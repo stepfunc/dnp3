@@ -3,6 +3,7 @@ use std::borrow::BorrowMut;
 use tracing::Instrument;
 use xxhash_rust::xxh64::xxh64;
 
+use crate::app::attr::Attribute;
 use crate::app::control::CommandStatus;
 use crate::app::format::write::HeaderWriter;
 use crate::app::gen::all::AllObjectsVariation;
@@ -1256,6 +1257,20 @@ impl OutstationSession {
         iin2
     }
 
+    fn handle_write_attr(&mut self, attr: Attribute, db: &mut DatabaseHandle) -> Iin2 {
+        tracing::info!("Received write attr: {:?}", attr);
+        match db.transaction(|db| db.inner.get_attr_map().write(attr)) {
+            Ok(()) => {
+                // TODO - invoke write callback!
+                Iin2::default()
+            }
+            Err(err) => {
+                tracing::warn!("Error writing attribute: {}", err);
+                Iin2::PARAMETER_ERROR
+            }
+        }
+    }
+
     fn handle_write_abs_time(&mut self, seq: CountSequence<Group50Var1>) -> Iin2 {
         if let Some(value) = seq.single() {
             match self.application.write_absolute_time(value.time) {
@@ -1309,6 +1324,12 @@ impl OutstationSession {
         db: &mut DatabaseHandle,
     ) -> Iin2 {
         match header.details {
+            HeaderDetails::OneByteStartStop(_, _, RangedVariation::Group0(_, Some(attr))) => {
+                self.handle_write_attr(attr, db)
+            }
+            HeaderDetails::TwoByteStartStop(_, _, RangedVariation::Group0(_, Some(attr))) => {
+                self.handle_write_attr(attr, db)
+            }
             HeaderDetails::OneByteStartStop(_, _, RangedVariation::Group80Var1(bits)) => {
                 self.handle_write_iin(bits)
             }

@@ -8,11 +8,6 @@ use std::collections::VecDeque;
 
 pub(crate) mod map;
 
-/// models selected variations with a set
-struct SetVars {
-    vars: [u8; 32],
-}
-
 /// A single selection
 #[derive(Debug)]
 struct Selected {

@@ -56,7 +56,7 @@ async fn object_unknown() {
 
     harness
         .test_request_response(
-            &[0xC0, 0x01, 0x00, 0x00], // Read g0v0
+            &[0xC0, 0x01, 200, 0x00],  // Read g200v0
             &[0xC0, 0x81, 0x80, 0x02], // IIN2.1 OBJECT_UNKNOWN set
         )
         .await;

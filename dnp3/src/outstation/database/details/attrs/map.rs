@@ -49,7 +49,7 @@ pub(crate) struct SetMap {
 #[non_exhaustive]
 pub enum AttrError {
     /// An attribute with this value has not been defined for this variation
-    AttrNotDefined(u8),
+    AttrNotDefined(AttrSet, u8),
     /// No set with this value has been defined
     SetNotDefined(AttrSet),
     /// The attribute is already defined
@@ -59,12 +59,37 @@ pub enum AttrError {
     /// The variation is reserved (254 or 255) and cannot be defined, written, or retrieved
     ReservedVariation(u8),
     /// The attribute is not writable
-    NotWritable,
+    NotWritable(AttrSet, u8),
 }
 
 impl From<TypeError> for AttrError {
     fn from(value: TypeError) -> Self {
         Self::BadType(value)
+    }
+}
+
+impl std::fmt::Display for AttrError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            AttrError::AttrNotDefined(set, x) => write!(
+                f,
+                "Attribute with set = {set:?} is not defined for variation {x}"
+            ),
+            AttrError::SetNotDefined(x) => write!(f, "Attribute set not defined: {x:?}"),
+            AttrError::AlreadyDefined => write!(f, "This attribute has already been defined"),
+            AttrError::BadType(x) => write!(
+                f,
+                "The type {:?} does not match the expected type {:?}",
+                x.actual, x.expected
+            ),
+            AttrError::ReservedVariation(x) => {
+                write!(f, "Reserved variation cannot be defined or written: {x}")
+            }
+            AttrError::NotWritable(set, var) => write!(
+                f,
+                "Attribute with set = {set:?} and var = {var} cannot be written"
+            ),
+        }
     }
 }
 
@@ -81,7 +106,7 @@ impl SetMap {
 
         // constraints that apply to certain items in the default set
         if attr.set == AttrSet::Default && prop.is_writable() && !variation.can_be_written() {
-            return Err(AttrError::NotWritable);
+            return Err(AttrError::NotWritable(attr.set, attr.variation));
         }
 
         // lookup or create the set
@@ -107,18 +132,18 @@ impl SetMap {
         let key = Variation::create(attr.variation)?;
 
         match self.get_set_mut(attr.set)?.get_mut(&key) {
-            None => Err(AttrError::AttrNotDefined(key.value)),
+            None => Err(AttrError::AttrNotDefined(attr.set, key.value)),
             Some((prop, current)) => {
                 if prop.is_writable() {
                     match attr.to_owned() {
-                        None => Err(AttrError::NotWritable),
+                        None => Err(AttrError::NotWritable(attr.set, key.value)),
                         Some(attr) => {
                             current.value.modify(attr.value)?;
                             Ok(())
                         }
                     }
                 } else {
-                    Err(AttrError::NotWritable)
+                    Err(AttrError::NotWritable(attr.set, key.value))
                 }
             }
         }
@@ -132,7 +157,7 @@ impl SetMap {
     pub(crate) fn get(&self, set: AttrSet, var: u8) -> Result<&OwnedAttribute, AttrError> {
         let key = Variation::create(var)?;
         match self.get_set(set)?.get(&key) {
-            None => Err(AttrError::AttrNotDefined(key.value)),
+            None => Err(AttrError::AttrNotDefined(set, key.value)),
             Some((_, attr)) => Ok(attr),
         }
     }
@@ -229,7 +254,13 @@ mod test {
             OwnedAttrValue::VisibleString("3:2010".into()),
         );
         let err = map.define(AttrProp::writable(), attr).unwrap_err();
-        assert_eq!(err, AttrError::NotWritable);
+        assert_eq!(
+            err,
+            AttrError::NotWritable(
+                AttrSet::Default,
+                StringAttr::DeviceSubsetAndConformance.variation()
+            )
+        );
     }
 
     #[test]
