@@ -85,8 +85,6 @@ fn get_list_encoding(num_items: usize) -> Option<(u8, AttrDataType)> {
 
 impl Selection {
     fn push(&mut self, s: Selected) -> Iin2 {
-        tracing::warn!("push {s:?}");
-
         if self.selected.len() < self.max {
             self.selected.push_back(s);
             Iin2::default()
@@ -169,7 +167,6 @@ impl Selection {
                 self.selected.pop_front();
             }
         }
-        tracing::info!("wrote all attributes");
         true
     }
 

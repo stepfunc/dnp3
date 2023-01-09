@@ -322,8 +322,7 @@ impl std::fmt::Display for FragmentDisplay<'_> {
                     f.write_str("\n")?;
                     header.format(self.level.object_values(), f)?;
                 }
-                // log the original error after any valid headers that preceded it
-                tracing::warn!("{}", err);
+                write!(f, "\ndecoding err: {}", err)?;
             }
         }
 
