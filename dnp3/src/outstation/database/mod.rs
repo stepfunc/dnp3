@@ -271,7 +271,7 @@ pub trait Get<T> {
 
 /// Errors that can occur when manipulating attributes
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[non_exhaustive]
+#[cfg_attr(not(feature = "ffi"), non_exhaustive)]
 pub enum AttrDefError {
     /// The attribute is already defined
     AlreadyDefined,

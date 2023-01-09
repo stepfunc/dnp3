@@ -903,13 +903,22 @@ pub(crate) fn define_database(
         .doc("Update an Octet String point")?
         .build()?;
 
-    let attr_error = lib
+    let attr_def_error = lib
         .define_error_type(
-            "attr_error",
-            "attr_exception",
+            "attr_def_error",
+            "attr_def_exception",
             ExceptionType::UncheckedException,
         )?
         .doc("Errors that can occur when defining attributes")?
+        .add_error("already_defined", "Attribute has already been defined")?
+        .add_error(
+            "reserved_variation",
+            "Variation is reserved and cannot be defined",
+        )?
+        .add_error(
+            "bad_type",
+            "The type does not match the required type in set 0",
+        )?
         .add_error(
             "not_writable",
             "This attribute cannot be configured as writable",
@@ -926,7 +935,7 @@ pub(crate) fn define_database(
         )?
         .param("variation", Primitive::U8, "The variation of the attribute")?
         .param("value", StringType, "The value of the attribute")?
-        .fails_with(attr_error)?
+        .fails_with(attr_def_error)?
         .build()?;
 
     // TODO: Add a getter for octet strings

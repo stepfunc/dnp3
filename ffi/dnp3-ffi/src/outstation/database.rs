@@ -1,4 +1,4 @@
-use dnp3::app::attr::{AttrSet, OwnedAttrValue, OwnedAttribute};
+use dnp3::app::attr::{AttrProp, AttrSet, OwnedAttrValue, OwnedAttribute};
 use dnp3::app::measurement::*;
 use dnp3::app::Timestamp;
 pub use dnp3::outstation::database::Database;
@@ -179,23 +179,32 @@ pub unsafe fn database_define_string_attr(
     set: u8,
     variation: u8,
     value: &CStr,
-) -> Result<(), ffi::AttrError> {
-    let _db = match instance.as_mut() {
+) -> Result<(), ffi::AttrDefError> {
+    let db = match instance.as_mut() {
         None => return Ok(()),
         Some(x) => x,
     };
 
-    let value = value.to_string_lossy().to_string();
-    let _attr = OwnedAttribute::new(
+    let attr = OwnedAttribute::new(
         AttrSet::new(set),
         variation,
-        OwnedAttrValue::VisibleString(value),
+        OwnedAttrValue::VisibleString(value.to_string_lossy().to_string()),
     );
 
-    // TODO!
-    //db.define_attr(AttrProp::default(), attr)?;
+    db.define_attr(AttrProp::default(), attr)?;
 
     Ok(())
+}
+
+impl From<AttrDefError> for ffi::AttrDefError {
+    fn from(value: AttrDefError) -> Self {
+        match value {
+            AttrDefError::AlreadyDefined => ffi::AttrDefError::AlreadyDefined,
+            AttrDefError::BadType(_) => ffi::AttrDefError::BadType,
+            AttrDefError::ReservedVariation(_) => ffi::AttrDefError::ReservedVariation,
+            AttrDefError::NotWritable(_, _) => ffi::AttrDefError::NotWritable,
+        }
+    }
 }
 
 pub fn update_options_default() -> ffi::UpdateOptions {
