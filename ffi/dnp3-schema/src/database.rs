@@ -935,6 +935,88 @@ pub(crate) fn define_database(
         )?
         .param("variation", Primitive::U8, "The variation of the attribute")?
         .param("value", StringType, "The value of the attribute")?
+        .fails_with(attr_def_error.clone())?
+        .build()?;
+
+    let define_float_attr = lib
+        .define_method("define_float_attr", database.clone())?
+        .doc("Define a 32-bit floating point attribute")?
+        .param(
+            "set",
+            Primitive::U8,
+            "The set to which the attribute belongs",
+        )?
+        .param("variation", Primitive::U8, "The variation of the attribute")?
+        .param("value", Primitive::Float, "The value of the attribute")?
+        .fails_with(attr_def_error.clone())?
+        .build()?;
+
+    let define_double_attr = lib
+        .define_method("define_double_attr", database.clone())?
+        .doc("Define a 64-bit floating point attribute")?
+        .param(
+            "set",
+            Primitive::U8,
+            "The set to which the attribute belongs",
+        )?
+        .param("variation", Primitive::U8, "The variation of the attribute")?
+        .param("value", Primitive::Double, "The value of the attribute")?
+        .fails_with(attr_def_error.clone())?
+        .build()?;
+
+    let define_uint_attr = lib
+        .define_method("define_uint_attr", database.clone())?
+        .doc("Define an unsigned integer attribute")?
+        .param(
+            "set",
+            Primitive::U8,
+            "The set to which the attribute belongs",
+        )?
+        .param("variation", Primitive::U8, "The variation of the attribute")?
+        .param("value", Primitive::U32, "The value of the attribute")?
+        .fails_with(attr_def_error.clone())?
+        .build()?;
+
+    let define_int_attr = lib
+        .define_method("define_int_attr", database.clone())?
+        .doc("Define a signed integer attribute")?
+        .param(
+            "set",
+            Primitive::U8,
+            "The set to which the attribute belongs",
+        )?
+        .param("variation", Primitive::U8, "The variation of the attribute")?
+        .param("value", Primitive::S32, "The value of the attribute")?
+        .fails_with(attr_def_error.clone())?
+        .build()?;
+
+    let define_time_attr = lib
+        .define_method("define_time_attr", database.clone())?
+        .doc("Define a DNP3 time attribute")?
+        .param(
+            "set",
+            Primitive::U8,
+            "The set to which the attribute belongs",
+        )?
+        .param("variation", Primitive::U8, "The variation of the attribute")?
+        .param(
+            "value",
+            Primitive::U64,
+            "The DNP3 timestamp value of the attribute. Only the lower 48-bits are used.",
+        )?
+        .fails_with(attr_def_error.clone())?
+        .build()?;
+
+    let define_bool_attr = lib
+        .define_method("define_bool_attr", database.clone())?
+        .doc("Define a boolean attribute which is mapped to an unsigned integer internally")?
+        .param(
+            "set",
+            Primitive::U8,
+            "The set to which the attribute belongs",
+        )?
+        .param("variation", Primitive::U8, "The variation of the attribute")?
+        .param("value", Primitive::Bool, "The value of the attribute")?
         .fails_with(attr_def_error)?
         .build()?;
 
@@ -983,6 +1065,12 @@ pub(crate) fn define_database(
         .method(update_octet_string)?
         // device attributes
         .method(define_string_attr)?
+        .method(define_int_attr)?
+        .method(define_uint_attr)?
+        .method(define_time_attr)?
+        .method(define_bool_attr)?
+        .method(define_float_attr)?
+        .method(define_double_attr)?
         .doc(
             doc("Internal database access")
                 .warning("This object is only valid within a transaction"),
