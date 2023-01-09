@@ -401,8 +401,12 @@ class ExampleOutstation
                 db.AddFrozenCounter(i, EventClass.Class1, new FrozenCounterConfig());
                 db.AddAnalogInput(i, EventClass.Class1, new AnalogInputConfig());
                 db.AddAnalogOutputStatus(i, EventClass.Class1, new AnalogOutputStatusConfig());
-                db.AddOctetString(i, EventClass.Class1);
+                db.AddOctetString(i, EventClass.Class1);                
             }
+
+            // define any desired device attributes
+            db.DefineStringAttr(0, false, AttributeVariations.DeviceManufacturersName, "Step Function I/O");
+            db.DefineStringAttr(0, true, AttributeVariations.UserAssignedLocation, "Bend, OR");
         });
         // ANCHOR_END: database_init
 

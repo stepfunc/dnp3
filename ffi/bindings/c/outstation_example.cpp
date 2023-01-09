@@ -302,6 +302,10 @@ void run_server(dnp3::OutstationServer &server)
             db.add_analog_output_status(i, EventClass::class1, AnalogOutputStatusConfig());
             db.add_octet_string(i, EventClass::class1);
         }
+
+        // define any desired attributes
+        db.define_string_attr(0, false, dnp3::attribute_variations::device_manufacturers_name, "Step Function I/O");
+        db.define_string_attr(0, true, dnp3::attribute_variations::user_assigned_location, "Bend, OR");
     });
     outstation.transaction(setup);
     // ANCHOR_END: database_init_transaction

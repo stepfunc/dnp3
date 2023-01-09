@@ -281,6 +281,8 @@ void outstation_transaction_startup(dnp3_database_t *db, void *context)
     }
 
     // initialize desired device attributes
+    dnp3_database_define_string_attr(db, 0, false, DNP3_ATTRIBUTE_VARIATIONS_DEVICE_MANUFACTURERS_NAME, "Step Function I/O");
+    dnp3_database_define_string_attr(db, 0, true, DNP3_ATTRIBUTE_VARIATIONS_USER_ASSIGNED_LOCATION, "Bend, OR");   
 }
 // ANCHOR_END: database_init_transaction
 

@@ -360,6 +360,10 @@ public class OutstationExample {
       db.addAnalogOutputStatus(ushort(i), EventClass.CLASS1, new AnalogOutputStatusConfig());
       db.addOctetString(ushort(i), EventClass.CLASS1);
     }
+
+    // define any desired device attributes
+    db.defineStringAttr(ubyte(0), false, AttributeVariations.DEVICE_MANUFACTURERS_NAME, "Step Function I/O");
+    db.defineStringAttr(ubyte(0), true, AttributeVariations.USER_ASSIGNED_LOCATION, "Bend, OR");
   }
   // ANCHOR_END: database_init_function
 
