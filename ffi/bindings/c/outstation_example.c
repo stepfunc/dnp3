@@ -279,6 +279,8 @@ void outstation_transaction_startup(dnp3_database_t *db, void *context)
         dnp3_database_add_analog_output_status(db, i, DNP3_EVENT_CLASS_CLASS1, dnp3_analog_output_status_config_init());
         dnp3_database_add_octet_string(db, i, DNP3_EVENT_CLASS_CLASS1);
     }
+
+    // initialize desired device attributes
 }
 // ANCHOR_END: database_init_transaction
 

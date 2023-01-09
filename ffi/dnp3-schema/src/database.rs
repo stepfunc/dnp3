@@ -930,6 +930,11 @@ pub(crate) fn define_database(
             Primitive::U8,
             "The set to which the attribute belongs",
         )?
+        .param(
+            "writable",
+            Primitive::Bool,
+            "True if the attribute may be written",
+        )?
         .param("variation", Primitive::U8, "The variation of the attribute")?
         .param("value", StringType, "The value of the attribute")?
         .returns(
@@ -945,6 +950,11 @@ pub(crate) fn define_database(
             "set",
             Primitive::U8,
             "The set to which the attribute belongs",
+        )?
+        .param(
+            "writable",
+            Primitive::Bool,
+            "True if the attribute may be written",
         )?
         .param("variation", Primitive::U8, "The variation of the attribute")?
         .param("value", Primitive::Float, "The value of the attribute")?
@@ -962,6 +972,11 @@ pub(crate) fn define_database(
             Primitive::U8,
             "The set to which the attribute belongs",
         )?
+        .param(
+            "writable",
+            Primitive::Bool,
+            "True if the attribute may be written",
+        )?
         .param("variation", Primitive::U8, "The variation of the attribute")?
         .param("value", Primitive::Double, "The value of the attribute")?
         .returns(
@@ -977,6 +992,11 @@ pub(crate) fn define_database(
             "set",
             Primitive::U8,
             "The set to which the attribute belongs",
+        )?
+        .param(
+            "writable",
+            Primitive::Bool,
+            "True if the attribute may be written",
         )?
         .param("variation", Primitive::U8, "The variation of the attribute")?
         .param("value", Primitive::U32, "The value of the attribute")?
@@ -994,6 +1014,11 @@ pub(crate) fn define_database(
             Primitive::U8,
             "The set to which the attribute belongs",
         )?
+        .param(
+            "writable",
+            Primitive::Bool,
+            "True if the attribute may be written",
+        )?
         .param("variation", Primitive::U8, "The variation of the attribute")?
         .param("value", Primitive::S32, "The value of the attribute")?
         .returns(
@@ -1009,6 +1034,11 @@ pub(crate) fn define_database(
             "set",
             Primitive::U8,
             "The set to which the attribute belongs",
+        )?
+        .param(
+            "writable",
+            Primitive::Bool,
+            "True if the attribute may be written",
         )?
         .param("variation", Primitive::U8, "The variation of the attribute")?
         .param(
@@ -1029,6 +1059,11 @@ pub(crate) fn define_database(
             "set",
             Primitive::U8,
             "The set to which the attribute belongs",
+        )?
+        .param(
+            "writable",
+            Primitive::Bool,
+            "True if the attribute may be written",
         )?
         .param("variation", Primitive::U8, "The variation of the attribute")?
         .param("value", Primitive::Bool, "The value of the attribute")?
