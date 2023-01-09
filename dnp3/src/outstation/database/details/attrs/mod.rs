@@ -72,7 +72,7 @@ fn get_list_encoding(num_items: usize) -> Option<(u8, AttrDataType)> {
         match len.try_into() {
             Ok(x) => return Some((x, AttrDataType::AttrList)),
             Err(_) => {
-                if let Some(len) = len.checked_sub(255) {
+                if let Some(len) = len.checked_sub(256) {
                     if let Ok(x) = len.try_into() {
                         return Some((x, AttrDataType::ExtAttrList));
                     }
@@ -197,19 +197,12 @@ impl AttrHandler {
             StringAttr::UserAssignedSystemName.with_value("SYSTEMS!"),
         );
 
-        // set 1
-        let _ = map.define(
-            AttrProp::default(),
-            OwnedAttribute::new(AttrSet::Private(1), 24, OwnedAttrValue::SignedInt(42)),
-        );
-        let _ = map.define(
-            AttrProp::writable(),
-            OwnedAttribute::new(
-                AttrSet::Private(1),
-                26,
-                OwnedAttrValue::VisibleString("tada".to_string()),
-            ),
-        );
+        for var in 0..=255 {
+            let _ = map.define(
+                AttrProp::default(),
+                OwnedAttribute::new(AttrSet::Private(1), var, OwnedAttrValue::SignedInt(42)),
+            );
+        }
 
         Self {
             map,
