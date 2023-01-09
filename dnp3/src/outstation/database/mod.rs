@@ -9,8 +9,7 @@ use crate::app::Iin2;
 use crate::master::EventClasses;
 use crate::outstation::database::read::ReadHeader;
 
-use crate::app::attr::{AttrProp, OwnedAttribute};
-use crate::outstation::database::details::attrs::map::AttrError;
+use crate::app::attr::{AttrProp, AttrSet, OwnedAttribute, TypeError};
 use scursor::WriteCursor;
 
 mod config;
@@ -270,6 +269,46 @@ pub trait Get<T> {
     fn get(&self, index: u16) -> Option<T>;
 }
 
+/// Errors that can occur when manipulating attributes
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum AttrDefError {
+    /// The attribute is already defined
+    AlreadyDefined,
+    /// The attribute does not match the type expected for set 0
+    BadType(TypeError),
+    /// The variation is reserved (254 or 255) and cannot be defined, written, or retrieved
+    ReservedVariation(u8),
+    /// The attribute is not writable
+    NotWritable(AttrSet, u8),
+}
+
+impl std::fmt::Display for AttrDefError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            Self::BadType(x) => write!(
+                f,
+                "The type {:?} does not match the expected type {:?}",
+                x.actual, x.expected
+            ),
+            Self::ReservedVariation(x) => {
+                write!(f, "Reserved variation cannot be defined: {x}")
+            }
+            Self::NotWritable(set, var) => write!(
+                f,
+                "Attribute with set = {set:?} and var = {var} cannot be written"
+            ),
+            Self::AlreadyDefined => write!(f, "The requested attribute is already defined"),
+        }
+    }
+}
+
+impl From<TypeError> for AttrDefError {
+    fn from(value: TypeError) -> Self {
+        Self::BadType(value)
+    }
+}
+
 /// Core database implementation shared between an outstation task and the user facing API.
 /// This type is always guarded by a `DatabaseHandle` which provides a transactional API.
 pub struct Database {
@@ -293,7 +332,11 @@ impl Database {
     }
 
     /// Define an attribute that will be exposed to the master
-    pub fn define_attr(&mut self, prop: AttrProp, attr: OwnedAttribute) -> Result<(), AttrError> {
+    pub fn define_attr(
+        &mut self,
+        prop: AttrProp,
+        attr: OwnedAttribute,
+    ) -> Result<(), AttrDefError> {
         self.inner.get_attr_map().define(prop, attr)
     }
 }

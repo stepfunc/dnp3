@@ -1,6 +1,7 @@
 use crate::app::attr::{
     AnyAttribute, AttrItem, AttrProp, AttrSet, Attribute, OwnedAttribute, TypeError,
 };
+use crate::outstation::database::AttrDefError;
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 
@@ -10,10 +11,24 @@ struct Variation {
     value: u8,
 }
 
+struct Reserved(u8);
+
+impl From<Reserved> for AttrDefError {
+    fn from(value: Reserved) -> Self {
+        Self::ReservedVariation(value.0)
+    }
+}
+
+impl From<Reserved> for AttrError {
+    fn from(value: Reserved) -> Self {
+        Self::ReservedVariation(value.0)
+    }
+}
+
 impl Variation {
-    fn create(value: u8) -> Result<Self, AttrError> {
+    fn create(value: u8) -> Result<Self, Reserved> {
         match value {
-            254 | 255 => Err(AttrError::ReservedVariation(value)),
+            254 | 255 => Err(Reserved(0)),
             _ => Ok(Self { value }),
         }
     }
@@ -46,14 +61,11 @@ pub(crate) struct SetMap {
 
 /// Errors that can occur when manipulating attributes
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum AttrError {
+pub(crate) enum AttrError {
     /// An attribute with this value has not been defined for this variation
     AttrNotDefined(AttrSet, u8),
     /// No set with this value has been defined
     SetNotDefined(AttrSet),
-    /// The attribute is already defined
-    AlreadyDefined,
     /// The attribute does not match the type expected for set 0
     BadType(TypeError),
     /// The variation is reserved (254 or 255) and cannot be defined, written, or retrieved
@@ -62,30 +74,23 @@ pub enum AttrError {
     NotWritable(AttrSet, u8),
 }
 
-impl From<TypeError> for AttrError {
-    fn from(value: TypeError) -> Self {
-        Self::BadType(value)
-    }
-}
-
 impl std::fmt::Display for AttrError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            AttrError::AttrNotDefined(set, x) => write!(
+            Self::AttrNotDefined(set, x) => write!(
                 f,
                 "Attribute with set = {set:?} is not defined for variation {x}"
             ),
-            AttrError::SetNotDefined(x) => write!(f, "Attribute set not defined: {x:?}"),
-            AttrError::AlreadyDefined => write!(f, "This attribute has already been defined"),
-            AttrError::BadType(x) => write!(
+            Self::SetNotDefined(x) => write!(f, "Attribute set not defined: {x:?}"),
+            Self::BadType(x) => write!(
                 f,
                 "The type {:?} does not match the expected type {:?}",
                 x.actual, x.expected
             ),
-            AttrError::ReservedVariation(x) => {
+            Self::ReservedVariation(x) => {
                 write!(f, "Reserved variation cannot be defined or written: {x}")
             }
-            AttrError::NotWritable(set, var) => write!(
+            Self::NotWritable(set, var) => write!(
                 f,
                 "Attribute with set = {set:?} and var = {var} cannot be written"
             ),
@@ -93,11 +98,21 @@ impl std::fmt::Display for AttrError {
     }
 }
 
+impl From<TypeError> for AttrError {
+    fn from(value: TypeError) -> Self {
+        Self::BadType(value)
+    }
+}
+
 impl SetMap {
     /// Define an attribute in map
     ///
     /// return false if the attribute already exists
-    pub(crate) fn define(&mut self, prop: AttrProp, attr: OwnedAttribute) -> Result<(), AttrError> {
+    pub(crate) fn define(
+        &mut self,
+        prop: AttrProp,
+        attr: OwnedAttribute,
+    ) -> Result<(), AttrDefError> {
         // reject reserved variations
         let variation = Variation::create(attr.variation)?;
 
@@ -106,13 +121,13 @@ impl SetMap {
 
         // constraints that apply to certain items in the default set
         if attr.set == AttrSet::Default && prop.is_writable() && !variation.can_be_written() {
-            return Err(AttrError::NotWritable(attr.set, attr.variation));
+            return Err(AttrDefError::NotWritable(attr.set, attr.variation));
         }
 
         // lookup or create the set
         match self.sets.entry(attr.set) {
             Entry::Occupied(mut e) => match e.get_mut().entry(variation) {
-                Entry::Occupied(_) => Err(AttrError::AlreadyDefined),
+                Entry::Occupied(_) => Err(AttrDefError::AlreadyDefined),
                 Entry::Vacant(x) => {
                     x.insert((prop, attr));
                     Ok(())
@@ -238,7 +253,7 @@ mod test {
         let err = map.define(AttrProp::writable(), attr).unwrap_err();
         assert_eq!(
             err,
-            AttrError::BadType(TypeError {
+            AttrDefError::BadType(TypeError {
                 expected: AttrDataType::VisibleString,
                 actual: AttrDataType::SignedInt
             })
@@ -256,7 +271,7 @@ mod test {
         let err = map.define(AttrProp::writable(), attr).unwrap_err();
         assert_eq!(
             err,
-            AttrError::NotWritable(
+            AttrDefError::NotWritable(
                 AttrSet::Default,
                 StringAttr::DeviceSubsetAndConformance.variation()
             )

@@ -903,6 +903,32 @@ pub(crate) fn define_database(
         .doc("Update an Octet String point")?
         .build()?;
 
+    let attr_error = lib
+        .define_error_type(
+            "attr_error",
+            "attr_exception",
+            ExceptionType::UncheckedException,
+        )?
+        .doc("Errors that can occur when defining attributes")?
+        .add_error(
+            "not_writable",
+            "This attribute cannot be configured as writable",
+        )?
+        .build()?;
+
+    let define_string_attr = lib
+        .define_method("define_string_attr", database.clone())?
+        .doc("Define a string attribute")?
+        .param(
+            "set",
+            Primitive::U8,
+            "The set to which the attribute belongs",
+        )?
+        .param("variation", Primitive::U8, "The variation of the attribute")?
+        .param("value", StringType, "The value of the attribute")?
+        .fails_with(attr_error)?
+        .build()?;
+
     // TODO: Add a getter for octet strings
 
     let database = lib
@@ -946,6 +972,8 @@ pub(crate) fn define_database(
         .method(add_octet_string)?
         .method(remove_octet_string)?
         .method(update_octet_string)?
+        // device attributes
+        .method(define_string_attr)?
         .doc(
             doc("Internal database access")
                 .warning("This object is only valid within a transaction"),

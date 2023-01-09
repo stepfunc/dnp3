@@ -1,8 +1,10 @@
+use dnp3::app::attr::{AttrSet, OwnedAttrValue, OwnedAttribute};
 use dnp3::app::measurement::*;
 use dnp3::app::Timestamp;
 pub use dnp3::outstation::database::Database;
 pub use dnp3::outstation::database::DatabaseHandle;
 use dnp3::outstation::database::*;
+use std::ffi::CStr;
 
 use crate::ffi;
 
@@ -170,6 +172,30 @@ pub unsafe fn database_update_octet_string(
         }
     }
     false
+}
+
+pub unsafe fn database_define_string_attr(
+    instance: *mut crate::Database,
+    set: u8,
+    variation: u8,
+    value: &CStr,
+) -> Result<(), ffi::AttrError> {
+    let _db = match instance.as_mut() {
+        None => return Ok(()),
+        Some(x) => x,
+    };
+
+    let value = value.to_string_lossy().to_string();
+    let _attr = OwnedAttribute::new(
+        AttrSet::new(set),
+        variation,
+        OwnedAttrValue::VisibleString(value),
+    );
+
+    // TODO!
+    //db.define_attr(AttrProp::default(), attr)?;
+
+    Ok(())
 }
 
 pub fn update_options_default() -> ffi::UpdateOptions {
