@@ -322,7 +322,7 @@ impl std::fmt::Display for FragmentDisplay<'_> {
                     f.write_str("\n")?;
                     header.format(self.level.object_values(), f)?;
                 }
-                write!(f, "\ndecoding err: {}", err)?;
+                write!(f, "\ndecoding err: {err}")?;
             }
         }
 
