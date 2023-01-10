@@ -6,65 +6,124 @@ use scursor::{ReadCursor, ReadError, WriteCursor, WriteError};
 use std::fmt::{Display, Formatter};
 use std::str::Utf8Error;
 
-/// constants defining attribute variations
-pub(crate) mod var {
-    pub(crate) const CONFIG_ID: u8 = 196;
-    pub(crate) const CONFIG_VERSION: u8 = 197;
-    pub(crate) const CONFIG_BUILD_DATE: u8 = 198;
-    pub(crate) const CONFIG_LAST_CHANGE_DATE: u8 = 199;
-    pub(crate) const CONFIG_DIGEST: u8 = 200;
-    pub(crate) const CONFIG_DIGEST_ALGORITHM: u8 = 201;
-    pub(crate) const MASTER_RESOURCE_ID: u8 = 202;
-    pub(crate) const DEVICE_LOCATION_ALTITUDE: u8 = 203;
-    pub(crate) const DEVICE_LOCATION_LONGITUDE: u8 = 204;
-    pub(crate) const DEVICE_LOCATION_LATITUDE: u8 = 205;
-    pub(crate) const USER_ASSIGNED_SECONDARY_OPERATOR_NAME: u8 = 206;
-    pub(crate) const USER_ASSIGNED_PRIMARY_OPERATOR_NAME: u8 = 207;
-    pub(crate) const USER_ASSIGNED_SYSTEM_NAME: u8 = 208;
-    pub(crate) const SECURE_AUTH_VERSION: u8 = 209;
-    pub(crate) const NUM_SECURITY_STAT_PER_ASSOC: u8 = 210;
-    pub(crate) const USER_SPECIFIC_ATTRIBUTES: u8 = 211;
-    pub(crate) const NUM_MASTER_DEFINED_DATA_SET_PROTO: u8 = 212;
-    pub(crate) const NUM_OUTSTATION_DEFINED_DATA_SET_PROTO: u8 = 213;
-    pub(crate) const NUM_MASTER_DEFINED_DATA_SETS: u8 = 214;
-    pub(crate) const NUM_OUTSTATION_DEFINED_DATA_SETS: u8 = 215;
-    pub(crate) const MAX_BINARY_OUTPUT_PER_REQUEST: u8 = 216;
-    pub(crate) const LOCAL_TIMING_ACCURACY: u8 = 217;
-    pub(crate) const DURATION_OF_TIME_ACCURACY: u8 = 218;
-    pub(crate) const SUPPORTS_ANALOG_OUTPUT_EVENTS: u8 = 219;
-    pub(crate) const MAX_ANALOG_OUTPUT_INDEX: u8 = 220;
-    pub(crate) const NUM_ANALOG_OUTPUT: u8 = 221;
-    pub(crate) const SUPPORTS_BINARY_OUTPUT_EVENTS: u8 = 222;
-    pub(crate) const MAX_BINARY_OUTPUT_INDEX: u8 = 223;
-    pub(crate) const NUM_BINARY_OUTPUT: u8 = 224;
-    pub(crate) const SUPPORTS_FROZEN_COUNTER_EVENTS: u8 = 225;
-    pub(crate) const SUPPORTS_FROZEN_COUNTERS: u8 = 226;
-    pub(crate) const SUPPORTS_COUNTER_EVENTS: u8 = 227;
-    pub(crate) const MAX_COUNTER_INDEX: u8 = 228;
-    pub(crate) const NUM_COUNTER: u8 = 229;
-    pub(crate) const SUPPORTS_FROZEN_ANALOG_INPUTS: u8 = 230;
-    pub(crate) const SUPPORTS_ANALOG_INPUT_EVENTS: u8 = 231;
-    pub(crate) const MAX_ANALOG_INPUT_INDEX: u8 = 232;
-    pub(crate) const NUM_ANALOG_INPUT: u8 = 233;
-    pub(crate) const SUPPORTS_DOUBLE_BIT_BINARY_INPUT_EVENTS: u8 = 234;
-    pub(crate) const MAX_DOUBLE_BIT_BINARY_INPUT_INDEX: u8 = 235;
-    pub(crate) const NUM_DOUBLE_BIT_BINARY_INPUT: u8 = 236;
-    pub(crate) const SUPPORTS_BINARY_INPUT_EVENTS: u8 = 237;
-    pub(crate) const MAX_BINARY_INPUT_INDEX: u8 = 238;
-    pub(crate) const NUM_BINARY_INPUT: u8 = 239;
-    pub(crate) const MAX_TX_FRAGMENT_SIZE: u8 = 240;
-    pub(crate) const MAX_RX_FRAGMENT_SIZE: u8 = 241;
-    pub(crate) const DEVICE_MANUFACTURER_SOFTWARE_VERSION: u8 = 242;
-    pub(crate) const DEVICE_MANUFACTURER_HARDWARE_VERSION: u8 = 243;
-    pub(crate) const USER_ASSIGNED_OWNER_NAME: u8 = 244;
-    pub(crate) const USER_ASSIGNED_LOCATION: u8 = 245;
-    pub(crate) const USER_ASSIGNED_ID: u8 = 246;
-    pub(crate) const USER_ASSIGNED_DEVICE_NAME: u8 = 247;
-    pub(crate) const DEVICE_SERIAL_NUMBER: u8 = 248;
-    pub(crate) const DEVICE_SUBSET_AND_CONFORMANCE: u8 = 249;
-    pub(crate) const PRODUCT_NAME_AND_MODEL: u8 = 250;
-    pub(crate) const DEVICE_MANUFACTURER_NAME: u8 = 252;
-    pub(crate) const LIST_OF_ATTRIBUTE_VARIATIONS: u8 = 255;
+/// Constants defining attribute variations from set 0
+pub mod var {
+    /// Variation 196
+    pub const CONFIG_ID: u8 = 196;
+    /// Variation 197
+    pub const CONFIG_VERSION: u8 = 197;
+    /// Variation 198
+    pub const CONFIG_BUILD_DATE: u8 = 198;
+    /// Variation 199
+    pub const CONFIG_LAST_CHANGE_DATE: u8 = 199;
+    /// Variation 200
+    pub const CONFIG_DIGEST: u8 = 200;
+    /// Variation 201
+    pub const CONFIG_DIGEST_ALGORITHM: u8 = 201;
+    /// Variation 202
+    pub const MASTER_RESOURCE_ID: u8 = 202;
+    /// Variation 203
+    pub const DEVICE_LOCATION_ALTITUDE: u8 = 203;
+    /// Variation 204
+    pub const DEVICE_LOCATION_LONGITUDE: u8 = 204;
+    /// Variation 205
+    pub const DEVICE_LOCATION_LATITUDE: u8 = 205;
+    /// Variation 206
+    pub const USER_ASSIGNED_SECONDARY_OPERATOR_NAME: u8 = 206;
+    /// Variation 207
+    pub const USER_ASSIGNED_PRIMARY_OPERATOR_NAME: u8 = 207;
+    /// Variation 208
+    pub const USER_ASSIGNED_SYSTEM_NAME: u8 = 208;
+    /// Variation 209
+    pub const SECURE_AUTH_VERSION: u8 = 209;
+    /// Variation 210
+    pub const NUM_SECURITY_STAT_PER_ASSOC: u8 = 210;
+    /// Variation 211
+    pub const USER_SPECIFIC_ATTRIBUTES: u8 = 211;
+    /// Variation 212
+    pub const NUM_MASTER_DEFINED_DATA_SET_PROTO: u8 = 212;
+    /// Variation 213
+    pub const NUM_OUTSTATION_DEFINED_DATA_SET_PROTO: u8 = 213;
+    /// Variation 214
+    pub const NUM_MASTER_DEFINED_DATA_SETS: u8 = 214;
+    /// Variation 215
+    pub const NUM_OUTSTATION_DEFINED_DATA_SETS: u8 = 215;
+    /// Variation 216
+    pub const MAX_BINARY_OUTPUT_PER_REQUEST: u8 = 216;
+    /// Variation 217
+    pub const LOCAL_TIMING_ACCURACY: u8 = 217;
+    /// Variation 218
+    pub const DURATION_OF_TIME_ACCURACY: u8 = 218;
+    /// Variation 219
+    pub const SUPPORTS_ANALOG_OUTPUT_EVENTS: u8 = 219;
+    /// Variation 220
+    pub const MAX_ANALOG_OUTPUT_INDEX: u8 = 220;
+    /// Variation 221
+    pub const NUM_ANALOG_OUTPUT: u8 = 221;
+    /// Variation 222
+    pub const SUPPORTS_BINARY_OUTPUT_EVENTS: u8 = 222;
+    /// Variation 223
+    pub const MAX_BINARY_OUTPUT_INDEX: u8 = 223;
+    /// Variation 224
+    pub const NUM_BINARY_OUTPUT: u8 = 224;
+    /// Variation 225
+    pub const SUPPORTS_FROZEN_COUNTER_EVENTS: u8 = 225;
+    /// Variation 226
+    pub const SUPPORTS_FROZEN_COUNTERS: u8 = 226;
+    /// Variation 227
+    pub const SUPPORTS_COUNTER_EVENTS: u8 = 227;
+    /// Variation 228
+    pub const MAX_COUNTER_INDEX: u8 = 228;
+    /// Variation 229
+    pub const NUM_COUNTER: u8 = 229;
+    /// Variation 230
+    pub const SUPPORTS_FROZEN_ANALOG_INPUTS: u8 = 230;
+    /// Variation 231
+    pub const SUPPORTS_ANALOG_INPUT_EVENTS: u8 = 231;
+    /// Variation 232
+    pub const MAX_ANALOG_INPUT_INDEX: u8 = 232;
+    /// Variation 233
+    pub const NUM_ANALOG_INPUT: u8 = 233;
+    /// Variation 234
+    pub const SUPPORTS_DOUBLE_BIT_BINARY_INPUT_EVENTS: u8 = 234;
+    /// Variation 235
+    pub const MAX_DOUBLE_BIT_BINARY_INPUT_INDEX: u8 = 235;
+    /// Variation 236
+    pub const NUM_DOUBLE_BIT_BINARY_INPUT: u8 = 236;
+    /// Variation 237
+    pub const SUPPORTS_BINARY_INPUT_EVENTS: u8 = 237;
+    /// Variation 238
+    pub const MAX_BINARY_INPUT_INDEX: u8 = 238;
+    /// Variation 239
+    pub const NUM_BINARY_INPUT: u8 = 239;
+    /// Variation 240
+    pub const MAX_TX_FRAGMENT_SIZE: u8 = 240;
+    /// Variation 241
+    pub const MAX_RX_FRAGMENT_SIZE: u8 = 241;
+    /// Variation 242
+    pub const DEVICE_MANUFACTURER_SOFTWARE_VERSION: u8 = 242;
+    /// Variation 243
+    pub const DEVICE_MANUFACTURER_HARDWARE_VERSION: u8 = 243;
+    /// Variation 243
+    pub const USER_ASSIGNED_OWNER_NAME: u8 = 244;
+    /// Variation 245
+    pub const USER_ASSIGNED_LOCATION: u8 = 245;
+    /// Variation 246
+    pub const USER_ASSIGNED_ID: u8 = 246;
+    /// Variation 247
+    pub const USER_ASSIGNED_DEVICE_NAME: u8 = 247;
+    /// Variation 248
+    pub const DEVICE_SERIAL_NUMBER: u8 = 248;
+    /// Variation 249
+    pub const DEVICE_SUBSET_AND_CONFORMANCE: u8 = 249;
+    /// Variation 250
+    pub const PRODUCT_NAME_AND_MODEL: u8 = 250;
+    /// Variation 252
+    pub const DEVICE_MANUFACTURER_NAME: u8 = 252;
+    /// Variation 254
+    pub const ALL_ATTRIBUTES_REQUEST: u8 = 254;
+    /// Variation 255
+    pub const LIST_OF_ATTRIBUTE_VARIATIONS: u8 = 255;
 }
 
 /// Set to which a device attribute belongs
