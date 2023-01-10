@@ -1258,16 +1258,21 @@ impl OutstationSession {
     }
 
     async fn handle_write_attr(&mut self, attr: Attribute<'_>, db: &mut DatabaseHandle) -> Iin2 {
-        match db.transaction(|db| db.inner.get_attr_map().write(attr)) {
-            Ok(()) => {
-                self.application.write_device_attr(attr).get().await;
-                Iin2::default()
-            }
-            Err(err) => {
-                tracing::warn!("Unable to WRITE attribute: {}", err);
-                Iin2::PARAMETER_ERROR
-            }
+        // first validate that attribute can be written
+        if let Err(err) = db.transaction(|db| db.inner.get_attr_map().can_write(attr)) {
+            tracing::warn!("Unable to WRITE attribute: {err}");
+            return Iin2::PARAMETER_ERROR;
         }
+
+        // next, ask the application to validate and persist the value
+        if !self.application.write_device_attr(attr).get().await {
+            // validation of the value failed
+            return Iin2::PARAMETER_ERROR;
+        }
+
+        // this should never fail b/c we already validated the attribute is writable
+        let _ = db.transaction(|db| db.inner.get_attr_map().write(attr));
+        Iin2::default()
     }
 
     fn handle_write_abs_time(&mut self, seq: CountSequence<Group50Var1>) -> Iin2 {

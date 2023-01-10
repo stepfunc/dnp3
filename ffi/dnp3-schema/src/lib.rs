@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use oo_bindgen::model::*;
 
+pub(crate) mod attributes;
 mod constants;
 mod database;
 mod decoding;

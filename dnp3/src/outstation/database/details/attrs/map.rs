@@ -1,5 +1,5 @@
 use crate::app::attr::{
-    AnyAttribute, AttrItem, AttrProp, AttrSet, Attribute, OwnedAttribute, TypeError,
+    AnyAttribute, AttrDataType, AttrItem, AttrProp, AttrSet, Attribute, OwnedAttribute, TypeError,
 };
 use crate::outstation::database::AttrDefError;
 use std::collections::btree_map::Entry;
@@ -142,6 +142,31 @@ impl SetMap {
         }
     }
 
+    fn same_type(expected: AttrDataType, actual: AttrDataType) -> Result<(), TypeError> {
+        if expected == actual {
+            Ok(())
+        } else {
+            Err(TypeError::new(expected, actual))
+        }
+    }
+
+    /// Write an attribute in the map
+    pub(crate) fn can_write(&mut self, attr: Attribute) -> Result<(), AttrError> {
+        let key = Variation::create(attr.variation)?;
+
+        match self.get_set_mut(attr.set)?.get_mut(&key) {
+            None => Err(AttrError::AttrNotDefined(attr.set, key.value)),
+            Some((prop, current)) => {
+                if prop.is_writable() {
+                    Self::same_type(current.value.data_type(), attr.value.data_type())?;
+                    Ok(())
+                } else {
+                    Err(AttrError::NotWritable(attr.set, key.value))
+                }
+            }
+        }
+    }
+
     /// Write an attribute in the map
     pub(crate) fn write(&mut self, attr: Attribute) -> Result<(), AttrError> {
         let key = Variation::create(attr.variation)?;
@@ -152,8 +177,9 @@ impl SetMap {
                 if prop.is_writable() {
                     match attr.to_owned() {
                         None => Err(AttrError::NotWritable(attr.set, key.value)),
-                        Some(attr) => {
-                            current.value.modify(attr.value)?;
+                        Some(mut attr) => {
+                            Self::same_type(current.value.data_type(), attr.value.data_type())?;
+                            std::mem::swap(&mut attr, current);
                             Ok(())
                         }
                     }

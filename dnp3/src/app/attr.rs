@@ -561,7 +561,8 @@ pub enum KnownAttribute<'a> {
 }
 
 impl<'a> AnyAttribute<'a> {
-    pub(crate) fn try_from(attr: &Attribute<'a>) -> Result<Self, TypeError> {
+    /// Try to construct from a raw attribute
+    pub fn try_from(attr: &Attribute<'a>) -> Result<Self, TypeError> {
         if let AttrSet::Private(_) = attr.set {
             return Ok(AnyAttribute::Other(*attr));
         }
@@ -885,6 +886,19 @@ pub enum AttrValue<'a> {
 }
 
 impl<'a> AttrValue<'a> {
+    pub(crate) fn data_type(&self) -> AttrDataType {
+        match self {
+            Self::VisibleString(_) => AttrDataType::VisibleString,
+            Self::UnsignedInt(_) => AttrDataType::UnsignedInt,
+            Self::SignedInt(_) => AttrDataType::SignedInt,
+            Self::FloatingPoint(_) => AttrDataType::FloatingPoint,
+            Self::OctetString(_) => AttrDataType::OctetString,
+            Self::Dnp3Time(_) => AttrDataType::Dnp3Time,
+            Self::BitString(_) => AttrDataType::BitString,
+            Self::AttrList(_) => AttrDataType::AttrList,
+        }
+    }
+
     pub(crate) fn to_owned(self) -> Option<OwnedAttrValue> {
         let attr = match self {
             AttrValue::VisibleString(x) => OwnedAttrValue::VisibleString(x.to_string()),
@@ -923,7 +937,7 @@ pub enum OwnedAttrValue {
 }
 
 impl OwnedAttrValue {
-    fn data_type(&self) -> AttrDataType {
+    pub(crate) fn data_type(&self) -> AttrDataType {
         match self {
             OwnedAttrValue::VisibleString(_) => AttrDataType::VisibleString,
             OwnedAttrValue::UnsignedInt(_) => AttrDataType::UnsignedInt,
@@ -945,55 +959,6 @@ impl OwnedAttrValue {
             OwnedAttrValue::Dnp3Time(x) => AttrValue::Dnp3Time(*x),
             OwnedAttrValue::BitString(x) => AttrValue::BitString(x.as_slice()),
         }
-    }
-
-    /// Modify a value if it is of the same type
-    pub(crate) fn modify(&mut self, other: Self) -> Result<(), TypeError> {
-        match self {
-            Self::VisibleString(x) => {
-                if let Self::VisibleString(y) = other {
-                    *x = y;
-                    return Ok(());
-                }
-            }
-            Self::UnsignedInt(x) => {
-                if let Self::UnsignedInt(y) = other {
-                    *x = y;
-                    return Ok(());
-                }
-            }
-            Self::SignedInt(x) => {
-                if let Self::SignedInt(y) = other {
-                    *x = y;
-                    return Ok(());
-                }
-            }
-            Self::FloatingPoint(x) => {
-                if let Self::FloatingPoint(y) = other {
-                    *x = y;
-                    return Ok(());
-                }
-            }
-            Self::OctetString(x) => {
-                if let Self::OctetString(y) = other {
-                    *x = y;
-                    return Ok(());
-                }
-            }
-            Self::Dnp3Time(x) => {
-                if let Self::Dnp3Time(y) = other {
-                    *x = y;
-                    return Ok(());
-                }
-            }
-            Self::BitString(x) => {
-                if let Self::BitString(y) = other {
-                    *x = y;
-                    return Ok(());
-                }
-            }
-        }
-        Err(TypeError::new(self.data_type(), other.data_type()))
     }
 }
 
@@ -1182,7 +1147,7 @@ pub struct TypeError {
 }
 
 impl TypeError {
-    fn new(expected: AttrDataType, actual: AttrDataType) -> Self {
+    pub(crate) fn new(expected: AttrDataType, actual: AttrDataType) -> Self {
         Self { expected, actual }
     }
 }

@@ -2,7 +2,10 @@ use oo_bindgen::model::*;
 
 use crate::shared::SharedDefinitions;
 
-pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTraced<ClassHandle> {
+pub(crate) fn define(
+    lib: &mut LibraryBuilder,
+    shared: &SharedDefinitions,
+) -> BackTraced<ClassHandle> {
     let request = lib.declare_class("request")?;
 
     let constructor = lib

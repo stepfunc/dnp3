@@ -154,11 +154,14 @@ pub trait OutstationApplication: Sync + Send + 'static {
     ///
     /// This callback is only invoked for attributes that have been defined as write-able in the
     /// database. The library automatically validates that the attribute has the same type as the
-    /// defined type. Writes to non-defined or readonly attributes are rejected with IIN2::PARAM_ERROR
+    /// defined type. Writes to undefined or readonly attributes are rejected with IIN2::PARAM_ERROR
     /// within the library.
+    ///
+    /// This method may validate the value and reject the write by returning false. If the method
+    /// returns true, then the in memory copy of the attribute will be modified.
     #[allow(unused_variables)]
-    fn write_device_attr(&mut self, attr: Attribute) -> MaybeAsync<()> {
-        MaybeAsync::ready(())
+    fn write_device_attr(&mut self, attr: Attribute) -> MaybeAsync<bool> {
+        MaybeAsync::ready(true)
     }
 }
 

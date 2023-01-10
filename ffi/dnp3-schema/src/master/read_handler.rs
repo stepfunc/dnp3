@@ -1,7 +1,7 @@
 use crate::shared::SharedDefinitions;
 use oo_bindgen::model::*;
 
-pub fn define(
+pub(crate) fn define(
     lib: &mut LibraryBuilder,
     shared_def: &SharedDefinitions,
 ) -> BackTraced<AsynchronousInterface> {
@@ -13,8 +13,6 @@ pub fn define(
         .build()?;
 
     let iin = declare_iin_struct(lib)?;
-
-    let attr = crate::master::attributes::define(lib)?;
 
     let response_header = lib.declare_callback_argument_struct("response_header")?;
     let response_header = lib
@@ -209,7 +207,7 @@ pub fn define(
         )?
         .param(
             "attr",
-            attr.string_attr,
+            shared_def.attr.string_attr.clone(),
             "Enumeration describing the attribute (possibly unknown) associated with the value"
         )?
         .param(
@@ -233,7 +231,7 @@ pub fn define(
         )?
         .param(
             "attr",
-            attr.variation_list_attr,
+            shared_def.attr.variation_list_attr.clone(),
             "Enumeration describing the attribute (possibly unknown) associated with the value"
         )?
         .param(
@@ -246,7 +244,7 @@ pub fn define(
             Primitive::U8,
             "The variation associated with this attribute. Examining this argument is only important if the attr argument is unknown."
         )?
-        .param("value", attr.attr_item_iter, "Iterator over a list of variation / properties pairs")?
+        .param("value", shared_def.attr.attr_item_iter.clone(), "Iterator over a list of variation / properties pairs")?
         .returns_nothing_by_default()?
         .end_callback()?
         .begin_callback("handle_uint_attr", "Handle an unsigned integer device attribute")?
@@ -257,7 +255,7 @@ pub fn define(
         )?
         .param(
             "attr",
-            attr.uint_attr,
+            shared_def.attr.uint_attr.clone(),
             "Enumeration describing the attribute (possibly unknown) associated with the value"
         )?
         .param(
@@ -284,7 +282,7 @@ pub fn define(
         )?
         .param(
             "attr",
-            attr.bool_attr,
+            shared_def.attr.bool_attr.clone(),
             "Enumeration describing the attribute associated with the value"
         )?
         .param(
@@ -311,7 +309,7 @@ pub fn define(
         )?
         .param(
             "attr",
-            attr.int_attr,
+            shared_def.attr.int_attr.clone(),
             "Enumeration describing the attribute associated with the value"
         )?
         .param(
@@ -335,7 +333,7 @@ pub fn define(
         )?
         .param(
             "attr",
-            attr.time_attr,
+            shared_def.attr.time_attr.clone(),
             "Enumeration describing the attribute associated with the value"
         )?
         .param(
@@ -359,7 +357,7 @@ pub fn define(
         )?
         .param(
             "attr",
-            attr.float_attr,
+            shared_def.attr.float_attr.clone(),
             "Enumeration describing the attribute associated with the value"
         )?
         .param(
@@ -383,7 +381,7 @@ pub fn define(
         )?
         .param(
             "attr",
-            attr.octet_string_attr,
+            shared_def.attr.octet_string_attr.clone(),
             "Enumeration describing the attribute associated with the value"
         )?
         .param(
@@ -407,7 +405,7 @@ pub fn define(
         )?
         .param(
             "attr",
-            attr.bit_string_attr,
+            shared_def.attr.bit_string_attr.clone(),
             "Enumeration describing the attribute associated with the value"
         )?
         .param(
