@@ -358,7 +358,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             "wda" => {
                 // ANCHOR: write_attribute
                 let headers = Headers::default()
-                    .add_attribute(StringAttr::UserAssignedLocation.with_value("Bend, OR"));
+                    .add_attribute(StringAttr::UserAssignedLocation.with_value("Mt. Olympus"));
 
                 let result = association
                     .send_and_expect_empty_response(FunctionCode::Write, headers)
