@@ -28,7 +28,7 @@ impl From<Reserved> for AttrError {
 impl Variation {
     fn create(value: u8) -> Result<Self, Reserved> {
         match value {
-            254 | 255 => Err(Reserved(0)),
+            0 | 254 | 255 => Err(Reserved(value)),
             _ => Ok(Self { value }),
         }
     }

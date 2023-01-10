@@ -262,6 +262,7 @@ impl Variation {
     pub(crate) fn lookup(group: u8, var: u8) -> Option<Variation> {
         match group {
             0 => match var {
+                0 => None,
                 254 => Some(Variation::Group0Var254),
                 _ => Some(Variation::Group0(var)),
             },

@@ -46,6 +46,7 @@ object VariationEnumModule extends Module {
             s"${g.group} => Some(Variation::${g.name}(var)),".eol
           case GroupType.DeviceAttributes =>
             bracketComma(s"${g.group} => match var") {
+              "0 => None,".eol ++ // not allowed
               "254 => Some(Variation::Group0Var254),".eol ++
               "_ => Some(Variation::Group0(var)),".eol
             }
