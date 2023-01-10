@@ -66,9 +66,9 @@ impl OutstationApplication for ExampleOutstationApplication {
         tracing::info!("change analog dead-band {index} to {dead_band}");
     }
 
-    fn write_device_attr(&mut self, attr: Attribute) -> MaybeAsync<()> {
+    fn write_device_attr(&mut self, attr: Attribute) -> MaybeAsync<bool> {
         tracing::info!("write device attribute: {:?}", attr);
-        MaybeAsync::ready(())
+        MaybeAsync::ready(true)
     }
 }
 

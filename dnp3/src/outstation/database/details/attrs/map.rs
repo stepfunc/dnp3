@@ -150,38 +150,33 @@ impl SetMap {
         }
     }
 
-    /// Write an attribute in the map
+    /// Validate that the write would succeed
     pub(crate) fn can_write(&mut self, attr: Attribute) -> Result<(), AttrError> {
-        let key = Variation::create(attr.variation)?;
+        self.maybe_write(attr, false)
+    }
 
+    /// Write an attribute in the map
+    pub(crate) fn write(&mut self, attr: Attribute) -> Result<(), AttrError> {
+        self.maybe_write(attr, true)
+    }
+
+    fn maybe_write(&mut self, attr: Attribute, commit: bool) -> Result<(), AttrError> {
+        let key = Variation::create(attr.variation)?;
         match self.get_set_mut(attr.set)?.get_mut(&key) {
             None => Err(AttrError::AttrNotDefined(attr.set, key.value)),
             Some((prop, current)) => {
                 if prop.is_writable() {
                     Self::same_type(current.value.data_type(), attr.value.data_type())?;
-                    Ok(())
-                } else {
-                    Err(AttrError::NotWritable(attr.set, key.value))
-                }
-            }
-        }
-    }
-
-    /// Write an attribute in the map
-    pub(crate) fn write(&mut self, attr: Attribute) -> Result<(), AttrError> {
-        let key = Variation::create(attr.variation)?;
-
-        match self.get_set_mut(attr.set)?.get_mut(&key) {
-            None => Err(AttrError::AttrNotDefined(attr.set, key.value)),
-            Some((prop, current)) => {
-                if prop.is_writable() {
-                    match attr.to_owned() {
-                        None => Err(AttrError::NotWritable(attr.set, key.value)),
-                        Some(mut attr) => {
-                            Self::same_type(current.value.data_type(), attr.value.data_type())?;
-                            std::mem::swap(&mut attr, current);
-                            Ok(())
+                    if commit {
+                        match attr.to_owned() {
+                            None => Err(AttrError::NotWritable(attr.set, key.value)),
+                            Some(mut attr) => {
+                                std::mem::swap(&mut attr, current);
+                                Ok(())
+                            }
                         }
+                    } else {
+                        Ok(())
                     }
                 } else {
                     Err(AttrError::NotWritable(attr.set, key.value))
