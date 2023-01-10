@@ -52,6 +52,10 @@ class MyOutstationApplication : public OutstationApplication {
     FreezeResult freeze_counters_range(uint16_t start, uint16_t stop, FreezeType freeze_type, DatabaseHandle &database) override {
         return FreezeResult::not_supported;
     }
+    bool write_string_attr(uint8_t set, uint8_t variation, StringAttr attr_type, const char *value) override {
+        // Allow writing any string attributes that have been defined as writable
+        return true;
+    }
 };
 
 class MyOutstationInformation : public OutstationInformation {

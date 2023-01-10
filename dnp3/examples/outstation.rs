@@ -68,6 +68,7 @@ impl OutstationApplication for ExampleOutstationApplication {
 
     fn write_device_attr(&mut self, attr: Attribute) -> MaybeAsync<bool> {
         tracing::info!("write device attribute: {:?}", attr);
+        // Allow writing any attribute that has been defined as writable
         MaybeAsync::ready(true)
     }
 }

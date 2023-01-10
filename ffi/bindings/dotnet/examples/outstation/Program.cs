@@ -65,7 +65,46 @@ class ExampleOutstation
 
         void IOutstationApplication.EndWriteAnalogDeadBands() {}
 
-        
+        bool IOutstationApplication.WriteStringAttr(byte set, byte variation, StringAttr attrType, string value)
+        {
+            // Allow writing any string attributes that have been defined as writable
+            return true;
+        }
+
+        bool IOutstationApplication.WriteFloatAttr(byte set, byte variation, FloatAttr attrType, float value)
+        {            
+            return false;
+        }
+
+        bool IOutstationApplication.WriteDoubleAttr(byte set, byte variation, FloatAttr attrType, double value)
+        {
+            return false;
+        }
+
+        bool IOutstationApplication.WriteUintAttr(byte set, byte variation, UintAttr attrType, uint value)
+        {
+            return false;
+        }
+
+        bool IOutstationApplication.WriteIntAttr(byte set, byte variation, IntAttr attrType, int value)
+        {
+            return false;
+        }
+
+        bool IOutstationApplication.WriteOctetStringAttr(byte set, byte variation, OctetStringAttr attrType, ICollection<byte> value)
+        {
+            return false;
+        }
+
+        bool IOutstationApplication.WriteBitStringAttr(byte set, byte variation, BitStringAttr attrType, ICollection<byte> value)
+        {
+            return false;
+        }
+
+        bool IOutstationApplication.WriteTimeAttr(byte set, byte variation, TimeAttr attrType, ulong value)
+        {
+            return false;
+        }
     }
 
     class TestOutstationInformation : IOutstationInformation

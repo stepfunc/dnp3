@@ -59,6 +59,13 @@ class TestOutstationApplication implements OutstationApplication {
       UShort start, UShort stop, FreezeType freezeType, DatabaseHandle database) {
     return FreezeResult.NOT_SUPPORTED;
   }
+
+  @Override
+  public boolean writeStringAttr(UByte set, UByte variation, StringAttr attrType, String value) {
+    // Allow writing any string attributes that have been defined as writable
+    return true;
+  }
+
 }
 
 class TestOutstationInformation implements OutstationInformation {
