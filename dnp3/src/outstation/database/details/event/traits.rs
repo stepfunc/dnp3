@@ -10,6 +10,9 @@ use scursor::{WriteCursor, WriteError};
 
 use super::write_fn::write_octet_string;
 
+#[derive(Copy, Clone, PartialEq, Eq)]
+pub(crate) struct OctetStringLength(pub(crate) usize);
+
 pub(crate) trait EventVariation<T> {
     fn write(
         &self,
@@ -313,7 +316,7 @@ impl EventVariation<AnalogOutputStatus> for EventAnalogOutputStatusVariation {
     }
 }
 
-impl EventVariation<Box<[u8]>> for EventOctetStringVariation {
+impl EventVariation<Box<[u8]>> for OctetStringLength {
     fn write(
         &self,
         cursor: &mut WriteCursor,
