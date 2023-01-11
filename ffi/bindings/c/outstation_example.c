@@ -287,7 +287,7 @@ void outstation_transaction_startup(dnp3_database_t *db, void *context)
         dnp3_database_add_octet_string(db, i, DNP3_EVENT_CLASS_CLASS1);
     }
 
-    // initialize desired device attributes
+    // define device attributes made available to the master
     dnp3_database_define_string_attr(db, 0, false, DNP3_ATTRIBUTE_VARIATIONS_DEVICE_MANUFACTURERS_NAME, "Step Function I/O");
     dnp3_database_define_string_attr(db, 0, true, DNP3_ATTRIBUTE_VARIATIONS_USER_ASSIGNED_LOCATION, "Bend, OR");   
 }

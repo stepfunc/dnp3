@@ -38,10 +38,7 @@ impl Variation {
         use crate::app::attr::var;
         std::matches!(
             self.value,
-            var::DEVICE_LOCATION_ALTITUDE
-                | var::DEVICE_LOCATION_LONGITUDE
-                | var::DEVICE_LOCATION_LATITUDE
-                | var::USER_ASSIGNED_SECONDARY_OPERATOR_NAME
+            var::USER_ASSIGNED_SECONDARY_OPERATOR_NAME
                 | var::USER_ASSIGNED_PRIMARY_OPERATOR_NAME
                 | var::USER_ASSIGNED_OWNER_NAME
                 | var::USER_ASSIGNED_DEVICE_NAME

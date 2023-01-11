@@ -443,7 +443,7 @@ class ExampleOutstation
                 db.AddOctetString(i, EventClass.Class1);                
             }
 
-            // define any desired device attributes
+            // define device attributes made available to the master
             db.DefineStringAttr(0, false, AttributeVariations.DeviceManufacturersName, "Step Function I/O");
             db.DefineStringAttr(0, true, AttributeVariations.UserAssignedLocation, "Bend, OR");
         });

@@ -307,7 +307,7 @@ void run_server(dnp3::OutstationServer &server)
             db.add_octet_string(i, EventClass::class1);
         }
 
-        // define any desired attributes
+        // define device attributes made available to the master
         db.define_string_attr(0, false, dnp3::attribute_variations::device_manufacturers_name, "Step Function I/O");
         db.define_string_attr(0, true, dnp3::attribute_variations::user_assigned_location, "Bend, OR");
     });

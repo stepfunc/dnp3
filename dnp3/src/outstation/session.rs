@@ -1261,7 +1261,7 @@ impl OutstationSession {
         // first validate that attribute can be written
         if let Err(err) = db.transaction(|db| db.inner.get_attr_map().can_write(attr)) {
             tracing::warn!("Unable to WRITE attribute: {err}");
-            return Iin2::PARAMETER_ERROR;
+            return Iin2::NO_FUNC_CODE_SUPPORT;
         }
 
         // next, ask the application to validate and persist the value

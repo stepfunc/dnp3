@@ -322,7 +322,7 @@ async fn run_tcp_server(mut server: Server) -> Result<(), Box<dyn std::error::Er
             db.add(i, Some(EventClass::Class1), OctetStringConfig);
         }
 
-        // setup any desired device attributes
+        // define device attributes made available to the master
         let _ = db.define_attr(
             AttrProp::default(),
             StringAttr::DeviceManufacturersName.with_value("Step Function I/O"),
@@ -330,14 +330,6 @@ async fn run_tcp_server(mut server: Server) -> Result<(), Box<dyn std::error::Er
         let _ = db.define_attr(
             AttrProp::writable(),
             StringAttr::UserAssignedLocation.with_value("Bend, OR"),
-        );
-        let _ = db.define_attr(
-            AttrProp::writable(),
-            StringAttr::UserAssignedPrimaryOperatorName.with_value("Company1"),
-        );
-        let _ = db.define_attr(
-            AttrProp::writable(),
-            StringAttr::UserAssignedSecondaryOperatorName.with_value("Company2"),
         );
     });
     // ANCHOR_END: database_init

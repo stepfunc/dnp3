@@ -368,7 +368,7 @@ public class OutstationExample {
       db.addOctetString(ushort(i), EventClass.CLASS1);
     }
 
-    // define any desired device attributes
+    // define device attributes made available to the master
     db.defineStringAttr(ubyte(0), false, AttributeVariations.DEVICE_MANUFACTURERS_NAME, "Step Function I/O");
     db.defineStringAttr(ubyte(0), true, AttributeVariations.USER_ASSIGNED_LOCATION, "Bend, OR");
   }
