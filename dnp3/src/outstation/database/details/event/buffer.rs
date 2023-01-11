@@ -13,6 +13,7 @@ use crate::util::BadWrite;
 use super::list::VecList;
 use super::writer::EventWriter;
 
+use crate::outstation::database::details::event::traits::OctetStringLength;
 use scursor::WriteCursor;
 
 impl From<EventClass> for EventClasses {
@@ -329,7 +330,9 @@ impl Event {
             Event::FrozenCounter(evt, v) => writer.write(cursor, evt, index, v.selected.get()),
             Event::Analog(evt, v) => writer.write(cursor, evt, index, v.selected.get()),
             Event::AnalogOutputStatus(evt, v) => writer.write(cursor, evt, index, v.selected.get()),
-            Event::OctetString(evt, v) => writer.write(cursor, evt, index, v.selected.get()),
+            Event::OctetString(evt, _) => {
+                writer.write(cursor, evt, index, OctetStringLength(evt.len()))
+            }
         }
     }
 }

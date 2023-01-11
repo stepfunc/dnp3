@@ -4,7 +4,7 @@ use crate::app::variations::{Group51Var1, Group51Var2};
 use crate::app::QualifierCode;
 use crate::app::Timestamp;
 use crate::outstation::database::config::*;
-use crate::outstation::database::details::event::traits::EventVariation;
+use crate::outstation::database::details::event::traits::{EventVariation, OctetStringLength};
 use crate::outstation::database::details::event::write_fn::Continue;
 
 use crate::util::BadWrite;
@@ -46,7 +46,7 @@ pub(crate) enum HeaderType {
     FrozenCounter(EventFrozenCounterVariation),
     Analog(EventAnalogInputVariation),
     AnalogOutputStatus(EventAnalogOutputStatusVariation),
-    OctetString(EventOctetStringVariation),
+    OctetString(OctetStringLength),
 }
 
 #[derive(Copy, Clone)]
@@ -325,7 +325,7 @@ impl Writable for AnalogOutputStatus {
 }
 
 impl Writable for Box<[u8]> {
-    type EventVariation = EventOctetStringVariation;
+    type EventVariation = OctetStringLength;
 
     fn get_header_variation(&self, header: &HeaderType) -> Option<Self::EventVariation> {
         match header {
