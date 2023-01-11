@@ -197,7 +197,7 @@ pub unsafe fn outstation_create_serial_session(
 ) -> Result<*mut crate::Outstation, ffi::ParamError> {
     let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
 
-    let _enter = runtime.inner.enter();
+    let _enter = runtime.inner.as_ref().unwrap().enter();
     let serial_path = serial_path.to_string_lossy();
 
     let config = convert_outstation_config(config)?;
@@ -248,7 +248,7 @@ pub unsafe fn outstation_create_serial_session_fault_tolerant(
 ) -> Result<*mut crate::Outstation, ffi::ParamError> {
     let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
 
-    let _enter = runtime.inner.enter();
+    let _enter = runtime.inner.as_ref().unwrap().enter();
     let serial_path = serial_path.to_string_lossy();
 
     let config = convert_outstation_config(config)?;

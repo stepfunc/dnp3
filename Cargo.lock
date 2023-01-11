@@ -400,7 +400,7 @@ dependencies = [
  "lazy_static",
  "num_cpus",
  "oo-bindgen",
- "sfio-tokio-ffi",
+ "sfio-tokio-ffi 0.6.0",
  "sfio-tracing-ffi",
  "tokio",
  "tracing",
@@ -423,7 +423,7 @@ name = "dnp3-schema"
 version = "1.3.0-rc1"
 dependencies = [
  "oo-bindgen",
- "sfio-tokio-ffi",
+ "sfio-tokio-ffi 0.5.1",
  "sfio-tracing-ffi",
 ]
 
@@ -1253,6 +1253,15 @@ name = "sfio-tokio-ffi"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b3011decee9900ac6162a077ba2a662a60082772a691ae50f2cc6759b8ea4d90"
+dependencies = [
+ "oo-bindgen",
+]
+
+[[package]]
+name = "sfio-tokio-ffi"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "92c98f3f2f961635b881a6b229332c80d3fabfe88075c3a685edea90dddbfd23"
 dependencies = [
  "oo-bindgen",
 ]

@@ -65,7 +65,7 @@ pub(crate) unsafe fn master_channel_create_tcp_2(
     );
 
     // enter the runtime context so that we can spawn
-    let _enter = runtime.inner.enter();
+    let _enter = runtime.inner.as_ref().unwrap().enter();
 
     let channel = dnp3::tcp::spawn_master_tcp_client_2(
         link_error_mode.into(),
@@ -169,7 +169,7 @@ pub(crate) unsafe fn master_channel_create_tls_2(
     );
 
     // enter the runtime context so that we can spawn
-    let _enter = runtime.inner.enter();
+    let _enter = runtime.inner.as_ref().unwrap().enter();
 
     let channel = dnp3::tcp::tls::spawn_master_tls_client_2(
         link_error_mode.into(),
@@ -214,7 +214,7 @@ pub(crate) unsafe fn master_channel_create_serial(
     let config = convert_config(config)?;
 
     // enter the runtime context so that we can spawn
-    let _enter = runtime.inner.enter();
+    let _enter = runtime.inner.as_ref().unwrap().enter();
 
     let channel = spawn_master_serial(
         config,
