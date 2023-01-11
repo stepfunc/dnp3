@@ -1,7 +1,10 @@
+use crate::attr::FfiAttrValue;
+use dnp3::app::attr::{AnyAttribute, Attribute, FloatType};
 use dnp3::app::control::*;
 use dnp3::app::*;
 use dnp3::outstation::database::DatabaseHandle;
 use dnp3::outstation::*;
+use std::ffi::CString;
 
 use crate::ffi;
 
@@ -111,6 +114,83 @@ impl OutstationApplication for ffi::OutstationApplication {
     fn end_write_analog_dead_bands(&mut self) -> MaybeAsync<()> {
         ffi::OutstationApplication::end_write_analog_dead_bands(self);
         MaybeAsync::ready(())
+    }
+
+    fn write_device_attr(&mut self, attr: Attribute) -> MaybeAsync<bool> {
+        let any = match AnyAttribute::try_from(&attr) {
+            Ok(any) => any,
+            Err(_) => {
+                return MaybeAsync::ready(false);
+            }
+        };
+
+        let (set, var, value) = FfiAttrValue::extract(any);
+        match value {
+            FfiAttrValue::VariationList(_, _) => {
+                // we can't write a variation list
+                MaybeAsync::ready(false)
+            }
+            FfiAttrValue::String(attr, value) => match CString::new(value) {
+                Ok(str) => {
+                    let attr = attr.map(|x| x.into()).unwrap_or(ffi::StringAttr::Unknown);
+                    let res = self.write_string_attr(set.value(), var, attr, &str);
+                    MaybeAsync::ready(res.unwrap_or(false))
+                }
+                Err(err) => {
+                    tracing::warn!("Cannot convert string attribute to CString: {err}");
+                    MaybeAsync::ready(false)
+                }
+            },
+            FfiAttrValue::Float(attr, value) => {
+                let attr = attr.map(|x| x.into()).unwrap_or(ffi::FloatAttr::Unknown);
+                let res = match value {
+                    FloatType::F32(value) => self.write_float_attr(set.value(), var, attr, value),
+                    FloatType::F64(value) => self.write_double_attr(set.value(), var, attr, value),
+                };
+                MaybeAsync::ready(res.unwrap_or(false))
+            }
+            FfiAttrValue::UInt(attr, value) => {
+                let attr = attr.map(|x| x.into()).unwrap_or(ffi::UintAttr::Unknown);
+                let res = self
+                    .write_uint_attr(set.value(), var, attr, value)
+                    .unwrap_or(false);
+                MaybeAsync::ready(res)
+            }
+            FfiAttrValue::Int(value) => {
+                let res = self
+                    .write_int_attr(set.value(), var, ffi::IntAttr::Unknown, value)
+                    .unwrap_or(false);
+                MaybeAsync::ready(res)
+            }
+            FfiAttrValue::Bool(_, _) => {
+                // none of the bool attributes are writable so we ignore this
+                MaybeAsync::ready(false)
+            }
+            FfiAttrValue::OctetString(attr, value) => {
+                let attr = attr
+                    .map(|x| x.into())
+                    .unwrap_or(ffi::OctetStringAttr::Unknown);
+                let mut iter = crate::ByteIterator::new(value);
+                let res = self
+                    .write_octet_string_attr(set.value(), var, attr, &mut iter)
+                    .unwrap_or(false);
+                MaybeAsync::ready(res)
+            }
+            FfiAttrValue::BitString(value) => {
+                let mut iter = crate::ByteIterator::new(value);
+                let res = self
+                    .write_bit_string_attr(set.value(), var, ffi::BitStringAttr::Unknown, &mut iter)
+                    .unwrap_or(false);
+                MaybeAsync::ready(res)
+            }
+            FfiAttrValue::DNP3Time(attr, value) => {
+                let attr = attr.map(|x| x.into()).unwrap_or(ffi::TimeAttr::Unknown);
+                let res = self
+                    .write_time_attr(set.value(), var, attr, value.raw_value())
+                    .unwrap_or(false);
+                MaybeAsync::ready(res)
+            }
+        }
     }
 }
 

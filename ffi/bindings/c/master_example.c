@@ -482,7 +482,7 @@ int run_channel(dnp3_master_channel_t *channel)
         else if (strcmp(cbuf, "wda\n") == 0) {
             // ANCHOR: write_attribute
             dnp3_request_t *request = dnp3_request_create();
-            dnp3_request_add_string_attribute(request, DNP3_ATTRIBUTE_VARIATIONS_USER_ASSIGNED_LOCATION, 0, "Bend, OR");
+            dnp3_request_add_string_attribute(request, DNP3_ATTRIBUTE_VARIATIONS_USER_ASSIGNED_LOCATION, 0, "Mt. Olympus");
 
             dnp3_empty_response_callback_t cb = {
                 .on_complete = &on_generic_success,

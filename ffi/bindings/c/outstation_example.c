@@ -40,6 +40,12 @@ dnp3_freeze_result_t freeze_counters_range(uint16_t start, uint16_t stop, dnp3_f
     return DNP3_FREEZE_RESULT_NOT_SUPPORTED;
 }
 
+bool write_string_attr(uint8_t set, uint8_t var, dnp3_string_attr_t attr, const char* value, void *context)
+{
+    // Allow writing any string attributes that have been defined as writable    
+    return true;
+}
+
 dnp3_outstation_application_t get_outstation_application()
 {
     return (dnp3_outstation_application_t){
@@ -50,6 +56,7 @@ dnp3_outstation_application_t get_outstation_application()
         .warm_restart = &warm_restart,
         .freeze_counters_all = &freeze_counters_all,
         .freeze_counters_range = &freeze_counters_range,
+        .write_string_attr = &write_string_attr,
         .on_destroy = NULL,
         .ctx = NULL,
     };
@@ -279,6 +286,10 @@ void outstation_transaction_startup(dnp3_database_t *db, void *context)
         dnp3_database_add_analog_output_status(db, i, DNP3_EVENT_CLASS_CLASS1, dnp3_analog_output_status_config_init());
         dnp3_database_add_octet_string(db, i, DNP3_EVENT_CLASS_CLASS1);
     }
+
+    // define device attributes made available to the master
+    dnp3_database_define_string_attr(db, 0, false, DNP3_ATTRIBUTE_VARIATIONS_DEVICE_MANUFACTURERS_NAME, "Step Function I/O");
+    dnp3_database_define_string_attr(db, 0, true, DNP3_ATTRIBUTE_VARIATIONS_USER_ASSIGNED_LOCATION, "Bend, OR");   
 }
 // ANCHOR_END: database_init_transaction
 

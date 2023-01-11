@@ -1,8 +1,9 @@
+use crate::attributes::DeviceAttrTypes;
 use crate::gv;
 use oo_bindgen::model::*;
 use std::time::Duration;
 
-pub struct SharedDefinitions {
+pub(crate) struct SharedDefinitions {
     pub error_type: ErrorType<Unvalidated>,
     pub port_state_listener: AsynchronousInterface,
     pub variation_enum: EnumHandle,
@@ -27,18 +28,19 @@ pub struct SharedDefinitions {
     pub frozen_counter_it: AbstractIteratorHandle,
     pub analog_point: UniversalStructHandle,
     pub analog_it: AbstractIteratorHandle,
-    pub frozen_analog_point: UniversalStructHandle,
+    pub _frozen_analog_point: UniversalStructHandle,
     pub frozen_analog_it: AbstractIteratorHandle,
     pub analog_output_status_point: UniversalStructHandle,
     pub analog_output_status_it: AbstractIteratorHandle,
-    pub octet_string: FunctionReturnStructHandle,
+    pub _octet_string: FunctionReturnStructHandle,
     pub octet_string_it: AbstractIteratorHandle,
     pub byte_it: AbstractIteratorHandle,
     pub min_tls_version: EnumHandle,
     pub certificate_mode: EnumHandle,
+    pub attr: DeviceAttrTypes,
 }
 
-pub fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
+pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
     let error_type = lib
         .define_error_type(
             "param_error",
@@ -267,6 +269,8 @@ pub fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
 
     let connect_options = define_connect_options(lib, error_type.clone())?;
 
+    let attr = crate::attributes::define(lib)?;
+
     Ok(SharedDefinitions {
         error_type,
         port_state_listener: define_port_state_listener(lib)?,
@@ -294,13 +298,14 @@ pub fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
         frozen_counter_it,
         analog_point,
         analog_it,
-        frozen_analog_point,
+        _frozen_analog_point: frozen_analog_point,
         frozen_analog_it,
         analog_output_status_point,
         analog_output_status_it,
-        octet_string,
+        _octet_string: octet_string,
         octet_string_it,
         byte_it,
+        attr,
     })
 }
 

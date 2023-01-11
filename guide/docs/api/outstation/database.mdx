@@ -148,3 +148,29 @@ Most applications don't need to remove points, but the option is there in case y
 Removing a point stops the outstation from reporting static data for that point. However, it does NOT remove any queued events for that point from
 the event buffer. Those events will remain in the event buffer until they are reported and cleared by confirmation.
 :::
+
+## Defining Device Attributes
+
+Specific attributes from Group 0 may be defined using the database. As you can see in the examples above, this should typically be done during database initialization. Rust
+uses a single method for defining attributes whereas the bindings have different methods for each type of attribute. Only attributes that are defined as writable are eligible
+to receive WRITE callbacks in the [OutstationApplication](application) interface.
+
+### Default Set
+
+The standard predefines a number of attributes belonging to the default set (index == 0). The database will only allow you define values with the correct type for these objects. It
+will also enforce that only certain variations are writable. Writable variations in the default set are:
+
+* Variation 206 - User-assigned secondary operator name
+* Variation 207 - User-assigned primary operator name
+* Variation 207 - User-assigned primary operator name
+* Variation 244 - User-assigned owner name
+* Variation 245 - User-assigned location
+* Variation 246 - User-assigned ID code/number
+* Variation 247 - User-assigned device name
+
+### Private Sets
+
+Private sets are sets with any index other than 0. User may assign any attribute values to variations within these sets
+other than the reserved variation numbers 0, 254, and 255.
+
+

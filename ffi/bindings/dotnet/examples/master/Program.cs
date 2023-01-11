@@ -543,7 +543,7 @@ class MainClass
                 {
                     // ANCHOR: write_attribute
                     var request = new Request();
-                    request.AddStringAttribute(AttributeVariations.UserAssignedLocation, 0, "Bend, OR");
+                    request.AddStringAttribute(AttributeVariations.UserAssignedLocation, 0, "Mt. Olympus");
                     await channel.SendAndExpectEmptyResponse(association, FunctionCode.Write, request);
                     return true;
                     // ANCHOR_END: write_attribute

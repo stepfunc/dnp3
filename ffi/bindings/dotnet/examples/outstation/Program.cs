@@ -65,7 +65,46 @@ class ExampleOutstation
 
         void IOutstationApplication.EndWriteAnalogDeadBands() {}
 
-        
+        bool IOutstationApplication.WriteStringAttr(byte set, byte variation, StringAttr attrType, string value)
+        {
+            // Allow writing any string attributes that have been defined as writable
+            return true;
+        }
+
+        bool IOutstationApplication.WriteFloatAttr(byte set, byte variation, FloatAttr attrType, float value)
+        {            
+            return false;
+        }
+
+        bool IOutstationApplication.WriteDoubleAttr(byte set, byte variation, FloatAttr attrType, double value)
+        {
+            return false;
+        }
+
+        bool IOutstationApplication.WriteUintAttr(byte set, byte variation, UintAttr attrType, uint value)
+        {
+            return false;
+        }
+
+        bool IOutstationApplication.WriteIntAttr(byte set, byte variation, IntAttr attrType, int value)
+        {
+            return false;
+        }
+
+        bool IOutstationApplication.WriteOctetStringAttr(byte set, byte variation, OctetStringAttr attrType, ICollection<byte> value)
+        {
+            return false;
+        }
+
+        bool IOutstationApplication.WriteBitStringAttr(byte set, byte variation, BitStringAttr attrType, ICollection<byte> value)
+        {
+            return false;
+        }
+
+        bool IOutstationApplication.WriteTimeAttr(byte set, byte variation, TimeAttr attrType, ulong value)
+        {
+            return false;
+        }
     }
 
     class TestOutstationInformation : IOutstationInformation
@@ -401,8 +440,12 @@ class ExampleOutstation
                 db.AddFrozenCounter(i, EventClass.Class1, new FrozenCounterConfig());
                 db.AddAnalogInput(i, EventClass.Class1, new AnalogInputConfig());
                 db.AddAnalogOutputStatus(i, EventClass.Class1, new AnalogOutputStatusConfig());
-                db.AddOctetString(i, EventClass.Class1);
+                db.AddOctetString(i, EventClass.Class1);                
             }
+
+            // define device attributes made available to the master
+            db.DefineStringAttr(0, false, AttributeVariations.DeviceManufacturersName, "Step Function I/O");
+            db.DefineStringAttr(0, true, AttributeVariations.UserAssignedLocation, "Bend, OR");
         });
         // ANCHOR_END: database_init
 

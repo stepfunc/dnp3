@@ -9,11 +9,13 @@ use crate::outstation::database::{
     ClassZeroConfig, EventBufferConfig, ResponseInfo, UpdateOptions,
 };
 
+use crate::outstation::database::details::attrs::map::SetMap;
 use scursor::WriteCursor;
 
 pub(crate) struct Database {
     static_db: StaticDatabase,
     event_buffer: EventBuffer,
+    attrs: super::attrs::AttrHandler,
 }
 
 impl Database {
@@ -25,12 +27,18 @@ impl Database {
         Self {
             static_db: StaticDatabase::new(max_read_selection, class_zero_config),
             event_buffer: EventBuffer::new(config),
+            attrs: super::attrs::AttrHandler::new(32),
         }
+    }
+
+    pub(crate) fn get_attr_map(&mut self) -> &mut SetMap {
+        self.attrs.get_attr_map()
     }
 
     pub(crate) fn reset(&mut self) {
         self.static_db.reset();
         self.event_buffer.reset();
+        self.attrs.reset();
     }
 
     pub(crate) fn set_analog_deadband(&mut self, index: u16, deadband: f64) -> bool {
@@ -56,6 +64,7 @@ impl Database {
                 self.event_buffer.select_by_header(header);
                 Iin2::default()
             }
+            ReadHeader::Attr(header) => self.attrs.select(header),
         }
     }
 
@@ -107,12 +116,20 @@ impl Database {
             Err(count) => count > 0,
         };
 
+        // next write static data
         let complete = if result.is_err() {
-            // unable to write all the events in this response, so we can't any static data
+            // unable to write all the events in this response, so we can't write any static data
             false
         } else {
             // write all events to we can try to write all static data
             self.static_db.write(cursor).is_ok()
+        };
+
+        // next write device attributes
+        let complete = if complete {
+            self.attrs.write(cursor)
+        } else {
+            false
         };
 
         ResponseInfo {

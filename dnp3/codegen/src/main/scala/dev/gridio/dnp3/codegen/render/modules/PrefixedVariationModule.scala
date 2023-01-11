@@ -29,7 +29,7 @@ object PrefixedVariationModule extends Module {
     def definition(v : Variation) : Iterator[String] = {
       v match {
         case SpecificAttribute => {
-          "Group0(crate::app::Attribute<'a>),".eol
+          "Group0(crate::app::attr::Attribute<'a>),".eol
         }
         case _ : SizedByVariation =>{
           "Group111VarX(u8, PrefixedBytesSequence<'a, I>),".eol
@@ -49,7 +49,7 @@ object PrefixedVariationModule extends Module {
 
     def parseMatcher(v: Variation) : Iterator[String] = v match {
       case SpecificAttribute => {
-        s"Variation::Group0(var) => Ok(PrefixedVariation::Group0(crate::app::Attribute::parse_prefixed::<I>(var, count, cursor)?)),".eol
+        s"Variation::Group0(var) => Ok(PrefixedVariation::Group0(crate::app::attr::Attribute::parse_prefixed::<I>(var, count, cursor)?)),".eol
       }
       case Group111AnyVar => {
         "Variation::Group111(0) => Err(ObjectParseError::ZeroLengthOctetData),".eol ++

@@ -1,4 +1,5 @@
 use std::collections::{BTreeMap, Bound, VecDeque};
+use std::fmt::Formatter;
 use std::ops::RangeBounds;
 
 use crate::app::measurement::*;
@@ -11,6 +12,7 @@ use crate::outstation::database::details::range::writer::RangeWriter;
 use crate::outstation::database::read::StaticReadHeader;
 use crate::outstation::database::{ClassZeroConfig, EventClass, EventMode, UpdateOptions};
 
+use crate::app::attr::AttrSet;
 use crate::util::BadWrite;
 use scursor::WriteCursor;
 
@@ -36,9 +38,23 @@ pub(crate) struct IndexRange {
     stop: u16,
 }
 
+impl std::fmt::Display for IndexRange {
+    fn fmt(&self, f: &mut Formatter) -> std::fmt::Result {
+        write!(f, "start: {} stop: {}", self.start, self.stop)
+    }
+}
+
 impl IndexRange {
     pub(crate) fn new(start: u16, stop: u16) -> Self {
         Self { start, stop }
+    }
+
+    pub(crate) fn to_attr_set(self) -> Option<AttrSet> {
+        if self.start != self.stop {
+            return None;
+        }
+
+        self.start.try_into().ok().map(AttrSet::new)
     }
 }
 

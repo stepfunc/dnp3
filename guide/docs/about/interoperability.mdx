@@ -16,26 +16,22 @@ DNP3 defines four subset levels of interoperability:
 
 ### Current Support: Level 3
 
-Our library is currently `Level 3` compliant for both master and outstation. We will make it `Level 4` compliant in a future release. Please note that we already support a number of `Level 4` features, along with features that do not belong to a subset level:
+Our library is currently `Level 3` compliant for both master and outstation. We will make it `Level 4` compliant in a future release. Please note that we already support a number of `Level 4` features, along with features that do not belong to a subset level including:
 
-| Feature                   | Level |
-|---------------------------|:-----:|
-| Double-bit Binary Inputs  |  4    |
-| Floating-point AI/AO      |  4    |
-| Analog Input Dead-bands   |  4    |
-| BO/AO events              |  4    |
-| LAN time-synchronization  |  4    |
-| Self-address support      |  4    |
-| Octet strings (g110/111)  |  n/a  |
+| Feature                   | Objects                                                 |   Level    |
+|---------------------------|---------------------------------------------------------|:----------:|
+| Device Attributes         |  Group 0                                                |     4      |
+| Double-bit Binary Inputs  |  Groups 3 & 4                                           |     4      |
+| Floating-point AI/AO      |  Float/double variations in groups  30, 32, and 41      |     4      |
+| Analog Input Dead-bands   |  Group 34                                               |     4      |
+| BO/AO events              |  Groups 11 & 42                                         |     4      |
+| LAN time-synchronization  |  Group 50 Var 3                                         |     4      |
+| Self-address support      |  n/a                                                    |     4      |
+| Octet strings (g110/111)  |  Groups 110 and 11                                      |     n/a    |
 
 ### Future Support
 
-We are planning to add support for several features in future releases, including:
-
-1. Device attributes (group 0)
-2. AO/BO command events (groups 13 & 43)
-
-The library will be level 4 compliant when we complete these two remaining features.
+The library will be level 4 compliant when we add AO/BO command events (groups 13 & 43).
 
 ## Conformance Testing
 

@@ -17,6 +17,7 @@ pub use runtime::*;
 pub(crate) use tcp::*;
 pub use write_dead_band_request::*;
 
+pub(crate) mod attr;
 mod command;
 mod connect;
 mod decoding;

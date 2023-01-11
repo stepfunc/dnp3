@@ -1,8 +1,10 @@
+use dnp3::app::attr::{AttrProp, AttrSet, FloatType, OwnedAttrValue, OwnedAttribute};
 use dnp3::app::measurement::*;
 use dnp3::app::Timestamp;
 pub use dnp3::outstation::database::Database;
 pub use dnp3::outstation::database::DatabaseHandle;
 use dnp3::outstation::database::*;
+use std::ffi::CStr;
 
 use crate::ffi;
 
@@ -170,6 +172,130 @@ pub unsafe fn database_update_octet_string(
         }
     }
     false
+}
+
+pub(crate) unsafe fn database_define_string_attr(
+    instance: *mut crate::Database,
+    set: u8,
+    writable: bool,
+    variation: u8,
+    value: &CStr,
+) -> ffi::AttrDefError {
+    let value = || OwnedAttrValue::VisibleString(value.to_string_lossy().to_string());
+    define_any_attr(instance, set, writable, variation, value)
+}
+
+pub(crate) unsafe fn database_define_uint_attr(
+    instance: *mut crate::Database,
+    set: u8,
+    writable: bool,
+    variation: u8,
+    value: u32,
+) -> ffi::AttrDefError {
+    define_any_attr(instance, set, writable, variation, || {
+        OwnedAttrValue::UnsignedInt(value)
+    })
+}
+
+pub(crate) unsafe fn database_define_int_attr(
+    instance: *mut crate::Database,
+    set: u8,
+    writable: bool,
+    variation: u8,
+    value: i32,
+) -> ffi::AttrDefError {
+    define_any_attr(instance, set, writable, variation, || {
+        OwnedAttrValue::SignedInt(value)
+    })
+}
+
+pub(crate) unsafe fn database_define_time_attr(
+    instance: *mut crate::Database,
+    set: u8,
+    writable: bool,
+    variation: u8,
+    value: u64,
+) -> ffi::AttrDefError {
+    define_any_attr(instance, set, writable, variation, || {
+        OwnedAttrValue::Dnp3Time(Timestamp::new(value))
+    })
+}
+
+pub(crate) unsafe fn database_define_bool_attr(
+    instance: *mut crate::Database,
+    set: u8,
+    writable: bool,
+    variation: u8,
+    value: bool,
+) -> ffi::AttrDefError {
+    define_any_attr(instance, set, writable, variation, || {
+        OwnedAttrValue::SignedInt(value.into())
+    })
+}
+
+pub(crate) unsafe fn database_define_float_attr(
+    instance: *mut crate::Database,
+    set: u8,
+    writable: bool,
+    variation: u8,
+    value: f32,
+) -> ffi::AttrDefError {
+    define_any_attr(instance, set, writable, variation, || {
+        OwnedAttrValue::FloatingPoint(FloatType::F32(value))
+    })
+}
+
+pub(crate) unsafe fn database_define_double_attr(
+    instance: *mut crate::Database,
+    set: u8,
+    writable: bool,
+    variation: u8,
+    value: f64,
+) -> ffi::AttrDefError {
+    define_any_attr(instance, set, writable, variation, || {
+        OwnedAttrValue::FloatingPoint(FloatType::F64(value))
+    })
+}
+
+unsafe fn define_any_attr<F>(
+    instance: *mut crate::Database,
+    set: u8,
+    writable: bool,
+    variation: u8,
+    value: F,
+) -> ffi::AttrDefError
+where
+    F: FnOnce() -> OwnedAttrValue,
+{
+    let db = match instance.as_mut() {
+        None => return ffi::AttrDefError::Ok,
+        Some(x) => x,
+    };
+
+    let prop = if writable {
+        AttrProp::writable()
+    } else {
+        AttrProp::default()
+    };
+
+    let attr = OwnedAttribute::new(AttrSet::new(set), variation, value());
+
+    if let Err(err) = db.define_attr(prop, attr) {
+        return err.into();
+    }
+
+    ffi::AttrDefError::Ok
+}
+
+impl From<AttrDefError> for ffi::AttrDefError {
+    fn from(value: AttrDefError) -> Self {
+        match value {
+            AttrDefError::AlreadyDefined => ffi::AttrDefError::AlreadyDefined,
+            AttrDefError::BadType(_) => ffi::AttrDefError::BadType,
+            AttrDefError::ReservedVariation(_) => ffi::AttrDefError::ReservedVariation,
+            AttrDefError::NotWritable(_, _) => ffi::AttrDefError::NotWritable,
+        }
+    }
 }
 
 pub fn update_options_default() -> ffi::UpdateOptions {

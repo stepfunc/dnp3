@@ -6,6 +6,7 @@ use dnp3::link::*;
 use dnp3::outstation::database::*;
 use dnp3::outstation::*;
 
+use dnp3::app::attr::{AttrProp, Attribute, StringAttr};
 use dnp3::tcp::*;
 use std::process::exit;
 use std::time::Duration;
@@ -63,6 +64,12 @@ impl OutstationApplication for ExampleOutstationApplication {
 
     fn write_analog_dead_band(&mut self, index: u16, dead_band: f64) {
         tracing::info!("change analog dead-band {index} to {dead_band}");
+    }
+
+    fn write_device_attr(&mut self, attr: Attribute) -> MaybeAsync<bool> {
+        tracing::info!("write device attribute: {:?}", attr);
+        // Allow writing any attribute that has been defined as writable
+        MaybeAsync::ready(true)
     }
 }
 
@@ -314,6 +321,16 @@ async fn run_tcp_server(mut server: Server) -> Result<(), Box<dyn std::error::Er
             );
             db.add(i, Some(EventClass::Class1), OctetStringConfig);
         }
+
+        // define device attributes made available to the master
+        let _ = db.define_attr(
+            AttrProp::default(),
+            StringAttr::DeviceManufacturersName.with_value("Step Function I/O"),
+        );
+        let _ = db.define_attr(
+            AttrProp::writable(),
+            StringAttr::UserAssignedLocation.with_value("Bend, OR"),
+        );
     });
     // ANCHOR_END: database_init
 

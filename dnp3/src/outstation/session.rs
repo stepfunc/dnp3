@@ -3,6 +3,7 @@ use std::borrow::BorrowMut;
 use tracing::Instrument;
 use xxhash_rust::xxh64::xxh64;
 
+use crate::app::attr::Attribute;
 use crate::app::control::CommandStatus;
 use crate::app::format::write::HeaderWriter;
 use crate::app::gen::all::AllObjectsVariation;
@@ -1256,6 +1257,24 @@ impl OutstationSession {
         iin2
     }
 
+    async fn handle_write_attr(&mut self, attr: Attribute<'_>, db: &mut DatabaseHandle) -> Iin2 {
+        // first validate that attribute can be written
+        if let Err(err) = db.transaction(|db| db.inner.get_attr_map().can_write(attr)) {
+            tracing::warn!("Unable to WRITE attribute: {err}");
+            return Iin2::NO_FUNC_CODE_SUPPORT;
+        }
+
+        // next, ask the application to validate and persist the value
+        if !self.application.write_device_attr(attr).get().await {
+            // validation of the value failed
+            return Iin2::PARAMETER_ERROR;
+        }
+
+        // this should never fail b/c we already validated the attribute is writable
+        let _ = db.transaction(|db| db.inner.get_attr_map().write(attr));
+        Iin2::default()
+    }
+
     fn handle_write_abs_time(&mut self, seq: CountSequence<Group50Var1>) -> Iin2 {
         if let Some(value) = seq.single() {
             match self.application.write_absolute_time(value.time) {
@@ -1309,6 +1328,12 @@ impl OutstationSession {
         db: &mut DatabaseHandle,
     ) -> Iin2 {
         match header.details {
+            HeaderDetails::OneByteStartStop(_, _, RangedVariation::Group0(_, Some(attr))) => {
+                self.handle_write_attr(attr, db).await
+            }
+            HeaderDetails::TwoByteStartStop(_, _, RangedVariation::Group0(_, Some(attr))) => {
+                self.handle_write_attr(attr, db).await
+            }
             HeaderDetails::OneByteStartStop(_, _, RangedVariation::Group80Var1(bits)) => {
                 self.handle_write_iin(bits)
             }

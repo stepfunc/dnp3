@@ -59,6 +59,13 @@ class TestOutstationApplication implements OutstationApplication {
       UShort start, UShort stop, FreezeType freezeType, DatabaseHandle database) {
     return FreezeResult.NOT_SUPPORTED;
   }
+
+  @Override
+  public boolean writeStringAttr(UByte set, UByte variation, StringAttr attrType, String value) {
+    // Allow writing any string attributes that have been defined as writable
+    return true;
+  }
+
 }
 
 class TestOutstationInformation implements OutstationInformation {
@@ -360,6 +367,10 @@ public class OutstationExample {
       db.addAnalogOutputStatus(ushort(i), EventClass.CLASS1, new AnalogOutputStatusConfig());
       db.addOctetString(ushort(i), EventClass.CLASS1);
     }
+
+    // define device attributes made available to the master
+    db.defineStringAttr(ubyte(0), false, AttributeVariations.DEVICE_MANUFACTURERS_NAME, "Step Function I/O");
+    db.defineStringAttr(ubyte(0), true, AttributeVariations.USER_ASSIGNED_LOCATION, "Bend, OR");
   }
   // ANCHOR_END: database_init_function
 

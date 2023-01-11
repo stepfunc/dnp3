@@ -322,8 +322,7 @@ impl std::fmt::Display for FragmentDisplay<'_> {
                     f.write_str("\n")?;
                     header.format(self.level.object_values(), f)?;
                 }
-                // log the original error after any valid headers that preceded it
-                tracing::warn!("{}", err);
+                write!(f, "\ndecoding err: {err}")?;
             }
         }
 
@@ -1089,7 +1088,11 @@ mod test {
 
         assert_eq!(first.variation, Variation::Group0(0xCA));
         let set = match first.details {
-            HeaderDetails::OneByteStartStop(0x07, 0x07, RangedVariation::Group0(Some(set))) => set,
+            HeaderDetails::OneByteStartStop(
+                0x07,
+                0x07,
+                RangedVariation::Group0(0xCA, Some(set)),
+            ) => set,
             _ => unreachable!(),
         };
 
@@ -1117,7 +1120,7 @@ mod test {
         assert_eq!(first.variation, Variation::Group0(0xCA));
         assert!(std::matches!(
             first.details,
-            HeaderDetails::OneByteStartStop(0x07, 0x07, RangedVariation::Group0(None))
+            HeaderDetails::OneByteStartStop(0x07, 0x07, RangedVariation::Group0(0xCA, None))
         ));
     }
 

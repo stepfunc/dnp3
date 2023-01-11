@@ -520,7 +520,7 @@ public class MasterExample {
       {
         // ANCHOR: write_attribute
         Request request = new Request();
-        request.addStringAttribute(AttributeVariations.USER_ASSIGNED_LOCATION, ubyte(0), "Bend, OR");
+        request.addStringAttribute(AttributeVariations.USER_ASSIGNED_LOCATION, ubyte(0), "Mt. Olympus");
         channel.sendAndExpectEmptyResponse(association, FunctionCode.WRITE, request).toCompletableFuture().get();
         // ANCHOR_END: write_attribute
         System.out.println("write device attribute success");

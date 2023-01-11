@@ -6,8 +6,128 @@ use scursor::{ReadCursor, ReadError, WriteCursor, WriteError};
 use std::fmt::{Display, Formatter};
 use std::str::Utf8Error;
 
+/// Constants defining attribute variations from set 0
+pub mod var {
+    /// Variation 196
+    pub const CONFIG_ID: u8 = 196;
+    /// Variation 197
+    pub const CONFIG_VERSION: u8 = 197;
+    /// Variation 198
+    pub const CONFIG_BUILD_DATE: u8 = 198;
+    /// Variation 199
+    pub const CONFIG_LAST_CHANGE_DATE: u8 = 199;
+    /// Variation 200
+    pub const CONFIG_DIGEST: u8 = 200;
+    /// Variation 201
+    pub const CONFIG_DIGEST_ALGORITHM: u8 = 201;
+    /// Variation 202
+    pub const MASTER_RESOURCE_ID: u8 = 202;
+    /// Variation 203
+    pub const DEVICE_LOCATION_ALTITUDE: u8 = 203;
+    /// Variation 204
+    pub const DEVICE_LOCATION_LONGITUDE: u8 = 204;
+    /// Variation 205
+    pub const DEVICE_LOCATION_LATITUDE: u8 = 205;
+    /// Variation 206
+    pub const USER_ASSIGNED_SECONDARY_OPERATOR_NAME: u8 = 206;
+    /// Variation 207
+    pub const USER_ASSIGNED_PRIMARY_OPERATOR_NAME: u8 = 207;
+    /// Variation 208
+    pub const USER_ASSIGNED_SYSTEM_NAME: u8 = 208;
+    /// Variation 209
+    pub const SECURE_AUTH_VERSION: u8 = 209;
+    /// Variation 210
+    pub const NUM_SECURITY_STAT_PER_ASSOC: u8 = 210;
+    /// Variation 211
+    pub const USER_SPECIFIC_ATTRIBUTES: u8 = 211;
+    /// Variation 212
+    pub const NUM_MASTER_DEFINED_DATA_SET_PROTO: u8 = 212;
+    /// Variation 213
+    pub const NUM_OUTSTATION_DEFINED_DATA_SET_PROTO: u8 = 213;
+    /// Variation 214
+    pub const NUM_MASTER_DEFINED_DATA_SETS: u8 = 214;
+    /// Variation 215
+    pub const NUM_OUTSTATION_DEFINED_DATA_SETS: u8 = 215;
+    /// Variation 216
+    pub const MAX_BINARY_OUTPUT_PER_REQUEST: u8 = 216;
+    /// Variation 217
+    pub const LOCAL_TIMING_ACCURACY: u8 = 217;
+    /// Variation 218
+    pub const DURATION_OF_TIME_ACCURACY: u8 = 218;
+    /// Variation 219
+    pub const SUPPORTS_ANALOG_OUTPUT_EVENTS: u8 = 219;
+    /// Variation 220
+    pub const MAX_ANALOG_OUTPUT_INDEX: u8 = 220;
+    /// Variation 221
+    pub const NUM_ANALOG_OUTPUT: u8 = 221;
+    /// Variation 222
+    pub const SUPPORTS_BINARY_OUTPUT_EVENTS: u8 = 222;
+    /// Variation 223
+    pub const MAX_BINARY_OUTPUT_INDEX: u8 = 223;
+    /// Variation 224
+    pub const NUM_BINARY_OUTPUT: u8 = 224;
+    /// Variation 225
+    pub const SUPPORTS_FROZEN_COUNTER_EVENTS: u8 = 225;
+    /// Variation 226
+    pub const SUPPORTS_FROZEN_COUNTERS: u8 = 226;
+    /// Variation 227
+    pub const SUPPORTS_COUNTER_EVENTS: u8 = 227;
+    /// Variation 228
+    pub const MAX_COUNTER_INDEX: u8 = 228;
+    /// Variation 229
+    pub const NUM_COUNTER: u8 = 229;
+    /// Variation 230
+    pub const SUPPORTS_FROZEN_ANALOG_INPUTS: u8 = 230;
+    /// Variation 231
+    pub const SUPPORTS_ANALOG_INPUT_EVENTS: u8 = 231;
+    /// Variation 232
+    pub const MAX_ANALOG_INPUT_INDEX: u8 = 232;
+    /// Variation 233
+    pub const NUM_ANALOG_INPUT: u8 = 233;
+    /// Variation 234
+    pub const SUPPORTS_DOUBLE_BIT_BINARY_INPUT_EVENTS: u8 = 234;
+    /// Variation 235
+    pub const MAX_DOUBLE_BIT_BINARY_INPUT_INDEX: u8 = 235;
+    /// Variation 236
+    pub const NUM_DOUBLE_BIT_BINARY_INPUT: u8 = 236;
+    /// Variation 237
+    pub const SUPPORTS_BINARY_INPUT_EVENTS: u8 = 237;
+    /// Variation 238
+    pub const MAX_BINARY_INPUT_INDEX: u8 = 238;
+    /// Variation 239
+    pub const NUM_BINARY_INPUT: u8 = 239;
+    /// Variation 240
+    pub const MAX_TX_FRAGMENT_SIZE: u8 = 240;
+    /// Variation 241
+    pub const MAX_RX_FRAGMENT_SIZE: u8 = 241;
+    /// Variation 242
+    pub const DEVICE_MANUFACTURER_SOFTWARE_VERSION: u8 = 242;
+    /// Variation 243
+    pub const DEVICE_MANUFACTURER_HARDWARE_VERSION: u8 = 243;
+    /// Variation 243
+    pub const USER_ASSIGNED_OWNER_NAME: u8 = 244;
+    /// Variation 245
+    pub const USER_ASSIGNED_LOCATION: u8 = 245;
+    /// Variation 246
+    pub const USER_ASSIGNED_ID: u8 = 246;
+    /// Variation 247
+    pub const USER_ASSIGNED_DEVICE_NAME: u8 = 247;
+    /// Variation 248
+    pub const DEVICE_SERIAL_NUMBER: u8 = 248;
+    /// Variation 249
+    pub const DEVICE_SUBSET_AND_CONFORMANCE: u8 = 249;
+    /// Variation 250
+    pub const PRODUCT_NAME_AND_MODEL: u8 = 250;
+    /// Variation 252
+    pub const DEVICE_MANUFACTURER_NAME: u8 = 252;
+    /// Variation 254
+    pub const ALL_ATTRIBUTES_REQUEST: u8 = 254;
+    /// Variation 255
+    pub const LIST_OF_ATTRIBUTE_VARIATIONS: u8 = 255;
+}
+
 /// Set to which a device attribute belongs
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub enum AttrSet {
     /// The default attribute set defined by DNP3.org
     Default,
@@ -81,7 +201,7 @@ pub enum VariationListAttr {
 }
 
 impl VariationListAttr {
-    fn extract_from(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
+    fn extract(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
         Ok(KnownAttribute::AttributeList(
             self,
             value.expect_attr_list()?,
@@ -144,31 +264,37 @@ pub enum StringAttr {
 }
 
 impl StringAttr {
-    fn extract_from(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
+    fn extract(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
         Ok(KnownAttribute::String(self, value.expect_vstr()?))
     }
 
     /// The variation associated with this string attribute
     pub fn variation(self) -> u8 {
         match self {
-            StringAttr::ConfigId => 196,
-            StringAttr::ConfigVersion => 197,
-            StringAttr::ConfigDigestAlgorithm => 201,
-            StringAttr::MasterResourceId => 202,
-            StringAttr::UserAssignedSecondaryOperatorName => 206,
-            StringAttr::UserAssignedPrimaryOperatorName => 207,
-            StringAttr::UserAssignedSystemName => 208,
-            StringAttr::UserSpecificAttributes => 211,
-            StringAttr::DeviceManufacturerSoftwareVersion => 242,
-            StringAttr::DeviceManufacturerHardwareVersion => 243,
-            StringAttr::UserAssignedOwnerName => 244,
-            StringAttr::UserAssignedLocation => 245,
-            StringAttr::UserAssignedId => 246,
-            StringAttr::UserAssignedDeviceName => 247,
-            StringAttr::DeviceSerialNumber => 248,
-            StringAttr::DeviceSubsetAndConformance => 249,
-            StringAttr::ProductNameAndModel => 250,
-            StringAttr::DeviceManufacturersName => 252,
+            StringAttr::ConfigId => var::CONFIG_ID,
+            StringAttr::ConfigVersion => var::CONFIG_VERSION,
+            StringAttr::ConfigDigestAlgorithm => var::CONFIG_DIGEST_ALGORITHM,
+            StringAttr::MasterResourceId => var::MASTER_RESOURCE_ID,
+            StringAttr::UserAssignedSecondaryOperatorName => {
+                var::USER_ASSIGNED_SECONDARY_OPERATOR_NAME
+            }
+            StringAttr::UserAssignedPrimaryOperatorName => var::USER_ASSIGNED_PRIMARY_OPERATOR_NAME,
+            StringAttr::UserAssignedSystemName => var::USER_ASSIGNED_SYSTEM_NAME,
+            StringAttr::UserSpecificAttributes => var::USER_SPECIFIC_ATTRIBUTES,
+            StringAttr::DeviceManufacturerSoftwareVersion => {
+                var::DEVICE_MANUFACTURER_SOFTWARE_VERSION
+            }
+            StringAttr::DeviceManufacturerHardwareVersion => {
+                var::DEVICE_MANUFACTURER_HARDWARE_VERSION
+            }
+            StringAttr::UserAssignedOwnerName => var::USER_ASSIGNED_OWNER_NAME,
+            StringAttr::UserAssignedLocation => var::USER_ASSIGNED_LOCATION,
+            StringAttr::UserAssignedId => var::USER_ASSIGNED_ID,
+            StringAttr::UserAssignedDeviceName => var::USER_ASSIGNED_DEVICE_NAME,
+            StringAttr::DeviceSerialNumber => var::DEVICE_SERIAL_NUMBER,
+            StringAttr::DeviceSubsetAndConformance => var::DEVICE_SUBSET_AND_CONFORMANCE,
+            StringAttr::ProductNameAndModel => var::PRODUCT_NAME_AND_MODEL,
+            StringAttr::DeviceManufacturersName => var::DEVICE_MANUFACTURER_NAME,
         }
     }
 
@@ -240,36 +366,38 @@ pub enum UIntAttr {
 }
 
 impl UIntAttr {
-    fn extract_from(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
+    fn extract(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
         Ok(KnownAttribute::UInt(self, value.expect_uint()?))
     }
 
     /// The variation associated with this string attribute
     pub fn variation(self) -> u8 {
         match self {
-            UIntAttr::SecureAuthVersion => 209,
-            UIntAttr::NumSecurityStatsPerAssoc => 210,
-            UIntAttr::NumMasterDefinedDataSetProto => 212,
-            UIntAttr::NumOutstationDefinedDataSetProto => 213,
-            UIntAttr::NumMasterDefinedDataSets => 214,
-            UIntAttr::NumOutstationDefinedDataSets => 215,
-            UIntAttr::MaxBinaryOutputPerRequest => 216,
-            UIntAttr::LocalTimingAccuracy => 217,
-            UIntAttr::DurationOfTimeAccuracy => 218,
-            UIntAttr::MaxAnalogOutputIndex => 220,
-            UIntAttr::NumAnalogOutputs => 221,
-            UIntAttr::MaxBinaryOutputIndex => 223,
-            UIntAttr::NumBinaryOutputs => 224,
-            UIntAttr::MaxCounterIndex => 228,
-            UIntAttr::NumCounter => 229,
-            UIntAttr::MaxAnalogInputIndex => 232,
-            UIntAttr::NumAnalogInput => 233,
-            UIntAttr::MaxDoubleBitBinaryInputIndex => 235,
-            UIntAttr::NumDoubleBitBinaryInput => 236,
-            UIntAttr::MaxBinaryInputIndex => 238,
-            UIntAttr::NumBinaryInput => 239,
-            UIntAttr::MaxTxFragmentSize => 240,
-            UIntAttr::MaxRxFragmentSize => 241,
+            UIntAttr::SecureAuthVersion => var::SECURE_AUTH_VERSION,
+            UIntAttr::NumSecurityStatsPerAssoc => var::NUM_SECURITY_STAT_PER_ASSOC,
+            UIntAttr::NumMasterDefinedDataSetProto => var::NUM_MASTER_DEFINED_DATA_SET_PROTO,
+            UIntAttr::NumOutstationDefinedDataSetProto => {
+                var::NUM_OUTSTATION_DEFINED_DATA_SET_PROTO
+            }
+            UIntAttr::NumMasterDefinedDataSets => var::NUM_MASTER_DEFINED_DATA_SETS,
+            UIntAttr::NumOutstationDefinedDataSets => var::NUM_OUTSTATION_DEFINED_DATA_SETS,
+            UIntAttr::MaxBinaryOutputPerRequest => var::MAX_BINARY_OUTPUT_PER_REQUEST,
+            UIntAttr::LocalTimingAccuracy => var::LOCAL_TIMING_ACCURACY,
+            UIntAttr::DurationOfTimeAccuracy => var::DURATION_OF_TIME_ACCURACY,
+            UIntAttr::MaxAnalogOutputIndex => var::MAX_ANALOG_OUTPUT_INDEX,
+            UIntAttr::NumAnalogOutputs => var::NUM_ANALOG_OUTPUT,
+            UIntAttr::MaxBinaryOutputIndex => var::MAX_BINARY_OUTPUT_INDEX,
+            UIntAttr::NumBinaryOutputs => var::NUM_BINARY_OUTPUT,
+            UIntAttr::MaxCounterIndex => var::MAX_COUNTER_INDEX,
+            UIntAttr::NumCounter => var::NUM_COUNTER,
+            UIntAttr::MaxAnalogInputIndex => var::MAX_ANALOG_INPUT_INDEX,
+            UIntAttr::NumAnalogInput => var::NUM_ANALOG_INPUT,
+            UIntAttr::MaxDoubleBitBinaryInputIndex => var::MAX_DOUBLE_BIT_BINARY_INPUT_INDEX,
+            UIntAttr::NumDoubleBitBinaryInput => var::NUM_DOUBLE_BIT_BINARY_INPUT,
+            UIntAttr::MaxBinaryInputIndex => var::MAX_BINARY_INPUT_INDEX,
+            UIntAttr::NumBinaryInput => var::NUM_BINARY_INPUT,
+            UIntAttr::MaxTxFragmentSize => var::MAX_TX_FRAGMENT_SIZE,
+            UIntAttr::MaxRxFragmentSize => var::MAX_RX_FRAGMENT_SIZE,
         }
     }
 
@@ -315,22 +443,24 @@ pub enum BoolAttr {
 }
 
 impl BoolAttr {
-    fn extract_from(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
+    fn extract(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
         Ok(KnownAttribute::Bool(self, value.expect_bool()?))
     }
 
     /// The variation associated with this string attribute
     pub fn variation(self) -> u8 {
         match self {
-            BoolAttr::SupportsAnalogOutputEvents => 219,
-            BoolAttr::SupportsBinaryOutputEvents => 222,
-            BoolAttr::SupportsFrozenCounterEvents => 225,
-            BoolAttr::SupportsFrozenCounters => 226,
-            BoolAttr::SupportsCounterEvents => 227,
-            BoolAttr::SupportsFrozenAnalogInputs => 230,
-            BoolAttr::SupportsAnalogInputEvents => 231,
-            BoolAttr::SupportsDoubleBitBinaryInputEvents => 234,
-            BoolAttr::SupportsBinaryInputEvents => 237,
+            BoolAttr::SupportsAnalogOutputEvents => var::SUPPORTS_ANALOG_OUTPUT_EVENTS,
+            BoolAttr::SupportsBinaryOutputEvents => var::SUPPORTS_BINARY_OUTPUT_EVENTS,
+            BoolAttr::SupportsFrozenCounterEvents => var::SUPPORTS_FROZEN_COUNTER_EVENTS,
+            BoolAttr::SupportsFrozenCounters => var::SUPPORTS_FROZEN_COUNTERS,
+            BoolAttr::SupportsCounterEvents => var::SUPPORTS_COUNTER_EVENTS,
+            BoolAttr::SupportsFrozenAnalogInputs => var::SUPPORTS_FROZEN_ANALOG_INPUTS,
+            BoolAttr::SupportsAnalogInputEvents => var::SUPPORTS_ANALOG_INPUT_EVENTS,
+            BoolAttr::SupportsDoubleBitBinaryInputEvents => {
+                var::SUPPORTS_DOUBLE_BIT_BINARY_INPUT_EVENTS
+            }
+            BoolAttr::SupportsBinaryInputEvents => var::SUPPORTS_BINARY_INPUT_EVENTS,
         }
     }
 
@@ -360,15 +490,15 @@ pub enum TimeAttr {
 }
 
 impl TimeAttr {
-    fn extract_from(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
+    fn extract(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
         Ok(KnownAttribute::DNP3Time(self, value.expect_time()?))
     }
 
     /// The variation associated with this string attribute
     pub fn variation(self) -> u8 {
         match self {
-            TimeAttr::ConfigBuildDate => 198,
-            TimeAttr::ConfigLastChangeDate => 199,
+            TimeAttr::ConfigBuildDate => var::CONFIG_BUILD_DATE,
+            TimeAttr::ConfigLastChangeDate => var::CONFIG_LAST_CHANGE_DATE,
         }
     }
 
@@ -396,7 +526,7 @@ pub enum OctetStringAttr {
 }
 
 impl OctetStringAttr {
-    fn extract_from(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
+    fn extract(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
         Ok(KnownAttribute::OctetString(
             self,
             value.expect_octet_string()?,
@@ -406,7 +536,7 @@ impl OctetStringAttr {
     /// The variation associated with this string attribute
     pub fn variation(self) -> u8 {
         match self {
-            OctetStringAttr::ConfigDigest => 201,
+            OctetStringAttr::ConfigDigest => var::CONFIG_DIGEST,
         }
     }
 
@@ -429,7 +559,7 @@ impl From<OctetStringAttr> for u8 {
 /// Enumeration of all known float attributes
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum FloatAttr {
-    /// Variation 203 - Altitude of the device
+    /// Variation 203 - Altitude of the device in meters
     DeviceLocationAltitude,
     /// Variation 204 - Longitude of the device from reference meridian (-180.0 to 180.0 deg)
     DeviceLocationLongitude,
@@ -438,16 +568,16 @@ pub enum FloatAttr {
 }
 
 impl FloatAttr {
-    fn extract_from(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
+    fn extract(self, value: AttrValue) -> Result<KnownAttribute, TypeError> {
         Ok(KnownAttribute::Float(self, value.expect_float()?))
     }
 
     /// The variation associated with this string attribute
     pub fn variation(self) -> u8 {
         match self {
-            FloatAttr::DeviceLocationAltitude => 203,
-            FloatAttr::DeviceLocationLongitude => 204,
-            FloatAttr::DeviceLocationLatitude => 205,
+            FloatAttr::DeviceLocationAltitude => var::DEVICE_LOCATION_ALTITUDE,
+            FloatAttr::DeviceLocationLongitude => var::DEVICE_LOCATION_LONGITUDE,
+            FloatAttr::DeviceLocationLatitude => var::DEVICE_LOCATION_LATITUDE,
         }
     }
 
@@ -490,69 +620,134 @@ pub enum KnownAttribute<'a> {
 }
 
 impl<'a> AnyAttribute<'a> {
-    pub(crate) fn try_from(attr: &Attribute<'a>) -> Result<Self, TypeError> {
+    /// Try to construct from a raw attribute
+    pub fn try_from(attr: &Attribute<'a>) -> Result<Self, TypeError> {
         if let AttrSet::Private(_) = attr.set {
             return Ok(AnyAttribute::Other(*attr));
         }
 
         let known = match attr.variation {
-            196 => StringAttr::ConfigId.extract_from(attr.value)?,
-            197 => StringAttr::ConfigVersion.extract_from(attr.value)?,
-            198 => TimeAttr::ConfigBuildDate.extract_from(attr.value)?,
-            199 => TimeAttr::ConfigLastChangeDate.extract_from(attr.value)?,
-            200 => OctetStringAttr::ConfigDigest.extract_from(attr.value)?,
-            201 => StringAttr::ConfigDigestAlgorithm.extract_from(attr.value)?,
-            202 => StringAttr::MasterResourceId.extract_from(attr.value)?,
-            203 => FloatAttr::DeviceLocationAltitude.extract_from(attr.value)?,
-            204 => FloatAttr::DeviceLocationLongitude.extract_from(attr.value)?,
-            205 => FloatAttr::DeviceLocationLatitude.extract_from(attr.value)?,
-            206 => StringAttr::UserAssignedSecondaryOperatorName.extract_from(attr.value)?,
-            207 => StringAttr::UserAssignedPrimaryOperatorName.extract_from(attr.value)?,
-            208 => StringAttr::UserAssignedSystemName.extract_from(attr.value)?,
-            209 => UIntAttr::SecureAuthVersion.extract_from(attr.value)?,
-            210 => UIntAttr::NumSecurityStatsPerAssoc.extract_from(attr.value)?,
-            211 => StringAttr::UserSpecificAttributes.extract_from(attr.value)?,
-            212 => UIntAttr::NumMasterDefinedDataSetProto.extract_from(attr.value)?,
-            213 => UIntAttr::NumOutstationDefinedDataSetProto.extract_from(attr.value)?,
-            214 => UIntAttr::NumMasterDefinedDataSets.extract_from(attr.value)?,
-            215 => UIntAttr::NumOutstationDefinedDataSets.extract_from(attr.value)?,
-            216 => UIntAttr::MaxBinaryOutputPerRequest.extract_from(attr.value)?,
-            217 => UIntAttr::LocalTimingAccuracy.extract_from(attr.value)?,
-            218 => UIntAttr::DurationOfTimeAccuracy.extract_from(attr.value)?,
-            219 => BoolAttr::SupportsAnalogOutputEvents.extract_from(attr.value)?,
-            220 => UIntAttr::MaxAnalogOutputIndex.extract_from(attr.value)?,
-            221 => UIntAttr::NumAnalogOutputs.extract_from(attr.value)?,
-            222 => BoolAttr::SupportsBinaryOutputEvents.extract_from(attr.value)?,
-            223 => UIntAttr::MaxBinaryInputIndex.extract_from(attr.value)?,
-            224 => UIntAttr::NumBinaryOutputs.extract_from(attr.value)?,
-            225 => BoolAttr::SupportsFrozenCounterEvents.extract_from(attr.value)?,
-            226 => BoolAttr::SupportsFrozenCounters.extract_from(attr.value)?,
-            227 => BoolAttr::SupportsCounterEvents.extract_from(attr.value)?,
-            228 => UIntAttr::MaxCounterIndex.extract_from(attr.value)?,
-            229 => UIntAttr::NumCounter.extract_from(attr.value)?,
-            230 => BoolAttr::SupportsFrozenAnalogInputs.extract_from(attr.value)?,
-            231 => BoolAttr::SupportsAnalogInputEvents.extract_from(attr.value)?,
-            232 => UIntAttr::MaxAnalogInputIndex.extract_from(attr.value)?,
-            233 => UIntAttr::NumAnalogInput.extract_from(attr.value)?,
-            234 => BoolAttr::SupportsDoubleBitBinaryInputEvents.extract_from(attr.value)?,
-            235 => UIntAttr::MaxDoubleBitBinaryInputIndex.extract_from(attr.value)?,
-            236 => UIntAttr::NumDoubleBitBinaryInput.extract_from(attr.value)?,
-            237 => BoolAttr::SupportsBinaryInputEvents.extract_from(attr.value)?,
-            238 => UIntAttr::MaxBinaryInputIndex.extract_from(attr.value)?,
-            239 => UIntAttr::NumBinaryInput.extract_from(attr.value)?,
-            240 => UIntAttr::MaxTxFragmentSize.extract_from(attr.value)?,
-            241 => UIntAttr::MaxRxFragmentSize.extract_from(attr.value)?,
-            242 => StringAttr::DeviceManufacturerSoftwareVersion.extract_from(attr.value)?,
-            243 => StringAttr::DeviceManufacturerHardwareVersion.extract_from(attr.value)?,
-            244 => StringAttr::UserAssignedOwnerName.extract_from(attr.value)?,
-            245 => StringAttr::UserAssignedLocation.extract_from(attr.value)?,
-            246 => StringAttr::UserAssignedId.extract_from(attr.value)?,
-            247 => StringAttr::UserAssignedDeviceName.extract_from(attr.value)?,
-            248 => StringAttr::DeviceSerialNumber.extract_from(attr.value)?,
-            249 => StringAttr::DeviceSubsetAndConformance.extract_from(attr.value)?,
-            250 => StringAttr::ProductNameAndModel.extract_from(attr.value)?,
-            252 => StringAttr::DeviceManufacturersName.extract_from(attr.value)?,
-            255 => VariationListAttr::ListOfVariations.extract_from(attr.value)?,
+            var::CONFIG_ID => StringAttr::ConfigId.extract(attr.value)?,
+            var::CONFIG_VERSION => StringAttr::ConfigVersion.extract(attr.value)?,
+            var::CONFIG_BUILD_DATE => TimeAttr::ConfigBuildDate.extract(attr.value)?,
+            var::CONFIG_LAST_CHANGE_DATE => TimeAttr::ConfigLastChangeDate.extract(attr.value)?,
+            var::CONFIG_DIGEST => OctetStringAttr::ConfigDigest.extract(attr.value)?,
+            var::CONFIG_DIGEST_ALGORITHM => {
+                StringAttr::ConfigDigestAlgorithm.extract(attr.value)?
+            }
+            var::MASTER_RESOURCE_ID => StringAttr::MasterResourceId.extract(attr.value)?,
+            var::DEVICE_LOCATION_ALTITUDE => {
+                FloatAttr::DeviceLocationAltitude.extract(attr.value)?
+            }
+            var::DEVICE_LOCATION_LONGITUDE => {
+                FloatAttr::DeviceLocationLongitude.extract(attr.value)?
+            }
+            var::DEVICE_LOCATION_LATITUDE => {
+                FloatAttr::DeviceLocationLatitude.extract(attr.value)?
+            }
+            var::USER_ASSIGNED_SECONDARY_OPERATOR_NAME => {
+                StringAttr::UserAssignedSecondaryOperatorName.extract(attr.value)?
+            }
+            var::USER_ASSIGNED_PRIMARY_OPERATOR_NAME => {
+                StringAttr::UserAssignedPrimaryOperatorName.extract(attr.value)?
+            }
+            var::USER_ASSIGNED_SYSTEM_NAME => {
+                StringAttr::UserAssignedSystemName.extract(attr.value)?
+            }
+            var::SECURE_AUTH_VERSION => UIntAttr::SecureAuthVersion.extract(attr.value)?,
+            var::NUM_SECURITY_STAT_PER_ASSOC => {
+                UIntAttr::NumSecurityStatsPerAssoc.extract(attr.value)?
+            }
+            var::USER_SPECIFIC_ATTRIBUTES => {
+                StringAttr::UserSpecificAttributes.extract(attr.value)?
+            }
+            var::NUM_MASTER_DEFINED_DATA_SET_PROTO => {
+                UIntAttr::NumMasterDefinedDataSetProto.extract(attr.value)?
+            }
+            var::NUM_OUTSTATION_DEFINED_DATA_SET_PROTO => {
+                UIntAttr::NumOutstationDefinedDataSetProto.extract(attr.value)?
+            }
+            var::NUM_MASTER_DEFINED_DATA_SETS => {
+                UIntAttr::NumMasterDefinedDataSets.extract(attr.value)?
+            }
+            var::NUM_OUTSTATION_DEFINED_DATA_SETS => {
+                UIntAttr::NumOutstationDefinedDataSets.extract(attr.value)?
+            }
+            var::MAX_BINARY_OUTPUT_PER_REQUEST => {
+                UIntAttr::MaxBinaryOutputPerRequest.extract(attr.value)?
+            }
+            var::LOCAL_TIMING_ACCURACY => UIntAttr::LocalTimingAccuracy.extract(attr.value)?,
+            var::DURATION_OF_TIME_ACCURACY => {
+                UIntAttr::DurationOfTimeAccuracy.extract(attr.value)?
+            }
+            var::SUPPORTS_ANALOG_OUTPUT_EVENTS => {
+                BoolAttr::SupportsAnalogOutputEvents.extract(attr.value)?
+            }
+            var::MAX_ANALOG_OUTPUT_INDEX => UIntAttr::MaxAnalogOutputIndex.extract(attr.value)?,
+            var::NUM_ANALOG_OUTPUT => UIntAttr::NumAnalogOutputs.extract(attr.value)?,
+            var::SUPPORTS_BINARY_OUTPUT_EVENTS => {
+                BoolAttr::SupportsBinaryOutputEvents.extract(attr.value)?
+            }
+            var::MAX_BINARY_OUTPUT_INDEX => UIntAttr::MaxBinaryOutputIndex.extract(attr.value)?,
+            var::NUM_BINARY_OUTPUT => UIntAttr::NumBinaryOutputs.extract(attr.value)?,
+            var::SUPPORTS_FROZEN_COUNTER_EVENTS => {
+                BoolAttr::SupportsFrozenCounterEvents.extract(attr.value)?
+            }
+            var::SUPPORTS_FROZEN_COUNTERS => {
+                BoolAttr::SupportsFrozenCounters.extract(attr.value)?
+            }
+            var::SUPPORTS_COUNTER_EVENTS => BoolAttr::SupportsCounterEvents.extract(attr.value)?,
+            var::MAX_COUNTER_INDEX => UIntAttr::MaxCounterIndex.extract(attr.value)?,
+            var::NUM_COUNTER => UIntAttr::NumCounter.extract(attr.value)?,
+            var::SUPPORTS_FROZEN_ANALOG_INPUTS => {
+                BoolAttr::SupportsFrozenAnalogInputs.extract(attr.value)?
+            }
+            var::SUPPORTS_ANALOG_INPUT_EVENTS => {
+                BoolAttr::SupportsAnalogInputEvents.extract(attr.value)?
+            }
+            var::MAX_ANALOG_INPUT_INDEX => UIntAttr::MaxAnalogInputIndex.extract(attr.value)?,
+            var::NUM_ANALOG_INPUT => UIntAttr::NumAnalogInput.extract(attr.value)?,
+            var::SUPPORTS_DOUBLE_BIT_BINARY_INPUT_EVENTS => {
+                BoolAttr::SupportsDoubleBitBinaryInputEvents.extract(attr.value)?
+            }
+            var::MAX_DOUBLE_BIT_BINARY_INPUT_INDEX => {
+                UIntAttr::MaxDoubleBitBinaryInputIndex.extract(attr.value)?
+            }
+            var::NUM_DOUBLE_BIT_BINARY_INPUT => {
+                UIntAttr::NumDoubleBitBinaryInput.extract(attr.value)?
+            }
+            var::SUPPORTS_BINARY_INPUT_EVENTS => {
+                BoolAttr::SupportsBinaryInputEvents.extract(attr.value)?
+            }
+            var::MAX_BINARY_INPUT_INDEX => UIntAttr::MaxBinaryInputIndex.extract(attr.value)?,
+            var::NUM_BINARY_INPUT => UIntAttr::NumBinaryInput.extract(attr.value)?,
+            var::MAX_TX_FRAGMENT_SIZE => UIntAttr::MaxTxFragmentSize.extract(attr.value)?,
+            var::MAX_RX_FRAGMENT_SIZE => UIntAttr::MaxRxFragmentSize.extract(attr.value)?,
+            var::DEVICE_MANUFACTURER_SOFTWARE_VERSION => {
+                StringAttr::DeviceManufacturerSoftwareVersion.extract(attr.value)?
+            }
+            var::DEVICE_MANUFACTURER_HARDWARE_VERSION => {
+                StringAttr::DeviceManufacturerHardwareVersion.extract(attr.value)?
+            }
+            var::USER_ASSIGNED_OWNER_NAME => {
+                StringAttr::UserAssignedOwnerName.extract(attr.value)?
+            }
+            var::USER_ASSIGNED_LOCATION => StringAttr::UserAssignedLocation.extract(attr.value)?,
+            var::USER_ASSIGNED_ID => StringAttr::UserAssignedId.extract(attr.value)?,
+            var::USER_ASSIGNED_DEVICE_NAME => {
+                StringAttr::UserAssignedDeviceName.extract(attr.value)?
+            }
+            var::DEVICE_SERIAL_NUMBER => StringAttr::DeviceSerialNumber.extract(attr.value)?,
+            var::DEVICE_SUBSET_AND_CONFORMANCE => {
+                StringAttr::DeviceSubsetAndConformance.extract(attr.value)?
+            }
+            var::PRODUCT_NAME_AND_MODEL => StringAttr::ProductNameAndModel.extract(attr.value)?,
+            var::DEVICE_MANUFACTURER_NAME => {
+                StringAttr::DeviceManufacturersName.extract(attr.value)?
+            }
+            var::LIST_OF_ATTRIBUTE_VARIATIONS => {
+                VariationListAttr::ListOfVariations.extract(attr.value)?
+            }
             _ => return Ok(AnyAttribute::Other(*attr)),
         };
 
@@ -593,6 +788,22 @@ pub(crate) enum AttrDataType {
     AttrList,
     /// Extended list of UINT8-BSTR8 pairs
     ExtAttrList,
+}
+
+impl From<AttrDataType> for u8 {
+    fn from(value: AttrDataType) -> Self {
+        match value {
+            AttrDataType::VisibleString => VISIBLE_STRING,
+            AttrDataType::UnsignedInt => UNSIGNED_INT,
+            AttrDataType::SignedInt => SIGNED_INT,
+            AttrDataType::FloatingPoint => FLOATING_POINT,
+            AttrDataType::OctetString => OCTET_STRING,
+            AttrDataType::BitString => BIT_STRING,
+            AttrDataType::Dnp3Time => DNP3_TIME,
+            AttrDataType::AttrList => ATTR_LIST,
+            AttrDataType::ExtAttrList => EXT_ATTR_LIST,
+        }
+    }
 }
 
 impl AttrDataType {
@@ -652,7 +863,7 @@ impl AttrProp {
     const READ_BIT: u8 = 0x01;
 
     /// Construct `AttrProp` with the write-able bit set
-    pub fn writable(self) -> Self {
+    pub const fn writable() -> Self {
         Self { is_writable: true }
     }
 
@@ -665,6 +876,12 @@ impl AttrProp {
         Self {
             is_writable: props & Self::READ_BIT != 0,
         }
+    }
+}
+
+impl From<AttrProp> for u8 {
+    fn from(value: AttrProp) -> Self {
+        value.is_writable.into()
     }
 }
 
@@ -727,6 +944,36 @@ pub enum AttrValue<'a> {
     AttrList(VariationList<'a>),
 }
 
+impl<'a> AttrValue<'a> {
+    pub(crate) fn data_type(&self) -> AttrDataType {
+        match self {
+            Self::VisibleString(_) => AttrDataType::VisibleString,
+            Self::UnsignedInt(_) => AttrDataType::UnsignedInt,
+            Self::SignedInt(_) => AttrDataType::SignedInt,
+            Self::FloatingPoint(_) => AttrDataType::FloatingPoint,
+            Self::OctetString(_) => AttrDataType::OctetString,
+            Self::Dnp3Time(_) => AttrDataType::Dnp3Time,
+            Self::BitString(_) => AttrDataType::BitString,
+            Self::AttrList(_) => AttrDataType::AttrList,
+        }
+    }
+
+    pub(crate) fn to_owned(self) -> Option<OwnedAttrValue> {
+        let attr = match self {
+            AttrValue::VisibleString(x) => OwnedAttrValue::VisibleString(x.to_string()),
+            AttrValue::UnsignedInt(x) => OwnedAttrValue::UnsignedInt(x),
+            AttrValue::SignedInt(x) => OwnedAttrValue::SignedInt(x),
+            AttrValue::FloatingPoint(x) => OwnedAttrValue::FloatingPoint(x),
+            AttrValue::OctetString(x) => OwnedAttrValue::OctetString(x.to_vec()),
+            AttrValue::Dnp3Time(x) => OwnedAttrValue::Dnp3Time(x),
+            AttrValue::BitString(x) => OwnedAttrValue::BitString(x.to_vec()),
+            AttrValue::AttrList(_) => return None,
+        };
+
+        Some(attr)
+    }
+}
+
 /// Represents the value of an attribute
 ///
 /// This type owns all of its data unlike [AttrValue].
@@ -746,6 +993,32 @@ pub enum OwnedAttrValue {
     Dnp3Time(Timestamp),
     /// BSTR - Bit string
     BitString(Vec<u8>),
+}
+
+impl OwnedAttrValue {
+    pub(crate) fn data_type(&self) -> AttrDataType {
+        match self {
+            OwnedAttrValue::VisibleString(_) => AttrDataType::VisibleString,
+            OwnedAttrValue::UnsignedInt(_) => AttrDataType::UnsignedInt,
+            OwnedAttrValue::SignedInt(_) => AttrDataType::SignedInt,
+            OwnedAttrValue::FloatingPoint(_) => AttrDataType::FloatingPoint,
+            OwnedAttrValue::OctetString(_) => AttrDataType::OctetString,
+            OwnedAttrValue::Dnp3Time(_) => AttrDataType::Dnp3Time,
+            OwnedAttrValue::BitString(_) => AttrDataType::BitString,
+        }
+    }
+
+    pub(crate) fn view(&self) -> AttrValue {
+        match self {
+            OwnedAttrValue::VisibleString(x) => AttrValue::VisibleString(x.as_str()),
+            OwnedAttrValue::UnsignedInt(x) => AttrValue::UnsignedInt(*x),
+            OwnedAttrValue::SignedInt(x) => AttrValue::SignedInt(*x),
+            OwnedAttrValue::FloatingPoint(x) => AttrValue::FloatingPoint(*x),
+            OwnedAttrValue::OctetString(x) => AttrValue::OctetString(x.as_slice()),
+            OwnedAttrValue::Dnp3Time(x) => AttrValue::Dnp3Time(*x),
+            OwnedAttrValue::BitString(x) => AttrValue::BitString(x.as_slice()),
+        }
+    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -927,13 +1200,13 @@ impl OwnedAttrValue {
 
 /// Expected type X but received type Y
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub(crate) struct TypeError {
+pub struct TypeError {
     pub(crate) expected: AttrDataType,
     pub(crate) actual: AttrDataType,
 }
 
 impl TypeError {
-    fn new(expected: AttrDataType, actual: AttrDataType) -> Self {
+    pub(crate) fn new(expected: AttrDataType, actual: AttrDataType) -> Self {
         Self { expected, actual }
     }
 }
@@ -941,21 +1214,21 @@ impl TypeError {
 impl<'a> AttrValue<'a> {
     pub(crate) fn format(&self, f: &mut Formatter) -> std::fmt::Result {
         match self {
-            AttrValue::VisibleString(x) => write!(f, "visible string: {x}"),
-            AttrValue::UnsignedInt(x) => write!(f, "unsigned int: {x}"),
-            AttrValue::SignedInt(x) => write!(f, "signed int: {x}"),
+            AttrValue::VisibleString(x) => write!(f, "\nvisible string: {x}"),
+            AttrValue::UnsignedInt(x) => write!(f, "\nunsigned int: {x}"),
+            AttrValue::SignedInt(x) => write!(f, "\nsigned int: {x}"),
             AttrValue::FloatingPoint(x) => match x {
-                FloatType::F32(x) => write!(f, "float32: {x}"),
-                FloatType::F64(x) => write!(f, "float64: {x}"),
+                FloatType::F32(x) => write!(f, "\nfloat32: {x}"),
+                FloatType::F64(x) => write!(f, "\nfloat64: {x}"),
             },
-            AttrValue::OctetString(x) => write!(f, "octet string len == {}", x.len()),
-            AttrValue::BitString(x) => write!(f, "bit string len == {}", x.len()),
-            AttrValue::Dnp3Time(x) => write!(f, "{x}"),
+            AttrValue::OctetString(x) => write!(f, "\noctet string len == {}", x.len()),
+            AttrValue::BitString(x) => write!(f, "\nbit string len == {}", x.len()),
+            AttrValue::Dnp3Time(x) => write!(f, "\n{x}"),
             AttrValue::AttrList(list) => {
                 for x in list.iter() {
                     write!(
                         f,
-                        "\n variation: {} writeable: {}",
+                        "\nvariation: {} writeable: {}",
                         x.variation, x.properties.is_writable
                     )?;
                 }
@@ -1031,6 +1304,17 @@ pub struct Attribute<'a> {
     pub value: AttrValue<'a>,
 }
 
+impl<'a> Attribute<'a> {
+    pub(crate) fn to_owned(self) -> Option<OwnedAttribute> {
+        let value = self.value.to_owned()?;
+        Some(OwnedAttribute {
+            set: self.set,
+            variation: self.variation,
+            value,
+        })
+    }
+}
+
 /// Attribute value and the set to which it belongs
 ///
 /// This type owns all of its data unlike [Attribute].
@@ -1053,67 +1337,79 @@ impl OwnedAttribute {
             value,
         }
     }
+
+    pub(crate) fn view(&self) -> Attribute {
+        Attribute {
+            set: self.set,
+            variation: self.variation,
+            value: self.value.view(),
+        }
+    }
 }
 
 fn get_default_desc(var: u8) -> &'static str {
     match var {
-        196 => "Configuration ID",
-        197 => "Configuration version",
-        198 => "Configuration build date",
-        199 => "Configuration last change date",
-        200 => "Configuration digest",
-        201 => "Configuration digest algorithm",
-        202 => "Master resource ID",
-        203 => "Device location altitude",
-        204 => "Device location longitude",
-        205 => "Device location latitude",
-        206 => "User-assigned secondary operator name",
-        207 => "User-assigned primary operator name",
-        208 => "User-assigned system name",
-        209 => "Secure authentication version",
-        210 => "Number of security statistics per association",
-        211 => "Identification of support for user-specific attributes",
-        212 => "Number of master-defined data set prototypes",
-        213 => "Number of outstation-defined data set prototypes",
-        214 => "Number of master-defined data sets",
-        215 => "Number of outstation-defined data sets",
-        216 => "Maximum number of binary output objects per request",
-        217 => "Local timing accuracy",
-        218 => "Duration of time accuracy",
-        219 => "Support for analog output events",
-        220 => "Maximum analog output index",
-        221 => "Number of analog outputs",
-        222 => "Support for binary output events",
-        223 => "Maximum binary output index",
-        224 => "Number of binary outputs",
-        225 => "Support for frozen counter events",
-        226 => "Support for frozen counters",
-        227 => "Support for counter events",
-        228 => "Maximum counter index",
-        229 => "Number of counter points",
-        230 => "Support for frozen analog inputs",
-        231 => "Support for analog input events",
-        232 => "Maximum analog input index",
-        233 => "Number of analog input points",
-        234 => "Support for double-bit binary input events",
-        235 => "Maximum double-bit binary input index",
-        236 => "Number of double-bit binary input points",
-        237 => "Support for binary input events",
-        238 => "Maximum binary input index",
-        239 => "Number of binary input points",
-        240 => "Maximum transmit fragment size",
-        241 => "Maximum receive fragment size",
-        242 => "Device manufacturer's software version",
-        243 => "Device manufacturer's hardware version",
-        244 => "User-assigned owner name",
-        245 => "User-assigned location name",
-        246 => "User-assigned ID code/number",
-        247 => "User-assigned device name",
-        248 => "Device serial number",
-        249 => "DNP3 subset and conformance",
-        250 => "Device manufacturer's product name and model",
-        252 => "Device manufacturer's name",
-        255 => "List of attribute variations",
+        var::CONFIG_ID => "Configuration ID",
+        var::CONFIG_VERSION => "Configuration version",
+        var::CONFIG_BUILD_DATE => "Configuration build date",
+        var::CONFIG_LAST_CHANGE_DATE => "Configuration last change date",
+        var::CONFIG_DIGEST => "Configuration digest",
+        var::CONFIG_DIGEST_ALGORITHM => "Configuration digest algorithm",
+        var::MASTER_RESOURCE_ID => "Master resource ID",
+        var::DEVICE_LOCATION_ALTITUDE => "Device location altitude",
+        var::DEVICE_LOCATION_LONGITUDE => "Device location longitude",
+        var::DEVICE_LOCATION_LATITUDE => "Device location latitude",
+        var::USER_ASSIGNED_SECONDARY_OPERATOR_NAME => "User-assigned secondary operator name",
+        var::USER_ASSIGNED_PRIMARY_OPERATOR_NAME => "User-assigned primary operator name",
+        var::USER_ASSIGNED_SYSTEM_NAME => "User-assigned system name",
+        var::SECURE_AUTH_VERSION => "Secure authentication version",
+        var::NUM_SECURITY_STAT_PER_ASSOC => "Number of security statistics per association",
+        var::USER_SPECIFIC_ATTRIBUTES => "Identification of support for user-specific attributes",
+        var::NUM_MASTER_DEFINED_DATA_SET_PROTO => "Number of master-defined data set prototypes",
+        var::NUM_OUTSTATION_DEFINED_DATA_SET_PROTO => {
+            "Number of outstation-defined data set prototypes"
+        }
+        var::NUM_MASTER_DEFINED_DATA_SETS => "Number of master-defined data sets",
+        var::NUM_OUTSTATION_DEFINED_DATA_SETS => "Number of outstation-defined data sets",
+        var::MAX_BINARY_OUTPUT_PER_REQUEST => "Maximum number of binary output objects per request",
+        var::LOCAL_TIMING_ACCURACY => "Local timing accuracy",
+        var::DURATION_OF_TIME_ACCURACY => "Duration of time accuracy",
+        var::SUPPORTS_ANALOG_OUTPUT_EVENTS => "Support for analog output events",
+        var::MAX_ANALOG_OUTPUT_INDEX => "Maximum analog output index",
+        var::NUM_ANALOG_OUTPUT => "Number of analog outputs",
+        var::SUPPORTS_BINARY_OUTPUT_EVENTS => "Support for binary output events",
+        var::MAX_BINARY_OUTPUT_INDEX => "Maximum binary output index",
+        var::NUM_BINARY_OUTPUT => "Number of binary outputs",
+        var::SUPPORTS_FROZEN_COUNTER_EVENTS => "Support for frozen counter events",
+        var::SUPPORTS_FROZEN_COUNTERS => "Support for frozen counters",
+        var::SUPPORTS_COUNTER_EVENTS => "Support for counter events",
+        var::MAX_COUNTER_INDEX => "Maximum counter index",
+        var::NUM_COUNTER => "Number of counter points",
+        var::SUPPORTS_FROZEN_ANALOG_INPUTS => "Support for frozen analog inputs",
+        var::SUPPORTS_ANALOG_INPUT_EVENTS => "Support for analog input events",
+        var::MAX_ANALOG_INPUT_INDEX => "Maximum analog input index",
+        var::NUM_ANALOG_INPUT => "Number of analog input points",
+        var::SUPPORTS_DOUBLE_BIT_BINARY_INPUT_EVENTS => {
+            "Support for double-bit binary input events"
+        }
+        var::MAX_DOUBLE_BIT_BINARY_INPUT_INDEX => "Maximum double-bit binary input index",
+        var::NUM_DOUBLE_BIT_BINARY_INPUT => "Number of double-bit binary input points",
+        var::SUPPORTS_BINARY_INPUT_EVENTS => "Support for binary input events",
+        var::MAX_BINARY_INPUT_INDEX => "Maximum binary input index",
+        var::NUM_BINARY_INPUT => "Number of binary input points",
+        var::MAX_TX_FRAGMENT_SIZE => "Maximum transmit fragment size",
+        var::MAX_RX_FRAGMENT_SIZE => "Maximum receive fragment size",
+        var::DEVICE_MANUFACTURER_SOFTWARE_VERSION => "Device manufacturer's software version",
+        var::DEVICE_MANUFACTURER_HARDWARE_VERSION => "Device manufacturer's hardware version",
+        var::USER_ASSIGNED_OWNER_NAME => "User-assigned owner name",
+        var::USER_ASSIGNED_LOCATION => "User-assigned location name",
+        var::USER_ASSIGNED_ID => "User-assigned ID code/number",
+        var::USER_ASSIGNED_DEVICE_NAME => "User-assigned device name",
+        var::DEVICE_SERIAL_NUMBER => "Device serial number",
+        var::DEVICE_SUBSET_AND_CONFORMANCE => "DNP3 subset and conformance",
+        var::PRODUCT_NAME_AND_MODEL => "Device manufacturer's product name and model",
+        var::DEVICE_MANUFACTURER_NAME => "Device manufacturer's name",
+        var::LIST_OF_ATTRIBUTE_VARIATIONS => "List of attribute variations",
         _ => "Unknown",
     }
 }
@@ -1124,10 +1420,10 @@ impl<'a> Attribute<'a> {
             AttrSet::Default => {
                 // lookup description
                 let desc = get_default_desc(self.variation);
-                writeln!(f, "\nDefault set - variation {} - {desc}", self.variation)?;
+                write!(f, "\nDefault set - variation {} - {desc}", self.variation)?;
             }
             AttrSet::Private(x) => {
-                writeln!(f, "Private set ({x})")?;
+                write!(f, "\nPrivate set ({x}) - variation {}", self.variation)?;
             }
         }
         self.value.format(f)

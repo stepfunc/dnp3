@@ -1,4 +1,3 @@
-pub(crate) mod attributes;
 pub(crate) mod read_handler;
 pub(crate) mod request;
 pub(crate) mod write_dead_band_request;
@@ -7,7 +6,7 @@ use crate::shared::SharedDefinitions;
 use oo_bindgen::model::*;
 use std::time::Duration;
 
-pub fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTraced<()> {
+pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTraced<()> {
     let read_handler = read_handler::define(lib, shared)?;
 
     let endpoint_list = define_endpoint_list(lib)?;

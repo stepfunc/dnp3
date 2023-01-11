@@ -903,6 +903,176 @@ pub(crate) fn define_database(
         .doc("Update an Octet String point")?
         .build()?;
 
+    let attr_def_error = lib
+        .define_enum("attr_def_error")?
+        .doc("Errors that can occur when defining attributes")?
+        .variant("ok", 0, "attribute defined successfully")?
+        .push("already_defined", "Attribute has already been defined")?
+        .push(
+            "reserved_variation",
+            "Variation is reserved and cannot be defined",
+        )?
+        .push(
+            "bad_type",
+            "The type does not match the required type in set 0",
+        )?
+        .push(
+            "not_writable",
+            "This attribute cannot be configured as writable",
+        )?
+        .build()?;
+
+    let define_string_attr = lib
+        .define_method("define_string_attr", database.clone())?
+        .doc("Define a string attribute")?
+        .param(
+            "set",
+            Primitive::U8,
+            "The set to which the attribute belongs",
+        )?
+        .param(
+            "writable",
+            Primitive::Bool,
+            "True if the attribute may be written",
+        )?
+        .param("variation", Primitive::U8, "The variation of the attribute")?
+        .param("value", StringType, "The value of the attribute")?
+        .returns(
+            attr_def_error.clone(),
+            "Enumeration indicating if the operation was successful",
+        )?
+        .build()?;
+
+    let define_float_attr = lib
+        .define_method("define_float_attr", database.clone())?
+        .doc("Define a 32-bit floating point attribute")?
+        .param(
+            "set",
+            Primitive::U8,
+            "The set to which the attribute belongs",
+        )?
+        .param(
+            "writable",
+            Primitive::Bool,
+            "True if the attribute may be written",
+        )?
+        .param("variation", Primitive::U8, "The variation of the attribute")?
+        .param("value", Primitive::Float, "The value of the attribute")?
+        .returns(
+            attr_def_error.clone(),
+            "Enumeration indicating if the operation was successful",
+        )?
+        .build()?;
+
+    let define_double_attr = lib
+        .define_method("define_double_attr", database.clone())?
+        .doc("Define a 64-bit floating point attribute")?
+        .param(
+            "set",
+            Primitive::U8,
+            "The set to which the attribute belongs",
+        )?
+        .param(
+            "writable",
+            Primitive::Bool,
+            "True if the attribute may be written",
+        )?
+        .param("variation", Primitive::U8, "The variation of the attribute")?
+        .param("value", Primitive::Double, "The value of the attribute")?
+        .returns(
+            attr_def_error.clone(),
+            "Enumeration indicating if the operation was successful",
+        )?
+        .build()?;
+
+    let define_uint_attr = lib
+        .define_method("define_uint_attr", database.clone())?
+        .doc("Define an unsigned integer attribute")?
+        .param(
+            "set",
+            Primitive::U8,
+            "The set to which the attribute belongs",
+        )?
+        .param(
+            "writable",
+            Primitive::Bool,
+            "True if the attribute may be written",
+        )?
+        .param("variation", Primitive::U8, "The variation of the attribute")?
+        .param("value", Primitive::U32, "The value of the attribute")?
+        .returns(
+            attr_def_error.clone(),
+            "Enumeration indicating if the operation was successful",
+        )?
+        .build()?;
+
+    let define_int_attr = lib
+        .define_method("define_int_attr", database.clone())?
+        .doc("Define a signed integer attribute")?
+        .param(
+            "set",
+            Primitive::U8,
+            "The set to which the attribute belongs",
+        )?
+        .param(
+            "writable",
+            Primitive::Bool,
+            "True if the attribute may be written",
+        )?
+        .param("variation", Primitive::U8, "The variation of the attribute")?
+        .param("value", Primitive::S32, "The value of the attribute")?
+        .returns(
+            attr_def_error.clone(),
+            "Enumeration indicating if the operation was successful",
+        )?
+        .build()?;
+
+    let define_time_attr = lib
+        .define_method("define_time_attr", database.clone())?
+        .doc("Define a DNP3 time attribute")?
+        .param(
+            "set",
+            Primitive::U8,
+            "The set to which the attribute belongs",
+        )?
+        .param(
+            "writable",
+            Primitive::Bool,
+            "True if the attribute may be written",
+        )?
+        .param("variation", Primitive::U8, "The variation of the attribute")?
+        .param(
+            "value",
+            Primitive::U64,
+            "The DNP3 timestamp value of the attribute. Only the lower 48-bits are used.",
+        )?
+        .returns(
+            attr_def_error.clone(),
+            "Enumeration indicating if the operation was successful",
+        )?
+        .build()?;
+
+    let define_bool_attr = lib
+        .define_method("define_bool_attr", database.clone())?
+        .doc("Define a boolean attribute which is mapped to an unsigned integer internally")?
+        .param(
+            "set",
+            Primitive::U8,
+            "The set to which the attribute belongs",
+        )?
+        .param(
+            "writable",
+            Primitive::Bool,
+            "True if the attribute may be written",
+        )?
+        .param("variation", Primitive::U8, "The variation of the attribute")?
+        .param("value", Primitive::Bool, "The value of the attribute")?
+        .returns(
+            attr_def_error,
+            "Enumeration indicating if the operation was successful",
+        )?
+        .build()?;
+
     // TODO: Add a getter for octet strings
 
     let database = lib
@@ -946,6 +1116,14 @@ pub(crate) fn define_database(
         .method(add_octet_string)?
         .method(remove_octet_string)?
         .method(update_octet_string)?
+        // device attributes
+        .method(define_string_attr)?
+        .method(define_int_attr)?
+        .method(define_uint_attr)?
+        .method(define_time_attr)?
+        .method(define_bool_attr)?
+        .method(define_float_attr)?
+        .method(define_double_attr)?
         .doc(
             doc("Internal database access")
                 .warning("This object is only valid within a transaction"),

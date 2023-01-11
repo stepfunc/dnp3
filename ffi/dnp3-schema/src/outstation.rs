@@ -13,24 +13,24 @@ struct OutstationTypes {
 }
 
 impl OutstationTypes {
-    fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackTraced<Self> {
+    fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTraced<Self> {
         let DatabaseTypes {
             database_transaction,
             database_handle,
-        } = crate::database::define(lib, shared_def)?;
+        } = crate::database::define(lib, shared)?;
 
         Ok(Self {
             database_transaction,
-            outstation_config: define_outstation_config(lib, shared_def)?,
-            outstation_application: define_outstation_application(lib, &database_handle)?,
-            outstation_information: define_outstation_information(lib, shared_def)?,
-            control_handler: define_control_handler(lib, &database_handle, shared_def)?,
+            outstation_config: define_outstation_config(lib, shared)?,
+            outstation_application: define_outstation_application(lib, shared, &database_handle)?,
+            outstation_information: define_outstation_information(lib, shared)?,
+            control_handler: define_control_handler(lib, &database_handle, shared)?,
             connection_state_listener: define_connection_state_listener(lib)?,
         })
     }
 }
 
-pub fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackTraced<()> {
+pub(crate) fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackTraced<()> {
     // Everything required to create an outstation
 
     let types = OutstationTypes::define(lib, shared_def)?;
@@ -645,6 +645,7 @@ fn define_restart_delay(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructH
 
 fn define_outstation_application(
     lib: &mut LibraryBuilder,
+    shared: &SharedDefinitions,
     database_handle: &ClassHandle,
 ) -> BackTraced<AsynchronousInterface> {
     let restart_delay = define_restart_delay(lib)?;
@@ -676,6 +677,11 @@ fn define_outstation_application(
     let application_iin = define_application_iin(lib)?;
 
     let freeze_not_supported = freeze_result.value("not_supported")?;
+
+    let set_doc = "Set to which the attribute belongs";
+    let var_doc = "Variation of the attribute";
+    let attr_return_doc = "If true, the value will be modified in the in memory database and the outstation will return a successful response. If false, no change will be made and the outstation will return PARAM_ERROR";
+    let attr_enum_doc = "Enumeration describing which attribute it is, possibly unknown";
 
     let application = lib.define_interface("outstation_application", "Dynamic information required by the outstation from the user application")?
         .begin_callback("get_processing_delay_ms", doc("Returns the DELAY_MEASUREMENT delay")
@@ -759,6 +765,79 @@ fn define_outstation_application(
              )?
             .returns_nothing_by_default()?
             .end_callback()?
+        // attribute callbacks
+        .begin_callback("write_string_attr",
+                        doc("Write a string attribute. This method is only called if the corresponding attribute has been configured as writable")
+        )?
+        .param("set", Primitive::U8, set_doc)?
+        .param("variation", Primitive::U8, var_doc)?
+        .param("attr_type", shared.attr.string_attr.clone(), attr_enum_doc)?
+        .param("value", StringType, "Value of the attribute")?
+        .returns_with_default(PrimitiveValue::Bool(false), attr_return_doc)?
+        .end_callback()?
+        .begin_callback("write_float_attr",
+                        doc("Write a 32-bit floating point attribute. This method is only called if the corresponding attribute has been configured as writable")
+        )?
+        .param("set", Primitive::U8, set_doc)?
+        .param("variation", Primitive::U8, var_doc)?
+        .param("attr_type", shared.attr.float_attr.clone(), attr_enum_doc)?
+        .param("value", Primitive::Float, "Value of the attribute")?
+        .returns_with_default(PrimitiveValue::Bool(false), attr_return_doc)?
+        .end_callback()?
+        .begin_callback("write_double_attr",
+                        doc("Write a 64-bit floating point attribute. This method is only called if the corresponding attribute has been configured as writable")
+        )?
+        .param("set", Primitive::U8, set_doc)?
+        .param("variation", Primitive::U8, var_doc)?
+        .param("attr_type", shared.attr.float_attr.clone(), attr_enum_doc)?
+        .param("value", Primitive::Double, "Value of the attribute")?
+        .returns_with_default(PrimitiveValue::Bool(false), attr_return_doc)?
+        .end_callback()?
+        .begin_callback("write_uint_attr",
+                        doc("Write an unsigned integer attribute. This method is only called if the corresponding attribute has been configured as writable")
+        )?
+        .param("set", Primitive::U8, set_doc)?
+        .param("variation", Primitive::U8, var_doc)?
+        .param("attr_type", shared.attr.uint_attr.clone(), attr_enum_doc)?
+        .param("value", Primitive::U32, "Value of the attribute")?
+        .returns_with_default(PrimitiveValue::Bool(false), attr_return_doc)?
+        .end_callback()?
+        .begin_callback("write_int_attr",
+                        doc("Write a signed integer attribute. This method is only called if the corresponding attribute has been configured as writable")
+        )?
+        .param("set", Primitive::U8, set_doc)?
+        .param("variation", Primitive::U8, var_doc)?
+        .param("attr_type", shared.attr.int_attr.clone(), attr_enum_doc)?
+        .param("value", Primitive::S32, "Value of the attribute")?
+        .returns_with_default(PrimitiveValue::Bool(false), attr_return_doc)?
+        .end_callback()?
+        .begin_callback("write_octet_string_attr",
+                        doc("Write an octet-string attribute. This method is only called if the corresponding attribute has been configured as writable")
+        )?
+        .param("set", Primitive::U8, set_doc)?
+        .param("variation", Primitive::U8, var_doc)?
+        .param("attr_type", shared.attr.octet_string_attr.clone(), attr_enum_doc)?
+        .param("value", shared.byte_it.clone(), "Iterator over bytes of the value")?
+        .returns_with_default(PrimitiveValue::Bool(false), attr_return_doc)?
+        .end_callback()?
+        .begin_callback("write_bit_string_attr",
+                        doc("Write a bit-string attribute. This method is only called if the corresponding attribute has been configured as writable")
+        )?
+        .param("set", Primitive::U8, set_doc)?
+        .param("variation", Primitive::U8, var_doc)?
+        .param("attr_type", shared.attr.bit_string_attr.clone(), attr_enum_doc)?
+        .param("value", shared.byte_it.clone(), "Iterator over bytes of the value")?
+        .returns_with_default(PrimitiveValue::Bool(false), attr_return_doc)?
+        .end_callback()?
+        .begin_callback("write_time_attr",
+                        doc("Write a DNP3 time attribute. This method is only called if the corresponding attribute has been configured as writable.")
+        )?
+        .param("set", Primitive::U8, set_doc)?
+        .param("variation", Primitive::U8, var_doc)?
+        .param("attr_type", shared.attr.time_attr.clone(), attr_enum_doc)?
+        .param("value", Primitive::U64, "48-bit DNP3 timestamp value")?
+        .returns_with_default(PrimitiveValue::Bool(false), attr_return_doc)?
+        .end_callback()?
         .build_async()?;
 
     Ok(application)

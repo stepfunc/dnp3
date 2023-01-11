@@ -47,6 +47,14 @@ pub(crate) enum EventReadHeader {
     OctetString(Option<usize>),
 }
 
+#[derive(Copy, Clone)]
+pub(crate) enum AttrHeader {
+    /// read a variation for all sets
+    All(u8),
+    /// read a variation for specific set(s)
+    Specific(u8, IndexRange),
+}
+
 /// Enum representation of all header types that can be in a READ request
 /// This type does not borrow any data so doesn't have lifetime constraints like
 /// the object header types in the parser
@@ -54,6 +62,13 @@ pub(crate) enum EventReadHeader {
 pub(crate) enum ReadHeader {
     Static(StaticReadHeader),
     Event(EventReadHeader),
+    Attr(AttrHeader),
+}
+
+impl From<AttrHeader> for ReadHeader {
+    fn from(value: AttrHeader) -> Self {
+        ReadHeader::Attr(value)
+    }
 }
 
 impl From<StaticReadHeader> for ReadHeader {
@@ -100,8 +115,8 @@ impl ReadHeader {
     fn from_all_objects(header: &AllObjectsVariation) -> Option<ReadHeader> {
         match header {
             // group 0
-            AllObjectsVariation::Group0Var254 => None,
-            AllObjectsVariation::Group0(_) => None,
+            AllObjectsVariation::Group0Var254 => Some(AttrHeader::All(254).into()),
+            AllObjectsVariation::Group0(x) => Some(AttrHeader::All(*x).into()),
             // group 1
             AllObjectsVariation::Group1Var0 => Some(StaticReadHeader::Binary(None, None).into()),
             AllObjectsVariation::Group1Var1 => Some(
@@ -883,8 +898,10 @@ impl ReadHeader {
     fn from_range(header: &RangedVariation, range: IndexRange) -> Option<ReadHeader> {
         match header {
             // group 0
-            RangedVariation::Group0Var254 => None,
-            RangedVariation::Group0(_) => None,
+            RangedVariation::Group0Var254 => Some(AttrHeader::Specific(254, range).into()),
+            RangedVariation::Group0(var, None) => Some(AttrHeader::Specific(*var, range).into()),
+            // This should never happen, but if does the correct behavior is to reject it
+            RangedVariation::Group0(_, Some(_)) => None,
             // group 1
             RangedVariation::Group1Var0 => Some(StaticReadHeader::Binary(None, Some(range)).into()),
             RangedVariation::Group1Var1(_) => Some(

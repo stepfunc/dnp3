@@ -52,6 +52,10 @@ class MyOutstationApplication : public OutstationApplication {
     FreezeResult freeze_counters_range(uint16_t start, uint16_t stop, FreezeType freeze_type, DatabaseHandle &database) override {
         return FreezeResult::not_supported;
     }
+    bool write_string_attr(uint8_t set, uint8_t variation, StringAttr attr_type, const char *value) override {
+        // Allow writing any string attributes that have been defined as writable
+        return true;
+    }
 };
 
 class MyOutstationInformation : public OutstationInformation {
@@ -302,6 +306,10 @@ void run_server(dnp3::OutstationServer &server)
             db.add_analog_output_status(i, EventClass::class1, AnalogOutputStatusConfig());
             db.add_octet_string(i, EventClass::class1);
         }
+
+        // define device attributes made available to the master
+        db.define_string_attr(0, false, dnp3::attribute_variations::device_manufacturers_name, "Step Function I/O");
+        db.define_string_attr(0, true, dnp3::attribute_variations::user_assigned_location, "Bend, OR");
     });
     outstation.transaction(setup);
     // ANCHOR_END: database_init_transaction
