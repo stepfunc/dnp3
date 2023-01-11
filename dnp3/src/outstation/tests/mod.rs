@@ -6,6 +6,8 @@ mod controls;
 mod freeze;
 /// various IIN bit tests
 mod iin;
+/// encoding tests for octet strings
+mod octet_strings;
 /// reading g34
 mod read_dead_band;
 /// state machine for READ requests
