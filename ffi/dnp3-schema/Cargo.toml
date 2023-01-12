@@ -6,6 +6,6 @@ authors = ["Step Function I/O LLC <info@stepfunc.io>"]
 edition = "2021"
 
 [dependencies]
-oo-bindgen = { git = "https://github.com/stepfunc/oo_bindgen.git", branch = "feature/drop-safe-futures" }
-sfio-tracing-ffi = { git = "https://github.com/stepfunc/tracing-ffi.git", branch = "feature/bindgen-0.7" }
-sfio-tokio-ffi = { git = "https://github.com/stepfunc/tokio-ffi.git", branch = "feature/bindgen-0.7" }
+oo-bindgen = "0.7"
+sfio-tracing-ffi = "0.7"
+sfio-tokio-ffi = "0.7"

@@ -470,7 +470,6 @@ impl From<ControlField> for ffi::ControlField {
             uns: from.uns,
             seq: from.seq.value(),
         }
-        .into()
     }
 }
 
@@ -533,7 +532,6 @@ impl From<Group12Var1> for ffi::Group12Var1 {
             on_time: from.on_time,
             off_time: from.off_time,
         }
-        .into()
     }
 }
 
