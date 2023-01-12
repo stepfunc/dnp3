@@ -678,7 +678,7 @@ fn define_read_callback(
         "Handler for read tasks",
         nothing,
         "Result of the read task",
-        Some(read_error),
+        read_error,
     )?;
 
     Ok(callback)
@@ -1166,7 +1166,7 @@ fn define_command_callback(
         "Handler for command tasks",
         nothing,
         "Result of the command task",
-        Some(command_error),
+        command_error,
     )?;
 
     Ok(callback)
@@ -1373,7 +1373,7 @@ fn define_time_sync_callback(
         "Handler for time synchronization tasks",
         nothing,
         "Result of the time synchronization task",
-        Some(time_sync_error),
+        time_sync_error,
     )?;
 
     Ok(callback)
@@ -1412,7 +1412,7 @@ fn define_restart_callback(lib: &mut LibraryBuilder) -> BackTraced<FutureInterfa
         "Handler for restart tasks",
         DurationType::Milliseconds,
         "Result of the restart task",
-        Some(restart_error),
+        restart_error,
     )?;
 
     Ok(callback)
@@ -1437,7 +1437,7 @@ fn define_link_status_callback(
         "Handler for link status check",
         nothing,
         "Result of the link status",
-        Some(link_status_error),
+        link_status_error,
     )?;
 
     Ok(callback)
@@ -1466,7 +1466,7 @@ fn define_empty_response_callback(
         "Callback interface for any task that expects an empty response",
         nothing,
         "Result of operation",
-        Some(error),
+        error,
     )?;
 
     Ok(callback)

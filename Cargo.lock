@@ -879,8 +879,7 @@ checksum = "86f0b0d4bf799edbc74508c1e8bf170ff5f41238e5f8225603ca7caaae2b7860"
 [[package]]
 name = "oo-bindgen"
 version = "0.6.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54cdf6856a71b6c302dc486372966a5582a01b89b9dd63d4b99f88aec712117e"
+source = "git+https://github.com/stepfunc/oo_bindgen.git?branch=feature/drop-safe-futures#d6fc1deae6c6b5f54051ef6d551b79582e445b0d"
 dependencies = [
  "backtrace",
  "clap",
@@ -1251,8 +1250,7 @@ dependencies = [
 [[package]]
 name = "sfio-tokio-ffi"
 version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92c98f3f2f961635b881a6b229332c80d3fabfe88075c3a685edea90dddbfd23"
+source = "git+https://github.com/stepfunc/tokio-ffi.git?branch=feature/bindgen-0.7#c854b31efb6fa7f596d80cb7f765c3321ad2af67"
 dependencies = [
  "oo-bindgen",
 ]
@@ -1269,8 +1267,7 @@ dependencies = [
 [[package]]
 name = "sfio-tracing-ffi"
 version = "0.5.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e582bebc03d7f2e8ebc86f0d44daa75ac6340b7a58d0da29b475aeddd6ac24f"
+source = "git+https://github.com/stepfunc/tracing-ffi.git?branch=feature/bindgen-0.7#3837d591d87f7e5083412e95445b588a1f7c18cf"
 dependencies = [
  "oo-bindgen",
 ]
