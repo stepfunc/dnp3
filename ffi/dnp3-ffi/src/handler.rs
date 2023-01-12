@@ -256,26 +256,6 @@ impl ReadHandler for ffi::ReadHandler {
     }
 }
 
-impl ffi::ReadHandler {
-    fn handle_string_attr_impl(
-        &mut self,
-        info: ffi::HeaderInfo,
-        attr: ffi::StringAttr,
-        set: u8,
-        variation: u8,
-        value: &str,
-    ) {
-        let string = match CString::new(value) {
-            Ok(x) => x,
-            Err(err) => {
-                tracing::warn!("Attribute is not a valid C-string: {}", err);
-                return;
-            }
-        };
-        ffi::ReadHandler::handle_string_attr(self, info, attr, set, variation, string.as_ref());
-    }
-}
-
 impl From<VariationListAttr> for ffi::VariationListAttr {
     fn from(value: VariationListAttr) -> Self {
         match value {
