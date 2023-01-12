@@ -1250,7 +1250,7 @@ dependencies = [
 [[package]]
 name = "sfio-tokio-ffi"
 version = "0.6.0"
-source = "git+https://github.com/stepfunc/tokio-ffi.git?branch=feature/bindgen-0.7#c854b31efb6fa7f596d80cb7f765c3321ad2af67"
+source = "git+https://github.com/stepfunc/tokio-ffi.git?branch=feature/bindgen-0.7#f0f4a52298c751d6780f81dddd573ac58d271966"
 dependencies = [
  "oo-bindgen",
 ]
