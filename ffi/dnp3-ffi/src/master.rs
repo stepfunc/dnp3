@@ -729,6 +729,7 @@ impl Listener<PortState> for ffi::PortStateListener {
     }
 }
 
+#[cfg(feature = "serial")]
 impl From<PortState> for ffi::PortState {
     fn from(value: PortState) -> Self {
         match value {
