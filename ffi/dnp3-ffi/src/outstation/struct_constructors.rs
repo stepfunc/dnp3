@@ -107,7 +107,6 @@ impl From<EventBufferConfig> for ffi::EventBufferConfig {
             max_analog_output_status: from.max_analog_output_status,
             max_octet_string: from.max_octet_string,
         }
-        .into()
     }
 }
 

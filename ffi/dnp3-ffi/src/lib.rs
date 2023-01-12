@@ -1,6 +1,4 @@
-#![allow(clippy::missing_safety_doc, clippy::useless_conversion)]
-#![allow(clippy::derive_partial_eq_without_eq)]
-#![allow(dead_code)]
+#![allow(clippy::missing_safety_doc)]
 
 pub(crate) use crate::tracing::*;
 /// these use statements allow the code in the FFI to not have to known the real locations
@@ -30,6 +28,8 @@ mod tcp;
 mod tracing;
 mod write_dead_band_request;
 
+#[allow(dead_code)]
+#[allow(clippy::derive_partial_eq_without_eq, clippy::useless_conversion)]
 pub mod ffi;
 
 lazy_static::lazy_static! {
@@ -73,4 +73,30 @@ impl From<crate::runtime::RuntimeError> for crate::ffi::ParamError {
             }
         }
     }
+}
+
+/// these implementations are required for all error types on future interfaces:
+
+impl crate::ffi::promise::DropError for crate::ffi::EmptyResponseError {
+    const ERROR_ON_DROP: Self = Self::Shutdown;
+}
+
+impl crate::ffi::promise::DropError for crate::ffi::ReadError {
+    const ERROR_ON_DROP: Self = Self::Shutdown;
+}
+
+impl crate::ffi::promise::DropError for crate::ffi::CommandError {
+    const ERROR_ON_DROP: Self = Self::Shutdown;
+}
+
+impl crate::ffi::promise::DropError for crate::ffi::TimeSyncError {
+    const ERROR_ON_DROP: Self = Self::Shutdown;
+}
+
+impl crate::ffi::promise::DropError for crate::ffi::RestartError {
+    const ERROR_ON_DROP: Self = Self::Shutdown;
+}
+
+impl crate::ffi::promise::DropError for crate::ffi::LinkStatusError {
+    const ERROR_ON_DROP: Self = Self::Shutdown;
 }

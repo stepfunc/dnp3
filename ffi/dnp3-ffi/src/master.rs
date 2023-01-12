@@ -10,6 +10,8 @@ use dnp3::link::{EndpointAddress, SpecialAddressError};
 use dnp3::master::*;
 use dnp3::tcp::ClientState;
 
+use ffi::promise::Promise;
+
 #[cfg(feature = "serial")]
 use dnp3::serial::*;
 #[cfg(feature = "tls")]
@@ -65,7 +67,7 @@ pub(crate) unsafe fn master_channel_create_tcp_2(
     );
 
     // enter the runtime context so that we can spawn
-    let _enter = runtime.inner.enter();
+    let _enter = runtime.enter();
 
     let channel = dnp3::tcp::spawn_master_tcp_client_2(
         link_error_mode.into(),
@@ -169,7 +171,7 @@ pub(crate) unsafe fn master_channel_create_tls_2(
     );
 
     // enter the runtime context so that we can spawn
-    let _enter = runtime.inner.enter();
+    let _enter = runtime.enter();
 
     let channel = dnp3::tcp::tls::spawn_master_tls_client_2(
         link_error_mode.into(),
@@ -214,7 +216,7 @@ pub(crate) unsafe fn master_channel_create_serial(
     let config = convert_config(config)?;
 
     // enter the runtime context so that we can spawn
-    let _enter = runtime.inner.enter();
+    let _enter = runtime.enter();
 
     let channel = spawn_master_serial(
         config,
@@ -378,7 +380,7 @@ pub(crate) unsafe fn master_channel_read(
     channel: *mut crate::MasterChannel,
     association: ffi::AssociationId,
     request: *mut crate::Request,
-    callback: ffi::ReadTaskCallback,
+    mut promise: impl crate::ffi::promise::Promise<Result<ffi::Nothing, ffi::ReadError>>,
 ) -> Result<(), ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::try_new(association.address)?;
@@ -390,10 +392,11 @@ pub(crate) unsafe fn master_channel_read(
     let mut handle = AssociationHandle::create(address, channel.handle.clone());
 
     let task = async move {
-        match handle.read(request).await {
-            Ok(()) => callback.on_complete(ffi::Nothing::Nothing),
-            Err(err) => callback.on_failure(err.into()),
+        let res = match handle.read(request).await {
+            Ok(()) => Ok(ffi::Nothing::Nothing),
+            Err(err) => Err(err.into()),
         };
+        promise.complete(res);
     };
 
     channel.runtime.spawn(task)?;
@@ -404,7 +407,7 @@ pub(crate) unsafe fn master_channel_write_dead_bands(
     channel: *mut crate::MasterChannel,
     association: ffi::AssociationId,
     request: *mut crate::WriteDeadBandRequest,
-    callback: ffi::EmptyResponseCallback,
+    mut promise: impl crate::ffi::promise::Promise<Result<ffi::Nothing, ffi::EmptyResponseError>>,
 ) -> Result<(), ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::try_new(association.address)?;
@@ -414,10 +417,11 @@ pub(crate) unsafe fn master_channel_write_dead_bands(
     let mut handle = AssociationHandle::create(address, channel.handle.clone());
 
     let task = async move {
-        match handle.write_dead_bands(headers).await {
-            Ok(()) => callback.on_complete(ffi::Nothing::Nothing),
-            Err(err) => callback.on_failure(err.into()),
-        }
+        let res = match handle.write_dead_bands(headers).await {
+            Ok(()) => Ok(ffi::Nothing::Nothing),
+            Err(err) => Err(err.into()),
+        };
+        promise.complete(res);
     };
 
     channel.runtime.spawn(task)?;
@@ -429,7 +433,7 @@ pub(crate) unsafe fn master_channel_send_and_expect_empty_response(
     association: ffi::AssociationId,
     function: ffi::FunctionCode,
     headers: *mut crate::Request,
-    callback: ffi::EmptyResponseCallback,
+    mut promise: impl ffi::promise::Promise<Result<ffi::Nothing, ffi::EmptyResponseError>>,
 ) -> Result<(), ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::try_new(association.address)?;
@@ -440,13 +444,14 @@ pub(crate) unsafe fn master_channel_send_and_expect_empty_response(
     let mut handle = AssociationHandle::create(address, channel.handle.clone());
 
     let task = async move {
-        match handle
+        let res = match handle
             .send_and_expect_empty_response(function, headers)
             .await
         {
-            Ok(()) => callback.on_complete(ffi::Nothing::Nothing),
-            Err(err) => callback.on_failure(err.into()),
-        }
+            Ok(()) => Ok(ffi::Nothing::Nothing),
+            Err(err) => Err(err.into()),
+        };
+        promise.complete(res);
     };
 
     channel.runtime.spawn(task)?;
@@ -458,7 +463,7 @@ pub(crate) unsafe fn master_channel_read_with_handler(
     association: ffi::AssociationId,
     request: *mut crate::Request,
     handler: ffi::ReadHandler,
-    callback: ffi::ReadTaskCallback,
+    mut promise: impl ffi::promise::Promise<Result<ffi::Nothing, ffi::ReadError>>,
 ) -> Result<(), ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::try_new(association.address)?;
@@ -470,22 +475,23 @@ pub(crate) unsafe fn master_channel_read_with_handler(
     let mut handle = AssociationHandle::create(address, channel.handle.clone());
 
     let task = async move {
-        match handle.read_with_handler(request, Box::new(handler)).await {
-            Ok(()) => callback.on_complete(ffi::Nothing::Nothing),
-            Err(err) => callback.on_failure(err.into()),
+        let res = match handle.read_with_handler(request, Box::new(handler)).await {
+            Ok(()) => Ok(ffi::Nothing::Nothing),
+            Err(err) => Err(err.into()),
         };
+        promise.complete(res);
     };
 
     channel.runtime.spawn(task)?;
     Ok(())
 }
 
-pub unsafe fn master_channel_operate(
+pub(crate) unsafe fn master_channel_operate(
     channel: *mut crate::MasterChannel,
     association: ffi::AssociationId,
     mode: ffi::CommandMode,
     commands: *mut crate::CommandSet,
-    callback: ffi::CommandTaskCallback,
+    mut promise: impl ffi::promise::Promise<Result<ffi::Nothing, ffi::CommandError>>,
 ) -> Result<(), ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::try_new(association.address)?;
@@ -498,50 +504,44 @@ pub unsafe fn master_channel_operate(
     let mut handle = AssociationHandle::create(address, channel.handle.clone());
 
     let task = async move {
-        match handle.operate(mode.into(), headers).await {
-            Ok(_) => {
-                callback.on_complete(ffi::Nothing::Nothing);
-            }
-            Err(err) => {
-                let err: ffi::CommandError = match err {
-                    CommandError::Task(err) => err.into(),
-                    CommandError::Response(err) => match err {
-                        CommandResponseError::Request(err) => err.into(),
-                        CommandResponseError::BadStatus(_) => ffi::CommandError::BadStatus,
-                        CommandResponseError::HeaderCountMismatch => {
-                            ffi::CommandError::HeaderMismatch
-                        }
-                        CommandResponseError::HeaderTypeMismatch => {
-                            ffi::CommandError::HeaderMismatch
-                        }
-                        CommandResponseError::ObjectCountMismatch => {
-                            ffi::CommandError::HeaderMismatch
-                        }
-                        CommandResponseError::ObjectValueMismatch => {
-                            ffi::CommandError::HeaderMismatch
-                        }
-                    },
-                };
-                callback.on_failure(err);
-            }
+        let res = match handle.operate(mode.into(), headers).await {
+            Ok(_) => Ok(ffi::Nothing::Nothing),
+            Err(err) => Err(err.into()),
         };
+        promise.complete(res);
     };
 
     channel.runtime.spawn(task)?;
     Ok(())
 }
 
+impl From<CommandError> for ffi::CommandError {
+    fn from(value: CommandError) -> Self {
+        match value {
+            CommandError::Task(err) => err.into(),
+            CommandError::Response(err) => match err {
+                CommandResponseError::Request(err) => err.into(),
+                CommandResponseError::BadStatus(_) => Self::BadStatus,
+                CommandResponseError::HeaderCountMismatch => Self::HeaderMismatch,
+                CommandResponseError::HeaderTypeMismatch => Self::HeaderMismatch,
+                CommandResponseError::ObjectCountMismatch => Self::HeaderMismatch,
+                CommandResponseError::ObjectValueMismatch => Self::HeaderMismatch,
+            },
+        }
+    }
+}
+
 impl From<TimeSyncError> for ffi::TimeSyncError {
     fn from(err: TimeSyncError) -> Self {
         match err {
             TimeSyncError::Task(err) => err.into(),
-            TimeSyncError::ClockRollback => ffi::TimeSyncError::ClockRollback,
-            TimeSyncError::SystemTimeNotUnix => ffi::TimeSyncError::SystemTimeNotUnix,
-            TimeSyncError::BadOutstationTimeDelay(_) => ffi::TimeSyncError::BadOutstationTimeDelay,
-            TimeSyncError::Overflow => ffi::TimeSyncError::Overflow,
-            TimeSyncError::StillNeedsTime => ffi::TimeSyncError::StillNeedsTime,
-            TimeSyncError::SystemTimeNotAvailable => ffi::TimeSyncError::SystemTimeNotAvailable,
-            TimeSyncError::IinError(_) => ffi::TimeSyncError::IinError,
+            TimeSyncError::ClockRollback => Self::ClockRollback,
+            TimeSyncError::SystemTimeNotUnix => Self::SystemTimeNotUnix,
+            TimeSyncError::BadOutstationTimeDelay(_) => Self::BadOutstationTimeDelay,
+            TimeSyncError::Overflow => Self::Overflow,
+            TimeSyncError::StillNeedsTime => Self::StillNeedsTime,
+            TimeSyncError::SystemTimeNotAvailable => Self::SystemTimeNotAvailable,
+            TimeSyncError::IinError(_) => Self::IinError,
         }
     }
 }
@@ -550,7 +550,7 @@ pub(crate) unsafe fn master_channel_synchronize_time(
     channel: *mut crate::MasterChannel,
     association: ffi::AssociationId,
     mode: ffi::TimeSyncMode,
-    callback: ffi::TimeSyncTaskCallback,
+    mut promise: impl Promise<Result<ffi::Nothing, ffi::TimeSyncError>>,
 ) -> Result<(), ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::try_new(association.address)?;
@@ -558,10 +558,11 @@ pub(crate) unsafe fn master_channel_synchronize_time(
     let mut association = AssociationHandle::create(address, channel.handle.clone());
 
     let task = async move {
-        match association.synchronize_time(mode.into()).await {
-            Ok(()) => callback.on_complete(ffi::Nothing::Nothing),
-            Err(err) => callback.on_failure(err.into()),
+        let res = match association.synchronize_time(mode.into()).await {
+            Ok(()) => Ok(ffi::Nothing::Nothing),
+            Err(err) => Err(err.into()),
         };
+        promise.complete(res);
     };
 
     channel.runtime.spawn(task)?;
@@ -571,7 +572,7 @@ pub(crate) unsafe fn master_channel_synchronize_time(
 pub(crate) unsafe fn master_channel_cold_restart(
     channel: *mut crate::MasterChannel,
     association: ffi::AssociationId,
-    callback: ffi::RestartTaskCallback,
+    mut promise: impl Promise<Result<Duration, ffi::RestartError>>,
 ) -> Result<(), ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::try_new(association.address)?;
@@ -579,10 +580,11 @@ pub(crate) unsafe fn master_channel_cold_restart(
     let mut association = AssociationHandle::create(address, channel.handle.clone());
 
     let task = async move {
-        match association.cold_restart().await {
-            Ok(x) => callback.on_complete(x),
-            Err(err) => callback.on_failure(err.into()),
+        let res = match association.cold_restart().await {
+            Ok(x) => Ok(x),
+            Err(err) => Err(err.into()),
         };
+        promise.complete(res);
     };
 
     channel.runtime.spawn(task)?;
@@ -592,7 +594,7 @@ pub(crate) unsafe fn master_channel_cold_restart(
 pub(crate) unsafe fn master_channel_warm_restart(
     channel: *mut crate::MasterChannel,
     association: ffi::AssociationId,
-    callback: ffi::RestartTaskCallback,
+    mut promise: impl Promise<Result<Duration, ffi::RestartError>>,
 ) -> Result<(), ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::try_new(association.address)?;
@@ -600,10 +602,11 @@ pub(crate) unsafe fn master_channel_warm_restart(
     let mut association = AssociationHandle::create(address, channel.handle.clone());
 
     let task = async move {
-        match association.warm_restart().await {
-            Ok(x) => callback.on_complete(x),
-            Err(err) => callback.on_failure(err.into()),
+        let res = match association.warm_restart().await {
+            Ok(x) => Ok(x),
+            Err(err) => Err(err.into()),
         };
+        promise.complete(res);
     };
 
     channel.runtime.spawn(task)?;
@@ -613,7 +616,7 @@ pub(crate) unsafe fn master_channel_warm_restart(
 pub(crate) unsafe fn master_channel_check_link_status(
     channel: *mut crate::MasterChannel,
     association: ffi::AssociationId,
-    callback: ffi::LinkStatusCallback,
+    mut promise: impl Promise<Result<ffi::Nothing, ffi::LinkStatusError>>,
 ) -> Result<(), ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::try_new(association.address)?;
@@ -621,10 +624,11 @@ pub(crate) unsafe fn master_channel_check_link_status(
     let mut association = AssociationHandle::create(address, channel.handle.clone());
 
     let task = async move {
-        match association.check_link_status().await {
-            Ok(_) => callback.on_complete(ffi::Nothing::Nothing),
-            Err(err) => callback.on_failure(err.into()),
+        let res = match association.check_link_status().await {
+            Ok(_) => Ok(ffi::Nothing::Nothing),
+            Err(err) => Err(err.into()),
         };
+        promise.complete(res);
     };
 
     channel.runtime.spawn(task)?;
@@ -699,30 +703,41 @@ impl From<ffi::UtcTimestamp> for Option<Timestamp> {
 
 impl Listener<ClientState> for ffi::ClientStateListener {
     fn update(&mut self, value: ClientState) -> MaybeAsync<()> {
-        let value = match value {
-            ClientState::Disabled => ffi::ClientState::Disabled,
-            ClientState::Connecting => ffi::ClientState::Connecting,
-            ClientState::Connected => ffi::ClientState::Connected,
-            ClientState::WaitAfterFailedConnect(_) => ffi::ClientState::WaitAfterFailedConnect,
-            ClientState::WaitAfterDisconnect(_) => ffi::ClientState::WaitAfterDisconnect,
-            ClientState::Shutdown => ffi::ClientState::Shutdown,
-        };
-        self.on_change(value);
+        self.on_change(value.into());
         MaybeAsync::ready(())
+    }
+}
+
+impl From<ClientState> for ffi::ClientState {
+    fn from(value: ClientState) -> Self {
+        match value {
+            ClientState::Disabled => Self::Disabled,
+            ClientState::Connecting => Self::Connecting,
+            ClientState::Connected => Self::Connected,
+            ClientState::WaitAfterFailedConnect(_) => Self::WaitAfterFailedConnect,
+            ClientState::WaitAfterDisconnect(_) => Self::WaitAfterDisconnect,
+            ClientState::Shutdown => Self::Shutdown,
+        }
     }
 }
 
 #[cfg(feature = "serial")]
 impl Listener<PortState> for ffi::PortStateListener {
     fn update(&mut self, value: PortState) -> MaybeAsync<()> {
-        let value = match value {
-            PortState::Disabled => ffi::PortState::Disabled,
-            PortState::Wait(_) => ffi::PortState::Wait,
-            PortState::Open => ffi::PortState::Open,
-            PortState::Shutdown => ffi::PortState::Shutdown,
-        };
-        self.on_change(value);
+        self.on_change(value.into());
         MaybeAsync::ready(())
+    }
+}
+
+#[cfg(feature = "serial")]
+impl From<PortState> for ffi::PortState {
+    fn from(value: PortState) -> Self {
+        match value {
+            PortState::Disabled => Self::Disabled,
+            PortState::Wait(_) => Self::Wait,
+            PortState::Open => Self::Open,
+            PortState::Shutdown => Self::Shutdown,
+        }
     }
 }
 
@@ -795,8 +810,8 @@ impl From<ffi::SerialSettings> for dnp3::serial::SerialSettings {
 impl From<ffi::CommandMode> for CommandMode {
     fn from(x: ffi::CommandMode) -> Self {
         match x {
-            ffi::CommandMode::DirectOperate => CommandMode::DirectOperate,
-            ffi::CommandMode::SelectBeforeOperate => CommandMode::SelectBeforeOperate,
+            ffi::CommandMode::DirectOperate => Self::DirectOperate,
+            ffi::CommandMode::SelectBeforeOperate => Self::SelectBeforeOperate,
         }
     }
 }
@@ -804,23 +819,23 @@ impl From<ffi::CommandMode> for CommandMode {
 impl From<ffi::TimeSyncMode> for TimeSyncProcedure {
     fn from(x: ffi::TimeSyncMode) -> Self {
         match x {
-            ffi::TimeSyncMode::Lan => TimeSyncProcedure::Lan,
-            ffi::TimeSyncMode::NonLan => TimeSyncProcedure::NonLan,
+            ffi::TimeSyncMode::Lan => Self::Lan,
+            ffi::TimeSyncMode::NonLan => Self::NonLan,
         }
     }
 }
 
 impl From<SpecialAddressError> for ffi::ParamError {
     fn from(_: SpecialAddressError) -> Self {
-        ffi::ParamError::InvalidDnp3Address
+        Self::InvalidDnp3Address
     }
 }
 
 impl From<AssociationError> for ffi::ParamError {
     fn from(error: AssociationError) -> Self {
         match error {
-            AssociationError::Shutdown => ffi::ParamError::MasterAlreadyShutdown,
-            AssociationError::DuplicateAddress(_) => ffi::ParamError::AssociationDuplicateAddress,
+            AssociationError::Shutdown => Self::MasterAlreadyShutdown,
+            AssociationError::DuplicateAddress(_) => Self::AssociationDuplicateAddress,
         }
     }
 }
@@ -828,8 +843,8 @@ impl From<AssociationError> for ffi::ParamError {
 impl From<PollError> for ffi::ParamError {
     fn from(error: PollError) -> Self {
         match error {
-            PollError::Shutdown => ffi::ParamError::MasterAlreadyShutdown,
-            PollError::NoSuchAssociation(_) => ffi::ParamError::AssociationDoesNotExist,
+            PollError::Shutdown => Self::MasterAlreadyShutdown,
+            PollError::NoSuchAssociation(_) => Self::AssociationDoesNotExist,
         }
     }
 }
@@ -838,7 +853,7 @@ impl From<WriteError> for ffi::EmptyResponseError {
     fn from(value: WriteError) -> Self {
         match value {
             WriteError::Task(x) => x.into(),
-            WriteError::IinError(_) => ffi::EmptyResponseError::RejectedByIin2,
+            WriteError::IinError(_) => Self::RejectedByIin2,
         }
     }
 }
@@ -847,11 +862,11 @@ impl From<WriteError> for ffi::EmptyResponseError {
 impl From<TlsError> for ffi::ParamError {
     fn from(error: TlsError) -> Self {
         match error {
-            TlsError::InvalidDnsName => ffi::ParamError::InvalidDnsName,
-            TlsError::InvalidPeerCertificate(_) => ffi::ParamError::InvalidPeerCertificate,
-            TlsError::InvalidLocalCertificate(_) => ffi::ParamError::InvalidLocalCertificate,
-            TlsError::InvalidPrivateKey(_) => ffi::ParamError::InvalidPrivateKey,
-            TlsError::Other(_) => ffi::ParamError::OtherTlsError,
+            TlsError::InvalidDnsName => Self::InvalidDnsName,
+            TlsError::InvalidPeerCertificate(_) => Self::InvalidPeerCertificate,
+            TlsError::InvalidLocalCertificate(_) => Self::InvalidLocalCertificate,
+            TlsError::InvalidPrivateKey(_) => Self::InvalidPrivateKey,
+            TlsError::Other(_) => Self::OtherTlsError,
         }
     }
 }
@@ -860,8 +875,8 @@ impl From<TlsError> for ffi::ParamError {
 impl From<ffi::MinTlsVersion> for MinTlsVersion {
     fn from(from: ffi::MinTlsVersion) -> Self {
         match from {
-            ffi::MinTlsVersion::V12 => MinTlsVersion::V12,
-            ffi::MinTlsVersion::V13 => MinTlsVersion::V13,
+            ffi::MinTlsVersion::V12 => Self::V12,
+            ffi::MinTlsVersion::V13 => Self::V13,
         }
     }
 }
@@ -870,8 +885,8 @@ impl From<ffi::MinTlsVersion> for MinTlsVersion {
 impl From<ffi::CertificateMode> for CertificateMode {
     fn from(from: ffi::CertificateMode) -> Self {
         match from {
-            ffi::CertificateMode::AuthorityBased => CertificateMode::AuthorityBased,
-            ffi::CertificateMode::SelfSigned => CertificateMode::SelfSigned,
+            ffi::CertificateMode::AuthorityBased => Self::AuthorityBased,
+            ffi::CertificateMode::SelfSigned => Self::SelfSigned,
         }
     }
 }
@@ -881,22 +896,22 @@ macro_rules! define_task_from_impl {
         impl From<TaskError> for ffi::$name {
             fn from(err: TaskError) -> Self {
                 match err {
-                    TaskError::TooManyRequests => ffi::$name::TooManyRequests,
-                    TaskError::Link(_) => ffi::$name::NoConnection,
-                    TaskError::Transport => ffi::$name::NoConnection,
-                    TaskError::MalformedResponse(_) => ffi::$name::BadResponse,
-                    TaskError::UnexpectedResponseHeaders => ffi::$name::BadResponse,
-                    TaskError::NonFinWithoutCon => ffi::$name::BadResponse,
-                    TaskError::NeverReceivedFir => ffi::$name::BadResponse,
-                    TaskError::UnexpectedFir => ffi::$name::BadResponse,
-                    TaskError::MultiFragmentResponse => ffi::$name::BadResponse,
-                    TaskError::ResponseTimeout => ffi::$name::ResponseTimeout,
-                    TaskError::WriteError => ffi::$name::WriteError,
-                    TaskError::NoSuchAssociation(_) => ffi::$name::AssociationRemoved,
-                    TaskError::NoConnection => ffi::$name::NoConnection,
-                    TaskError::Shutdown => ffi::$name::Shutdown,
-                    TaskError::Disabled => ffi::$name::NoConnection,
-                    TaskError::BadEncoding(_) => ffi::$name::BadEncoding,
+                    TaskError::TooManyRequests => Self::TooManyRequests,
+                    TaskError::Link(_) => Self::NoConnection,
+                    TaskError::Transport => Self::NoConnection,
+                    TaskError::MalformedResponse(_) => Self::BadResponse,
+                    TaskError::UnexpectedResponseHeaders => Self::BadResponse,
+                    TaskError::NonFinWithoutCon => Self::BadResponse,
+                    TaskError::NeverReceivedFir => Self::BadResponse,
+                    TaskError::UnexpectedFir => Self::BadResponse,
+                    TaskError::MultiFragmentResponse => Self::BadResponse,
+                    TaskError::ResponseTimeout => Self::ResponseTimeout,
+                    TaskError::WriteError => Self::WriteError,
+                    TaskError::NoSuchAssociation(_) => Self::AssociationRemoved,
+                    TaskError::NoConnection => Self::NoConnection,
+                    TaskError::Shutdown => Self::Shutdown,
+                    TaskError::Disabled => Self::NoConnection,
+                    TaskError::BadEncoding(_) => Self::BadEncoding,
                 }
             }
         }
@@ -914,49 +929,39 @@ define_task_from_impl!(EmptyResponseError);
 impl From<ffi::FunctionCode> for dnp3::app::FunctionCode {
     fn from(value: ffi::FunctionCode) -> Self {
         match value {
-            ffi::FunctionCode::Confirm => dnp3::app::FunctionCode::Confirm,
-            ffi::FunctionCode::Read => dnp3::app::FunctionCode::Read,
-            ffi::FunctionCode::Write => dnp3::app::FunctionCode::Write,
-            ffi::FunctionCode::Select => dnp3::app::FunctionCode::Select,
-            ffi::FunctionCode::Operate => dnp3::app::FunctionCode::Operate,
-            ffi::FunctionCode::DirectOperate => dnp3::app::FunctionCode::DirectOperate,
-            ffi::FunctionCode::DirectOperateNoResponse => {
-                dnp3::app::FunctionCode::DirectOperateNoResponse
-            }
-            ffi::FunctionCode::ImmediateFreeze => dnp3::app::FunctionCode::ImmediateFreeze,
-            ffi::FunctionCode::ImmediateFreezeNoResponse => {
-                dnp3::app::FunctionCode::ImmediateFreezeNoResponse
-            }
-            ffi::FunctionCode::FreezeClear => dnp3::app::FunctionCode::FreezeClear,
-            ffi::FunctionCode::FreezeClearNoResponse => {
-                dnp3::app::FunctionCode::FreezeClearNoResponse
-            }
-            ffi::FunctionCode::FreezeAtTime => dnp3::app::FunctionCode::FreezeAtTime,
-            ffi::FunctionCode::FreezeAtTimeNoResponse => {
-                dnp3::app::FunctionCode::FreezeAtTimeNoResponse
-            }
-            ffi::FunctionCode::ColdRestart => dnp3::app::FunctionCode::ColdRestart,
-            ffi::FunctionCode::WarmRestart => dnp3::app::FunctionCode::WarmRestart,
-            ffi::FunctionCode::InitializeData => dnp3::app::FunctionCode::InitializeData,
-            ffi::FunctionCode::InitializeApplication => {
-                dnp3::app::FunctionCode::InitializeApplication
-            }
-            ffi::FunctionCode::StartApplication => dnp3::app::FunctionCode::StartApplication,
-            ffi::FunctionCode::StopApplication => dnp3::app::FunctionCode::StopApplication,
-            ffi::FunctionCode::SaveConfiguration => dnp3::app::FunctionCode::SaveConfiguration,
-            ffi::FunctionCode::EnableUnsolicited => dnp3::app::FunctionCode::EnableUnsolicited,
-            ffi::FunctionCode::DisableUnsolicited => dnp3::app::FunctionCode::DisableUnsolicited,
-            ffi::FunctionCode::AssignClass => dnp3::app::FunctionCode::AssignClass,
-            ffi::FunctionCode::DelayMeasure => dnp3::app::FunctionCode::DelayMeasure,
-            ffi::FunctionCode::RecordCurrentTime => dnp3::app::FunctionCode::RecordCurrentTime,
-            ffi::FunctionCode::OpenFile => dnp3::app::FunctionCode::OpenFile,
-            ffi::FunctionCode::CloseFile => dnp3::app::FunctionCode::CloseFile,
-            ffi::FunctionCode::DeleteFile => dnp3::app::FunctionCode::DeleteFile,
-            ffi::FunctionCode::GetFileInfo => dnp3::app::FunctionCode::GetFileInfo,
-            ffi::FunctionCode::AuthenticateFile => dnp3::app::FunctionCode::AuthenticateFile,
-            ffi::FunctionCode::AbortFile => dnp3::app::FunctionCode::AbortFile,
-            ffi::FunctionCode::Response => dnp3::app::FunctionCode::Response,
-            ffi::FunctionCode::UnsolicitedResponse => dnp3::app::FunctionCode::UnsolicitedResponse,
+            ffi::FunctionCode::Confirm => Self::Confirm,
+            ffi::FunctionCode::Read => Self::Read,
+            ffi::FunctionCode::Write => Self::Write,
+            ffi::FunctionCode::Select => Self::Select,
+            ffi::FunctionCode::Operate => Self::Operate,
+            ffi::FunctionCode::DirectOperate => Self::DirectOperate,
+            ffi::FunctionCode::DirectOperateNoResponse => Self::DirectOperateNoResponse,
+            ffi::FunctionCode::ImmediateFreeze => Self::ImmediateFreeze,
+            ffi::FunctionCode::ImmediateFreezeNoResponse => Self::ImmediateFreezeNoResponse,
+            ffi::FunctionCode::FreezeClear => Self::FreezeClear,
+            ffi::FunctionCode::FreezeClearNoResponse => Self::FreezeClearNoResponse,
+            ffi::FunctionCode::FreezeAtTime => Self::FreezeAtTime,
+            ffi::FunctionCode::FreezeAtTimeNoResponse => Self::FreezeAtTimeNoResponse,
+            ffi::FunctionCode::ColdRestart => Self::ColdRestart,
+            ffi::FunctionCode::WarmRestart => Self::WarmRestart,
+            ffi::FunctionCode::InitializeData => Self::InitializeData,
+            ffi::FunctionCode::InitializeApplication => Self::InitializeApplication,
+            ffi::FunctionCode::StartApplication => Self::StartApplication,
+            ffi::FunctionCode::StopApplication => Self::StopApplication,
+            ffi::FunctionCode::SaveConfiguration => Self::SaveConfiguration,
+            ffi::FunctionCode::EnableUnsolicited => Self::EnableUnsolicited,
+            ffi::FunctionCode::DisableUnsolicited => Self::DisableUnsolicited,
+            ffi::FunctionCode::AssignClass => Self::AssignClass,
+            ffi::FunctionCode::DelayMeasure => Self::DelayMeasure,
+            ffi::FunctionCode::RecordCurrentTime => Self::RecordCurrentTime,
+            ffi::FunctionCode::OpenFile => Self::OpenFile,
+            ffi::FunctionCode::CloseFile => Self::CloseFile,
+            ffi::FunctionCode::DeleteFile => Self::DeleteFile,
+            ffi::FunctionCode::GetFileInfo => Self::GetFileInfo,
+            ffi::FunctionCode::AuthenticateFile => Self::AuthenticateFile,
+            ffi::FunctionCode::AbortFile => Self::AbortFile,
+            ffi::FunctionCode::Response => Self::Response,
+            ffi::FunctionCode::UnsolicitedResponse => Self::UnsolicitedResponse,
         }
     }
 }

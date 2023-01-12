@@ -6,6 +6,6 @@ authors = ["Step Function I/O LLC <info@stepfunc.io>"]
 edition = "2021"
 
 [dependencies]
-oo-bindgen = "0.6"
-sfio-tracing-ffi = "0.5"
-sfio-tokio-ffi = "0.5"
+oo-bindgen = "0.7"
+sfio-tracing-ffi = "0.7"
+sfio-tokio-ffi = "0.7"

@@ -878,9 +878,9 @@ checksum = "86f0b0d4bf799edbc74508c1e8bf170ff5f41238e5f8225603ca7caaae2b7860"
 
 [[package]]
 name = "oo-bindgen"
-version = "0.6.3"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "54cdf6856a71b6c302dc486372966a5582a01b89b9dd63d4b99f88aec712117e"
+checksum = "853bdca8e13eff040ebc7ed4d120bc989c09d157018987f50de04ecb819388e1"
 dependencies = [
  "backtrace",
  "clap",
@@ -1250,9 +1250,9 @@ dependencies = [
 
 [[package]]
 name = "sfio-tokio-ffi"
-version = "0.5.1"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b3011decee9900ac6162a077ba2a662a60082772a691ae50f2cc6759b8ea4d90"
+checksum = "4a16029060d63c415c8de5ad158d468e3b3babb6e9342db5b3386fcd211b2f1a"
 dependencies = [
  "oo-bindgen",
 ]
@@ -1268,9 +1268,9 @@ dependencies = [
 
 [[package]]
 name = "sfio-tracing-ffi"
-version = "0.5.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4e582bebc03d7f2e8ebc86f0d44daa75ac6340b7a58d0da29b475aeddd6ac24f"
+checksum = "7945dc84282559575ddbb2d894ca10cbf23dda1df8c9f2a6b915b8863b32fd26"
 dependencies = [
  "oo-bindgen",
 ]
