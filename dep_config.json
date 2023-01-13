@@ -1361,6 +1361,21 @@
         }
       ]
     },
+    "static_assertions": {
+      "id": "static_assertions",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2017 Nikolai Vazquez"
+              ]
+            }
+          }
+        }
+      ]
+    },
     "subtle": {
       "id": "subtle",
       "source": "crates.io",

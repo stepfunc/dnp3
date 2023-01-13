@@ -98,7 +98,35 @@ If you have a case where some blocking is unavoidable, set the number of worker 
 
 ## Shutdown
 
-When you shut down a `Runtime`, it stops all tasks associated with it. This is typically the last operation your program should perform before exit.
+Shutting down the runtime is typically one of the last operations your program should perform before exiting. The call
+to shutdown is synchronous and when it completes you are assured there are no longer any tasks running and all of the
+worker threads have been joined.
+
+:::warning
+A blocked worker thread can cause shutdown to deadlock. For example, if a communication channel makes a callback to user code
+that permanently blocks, `shutdown` will cause a deadlock.
+
+If you cannot ensure a clean shutdown, you can use `Runtime.set_shutdown_timeout(..)` to put an upper
+time limit on the eventual shut down. You would call this method immediately after creating the Runtime.
+
+**Shutting down the runtime using a timeout can leak memory as worker threads are be aborted if the timeout occurs. Only
+use this method if you are exiting the process anyway.**
+:::
+
+### Logging
+
+Both the creation and the shutdown of the `Runtime` are logged in the bindings:
+
+```
+Jan 12 16:16:42.004  INFO creating runtime with 24 threads
+
+.......
+
+Jan 12 16:36:53.832  INFO beginning runtime shutdown (no timeout)
+Jan 12 16:36:53.838  INFO runtime shutdown complete
+```
+
+### Examples
 
 <Tabs
 groupId="language"
@@ -154,3 +182,7 @@ If you don't call `Shutdown` before exiting, the .NET runtime will shut down the
 
 </TabItem>
 </Tabs>
+
+:::tip
+
+:::
