@@ -242,28 +242,51 @@ impl ResponseInfo {
 /// Setting class to None means that the value will not produce events (static only).
 /// The value is initialized to the default of 0.0/false with flags == RESTART.
 pub trait Add<T> {
-    /// add a measurement to the database
+    /// Add a measurement to the database
     fn add(&mut self, index: u16, class: Option<EventClass>, config: T) -> bool;
 }
 
-/// trait for removing a type from the database
+/// Trait for removing a type from the database
 pub trait Remove<T> {
-    /// remove a type by index, return true of the value existed, false otherwise
+    /// Remove a type by index, return true of the value existed, false otherwise
     ///
     /// Note: this remove the static value and configuration only. Any previously
     /// buffered events will be reported normally
     fn remove(&mut self, index: u16) -> bool;
 }
 
-/// trait for updating an existing value in the database
+/// Information about what occurred during a point update
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum UpdateInfo {
+    /// No point exists for this type and index
+    NoPoint,
+    /// The point exists, but the update did not create an event
+    NoEvent,
+    /// An event was created with this id
+    Created(u64),
+    /// An event was created with this id, but inserting it caused an overflow
+    Overflow {
+        /// Id of the event that was created
+        created: u64,
+        /// Id of the previously inserted event that was discarded
+        discarded: u64,
+    },
+}
+
+/// Trait for updating an existing value in the database
 pub trait Update<T> {
     /// Update a value at a particular index. The options control
     /// how static/event data is modified
     /// Returns true if the update succeeded (i.e. the point exists)
-    fn update(&mut self, index: u16, value: &T, options: UpdateOptions) -> bool;
+    fn update(&mut self, index: u16, value: &T, options: UpdateOptions) -> bool {
+        self.update2(index, value, options) != UpdateInfo::NoPoint
+    }
+
+    /// An overload of [update] that provides more information about what occurred
+    fn update2(&mut self, index: u16, value: &T, options: UpdateOptions) -> UpdateInfo;
 }
 
-/// trait for getting the current value in the database
+/// Trait for getting the current value in the database
 pub trait Get<T> {
     /// retrieve the current value off the database.
     fn get(&self, index: u16) -> Option<T>;
@@ -436,49 +459,64 @@ impl DatabaseHandle {
 }
 
 impl Update<BinaryInput> for Database {
-    fn update(&mut self, index: u16, value: &BinaryInput, options: UpdateOptions) -> bool {
+    fn update2(&mut self, index: u16, value: &BinaryInput, options: UpdateOptions) -> UpdateInfo {
         self.inner.update(value, index, options)
     }
 }
 
 impl Update<DoubleBitBinaryInput> for Database {
-    fn update(&mut self, index: u16, value: &DoubleBitBinaryInput, options: UpdateOptions) -> bool {
+    fn update2(
+        &mut self,
+        index: u16,
+        value: &DoubleBitBinaryInput,
+        options: UpdateOptions,
+    ) -> UpdateInfo {
         self.inner.update(value, index, options)
     }
 }
 
 impl Update<BinaryOutputStatus> for Database {
-    fn update(&mut self, index: u16, value: &BinaryOutputStatus, options: UpdateOptions) -> bool {
+    fn update2(
+        &mut self,
+        index: u16,
+        value: &BinaryOutputStatus,
+        options: UpdateOptions,
+    ) -> UpdateInfo {
         self.inner.update(value, index, options)
     }
 }
 
 impl Update<Counter> for Database {
-    fn update(&mut self, index: u16, value: &Counter, options: UpdateOptions) -> bool {
+    fn update2(&mut self, index: u16, value: &Counter, options: UpdateOptions) -> UpdateInfo {
         self.inner.update(value, index, options)
     }
 }
 
 impl Update<FrozenCounter> for Database {
-    fn update(&mut self, index: u16, value: &FrozenCounter, options: UpdateOptions) -> bool {
+    fn update2(&mut self, index: u16, value: &FrozenCounter, options: UpdateOptions) -> UpdateInfo {
         self.inner.update(value, index, options)
     }
 }
 
 impl Update<AnalogInput> for Database {
-    fn update(&mut self, index: u16, value: &AnalogInput, options: UpdateOptions) -> bool {
+    fn update2(&mut self, index: u16, value: &AnalogInput, options: UpdateOptions) -> UpdateInfo {
         self.inner.update(value, index, options)
     }
 }
 
 impl Update<AnalogOutputStatus> for Database {
-    fn update(&mut self, index: u16, value: &AnalogOutputStatus, options: UpdateOptions) -> bool {
+    fn update2(
+        &mut self,
+        index: u16,
+        value: &AnalogOutputStatus,
+        options: UpdateOptions,
+    ) -> UpdateInfo {
         self.inner.update(value, index, options)
     }
 }
 
 impl Update<OctetString> for Database {
-    fn update(&mut self, index: u16, value: &OctetString, options: UpdateOptions) -> bool {
+    fn update2(&mut self, index: u16, value: &OctetString, options: UpdateOptions) -> UpdateInfo {
         self.inner.update(value, index, options)
     }
 }
