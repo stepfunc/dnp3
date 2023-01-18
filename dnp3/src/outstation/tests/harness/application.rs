@@ -83,16 +83,16 @@ impl OutstationApplication for MockOutstationApplication {
         MaybeAsync::ready(())
     }
 
-    fn begin_ack(&mut self) {
-        self.events.send(Event::BeginAck);
+    fn begin_confirm(&mut self) {
+        self.events.send(Event::BeginConfirm);
     }
 
     fn event_cleared(&mut self, id: u64) {
         self.events.send(Event::Cleared(id));
     }
 
-    fn end_ack(&mut self, state: BufferState) -> MaybeAsync<()> {
-        self.events.send(Event::EndAck(state));
+    fn end_confirm(&mut self, state: BufferState) -> MaybeAsync<()> {
+        self.events.send(Event::EndConfirm(state));
         MaybeAsync::ready(())
     }
 }

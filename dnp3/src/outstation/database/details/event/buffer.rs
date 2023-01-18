@@ -990,13 +990,13 @@ mod tests {
     }
 
     impl OutstationApplication for MockApplication {
-        fn begin_ack(&mut self) {
+        fn begin_confirm(&mut self) {
             unreachable!()
         }
         fn event_cleared(&mut self, id: u64) {
             self.events.push_back(Event::Clear(id));
         }
-        fn end_ack(&mut self, _state: BufferState) -> MaybeAsync<()> {
+        fn end_confirm(&mut self, _state: BufferState) -> MaybeAsync<()> {
             unreachable!()
         }
     }

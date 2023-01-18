@@ -193,7 +193,7 @@ impl OutstationApplication for ffi::OutstationApplication {
         }
     }
 
-    fn begin_ack(&mut self) {
+    fn begin_confirm(&mut self) {
         ffi::OutstationApplication::begin_confirm(self)
     }
 
@@ -201,7 +201,7 @@ impl OutstationApplication for ffi::OutstationApplication {
         ffi::OutstationApplication::event_cleared(self, id);
     }
 
-    fn end_ack(&mut self, state: BufferState) -> MaybeAsync<()> {
+    fn end_confirm(&mut self, state: BufferState) -> MaybeAsync<()> {
         ffi::OutstationApplication::end_confirm(self, state.into());
         MaybeAsync::ready(())
     }

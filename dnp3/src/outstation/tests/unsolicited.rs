@@ -189,9 +189,9 @@ async fn defers_read_during_unsol_confirm_wait() {
     harness.check_events(&[Event::UnsolicitedConfirmReceived(1)]);
     harness.expect_response(CLASS_0_RESPONSE_SEQ0).await;
     harness.check_events(&[
-        Event::BeginAck,
+        Event::BeginConfirm,
         Event::Cleared(0),
-        Event::EndAck(BufferState {
+        Event::EndConfirm(BufferState {
             remaining_class_1: 0,
             remaining_class_2: 0,
             remaining_class_3: 0,

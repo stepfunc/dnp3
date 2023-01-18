@@ -182,19 +182,19 @@ pub trait OutstationApplication: Sync + Send + 'static {
         MaybeAsync::ready(true)
     }
 
-    /// Called when an ACK is received to a response or unsolicited response, but before any
+    /// Called when a CONFIRM is received to a response or unsolicited response, but before any
     /// previously transmitted events are cleared from the buffer
-    fn begin_ack(&mut self) {}
+    fn begin_confirm(&mut self) {}
 
-    /// Called when an event is cleared from the buffer due to master acknowledgement
+    /// Called when an event is cleared from the buffer due to master confirmation
     #[allow(unused_variables)]
     fn event_cleared(&mut self, id: u64) {}
 
-    /// Called when all relevant events have been cleared due to acknowledgement
+    /// Called when all relevant events have been cleared due to confirmation
     ///
     /// * state - number of events remaining in the buffer for Class 1, 2, and 3
     #[allow(unused_variables)]
-    fn end_ack(&mut self, state: BufferState) -> MaybeAsync<()> {
+    fn end_confirm(&mut self, state: BufferState) -> MaybeAsync<()> {
         MaybeAsync::ready(())
     }
 }

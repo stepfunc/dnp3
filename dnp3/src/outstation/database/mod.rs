@@ -406,9 +406,9 @@ impl DatabaseHandle {
     }
 
     pub(crate) async fn clear_written_events(&mut self, app: &mut dyn OutstationApplication) {
-        app.begin_ack();
+        app.begin_confirm();
         let state = self.inner.lock().unwrap().inner.clear_written_events(app);
-        app.end_ack(state).get().await;
+        app.end_confirm(state).get().await;
     }
 
     pub(crate) fn get_events_info(&self) -> EventsInfo {

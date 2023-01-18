@@ -37,9 +37,9 @@ pub(crate) enum Event {
     BeginWriteDeadBands,
     WriteDeadBand(u16, f64),
     EndWriteDeadBands,
-    BeginAck,
+    BeginConfirm,
     Cleared(u64),
-    EndAck(BufferState),
+    EndConfirm(BufferState),
 }
 
 #[derive(Clone)]
