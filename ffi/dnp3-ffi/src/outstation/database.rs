@@ -8,13 +8,54 @@ use std::ffi::CStr;
 
 use crate::ffi;
 
+impl Default for ffi::UpdateInfoFields {
+    fn default() -> Self {
+        Self {
+            result: ffi::UpdateResult::NoPoint,
+            created: 0,
+            discarded: 0,
+        }
+    }
+}
+
+impl From<dnp3::outstation::database::UpdateInfo> for ffi::UpdateInfo {
+    fn from(value: UpdateInfo) -> Self {
+        match value {
+            UpdateInfo::NoPoint => ffi::UpdateInfoFields {
+                result: ffi::UpdateResult::NoPoint,
+                created: 0,
+                discarded: 0,
+            }
+            .into(),
+            UpdateInfo::NoEvent => ffi::UpdateInfoFields {
+                result: ffi::UpdateResult::NoEvent,
+                created: 0,
+                discarded: 0,
+            }
+            .into(),
+            UpdateInfo::Created(id) => ffi::UpdateInfoFields {
+                result: ffi::UpdateResult::Created,
+                created: id,
+                discarded: 0,
+            }
+            .into(),
+            UpdateInfo::Overflow { created, discarded } => ffi::UpdateInfoFields {
+                result: ffi::UpdateResult::Overflow,
+                created,
+                discarded,
+            }
+            .into(),
+        }
+    }
+}
+
 macro_rules! implement_database_point_operations {
     (
-        $add_name:ident, $remove_name:ident, $update_name:ident, $get_name:ident,
+        $add_name:ident, $remove_name:ident, $update_name:ident, $update_name_2:ident, $get_name:ident,
         $lib_point_type:ty, $lib_config_type:ty,
         $ffi_point_type:ty, $ffi_config_type:ty,
     ) => {
-        pub unsafe fn $add_name(
+        pub(crate) unsafe fn $add_name(
             database: *mut Database,
             index: u16,
             point_class: ffi::EventClass,
@@ -26,29 +67,40 @@ macro_rules! implement_database_point_operations {
             false
         }
 
-        pub unsafe fn $remove_name(database: *mut Database, index: u16) -> bool {
+        pub(crate) unsafe fn $remove_name(database: *mut Database, index: u16) -> bool {
             if let Some(database) = database.as_mut() {
                 return Remove::<$lib_point_type>::remove(database, index);
             }
             false
         }
 
-        pub unsafe fn $update_name(
+        pub(crate) unsafe fn $update_name(
             database: *mut Database,
             value: $ffi_point_type,
             options: ffi::UpdateOptions,
         ) -> bool {
             if let Some(database) = database.as_mut() {
-                return database.update(
-                    value.index,
-                    &<$lib_point_type>::from(value),
-                    options.into(),
-                );
+                return database
+                    .update(value.index, &<$lib_point_type>::from(value), options.into())
+                    .into();
             }
             false
         }
 
-        pub unsafe fn $get_name(
+        pub(crate) unsafe fn $update_name_2(
+            database: *mut Database,
+            value: $ffi_point_type,
+            options: ffi::UpdateOptions,
+        ) -> ffi::UpdateInfo {
+            if let Some(database) = database.as_mut() {
+                return database
+                    .update2(value.index, &<$lib_point_type>::from(value), options.into())
+                    .into();
+            }
+            ffi::UpdateInfoFields::default().into()
+        }
+
+        pub(crate) unsafe fn $get_name(
             database: *mut Database,
             index: u16,
         ) -> Result<$ffi_point_type, ffi::ParamError> {
@@ -67,6 +119,7 @@ implement_database_point_operations!(
     database_add_binary_input,
     database_remove_binary_input,
     database_update_binary_input,
+    database_update_binary_input_2,
     database_get_binary_input,
     BinaryInput,
     BinaryInputConfig,
@@ -78,6 +131,7 @@ implement_database_point_operations!(
     database_add_double_bit_binary_input,
     database_remove_double_bit_binary_input,
     database_update_double_bit_binary_input,
+    database_update_double_bit_binary_input_2,
     database_get_double_bit_binary_input,
     DoubleBitBinaryInput,
     DoubleBitBinaryInputConfig,
@@ -89,6 +143,7 @@ implement_database_point_operations!(
     database_add_binary_output_status,
     database_remove_binary_output_status,
     database_update_binary_output_status,
+    database_update_binary_output_status_2,
     database_get_binary_output_status,
     BinaryOutputStatus,
     BinaryOutputStatusConfig,
@@ -100,6 +155,7 @@ implement_database_point_operations!(
     database_add_counter,
     database_remove_counter,
     database_update_counter,
+    database_update_counter_2,
     database_get_counter,
     Counter,
     CounterConfig,
@@ -111,6 +167,7 @@ implement_database_point_operations!(
     database_add_frozen_counter,
     database_remove_frozen_counter,
     database_update_frozen_counter,
+    database_update_frozen_counter_2,
     database_get_frozen_counter,
     FrozenCounter,
     FrozenCounterConfig,
@@ -122,6 +179,7 @@ implement_database_point_operations!(
     database_add_analog_input,
     database_remove_analog_input,
     database_update_analog_input,
+    database_update_analog_input_2,
     database_get_analog_input,
     AnalogInput,
     AnalogInputConfig,
@@ -133,6 +191,7 @@ implement_database_point_operations!(
     database_add_analog_output_status,
     database_remove_analog_output_status,
     database_update_analog_output_status,
+    database_update_analog_output_status_2,
     database_get_analog_output_status,
     AnalogOutputStatus,
     AnalogOutputStatusConfig,

@@ -503,6 +503,30 @@ pub(crate) fn define(
     })
 }
 
+pub(crate) fn define_update_info(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructHandle> {
+    let update_result = lib
+        .define_enum("update_result")?
+        .doc("Defines what occurred during an update operation and which fields of {struct:update_info} are valid")?
+        .push("no_point", "No point exists for this type and index")?
+        .push("no_event", "The point exists, but the update did not create an event")?
+        .push("created", "An event was created with the specified id")?
+        .push("overflow", "An event was created with the specified, but inserting it caused an event to be discarded")?
+        .build()?;
+
+    let update_info = lib.declare_universal_struct("update_info")?;
+
+    let update_info = lib
+        .define_universal_struct(update_info)?
+        .doc("Defines what occurred during an update operation. Only certain id fields are valid depending on the value of the enumeration")?
+        .add("result", update_result, "Defines what happened and which id fields are valid")?
+        .add("created", Primitive::U64, "The id of the created event if the result is {enum:update_result.created} or {enum:update_result.overflow}")?
+        .add("discarded", Primitive::U64, "The id of the discarded event if the result is {enum:update_result.overflow}")?
+        .end_fields()?
+        .build()?;
+
+    Ok(update_info)
+}
+
 pub(crate) fn define_database(
     lib: &mut LibraryBuilder,
     shared_def: &SharedDefinitions,
@@ -517,6 +541,8 @@ pub(crate) fn define_database(
         .push("class3", "Class 3 event")?
         .doc("Event class")?
         .build()?;
+
+    let update_info = define_update_info(lib)?;
 
     let update_options = define_update_options(lib)?;
 
@@ -556,6 +582,21 @@ pub(crate) fn define_database(
         .returns(
             Primitive::Bool,
             "True if the point was successfully updated, false otherwise",
+        )?
+        .doc("Update a BinaryInput point")?
+        .build()?;
+
+    let update_binary_2 = lib
+        .define_method("update_binary_input_2", database.clone())?
+        .param(
+            "value",
+            shared_def.binary_point.clone(),
+            "New value of the point",
+        )?
+        .param("options", update_options.clone(), "Update options")?
+        .returns(
+            update_info.clone(),
+            "Provides detailed information about what occurred during the update operation",
         )?
         .doc("Update a BinaryInput point")?
         .build()?;
@@ -1081,6 +1122,7 @@ pub(crate) fn define_database(
         .method(add_binary)?
         .method(remove_binary)?
         .method(update_binary)?
+        .method(update_binary_2)?
         .method(get_binary)?
         // double-bit binary methods
         .method(add_double_bit_binary)?
