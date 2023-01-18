@@ -238,7 +238,7 @@ impl ResponseInfo {
     }
 }
 
-/// trait for adding a type to the database by index/class/configuration
+/// Trait for adding a type to the database by index/class/configuration
 ///
 /// Setting class to None means that the value will not produce events (static only).
 /// The value is initialized to the default of 0.0/false with flags == RESTART.
@@ -283,7 +283,7 @@ pub trait Update<T> {
         self.update2(index, value, options) != UpdateInfo::NoPoint
     }
 
-    /// An overload of [update] that provides more information about what occurred
+    /// An overload of [`Update::update()`] that provides more information about what occurred
     fn update2(&mut self, index: u16, value: &T, options: UpdateOptions) -> UpdateInfo;
 }
 
