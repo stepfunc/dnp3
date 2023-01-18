@@ -4,7 +4,7 @@ use crate::app::{MaybeAsync, Timestamp};
 use crate::outstation::database::DatabaseHandle;
 use crate::outstation::tests::harness::{Event, EventSender};
 use crate::outstation::traits::{OutstationApplication, RequestError, RestartDelay};
-use crate::outstation::{FreezeIndices, FreezeType};
+use crate::outstation::{BufferState, FreezeIndices, FreezeType};
 
 pub(crate) struct MockOutstationApplication {
     events: EventSender,
@@ -80,6 +80,19 @@ impl OutstationApplication for MockOutstationApplication {
 
     fn end_write_analog_dead_bands(&mut self) -> MaybeAsync<()> {
         self.events.send(Event::EndWriteDeadBands);
+        MaybeAsync::ready(())
+    }
+
+    fn begin_ack(&mut self) {
+        self.events.send(Event::BeginAck);
+    }
+
+    fn event_cleared(&mut self, id: u64) {
+        self.events.send(Event::Cleared(id));
+    }
+
+    fn end_ack(&mut self, state: BufferState) -> MaybeAsync<()> {
+        self.events.send(Event::EndAck(state));
         MaybeAsync::ready(())
     }
 }

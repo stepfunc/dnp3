@@ -10,6 +10,7 @@ use crate::outstation::database::{
 };
 
 use crate::outstation::database::details::attrs::map::SetMap;
+use crate::outstation::{BufferState, OutstationApplication};
 use scursor::WriteCursor;
 
 pub(crate) struct Database {
@@ -45,8 +46,12 @@ impl Database {
         self.static_db.set_analog_deadband(index, deadband)
     }
 
-    pub(crate) fn clear_written_events(&mut self) {
-        self.event_buffer.clear_written();
+    pub(crate) fn clear_written_events(
+        &mut self,
+        app: &mut dyn OutstationApplication,
+    ) -> BufferState {
+        self.event_buffer.clear_written(app);
+        self.event_buffer.class_state()
     }
 
     pub(crate) fn unwritten_classes(&self) -> EventClasses {

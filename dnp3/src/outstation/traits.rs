@@ -49,6 +49,24 @@ pub enum ConnectionState {
     Disconnected,
 }
 
+/// Information about the state of buffer after an ACK has been received
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct BufferState {
+    /// number of class 1 events remaining in the buffer
+    pub remaining_class_1: usize,
+    /// number of class 2 events remaining in the buffer
+    pub remaining_class_2: usize,
+    /// number of class 3 events remaining in the buffer
+    pub remaining_class_3: usize,
+}
+
+impl BufferState {
+    /// true if there are no events remaining in the buffer
+    pub fn is_empty(&self) -> bool {
+        self.remaining_class_1 == 0 && self.remaining_class_2 == 0 && self.remaining_class_3 == 0
+    }
+}
+
 /// dynamic information required by the outstation from the user application
 pub trait OutstationApplication: Sync + Send + 'static {
     /// The value returned by this method is used in conjunction with the `Delay Measurement`
@@ -162,6 +180,22 @@ pub trait OutstationApplication: Sync + Send + 'static {
     #[allow(unused_variables)]
     fn write_device_attr(&mut self, attr: Attribute) -> MaybeAsync<bool> {
         MaybeAsync::ready(true)
+    }
+
+    /// Called when an ACK is received to a response or unsolicited response, but before any
+    /// previously transmitted events are cleared from the buffer
+    fn begin_ack(&mut self) {}
+
+    /// Called when an event is cleared from the buffer due to master acknowledgement
+    #[allow(unused_variables)]
+    fn event_cleared(&mut self, id: u64) {}
+
+    /// Called when all relevant events have been cleared due to acknowledgement
+    ///
+    /// * state - number of events remaining in the buffer for Class 1, 2, and 3
+    #[allow(unused_variables)]
+    fn end_ack(&mut self, state: BufferState) -> MaybeAsync<()> {
+        MaybeAsync::ready(())
     }
 }
 

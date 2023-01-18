@@ -1,6 +1,6 @@
 use crate::app::variations::{Group12Var1, Group41Var1, Group41Var2, Group41Var3, Group41Var4};
 use crate::outstation::traits::{BroadcastAction, OperateType, RestartDelay};
-use crate::outstation::{FreezeIndices, FreezeType};
+use crate::outstation::{BufferState, FreezeIndices, FreezeType};
 
 use crate::app::{FunctionCode, Timestamp};
 
@@ -37,6 +37,9 @@ pub(crate) enum Event {
     BeginWriteDeadBands,
     WriteDeadBand(u16, f64),
     EndWriteDeadBands,
+    BeginAck,
+    Cleared(u64),
+    EndAck(BufferState),
 }
 
 #[derive(Clone)]

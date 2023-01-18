@@ -10,6 +10,7 @@ use crate::master::EventClasses;
 use crate::outstation::database::read::ReadHeader;
 
 use crate::app::attr::{AttrProp, AttrSet, OwnedAttribute, TypeError};
+use crate::outstation::OutstationApplication;
 use scursor::WriteCursor;
 
 mod config;
@@ -404,8 +405,10 @@ impl DatabaseHandle {
         }
     }
 
-    pub(crate) fn clear_written_events(&mut self) {
-        self.inner.lock().unwrap().inner.clear_written_events();
+    pub(crate) async fn clear_written_events(&mut self, app: &mut dyn OutstationApplication) {
+        app.begin_ack();
+        let state = self.inner.lock().unwrap().inner.clear_written_events(app);
+        app.end_ack(state).get().await;
     }
 
     pub(crate) fn get_events_info(&self) -> EventsInfo {

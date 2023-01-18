@@ -14,6 +14,7 @@ use super::list::VecList;
 use super::writer::EventWriter;
 
 use crate::outstation::database::details::event::traits::OctetStringLength;
+use crate::outstation::{BufferState, OutstationApplication};
 use scursor::WriteCursor;
 
 impl From<EventClass> for EventClasses {
@@ -584,10 +585,11 @@ impl EventBuffer {
         }
     }
 
-    pub(crate) fn clear_written(&mut self) -> usize {
+    pub(crate) fn clear_written(&mut self, app: &mut dyn OutstationApplication) -> usize {
         let total = &mut self.total;
         let count = self.events.remove_all(|event| {
             if event.state.get() == EventState::Written {
+                app.event_cleared(event.id);
                 total.decrement(event);
                 true
             } else {
@@ -600,6 +602,14 @@ impl EventBuffer {
             self.is_overflown = false;
         }
         count
+    }
+
+    pub(crate) fn class_state(&self) -> BufferState {
+        BufferState {
+            remaining_class_1: self.total.classes.num_class_1.value,
+            remaining_class_2: self.total.classes.num_class_2.value,
+            remaining_class_3: self.total.classes.num_class_3.value,
+        }
     }
 
     pub(crate) fn reset(&mut self) {
@@ -964,8 +974,32 @@ impl Insertable for measurement::OctetString {
 #[cfg(test)]
 mod tests {
     use crate::app::measurement::*;
+    use crate::app::MaybeAsync;
+    use std::collections::VecDeque;
 
     use super::*;
+
+    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+    enum Event {
+        Clear(u64),
+    }
+
+    #[derive(Default)]
+    struct MockApplication {
+        events: VecDeque<Event>,
+    }
+
+    impl OutstationApplication for MockApplication {
+        fn begin_ack(&mut self) {
+            unreachable!()
+        }
+        fn event_cleared(&mut self, id: u64) {
+            self.events.push_back(Event::Clear(id));
+        }
+        fn end_ack(&mut self, _state: BufferState) -> MaybeAsync<()> {
+            unreachable!()
+        }
+    }
 
     fn insert_events(buffer: &mut EventBuffer) {
         buffer
@@ -1078,12 +1112,14 @@ mod tests {
 
         let mut backing = [0u8; 24];
 
+        let mut mock = MockApplication::default();
+
         {
             let mut cursor = WriteCursor::new(backing.as_mut());
             assert_eq!(buffer.write_events(&mut cursor), Err(1)); // not enough space to write both events
             let remaining_classes = EventClasses::all();
             assert_eq!(buffer.unwritten_classes(), remaining_classes);
-            assert_eq!(buffer.clear_written(), 1);
+            assert_eq!(buffer.clear_written(&mut mock), 1);
             assert_eq!(buffer.unwritten_classes(), remaining_classes);
         }
 
@@ -1092,7 +1128,7 @@ mod tests {
             assert_eq!(buffer.write_events(&mut cursor), Err(1));
             let remaining_classes = EventClass::Class1 | EventClass::Class2; //  we just wrote the only class 3 event
             assert_eq!(buffer.unwritten_classes(), remaining_classes);
-            assert_eq!(buffer.clear_written(), 1);
+            assert_eq!(buffer.clear_written(&mut mock), 1);
             assert_eq!(buffer.unwritten_classes(), remaining_classes);
         }
     }
@@ -1130,6 +1166,11 @@ mod tests {
             ]
         );
 
-        assert_eq!(2, buffer.clear_written());
+        let mut mock = MockApplication::default();
+
+        assert_eq!(2, buffer.clear_written(&mut mock));
+        assert_eq!(mock.events.pop_front(), Some(Event::Clear(0)));
+        assert_eq!(mock.events.pop_front(), Some(Event::Clear(3)));
+        assert_eq!(mock.events.pop_front(), None);
     }
 }
