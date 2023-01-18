@@ -30,6 +30,32 @@ impl OutstationTypes {
     }
 }
 
+pub(crate) fn define_buffer_state(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructHandle> {
+    let buffer_state = lib.declare_universal_struct("buffer_state")?;
+    let buffer_state = lib
+        .define_universal_struct(buffer_state)?
+        .doc("Information about the state of buffer after an ACK has been received")?
+        .add(
+            "remaining_class_1",
+            Primitive::U32,
+            "number of class 1 events remaining in the buffer",
+        )?
+        .add(
+            "remaining_class_2",
+            Primitive::U32,
+            "number of class 2 events remaining in the buffer",
+        )?
+        .add(
+            "remaining_class_3",
+            Primitive::U32,
+            "number of class 3 events remaining in the buffer",
+        )?
+        .end_fields()?
+        .build()?;
+
+    Ok(buffer_state)
+}
+
 pub(crate) fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -> BackTraced<()> {
     // Everything required to create an outstation
 
@@ -676,6 +702,8 @@ fn define_outstation_application(
 
     let application_iin = define_application_iin(lib)?;
 
+    let buffer_state = define_buffer_state(lib)?;
+
     let freeze_not_supported = freeze_result.value("not_supported")?;
 
     let set_doc = "Set to which the attribute belongs";
@@ -837,6 +865,21 @@ fn define_outstation_application(
         .param("attr_type", shared.attr.time_attr.clone(), attr_enum_doc)?
         .param("value", Primitive::U64, "48-bit DNP3 timestamp value")?
         .returns_with_default(PrimitiveValue::Bool(false), attr_return_doc)?
+        .end_callback()?
+        // event CONFIRM handling
+        // begin CONFIRM
+        .begin_callback("begin_confirm", doc("Called when a CONFIRM is received to a response or unsolicited response, but before any previously transmitted events are cleared from the buffer"))?
+        .returns_nothing_by_default()?
+        .end_callback()?
+        // event cleared
+        .begin_callback("event_cleared", doc("Called when an event is cleared from the buffer due to master acknowledgement"))?
+        .param("id", Primitive::U64, "Unique identifier previously assigned to the event by the database in an update method")?
+        .returns_nothing_by_default()?
+        .end_callback()?
+        // end CONFIRM
+        .begin_callback("end_confirm", doc(" Called when all relevant events have been cleared"))?
+        .param("state", buffer_state, "information about the post-CONFIRM state of the buffer")?
+        .returns_nothing_by_default()?
         .end_callback()?
         .build_async()?;
 

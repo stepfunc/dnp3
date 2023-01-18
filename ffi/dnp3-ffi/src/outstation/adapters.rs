@@ -192,6 +192,29 @@ impl OutstationApplication for ffi::OutstationApplication {
             }
         }
     }
+
+    fn begin_ack(&mut self) {
+        ffi::OutstationApplication::begin_confirm(self)
+    }
+
+    fn event_cleared(&mut self, id: u64) {
+        ffi::OutstationApplication::event_cleared(self, id);
+    }
+
+    fn end_ack(&mut self, state: BufferState) -> MaybeAsync<()> {
+        ffi::OutstationApplication::end_confirm(self, state.into());
+        MaybeAsync::ready(())
+    }
+}
+
+impl From<dnp3::outstation::BufferState> for ffi::BufferState {
+    fn from(value: BufferState) -> Self {
+        Self {
+            remaining_class_1: value.remaining_class_1 as u32,
+            remaining_class_2: value.remaining_class_2 as u32,
+            remaining_class_3: value.remaining_class_3 as u32,
+        }
+    }
 }
 
 impl From<ffi::ApplicationIin> for ApplicationIin {
