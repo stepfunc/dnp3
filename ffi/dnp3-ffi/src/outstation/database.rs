@@ -199,7 +199,7 @@ implement_database_point_operations!(
     ffi::AnalogOutputStatusConfig,
 );
 
-pub unsafe fn database_add_octet_string(
+pub(crate) unsafe fn database_add_octet_string(
     database: *mut Database,
     index: u16,
     point_class: ffi::EventClass,
@@ -210,14 +210,14 @@ pub unsafe fn database_add_octet_string(
     false
 }
 
-pub unsafe fn database_remove_octet_string(database: *mut Database, index: u16) -> bool {
+pub(crate) unsafe fn database_remove_octet_string(database: *mut Database, index: u16) -> bool {
     if let Some(database) = database.as_mut() {
         return Remove::<OctetString>::remove(database, index);
     }
     false
 }
 
-pub unsafe fn database_update_octet_string(
+pub(crate) unsafe fn database_update_octet_string(
     database: *mut Database,
     index: u16,
     value: *mut OctetStringValue,
@@ -231,6 +231,22 @@ pub unsafe fn database_update_octet_string(
         }
     }
     false
+}
+
+pub(crate) unsafe fn database_update_octet_string_2(
+    database: *mut crate::Database,
+    index: u16,
+    value: *mut crate::OctetStringValue,
+    options: ffi::UpdateOptions,
+) -> ffi::UpdateInfo {
+    if let Some(database) = database.as_mut() {
+        if let Some(value) = value.as_ref() {
+            if let Some(value) = value.into() {
+                return database.update2(index, &value, options.into()).into();
+            }
+        }
+    }
+    ffi::UpdateInfoFields::default().into()
 }
 
 pub(crate) unsafe fn database_define_string_attr(
