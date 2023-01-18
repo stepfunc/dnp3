@@ -143,7 +143,7 @@ pub struct BinaryInput {
 
 impl BinaryInput {
     /// construct a `BinaryInput` from its fields
-    pub fn new(value: bool, flags: Flags, time: Time) -> Self {
+    pub const fn new(value: bool, flags: Flags, time: Time) -> Self {
         Self {
             value,
             flags,
@@ -165,7 +165,7 @@ pub struct DoubleBitBinaryInput {
 
 impl DoubleBitBinaryInput {
     /// construct a `DoubleBitBinaryInput` from its fields
-    pub fn new(value: DoubleBit, flags: Flags, time: Time) -> Self {
+    pub const fn new(value: DoubleBit, flags: Flags, time: Time) -> Self {
         Self {
             value,
             flags,
@@ -187,7 +187,7 @@ pub struct BinaryOutputStatus {
 
 impl BinaryOutputStatus {
     /// construct a `BinaryOutputStatus` from its fields
-    pub fn new(value: bool, flags: Flags, time: Time) -> Self {
+    pub const fn new(value: bool, flags: Flags, time: Time) -> Self {
         Self {
             value,
             flags,
@@ -209,7 +209,7 @@ pub struct Counter {
 
 impl Counter {
     /// construct a `Counter` from its fields
-    pub fn new(value: u32, flags: Flags, time: Time) -> Self {
+    pub const fn new(value: u32, flags: Flags, time: Time) -> Self {
         Self {
             value,
             flags,
@@ -231,7 +231,7 @@ pub struct FrozenCounter {
 
 impl FrozenCounter {
     /// construct a `FrozenCounter` from its fields
-    pub fn new(value: u32, flags: Flags, time: Time) -> Self {
+    pub const fn new(value: u32, flags: Flags, time: Time) -> Self {
         Self {
             value,
             flags,
@@ -253,7 +253,7 @@ pub struct AnalogInput {
 
 impl AnalogInput {
     /// construct an `AnalogInput` from its fields
-    pub fn new(value: f64, flags: Flags, time: Time) -> Self {
+    pub const fn new(value: f64, flags: Flags, time: Time) -> Self {
         Self {
             value,
             flags,
@@ -275,7 +275,7 @@ pub struct FrozenAnalogInput {
 
 impl FrozenAnalogInput {
     /// construct an `AnalogInput` from its fields
-    pub fn new(value: f64, flags: Flags, time: Time) -> Self {
+    pub const fn new(value: f64, flags: Flags, time: Time) -> Self {
         Self {
             value,
             flags,

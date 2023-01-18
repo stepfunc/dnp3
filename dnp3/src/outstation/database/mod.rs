@@ -723,3 +723,108 @@ impl Get<OctetString> for Database {
         self.inner.get::<OctetString>(index)
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::app::Timestamp;
+
+    const fn binary(val: bool) -> BinaryInput {
+        BinaryInput::new(val, Flags::ONLINE, Time::Synchronized(Timestamp::zero()))
+    }
+
+    #[test]
+    fn returns_no_point_if_point_not_added() {
+        let mut db = Database::new(
+            None,
+            ClassZeroConfig::default(),
+            EventBufferConfig::all_types(10),
+        );
+        assert_eq!(
+            UpdateInfo::NoPoint,
+            db.update2(0, &binary(true), UpdateOptions::default())
+        );
+    }
+
+    #[test]
+    fn returns_no_event_if_buffer_space_zero() {
+        let mut db = Database::new(
+            None,
+            ClassZeroConfig::default(),
+            EventBufferConfig::all_types(0),
+        );
+        db.add(0, Some(EventClass::Class1), BinaryInputConfig::default());
+        assert_eq!(
+            UpdateInfo::NoEvent,
+            db.update2(0, &binary(true), UpdateOptions::default())
+        );
+    }
+
+    #[test]
+    fn returns_created_if_event_detected() {
+        let mut db = Database::new(
+            None,
+            ClassZeroConfig::default(),
+            EventBufferConfig::all_types(3),
+        );
+        db.add(0, Some(EventClass::Class1), BinaryInputConfig::default());
+        assert_eq!(
+            UpdateInfo::Created(0),
+            db.update2(0, &binary(true), UpdateOptions::default())
+        );
+        assert_eq!(
+            UpdateInfo::Created(1),
+            db.update2(0, &binary(false), UpdateOptions::default())
+        );
+        assert_eq!(
+            UpdateInfo::Created(2),
+            db.update2(0, &binary(true), UpdateOptions::default())
+        );
+    }
+
+    #[test]
+    fn returns_overflow_when_event_discarded() {
+        let mut db = Database::new(
+            None,
+            ClassZeroConfig::default(),
+            EventBufferConfig::all_types(1),
+        );
+        db.add(0, Some(EventClass::Class1), BinaryInputConfig::default());
+        assert_eq!(
+            UpdateInfo::Created(0),
+            db.update2(0, &binary(true), UpdateOptions::default())
+        );
+        assert_eq!(
+            UpdateInfo::Overflow {
+                created: 1,
+                discarded: 0
+            },
+            db.update2(0, &binary(false), UpdateOptions::default())
+        );
+        assert_eq!(
+            UpdateInfo::Overflow {
+                created: 2,
+                discarded: 1
+            },
+            db.update2(0, &binary(true), UpdateOptions::default())
+        );
+    }
+
+    #[test]
+    fn returns_overflow_no_event_if_no_change() {
+        let mut db = Database::new(
+            None,
+            ClassZeroConfig::default(),
+            EventBufferConfig::all_types(1),
+        );
+        db.add(0, Some(EventClass::Class1), BinaryInputConfig::default());
+        assert_eq!(
+            UpdateInfo::Created(0),
+            db.update2(0, &binary(true), UpdateOptions::default())
+        );
+        assert_eq!(
+            UpdateInfo::NoEvent,
+            db.update2(0, &binary(true), UpdateOptions::default())
+        );
+    }
+}
