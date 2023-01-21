@@ -6,7 +6,6 @@ pub(crate) use crate::tracing::*;
 pub use command::*;
 pub use connect::*;
 pub use decoding::*;
-use dnp3::app::Shutdown;
 pub use handler::*;
 pub use master::*;
 pub use outstation::*;
@@ -54,7 +53,7 @@ impl From<crate::runtime::RuntimeError> for std::os::raw::c_int {
 }
 
 impl From<dnp3::app::Shutdown> for crate::ffi::ParamError {
-    fn from(_: Shutdown) -> Self {
+    fn from(_: dnp3::app::Shutdown) -> Self {
         crate::ffi::ParamError::MasterAlreadyShutdown
     }
 }
@@ -73,30 +72,4 @@ impl From<crate::runtime::RuntimeError> for crate::ffi::ParamError {
             }
         }
     }
-}
-
-/// these implementations are required for all error types on future interfaces:
-
-impl crate::ffi::promise::DropError for crate::ffi::EmptyResponseError {
-    const ERROR_ON_DROP: Self = Self::Shutdown;
-}
-
-impl crate::ffi::promise::DropError for crate::ffi::ReadError {
-    const ERROR_ON_DROP: Self = Self::Shutdown;
-}
-
-impl crate::ffi::promise::DropError for crate::ffi::CommandError {
-    const ERROR_ON_DROP: Self = Self::Shutdown;
-}
-
-impl crate::ffi::promise::DropError for crate::ffi::TimeSyncError {
-    const ERROR_ON_DROP: Self = Self::Shutdown;
-}
-
-impl crate::ffi::promise::DropError for crate::ffi::RestartError {
-    const ERROR_ON_DROP: Self = Self::Shutdown;
-}
-
-impl crate::ffi::promise::DropError for crate::ffi::LinkStatusError {
-    const ERROR_ON_DROP: Self = Self::Shutdown;
 }

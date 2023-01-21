@@ -15,6 +15,7 @@ tracing-subscriber = "0.2"
 dnp3 = { path = "../../dnp3", default-features = false, features = ["ffi"] }
 tokio = { version = "1.0", features = ["rt-multi-thread"] }
 num_cpus = "1"
+sfio-promise = "0.2"
 
 [features]
 default = ["tls", "serial"]
@@ -23,6 +24,6 @@ serial = ["dnp3/serial"]
 
 [build-dependencies]
 dnp3-schema = { path = "../dnp3-schema" }
-oo-bindgen = "0.7"
-sfio-tracing-ffi = "0.7"
-sfio-tokio-ffi = "0.7"
+oo-bindgen = "0.8"
+sfio-tracing-ffi = "0.8"
+sfio-tokio-ffi = "0.8"
