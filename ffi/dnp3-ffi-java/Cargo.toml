@@ -19,4 +19,4 @@ serial = ["dnp3-ffi/serial"]
 
 [build-dependencies]
 dnp3-schema = { path = "../dnp3-schema" }
-oo-bindgen = "0.7"
+oo-bindgen = "0.8"

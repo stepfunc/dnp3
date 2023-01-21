@@ -5,7 +5,7 @@ authors = ["Step Function I/O LLC <info@stepfunc.io>"]
 edition = "2021"
 
 [dependencies]
-oo-bindgen = "0.7"
+oo-bindgen = "0.8"
 dnp3-schema = { path = "../dnp3-schema" }
 tracing-subscriber = "0.3"
 tracing = "0.1"

@@ -387,7 +387,7 @@ pub(crate) unsafe fn master_channel_read(
         .ok_or(ffi::ParamError::NullParameter)?
         .build_read_request();
 
-    let promise = sfio_promise::Promise::new(callback);
+    let promise = sfio_promise::wrap(callback);
 
     let mut handle = AssociationHandle::create(address, channel.handle.clone());
 
@@ -409,7 +409,7 @@ pub(crate) unsafe fn master_channel_write_dead_bands(
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::try_new(association.address)?;
     let request = request.as_mut().ok_or(ffi::ParamError::NullParameter)?;
-    let promise = sfio_promise::Promise::new(callback);
+    let promise = sfio_promise::wrap(callback);
     let headers = request.build();
 
     let mut handle = AssociationHandle::create(address, channel.handle.clone());
@@ -437,7 +437,7 @@ pub(crate) unsafe fn master_channel_send_and_expect_empty_response(
         .as_mut()
         .ok_or(ffi::ParamError::NullParameter)?
         .build_headers();
-    let promise = sfio_promise::Promise::new(callback);
+    let promise = sfio_promise::wrap(callback);
 
     let mut handle = AssociationHandle::create(address, channel.handle.clone());
 
@@ -466,7 +466,7 @@ pub(crate) unsafe fn master_channel_read_with_handler(
         .ok_or(ffi::ParamError::NullParameter)?
         .build_read_request();
 
-    let promise = sfio_promise::Promise::new(callback);
+    let promise = sfio_promise::wrap(callback);
 
     let mut handle = AssociationHandle::create(address, channel.handle.clone());
 
@@ -494,7 +494,7 @@ pub(crate) unsafe fn master_channel_operate(
         .clone()
         .build();
 
-    let promise = sfio_promise::Promise::new(callback);
+    let promise = sfio_promise::wrap(callback);
 
     let mut handle = AssociationHandle::create(address, channel.handle.clone());
 
@@ -548,7 +548,7 @@ pub(crate) unsafe fn master_channel_synchronize_time(
     let address = EndpointAddress::try_new(association.address)?;
 
     let mut association = AssociationHandle::create(address, channel.handle.clone());
-    let promise = sfio_promise::Promise::new(callback);
+    let promise = sfio_promise::wrap(callback);
 
     let task = async move {
         let res = association.synchronize_time(mode.into()).await;
@@ -568,7 +568,7 @@ pub(crate) unsafe fn master_channel_cold_restart(
     let address = EndpointAddress::try_new(association.address)?;
 
     let mut association = AssociationHandle::create(address, channel.handle.clone());
-    let promise = sfio_promise::Promise::new(callback);
+    let promise = sfio_promise::wrap(callback);
 
     let task = async move {
         let res = association.cold_restart().await;
@@ -588,7 +588,7 @@ pub(crate) unsafe fn master_channel_warm_restart(
     let address = EndpointAddress::try_new(association.address)?;
 
     let mut association = AssociationHandle::create(address, channel.handle.clone());
-    let promise = sfio_promise::Promise::new(callback);
+    let promise = sfio_promise::wrap(callback);
 
     let task = async move {
         let res = association.warm_restart().await;
@@ -608,7 +608,7 @@ pub(crate) unsafe fn master_channel_check_link_status(
     let address = EndpointAddress::try_new(association.address)?;
 
     let mut association = AssociationHandle::create(address, channel.handle.clone());
-    let promise = sfio_promise::Promise::new(callback);
+    let promise = sfio_promise::wrap(callback);
 
     let task = async move {
         let res = association.check_link_status().await;
