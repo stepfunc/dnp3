@@ -56,6 +56,9 @@
     "scursor": {
       "url": "https://github.com/stepfunc/scursor"
     },
+    "sfio-promise": {
+      "url": "https://github.com/stepfunc/promise"
+    },
     "sfio-tokio-ffi": {
       "url": "https://github.com/stepfunc/tokio-ffi"
     },
