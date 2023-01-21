@@ -10,8 +10,6 @@ use dnp3::link::{EndpointAddress, SpecialAddressError};
 use dnp3::master::*;
 use dnp3::tcp::ClientState;
 
-use ffi::promise::Promise;
-
 #[cfg(feature = "serial")]
 use dnp3::serial::*;
 #[cfg(feature = "tls")]
@@ -234,13 +232,13 @@ pub(crate) unsafe fn master_channel_create_serial(
     Ok(Box::into_raw(Box::new(channel)))
 }
 
-pub unsafe fn master_channel_destroy(channel: *mut MasterChannel) {
+pub(crate) unsafe fn master_channel_destroy(channel: *mut MasterChannel) {
     if !channel.is_null() {
         drop(Box::from_raw(channel));
     }
 }
 
-pub unsafe fn master_channel_enable(
+pub(crate) unsafe fn master_channel_enable(
     channel: *mut crate::MasterChannel,
 ) -> Result<(), ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
@@ -248,7 +246,7 @@ pub unsafe fn master_channel_enable(
     Ok(())
 }
 
-pub unsafe fn master_channel_disable(
+pub(crate) unsafe fn master_channel_disable(
     channel: *mut crate::MasterChannel,
 ) -> Result<(), ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
@@ -256,7 +254,7 @@ pub unsafe fn master_channel_disable(
     Ok(())
 }
 
-pub unsafe fn master_channel_add_association(
+pub(crate) unsafe fn master_channel_add_association(
     channel: *mut MasterChannel,
     address: u16,
     config: ffi::AssociationConfig,
@@ -359,7 +357,7 @@ pub(crate) unsafe fn master_channel_remove_poll(
     Ok(())
 }
 
-pub unsafe fn master_channel_demand_poll(
+pub(crate) unsafe fn master_channel_demand_poll(
     channel: *mut crate::MasterChannel,
     poll: ffi::PollId,
 ) -> Result<(), ffi::ParamError> {
@@ -380,7 +378,7 @@ pub(crate) unsafe fn master_channel_read(
     channel: *mut crate::MasterChannel,
     association: ffi::AssociationId,
     request: *mut crate::Request,
-    mut promise: impl crate::ffi::promise::Promise<Result<ffi::Nothing, ffi::ReadError>>,
+    callback: ffi::ReadTaskCallback,
 ) -> Result<(), ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::try_new(association.address)?;
@@ -389,13 +387,12 @@ pub(crate) unsafe fn master_channel_read(
         .ok_or(ffi::ParamError::NullParameter)?
         .build_read_request();
 
+    let promise = sfio_promise::Promise::new(callback);
+
     let mut handle = AssociationHandle::create(address, channel.handle.clone());
 
     let task = async move {
-        let res = match handle.read(request).await {
-            Ok(()) => Ok(ffi::Nothing::Nothing),
-            Err(err) => Err(err.into()),
-        };
+        let res = handle.read(request).await;
         promise.complete(res);
     };
 
@@ -407,20 +404,18 @@ pub(crate) unsafe fn master_channel_write_dead_bands(
     channel: *mut crate::MasterChannel,
     association: ffi::AssociationId,
     request: *mut crate::WriteDeadBandRequest,
-    mut promise: impl crate::ffi::promise::Promise<Result<ffi::Nothing, ffi::EmptyResponseError>>,
+    callback: ffi::EmptyResponseCallback,
 ) -> Result<(), ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::try_new(association.address)?;
     let request = request.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let promise = sfio_promise::Promise::new(callback);
     let headers = request.build();
 
     let mut handle = AssociationHandle::create(address, channel.handle.clone());
 
     let task = async move {
-        let res = match handle.write_dead_bands(headers).await {
-            Ok(()) => Ok(ffi::Nothing::Nothing),
-            Err(err) => Err(err.into()),
-        };
+        let res = handle.write_dead_bands(headers).await;
         promise.complete(res);
     };
 
@@ -433,24 +428,23 @@ pub(crate) unsafe fn master_channel_send_and_expect_empty_response(
     association: ffi::AssociationId,
     function: ffi::FunctionCode,
     headers: *mut crate::Request,
-    mut promise: impl ffi::promise::Promise<Result<ffi::Nothing, ffi::EmptyResponseError>>,
+    callback: ffi::EmptyResponseCallback,
 ) -> Result<(), ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::try_new(association.address)?;
     let function: dnp3::app::FunctionCode = function.into();
-    let headers = headers.as_mut().ok_or(ffi::ParamError::NullParameter)?;
-    let headers = headers.build_headers();
+    let headers = headers
+        .as_mut()
+        .ok_or(ffi::ParamError::NullParameter)?
+        .build_headers();
+    let promise = sfio_promise::Promise::new(callback);
 
     let mut handle = AssociationHandle::create(address, channel.handle.clone());
 
     let task = async move {
-        let res = match handle
+        let res = handle
             .send_and_expect_empty_response(function, headers)
-            .await
-        {
-            Ok(()) => Ok(ffi::Nothing::Nothing),
-            Err(err) => Err(err.into()),
-        };
+            .await;
         promise.complete(res);
     };
 
@@ -463,7 +457,7 @@ pub(crate) unsafe fn master_channel_read_with_handler(
     association: ffi::AssociationId,
     request: *mut crate::Request,
     handler: ffi::ReadHandler,
-    mut promise: impl ffi::promise::Promise<Result<ffi::Nothing, ffi::ReadError>>,
+    callback: ffi::ReadTaskCallback,
 ) -> Result<(), ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::try_new(association.address)?;
@@ -472,13 +466,12 @@ pub(crate) unsafe fn master_channel_read_with_handler(
         .ok_or(ffi::ParamError::NullParameter)?
         .build_read_request();
 
+    let promise = sfio_promise::Promise::new(callback);
+
     let mut handle = AssociationHandle::create(address, channel.handle.clone());
 
     let task = async move {
-        let res = match handle.read_with_handler(request, Box::new(handler)).await {
-            Ok(()) => Ok(ffi::Nothing::Nothing),
-            Err(err) => Err(err.into()),
-        };
+        let res = handle.read_with_handler(request, Box::new(handler)).await;
         promise.complete(res);
     };
 
@@ -491,7 +484,7 @@ pub(crate) unsafe fn master_channel_operate(
     association: ffi::AssociationId,
     mode: ffi::CommandMode,
     commands: *mut crate::CommandSet,
-    mut promise: impl ffi::promise::Promise<Result<ffi::Nothing, ffi::CommandError>>,
+    callback: ffi::CommandTaskCallback,
 ) -> Result<(), ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::try_new(association.address)?;
@@ -501,13 +494,12 @@ pub(crate) unsafe fn master_channel_operate(
         .clone()
         .build();
 
+    let promise = sfio_promise::Promise::new(callback);
+
     let mut handle = AssociationHandle::create(address, channel.handle.clone());
 
     let task = async move {
-        let res = match handle.operate(mode.into(), headers).await {
-            Ok(_) => Ok(ffi::Nothing::Nothing),
-            Err(err) => Err(err.into()),
-        };
+        let res = handle.operate(mode.into(), headers).await;
         promise.complete(res);
     };
 
@@ -550,18 +542,16 @@ pub(crate) unsafe fn master_channel_synchronize_time(
     channel: *mut crate::MasterChannel,
     association: ffi::AssociationId,
     mode: ffi::TimeSyncMode,
-    mut promise: impl Promise<Result<ffi::Nothing, ffi::TimeSyncError>>,
+    callback: ffi::TimeSyncTaskCallback,
 ) -> Result<(), ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::try_new(association.address)?;
 
     let mut association = AssociationHandle::create(address, channel.handle.clone());
+    let promise = sfio_promise::Promise::new(callback);
 
     let task = async move {
-        let res = match association.synchronize_time(mode.into()).await {
-            Ok(()) => Ok(ffi::Nothing::Nothing),
-            Err(err) => Err(err.into()),
-        };
+        let res = association.synchronize_time(mode.into()).await;
         promise.complete(res);
     };
 
@@ -572,18 +562,16 @@ pub(crate) unsafe fn master_channel_synchronize_time(
 pub(crate) unsafe fn master_channel_cold_restart(
     channel: *mut crate::MasterChannel,
     association: ffi::AssociationId,
-    mut promise: impl Promise<Result<Duration, ffi::RestartError>>,
+    callback: ffi::RestartTaskCallback,
 ) -> Result<(), ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::try_new(association.address)?;
 
     let mut association = AssociationHandle::create(address, channel.handle.clone());
+    let promise = sfio_promise::Promise::new(callback);
 
     let task = async move {
-        let res = match association.cold_restart().await {
-            Ok(x) => Ok(x),
-            Err(err) => Err(err.into()),
-        };
+        let res = association.cold_restart().await;
         promise.complete(res);
     };
 
@@ -594,18 +582,16 @@ pub(crate) unsafe fn master_channel_cold_restart(
 pub(crate) unsafe fn master_channel_warm_restart(
     channel: *mut crate::MasterChannel,
     association: ffi::AssociationId,
-    mut promise: impl Promise<Result<Duration, ffi::RestartError>>,
+    callback: ffi::RestartTaskCallback,
 ) -> Result<(), ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::try_new(association.address)?;
 
     let mut association = AssociationHandle::create(address, channel.handle.clone());
+    let promise = sfio_promise::Promise::new(callback);
 
     let task = async move {
-        let res = match association.warm_restart().await {
-            Ok(x) => Ok(x),
-            Err(err) => Err(err.into()),
-        };
+        let res = association.warm_restart().await;
         promise.complete(res);
     };
 
@@ -616,18 +602,16 @@ pub(crate) unsafe fn master_channel_warm_restart(
 pub(crate) unsafe fn master_channel_check_link_status(
     channel: *mut crate::MasterChannel,
     association: ffi::AssociationId,
-    mut promise: impl Promise<Result<ffi::Nothing, ffi::LinkStatusError>>,
+    callback: ffi::LinkStatusCallback,
 ) -> Result<(), ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::try_new(association.address)?;
 
     let mut association = AssociationHandle::create(address, channel.handle.clone());
+    let promise = sfio_promise::Promise::new(callback);
 
     let task = async move {
-        let res = match association.check_link_status().await {
-            Ok(_) => Ok(ffi::Nothing::Nothing),
-            Err(err) => Err(err.into()),
-        };
+        let res = association.check_link_status().await;
         promise.complete(res);
     };
 
@@ -674,20 +658,6 @@ fn convert_auto_time_sync(config: &ffi::AutoTimeSync) -> Option<TimeSyncProcedur
         ffi::AutoTimeSync::None => None,
         ffi::AutoTimeSync::Lan => Some(TimeSyncProcedure::Lan),
         ffi::AutoTimeSync::NonLan => Some(TimeSyncProcedure::NonLan),
-    }
-}
-
-pub fn timestamp_utc_valid(value: u64) -> ffi::UtcTimestamp {
-    ffi::UtcTimestamp {
-        value,
-        is_valid: true,
-    }
-}
-
-pub fn timestamp_utc_invalid() -> ffi::UtcTimestamp {
-    ffi::UtcTimestamp {
-        value: 0,
-        is_valid: false,
     }
 }
 

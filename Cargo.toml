@@ -10,3 +10,6 @@ members = [
 
 [profile.release]
 lto=true
+
+[patch.crates-io]
+oo-bindgen = { git = "https://github.com/stepfunc/oo_bindgen.git", branch = "feature/more-generic-promise" }

@@ -15,6 +15,7 @@ tracing-subscriber = "0.2"
 dnp3 = { path = "../../dnp3", default-features = false, features = ["ffi"] }
 tokio = { version = "1.0", features = ["rt-multi-thread"] }
 num_cpus = "1"
+sfio-promise = "0.1"
 
 [features]
 default = ["tls", "serial"]
