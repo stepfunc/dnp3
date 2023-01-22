@@ -1,15 +1,16 @@
 use crate::app::Iin2;
 use crate::master::EventClasses;
-use crate::outstation::database::details::event::buffer::EventBuffer;
+use crate::outstation::database::details::event::buffer::{EventBuffer, InsertError};
 use crate::outstation::database::details::range::static_db::{
     PointConfig, StaticDatabase, Updatable,
 };
 use crate::outstation::database::read::ReadHeader;
 use crate::outstation::database::{
-    ClassZeroConfig, EventBufferConfig, ResponseInfo, UpdateOptions,
+    ClassZeroConfig, EventBufferConfig, ResponseInfo, UpdateInfo, UpdateOptions,
 };
 
 use crate::outstation::database::details::attrs::map::SetMap;
+use crate::outstation::{BufferState, OutstationApplication};
 use scursor::WriteCursor;
 
 pub(crate) struct Database {
@@ -45,8 +46,12 @@ impl Database {
         self.static_db.set_analog_deadband(index, deadband)
     }
 
-    pub(crate) fn clear_written_events(&mut self) {
-        self.event_buffer.clear_written();
+    pub(crate) fn clear_written_events(
+        &mut self,
+        app: &mut dyn OutstationApplication,
+    ) -> BufferState {
+        self.event_buffer.clear_written(app);
+        self.event_buffer.class_state()
     }
 
     pub(crate) fn unwritten_classes(&self) -> EventClasses {
@@ -93,7 +98,7 @@ impl Database {
         self.static_db.get::<T>(index)
     }
 
-    pub(crate) fn update<T>(&mut self, value: &T, index: u16, options: UpdateOptions) -> bool
+    pub(crate) fn update<T>(&mut self, value: &T, index: u16, options: UpdateOptions) -> UpdateInfo
     where
         T: Updatable,
     {
@@ -102,10 +107,20 @@ impl Database {
         // if an event should be produced, insert it into the buffer
         if let Some((variation, class)) = event_data {
             // Overflow is handled in the event buffer
-            let _ = self.event_buffer.insert(index, class, value, variation);
+            return match self.event_buffer.insert(index, class, value, variation) {
+                Ok(x) => UpdateInfo::Created(x),
+                Err(InsertError::TypeMaxIsZero) => UpdateInfo::NoEvent,
+                Err(InsertError::Overflow { created, discarded }) => {
+                    UpdateInfo::Overflow { created, discarded }
+                }
+            };
         }
 
-        exists
+        if exists {
+            UpdateInfo::NoEvent
+        } else {
+            UpdateInfo::NoPoint
+        }
     }
 
     pub(crate) fn write_response_headers(&mut self, cursor: &mut WriteCursor) -> ResponseInfo {

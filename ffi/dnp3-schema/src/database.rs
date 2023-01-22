@@ -503,6 +503,30 @@ pub(crate) fn define(
     })
 }
 
+pub(crate) fn define_update_info(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructHandle> {
+    let update_result = lib
+        .define_enum("update_result")?
+        .doc("Defines what occurred during an update operation and which fields of {struct:update_info} are valid")?
+        .push("no_point", "No point exists for this type and index")?
+        .push("no_event", "The point exists, but the update did not create an event")?
+        .push("created", "An event was created with the specified id")?
+        .push("overflow", "An event was created with the specified, but inserting it caused an event to be discarded")?
+        .build()?;
+
+    let update_info = lib.declare_universal_struct("update_info")?;
+
+    let update_info = lib
+        .define_universal_struct(update_info)?
+        .doc("Defines what occurred during an update operation. Only certain id fields are valid depending on the value of the enumeration")?
+        .add("result", update_result, "Defines what happened and which id fields are valid")?
+        .add("created", Primitive::U64, "The id of the created event if the result is {enum:update_result.created} or {enum:update_result.overflow}")?
+        .add("discarded", Primitive::U64, "The id of the discarded event if the result is {enum:update_result.overflow}")?
+        .end_fields()?
+        .build()?;
+
+    Ok(update_info)
+}
+
 pub(crate) fn define_database(
     lib: &mut LibraryBuilder,
     shared_def: &SharedDefinitions,
@@ -517,6 +541,8 @@ pub(crate) fn define_database(
         .push("class3", "Class 3 event")?
         .doc("Event class")?
         .build()?;
+
+    let update_info = define_update_info(lib)?;
 
     let update_options = define_update_options(lib)?;
 
@@ -556,6 +582,21 @@ pub(crate) fn define_database(
         .returns(
             Primitive::Bool,
             "True if the point was successfully updated, false otherwise",
+        )?
+        .doc("Update a BinaryInput point")?
+        .build()?;
+
+    let update_binary_2 = lib
+        .define_method("update_binary_input_2", database.clone())?
+        .param(
+            "value",
+            shared_def.binary_point.clone(),
+            "New value of the point",
+        )?
+        .param("options", update_options.clone(), "Update options")?
+        .returns(
+            update_info.clone(),
+            "Provides detailed information about what occurred during the update operation",
         )?
         .doc("Update a BinaryInput point")?
         .build()?;
@@ -604,6 +645,21 @@ pub(crate) fn define_database(
         .returns(
             Primitive::Bool,
             "True if the point was successfully updated, false otherwise",
+        )?
+        .doc("Update a Double-Bit Binary Input point")?
+        .build()?;
+
+    let update_double_bit_binary_2 = lib
+        .define_method("update_double_bit_binary_input_2", database.clone())?
+        .param(
+            "value",
+            shared_def.double_bit_binary_point.clone(),
+            "New value of the point",
+        )?
+        .param("options", update_options.clone(), "Update options")?
+        .returns(
+            update_info.clone(),
+            "Provides detailed information about what occurred during the update operation",
         )?
         .doc("Update a Double-Bit Binary Input point")?
         .build()?;
@@ -659,6 +715,21 @@ pub(crate) fn define_database(
         .doc("Update a Binary Output Status point")?
         .build()?;
 
+    let update_binary_output_status_2 = lib
+        .define_method("update_binary_output_status_2", database.clone())?
+        .param(
+            "value",
+            shared_def.binary_output_status_point.clone(),
+            "New value of the point",
+        )?
+        .param("options", update_options.clone(), "Update options")?
+        .returns(
+            update_info.clone(),
+            "Provides detailed information about what occurred during the update operation",
+        )?
+        .doc("Update a Binary Output Status point")?
+        .build()?;
+
     let get_binary_output_status = lib
         .define_method("get_binary_output_status", database.clone())?
         .param("index", Primitive::U16, "Index of the point to get")?
@@ -710,6 +781,21 @@ pub(crate) fn define_database(
         .doc("Update a Counter point")?
         .build()?;
 
+    let update_counter_2 = lib
+        .define_method("update_counter_2", database.clone())?
+        .param(
+            "value",
+            shared_def.counter_point.clone(),
+            "New value of the point",
+        )?
+        .param("options", update_options.clone(), "Update options")?
+        .returns(
+            update_info.clone(),
+            "Provides detailed information about what occurred during the update operation",
+        )?
+        .doc("Update a Counter point")?
+        .build()?;
+
     let get_counter = lib
         .define_method("get_counter", database.clone())?
         .param("index", Primitive::U16, "Index of the point to get")?
@@ -754,6 +840,21 @@ pub(crate) fn define_database(
         .returns(
             Primitive::Bool,
             "True if the point was successfully updated, false otherwise",
+        )?
+        .doc("Update an Frozen Counter point")?
+        .build()?;
+
+    let update_frozen_counter_2 = lib
+        .define_method("update_frozen_counter_2", database.clone())?
+        .param(
+            "value",
+            shared_def.frozen_counter_point.clone(),
+            "New value of the point",
+        )?
+        .param("options", update_options.clone(), "Update options")?
+        .returns(
+            update_info.clone(),
+            "Provides detailed information about what occurred during the update operation",
         )?
         .doc("Update an Frozen Counter point")?
         .build()?;
@@ -809,6 +910,21 @@ pub(crate) fn define_database(
         .doc("Update a AnalogInput point")?
         .build()?;
 
+    let update_analog_2 = lib
+        .define_method("update_analog_input_2", database.clone())?
+        .param(
+            "value",
+            shared_def.analog_point.clone(),
+            "New value of the point",
+        )?
+        .param("options", update_options.clone(), "Update options")?
+        .returns(
+            update_info.clone(),
+            "Provides detailed information about what occurred during the update operation",
+        )?
+        .doc("Update a AnalogInput point")?
+        .build()?;
+
     let get_analog = lib
         .define_method("get_analog_input", database.clone())?
         .param("index", Primitive::U16, "Index of the point to get")?
@@ -856,6 +972,21 @@ pub(crate) fn define_database(
         .doc("Update a Analog Output Status point")?
         .build()?;
 
+    let update_analog_output_status_2 = lib
+        .define_method("update_analog_output_status_2", database.clone())?
+        .param(
+            "value",
+            shared_def.analog_output_status_point.clone(),
+            "New value of the point",
+        )?
+        .param("options", update_options.clone(), "Update options")?
+        .returns(
+            update_info.clone(),
+            "Provides detailed information about what occurred during the update operation",
+        )?
+        .doc("Update a Analog Output Status point")?
+        .build()?;
+
     let get_analog_output_status = lib
         .define_method("get_analog_output_status", database.clone())?
         .param("index", Primitive::U16, "Index of the point to get")?
@@ -894,11 +1025,23 @@ pub(crate) fn define_database(
     let update_octet_string = lib
         .define_method("update_octet_string", database.clone())?
         .param("index", Primitive::U16, "Index of the octet string")?
-        .param("value", octet_string, "New value of the point")?
-        .param("options", update_options, "Update options")?
+        .param("value", octet_string.clone(), "New value of the point")?
+        .param("options", update_options.clone(), "Update options")?
         .returns(
             Primitive::Bool,
             "True if the point was successfully updated, false otherwise",
+        )?
+        .doc("Update an Octet String point")?
+        .build()?;
+
+    let update_octet_string_2 = lib
+        .define_method("update_octet_string_2", database.clone())?
+        .param("index", Primitive::U16, "Index of the octet string")?
+        .param("value", octet_string, "New value of the point")?
+        .param("options", update_options, "Update options")?
+        .returns(
+            update_info,
+            "Provides detailed information about what occurred during the update operation",
         )?
         .doc("Update an Octet String point")?
         .build()?;
@@ -1081,41 +1224,49 @@ pub(crate) fn define_database(
         .method(add_binary)?
         .method(remove_binary)?
         .method(update_binary)?
+        .method(update_binary_2)?
         .method(get_binary)?
         // double-bit binary methods
         .method(add_double_bit_binary)?
         .method(remove_double_bit_binary)?
         .method(update_double_bit_binary)?
+        .method(update_double_bit_binary_2)?
         .method(get_double_bit_binary)?
         // binary output status methods
         .method(add_binary_output_status)?
         .method(remove_binary_output_status)?
         .method(update_binary_output_status)?
+        .method(update_binary_output_status_2)?
         .method(get_binary_output_status)?
         // counter methods
         .method(add_counter)?
         .method(remove_counter)?
         .method(update_counter)?
+        .method(update_counter_2)?
         .method(get_counter)?
         // frozen-counter methods
         .method(add_frozen_counter)?
         .method(remove_frozen_counter)?
         .method(update_frozen_counter)?
+        .method(update_frozen_counter_2)?
         .method(get_frozen_counter)?
         // analog methods
         .method(add_analog)?
         .method(remove_analog)?
         .method(update_analog)?
+        .method(update_analog_2)?
         .method(get_analog)?
         // analog output status methods
         .method(add_analog_output_status)?
         .method(remove_analog_output_status)?
         .method(update_analog_output_status)?
+        .method(update_analog_output_status_2)?
         .method(get_analog_output_status)?
         // octet-string methods
         .method(add_octet_string)?
         .method(remove_octet_string)?
         .method(update_octet_string)?
+        .method(update_octet_string_2)?
         // device attributes
         .method(define_string_attr)?
         .method(define_int_attr)?

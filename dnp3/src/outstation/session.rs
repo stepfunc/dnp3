@@ -535,7 +535,9 @@ impl OutstationSession {
                         Ok(Some(retry_at))
                     }
                     Some(UnsolicitedResult::Confirmed) => {
-                        database.clear_written_events();
+                        database
+                            .clear_written_events(self.application.as_mut())
+                            .await;
                         self.state.unsolicited = UnsolicitedState::Ready(None);
                         Ok(None)
                     }
@@ -1989,7 +1991,11 @@ impl OutstationSession {
             {
                 Confirm::Yes => {
                     self.state.last_broadcast_type = None;
-                    database.clear_written_events();
+
+                    database
+                        .clear_written_events(self.application.as_mut())
+                        .await;
+
                     if series.fin {
                         // done with response series
                         return Ok(());

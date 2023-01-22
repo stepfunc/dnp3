@@ -105,6 +105,21 @@ class ExampleOutstation
         {
             return false;
         }
+
+        void IOutstationApplication.BeginConfirm()
+        {
+
+        }
+
+        void IOutstationApplication.EventCleared(ulong id)
+        {
+
+        }
+
+        void IOutstationApplication.EndConfirm(BufferState state)
+        {
+
+        }
     }
 
     class TestOutstationInformation : IOutstationInformation

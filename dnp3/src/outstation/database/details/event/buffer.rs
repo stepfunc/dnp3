@@ -14,6 +14,7 @@ use super::list::VecList;
 use super::writer::EventWriter;
 
 use crate::outstation::database::details::event::traits::OctetStringLength;
+use crate::outstation::{BufferState, OutstationApplication};
 use scursor::WriteCursor;
 
 impl From<EventClass> for EventClasses {
@@ -248,7 +249,7 @@ impl Counters {
 }
 
 #[derive(Debug, PartialEq)]
-struct Variation<T>
+pub(crate) struct Variation<T>
 where
     T: Copy,
 {
@@ -273,7 +274,7 @@ where
 }
 
 #[derive(Debug, PartialEq)]
-enum Event {
+pub(crate) enum Event {
     Binary(
         measurement::BinaryInput,
         Variation<EventBinaryInputVariation>,
@@ -347,25 +348,22 @@ enum EventState {
 #[derive(Debug, PartialEq)]
 pub(crate) struct EventRecord {
     index: u16,
+    id: u64,
     class: EventClass,
     event: Event,
     state: Cell<EventState>,
 }
 
 impl EventRecord {
-    fn new(index: u16, class: EventClass, event: Event) -> Self {
+    fn new(index: u16, id: u64, class: EventClass, event: Event) -> Self {
         Self {
             index,
+            id,
             class,
             event,
             state: Cell::new(EventState::Unselected),
         }
     }
-    /*
-       fn is_selected(&self) -> bool {
-           self.state.get() == EventState::Selected
-       }
-    */
 }
 
 pub(crate) trait Insertable: Sized {
@@ -376,12 +374,7 @@ pub(crate) trait Insertable: Sized {
     fn is_type(record: &EventRecord) -> bool;
     fn decrement_type(counter: &mut TypeCounter);
     fn increment_type(counter: &mut TypeCounter);
-    fn create_event_record(
-        &self,
-        index: u16,
-        class: EventClass,
-        default_variation: Self::EventVariation,
-    ) -> EventRecord;
+    fn create_event(&self, default_variation: Self::EventVariation) -> Event;
     // set the selected variation if the record is of this type
     fn select_variation(record: &EventRecord, variation: Self::EventVariation) -> bool;
 }
@@ -392,12 +385,13 @@ pub(crate) struct EventBuffer {
     total: Counters,
     written: Counters,
     is_overflown: bool,
+    next: u64,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum InsertError {
     TypeMaxIsZero,
-    Overflow,
+    Overflow { created: u64, discarded: u64 },
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -414,6 +408,7 @@ impl EventBuffer {
             total: Counters::new(),
             written: Counters::new(),
             is_overflown: false,
+            next: 0,
         }
     }
 
@@ -432,7 +427,7 @@ impl EventBuffer {
         class: EventClass,
         event: &T,
         default_variation: T::EventVariation,
-    ) -> Result<(), InsertError>
+    ) -> Result<u64, InsertError>
     where
         T: Insertable,
     {
@@ -442,19 +437,28 @@ impl EventBuffer {
             return Err(InsertError::TypeMaxIsZero);
         }
 
+        let id = self.next;
+        self.next += 1;
+
         let ret = if T::get_type_count(&self.total.types) == max as usize {
             if let Some(record) = self.events.remove_first(T::is_type) {
                 T::decrement_type(&mut self.total.types);
                 self.total.classes.decrement(record.class);
                 self.is_overflown = true;
+                Err(InsertError::Overflow {
+                    created: id,
+                    discarded: record.id,
+                })
+            } else {
+                Ok(id)
             }
-            Err(InsertError::Overflow)
         } else {
-            Ok(())
+            Ok(id)
         };
 
-        self.events
-            .add(event.create_event_record(index, class, default_variation));
+        let record = EventRecord::new(index, id, class, event.create_event(default_variation));
+
+        self.events.add(record);
         self.total.classes.increment(class);
         T::increment_type(&mut self.total.types);
 
@@ -581,10 +585,11 @@ impl EventBuffer {
         }
     }
 
-    pub(crate) fn clear_written(&mut self) -> usize {
+    pub(crate) fn clear_written(&mut self, app: &mut dyn OutstationApplication) -> usize {
         let total = &mut self.total;
         let count = self.events.remove_all(|event| {
             if event.state.get() == EventState::Written {
+                app.event_cleared(event.id);
                 total.decrement(event);
                 true
             } else {
@@ -597,6 +602,14 @@ impl EventBuffer {
             self.is_overflown = false;
         }
         count
+    }
+
+    pub(crate) fn class_state(&self) -> BufferState {
+        BufferState {
+            remaining_class_1: self.total.classes.num_class_1.value,
+            remaining_class_2: self.total.classes.num_class_2.value,
+            remaining_class_3: self.total.classes.num_class_3.value,
+        }
     }
 
     pub(crate) fn reset(&mut self) {
@@ -685,17 +698,8 @@ impl Insertable for measurement::BinaryInput {
         counter.num_binary.increment();
     }
 
-    fn create_event_record(
-        &self,
-        index: u16,
-        class: EventClass,
-        default_variation: EventBinaryInputVariation,
-    ) -> EventRecord {
-        EventRecord::new(
-            index,
-            class,
-            Event::Binary(*self, Variation::new(default_variation)),
-        )
+    fn create_event(&self, default_variation: EventBinaryInputVariation) -> Event {
+        Event::Binary(*self, Variation::new(default_variation))
     }
 
     fn select_variation(record: &EventRecord, variation: Self::EventVariation) -> bool {
@@ -731,17 +735,8 @@ impl Insertable for measurement::DoubleBitBinaryInput {
         counter.num_double_binary.increment();
     }
 
-    fn create_event_record(
-        &self,
-        index: u16,
-        class: EventClass,
-        default_variation: EventDoubleBitBinaryInputVariation,
-    ) -> EventRecord {
-        EventRecord::new(
-            index,
-            class,
-            Event::DoubleBitBinary(*self, Variation::new(default_variation)),
-        )
+    fn create_event(&self, default_variation: EventDoubleBitBinaryInputVariation) -> Event {
+        Event::DoubleBitBinary(*self, Variation::new(default_variation))
     }
 
     fn select_variation(record: &EventRecord, variation: Self::EventVariation) -> bool {
@@ -777,17 +772,8 @@ impl Insertable for measurement::BinaryOutputStatus {
         counter.num_binary_output_status.increment();
     }
 
-    fn create_event_record(
-        &self,
-        index: u16,
-        class: EventClass,
-        default_variation: EventBinaryOutputStatusVariation,
-    ) -> EventRecord {
-        EventRecord::new(
-            index,
-            class,
-            Event::BinaryOutputStatus(*self, Variation::new(default_variation)),
-        )
+    fn create_event(&self, default_variation: EventBinaryOutputStatusVariation) -> Event {
+        Event::BinaryOutputStatus(*self, Variation::new(default_variation))
     }
 
     fn select_variation(record: &EventRecord, variation: Self::EventVariation) -> bool {
@@ -823,17 +809,8 @@ impl Insertable for measurement::Counter {
         counter.num_counter.increment();
     }
 
-    fn create_event_record(
-        &self,
-        index: u16,
-        class: EventClass,
-        default_variation: EventCounterVariation,
-    ) -> EventRecord {
-        EventRecord::new(
-            index,
-            class,
-            Event::Counter(*self, Variation::new(default_variation)),
-        )
+    fn create_event(&self, default_variation: EventCounterVariation) -> Event {
+        Event::Counter(*self, Variation::new(default_variation))
     }
 
     fn select_variation(record: &EventRecord, variation: Self::EventVariation) -> bool {
@@ -869,17 +846,8 @@ impl Insertable for measurement::FrozenCounter {
         counter.num_frozen_counter.increment();
     }
 
-    fn create_event_record(
-        &self,
-        index: u16,
-        class: EventClass,
-        default_variation: EventFrozenCounterVariation,
-    ) -> EventRecord {
-        EventRecord::new(
-            index,
-            class,
-            Event::FrozenCounter(*self, Variation::new(default_variation)),
-        )
+    fn create_event(&self, default_variation: EventFrozenCounterVariation) -> Event {
+        Event::FrozenCounter(*self, Variation::new(default_variation))
     }
 
     fn select_variation(record: &EventRecord, variation: Self::EventVariation) -> bool {
@@ -915,17 +883,8 @@ impl Insertable for measurement::AnalogInput {
         counter.num_analog.increment();
     }
 
-    fn create_event_record(
-        &self,
-        index: u16,
-        class: EventClass,
-        default_variation: EventAnalogInputVariation,
-    ) -> EventRecord {
-        EventRecord::new(
-            index,
-            class,
-            Event::Analog(*self, Variation::new(default_variation)),
-        )
+    fn create_event(&self, default_variation: EventAnalogInputVariation) -> Event {
+        Event::Analog(*self, Variation::new(default_variation))
     }
 
     fn select_variation(record: &EventRecord, variation: Self::EventVariation) -> bool {
@@ -961,17 +920,8 @@ impl Insertable for measurement::AnalogOutputStatus {
         counter.num_analog_output_status.increment();
     }
 
-    fn create_event_record(
-        &self,
-        index: u16,
-        class: EventClass,
-        default_variation: EventAnalogOutputStatusVariation,
-    ) -> EventRecord {
-        EventRecord::new(
-            index,
-            class,
-            Event::AnalogOutputStatus(*self, Variation::new(default_variation)),
-        )
+    fn create_event(&self, default_variation: EventAnalogOutputStatusVariation) -> Event {
+        Event::AnalogOutputStatus(*self, Variation::new(default_variation))
     }
 
     fn select_variation(record: &EventRecord, variation: Self::EventVariation) -> bool {
@@ -1007,17 +957,8 @@ impl Insertable for measurement::OctetString {
         counter.num_octet_string.increment();
     }
 
-    fn create_event_record(
-        &self,
-        index: u16,
-        class: EventClass,
-        default_variation: EventOctetStringVariation,
-    ) -> EventRecord {
-        EventRecord::new(
-            index,
-            class,
-            Event::OctetString(self.as_boxed_slice(), Variation::new(default_variation)),
-        )
+    fn create_event(&self, default_variation: EventOctetStringVariation) -> Event {
+        Event::OctetString(self.as_boxed_slice(), Variation::new(default_variation))
     }
 
     fn select_variation(record: &EventRecord, variation: Self::EventVariation) -> bool {
@@ -1033,8 +974,32 @@ impl Insertable for measurement::OctetString {
 #[cfg(test)]
 mod tests {
     use crate::app::measurement::*;
+    use crate::app::MaybeAsync;
+    use std::collections::VecDeque;
 
     use super::*;
+
+    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+    enum Event {
+        Clear(u64),
+    }
+
+    #[derive(Default)]
+    struct MockApplication {
+        events: VecDeque<Event>,
+    }
+
+    impl OutstationApplication for MockApplication {
+        fn begin_confirm(&mut self) {
+            unreachable!()
+        }
+        fn event_cleared(&mut self, id: u64) {
+            self.events.push_back(Event::Clear(id));
+        }
+        fn end_confirm(&mut self, _state: BufferState) -> MaybeAsync<()> {
+            unreachable!()
+        }
+    }
 
     fn insert_events(buffer: &mut EventBuffer) {
         buffer
@@ -1117,14 +1082,19 @@ mod tests {
             )
             .unwrap();
 
-        assert_matches!(
+        let expected = InsertError::Overflow {
+            created: 1,
+            discarded: 0,
+        };
+
+        assert_eq!(
             buffer.insert(
                 1,
                 EventClass::Class1,
                 &binary,
                 EventBinaryInputVariation::Group2Var1
             ),
-            Err(InsertError::Overflow)
+            Err(expected)
         )
     }
 
@@ -1142,12 +1112,14 @@ mod tests {
 
         let mut backing = [0u8; 24];
 
+        let mut mock = MockApplication::default();
+
         {
             let mut cursor = WriteCursor::new(backing.as_mut());
             assert_eq!(buffer.write_events(&mut cursor), Err(1)); // not enough space to write both events
             let remaining_classes = EventClasses::all();
             assert_eq!(buffer.unwritten_classes(), remaining_classes);
-            assert_eq!(buffer.clear_written(), 1);
+            assert_eq!(buffer.clear_written(&mut mock), 1);
             assert_eq!(buffer.unwritten_classes(), remaining_classes);
         }
 
@@ -1156,7 +1128,7 @@ mod tests {
             assert_eq!(buffer.write_events(&mut cursor), Err(1));
             let remaining_classes = EventClass::Class1 | EventClass::Class2; //  we just wrote the only class 3 event
             assert_eq!(buffer.unwritten_classes(), remaining_classes);
-            assert_eq!(buffer.clear_written(), 1);
+            assert_eq!(buffer.clear_written(&mut mock), 1);
             assert_eq!(buffer.unwritten_classes(), remaining_classes);
         }
     }
@@ -1194,6 +1166,11 @@ mod tests {
             ]
         );
 
-        assert_eq!(2, buffer.clear_written());
+        let mut mock = MockApplication::default();
+
+        assert_eq!(2, buffer.clear_written(&mut mock));
+        assert_eq!(mock.events.pop_front(), Some(Event::Clear(0)));
+        assert_eq!(mock.events.pop_front(), Some(Event::Clear(3)));
+        assert_eq!(mock.events.pop_front(), None);
     }
 }

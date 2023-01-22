@@ -2,6 +2,7 @@ use crate::app::measurement::*;
 use crate::app::Timestamp;
 use crate::outstation::config::OutstationConfig;
 use crate::outstation::database::*;
+use crate::outstation::BufferState;
 
 use super::harness::*;
 
@@ -187,6 +188,15 @@ async fn defers_read_during_unsol_confirm_wait() {
     harness.send_and_process(UNS_CONFIRM_SEQ_1).await;
     harness.check_events(&[Event::UnsolicitedConfirmReceived(1)]);
     harness.expect_response(CLASS_0_RESPONSE_SEQ0).await;
+    harness.check_events(&[
+        Event::BeginConfirm,
+        Event::Cleared(0),
+        Event::EndConfirm(BufferState {
+            remaining_class_1: 0,
+            remaining_class_2: 0,
+            remaining_class_3: 0,
+        }),
+    ]);
     harness.check_no_events();
 }
 
