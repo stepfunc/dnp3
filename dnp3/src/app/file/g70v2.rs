@@ -1,37 +1,7 @@
+use super::*;
 use scursor::{ReadCursor, WriteCursor};
-use std::str::Utf8Error;
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub(crate) enum FileField {
-    Username,
-    Password,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub(crate) enum FileParseError {
-    /// No more data
-    ReadError,
-    /// Field has a bad offset in the encoding
-    BadOffset {
-        field: FileField,
-        expected: u16,
-        actual: u16,
-    },
-    /// The encoding is bad because it requires that a value overflows the u16 representation
-    Overflow,
-    /// A string is not UTF8 encoded
-    BadString(FileField, Utf8Error),
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub(crate) enum FileWriteError {
-    /// Cursor error
-    WriteError(scursor::WriteError),
-    /// The provided data would overflow the u16 representation
-    Overflow,
-}
-
-/// Group 70 Variation2 - File-control - authentication
+/// Group 70 Variation 3 - authentication
 ///
 /// This representation is borrowed from the underlying ASDU
 #[derive(Debug, PartialEq, Eq)]
@@ -45,20 +15,18 @@ impl<'a> Group70Var2<'a> {
     // the user name offset is always 12 octets because all the fields in front of it are fixed size
     const USER_NAME_OFFSET: u16 = 12;
 
-    pub(crate) fn write(&self, cursor: &mut WriteCursor) -> Result<(), FileWriteError> {
+    pub(crate) fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u16_le(Self::USER_NAME_OFFSET)?;
-        let user_name_size: u16 =
-            u16::try_from(self.user_name.as_bytes().len()).map_err(|_| FileWriteError::Overflow)?;
+        let user_name_size = length(self.user_name)?;
         cursor.write_u16_le(user_name_size)?;
 
         let password_offset = match Self::USER_NAME_OFFSET.checked_add(user_name_size) {
-            None => return Err(FileWriteError::Overflow),
+            None => return Err(WriteError::Overflow),
             Some(x) => x,
         };
 
         cursor.write_u16_le(password_offset)?;
-        let password_size =
-            u16::try_from(self.password.as_bytes().len()).map_err(|_| FileWriteError::Overflow)?;
+        let password_size = length(self.password)?;
 
         cursor.write_u16_le(password_size)?;
         cursor.write_u32_le(self.auth_key)?;
@@ -68,13 +36,12 @@ impl<'a> Group70Var2<'a> {
         Ok(())
     }
 
-    pub(crate) fn parse(cursor: &mut ReadCursor<'a>) -> Result<Self, FileParseError> {
+    pub(crate) fn read(cursor: &mut ReadCursor<'a>) -> Result<Self, ReadError> {
         let user_name_offset = cursor.read_u16_le()?;
 
         // since this is fixed length, we can validate it early
         if user_name_offset != Self::USER_NAME_OFFSET {
-            return Err(FileParseError::BadOffset {
-                field: FileField::Username,
+            return Err(ReadError::BadOffset {
                 expected: Self::USER_NAME_OFFSET,
                 actual: user_name_offset,
             });
@@ -83,15 +50,14 @@ impl<'a> Group70Var2<'a> {
         let user_name_length: u16 = cursor.read_u16_le()?;
 
         let implied_password_offset = match Self::USER_NAME_OFFSET.checked_add(user_name_length) {
-            None => return Err(FileParseError::Overflow),
+            None => return Err(ReadError::Overflow),
             Some(x) => x,
         };
 
         let password_offset = cursor.read_u16_le()?;
 
         if password_offset != implied_password_offset {
-            return Err(FileParseError::BadOffset {
-                field: FileField::Password,
+            return Err(ReadError::BadOffset {
                 expected: implied_password_offset,
                 actual: password_offset,
             });
@@ -103,10 +69,8 @@ impl<'a> Group70Var2<'a> {
         let user_name_bytes = cursor.read_bytes(user_name_length as usize)?;
         let password_bytes = cursor.read_bytes(password_length as usize)?;
 
-        let user_name = std::str::from_utf8(user_name_bytes)
-            .map_err(|err| FileParseError::BadString(FileField::Username, err))?;
-        let password = std::str::from_utf8(password_bytes)
-            .map_err(|err| FileParseError::BadString(FileField::Password, err))?;
+        let user_name = std::str::from_utf8(user_name_bytes)?;
+        let password = std::str::from_utf8(password_bytes)?;
 
         Ok(Self {
             auth_key,
@@ -116,21 +80,9 @@ impl<'a> Group70Var2<'a> {
     }
 }
 
-impl From<scursor::WriteError> for FileWriteError {
-    fn from(value: scursor::WriteError) -> Self {
-        Self::WriteError(value)
-    }
-}
-
-impl From<scursor::ReadError> for FileParseError {
-    fn from(_: scursor::ReadError) -> Self {
-        Self::ReadError
-    }
-}
-
 #[cfg(test)]
 mod test {
-    use crate::app::file::Group70Var2;
+    use super::Group70Var2;
     use scursor::{ReadCursor, WriteCursor};
 
     const VALID_G70V2: Group70Var2 = Group70Var2 {
@@ -174,8 +126,9 @@ mod test {
     #[test]
     fn parses_valid_g70v2() {
         let mut cursor = ReadCursor::new(VALID_G70V2_DATA);
-        let obj = Group70Var2::parse(&mut cursor).unwrap();
+        let obj = Group70Var2::read(&mut cursor).unwrap();
 
-        assert_eq!(obj, VALID_G70V2)
+        assert_eq!(obj, VALID_G70V2);
+        assert!(cursor.is_empty());
     }
 }
