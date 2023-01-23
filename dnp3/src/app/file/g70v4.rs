@@ -132,7 +132,7 @@ impl<'a> Group70Var4<'a> {
 mod test {
     use super::*;
 
-    const VALID_G70V4: Group70Var4 = Group70Var4 {
+    const OBJECT: Group70Var4 = Group70Var4 {
         file_handle: 0x01020304,
         file_size: 0xAABBCCDD,
         max_block_size: 1024,
@@ -141,7 +141,7 @@ mod test {
         text: "wat",
     };
 
-    const VALID_G70V4_DATA: &[u8] = &[
+    const DATA: &[u8] = &[
         4, // file handle
         3, 2, 1, 0xDD, // file size
         0xCC, 0xBB, 0xAA, 00, // max block size
@@ -156,17 +156,17 @@ mod test {
         let mut buffer = [0; 64];
 
         let mut cursor = WriteCursor::new(&mut buffer);
-        VALID_G70V4.write(&mut cursor).unwrap();
+        OBJECT.write(&mut cursor).unwrap();
 
-        assert_eq!(cursor.written(), VALID_G70V4_DATA)
+        assert_eq!(cursor.written(), DATA)
     }
 
     #[test]
     fn parses_valid_g70v3() {
-        let mut cursor = ReadCursor::new(VALID_G70V4_DATA);
+        let mut cursor = ReadCursor::new(DATA);
         let obj = Group70Var4::read(&mut cursor).unwrap();
 
-        assert_eq!(obj, VALID_G70V4);
+        assert_eq!(obj, OBJECT);
         assert!(cursor.is_empty());
     }
 }

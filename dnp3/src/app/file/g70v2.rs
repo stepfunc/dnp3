@@ -85,13 +85,13 @@ mod test {
     use super::Group70Var2;
     use scursor::{ReadCursor, WriteCursor};
 
-    const VALID_G70V2: Group70Var2 = Group70Var2 {
+    const OBJECT: Group70Var2 = Group70Var2 {
         auth_key: 0xDEADCAFE,
         user_name: "root",
         password: "foo",
     };
 
-    const VALID_G70V2_DATA: &[u8] = &[
+    const DATA: &[u8] = &[
         12, // username string offset - always 12
         0,
         4, // username string size
@@ -118,17 +118,17 @@ mod test {
         let mut buffer = [0; 64];
 
         let mut cursor = WriteCursor::new(&mut buffer);
-        VALID_G70V2.write(&mut cursor).unwrap();
+        OBJECT.write(&mut cursor).unwrap();
 
-        assert_eq!(cursor.written(), VALID_G70V2_DATA)
+        assert_eq!(cursor.written(), DATA)
     }
 
     #[test]
     fn parses_valid_g70v2() {
-        let mut cursor = ReadCursor::new(VALID_G70V2_DATA);
+        let mut cursor = ReadCursor::new(DATA);
         let obj = Group70Var2::read(&mut cursor).unwrap();
 
-        assert_eq!(obj, VALID_G70V2);
+        assert_eq!(obj, OBJECT);
         assert!(cursor.is_empty());
     }
 }

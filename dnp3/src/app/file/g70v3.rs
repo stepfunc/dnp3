@@ -201,7 +201,7 @@ impl<'a> Group70Var3<'a> {
 mod test {
     use super::*;
 
-    const VALID_G70V3: Group70Var3 = Group70Var3 {
+    const OBJECT: Group70Var3 = Group70Var3 {
         time_of_creation: Timestamp::new(0xAABBCCDDEEFF),
         permissions: Permissions {
             world: Permission {
@@ -228,7 +228,7 @@ mod test {
         file_name: "secrets.txt",
     };
 
-    const VALID_G70V3_DATA: &[u8] = &[
+    const DATA: &[u8] = &[
         26, // filename string offset - always 12
         0, 11, // filename string size
         0, 0xFF, //  time of creation
@@ -258,17 +258,17 @@ mod test {
         let mut buffer = [0; 64];
 
         let mut cursor = WriteCursor::new(&mut buffer);
-        VALID_G70V3.write(&mut cursor).unwrap();
+        OBJECT.write(&mut cursor).unwrap();
 
-        assert_eq!(cursor.written(), VALID_G70V3_DATA)
+        assert_eq!(cursor.written(), DATA)
     }
 
     #[test]
     fn parses_valid_g70v3() {
-        let mut cursor = ReadCursor::new(VALID_G70V3_DATA);
+        let mut cursor = ReadCursor::new(DATA);
         let obj = Group70Var3::read(&mut cursor).unwrap();
 
-        assert_eq!(obj, VALID_G70V3);
+        assert_eq!(obj, OBJECT);
         assert!(cursor.is_empty());
     }
 }
