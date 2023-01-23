@@ -1,4 +1,4 @@
-use scursor::ReadCursor;
+use scursor::{ReadCursor, WriteCursor};
 use std::str::Utf8Error;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -23,6 +23,14 @@ pub(crate) enum FileParseError {
     BadString(FileField, Utf8Error),
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) enum FileWriteError {
+    /// Cursor error
+    WriteError(scursor::WriteError),
+    /// The provided data would overflow the u16 representation
+    Overflow,
+}
+
 /// Group 70 Variation2 - File-control - authentication
 ///
 /// This representation is borrowed from the underlying ASDU
@@ -36,6 +44,29 @@ pub(crate) struct Group70Var2<'a> {
 impl<'a> Group70Var2<'a> {
     // the user name offset is always 12 octets because all the fields in front of it are fixed size
     const USER_NAME_OFFSET: u16 = 12;
+
+    pub(crate) fn write(&self, cursor: &mut WriteCursor) -> Result<(), FileWriteError> {
+        cursor.write_u16_le(Self::USER_NAME_OFFSET)?;
+        let user_name_size: u16 =
+            u16::try_from(self.user_name.as_bytes().len()).map_err(|_| FileWriteError::Overflow)?;
+        cursor.write_u16_le(user_name_size)?;
+
+        let password_offset = match Self::USER_NAME_OFFSET.checked_add(user_name_size) {
+            None => return Err(FileWriteError::Overflow),
+            Some(x) => x,
+        };
+
+        cursor.write_u16_le(password_offset)?;
+        let password_size =
+            u16::try_from(self.password.as_bytes().len()).map_err(|_| FileWriteError::Overflow)?;
+
+        cursor.write_u16_le(password_size)?;
+        cursor.write_u32_le(self.auth_key)?;
+        cursor.write_bytes(self.user_name.as_bytes())?;
+        cursor.write_bytes(self.password.as_bytes())?;
+
+        Ok(())
+    }
 
     pub(crate) fn parse(cursor: &mut ReadCursor<'a>) -> Result<Self, FileParseError> {
         let user_name_offset = cursor.read_u16_le()?;
@@ -85,6 +116,12 @@ impl<'a> Group70Var2<'a> {
     }
 }
 
+impl From<scursor::WriteError> for FileWriteError {
+    fn from(value: scursor::WriteError) -> Self {
+        Self::WriteError(value)
+    }
+}
+
 impl From<scursor::ReadError> for FileParseError {
     fn from(_: scursor::ReadError) -> Self {
         Self::ReadError
@@ -94,42 +131,51 @@ impl From<scursor::ReadError> for FileParseError {
 #[cfg(test)]
 mod test {
     use crate::app::file::Group70Var2;
-    use scursor::ReadCursor;
+    use scursor::{ReadCursor, WriteCursor};
+
+    const VALID_G70V2: Group70Var2 = Group70Var2 {
+        auth_key: 0xDEADCAFE,
+        user_name: "root",
+        password: "foo",
+    };
+
+    const VALID_G70V2_DATA: &[u8] = &[
+        12, // username string offset - always 12
+        0,
+        4, // username string size
+        0,
+        12 + 4, // password string offset
+        0,
+        3, // password string size
+        0,
+        0xFE, // authentication key
+        0xCA,
+        0xAD,
+        0xDE,
+        b'r', // username
+        b'o',
+        b'o',
+        b't',
+        b'f', // password
+        b'o',
+        b'o',
+    ];
+
+    #[test]
+    fn writes_valid_g70v2() {
+        let mut buffer = [0; 64];
+
+        let mut cursor = WriteCursor::new(&mut buffer);
+        VALID_G70V2.write(&mut cursor).unwrap();
+
+        assert_eq!(cursor.written(), VALID_G70V2_DATA)
+    }
 
     #[test]
     fn parses_valid_g70v2() {
-        let input: &[u8] = &[
-            12, // username string offset - always 12
-            0,
-            4, // username string size
-            0,
-            12 + 4, // password string offset
-            0,
-            3, // password string size
-            0,
-            0xDE, // authentication key
-            0xAD,
-            0xCA,
-            0xFE,
-            b'r', // username
-            b'o',
-            b'o',
-            b't',
-            b'f', // password
-            b'o',
-            b'o',
-        ];
-
-        let mut cursor = ReadCursor::new(input);
+        let mut cursor = ReadCursor::new(VALID_G70V2_DATA);
         let obj = Group70Var2::parse(&mut cursor).unwrap();
 
-        assert_eq!(
-            obj,
-            Group70Var2 {
-                auth_key: 0xFECAADDE,
-                user_name: "root",
-                password: "foo",
-            }
-        )
+        assert_eq!(obj, VALID_G70V2)
     }
 }
