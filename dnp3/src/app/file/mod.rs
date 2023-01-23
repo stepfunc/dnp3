@@ -2,6 +2,7 @@ use std::str::Utf8Error;
 
 mod g70v2;
 mod g70v3;
+mod g70v4;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 struct Overflow;

@@ -122,11 +122,11 @@ impl FileMode {
 
     fn to_u16(self) -> u16 {
         match self {
-            FileMode::Null => 0,
-            FileMode::Read => 1,
-            FileMode::Write => 2,
-            FileMode::Append => 3,
-            FileMode::Reserved(x) => x,
+            Self::Null => 0,
+            Self::Read => 1,
+            Self::Write => 2,
+            Self::Append => 3,
+            Self::Reserved(x) => x,
         }
     }
 }
