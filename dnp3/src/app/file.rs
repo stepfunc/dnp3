@@ -99,25 +99,25 @@ mod test {
     #[test]
     fn parses_valid_g70v2() {
         let input: &[u8] = &[
-            12,
-            0, // username string offset - always 12
-            4,
-            0, // username string size
-            12 + 4,
-            0, // password string offset
-            3,
-            0, // password string size
-            0xDE,
+            12, // username string offset - always 12
+            0,
+            4, // username string size
+            0,
+            12 + 4, // password string offset
+            0,
+            3, // password string size
+            0,
+            0xDE, // authentication key
             0xAD,
             0xCA,
-            0xFE, // authentication key
-            b'r',
+            0xFE,
+            b'r', // username
             b'o',
             b'o',
-            b't', // username
-            b'f',
+            b't',
+            b'f', // password
             b'o',
-            b'o', // password
+            b'o',
         ];
 
         let mut cursor = ReadCursor::new(input);
