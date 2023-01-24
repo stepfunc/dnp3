@@ -50,7 +50,7 @@ mod test {
     ];
 
     #[test]
-    fn writes_valid_g70v3() {
+    fn writes_valid_object() {
         let mut buffer = [0; 64];
 
         let mut cursor = WriteCursor::new(&mut buffer);
@@ -60,7 +60,7 @@ mod test {
     }
 
     #[test]
-    fn parses_valid_g70v3() {
+    fn parses_valid_object() {
         let mut cursor = ReadCursor::new(DATA);
         let obj = Group70Var5::read(&mut cursor).unwrap();
 

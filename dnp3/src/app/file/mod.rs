@@ -5,6 +5,10 @@ mod g70v3;
 mod g70v4;
 mod g70v5;
 mod g70v6;
+mod g70v7;
+mod permissions;
+
+pub(crate) use permissions::*;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) enum FileStatus {
