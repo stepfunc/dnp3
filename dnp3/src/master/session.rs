@@ -36,7 +36,7 @@ enum ReadResponseAction {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum StateChange {
+pub(crate) enum StateChange {
     Disable,
     Shutdown,
 }
