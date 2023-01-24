@@ -1173,4 +1173,28 @@ mod test {
             ObjectParseError::BadAttribute(AttrParseError::CountNotOne(2))
         );
     }
+
+    #[test]
+    fn parses_free_format() {
+        let input: &[u8] = &[
+            70, 5, 0x5B, 12, 0x00, 0x01, 0x02, 0x03, 0x04, 0xAA, 0xBB, 0xCC, 0xDD, b'd', b'a',
+            b't', b'a',
+        ];
+        let headers = ObjectParser::parse(FunctionCode::Response, &input).unwrap();
+        let header = headers.iter().next().unwrap();
+
+        assert_eq!(header.variation, Variation::Group70Var5);
+        let obj = match header.details {
+            HeaderDetails::TwoByteFreeFormat(12, FreeFormatVariation::Group70Var5(obj)) => obj,
+            _ => unreachable!(),
+        };
+        assert_eq!(
+            obj,
+            crate::app::file::Group70Var5 {
+                file_handle: 0x04030201,
+                block_number: 0xDDCCBBAA,
+                file_data: &[b'd', b'a', b't', b'a'],
+            }
+        );
+    }
 }
