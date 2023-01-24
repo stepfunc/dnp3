@@ -6,6 +6,7 @@ mod g70v4;
 mod g70v5;
 mod g70v6;
 mod g70v7;
+mod g70v8;
 mod permissions;
 
 pub(crate) use permissions::*;
