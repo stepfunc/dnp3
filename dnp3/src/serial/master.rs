@@ -4,7 +4,7 @@ use tracing::Instrument;
 
 use crate::app::{Listener, Shutdown};
 use crate::link::LinkErrorMode;
-use crate::master::session::{MasterSession, RunError, StateChange};
+use crate::master::session::{MasterSession, RunError, StopReason};
 use crate::master::*;
 use crate::serial::{PortState, SerialSettings};
 use crate::transport::TransportReader;
@@ -82,13 +82,13 @@ impl MasterTask {
         loop {
             self.listener.update(PortState::Disabled).get().await;
             self.session.wait_for_enabled().await?;
-            if let Err(StateChange::Shutdown) = self.run_enabled().await {
+            if let Err(StopReason::Shutdown) = self.run_enabled().await {
                 return Err(Shutdown);
             }
         }
     }
 
-    async fn run_enabled(&mut self) -> Result<(), StateChange> {
+    async fn run_enabled(&mut self) -> Result<(), StopReason> {
         loop {
             match crate::serial::open(self.path.as_str(), self.serial_settings) {
                 Err(err) => {
@@ -112,7 +112,7 @@ impl MasterTask {
                         .run(&mut io, &mut self.writer, &mut self.reader)
                         .await
                     {
-                        RunError::State(x) => {
+                        RunError::Stop(x) => {
                             return Err(x);
                         }
                         RunError::Link(err) => {

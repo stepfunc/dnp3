@@ -35,27 +35,30 @@ enum ReadResponseAction {
     Complete,
 }
 
+/// communication sessions might be stopped due to being disabled, or due to being shutdown permanently
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub(crate) enum StateChange {
+pub(crate) enum StopReason {
+    /// Communication channel is temporarily disabled
     Disable,
+    /// Communication channel is permanently shut down
     Shutdown,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum RunError {
-    State(StateChange),
+    Stop(StopReason),
     Link(LinkError),
 }
 
-impl From<Shutdown> for StateChange {
+impl From<Shutdown> for StopReason {
     fn from(_: Shutdown) -> Self {
-        StateChange::Shutdown
+        StopReason::Shutdown
     }
 }
 
-impl From<StateChange> for RunError {
-    fn from(x: StateChange) -> Self {
-        RunError::State(x)
+impl From<StopReason> for RunError {
+    fn from(x: StopReason) -> Self {
+        RunError::Stop(x)
     }
 }
 
@@ -67,7 +70,7 @@ impl From<LinkError> for RunError {
 
 impl From<Shutdown> for RunError {
     fn from(_: Shutdown) -> Self {
-        RunError::State(StateChange::Shutdown)
+        RunError::Stop(StopReason::Shutdown)
     }
 }
 
@@ -88,7 +91,7 @@ impl MasterSession {
     }
 
     /// Wait for the defined duration, processing messages that are received in the meantime.
-    pub(crate) async fn wait_for_retry(&mut self, duration: Duration) -> Result<(), StateChange> {
+    pub(crate) async fn wait_for_retry(&mut self, duration: Duration) -> Result<(), StopReason> {
         let deadline = Instant::now().add(duration);
 
         loop {
@@ -96,7 +99,7 @@ impl MasterSession {
                 result = self.process_message(false) => {
                    result?;
                    if !self.enabled {
-                       return Err(StateChange::Disable)
+                       return Err(StopReason::Disable)
                    }
                 }
                 _ = tokio::time::sleep_until(deadline) => {
@@ -113,7 +116,7 @@ impl MasterSession {
                 return Ok(());
             }
 
-            if let Err(StateChange::Shutdown) = self.process_message(false).await {
+            if let Err(StopReason::Shutdown) = self.process_message(false).await {
                 return Err(Shutdown);
             }
         }
@@ -223,13 +226,13 @@ impl MasterSession {
         }
     }
 
-    async fn process_message(&mut self, is_connected: bool) -> Result<(), StateChange> {
+    async fn process_message(&mut self, is_connected: bool) -> Result<(), StopReason> {
         let message = self.messages.receive().await?;
         match message {
             Message::Master(msg) => {
                 self.process_master_message(msg);
                 if is_connected && !self.enabled {
-                    return Err(StateChange::Disable);
+                    return Err(StopReason::Disable);
                 }
             }
             Message::Association(msg) => {
@@ -328,8 +331,8 @@ impl MasterSession {
         match result {
             Ok(()) => Ok(()),
             Err(err) => match err {
-                TaskError::Shutdown => Err(RunError::State(StateChange::Shutdown)),
-                TaskError::Disabled => Err(RunError::State(StateChange::Disable)),
+                TaskError::Shutdown => Err(RunError::Stop(StopReason::Shutdown)),
+                TaskError::Disabled => Err(RunError::Stop(StopReason::Disable)),
                 TaskError::Link(err) => Err(RunError::Link(err)),
                 _ => Ok(()),
             },

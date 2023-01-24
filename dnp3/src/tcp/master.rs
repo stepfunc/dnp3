@@ -4,7 +4,7 @@ use tracing::Instrument;
 use crate::app::{ConnectStrategy, Listener};
 use crate::app::{RetryStrategy, Shutdown};
 use crate::link::LinkErrorMode;
-use crate::master::session::{MasterSession, RunError, StateChange};
+use crate::master::session::{MasterSession, RunError, StopReason};
 use crate::master::{MasterChannel, MasterChannelConfig};
 use crate::tcp::EndpointList;
 use crate::tcp::{ClientState, ConnectOptions, Connector, PostConnectionHandler};
@@ -121,19 +121,19 @@ impl MasterTask {
         loop {
             self.listener.update(ClientState::Disabled).get().await;
             self.session.wait_for_enabled().await?;
-            if let Err(StateChange::Shutdown) = self.run_connection().await {
+            if let Err(StopReason::Shutdown) = self.run_connection().await {
                 return Err(Shutdown);
             }
         }
     }
 
-    async fn run_connection(&mut self) -> Result<(), StateChange> {
+    async fn run_connection(&mut self) -> Result<(), StopReason> {
         loop {
             self.run_one_connection().await?;
         }
     }
 
-    async fn run_one_connection(&mut self) -> Result<(), StateChange> {
+    async fn run_one_connection(&mut self) -> Result<(), StopReason> {
         self.listener.update(ClientState::Connecting).get().await;
         match self.connector.connect().await {
             Ok(phys) => {
@@ -151,13 +151,13 @@ impl MasterTask {
         }
     }
 
-    async fn run_phys(&mut self, mut phys: PhysLayer) -> Result<(), StateChange> {
+    async fn run_phys(&mut self, mut phys: PhysLayer) -> Result<(), StopReason> {
         match self
             .session
             .run(&mut phys, &mut self.writer, &mut self.reader)
             .await
         {
-            RunError::State(s) => Err(s),
+            RunError::Stop(s) => Err(s),
             RunError::Link(err) => {
                 tracing::warn!("connection lost - {}", err);
 
