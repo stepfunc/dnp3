@@ -9,6 +9,13 @@ mod g70v7;
 mod g70v8;
 mod permissions;
 
+pub(crate) use g70v2::*;
+pub(crate) use g70v3::*;
+pub(crate) use g70v4::*;
+pub(crate) use g70v5::*;
+pub(crate) use g70v6::*;
+pub(crate) use g70v7::*;
+pub(crate) use g70v8::*;
 pub(crate) use permissions::*;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
