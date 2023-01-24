@@ -19,6 +19,7 @@ use crate::util::buffer::Buffer;
 use crate::util::channel::Receiver;
 use crate::util::phys::PhysLayer;
 
+use crate::shared::{RunError, StopReason};
 use tokio::time::Instant;
 
 pub(crate) struct MasterSession {
@@ -33,45 +34,6 @@ enum ReadResponseAction {
     Ignore,
     ReadNext,
     Complete,
-}
-
-/// communication sessions might be stopped due to being disabled, or due to being shutdown permanently
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub(crate) enum StopReason {
-    /// Communication channel is temporarily disabled
-    Disable,
-    /// Communication channel is permanently shut down
-    Shutdown,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub(crate) enum RunError {
-    Stop(StopReason),
-    Link(LinkError),
-}
-
-impl From<Shutdown> for StopReason {
-    fn from(_: Shutdown) -> Self {
-        StopReason::Shutdown
-    }
-}
-
-impl From<StopReason> for RunError {
-    fn from(x: StopReason) -> Self {
-        RunError::Stop(x)
-    }
-}
-
-impl From<LinkError> for RunError {
-    fn from(err: LinkError) -> Self {
-        RunError::Link(err)
-    }
-}
-
-impl From<Shutdown> for RunError {
-    fn from(_: Shutdown) -> Self {
-        RunError::Stop(StopReason::Shutdown)
-    }
 }
 
 impl MasterSession {

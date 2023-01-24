@@ -4,9 +4,10 @@ use tracing::Instrument;
 
 use crate::app::{Listener, Shutdown};
 use crate::link::LinkErrorMode;
-use crate::master::session::{MasterSession, RunError, StopReason};
+use crate::master::session::MasterSession;
 use crate::master::*;
 use crate::serial::{PortState, SerialSettings};
+use crate::shared::{RunError, StopReason};
 use crate::transport::TransportReader;
 use crate::transport::TransportWriter;
 use crate::util::phys::PhysLayer;

@@ -8,8 +8,9 @@ use crate::link::header::{FrameInfo, FrameType};
 use crate::link::{EndpointAddress, LinkErrorMode};
 use crate::master::association::AssociationConfig;
 use crate::master::handler::{AssociationHandle, MasterChannel, ReadHandler};
-use crate::master::session::{MasterSession, RunError};
+use crate::master::session::MasterSession;
 use crate::master::{AssociationHandler, AssociationInformation, HeaderInfo};
+use crate::shared::RunError;
 use crate::transport::create_master_transport_layer;
 use crate::util::phys::PhysLayer;
 

@@ -15,7 +15,6 @@ use crate::master::handler::{AssociationHandler, Promise};
 use crate::master::messages::AssociationMsgType;
 use crate::master::poll::{PollHandle, PollMap, PollMsg};
 use crate::master::request::{Classes, EventClasses, TimeSyncProcedure};
-use crate::master::session::RunError;
 use crate::master::tasks::auto::AutoTask;
 use crate::master::tasks::time::TimeSyncTask;
 use crate::master::tasks::NonReadTask::TimeSync;
@@ -23,6 +22,7 @@ use crate::master::tasks::{AssociationTask, ReadTask, Task};
 use crate::master::{AssociationInformation, ReadHandler, ReadType, TaskType};
 use crate::util::Smallest;
 
+use crate::shared::RunError;
 use tokio::time::Instant;
 
 /// Configuration for a master association
