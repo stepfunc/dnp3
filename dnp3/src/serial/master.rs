@@ -4,12 +4,10 @@ use tracing::Instrument;
 
 use crate::app::{Listener, Shutdown};
 use crate::link::LinkErrorMode;
-use crate::master::session::MasterSession;
+use crate::master::task::MasterTask;
 use crate::master::*;
 use crate::serial::{PortState, SerialSettings};
 use crate::shared::{RunError, StopReason};
-use crate::transport::TransportReader;
-use crate::transport::TransportWriter;
 use crate::util::phys::PhysLayer;
 
 /// Spawn a master task onto the `Tokio` runtime. The task runs until the returned handle, and any
@@ -25,7 +23,8 @@ pub fn spawn_master_serial(
     listener: Box<dyn Listener<PortState>>,
 ) -> MasterChannel {
     let log_path = path.to_owned();
-    let (mut task, handle) = MasterTask::new(path, serial_settings, config, retry_delay, listener);
+    let (mut task, handle) =
+        MasterSerialTask::new(path, serial_settings, config, retry_delay, listener);
     let future = async move {
         task.run()
             .instrument(tracing::info_span!("dnp3-master-serial", "port" = ?log_path))
@@ -35,17 +34,15 @@ pub fn spawn_master_serial(
     handle
 }
 
-struct MasterTask {
+struct MasterSerialTask {
     path: String,
     serial_settings: SerialSettings,
     retry_delay: Duration,
-    session: MasterSession,
-    reader: TransportReader,
-    writer: TransportWriter,
+    task: MasterTask,
     listener: Box<dyn Listener<PortState>>,
 }
 
-impl MasterTask {
+impl MasterSerialTask {
     fn new(
         path: &str,
         serial_settings: SerialSettings,
@@ -54,20 +51,12 @@ impl MasterTask {
         listener: Box<dyn Listener<PortState>>,
     ) -> (Self, MasterChannel) {
         let (tx, rx) = crate::util::channel::request_channel();
-        let session = MasterSession::new(false, config.decode_level, config.tx_buffer_size, rx);
-        let (reader, writer) = crate::transport::create_master_transport_layer(
-            // serial ports always discard link parsing errors
-            LinkErrorMode::Discard,
-            config.master_address,
-            config.rx_buffer_size,
-        );
+        let task = MasterTask::new(false, LinkErrorMode::Discard, config, rx);
         let task = Self {
             path: path.to_string(),
             serial_settings,
             retry_delay,
-            session,
-            reader,
-            writer,
+            task,
             listener,
         };
         (task, MasterChannel::new(tx))
@@ -75,14 +64,14 @@ impl MasterTask {
 
     async fn run(&mut self) {
         let _ = self.run_impl().await;
-        self.session.shutdown().await;
+        self.task.shutdown().await;
         self.listener.update(PortState::Shutdown).get().await;
     }
 
     async fn run_impl(&mut self) -> Result<(), Shutdown> {
         loop {
             self.listener.update(PortState::Disabled).get().await;
-            self.session.wait_for_enabled().await?;
+            self.task.wait_for_enabled().await?;
             if let Err(StopReason::Shutdown) = self.run_enabled().await {
                 return Err(Shutdown);
             }
@@ -102,17 +91,13 @@ impl MasterTask {
                         .update(PortState::Wait(self.retry_delay))
                         .get()
                         .await;
-                    self.session.wait_for_retry(self.retry_delay).await?;
+                    self.task.wait_for_retry(self.retry_delay).await?;
                 }
                 Ok(serial) => {
                     let mut io = PhysLayer::Serial(serial);
                     tracing::info!("serial port open");
                     self.listener.update(PortState::Open).get().await;
-                    match self
-                        .session
-                        .run(&mut io, &mut self.writer, &mut self.reader)
-                        .await
-                    {
+                    match self.task.run(&mut io).await {
                         RunError::Stop(x) => {
                             return Err(x);
                         }
@@ -126,7 +111,7 @@ impl MasterTask {
                                 .update(PortState::Wait(self.retry_delay))
                                 .get()
                                 .await;
-                            self.session.wait_for_retry(self.retry_delay).await?;
+                            self.task.wait_for_retry(self.retry_delay).await?;
                         }
                     }
                 }

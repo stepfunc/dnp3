@@ -8,12 +8,12 @@ use crate::app::parse::parser::Response;
 use crate::app::{BufferSize, ControlField, FunctionCode, Sequence, Shutdown};
 use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
-use crate::link::EndpointAddress;
+use crate::link::{EndpointAddress, LinkErrorMode};
 use crate::master::association::{AssociationMap, Next};
 use crate::master::error::TaskError;
 use crate::master::messages::{MasterMsg, Message};
 use crate::master::tasks::{AssociationTask, NonReadTask, ReadTask, RequestWriter, Task};
-use crate::master::Association;
+use crate::master::{Association, MasterChannelConfig};
 use crate::transport::{TransportReader, TransportResponse, TransportWriter};
 use crate::util::buffer::Buffer;
 use crate::util::channel::Receiver;
@@ -22,7 +22,63 @@ use crate::util::phys::PhysLayer;
 use crate::shared::{RunError, StopReason};
 use tokio::time::Instant;
 
-pub(crate) struct MasterSession {
+/// combines the session with transport stuff
+pub(crate) struct MasterTask {
+    session: MasterSession,
+    reader: TransportReader,
+    writer: TransportWriter,
+}
+
+impl MasterTask {
+    pub(crate) fn new(
+        enabled: bool,
+        link_error_mode: LinkErrorMode,
+        config: MasterChannelConfig,
+        messages: Receiver<Message>,
+    ) -> Self {
+        let session = MasterSession::new(
+            enabled,
+            config.decode_level,
+            config.tx_buffer_size,
+            messages,
+        );
+        let (reader, writer) = crate::transport::create_master_transport_layer(
+            link_error_mode,
+            config.master_address,
+            config.rx_buffer_size,
+        );
+        Self {
+            session,
+            reader,
+            writer,
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn set_rx_frame_info(&mut self, info: crate::link::header::FrameInfo) {
+        self.reader.get_inner().set_rx_frame_info(info);
+    }
+
+    pub(crate) async fn run(&mut self, io: &mut PhysLayer) -> RunError {
+        self.session
+            .run(io, &mut self.writer, &mut self.reader)
+            .await
+    }
+
+    pub(crate) async fn shutdown(&mut self) {
+        self.session.shutdown().await
+    }
+
+    pub(crate) async fn wait_for_enabled(&mut self) -> Result<(), Shutdown> {
+        self.session.wait_for_enabled().await
+    }
+
+    pub(crate) async fn wait_for_retry(&mut self, duration: Duration) -> Result<(), StopReason> {
+        self.session.wait_for_retry(duration).await
+    }
+}
+
+struct MasterSession {
     enabled: bool,
     decode_level: DecodeLevel,
     associations: AssociationMap,
@@ -37,7 +93,7 @@ enum ReadResponseAction {
 }
 
 impl MasterSession {
-    pub(crate) fn new(
+    fn new(
         enabled: bool,
         decode_level: DecodeLevel,
         tx_buffer_size: BufferSize<249, 2048>,
@@ -53,7 +109,7 @@ impl MasterSession {
     }
 
     /// Wait for the defined duration, processing messages that are received in the meantime.
-    pub(crate) async fn wait_for_retry(&mut self, duration: Duration) -> Result<(), StopReason> {
+    async fn wait_for_retry(&mut self, duration: Duration) -> Result<(), StopReason> {
         let deadline = Instant::now().add(duration);
 
         loop {
@@ -72,7 +128,7 @@ impl MasterSession {
     }
 
     /// wait until the session has been enabled
-    pub(crate) async fn wait_for_enabled(&mut self) -> Result<(), Shutdown> {
+    async fn wait_for_enabled(&mut self) -> Result<(), Shutdown> {
         loop {
             if self.enabled {
                 return Ok(());
@@ -85,7 +141,7 @@ impl MasterSession {
     }
 
     /// Run the master until an error or shutdown occurs.
-    pub(crate) async fn run(
+    async fn run(
         &mut self,
         io: &mut PhysLayer,
         writer: &mut TransportWriter,
@@ -113,7 +169,7 @@ impl MasterSession {
         }
     }
 
-    pub(crate) async fn shutdown(&mut self) {
+    async fn shutdown(&mut self) {
         // close the receiver to new messages
         self.messages.close();
         // process any existing messages
@@ -249,10 +305,7 @@ impl MasterSession {
     fn reset(&mut self, err: RunError) {
         self.associations.reset(err);
     }
-}
 
-// Task processing
-impl MasterSession {
     /// Run a specific task.
     ///
     /// Returns an error only if shutdown or link layer error occured.

@@ -4,13 +4,11 @@ use tracing::Instrument;
 use crate::app::{ConnectStrategy, Listener};
 use crate::app::{RetryStrategy, Shutdown};
 use crate::link::LinkErrorMode;
-use crate::master::session::MasterSession;
+use crate::master::task::MasterTask;
 use crate::master::{MasterChannel, MasterChannelConfig};
 use crate::shared::{RunError, StopReason};
 use crate::tcp::EndpointList;
 use crate::tcp::{ClientState, ConnectOptions, Connector, PostConnectionHandler};
-use crate::transport::TransportReader;
-use crate::transport::TransportWriter;
 use crate::util::phys::PhysLayer;
 
 /// Spawn a task onto the `Tokio` runtime. The task runs until the returned handle, and any
@@ -46,7 +44,7 @@ pub fn spawn_master_tcp_client_2(
     listener: Box<dyn Listener<ClientState>>,
 ) -> MasterChannel {
     let main_addr = endpoints.main_addr().to_string();
-    let (mut task, handle) = MasterTask::new(
+    let (mut task, handle) = MasterTcpTask::new(
         link_error_mode,
         endpoints,
         config,
@@ -64,16 +62,14 @@ pub fn spawn_master_tcp_client_2(
     handle
 }
 
-pub(crate) struct MasterTask {
+pub(crate) struct MasterTcpTask {
     connector: Connector,
     reconnect_delay: Duration,
-    session: MasterSession,
-    reader: TransportReader,
-    writer: TransportWriter,
+    task: MasterTask,
     listener: Box<dyn Listener<ClientState>>,
 }
 
-impl MasterTask {
+impl MasterTcpTask {
     pub(crate) fn new(
         link_error_mode: LinkErrorMode,
         endpoints: EndpointList,
@@ -84,12 +80,7 @@ impl MasterTask {
         listener: Box<dyn Listener<ClientState>>,
     ) -> (Self, MasterChannel) {
         let (tx, rx) = crate::util::channel::request_channel();
-        let session = MasterSession::new(false, config.decode_level, config.tx_buffer_size, rx);
-        let (reader, writer) = crate::transport::create_master_transport_layer(
-            link_error_mode,
-            config.master_address,
-            config.rx_buffer_size,
-        );
+        let task = MasterTask::new(false, link_error_mode, config, rx);
 
         let retry_strategy = RetryStrategy::new(
             connect_strategy.min_connect_delay,
@@ -104,9 +95,7 @@ impl MasterTask {
                 connection_handler,
             ),
             reconnect_delay: connect_strategy.reconnect_delay,
-            session,
-            reader,
-            writer,
+            task,
             listener,
         };
         (task, MasterChannel::new(tx))
@@ -114,14 +103,14 @@ impl MasterTask {
 
     pub(crate) async fn run(&mut self) {
         let _ = self.run_impl().await;
-        self.session.shutdown().await;
+        self.task.shutdown().await;
         self.listener.update(ClientState::Shutdown).get().await;
     }
 
     async fn run_impl(&mut self) -> Result<(), Shutdown> {
         loop {
             self.listener.update(ClientState::Disabled).get().await;
-            self.session.wait_for_enabled().await?;
+            self.task.wait_for_enabled().await?;
             if let Err(StopReason::Shutdown) = self.run_connection().await {
                 return Err(Shutdown);
             }
@@ -147,17 +136,13 @@ impl MasterTask {
                     .update(ClientState::WaitAfterFailedConnect(delay))
                     .get()
                     .await;
-                self.session.wait_for_retry(delay).await
+                self.task.wait_for_retry(delay).await
             }
         }
     }
 
     async fn run_phys(&mut self, mut phys: PhysLayer) -> Result<(), StopReason> {
-        match self
-            .session
-            .run(&mut phys, &mut self.writer, &mut self.reader)
-            .await
-        {
+        match self.task.run(&mut phys).await {
             RunError::Stop(s) => Err(s),
             RunError::Link(err) => {
                 tracing::warn!("connection lost - {}", err);
@@ -173,7 +158,7 @@ impl MasterTask {
                         self.reconnect_delay.as_millis()
                     );
 
-                    self.session.wait_for_retry(self.reconnect_delay).await?;
+                    self.task.wait_for_retry(self.reconnect_delay).await?;
                 }
 
                 Ok(())

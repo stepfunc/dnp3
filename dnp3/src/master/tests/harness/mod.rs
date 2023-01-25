@@ -8,10 +8,9 @@ use crate::link::header::{FrameInfo, FrameType};
 use crate::link::{EndpointAddress, LinkErrorMode};
 use crate::master::association::AssociationConfig;
 use crate::master::handler::{AssociationHandle, MasterChannel, ReadHandler};
-use crate::master::session::MasterSession;
-use crate::master::{AssociationHandler, AssociationInformation, HeaderInfo};
+use crate::master::task::MasterTask;
+use crate::master::{AssociationHandler, AssociationInformation, HeaderInfo, MasterChannelConfig};
 use crate::shared::RunError;
-use crate::transport::create_master_transport_layer;
 use crate::util::phys::PhysLayer;
 
 pub(crate) mod requests;
@@ -29,28 +28,28 @@ pub(crate) async fn create_association(mut config: AssociationConfig) -> TestHar
 
     let outstation_address = EndpointAddress::try_new(1024).unwrap();
 
+    let task_config = MasterChannelConfig {
+        master_address: EndpointAddress::try_new(1).unwrap(),
+        decode_level: AppDecodeLevel::ObjectValues.into(),
+        tx_buffer_size: BufferSize::min(),
+        rx_buffer_size: BufferSize::min(),
+    };
+
     // Create the master session
     let (tx, rx) = crate::util::channel::request_channel();
-    let mut runner = MasterSession::new(
-        true,
-        AppDecodeLevel::ObjectValues.into(),
-        BufferSize::min(),
-        rx,
-    );
+    let mut task = MasterTask::new(true, LinkErrorMode::Close, task_config, rx);
+
     let mut master = MasterChannel::new(tx);
 
-    let (mut reader, mut writer) = create_master_transport_layer(
-        LinkErrorMode::Close,
-        EndpointAddress::try_new(1).unwrap(),
-        BufferSize::min(),
-    );
+    task.set_rx_frame_info(FrameInfo::new(outstation_address, None, FrameType::Data));
 
+    /* TODO
     reader
         .get_inner()
         .set_rx_frame_info(FrameInfo::new(outstation_address, None, FrameType::Data));
+     */
 
-    let master_task =
-        tokio::spawn(async move { runner.run(&mut io, &mut writer, &mut reader).await });
+    let master_task = tokio::spawn(async move { task.run(&mut io).await });
 
     // Create the association
     let handler = CountHandler::new();
