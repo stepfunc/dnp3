@@ -8,7 +8,7 @@ use crate::app::{ConnectStrategy, Listener};
 use crate::link::LinkErrorMode;
 use crate::master::{MasterChannel, MasterChannelConfig};
 use crate::tcp::tls::{load_certs, load_private_key, CertificateMode, MinTlsVersion, TlsError};
-use crate::tcp::{ClientState, ConnectOptions, MasterTcpTask};
+use crate::tcp::{wire_master_client, ClientState, ConnectOptions};
 use crate::tcp::{EndpointList, PostConnectionHandler};
 use crate::util::phys::PhysLayer;
 
@@ -59,7 +59,7 @@ pub fn spawn_master_tls_client_2(
     tls_config: TlsClientConfig,
 ) -> MasterChannel {
     let main_addr = endpoints.main_addr().to_string();
-    let (mut task, handle) = MasterTcpTask::new(
+    let (mut task, handle) = wire_master_client(
         link_error_mode,
         endpoints,
         config,

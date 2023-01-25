@@ -16,6 +16,8 @@ mod master;
 mod no_delay;
 mod outstation;
 
+pub(crate) mod client;
+
 /// state of TCP client connection
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ClientState {
