@@ -1,11 +1,11 @@
 use crate::app::{ConnectStrategy, Listener, RetryStrategy, Shutdown};
-use crate::shared::{RunError, StopReason};
 use crate::tcp::{ClientState, ConnectOptions, Connector, EndpointList, PostConnectionHandler};
 use crate::util::phys::PhysLayer;
+use crate::util::session::{RunError, Session, StopReason};
 use std::time::Duration;
 
 pub(crate) struct ClientTask {
-    session: crate::shared::Session,
+    session: Session,
     connector: Connector,
     reconnect_delay: Duration,
     listener: Box<dyn Listener<ClientState>>,
@@ -13,7 +13,7 @@ pub(crate) struct ClientTask {
 
 impl ClientTask {
     pub(crate) fn new(
-        session: crate::shared::Session,
+        session: Session,
         endpoints: EndpointList,
         connect_strategy: ConnectStrategy,
         connect_options: ConnectOptions,

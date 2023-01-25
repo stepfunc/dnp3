@@ -40,6 +40,7 @@ use crate::app::gen::prefixed::PrefixedVariation;
 use crate::app::parse::bit::BitSequence;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
+use crate::util::session::{RunError, StopReason};
 
 #[derive(Copy, Clone)]
 enum TimeoutStatus {
@@ -242,6 +243,7 @@ impl SessionState {
 }
 
 pub(crate) struct OutstationSession {
+    enabled: bool,
     messages: Receiver<OutstationMessage>,
     sol_tx_buffer: Buffer,
     unsol_tx_buffer: Buffer,
@@ -292,24 +294,6 @@ enum ConfirmAction {
     ContinueWait,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub(crate) enum RunError {
-    Link(LinkError),
-    Shutdown,
-}
-
-impl From<Shutdown> for RunError {
-    fn from(_: Shutdown) -> Self {
-        RunError::Shutdown
-    }
-}
-
-impl From<LinkError> for RunError {
-    fn from(err: LinkError) -> Self {
-        RunError::Link(err)
-    }
-}
-
 impl OutstationSession {
     pub(crate) fn new(
         messages: Receiver<OutstationMessage>,
@@ -324,6 +308,7 @@ impl OutstationSession {
             .map(|delay| tokio::time::Instant::now() + delay);
 
         Self {
+            enabled: true,
             messages,
             config,
             sol_tx_buffer: param.sol_tx_buffer_size.create_buffer(),
@@ -336,8 +321,12 @@ impl OutstationSession {
         }
     }
 
+    pub(crate) fn is_enabled(&self) -> bool {
+        self.enabled
+    }
+
     /// used when the there is no running IO to process outstation messages
-    pub(crate) async fn process_messages(&mut self) -> Result<(), Shutdown> {
+    pub(crate) async fn process_messages(&mut self) -> Result<(), StopReason> {
         loop {
             self.handle_next_message().await?;
         }
@@ -874,9 +863,19 @@ impl OutstationSession {
         }
     }
 
-    async fn handle_next_message(&mut self) -> Result<(), Shutdown> {
+    async fn handle_next_message(&mut self) -> Result<(), StopReason> {
         match self.messages.receive().await? {
-            OutstationMessage::Shutdown => Err(Shutdown),
+            OutstationMessage::Shutdown => Err(StopReason::Shutdown),
+            OutstationMessage::Enable => {
+                tracing::info!("enable communication");
+                self.enabled = true;
+                Ok(())
+            }
+            OutstationMessage::Disable => {
+                tracing::info!("disable communication");
+                self.enabled = false;
+                Err(StopReason::Disable)
+            }
             OutstationMessage::Configuration(change) => {
                 self.handle_config_change(change);
                 Ok(())

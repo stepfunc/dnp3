@@ -10,8 +10,8 @@ use crate::master::association::AssociationConfig;
 use crate::master::handler::{AssociationHandle, MasterChannel, ReadHandler};
 use crate::master::task::MasterTask;
 use crate::master::{AssociationHandler, AssociationInformation, HeaderInfo, MasterChannelConfig};
-use crate::shared::RunError;
 use crate::util::phys::PhysLayer;
+use crate::util::session::RunError;
 
 pub(crate) mod requests;
 
@@ -42,12 +42,6 @@ pub(crate) async fn create_association(mut config: AssociationConfig) -> TestHar
     let mut master = MasterChannel::new(tx);
 
     task.set_rx_frame_info(FrameInfo::new(outstation_address, None, FrameType::Data));
-
-    /* TODO
-    reader
-        .get_inner()
-        .set_rx_frame_info(FrameInfo::new(outstation_address, None, FrameType::Data));
-     */
 
     let master_task = tokio::spawn(async move { task.run(&mut io).await });
 

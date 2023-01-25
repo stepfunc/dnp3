@@ -1,7 +1,7 @@
 use crate::app::{Listener, Shutdown};
 use crate::serial::{PortState, SerialSettings};
-use crate::shared::{RunError, Session, StopReason};
 use crate::util::phys::PhysLayer;
+use crate::util::session::{RunError, Session, StopReason};
 use std::time::Duration;
 
 pub(crate) struct SerialTask {

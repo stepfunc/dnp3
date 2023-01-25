@@ -47,6 +47,7 @@ impl From<Shutdown> for RunError {
 
 enum SessionType {
     Master(crate::master::task::MasterTask),
+    Outstation(crate::outstation::task::OutstationTask),
 }
 
 /// Wrapper around a specific type of session (master or outstation)
@@ -64,27 +65,37 @@ impl Session {
         }
     }
 
+    pub(crate) fn outstation(task: crate::outstation::task::OutstationTask) -> Self {
+        Self {
+            inner: SessionType::Outstation(task),
+        }
+    }
+
     fn is_enabled(&self) -> bool {
         match &self.inner {
             SessionType::Master(x) => x.is_enabled(),
+            SessionType::Outstation(x) => x.is_enabled(),
         }
     }
 
     async fn process_next_message(&mut self) -> Result<(), StopReason> {
         match &mut self.inner {
             SessionType::Master(x) => x.process_next_message().await,
+            SessionType::Outstation(x) => x.process_messages().await, // TODO
         }
     }
 
     pub(crate) async fn run(&mut self, io: &mut PhysLayer) -> RunError {
         match &mut self.inner {
             SessionType::Master(x) => x.run(io).await,
+            SessionType::Outstation(x) => x.run(io).await,
         }
     }
 
     pub(crate) async fn shutdown(&mut self) {
         match &mut self.inner {
             SessionType::Master(x) => x.shutdown().await,
+            SessionType::Outstation(_) => {} // TODO
         }
     }
 

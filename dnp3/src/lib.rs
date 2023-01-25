@@ -69,6 +69,5 @@ pub mod serial;
 /// Entry points and types for TCP
 pub mod tcp;
 
-pub(crate) mod shared;
 pub(crate) mod transport;
 pub(crate) mod util;

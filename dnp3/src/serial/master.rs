@@ -7,7 +7,7 @@ use crate::link::LinkErrorMode;
 use crate::master::task::MasterTask;
 use crate::master::*;
 use crate::serial::{PortState, SerialSettings};
-use crate::shared::Session;
+use crate::util::session::Session;
 
 /// Spawn a master task onto the `Tokio` runtime. The task runs until the returned handle, and any
 /// `AssociationHandle` created from it, are dropped.

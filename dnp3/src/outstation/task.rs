@@ -1,13 +1,13 @@
-use crate::app::Shutdown;
 use crate::decode::DecodeLevel;
 use crate::link::LinkErrorMode;
 use crate::outstation::config::*;
 use crate::outstation::database::DatabaseHandle;
-use crate::outstation::session::{OutstationSession, RunError};
+use crate::outstation::session::OutstationSession;
 use crate::outstation::traits::{ControlHandler, OutstationApplication, OutstationInformation};
 use crate::outstation::OutstationHandle;
 use crate::transport::{TransportReader, TransportWriter};
 use crate::util::phys::PhysLayer;
+use crate::util::session::{RunError, StopReason};
 
 pub(crate) enum ConfigurationChange {
     SetDecodeLevel(DecodeLevel),
@@ -20,6 +20,8 @@ impl From<ConfigurationChange> for OutstationMessage {
 }
 
 pub(crate) enum OutstationMessage {
+    Enable,
+    Disable,
     Shutdown,
     Configuration(ConfigurationChange),
 }
@@ -74,6 +76,10 @@ impl OutstationTask {
         )
     }
 
+    pub(crate) fn is_enabled(&self) -> bool {
+        self.session.is_enabled()
+    }
+
     /// run the outstation task asynchronously until a `SessionError` occurs
     pub(crate) async fn run(&mut self, io: &mut PhysLayer) -> RunError {
         self.session
@@ -82,7 +88,7 @@ impl OutstationTask {
     }
 
     /// process received outstation messages while idle without a session
-    pub(crate) async fn process_messages(&mut self) -> Result<(), Shutdown> {
+    pub(crate) async fn process_messages(&mut self) -> Result<(), StopReason> {
         loop {
             self.session.process_messages().await?;
         }

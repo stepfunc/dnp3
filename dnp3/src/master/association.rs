@@ -22,7 +22,7 @@ use crate::master::tasks::{AssociationTask, ReadTask, Task};
 use crate::master::{AssociationInformation, ReadHandler, ReadType, TaskType};
 use crate::util::Smallest;
 
-use crate::shared::RunError;
+use crate::util::session::RunError;
 use tokio::time::Instant;
 
 /// Configuration for a master association

@@ -57,6 +57,18 @@ impl OutstationHandle {
         Ok(())
     }
 
+    /// Enable communications
+    pub async fn enable(&mut self) -> Result<(), Shutdown> {
+        self.sender.send(OutstationMessage::Enable).await?;
+        Ok(())
+    }
+
+    /// Disable communications
+    pub async fn disable(&mut self) -> Result<(), Shutdown> {
+        self.sender.send(OutstationMessage::Disable).await?;
+        Ok(())
+    }
+
     pub(crate) async fn shutdown(&mut self) -> Result<(), Shutdown> {
         self.sender.send(OutstationMessage::Shutdown).await?;
         Ok(())

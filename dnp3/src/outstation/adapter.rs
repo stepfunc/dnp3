@@ -1,11 +1,11 @@
 use tracing::Instrument;
 
 use crate::app::{Listener, Shutdown};
-use crate::outstation::session::RunError;
 use crate::outstation::task::OutstationTask;
 use crate::outstation::ConnectionState;
 use crate::util::channel::{request_channel, Receiver, Sender};
 use crate::util::phys::PhysLayer;
+use crate::util::session::{RunError, StopReason};
 
 /// message that gets sent to OutstationTaskAdapter when
 /// it needs to switch to a new session
@@ -52,7 +52,9 @@ impl OutstationTaskAdapter {
                     return session;
                 }
                 ret = self.task.process_messages() => {
-                    ret?
+                    if let Err(StopReason::Shutdown) = ret {
+                        return Err(Shutdown);
+                    }
                 }
             }
         }
@@ -78,6 +80,8 @@ impl OutstationTaskAdapter {
                     session.replace(self.wait_for_session().await?);
                 }
                 Some(mut s) => {
+                    // TODO - check if enabled
+
                     let id = s.id;
 
                     self.listener.update(ConnectionState::Connected).get().await;
@@ -107,7 +111,10 @@ impl OutstationTaskAdapter {
                             // go to next iteration to get a new session
                             tracing::warn!("session error: {}", err);
                         }
-                        Err(RunError::Shutdown) => return Err(Shutdown),
+                        Err(RunError::Stop(StopReason::Shutdown)) => return Err(Shutdown),
+                        Err(RunError::Stop(StopReason::Disable)) => {
+                            // do nothing?
+                        }
                     }
                 }
             }

@@ -16,7 +16,7 @@ use crate::util::buffer::Buffer;
 use crate::util::channel::Receiver;
 use crate::util::phys::PhysLayer;
 
-use crate::shared::{RunError, StopReason};
+use crate::util::session::{RunError, StopReason};
 use tokio::time::Instant;
 
 /// combines the session with transport stuff

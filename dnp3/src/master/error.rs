@@ -12,7 +12,7 @@ use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError;
 
 use crate::app::attr::BadAttribute;
-use crate::shared::{RunError, StopReason};
+use crate::util::session::{RunError, StopReason};
 
 /// Errors that can occur when adding an association
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

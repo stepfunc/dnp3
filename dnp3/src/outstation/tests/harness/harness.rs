@@ -6,7 +6,6 @@ use crate::link::header::{BroadcastConfirmMode, FrameInfo, FrameType};
 use crate::link::{EndpointAddress, LinkErrorMode};
 use crate::outstation::config::{Feature, OutstationConfig};
 use crate::outstation::database::EventBufferConfig;
-use crate::outstation::session::RunError;
 use crate::outstation::task::OutstationTask;
 use crate::outstation::tests::harness::{
     event_handlers, ApplicationData, Event, EventReceiver, MockControlHandler,
@@ -14,6 +13,7 @@ use crate::outstation::tests::harness::{
 };
 use crate::outstation::OutstationHandle;
 use crate::util::phys::PhysLayer;
+use crate::util::session::RunError;
 
 pub(crate) fn get_default_config() -> OutstationConfig {
     let mut config = get_default_unsolicited_config();

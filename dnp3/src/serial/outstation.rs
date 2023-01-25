@@ -1,15 +1,16 @@
-use crate::app::{ExponentialBackOff, RetryStrategy, Shutdown};
+use crate::app::{Listener, MaybeAsync, RetryStrategy};
 use tracing::Instrument;
 
 use crate::link::LinkErrorMode;
-use crate::outstation::session::RunError;
 use crate::outstation::task::OutstationTask;
 use crate::outstation::{
     ControlHandler, OutstationApplication, OutstationConfig, OutstationHandle,
     OutstationInformation,
 };
-use crate::serial::SerialSettings;
+use crate::serial::task::SerialTask;
+use crate::serial::{PortState, SerialSettings};
 use crate::util::phys::PhysLayer;
+use crate::util::session::Session;
 
 /// Spawn an outstation task onto the `Tokio` runtime. The task runs until the returned handle is dropped or
 /// a serial port error occurs, e.g. a serial port is removed from the OS. It attempts to open
@@ -49,6 +50,14 @@ pub fn spawn_outstation_serial(
     Ok(handle)
 }
 
+struct NullListener;
+
+impl Listener<PortState> for NullListener {
+    fn update(&mut self, _: PortState) -> MaybeAsync<()> {
+        MaybeAsync::ready(())
+    }
+}
+
 /// Spawns an outstation task onto the `Tokio` runtime. The task runs until the returned handle is dropped.
 /// It is tolerant to the serial port being unavailable at startup or being removed from the OS. It
 /// uses the provided `RetryStrategy` to determine when to retry the port if the port cannot be
@@ -75,70 +84,21 @@ pub fn spawn_outstation_serial_fault_tolerant(
         control_handler,
     );
 
-    let mut serial_task = SerialOutstation {
-        port: path.to_string(),
-        backoff: ExponentialBackOff::new(retry),
+    let mut serial = SerialTask::new(
+        path,
         settings,
-        outstation: task,
-    };
+        Session::outstation(task),
+        retry.max_delay, // TODO
+        Box::new(NullListener),
+    );
 
     let log_path = path.to_owned();
     let future = async move {
-        let _ = serial_task
+        let _ = serial
             .run()
             .instrument(tracing::info_span!("dnp3-outstation-serial", "port" = ?log_path))
             .await;
     };
     tokio::spawn(future);
     handle
-}
-
-struct SerialOutstation {
-    port: String,
-    backoff: ExponentialBackOff,
-    settings: SerialSettings,
-    outstation: OutstationTask,
-}
-
-impl SerialOutstation {
-    async fn sleep_for(&mut self, delay: std::time::Duration) -> Result<(), Shutdown> {
-        match tokio::time::timeout(delay, self.outstation.process_messages()).await {
-            Ok(x) => x,
-            // timeout
-            Err(_) => Ok(()),
-        }
-    }
-
-    async fn run(&mut self) -> Shutdown {
-        loop {
-            match crate::serial::open(&self.port, self.settings) {
-                Ok(serial) => {
-                    self.backoff.on_success();
-                    tracing::info!("opened port");
-                    // run an open port until shutdown or failure
-                    let mut phys = PhysLayer::Serial(serial);
-                    if let RunError::Shutdown = self.outstation.run(&mut phys).await {
-                        return Shutdown;
-                    }
-                    let delay = self.backoff.on_failure();
-                    // we wait here to prevent any kind of rapid retry scenario if the port opens and immediately fails
-                    tracing::warn!("waiting {:?} to reopen port", delay);
-                    if let Err(Shutdown) = self.sleep_for(delay).await {
-                        return Shutdown;
-                    }
-                }
-                Err(err) => {
-                    let delay = self.backoff.on_failure();
-                    tracing::warn!(
-                        "unable to open serial port, retrying in {:?} - error: {}",
-                        delay,
-                        err
-                    );
-                    if let Err(Shutdown) = self.sleep_for(delay).await {
-                        return Shutdown;
-                    }
-                }
-            }
-        }
-    }
 }
