@@ -13,7 +13,7 @@ use crate::outstation::tests::harness::{
 };
 use crate::outstation::OutstationHandle;
 use crate::util::phys::PhysLayer;
-use crate::util::session::RunError;
+use crate::util::session::{Enabled, RunError};
 
 pub(crate) fn get_default_config() -> OutstationConfig {
     let mut config = get_default_unsolicited_config();
@@ -112,6 +112,7 @@ fn new_harness_impl(
     let (data, application) = MockOutstationApplication::new(sender.clone());
 
     let (task, handle) = OutstationTask::create(
+        Enabled::Yes,
         LinkErrorMode::Close,
         config,
         application,

@@ -7,7 +7,7 @@ use crate::master::{MasterChannel, MasterChannelConfig};
 use crate::tcp::client::ClientTask;
 use crate::tcp::EndpointList;
 use crate::tcp::{ClientState, ConnectOptions, PostConnectionHandler};
-use crate::util::session::Session;
+use crate::util::session::{Enabled, Session};
 
 /// Spawn a task onto the `Tokio` runtime. The task runs until the returned handle, and any
 /// `AssociationHandle` created from it, are dropped.
@@ -70,7 +70,7 @@ pub(crate) fn wire_master_client(
     listener: Box<dyn Listener<ClientState>>,
 ) -> (ClientTask, MasterChannel) {
     let (tx, rx) = crate::util::channel::request_channel();
-    let session = Session::master(MasterTask::new(false, link_error_mode, config, rx));
+    let session = Session::master(MasterTask::new(Enabled::No, link_error_mode, config, rx));
     let client = ClientTask::new(
         session,
         endpoints,

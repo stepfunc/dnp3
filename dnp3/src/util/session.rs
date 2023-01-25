@@ -3,6 +3,15 @@ use crate::link::error::LinkError;
 use crate::util::phys::PhysLayer;
 use std::time::Duration;
 
+/// Just used to avoid bool in methods
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) enum Enabled {
+    /// Communication session is enabled
+    Yes,
+    /// Communication session is disabled
+    No,
+}
+
 /// Communication sessions might be stopped due to being disabled, or due to being shutdown permanently
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) enum StopReason {
@@ -71,10 +80,10 @@ impl Session {
         }
     }
 
-    fn is_enabled(&self) -> bool {
+    fn enabled(&self) -> Enabled {
         match &self.inner {
-            SessionType::Master(x) => x.is_enabled(),
-            SessionType::Outstation(x) => x.is_enabled(),
+            SessionType::Master(x) => x.enabled(),
+            SessionType::Outstation(x) => x.enabled(),
         }
     }
 
@@ -101,7 +110,7 @@ impl Session {
 
     pub(crate) async fn wait_for_enabled(&mut self) -> Result<(), Shutdown> {
         loop {
-            if self.is_enabled() {
+            if self.enabled() == Enabled::Yes {
                 return Ok(());
             }
 
@@ -120,7 +129,7 @@ impl Session {
             tokio::select! {
                 result = self.process_next_message() => {
                    result?;
-                   if !self.is_enabled() {
+                   if self.enabled() == Enabled::No {
                        return Err(StopReason::Disable)
                    }
                 }

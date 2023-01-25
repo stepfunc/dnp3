@@ -9,6 +9,7 @@ use crate::outstation::*;
 use crate::tcp::{AddressFilter, FilterError};
 use crate::util::channel::Sender;
 use crate::util::phys::PhysLayer;
+use crate::util::session::Enabled;
 
 struct OutstationInfo {
     filter: AddressFilter,
@@ -95,6 +96,7 @@ impl Server {
         }
 
         let (task, handle) = OutstationTask::create(
+            Enabled::Yes,
             self.link_error_mode,
             config,
             application,

@@ -40,7 +40,7 @@ use crate::app::gen::prefixed::PrefixedVariation;
 use crate::app::parse::bit::BitSequence;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
-use crate::util::session::{RunError, StopReason};
+use crate::util::session::{Enabled, RunError, StopReason};
 
 #[derive(Copy, Clone)]
 enum TimeoutStatus {
@@ -243,7 +243,7 @@ impl SessionState {
 }
 
 pub(crate) struct OutstationSession {
-    enabled: bool,
+    enabled: Enabled,
     messages: Receiver<OutstationMessage>,
     sol_tx_buffer: Buffer,
     unsol_tx_buffer: Buffer,
@@ -296,6 +296,7 @@ enum ConfirmAction {
 
 impl OutstationSession {
     pub(crate) fn new(
+        initial_state: Enabled,
         messages: Receiver<OutstationMessage>,
         config: SessionConfig,
         param: SessionParameters,
@@ -308,7 +309,7 @@ impl OutstationSession {
             .map(|delay| tokio::time::Instant::now() + delay);
 
         Self {
-            enabled: true,
+            enabled: initial_state,
             messages,
             config,
             sol_tx_buffer: param.sol_tx_buffer_size.create_buffer(),
@@ -321,7 +322,7 @@ impl OutstationSession {
         }
     }
 
-    pub(crate) fn is_enabled(&self) -> bool {
+    pub(crate) fn enabled(&self) -> Enabled {
         self.enabled
     }
 
@@ -868,12 +869,12 @@ impl OutstationSession {
             OutstationMessage::Shutdown => Err(StopReason::Shutdown),
             OutstationMessage::Enable => {
                 tracing::info!("enable communication");
-                self.enabled = true;
+                self.enabled = Enabled::Yes;
                 Ok(())
             }
             OutstationMessage::Disable => {
                 tracing::info!("disable communication");
-                self.enabled = false;
+                self.enabled = Enabled::No;
                 Err(StopReason::Disable)
             }
             OutstationMessage::Configuration(change) => {

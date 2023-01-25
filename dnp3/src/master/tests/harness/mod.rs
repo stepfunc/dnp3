@@ -11,7 +11,7 @@ use crate::master::handler::{AssociationHandle, MasterChannel, ReadHandler};
 use crate::master::task::MasterTask;
 use crate::master::{AssociationHandler, AssociationInformation, HeaderInfo, MasterChannelConfig};
 use crate::util::phys::PhysLayer;
-use crate::util::session::RunError;
+use crate::util::session::{Enabled, RunError};
 
 pub(crate) mod requests;
 
@@ -37,7 +37,7 @@ pub(crate) async fn create_association(mut config: AssociationConfig) -> TestHar
 
     // Create the master session
     let (tx, rx) = crate::util::channel::request_channel();
-    let mut task = MasterTask::new(true, LinkErrorMode::Close, task_config, rx);
+    let mut task = MasterTask::new(Enabled::Yes, LinkErrorMode::Close, task_config, rx);
 
     let mut master = MasterChannel::new(tx);
 

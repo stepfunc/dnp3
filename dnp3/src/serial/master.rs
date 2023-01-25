@@ -7,7 +7,7 @@ use crate::link::LinkErrorMode;
 use crate::master::task::MasterTask;
 use crate::master::*;
 use crate::serial::{PortState, SerialSettings};
-use crate::util::session::Session;
+use crate::util::session::{Enabled, Session};
 
 /// Spawn a master task onto the `Tokio` runtime. The task runs until the returned handle, and any
 /// `AssociationHandle` created from it, are dropped.
@@ -23,7 +23,7 @@ pub fn spawn_master_serial(
 ) -> MasterChannel {
     let log_path = path.to_owned();
     let (tx, rx) = crate::util::channel::request_channel();
-    let task = MasterTask::new(false, LinkErrorMode::Discard, config, rx);
+    let task = MasterTask::new(Enabled::No, LinkErrorMode::Discard, config, rx);
     let mut serial = super::task::SerialTask::new(
         path,
         serial_settings,

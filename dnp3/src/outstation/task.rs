@@ -7,7 +7,7 @@ use crate::outstation::traits::{ControlHandler, OutstationApplication, Outstatio
 use crate::outstation::OutstationHandle;
 use crate::transport::{TransportReader, TransportWriter};
 use crate::util::phys::PhysLayer;
-use crate::util::session::{RunError, StopReason};
+use crate::util::session::{Enabled, RunError, StopReason};
 
 pub(crate) enum ConfigurationChange {
     SetDecodeLevel(DecodeLevel),
@@ -36,6 +36,7 @@ pub(crate) struct OutstationTask {
 impl OutstationTask {
     /// create an `OutstationTask` and return it along with a `DatabaseHandle` for updating it
     pub(crate) fn create(
+        initial_state: Enabled,
         link_error_mode: LinkErrorMode,
         config: OutstationConfig,
         application: Box<dyn OutstationApplication>,
@@ -56,6 +57,7 @@ impl OutstationTask {
         );
         let task = Self {
             session: OutstationSession::new(
+                initial_state,
                 rx,
                 config.into(),
                 config.into(),
@@ -76,8 +78,8 @@ impl OutstationTask {
         )
     }
 
-    pub(crate) fn is_enabled(&self) -> bool {
-        self.session.is_enabled()
+    pub(crate) fn enabled(&self) -> Enabled {
+        self.session.enabled()
     }
 
     /// run the outstation task asynchronously until a `SessionError` occurs

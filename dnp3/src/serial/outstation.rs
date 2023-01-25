@@ -10,7 +10,7 @@ use crate::outstation::{
 use crate::serial::task::SerialTask;
 use crate::serial::{PortState, SerialSettings};
 use crate::util::phys::PhysLayer;
-use crate::util::session::Session;
+use crate::util::session::{Enabled, Session};
 
 /// Spawn an outstation task onto the `Tokio` runtime. The task runs until the returned handle is dropped or
 /// a serial port error occurs, e.g. a serial port is removed from the OS. It attempts to open
@@ -31,6 +31,7 @@ pub fn spawn_outstation_serial(
 ) -> std::io::Result<OutstationHandle> {
     let serial = crate::serial::open(path, settings)?;
     let (mut task, handle) = OutstationTask::create(
+        Enabled::Yes,
         LinkErrorMode::Discard,
         config,
         application,
@@ -77,6 +78,7 @@ pub fn spawn_outstation_serial_fault_tolerant(
     control_handler: Box<dyn ControlHandler>,
 ) -> OutstationHandle {
     let (task, handle) = OutstationTask::create(
+        Enabled::Yes,
         LinkErrorMode::Discard,
         config,
         application,
@@ -94,7 +96,7 @@ pub fn spawn_outstation_serial_fault_tolerant(
 
     let log_path = path.to_owned();
     let future = async move {
-        let _ = serial
+        serial
             .run()
             .instrument(tracing::info_span!("dnp3-outstation-serial", "port" = ?log_path))
             .await;

@@ -16,7 +16,7 @@ use crate::util::buffer::Buffer;
 use crate::util::channel::Receiver;
 use crate::util::phys::PhysLayer;
 
-use crate::util::session::{RunError, StopReason};
+use crate::util::session::{Enabled, RunError, StopReason};
 use tokio::time::Instant;
 
 /// combines the session with transport stuff
@@ -28,13 +28,13 @@ pub(crate) struct MasterTask {
 
 impl MasterTask {
     pub(crate) fn new(
-        enabled: bool,
+        initial_state: Enabled,
         link_error_mode: LinkErrorMode,
         config: MasterChannelConfig,
         messages: Receiver<Message>,
     ) -> Self {
         let session = MasterSession::new(
-            enabled,
+            initial_state,
             config.decode_level,
             config.tx_buffer_size,
             messages,
@@ -56,7 +56,7 @@ impl MasterTask {
         self.reader.get_inner().set_rx_frame_info(info);
     }
 
-    pub(crate) fn is_enabled(&self) -> bool {
+    pub(crate) fn enabled(&self) -> Enabled {
         self.session.enabled
     }
 
@@ -76,7 +76,7 @@ impl MasterTask {
 }
 
 struct MasterSession {
-    enabled: bool,
+    enabled: Enabled,
     decode_level: DecodeLevel,
     associations: AssociationMap,
     messages: Receiver<Message>,
@@ -91,13 +91,13 @@ enum ReadResponseAction {
 
 impl MasterSession {
     fn new(
-        enabled: bool,
+        initial_state: Enabled,
         decode_level: DecodeLevel,
         tx_buffer_size: BufferSize<249, 2048>,
         messages: Receiver<Message>,
     ) -> Self {
         Self {
-            enabled,
+            enabled: initial_state,
             decode_level,
             associations: AssociationMap::new(),
             messages,
@@ -218,7 +218,7 @@ impl MasterSession {
         match message {
             Message::Master(msg) => {
                 self.process_master_message(msg);
-                if is_connected && !self.enabled {
+                if is_connected && self.enabled != Enabled::Yes {
                     return Err(StopReason::Disable);
                 }
             }
@@ -235,13 +235,12 @@ impl MasterSession {
 
     fn process_master_message(&mut self, msg: MasterMsg) {
         match msg {
-            MasterMsg::EnableCommunication(enable) => {
-                if enable {
-                    tracing::info!("communication enabled");
-                } else {
-                    tracing::info!("communication disabled");
+            MasterMsg::EnableCommunication(enabled) => {
+                match enabled {
+                    Enabled::Yes => tracing::info!("communication enabled"),
+                    Enabled::No => tracing::info!("communication disabled"),
                 }
-                self.enabled = enable;
+                self.enabled = enabled;
             }
             MasterMsg::AddAssociation(
                 address,
