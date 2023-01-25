@@ -64,6 +64,18 @@ impl Session {
         }
     }
 
+    fn is_enabled(&self) -> bool {
+        match &self.inner {
+            SessionType::Master(x) => x.is_enabled(),
+        }
+    }
+
+    async fn process_next_message(&mut self) -> Result<(), StopReason> {
+        match &mut self.inner {
+            SessionType::Master(x) => x.process_next_message().await,
+        }
+    }
+
     pub(crate) async fn run(&mut self, io: &mut PhysLayer) -> RunError {
         match &mut self.inner {
             SessionType::Master(x) => x.run(io).await,
@@ -77,14 +89,34 @@ impl Session {
     }
 
     pub(crate) async fn wait_for_enabled(&mut self) -> Result<(), Shutdown> {
-        match &mut self.inner {
-            SessionType::Master(x) => x.wait_for_enabled().await,
+        loop {
+            if self.is_enabled() {
+                return Ok(());
+            }
+
+            if let Err(StopReason::Shutdown) = self.process_next_message().await {
+                return Err(Shutdown);
+            }
         }
     }
 
     pub(crate) async fn wait_for_retry(&mut self, duration: Duration) -> Result<(), StopReason> {
-        match &mut self.inner {
-            SessionType::Master(x) => x.wait_for_retry(duration).await,
+        use std::ops::Add;
+
+        let deadline = tokio::time::Instant::now().add(duration);
+
+        loop {
+            tokio::select! {
+                result = self.process_next_message() => {
+                   result?;
+                   if !self.is_enabled() {
+                       return Err(StopReason::Disable)
+                   }
+                }
+                _ = tokio::time::sleep_until(deadline) => {
+                   return Ok(());
+                }
+            }
         }
     }
 }

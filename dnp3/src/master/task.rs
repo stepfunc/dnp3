@@ -1,11 +1,8 @@
-use std::ops::Add;
-use std::time::Duration;
-
 use tracing::Instrument;
 
 use crate::app::format::write;
 use crate::app::parse::parser::Response;
-use crate::app::{BufferSize, ControlField, FunctionCode, Sequence, Shutdown};
+use crate::app::{BufferSize, ControlField, FunctionCode, Sequence};
 use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
 use crate::link::{EndpointAddress, LinkErrorMode};
@@ -59,6 +56,10 @@ impl MasterTask {
         self.reader.get_inner().set_rx_frame_info(info);
     }
 
+    pub(crate) fn is_enabled(&self) -> bool {
+        self.session.enabled
+    }
+
     pub(crate) async fn run(&mut self, io: &mut PhysLayer) -> RunError {
         self.session
             .run(io, &mut self.writer, &mut self.reader)
@@ -69,12 +70,8 @@ impl MasterTask {
         self.session.shutdown().await
     }
 
-    pub(crate) async fn wait_for_enabled(&mut self) -> Result<(), Shutdown> {
-        self.session.wait_for_enabled().await
-    }
-
-    pub(crate) async fn wait_for_retry(&mut self, duration: Duration) -> Result<(), StopReason> {
-        self.session.wait_for_retry(duration).await
+    pub(crate) async fn process_next_message(&mut self) -> Result<(), StopReason> {
+        self.session.process_next_message().await
     }
 }
 
@@ -105,38 +102,6 @@ impl MasterSession {
             associations: AssociationMap::new(),
             messages,
             tx_buffer: tx_buffer_size.create_buffer(),
-        }
-    }
-
-    /// Wait for the defined duration, processing messages that are received in the meantime.
-    async fn wait_for_retry(&mut self, duration: Duration) -> Result<(), StopReason> {
-        let deadline = Instant::now().add(duration);
-
-        loop {
-            tokio::select! {
-                result = self.process_message(false) => {
-                   result?;
-                   if !self.enabled {
-                       return Err(StopReason::Disable)
-                   }
-                }
-                _ = tokio::time::sleep_until(deadline) => {
-                   return Ok(());
-                }
-            }
-        }
-    }
-
-    /// wait until the session has been enabled
-    async fn wait_for_enabled(&mut self) -> Result<(), Shutdown> {
-        loop {
-            if self.enabled {
-                return Ok(());
-            }
-
-            if let Err(StopReason::Shutdown) = self.process_message(false).await {
-                return Err(Shutdown);
-            }
         }
     }
 
@@ -242,6 +207,10 @@ impl MasterSession {
                 }
             }
         }
+    }
+
+    pub(crate) async fn process_next_message(&mut self) -> Result<(), StopReason> {
+        self.process_message(false).await
     }
 
     async fn process_message(&mut self, is_connected: bool) -> Result<(), StopReason> {
