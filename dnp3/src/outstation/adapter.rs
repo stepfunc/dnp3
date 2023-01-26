@@ -5,7 +5,7 @@ use crate::outstation::task::OutstationTask;
 use crate::outstation::ConnectionState;
 use crate::util::channel::{request_channel, Receiver, Sender};
 use crate::util::phys::PhysLayer;
-use crate::util::session::{RunError, StopReason};
+use crate::util::session::{Enabled, RunError, StopReason};
 
 /// message that gets sent to OutstationTaskAdapter when
 /// it needs to switch to a new session
@@ -71,6 +71,40 @@ impl OutstationTaskAdapter {
         }
     }
 
+    pub(crate) async fn run_new_session(
+        &mut self,
+        mut session: NewSession,
+    ) -> Result<Option<NewSession>, Shutdown> {
+        let id = session.id;
+        self.listener.update(ConnectionState::Connected).get().await;
+        let result = self
+            .run_one_session(&mut session.phys)
+            .instrument(tracing::info_span!("session", "id" = id))
+            .await;
+        self.listener
+            .update(ConnectionState::Disconnected)
+            .get()
+            .await;
+
+        // reset outstation state in between sessions
+        self.task.reset();
+
+        match result {
+            Ok(new_session) => {
+                tracing::warn!("closing session {} for new session {}", id, new_session.id);
+                // go to next iteration with a new session
+                Ok(Some(new_session))
+            }
+            Err(RunError::Link(err)) => {
+                // go to next iteration to get a new session
+                tracing::warn!("session error: {}", err);
+                Ok(None)
+            }
+            Err(RunError::Stop(StopReason::Shutdown)) => return Err(Shutdown),
+            Err(RunError::Stop(StopReason::Disable)) => Ok(None),
+        }
+    }
+
     pub(crate) async fn run(&mut self) -> Result<(), Shutdown> {
         let mut session = None;
 
@@ -79,42 +113,13 @@ impl OutstationTaskAdapter {
                 None => {
                     session.replace(self.wait_for_session().await?);
                 }
-                Some(mut s) => {
-                    // TODO - check if enabled
-
-                    let id = s.id;
-
-                    self.listener.update(ConnectionState::Connected).get().await;
-                    let result = self
-                        .run_one_session(&mut s.phys)
-                        .instrument(tracing::info_span!("session", "id" = id))
-                        .await;
-                    self.listener
-                        .update(ConnectionState::Disconnected)
-                        .get()
-                        .await;
-
-                    // reset outstation state in between sessions
-                    self.task.reset();
-
-                    match result {
-                        Ok(new_session) => {
-                            tracing::warn!(
-                                "closing session {} for new session {}",
-                                id,
-                                new_session.id
-                            );
-                            // go to next iteration with a new session
-                            session.replace(new_session);
+                Some(s) => {
+                    if self.task.enabled() == Enabled::Yes {
+                        if let Some(s) = self.run_new_session(s).await? {
+                            session.replace(s);
                         }
-                        Err(RunError::Link(err)) => {
-                            // go to next iteration to get a new session
-                            tracing::warn!("session error: {}", err);
-                        }
-                        Err(RunError::Stop(StopReason::Shutdown)) => return Err(Shutdown),
-                        Err(RunError::Stop(StopReason::Disable)) => {
-                            // do nothing?
-                        }
+                    } else {
+                        tracing::warn!("Ignoring new connection while disabled: {}", s.id);
                     }
                 }
             }
