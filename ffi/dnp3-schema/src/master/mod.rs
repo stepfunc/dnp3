@@ -9,15 +9,11 @@ use std::time::Duration;
 pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTraced<()> {
     let read_handler = read_handler::define(lib, shared)?;
 
-    let endpoint_list = define_endpoint_list(lib)?;
+    let tls_client_config = define_tls_client_config(lib, shared)?;
 
     let master_channel_config = define_master_channel_config(lib, shared)?;
 
     let master_channel_class = lib.declare_class("master_channel")?;
-
-    let tls_client_config = define_tls_client_config(lib, shared)?;
-
-    let connect_strategy = define_connect_strategy(lib)?;
 
     let nothing = lib
         .define_enum("nothing")?
@@ -47,12 +43,12 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         )?
         .param(
             "endpoints",
-            endpoint_list.declaration(),
+            shared.endpoint_list.declaration(),
             "List of IP endpoints.",
         )?
         .param(
             "connect_strategy",
-            connect_strategy.clone(),
+            shared.connect_strategy.clone(),
             "Controls the timing of (re)connection attempts",
         )?
         .param(
@@ -87,12 +83,12 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         )?
         .param(
             "endpoints",
-            endpoint_list.declaration(),
+            shared.endpoint_list.declaration(),
             "List of IP endpoints.",
         )?
         .param(
             "connect_strategy",
-            connect_strategy.clone(),
+            shared.connect_strategy.clone(),
             "Controls the timing of (re)connection attempts",
         )?
         .param(
@@ -156,12 +152,12 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         )?
         .param(
             "endpoints",
-            endpoint_list.declaration(),
+            shared.endpoint_list.declaration(),
             "List of IP endpoints.",
         )?
         .param(
             "connect_strategy",
-            connect_strategy.clone(),
+            shared.connect_strategy.clone(),
             "Controls the timing of (re)connection attempts",
         )?
         .param(
@@ -201,12 +197,12 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         )?
         .param(
             "endpoints",
-            endpoint_list.declaration(),
+            shared.endpoint_list.declaration(),
             "List of IP endpoints.",
         )?
         .param(
             "connect_strategy",
-            connect_strategy,
+            shared.connect_strategy.clone(),
             "Controls the timing of (re)connection attempts",
         )?
         .param(
@@ -534,45 +530,6 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
     Ok(())
 }
 
-fn define_connect_strategy(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
-    let min_connect_delay = Name::create("min_connect_delay")?;
-    let max_connect_delay = Name::create("max_connect_delay")?;
-    let reconnect_delay = Name::create("reconnect_delay")?;
-
-    let strategy = lib.declare_function_argument_struct("connect_strategy")?;
-    let strategy = lib
-        .define_function_argument_struct(strategy)?
-        .add(
-            &min_connect_delay,
-            DurationType::Milliseconds,
-            "Minimum delay between two connection attempts, doubles up to the maximum delay",
-        )?
-        .add(
-            &max_connect_delay,
-            DurationType::Milliseconds,
-            "Maximum delay between two connection attempts",
-        )?
-        .add(
-            &reconnect_delay,
-            DurationType::Milliseconds,
-            "Delay before attempting a connection after a disconnect",
-        )?
-        .doc("Timing parameters for connection attempts")?
-        .end_fields()?
-        .begin_initializer(
-            "init",
-            InitializerType::Normal,
-            "Initialize to default values",
-        )?
-        .default(&min_connect_delay, Duration::from_secs(1))?
-        .default(&max_connect_delay, Duration::from_secs(10))?
-        .default(&reconnect_delay, Duration::from_secs(1))?
-        .end_initializer()?
-        .build()?;
-
-    Ok(strategy)
-}
-
 fn define_tls_client_config(
     lib: &mut LibraryBuilder,
     shared: &SharedDefinitions,
@@ -801,35 +758,6 @@ fn define_master_channel_config(
         .build()?;
 
     Ok(config)
-}
-
-fn define_endpoint_list(lib: &mut LibraryBuilder) -> BackTraced<ClassHandle> {
-    let endpoint_list = lib.declare_class("endpoint_list")?;
-
-    let constructor = lib.define_constructor(endpoint_list.clone())?
-        .param("main_endpoint", StringType, "Main endpoint")?
-        .doc(doc("Create a new list of IP endpoints.").details("You can write IP addresses or DNS names and the port to connect to. e.g. \"127.0.0.1:20000\" or \"dnp3.myorg.com:20000\"."))?
-        .build()?;
-
-    let destructor = lib.define_destructor(
-        endpoint_list.clone(),
-        "Destroy a previously allocated endpoint list",
-    )?;
-
-    let add_method = lib.define_method("add", endpoint_list.clone())?
-        .param("endpoint", StringType, "Endpoint to add to the list")?
-
-        .doc(doc("Add an IP endpoint to the list.").details("You can write IP addresses or DNS names and the port to connect to. e.g. \"127.0.0.1:20000\" or \"dnp3.myorg.com:20000\"."))?
-        .build()?;
-
-    let endpoint_list = lib.define_class(&endpoint_list)?
-        .constructor(constructor)?
-        .destructor(destructor)?
-        .method(add_method)?
-        .doc(doc("List of IP endpoints.").details("You can write IP addresses or DNS names and the port to connect to. e.g. \"127.0.0.1:20000\" or \"dnp3.myorg.com:20000\"."))?
-        .build()?;
-
-    Ok(endpoint_list)
 }
 
 fn define_utc_timestamp(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructHandle> {

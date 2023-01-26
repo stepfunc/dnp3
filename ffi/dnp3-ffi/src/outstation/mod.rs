@@ -171,6 +171,49 @@ pub unsafe fn outstation_destroy(outstation: *mut Outstation) {
     }
 }
 
+#[allow(clippy::too_many_arguments)] // TODO
+pub(crate) unsafe fn outstation_create_tcp_client(
+    runtime: *mut crate::Runtime,
+    link_error_mode: ffi::LinkErrorMode,
+    endpoints: *mut crate::EndpointList,
+    connect_strategy: ffi::ConnectStrategy,
+    connect_options: *mut crate::ConnectOptions,
+    config: ffi::OutstationConfig,
+    application: ffi::OutstationApplication,
+    information: ffi::OutstationInformation,
+    control_handler: ffi::ControlHandler,
+    listener: ffi::ClientStateListener,
+) -> Result<*mut crate::Outstation, ffi::ParamError> {
+    let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
+    let endpoints = endpoints.as_ref().ok_or(ffi::ParamError::NullParameter)?;
+    let connect_options = connect_options
+        .as_ref()
+        .map(|x| x.inner)
+        .unwrap_or_else(Default::default);
+
+    let config = convert_outstation_config(config)?;
+
+    let _enter = runtime.enter();
+    let handle = dnp3::tcp::spawn_outstation_tcp_client(
+        link_error_mode.into(),
+        endpoints.clone(),
+        connect_strategy.into(),
+        connect_options,
+        config,
+        Box::new(application),
+        Box::new(information),
+        Box::new(control_handler),
+        Box::new(listener),
+    );
+
+    let handle = Box::new(crate::Outstation {
+        handle,
+        runtime: runtime.handle(),
+    });
+
+    Ok(Box::into_raw(handle))
+}
+
 #[cfg(not(feature = "serial"))]
 #[allow(clippy::too_many_arguments)] // TODO
 pub unsafe fn outstation_create_serial_session(

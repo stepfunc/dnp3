@@ -58,12 +58,6 @@ pub(crate) unsafe fn master_channel_create_tcp_2(
         .map(|x| x.inner)
         .unwrap_or_else(Default::default);
 
-    let connect_strategy = ConnectStrategy::new(
-        connect_strategy.min_connect_delay(),
-        connect_strategy.max_connect_delay(),
-        connect_strategy.reconnect_delay(),
-    );
-
     // enter the runtime context so that we can spawn
     let _enter = runtime.enter();
 
@@ -71,7 +65,7 @@ pub(crate) unsafe fn master_channel_create_tcp_2(
         link_error_mode.into(),
         config,
         endpoints.clone(),
-        connect_strategy,
+        connect_strategy.into(),
         connect_options,
         Box::new(listener),
     );
@@ -162,12 +156,6 @@ pub(crate) unsafe fn master_channel_create_tls_2(
         err
     })?;
 
-    let connect_strategy = ConnectStrategy::new(
-        connect_strategy.min_connect_delay(),
-        connect_strategy.max_connect_delay(),
-        connect_strategy.reconnect_delay(),
-    );
-
     // enter the runtime context so that we can spawn
     let _enter = runtime.enter();
 
@@ -175,7 +163,7 @@ pub(crate) unsafe fn master_channel_create_tls_2(
         link_error_mode.into(),
         config,
         endpoints.clone(),
-        connect_strategy,
+        connect_strategy.into(),
         connect_options,
         Box::new(listener),
         tls_config,
@@ -858,6 +846,16 @@ impl From<ffi::CertificateMode> for CertificateMode {
             ffi::CertificateMode::AuthorityBased => Self::AuthorityBased,
             ffi::CertificateMode::SelfSigned => Self::SelfSigned,
         }
+    }
+}
+
+impl From<ffi::ConnectStrategy> for ConnectStrategy {
+    fn from(value: ffi::ConnectStrategy) -> Self {
+        ConnectStrategy::new(
+            value.min_connect_delay(),
+            value.max_connect_delay(),
+            value.reconnect_delay(),
+        )
     }
 }
 
