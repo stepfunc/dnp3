@@ -420,6 +420,12 @@ public class OutstationExample {
         switch (line) {
           case "x":
             return;
+          case "enable":
+            outstation.enable();
+            break;
+          case "disable":
+            outstation.disable();
+            break;
           case "bi":
             {
               binaryValue = !binaryValue;
@@ -549,7 +555,7 @@ public class OutstationExample {
               break;
             }
           default:
-            System.out.println("Unknown command");
+            System.out.printf("Unknown command: %s%n", line);
             break;
         }
       }
