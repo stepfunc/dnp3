@@ -13,8 +13,6 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
 
     let master_channel_config = define_master_channel_config(lib, shared)?;
 
-    let tcp_client_state_listener = define_tcp_client_state_listener(lib)?;
-
     let master_channel_class = lib.declare_class("master_channel")?;
 
     let tls_client_config = define_tls_client_config(lib, shared)?;
@@ -59,7 +57,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         )?
         .param(
             "listener",
-            tcp_client_state_listener.clone(),
+            shared.client_state_listener.clone(),
             "TCP connection listener used to receive updates on the status of the connection",
         )?
         .returns(
@@ -104,7 +102,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         )?
         .param(
             "listener",
-            tcp_client_state_listener.clone(),
+            shared.client_state_listener.clone(),
             "TCP connection listener used to receive updates on the status of the connection",
         )?
         .returns(
@@ -168,7 +166,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         )?
         .param(
             "listener",
-            tcp_client_state_listener.clone(),
+            shared.client_state_listener.clone(),
             "TCP connection listener used to receive updates on the status of the connection",
         )?
         .param(
@@ -218,7 +216,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         )?
         .param(
             "listener",
-            tcp_client_state_listener,
+            shared.client_state_listener.clone(),
             "TCP connection listener used to receive updates on the status of the connection",
         )?
         .param(
@@ -775,43 +773,6 @@ fn define_association_config(
         .build()?;
 
     Ok(association_config)
-}
-
-fn define_tcp_client_state_listener(lib: &mut LibraryBuilder) -> BackTraced<AsynchronousInterface> {
-    let client_state_enum = lib
-        .define_enum("client_state")?
-        .push("disabled", "Client is disabled and idle until enabled")?
-        .push(
-            "connecting",
-            "Client is trying to establish a connection to the remote device",
-        )?
-        .push("connected", "Client is connected to the remote device")?
-        .push(
-            "wait_after_failed_connect",
-            "Failed to establish a connection, waiting before retrying",
-        )?
-        .push(
-            "wait_after_disconnect",
-            "Client was disconnected, waiting before retrying",
-        )?
-        .push("shutdown", "Client is shutting down")?
-        .doc(
-            doc("State of the client connection.")
-                .details("Use by the {interface:client_state_listener}."),
-        )?
-        .build()?;
-
-    let listener = lib
-        .define_interface(
-            "client_state_listener",
-            "Callback for monitoring the client TCP connection state",
-        )?
-        .begin_callback("on_change", "Called when the client state changed")?
-        .param("state", client_state_enum, "New state")?
-        .end_callback()?
-        .build_async()?;
-
-    Ok(listener)
 }
 
 fn define_master_channel_config(
