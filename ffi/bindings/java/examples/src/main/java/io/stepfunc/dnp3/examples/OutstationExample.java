@@ -204,7 +204,6 @@ class TestConnectionStateListener implements ConnectionStateListener {
     System.out.println("Connection state change: " + state);
   }
 }
-
 public class OutstationExample {
 
   // ANCHOR: event_buffer_config
@@ -295,7 +294,7 @@ public class OutstationExample {
 
   private static void runSerial(Runtime runtime) {
     // ANCHOR: create_serial_server
-    Outstation outstation = Outstation.createSerialSessionFaultTolerant(
+    Outstation outstation = Outstation.createSerialSession2(
             runtime,
             "/dev/pts/4",
             new SerialSettings(),
@@ -303,7 +302,8 @@ public class OutstationExample {
             getOutstationConfig(),
             new TestOutstationApplication(),
             new TestOutstationInformation(),
-            new TestControlHandler()
+            new TestControlHandler(),
+            state -> System.out.println("Port state change: " + state)
     );
     // ANCHOR_END: create_serial_server
 
