@@ -327,10 +327,8 @@ impl OutstationSession {
     }
 
     /// used when the there is no running IO to process outstation messages
-    pub(crate) async fn process_messages(&mut self) -> Result<(), StopReason> {
-        loop {
-            self.handle_next_message().await?;
-        }
+    pub(crate) async fn process_next_message(&mut self) -> Result<(), StopReason> {
+        self.handle_next_message().await
     }
 
     pub(crate) async fn run(

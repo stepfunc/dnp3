@@ -1,11 +1,10 @@
 use tracing::Instrument;
 
 use crate::app::{Listener, Shutdown};
-use crate::outstation::task::OutstationTask;
 use crate::outstation::ConnectionState;
 use crate::util::channel::{request_channel, Receiver, Sender};
 use crate::util::phys::PhysLayer;
-use crate::util::session::{Enabled, RunError, StopReason};
+use crate::util::session::{Enabled, RunError, Session, StopReason};
 
 /// message that gets sent to OutstationTaskAdapter when
 /// it needs to switch to a new session
@@ -21,24 +20,23 @@ impl NewSession {
     }
 }
 
-/// adapts an OutstationTask to something that can listen for new
-/// connections on a channel and shutdown an existing session
-pub(crate) struct OutstationTaskAdapter {
+/// Wraps a session allowing it to receive new physical layers from a server component
+pub(crate) struct ServerTask {
     receiver: Receiver<NewSession>,
-    task: OutstationTask,
+    session: Session,
     listener: Box<dyn Listener<ConnectionState>>,
 }
 
-impl OutstationTaskAdapter {
+impl ServerTask {
     pub(crate) fn create(
-        task: OutstationTask,
+        session: Session,
         listener: Box<dyn Listener<ConnectionState>>,
     ) -> (Self, Sender<NewSession>) {
         let (tx, rx) = request_channel();
         (
             Self {
                 receiver: rx,
-                task,
+                session,
                 listener,
             },
             tx,
@@ -51,7 +49,7 @@ impl OutstationTaskAdapter {
                 session = self.receiver.receive() => {
                     return session;
                 }
-                ret = self.task.process_messages() => {
+                ret = self.session.process_next_message() => {
                     if let Err(StopReason::Shutdown) = ret {
                         return Err(Shutdown);
                     }
@@ -62,7 +60,7 @@ impl OutstationTaskAdapter {
 
     async fn run_one_session(&mut self, io: &mut PhysLayer) -> Result<NewSession, RunError> {
         tokio::select! {
-            res = self.task.run(io) => {
+            res = self.session.run(io) => {
                 Err(res)
             }
             x = self.receiver.receive() => {
@@ -87,7 +85,7 @@ impl OutstationTaskAdapter {
             .await;
 
         // reset outstation state in between sessions
-        self.task.reset();
+        self.session.reset();
 
         match result {
             Ok(new_session) => {
@@ -100,7 +98,7 @@ impl OutstationTaskAdapter {
                 tracing::warn!("session error: {}", err);
                 Ok(None)
             }
-            Err(RunError::Stop(StopReason::Shutdown)) => return Err(Shutdown),
+            Err(RunError::Stop(StopReason::Shutdown)) => Err(Shutdown),
             Err(RunError::Stop(StopReason::Disable)) => Ok(None),
         }
     }
@@ -114,7 +112,7 @@ impl OutstationTaskAdapter {
                     session.replace(self.wait_for_session().await?);
                 }
                 Some(s) => {
-                    if self.task.enabled() == Enabled::Yes {
+                    if self.session.enabled() == Enabled::Yes {
                         if let Some(s) = self.run_new_session(s).await? {
                             session.replace(s);
                         }

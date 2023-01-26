@@ -80,17 +80,17 @@ impl Session {
         }
     }
 
-    fn enabled(&self) -> Enabled {
+    pub(crate) fn enabled(&self) -> Enabled {
         match &self.inner {
             SessionType::Master(x) => x.enabled(),
             SessionType::Outstation(x) => x.enabled(),
         }
     }
 
-    async fn process_next_message(&mut self) -> Result<(), StopReason> {
+    pub(crate) async fn process_next_message(&mut self) -> Result<(), StopReason> {
         match &mut self.inner {
             SessionType::Master(x) => x.process_next_message().await,
-            SessionType::Outstation(x) => x.process_messages().await, // TODO
+            SessionType::Outstation(x) => x.process_next_message().await,
         }
     }
 
@@ -105,6 +105,13 @@ impl Session {
         match &mut self.inner {
             SessionType::Master(x) => x.shutdown().await,
             SessionType::Outstation(_) => {} // TODO
+        }
+    }
+
+    pub(crate) fn reset(&mut self) {
+        match &mut self.inner {
+            SessionType::Master(_) => {} // TODO
+            SessionType::Outstation(x) => x.reset(),
         }
     }
 

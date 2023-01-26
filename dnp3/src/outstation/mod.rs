@@ -12,8 +12,6 @@ use crate::util::channel::Sender;
 /// database API to add/remove/update values
 pub mod database;
 
-/// wraps an outstation task so that it can switch communication sessions
-pub(crate) mod adapter;
 mod config;
 /// functionality for processing control requests
 pub(crate) mod control;
