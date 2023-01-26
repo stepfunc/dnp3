@@ -72,10 +72,6 @@ impl MasterTask {
         ret
     }
 
-    pub(crate) async fn shutdown(&mut self) {
-        self.session.shutdown().await
-    }
-
     pub(crate) async fn process_next_message(&mut self) -> Result<(), StopReason> {
         self.session.process_next_message().await
     }
@@ -133,16 +129,14 @@ impl MasterSession {
 
             if let Err(err) = result {
                 self.reset(err);
+
+                if RunError::Stop(StopReason::Shutdown) == err {
+                    self.messages.close_and_drain();
+                }
+
                 return err;
             }
         }
-    }
-
-    async fn shutdown(&mut self) {
-        // close the receiver to new messages
-        self.messages.close();
-        // process any existing messages
-        while let Ok(()) = self.process_message(false).await {}
     }
 
     /// Wait until a message is received or a response is received.

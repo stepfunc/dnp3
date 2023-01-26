@@ -101,14 +101,6 @@ impl Session {
         }
     }
 
-    pub(crate) async fn shutdown(&mut self) {
-        match &mut self.inner {
-            SessionType::Master(x) => x.shutdown().await,
-            // no special shutdown required
-            SessionType::Outstation(_) => {}
-        }
-    }
-
     pub(crate) async fn wait_for_enabled(&mut self) -> Result<(), Shutdown> {
         loop {
             if self.enabled() == Enabled::Yes {

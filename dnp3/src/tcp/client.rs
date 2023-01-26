@@ -40,7 +40,6 @@ impl ClientTask {
 
     pub(crate) async fn run(&mut self) {
         let _ = self.run_impl().await;
-        self.session.shutdown().await;
         self.listener.update(ClientState::Shutdown).get().await;
     }
 

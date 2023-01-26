@@ -30,7 +30,6 @@ impl SerialTask {
 
     pub(crate) async fn run(&mut self) {
         let _ = self.run_inner().await;
-        self.session.shutdown().await;
         self.listener.update(PortState::Shutdown).get().await;
     }
 
