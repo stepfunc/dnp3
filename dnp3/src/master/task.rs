@@ -1,28 +1,84 @@
-use std::ops::Add;
-use std::time::Duration;
-
 use tracing::Instrument;
 
 use crate::app::format::write;
 use crate::app::parse::parser::Response;
-use crate::app::{BufferSize, ControlField, FunctionCode, Sequence, Shutdown};
+use crate::app::{BufferSize, ControlField, FunctionCode, Sequence};
 use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
-use crate::link::EndpointAddress;
+use crate::link::{EndpointAddress, LinkErrorMode};
 use crate::master::association::{AssociationMap, Next};
 use crate::master::error::TaskError;
 use crate::master::messages::{MasterMsg, Message};
 use crate::master::tasks::{AssociationTask, NonReadTask, ReadTask, RequestWriter, Task};
-use crate::master::Association;
+use crate::master::{Association, MasterChannelConfig};
 use crate::transport::{TransportReader, TransportResponse, TransportWriter};
 use crate::util::buffer::Buffer;
 use crate::util::channel::Receiver;
 use crate::util::phys::PhysLayer;
 
+use crate::util::session::{Enabled, RunError, StopReason};
 use tokio::time::Instant;
 
-pub(crate) struct MasterSession {
-    enabled: bool,
+/// combines the session with transport stuff
+pub(crate) struct MasterTask {
+    session: MasterSession,
+    reader: TransportReader,
+    writer: TransportWriter,
+}
+
+impl MasterTask {
+    pub(crate) fn new(
+        initial_state: Enabled,
+        link_error_mode: LinkErrorMode,
+        config: MasterChannelConfig,
+        messages: Receiver<Message>,
+    ) -> Self {
+        let session = MasterSession::new(
+            initial_state,
+            config.decode_level,
+            config.tx_buffer_size,
+            messages,
+        );
+        let (reader, writer) = crate::transport::create_master_transport_layer(
+            link_error_mode,
+            config.master_address,
+            config.rx_buffer_size,
+        );
+        Self {
+            session,
+            reader,
+            writer,
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) fn set_rx_frame_info(&mut self, info: crate::link::header::FrameInfo) {
+        self.reader.get_inner().set_rx_frame_info(info);
+    }
+
+    pub(crate) fn enabled(&self) -> Enabled {
+        self.session.enabled
+    }
+
+    pub(crate) async fn run(&mut self, io: &mut PhysLayer) -> RunError {
+        let ret = self
+            .session
+            .run(io, &mut self.writer, &mut self.reader)
+            .await;
+
+        self.writer.reset();
+        self.reader.reset();
+
+        ret
+    }
+
+    pub(crate) async fn process_next_message(&mut self) -> Result<(), StopReason> {
+        self.session.process_next_message().await
+    }
+}
+
+struct MasterSession {
+    enabled: Enabled,
     decode_level: DecodeLevel,
     associations: AssociationMap,
     messages: Receiver<Message>,
@@ -35,51 +91,15 @@ enum ReadResponseAction {
     Complete,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum StateChange {
-    Disable,
-    Shutdown,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub(crate) enum RunError {
-    State(StateChange),
-    Link(LinkError),
-}
-
-impl From<Shutdown> for StateChange {
-    fn from(_: Shutdown) -> Self {
-        StateChange::Shutdown
-    }
-}
-
-impl From<StateChange> for RunError {
-    fn from(x: StateChange) -> Self {
-        RunError::State(x)
-    }
-}
-
-impl From<LinkError> for RunError {
-    fn from(err: LinkError) -> Self {
-        RunError::Link(err)
-    }
-}
-
-impl From<Shutdown> for RunError {
-    fn from(_: Shutdown) -> Self {
-        RunError::State(StateChange::Shutdown)
-    }
-}
-
 impl MasterSession {
-    pub(crate) fn new(
-        enabled: bool,
+    fn new(
+        initial_state: Enabled,
         decode_level: DecodeLevel,
         tx_buffer_size: BufferSize<249, 2048>,
         messages: Receiver<Message>,
     ) -> Self {
         Self {
-            enabled,
+            enabled: initial_state,
             decode_level,
             associations: AssociationMap::new(),
             messages,
@@ -87,40 +107,8 @@ impl MasterSession {
         }
     }
 
-    /// Wait for the defined duration, processing messages that are received in the meantime.
-    pub(crate) async fn wait_for_retry(&mut self, duration: Duration) -> Result<(), StateChange> {
-        let deadline = Instant::now().add(duration);
-
-        loop {
-            tokio::select! {
-                result = self.process_message(false) => {
-                   result?;
-                   if !self.enabled {
-                       return Err(StateChange::Disable)
-                   }
-                }
-                _ = tokio::time::sleep_until(deadline) => {
-                   return Ok(());
-                }
-            }
-        }
-    }
-
-    /// wait until the session has been enabled
-    pub(crate) async fn wait_for_enabled(&mut self) -> Result<(), Shutdown> {
-        loop {
-            if self.enabled {
-                return Ok(());
-            }
-
-            if let Err(StateChange::Shutdown) = self.process_message(false).await {
-                return Err(Shutdown);
-            }
-        }
-    }
-
     /// Run the master until an error or shutdown occurs.
-    pub(crate) async fn run(
+    async fn run(
         &mut self,
         io: &mut PhysLayer,
         writer: &mut TransportWriter,
@@ -141,18 +129,14 @@ impl MasterSession {
 
             if let Err(err) = result {
                 self.reset(err);
-                writer.reset();
-                reader.reset();
+
+                if RunError::Stop(StopReason::Shutdown) == err {
+                    self.messages.close_and_drain();
+                }
+
                 return err;
             }
         }
-    }
-
-    pub(crate) async fn shutdown(&mut self) {
-        // close the receiver to new messages
-        self.messages.close();
-        // process any existing messages
-        while let Ok(()) = self.process_message(false).await {}
     }
 
     /// Wait until a message is received or a response is received.
@@ -223,13 +207,17 @@ impl MasterSession {
         }
     }
 
-    async fn process_message(&mut self, is_connected: bool) -> Result<(), StateChange> {
+    pub(crate) async fn process_next_message(&mut self) -> Result<(), StopReason> {
+        self.process_message(false).await
+    }
+
+    async fn process_message(&mut self, is_connected: bool) -> Result<(), StopReason> {
         let message = self.messages.receive().await?;
         match message {
             Message::Master(msg) => {
                 self.process_master_message(msg);
-                if is_connected && !self.enabled {
-                    return Err(StateChange::Disable);
+                if is_connected && self.enabled != Enabled::Yes {
+                    return Err(StopReason::Disable);
                 }
             }
             Message::Association(msg) => {
@@ -245,13 +233,12 @@ impl MasterSession {
 
     fn process_master_message(&mut self, msg: MasterMsg) {
         match msg {
-            MasterMsg::EnableCommunication(enable) => {
-                if enable {
-                    tracing::info!("communication enabled");
-                } else {
-                    tracing::info!("communication disabled");
+            MasterMsg::EnableCommunication(enabled) => {
+                match enabled {
+                    Enabled::Yes => tracing::info!("communication enabled"),
+                    Enabled::No => tracing::info!("communication disabled"),
                 }
-                self.enabled = enable;
+                self.enabled = enabled;
             }
             MasterMsg::AddAssociation(
                 address,
@@ -284,10 +271,7 @@ impl MasterSession {
     fn reset(&mut self, err: RunError) {
         self.associations.reset(err);
     }
-}
 
-// Task processing
-impl MasterSession {
     /// Run a specific task.
     ///
     /// Returns an error only if shutdown or link layer error occured.
@@ -328,8 +312,8 @@ impl MasterSession {
         match result {
             Ok(()) => Ok(()),
             Err(err) => match err {
-                TaskError::Shutdown => Err(RunError::State(StateChange::Shutdown)),
-                TaskError::Disabled => Err(RunError::State(StateChange::Disable)),
+                TaskError::Shutdown => Err(RunError::Stop(StopReason::Shutdown)),
+                TaskError::Disabled => Err(RunError::Stop(StopReason::Disable)),
                 TaskError::Link(err) => Err(RunError::Link(err)),
                 _ => Ok(()),
             },

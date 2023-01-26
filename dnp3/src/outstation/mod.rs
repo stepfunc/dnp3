@@ -12,8 +12,6 @@ use crate::util::channel::Sender;
 /// database API to add/remove/update values
 pub mod database;
 
-/// wraps an outstation task so that it can switch communication sessions
-pub(crate) mod adapter;
 mod config;
 /// functionality for processing control requests
 pub(crate) mod control;
@@ -54,6 +52,18 @@ impl OutstationHandle {
         self.sender
             .send(ConfigurationChange::SetDecodeLevel(decode_level).into())
             .await?;
+        Ok(())
+    }
+
+    /// Enable communications
+    pub async fn enable(&mut self) -> Result<(), Shutdown> {
+        self.sender.send(OutstationMessage::Enable).await?;
+        Ok(())
+    }
+
+    /// Disable communications
+    pub async fn disable(&mut self) -> Result<(), Shutdown> {
+        self.sender.send(OutstationMessage::Disable).await?;
         Ok(())
     }
 

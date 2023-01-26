@@ -41,8 +41,9 @@ impl<T> Receiver<T> {
         }
     }
 
-    pub(crate) fn close(&mut self) {
-        self.inner.close()
+    pub(crate) fn close_and_drain(&mut self) {
+        self.inner.close();
+        while self.inner.try_recv().is_ok() {}
     }
 }
 

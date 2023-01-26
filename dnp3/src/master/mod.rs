@@ -13,7 +13,7 @@ pub(crate) mod convert;
 pub(crate) mod extract;
 pub(crate) mod messages;
 pub(crate) mod poll;
-pub(crate) mod session;
+pub(crate) mod task;
 pub(crate) mod tasks;
 
 #[cfg(test)]

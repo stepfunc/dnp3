@@ -2,13 +2,14 @@ use tracing::Instrument;
 
 use crate::app::{Listener, Shutdown};
 use crate::link::LinkErrorMode;
-use crate::outstation::adapter::{NewSession, OutstationTaskAdapter};
 use crate::outstation::task::OutstationTask;
 use crate::outstation::OutstationHandle;
 use crate::outstation::*;
+use crate::tcp::server::{NewSession, ServerTask};
 use crate::tcp::{AddressFilter, FilterError};
 use crate::util::channel::Sender;
 use crate::util::phys::PhysLayer;
+use crate::util::session::{Enabled, Session};
 
 struct OutstationInfo {
     filter: AddressFilter,
@@ -95,6 +96,7 @@ impl Server {
         }
 
         let (task, handle) = OutstationTask::create(
+            Enabled::Yes,
             self.link_error_mode,
             config,
             application,
@@ -102,7 +104,7 @@ impl Server {
             control_handler,
         );
 
-        let (mut adapter, tx) = OutstationTaskAdapter::create(task, listener);
+        let (mut adapter, tx) = ServerTask::create(Session::outstation(task), listener);
 
         let outstation = OutstationInfo {
             filter,

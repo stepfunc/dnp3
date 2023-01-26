@@ -247,7 +247,7 @@ async fn run_tcp() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(feature = "serial")]
 async fn run_serial() -> Result<(), Box<dyn std::error::Error>> {
     // ANCHOR: create_serial_server
-    let outstation = spawn_outstation_serial_fault_tolerant(
+    let outstation = spawn_outstation_serial_2(
         // change this for a real port
         "/dev/ttySIM1",
         SerialSettings::default(),
@@ -259,6 +259,7 @@ async fn run_serial() -> Result<(), Box<dyn std::error::Error>> {
         Box::new(ExampleOutstationInformation),
         // customizable trait to process control requests from the master
         Box::new(ExampleControlHandler),
+        NullListener::create(),
     );
     // ANCHOR_END: create_serial_server
 
@@ -343,7 +344,9 @@ async fn run_tcp_server(mut server: Server) -> Result<(), Box<dyn std::error::Er
 }
 
 // run the same logic regardless of the transport type
-async fn run_outstation(outstation: OutstationHandle) -> Result<(), Box<dyn std::error::Error>> {
+async fn run_outstation(
+    mut outstation: OutstationHandle,
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut binary_input_value = false;
     let mut double_bit_binary_input_value = DoubleBit::DeterminedOff;
     let mut binary_output_status_value = false;
@@ -357,6 +360,12 @@ async fn run_outstation(outstation: OutstationHandle) -> Result<(), Box<dyn std:
     loop {
         match reader.next().await.unwrap()?.as_str() {
             "x" => return Ok(()),
+            "enable" => {
+                outstation.enable().await?;
+            }
+            "disable" => {
+                outstation.disable().await?;
+            }
             "bi" => {
                 binary_input_value = !binary_input_value;
                 outstation.transaction(|db| {

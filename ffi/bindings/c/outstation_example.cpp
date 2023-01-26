@@ -211,6 +211,12 @@ void run_outstation(dnp3::Outstation &outstation)
         if (cmd == "x") {
             return;
         }
+        else if (cmd == "enable") {
+            outstation.enable();
+        }
+        else if (cmd == "disable") {
+            outstation.disable();
+        }
         else if (cmd == "bi") {
             auto modify = database_transaction([&](Database &db) {
                 state.binary = !state.binary;
@@ -333,7 +339,7 @@ void run_tcp_server(dnp3::Runtime &runtime)
 void run_serial(dnp3::Runtime &runtime)
 {
     // ANCHOR: create_serial_server
-    auto outstation = dnp3::Outstation::create_serial_session_fault_tolerant(
+    auto outstation = dnp3::Outstation::create_serial_session_2(
         runtime,
         "/dev/pts/4",  // change this to a real port
         dnp3::SerialSettings(), // default settings
@@ -341,7 +347,8 @@ void run_serial(dnp3::Runtime &runtime)
         get_outstation_config(),
         std::make_unique<MyOutstationApplication>(),
         std::make_unique<MyOutstationInformation>(),
-        std::make_unique<MyControlHandler>()
+        std::make_unique<MyControlHandler>(),
+        port_state_listener([](PortState state) { std::cout << "PortState: " << to_string(state) << std::endl; })
     );
     // ANCHOR_END: create_serial_server
 

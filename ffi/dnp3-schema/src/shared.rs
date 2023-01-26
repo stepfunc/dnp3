@@ -6,6 +6,7 @@ use std::time::Duration;
 pub(crate) struct SharedDefinitions {
     pub error_type: ErrorType<Unvalidated>,
     pub port_state_listener: AsynchronousInterface,
+    pub client_state_listener: AsynchronousInterface,
     pub variation_enum: EnumHandle,
     pub runtime_class: ClassDeclarationHandle,
     pub connect_options: ClassHandle,
@@ -274,6 +275,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> 
     Ok(SharedDefinitions {
         error_type,
         port_state_listener: define_port_state_listener(lib)?,
+        client_state_listener: define_tcp_client_state_listener(lib)?,
         variation_enum: crate::variation::define(lib)?,
         runtime_class,
         connect_options,
@@ -522,6 +524,43 @@ fn declare_flags_struct(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructH
         .build()?;
 
     Ok(flags_struct)
+}
+
+fn define_tcp_client_state_listener(lib: &mut LibraryBuilder) -> BackTraced<AsynchronousInterface> {
+    let client_state_enum = lib
+        .define_enum("client_state")?
+        .push("disabled", "Client is disabled and idle until enabled")?
+        .push(
+            "connecting",
+            "Client is trying to establish a connection to the remote device",
+        )?
+        .push("connected", "Client is connected to the remote device")?
+        .push(
+            "wait_after_failed_connect",
+            "Failed to establish a connection, waiting before retrying",
+        )?
+        .push(
+            "wait_after_disconnect",
+            "Client was disconnected, waiting before retrying",
+        )?
+        .push("shutdown", "Client is shutting down")?
+        .doc(
+            doc("State of the client connection.")
+                .details("Use by the {interface:client_state_listener}."),
+        )?
+        .build()?;
+
+    let listener = lib
+        .define_interface(
+            "client_state_listener",
+            "Callback for monitoring the client TCP connection state",
+        )?
+        .begin_callback("on_change", "Called when the client state changed")?
+        .param("state", client_state_enum, "New state")?
+        .end_callback()?
+        .build_async()?;
+
+    Ok(listener)
 }
 
 fn define_port_state_listener(lib: &mut LibraryBuilder) -> BackTraced<AsynchronousInterface> {

@@ -4,6 +4,7 @@ pub(crate) mod channel;
 pub(crate) mod decode;
 pub(crate) mod future;
 pub(crate) mod phys;
+pub(crate) mod session;
 pub(crate) mod slice_ext;
 
 pub(crate) struct Smallest<T>

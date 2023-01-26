@@ -1,13 +1,13 @@
-use crate::app::Shutdown;
 use crate::decode::DecodeLevel;
 use crate::link::LinkErrorMode;
 use crate::outstation::config::*;
 use crate::outstation::database::DatabaseHandle;
-use crate::outstation::session::{OutstationSession, RunError};
+use crate::outstation::session::OutstationSession;
 use crate::outstation::traits::{ControlHandler, OutstationApplication, OutstationInformation};
 use crate::outstation::OutstationHandle;
 use crate::transport::{TransportReader, TransportWriter};
 use crate::util::phys::PhysLayer;
+use crate::util::session::{Enabled, RunError, StopReason};
 
 pub(crate) enum ConfigurationChange {
     SetDecodeLevel(DecodeLevel),
@@ -20,6 +20,8 @@ impl From<ConfigurationChange> for OutstationMessage {
 }
 
 pub(crate) enum OutstationMessage {
+    Enable,
+    Disable,
     Shutdown,
     Configuration(ConfigurationChange),
 }
@@ -34,6 +36,7 @@ pub(crate) struct OutstationTask {
 impl OutstationTask {
     /// create an `OutstationTask` and return it along with a `DatabaseHandle` for updating it
     pub(crate) fn create(
+        initial_state: Enabled,
         link_error_mode: LinkErrorMode,
         config: OutstationConfig,
         application: Box<dyn OutstationApplication>,
@@ -54,6 +57,7 @@ impl OutstationTask {
         );
         let task = Self {
             session: OutstationSession::new(
+                initial_state,
                 rx,
                 config.into(),
                 config.into(),
@@ -74,24 +78,26 @@ impl OutstationTask {
         )
     }
 
+    pub(crate) fn enabled(&self) -> Enabled {
+        self.session.enabled()
+    }
+
     /// run the outstation task asynchronously until a `SessionError` occurs
     pub(crate) async fn run(&mut self, io: &mut PhysLayer) -> RunError {
-        self.session
+        let res = self
+            .session
             .run(io, &mut self.reader, &mut self.writer, &mut self.database)
-            .await
+            .await;
+
+        self.reader.reset();
+        self.writer.reset();
+
+        res
     }
 
     /// process received outstation messages while idle without a session
-    pub(crate) async fn process_messages(&mut self) -> Result<(), Shutdown> {
-        loop {
-            self.session.process_messages().await?;
-        }
-    }
-
-    pub(crate) fn reset(&mut self) {
-        self.session.reset();
-        self.reader.reset();
-        self.writer.reset();
+    pub(crate) async fn process_next_message(&mut self) -> Result<(), StopReason> {
+        self.session.process_next_message().await
     }
 
     #[cfg(test)]

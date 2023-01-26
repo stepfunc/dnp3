@@ -254,6 +254,14 @@ class ExampleOutstation
         }
     }
 
+    class TestPortStateListener : IPortStateListener
+    {
+        public void OnChange(PortState state)
+        {
+            Console.WriteLine("Port state change: " + state);
+        }
+    }
+
     private static void RunServer(OutstationServer server)
     {
         // ANCHOR: tcp_server_add_outstation
@@ -293,7 +301,7 @@ class ExampleOutstation
     private static void RunSerial(Runtime runtime)
     {
         // ANCHOR: create_serial_server
-        var outstation = Outstation.CreateSerialSessionFaultTolerant(
+        var outstation = Outstation.CreateSerialSession2(
             runtime,
             "COM1",
             new SerialSettings(),
@@ -301,7 +309,8 @@ class ExampleOutstation
             GetOutstationConfig(),
             new TestOutstationApplication(),
             new TestOutstationInformation(),
-            new TestControlHandler()
+            new TestControlHandler(),
+            new TestPortStateListener()
         );
         // ANCHOR_END: create_serial_server
 
@@ -481,6 +490,16 @@ class ExampleOutstation
             {
                 case "x":
                     return;
+                case "enable":
+                    {
+                        outstation.Enable();
+                        break;
+                    }
+                case "disable":
+                    {
+                        outstation.Disable();
+                        break;
+                    }
                 case "bi":
                     {
                         outstation.Transaction(db =>

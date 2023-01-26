@@ -21,6 +21,7 @@ use crate::master::tasks::time::TimeSyncTask;
 use crate::master::tasks::Task;
 use crate::master::{DeadBandHeader, Headers, WriteError};
 use crate::util::channel::Sender;
+use crate::util::session::Enabled;
 
 /// Handle to a master communication channel. This handle controls
 /// a task running on the Tokio Runtime.
@@ -75,14 +76,14 @@ impl MasterChannel {
 
     /// enable communications
     pub async fn enable(&mut self) -> Result<(), Shutdown> {
-        self.send_master_message(MasterMsg::EnableCommunication(true))
+        self.send_master_message(MasterMsg::EnableCommunication(Enabled::Yes))
             .await?;
         Ok(())
     }
 
     /// disable communications
     pub async fn disable(&mut self) -> Result<(), Shutdown> {
-        self.send_master_message(MasterMsg::EnableCommunication(false))
+        self.send_master_message(MasterMsg::EnableCommunication(Enabled::No))
             .await?;
         Ok(())
     }

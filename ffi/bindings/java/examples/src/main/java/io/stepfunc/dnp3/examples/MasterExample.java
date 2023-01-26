@@ -31,14 +31,6 @@ class TestClientStateListener implements ClientStateListener {
   }
 }
 
-class TestPortStateListener implements PortStateListener {
-
-  @Override
-  public void onChange(PortState state) {
-    System.out.println(state);
-  }
-}
-
 // ANCHOR: read_handler
 class TestReadHandler implements ReadHandler {
 
@@ -370,7 +362,8 @@ public class MasterExample {
                     "/dev/pts/4", // replace with a real port
                     new SerialSettings(),
                     Duration.ofSeconds(5),
-                    new TestPortStateListener());
+                    state -> System.out.println("Port state change: " + state)
+            );
     // ANCHOR_END: create_serial_channel
 
     try {

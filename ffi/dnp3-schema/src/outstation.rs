@@ -247,9 +247,57 @@ fn define_outstation(
         )?
         .fails_with(shared_def.error_type.clone())?
         .doc(
-            doc("Create an outstation instance running on a serial port which is tolerant to the serial port being added and removed")
+            doc("This method is implemented in terms of {class:outstation.create_serial_session_2()} but without a port listener")
         )?
         .build_static("create_serial_session_fault_tolerant")?;
+
+    let outstation_create_serial_session_2 = lib
+        .define_function("outstation_create_serial_session_2")?
+        .param(
+            "runtime",
+            shared_def.runtime_class.clone(),
+            "runtime on which to spawn the outstation",
+        )?
+        .param("serial_path", StringType, "Path of the serial device")?
+        .param(
+            "settings",
+            shared_def.serial_port_settings.clone(),
+            "settings for the serial port",
+        )?
+        .param("open_retry_delay", DurationType::Milliseconds, "delay between attempts to open the serial port")?
+        .param(
+            "config",
+            types.outstation_config.clone(),
+            "outstation configuration",
+        )?
+        .param(
+            "application",
+            types.outstation_application.clone(),
+            "application interface",
+        )?
+        .param(
+            "information",
+            types.outstation_information.clone(),
+            "informational events interface",
+        )?
+        .param(
+            "control_handler",
+            types.control_handler.clone(),
+            "control handler interface",
+        )?
+        .param("port_listener",
+            shared_def.port_state_listener.clone(),
+            "port state listener"
+        )?
+        .returns(
+            outstation.clone(),
+            "Outstation instance or {null} if the port cannot be opened",
+        )?
+        .fails_with(shared_def.error_type.clone())?
+        .doc(
+            doc("Create an outstation instance running on a serial port which is tolerant to the serial port being added and removed")
+        )?
+        .build_static("create_serial_session_2")?;
 
     let destructor = lib.define_destructor(
         outstation.clone(),
@@ -273,11 +321,26 @@ fn define_outstation(
         .doc("Set decoding log level")?
         .build()?;
 
+    let enable = lib
+        .define_method("enable", outstation.clone())?
+        .fails_with(shared_def.error_type.clone())?
+        .doc("enable communications")?
+        .build()?;
+
+    let disable = lib
+        .define_method("disable", outstation.clone())?
+        .fails_with(shared_def.error_type.clone())?
+        .doc("disable communications")?
+        .build()?;
+
     let outstation = lib
         .define_class(&outstation)?
         .destructor(destructor)?
         .static_method(outstation_create_serial_session_fn)?
         .static_method(outstation_create_serial_session_fault_tolerant_fn)?
+        .static_method(outstation_create_serial_session_2)?
+        .method(enable)?
+        .method(disable)?
         .method(execute_transaction)?
         .method(set_decode_level)?
         .doc(doc("Outstation handle").details("Use this handle to modify the internal database."))?

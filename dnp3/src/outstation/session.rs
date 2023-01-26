@@ -40,6 +40,7 @@ use crate::app::gen::prefixed::PrefixedVariation;
 use crate::app::parse::bit::BitSequence;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
+use crate::util::session::{Enabled, RunError, StopReason};
 
 #[derive(Copy, Clone)]
 enum TimeoutStatus {
@@ -242,6 +243,7 @@ impl SessionState {
 }
 
 pub(crate) struct OutstationSession {
+    enabled: Enabled,
     messages: Receiver<OutstationMessage>,
     sol_tx_buffer: Buffer,
     unsol_tx_buffer: Buffer,
@@ -292,26 +294,9 @@ enum ConfirmAction {
     ContinueWait,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub(crate) enum RunError {
-    Link(LinkError),
-    Shutdown,
-}
-
-impl From<Shutdown> for RunError {
-    fn from(_: Shutdown) -> Self {
-        RunError::Shutdown
-    }
-}
-
-impl From<LinkError> for RunError {
-    fn from(err: LinkError) -> Self {
-        RunError::Link(err)
-    }
-}
-
 impl OutstationSession {
     pub(crate) fn new(
+        initial_state: Enabled,
         messages: Receiver<OutstationMessage>,
         config: SessionConfig,
         param: SessionParameters,
@@ -324,6 +309,7 @@ impl OutstationSession {
             .map(|delay| tokio::time::Instant::now() + delay);
 
         Self {
+            enabled: initial_state,
             messages,
             config,
             sol_tx_buffer: param.sol_tx_buffer_size.create_buffer(),
@@ -336,11 +322,13 @@ impl OutstationSession {
         }
     }
 
+    pub(crate) fn enabled(&self) -> Enabled {
+        self.enabled
+    }
+
     /// used when the there is no running IO to process outstation messages
-    pub(crate) async fn process_messages(&mut self) -> Result<(), Shutdown> {
-        loop {
-            self.handle_next_message().await?;
-        }
+    pub(crate) async fn process_next_message(&mut self) -> Result<(), StopReason> {
+        self.handle_next_message().await
     }
 
     pub(crate) async fn run(
@@ -352,13 +340,10 @@ impl OutstationSession {
     ) -> RunError {
         loop {
             if let Err(err) = self.run_idle_state(io, reader, writer, database).await {
+                self.state.reset();
                 return err;
             }
         }
-    }
-
-    pub(crate) fn reset(&mut self) {
-        self.state.reset();
     }
 
     async fn write_unsolicited(
@@ -874,9 +859,19 @@ impl OutstationSession {
         }
     }
 
-    async fn handle_next_message(&mut self) -> Result<(), Shutdown> {
+    async fn handle_next_message(&mut self) -> Result<(), StopReason> {
         match self.messages.receive().await? {
-            OutstationMessage::Shutdown => Err(Shutdown),
+            OutstationMessage::Shutdown => Err(StopReason::Shutdown),
+            OutstationMessage::Enable => {
+                tracing::info!("enable communication");
+                self.enabled = Enabled::Yes;
+                Ok(())
+            }
+            OutstationMessage::Disable => {
+                tracing::info!("disable communication");
+                self.enabled = Enabled::No;
+                Err(StopReason::Disable)
+            }
             OutstationMessage::Configuration(change) => {
                 self.handle_config_change(change);
                 Ok(())

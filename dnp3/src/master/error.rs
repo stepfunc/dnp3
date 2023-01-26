@@ -6,13 +6,13 @@ use crate::app::{ObjectParseError, Shutdown};
 use crate::link::error::LinkError;
 use crate::link::EndpointAddress;
 use crate::master::association::NoAssociation;
-use crate::master::session::{RunError, StateChange};
 use crate::transport::TransportResponseError;
 
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError;
 
 use crate::app::attr::BadAttribute;
+use crate::util::session::{RunError, StopReason};
 
 /// Errors that can occur when adding an association
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -307,8 +307,8 @@ impl From<ObjectParseError> for TaskError {
 impl From<RunError> for TaskError {
     fn from(x: RunError) -> Self {
         match x {
-            RunError::State(StateChange::Shutdown) => TaskError::Shutdown,
-            RunError::State(StateChange::Disable) => TaskError::Disabled,
+            RunError::Stop(StopReason::Shutdown) => TaskError::Shutdown,
+            RunError::Stop(StopReason::Disable) => TaskError::Disabled,
             RunError::Link(x) => TaskError::Link(x),
         }
     }
@@ -368,11 +368,11 @@ impl From<TaskError> for WriteError {
     }
 }
 
-impl From<StateChange> for TaskError {
-    fn from(x: StateChange) -> Self {
+impl From<StopReason> for TaskError {
+    fn from(x: StopReason) -> Self {
         match x {
-            StateChange::Disable => TaskError::Disabled,
-            StateChange::Shutdown => TaskError::Shutdown,
+            StopReason::Disable => TaskError::Disabled,
+            StopReason::Shutdown => TaskError::Shutdown,
         }
     }
 }
