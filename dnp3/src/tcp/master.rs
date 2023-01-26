@@ -53,7 +53,7 @@ pub fn spawn_master_tcp_client_2(
     );
     let future = async move {
         task.run()
-            .instrument(tracing::info_span!("dnp3-master-tcp", "endpoint" = ?main_addr))
+            .instrument(tracing::info_span!("dnp3-master-tcp-client", "endpoint" = ?main_addr))
             .await;
     };
     tokio::spawn(future);

@@ -70,7 +70,7 @@ pub fn spawn_master_tls_client_2(
     );
     let future = async move {
         task.run()
-            .instrument(tracing::info_span!("dnp3-master-tls", "endpoint" = ?main_addr))
+            .instrument(tracing::info_span!("dnp3-master-tls-client", "endpoint" = ?main_addr))
             .await;
     };
     tokio::spawn(future);

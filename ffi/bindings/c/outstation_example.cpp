@@ -336,6 +336,26 @@ void run_tcp_server(dnp3::Runtime &runtime)
     run_server(server);
 }
 
+void run_tcp_client(dnp3::Runtime &runtime)
+{
+    dnp3::EndpointList endpoints(std::string("127.0.0.1:20000"));
+    dnp3::ConnectOptions options;
+
+    auto outstation = Outstation::create_tcp_client(
+        runtime, LinkErrorMode::discard,
+        endpoints,
+        dnp3::ConnectStrategy(),
+        options,
+        get_outstation_config(),
+        std::make_unique<MyOutstationApplication>(),
+        std::make_unique<MyOutstationInformation>(),
+        std::make_unique<MyControlHandler>(),
+        client_state_listener([](ClientState state) { std::cout << "ClientState: " << to_string(state) << std::endl; })
+    );
+
+    run_outstation(outstation);
+}
+
 void run_serial(dnp3::Runtime &runtime)
 {
     // ANCHOR: create_serial_server
@@ -416,6 +436,9 @@ int main(int argc, char *argv[])
 
     if (strcmp(type, "tcp") == 0) {
         run_tcp_server(runtime);
+    }
+    else if (strcmp(type, "tcp-client") == 0) {
+        run_tcp_client(runtime);
     }
     else if (strcmp(type, "serial") == 0) {
         run_serial(runtime);

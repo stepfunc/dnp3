@@ -171,6 +171,114 @@ pub unsafe fn outstation_destroy(outstation: *mut Outstation) {
     }
 }
 
+#[allow(clippy::too_many_arguments)] // TODO
+pub(crate) unsafe fn outstation_create_tcp_client(
+    runtime: *mut crate::Runtime,
+    link_error_mode: ffi::LinkErrorMode,
+    endpoints: *mut crate::EndpointList,
+    connect_strategy: ffi::ConnectStrategy,
+    connect_options: *mut crate::ConnectOptions,
+    config: ffi::OutstationConfig,
+    application: ffi::OutstationApplication,
+    information: ffi::OutstationInformation,
+    control_handler: ffi::ControlHandler,
+    listener: ffi::ClientStateListener,
+) -> Result<*mut crate::Outstation, ffi::ParamError> {
+    let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
+    let endpoints = endpoints.as_ref().ok_or(ffi::ParamError::NullParameter)?;
+    let connect_options = connect_options
+        .as_ref()
+        .map(|x| x.inner)
+        .unwrap_or_else(Default::default);
+
+    let config = convert_outstation_config(config)?;
+
+    let _enter = runtime.enter();
+    let handle = dnp3::tcp::spawn_outstation_tcp_client(
+        link_error_mode.into(),
+        endpoints.clone(),
+        connect_strategy.into(),
+        connect_options,
+        config,
+        Box::new(application),
+        Box::new(information),
+        Box::new(control_handler),
+        Box::new(listener),
+    );
+
+    let handle = Box::new(crate::Outstation {
+        handle,
+        runtime: runtime.handle(),
+    });
+
+    Ok(Box::into_raw(handle))
+}
+
+#[cfg(not(feature = "tls"))]
+#[allow(clippy::too_many_arguments)] // TODO
+pub(crate) unsafe fn outstation_create_tls_client(
+    _runtime: *mut crate::Runtime,
+    _link_error_mode: ffi::LinkErrorMode,
+    _endpoints: *mut crate::EndpointList,
+    _connect_strategy: ffi::ConnectStrategy,
+    _connect_options: *mut crate::ConnectOptions,
+    _config: ffi::OutstationConfig,
+    _application: ffi::OutstationApplication,
+    _information: ffi::OutstationInformation,
+    _control_handler: ffi::ControlHandler,
+    _listener: ffi::ClientStateListener,
+    _tls_config: ffi::TlsClientConfig,
+) -> Result<*mut crate::Outstation, ffi::ParamError> {
+    Err(ffi::ParamError::NoSupport)
+}
+
+#[cfg(feature = "tls")]
+#[allow(clippy::too_many_arguments)] // TODO
+pub(crate) unsafe fn outstation_create_tls_client(
+    runtime: *mut crate::Runtime,
+    link_error_mode: ffi::LinkErrorMode,
+    endpoints: *mut crate::EndpointList,
+    connect_strategy: ffi::ConnectStrategy,
+    connect_options: *mut crate::ConnectOptions,
+    config: ffi::OutstationConfig,
+    application: ffi::OutstationApplication,
+    information: ffi::OutstationInformation,
+    control_handler: ffi::ControlHandler,
+    listener: ffi::ClientStateListener,
+    tls_config: ffi::TlsClientConfig,
+) -> Result<*mut crate::Outstation, ffi::ParamError> {
+    let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
+    let endpoints = endpoints.as_ref().ok_or(ffi::ParamError::NullParameter)?;
+    let connect_options = connect_options
+        .as_ref()
+        .map(|x| x.inner)
+        .unwrap_or_else(Default::default);
+
+    let config = convert_outstation_config(config)?;
+    let tls_config = tls_config.try_into()?;
+
+    let _enter = runtime.enter();
+    let handle = dnp3::tcp::tls::spawn_outstation_tls_client(
+        link_error_mode.into(),
+        endpoints.clone(),
+        connect_strategy.into(),
+        connect_options,
+        config,
+        Box::new(application),
+        Box::new(information),
+        Box::new(control_handler),
+        Box::new(listener),
+        tls_config,
+    );
+
+    let handle = Box::new(crate::Outstation {
+        handle,
+        runtime: runtime.handle(),
+    });
+
+    Ok(Box::into_raw(handle))
+}
+
 #[cfg(not(feature = "serial"))]
 #[allow(clippy::too_many_arguments)] // TODO
 pub unsafe fn outstation_create_serial_session(
