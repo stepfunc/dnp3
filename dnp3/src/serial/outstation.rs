@@ -90,7 +90,7 @@ pub fn spawn_outstation_serial_fault_tolerant(
         path,
         settings,
         Session::outstation(task),
-        retry.max_delay, // TODO
+        retry,
         Box::new(NullListener),
     );
 

@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use tracing::Instrument;
 
-use crate::app::Listener;
+use crate::app::{Listener, RetryStrategy};
 use crate::link::LinkErrorMode;
 use crate::master::task::MasterTask;
 use crate::master::*;
@@ -28,7 +28,7 @@ pub fn spawn_master_serial(
         path,
         serial_settings,
         Session::master(task),
-        retry_delay,
+        RetryStrategy::new(retry_delay, retry_delay),
         listener,
     );
     let future = async move {

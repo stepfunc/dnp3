@@ -1,13 +1,12 @@
-use crate::app::{Listener, Shutdown};
+use crate::app::{ExponentialBackOff, Listener, RetryStrategy, Shutdown};
 use crate::serial::{PortState, SerialSettings};
 use crate::util::phys::PhysLayer;
 use crate::util::session::{RunError, Session, StopReason};
-use std::time::Duration;
 
 pub(crate) struct SerialTask {
     path: String,
     serial_settings: SerialSettings,
-    retry_delay: Duration,
+    back_off: ExponentialBackOff,
     session: Session,
     listener: Box<dyn Listener<PortState>>,
 }
@@ -17,25 +16,25 @@ impl SerialTask {
         path: &str,
         serial_settings: SerialSettings,
         session: Session,
-        retry_delay: Duration,
+        retry: RetryStrategy,
         listener: Box<dyn Listener<PortState>>,
     ) -> Self {
         Self {
             path: path.to_string(),
             serial_settings,
-            retry_delay,
+            back_off: ExponentialBackOff::new(retry),
             session,
             listener,
         }
     }
 
     pub(crate) async fn run(&mut self) {
-        let _ = self.run_impl().await;
+        let _ = self.run_inner().await;
         self.session.shutdown().await;
         self.listener.update(PortState::Shutdown).get().await;
     }
 
-    async fn run_impl(&mut self) -> Result<(), Shutdown> {
+    async fn run_inner(&mut self) -> Result<(), Shutdown> {
         loop {
             self.listener.update(PortState::Disabled).get().await;
             self.session.wait_for_enabled().await?;
@@ -49,36 +48,30 @@ impl SerialTask {
         loop {
             match crate::serial::open(self.path.as_str(), self.serial_settings) {
                 Err(err) => {
-                    tracing::warn!(
-                        "{} - waiting {} ms to re-open port",
-                        err,
-                        self.retry_delay.as_millis()
-                    );
-                    self.listener
-                        .update(PortState::Wait(self.retry_delay))
-                        .get()
-                        .await;
-                    self.session.wait_for_retry(self.retry_delay).await?;
+                    let delay = self.back_off.on_failure();
+                    tracing::warn!("{} - waiting {} ms to re-open port", err, delay.as_millis());
+                    self.listener.update(PortState::Wait(delay)).get().await;
+                    self.session.wait_for_retry(delay).await?;
                 }
                 Ok(serial) => {
-                    let mut io = PhysLayer::Serial(serial);
+                    self.back_off.on_success();
                     tracing::info!("serial port open");
+                    let mut io = PhysLayer::Serial(serial);
                     self.listener.update(PortState::Open).get().await;
                     match self.session.run(&mut io).await {
                         RunError::Stop(x) => {
                             return Err(x);
                         }
                         RunError::Link(err) => {
-                            tracing::warn!("serial port error: {}", err);
-                            tracing::info!(
-                                "waiting {} ms to re-open",
-                                self.retry_delay.as_millis()
+                            let delay = self.back_off.on_failure();
+                            // we wait here to prevent any kind of rapid retry scenario if the port opens and then immediately fails
+                            tracing::warn!(
+                                "{} - waiting {} ms to re-open port",
+                                err,
+                                delay.as_millis()
                             );
-                            self.listener
-                                .update(PortState::Wait(self.retry_delay))
-                                .get()
-                                .await;
-                            self.session.wait_for_retry(self.retry_delay).await?;
+                            self.listener.update(PortState::Wait(delay)).get().await;
+                            self.session.wait_for_retry(delay).await?;
                         }
                     }
                 }

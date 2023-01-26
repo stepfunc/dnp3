@@ -91,9 +91,7 @@ impl OutstationTask {
 
     /// process received outstation messages while idle without a session
     pub(crate) async fn process_messages(&mut self) -> Result<(), StopReason> {
-        loop {
-            self.session.process_messages().await?;
-        }
+        self.session.process_messages().await
     }
 
     pub(crate) fn reset(&mut self) {
