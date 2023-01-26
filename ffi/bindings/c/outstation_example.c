@@ -376,10 +376,21 @@ void octet_string_transaction(dnp3_database_t *db, void *context)
 
 void on_connection_state_change(dnp3_connection_state_t state, void *ctx) { printf("Connection state change: %s\n", dnp3_connection_state_to_string(state)); }
 
+void on_port_state_change(dnp3_port_state_t state, void *ctx) { printf("Port state change: %s\n", dnp3_port_state_to_string(state)); }
+
 dnp3_connection_state_listener_t get_connection_state_listener()
 {
     return (dnp3_connection_state_listener_t){
         .on_change = &on_connection_state_change,
+        .on_destroy = NULL,
+        .ctx = NULL,
+    };
+}
+
+dnp3_port_state_listener_t get_port_state_listener()
+{
+    return (dnp3_port_state_listener_t){
+        .on_change = &on_port_state_change,
         .on_destroy = NULL,
         .ctx = NULL,
     };
@@ -619,7 +630,7 @@ int run_serial(dnp3_runtime_t* runtime)
 {
     // ANCHOR: create_serial_server
     dnp3_outstation_t* outstation = NULL;
-    dnp3_param_error_t err = dnp3_outstation_create_serial_session_fault_tolerant(
+    dnp3_param_error_t err = dnp3_outstation_create_serial_session_2(
         runtime,
         "/dev/pts/4",                // change to a real port
         dnp3_serial_settings_init(), // default settings
@@ -628,6 +639,7 @@ int run_serial(dnp3_runtime_t* runtime)
         get_outstation_application(),
         get_outstation_information(),
         get_control_handler(),
+        get_port_state_listener(),
         &outstation
     );
     // ANCHOR_END: create_serial_server
