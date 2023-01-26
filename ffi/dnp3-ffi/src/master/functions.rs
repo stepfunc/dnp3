@@ -126,8 +126,6 @@ pub(crate) unsafe fn master_channel_create_tls_2(
     listener: ffi::ClientStateListener,
     tls_config: ffi::TlsClientConfig,
 ) -> Result<*mut MasterChannel, ffi::ParamError> {
-    use std::path::Path;
-
     let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
     let config = convert_config(config)?;
     let endpoints = endpoints.as_ref().ok_or(ffi::ParamError::NullParameter)?;
@@ -136,25 +134,7 @@ pub(crate) unsafe fn master_channel_create_tls_2(
         .map(|x| x.inner)
         .unwrap_or_else(Default::default);
 
-    let password = tls_config.password().to_string_lossy();
-    let optional_password = match password.as_ref() {
-        "" => None,
-        password => Some(password),
-    };
-
-    let tls_config = TlsClientConfig::new(
-        &tls_config.dns_name().to_string_lossy(),
-        Path::new(tls_config.peer_cert_path().to_string_lossy().as_ref()),
-        Path::new(tls_config.local_cert_path().to_string_lossy().as_ref()),
-        Path::new(tls_config.private_key_path().to_string_lossy().as_ref()),
-        optional_password,
-        tls_config.min_tls_version().into(),
-        tls_config.certificate_mode().into(),
-    )
-    .map_err(|err| {
-        tracing::error!("TLS error: {}", err);
-        err
-    })?;
+    let tls_config = tls_config.try_into()?;
 
     // enter the runtime context so that we can spawn
     let _enter = runtime.enter();
@@ -175,6 +155,37 @@ pub(crate) unsafe fn master_channel_create_tls_2(
     };
 
     Ok(Box::into_raw(Box::new(channel)))
+}
+
+#[cfg(feature = "tls")]
+impl TryFrom<ffi::TlsClientConfig> for TlsClientConfig {
+    type Error = ffi::ParamError;
+
+    fn try_from(value: ffi::TlsClientConfig) -> Result<Self, Self::Error> {
+        use std::path::Path;
+
+        let password = value.password().to_string_lossy();
+        let optional_password = match password.as_ref() {
+            "" => None,
+            password => Some(password),
+        };
+
+        let ret = TlsClientConfig::new(
+            &value.dns_name().to_string_lossy(),
+            Path::new(value.peer_cert_path().to_string_lossy().as_ref()),
+            Path::new(value.local_cert_path().to_string_lossy().as_ref()),
+            Path::new(value.private_key_path().to_string_lossy().as_ref()),
+            optional_password,
+            value.min_tls_version().into(),
+            value.certificate_mode().into(),
+        )
+        .map_err(|err| {
+            tracing::error!("TLS error: {}", err);
+            err
+        })?;
+
+        Ok(ret)
+    }
 }
 
 #[cfg(not(feature = "serial"))]

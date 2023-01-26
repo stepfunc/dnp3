@@ -9,8 +9,6 @@ use std::time::Duration;
 pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTraced<()> {
     let read_handler = read_handler::define(lib, shared)?;
 
-    let tls_client_config = define_tls_client_config(lib, shared)?;
-
     let master_channel_config = define_master_channel_config(lib, shared)?;
 
     let master_channel_class = lib.declare_class("master_channel")?;
@@ -167,7 +165,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         )?
         .param(
             "tls_config",
-            tls_client_config.clone(),
+            shared.tls_client_config.clone(),
             "TLS client configuration",
         )?
         .returns(
@@ -217,7 +215,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         )?
         .param(
             "tls_config",
-            tls_client_config,
+            shared.tls_client_config.clone(),
             "TLS client configuration",
         )?
         .returns(
@@ -528,53 +526,6 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         .build()?;
 
     Ok(())
-}
-
-fn define_tls_client_config(
-    lib: &mut LibraryBuilder,
-    shared: &SharedDefinitions,
-) -> BackTraced<FunctionArgStructHandle> {
-    let min_tls_version = Name::create("min_tls_version")?;
-    let certificate_mode = Name::create("certificate_mode")?;
-
-    let tls_client_config = lib.declare_function_argument_struct("tls_client_config")?;
-    let tls_client_config = lib.define_function_argument_struct(tls_client_config)?
-        .add("dns_name", StringType, "Expected name to validate in the presented certificate (only in {enum:certificate_mode.authority_based} mode)")?
-        .add(
-            "peer_cert_path",
-            StringType,
-            "Path to the PEM-encoded certificate of the peer",
-        )?
-        .add(
-            "local_cert_path",
-            StringType,
-            "Path to the PEM-encoded local certificate",
-        )?
-        .add(
-            "private_key_path",
-            StringType,
-            "Path to the the PEM-encoded private key",
-        )?
-        .add(
-            "password",
-            StringType,
-            doc("Optional password if the private key file is encrypted").details("Only PKCS#8 encrypted files are supported.").details("Pass empty string if the file is not encrypted.")
-        )?
-        .add(
-            min_tls_version.clone(),
-            shared.min_tls_version.clone(),
-            "Minimum TLS version allowed",
-        )?
-        .add(certificate_mode.clone(), shared.certificate_mode.clone(), "Certificate validation mode")?
-        .doc("TLS client configuration")?
-        .end_fields()?
-        .begin_initializer("init", InitializerType::Normal, "construct the configuration with defaults")?
-        .default_variant(&min_tls_version, "v12")?
-        .default_variant(&certificate_mode, "authority_based")?
-        .end_initializer()?
-        .build()?;
-
-    Ok(tls_client_config)
 }
 
 fn define_association_id(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructHandle> {

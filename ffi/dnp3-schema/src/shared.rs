@@ -12,6 +12,7 @@ pub(crate) struct SharedDefinitions {
     pub connect_options: ClassHandle,
     pub endpoint_list: ClassHandle,
     pub connect_strategy: FunctionArgStructHandle,
+    pub tls_client_config: FunctionArgStructHandle,
     pub decode_level: UniversalStructHandle,
     pub serial_port_settings: FunctionArgStructHandle,
     pub link_error_mode: EnumHandle,
@@ -273,6 +274,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> 
     let connect_options = define_connect_options(lib, error_type.clone())?;
     let endpoint_list = define_endpoint_list(lib)?;
     let connect_strategy = define_connect_strategy(lib)?;
+    let tls = define_tls_types(lib)?;
 
     let attr = crate::attributes::define(lib)?;
 
@@ -285,12 +287,13 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> 
         connect_options,
         endpoint_list,
         connect_strategy,
+        tls_client_config: tls.tls_client_config,
         decode_level,
         retry_strategy: define_retry_strategy(lib)?,
         serial_port_settings: define_serial_port_settings(lib)?,
         link_error_mode: define_link_error_mode(lib)?,
-        min_tls_version: define_min_tls_version(lib)?,
-        certificate_mode: define_certificate_mode(lib)?,
+        min_tls_version: tls.min_tls_version,
+        certificate_mode: tls.certificate_mode,
         control_field_struct,
         g12v1_struct,
         function_code: define_function_code(lib)?,
@@ -314,6 +317,63 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> 
         octet_string_it,
         byte_it,
         attr,
+    })
+}
+
+struct TlsTypes {
+    min_tls_version: EnumHandle,
+    certificate_mode: EnumHandle,
+    tls_client_config: FunctionArgStructHandle,
+}
+
+fn define_tls_types(lib: &mut LibraryBuilder) -> BackTraced<TlsTypes> {
+    let min_tls_version = define_min_tls_version(lib)?;
+    let certificate_mode = define_certificate_mode(lib)?;
+
+    let min_tls_version_name = Name::create("min_tls_version")?;
+    let certificate_mode_name = Name::create("certificate_mode")?;
+
+    let tls_client_config = lib.declare_function_argument_struct("tls_client_config")?;
+    let tls_client_config = lib.define_function_argument_struct(tls_client_config)?
+        .add("dns_name", StringType, "Expected name to validate in the presented certificate (only in {enum:certificate_mode.authority_based} mode)")?
+        .add(
+            "peer_cert_path",
+            StringType,
+            "Path to the PEM-encoded certificate of the peer",
+        )?
+        .add(
+            "local_cert_path",
+            StringType,
+            "Path to the PEM-encoded local certificate",
+        )?
+        .add(
+            "private_key_path",
+            StringType,
+            "Path to the the PEM-encoded private key",
+        )?
+        .add(
+            "password",
+            StringType,
+            doc("Optional password if the private key file is encrypted").details("Only PKCS#8 encrypted files are supported.").details("Pass empty string if the file is not encrypted.")
+        )?
+        .add(
+            min_tls_version_name.clone(),
+            min_tls_version.clone(),
+            "Minimum TLS version allowed",
+        )?
+        .add(certificate_mode_name.clone(), certificate_mode.clone(), "Certificate validation mode")?
+        .doc("TLS client configuration")?
+        .end_fields()?
+        .begin_initializer("init", InitializerType::Normal, "construct the configuration with defaults")?
+        .default_variant(&min_tls_version_name, "v12")?
+        .default_variant(&certificate_mode_name, "authority_based")?
+        .end_initializer()?
+        .build()?;
+
+    Ok(TlsTypes {
+        min_tls_version,
+        certificate_mode,
+        tls_client_config,
     })
 }
 
