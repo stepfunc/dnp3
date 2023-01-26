@@ -14,7 +14,7 @@ use crate::util::channel::Sender;
 use crate::util::phys::PhysLayer;
 use crate::util::session::{Enabled, Session};
 
-/// Spawn a tcp client task onto the `Tokio` runtime. The task runs until the returned handle is dropped.
+/// Spawn a TCP client task onto the `Tokio` runtime. The task runs until the returned handle is dropped.
 ///
 /// **Note**: This function may only be called from within the runtime itself, and panics otherwise.
 /// Use Runtime::enter() if required.

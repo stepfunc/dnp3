@@ -6,10 +6,70 @@ use std::sync::Arc;
 use tokio_rustls::rustls;
 use tokio_rustls::rustls::server::AllowAnyAuthenticatedClient;
 
-use crate::tcp::tls::{load_certs, load_private_key, CertificateMode, MinTlsVersion, TlsError};
+use crate::app::{ConnectStrategy, Listener};
+use crate::link::LinkErrorMode;
+use crate::outstation::task::OutstationTask;
+use crate::outstation::{
+    ControlHandler, OutstationApplication, OutstationConfig, OutstationHandle,
+    OutstationInformation,
+};
+use crate::tcp::client::ClientTask;
+use crate::tcp::tls::{
+    load_certs, load_private_key, CertificateMode, MinTlsVersion, TlsClientConfig, TlsError,
+};
+use crate::tcp::{ClientState, ConnectOptions, EndpointList, PostConnectionHandler};
 use crate::util::phys::PhysLayer;
+use crate::util::session::{Enabled, Session};
 use rx509;
 use tokio::net::TcpStream;
+
+use tracing::Instrument;
+
+/// Spawn a TLS client task onto the `Tokio` runtime. The task runs until the returned handle is dropped.
+///
+/// **Note**: This function may only be called from within the runtime itself, and panics otherwise.
+/// Use Runtime::enter() if required.
+#[allow(clippy::too_many_arguments)]
+pub fn spawn_outstation_tls_client(
+    link_error_mode: LinkErrorMode,
+    endpoints: EndpointList,
+    connect_strategy: ConnectStrategy,
+    connect_options: ConnectOptions,
+    config: OutstationConfig,
+    application: Box<dyn OutstationApplication>,
+    information: Box<dyn OutstationInformation>,
+    control_handler: Box<dyn ControlHandler>,
+    listener: Box<dyn Listener<ClientState>>,
+    tls_config: TlsClientConfig,
+) -> OutstationHandle {
+    let main_addr = endpoints.main_addr().to_string();
+    let (task, handle) = OutstationTask::create(
+        Enabled::No,
+        link_error_mode,
+        config,
+        application,
+        information,
+        control_handler,
+    );
+    let session = Session::outstation(task);
+    let mut client = ClientTask::new(
+        session,
+        endpoints,
+        connect_strategy,
+        connect_options,
+        PostConnectionHandler::Tls(tls_config),
+        listener,
+    );
+
+    let future = async move {
+        client
+            .run()
+            .instrument(tracing::info_span!("dnp3-outstation-tls-client", "endpoint" = ?main_addr))
+            .await;
+    };
+    tokio::spawn(future);
+    handle
+}
 
 /// TLS configuration
 pub struct TlsServerConfig {
