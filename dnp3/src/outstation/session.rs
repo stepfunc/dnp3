@@ -340,13 +340,10 @@ impl OutstationSession {
     ) -> RunError {
         loop {
             if let Err(err) = self.run_idle_state(io, reader, writer, database).await {
+                self.state.reset();
                 return err;
             }
         }
-    }
-
-    pub(crate) fn reset(&mut self) {
-        self.state.reset();
     }
 
     async fn write_unsolicited(

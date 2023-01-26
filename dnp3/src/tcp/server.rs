@@ -84,9 +84,6 @@ impl ServerTask {
             .get()
             .await;
 
-        // reset outstation state in between sessions
-        self.session.reset();
-
         match result {
             Ok(new_session) => {
                 tracing::warn!("closing session {} for new session {}", id, new_session.id);

@@ -84,20 +84,20 @@ impl OutstationTask {
 
     /// run the outstation task asynchronously until a `SessionError` occurs
     pub(crate) async fn run(&mut self, io: &mut PhysLayer) -> RunError {
-        self.session
+        let res = self
+            .session
             .run(io, &mut self.reader, &mut self.writer, &mut self.database)
-            .await
+            .await;
+
+        self.reader.reset();
+        self.writer.reset();
+
+        res
     }
 
     /// process received outstation messages while idle without a session
     pub(crate) async fn process_next_message(&mut self) -> Result<(), StopReason> {
         self.session.process_next_message().await
-    }
-
-    pub(crate) fn reset(&mut self) {
-        self.session.reset();
-        self.reader.reset();
-        self.writer.reset();
     }
 
     #[cfg(test)]

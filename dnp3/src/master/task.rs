@@ -61,9 +61,15 @@ impl MasterTask {
     }
 
     pub(crate) async fn run(&mut self, io: &mut PhysLayer) -> RunError {
-        self.session
+        let ret = self
+            .session
             .run(io, &mut self.writer, &mut self.reader)
-            .await
+            .await;
+
+        self.writer.reset();
+        self.reader.reset();
+
+        ret
     }
 
     pub(crate) async fn shutdown(&mut self) {
@@ -127,8 +133,6 @@ impl MasterSession {
 
             if let Err(err) = result {
                 self.reset(err);
-                writer.reset();
-                reader.reset();
                 return err;
             }
         }

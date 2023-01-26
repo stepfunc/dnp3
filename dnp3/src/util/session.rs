@@ -104,14 +104,8 @@ impl Session {
     pub(crate) async fn shutdown(&mut self) {
         match &mut self.inner {
             SessionType::Master(x) => x.shutdown().await,
-            SessionType::Outstation(_) => {} // TODO
-        }
-    }
-
-    pub(crate) fn reset(&mut self) {
-        match &mut self.inner {
-            SessionType::Master(_) => {} // TODO
-            SessionType::Outstation(x) => x.reset(),
+            // no special shutdown required
+            SessionType::Outstation(_) => {}
         }
     }
 
