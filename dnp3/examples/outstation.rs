@@ -247,7 +247,7 @@ async fn run_tcp() -> Result<(), Box<dyn std::error::Error>> {
 #[cfg(feature = "serial")]
 async fn run_serial() -> Result<(), Box<dyn std::error::Error>> {
     // ANCHOR: create_serial_server
-    let outstation = spawn_outstation_serial_fault_tolerant(
+    let outstation = spawn_outstation_serial_2(
         // change this for a real port
         "/dev/ttySIM1",
         SerialSettings::default(),
@@ -259,6 +259,7 @@ async fn run_serial() -> Result<(), Box<dyn std::error::Error>> {
         Box::new(ExampleOutstationInformation),
         // customizable trait to process control requests from the master
         Box::new(ExampleControlHandler),
+        NullListener::create(),
     );
     // ANCHOR_END: create_serial_server
 
