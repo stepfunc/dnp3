@@ -69,6 +69,7 @@ impl Listener<PortState> for NullListener {
 ///
 /// **Note**: This function may only be called from within the runtime itself, and panics otherwise.
 /// Use Runtime::enter() if required.
+#[allow(clippy::too_many_arguments)]
 pub fn spawn_outstation_serial_2(
     path: &str,
     settings: SerialSettings,

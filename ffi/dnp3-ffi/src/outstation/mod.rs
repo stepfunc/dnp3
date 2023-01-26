@@ -217,24 +217,9 @@ pub unsafe fn outstation_create_serial_session(
     Ok(Box::into_raw(handle))
 }
 
-#[cfg(not(feature = "serial"))]
+/// This variant is just implemented in terms of another so we don't need feature checking
 #[allow(clippy::too_many_arguments)] // TODO
-pub unsafe fn outstation_create_serial_session_fault_tolerant(
-    _runtime: *mut crate::Runtime,
-    _serial_path: &CStr,
-    _settings: ffi::SerialSettings,
-    _open_retry_delay: std::time::Duration,
-    _config: ffi::OutstationConfig,
-    _application: ffi::OutstationApplication,
-    _information: ffi::OutstationInformation,
-    _control_handler: ffi::ControlHandler,
-) -> Result<*mut crate::Outstation, ffi::ParamError> {
-    Err(ffi::ParamError::NoSupport)
-}
-
-#[cfg(feature = "serial")]
-#[allow(clippy::too_many_arguments)] // TODO
-pub unsafe fn outstation_create_serial_session_fault_tolerant(
+pub(crate) unsafe fn outstation_create_serial_session_fault_tolerant(
     runtime: *mut crate::Runtime,
     serial_path: &CStr,
     settings: ffi::SerialSettings,
@@ -244,12 +229,60 @@ pub unsafe fn outstation_create_serial_session_fault_tolerant(
     information: ffi::OutstationInformation,
     control_handler: ffi::ControlHandler,
 ) -> Result<*mut crate::Outstation, ffi::ParamError> {
+    let port_listener = ffi::PortStateListener {
+        on_change: None,
+        on_destroy: None,
+        ctx: std::ptr::null_mut(),
+    };
+
+    outstation_create_serial_session_2(
+        runtime,
+        serial_path,
+        settings,
+        open_retry_delay,
+        config,
+        application,
+        information,
+        control_handler,
+        port_listener,
+    )
+}
+
+#[cfg(not(feature = "serial"))]
+#[allow(clippy::too_many_arguments)]
+pub(crate) unsafe fn outstation_create_serial_session_2(
+    _runtime: *mut crate::Runtime,
+    _serial_path: &CStr,
+    _settings: ffi::SerialSettings,
+    _open_retry_delay: std::time::Duration,
+    _config: ffi::OutstationConfig,
+    _application: ffi::OutstationApplication,
+    _information: ffi::OutstationInformation,
+    _control_handler: ffi::ControlHandler,
+    _port_listener: ffi::PortStateListener,
+) -> Result<*mut crate::Outstation, ffi::ParamError> {
+    Err(ffi::ParamError::NoSupport)
+}
+
+#[cfg(feature = "serial")]
+#[allow(clippy::too_many_arguments)]
+pub(crate) unsafe fn outstation_create_serial_session_2(
+    runtime: *mut crate::Runtime,
+    serial_path: &CStr,
+    settings: ffi::SerialSettings,
+    open_retry_delay: std::time::Duration,
+    config: ffi::OutstationConfig,
+    application: ffi::OutstationApplication,
+    information: ffi::OutstationInformation,
+    control_handler: ffi::ControlHandler,
+    port_listener: ffi::PortStateListener,
+) -> Result<*mut crate::Outstation, ffi::ParamError> {
     let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
     let serial_path = serial_path.to_string_lossy();
     let config = convert_outstation_config(config)?;
 
     let _enter = runtime.enter();
-    let handle = dnp3::serial::spawn_outstation_serial_fault_tolerant(
+    let handle = dnp3::serial::spawn_outstation_serial_2(
         &serial_path,
         settings.into(),
         config,
@@ -257,6 +290,7 @@ pub unsafe fn outstation_create_serial_session_fault_tolerant(
         Box::new(application),
         Box::new(information),
         Box::new(control_handler),
+        Box::new(port_listener),
     );
 
     let handle = Box::new(crate::Outstation {
@@ -267,7 +301,7 @@ pub unsafe fn outstation_create_serial_session_fault_tolerant(
     Ok(Box::into_raw(handle))
 }
 
-pub unsafe fn outstation_transaction(
+pub(crate) unsafe fn outstation_transaction(
     outstation: *mut Outstation,
     callback: ffi::DatabaseTransaction,
 ) {
