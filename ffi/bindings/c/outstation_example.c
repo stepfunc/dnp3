@@ -398,12 +398,18 @@ int run_outstation(dnp3_outstation_t *outstation)
         .analogOutputStatusValue = 0.0,
     };
 
-    char cbuf[6];
+    char cbuf[10];
     while (true) {
-        fgets(cbuf, 6, stdin);
+        fgets(cbuf, 10, stdin);
 
         if (strcmp(cbuf, "x\n") == 0) {
             return 0;
+        }
+        else if (strcmp(cbuf, "enable\n") == 0) {
+            dnp3_outstation_enable(outstation);
+        }
+        else if (strcmp(cbuf, "disable\n") == 0) {
+            dnp3_outstation_disable(outstation);
         }
         else if (strcmp(cbuf, "bi\n") == 0) {
             dnp3_database_transaction_t transaction = {

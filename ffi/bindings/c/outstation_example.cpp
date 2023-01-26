@@ -211,6 +211,12 @@ void run_outstation(dnp3::Outstation &outstation)
         if (cmd == "x") {
             return;
         }
+        else if (cmd == "enable") {
+            outstation.enable();
+        }
+        else if (cmd == "disable") {
+            outstation.disable();
+        }
         else if (cmd == "bi") {
             auto modify = database_transaction([&](Database &db) {
                 state.binary = !state.binary;
