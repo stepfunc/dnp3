@@ -55,8 +55,8 @@ impl From<Shutdown> for RunError {
 }
 
 enum SessionType {
-    Master(crate::master::task::MasterTask),
-    Outstation(crate::outstation::task::OutstationTask),
+    Master(Box<crate::master::task::MasterTask>),
+    Outstation(Box<crate::outstation::task::OutstationTask>),
 }
 
 /// Wrapper around a specific type of session (master or outstation)
@@ -70,13 +70,13 @@ pub(crate) struct Session {
 impl Session {
     pub(crate) fn master(task: crate::master::task::MasterTask) -> Self {
         Self {
-            inner: SessionType::Master(task),
+            inner: SessionType::Master(Box::new(task)),
         }
     }
 
     pub(crate) fn outstation(task: crate::outstation::task::OutstationTask) -> Self {
         Self {
-            inner: SessionType::Outstation(task),
+            inner: SessionType::Outstation(Box::new(task)),
         }
     }
 
