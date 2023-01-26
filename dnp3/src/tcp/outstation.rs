@@ -24,11 +24,11 @@ pub fn spawn_outstation_tcp_client(
     endpoints: EndpointList,
     connect_strategy: ConnectStrategy,
     connect_options: ConnectOptions,
-    listener: Box<dyn Listener<ClientState>>,
     config: OutstationConfig,
     application: Box<dyn OutstationApplication>,
     information: Box<dyn OutstationInformation>,
     control_handler: Box<dyn ControlHandler>,
+    listener: Box<dyn Listener<ClientState>>,
 ) -> OutstationHandle {
     let main_addr = endpoints.main_addr().to_string();
     let (task, handle) = OutstationTask::create(

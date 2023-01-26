@@ -39,13 +39,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     };
     match transport {
-        "tcp" => run_tcp().await,
+        "tcp" => run_tcp_server().await,
+        "tcp-client" => run_tcp_client().await,
         #[cfg(feature = "serial")]
         "serial" => run_serial().await,
         #[cfg(feature = "tls")]
-        "tls-ca" => run_tls(get_ca_chain_config()?).await,
+        "tls-ca" => run_tls_server(get_ca_chain_config()?).await,
         #[cfg(feature = "tls")]
-        "tls-self-signed" => run_tls(get_self_signed_config()?).await,
+        "tls-self-signed" => run_tls_server(get_self_signed_config()?).await,
         _ => {
             eprintln!(
                 "unknown transport '{}', options are (tcp, serial, tls-ca, tls-self-signed)",
@@ -236,12 +237,28 @@ impl ControlSupport<Group41Var4> for ExampleControlHandler {
 }
 // ANCHOR_END: control_handler
 
-async fn run_tcp() -> Result<(), Box<dyn std::error::Error>> {
+async fn run_tcp_server() -> Result<(), Box<dyn std::error::Error>> {
     // ANCHOR: create_tcp_server
     let server = Server::new_tcp_server(LinkErrorMode::Close, "127.0.0.1:20000".parse()?);
     // ANCHOR_END: create_tcp_server
 
-    run_tcp_server(server).await
+    run_server(server).await
+}
+
+async fn run_tcp_client() -> Result<(), Box<dyn std::error::Error>> {
+    let outstation = spawn_outstation_tcp_client(
+        LinkErrorMode::Close,
+        EndpointList::single("127.0.0.1:20000".to_string()),
+        ConnectStrategy::default(),
+        ConnectOptions::default(),
+        get_outstation_config(),
+        Box::new(ExampleOutstationApplication),
+        Box::new(ExampleOutstationInformation),
+        Box::new(ExampleControlHandler),
+        NullListener::create(),
+    );
+
+    run_outstation(outstation).await
 }
 
 #[cfg(feature = "serial")]
@@ -267,15 +284,15 @@ async fn run_serial() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[cfg(feature = "tls")]
-async fn run_tls(config: TlsServerConfig) -> Result<(), Box<dyn std::error::Error>> {
+async fn run_tls_server(config: TlsServerConfig) -> Result<(), Box<dyn std::error::Error>> {
     // ANCHOR: create_tls_server
     let server = Server::new_tls_server(LinkErrorMode::Close, "127.0.0.1:20001".parse()?, config);
     // ANCHOR_END: create_tls_server
 
-    run_tcp_server(server).await
+    run_server(server).await
 }
 
-async fn run_tcp_server(mut server: Server) -> Result<(), Box<dyn std::error::Error>> {
+async fn run_server(mut server: Server) -> Result<(), Box<dyn std::error::Error>> {
     // ANCHOR: tcp_server_spawn_outstation
     let outstation = server.add_outstation(
         get_outstation_config(),
