@@ -289,6 +289,20 @@ pub unsafe fn outstation_set_decode_level(
     Ok(())
 }
 
+pub unsafe fn outstation_enable(outstation: *mut crate::Outstation) -> Result<(), ffi::ParamError> {
+    let outstation = outstation.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    outstation.runtime.block_on(outstation.handle.enable())??;
+    Ok(())
+}
+
+pub unsafe fn outstation_disable(
+    outstation: *mut crate::Outstation,
+) -> Result<(), ffi::ParamError> {
+    let outstation = outstation.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    outstation.runtime.block_on(outstation.handle.disable())??;
+    Ok(())
+}
+
 fn convert_outstation_config(
     config: ffi::OutstationConfig,
 ) -> Result<OutstationConfig, ffi::ParamError> {

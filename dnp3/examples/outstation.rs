@@ -343,7 +343,9 @@ async fn run_tcp_server(mut server: Server) -> Result<(), Box<dyn std::error::Er
 }
 
 // run the same logic regardless of the transport type
-async fn run_outstation(mut outstation: OutstationHandle) -> Result<(), Box<dyn std::error::Error>> {
+async fn run_outstation(
+    mut outstation: OutstationHandle,
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut binary_input_value = false;
     let mut double_bit_binary_input_value = DoubleBit::DeterminedOff;
     let mut binary_output_status_value = false;

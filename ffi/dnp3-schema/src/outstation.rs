@@ -273,11 +273,25 @@ fn define_outstation(
         .doc("Set decoding log level")?
         .build()?;
 
+    let enable = lib
+        .define_method("enable", outstation.clone())?
+        .fails_with(shared_def.error_type.clone())?
+        .doc("enable communications")?
+        .build()?;
+
+    let disable = lib
+        .define_method("disable", outstation.clone())?
+        .fails_with(shared_def.error_type.clone())?
+        .doc("disable communications")?
+        .build()?;
+
     let outstation = lib
         .define_class(&outstation)?
         .destructor(destructor)?
         .static_method(outstation_create_serial_session_fn)?
         .static_method(outstation_create_serial_session_fault_tolerant_fn)?
+        .method(enable)?
+        .method(disable)?
         .method(execute_transaction)?
         .method(set_decode_level)?
         .doc(doc("Outstation handle").details("Use this handle to modify the internal database."))?
