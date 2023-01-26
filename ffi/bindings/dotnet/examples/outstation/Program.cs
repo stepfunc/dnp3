@@ -481,6 +481,16 @@ class ExampleOutstation
             {
                 case "x":
                     return;
+                case "enable":
+                    {
+                        outstation.Enable();
+                        break;
+                    }
+                case "disable":
+                    {
+                        outstation.Disable();
+                        break;
+                    }
                 case "bi":
                     {
                         outstation.Transaction(db =>
