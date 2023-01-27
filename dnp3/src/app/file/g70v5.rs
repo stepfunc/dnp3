@@ -1,4 +1,5 @@
 use super::*;
+use crate::app::format::WriteError;
 use scursor::{ReadCursor, WriteCursor};
 
 /// Group 70 Variation 5 - file transport

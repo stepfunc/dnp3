@@ -1,4 +1,5 @@
 use super::*;
+use crate::app::format::WriteError;
 use crate::app::Timestamp;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -45,7 +46,7 @@ impl<'a> Group70Var7<'a> {
 
     pub(crate) fn write(&self, cursor: &mut scursor::WriteCursor) -> Result<(), WriteError> {
         cursor.write_u16_le(Self::FILE_NAME_OFFSET)?;
-        cursor.write_u16_le(length(self.file_name)?)?;
+        cursor.write_u16_le(byte_length(self.file_name)?)?;
         cursor.write_u16_le(self.file_type.to_u16())?;
         cursor.write_u32_le(self.file_size)?;
         self.time_of_creation.write(cursor)?;

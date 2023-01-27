@@ -1,5 +1,6 @@
 use super::permissions::*;
 use super::*;
+use crate::app::format::WriteError;
 use crate::app::Timestamp;
 use scursor::{ReadCursor, WriteCursor};
 
@@ -60,7 +61,7 @@ impl<'a> Group70Var3<'a> {
 
     pub(crate) fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u16_le(Self::FILE_NAME_OFFSET)?;
-        cursor.write_u16_le(length(self.file_name)?)?;
+        cursor.write_u16_le(byte_length(self.file_name)?)?;
         self.time_of_creation.write(cursor)?;
         self.permissions.write(cursor)?;
         cursor.write_u32_le(self.auth_key)?;

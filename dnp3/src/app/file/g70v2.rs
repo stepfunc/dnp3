@@ -1,4 +1,5 @@
 use super::*;
+use crate::app::format::WriteError;
 use scursor::{ReadCursor, WriteCursor};
 
 /// Group 70 Variation 3 - authentication
@@ -17,7 +18,7 @@ impl<'a> Group70Var2<'a> {
 
     pub(crate) fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u16_le(Self::USER_NAME_OFFSET)?;
-        let user_name_size = length(self.user_name)?;
+        let user_name_size = byte_length(self.user_name)?;
         cursor.write_u16_le(user_name_size)?;
 
         let password_offset = match Self::USER_NAME_OFFSET.checked_add(user_name_size) {
@@ -26,7 +27,7 @@ impl<'a> Group70Var2<'a> {
         };
 
         cursor.write_u16_le(password_offset)?;
-        let password_size = length(self.password)?;
+        let password_size = byte_length(self.password)?;
 
         cursor.write_u16_le(password_size)?;
         cursor.write_u32_le(self.auth_key)?;

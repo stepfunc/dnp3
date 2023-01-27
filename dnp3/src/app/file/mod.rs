@@ -102,21 +102,8 @@ impl FileStatus {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-struct Overflow;
-
-impl From<Overflow> for WriteError {
-    fn from(_: Overflow) -> Self {
-        WriteError::Overflow
-    }
-}
-
-fn to_u16<X: TryInto<u16>>(x: X) -> Result<u16, Overflow> {
-    x.try_into().map_err(|_| Overflow)
-}
-
-fn length(s: &str) -> Result<u16, Overflow> {
-    to_u16(s.len())
+fn byte_length(s: &str) -> Result<u16, crate::app::format::Overflow> {
+    crate::app::format::to_u16(s.as_bytes().len())
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -129,20 +116,6 @@ pub(crate) enum ReadError {
     Overflow,
     /// A string is not UTF8 encoded
     BadString(Utf8Error),
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub(crate) enum WriteError {
-    /// Cursor error
-    WriteError(scursor::WriteError),
-    /// The provided data would overflow the u16 representation
-    Overflow,
-}
-
-impl From<scursor::WriteError> for WriteError {
-    fn from(value: scursor::WriteError) -> Self {
-        Self::WriteError(value)
-    }
 }
 
 impl From<scursor::ReadError> for ReadError {
