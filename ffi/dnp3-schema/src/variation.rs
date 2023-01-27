@@ -249,17 +249,24 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
         )?
         .push(gv(52, 1), "Time delay - Coarse")?
         .push(gv(52, 2), "Time delay - Fine")?
+        // class requests
         .push(gv(60, 1), "Class objects - Class 0 data")?
         .push(gv(60, 2), "Class objects - Class 1 data")?
         .push(gv(60, 3), "Class objects - Class 2 data")?
         .push(gv(60, 4), "Class objects - Class 3 data")?
+        // file control
+        .push(gv(70, 2), "File control - authentication")?
+        .push(gv(70, 3), "File control - file command")?
+        .push(gv(70, 4), "File control - file command status")?
+        .push(gv(70, 5), "File control - file transport")?
+        .push(gv(70, 6), "File control - file transport status")?
+        .push(gv(70, 7), "File control - file descriptor")?
+        .push(gv(70, 8), "File control - file specification string")?
+        // iin
         .push(gv(80, 1), "Internal Indications - Packed format")?
+        // octet strings
         .push("group110", "Octet String")?
         .push("group111", "Octet String Event")?
-        /*
-        .push("group112", "Virtual Terminal Output Block")?
-        .push("group113", "Virtual Terminal Event Data")?
-         */
         .doc("Group/Variation")?
         .build()?;
 

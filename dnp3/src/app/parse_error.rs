@@ -6,7 +6,7 @@ use crate::app::variations::Variation;
 use crate::app::{FunctionCode, QualifierCode};
 
 use crate::app::attr::AttrParseError;
-use scursor::ReadError;
+use scursor::{ReadError, TrailingBytes};
 
 /// Errors that occur when parsing an application layer header
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -38,6 +38,14 @@ pub enum ObjectParseError {
     ZeroLengthOctetData,
     /// Device attribute parsing error
     BadAttribute(AttrParseError),
+    /// Object is not properly encoded
+    BadEncoding,
+}
+
+impl From<TrailingBytes> for ObjectParseError {
+    fn from(_: TrailingBytes) -> Self {
+        Self::BadEncoding
+    }
 }
 
 /// Errors that occur when interpreting a header as a request header
@@ -107,6 +115,7 @@ impl std::fmt::Display for ObjectParseError {
                 f.write_str("octet-data may not be zero length")
             }
             ObjectParseError::BadAttribute(x) => write!(f, "{x}"),
+            ObjectParseError::BadEncoding => f.write_str("Object is not properly encoded"),
         }
     }
 }

@@ -109,6 +109,7 @@ impl ReadHeader {
             }
             HeaderDetails::OneByteCountAndPrefix(_, _) => None,
             HeaderDetails::TwoByteCountAndPrefix(_, _) => None,
+            HeaderDetails::TwoByteFreeFormat(_, _) => None,
         }
     }
 

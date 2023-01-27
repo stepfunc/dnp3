@@ -2170,6 +2170,7 @@ impl From<ObjectParseError> for Iin2 {
             ObjectParseError::UnknownQualifier(_) => Iin2::PARAMETER_ERROR,
             ObjectParseError::ZeroLengthOctetData => Iin2::PARAMETER_ERROR,
             ObjectParseError::BadAttribute(_) => Iin2::PARAMETER_ERROR,
+            ObjectParseError::BadEncoding => Iin2::PARAMETER_ERROR,
         }
     }
 }

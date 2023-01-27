@@ -33,7 +33,7 @@ object ObjectGroup {
     Group51,
     Group52,
     Group60,
-    //Group70,
+    Group70,
     Group80,
     Group110,
     Group111,
