@@ -23,6 +23,8 @@ pub(crate) mod auto;
 pub(crate) mod command;
 pub(crate) mod deadbands;
 pub(crate) mod empty_response;
+#[allow(dead_code)]
+pub(crate) mod file_read;
 pub(crate) mod read;
 pub(crate) mod restart;
 pub(crate) mod time;

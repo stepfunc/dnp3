@@ -1,6 +1,6 @@
 use scursor::{ReadCursor, WriteCursor};
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct Permission {
     pub(crate) execute: bool,
     pub(crate) write: bool,
@@ -31,7 +31,7 @@ impl Permission {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct Permissions {
     pub(crate) world: Permission,
     pub(crate) group: Permission,

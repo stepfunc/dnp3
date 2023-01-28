@@ -1,4 +1,4 @@
-use crate::app::file::{Group70Var2, Group70Var5};
+use crate::app::file::{Group70Var2, Group70Var3, Group70Var4, Group70Var5};
 use crate::app::format::WriteError;
 use crate::app::Variation;
 use scursor::WriteCursor;
@@ -11,6 +11,22 @@ pub(crate) trait FreeFormat {
 
 impl<'a> FreeFormat for Group70Var2<'a> {
     const VARIATION: Variation = Variation::Group70Var2;
+
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        self.write(cursor)
+    }
+}
+
+impl<'a> FreeFormat for Group70Var3<'a> {
+    const VARIATION: Variation = Variation::Group70Var3;
+
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        self.write(cursor)
+    }
+}
+
+impl<'a> FreeFormat for Group70Var4<'a> {
+    const VARIATION: Variation = Variation::Group70Var4;
 
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         self.write(cursor)
