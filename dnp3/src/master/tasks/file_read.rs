@@ -42,58 +42,6 @@ pub(crate) struct FileReadTask {
 }
 
 impl FileReadTask {
-    fn write_auth(auth: &AuthData, writer: &mut HeaderWriter) -> Result<(), WriteError> {
-        let obj = Group70Var2 {
-            auth_key: 0,
-            user_name: &auth.user_name,
-            password: &auth.password,
-        };
-        writer.write_free_format(&obj)
-    }
-
-    fn write_open(
-        settings: &Settings,
-        key: AuthKey,
-        writer: &mut HeaderWriter,
-    ) -> Result<(), WriteError> {
-        let obj = Group70Var3 {
-            time_of_creation: Timestamp::zero(),
-            permissions: Permissions::default(),
-            auth_key: key.0,
-            file_size: 0,
-            mode: FileMode::Read,
-            max_block_size: settings.max_block_size,
-            request_id: 4, // TODO
-            file_name: &settings.name.0,
-        };
-        writer.write_free_format(&obj)
-    }
-
-    fn write_read(
-        handle: FileHandle,
-        block: BlockNumber,
-        writer: &mut HeaderWriter,
-    ) -> Result<(), WriteError> {
-        let obj = Group70Var5 {
-            file_handle: handle.0,
-            block_number: block.0,
-            file_data: &[],
-        };
-        writer.write_free_format(&obj)
-    }
-
-    fn write_close(handle: FileHandle, writer: &mut HeaderWriter) -> Result<(), WriteError> {
-        let obj = Group70Var4 {
-            file_handle: handle.0,
-            file_size: 0,
-            max_block_size: 0,
-            request_id: 5, // TODO
-            status_code: FileStatus::Success,
-            text: "",
-        };
-        writer.write_free_format(&obj)
-    }
-
     pub(crate) fn auth(settings: Settings, auth: AuthData) -> Self {
         Self {
             settings,
@@ -119,10 +67,62 @@ impl FileReadTask {
 
     pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
         match &self.state {
-            State::GetAuth(auth) => Self::write_auth(auth, writer),
-            State::Open(auth) => Self::write_open(&self.settings, *auth, writer),
-            State::Read(handle, block) => Self::write_read(*handle, *block, writer),
-            State::Close(handle) => Self::write_close(*handle, writer),
+            State::GetAuth(auth) => write_auth(auth, writer),
+            State::Open(auth) => write_open(&self.settings, *auth, writer),
+            State::Read(handle, block) => write_read(*handle, *block, writer),
+            State::Close(handle) => write_close(*handle, writer),
         }
     }
+}
+
+fn write_auth(auth: &AuthData, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    let obj = Group70Var2 {
+        auth_key: 0,
+        user_name: &auth.user_name,
+        password: &auth.password,
+    };
+    writer.write_free_format(&obj)
+}
+
+fn write_open(
+    settings: &Settings,
+    key: AuthKey,
+    writer: &mut HeaderWriter,
+) -> Result<(), WriteError> {
+    let obj = Group70Var3 {
+        time_of_creation: Timestamp::zero(),
+        permissions: Permissions::default(),
+        auth_key: key.0,
+        file_size: 0,
+        mode: FileMode::Read,
+        max_block_size: settings.max_block_size,
+        request_id: 4, // TODO
+        file_name: &settings.name.0,
+    };
+    writer.write_free_format(&obj)
+}
+
+fn write_read(
+    handle: FileHandle,
+    block: BlockNumber,
+    writer: &mut HeaderWriter,
+) -> Result<(), WriteError> {
+    let obj = Group70Var5 {
+        file_handle: handle.0,
+        block_number: block.0,
+        file_data: &[],
+    };
+    writer.write_free_format(&obj)
+}
+
+fn write_close(handle: FileHandle, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    let obj = Group70Var4 {
+        file_handle: handle.0,
+        file_size: 0,
+        max_block_size: 0,
+        request_id: 5, // TODO
+        status_code: FileStatus::Success,
+        text: "",
+    };
+    writer.write_free_format(&obj)
 }
