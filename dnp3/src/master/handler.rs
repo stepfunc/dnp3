@@ -15,11 +15,12 @@ use crate::master::request::{CommandHeaders, CommandMode, ReadRequest, TimeSyncP
 use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::deadbands::WriteDeadBandsTask;
 use crate::master::tasks::empty_response::EmptyResponseTask;
+use crate::master::tasks::file_read::FileReadTask;
 use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::restart::{RestartTask, RestartType};
 use crate::master::tasks::time::TimeSyncTask;
-use crate::master::tasks::Task;
-use crate::master::{DeadBandHeader, Headers, WriteError};
+use crate::master::tasks::{NonReadTask, Task};
+use crate::master::{DeadBandHeader, FileReader, Headers, WriteError};
 use crate::util::channel::Sender;
 use crate::util::session::Enabled;
 
@@ -308,6 +309,21 @@ impl AssociationHandle {
         self.send_task(Task::LinkStatus(Promise::OneShot(tx)))
             .await?;
         rx.await?
+    }
+
+    /// Read a file without authentication
+    pub async fn read_file(
+        &mut self,
+        file_path: String,
+        max_block_size: u16,
+        reader: Box<dyn FileReader>,
+    ) -> Result<(), Shutdown> {
+        let task = Task::NonRead(NonReadTask::FileRead(FileReadTask::open(
+            file_path,
+            max_block_size,
+            reader,
+        )));
+        self.send_task(task).await
     }
 
     async fn send_task(&mut self, task: Task) -> Result<(), Shutdown> {

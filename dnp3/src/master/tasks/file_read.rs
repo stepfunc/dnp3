@@ -91,7 +91,16 @@ impl FileReadTask {
         Self::new(settings, State::GetAuth(auth))
     }
 
-    pub(crate) fn open(settings: Settings) -> Self {
+    pub(crate) fn open(
+        file_name: String,
+        max_block_size: u16,
+        reader: Box<dyn FileReader>,
+    ) -> Self {
+        let settings = Settings {
+            name: Filename(file_name),
+            max_block_size,
+            reader,
+        };
         Self::new(settings, State::Open(AuthKey::default()))
     }
 
@@ -117,11 +126,14 @@ impl FileReadTask {
         self.settings.reader.aborted(FileReadError::TaskError(err));
     }
 
-    pub(crate) fn handle(self, response: Response) -> Option<NonReadTask> {
+    pub(crate) fn handle(mut self, response: Response) -> Option<NonReadTask> {
         let headers = match response.objects {
             Ok(x) => x,
             Err(err) => {
                 tracing::warn!("File operation received malformed response: {err}");
+                self.settings
+                    .reader
+                    .aborted(FileReadError::TaskError(TaskError::MalformedResponse(err)));
                 return None;
             }
         };
@@ -129,6 +141,9 @@ impl FileReadTask {
         let header = match headers.get_only_header() {
             None => {
                 tracing::warn!("File operation response contains unexpected number of headers");
+                self.settings.reader.aborted(FileReadError::TaskError(
+                    TaskError::UnexpectedResponseHeaders,
+                ));
                 return None;
             }
             Some(x) => x,

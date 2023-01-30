@@ -175,6 +175,13 @@ impl TestHarness {
         );
     }
 
+    pub(crate) async fn pop_write(&mut self) -> Vec<u8> {
+        match self.io.next_event().await {
+            sfio_tokio_mock_io::Event::Write(data) => data,
+            _ => unreachable!(),
+        }
+    }
+
     pub(crate) async fn expect_write_and_respond(&mut self, expected: Vec<u8>, response: Vec<u8>) {
         self.expect_write(expected).await;
         self.process_response(response).await;

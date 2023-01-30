@@ -1,7 +1,7 @@
 use crate::app::file::FileStatus;
 
 /// Errors that can occur during a file read operation
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(not(feature = "ffi"), non_exhaustive)]
 pub enum FileReadError {
     /// Outstation returned a bad response
