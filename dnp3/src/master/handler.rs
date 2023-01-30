@@ -20,7 +20,7 @@ use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::restart::{RestartTask, RestartType};
 use crate::master::tasks::time::TimeSyncTask;
 use crate::master::tasks::{NonReadTask, Task};
-use crate::master::{DeadBandHeader, FileReader, Headers, WriteError};
+use crate::master::{DeadBandHeader, FileCredentials, FileReader, Headers, WriteError};
 use crate::util::channel::Sender;
 use crate::util::session::Enabled;
 
@@ -317,13 +317,15 @@ impl AssociationHandle {
         file_path: String,
         max_block_size: u16,
         reader: Box<dyn FileReader>,
+        credentials: Option<FileCredentials>,
     ) -> Result<(), Shutdown> {
-        let task = Task::NonRead(NonReadTask::FileRead(FileReadTask::open(
+        let task = FileReadTask::start(
             file_path,
             max_block_size,
             reader,
-        )));
-        self.send_task(task).await
+            credentials
+        );
+        self.send_task(Task::NonRead(NonReadTask::FileRead(task))).await
     }
 
     async fn send_task(&mut self, task: Task) -> Result<(), Shutdown> {

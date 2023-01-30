@@ -1,5 +1,14 @@
 use crate::app::file::FileStatus;
 
+/// Credentials for obtaining a file authorization token from the outstation
+#[derive(Clone, Debug)]
+pub struct FileCredentials {
+    /// User name
+    pub user_name: String,
+    /// Password
+    pub password: String,
+}
+
 /// Errors that can occur during a file read operation
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(not(feature = "ffi"), non_exhaustive)]

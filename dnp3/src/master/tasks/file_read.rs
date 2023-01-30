@@ -5,12 +5,9 @@ use crate::app::parse::free_format::FreeFormatVariation;
 use crate::app::parse::parser::{HeaderDetails, ObjectHeader, Response};
 use crate::app::{FunctionCode, Timestamp};
 use crate::master::tasks::NonReadTask;
-use crate::master::{FileReadError, FileReader, TaskError};
+use crate::master::{FileReadError, FileReader, TaskError, FileCredentials};
 
-pub(crate) struct AuthData {
-    pub(crate) user_name: String,
-    pub(crate) password: String,
-}
+
 
 pub(crate) struct Filename(pub(crate) String);
 
@@ -66,7 +63,7 @@ impl ReadState {
 /// States of the file transfer
 enum State {
     /// Obtain and authentication key using file name and authentication data
-    GetAuth(AuthData),
+    GetAuth(FileCredentials),
     /// Open the file - We might state in this state w/ the default AuthKey if auth not required
     Open(AuthKey),
     /// Read the next block
@@ -87,21 +84,22 @@ impl FileReadTask {
         Self { settings, state }
     }
 
-    pub(crate) fn auth(settings: Settings, auth: AuthData) -> Self {
-        Self::new(settings, State::GetAuth(auth))
-    }
-
-    pub(crate) fn open(
+    pub(crate) fn start(
         file_name: String,
         max_block_size: u16,
         reader: Box<dyn FileReader>,
+        credentials: Option<FileCredentials>,
     ) -> Self {
         let settings = Settings {
             name: Filename(file_name),
             max_block_size,
             reader,
         };
-        Self::new(settings, State::Open(AuthKey::default()))
+        let state = match credentials {
+            None => State::Open(AuthKey::default()),
+            Some(x) => State::GetAuth(x),
+        };
+        Self::new(settings, state)
     }
 
     pub(crate) fn function(&self) -> FunctionCode {
@@ -312,11 +310,11 @@ impl FileReadTask {
     }
 }
 
-fn write_auth(auth: &AuthData, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+fn write_auth(credentials: &FileCredentials, writer: &mut HeaderWriter) -> Result<(), WriteError> {
     let obj = Group70Var2 {
         auth_key: 0,
-        user_name: &auth.user_name,
-        password: &auth.password,
+        user_name: &credentials.user_name,
+        password: &credentials.password,
     };
     writer.write_free_format(&obj)
 }
