@@ -18,8 +18,9 @@ pub(crate) use g70v7::*;
 pub(crate) use g70v8::*;
 pub(crate) use permissions::*;
 
+/// File status enumeration used Group 70 objects
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub(crate) enum FileStatus {
+pub enum FileStatus {
     /// Requested operation was successful
     Success,
     /// Permission was denied due to improper authentication key, user name, or password
