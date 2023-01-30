@@ -5,9 +5,7 @@ use crate::app::parse::free_format::FreeFormatVariation;
 use crate::app::parse::parser::{HeaderDetails, ObjectHeader, Response};
 use crate::app::{FunctionCode, Timestamp};
 use crate::master::tasks::NonReadTask;
-use crate::master::{FileReadError, FileReader, TaskError, FileCredentials};
-
-
+use crate::master::{FileCredentials, FileReadError, FileReader, TaskError};
 
 pub(crate) struct Filename(pub(crate) String);
 
@@ -39,10 +37,52 @@ impl PartialEq for BlockNumber {
     }
 }
 
+pub(crate) struct FileReadCallbacks {
+    inner: Option<Box<dyn FileReader>>,
+}
+
+impl FileReader for FileReadCallbacks {
+    fn opened(&mut self, size: u32) -> bool {
+        if let Some(x) = self.inner.as_mut() {
+            x.opened(size)
+        } else {
+            false
+        }
+    }
+
+    fn block_received(&mut self, block_num: u32, data: &[u8]) -> bool {
+        if let Some(x) = self.inner.as_mut() {
+            x.block_received(block_num, data)
+        } else {
+            false
+        }
+    }
+
+    fn aborted(&mut self, err: FileReadError) {
+        if let Some(mut x) = self.inner.take() {
+            x.aborted(err);
+        }
+    }
+
+    fn completed(&mut self) {
+        if let Some(mut x) = self.inner.take() {
+            x.completed();
+        }
+    }
+}
+
+impl Drop for FileReadCallbacks {
+    fn drop(&mut self) {
+        if let Some(mut x) = self.inner.take() {
+            x.aborted(FileReadError::TaskError(TaskError::Shutdown));
+        }
+    }
+}
+
 pub(crate) struct Settings {
     pub(crate) name: Filename,
     pub(crate) max_block_size: u16,
-    pub(crate) reader: Box<dyn FileReader>,
+    pub(crate) reader: FileReadCallbacks,
 }
 
 #[derive(Copy, Clone)]
@@ -93,7 +133,9 @@ impl FileReadTask {
         let settings = Settings {
             name: Filename(file_name),
             max_block_size,
-            reader,
+            reader: FileReadCallbacks {
+                inner: Some(reader),
+            },
         };
         let state = match credentials {
             None => State::Open(AuthKey::default()),
@@ -233,7 +275,7 @@ impl FileReadTask {
         header: ObjectHeader,
     ) -> Option<FileReadTask> {
         fn inner(
-            reader: &mut dyn FileReader,
+            reader: &mut FileReadCallbacks,
             rs: ReadState,
             header: ObjectHeader,
         ) -> Result<Option<ReadState>, FileReadError> {
@@ -274,7 +316,7 @@ impl FileReadTask {
             })
         }
 
-        match inner(settings.reader.as_mut(), rs, header) {
+        match inner(&mut settings.reader, rs, header) {
             Ok(None) => {
                 settings.reader.completed();
                 Some(FileReadTask::new(settings, State::Close(rs.handle)))

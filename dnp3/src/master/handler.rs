@@ -319,13 +319,9 @@ impl AssociationHandle {
         reader: Box<dyn FileReader>,
         credentials: Option<FileCredentials>,
     ) -> Result<(), Shutdown> {
-        let task = FileReadTask::start(
-            file_path,
-            max_block_size,
-            reader,
-            credentials
-        );
-        self.send_task(Task::NonRead(NonReadTask::FileRead(task))).await
+        let task = FileReadTask::start(file_path, max_block_size, reader, credentials);
+        self.send_task(Task::NonRead(NonReadTask::FileRead(task)))
+            .await
     }
 
     async fn send_task(&mut self, task: Task) -> Result<(), Shutdown> {
