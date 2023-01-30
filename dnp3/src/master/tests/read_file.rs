@@ -31,11 +31,17 @@ struct EventHandle {
 }
 
 impl EventHandle {
-    fn events(&self) -> Vec<Event> {
+    fn pop_all(&self) -> Vec<Event> {
         let mut state = self.state.lock().unwrap();
         let mut ret = Vec::new();
         std::mem::swap(&mut state.events, &mut ret);
         ret
+    }
+
+    fn expect_one(&self) -> Event {
+        let mut events = self.pop_all();
+        assert_eq!(events.len(), 1);
+        events.remove(0)
     }
 }
 
@@ -77,15 +83,6 @@ impl FileReader for MockReader {
     }
 }
 
-fn file_open() -> Vec<u8> {
-    [
-        0xC0, 25, // open file
-        70, 3, 0x5B, // free format
-        36,   // 36- bytes
-    ]
-    .to_vec()
-}
-
 fn file_open_response() -> Vec<u8> {
     [0xC0, 0x81, 0x00, 0x00].to_vec()
 }
@@ -94,7 +91,7 @@ fn file_open_response() -> Vec<u8> {
 async fn can_read_file() {
     let config = AssociationConfig::quiet();
     let mut harness = create_association(config).await;
-    let (handle, reader) = pair();
+    let (events, reader) = pair();
     harness
         .association
         .read_file("./test.txt".to_string(), 1024, reader)
@@ -107,10 +104,9 @@ async fn can_read_file() {
     harness.process_response(file_open_response()).await;
 
     assert_eq!(
-        handle.events().as_slice(),
-        [Event::Abort(FileReadError::TaskError(
+        events.expect_one(),
+        Event::Abort(FileReadError::TaskError(
             TaskError::UnexpectedResponseHeaders
-        ))]
-        .as_slice()
+        ))
     );
 }
