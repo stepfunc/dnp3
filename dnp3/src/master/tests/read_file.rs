@@ -1,3 +1,4 @@
+use crate::app::FileStatus;
 use std::sync::{Arc, Mutex};
 
 use crate::master::association::AssociationConfig;
@@ -21,7 +22,6 @@ struct State {
 
 impl State {
     fn push(&mut self, event: Event) {
-        println!("Event: {:?}", event);
         self.events.push(event);
     }
 }
@@ -83,8 +83,30 @@ impl FileReader for MockReader {
     }
 }
 
-fn file_open_response() -> Vec<u8> {
-    [0xC0, 0x81, 0x00, 0x00].to_vec()
+#[tokio::test]
+async fn aborts_when_no_object_header() {
+    let config = AssociationConfig::quiet();
+    let mut harness = create_association(config).await;
+    let (events, reader) = pair();
+    harness
+        .association
+        .read_file("./test.txt".to_string(), 1024, reader)
+        .await
+        .unwrap();
+
+    // check that its a file open request
+    assert_eq!(harness.pop_write().await[..5], [0xC0, 25, 70, 3, 0x5B]);
+
+    harness
+        .process_response([0xC0, 0x81, 0x00, 0x00].to_vec())
+        .await;
+
+    assert_eq!(
+        events.expect_one(),
+        Event::Abort(FileReadError::TaskError(
+            TaskError::UnexpectedResponseHeaders
+        ))
+    );
 }
 
 #[tokio::test]
@@ -101,12 +123,40 @@ async fn can_read_file() {
     // check that its a file open request
     assert_eq!(harness.pop_write().await[..5], [0xC0, 25, 70, 3, 0x5B]);
 
-    harness.process_response(file_open_response()).await;
+    harness
+        .process_response(file_status(0xDEADCAFE, 24, FileStatus::Success))
+        .await;
 
-    assert_eq!(
-        events.expect_one(),
-        Event::Abort(FileReadError::TaskError(
-            TaskError::UnexpectedResponseHeaders
-        ))
-    );
+    assert_eq!(events.expect_one(), Event::Open(24),);
+}
+
+fn file_status(file_handle: u32, file_size: u32, status: FileStatus) -> Vec<u8> {
+    let fh_bytes = file_handle.to_le_bytes();
+    let fs_bytes = file_size.to_le_bytes();
+
+    [
+        0xC0,
+        0x81,
+        0x00,
+        0x00,
+        70,
+        4,
+        0x5B,
+        13, // length
+        00,
+        fh_bytes[0], // file handle
+        fh_bytes[1],
+        fh_bytes[2],
+        fh_bytes[3],
+        fs_bytes[0], // file size
+        fs_bytes[1],
+        fs_bytes[2],
+        fs_bytes[3],
+        0x00, // max block size
+        0x40,
+        0x00, // request id
+        0x00,
+        status.to_u8(),
+    ]
+    .to_vec()
 }

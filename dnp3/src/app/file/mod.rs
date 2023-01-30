@@ -80,7 +80,7 @@ impl FileStatus {
         }
     }
 
-    fn to_u8(self) -> u8 {
+    pub(crate) fn to_u8(self) -> u8 {
         match self {
             FileStatus::Success => 0,
             FileStatus::PermissionDenied => 1,
