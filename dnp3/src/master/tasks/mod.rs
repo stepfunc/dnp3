@@ -18,6 +18,7 @@ use crate::master::{ReadType, TaskType};
 
 use crate::master::tasks::deadbands::WriteDeadBandsTask;
 use crate::master::tasks::empty_response::EmptyResponseTask;
+use crate::master::tasks::file_read::FileReadTask;
 
 pub(crate) mod auto;
 pub(crate) mod command;
@@ -119,6 +120,8 @@ pub(crate) enum NonReadTask {
     DeadBands(WriteDeadBandsTask),
     /// Generic task for anything that doesn't have response object headers
     EmptyResponseTask(EmptyResponseTask),
+    /// read file from the outstation
+    FileRead(FileReadTask),
 }
 
 impl RequestWriter for ReadTask {
@@ -150,8 +153,15 @@ impl RequestWriter for NonReadTask {
             NonReadTask::Restart(_) => {}
             NonReadTask::DeadBands(t) => t.write(writer)?,
             NonReadTask::EmptyResponseTask(t) => t.write(writer)?,
+            NonReadTask::FileRead(t) => t.write(writer)?,
         }
         Ok(())
+    }
+}
+
+impl From<crate::app::format::WriteError> for TaskError {
+    fn from(_: crate::app::format::WriteError) -> Self {
+        TaskError::WriteError
     }
 }
 
@@ -234,34 +244,37 @@ impl NonReadTask {
 
     pub(crate) fn start(self, association: &mut Association) -> Option<NonReadTask> {
         match self {
-            NonReadTask::Command(_) => Some(self),
-            NonReadTask::Auto(_) => Some(self),
-            NonReadTask::TimeSync(task) => task.start(association).map(|task| task.wrap()),
-            NonReadTask::Restart(_) => Some(self),
-            NonReadTask::DeadBands(_) => Some(self),
-            NonReadTask::EmptyResponseTask(_) => Some(self),
+            Self::Command(_) => Some(self),
+            Self::Auto(_) => Some(self),
+            Self::TimeSync(task) => task.start(association).map(|task| task.wrap()),
+            Self::Restart(_) => Some(self),
+            Self::DeadBands(_) => Some(self),
+            Self::EmptyResponseTask(_) => Some(self),
+            Self::FileRead(_) => Some(self),
         }
     }
 
     pub(crate) fn function(&self) -> FunctionCode {
         match self {
-            NonReadTask::Command(task) => task.function(),
-            NonReadTask::Auto(task) => task.function(),
-            NonReadTask::TimeSync(task) => task.function(),
-            NonReadTask::Restart(task) => task.function(),
-            NonReadTask::DeadBands(task) => task.function(),
-            NonReadTask::EmptyResponseTask(task) => task.function(),
+            Self::Command(task) => task.function(),
+            Self::Auto(task) => task.function(),
+            Self::TimeSync(task) => task.function(),
+            Self::Restart(task) => task.function(),
+            Self::DeadBands(task) => task.function(),
+            Self::EmptyResponseTask(task) => task.function(),
+            Self::FileRead(task) => task.function(),
         }
     }
 
     pub(crate) fn on_task_error(self, association: Option<&mut Association>, err: TaskError) {
         match self {
-            NonReadTask::Command(task) => task.on_task_error(err),
-            NonReadTask::TimeSync(task) => task.on_task_error(association, err),
-            NonReadTask::Auto(task) => task.on_task_error(association, err),
-            NonReadTask::Restart(task) => task.on_task_error(err),
-            NonReadTask::DeadBands(task) => task.on_task_error(err),
-            NonReadTask::EmptyResponseTask(task) => task.on_task_error(err),
+            Self::Command(task) => task.on_task_error(err),
+            Self::TimeSync(task) => task.on_task_error(association, err),
+            Self::Auto(task) => task.on_task_error(association, err),
+            Self::Restart(task) => task.on_task_error(err),
+            Self::DeadBands(task) => task.on_task_error(err),
+            Self::EmptyResponseTask(task) => task.on_task_error(err),
+            Self::FileRead(task) => task.on_task_error(err),
         }
     }
 
@@ -271,15 +284,16 @@ impl NonReadTask {
         response: Response,
     ) -> Option<NonReadTask> {
         match self {
-            NonReadTask::Command(task) => task.handle(response),
-            NonReadTask::Auto(task) => match response.objects.ok() {
+            Self::Command(task) => task.handle(response),
+            Self::Auto(task) => match response.objects.ok() {
                 Some(headers) => task.handle(association, response.header, headers),
                 None => None,
             },
-            NonReadTask::TimeSync(task) => task.handle(association, response),
-            NonReadTask::Restart(task) => task.handle(response),
-            NonReadTask::DeadBands(task) => task.handle(response),
-            NonReadTask::EmptyResponseTask(task) => task.handle(response),
+            Self::TimeSync(task) => task.handle(association, response),
+            Self::Restart(task) => task.handle(response),
+            Self::DeadBands(task) => task.handle(response),
+            Self::EmptyResponseTask(task) => task.handle(response),
+            Self::FileRead(task) => task.handle(response),
         }
     }
 
@@ -293,8 +307,9 @@ impl NonReadTask {
             },
             Self::TimeSync(_) => TaskType::TimeSync,
             Self::Restart(_) => TaskType::Restart,
-            NonReadTask::DeadBands(_) => TaskType::WriteDeadBands,
-            NonReadTask::EmptyResponseTask(_) => TaskType::GenericEmptyResponse(self.function()),
+            Self::DeadBands(_) => TaskType::WriteDeadBands,
+            Self::EmptyResponseTask(_) => TaskType::GenericEmptyResponse(self.function()),
+            Self::FileRead(_) => TaskType::FileRead,
         }
     }
 }

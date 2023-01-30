@@ -780,6 +780,7 @@ fn define_association_information(
             "generic_empty_response",
             "Generic request that expects an empty response",
         )?
+        .push("file_read", "Read a file from the outstation")?
         .doc("Task type used in {interface:association_information}")?
         .build()?;
 

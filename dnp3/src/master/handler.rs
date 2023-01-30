@@ -372,6 +372,8 @@ pub enum TaskType {
     WriteDeadBands,
     /// Generic task which
     GenericEmptyResponse(FunctionCode),
+    /// Read a file from the outstation
+    FileRead,
 }
 
 /// callbacks associated with a single master to outstation association

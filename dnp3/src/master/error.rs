@@ -63,7 +63,7 @@ pub enum TaskError {
     MultiFragmentResponse,
     /// The response timed-out
     ResponseTimeout,
-    /// Insufficient buffer space to serialize the request
+    /// Insufficient buffer space to serialize the request or data can't be encoded
     WriteError,
     /// Request data could not be encoded
     BadEncoding(BadEncoding),

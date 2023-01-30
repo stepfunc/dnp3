@@ -4,6 +4,8 @@ use crate::app::format::WriteError;
 use crate::app::parse::free_format::FreeFormatVariation;
 use crate::app::parse::parser::{HeaderDetails, ObjectHeader, Response};
 use crate::app::{FunctionCode, Timestamp};
+use crate::master::tasks::NonReadTask;
+use crate::master::TaskError;
 
 pub(crate) struct AuthData {
     pub(crate) user_name: String,
@@ -113,7 +115,11 @@ impl FileReadTask {
         }
     }
 
-    pub(crate) fn handle(self, response: Response) -> Option<FileReadTask> {
+    pub(crate) fn on_task_error(self, _err: TaskError) {
+        // TODO - fail the task with the task error
+    }
+
+    pub(crate) fn handle(self, response: Response) -> Option<NonReadTask> {
         let headers = match response.objects {
             Ok(x) => x,
             Err(err) => {
@@ -130,12 +136,14 @@ impl FileReadTask {
             Some(x) => x,
         };
 
-        match self.state {
+        let next = match self.state {
             State::GetAuth(_) => Self::handle_auth_response(self.settings, header),
             State::Open(_) => Self::handle_open_response(self.settings, header),
             State::Read(rs) => Self::handle_read_response(self.settings, rs, header),
             State::Close(_) => Self::handle_close_response(header),
-        }
+        };
+
+        next.map(NonReadTask::FileRead)
     }
 
     fn handle_auth_response(settings: Settings, header: ObjectHeader) -> Option<FileReadTask> {
