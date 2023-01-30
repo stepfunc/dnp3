@@ -1,4 +1,5 @@
 use crate::app::FileStatus;
+use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
 use crate::master::association::AssociationConfig;
@@ -17,12 +18,12 @@ enum Event {
 #[derive(Default)]
 struct State {
     aborted: bool,
-    events: Vec<Event>,
+    events: VecDeque<Event>,
 }
 
 impl State {
     fn push(&mut self, event: Event) {
-        self.events.push(event);
+        self.events.push_back(event);
     }
 }
 
@@ -31,17 +32,9 @@ struct EventHandle {
 }
 
 impl EventHandle {
-    fn pop_all(&self) -> Vec<Event> {
+    fn pop(&self) -> Option<Event> {
         let mut state = self.state.lock().unwrap();
-        let mut ret = Vec::new();
-        std::mem::swap(&mut state.events, &mut ret);
-        ret
-    }
-
-    fn expect_one(&self) -> Event {
-        let mut events = self.pop_all();
-        assert_eq!(events.len(), 1);
-        events.remove(0)
+        state.events.pop_front()
     }
 }
 
@@ -63,13 +56,13 @@ impl FileReader for MockReader {
     fn opened(&mut self, size: u32) -> bool {
         let mut state = self.state.lock().unwrap();
         state.push(Event::Open(size));
-        state.aborted
+        !state.aborted
     }
 
     fn block_received(&mut self, block_num: u32, data: &[u8]) -> bool {
         let mut state = self.state.lock().unwrap();
         state.push(Event::Rx(block_num, data.to_vec()));
-        state.aborted
+        !state.aborted
     }
 
     fn aborted(&mut self, err: FileReadError) {
@@ -102,7 +95,7 @@ async fn aborts_when_no_object_header() {
         .await;
 
     assert_eq!(
-        events.expect_one(),
+        events.pop().unwrap(),
         Event::Abort(FileReadError::TaskError(
             TaskError::UnexpectedResponseHeaders
         ))
@@ -110,7 +103,7 @@ async fn aborts_when_no_object_header() {
 }
 
 #[tokio::test]
-async fn can_read_file() {
+async fn closes_file_on_completion() {
     let config = AssociationConfig::quiet();
     let mut harness = create_association(config).await;
     let (events, reader) = pair();
@@ -120,14 +113,30 @@ async fn can_read_file() {
         .await
         .unwrap();
 
-    // check that its a file open request
+    // file open
     assert_eq!(harness.pop_write().await[..5], [0xC0, 25, 70, 3, 0x5B]);
 
+    let handle = 0xDEADCAFE;
+    let data = b"data".as_slice();
+
     harness
-        .process_response(file_status(0xDEADCAFE, 24, FileStatus::Success))
+        .process_response(file_status(handle, 24, FileStatus::Success))
         .await;
 
-    assert_eq!(events.expect_one(), Event::Open(24),);
+    assert_eq!(events.pop().unwrap(), Event::Open(24));
+
+    // file read
+    assert_eq!(harness.pop_write().await[..5], [0xC1, 0x01, 70, 5, 0x5B]);
+
+    harness
+        .process_response(file_transport(handle, 0x80_00_00_00, data))
+        .await;
+
+    assert_eq!(events.pop().unwrap(), Event::Rx(0, data.to_vec()));
+    assert_eq!(events.pop().unwrap(), Event::Complete);
+
+    // close file
+    assert_eq!(harness.pop_write().await[..5], [0xC2, 26, 70, 4, 0x5B]);
 }
 
 fn file_status(file_handle: u32, file_size: u32, status: FileStatus) -> Vec<u8> {
@@ -159,4 +168,22 @@ fn file_status(file_handle: u32, file_size: u32, status: FileStatus) -> Vec<u8> 
         status.to_u8(),
     ]
     .to_vec()
+}
+
+fn file_transport(file_handle: u32, block: u32, bytes: &[u8]) -> Vec<u8> {
+    let fh = file_handle.to_le_bytes();
+    let blk = block.to_le_bytes();
+
+    let len: u16 = (8 + bytes.len()).try_into().unwrap();
+    let len = len.to_le_bytes();
+
+    let mut resp = [
+        0xC1, 0x81, 0x00, 0x00, 70, 5, 0x5B, len[0], // length
+        len[1], fh[0], fh[1], fh[2], fh[3], blk[0], blk[1], blk[2], blk[3],
+    ]
+    .to_vec();
+
+    resp.extend(bytes);
+
+    resp
 }

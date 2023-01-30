@@ -261,7 +261,7 @@ impl FileReadTask {
                 return Err(FileReadError::BadBlockNum);
             }
 
-            if !reader.block_received(rx_block.0, obj.file_data) {
+            if !reader.block_received(rx_block.bottom_bits(), obj.file_data) {
                 tracing::warn!("File transfer aborted by user");
                 return Err(FileReadError::AbortByUser);
             }
