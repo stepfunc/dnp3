@@ -3,7 +3,7 @@ use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
 use crate::master::association::AssociationConfig;
-use crate::master::{FileReadError, FileReader, TaskError};
+use crate::master::{FileReadConfig, FileReadError, FileReader, TaskError};
 
 use super::harness::create_association;
 
@@ -83,7 +83,12 @@ async fn aborts_when_no_object_header() {
     let (events, reader) = pair();
     harness
         .association
-        .read_file("./test.txt".to_string(), 1024, reader, None)
+        .read_file(
+            "./test.txt".to_string(),
+            FileReadConfig::default(),
+            reader,
+            None,
+        )
         .await
         .unwrap();
 
@@ -109,7 +114,12 @@ async fn closes_file_on_completion() {
     let (events, reader) = pair();
     harness
         .association
-        .read_file("./test.txt".to_string(), 1024, reader, None)
+        .read_file(
+            "./test.txt".to_string(),
+            FileReadConfig::default(),
+            reader,
+            None,
+        )
         .await
         .unwrap();
 

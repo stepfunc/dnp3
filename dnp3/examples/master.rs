@@ -423,7 +423,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             "rd" => {
                 if let Err(err) = association
-                    .read_file("./", 4096, Box::new(FileLogger), None)
+                    .read_file("./", FileReadConfig::default(), Box::new(FileLogger), None)
                     .await
                 {
                     tracing::warn!("Unable to start file transfer: {err}");
@@ -433,7 +433,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 if let Err(err) = association
                     .read_file(
                         "./Test Harness Manual.pdf",
-                        4096,
+                        FileReadConfig::default(),
                         Box::new(FileLogger),
                         None,
                     )
