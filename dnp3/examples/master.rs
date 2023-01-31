@@ -422,11 +422,23 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
             "rd" => {
-                if let Err(err) = association
-                    .read_directory("./", FileReadConfig::default(), None)
+                match association
+                    .read_directory("./", DirReadConfig::default(), None)
                     .await
                 {
-                    tracing::warn!("Unable to start file transfer: {err}");
+                    Err(err) => {
+                        tracing::warn!("Unable to read directory: {err}");
+                    }
+                    Ok(items) => {
+                        for info in items {
+                            println!("File name: {}", info.name);
+                            println!("     size: {}", info.size);
+                            println!("     permissions:");
+                            println!("         world: {}", info.permissions.world);
+                            println!("         group: {}", info.permissions.group);
+                            println!("         owner: {}", info.permissions.owner);
+                        }
+                    }
                 }
             }
             "rf" => {

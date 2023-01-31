@@ -1,5 +1,6 @@
 use crate::app::file::{FileStatus, FileType, Group70Var7, Permissions};
-use crate::app::Timestamp;
+use crate::app::{Shutdown, Timestamp};
+use crate::master::{Promise, TaskError};
 use scursor::ReadCursor;
 use std::fmt::Debug;
 
@@ -39,6 +40,24 @@ pub struct FileReadConfig {
     pub(crate) max_file_size: usize,
 }
 
+/// Configuration related to reading a directory
+///
+///
+#[derive(Copy, Clone, Debug)]
+pub struct DirReadConfig {
+    pub(crate) max_block_size: u16,
+    pub(crate) max_file_size: usize,
+}
+
+impl From<DirReadConfig> for FileReadConfig {
+    fn from(value: DirReadConfig) -> Self {
+        Self {
+            max_block_size: value.max_block_size,
+            max_file_size: value.max_file_size,
+        }
+    }
+}
+
 impl FileReadConfig {
     /// Creates a new configuration with maximum values for the file size and max file bytes
     pub fn new() -> Self {
@@ -70,7 +89,43 @@ impl FileReadConfig {
     }
 }
 
+impl DirReadConfig {
+    /// Default maximum number of bytes read
+    pub const DEFAULT_MAX_SIZE: usize = 2048;
+
+    /// Creates a new configuration with maximum values for the file size and max file bytes
+    pub fn new() -> Self {
+        Self {
+            max_block_size: u16::MAX,
+            max_file_size: Self::DEFAULT_MAX_SIZE,
+        }
+    }
+
+    /// Modify the maximum block size requested by the master during the file open
+    pub fn set_max_block_size(self, max_block_size: u16) -> Self {
+        Self {
+            max_block_size,
+            ..self
+        }
+    }
+
+    /// Modify the maximum number of bytes that may be accumulated while reading
+    /// directory information
+    pub fn set_max_size(self, max_size: usize) -> Self {
+        Self {
+            max_file_size: max_size,
+            ..self
+        }
+    }
+}
+
 impl Default for FileReadConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Default for DirReadConfig {
     fn default() -> Self {
         Self::new()
     }
@@ -93,7 +148,7 @@ pub enum FileReadError {
     /// Exceeded the maximum length specified by the user
     MaxLengthExceeded,
     /// Generic task error occurred
-    TaskError(crate::master::TaskError),
+    TaskError(TaskError),
 }
 
 impl std::fmt::Display for FileReadError {
@@ -133,11 +188,15 @@ pub trait FileReader: Send + Sync + 'static {
 
 pub(crate) struct DirectoryReader {
     data: Vec<u8>,
+    promise: Option<Promise<Result<Vec<FileInfo>, FileReadError>>>,
 }
 
 impl DirectoryReader {
-    pub(crate) fn new() -> Self {
-        Self { data: Vec::new() }
+    pub(crate) fn new(promise: Promise<Result<Vec<FileInfo>, FileReadError>>) -> Self {
+        Self {
+            data: Vec::new(),
+            promise: Some(promise),
+        }
     }
 }
 
@@ -151,8 +210,10 @@ impl FileReader for DirectoryReader {
         true
     }
 
-    fn aborted(&mut self, _err: FileReadError) {
-        // complete the promise with an error
+    fn aborted(&mut self, err: FileReadError) {
+        if let Some(x) = self.promise.take() {
+            x.complete(Err(err));
+        }
     }
 
     fn completed(&mut self) {
@@ -173,22 +234,9 @@ impl FileReader for DirectoryReader {
 
         // parse the accumulated data
 
-        match parse(self.data.as_slice()) {
-            Ok(items) => {
-                // complete the promise!
-                for item in items {
-                    println!("File name: {}", item.name);
-                    println!("  type: {:?}", item.file_type);
-                    println!("  size: {}", item.size);
-                    println!("  permissions:");
-                    println!("     world: {}", item.permissions.world);
-                    println!("     group: {}", item.permissions.group);
-                    println!("     owner: {}", item.permissions.owner);
-                }
-            }
-            Err(err) => {
-                println!("error reading director: {err}");
-            }
+        let res = parse(self.data.as_slice());
+        if let Some(promise) = self.promise.take() {
+            promise.complete(res);
         }
     }
 }
@@ -202,5 +250,17 @@ impl<'a> From<Group70Var7<'a>> for FileInfo {
             time_created: value.time_of_creation,
             permissions: value.permissions,
         }
+    }
+}
+
+impl From<Shutdown> for FileReadError {
+    fn from(_: Shutdown) -> Self {
+        Self::TaskError(TaskError::Shutdown)
+    }
+}
+
+impl From<tokio::sync::oneshot::error::RecvError> for FileReadError {
+    fn from(_: tokio::sync::oneshot::error::RecvError) -> Self {
+        Self::TaskError(TaskError::Shutdown)
     }
 }

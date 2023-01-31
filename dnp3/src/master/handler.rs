@@ -21,8 +21,8 @@ use crate::master::tasks::restart::{RestartTask, RestartType};
 use crate::master::tasks::time::TimeSyncTask;
 use crate::master::tasks::{NonReadTask, Task};
 use crate::master::{
-    DeadBandHeader, DirectoryReader, FileCredentials, FileReadConfig, FileReader, Headers,
-    WriteError,
+    DeadBandHeader, DirReadConfig, DirectoryReader, FileCredentials, FileInfo, FileReadConfig,
+    FileReadError, FileReader, Headers, WriteError,
 };
 use crate::util::channel::Sender;
 use crate::util::session::Enabled;
@@ -331,11 +331,14 @@ impl AssociationHandle {
     pub async fn read_directory<T: ToString>(
         &mut self,
         dir_path: T,
-        config: FileReadConfig,
+        config: DirReadConfig,
         credentials: Option<FileCredentials>,
-    ) -> Result<(), Shutdown> {
-        let reader = Box::new(DirectoryReader::new());
-        self.read_file(dir_path, config, reader, credentials).await
+    ) -> Result<Vec<FileInfo>, FileReadError> {
+        let (promise, rx) = Promise::one_shot();
+        let reader = Box::new(DirectoryReader::new(promise));
+        self.read_file(dir_path, config.into(), reader, credentials)
+            .await?;
+        rx.await?
     }
 
     async fn send_task(&mut self, task: Task) -> Result<(), Shutdown> {
@@ -362,6 +365,11 @@ pub(crate) enum Promise<T> {
 }
 
 impl<T> Promise<T> {
+    pub(crate) fn one_shot() -> (Self, tokio::sync::oneshot::Receiver<T>) {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        (Self::OneShot(tx), rx)
+    }
+
     pub(crate) fn complete(self, value: T) {
         match self {
             Promise::None => {}
