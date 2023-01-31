@@ -312,14 +312,14 @@ impl AssociationHandle {
     }
 
     /// Read a file without authentication
-    pub async fn read_file(
+    pub async fn read_file<T: ToString>(
         &mut self,
-        file_path: String,
+        file_path: T,
         max_block_size: u16,
         reader: Box<dyn FileReader>,
         credentials: Option<FileCredentials>,
     ) -> Result<(), Shutdown> {
-        let task = FileReadTask::start(file_path, max_block_size, reader, credentials);
+        let task = FileReadTask::start(file_path.to_string(), max_block_size, reader, credentials);
         self.send_task(Task::NonRead(NonReadTask::FileRead(task)))
             .await
     }

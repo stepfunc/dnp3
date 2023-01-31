@@ -183,17 +183,39 @@ impl ReadHandler for ExampleReadHandler {
 
 // ANCHOR: association_handler
 #[derive(Copy, Clone)]
-pub struct ExampleAssociationHandler;
+struct ExampleAssociationHandler;
 
 impl AssociationHandler for ExampleAssociationHandler {}
 // ANCHOR_END: association_handler
 
 // ANCHOR: association_information
 #[derive(Copy, Clone)]
-pub struct ExampleAssociationInformation;
+struct ExampleAssociationInformation;
 
 impl AssociationInformation for ExampleAssociationInformation {}
 // ANCHOR_END: association_information
+
+struct FileLogger;
+
+impl FileReader for FileLogger {
+    fn opened(&mut self, size: u32) -> bool {
+        tracing::info!("File opened - size: {size}");
+        true
+    }
+
+    fn block_received(&mut self, block_num: u32, data: &[u8]) -> bool {
+        tracing::info!("Received block {block_num} with size: {}", data.len());
+        true
+    }
+
+    fn aborted(&mut self, err: FileReadError) {
+        tracing::info!("File transfer aborted: {}", err);
+    }
+
+    fn completed(&mut self) {
+        tracing::info!("File transfer completed");
+    }
+}
 
 /*
   Example program using the master API from within the Tokio runtime.
@@ -396,6 +418,9 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Ok(delay) => tracing::info!("restart delay: {:?}", delay),
                     Err(err) => tracing::warn!("error: {}", err),
                 }
+            }
+            "rf" => {
+                let result = association.read_file("./test.txt", 1024, )
             }
             "lsr" => {
                 tracing::info!("{:?}", association.check_link_status().await);

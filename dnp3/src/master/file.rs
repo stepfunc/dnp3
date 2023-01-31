@@ -1,3 +1,4 @@
+use std::fmt::Debug;
 use crate::app::file::FileStatus;
 
 /// Credentials for obtaining a file authorization token from the outstation
@@ -25,6 +26,19 @@ pub enum FileReadError {
     AbortByUser,
     /// Generic task error occurred
     TaskError(crate::master::TaskError),
+}
+
+impl std::fmt::Display for FileReadError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            FileReadError::BadResponse => f.write_str("bad response data"),
+            FileReadError::BadStatus(s) => write!(f, "bad status code: {s:?}"),
+            FileReadError::NoPermission => f.write_str("no permission"),
+            FileReadError::BadBlockNum => f.write_str("bad block number"),
+            FileReadError::AbortByUser => f.write_str("aborted by user"),
+            FileReadError::TaskError(t) => std::fmt::Debug::fmt(&t, f),
+        }
+    }
 }
 
 /// Callbacks for reading a file
