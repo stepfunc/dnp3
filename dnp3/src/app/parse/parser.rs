@@ -603,6 +603,13 @@ impl<'a> ObjectParser<'a> {
         &mut self,
         v: Variation,
     ) -> Result<ObjectHeader<'a>, ObjectParseError> {
+        // read the count of objects
+        let count = self.cursor.read_u8()?;
+
+        if count != 1 {
+            return Err(ObjectParseError::UnsupportedFreeFormatCount(count));
+        }
+
         // read the length of free-format data
         let length = self.cursor.read_u16_le()?;
         // the bytes inside the header
@@ -1177,8 +1184,8 @@ mod test {
     #[test]
     fn parses_free_format() {
         let input: &[u8] = &[
-            70, 5, 0x5B, 12, 0x00, 0x01, 0x02, 0x03, 0x04, 0xAA, 0xBB, 0xCC, 0xDD, b'd', b'a',
-            b't', b'a',
+            70, 5, 0x5B, 0x01, 12, 0x00, 0x01, 0x02, 0x03, 0x04, 0xAA, 0xBB, 0xCC, 0xDD, b'd',
+            b'a', b't', b'a',
         ];
         let headers = ObjectParser::parse(FunctionCode::Response, &input).unwrap();
         let header = headers.iter().next().unwrap();

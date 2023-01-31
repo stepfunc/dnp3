@@ -2171,6 +2171,7 @@ impl From<ObjectParseError> for Iin2 {
             ObjectParseError::ZeroLengthOctetData => Iin2::PARAMETER_ERROR,
             ObjectParseError::BadAttribute(_) => Iin2::PARAMETER_ERROR,
             ObjectParseError::BadEncoding => Iin2::PARAMETER_ERROR,
+            ObjectParseError::UnsupportedFreeFormatCount(_) => Iin2::PARAMETER_ERROR,
         }
     }
 }

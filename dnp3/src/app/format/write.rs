@@ -153,6 +153,7 @@ impl<'a, 'b> HeaderWriter<'a, 'b> {
     ) -> Result<(), crate::app::format::WriteError> {
         T::VARIATION.write(self.cursor)?;
         QualifierCode::FreeFormat16.write(self.cursor)?;
+        self.cursor.write_u8(1)?; // count of 1
         let length_pos = self.cursor.position();
         self.cursor.skip(2)?; // come back and write this after
         let object_start = self.cursor.position();
@@ -243,7 +244,9 @@ mod test {
         assert_eq!(
             cursor.written(),
             [
-                70, 05, 0x5B, 10, 00, // length
+                70, 05, 0x5B, // var and qualifier
+                0x01, // count
+                10, 00, // length
                 0xCC, 0xDD, 0xEE, 0xFF, 0xEF, 0xCD, 0xAB, 0x01, b'h', b'i'
             ]
         );

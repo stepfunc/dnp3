@@ -126,7 +126,10 @@ async fn closes_file_on_completion() {
     assert_eq!(events.pop().unwrap(), Event::Open(24));
 
     // file read
-    assert_eq!(harness.pop_write().await[..5], [0xC1, 0x01, 70, 5, 0x5B]);
+    assert_eq!(
+        harness.pop_write().await[..6],
+        [0xC1, 0x01, 70, 5, 0x5B, 0x01]
+    );
 
     harness
         .process_response(file_transport(handle, 0x80_00_00_00, data))
@@ -136,7 +139,10 @@ async fn closes_file_on_completion() {
     assert_eq!(events.pop().unwrap(), Event::Complete);
 
     // close file
-    assert_eq!(harness.pop_write().await[..5], [0xC2, 26, 70, 4, 0x5B]);
+    assert_eq!(
+        harness.pop_write().await[..6],
+        [0xC2, 26, 70, 4, 0x5B, 0x01]
+    );
 }
 
 fn file_status(file_handle: u32, file_size: u32, status: FileStatus) -> Vec<u8> {
@@ -151,6 +157,7 @@ fn file_status(file_handle: u32, file_size: u32, status: FileStatus) -> Vec<u8> 
         70,
         4,
         0x5B,
+        0x01,
         13, // length
         00,
         fh_bytes[0], // file handle
@@ -178,7 +185,7 @@ fn file_transport(file_handle: u32, block: u32, bytes: &[u8]) -> Vec<u8> {
     let len = len.to_le_bytes();
 
     let mut resp = [
-        0xC1, 0x81, 0x00, 0x00, 70, 5, 0x5B, len[0], // length
+        0xC1, 0x81, 0x00, 0x00, 70, 5, 0x5B, 0x01, len[0], // length
         len[1], fh[0], fh[1], fh[2], fh[3], blk[0], blk[1], blk[2], blk[3],
     ]
     .to_vec();

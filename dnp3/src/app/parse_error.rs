@@ -34,6 +34,8 @@ pub enum ObjectParseError {
     InvalidQualifierForVariation(Variation, QualifierCode),
     /// Specified qualifier code is not supported
     UnsupportedQualifierCode(QualifierCode),
+    /// Free format parser can only handle counts of 1
+    UnsupportedFreeFormatCount(u8),
     /// Response containing zero-length octet data disallowed by the specification
     ZeroLengthOctetData,
     /// Device attribute parsing error
@@ -116,6 +118,9 @@ impl std::fmt::Display for ObjectParseError {
             }
             ObjectParseError::BadAttribute(x) => write!(f, "{x}"),
             ObjectParseError::BadEncoding => f.write_str("Object is not properly encoded"),
+            ObjectParseError::UnsupportedFreeFormatCount(x) => {
+                write!(f, "Unsupported free-format count: {x}")
+            }
         }
     }
 }

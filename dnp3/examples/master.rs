@@ -255,12 +255,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // create an event poll
     // ANCHOR: add_poll
+    /*
     let mut poll = association
         .add_poll(
             ReadRequest::ClassScan(Classes::class123()),
             Duration::from_secs(5),
         )
         .await?;
+     */
     // ANCHOR_END: add_poll
 
     // enable communications
@@ -320,7 +322,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 // ANCHOR_END: assoc_control
             }
-            "evt" => poll.demand().await?,
+            //"evt" => poll.demand().await?,
             "lts" => {
                 if let Err(err) = association.synchronize_time(TimeSyncProcedure::Lan).await {
                     tracing::warn!("error: {}", err);
@@ -419,8 +421,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Err(err) => tracing::warn!("error: {}", err),
                 }
             }
+            "rd" => {
+                if let Err(err) = association
+                    .read_file("./", 4096, Box::new(FileLogger), None)
+                    .await
+                {
+                    tracing::warn!("Unable to start file transfer: {err}");
+                }
+            }
             "rf" => {
-                let result = association.read_file("./test.txt", 1024, )
+                if let Err(err) = association
+                    .read_file(
+                        "./Test Harness Manual.pdf",
+                        4096,
+                        Box::new(FileLogger),
+                        None,
+                    )
+                    .await
+                {
+                    tracing::warn!("Unable to start file transfer: {err}");
+                }
             }
             "lsr" => {
                 tracing::info!("{:?}", association.check_link_status().await);

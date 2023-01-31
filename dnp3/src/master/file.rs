@@ -1,5 +1,5 @@
-use std::fmt::Debug;
 use crate::app::file::FileStatus;
+use std::fmt::Debug;
 
 /// Credentials for obtaining a file authorization token from the outstation
 #[derive(Clone, Debug)]
