@@ -21,7 +21,8 @@ use crate::master::tasks::restart::{RestartTask, RestartType};
 use crate::master::tasks::time::TimeSyncTask;
 use crate::master::tasks::{NonReadTask, Task};
 use crate::master::{
-    DeadBandHeader, FileCredentials, FileReadConfig, FileReader, Headers, WriteError,
+    DeadBandHeader, DirectoryReader, FileCredentials, FileReadConfig, FileReader, Headers,
+    WriteError,
 };
 use crate::util::channel::Sender;
 use crate::util::session::Enabled;
@@ -313,7 +314,7 @@ impl AssociationHandle {
         rx.await?
     }
 
-    /// Read a file without authentication
+    /// Read a file
     pub async fn read_file<T: ToString>(
         &mut self,
         file_path: T,
@@ -324,6 +325,17 @@ impl AssociationHandle {
         let task = FileReadTask::start(file_path.to_string(), config, reader, credentials);
         self.send_task(Task::NonRead(NonReadTask::FileRead(task)))
             .await
+    }
+
+    /// Read a file directory
+    pub async fn read_directory<T: ToString>(
+        &mut self,
+        dir_path: T,
+        config: FileReadConfig,
+        credentials: Option<FileCredentials>,
+    ) -> Result<(), Shutdown> {
+        let reader = Box::new(DirectoryReader::new());
+        self.read_file(dir_path, config, reader, credentials).await
     }
 
     async fn send_task(&mut self, task: Task) -> Result<(), Shutdown> {

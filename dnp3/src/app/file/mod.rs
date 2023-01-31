@@ -16,6 +16,7 @@ pub(crate) use g70v5::*;
 pub(crate) use g70v6::*;
 pub(crate) use g70v7::*;
 pub(crate) use g70v8::*;
+
 pub(crate) use permissions::*;
 
 /// File status enumeration used Group 70 objects
@@ -103,6 +104,31 @@ impl FileStatus {
     }
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum FileType {
+    Directory,
+    File,
+    Reserved(u16),
+}
+
+impl FileType {
+    fn new(value: u16) -> Self {
+        match value {
+            0 => Self::Directory,
+            1 => Self::File,
+            _ => Self::Reserved(value),
+        }
+    }
+
+    fn to_u16(self) -> u16 {
+        match self {
+            FileType::Directory => 0,
+            FileType::File => 1,
+            FileType::Reserved(x) => x,
+        }
+    }
+}
+
 fn byte_length(s: &str) -> Result<u16, crate::app::format::Overflow> {
     crate::app::format::to_u16(s.as_bytes().len())
 }
@@ -117,6 +143,32 @@ pub(crate) enum ReadError {
     Overflow,
     /// A string is not UTF8 encoded
     BadString(Utf8Error),
+}
+
+impl std::fmt::Display for ReadError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            ReadError::NoMoreBytes => f.write_str("Insufficient bytes to represent file data"),
+            ReadError::BadOffset { expected, actual } => {
+                write!(
+                    f,
+                    "Expected an offset of {expected} but received {actual} in file data"
+                )
+            }
+            ReadError::Overflow => {
+                write!(
+                    f,
+                    "An overflow occurred while parsing file data indicating a bad encoding"
+                )
+            }
+            ReadError::BadString(err) => {
+                write!(
+                    f,
+                    "File data data expected to be a string contains is not UTF-8 encoded: {err}"
+                )
+            }
+        }
+    }
 }
 
 impl From<scursor::ReadError> for ReadError {

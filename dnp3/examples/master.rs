@@ -423,7 +423,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             "rd" => {
                 if let Err(err) = association
-                    .read_file("./", FileReadConfig::default(), Box::new(FileLogger), None)
+                    .read_directory("./", FileReadConfig::default(), None)
                     .await
                 {
                     tracing::warn!("Unable to start file transfer: {err}");

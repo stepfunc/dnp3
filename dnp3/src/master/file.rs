@@ -1,4 +1,6 @@
-use crate::app::file::FileStatus;
+use crate::app::file::{FileStatus, FileType, Group70Var7, Permissions};
+use crate::app::Timestamp;
+use scursor::ReadCursor;
 use std::fmt::Debug;
 
 /// Credentials for obtaining a file authorization token from the outstation
@@ -8,6 +10,24 @@ pub struct FileCredentials {
     pub user_name: String,
     /// Password
     pub password: String,
+}
+
+/// Information about a file or directory returned from the outstation
+///
+/// This is a user-facing representation of Group 70 Variation 7
+#[derive(Clone, Debug)]
+pub struct FileInfo {
+    /// Name of the file or directory
+    pub name: String,
+    /// File or directory
+    pub file_type: FileType,
+    /// If a file, this represents its size in bytes. If a directory, this represents the number of
+    /// files and directories it contains.
+    pub size: u32,
+    /// Time of creation as a DNP3 timestamp
+    pub time_created: Timestamp,
+    /// Permissions as defined in the protocol
+    pub permissions: Permissions,
 }
 
 /// Configuration related to reading a file
@@ -109,4 +129,78 @@ pub trait FileReader: Send + Sync + 'static {
 
     /// Called when the transfer completes
     fn completed(&mut self);
+}
+
+pub(crate) struct DirectoryReader {
+    data: Vec<u8>,
+}
+
+impl DirectoryReader {
+    pub(crate) fn new() -> Self {
+        Self { data: Vec::new() }
+    }
+}
+
+impl FileReader for DirectoryReader {
+    fn opened(&mut self, _size: u32) -> bool {
+        true
+    }
+
+    fn block_received(&mut self, _block_num: u32, data: &[u8]) -> bool {
+        self.data.extend(data);
+        true
+    }
+
+    fn aborted(&mut self, _err: FileReadError) {
+        // complete the promise with an error
+    }
+
+    fn completed(&mut self) {
+        fn parse(data: &[u8]) -> Result<Vec<FileInfo>, FileReadError> {
+            let mut cursor = ReadCursor::new(data);
+            let mut items = Vec::new();
+            while !cursor.is_empty() {
+                match Group70Var7::read(&mut cursor) {
+                    Ok(x) => items.push(x),
+                    Err(err) => {
+                        tracing::warn!("Error reading directory information: {err}");
+                        return Err(FileReadError::BadResponse);
+                    }
+                }
+            }
+            Ok(items.into_iter().map(|x| x.into()).collect())
+        }
+
+        // parse the accumulated data
+
+        match parse(self.data.as_slice()) {
+            Ok(items) => {
+                // complete the promise!
+                for item in items {
+                    println!("File name: {}", item.name);
+                    println!("  type: {:?}", item.file_type);
+                    println!("  size: {}", item.size);
+                    println!("  permissions:");
+                    println!("     world: {}", item.permissions.world);
+                    println!("     group: {}", item.permissions.group);
+                    println!("     owner: {}", item.permissions.owner);
+                }
+            }
+            Err(err) => {
+                println!("error reading director: {err}");
+            }
+        }
+    }
+}
+
+impl<'a> From<Group70Var7<'a>> for FileInfo {
+    fn from(value: Group70Var7<'a>) -> Self {
+        Self {
+            name: value.file_name.to_string(),
+            file_type: value.file_type,
+            size: value.file_size,
+            time_created: value.time_of_creation,
+            permissions: value.permissions,
+        }
+    }
 }

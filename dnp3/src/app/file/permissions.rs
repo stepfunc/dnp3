@@ -1,13 +1,23 @@
 use scursor::{ReadCursor, WriteCursor};
+use std::fmt::Write;
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
-pub(crate) struct Permission {
-    pub(crate) execute: bool,
-    pub(crate) write: bool,
-    pub(crate) read: bool,
+pub struct PermissionSet {
+    pub execute: bool,
+    pub write: bool,
+    pub read: bool,
 }
 
-impl Permission {
+impl std::fmt::Display for PermissionSet {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        f.write_char(if self.read { 'r' } else { '-' })?;
+        f.write_char(if self.write { 'w' } else { '-' })?;
+        f.write_char(if self.execute { 'x' } else { '-' })?;
+        Ok(())
+    }
+}
+
+impl PermissionSet {
     pub(crate) const fn all() -> Self {
         Self {
             execute: true,
@@ -32,10 +42,20 @@ impl Permission {
 }
 
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
-pub(crate) struct Permissions {
-    pub(crate) world: Permission,
-    pub(crate) group: Permission,
-    pub(crate) owner: Permission,
+pub struct Permissions {
+    pub world: PermissionSet,
+    pub group: PermissionSet,
+    pub owner: PermissionSet,
+}
+
+impl std::fmt::Display for Permissions {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "world: {} group: {} owner: {}",
+            self.world, self.group, self.owner
+        )
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -74,17 +94,17 @@ impl Permissions {
     pub(crate) fn read(cursor: &mut ReadCursor) -> Result<Self, scursor::ReadError> {
         let bits = cursor.read_u16_le()?;
         Ok(Self {
-            world: Permission {
+            world: PermissionSet {
                 execute: Self::WE.is_set(bits),
                 write: Self::WW.is_set(bits),
                 read: Self::WR.is_set(bits),
             },
-            group: Permission {
+            group: PermissionSet {
                 execute: Self::GE.is_set(bits),
                 write: Self::GW.is_set(bits),
                 read: Self::GR.is_set(bits),
             },
-            owner: Permission {
+            owner: PermissionSet {
                 execute: Self::OE.is_set(bits),
                 write: Self::OW.is_set(bits),
                 read: Self::OR.is_set(bits),

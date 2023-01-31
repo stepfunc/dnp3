@@ -2,31 +2,6 @@ use super::*;
 use crate::app::format::WriteError;
 use crate::app::Timestamp;
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub(crate) enum FileType {
-    Directory,
-    File,
-    Reserved(u16),
-}
-
-impl FileType {
-    fn new(value: u16) -> Self {
-        match value {
-            0 => Self::Directory,
-            1 => Self::File,
-            _ => Self::Reserved(value),
-        }
-    }
-
-    fn to_u16(self) -> u16 {
-        match self {
-            FileType::Directory => 0,
-            FileType::File => 1,
-            FileType::Reserved(x) => x,
-        }
-    }
-}
-
 /// Group 70 Variation 7 - file descriptor
 ///
 /// This representation is borrowed from the underlying ASDU
