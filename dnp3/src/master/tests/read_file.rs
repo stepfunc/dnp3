@@ -3,7 +3,7 @@ use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
 use crate::master::association::AssociationConfig;
-use crate::master::{FileReadConfig, FileReadError, FileReader, TaskError};
+use crate::master::{FileError, FileReadConfig, FileReader, TaskError};
 
 use super::harness::create_association;
 
@@ -11,7 +11,7 @@ use super::harness::create_association;
 enum Event {
     Open(u32),
     Rx(u32, Vec<u8>),
-    Abort(FileReadError),
+    Abort(FileError),
     Complete,
 }
 
@@ -65,7 +65,7 @@ impl FileReader for MockReader {
         !state.aborted
     }
 
-    fn aborted(&mut self, err: FileReadError) {
+    fn aborted(&mut self, err: FileError) {
         let mut state = self.state.lock().unwrap();
         state.push(Event::Abort(err));
     }
@@ -101,9 +101,7 @@ async fn aborts_when_no_object_header() {
 
     assert_eq!(
         events.pop().unwrap(),
-        Event::Abort(FileReadError::TaskError(
-            TaskError::UnexpectedResponseHeaders
-        ))
+        Event::Abort(FileError::TaskError(TaskError::UnexpectedResponseHeaders))
     );
 }
 

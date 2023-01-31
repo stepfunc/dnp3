@@ -208,7 +208,7 @@ impl FileReader for FileLogger {
         true
     }
 
-    fn aborted(&mut self, err: FileReadError) {
+    fn aborted(&mut self, err: FileError) {
         tracing::info!("File transfer aborted: {}", err);
     }
 

@@ -113,17 +113,17 @@ mod test {
     const OBJECT: Group70Var3 = Group70Var3 {
         time_of_creation: Timestamp::new(0xAABBCCDDEEFF),
         permissions: Permissions {
-            world: Permission {
+            world: PermissionSet {
                 execute: true,
                 write: false,
                 read: true,
             },
-            group: Permission {
+            group: PermissionSet {
                 execute: false,
                 write: true,
                 read: false,
             },
-            owner: Permission {
+            owner: PermissionSet {
                 execute: true,
                 write: false,
                 read: true,

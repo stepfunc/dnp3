@@ -5,7 +5,7 @@ use crate::app::parse::free_format::FreeFormatVariation;
 use crate::app::parse::parser::{HeaderDetails, ObjectHeader, Response};
 use crate::app::{FunctionCode, Timestamp};
 use crate::master::tasks::NonReadTask;
-use crate::master::{FileCredentials, FileReadConfig, FileReadError, FileReader, TaskError};
+use crate::master::{FileCredentials, FileError, FileReadConfig, FileReader, TaskError};
 
 pub(crate) struct Filename(pub(crate) String);
 
@@ -58,7 +58,7 @@ impl FileReader for FileReadCallbacks {
         }
     }
 
-    fn aborted(&mut self, err: FileReadError) {
+    fn aborted(&mut self, err: FileError) {
         if let Some(mut x) = self.inner.take() {
             x.aborted(err);
         }
@@ -74,7 +74,7 @@ impl FileReader for FileReadCallbacks {
 impl Drop for FileReadCallbacks {
     fn drop(&mut self) {
         if let Some(mut x) = self.inner.take() {
-            x.aborted(FileReadError::TaskError(TaskError::Shutdown));
+            x.aborted(FileError::TaskError(TaskError::Shutdown));
         }
     }
 }
@@ -165,7 +165,7 @@ impl FileReadTask {
     }
 
     pub(crate) fn on_task_error(mut self, err: TaskError) {
-        self.settings.reader.aborted(FileReadError::TaskError(err));
+        self.settings.reader.aborted(FileError::TaskError(err));
     }
 
     pub(crate) fn handle(mut self, response: Response) -> Option<NonReadTask> {
@@ -175,7 +175,7 @@ impl FileReadTask {
                 tracing::warn!("File operation received malformed response: {err}");
                 self.settings
                     .reader
-                    .aborted(FileReadError::TaskError(TaskError::MalformedResponse(err)));
+                    .aborted(FileError::TaskError(TaskError::MalformedResponse(err)));
                 return None;
             }
         };
@@ -183,9 +183,9 @@ impl FileReadTask {
         let header = match headers.get_only_header() {
             None => {
                 tracing::warn!("File operation response contains unexpected number of headers");
-                self.settings.reader.aborted(FileReadError::TaskError(
-                    TaskError::UnexpectedResponseHeaders,
-                ));
+                self.settings
+                    .reader
+                    .aborted(FileError::TaskError(TaskError::UnexpectedResponseHeaders));
                 return None;
             }
             Some(x) => x,
@@ -202,7 +202,7 @@ impl FileReadTask {
     }
 
     fn handle_auth_response(mut settings: Settings, header: ObjectHeader) -> Option<FileReadTask> {
-        fn inner(header: ObjectHeader) -> Result<State, FileReadError> {
+        fn inner(header: ObjectHeader) -> Result<State, FileError> {
             let obj = match header.details {
                 HeaderDetails::TwoByteFreeFormat(_, FreeFormatVariation::Group70Var2(obj)) => obj,
                 _ => {
@@ -210,13 +210,13 @@ impl FileReadTask {
                         "File AUTHENTICATE response contains unexpected variation: {}",
                         header.variation
                     );
-                    return Err(FileReadError::BadResponse);
+                    return Err(FileError::BadResponse);
                 }
             };
 
             if obj.auth_key == 0 {
                 tracing::warn!("Outstation returned auth key == 0: no permission to access file");
-                return Err(FileReadError::NoPermission);
+                return Err(FileError::NoPermission);
             }
 
             Ok(State::Open(AuthKey(obj.auth_key)))
@@ -232,7 +232,7 @@ impl FileReadTask {
     }
 
     fn handle_open_response(mut settings: Settings, header: ObjectHeader) -> Option<FileReadTask> {
-        fn inner(header: ObjectHeader) -> Result<(u32, FileHandle), FileReadError> {
+        fn inner(header: ObjectHeader) -> Result<(u32, FileHandle), FileError> {
             let obj = match header.details {
                 HeaderDetails::TwoByteFreeFormat(_, FreeFormatVariation::Group70Var4(obj)) => obj,
                 _ => {
@@ -240,13 +240,13 @@ impl FileReadTask {
                         "File OPEN response contains unexpected variation: {}",
                         header.variation
                     );
-                    return Err(FileReadError::BadResponse);
+                    return Err(FileError::BadResponse);
                 }
             };
 
             if obj.status_code != FileStatus::Success {
                 tracing::warn!("Unable to open file (status code == {:?})", obj.status_code);
-                return Err(FileReadError::BadStatus(obj.status_code));
+                return Err(FileError::BadStatus(obj.status_code));
             }
 
             Ok((obj.file_size, FileHandle(obj.file_handle)))
@@ -280,7 +280,7 @@ impl FileReadTask {
             settings: &mut Settings,
             rs: ReadState,
             header: ObjectHeader,
-        ) -> Result<Option<ReadState>, FileReadError> {
+        ) -> Result<Option<ReadState>, FileError> {
             let obj = match header.details {
                 HeaderDetails::TwoByteFreeFormat(_, FreeFormatVariation::Group70Var5(obj)) => obj,
                 _ => {
@@ -288,7 +288,7 @@ impl FileReadTask {
                         "File READ response contains unexpected variation: {}",
                         header.variation
                     );
-                    return Err(FileReadError::BadResponse);
+                    return Err(FileError::BadResponse);
                 }
             };
 
@@ -300,13 +300,13 @@ impl FileReadTask {
                     rs.block.bottom_bits(),
                     rx_block.bottom_bits()
                 );
-                return Err(FileReadError::BadBlockNum);
+                return Err(FileError::BadBlockNum);
             }
 
             let new_total = match rs.total_rx.checked_add(obj.file_data.len()) {
                 None => {
                     tracing::error!("Total rx file data overflow");
-                    return Err(FileReadError::MaxLengthExceeded);
+                    return Err(FileError::MaxLengthExceeded);
                 }
                 Some(x) => x,
             };
@@ -316,7 +316,7 @@ impl FileReadTask {
                     "Received bytes ({new_total}) exceeds configured maximum {}",
                     settings.config.max_file_size
                 );
-                return Err(FileReadError::MaxLengthExceeded);
+                return Err(FileError::MaxLengthExceeded);
             }
 
             if !settings
@@ -324,7 +324,7 @@ impl FileReadTask {
                 .block_received(rx_block.bottom_bits(), obj.file_data)
             {
                 tracing::warn!("File transfer aborted by user");
-                return Err(FileReadError::AbortByUser);
+                return Err(FileError::AbortByUser);
             }
 
             Ok(if rx_block.is_last() {

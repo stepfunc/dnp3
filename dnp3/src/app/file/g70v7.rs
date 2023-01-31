@@ -68,9 +68,9 @@ mod test {
         file_size: 0xAABBCCDD,
         time_of_creation: Timestamp::new(0xAABBCCDDEEFF),
         permissions: Permissions {
-            world: Permission::all(),
-            group: Permission::all(),
-            owner: Permission::all(),
+            world: PermissionSet::all(),
+            group: PermissionSet::all(),
+            owner: PermissionSet::all(),
         },
         request_id: 0xEEFF,
         file_name: "foo.dat",

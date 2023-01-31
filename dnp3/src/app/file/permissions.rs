@@ -121,9 +121,9 @@ mod test {
     #[test]
     fn calculates_permission_bytes() {
         let all = Permissions {
-            world: Permission::all(),
-            group: Permission::all(),
-            owner: Permission::all(),
+            world: PermissionSet::all(),
+            group: PermissionSet::all(),
+            owner: PermissionSet::all(),
         };
 
         assert_eq!(all.value(), 0x1FF);

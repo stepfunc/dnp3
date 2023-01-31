@@ -21,8 +21,8 @@ use crate::master::tasks::restart::{RestartTask, RestartType};
 use crate::master::tasks::time::TimeSyncTask;
 use crate::master::tasks::{NonReadTask, Task};
 use crate::master::{
-    DeadBandHeader, DirReadConfig, DirectoryReader, FileCredentials, FileInfo, FileReadConfig,
-    FileReadError, FileReader, Headers, WriteError,
+    DeadBandHeader, DirReadConfig, DirectoryReader, FileCredentials, FileError, FileInfo,
+    FileReadConfig, FileReader, Headers, WriteError,
 };
 use crate::util::channel::Sender;
 use crate::util::session::Enabled;
@@ -333,7 +333,7 @@ impl AssociationHandle {
         dir_path: T,
         config: DirReadConfig,
         credentials: Option<FileCredentials>,
-    ) -> Result<Vec<FileInfo>, FileReadError> {
+    ) -> Result<Vec<FileInfo>, FileError> {
         let (promise, rx) = Promise::one_shot();
         let reader = Box::new(DirectoryReader::new(promise));
         self.read_file(dir_path, config.into(), reader, credentials)

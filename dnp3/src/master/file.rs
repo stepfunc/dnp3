@@ -131,10 +131,10 @@ impl Default for DirReadConfig {
     }
 }
 
-/// Errors that can occur during a file read operation
+/// Errors that can occur during a file operations
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(not(feature = "ffi"), non_exhaustive)]
-pub enum FileReadError {
+pub enum FileError {
     /// Outstation returned a bad response
     BadResponse,
     /// Outstation returned an error status code
@@ -151,16 +151,16 @@ pub enum FileReadError {
     TaskError(TaskError),
 }
 
-impl std::fmt::Display for FileReadError {
+impl std::fmt::Display for FileError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            FileReadError::BadResponse => f.write_str("bad response data"),
-            FileReadError::BadStatus(s) => write!(f, "bad status code: {s:?}"),
-            FileReadError::NoPermission => f.write_str("no permission"),
-            FileReadError::BadBlockNum => f.write_str("bad block number"),
-            FileReadError::AbortByUser => f.write_str("aborted by user"),
-            FileReadError::TaskError(t) => std::fmt::Debug::fmt(&t, f),
-            FileReadError::MaxLengthExceeded => f.write_str("exceeded maximum received length"),
+            FileError::BadResponse => f.write_str("bad response data"),
+            FileError::BadStatus(s) => write!(f, "bad status code: {s:?}"),
+            FileError::NoPermission => f.write_str("no permission"),
+            FileError::BadBlockNum => f.write_str("bad block number"),
+            FileError::AbortByUser => f.write_str("aborted by user"),
+            FileError::TaskError(t) => std::fmt::Debug::fmt(&t, f),
+            FileError::MaxLengthExceeded => f.write_str("exceeded maximum received length"),
         }
     }
 }
@@ -180,7 +180,7 @@ pub trait FileReader: Send + Sync + 'static {
     fn block_received(&mut self, block_num: u32, data: &[u8]) -> bool;
 
     /// Called when the transfer is aborted before completion due to an error in the transfer
-    fn aborted(&mut self, err: FileReadError);
+    fn aborted(&mut self, err: FileError);
 
     /// Called when the transfer completes
     fn completed(&mut self);
@@ -188,11 +188,11 @@ pub trait FileReader: Send + Sync + 'static {
 
 pub(crate) struct DirectoryReader {
     data: Vec<u8>,
-    promise: Option<Promise<Result<Vec<FileInfo>, FileReadError>>>,
+    promise: Option<Promise<Result<Vec<FileInfo>, FileError>>>,
 }
 
 impl DirectoryReader {
-    pub(crate) fn new(promise: Promise<Result<Vec<FileInfo>, FileReadError>>) -> Self {
+    pub(crate) fn new(promise: Promise<Result<Vec<FileInfo>, FileError>>) -> Self {
         Self {
             data: Vec::new(),
             promise: Some(promise),
@@ -210,14 +210,14 @@ impl FileReader for DirectoryReader {
         true
     }
 
-    fn aborted(&mut self, err: FileReadError) {
+    fn aborted(&mut self, err: FileError) {
         if let Some(x) = self.promise.take() {
             x.complete(Err(err));
         }
     }
 
     fn completed(&mut self) {
-        fn parse(data: &[u8]) -> Result<Vec<FileInfo>, FileReadError> {
+        fn parse(data: &[u8]) -> Result<Vec<FileInfo>, FileError> {
             let mut cursor = ReadCursor::new(data);
             let mut items = Vec::new();
             while !cursor.is_empty() {
@@ -225,7 +225,7 @@ impl FileReader for DirectoryReader {
                     Ok(x) => items.push(x),
                     Err(err) => {
                         tracing::warn!("Error reading directory information: {err}");
-                        return Err(FileReadError::BadResponse);
+                        return Err(FileError::BadResponse);
                     }
                 }
             }
@@ -253,13 +253,13 @@ impl<'a> From<Group70Var7<'a>> for FileInfo {
     }
 }
 
-impl From<Shutdown> for FileReadError {
+impl From<Shutdown> for FileError {
     fn from(_: Shutdown) -> Self {
         Self::TaskError(TaskError::Shutdown)
     }
 }
 
-impl From<tokio::sync::oneshot::error::RecvError> for FileReadError {
+impl From<tokio::sync::oneshot::error::RecvError> for FileError {
     fn from(_: tokio::sync::oneshot::error::RecvError) -> Self {
         Self::TaskError(TaskError::Shutdown)
     }
