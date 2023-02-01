@@ -7,6 +7,9 @@ use crate::app::{FunctionCode, Timestamp};
 use crate::master::tasks::NonReadTask;
 use crate::master::{FileCredentials, FileError, FileReadConfig, FileReader, TaskError};
 
+use tokio::fs::File;
+use tokio::io::AsyncWriteExt;
+
 pub(crate) struct Filename(pub(crate) String);
 
 #[derive(Copy, Clone, Default)]
@@ -37,11 +40,17 @@ impl PartialEq for BlockNumber {
     }
 }
 
-pub(crate) struct FileReadCallbacks {
+pub(crate) enum 
+
+pub(crate) struct TokioFileSink {
+    file: Option<File>
+}
+
+pub(crate) struct FileReaderWrapper {
     inner: Option<Box<dyn FileReader>>,
 }
 
-impl FileReadCallbacks {
+impl FileReaderWrapper {
     fn opened(&mut self, size: u32) -> bool {
         if let Some(x) = self.inner.as_mut() {
             x.opened(size)
@@ -71,7 +80,39 @@ impl FileReadCallbacks {
     }
 }
 
-impl Drop for FileReadCallbacks {
+
+
+impl TokioFileSink {
+    fn opened(&mut self, _size: u32) -> bool {
+        true
+    }
+
+    async fn block_received(&mut self, _block_num: u32, data: &[u8]) -> bool {
+        match &mut self.file {
+            None => false,
+            Some(file) => {
+                match file.write_all(data).await {
+                    Ok(()) => true,
+                    Err(err) => {
+                        tracing::error!("Error writing file data: {err}");
+                        false
+                    }
+                }
+            }
+        }
+    }
+
+    fn aborted(&mut self, _err: FileError) {
+        self.file.take();
+    }
+
+    fn completed(&mut self) {
+        self.file.take();
+    }
+}
+
+
+impl Drop for FileReaderWrapper {
     fn drop(&mut self) {
         if let Some(mut x) = self.inner.take() {
             x.aborted(FileError::TaskError(TaskError::Shutdown));
@@ -82,7 +123,7 @@ impl Drop for FileReadCallbacks {
 pub(crate) struct Settings {
     pub(crate) name: Filename,
     pub(crate) config: FileReadConfig,
-    pub(crate) reader: FileReadCallbacks,
+    pub(crate) reader: FileReaderWrapper,
 }
 
 #[derive(Copy, Clone)]
@@ -135,7 +176,7 @@ impl FileReadTask {
         let settings = Settings {
             name: Filename(file_name),
             config,
-            reader: FileReadCallbacks {
+            reader: FileReaderWrapper {
                 inner: Some(reader),
             },
         };
