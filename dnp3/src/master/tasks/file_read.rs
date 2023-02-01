@@ -41,7 +41,7 @@ pub(crate) struct FileReadCallbacks {
     inner: Option<Box<dyn FileReader>>,
 }
 
-impl FileReader for FileReadCallbacks {
+impl FileReadCallbacks {
     fn opened(&mut self, size: u32) -> bool {
         if let Some(x) = self.inner.as_mut() {
             x.opened(size)
@@ -50,9 +50,9 @@ impl FileReader for FileReadCallbacks {
         }
     }
 
-    fn block_received(&mut self, block_num: u32, data: &[u8]) -> bool {
+    async fn block_received(&mut self, block_num: u32, data: &[u8]) -> bool {
         if let Some(x) = self.inner.as_mut() {
-            x.block_received(block_num, data)
+            x.block_received(block_num, data).get().await
         } else {
             false
         }
@@ -168,7 +168,7 @@ impl FileReadTask {
         self.settings.reader.aborted(FileError::TaskError(err));
     }
 
-    pub(crate) fn handle(mut self, response: Response) -> Option<NonReadTask> {
+    pub(crate) async fn handle(mut self, response: Response<'_>) -> Option<NonReadTask> {
         let headers = match response.objects {
             Ok(x) => x,
             Err(err) => {
@@ -194,7 +194,7 @@ impl FileReadTask {
         let next = match self.state {
             State::GetAuth(_) => Self::handle_auth_response(self.settings, header),
             State::Open(_) => Self::handle_open_response(self.settings, header),
-            State::Read(rs) => Self::handle_read_response(self.settings, rs, header),
+            State::Read(rs) => Self::handle_read_response(self.settings, rs, header).await,
             State::Close(_) => Self::handle_close_response(header),
         };
 
@@ -271,15 +271,15 @@ impl FileReadTask {
         }
     }
 
-    fn handle_read_response(
+    async fn handle_read_response(
         mut settings: Settings,
         rs: ReadState,
-        header: ObjectHeader,
+        header: ObjectHeader<'_>,
     ) -> Option<FileReadTask> {
-        fn inner(
+        async fn inner(
             settings: &mut Settings,
             rs: ReadState,
-            header: ObjectHeader,
+            header: ObjectHeader<'_>,
         ) -> Result<Option<ReadState>, FileError> {
             let obj = match header.details {
                 HeaderDetails::TwoByteFreeFormat(_, FreeFormatVariation::Group70Var5(obj)) => obj,
@@ -322,6 +322,7 @@ impl FileReadTask {
             if !settings
                 .reader
                 .block_received(rx_block.bottom_bits(), obj.file_data)
+                .await
             {
                 tracing::warn!("File transfer aborted by user");
                 return Err(FileError::AbortByUser);
@@ -338,7 +339,7 @@ impl FileReadTask {
             })
         }
 
-        match inner(&mut settings, rs, header) {
+        match inner(&mut settings, rs, header).await {
             Ok(None) => {
                 settings.reader.completed();
                 Some(FileReadTask::new(settings, State::Close(rs.handle)))

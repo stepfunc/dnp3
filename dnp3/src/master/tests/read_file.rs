@@ -1,4 +1,4 @@
-use crate::app::FileStatus;
+use crate::app::{FileStatus, MaybeAsync};
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
@@ -59,10 +59,10 @@ impl FileReader for MockReader {
         !state.aborted
     }
 
-    fn block_received(&mut self, block_num: u32, data: &[u8]) -> bool {
+    fn block_received(&mut self, block_num: u32, data: &[u8]) -> MaybeAsync<bool> {
         let mut state = self.state.lock().unwrap();
         state.push(Event::Rx(block_num, data.to_vec()));
-        !state.aborted
+        MaybeAsync::ready(!state.aborted)
     }
 
     fn aborted(&mut self, err: FileError) {

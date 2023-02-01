@@ -1,5 +1,5 @@
 use crate::app::file::{FileStatus, FileType, Group70Var7, Permissions};
-use crate::app::{Shutdown, Timestamp};
+use crate::app::{MaybeAsync, Shutdown, Timestamp};
 use crate::master::{Promise, TaskError};
 use scursor::ReadCursor;
 use std::fmt::Debug;
@@ -177,7 +177,7 @@ pub trait FileReader: Send + Sync + 'static {
     /// Returning false will abort the transfer. This allows the received to place
     /// limits on the amount of received data or abort on internals errors like being
     /// unable to write to a local file
-    fn block_received(&mut self, block_num: u32, data: &[u8]) -> bool;
+    fn block_received(&mut self, block_num: u32, data: &[u8]) -> MaybeAsync<bool>;
 
     /// Called when the transfer is aborted before completion due to an error in the transfer
     fn aborted(&mut self, err: FileError);
@@ -205,9 +205,9 @@ impl FileReader for DirectoryReader {
         true
     }
 
-    fn block_received(&mut self, _block_num: u32, data: &[u8]) -> bool {
+    fn block_received(&mut self, _block_num: u32, data: &[u8]) -> MaybeAsync<bool> {
         self.data.extend(data);
-        true
+        MaybeAsync::ready(true)
     }
 
     fn aborted(&mut self, err: FileError) {

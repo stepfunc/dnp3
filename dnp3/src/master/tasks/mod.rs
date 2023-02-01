@@ -285,10 +285,10 @@ impl NonReadTask {
         }
     }
 
-    pub(crate) fn handle(
+    pub(crate) async fn handle(
         self,
         association: &mut Association,
-        response: Response,
+        response: Response<'_>,
     ) -> Option<NonReadTask> {
         match self {
             Self::Command(task) => task.handle(response),
@@ -300,7 +300,7 @@ impl NonReadTask {
             Self::Restart(task) => task.handle(response),
             Self::DeadBands(task) => task.handle(response),
             Self::EmptyResponseTask(task) => task.handle(response),
-            Self::FileRead(task) => task.handle(response),
+            Self::FileRead(task) => task.handle(response).await,
             Self::GetFileInfo(task) => task.handle(response),
         }
     }

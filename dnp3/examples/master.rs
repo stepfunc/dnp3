@@ -203,9 +203,9 @@ impl FileReader for FileLogger {
         true
     }
 
-    fn block_received(&mut self, block_num: u32, data: &[u8]) -> bool {
+    fn block_received(&mut self, block_num: u32, data: &[u8]) -> MaybeAsync<bool> {
         tracing::info!("Received block {block_num} with size: {}", data.len());
-        true
+        MaybeAsync::ready(true)
     }
 
     fn aborted(&mut self, err: FileError) {

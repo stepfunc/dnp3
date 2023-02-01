@@ -384,7 +384,7 @@ mod tests {
         (task, system_time, association, rx)
     }
 
-    fn send_write_response(task: NonReadTask, association: &mut Association) {
+    async fn send_write_response(task: NonReadTask, association: &mut Association) {
         let mut buffer = [0; 20];
         let mut cursor = WriteCursor::new(&mut buffer);
         let writer = start_response(
@@ -396,7 +396,7 @@ mod tests {
         .unwrap();
         let response = writer.to_parsed().to_response().unwrap();
 
-        assert!(task.handle(association, response).is_none());
+        assert!(task.handle(association, response).await.is_none());
     }
 
     mod non_lan {
@@ -439,9 +439,11 @@ mod tests {
             let (task, system_time, mut association, mut rx) = non_lan_time_sync_setup();
             let task = check_measure_delay_request(task, &mut association);
             tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS as u64)).await;
-            let task = send_measure_delay_response(task, &mut association).unwrap();
+            let task = send_measure_delay_response(task, &mut association)
+                .await
+                .unwrap();
             let task = check_write_request(task, &mut association, system_time);
-            send_write_response(task, &mut association);
+            send_write_response(task, &mut association).await;
             assert!(rx.try_recv().unwrap().is_ok());
         }
 
@@ -478,11 +480,12 @@ mod tests {
                     .to_response()
                     .unwrap();
 
-                task.handle(&mut association, response)
+                task.handle(&mut association, response).await
             }
             .unwrap();
+
             let task = check_write_request(task, &mut association, system_time);
-            send_write_response(task, &mut association);
+            send_write_response(task, &mut association).await;
             assert!(rx.try_recv().unwrap().is_ok());
         }
 
@@ -491,7 +494,9 @@ mod tests {
             let (task, _system_time, mut association, mut rx) = non_lan_time_sync_setup();
             let task = check_measure_delay_request(task, &mut association);
             tokio::time::advance(Duration::from_millis(1)).await; // This delay is less than the reported delay of the outstation
-            assert!(send_measure_delay_response(task, &mut association).is_none());
+            assert!(send_measure_delay_response(task, &mut association)
+                .await
+                .is_none());
             assert_eq!(
                 Err(TimeSyncError::BadOutstationTimeDelay(OUTSTATION_DELAY_MS)),
                 rx.try_recv().unwrap()
@@ -516,7 +521,7 @@ mod tests {
 
                 let response = writer.to_parsed().to_response().unwrap();
 
-                assert!(task.handle(&mut association, response).is_none());
+                assert!(task.handle(&mut association, response).await.is_none());
             }
             assert_eq!(
                 rx.try_recv().unwrap(),
@@ -529,7 +534,9 @@ mod tests {
             let (task, system_time, mut association, mut rx) = non_lan_time_sync_setup();
             let task = check_measure_delay_request(task, &mut association);
             tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS as u64)).await;
-            let task = send_measure_delay_response(task, &mut association).unwrap();
+            let task = send_measure_delay_response(task, &mut association)
+                .await
+                .unwrap();
             let task = check_write_request(task, &mut association, system_time);
             {
                 let mut buffer = [0; 20];
@@ -545,7 +552,7 @@ mod tests {
 
                 let response = writer.to_parsed().to_response().unwrap();
 
-                assert!(task.handle(&mut association, response).is_none());
+                assert!(task.handle(&mut association, response).await.is_none());
             }
             assert_matches!(
                 rx.try_recv().unwrap(),
@@ -559,7 +566,9 @@ mod tests {
 
             let task = check_measure_delay_request(task, &mut association);
             tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS as u64)).await;
-            let task = send_measure_delay_response(task, &mut association).unwrap();
+            let task = send_measure_delay_response(task, &mut association)
+                .await
+                .unwrap();
             let task = check_write_request(task, &mut association, system_time);
             {
                 let mut buffer = [0; 20];
@@ -574,7 +583,7 @@ mod tests {
 
                 let response = writer.to_parsed().to_response().unwrap();
 
-                assert!(task.handle(&mut association, response).is_none());
+                assert!(task.handle(&mut association, response).await.is_none());
             }
             assert_matches!(rx.try_recv().unwrap(), Err(TimeSyncError::StillNeedsTime));
         }
@@ -584,7 +593,9 @@ mod tests {
             let (task, system_time, mut association, mut rx) = non_lan_time_sync_setup();
             let task = check_measure_delay_request(task, &mut association);
             tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS as u64)).await;
-            let task = send_measure_delay_response(task, &mut association).unwrap();
+            let task = send_measure_delay_response(task, &mut association)
+                .await
+                .unwrap();
             let task = check_write_request(task, &mut association, system_time);
             task.on_task_error(Some(&mut association), TaskError::ResponseTimeout);
             assert_eq!(
@@ -612,7 +623,9 @@ mod tests {
                 non_lan_time_sync_single_time_setup();
             let task = check_measure_delay_request(task, &mut association);
             tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS as u64)).await;
-            assert!(send_measure_delay_response(task, &mut association).is_none());
+            assert!(send_measure_delay_response(task, &mut association)
+                .await
+                .is_none());
             assert_eq!(
                 rx.try_recv().unwrap(),
                 Err(TimeSyncError::SystemTimeNotAvailable)
@@ -641,7 +654,7 @@ mod tests {
             task
         }
 
-        fn send_measure_delay_response(
+        async fn send_measure_delay_response(
             task: NonReadTask,
             association: &mut Association,
         ) -> Option<NonReadTask> {
@@ -661,7 +674,7 @@ mod tests {
                 .unwrap();
             let response = writer.to_parsed().to_response().unwrap();
 
-            task.handle(association, response)
+            task.handle(association, response).await
         }
 
         fn check_write_request(
@@ -710,9 +723,11 @@ mod tests {
             let (task, system_time, mut association, mut rx) = lan_time_sync_setup();
             let task = check_record_current_time_request(task, &mut association);
             tokio::time::advance(Duration::from_millis(DELAY_MS as u64)).await;
-            let task = send_record_current_time_response(task, &mut association).unwrap();
+            let task = send_record_current_time_response(task, &mut association)
+                .await
+                .unwrap();
             let task = check_write_request(task, &mut association, system_time);
-            send_write_response(task, &mut association);
+            send_write_response(task, &mut association).await;
             assert!(rx.try_recv().unwrap().is_ok());
         }
 
@@ -735,7 +750,7 @@ mod tests {
 
                 let response = writer.to_parsed().to_response().unwrap();
 
-                assert!(task.handle(&mut association, response).is_none());
+                assert!(task.handle(&mut association, response).await.is_none());
             }
             assert_eq!(
                 rx.try_recv().unwrap(),
@@ -748,7 +763,9 @@ mod tests {
             let (task, system_time, mut association, mut rx) = lan_time_sync_setup();
             let task = check_record_current_time_request(task, &mut association);
             tokio::time::advance(Duration::from_millis(DELAY_MS as u64)).await;
-            let task = send_record_current_time_response(task, &mut association).unwrap();
+            let task = send_record_current_time_response(task, &mut association)
+                .await
+                .unwrap();
             let task = check_write_request(task, &mut association, system_time);
             {
                 let mut buffer = [0; 20];
@@ -764,7 +781,7 @@ mod tests {
 
                 let response = writer.to_parsed().to_response().unwrap();
 
-                assert!(task.handle(&mut association, response).is_none());
+                assert!(task.handle(&mut association, response).await.is_none());
             }
             assert_eq!(
                 rx.try_recv().unwrap(),
@@ -777,7 +794,9 @@ mod tests {
             let (task, system_time, mut association, mut rx) = lan_time_sync_setup();
             let task = check_record_current_time_request(task, &mut association);
             tokio::time::advance(Duration::from_millis(DELAY_MS as u64)).await;
-            let task = send_record_current_time_response(task, &mut association).unwrap();
+            let task = send_record_current_time_response(task, &mut association)
+                .await
+                .unwrap();
             let task = check_write_request(task, &mut association, system_time);
             {
                 let mut buffer = [0; 20];
@@ -792,7 +811,7 @@ mod tests {
 
                 let response = writer.to_parsed().to_response().unwrap();
 
-                assert!(task.handle(&mut association, response).is_none());
+                assert!(task.handle(&mut association, response).await.is_none());
             }
             assert_matches!(rx.try_recv().unwrap(), Err(TimeSyncError::StillNeedsTime));
         }
@@ -802,7 +821,9 @@ mod tests {
             let (task, system_time, mut association, mut rx) = lan_time_sync_setup();
             let task = check_record_current_time_request(task, &mut association);
             tokio::time::advance(Duration::from_millis(DELAY_MS as u64)).await;
-            let task = send_record_current_time_response(task, &mut association).unwrap();
+            let task = send_record_current_time_response(task, &mut association)
+                .await
+                .unwrap();
             let task = check_write_request(task, &mut association, system_time);
             task.on_task_error(Some(&mut association), TaskError::ResponseTimeout);
             assert_eq!(
@@ -856,7 +877,7 @@ mod tests {
             task
         }
 
-        fn send_record_current_time_response(
+        async fn send_record_current_time_response(
             task: NonReadTask,
             association: &mut Association,
         ) -> Option<NonReadTask> {
@@ -871,7 +892,7 @@ mod tests {
             .unwrap();
             let response = writer.to_parsed().to_response().unwrap();
 
-            task.handle(association, response)
+            task.handle(association, response).await
         }
 
         fn check_write_request(
