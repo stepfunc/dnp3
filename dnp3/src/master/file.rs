@@ -13,31 +13,6 @@ pub struct FileCredentials {
     pub password: String,
 }
 
-/// Represents the status of a file operation in progress
-pub struct FileOperation {
-    canceler: crate::util::cancelation::Canceler,
-    reply: tokio::sync::oneshot::Receiver<Result<(), FileError>>,
-}
-
-impl FileOperation {
-    pub(crate) fn new(
-        canceler: crate::util::cancelation::Canceler,
-        reply: tokio::sync::oneshot::Receiver<Result<(), FileError>>,
-    ) -> Self {
-        Self { canceler, reply }
-    }
-
-    /// request that the file operation aborts at the next opportunity
-    pub async fn abort(&self) {
-        self.canceler.cancel();
-    }
-
-    /// await the result of the file operation
-    pub async fn result(self) -> Result<(), FileError> {
-        self.reply.await?
-    }
-}
-
 /// Information about a file or directory returned from the outstation
 ///
 /// This is a user-facing representation of Group 70 Variation 7

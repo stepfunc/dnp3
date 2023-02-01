@@ -5,10 +5,7 @@ use crate::app::parse::free_format::FreeFormatVariation;
 use crate::app::parse::parser::{HeaderDetails, ObjectHeader, Response};
 use crate::app::{FunctionCode, Timestamp};
 use crate::master::tasks::NonReadTask;
-use crate::master::{FileCredentials, FileError, FileReadConfig, FileReader, Promise, TaskError};
-
-use tokio::fs::File;
-use tokio::io::AsyncWriteExt;
+use crate::master::{FileCredentials, FileError, FileReadConfig, FileReader, TaskError};
 
 pub(crate) struct Filename(pub(crate) String);
 
@@ -41,7 +38,6 @@ impl PartialEq for BlockNumber {
 }
 
 enum ReaderTypes {
-    File(TokioFileSink),
     Trait(Box<dyn FileReader>),
 }
 
@@ -56,22 +52,9 @@ impl FileReaderType {
         }
     }
 
-    pub(crate) fn from_file(
-        file: File,
-        canceled: crate::util::cancelation::Canceled,
-        promise: Promise<Result<(), FileError>>,
-    ) -> Self {
-        Self {
-            inner: Some(ReaderTypes::File(TokioFileSink::new(
-                file, canceled, promise,
-            ))),
-        }
-    }
-
     fn opened(&mut self, size: u32) -> bool {
         if let Some(x) = self.inner.as_mut() {
             match x {
-                ReaderTypes::File(x) => x.opened(size),
                 ReaderTypes::Trait(x) => x.opened(size),
             }
         } else {
@@ -82,7 +65,6 @@ impl FileReaderType {
     async fn block_received(&mut self, block_num: u32, data: &[u8]) -> bool {
         if let Some(x) = self.inner.as_mut() {
             match x {
-                ReaderTypes::File(x) => x.block_received(block_num, data).await,
                 ReaderTypes::Trait(x) => x.block_received(block_num, data).get().await,
             }
         } else {
@@ -93,7 +75,6 @@ impl FileReaderType {
     fn aborted(&mut self, err: FileError) {
         if let Some(x) = self.inner.take() {
             match x {
-                ReaderTypes::File(x) => x.aborted(err),
                 ReaderTypes::Trait(mut x) => x.aborted(err),
             }
         }
@@ -102,52 +83,9 @@ impl FileReaderType {
     fn completed(&mut self) {
         if let Some(x) = self.inner.take() {
             match x {
-                ReaderTypes::File(x) => x.completed(),
                 ReaderTypes::Trait(mut x) => x.completed(),
             }
         }
-    }
-}
-
-struct TokioFileSink {
-    file: File,
-    canceled: crate::util::cancelation::Canceled,
-    promise: Promise<Result<(), FileError>>,
-}
-
-impl TokioFileSink {
-    fn new(
-        file: File,
-        canceled: crate::util::cancelation::Canceled,
-        promise: Promise<Result<(), FileError>>,
-    ) -> Self {
-        Self {
-            file,
-            canceled,
-            promise,
-        }
-    }
-
-    fn opened(&mut self, _size: u32) -> bool {
-        self.canceled.get()
-    }
-
-    async fn block_received(&mut self, _block_num: u32, data: &[u8]) -> bool {
-        match self.file.write_all(data).await {
-            Ok(()) => self.canceled.get(),
-            Err(err) => {
-                tracing::error!("Error writing file data: {err}");
-                false
-            }
-        }
-    }
-
-    fn aborted(self, err: FileError) {
-        self.promise.complete(Err(err))
-    }
-
-    fn completed(self) {
-        self.promise.complete(Ok(()))
     }
 }
 
@@ -155,7 +93,6 @@ impl Drop for FileReaderType {
     fn drop(&mut self) {
         if let Some(x) = self.inner.take() {
             match x {
-                ReaderTypes::File(x) => x.aborted(FileError::TaskError(TaskError::Shutdown)),
                 ReaderTypes::Trait(mut x) => x.aborted(FileError::TaskError(TaskError::Shutdown)),
             }
         }

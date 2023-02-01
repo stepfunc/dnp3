@@ -1,6 +1,5 @@
 pub(crate) mod bit;
 pub(crate) mod buffer;
-pub(crate) mod cancelation;
 pub(crate) mod channel;
 pub(crate) mod decode;
 pub(crate) mod future;
