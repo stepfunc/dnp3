@@ -431,16 +431,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     Ok(items) => {
                         for info in items {
-                            println!("File name: {}", info.name);
-                            println!("     size: {}", info.size);
-                            println!("     permissions:");
-                            println!("         world: {}", info.permissions.world);
-                            println!("         group: {}", info.permissions.group);
-                            println!("         owner: {}", info.permissions.owner);
+                            print_file_info(info);
                         }
                     }
                 }
             }
+            "gfi" => match association.get_file_info(".").await {
+                Err(err) => {
+                    tracing::warn!("Unable to get file info: {err}");
+                }
+                Ok(info) => {
+                    print_file_info(info);
+                }
+            },
             "rf" => {
                 if let Err(err) = association
                     .read_file(
@@ -593,4 +596,15 @@ fn create_tls_channel(
     );
     // ANCHOR_END: create_master_tls_channel
     Ok(channel)
+}
+
+fn print_file_info(info: FileInfo) {
+    println!("File name: {}", info.name);
+    println!("     type: {:?}", info.file_type);
+    println!("     size: {}", info.size);
+    println!("     created: {}", info.time_created.raw_value());
+    println!("     permissions:");
+    println!("         world: {}", info.permissions.world);
+    println!("         group: {}", info.permissions.group);
+    println!("         owner: {}", info.permissions.owner);
 }

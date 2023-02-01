@@ -1,4 +1,4 @@
-use crate::app::file::{Group70Var2, Group70Var3, Group70Var4, Group70Var5};
+use crate::app::file::*;
 use crate::app::format::WriteError;
 use crate::app::Variation;
 use scursor::WriteCursor;
@@ -35,6 +35,14 @@ impl<'a> FreeFormat for Group70Var4<'a> {
 
 impl<'a> FreeFormat for Group70Var5<'a> {
     const VARIATION: Variation = Variation::Group70Var5;
+
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        self.write(cursor)
+    }
+}
+
+impl<'a> FreeFormat for Group70Var7<'a> {
+    const VARIATION: Variation = Variation::Group70Var7;
 
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         self.write(cursor)

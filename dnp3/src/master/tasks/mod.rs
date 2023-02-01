@@ -19,12 +19,14 @@ use crate::master::{ReadType, TaskType};
 use crate::master::tasks::deadbands::WriteDeadBandsTask;
 use crate::master::tasks::empty_response::EmptyResponseTask;
 use crate::master::tasks::file_read::FileReadTask;
+use crate::master::tasks::get_file_info::GetFileInfoTask;
 
 pub(crate) mod auto;
 pub(crate) mod command;
 pub(crate) mod deadbands;
 pub(crate) mod empty_response;
 pub(crate) mod file_read;
+pub(crate) mod get_file_info;
 pub(crate) mod read;
 pub(crate) mod restart;
 pub(crate) mod time;
@@ -121,6 +123,8 @@ pub(crate) enum NonReadTask {
     EmptyResponseTask(EmptyResponseTask),
     /// read file from the outstation
     FileRead(FileReadTask),
+    /// get info about a file
+    GetFileInfo(GetFileInfoTask),
 }
 
 impl RequestWriter for ReadTask {
@@ -153,6 +157,7 @@ impl RequestWriter for NonReadTask {
             NonReadTask::DeadBands(t) => t.write(writer)?,
             NonReadTask::EmptyResponseTask(t) => t.write(writer)?,
             NonReadTask::FileRead(t) => t.write(writer)?,
+            NonReadTask::GetFileInfo(t) => t.write(writer)?,
         }
         Ok(())
     }
@@ -250,6 +255,7 @@ impl NonReadTask {
             Self::DeadBands(_) => Some(self),
             Self::EmptyResponseTask(_) => Some(self),
             Self::FileRead(_) => Some(self),
+            Self::GetFileInfo(_) => Some(self),
         }
     }
 
@@ -262,6 +268,7 @@ impl NonReadTask {
             Self::DeadBands(task) => task.function(),
             Self::EmptyResponseTask(task) => task.function(),
             Self::FileRead(task) => task.function(),
+            Self::GetFileInfo(task) => task.function(),
         }
     }
 
@@ -274,6 +281,7 @@ impl NonReadTask {
             Self::DeadBands(task) => task.on_task_error(err),
             Self::EmptyResponseTask(task) => task.on_task_error(err),
             Self::FileRead(task) => task.on_task_error(err),
+            Self::GetFileInfo(task) => task.on_task_error(err),
         }
     }
 
@@ -293,6 +301,7 @@ impl NonReadTask {
             Self::DeadBands(task) => task.handle(response),
             Self::EmptyResponseTask(task) => task.handle(response),
             Self::FileRead(task) => task.handle(response),
+            Self::GetFileInfo(task) => task.handle(response),
         }
     }
 
@@ -309,6 +318,7 @@ impl NonReadTask {
             Self::DeadBands(_) => TaskType::WriteDeadBands,
             Self::EmptyResponseTask(_) => TaskType::GenericEmptyResponse(self.function()),
             Self::FileRead(_) => TaskType::FileRead,
+            Self::GetFileInfo(_) => TaskType::GetFileInfo,
         }
     }
 }

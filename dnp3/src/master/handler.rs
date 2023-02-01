@@ -16,6 +16,7 @@ use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::deadbands::WriteDeadBandsTask;
 use crate::master::tasks::empty_response::EmptyResponseTask;
 use crate::master::tasks::file_read::FileReadTask;
+use crate::master::tasks::get_file_info::GetFileInfoTask;
 use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::restart::{RestartTask, RestartType};
 use crate::master::tasks::time::TimeSyncTask;
@@ -341,6 +342,18 @@ impl AssociationHandle {
         rx.await?
     }
 
+    /// Get information about a file
+    pub async fn get_file_info<T: ToString>(
+        &mut self,
+        file_path: T,
+    ) -> Result<FileInfo, FileError> {
+        let (promise, reply) = Promise::one_shot();
+        let task = GetFileInfoTask::new(file_path.to_string(), promise);
+        self.send_task(Task::NonRead(NonReadTask::GetFileInfo(task)))
+            .await?;
+        reply.await?
+    }
+
     async fn send_task(&mut self, task: Task) -> Result<(), Shutdown> {
         self.master
             .send_association_message(self.address, AssociationMsgType::QueueTask(task))
@@ -410,6 +423,8 @@ pub enum TaskType {
     GenericEmptyResponse(FunctionCode),
     /// Read a file from the outstation
     FileRead,
+    /// Get information about a file
+    GetFileInfo,
 }
 
 /// callbacks associated with a single master to outstation association
