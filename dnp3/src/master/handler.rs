@@ -326,14 +326,15 @@ impl AssociationHandle {
         credentials: Option<FileCredentials>,
     ) -> Result<FileOperation, FileError> {
         let (promise, reply) = Promise::one_shot();
+        let (canceler, canceled) = crate::util::cancelation::tokens();
         self.read_file_impl(
             remote_file_path,
             config,
-            FileReaderType::from_file(local_file, promise),
+            FileReaderType::from_file(local_file, canceled, promise),
             credentials,
         )
         .await?;
-        Ok(FileOperation::new(reply))
+        Ok(FileOperation::new(canceler, reply))
     }
 
     /// Read a file using a generic callback interface to receive data

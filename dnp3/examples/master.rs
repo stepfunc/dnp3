@@ -443,7 +443,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             },
             "rfm" => {
-                // read a file and log what happens, don't write anything to disk
+                // read a file to memory logging what happens
                 if let Err(err) = association
                     .read_file_to_memory(
                         "./Test Harness Manual.pdf",
@@ -471,7 +471,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         {
                             Err(err) => tracing::warn!("Unable to start file transfer: {err}"),
                             Ok(operation) => {
-                                // the operation handle returned here can be dropped
+                                // the operation handle returned here can be dropped or used to abort the operation
                                 match operation.result().await {
                                     Ok(()) => {
                                         tracing::info!("File transfer succeeded")

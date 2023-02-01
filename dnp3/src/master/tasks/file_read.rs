@@ -56,9 +56,15 @@ impl FileReaderType {
         }
     }
 
-    pub(crate) fn from_file(file: File, promise: Promise<Result<(), FileError>>) -> Self {
+    pub(crate) fn from_file(
+        file: File,
+        canceled: crate::util::cancelation::Canceled,
+        promise: Promise<Result<(), FileError>>,
+    ) -> Self {
         Self {
-            inner: Some(ReaderTypes::File(TokioFileSink::new(file, promise))),
+            inner: Some(ReaderTypes::File(TokioFileSink::new(
+                file, canceled, promise,
+            ))),
         }
     }
 
@@ -105,21 +111,30 @@ impl FileReaderType {
 
 struct TokioFileSink {
     file: File,
+    canceled: crate::util::cancelation::Canceled,
     promise: Promise<Result<(), FileError>>,
 }
 
 impl TokioFileSink {
-    fn new(file: File, promise: Promise<Result<(), FileError>>) -> Self {
-        Self { file, promise }
+    fn new(
+        file: File,
+        canceled: crate::util::cancelation::Canceled,
+        promise: Promise<Result<(), FileError>>,
+    ) -> Self {
+        Self {
+            file,
+            canceled,
+            promise,
+        }
     }
 
     fn opened(&mut self, _size: u32) -> bool {
-        true
+        self.canceled.get()
     }
 
     async fn block_received(&mut self, _block_num: u32, data: &[u8]) -> bool {
         match self.file.write_all(data).await {
-            Ok(()) => true,
+            Ok(()) => self.canceled.get(),
             Err(err) => {
                 tracing::error!("Error writing file data: {err}");
                 false

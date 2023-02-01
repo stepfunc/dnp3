@@ -15,12 +15,21 @@ pub struct FileCredentials {
 
 /// Represents the status of a file operation in progress
 pub struct FileOperation {
+    canceler: crate::util::cancelation::Canceler,
     reply: tokio::sync::oneshot::Receiver<Result<(), FileError>>,
 }
 
 impl FileOperation {
-    pub(crate) fn new(reply: tokio::sync::oneshot::Receiver<Result<(), FileError>>) -> Self {
-        Self { reply }
+    pub(crate) fn new(
+        canceler: crate::util::cancelation::Canceler,
+        reply: tokio::sync::oneshot::Receiver<Result<(), FileError>>,
+    ) -> Self {
+        Self { canceler, reply }
+    }
+
+    /// request that the file operation aborts at the next opportunity
+    pub async fn abort(&self) {
+        self.canceler.cancel();
     }
 
     /// await the result of the file operation
