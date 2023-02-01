@@ -19,7 +19,7 @@ pub(crate) use g70v8::*;
 
 pub(crate) use permissions::*;
 
-/// File status enumeration used Group 70 objects
+/// File status enumeration used in Group 70 objects
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum FileStatus {
     /// Requested operation was successful
@@ -55,7 +55,7 @@ pub enum FileStatus {
     /// Some other error not list here occurred. Optional text may provide further explanation.
     Undefined,
     /// Used to capture reserved values
-    Reserved(u8),
+    Other(u8),
 }
 
 impl FileStatus {
@@ -77,7 +77,7 @@ impl FileStatus {
             19 => Self::Fatal,
             20 => Self::BlockSeq,
             255 => Self::Undefined,
-            _ => Self::Reserved(value),
+            _ => Self::Other(value),
         }
     }
 
@@ -99,16 +99,20 @@ impl FileStatus {
             FileStatus::Fatal => 19,
             FileStatus::BlockSeq => 20,
             FileStatus::Undefined => 255,
-            FileStatus::Reserved(x) => x,
+            FileStatus::Other(x) => x,
         }
     }
 }
 
+/// File type enumeration used in Group 70 objects
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum FileType {
+    /// Directory
     Directory,
+    /// Simple file type
     File,
-    Reserved(u16),
+    /// Some other value
+    Other(u16),
 }
 
 impl FileType {
@@ -116,7 +120,7 @@ impl FileType {
         match value {
             0 => Self::Directory,
             1 => Self::File,
-            _ => Self::Reserved(value),
+            _ => Self::Other(value),
         }
     }
 
@@ -124,7 +128,7 @@ impl FileType {
         match self {
             FileType::Directory => 0,
             FileType::File => 1,
-            FileType::Reserved(x) => x,
+            FileType::Other(x) => x,
         }
     }
 }
