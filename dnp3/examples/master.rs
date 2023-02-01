@@ -442,9 +442,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     print_file_info(info);
                 }
             },
-            "rf" => {
+            "rfm" => {
+                // read a file and log what happens, don't write anything to disk
                 if let Err(err) = association
-                    .read_file(
+                    .read_file_to_memory(
                         "./Test Harness Manual.pdf",
                         FileReadConfig::default(),
                         Box::new(FileLogger),
@@ -453,6 +454,38 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     .await
                 {
                     tracing::warn!("Unable to start file transfer: {err}");
+                }
+            }
+            "rfd" => {
+                // read a remote file into a local file
+                match tokio::fs::File::create("./file.data").await {
+                    Ok(local_file) => {
+                        match association
+                            .read_file_to_disk(
+                                "./Test Harness Manual.pdf",
+                                FileReadConfig::default(),
+                                local_file,
+                                None,
+                            )
+                            .await
+                        {
+                            Err(err) => tracing::warn!("Unable to start file transfer: {err}"),
+                            Ok(operation) => {
+                                // the operation handle returned here can be dropped
+                                match operation.result().await {
+                                    Ok(()) => {
+                                        tracing::info!("File transfer succeeded")
+                                    }
+                                    Err(err) => {
+                                        tracing::warn!("File transfer failed: {err}")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        tracing::error!("Unable to open file: {err}");
+                    }
                 }
             }
             "lsr" => {

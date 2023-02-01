@@ -15,7 +15,7 @@ use crate::master::request::{CommandHeaders, CommandMode, ReadRequest, TimeSyncP
 use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::deadbands::WriteDeadBandsTask;
 use crate::master::tasks::empty_response::EmptyResponseTask;
-use crate::master::tasks::file_read::FileReadTask;
+use crate::master::tasks::file_read::{FileReadTask, FileReaderType};
 use crate::master::tasks::get_file_info::GetFileInfoTask;
 use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::restart::{RestartTask, RestartType};
@@ -23,7 +23,7 @@ use crate::master::tasks::time::TimeSyncTask;
 use crate::master::tasks::{NonReadTask, Task};
 use crate::master::{
     DeadBandHeader, DirReadConfig, DirectoryReader, FileCredentials, FileError, FileInfo,
-    FileReadConfig, FileReader, Headers, WriteError,
+    FileOperation, FileReadConfig, FileReader, Headers, WriteError,
 };
 use crate::util::channel::Sender;
 use crate::util::session::Enabled;
@@ -315,15 +315,52 @@ impl AssociationHandle {
         rx.await?
     }
 
-    /// Read a file
-    pub async fn read_file<T: ToString>(
+    /// Read a remote file to an already opened local file
+    ///
+    /// The future returned by
+    pub async fn read_file_to_disk<T: ToString>(
         &mut self,
-        file_path: T,
+        remote_file_path: T,
+        config: FileReadConfig,
+        local_file: tokio::fs::File,
+        credentials: Option<FileCredentials>,
+    ) -> Result<FileOperation, FileError> {
+        let (promise, reply) = Promise::one_shot();
+        self.read_file_impl(
+            remote_file_path,
+            config,
+            FileReaderType::from_file(local_file, promise),
+            credentials,
+        )
+        .await?;
+        Ok(FileOperation::new(reply))
+    }
+
+    /// Read a file using a generic callback interface to receive data
+    pub async fn read_file_to_memory<T: ToString>(
+        &mut self,
+        remote_file_path: T,
         config: FileReadConfig,
         reader: Box<dyn FileReader>,
         credentials: Option<FileCredentials>,
     ) -> Result<(), Shutdown> {
-        let task = FileReadTask::start(file_path.to_string(), config, reader, credentials);
+        self.read_file_impl(
+            remote_file_path,
+            config,
+            FileReaderType::from_reader(reader),
+            credentials,
+        )
+        .await
+    }
+
+    async fn read_file_impl<T: ToString>(
+        &mut self,
+        remote_file_path: T,
+        config: FileReadConfig,
+        reader: FileReaderType,
+        credentials: Option<FileCredentials>,
+    ) -> Result<(), Shutdown> {
+        let task = FileReadTask::start(remote_file_path.to_string(), config, reader, credentials);
         self.send_task(Task::NonRead(NonReadTask::FileRead(task)))
             .await
     }
@@ -337,7 +374,7 @@ impl AssociationHandle {
     ) -> Result<Vec<FileInfo>, FileError> {
         let (promise, rx) = Promise::one_shot();
         let reader = Box::new(DirectoryReader::new(promise));
-        self.read_file(dir_path, config.into(), reader, credentials)
+        self.read_file_to_memory(dir_path, config.into(), reader, credentials)
             .await?;
         rx.await?
     }

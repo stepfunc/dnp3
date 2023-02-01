@@ -83,7 +83,7 @@ async fn aborts_when_no_object_header() {
     let (events, reader) = pair();
     harness
         .association
-        .read_file(
+        .read_file_to_memory(
             "./test.txt".to_string(),
             FileReadConfig::default(),
             reader,
@@ -112,7 +112,7 @@ async fn closes_file_on_completion() {
     let (events, reader) = pair();
     harness
         .association
-        .read_file(
+        .read_file_to_memory(
             "./test.txt".to_string(),
             FileReadConfig::default(),
             reader,
