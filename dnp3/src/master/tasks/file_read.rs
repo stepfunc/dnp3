@@ -5,7 +5,9 @@ use crate::app::parse::free_format::FreeFormatVariation;
 use crate::app::parse::parser::{HeaderDetails, ObjectHeader, Response};
 use crate::app::{FunctionCode, Timestamp};
 use crate::master::tasks::NonReadTask;
-use crate::master::{FileCredentials, FileError, FileReadConfig, FileReader, TaskError};
+use crate::master::{
+    FileAction, FileCredentials, FileError, FileReadConfig, FileReader, TaskError,
+};
 
 pub(crate) struct Filename(pub(crate) String);
 
@@ -52,23 +54,23 @@ impl FileReaderType {
         }
     }
 
-    fn opened(&mut self, size: u32) -> bool {
+    fn opened(&mut self, size: u32) -> FileAction {
         if let Some(x) = self.inner.as_mut() {
             match x {
                 ReaderTypes::Trait(x) => x.opened(size),
             }
         } else {
-            false
+            FileAction::Abort
         }
     }
 
-    async fn block_received(&mut self, block_num: u32, data: &[u8]) -> bool {
+    async fn block_received(&mut self, block_num: u32, data: &[u8]) -> FileAction {
         if let Some(x) = self.inner.as_mut() {
             match x {
                 ReaderTypes::Trait(x) => x.block_received(block_num, data).get().await,
             }
         } else {
-            false
+            FileAction::Abort
         }
     }
 
@@ -272,14 +274,14 @@ impl FileReadTask {
 
         match inner(header) {
             Ok((file_size, handle)) => {
-                if settings.reader.opened(file_size) {
+                if settings.reader.opened(file_size).is_abort() {
+                    tracing::warn!("File transfer aborted by user");
+                    Some(FileReadTask::new(settings, State::Close(handle)))
+                } else {
                     Some(FileReadTask::new(
                         settings,
                         State::Read(ReadState::new(handle)),
                     ))
-                } else {
-                    tracing::warn!("File transfer aborted by user");
-                    Some(FileReadTask::new(settings, State::Close(handle)))
                 }
             }
             Err(err) => {
@@ -337,10 +339,11 @@ impl FileReadTask {
                 return Err(FileError::MaxLengthExceeded);
             }
 
-            if !settings
+            if settings
                 .reader
                 .block_received(rx_block.bottom_bits(), obj.file_data)
                 .await
+                .is_abort()
             {
                 tracing::warn!("File transfer aborted by user");
                 return Err(FileError::AbortByUser);

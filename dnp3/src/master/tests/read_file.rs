@@ -3,7 +3,7 @@ use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
 use crate::master::association::AssociationConfig;
-use crate::master::{FileError, FileReadConfig, FileReader, TaskError};
+use crate::master::{FileAction, FileError, FileReadConfig, FileReader, TaskError};
 
 use super::harness::create_association;
 
@@ -15,9 +15,15 @@ enum Event {
     Complete,
 }
 
+impl Default for FileAction {
+    fn default() -> Self {
+        FileAction::Continue
+    }
+}
+
 #[derive(Default)]
 struct State {
-    aborted: bool,
+    action: FileAction,
     events: VecDeque<Event>,
 }
 
@@ -53,16 +59,16 @@ fn pair() -> (EventHandle, Box<dyn FileReader>) {
 }
 
 impl FileReader for MockReader {
-    fn opened(&mut self, size: u32) -> bool {
+    fn opened(&mut self, size: u32) -> FileAction {
         let mut state = self.state.lock().unwrap();
         state.push(Event::Open(size));
-        !state.aborted
+        state.action
     }
 
-    fn block_received(&mut self, block_num: u32, data: &[u8]) -> MaybeAsync<bool> {
+    fn block_received(&mut self, block_num: u32, data: &[u8]) -> MaybeAsync<FileAction> {
         let mut state = self.state.lock().unwrap();
         state.push(Event::Rx(block_num, data.to_vec()));
-        MaybeAsync::ready(!state.aborted)
+        MaybeAsync::ready(state.action)
     }
 
     fn aborted(&mut self, err: FileError) {
@@ -83,7 +89,7 @@ async fn aborts_when_no_object_header() {
     let (events, reader) = pair();
     harness
         .association
-        .read_file_to_memory(
+        .read_file(
             "./test.txt".to_string(),
             FileReadConfig::default(),
             reader,
@@ -112,7 +118,7 @@ async fn closes_file_on_completion() {
     let (events, reader) = pair();
     harness
         .association
-        .read_file_to_memory(
+        .read_file(
             "./test.txt".to_string(),
             FileReadConfig::default(),
             reader,

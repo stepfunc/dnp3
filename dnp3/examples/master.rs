@@ -198,14 +198,14 @@ impl AssociationInformation for ExampleAssociationInformation {}
 struct FileLogger;
 
 impl FileReader for FileLogger {
-    fn opened(&mut self, size: u32) -> bool {
+    fn opened(&mut self, size: u32) -> FileAction {
         tracing::info!("File opened - size: {size}");
-        true
+        FileAction::Continue
     }
 
-    fn block_received(&mut self, block_num: u32, data: &[u8]) -> MaybeAsync<bool> {
+    fn block_received(&mut self, block_num: u32, data: &[u8]) -> MaybeAsync<FileAction> {
         tracing::info!("Received block {block_num} with size: {}", data.len());
-        MaybeAsync::ready(true)
+        MaybeAsync::ready(FileAction::Continue)
     }
 
     fn aborted(&mut self, err: FileError) {

@@ -165,19 +165,37 @@ impl std::fmt::Display for FileError {
     }
 }
 
+/// Describes whether a file operation should continue (No) or abort (Yes)
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum FileAction {
+    /// Abort the operation
+    Abort,
+    /// Continue the operation
+    Continue,
+}
+
+impl FileAction {
+    pub(crate) fn is_abort(self) -> bool {
+        match self {
+            Self::Abort => true,
+            Self::Continue => false,
+        }
+    }
+}
+
 /// Callbacks for reading a file
 pub trait FileReader: Send + Sync + 'static {
     /// Called when the file is successfully opened
     ///
-    /// Returning false will abort the transfer
-    fn opened(&mut self, size: u32) -> bool;
+    /// May optionally abort the operation
+    fn opened(&mut self, size: u32) -> FileAction;
 
     /// Called when the next block is received
     ///
     /// Returning false will abort the transfer. This allows the received to place
     /// limits on the amount of received data or abort on internals errors like being
     /// unable to write to a local file
-    fn block_received(&mut self, block_num: u32, data: &[u8]) -> MaybeAsync<bool>;
+    fn block_received(&mut self, block_num: u32, data: &[u8]) -> MaybeAsync<FileAction>;
 
     /// Called when the transfer is aborted before completion due to an error in the transfer
     fn aborted(&mut self, err: FileError);
@@ -201,13 +219,13 @@ impl DirectoryReader {
 }
 
 impl FileReader for DirectoryReader {
-    fn opened(&mut self, _size: u32) -> bool {
-        true
+    fn opened(&mut self, _size: u32) -> FileAction {
+        FileAction::Continue
     }
 
-    fn block_received(&mut self, _block_num: u32, data: &[u8]) -> MaybeAsync<bool> {
+    fn block_received(&mut self, _block_num: u32, data: &[u8]) -> MaybeAsync<FileAction> {
         self.data.extend(data);
-        MaybeAsync::ready(true)
+        MaybeAsync::ready(FileAction::Continue)
     }
 
     fn aborted(&mut self, err: FileError) {
