@@ -255,14 +255,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // create an event poll
     // ANCHOR: add_poll
-    /*
     let mut poll = association
         .add_poll(
             ReadRequest::ClassScan(Classes::class123()),
             Duration::from_secs(5),
         )
         .await?;
-     */
     // ANCHOR_END: add_poll
 
     // enable communications
@@ -322,7 +320,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
                 // ANCHOR_END: assoc_control
             }
-            //"evt" => poll.demand().await?,
+            "evt" => poll.demand().await?,
             "lts" => {
                 if let Err(err) = association.synchronize_time(TimeSyncProcedure::Lan).await {
                     tracing::warn!("error: {}", err);
