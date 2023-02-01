@@ -62,7 +62,7 @@ impl std::fmt::Display for Permissions {
 struct Mask(u16);
 
 impl Mask {
-    const fn new(bit: u8) -> Self {
+    const fn bit(bit: u8) -> Self {
         Self(1 << bit)
     }
     fn is_set(self, value: u16) -> bool {
@@ -71,17 +71,17 @@ impl Mask {
 }
 
 impl Permissions {
-    const WE: Mask = Mask::new(0);
-    const WW: Mask = Mask::new(1);
-    const WR: Mask = Mask::new(2);
+    const WE: Mask = Mask::bit(0);
+    const WW: Mask = Mask::bit(1);
+    const WR: Mask = Mask::bit(2);
 
-    const GE: Mask = Mask::new(3);
-    const GW: Mask = Mask::new(4);
-    const GR: Mask = Mask::new(5);
+    const GE: Mask = Mask::bit(3);
+    const GW: Mask = Mask::bit(4);
+    const GR: Mask = Mask::bit(5);
 
-    const OE: Mask = Mask::new(6);
-    const OW: Mask = Mask::new(7);
-    const OR: Mask = Mask::new(8);
+    const OE: Mask = Mask::bit(6);
+    const OW: Mask = Mask::bit(7);
+    const OR: Mask = Mask::bit(8);
 
     fn value(self) -> u16 {
         self.world.value() | self.group.value() << 3 | self.owner.value() << 6
