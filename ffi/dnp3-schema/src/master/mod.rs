@@ -528,6 +528,34 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         .doc("Asynchronously retrieve information on a particular file")?
         .build()?;
 
+    /*
+    let file_info_iter = lib
+        .define_iterator("file_info_iterator", shared.file.file_info.clone())?;
+
+
+    let read_directory_cb = lib.define_future_interface(
+        "read_directory_callback",
+        "Callback interface for retrieving a directory list",
+        file_info_iter,
+        "{iterator} of {struct:file_info} values",
+        shared.file.file_error.clone()
+    )?;
+
+
+    let read_directory_async = lib
+        .define_future_method("read_directory", master_channel_class.clone(), read_directory_cb)?
+        .param(
+            "association",
+            association_id.clone(),
+            "Id of the association",
+        )?
+        .param("dir_path", StringType, "Complete path to the remote directory")?
+        // TODO config
+        .fails_with(shared.error_type.clone())?
+        .doc("Asynchronously retrieve a directory listing")?
+        .build()?;
+     */
+
     let link_status_cb = define_link_status_callback(lib, nothing)?;
 
     let check_link_status_async = lib
@@ -568,6 +596,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         .async_method(write_dead_bands_async)?
         .async_method(send_and_expect_empty_response)?
         .async_method(get_file_info_async)?
+        //.async_method(read_directory_async)?
         .async_method(check_link_status_async)?
         .custom_destroy("shutdown")?
         .doc(
