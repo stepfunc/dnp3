@@ -1,5 +1,6 @@
 use std::ffi::CStr;
 use std::ptr::{null, null_mut};
+use std::str::Utf8Error;
 use std::time::Duration;
 
 use dnp3::app::{
@@ -598,6 +599,28 @@ pub(crate) unsafe fn master_channel_warm_restart(
     Ok(())
 }
 
+pub(crate) unsafe fn master_channel_get_file_info(
+    channel: *mut crate::MasterChannel,
+    association: ffi::AssociationId,
+    file_name: &CStr,
+    callback: ffi::FileInfoCallback,
+) -> Result<(), ffi::ParamError> {
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let address = EndpointAddress::try_new(association.address)?;
+
+    let mut association = AssociationHandle::create(address, channel.handle.clone());
+    let promise = sfio_promise::wrap(callback);
+    let file_name = file_name.to_str()?.to_string();
+
+    let task = async move {
+        let res = association.get_file_info(file_name).await;
+        promise.complete(res);
+    };
+
+    channel.runtime.spawn(task)?;
+    Ok(())
+}
+
 pub(crate) unsafe fn master_channel_check_link_status(
     channel: *mut crate::MasterChannel,
     association: ffi::AssociationId,
@@ -739,6 +762,12 @@ fn convert_config(
         tx_buffer_size: BufferSize::new(config.tx_buffer_size() as usize)?,
         rx_buffer_size: BufferSize::new(config.rx_buffer_size() as usize)?,
     })
+}
+
+impl From<Utf8Error> for ffi::ParamError {
+    fn from(_: Utf8Error) -> Self {
+        Self::StringNotUtf8
+    }
 }
 
 impl From<ffi::RetryStrategy> for dnp3::app::RetryStrategy {
@@ -904,6 +933,7 @@ define_task_from_impl!(ReadError);
 define_task_from_impl!(LinkStatusError);
 define_task_from_impl!(TaskError);
 define_task_from_impl!(EmptyResponseError);
+define_task_from_impl!(FileError);
 
 impl From<ffi::FunctionCode> for dnp3::app::FunctionCode {
     fn from(value: ffi::FunctionCode) -> Self {

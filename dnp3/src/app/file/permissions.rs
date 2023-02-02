@@ -1,10 +1,14 @@
 use scursor::{ReadCursor, WriteCursor};
 use std::fmt::Write;
 
+/// Defines read, write, execute permissions for particular group or user
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct PermissionSet {
+    /// Permission to execute
     pub execute: bool,
+    /// Permission to write
     pub write: bool,
+    /// Permission to read
     pub read: bool,
 }
 
@@ -41,10 +45,14 @@ impl PermissionSet {
     }
 }
 
+/// Permissions for world, group, and owner
 #[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct Permissions {
+    /// World permissions
     pub world: PermissionSet,
+    /// Group permissions
     pub group: PermissionSet,
+    /// Owner permissions
     pub owner: PermissionSet,
 }
 

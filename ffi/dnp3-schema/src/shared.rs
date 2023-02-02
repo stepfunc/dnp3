@@ -1,4 +1,5 @@
 use crate::attributes::DeviceAttrTypes;
+use crate::file::FileDefinitions;
 use crate::gv;
 use oo_bindgen::model::*;
 use std::time::Duration;
@@ -42,6 +43,7 @@ pub(crate) struct SharedDefinitions {
     pub min_tls_version: EnumHandle,
     pub certificate_mode: EnumHandle,
     pub attr: DeviceAttrTypes,
+    pub file: FileDefinitions,
 }
 
 pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
@@ -56,6 +58,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> 
             "The supplied timeout value is too small or too large",
         )?
         .add_error("null_parameter", "Null parameter")?
+        .add_error("string_not_utf8", "Provided string argument is not UTF-8")?
         .add_error(
             "no_support",
             "Native library was compiled without support for this feature",
@@ -317,6 +320,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> 
         octet_string_it,
         byte_it,
         attr,
+        file: crate::file::define(lib)?,
     })
 }
 

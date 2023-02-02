@@ -17,7 +17,7 @@ pub(crate) use g70v6::*;
 pub(crate) use g70v7::*;
 pub(crate) use g70v8::*;
 
-pub(crate) use permissions::*;
+pub use permissions::*;
 
 /// File status enumeration used in Group 70 objects
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

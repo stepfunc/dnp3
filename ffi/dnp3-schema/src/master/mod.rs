@@ -479,6 +479,20 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         .doc("Asynchronously perform a warm restart operation to the association")?
         .build()?;
 
+    let file_info_cb = define_file_info_callback(lib, shared)?;
+
+    let get_file_info_async = lib
+        .define_future_method("get_file_info", master_channel_class.clone(), file_info_cb)?
+        .param(
+            "association",
+            association_id.clone(),
+            "Id of the association",
+        )?
+        .param("file_name", StringType, "Complete path to the remote file")?
+        .fails_with(shared.error_type.clone())?
+        .doc("Asynchronously retrieve information on a particular file")?
+        .build()?;
+
     let link_status_cb = define_link_status_callback(lib, nothing)?;
 
     let check_link_status_async = lib
@@ -516,6 +530,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         .async_method(warm_restart_async)?
         .async_method(write_dead_bands_async)?
         .async_method(send_and_expect_empty_response)?
+        .async_method(get_file_info_async)?
         .async_method(check_link_status_async)?
         .custom_destroy("shutdown")?
         .doc(
@@ -955,7 +970,7 @@ const TASK_ERRORS: &[(&str, &str)] = &[
     ("bad_encoding", "request data could not be encoded"),
 ];
 
-trait TaskErrors: Sized {
+pub(crate) trait TaskErrors: Sized {
     fn add_task_errors(self) -> BackTraced<Self>;
 }
 
@@ -1255,6 +1270,21 @@ fn define_restart_callback(lib: &mut LibraryBuilder) -> BackTraced<FutureInterfa
         DurationType::Milliseconds,
         "Result of the restart task",
         restart_error,
+    )?;
+
+    Ok(callback)
+}
+
+fn define_file_info_callback(
+    lib: &mut LibraryBuilder,
+    shared: &SharedDefinitions,
+) -> BackTraced<FutureInterface<Unvalidated>> {
+    let callback = lib.define_future_interface(
+        "file_info_callback",
+        "Callback interface for retrieving file info asynchronously",
+        shared.file.file_info.clone(),
+        "Information about the requested file",
+        shared.file.file_error.clone(),
     )?;
 
     Ok(callback)

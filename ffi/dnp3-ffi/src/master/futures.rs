@@ -1,4 +1,6 @@
+use crate::ffi;
 use dnp3::master::*;
+use std::ffi::CString;
 use std::time::Duration;
 
 impl<T> sfio_promise::FutureType<Result<T, WriteError>> for crate::ffi::EmptyResponseCallback {
@@ -99,6 +101,77 @@ impl sfio_promise::FutureType<Result<(), TaskError>> for crate::ffi::LinkStatusC
             Err(err) => {
                 self.on_failure(err.into());
             }
+        }
+    }
+}
+
+impl sfio_promise::FutureType<Result<FileInfo, FileError>> for crate::ffi::FileInfoCallback {
+    fn on_drop() -> Result<FileInfo, FileError> {
+        Err(FileError::TaskError(TaskError::Shutdown))
+    }
+
+    fn complete(self, result: Result<FileInfo, FileError>) {
+        match result {
+            Ok(info) => {
+                // this stays validate for the duration of the completion callback allowing
+                // the C string to be copied
+                let name = CString::new(info.name).unwrap();
+                let info = ffi::FileInfoFields {
+                    file_name: &name,
+                    file_type: info.file_type.into(),
+                    size: info.size,
+                    time_created: info.time_created.raw_value(),
+                    permissions: info.permissions.into(),
+                };
+                self.on_complete(info.into());
+            }
+            Err(err) => {
+                self.on_failure(err.into());
+            }
+        }
+    }
+}
+
+impl From<dnp3::app::FileType> for ffi::FileType {
+    fn from(value: dnp3::app::FileType) -> Self {
+        match value {
+            dnp3::app::FileType::Directory => Self::Directory,
+            dnp3::app::FileType::File => Self::Simple,
+            dnp3::app::FileType::Other(_) => Self::Other,
+        }
+    }
+}
+
+impl From<dnp3::app::Permissions> for ffi::Permissions {
+    fn from(value: dnp3::app::Permissions) -> Self {
+        Self {
+            world: value.world.into(),
+            group: value.world.into(),
+            owner: value.group.into(),
+        }
+    }
+}
+
+impl From<dnp3::app::PermissionSet> for ffi::PermissionSet {
+    fn from(value: dnp3::app::PermissionSet) -> Self {
+        Self {
+            execute: value.execute,
+            write: value.write,
+            read: value.read,
+        }
+    }
+}
+
+impl From<dnp3::master::FileError> for ffi::FileError {
+    fn from(value: FileError) -> Self {
+        match value {
+            FileError::BadResponse => ffi::FileError::BadResponse,
+            FileError::BadStatus(_) => ffi::FileError::BadStatus,
+            FileError::NoPermission => ffi::FileError::NoPermission,
+            FileError::BadBlockNum => ffi::FileError::BadBlockNum,
+            FileError::AbortByUser => ffi::FileError::AbortByUser,
+            FileError::MaxLengthExceeded => ffi::FileError::MaxLengthExceeded,
+            FileError::TaskError(x) => x.into(),
         }
     }
 }
