@@ -229,6 +229,31 @@ class MainClass
     // ANCHOR_END: association_information
 
 
+    class FileReader : IFileReader
+    {
+        void IFileReader.Aborted(FileError error)
+        {
+            Console.WriteLine($"File transfer aborted: {error}");
+        }
+
+        bool IFileReader.BlockReceived(uint blockNum, ICollection<byte> data)
+        {
+            Console.WriteLine($"Received file block {blockNum} with size {data.Count}");
+            return true;
+        }
+
+        void IFileReader.Completed()
+        {
+            Console.WriteLine($"File transfer completed");
+        }
+
+        bool IFileReader.Opened(uint size)
+        {
+            Console.WriteLine($"Outstation open file with size: ${size}");
+            return true;
+        }
+    }
+
     // ANCHOR: master_channel_config
     private static MasterChannelConfig GetMasterChannelConfig()
     {
@@ -437,7 +462,7 @@ class MainClass
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Error: " + ex);
+                Console.WriteLine($"Error: {ex}");
             }
         }
     }
@@ -559,6 +584,13 @@ class MainClass
                 {
                     // get file info
                     var info = await channel.GetFileInfo(association, ".");
+                    PrintFileInfo(info);
+                    return true;
+                }
+            case "rf":
+                {
+                    // read a file asynchronously using a callback interface
+                    channel.ReadFile(association, ".", FileReadConfig.Init(), new FileReader());
                     return true;
                 }
             case "crt":
@@ -583,5 +615,12 @@ class MainClass
                 Console.WriteLine("Unknown command");
                 return true;
         }
+    }
+    private static void PrintFileInfo(FileInfo info)
+    {
+        Console.WriteLine($"Filename: {info.FileName}");
+        Console.WriteLine($"  type: {info.FileType}");
+        Console.WriteLine($"  size: {info.Size}");
+        Console.WriteLine($"  created: {info.TimeCreated}");
     }
 }
