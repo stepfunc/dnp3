@@ -555,6 +555,12 @@ class MainClass
                     await channel.Read(association, request);
                     return true;
                 }
+            case "gfi":
+                {
+                    // get file info
+                    var info = await channel.GetFileInfo(association, ".");
+                    return true;
+                }
             case "crt":
                 {
                     var delay = await channel.ColdRestart(association);

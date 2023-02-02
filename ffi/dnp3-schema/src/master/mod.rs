@@ -480,6 +480,41 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         .build()?;
 
     let file_info_cb = define_file_info_callback(lib, shared)?;
+    let file_reader = define_file_reader(lib, shared)?;
+    let file_read_config = define_file_read_config(lib)?;
+
+    let read_file = lib
+        .define_method("read_file", master_channel_class.clone())?
+        .doc("Start an operation to READ a file from the outstation using a {interface:file_reader} to receive data")?
+        .param(
+            "association",
+            association_id.clone(),
+            "Id of the association",
+        )?
+        .param("remote_file_path", StringType, "Path of the remote file")?
+        .param("config", file_read_config.clone(), "Configuration for the read operation")?
+        .param("reader", file_reader.clone(), "Interface used to receive file data")?
+        .fails_with(shared.error_type.clone())?
+        .build()?;
+
+    let read_file_with_auth = lib
+        .define_method("read_file_with_auth", master_channel_class.clone())?
+        .doc(
+            doc("Start an operation to READ a file from the outstation using a {interface:file_reader} to receive data")
+                .details("This variant first requests an authentication key from the outstation using the supplied credentials")
+        )?
+        .param(
+            "association",
+            association_id.clone(),
+            "Id of the association",
+        )?
+        .param("remote_file_path", StringType, "Path of the remote file")?
+        .param("config", file_read_config, "Configuration for the read operation")?
+        .param("reader", file_reader, "Interface used to receive file data")?
+        .param("user_name", StringType, "User name sent to the outstation")?
+        .param("password", StringType, "Password sent to the outstation")?
+        .fails_with(shared.error_type.clone())?
+        .build()?;
 
     let get_file_info_async = lib
         .define_future_method("get_file_info", master_channel_class.clone(), file_info_cb)?
@@ -522,6 +557,8 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         .method(add_poll_method)?
         .method(remove_poll_method)?
         .method(demand_poll_method)?
+        .method(read_file)?
+        .method(read_file_with_auth)?
         .async_method(read_async)?
         .async_method(read_with_handler_async)?
         .async_method(operate_async)?
@@ -1288,6 +1325,76 @@ fn define_file_info_callback(
     )?;
 
     Ok(callback)
+}
+
+fn define_file_reader(
+    lib: &mut LibraryBuilder,
+    shared: &SharedDefinitions,
+) -> BackTraced<AsynchronousInterface> {
+    let file_reader = lib
+        .define_interface(
+        "file_reader",
+        " Callbacks for reading a file from the outstation asynchronously"
+        )?
+        // opened
+        .begin_callback("opened",
+                        doc("Called when the file is successfully opened").details("May optionally abort the operation by returning false"),
+        )?
+        .param("size", Primitive::U32, "Size of the file returned by the outstation")?
+        .returns(Primitive::Bool, "True to continue, false to abort")?
+        .end_callback()?
+        // block received
+        .begin_callback("block_received",
+                        doc("Called when the next block is received")
+                            .details("May optionally abort the transfer. This allows the application abort on internal errors like being or by user request.")
+        )?
+        .param("block_num", Primitive::U32, "The block number which increments as the transfer proceeds")?
+        .param("data", shared.byte_it.clone(), "{iterator} of bytes in the block")?
+        .returns(Primitive::Bool, "True to continue, false to abort")?
+        .end_callback()?
+        // aborted
+        .begin_callback("aborted", "Called when the transfer is aborted before completion due to an error or user request")?
+        .param("error", shared.file.file_error.clone_enum(), "Error describing why the transfer aborted")?
+        .end_callback()?
+        // completed
+        .begin_callback("completed", "Called when the transfer completes successfully")?
+        .end_callback()?
+        .build_async()?;
+
+    Ok(file_reader)
+}
+
+fn define_file_read_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
+    let config = lib.declare_function_argument_struct("file_read_config")?;
+
+    let max_block_size = Name::create("max_block_size")?;
+    let max_file_size = Name::create("max_file_size")?;
+
+    let config = lib
+        .define_function_argument_struct(config)?
+        .doc("Configuration related to reading a file")?
+        .add(
+            max_block_size.clone(),
+            Primitive::U16,
+            "Maximum block size requested by the master during the file open",
+        )?
+        .add(
+            max_file_size.clone(),
+            Primitive::U32,
+            "Maximum file size accepted by the master",
+        )?
+        .end_fields()?
+        .begin_initializer(
+            "init",
+            InitializerType::Static,
+            "Initialize the configuration to default values",
+        )?
+        .default(&max_block_size, NumberValue::U16(u16::MAX))?
+        .default(&max_file_size, NumberValue::U32(u32::MAX))?
+        .end_initializer()?
+        .build()?;
+
+    Ok(config)
 }
 
 fn define_link_status_callback(

@@ -421,7 +421,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             }
             "rd" => {
                 match association
-                    .read_directory("./", DirReadConfig::default(), None)
+                    .read_directory(".", DirReadConfig::default(), None)
                     .await
                 {
                     Err(err) => {
@@ -446,7 +446,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // read a file logging what happens
                 if let Err(err) = association
                     .read_file(
-                        "./Test Harness Manual.pdf",
+                        ".", // this reads the "directory" file but doesn't parse it
                         FileReadConfig::default(),
                         Box::new(FileLogger),
                         None,

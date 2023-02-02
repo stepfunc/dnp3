@@ -16,7 +16,7 @@ use dnp3::serial::*;
 #[cfg(feature = "tls")]
 use dnp3::tcp::tls::*;
 
-use crate::ffi;
+use crate::{ffi, ByteIterator};
 
 pub struct MasterChannel {
     pub(crate) runtime: crate::runtime::RuntimeHandle,
@@ -599,6 +599,62 @@ pub(crate) unsafe fn master_channel_warm_restart(
     Ok(())
 }
 
+pub(crate) unsafe fn master_channel_read_file(
+    channel: *mut crate::MasterChannel,
+    association: ffi::AssociationId,
+    remote_file_path: &CStr,
+    config: ffi::FileReadConfig,
+    reader: ffi::FileReader,
+) -> Result<(), ffi::ParamError> {
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let address = EndpointAddress::try_new(association.address)?;
+    let mut association = AssociationHandle::create(address, channel.handle.clone());
+    let remote_file_path = remote_file_path.to_str()?.to_string();
+    let config: FileReadConfig = config.into();
+
+    channel.runtime.block_on(async move {
+        association
+            .read_file(remote_file_path, config, Box::new(reader), None)
+            .await
+    })??;
+
+    Ok(())
+}
+
+pub(crate) unsafe fn master_channel_read_file_with_auth(
+    channel: *mut crate::MasterChannel,
+    association: ffi::AssociationId,
+    remote_file_path: &CStr,
+    config: ffi::FileReadConfig,
+    reader: ffi::FileReader,
+    user_name: &CStr,
+    password: &CStr,
+) -> Result<(), ffi::ParamError> {
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let address = EndpointAddress::try_new(association.address)?;
+    let mut association = AssociationHandle::create(address, channel.handle.clone());
+    let remote_file_path = remote_file_path.to_str()?.to_string();
+    let config: FileReadConfig = config.into();
+
+    let credentials = FileCredentials {
+        user_name: user_name.to_str()?.to_string(),
+        password: password.to_str()?.to_string(),
+    };
+
+    channel.runtime.block_on(async move {
+        association
+            .read_file(
+                remote_file_path,
+                config,
+                Box::new(reader),
+                Some(credentials),
+            )
+            .await
+    })??;
+
+    Ok(())
+}
+
 pub(crate) unsafe fn master_channel_get_file_info(
     channel: *mut crate::MasterChannel,
     association: ffi::AssociationId,
@@ -856,6 +912,33 @@ impl From<WriteError> for ffi::EmptyResponseError {
     }
 }
 
+impl FileReader for ffi::FileReader {
+    fn opened(&mut self, size: u32) -> FileAction {
+        if ffi::FileReader::opened(self, size).unwrap_or(false) {
+            FileAction::Continue
+        } else {
+            FileAction::Abort
+        }
+    }
+
+    fn block_received(&mut self, block_num: u32, data: &[u8]) -> MaybeAsync<FileAction> {
+        let mut iter = ByteIterator::new(data);
+        if ffi::FileReader::block_received(self, block_num, &mut iter).unwrap_or(false) {
+            MaybeAsync::ready(FileAction::Continue)
+        } else {
+            MaybeAsync::ready(FileAction::Abort)
+        }
+    }
+
+    fn aborted(&mut self, err: FileError) {
+        ffi::FileReader::aborted(self, err.into());
+    }
+
+    fn completed(&mut self) {
+        ffi::FileReader::completed(self);
+    }
+}
+
 #[cfg(feature = "tls")]
 impl From<TlsError> for ffi::ParamError {
     fn from(error: TlsError) -> Self {
@@ -934,6 +1017,15 @@ define_task_from_impl!(LinkStatusError);
 define_task_from_impl!(TaskError);
 define_task_from_impl!(EmptyResponseError);
 define_task_from_impl!(FileError);
+
+impl From<ffi::FileReadConfig> for FileReadConfig {
+    fn from(value: ffi::FileReadConfig) -> Self {
+        Self {
+            max_block_size: value.max_block_size,
+            max_file_size: value.max_file_size as usize,
+        }
+    }
+}
 
 impl From<ffi::FunctionCode> for dnp3::app::FunctionCode {
     fn from(value: ffi::FunctionCode) -> Self {

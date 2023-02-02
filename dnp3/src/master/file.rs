@@ -32,12 +32,17 @@ pub struct FileInfo {
 }
 
 /// Configuration related to reading a file
-///
-///
 #[derive(Copy, Clone, Debug)]
 pub struct FileReadConfig {
-    pub(crate) max_block_size: u16,
-    pub(crate) max_file_size: usize,
+    /// Maximum block size requested by the master during the file open
+    pub max_block_size: u16,
+    /// Maximum file size accepted by the master
+    ///
+    /// This applies to both:
+    ///
+    /// 1) The size returned by the outstation in the OPEN operation
+    /// 2) The total number of bytes actually returned in subsequent READ operations
+    pub max_file_size: usize,
 }
 
 /// Configuration related to reading a directory
@@ -45,8 +50,11 @@ pub struct FileReadConfig {
 ///
 #[derive(Copy, Clone, Debug)]
 pub struct DirReadConfig {
-    pub(crate) max_block_size: u16,
-    pub(crate) max_file_size: usize,
+    /// Maximum block size requested by the master during the file open
+    pub max_block_size: u16,
+    /// Maximum number of bytes that may be accumulated while reading
+    /// directory information
+    pub max_file_size: usize,
 }
 
 impl From<DirReadConfig> for FileReadConfig {
@@ -66,27 +74,6 @@ impl FileReadConfig {
             max_file_size: usize::MAX,
         }
     }
-
-    /// Modify the maximum block size requested by the master during the file open
-    pub fn set_max_block_size(self, max_block_size: u16) -> Self {
-        Self {
-            max_block_size,
-            ..self
-        }
-    }
-
-    /// Modify the maximum file size accepted by the master
-    ///
-    /// This applies to both:
-    ///
-    /// 1) The size returned by the outstation in the OPEN operation
-    /// 2) The total number of bytes actually returned in subsequent READ operations
-    pub fn set_max_file_size(self, max_file_size: usize) -> Self {
-        Self {
-            max_file_size,
-            ..self
-        }
-    }
 }
 
 impl DirReadConfig {
@@ -98,23 +85,6 @@ impl DirReadConfig {
         Self {
             max_block_size: u16::MAX,
             max_file_size: Self::DEFAULT_MAX_SIZE,
-        }
-    }
-
-    /// Modify the maximum block size requested by the master during the file open
-    pub fn set_max_block_size(self, max_block_size: u16) -> Self {
-        Self {
-            max_block_size,
-            ..self
-        }
-    }
-
-    /// Modify the maximum number of bytes that may be accumulated while reading
-    /// directory information
-    pub fn set_max_size(self, max_size: usize) -> Self {
-        Self {
-            max_file_size: max_size,
-            ..self
         }
     }
 }
@@ -192,15 +162,14 @@ pub trait FileReader: Send + Sync + 'static {
 
     /// Called when the next block is received
     ///
-    /// Returning false will abort the transfer. This allows the received to place
-    /// limits on the amount of received data or abort on internals errors like being
-    /// unable to write to a local file
+    /// Returning ['FileAction::Abort'] will abort the transfer. This allows the application abort
+    /// on internal errors like being or by user request.
     fn block_received(&mut self, block_num: u32, data: &[u8]) -> MaybeAsync<FileAction>;
 
-    /// Called when the transfer is aborted before completion due to an error in the transfer
+    /// Called when the transfer is aborted before completion due to an error or user request
     fn aborted(&mut self, err: FileError);
 
-    /// Called when the transfer completes
+    /// Called when the transfer completes successfully
     fn completed(&mut self);
 }
 

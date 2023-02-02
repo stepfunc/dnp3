@@ -315,7 +315,7 @@ impl AssociationHandle {
         rx.await?
     }
 
-    /// Read a file using a generic callback interface to receive data
+    /// Start an operation to READ a file from the outstation using a [`FileReader`] to receive data
     pub async fn read_file<T: ToString>(
         &mut self,
         remote_file_path: T,
