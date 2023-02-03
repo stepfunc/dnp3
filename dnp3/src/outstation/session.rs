@@ -991,8 +991,6 @@ impl OutstationSession {
         match self.classify(info, request) {
             FragmentType::MalformedRequest(hash, err) => {
                 let response = Response::empty_solicited(seq, Iin::default() | Iin2::from(err));
-
-                // TODO: Shouldn't we return None here?
                 Some(LastValidRequest::new(seq, hash, Some(response), None))
             }
             FragmentType::NewRead(hash, objects) => {

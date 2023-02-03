@@ -577,7 +577,7 @@ impl From<TripCloseCode> for ffi::TripCloseCode {
             TripCloseCode::Close => Self::Close,
             TripCloseCode::Trip => Self::Trip,
             TripCloseCode::Reserved => Self::Reserved,
-            TripCloseCode::Unknown(_) => Self::Nul, // TODO: do something better than this
+            TripCloseCode::Unknown(_) => Self::Nul,
         }
     }
 }
@@ -590,7 +590,7 @@ impl From<OpType> for ffi::OpType {
             OpType::PulseOff => Self::PulseOff,
             OpType::LatchOn => Self::LatchOn,
             OpType::LatchOff => Self::LatchOff,
-            OpType::Unknown(_) => Self::Nul, // TODO: do something better than this
+            OpType::Unknown(_) => Self::Nul,
         }
     }
 }
@@ -656,7 +656,7 @@ impl From<ffi::CommandStatus> for CommandStatus {
             ffi::CommandStatus::BlockedOtherMaster => Self::BlockedOtherMaster,
             ffi::CommandStatus::DownstreamFail => Self::DownstreamFail,
             ffi::CommandStatus::NonParticipating => Self::NonParticipating,
-            ffi::CommandStatus::Unknown => Self::Unknown(0), // TODO: do something better than this
+            ffi::CommandStatus::Unknown => Self::Unknown(0),
         }
     }
 }

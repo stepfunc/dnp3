@@ -405,6 +405,10 @@ fn write_auth(credentials: &FileCredentials, writer: &mut HeaderWriter) -> Resul
     writer.write_free_format(&obj)
 }
 
+// we don't really care what the ID is as we don't support polling for file stuff
+// we can just be cute and write Step Function (SF) on the wire.
+const REQUEST_ID: u16 = u16::from_le_bytes([b'S', b'F']);
+
 fn write_open(
     settings: &Settings,
     key: AuthKey,
@@ -417,7 +421,7 @@ fn write_open(
         file_size: 0,
         mode: FileMode::Read,
         max_block_size: settings.config.max_block_size,
-        request_id: 4, // TODO
+        request_id: REQUEST_ID,
         file_name: &settings.name.0,
     };
     writer.write_free_format(&obj)
@@ -437,7 +441,7 @@ fn write_close(handle: FileHandle, writer: &mut HeaderWriter) -> Result<(), Writ
         file_handle: handle.0,
         file_size: 0,
         max_block_size: 0,
-        request_id: 5, // TODO
+        request_id: REQUEST_ID,
         status_code: FileStatus::Success,
         text: "",
     };

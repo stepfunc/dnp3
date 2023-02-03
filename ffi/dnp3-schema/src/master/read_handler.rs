@@ -468,7 +468,6 @@ fn declare_iin_struct(lib: &mut LibraryBuilder) -> BackTraced<CallbackArgStructH
         )?
         .add("device_restart", Primitive::Bool, "Outstation restarted")?
         .end_fields()?
-        // TODO - constructor
         .build()?;
 
     let iin2 = lib.declare_callback_argument_struct("iin2")?;
@@ -484,7 +483,6 @@ fn declare_iin_struct(lib: &mut LibraryBuilder) -> BackTraced<CallbackArgStructH
         .add("reserved_2", Primitive::Bool, "Reserved for future use - should always be set to 0")?
         .add("reserved_1", Primitive::Bool, "Reserved for future use - should always be set to 0")?
         .end_fields()?
-        // TODO - constructor
         .build()?;
 
     let iin = lib.declare_callback_argument_struct("iin")?;
@@ -494,7 +492,6 @@ fn declare_iin_struct(lib: &mut LibraryBuilder) -> BackTraced<CallbackArgStructH
         .add("iin2", iin2, "Second IIN byte")?
         .doc("Pair of IIN bytes")?
         .end_fields()?
-        // TODO - constructor
         .build()?;
 
     Ok(iin)
