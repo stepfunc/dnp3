@@ -1,4 +1,4 @@
-use std::ffi::CStr;
+use std::ffi::{CStr, CString};
 use std::ptr::{null, null_mut};
 use std::str::Utf8Error;
 use std::time::Duration;
@@ -17,6 +17,42 @@ use dnp3::serial::*;
 use dnp3::tcp::tls::*;
 
 use crate::{ffi, ByteIterator};
+
+pub struct FileInfoIterator {
+    inner: std::vec::IntoIter<FileInfo>,
+    current_name: CString,
+    current_info: Option<ffi::FileInfo>,
+}
+
+impl FileInfoIterator {
+    pub(crate) fn new(inner: std::vec::IntoIter<FileInfo>) -> Self {
+        Self {
+            inner,
+            current_name: Default::default(),
+            current_info: None,
+        }
+    }
+
+    pub(crate) fn next(&mut self) -> Option<&ffi::FileInfo> {
+        let next = self.inner.next()?;
+        self.current_name = CString::new(next.name).unwrap();
+        let file_type: ffi::FileType = next.file_type.into();
+        self.current_info = Some(ffi::FileInfo {
+            file_name: self.current_name.as_ptr(),
+            file_type: file_type.into(),
+            size: next.size,
+            time_created: next.time_created.raw_value(),
+            permissions: next.permissions.into(),
+        });
+        self.current_info.as_ref()
+    }
+}
+
+pub(crate) unsafe fn file_info_iterator_next<'a>(
+    iter: *mut crate::FileInfoIterator,
+) -> Option<&'a ffi::FileInfo> {
+    iter.as_mut()?.next()
+}
 
 pub struct MasterChannel {
     pub(crate) runtime: crate::runtime::RuntimeHandle,
@@ -655,6 +691,30 @@ pub(crate) unsafe fn master_channel_read_file_with_auth(
     Ok(())
 }
 
+pub(crate) unsafe fn master_channel_read_directory(
+    channel: *mut crate::MasterChannel,
+    association: ffi::AssociationId,
+    dir_path: &CStr,
+    callback: ffi::ReadDirectoryCallback,
+) -> Result<(), ffi::ParamError> {
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let address = EndpointAddress::try_new(association.address)?;
+    let dir_path = dir_path.to_str()?.to_string();
+
+    let mut association = AssociationHandle::create(address, channel.handle.clone());
+
+    let promise = sfio_promise::wrap(callback);
+    let task = async move {
+        let res = association
+            .read_directory(dir_path, DirReadConfig::default(), None)
+            .await;
+        promise.complete(res);
+    };
+
+    channel.runtime.spawn(task)?;
+    Ok(())
+}
+
 pub(crate) unsafe fn master_channel_get_file_info(
     channel: *mut crate::MasterChannel,
     association: ffi::AssociationId,
@@ -663,11 +723,10 @@ pub(crate) unsafe fn master_channel_get_file_info(
 ) -> Result<(), ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::try_new(association.address)?;
+    let file_name = file_name.to_str()?.to_string();
 
     let mut association = AssociationHandle::create(address, channel.handle.clone());
     let promise = sfio_promise::wrap(callback);
-    let file_name = file_name.to_str()?.to_string();
-
     let task = async move {
         let res = association.get_file_info(file_name).await;
         promise.complete(res);

@@ -1,4 +1,4 @@
-use crate::ffi;
+use crate::{ffi, FileInfoIterator};
 use dnp3::master::*;
 use std::ffi::CString;
 use std::time::Duration;
@@ -124,6 +124,26 @@ impl sfio_promise::FutureType<Result<FileInfo, FileError>> for crate::ffi::FileI
                     permissions: info.permissions.into(),
                 };
                 self.on_complete(info.into());
+            }
+            Err(err) => {
+                self.on_failure(err.into());
+            }
+        }
+    }
+}
+
+impl sfio_promise::FutureType<Result<Vec<FileInfo>, FileError>>
+    for crate::ffi::ReadDirectoryCallback
+{
+    fn on_drop() -> Result<Vec<FileInfo>, FileError> {
+        Err(FileError::TaskError(TaskError::Shutdown))
+    }
+
+    fn complete(self, result: Result<Vec<FileInfo>, FileError>) {
+        match result {
+            Ok(items) => {
+                let mut iter = FileInfoIterator::new(items.into_iter());
+                self.on_complete(&mut iter);
             }
             Err(err) => {
                 self.on_failure(err.into());

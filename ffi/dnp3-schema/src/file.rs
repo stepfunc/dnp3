@@ -4,7 +4,7 @@ use oo_bindgen::model::*;
 pub(crate) struct FileDefinitions {
     // pub(crate) file_status: EnumHandle,
     pub(crate) file_error: ErrorType<Unvalidated>,
-    pub(crate) file_info: CallbackArgStructHandle,
+    pub(crate) file_info: UniversalStructHandle,
 }
 
 pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<FileDefinitions> {
@@ -12,9 +12,9 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<FileDefinitions> {
 
     let permissions = define_permissions(lib)?;
 
-    let file_info = lib.declare_callback_argument_struct("file_info")?;
+    let file_info = lib.declare_universal_struct("file_info")?;
     let file_info = lib
-        .define_callback_argument_struct(file_info)?
+        .define_universal_struct(file_info)?
         .doc(
             doc("Information about a file or directory returned from the outstation")
                 .details("This is a user-facing representation of Group 70 Variation 7")
@@ -34,10 +34,10 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<FileDefinitions> {
     })
 }
 
-fn define_permissions(lib: &mut LibraryBuilder) -> BackTraced<CallbackArgStructHandle> {
-    let permission_set = lib.declare_callback_argument_struct("permission_set")?;
+fn define_permissions(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructHandle> {
+    let permission_set = lib.declare_universal_struct("permission_set")?;
     let permission_set = lib
-        .define_callback_argument_struct(permission_set)?
+        .define_universal_struct(permission_set)?
         .doc("Defines read, write, execute permissions for particular group or user")?
         .add("execute", Primitive::Bool, "Permission to execute")?
         .add("write", Primitive::Bool, "Permission to write")?
@@ -45,9 +45,9 @@ fn define_permissions(lib: &mut LibraryBuilder) -> BackTraced<CallbackArgStructH
         .end_fields()?
         .build()?;
 
-    let permissions = lib.declare_callback_argument_struct("permissions")?;
+    let permissions = lib.declare_universal_struct("permissions")?;
     let permissions = lib
-        .define_callback_argument_struct(permissions)?
+        .define_universal_struct(permissions)?
         .doc("Permissions for world, group, and owner")?
         .add("world", permission_set.clone(), "World permissions")?
         .add("group", permission_set.clone(), "Group permissions")?
