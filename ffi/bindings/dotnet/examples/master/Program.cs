@@ -580,6 +580,16 @@ class MainClass
                     await channel.Read(association, request);
                     return true;
                 }
+            case "rd":
+                {
+                    // read directory
+                    var items = await channel.ReadDirectory(association, ".");
+                    foreach(var info in items)
+                    {
+                        PrintFileInfo(info);
+                    }                    
+                    return true;
+                }
             case "gfi":
                 {
                     // get file info
