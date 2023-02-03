@@ -5,12 +5,12 @@ import static org.joou.Unsigned.*;
 import io.stepfunc.dnp3.*;
 import io.stepfunc.dnp3.Runtime;
 import org.joou.UByte;
+import org.joou.UInteger;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.time.Duration;
 import java.util.List;
-import java.util.Objects;
 
 // ANCHOR: logging_interface
 // callback interface used to receive log messages
@@ -251,6 +251,30 @@ class TestAssociationInformation implements AssociationInformation {
   public void unsolicitedResponse(boolean isDuplicate, UByte seq) {}
 }
 // ANCHOR_END: association_information
+
+class LoggingFileReader implements FileReader {
+  @Override
+  public boolean opened(UInteger size) {
+    System.out.println("Opened file - size: " + size);
+    return true;
+  }
+
+  @Override
+  public boolean blockReceived(UInteger blockNum, List<UByte> data) {
+    System.out.println("Received file block: " + blockNum);
+    return true;
+  }
+
+  @Override
+  public void aborted(FileError error) {
+    System.out.println("Aborted file transfer: " + error);
+  }
+
+  @Override
+  public void completed() {
+    System.out.println("Completed file transfer");
+  }
+}
 
 public class MasterExample {
 
@@ -539,6 +563,25 @@ public class MasterExample {
         System.out.println("Restart delay: " + delay);
         break;
       }
+      case "rd":
+      {
+        List<FileInfo> items = channel.readDirectory(association, ".", DirReadConfig.defaults()).toCompletableFuture().get();
+        for(FileInfo info : items) {
+          printFileInfo(info);
+        }
+        break;
+      }
+      case "gfi":
+      {
+        FileInfo info = channel.getFileInfo(association, ".").toCompletableFuture().get();
+        printFileInfo(info);
+        break;
+      }
+      case "rf":
+      {
+        channel.readFile(association, ".", FileReadConfig.defaults(), new LoggingFileReader());
+        break;
+      }
       case "lsr":
       {
         channel.checkLinkStatus(association).toCompletableFuture().get();
@@ -588,5 +631,12 @@ public class MasterExample {
         System.out.println("Error: " + ex);
       }
     }
+  }
+
+  private static void printFileInfo(FileInfo info) {
+    System.out.println("file name: " + info.fileName);
+    System.out.println("     type: " + info.fileType);
+    System.out.println("     size: " + info.size);
+    System.out.println("     created: " + info.timeCreated.toString());
   }
 }
