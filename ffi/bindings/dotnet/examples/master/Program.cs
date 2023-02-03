@@ -583,7 +583,7 @@ class MainClass
             case "rd":
                 {
                     // read directory
-                    var items = await channel.ReadDirectory(association, ".");
+                    var items = await channel.ReadDirectory(association, ".", DirReadConfig.Defaults());
                     foreach(var info in items)
                     {
                         PrintFileInfo(info);
@@ -600,7 +600,7 @@ class MainClass
             case "rf":
                 {
                     // read a file asynchronously using a callback interface
-                    channel.ReadFile(association, ".", FileReadConfig.Init(), new FileReader());
+                    channel.ReadFile(association, ".", FileReadConfig.Defaults(), new FileReader());
                     return true;
                 }
             case "crt":

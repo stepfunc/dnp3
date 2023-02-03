@@ -482,6 +482,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
     let file_info_cb = define_file_info_callback(lib, shared)?;
     let file_reader = define_file_reader(lib, shared)?;
     let file_read_config = define_file_read_config(lib)?;
+    let dir_read_config = define_dir_read_config(lib)?;
 
     let read_file = lib
         .define_method("read_file", master_channel_class.clone())?
@@ -555,7 +556,11 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
             StringType,
             "Complete path to the remote directory",
         )?
-        // TODO config
+        .param(
+            "config",
+            dir_read_config,
+            "Configuration for the directory read operation",
+        )?
         .fails_with(shared.error_type.clone())?
         .doc("Asynchronously retrieve a directory listing")?
         .build()?;
@@ -1418,12 +1423,45 @@ fn define_file_read_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgSt
         )?
         .end_fields()?
         .begin_initializer(
-            "init",
+            "defaults",
             InitializerType::Static,
             "Initialize the configuration to default values",
         )?
         .default(&max_block_size, NumberValue::U16(u16::MAX))?
         .default(&max_file_size, NumberValue::U32(u32::MAX))?
+        .end_initializer()?
+        .build()?;
+
+    Ok(config)
+}
+
+fn define_dir_read_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
+    let config = lib.declare_function_argument_struct("dir_read_config")?;
+
+    let max_block_size = Name::create("max_block_size")?;
+    let max_file_size = Name::create("max_file_size")?;
+
+    let config = lib
+        .define_function_argument_struct(config)?
+        .doc("Configuration related to reading a file")?
+        .add(
+            max_block_size.clone(),
+            Primitive::U16,
+            "Maximum block size requested by the master during the file open",
+        )?
+        .add(
+            max_file_size.clone(),
+            Primitive::U32,
+            "Maximum number of bytes that may be accumulated while reading directory information",
+        )?
+        .end_fields()?
+        .begin_initializer(
+            "defaults",
+            InitializerType::Static,
+            "Initialize the configuration to default values",
+        )?
+        .default(&max_block_size, NumberValue::U16(u16::MAX))?
+        .default(&max_file_size, NumberValue::U32(2048))?
         .end_initializer()?
         .build()?;
 

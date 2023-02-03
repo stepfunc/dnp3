@@ -695,6 +695,7 @@ pub(crate) unsafe fn master_channel_read_directory(
     channel: *mut crate::MasterChannel,
     association: ffi::AssociationId,
     dir_path: &CStr,
+    config: ffi::DirReadConfig,
     callback: ffi::ReadDirectoryCallback,
 ) -> Result<(), ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
@@ -706,7 +707,7 @@ pub(crate) unsafe fn master_channel_read_directory(
     let promise = sfio_promise::wrap(callback);
     let task = async move {
         let res = association
-            .read_directory(dir_path, DirReadConfig::default(), None)
+            .read_directory(dir_path, config.into(), None)
             .await;
         promise.complete(res);
     };
@@ -1079,6 +1080,15 @@ define_task_from_impl!(FileError);
 
 impl From<ffi::FileReadConfig> for FileReadConfig {
     fn from(value: ffi::FileReadConfig) -> Self {
+        Self {
+            max_block_size: value.max_block_size,
+            max_file_size: value.max_file_size as usize,
+        }
+    }
+}
+
+impl From<ffi::DirReadConfig> for DirReadConfig {
+    fn from(value: ffi::DirReadConfig) -> Self {
         Self {
             max_block_size: value.max_block_size,
             max_file_size: value.max_file_size as usize,
