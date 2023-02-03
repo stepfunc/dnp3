@@ -195,7 +195,6 @@ struct ExampleAssociationInformation;
 impl AssociationInformation for ExampleAssociationInformation {}
 // ANCHOR_END: association_information
 
-
 // ANCHOR: file_logger
 struct FileLogger;
 
@@ -451,7 +450,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
                 // ANCHOR_END: get_file_info
-            },
+            }
             "rf" => {
                 // ANCHOR: read_file
                 if let Err(err) = association
