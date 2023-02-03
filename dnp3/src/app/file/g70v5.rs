@@ -14,9 +14,9 @@ pub(crate) struct Group70Var5<'a> {
 
 impl<'a> Group70Var5<'a> {
     pub(crate) fn format(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        writeln!(f, "file handle: {}", self.file_handle)?;
-        writeln!(f, "block number: {}", self.block_number)?;
-        writeln!(f, "file data length: {}", self.file_data.len())?;
+        write!(f, "\nfile handle: {}", self.file_handle)?;
+        write!(f, "\nblock number: {}", self.block_number)?;
+        write!(f, "\nfile data length: {}", self.file_data.len())?;
         Ok(())
     }
 

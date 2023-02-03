@@ -14,10 +14,10 @@ pub(crate) struct Group70Var6<'a> {
 
 impl<'a> Group70Var6<'a> {
     pub(crate) fn format(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        writeln!(f, "file handle: {}", self.file_handle)?;
-        writeln!(f, "block number: {}", self.block_number)?;
-        writeln!(f, "status code: {:?}", self.status_code)?;
-        writeln!(f, "optional text: {:?}", self.text)?;
+        write!(f, "\nfile handle: {}", self.file_handle)?;
+        write!(f, "\nblock number: {}", self.block_number)?;
+        write!(f, "\nstatus code: {:?}", self.status_code)?;
+        write!(f, "\noptional text: {:?}", self.text)?;
         Ok(())
     }
 

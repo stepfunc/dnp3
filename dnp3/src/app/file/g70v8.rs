@@ -10,7 +10,7 @@ pub(crate) struct Group70Var8<'a> {
 
 impl<'a> Group70Var8<'a> {
     pub(crate) fn format(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        writeln!(f, "file specification: {}", self.file_specification)?;
+        write!(f, "\nfile specification: {}", self.file_specification)?;
         Ok(())
     }
 

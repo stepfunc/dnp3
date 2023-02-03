@@ -17,11 +17,10 @@ impl<'a> Group70Var2<'a> {
     const USER_NAME_OFFSET: u16 = 12;
 
     pub(crate) fn format(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        writeln!(
-            f,
-            "user name: {} password: {} auth key: {}",
-            self.user_name, self.password, self.auth_key
-        )
+        write!(f, "\nuser name: {}", self.user_name)?;
+        write!(f, "\npassword: {}", self.password)?;
+        write!(f, "\nauth key: {}", self.auth_key)?;
+        Ok(())
     }
 
     pub(crate) fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {

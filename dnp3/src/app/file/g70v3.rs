@@ -60,14 +60,14 @@ impl<'a> Group70Var3<'a> {
     const FILE_NAME_OFFSET: u16 = 26;
 
     pub(crate) fn format(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        writeln!(f, "file name: {}", self.file_name)?;
-        writeln!(f, "time of creation: {}", self.time_of_creation.raw_value())?;
-        writeln!(f, "permissions: {}", self.permissions)?;
-        writeln!(f, "auth key: {}", self.auth_key)?;
-        writeln!(f, "file size: {}", self.file_size)?;
-        writeln!(f, "operational mode: {:?}", self.mode)?;
-        writeln!(f, "max block size: {}", self.max_block_size)?;
-        writeln!(f, "request id: {}", self.request_id)?;
+        write!(f, "\nfile name: {}", self.file_name)?;
+        write!(f, "\ntime of creation: {}", self.time_of_creation.raw_value())?;
+        write!(f, "\npermissions: {}", self.permissions)?;
+        write!(f, "\nauth key: {}", self.auth_key)?;
+        write!(f, "\nfile size: {}", self.file_size)?;
+        write!(f, "\noperational mode: {:?}", self.mode)?;
+        write!(f, "\nmax block size: {}", self.max_block_size)?;
+        write!(f, "\nrequest id: {}", self.request_id)?;
         Ok(())
     }
 
