@@ -6,6 +6,7 @@ pub(crate) mod attributes;
 mod constants;
 mod database;
 mod decoding;
+mod file;
 mod master;
 mod outstation;
 mod shared;

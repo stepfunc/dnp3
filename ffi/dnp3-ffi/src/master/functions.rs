@@ -1,5 +1,6 @@
-use std::ffi::CStr;
+use std::ffi::{CStr, CString};
 use std::ptr::{null, null_mut};
+use std::str::Utf8Error;
 use std::time::Duration;
 
 use dnp3::app::{
@@ -15,7 +16,43 @@ use dnp3::serial::*;
 #[cfg(feature = "tls")]
 use dnp3::tcp::tls::*;
 
-use crate::ffi;
+use crate::{ffi, ByteIterator};
+
+pub struct FileInfoIterator {
+    inner: std::vec::IntoIter<FileInfo>,
+    current_name: CString,
+    current_info: Option<ffi::FileInfo>,
+}
+
+impl FileInfoIterator {
+    pub(crate) fn new(inner: std::vec::IntoIter<FileInfo>) -> Self {
+        Self {
+            inner,
+            current_name: Default::default(),
+            current_info: None,
+        }
+    }
+
+    pub(crate) fn next(&mut self) -> Option<&ffi::FileInfo> {
+        let next = self.inner.next()?;
+        self.current_name = CString::new(next.name).unwrap();
+        let file_type: ffi::FileType = next.file_type.into();
+        self.current_info = Some(ffi::FileInfo {
+            file_name: self.current_name.as_ptr(),
+            file_type: file_type.into(),
+            size: next.size,
+            time_created: next.time_created.raw_value(),
+            permissions: next.permissions.into(),
+        });
+        self.current_info.as_ref()
+    }
+}
+
+pub(crate) unsafe fn file_info_iterator_next<'a>(
+    iter: *mut crate::FileInfoIterator,
+) -> Option<&'a ffi::FileInfo> {
+    iter.as_mut()?.next()
+}
 
 pub struct MasterChannel {
     pub(crate) runtime: crate::runtime::RuntimeHandle,
@@ -598,6 +635,147 @@ pub(crate) unsafe fn master_channel_warm_restart(
     Ok(())
 }
 
+fn credentials(user_name: &CStr, password: &CStr) -> Result<FileCredentials, ffi::ParamError> {
+    let user_name = user_name.to_str()?.to_string();
+    let password = password.to_str()?.to_string();
+    Ok(FileCredentials {
+        user_name,
+        password,
+    })
+}
+
+pub(crate) unsafe fn master_channel_read_file(
+    channel: *mut crate::MasterChannel,
+    association: ffi::AssociationId,
+    remote_file_path: &CStr,
+    config: ffi::FileReadConfig,
+    reader: ffi::FileReader,
+) -> Result<(), ffi::ParamError> {
+    master_channel_read_file_internal(channel, association, remote_file_path, config, reader, None)
+}
+
+pub(crate) unsafe fn master_channel_read_file_with_auth(
+    channel: *mut crate::MasterChannel,
+    association: ffi::AssociationId,
+    remote_file_path: &CStr,
+    config: ffi::FileReadConfig,
+    reader: ffi::FileReader,
+    user_name: &CStr,
+    password: &CStr,
+) -> Result<(), ffi::ParamError> {
+    let credentials = credentials(user_name, password)?;
+
+    master_channel_read_file_internal(
+        channel,
+        association,
+        remote_file_path,
+        config,
+        reader,
+        Some(credentials),
+    )
+}
+
+unsafe fn master_channel_read_file_internal(
+    channel: *mut crate::MasterChannel,
+    association: ffi::AssociationId,
+    remote_file_path: &CStr,
+    config: ffi::FileReadConfig,
+    reader: ffi::FileReader,
+    credentials: Option<dnp3::master::FileCredentials>,
+) -> Result<(), ffi::ParamError> {
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let address = EndpointAddress::try_new(association.address)?;
+    let mut association = AssociationHandle::create(address, channel.handle.clone());
+    let remote_file_path = remote_file_path.to_str()?.to_string();
+    let config: FileReadConfig = config.into();
+
+    channel.runtime.block_on(async move {
+        association
+            .read_file(remote_file_path, config, Box::new(reader), credentials)
+            .await
+    })??;
+
+    Ok(())
+}
+
+pub(crate) unsafe fn master_channel_read_directory(
+    channel: *mut crate::MasterChannel,
+    association: ffi::AssociationId,
+    dir_path: &CStr,
+    config: ffi::DirReadConfig,
+    callback: ffi::ReadDirectoryCallback,
+) -> Result<(), ffi::ParamError> {
+    master_channel_read_directory_generic(channel, association, dir_path, config, callback, None)
+}
+
+pub(crate) unsafe fn master_channel_read_directory_with_auth(
+    channel: *mut crate::MasterChannel,
+    association: ffi::AssociationId,
+    dir_path: &CStr,
+    config: ffi::DirReadConfig,
+    user_name: &CStr,
+    password: &CStr,
+    callback: ffi::ReadDirectoryCallback,
+) -> Result<(), ffi::ParamError> {
+    let credentials = credentials(user_name, password)?;
+
+    master_channel_read_directory_generic(
+        channel,
+        association,
+        dir_path,
+        config,
+        callback,
+        Some(credentials),
+    )
+}
+
+unsafe fn master_channel_read_directory_generic(
+    channel: *mut crate::MasterChannel,
+    association: ffi::AssociationId,
+    dir_path: &CStr,
+    config: ffi::DirReadConfig,
+    callback: ffi::ReadDirectoryCallback,
+    credentials: Option<FileCredentials>,
+) -> Result<(), ffi::ParamError> {
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let address = EndpointAddress::try_new(association.address)?;
+    let dir_path = dir_path.to_str()?.to_string();
+
+    let mut association = AssociationHandle::create(address, channel.handle.clone());
+
+    let promise = sfio_promise::wrap(callback);
+    let task = async move {
+        let res = association
+            .read_directory(dir_path, config.into(), credentials)
+            .await;
+        promise.complete(res);
+    };
+
+    channel.runtime.spawn(task)?;
+    Ok(())
+}
+
+pub(crate) unsafe fn master_channel_get_file_info(
+    channel: *mut crate::MasterChannel,
+    association: ffi::AssociationId,
+    file_name: &CStr,
+    callback: ffi::FileInfoCallback,
+) -> Result<(), ffi::ParamError> {
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let address = EndpointAddress::try_new(association.address)?;
+    let file_name = file_name.to_str()?.to_string();
+
+    let mut association = AssociationHandle::create(address, channel.handle.clone());
+    let promise = sfio_promise::wrap(callback);
+    let task = async move {
+        let res = association.get_file_info(file_name).await;
+        promise.complete(res);
+    };
+
+    channel.runtime.spawn(task)?;
+    Ok(())
+}
+
 pub(crate) unsafe fn master_channel_check_link_status(
     channel: *mut crate::MasterChannel,
     association: ffi::AssociationId,
@@ -741,6 +919,12 @@ fn convert_config(
     })
 }
 
+impl From<Utf8Error> for ffi::ParamError {
+    fn from(_: Utf8Error) -> Self {
+        Self::StringNotUtf8
+    }
+}
+
 impl From<ffi::RetryStrategy> for dnp3::app::RetryStrategy {
     fn from(x: ffi::RetryStrategy) -> Self {
         dnp3::app::RetryStrategy::new(x.min_delay(), x.max_delay())
@@ -827,6 +1011,33 @@ impl From<WriteError> for ffi::EmptyResponseError {
     }
 }
 
+impl FileReader for ffi::FileReader {
+    fn opened(&mut self, size: u32) -> FileAction {
+        if ffi::FileReader::opened(self, size).unwrap_or(false) {
+            FileAction::Continue
+        } else {
+            FileAction::Abort
+        }
+    }
+
+    fn block_received(&mut self, block_num: u32, data: &[u8]) -> MaybeAsync<FileAction> {
+        let mut iter = ByteIterator::new(data);
+        if ffi::FileReader::block_received(self, block_num, &mut iter).unwrap_or(false) {
+            MaybeAsync::ready(FileAction::Continue)
+        } else {
+            MaybeAsync::ready(FileAction::Abort)
+        }
+    }
+
+    fn aborted(&mut self, err: FileError) {
+        ffi::FileReader::aborted(self, err.into());
+    }
+
+    fn completed(&mut self) {
+        ffi::FileReader::completed(self);
+    }
+}
+
 #[cfg(feature = "tls")]
 impl From<TlsError> for ffi::ParamError {
     fn from(error: TlsError) -> Self {
@@ -904,6 +1115,25 @@ define_task_from_impl!(ReadError);
 define_task_from_impl!(LinkStatusError);
 define_task_from_impl!(TaskError);
 define_task_from_impl!(EmptyResponseError);
+define_task_from_impl!(FileError);
+
+impl From<ffi::FileReadConfig> for FileReadConfig {
+    fn from(value: ffi::FileReadConfig) -> Self {
+        Self {
+            max_block_size: value.max_block_size,
+            max_file_size: value.max_file_size as usize,
+        }
+    }
+}
+
+impl From<ffi::DirReadConfig> for DirReadConfig {
+    fn from(value: ffi::DirReadConfig) -> Self {
+        Self {
+            max_block_size: value.max_block_size,
+            max_file_size: value.max_file_size as usize,
+        }
+    }
+}
 
 impl From<ffi::FunctionCode> for dnp3::app::FunctionCode {
     fn from(value: ffi::FunctionCode) -> Self {

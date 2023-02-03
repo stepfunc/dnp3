@@ -535,7 +535,6 @@ impl Association {
 
             true
         } else {
-            // TODO: notify this event?
             tracing::warn!(
                 "ignoring unsolicited response received before the end of the startup procedure"
             );

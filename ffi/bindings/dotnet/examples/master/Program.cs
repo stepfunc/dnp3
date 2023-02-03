@@ -228,6 +228,32 @@ class MainClass
     }
     // ANCHOR_END: association_information
 
+    // ANCHOR: file_logger
+    class FileReader : IFileReader
+    {
+        void IFileReader.Aborted(FileError error)
+        {
+            Console.WriteLine($"File transfer aborted: {error}");
+        }
+
+        bool IFileReader.BlockReceived(uint blockNum, ICollection<byte> data)
+        {
+            Console.WriteLine($"Received file block {blockNum} with size {data.Count}");
+            return true;
+        }
+
+        void IFileReader.Completed()
+        {
+            Console.WriteLine($"File transfer completed");
+        }
+
+        bool IFileReader.Opened(uint size)
+        {
+            Console.WriteLine($"Outstation open file with size: ${size}");
+            return true;
+        }
+    }
+    // ANCHOR_END: file_logger
 
     // ANCHOR: master_channel_config
     private static MasterChannelConfig GetMasterChannelConfig()
@@ -437,7 +463,7 @@ class MainClass
             }
             catch (Exception ex)
             {
-                Console.WriteLine("Error: " + ex);
+                Console.WriteLine($"Error: {ex}");
             }
         }
     }
@@ -555,6 +581,32 @@ class MainClass
                     await channel.Read(association, request);
                     return true;
                 }
+            case "rd":
+                {
+                    // ANCHOR: read_directory
+                    var items = await channel.ReadDirectory(association, ".", DirReadConfig.Defaults());
+                    foreach(var info in items)
+                    {
+                        PrintFileInfo(info);
+                    }
+                    // ANCHOR_END: read_directory
+                    return true;
+                }
+            case "gfi":
+                {
+                    // ANCHOR: get_file_info
+                    var info = await channel.GetFileInfo(association, ".");
+                    PrintFileInfo(info);
+                    // ANCHOR_END: get_file_info
+                    return true;
+                }
+            case "rf":
+                {
+                    // ANCHOR: read_file
+                    channel.ReadFile(association, ".", FileReadConfig.Defaults(), new FileReader());
+                    // ANCHOR_END: read_file
+                    return true;
+                }
             case "crt":
                 {
                     var delay = await channel.ColdRestart(association);
@@ -577,5 +629,12 @@ class MainClass
                 Console.WriteLine("Unknown command");
                 return true;
         }
+    }
+    private static void PrintFileInfo(FileInfo info)
+    {
+        Console.WriteLine($"Filename: {info.FileName}");
+        Console.WriteLine($"  type: {info.FileType}");
+        Console.WriteLine($"  size: {info.Size}");
+        Console.WriteLine($"  created: {info.TimeCreated}");
     }
 }

@@ -69,6 +69,7 @@ module.exports = {
                         'api/master/assoc_polls',
                         'api/master/assoc_controls',
                         'api/master/attributes',
+                        'api/master/file_transfer',
                         'api/master/assoc_other',
                     ]
                 },

@@ -5,12 +5,12 @@ import static org.joou.Unsigned.*;
 import io.stepfunc.dnp3.*;
 import io.stepfunc.dnp3.Runtime;
 import org.joou.UByte;
+import org.joou.UInteger;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.time.Duration;
 import java.util.List;
-import java.util.Objects;
 
 // ANCHOR: logging_interface
 // callback interface used to receive log messages
@@ -251,6 +251,32 @@ class TestAssociationInformation implements AssociationInformation {
   public void unsolicitedResponse(boolean isDuplicate, UByte seq) {}
 }
 // ANCHOR_END: association_information
+
+// ANCHOR: file_logger
+class LoggingFileReader implements FileReader {
+  @Override
+  public boolean opened(UInteger size) {
+    System.out.println("Opened file - size: " + size);
+    return true;
+  }
+
+  @Override
+  public boolean blockReceived(UInteger blockNum, List<UByte> data) {
+    System.out.println("Received file block: " + blockNum);
+    return true;
+  }
+
+  @Override
+  public void aborted(FileError error) {
+    System.out.println("Aborted file transfer: " + error);
+  }
+
+  @Override
+  public void completed() {
+    System.out.println("Completed file transfer");
+  }
+}
+// ANCHOR_END: file_logger
 
 public class MasterExample {
 
@@ -539,6 +565,33 @@ public class MasterExample {
         System.out.println("Restart delay: " + delay);
         break;
       }
+      case "rd":
+      {
+        // ANCHOR: read_directory
+        List<FileInfo> items = channel
+                .readDirectory(association, ".", DirReadConfig.defaults())
+                .toCompletableFuture().get();
+        for(FileInfo info : items) {
+          printFileInfo(info);
+        }
+        // ANCHOR_END: read_directory
+        break;
+      }
+      case "gfi":
+      {
+        // ANCHOR: get_file_info
+        FileInfo info = channel.getFileInfo(association, ".").toCompletableFuture().get();
+        printFileInfo(info);
+        // ANCHOR_END: get_file_info
+        break;
+      }
+      case "rf":
+      {
+        // ANCHOR: read_file
+        channel.readFile(association, ".", FileReadConfig.defaults(), new LoggingFileReader());
+        // ANCHOR_END: read_file
+        break;
+      }
       case "lsr":
       {
         channel.checkLinkStatus(association).toCompletableFuture().get();
@@ -588,5 +641,12 @@ public class MasterExample {
         System.out.println("Error: " + ex);
       }
     }
+  }
+
+  private static void printFileInfo(FileInfo info) {
+    System.out.println("file name: " + info.fileName);
+    System.out.println("     type: " + info.fileType);
+    System.out.println("     size: " + info.size);
+    System.out.println("     created: " + info.timeCreated.toString());
   }
 }

@@ -991,8 +991,6 @@ impl OutstationSession {
         match self.classify(info, request) {
             FragmentType::MalformedRequest(hash, err) => {
                 let response = Response::empty_solicited(seq, Iin::default() | Iin2::from(err));
-
-                // TODO: Shouldn't we return None here?
                 Some(LastValidRequest::new(seq, hash, Some(response), None))
             }
             FragmentType::NewRead(hash, objects) => {
@@ -2170,6 +2168,8 @@ impl From<ObjectParseError> for Iin2 {
             ObjectParseError::UnknownQualifier(_) => Iin2::PARAMETER_ERROR,
             ObjectParseError::ZeroLengthOctetData => Iin2::PARAMETER_ERROR,
             ObjectParseError::BadAttribute(_) => Iin2::PARAMETER_ERROR,
+            ObjectParseError::BadEncoding => Iin2::PARAMETER_ERROR,
+            ObjectParseError::UnsupportedFreeFormatCount(_) => Iin2::PARAMETER_ERROR,
         }
     }
 }

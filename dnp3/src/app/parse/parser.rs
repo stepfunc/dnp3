@@ -16,6 +16,7 @@ use crate::app::{FunctionCode, QualifierCode};
 use crate::decode::AppDecodeLevel;
 
 use crate::app::attr::Attribute;
+use crate::app::parse::free_format::FreeFormatVariation;
 use scursor::ReadCursor;
 
 pub(crate) fn format_count_of_items<T, V>(f: &mut Formatter, iter: T) -> std::fmt::Result
@@ -290,6 +291,20 @@ impl<'a> ObjectHeader<'a> {
                 }
                 Ok(())
             }
+            HeaderDetails::TwoByteFreeFormat(count, var) => {
+                write!(
+                    f,
+                    "{} : {} - {} - [{}]",
+                    self.variation,
+                    self.variation.description(),
+                    self.details.qualifier().description(),
+                    count
+                )?;
+                if format_values {
+                    var.format_objects(f)?;
+                }
+                Ok(())
+            }
         }
     }
 }
@@ -339,6 +354,7 @@ pub(crate) enum HeaderDetails<'a> {
     TwoByteCount(u16, CountVariation<'a>),
     OneByteCountAndPrefix(u8, PrefixedVariation<'a, u8>),
     TwoByteCountAndPrefix(u16, PrefixedVariation<'a, u16>),
+    TwoByteFreeFormat(u8, FreeFormatVariation<'a>),
 }
 
 impl HeaderDetails<'_> {
@@ -351,6 +367,7 @@ impl HeaderDetails<'_> {
             HeaderDetails::TwoByteCount(_, _) => QualifierCode::Count16,
             HeaderDetails::OneByteCountAndPrefix(_, _) => QualifierCode::CountAndPrefix8,
             HeaderDetails::TwoByteCountAndPrefix(_, _) => QualifierCode::CountAndPrefix16,
+            HeaderDetails::TwoByteFreeFormat(_, _) => QualifierCode::FreeFormat16,
         }
     }
 
@@ -492,7 +509,7 @@ impl<'a> ObjectParser<'a> {
             QualifierCode::Count16 => self.parse_count_u16(gv),
             QualifierCode::CountAndPrefix8 => self.parse_count_and_prefix_u8(gv),
             QualifierCode::CountAndPrefix16 => self.parse_count_and_prefix_u16(gv),
-            _ => Err(ObjectParseError::UnsupportedQualifierCode(qualifier)),
+            QualifierCode::FreeFormat16 => self.parse_free_format_u16(gv),
         }
     }
 
@@ -579,6 +596,36 @@ impl<'a> ObjectParser<'a> {
         Ok(ObjectHeader::new(
             v,
             HeaderDetails::TwoByteCountAndPrefix(count, data),
+        ))
+    }
+
+    fn parse_free_format_u16(
+        &mut self,
+        v: Variation,
+    ) -> Result<ObjectHeader<'a>, ObjectParseError> {
+        // read the count of objects
+        let count = self.cursor.read_u8()?;
+
+        if count != 1 {
+            return Err(ObjectParseError::UnsupportedFreeFormatCount(count));
+        }
+
+        // read the length of free-format data
+        let length = self.cursor.read_u16_le()?;
+        // the bytes inside the header
+        let bytes = self.cursor.read_bytes(length as usize)?;
+
+        // create a sub-cursor over only these bytes
+        let mut cursor = ReadCursor::new(bytes);
+
+        let variation = FreeFormatVariation::parse(v, &mut cursor)?;
+
+        // all of the designated data must be consumed otherwise the encoding is invalid
+        cursor.expect_empty()?;
+
+        Ok(ObjectHeader::new(
+            v,
+            HeaderDetails::TwoByteFreeFormat(count, variation),
         ))
     }
 }
@@ -1131,6 +1178,30 @@ mod test {
         assert_eq!(
             err,
             ObjectParseError::BadAttribute(AttrParseError::CountNotOne(2))
+        );
+    }
+
+    #[test]
+    fn parses_free_format() {
+        let input: &[u8] = &[
+            70, 5, 0x5B, 0x01, 12, 0x00, 0x01, 0x02, 0x03, 0x04, 0xAA, 0xBB, 0xCC, 0xDD, b'd',
+            b'a', b't', b'a',
+        ];
+        let headers = ObjectParser::parse(FunctionCode::Response, &input).unwrap();
+        let header = headers.iter().next().unwrap();
+
+        assert_eq!(header.variation, Variation::Group70Var5);
+        let obj = match header.details {
+            HeaderDetails::TwoByteFreeFormat(1, FreeFormatVariation::Group70Var5(obj)) => obj,
+            _ => unreachable!(),
+        };
+        assert_eq!(
+            obj,
+            crate::app::file::Group70Var5 {
+                file_handle: 0x04030201,
+                block_number: 0xDDCCBBAA,
+                file_data: &[b'd', b'a', b't', b'a'],
+            }
         );
     }
 }

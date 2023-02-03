@@ -6,7 +6,7 @@ use crate::app::variations::Variation;
 use crate::app::{FunctionCode, QualifierCode};
 
 use crate::app::attr::AttrParseError;
-use scursor::ReadError;
+use scursor::{ReadError, TrailingBytes};
 
 /// Errors that occur when parsing an application layer header
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -34,10 +34,20 @@ pub enum ObjectParseError {
     InvalidQualifierForVariation(Variation, QualifierCode),
     /// Specified qualifier code is not supported
     UnsupportedQualifierCode(QualifierCode),
+    /// Free format parser can only handle counts of 1
+    UnsupportedFreeFormatCount(u8),
     /// Response containing zero-length octet data disallowed by the specification
     ZeroLengthOctetData,
     /// Device attribute parsing error
     BadAttribute(AttrParseError),
+    /// Object is not properly encoded
+    BadEncoding,
+}
+
+impl From<TrailingBytes> for ObjectParseError {
+    fn from(_: TrailingBytes) -> Self {
+        Self::BadEncoding
+    }
 }
 
 /// Errors that occur when interpreting a header as a request header
@@ -107,6 +117,10 @@ impl std::fmt::Display for ObjectParseError {
                 f.write_str("octet-data may not be zero length")
             }
             ObjectParseError::BadAttribute(x) => write!(f, "{x}"),
+            ObjectParseError::BadEncoding => f.write_str("Object is not properly encoded"),
+            ObjectParseError::UnsupportedFreeFormatCount(x) => {
+                write!(f, "Unsupported free-format count: {x}")
+            }
         }
     }
 }

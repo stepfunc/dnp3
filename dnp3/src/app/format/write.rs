@@ -9,7 +9,8 @@ use crate::app::sequence::Sequence;
 use crate::app::variations::Variation;
 use crate::app::{FunctionCode, QualifierCode};
 
-use scursor::{WriteCursor, WriteError};
+use crate::app::format::free_format::FreeFormat;
+use scursor::WriteCursor;
 
 pub(crate) struct HeaderWriter<'a, 'b> {
     cursor: &'b mut WriteCursor<'a>,
@@ -19,7 +20,7 @@ pub(crate) fn start_request<'a, 'b>(
     control: ControlField,
     function: FunctionCode,
     cursor: &'b mut WriteCursor<'a>,
-) -> Result<HeaderWriter<'a, 'b>, WriteError> {
+) -> Result<HeaderWriter<'a, 'b>, scursor::WriteError> {
     let header = RequestHeader::new(control, function);
     header.write(cursor)?;
     Ok(HeaderWriter { cursor })
@@ -31,7 +32,7 @@ pub(crate) fn start_response<'a, 'b>(
     function: ResponseFunction,
     iin: Iin,
     cursor: &'b mut WriteCursor<'a>,
-) -> Result<HeaderWriter<'a, 'b>, WriteError> {
+) -> Result<HeaderWriter<'a, 'b>, scursor::WriteError> {
     let header = ResponseHeader::new(control, function, iin);
     header.write(cursor)?;
     Ok(HeaderWriter { cursor })
@@ -44,7 +45,7 @@ impl<'a, 'b> HeaderWriter<'a, 'b> {
     }
 
     #[cfg(test)]
-    pub(crate) fn write_class1230(&mut self) -> Result<(), WriteError> {
+    pub(crate) fn write_class1230(&mut self) -> Result<(), scursor::WriteError> {
         self.write_all_objects_header(Variation::Group60Var2)?;
         self.write_all_objects_header(Variation::Group60Var3)?;
         self.write_all_objects_header(Variation::Group60Var4)?;
@@ -59,7 +60,7 @@ impl<'a, 'b> HeaderWriter<'a, 'b> {
     pub(crate) fn write_all_objects_header(
         &mut self,
         variation: Variation,
-    ) -> Result<(), WriteError> {
+    ) -> Result<(), scursor::WriteError> {
         variation.write(self.cursor)?;
         QualifierCode::AllObjects.write(self.cursor)?;
         Ok(())
@@ -70,7 +71,7 @@ impl<'a, 'b> HeaderWriter<'a, 'b> {
         variation: Variation,
         start: T,
         stop: T,
-    ) -> Result<(), WriteError>
+    ) -> Result<(), scursor::WriteError>
     where
         T: Index,
     {
@@ -85,7 +86,7 @@ impl<'a, 'b> HeaderWriter<'a, 'b> {
         &mut self,
         variation: Variation,
         count: T,
-    ) -> Result<(), WriteError>
+    ) -> Result<(), scursor::WriteError>
     where
         T: Index,
     {
@@ -95,7 +96,7 @@ impl<'a, 'b> HeaderWriter<'a, 'b> {
         Ok(())
     }
 
-    pub(crate) fn write_clear_restart(&mut self) -> Result<(), WriteError> {
+    pub(crate) fn write_clear_restart(&mut self) -> Result<(), scursor::WriteError> {
         self.write_range_only(Variation::Group80Var1, 7u8, 7u8)?;
         self.cursor.write_u8(0)?;
         Ok(())
@@ -104,7 +105,7 @@ impl<'a, 'b> HeaderWriter<'a, 'b> {
     pub(crate) fn write_prefixed_items<'c, V, I>(
         &mut self,
         iter: impl Iterator<Item = &'c (V, I)>,
-    ) -> Result<(), WriteError>
+    ) -> Result<(), scursor::WriteError>
     where
         V: FixedSizeVariation + 'c,
         I: Index + 'c,
@@ -124,7 +125,7 @@ impl<'a, 'b> HeaderWriter<'a, 'b> {
         self.cursor.at_pos(pos_of_count, |cur| count.write(cur))
     }
 
-    pub(crate) fn write_count_of_one<V>(&mut self, item: V) -> Result<(), WriteError>
+    pub(crate) fn write_count_of_one<V>(&mut self, item: V) -> Result<(), scursor::WriteError>
     where
         V: FixedSizeVariation,
     {
@@ -146,20 +147,40 @@ impl<'a, 'b> HeaderWriter<'a, 'b> {
         Ok(())
     }
 
+    pub(crate) fn write_free_format<T: FreeFormat>(
+        &mut self,
+        value: &T,
+    ) -> Result<(), crate::app::format::WriteError> {
+        T::VARIATION.write(self.cursor)?;
+        QualifierCode::FreeFormat16.write(self.cursor)?;
+        self.cursor.write_u8(1)?; // count of 1
+        let length_pos = self.cursor.position();
+        self.cursor.skip(2)?; // come back and write this after
+        let object_start = self.cursor.position();
+        value.write(self.cursor)?;
+        let length = crate::app::format::to_u16(self.cursor.position() - object_start)?;
+        self.cursor
+            .at_pos(length_pos, |cur| cur.write_u16_le(length))?;
+        Ok(())
+    }
+
     #[cfg(test)]
     pub(crate) fn to_parsed(&'a self) -> ParsedFragment<'a> {
         ParsedFragment::parse(self.cursor.written()).unwrap()
     }
 }
 
-pub(crate) fn confirm_solicited(seq: Sequence, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+pub(crate) fn confirm_solicited(
+    seq: Sequence,
+    cursor: &mut WriteCursor,
+) -> Result<(), scursor::WriteError> {
     start_request(ControlField::request(seq), FunctionCode::Confirm, cursor).map(|_| {})
 }
 
 pub(crate) fn confirm_unsolicited(
     seq: Sequence,
     cursor: &mut WriteCursor,
-) -> Result<(), WriteError> {
+) -> Result<(), scursor::WriteError> {
     start_request(
         ControlField::unsolicited(seq),
         FunctionCode::Confirm,
@@ -169,7 +190,7 @@ pub(crate) fn confirm_unsolicited(
 }
 
 impl Variation {
-    pub(crate) fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+    pub(crate) fn write(self, cursor: &mut WriteCursor) -> Result<(), scursor::WriteError> {
         let (g, v) = self.to_group_and_var();
         cursor.write_u8(g)?;
         cursor.write_u8(v)?;
@@ -179,12 +200,13 @@ impl Variation {
 
 #[cfg(test)]
 mod test {
+    use crate::app::file::Group70Var5;
     use crate::app::sequence::Sequence;
     use scursor::WriteCursor;
 
     use super::*;
 
-    fn read_integrity(seq: Sequence, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+    fn read_integrity(seq: Sequence, cursor: &mut WriteCursor) -> Result<(), scursor::WriteError> {
         let mut writer = start_request(ControlField::request(seq), FunctionCode::Read, cursor)?;
         writer.write_all_objects_header(Variation::Group60Var2)?;
         writer.write_all_objects_header(Variation::Group60Var3)?;
@@ -202,6 +224,31 @@ mod test {
         assert_eq!(
             cursor.written(),
             [0xC1, 0x01, 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06, 0x3C, 0x01, 0x06]
+        );
+    }
+
+    #[test]
+    fn writes_free_format() {
+        let mut buffer: [u8; 100] = [0; 100];
+        let mut cursor = WriteCursor::new(&mut buffer);
+
+        let mut writer = HeaderWriter::new(&mut cursor);
+        let data = Group70Var5 {
+            file_handle: 0xFFEEDDCC,
+            block_number: 0x01ABCDEF,
+            file_data: &[b'h', b'i'],
+        };
+
+        writer.write_free_format(&data).unwrap();
+
+        assert_eq!(
+            cursor.written(),
+            [
+                70, 05, 0x5B, // var and qualifier
+                0x01, // count
+                10, 00, // length
+                0xCC, 0xDD, 0xEE, 0xFF, 0xEF, 0xCD, 0xAB, 0x01, b'h', b'i'
+            ]
         );
     }
 }

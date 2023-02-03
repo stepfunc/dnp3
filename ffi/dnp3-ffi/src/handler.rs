@@ -470,6 +470,8 @@ impl From<TaskType> for ffi::TaskType {
             TaskType::Restart => ffi::TaskType::Restart,
             TaskType::WriteDeadBands => ffi::TaskType::WriteDeadBands,
             TaskType::GenericEmptyResponse(_) => ffi::TaskType::GenericEmptyResponse,
+            TaskType::FileRead => ffi::TaskType::FileRead,
+            TaskType::GetFileInfo => ffi::TaskType::GetFileInfo,
         }
     }
 }

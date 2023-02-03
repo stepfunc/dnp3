@@ -1,11 +1,13 @@
 pub use association::*;
 pub use error::*;
+pub use file::*;
 pub use handler::*;
 pub use poll::PollHandle;
 pub use request::*;
 
 mod association;
 mod error;
+mod file;
 mod handler;
 mod request;
 

@@ -413,7 +413,7 @@ impl MasterSession {
                                         }
                                         Ok(association) => {
                                             association.process_iin(response.header.iin);
-                                            return Ok(task.handle(association, response));
+                                            return Ok(task.handle(association, response).await);
                                         }
                                     }
                                 }

@@ -15,11 +15,16 @@ use crate::master::request::{CommandHeaders, CommandMode, ReadRequest, TimeSyncP
 use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::deadbands::WriteDeadBandsTask;
 use crate::master::tasks::empty_response::EmptyResponseTask;
+use crate::master::tasks::file_read::{FileReadTask, FileReaderType};
+use crate::master::tasks::get_file_info::GetFileInfoTask;
 use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::restart::{RestartTask, RestartType};
 use crate::master::tasks::time::TimeSyncTask;
-use crate::master::tasks::Task;
-use crate::master::{DeadBandHeader, Headers, WriteError};
+use crate::master::tasks::{NonReadTask, Task};
+use crate::master::{
+    DeadBandHeader, DirReadConfig, DirectoryReader, FileCredentials, FileError, FileInfo,
+    FileReadConfig, FileReader, Headers, WriteError,
+};
 use crate::util::channel::Sender;
 use crate::util::session::Enabled;
 
@@ -310,6 +315,50 @@ impl AssociationHandle {
         rx.await?
     }
 
+    /// Start an operation to READ a file from the outstation using a [`FileReader`] to receive data
+    pub async fn read_file<T: ToString>(
+        &mut self,
+        remote_file_path: T,
+        config: FileReadConfig,
+        reader: Box<dyn FileReader>,
+        credentials: Option<FileCredentials>,
+    ) -> Result<(), Shutdown> {
+        let task = FileReadTask::start(
+            remote_file_path.to_string(),
+            config,
+            FileReaderType::from_reader(reader),
+            credentials,
+        );
+        self.send_task(Task::NonRead(NonReadTask::FileRead(task)))
+            .await
+    }
+
+    /// Read a file directory
+    pub async fn read_directory<T: ToString>(
+        &mut self,
+        dir_path: T,
+        config: DirReadConfig,
+        credentials: Option<FileCredentials>,
+    ) -> Result<Vec<FileInfo>, FileError> {
+        let (promise, rx) = Promise::one_shot();
+        let reader = Box::new(DirectoryReader::new(promise));
+        self.read_file(dir_path, config.into(), reader, credentials)
+            .await?;
+        rx.await?
+    }
+
+    /// Get information about a file
+    pub async fn get_file_info<T: ToString>(
+        &mut self,
+        file_path: T,
+    ) -> Result<FileInfo, FileError> {
+        let (promise, reply) = Promise::one_shot();
+        let task = GetFileInfoTask::new(file_path.to_string(), promise);
+        self.send_task(Task::NonRead(NonReadTask::GetFileInfo(task)))
+            .await?;
+        reply.await?
+    }
+
     async fn send_task(&mut self, task: Task) -> Result<(), Shutdown> {
         self.master
             .send_association_message(self.address, AssociationMsgType::QueueTask(task))
@@ -334,6 +383,11 @@ pub(crate) enum Promise<T> {
 }
 
 impl<T> Promise<T> {
+    pub(crate) fn one_shot() -> (Self, tokio::sync::oneshot::Receiver<T>) {
+        let (tx, rx) = tokio::sync::oneshot::channel();
+        (Self::OneShot(tx), rx)
+    }
+
     pub(crate) fn complete(self, value: T) {
         match self {
             Promise::None => {}
@@ -372,6 +426,10 @@ pub enum TaskType {
     WriteDeadBands,
     /// Generic task which
     GenericEmptyResponse(FunctionCode),
+    /// Read a file from the outstation
+    FileRead,
+    /// Get information about a file
+    GetFileInfo,
 }
 
 /// callbacks associated with a single master to outstation association

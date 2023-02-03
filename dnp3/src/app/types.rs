@@ -68,6 +68,12 @@ impl Timestamp {
         cursor.write_u48_le(self.value)
     }
 
+    pub(crate) fn read(cursor: &mut scursor::ReadCursor) -> Result<Self, scursor::ReadError> {
+        Ok(Self {
+            value: cursor.read_u48_le()?,
+        })
+    }
+
     pub(crate) fn checked_add(self, x: Duration) -> Option<Timestamp> {
         // safe from overflow since self.value cannot possibly be larger than MAX
         let max_add = Self::MAX_VALUE - self.value;

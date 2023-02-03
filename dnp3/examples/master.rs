@@ -183,17 +183,41 @@ impl ReadHandler for ExampleReadHandler {
 
 // ANCHOR: association_handler
 #[derive(Copy, Clone)]
-pub struct ExampleAssociationHandler;
+struct ExampleAssociationHandler;
 
 impl AssociationHandler for ExampleAssociationHandler {}
 // ANCHOR_END: association_handler
 
 // ANCHOR: association_information
 #[derive(Copy, Clone)]
-pub struct ExampleAssociationInformation;
+struct ExampleAssociationInformation;
 
 impl AssociationInformation for ExampleAssociationInformation {}
 // ANCHOR_END: association_information
+
+// ANCHOR: file_logger
+struct FileLogger;
+
+impl FileReader for FileLogger {
+    fn opened(&mut self, size: u32) -> FileAction {
+        tracing::info!("File opened - size: {size}");
+        FileAction::Continue
+    }
+
+    fn block_received(&mut self, block_num: u32, data: &[u8]) -> MaybeAsync<FileAction> {
+        tracing::info!("Received block {block_num} with size: {}", data.len());
+        MaybeAsync::ready(FileAction::Continue)
+    }
+
+    fn aborted(&mut self, err: FileError) {
+        tracing::info!("File transfer aborted: {}", err);
+    }
+
+    fn completed(&mut self) {
+        tracing::info!("File transfer completed");
+    }
+}
+// ANCHOR_END: file_logger
 
 /*
   Example program using the master API from within the Tokio runtime.
@@ -397,6 +421,51 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Err(err) => tracing::warn!("error: {}", err),
                 }
             }
+            "rd" => {
+                // ANCHOR: read_directory
+                match association
+                    .read_directory(".", DirReadConfig::default(), None)
+                    .await
+                {
+                    Err(err) => {
+                        tracing::warn!("Unable to read directory: {err}");
+                    }
+                    Ok(items) => {
+                        for info in items {
+                            print_file_info(info);
+                        }
+                    }
+                }
+                // ANCHOR_END: read_directory
+            }
+
+            "gfi" => {
+                // ANCHOR: get_file_info
+                match association.get_file_info(".").await {
+                    Err(err) => {
+                        tracing::warn!("Unable to get file info: {err}");
+                    }
+                    Ok(info) => {
+                        print_file_info(info);
+                    }
+                }
+                // ANCHOR_END: get_file_info
+            }
+            "rf" => {
+                // ANCHOR: read_file
+                if let Err(err) = association
+                    .read_file(
+                        ".", // this reads the root "directory" file but doesn't parse it
+                        FileReadConfig::default(),
+                        Box::new(FileLogger),
+                        None,
+                    )
+                    .await
+                {
+                    tracing::warn!("Unable to start file transfer: {err}");
+                }
+                // ANCHOR_END: read_file
+            }
             "lsr" => {
                 tracing::info!("{:?}", association.check_link_status().await);
             }
@@ -536,4 +605,15 @@ fn create_tls_channel(
     );
     // ANCHOR_END: create_master_tls_channel
     Ok(channel)
+}
+
+fn print_file_info(info: FileInfo) {
+    println!("File name: {}", info.name);
+    println!("     type: {:?}", info.file_type);
+    println!("     size: {}", info.size);
+    println!("     created: {}", info.time_created.raw_value());
+    println!("     permissions:");
+    println!("         world: {}", info.permissions.world);
+    println!("         group: {}", info.permissions.group);
+    println!("         owner: {}", info.permissions.owner);
 }

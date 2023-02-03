@@ -250,6 +250,20 @@ pub enum Variation {
     Group60Var3,
     /// Class Data - Class 3
     Group60Var4,
+    /// File-control - authentication
+    Group70Var2,
+    /// File-control - file command
+    Group70Var3,
+    /// File-control - file command status
+    Group70Var4,
+    /// File-control - file transport
+    Group70Var5,
+    /// File-control - file transport status
+    Group70Var6,
+    /// File-control - file descriptor
+    Group70Var7,
+    /// File-control - file specification string
+    Group70Var8,
     /// Internal Indications - Packed Format
     Group80Var1,
     /// Octet String - Sized by variation
@@ -448,6 +462,16 @@ impl Variation {
                 4 => Some(Variation::Group60Var4),
                 _ => None,
             },
+            70 => match var {
+                2 => Some(Variation::Group70Var2),
+                3 => Some(Variation::Group70Var3),
+                4 => Some(Variation::Group70Var4),
+                5 => Some(Variation::Group70Var5),
+                6 => Some(Variation::Group70Var6),
+                7 => Some(Variation::Group70Var7),
+                8 => Some(Variation::Group70Var8),
+                _ => None,
+            },
             80 => match var {
                 1 => Some(Variation::Group80Var1),
                 _ => None,
@@ -575,6 +599,13 @@ impl Variation {
             Variation::Group60Var2 => (60, 2),
             Variation::Group60Var3 => (60, 3),
             Variation::Group60Var4 => (60, 4),
+            Variation::Group70Var2 => (70, 2),
+            Variation::Group70Var3 => (70, 3),
+            Variation::Group70Var4 => (70, 4),
+            Variation::Group70Var5 => (70, 5),
+            Variation::Group70Var6 => (70, 6),
+            Variation::Group70Var7 => (70, 7),
+            Variation::Group70Var8 => (70, 8),
             Variation::Group80Var1 => (80, 1),
             Variation::Group110(x) => (110, x),
             Variation::Group111(x) => (111, x),
@@ -698,6 +729,13 @@ impl Variation {
             Variation::Group60Var2 => "Class Data - Class 1",
             Variation::Group60Var3 => "Class Data - Class 2",
             Variation::Group60Var4 => "Class Data - Class 3",
+            Variation::Group70Var2 => "File-control - authentication",
+            Variation::Group70Var3 => "File-control - file command",
+            Variation::Group70Var4 => "File-control - file command status",
+            Variation::Group70Var5 => "File-control - file transport",
+            Variation::Group70Var6 => "File-control - file transport status",
+            Variation::Group70Var7 => "File-control - file descriptor",
+            Variation::Group70Var8 => "File-control - file specification string",
             Variation::Group80Var1 => "Internal Indications - Packed Format",
             Variation::Group110(_) => "Octet String - Sized by variation",
             Variation::Group111(_) => "Octet String Event - Sized by variation",
