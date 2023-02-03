@@ -583,12 +583,13 @@ class MainClass
                 }
             case "rd":
                 {
-                    // read directory
+                    // ANCHOR: read_directory
                     var items = await channel.ReadDirectory(association, ".", DirReadConfig.Defaults());
                     foreach(var info in items)
                     {
                         PrintFileInfo(info);
-                    }                    
+                    }
+                    // ANCHOR_END: read_directory
                     return true;
                 }
             case "gfi":

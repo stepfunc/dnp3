@@ -423,6 +423,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
             "rd" => {
+                // ANCHOR: read_directory
                 match association
                     .read_directory(".", DirReadConfig::default(), None)
                     .await
@@ -436,6 +437,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     }
                 }
+                // ANCHOR_END: read_directory
             }
 
             "gfi" => {

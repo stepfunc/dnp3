@@ -210,6 +210,7 @@ class RestartTaskCallback : public dnp3::RestartTaskCallback {
     }
 };
 
+// ANCHOR: read_directory_callback
 class ReadDirectoryCallback : public dnp3::ReadDirectoryCallback {    
     void on_complete(dnp3::FileInfoIterator &iter) override
     {        
@@ -224,6 +225,7 @@ class ReadDirectoryCallback : public dnp3::ReadDirectoryCallback {
         std::cout << "Error reading directory: " << dnp3::to_string(error) << std::endl;
     }    
 };
+// ANCHOR_END: read_directory_callback
 
 // ANCHOR: file_info_callback
 class FileInfoCallback : public dnp3::FileInfoCallback {
@@ -387,8 +389,10 @@ void run_command(const std::string &cmd, dnp3::MasterChannel &channel, dnp3::Ass
     else if (cmd == "wrt") {
         channel.warm_restart(assoc, std::make_unique<RestartTaskCallback>());
     }
-    else if (cmd == "rd") {        
+    else if (cmd == "rd") {
+        // ANCHOR: read_directory
         channel.read_directory(assoc, ".", dnp3::DirReadConfig::defaults(), std::make_unique<ReadDirectoryCallback>());
+        // ANCHOR_END: read_directory
     }
     else if (cmd == "gfi") {
         // ANCHOR: get_file_info

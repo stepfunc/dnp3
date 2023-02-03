@@ -567,10 +567,14 @@ public class MasterExample {
       }
       case "rd":
       {
-        List<FileInfo> items = channel.readDirectory(association, ".", DirReadConfig.defaults()).toCompletableFuture().get();
+        // ANCHOR: read_directory
+        List<FileInfo> items = channel
+                .readDirectory(association, ".", DirReadConfig.defaults())
+                .toCompletableFuture().get();
         for(FileInfo info : items) {
           printFileInfo(info);
         }
+        // ANCHOR_END: read_directory
         break;
       }
       case "gfi":

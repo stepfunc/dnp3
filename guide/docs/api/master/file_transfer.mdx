@@ -152,3 +152,65 @@ This is possible, but not part of the C example!
 There is no need to manually close a file. The master will always attempt to close a file, even if the file operation
 is aborted by the user.
 :::
+
+## Read a Directory
+
+A directory listing in DNP3 is just a special kind of file with a special encoding. We implement this feature by starting
+a background file transfer, accumulating the file data over possibly multiple blocks, and then parsing it into a collection
+of `FileInfo` instances.
+
+:::warning
+The default limit for the size of directory file is 2048 bytes. This is a reasonable and safe limit, however, if its too
+small in your application you can raise this limit using the provided parameter in `DirReadConfig`.
+:::
+
+<Tabs
+groupId="language"
+defaultValue="Rust"
+values={[
+{label: 'Rust', value: 'Rust'},
+{label: 'C', value: 'C'},
+{label: 'C++', value: 'C++'},
+{label: 'Java', value: 'Java'},
+{label: 'C#', value: 'C#'},
+]}>
+<TabItem value="Rust">
+
+```rust
+{{#include ../dnp3/examples/master.rs:read_directory}}
+```
+
+</TabItem>
+<TabItem value="C">
+
+```c
+This is possible, but not part of the C example!
+```
+
+</TabItem>
+<TabItem value="C++">
+
+```cpp
+// Callback interface
+{{#include ../ffi/bindings/c/master_example.cpp:read_directory_callback}}
+
+// asynchronously start the operation
+{{#include ../ffi/bindings/c/master_example.cpp:read_directory}}
+```
+
+</TabItem>
+<TabItem value="Java">
+
+```java
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterExample.java:read_directory}}
+```
+
+</TabItem>
+<TabItem value="C#">
+
+```csharp
+{{#include ../ffi/bindings/dotnet/examples/master/Program.cs:read_directory}}
+```
+
+</TabItem>
+</Tabs>
