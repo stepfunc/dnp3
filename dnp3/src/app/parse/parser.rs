@@ -291,14 +291,14 @@ impl<'a> ObjectHeader<'a> {
                 }
                 Ok(())
             }
-            HeaderDetails::TwoByteFreeFormat(length, _var) => {
+            HeaderDetails::TwoByteFreeFormat(count, _var) => {
                 write!(
                     f,
                     "{} : {} - {} - [{}]",
                     self.variation,
                     self.variation.description(),
                     self.details.qualifier().description(),
-                    length
+                    count
                 )?;
                 if format_values {
                     // TODO!!
@@ -354,7 +354,7 @@ pub(crate) enum HeaderDetails<'a> {
     TwoByteCount(u16, CountVariation<'a>),
     OneByteCountAndPrefix(u8, PrefixedVariation<'a, u8>),
     TwoByteCountAndPrefix(u16, PrefixedVariation<'a, u16>),
-    TwoByteFreeFormat(u16, FreeFormatVariation<'a>),
+    TwoByteFreeFormat(u8, FreeFormatVariation<'a>),
 }
 
 impl HeaderDetails<'_> {
@@ -625,7 +625,7 @@ impl<'a> ObjectParser<'a> {
 
         Ok(ObjectHeader::new(
             v,
-            HeaderDetails::TwoByteFreeFormat(length, variation),
+            HeaderDetails::TwoByteFreeFormat(count, variation),
         ))
     }
 }
