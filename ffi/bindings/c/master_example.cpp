@@ -4,7 +4,6 @@
 #include <iomanip>
 #include <string>
 #include <cstring>
-#include <future>
 
 // ANCHOR: logging_callback
 class Logger : public dnp3::Logger {
@@ -35,6 +34,15 @@ std::ostream& operator<<(std::ostream& os, const dnp3::Flags& flags)
 {
     return write_hex_byte(os, flags.value);
 }
+
+void print_file_info(const dnp3::FileInfo &info)
+{
+    std::cout << "File name: " << info.file_name << std::endl;
+    std::cout << "     type: " << dnp3::to_string(info.file_type) << std::endl;
+    std::cout << "     size: " << info.size << std::endl;
+    std::cout << "     created: " << info.time_created << std::endl;
+}
+
 
 // ANCHOR: read_handler
 class ReadHandler : public dnp3::ReadHandler {
@@ -202,25 +210,19 @@ class RestartTaskCallback : public dnp3::RestartTaskCallback {
     }
 };
 
-class ReadDirectoryCallback : public dnp3::ReadDirectoryCallback {
-    std::promise<std::vector<dnp3::FileInfo>> promise;
-    void on_complete(dnp3::FileInfoIterator &iter) override {
-        std::vector<dnp3::FileInfo> items;
+class ReadDirectoryCallback : public dnp3::ReadDirectoryCallback {    
+    void on_complete(dnp3::FileInfoIterator &iter) override
+    {        
         while (iter.next()) {
             const auto info = iter.get();
-        }
-        this->promise.set_value(std::move(items));
+            print_file_info(info);
+        }        
     }
 
-    void on_failure(dnp3::FileError error) override {
-        this->promise.set_exception(std::make_exception_ptr(dnp3::FileException(error)));
-    }
-
-    public:
-
-    std::future<std::vector<dnp3::FileInfo>> future() {
-        return this->promise.get_future();
-    }
+    void on_failure(dnp3::FileError error) override
+    {
+        std::cout << "Error reading directory: " << dnp3::to_string(error) << std::endl;
+    }    
 };
 
 class GenericCallback : public dnp3::EmptyResponseCallback {
@@ -271,14 +273,6 @@ dnp3::AssociationConfig get_association_config()
     // ANCHOR_END: association_config
 
     return config;
-}
-
-void print_file_info(const dnp3::FileInfo& info)
-{
-    std::cout << "File name: " << info.file_name << std::endl;
-    std::cout << "     type: " << dnp3::to_string(info.file_type) << std::endl;
-    std::cout << "     size: " << info.size << std::endl;
-    std::cout << "     created: " << info.time_created << std::endl;
 }
 
 void run_command(const std::string &cmd, dnp3::MasterChannel &channel, dnp3::AssociationId assoc, dnp3::PollId event_poll)
@@ -357,14 +351,8 @@ void run_command(const std::string &cmd, dnp3::MasterChannel &channel, dnp3::Ass
     else if (cmd == "wrt") {
         channel.warm_restart(assoc, std::make_unique<RestartTaskCallback>());
     }
-    else if (cmd == "rd") {
-        auto callback = std::make_unique<ReadDirectoryCallback>();
-        auto result = callback->future();
-        channel.read_directory(assoc, ".", dnp3::DirReadConfig::defaults(), std::move(callback));
-        const auto items = result.get();
-        for (auto info : items) {
-            print_file_info(info);
-        }
+    else if (cmd == "rd") {        
+        channel.read_directory(assoc, ".", dnp3::DirReadConfig::defaults(), std::make_unique<ReadDirectoryCallback>());
     }
     else if (cmd == "lsr") {
         channel.check_link_status(assoc, std::make_unique<LinkStatusCallback>());
