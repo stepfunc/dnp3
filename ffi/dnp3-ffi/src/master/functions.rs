@@ -635,6 +635,15 @@ pub(crate) unsafe fn master_channel_warm_restart(
     Ok(())
 }
 
+fn credentials(user_name: &CStr, password: &CStr) -> Result<FileCredentials, ffi::ParamError> {
+    let user_name = user_name.to_str()?.to_string();
+    let password = password.to_str()?.to_string();
+    Ok(FileCredentials {
+        user_name,
+        password,
+    })
+}
+
 pub(crate) unsafe fn master_channel_read_file(
     channel: *mut crate::MasterChannel,
     association: ffi::AssociationId,
@@ -654,10 +663,7 @@ pub(crate) unsafe fn master_channel_read_file_with_auth(
     user_name: &CStr,
     password: &CStr,
 ) -> Result<(), ffi::ParamError> {
-    let credentials = FileCredentials {
-        user_name: user_name.to_str()?.to_string(),
-        password: password.to_str()?.to_string(),
-    };
+    let credentials = credentials(user_name, password)?;
 
     master_channel_read_file_internal(
         channel,
@@ -699,6 +705,38 @@ pub(crate) unsafe fn master_channel_read_directory(
     config: ffi::DirReadConfig,
     callback: ffi::ReadDirectoryCallback,
 ) -> Result<(), ffi::ParamError> {
+    master_channel_read_directory_generic(channel, association, dir_path, config, callback, None)
+}
+
+pub(crate) unsafe fn master_channel_read_directory_with_auth(
+    channel: *mut crate::MasterChannel,
+    association: ffi::AssociationId,
+    dir_path: &CStr,
+    config: ffi::DirReadConfig,
+    user_name: &CStr,
+    password: &CStr,
+    callback: ffi::ReadDirectoryCallback,
+) -> Result<(), ffi::ParamError> {
+    let credentials = credentials(user_name, password)?;
+
+    master_channel_read_directory_generic(
+        channel,
+        association,
+        dir_path,
+        config,
+        callback,
+        Some(credentials),
+    )
+}
+
+unsafe fn master_channel_read_directory_generic(
+    channel: *mut crate::MasterChannel,
+    association: ffi::AssociationId,
+    dir_path: &CStr,
+    config: ffi::DirReadConfig,
+    callback: ffi::ReadDirectoryCallback,
+    credentials: Option<FileCredentials>,
+) -> Result<(), ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::try_new(association.address)?;
     let dir_path = dir_path.to_str()?.to_string();
@@ -708,7 +746,7 @@ pub(crate) unsafe fn master_channel_read_directory(
     let promise = sfio_promise::wrap(callback);
     let task = async move {
         let res = association
-            .read_directory(dir_path, config.into(), None)
+            .read_directory(dir_path, config.into(), credentials)
             .await;
         promise.complete(res);
     };

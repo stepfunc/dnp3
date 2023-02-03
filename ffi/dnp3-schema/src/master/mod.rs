@@ -544,6 +544,31 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         .define_future_method(
             "read_directory",
             master_channel_class.clone(),
+            read_directory_cb.clone(),
+        )?
+        .param(
+            "association",
+            association_id.clone(),
+            "Id of the association",
+        )?
+        .param(
+            "dir_path",
+            StringType,
+            "Complete path to the remote directory",
+        )?
+        .param(
+            "config",
+            dir_read_config.clone(),
+            "Configuration for the directory read operation",
+        )?
+        .fails_with(shared.error_type.clone())?
+        .doc("Asynchronously retrieve a directory listing")?
+        .build()?;
+
+    let read_directory_with_auth_async = lib
+        .define_future_method(
+            "read_directory_with_auth",
+            master_channel_class.clone(),
             read_directory_cb,
         )?
         .param(
@@ -561,8 +586,12 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
             dir_read_config,
             "Configuration for the directory read operation",
         )?
+        .param("user_name", StringType, "User name sent to the outstation")?
+        .param("password", StringType, "Password sent to the outstation")?
         .fails_with(shared.error_type.clone())?
-        .doc("Asynchronously retrieve a directory listing")?
+        .doc(
+            "Asynchronously retrieve a directory listing by first obtaining an authentication key",
+        )?
         .build()?;
 
     let link_status_cb = define_link_status_callback(lib, nothing)?;
@@ -606,6 +635,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         .async_method(send_and_expect_empty_response)?
         .async_method(get_file_info_async)?
         .async_method(read_directory_async)?
+        .async_method(read_directory_with_auth_async)?
         .async_method(check_link_status_async)?
         .custom_destroy("shutdown")?
         .doc(
