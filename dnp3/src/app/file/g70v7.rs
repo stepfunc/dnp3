@@ -23,7 +23,11 @@ impl<'a> Group70Var7<'a> {
         write!(f, "\nfile name: {}", self.file_name)?;
         write!(f, "\nfile type: {:?}", self.file_type)?;
         write!(f, "\nfile size: {}", self.file_size)?;
-        write!(f, "\ntime of creation: {}", self.time_of_creation.raw_value())?;
+        write!(
+            f,
+            "\ntime of creation: {}",
+            self.time_of_creation.raw_value()
+        )?;
         write!(f, "\npermissions: {}", self.permissions)?;
         write!(f, "\nrequest id: {}", self.request_id)?;
         Ok(())

@@ -61,7 +61,11 @@ impl<'a> Group70Var3<'a> {
 
     pub(crate) fn format(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "\nfile name: {}", self.file_name)?;
-        write!(f, "\ntime of creation: {}", self.time_of_creation.raw_value())?;
+        write!(
+            f,
+            "\ntime of creation: {}",
+            self.time_of_creation.raw_value()
+        )?;
         write!(f, "\npermissions: {}", self.permissions)?;
         write!(f, "\nauth key: {}", self.auth_key)?;
         write!(f, "\nfile size: {}", self.file_size)?;
