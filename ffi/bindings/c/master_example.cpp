@@ -225,6 +225,36 @@ class ReadDirectoryCallback : public dnp3::ReadDirectoryCallback {
     }    
 };
 
+class FileInfoCallback : public dnp3::FileInfoCallback {
+    void on_complete(const dnp3::FileInfo& info) override
+    {
+        print_file_info(info);
+    }
+
+    void on_failure(dnp3::FileError error) override { std::cout << "Error getting file info: " << dnp3::to_string(error) << std::endl; }
+};
+
+class FileReader : public dnp3::FileReader {
+
+    bool opened(uint32_t size) override {
+        std::cout << "File opened - size: " << size << std::endl;
+        return true;
+    }
+
+    bool block_received(uint32_t block_num, dnp3::ByteIterator& data) override {
+        std::cout << "Received file block: " << block_num << std::endl;
+        return true;
+    }
+
+    void aborted(dnp3::FileError error) override {
+        std::cout << "File read aborted: " << dnp3::to_string(error) << std::endl;
+    }
+
+    void completed() override {
+        std::cout << "File read completed" << std::endl;
+    }
+};
+
 class GenericCallback : public dnp3::EmptyResponseCallback {
 public:
     GenericCallback(const std::string &task) : task(task) {}
@@ -353,6 +383,12 @@ void run_command(const std::string &cmd, dnp3::MasterChannel &channel, dnp3::Ass
     }
     else if (cmd == "rd") {        
         channel.read_directory(assoc, ".", dnp3::DirReadConfig::defaults(), std::make_unique<ReadDirectoryCallback>());
+    }
+    else if (cmd == "gfi") {
+        channel.get_file_info(assoc, ".", std::make_unique<FileInfoCallback>());
+    }
+    else if (cmd == "rf") {
+        channel.read_file(assoc, ".", dnp3::FileReadConfig::defaults(), std::make_unique<FileReader>());
     }
     else if (cmd == "lsr") {
         channel.check_link_status(assoc, std::make_unique<LinkStatusCallback>());
