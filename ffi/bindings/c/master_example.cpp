@@ -239,8 +239,8 @@ class FileInfoCallback : public dnp3::FileInfoCallback {
 };
 // ANCHOR_END: file_info_callback
 
+// ANCHOR: file_logger
 class FileReader : public dnp3::FileReader {
-
     bool opened(uint32_t size) override {
         std::cout << "File opened - size: " << size << std::endl;
         return true;
@@ -259,6 +259,7 @@ class FileReader : public dnp3::FileReader {
         std::cout << "File read completed" << std::endl;
     }
 };
+// ANCHOR_END: file_logger
 
 class GenericCallback : public dnp3::EmptyResponseCallback {
 public:
@@ -395,7 +396,9 @@ void run_command(const std::string &cmd, dnp3::MasterChannel &channel, dnp3::Ass
         // ANCHOR_END: get_file_info
     }
     else if (cmd == "rf") {
+        // ANCHOR: read_file
         channel.read_file(assoc, ".", dnp3::FileReadConfig::defaults(), std::make_unique<FileReader>());
+        // ANCHOR_END: read_file
     }
     else if (cmd == "lsr") {
         channel.check_link_status(assoc, std::make_unique<LinkStatusCallback>());

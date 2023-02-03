@@ -252,6 +252,7 @@ class TestAssociationInformation implements AssociationInformation {
 }
 // ANCHOR_END: association_information
 
+// ANCHOR: file_logger
 class LoggingFileReader implements FileReader {
   @Override
   public boolean opened(UInteger size) {
@@ -275,6 +276,7 @@ class LoggingFileReader implements FileReader {
     System.out.println("Completed file transfer");
   }
 }
+// ANCHOR_END: file_logger
 
 public class MasterExample {
 
@@ -581,7 +583,9 @@ public class MasterExample {
       }
       case "rf":
       {
+        // ANCHOR: read_file
         channel.readFile(association, ".", FileReadConfig.defaults(), new LoggingFileReader());
+        // ANCHOR_END: read_file
         break;
       }
       case "lsr":

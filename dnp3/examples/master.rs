@@ -195,6 +195,8 @@ struct ExampleAssociationInformation;
 impl AssociationInformation for ExampleAssociationInformation {}
 // ANCHOR_END: association_information
 
+
+// ANCHOR: file_logger
 struct FileLogger;
 
 impl FileReader for FileLogger {
@@ -216,6 +218,7 @@ impl FileReader for FileLogger {
         tracing::info!("File transfer completed");
     }
 }
+// ANCHOR_END: file_logger
 
 /*
   Example program using the master API from within the Tokio runtime.
@@ -448,10 +451,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 // ANCHOR_END: get_file_info
             },
             "rf" => {
-                // read a file logging what happens
+                // ANCHOR: read_file
                 if let Err(err) = association
                     .read_file(
-                        ".", // this reads the "directory" file but doesn't parse it
+                        ".", // this reads the root "directory" file but doesn't parse it
                         FileReadConfig::default(),
                         Box::new(FileLogger),
                         None,
@@ -460,6 +463,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 {
                     tracing::warn!("Unable to start file transfer: {err}");
                 }
+                // ANCHOR_END: read_file
             }
             "lsr" => {
                 tracing::info!("{:?}", association.check_link_status().await);

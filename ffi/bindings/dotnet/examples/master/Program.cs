@@ -228,7 +228,7 @@ class MainClass
     }
     // ANCHOR_END: association_information
 
-
+    // ANCHOR: file_logger
     class FileReader : IFileReader
     {
         void IFileReader.Aborted(FileError error)
@@ -253,6 +253,7 @@ class MainClass
             return true;
         }
     }
+    // ANCHOR_END: file_logger
 
     // ANCHOR: master_channel_config
     private static MasterChannelConfig GetMasterChannelConfig()
@@ -600,8 +601,9 @@ class MainClass
                 }
             case "rf":
                 {
-                    // read a file asynchronously using a callback interface
+                    // ANCHOR: read_file
                     channel.ReadFile(association, ".", FileReadConfig.Defaults(), new FileReader());
+                    // ANCHOR_END: read_file
                     return true;
                 }
             case "crt":

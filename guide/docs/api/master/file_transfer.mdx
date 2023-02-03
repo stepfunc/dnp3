@@ -69,3 +69,86 @@ This is possible, but not part of the C example!
 
 </TabItem>
 </Tabs>
+
+# Read a File
+
+File data may be asynchronously read from the outstation using a callback interface. Reading a file consists of multiple
+DNP3 requests. Obtaining an authentication key from the outstation and is optional depending on outstation requirements.
+
+```mermaid
+sequenceDiagram
+    Master-->>Outstation: authenticate_file (optional);
+    Outstation-->>Master: response w/ key;
+    Master->>Outstation: read file block (1 of N);
+    Outstation->>Master: response (1 of N);
+    Master->>Outstation: close file;
+    Outstation->>Master: response;
+```
+
+The `FileReader` interface is used to receive data from the outstation as it is read. Your code is responsible for doing
+something with this data, e.g. writing it to a local file.
+
+<Tabs
+groupId="language"
+defaultValue="Rust"
+values={[
+{label: 'Rust', value: 'Rust'},
+{label: 'C', value: 'C'},
+{label: 'C++', value: 'C++'},
+{label: 'Java', value: 'Java'},
+{label: 'C#', value: 'C#'},
+]}>
+<TabItem value="Rust">
+
+```rust
+{{#include ../dnp3/examples/master.rs:file_logger}}
+
+// asynchronously start the transfer
+{{#include ../dnp3/examples/master.rs:read_file}}
+```
+
+</TabItem>
+<TabItem value="C">
+
+```c
+This is possible, but not part of the C example!
+```
+
+</TabItem>
+<TabItem value="C++">
+
+```cpp
+// Callback interface
+{{#include ../ffi/bindings/c/master_example.cpp:file_logger}}
+
+// asynchronously start the operation
+{{#include ../ffi/bindings/c/master_example.cpp:read_file}}
+```
+
+</TabItem>
+<TabItem value="Java">
+
+```java
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterExample.java:file_logger}}
+
+// asynchronously start the operation
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterExample.java:read_file}}
+```
+
+</TabItem>
+<TabItem value="C#">
+
+```csharp
+{{#include ../ffi/bindings/dotnet/examples/master/Program.cs:file_logger}}
+
+// asynchronously start the operation
+{{#include ../ffi/bindings/dotnet/examples/master/Program.cs:read_file}}
+```
+
+</TabItem>
+</Tabs>
+
+:::tip
+There is no need to manually close a file. The master will always attempt to close a file, even if the file operation
+is aborted by the user.
+:::
