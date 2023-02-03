@@ -642,19 +642,7 @@ pub(crate) unsafe fn master_channel_read_file(
     config: ffi::FileReadConfig,
     reader: ffi::FileReader,
 ) -> Result<(), ffi::ParamError> {
-    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
-    let address = EndpointAddress::try_new(association.address)?;
-    let mut association = AssociationHandle::create(address, channel.handle.clone());
-    let remote_file_path = remote_file_path.to_str()?.to_string();
-    let config: FileReadConfig = config.into();
-
-    channel.runtime.block_on(async move {
-        association
-            .read_file(remote_file_path, config, Box::new(reader), None)
-            .await
-    })??;
-
-    Ok(())
+    master_channel_read_file_internal(channel, association, remote_file_path, config, reader, None)
 }
 
 pub(crate) unsafe fn master_channel_read_file_with_auth(
@@ -666,25 +654,38 @@ pub(crate) unsafe fn master_channel_read_file_with_auth(
     user_name: &CStr,
     password: &CStr,
 ) -> Result<(), ffi::ParamError> {
+    let credentials = FileCredentials {
+        user_name: user_name.to_str()?.to_string(),
+        password: password.to_str()?.to_string(),
+    };
+
+    master_channel_read_file_internal(
+        channel,
+        association,
+        remote_file_path,
+        config,
+        reader,
+        Some(credentials),
+    )
+}
+
+unsafe fn master_channel_read_file_internal(
+    channel: *mut crate::MasterChannel,
+    association: ffi::AssociationId,
+    remote_file_path: &CStr,
+    config: ffi::FileReadConfig,
+    reader: ffi::FileReader,
+    credentials: Option<dnp3::master::FileCredentials>,
+) -> Result<(), ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::try_new(association.address)?;
     let mut association = AssociationHandle::create(address, channel.handle.clone());
     let remote_file_path = remote_file_path.to_str()?.to_string();
     let config: FileReadConfig = config.into();
 
-    let credentials = FileCredentials {
-        user_name: user_name.to_str()?.to_string(),
-        password: password.to_str()?.to_string(),
-    };
-
     channel.runtime.block_on(async move {
         association
-            .read_file(
-                remote_file_path,
-                config,
-                Box::new(reader),
-                Some(credentials),
-            )
+            .read_file(remote_file_path, config, Box::new(reader), credentials)
             .await
     })??;
 
