@@ -43,10 +43,6 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
             "Binary Output Command - Control Relay Output Block",
         )?
         .push(gv(12, 1), "Binary Output Command - Pattern Control Block")?
-        /* TODO
-        .push(gv(13, 1), "Binary Output Command Event - Without time")?
-        .push(gv(13, 2), "Binary Output Command Event - With time")?
-         */
         .push(gv(20, 0), "Counter - Default variation")?
         .push(gv(20, 1), "Counter - 32-bit with flags")?
         .push(gv(20, 2), "Counter - 16-bit with flags")?
