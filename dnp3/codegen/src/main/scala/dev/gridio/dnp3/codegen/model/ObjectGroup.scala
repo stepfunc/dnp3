@@ -15,7 +15,6 @@ object ObjectGroup {
     Group10,
     Group11,
     Group12,
-    //Group13, TODO
     Group20,
     Group21,
     Group22,
@@ -28,7 +27,6 @@ object ObjectGroup {
     Group40,
     Group41,
     Group42,
-    //Group43, TODO
     Group50,
     Group51,
     Group52,
@@ -37,13 +35,6 @@ object ObjectGroup {
     Group80,
     Group110,
     Group111,
-    /*
-    Group112,
-    Group113,
-    Group120,
-    Group121,
-    Group122
-    */
   )
 
 }
