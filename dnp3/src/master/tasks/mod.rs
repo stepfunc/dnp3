@@ -73,7 +73,7 @@ impl Task {
 
     /// Perform operation before sending and check if the request should still be sent
     ///
-    /// Returning `true` means the task should proceed, returning false means
+    /// Returning Some means the task should proceed, returning None means
     /// the task was cancelled, forget about it.
     pub(crate) fn start(self, association: &mut Association) -> Option<Task> {
         if let Task::NonRead(task) = self {
