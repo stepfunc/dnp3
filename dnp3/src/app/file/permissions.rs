@@ -154,12 +154,20 @@ mod test {
         assert_eq!(expected, parsed);
     }
 
+    fn test_permission_writing(value: Permissions, expected: &[u8]) {
+        let mut buffer: [u8; 2] = [0; 2];
+        let mut cursor = WriteCursor::new(&mut buffer);
+        value.write(&mut cursor).unwrap();
+        assert_eq!(cursor.remaining(), 0);
+        assert_eq!(cursor.written(), expected);
+    }
+
     #[test]
-    fn calculates_permission_bytes() {
-        assert_eq!(Permissions::same(PermissionSet::all()).value(), 0x1FF);
-        assert_eq!(
-            Permissions::same(PermissionSet::read_only()).value(),
-            0b1_0010_0100
+    fn writes_permission_bytes() {
+        test_permission_writing(Permissions::same(PermissionSet::all()), &[0xFF, 0x01]);
+        test_permission_writing(
+            Permissions::same(PermissionSet::read_only()),
+            &[0b00100100, 1],
         );
     }
 
