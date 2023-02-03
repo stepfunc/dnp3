@@ -49,6 +49,18 @@ impl<'a> FreeFormatVariation<'a> {
 
         Ok(object)
     }
+
+    pub(crate) fn format_objects(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            FreeFormatVariation::Group70Var2(x) => x.format(f),
+            FreeFormatVariation::Group70Var3(x) => x.format(f),
+            FreeFormatVariation::Group70Var4(x) => x.format(f),
+            FreeFormatVariation::Group70Var5(x) => x.format(f),
+            FreeFormatVariation::Group70Var6(x) => x.format(f),
+            FreeFormatVariation::Group70Var7(x) => x.format(f),
+            FreeFormatVariation::Group70Var8(x) => x.format(f),
+        }
+    }
 }
 
 impl From<file::ReadError> for ObjectParseError {

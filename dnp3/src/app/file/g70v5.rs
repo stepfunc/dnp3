@@ -13,6 +13,13 @@ pub(crate) struct Group70Var5<'a> {
 }
 
 impl<'a> Group70Var5<'a> {
+    pub(crate) fn format(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        writeln!(f, "file handle: {}", self.file_handle)?;
+        writeln!(f, "block number: {}", self.block_number)?;
+        writeln!(f, "file data length: {}", self.file_data.len())?;
+        Ok(())
+    }
+
     pub(crate) fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u32_le(self.file_handle)?;
         cursor.write_u32_le(self.block_number)?;

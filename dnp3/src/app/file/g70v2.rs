@@ -16,6 +16,14 @@ impl<'a> Group70Var2<'a> {
     // the user name offset is always 12 octets because all the fields in front of it are fixed size
     const USER_NAME_OFFSET: u16 = 12;
 
+    pub(crate) fn format(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        writeln!(
+            f,
+            "user name: {} password: {} auth key: {}",
+            self.user_name, self.password, self.auth_key
+        )
+    }
+
     pub(crate) fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u16_le(Self::USER_NAME_OFFSET)?;
         let user_name_size = byte_length(self.user_name)?;

@@ -19,6 +19,16 @@ impl<'a> Group70Var7<'a> {
     // why on earth have these constants in the protocol?
     const FILE_NAME_OFFSET: u16 = 20;
 
+    pub(crate) fn format(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        writeln!(f, "file name: {}", self.file_name)?;
+        writeln!(f, "file type: {:?}", self.file_type)?;
+        writeln!(f, "file size: {}", self.file_size)?;
+        writeln!(f, "time of creation: {}", self.time_of_creation.raw_value())?;
+        writeln!(f, "permissions: {}", self.permissions)?;
+        writeln!(f, "request id: {}", self.request_id)?;
+        Ok(())
+    }
+
     pub(crate) fn write(&self, cursor: &mut scursor::WriteCursor) -> Result<(), WriteError> {
         cursor.write_u16_le(Self::FILE_NAME_OFFSET)?;
         cursor.write_u16_le(byte_length(self.file_name)?)?;

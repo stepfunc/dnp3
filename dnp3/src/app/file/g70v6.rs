@@ -13,6 +13,14 @@ pub(crate) struct Group70Var6<'a> {
 }
 
 impl<'a> Group70Var6<'a> {
+    pub(crate) fn format(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        writeln!(f, "file handle: {}", self.file_handle)?;
+        writeln!(f, "block number: {}", self.block_number)?;
+        writeln!(f, "status code: {:?}", self.status_code)?;
+        writeln!(f, "optional text: {:?}", self.text)?;
+        Ok(())
+    }
+
     // we aren't using this in production yet but will be needed for the outstation
     #[cfg(test)]
     pub(crate) fn write(

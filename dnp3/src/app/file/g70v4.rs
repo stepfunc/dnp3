@@ -16,6 +16,16 @@ pub(crate) struct Group70Var4<'a> {
 }
 
 impl<'a> Group70Var4<'a> {
+    pub(crate) fn format(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        writeln!(f, "file handle: {}", self.file_handle)?;
+        writeln!(f, "file size: {}", self.file_size)?;
+        writeln!(f, "max block size: {}", self.max_block_size)?;
+        writeln!(f, "request id: {}", self.request_id)?;
+        writeln!(f, "status code: {:?}", self.status_code)?;
+        writeln!(f, "optional text: {:?}", self.text)?;
+        Ok(())
+    }
+
     pub(crate) fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u32_le(self.file_handle)?;
         cursor.write_u32_le(self.file_size)?;

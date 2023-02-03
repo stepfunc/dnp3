@@ -291,7 +291,7 @@ impl<'a> ObjectHeader<'a> {
                 }
                 Ok(())
             }
-            HeaderDetails::TwoByteFreeFormat(count, _var) => {
+            HeaderDetails::TwoByteFreeFormat(count, var) => {
                 write!(
                     f,
                     "{} : {} - {} - [{}]",
@@ -301,7 +301,7 @@ impl<'a> ObjectHeader<'a> {
                     count
                 )?;
                 if format_values {
-                    // TODO!!
+                    var.format_objects(f)?;
                 }
                 Ok(())
             }
@@ -1192,7 +1192,7 @@ mod test {
 
         assert_eq!(header.variation, Variation::Group70Var5);
         let obj = match header.details {
-            HeaderDetails::TwoByteFreeFormat(12, FreeFormatVariation::Group70Var5(obj)) => obj,
+            HeaderDetails::TwoByteFreeFormat(1, FreeFormatVariation::Group70Var5(obj)) => obj,
             _ => unreachable!(),
         };
         assert_eq!(
