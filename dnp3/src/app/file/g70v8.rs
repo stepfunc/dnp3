@@ -9,6 +9,8 @@ pub(crate) struct Group70Var8<'a> {
 }
 
 impl<'a> Group70Var8<'a> {
+    // not using this in production yet
+    #[cfg(test)]
     pub(crate) fn write(
         &self,
         cursor: &mut scursor::WriteCursor,

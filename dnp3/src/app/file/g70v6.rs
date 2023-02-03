@@ -1,6 +1,5 @@
 use super::*;
-use crate::app::format::WriteError;
-use scursor::{ReadCursor, WriteCursor};
+use scursor::ReadCursor;
 
 /// Group 70 Variation 6 - file transport status
 ///
@@ -14,7 +13,12 @@ pub(crate) struct Group70Var6<'a> {
 }
 
 impl<'a> Group70Var6<'a> {
-    pub(crate) fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+    // we aren't using this in production yet but will be needed for the outstation
+    #[cfg(test)]
+    pub(crate) fn write(
+        &self,
+        cursor: &mut scursor::WriteCursor,
+    ) -> Result<(), crate::app::format::WriteError> {
         cursor.write_u32_le(self.file_handle)?;
         cursor.write_u32_le(self.block_number)?;
         cursor.write_u8(self.status_code.to_u8())?;
@@ -60,7 +64,7 @@ mod test {
     fn writes_valid_object() {
         let mut buffer = [0; 64];
 
-        let mut cursor = WriteCursor::new(&mut buffer);
+        let mut cursor = scursor::WriteCursor::new(&mut buffer);
         OBJECT.write(&mut cursor).unwrap();
 
         assert_eq!(cursor.written(), DATA)
