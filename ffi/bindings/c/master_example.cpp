@@ -225,14 +225,19 @@ class ReadDirectoryCallback : public dnp3::ReadDirectoryCallback {
     }    
 };
 
+// ANCHOR: file_info_callback
 class FileInfoCallback : public dnp3::FileInfoCallback {
     void on_complete(const dnp3::FileInfo& info) override
     {
         print_file_info(info);
     }
 
-    void on_failure(dnp3::FileError error) override { std::cout << "Error getting file info: " << dnp3::to_string(error) << std::endl; }
+    void on_failure(dnp3::FileError error) override
+    {
+        std::cout << "Error getting file info: " << dnp3::to_string(error) << std::endl;
+    }
 };
+// ANCHOR_END: file_info_callback
 
 class FileReader : public dnp3::FileReader {
 
@@ -385,7 +390,9 @@ void run_command(const std::string &cmd, dnp3::MasterChannel &channel, dnp3::Ass
         channel.read_directory(assoc, ".", dnp3::DirReadConfig::defaults(), std::make_unique<ReadDirectoryCallback>());
     }
     else if (cmd == "gfi") {
+        // ANCHOR: get_file_info
         channel.get_file_info(assoc, ".", std::make_unique<FileInfoCallback>());
+        // ANCHOR_END: get_file_info
     }
     else if (cmd == "rf") {
         channel.read_file(assoc, ".", dnp3::FileReadConfig::defaults(), std::make_unique<FileReader>());

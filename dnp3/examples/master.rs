@@ -434,13 +434,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
             }
-            "gfi" => match association.get_file_info(".").await {
-                Err(err) => {
-                    tracing::warn!("Unable to get file info: {err}");
+
+            "gfi" => {
+                // ANCHOR: get_file_info
+                match association.get_file_info(".").await {
+                    Err(err) => {
+                        tracing::warn!("Unable to get file info: {err}");
+                    }
+                    Ok(info) => {
+                        print_file_info(info);
+                    }
                 }
-                Ok(info) => {
-                    print_file_info(info);
-                }
+                // ANCHOR_END: get_file_info
             },
             "rf" => {
                 // read a file logging what happens

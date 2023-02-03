@@ -592,9 +592,10 @@ class MainClass
                 }
             case "gfi":
                 {
-                    // get file info
+                    // ANCHOR: get_file_info
                     var info = await channel.GetFileInfo(association, ".");
                     PrintFileInfo(info);
+                    // ANCHOR_END: get_file_info
                     return true;
                 }
             case "rf":

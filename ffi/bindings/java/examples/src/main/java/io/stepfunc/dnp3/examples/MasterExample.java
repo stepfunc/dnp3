@@ -573,8 +573,10 @@ public class MasterExample {
       }
       case "gfi":
       {
+        // ANCHOR: get_file_info
         FileInfo info = channel.getFileInfo(association, ".").toCompletableFuture().get();
         printFileInfo(info);
+        // ANCHOR_END: get_file_info
         break;
       }
       case "rf":

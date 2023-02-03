@@ -1,0 +1,71 @@
+---
+id: file_transfer
+title: File Transfer
+sidebar_label: File Transfer
+slug: /api/master/file_transfer
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+File transfer in DNP3 is defining using objects from Group 70. The Master API allows you to do several operations related
+to file transfer:
+
+* Get file info - Retrieve information on an individual file or directory
+* Read file - Read a remote file from the outstation asynchronously
+* Read directory listing - Read a directory information from the outstation
+
+# Get File Info
+
+Information about a single file or directory may be retrieved from outstation using a single method invocation.
+
+<Tabs
+groupId="language"
+defaultValue="Rust"
+values={[
+{label: 'Rust', value: 'Rust'},
+{label: 'C', value: 'C'},
+{label: 'C++', value: 'C++'},
+{label: 'Java', value: 'Java'},
+{label: 'C#', value: 'C#'},
+]}>
+<TabItem value="Rust">
+
+```rust
+{{#include ../dnp3/examples/master.rs:get_file_info}}
+```
+
+</TabItem>
+<TabItem value="C">
+
+```c
+This is possible, but not part of the C example!
+```
+
+</TabItem>
+<TabItem value="C++">
+
+```cpp
+// Callback interface
+{{#include ../ffi/bindings/c/master_example.cpp:file_info_callback}}
+
+// asynchronously start the operation
+{{#include ../ffi/bindings/c/master_example.cpp:get_file_info}}
+```
+
+</TabItem>
+<TabItem value="Java">
+
+```java
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterExample.java:get_file_info}}
+```
+
+</TabItem>
+<TabItem value="C#">
+
+```csharp
+{{#include ../ffi/bindings/dotnet/examples/master/Program.cs:get_file_info}}
+```
+
+</TabItem>
+</Tabs>
