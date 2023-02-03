@@ -22,10 +22,20 @@ impl std::fmt::Display for PermissionSet {
 }
 
 impl PermissionSet {
-    pub(crate) const fn all() -> Self {
+    /// Construct a permission set that allows read, write, and execute
+    pub const fn all() -> Self {
         Self {
             execute: true,
             write: true,
+            read: true,
+        }
+    }
+
+    /// Construct a permission set that indicates read-only access
+    pub const fn read_only() -> Self {
+        Self {
+            execute: false,
+            write: false,
             read: true,
         }
     }
@@ -54,6 +64,17 @@ pub struct Permissions {
     pub group: PermissionSet,
     /// Owner permissions
     pub owner: PermissionSet,
+}
+
+impl Permissions {
+    /// Construct Permissions indicating the same permissions for all users
+    pub const fn same(set: PermissionSet) -> Permissions {
+        Permissions {
+            world: set,
+            group: set,
+            owner: set,
+        }
+    }
 }
 
 impl std::fmt::Display for Permissions {
@@ -126,14 +147,28 @@ impl Permissions {
 mod test {
     use super::*;
 
+    fn test_permission_parsing(bytes: &[u8], expected: Permissions) {
+        let mut cursor = ReadCursor::new(bytes);
+        let parsed = Permissions::read(&mut cursor).unwrap();
+        assert!(cursor.is_empty());
+        assert_eq!(expected, parsed);
+    }
+
     #[test]
     fn calculates_permission_bytes() {
-        let all = Permissions {
-            world: PermissionSet::all(),
-            group: PermissionSet::all(),
-            owner: PermissionSet::all(),
-        };
+        assert_eq!(Permissions::same(PermissionSet::all()).value(), 0x1FF);
+        assert_eq!(
+            Permissions::same(PermissionSet::read_only()).value(),
+            0b1_0010_0100
+        );
+    }
 
-        assert_eq!(all.value(), 0x1FF);
+    #[test]
+    fn parses_permission_bytes() {
+        test_permission_parsing(&[0xFF, 0x01], Permissions::same(PermissionSet::all()));
+        test_permission_parsing(
+            &[0b00100100, 1],
+            Permissions::same(PermissionSet::read_only()),
+        );
     }
 }
