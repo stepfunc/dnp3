@@ -4,6 +4,7 @@
 #include <iomanip>
 #include <string>
 #include <cstring>
+#include <future>
 
 // ANCHOR: logging_callback
 class Logger : public dnp3::Logger {
@@ -201,6 +202,27 @@ class RestartTaskCallback : public dnp3::RestartTaskCallback {
     }
 };
 
+class ReadDirectoryCallback : public dnp3::ReadDirectoryCallback {
+    std::promise<std::vector<dnp3::FileInfo>> promise;
+    void on_complete(dnp3::FileInfoIterator &iter) override {
+        std::vector<dnp3::FileInfo> items;
+        while (iter.next()) {
+            const auto info = iter.get();
+        }
+        this->promise.set_value(std::move(items));
+    }
+
+    void on_failure(dnp3::FileError error) override {
+        this->promise.set_exception(std::make_exception_ptr(dnp3::FileException(error)));
+    }
+
+    public:
+
+    std::future<std::vector<dnp3::FileInfo>> future() {
+        return this->promise.get_future();
+    }
+};
+
 class GenericCallback : public dnp3::EmptyResponseCallback {
 public:
     GenericCallback(const std::string &task) : task(task) {}
@@ -251,6 +273,114 @@ dnp3::AssociationConfig get_association_config()
     return config;
 }
 
+void print_file_info(const dnp3::FileInfo& info)
+{
+    std::cout << "File name: " << info.file_name << std::endl;
+    std::cout << "     type: " << dnp3::to_string(info.file_type) << std::endl;
+    std::cout << "     size: " << info.size << std::endl;
+    std::cout << "     created: " << info.time_created << std::endl;
+}
+
+void run_command(const std::string &cmd, dnp3::MasterChannel &channel, dnp3::AssociationId assoc, dnp3::PollId event_poll)
+{
+    if (cmd == "enable") {
+        channel.enable();
+    }
+    else if (cmd == "disable") {
+        channel.disable();
+    }
+    else if (cmd == "dln") {
+        channel.set_decode_level(dnp3::DecodeLevel::nothing());
+    }
+    else if (cmd == "dlv") {
+        auto level = dnp3::DecodeLevel::nothing();
+        level.application = dnp3::AppDecodeLevel::object_values;
+        channel.set_decode_level(level);
+    }
+    else if (cmd == "rao") {
+        dnp3::Request request;
+        request.add_all_objects_header(dnp3::Variation::group40_var0);
+        channel.read(assoc, request, std::make_unique<ReadTaskCallback>());
+    }
+    else if (cmd == "rmo") {
+        dnp3::Request request;
+        request.add_all_objects_header(dnp3::Variation::group1_var0);
+        request.add_all_objects_header(dnp3::Variation::group10_var0);
+        channel.read(assoc, request, std::make_unique<ReadTaskCallback>());
+    }
+    else if (cmd == "evt") {
+        channel.demand_poll(event_poll);
+    }
+    else if (cmd == "lts") {
+        channel.synchronize_time(assoc, dnp3::TimeSyncMode::lan, std::make_unique<TimeSyncTaskCallback>());
+    }
+    else if (cmd == "nts") {
+        channel.synchronize_time(assoc, dnp3::TimeSyncMode::non_lan, std::make_unique<TimeSyncTaskCallback>());
+    }
+    else if (cmd == "wad") {
+        dnp3::WriteDeadBandRequest request;
+        request.add_g34v1_u8(3, 5);
+        request.add_g34v3_u16(2, 2.5);
+        channel.write_dead_bands(assoc, request, std::make_unique<GenericCallback>("write dead-bands"));
+    }
+    else if (cmd == "fat") {
+        dnp3::Request request;
+        request.add_time_and_interval(0xFF0000000000, 86400000);
+        request.add_all_objects_header(dnp3::Variation::group20_var0);
+        channel.send_and_expect_empty_response(assoc, dnp3::FunctionCode::freeze_at_time, request, std::make_unique<GenericCallback>("freeze-at-time"));
+    }
+    else if (cmd == "rda") {
+        // ANCHOR: read_attributes
+        dnp3::Request request;
+        request.add_specific_attribute(dnp3::attribute_variations::all_attributes_request, 0);
+        channel.read(assoc, request, std::make_unique<ReadTaskCallback>());
+        // ANCHOR_END: read_attributes
+    }
+    else if (cmd == "wda") {
+        // ANCHOR: write_attribute
+        dnp3::Request request;
+        request.add_string_attribute(dnp3::attribute_variations::user_assigned_location, 0, "Mt. Olympus");
+        channel.send_and_expect_empty_response(assoc, dnp3::FunctionCode::write, request, std::make_unique<GenericCallback>("write-device-attribute"));
+        // ANCHOR_END: write_attribute
+    }
+    else if (cmd == "ral") {
+        dnp3::Request request;
+        request.add_specific_attribute(dnp3::attribute_variations::list_of_variations, 0);
+        channel.read(assoc, request, std::make_unique<ReadTaskCallback>());
+    }
+    else if (cmd == "crt") {
+        channel.cold_restart(assoc, std::make_unique<RestartTaskCallback>());
+    }
+    else if (cmd == "wrt") {
+        channel.warm_restart(assoc, std::make_unique<RestartTaskCallback>());
+    }
+    else if (cmd == "wrt") {
+        channel.warm_restart(assoc, std::make_unique<RestartTaskCallback>());
+    }
+    else if (cmd == "rd") {
+        auto callback = std::make_unique<ReadDirectoryCallback>();
+        auto result = callback->future();
+        channel.read_directory(assoc, ".", dnp3::DirReadConfig::defaults(), std::move(callback));
+        const auto items = result.get();
+        for (auto info : items) {
+            print_file_info(info);
+        }
+    }
+    else if (cmd == "lsr") {
+        channel.check_link_status(assoc, std::make_unique<LinkStatusCallback>());
+    }
+    else if (cmd == "cmd") {
+        // ANCHOR: assoc_control
+        dnp3::CommandSet commands;
+        commands.add_g12_v1_u8(3, dnp3::Group12Var1(dnp3::ControlCode(dnp3::TripCloseCode::nul, false, dnp3::OpType::latch_on), 0, 1000, 1000));
+        channel.operate(assoc, dnp3::CommandMode::direct_operate, commands, std::make_unique<CommandTaskCallback>());
+        // ANCHOR_END: assoc_control
+    }
+    else {
+        std::cout << "unknown command: " << cmd << std::endl;
+    }
+}
+
 void run_channel(dnp3::MasterChannel &channel)
 {
     // ANCHOR: association_create
@@ -277,92 +407,13 @@ void run_channel(dnp3::MasterChannel &channel)
         if (cmd == "x") {
             return;
         }
-        else if (cmd == "enable") {
-            channel.enable();
-        }
-        else if (cmd == "disable") {
-            channel.disable();
-        }
-        else if (cmd == "dln") {
-            channel.set_decode_level(dnp3::DecodeLevel::nothing());
-        }
-        else if (cmd == "dlv") {
-            auto level = dnp3::DecodeLevel::nothing();
-            level.application = dnp3::AppDecodeLevel::object_values;
-            channel.set_decode_level(level);
-        }
-        else if (cmd == "rao") {
-            dnp3::Request request;
-            request.add_all_objects_header(dnp3::Variation::group40_var0);
-            channel.read(assoc, request, std::make_unique<ReadTaskCallback>());
-        }
-        else if (cmd == "rmo") {
-            dnp3::Request request;
-            request.add_all_objects_header(dnp3::Variation::group1_var0);
-            request.add_all_objects_header(dnp3::Variation::group10_var0);
-            channel.read(assoc, request, std::make_unique<ReadTaskCallback>());
-        }
-        else if (cmd == "evt") {
-            channel.demand_poll(event_poll);
-        }
-        else if (cmd == "lts") {
-            channel.synchronize_time(assoc, dnp3::TimeSyncMode::lan, std::make_unique<TimeSyncTaskCallback>());
-        }
-        else if (cmd == "nts") {
-            channel.synchronize_time(assoc, dnp3::TimeSyncMode::non_lan, std::make_unique<TimeSyncTaskCallback>());
-        }
-        else if (cmd == "wad") {
-            dnp3::WriteDeadBandRequest request;
-            request.add_g34v1_u8(3, 5);
-            request.add_g34v3_u16(2, 2.5);
-            channel.write_dead_bands(assoc, request, std::make_unique<GenericCallback>("write dead-bands"));
-        }
-        else if (cmd == "fat") {
-            dnp3::Request request;
-            request.add_time_and_interval(0xFF0000000000, 86400000);
-            request.add_all_objects_header(dnp3::Variation::group20_var0);
-            channel.send_and_expect_empty_response(assoc, dnp3::FunctionCode::freeze_at_time, request, std::make_unique<GenericCallback>("freeze-at-time"));
-        }
-        else if (cmd == "rda") {
-            // ANCHOR: read_attributes
-            dnp3::Request request;
-            request.add_specific_attribute(dnp3::attribute_variations::all_attributes_request, 0);
-            channel.read(assoc, request, std::make_unique<ReadTaskCallback>());
-            // ANCHOR_END: read_attributes
-        }
-        else if (cmd == "wda") {
-            // ANCHOR: write_attribute
-            dnp3::Request request;
-            request.add_string_attribute(dnp3::attribute_variations::user_assigned_location, 0, "Mt. Olympus");
-            channel.send_and_expect_empty_response(assoc, dnp3::FunctionCode::write, request, std::make_unique<GenericCallback>("write-device-attribute"));
-            // ANCHOR_END: write_attribute
-        }
-        else if (cmd == "ral") {
-            dnp3::Request request;
-            request.add_specific_attribute(dnp3::attribute_variations::list_of_variations, 0);
-            channel.read(assoc, request, std::make_unique<ReadTaskCallback>());
-        }
-        else if (cmd == "crt") {
-            channel.cold_restart(assoc, std::make_unique<RestartTaskCallback>());
-        }
-        else if (cmd == "wrt") {
-            channel.warm_restart(assoc, std::make_unique<RestartTaskCallback>());
-        }
-        else if (cmd == "wrt") {
-            channel.warm_restart(assoc, std::make_unique<RestartTaskCallback>());
-        }
-        else if (cmd == "lsr") {
-            channel.check_link_status(assoc, std::make_unique<LinkStatusCallback>());
-        }
-        else if (cmd == "cmd") {
-            // ANCHOR: assoc_control
-            dnp3::CommandSet commands;
-            commands.add_g12_v1_u8(3, dnp3::Group12Var1(dnp3::ControlCode(dnp3::TripCloseCode::nul, false, dnp3::OpType::latch_on), 0, 1000, 1000));
-            channel.operate(assoc, dnp3::CommandMode::direct_operate, commands, std::make_unique<CommandTaskCallback>());
-            // ANCHOR_END: assoc_control
-        }
         else {
-            std::cout << "unknown command: " << cmd << std::endl;
+            try {
+                run_command(cmd, channel, assoc, event_poll);
+            }
+            catch (const std::exception& ex) {
+                std::cout << "Exception: " << ex.what() << std::endl;
+            }
         }
     }
 }
