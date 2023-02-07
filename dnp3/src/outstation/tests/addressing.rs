@@ -3,11 +3,6 @@ use crate::outstation::tests::harness::*;
 
 #[tokio::test]
 async fn ignores_message_sent_from_master_different_than_configured() {
-    tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::INFO)
-        .with_target(false)
-        .init();
-
     let config = get_default_config();
     let different_address =
         EndpointAddress::try_new(config.master_address.raw_value() + 1).unwrap();

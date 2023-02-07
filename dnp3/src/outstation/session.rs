@@ -702,7 +702,7 @@ impl OutstationSession {
             return Ok(UnsolicitedWaitResult::Timeout);
         }
 
-        let mut guard = reader.pop_request();
+        let mut guard = reader.pop_request(self.config.master_address);
         let (info, request) = match guard.get() {
             None => return Ok(UnsolicitedWaitResult::ReadNext),
             Some(TransportRequest::Request(info, request)) => {
@@ -929,7 +929,7 @@ impl OutstationSession {
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
     ) -> Result<(), RunError> {
-        let mut guard = reader.pop_request();
+        let mut guard = reader.pop_request(self.config.master_address);
         match guard.get() {
             Some(TransportRequest::Request(info, request)) => {
                 self.on_link_activity();
@@ -2035,7 +2035,7 @@ impl OutstationSession {
                 }
                 // process data
                 TimeoutStatus::No => {
-                    let mut guard = reader.pop_request();
+                    let mut guard = reader.pop_request(self.config.master_address);
                     match self.expect_sol_confirm(ecsn, &mut guard) {
                         ConfirmAction::ContinueWait => {
                             // we ignored whatever the request was and logged it elsewhere

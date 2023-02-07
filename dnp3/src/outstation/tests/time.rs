@@ -43,7 +43,7 @@ async fn non_lan_procedure() {
     harness.check_events(&[Event::WriteAbsoluteTime(Timestamp::new(1614271096000))]);
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn lan_procedure() {
     let mut harness = new_harness(get_default_config());
 

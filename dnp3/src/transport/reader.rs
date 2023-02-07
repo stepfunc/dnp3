@@ -130,7 +130,17 @@ impl TransportReader {
         }
     }
 
-    pub(crate) fn pop_request(&mut self) -> RequestGuard<'_> {
+    pub(crate) fn pop_request(&mut self, master_address: EndpointAddress) -> RequestGuard<'_> {
+        if let Some(TransportRequest::Request(info, _)) = self.peek_request() {
+            if info.source != master_address {
+                tracing::warn!(
+                    "Discarding ASDU from master address: {} (configured address == {})",
+                    info.source.raw_value(),
+                    master_address.raw_value()
+                );
+                self.pop();
+            }
+        }
         RequestGuard::new(self)
     }
 
