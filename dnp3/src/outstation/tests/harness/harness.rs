@@ -54,6 +54,10 @@ impl OutstationHarness {
         );
     }
 
+    pub(crate) fn expect_no_response(&mut self) {
+        assert_eq!(self.io.pop_event(), None);
+    }
+
     pub(crate) async fn send_and_process(&mut self, request: &[u8]) {
         self.io.read(request);
         assert_eq!(self.io.next_event().await, sfio_tokio_mock_io::Event::Read);
@@ -89,23 +93,27 @@ impl OutstationHarness {
 }
 
 pub(crate) fn new_harness(config: OutstationConfig) -> OutstationHarness {
-    new_harness_impl(config, None)
+    new_harness_impl(config, None, None)
 }
 
-pub(crate) fn new_harness_with_custom_event_buffers(config: OutstationConfig) -> OutstationHarness {
-    new_harness_impl(config, None)
+pub(crate) fn new_harness_with_master_addr(
+    config: OutstationConfig,
+    master_address: EndpointAddress,
+) -> OutstationHarness {
+    new_harness_impl(config, None, Some(master_address))
 }
 
 pub(crate) fn new_harness_for_broadcast(
     config: OutstationConfig,
     broadcast: BroadcastConfirmMode,
 ) -> OutstationHarness {
-    new_harness_impl(config, Some(broadcast))
+    new_harness_impl(config, Some(broadcast), None)
 }
 
 fn new_harness_impl(
     config: OutstationConfig,
     broadcast: Option<BroadcastConfirmMode>,
+    master_address: Option<EndpointAddress>,
 ) -> OutstationHarness {
     let (sender, receiver) = event_handlers();
 
@@ -122,13 +130,11 @@ fn new_harness_impl(
 
     let mut task = Box::new(task);
 
+    let master_address = master_address.unwrap_or(config.master_address);
+
     task.get_reader()
         .get_inner()
-        .set_rx_frame_info(FrameInfo::new(
-            config.master_address,
-            broadcast,
-            FrameType::Data,
-        ));
+        .set_rx_frame_info(FrameInfo::new(master_address, broadcast, FrameType::Data));
 
     let (io, io_handle) = sfio_tokio_mock_io::mock();
 
