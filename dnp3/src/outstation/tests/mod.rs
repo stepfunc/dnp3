@@ -1,5 +1,7 @@
 pub(crate) mod harness;
 
+/// respond/ignore addresses
+mod addressing;
 /// control functionality
 mod controls;
 /// freeze counters tests
