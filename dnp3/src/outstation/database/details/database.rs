@@ -51,7 +51,7 @@ impl Database {
         app: &mut dyn OutstationApplication,
     ) -> BufferState {
         self.event_buffer.clear_written(app);
-        self.event_buffer.class_state()
+        self.event_buffer.buffer_state()
     }
 
     pub(crate) fn unwritten_classes(&self) -> EventClasses {

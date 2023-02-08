@@ -2,7 +2,7 @@ use crate::app::measurement::*;
 use crate::app::Timestamp;
 use crate::outstation::config::OutstationConfig;
 use crate::outstation::database::*;
-use crate::outstation::BufferState;
+use crate::outstation::{BufferState, ClassCount, TypeCount};
 
 use super::harness::*;
 
@@ -192,9 +192,21 @@ async fn defers_read_during_unsol_confirm_wait() {
         Event::BeginConfirm,
         Event::Cleared(0),
         Event::EndConfirm(BufferState {
-            remaining_class_1: 0,
-            remaining_class_2: 0,
-            remaining_class_3: 0,
+            classes: ClassCount {
+                num_class_1: 0,
+                num_class_2: 0,
+                num_class_3: 0,
+            },
+            types: TypeCount {
+                num_binary_input: 0,
+                num_double_bit_binary_input: 0,
+                num_binary_output_status: 0,
+                num_counter: 0,
+                num_frozen_counter: 0,
+                num_analog: 0,
+                num_analog_output_status: 0,
+                num_octet_string: 0,
+            },
         }),
     ]);
     harness.check_no_events();

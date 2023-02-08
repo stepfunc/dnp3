@@ -31,24 +31,88 @@ impl OutstationTypes {
 }
 
 pub(crate) fn define_buffer_state(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructHandle> {
+    let class_count = lib.declare_universal_struct("class_count")?;
+    let class_count = lib
+        .define_universal_struct(class_count)?
+        .doc("Remaining number of events in the buffer after a confirm on a per-class basis")?
+        .add(
+            "num_class_1",
+            Primitive::U32,
+            "Number of class 1 events remaining in the buffer",
+        )?
+        .add(
+            "num_class_2",
+            Primitive::U32,
+            "Number of class 2 events remaining in the buffer",
+        )?
+        .add(
+            "num_class_3",
+            Primitive::U32,
+            "Number of class 3 events remaining in the buffer",
+        )?
+        .end_fields()?
+        .build()?;
+
+    let type_count = lib.declare_universal_struct("type_count")?;
+    let type_count = lib
+        .define_universal_struct(type_count)?
+        .doc("Remaining number of events in the buffer after a confirm on a per-type basis")?
+        .add(
+            "num_binary_input",
+            Primitive::U32,
+            "Number of binary input events remaining in the buffer",
+        )?
+        .add(
+            "num_double_bit_binary_input",
+            Primitive::U32,
+            "Number of double-bit binary input events remaining in the buffer",
+        )?
+        .add(
+            "num_binary_output_status",
+            Primitive::U32,
+            "Number of binary output status events remaining in the buffer",
+        )?
+        .add(
+            "num_counter",
+            Primitive::U32,
+            "Number of counter events remaining in the buffer",
+        )?
+        .add(
+            "num_frozen_counter",
+            Primitive::U32,
+            "Number of frozen counter events remaining in the buffer",
+        )?
+        .add(
+            "num_analog",
+            Primitive::U32,
+            "Number of analog events remaining in the buffer",
+        )?
+        .add(
+            "num_analog_output_status",
+            Primitive::U32,
+            "Number of analog output status events remaining in the buffer",
+        )?
+        .add(
+            "num_octet_string",
+            Primitive::U32,
+            "Number octet string events remaining in the buffer",
+        )?
+        .end_fields()?
+        .build()?;
+
     let buffer_state = lib.declare_universal_struct("buffer_state")?;
     let buffer_state = lib
         .define_universal_struct(buffer_state)?
-        .doc("Information about the state of buffer after an ACK has been received")?
+        .doc("Information about the state of buffer after a CONFIRM has been processed")?
         .add(
-            "remaining_class_1",
-            Primitive::U32,
-            "number of class 1 events remaining in the buffer",
+            "classes",
+            class_count,
+            "Remaining number of events in the buffer on a per-class basis",
         )?
         .add(
-            "remaining_class_2",
-            Primitive::U32,
-            "number of class 2 events remaining in the buffer",
-        )?
-        .add(
-            "remaining_class_3",
-            Primitive::U32,
-            "number of class 3 events remaining in the buffer",
+            "types",
+            type_count,
+            "Remaining number of events in the buffer on a per-type basis",
         )?
         .end_fields()?
         .build()?;
