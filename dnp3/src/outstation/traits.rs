@@ -49,22 +49,52 @@ pub enum ConnectionState {
     Disconnected,
 }
 
-/// Information about the state of buffer after an ACK has been received
+/// Information about the remaining number of class events in the buffer
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct BufferState {
+pub struct ClassCount {
     /// number of class 1 events remaining in the buffer
-    pub remaining_class_1: usize,
+    pub num_class_1: usize,
     /// number of class 2 events remaining in the buffer
-    pub remaining_class_2: usize,
+    pub num_class_2: usize,
     /// number of class 3 events remaining in the buffer
-    pub remaining_class_3: usize,
+    pub num_class_3: usize,
 }
 
-impl BufferState {
-    /// true if there are no events remaining in the buffer
+impl ClassCount {
+    /// true if there is no remaining class 1, 2, or 3 data in the buffers
     pub fn is_empty(&self) -> bool {
-        self.remaining_class_1 == 0 && self.remaining_class_2 == 0 && self.remaining_class_3 == 0
+        self.num_class_1 == 0 && self.num_class_2 == 0 && self.num_class_3 == 0
     }
+}
+
+/// Information about the remaining number of events on a per-type basis
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct TypeCount {
+    /// number of binary input events remaining in the buffer
+    pub num_binary_input: usize,
+    /// number of double-bit binary input events remaining in the buffer
+    pub num_double_bit_binary_input: usize,
+    /// number of binary output status events remaining in the buffer
+    pub num_binary_output_status: usize,
+    /// number of counter events remaining in the buffer
+    pub num_counter: usize,
+    /// number of frozen counter events remaining in the buffer
+    pub num_frozen_counter: usize,
+    /// number of analog events remaining in the buffer
+    pub num_analog: usize,
+    /// number of analog output status events remaining in the buffer
+    pub num_analog_output_status: usize,
+    /// number octet string events remaining in the buffer
+    pub num_octet_string: usize,
+}
+
+/// Information about the state of buffer after a CONFIRM has been processed
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct BufferState {
+    /// Remaining number of events in the buffer on a per-class basis
+    pub classes: ClassCount,
+    /// Remaining number of events in the buffer on a per-type basis
+    pub types: TypeCount,
 }
 
 /// dynamic information required by the outstation from the user application

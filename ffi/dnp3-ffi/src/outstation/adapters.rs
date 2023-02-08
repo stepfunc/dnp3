@@ -210,9 +210,33 @@ impl OutstationApplication for ffi::OutstationApplication {
 impl From<dnp3::outstation::BufferState> for ffi::BufferState {
     fn from(value: BufferState) -> Self {
         Self {
-            remaining_class_1: value.remaining_class_1 as u32,
-            remaining_class_2: value.remaining_class_2 as u32,
-            remaining_class_3: value.remaining_class_3 as u32,
+            classes: value.classes.into(),
+            types: value.types.into(),
+        }
+    }
+}
+
+impl From<dnp3::outstation::ClassCount> for ffi::ClassCount {
+    fn from(value: ClassCount) -> Self {
+        Self {
+            num_class_1: value.num_class_1 as u32,
+            num_class_2: value.num_class_2 as u32,
+            num_class_3: value.num_class_3 as u32,
+        }
+    }
+}
+
+impl From<dnp3::outstation::TypeCount> for ffi::TypeCount {
+    fn from(value: TypeCount) -> Self {
+        Self {
+            num_binary_input: value.num_binary_input as u32,
+            num_double_bit_binary_input: value.num_double_bit_binary_input as u32,
+            num_binary_output_status: value.num_binary_output_status as u32,
+            num_counter: value.num_counter as u32,
+            num_frozen_counter: value.num_frozen_counter as u32,
+            num_analog: value.num_analog as u32,
+            num_analog_output_status: value.num_analog_output_status as u32,
+            num_octet_string: value.num_octet_string as u32,
         }
     }
 }

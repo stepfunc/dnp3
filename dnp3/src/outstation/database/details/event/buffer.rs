@@ -14,7 +14,7 @@ use super::list::VecList;
 use super::writer::EventWriter;
 
 use crate::outstation::database::details::event::traits::OctetStringLength;
-use crate::outstation::{BufferState, OutstationApplication};
+use crate::outstation::{BufferState, ClassCount, OutstationApplication, TypeCount};
 use scursor::WriteCursor;
 
 impl From<EventClass> for EventClasses {
@@ -105,6 +105,16 @@ struct ClassCounter {
     num_class_3: Count,
 }
 
+impl From<ClassCounter> for ClassCount {
+    fn from(value: ClassCounter) -> Self {
+        Self {
+            num_class_1: value.num_class_1.value,
+            num_class_2: value.num_class_2.value,
+            num_class_3: value.num_class_3.value,
+        }
+    }
+}
+
 impl ClassCounter {
     fn new() -> Self {
         Self {
@@ -145,7 +155,7 @@ impl ClassCounter {
     }
 }
 
-#[derive(Clone)]
+#[derive(Copy, Clone)]
 pub(crate) struct TypeCounter {
     num_binary: Count,
     num_double_binary: Count,
@@ -155,6 +165,21 @@ pub(crate) struct TypeCounter {
     num_analog: Count,
     num_analog_output_status: Count,
     num_octet_string: Count,
+}
+
+impl From<TypeCounter> for TypeCount {
+    fn from(value: TypeCounter) -> Self {
+        Self {
+            num_binary_input: value.num_binary.value,
+            num_double_bit_binary_input: value.num_double_binary.value,
+            num_binary_output_status: value.num_binary_output_status.value,
+            num_counter: value.num_counter.value,
+            num_frozen_counter: value.num_frozen_counter.value,
+            num_analog: value.num_analog.value,
+            num_analog_output_status: value.num_analog_output_status.value,
+            num_octet_string: value.num_octet_string.value,
+        }
+    }
 }
 
 impl TypeCounter {
@@ -209,10 +234,19 @@ impl TypeCounter {
     }
 }
 
-#[derive(Clone)]
+#[derive(Copy, Clone)]
 struct Counters {
     types: TypeCounter,
     classes: ClassCounter,
+}
+
+impl From<Counters> for BufferState {
+    fn from(value: Counters) -> Self {
+        Self {
+            classes: value.classes.into(),
+            types: value.types.into(),
+        }
+    }
 }
 
 impl Counters {
@@ -560,7 +594,7 @@ impl EventBuffer {
     pub(crate) fn write_events(&mut self, cursor: &mut WriteCursor) -> Result<usize, usize> {
         let mut count = 0;
         let mut writer = EventWriter::new();
-        let mut counters = self.written.clone();
+        let mut counters = self.written;
         let mut complete = true;
         for record in self.selected_iter() {
             if record
@@ -604,12 +638,8 @@ impl EventBuffer {
         count
     }
 
-    pub(crate) fn class_state(&self) -> BufferState {
-        BufferState {
-            remaining_class_1: self.total.classes.num_class_1.value,
-            remaining_class_2: self.total.classes.num_class_2.value,
-            remaining_class_3: self.total.classes.num_class_3.value,
-        }
+    pub(crate) fn buffer_state(&self) -> BufferState {
+        self.total.into()
     }
 
     pub(crate) fn reset(&mut self) {
