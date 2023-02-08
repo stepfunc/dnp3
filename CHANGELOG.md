@@ -1,4 +1,4 @@
-### 1.3.0-rc4 ###
+### 1.3.0-rc5 ###
 * :star: Add master and outstation support for device attributes (group 0).
 * :star: Add master support for reading files and directories. See [#281](https://github.com/stepfunc/dnp3/pull/281).
 * :star: Add ability to specify TCP/TLS client local adapter and connect timeout. See [#254](https://github.com/stepfunc/dnp3/pull/254).
@@ -10,6 +10,7 @@
 * :star: Add enable/disable methods to outstation instances. See [#278](https://github.com/stepfunc/dnp3/pull/278).
 * :star: Add TCP/TLS client modes to the outstation API. See [#279](https://github.com/stepfunc/dnp3/pull/279).
 * :bug: Fix incorrect encoding of octet-string events when adjacent events have different lengths. See [#269](https://github.com/stepfunc/dnp3/pull/270).
+* :bug: Fix bug where the outstation would respond to a master other than the one configured. See [#284](https://github.com/stepfunc/dnp3/pull/284).
 * :book: Various FFI documentation improvements. See [#250](https://github.com/stepfunc/dnp3/pull/250).
 
 ### 1.2.0 ###
