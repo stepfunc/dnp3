@@ -1694,6 +1694,21 @@
         }
       ]
     },
+    "windows-targets": {
+      "id": "windows-targets",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) Microsoft Corporation"
+              ]
+            }
+          }
+        }
+      ]
+    },
     "windows_x86_64_msvc": {
       "id": "windows_x86_64_msvc",
       "source": "crates.io",
