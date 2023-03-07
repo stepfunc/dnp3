@@ -1,4 +1,4 @@
-### 1.3.0-rc5 ###
+### 1.3.0 ###
 * :star: Add master and outstation support for device attributes (group 0).
 * :star: Add master support for reading files and directories. See [#281](https://github.com/stepfunc/dnp3/pull/281).
 * :star: Add ability to specify TCP/TLS client local adapter and connect timeout. See [#254](https://github.com/stepfunc/dnp3/pull/254).
