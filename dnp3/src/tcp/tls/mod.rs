@@ -196,9 +196,9 @@ fn load_certs(path: &Path, is_local: bool) -> Result<Vec<rustls::Certificate>, T
 }
 
 fn load_private_key(path: &Path, password: Option<&str>) -> Result<rustls::PrivateKey, TlsError> {
-    let expected_tag = match &password {
-        Some(_) => "ENCRYPTED PRIVATE KEY",
-        None => "PRIVATE KEY",
+    let expected_tags: &[&'static str] = match &password {
+        Some(_) => &["ENCRYPTED PRIVATE KEY"],
+        None => &["PRIVATE KEY", "BEGIN RSA PRIVATE KEY"],
     };
 
     let content = std::fs::read(path).map_err(TlsError::InvalidPrivateKey)?;
@@ -207,7 +207,7 @@ fn load_private_key(path: &Path, password: Option<&str>) -> Result<rustls::Priva
             TlsError::InvalidPrivateKey(io::Error::new(ErrorKind::InvalidData, err.to_string()))
         })?
         .into_iter()
-        .filter(|x| x.tag == expected_tag)
+        .filter(|x| expected_tags.iter().any(|t| x.tag.as_str() == *t))
         .map(|x| x.contents);
 
     let key = match iter.next() {
