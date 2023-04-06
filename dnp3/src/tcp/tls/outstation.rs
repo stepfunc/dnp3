@@ -91,7 +91,7 @@ impl TlsServerConfig {
         let local_certs = load_certs(local_cert_path, true)?;
         let private_key = load_private_key(private_key_path, password)?;
 
-        let verifier = match certificate_mode {
+        let verifier: Arc<dyn rustls::server::ClientCertVerifier> = match certificate_mode {
             CertificateMode::AuthorityBased => {
                 // Build root certificate store
                 let mut roots = rustls::RootCertStore::empty();
@@ -107,7 +107,7 @@ impl TlsServerConfig {
                 // Check that the DNS name is at least valid
                 rustls::ServerName::try_from(name).map_err(|_| TlsError::InvalidDnsName)?;
 
-                CaChainClientCertVerifier::new(roots, name.to_string())
+                Arc::new(CaChainClientCertVerifier::new(roots, name.to_string()))
             }
             CertificateMode::SelfSigned => {
                 if let Some(peer_cert) = peer_certs.pop() {
@@ -118,7 +118,7 @@ impl TlsServerConfig {
                         )));
                     }
 
-                    SelfSignedCertificateClientCertVerifier::new(peer_cert)
+                    Arc::new(SelfSignedCertificateClientCertVerifier::new(peer_cert))
                 } else {
                     return Err(TlsError::InvalidPeerCertificate(io::Error::new(
                         ErrorKind::InvalidData,
@@ -145,7 +145,7 @@ impl TlsServerConfig {
             })?;
 
         Ok(Self {
-            config: std::sync::Arc::new(config),
+            config: Arc::new(config),
         })
     }
 
@@ -165,17 +165,13 @@ impl TlsServerConfig {
 
 struct CaChainClientCertVerifier {
     inner: Arc<dyn rustls::server::ClientCertVerifier>,
-    server_name: String,
+    peer_name: String,
 }
 
 impl CaChainClientCertVerifier {
-    #[allow(clippy::new_ret_no_self)]
-    fn new(
-        roots: rustls::RootCertStore,
-        server_name: String,
-    ) -> Arc<dyn rustls::server::ClientCertVerifier> {
+    fn new(roots: rustls::RootCertStore, peer_name: String) -> Self {
         let inner = AllowAnyAuthenticatedClient::new(roots);
-        Arc::new(CaChainClientCertVerifier { inner, server_name })
+        Self { inner, peer_name }
     }
 }
 
@@ -204,7 +200,7 @@ impl rustls::server::ClientCertVerifier for CaChainClientCertVerifier {
             .verify_client_cert(end_entity, intermediates, now)?;
 
         // Check DNS name (including in the Common Name)
-        super::verify_dns_name(end_entity, &self.server_name)?;
+        super::verify_dns_name(end_entity, &self.peer_name)?;
 
         Ok(rustls::server::ClientCertVerified::assertion())
     }
@@ -215,9 +211,8 @@ struct SelfSignedCertificateClientCertVerifier {
 }
 
 impl SelfSignedCertificateClientCertVerifier {
-    #[allow(clippy::new_ret_no_self)]
-    fn new(cert: rustls::Certificate) -> Arc<dyn rustls::server::ClientCertVerifier> {
-        Arc::new(SelfSignedCertificateClientCertVerifier { cert })
+    fn new(cert: rustls::Certificate) -> Self {
+        Self { cert }
     }
 }
 
