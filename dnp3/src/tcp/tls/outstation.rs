@@ -1,4 +1,3 @@
-use std::convert::TryFrom;
 use std::io::{self, ErrorKind};
 use std::path::Path;
 use std::sync::Arc;
@@ -15,7 +14,8 @@ use crate::outstation::{
 };
 use crate::tcp::client::ClientTask;
 use crate::tcp::tls::{
-    load_certs, load_private_key, CertificateMode, MinTlsVersion, TlsClientConfig, TlsError,
+    load_certs, load_private_key, CertificateMode, MinTlsVersion, NameVerifier, TlsClientConfig,
+    TlsError,
 };
 use crate::tcp::{ClientState, ConnectOptions, EndpointList, PostConnectionHandler};
 use crate::util::phys::PhysLayer;
@@ -71,13 +71,17 @@ pub fn spawn_outstation_tls_client(
     handle
 }
 
-/// TLS configuration
+/// TLS configuration for a server
 pub struct TlsServerConfig {
     config: Arc<rustls::ServerConfig>,
 }
 
 impl TlsServerConfig {
-    /// Create a TLS server config
+    /// Create a TLS server config.
+    ///
+    /// The name field is what gets verified from the peer certificate. Name verification
+    /// can be disabled by first calling [crate::tcp::tls::dangerous::enable_peer_name_wildcards]
+    /// and then passing "*" to this function.
     pub fn new(
         name: &str,
         peer_cert_path: &Path,
@@ -104,10 +108,9 @@ impl TlsServerConfig {
                     })?;
                 }
 
-                // Check that the DNS name is at least valid
-                rustls::ServerName::try_from(name).map_err(|_| TlsError::InvalidDnsName)?;
+                let verifier = NameVerifier::try_create(name.to_string())?;
 
-                Arc::new(CaChainClientCertVerifier::new(roots, name.to_string()))
+                Arc::new(CaChainClientCertVerifier::new(roots, verifier))
             }
             CertificateMode::SelfSigned => {
                 if let Some(peer_cert) = peer_certs.pop() {
@@ -165,13 +168,13 @@ impl TlsServerConfig {
 
 struct CaChainClientCertVerifier {
     inner: Arc<dyn rustls::server::ClientCertVerifier>,
-    peer_name: String,
+    verifier: NameVerifier,
 }
 
 impl CaChainClientCertVerifier {
-    fn new(roots: rustls::RootCertStore, peer_name: String) -> Self {
+    fn new(roots: rustls::RootCertStore, verifier: NameVerifier) -> Self {
         let inner = AllowAnyAuthenticatedClient::new(roots);
-        Self { inner, peer_name }
+        Self { inner, verifier }
     }
 }
 
@@ -199,8 +202,7 @@ impl rustls::server::ClientCertVerifier for CaChainClientCertVerifier {
         self.inner
             .verify_client_cert(end_entity, intermediates, now)?;
 
-        // Check DNS name (including in the Common Name)
-        super::verify_dns_name(end_entity, &self.peer_name)?;
+        self.verifier.verify(end_entity)?;
 
         Ok(rustls::server::ClientCertVerified::assertion())
     }

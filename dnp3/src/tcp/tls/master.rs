@@ -7,7 +7,9 @@ use std::sync::Arc;
 use crate::app::{ConnectStrategy, Listener};
 use crate::link::LinkErrorMode;
 use crate::master::{MasterChannel, MasterChannelConfig};
-use crate::tcp::tls::{load_certs, load_private_key, CertificateMode, MinTlsVersion, TlsError};
+use crate::tcp::tls::{
+    load_certs, load_private_key, CertificateMode, MinTlsVersion, NameVerifier, TlsError,
+};
 use crate::tcp::{wire_master_client, ClientState, ConnectOptions};
 use crate::tcp::{EndpointList, PostConnectionHandler};
 use crate::util::phys::PhysLayer;
@@ -114,10 +116,11 @@ impl TlsClientConfig {
                     root.push(cert);
                 }
 
+                let verifier = NameVerifier::try_create(name.to_string())?;
+
                 builder
                     .with_custom_certificate_verifier(Arc::new(CommonNameServerCertVerifier::new(
-                        root,
-                        name.to_string(),
+                        root, verifier,
                     )))
                     .with_single_cert(local_certs, private_key)
             }
@@ -179,12 +182,12 @@ impl TlsClientConfig {
 
 struct CommonNameServerCertVerifier {
     roots: Vec<OwnedTrustAnchor>,
-    server_name: String,
+    verifier: NameVerifier,
 }
 
 impl CommonNameServerCertVerifier {
-    fn new(roots: Vec<OwnedTrustAnchor>, server_name: String) -> Self {
-        Self { roots, server_name }
+    fn new(roots: Vec<OwnedTrustAnchor>, verifier: NameVerifier) -> Self {
+        Self { roots, verifier }
     }
 }
 
@@ -215,7 +218,7 @@ impl rustls::client::ServerCertVerifier for CommonNameServerCertVerifier {
         .map(|_| cert)?;
 
         // Check DNS name (including in the Common Name)
-        super::verify_dns_name(end_entity, &self.server_name)?;
+        self.verifier.verify(end_entity)?;
 
         Ok(rustls::client::ServerCertVerified::assertion())
     }
