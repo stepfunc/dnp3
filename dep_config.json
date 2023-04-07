@@ -50,6 +50,9 @@
     "dnp3-ffi-java": {
       "url": "https://github.com/stepfunc/dnp3"
     },
+    "pem-util": {
+      "url": "https://github.com/stepfunc/pem-util"
+    },
     "rx509": {
       "url": "https://github.com/stepfunc/rasn"
     },
