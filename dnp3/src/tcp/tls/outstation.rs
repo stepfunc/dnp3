@@ -1,4 +1,3 @@
-use std::io::{self, ErrorKind};
 use std::path::Path;
 use std::sync::Arc;
 
@@ -88,6 +87,7 @@ impl TlsServerConfig {
         min_tls_version: MinTlsVersion,
         certificate_mode: CertificateMode,
     ) -> Result<Self, TlsError> {
+
         let peer_certs: Vec<rustls::Certificate> = {
             let data = std::fs::read(peer_cert_path)?;
             let certs = pem_util::read_certificates_from_pem(data)?;
@@ -114,12 +114,7 @@ impl TlsServerConfig {
                 // Build root certificate store
                 let mut roots = rustls::RootCertStore::empty();
                 for cert in &peer_certs {
-                    roots.add(cert).map_err(|err| {
-                        TlsError::InvalidPeerCertificate(io::Error::new(
-                            ErrorKind::InvalidData,
-                            err.to_string(),
-                        ))
-                    })?;
+                    roots.add(cert)?;
                 }
 
                 let verifier = NameVerifier::try_create(name.to_string())?;
