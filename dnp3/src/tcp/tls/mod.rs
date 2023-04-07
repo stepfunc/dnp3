@@ -141,16 +141,24 @@ impl MinTlsVersion {
 pub(crate) fn expect_single_peer_cert(
     peer_certs: Vec<rustls::Certificate>,
 ) -> Result<rustls::Certificate, std::io::Error> {
-    match peer_certs.as_slice() {
-        [single] => Ok(single.clone()),
-        &[] => Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            "no peer certificate",
-        )),
-        _ => Err(std::io::Error::new(
+    let mut iter = peer_certs.into_iter();
+    let first = match iter.next() {
+        None => {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "no peer certificate",
+            ))
+        }
+        Some(x) => x,
+    };
+
+    if iter.next().is_some() {
+        Err(std::io::Error::new(
             std::io::ErrorKind::InvalidData,
             "more than one peer certificate in self-signed mode",
-        )),
+        ))
+    } else {
+        Ok(first)
     }
 }
 
