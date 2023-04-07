@@ -1,5 +1,4 @@
 use std::convert::TryFrom;
-use std::io::{self, ErrorKind};
 use std::net::SocketAddr;
 use std::path::Path;
 use std::sync::Arc;
@@ -128,22 +127,8 @@ impl TlsClientConfig {
                 Arc::new(CommonNameServerCertVerifier::new(root, name_verifier))
             }
             CertificateMode::SelfSigned => {
-                let peer_cert = match peer_certs.as_slice() {
-                    &[] => {
-                        return Err(TlsError::InvalidPeerCertificate(io::Error::new(
-                            ErrorKind::InvalidData,
-                            "no peer certificate",
-                        )))
-                    }
-                    [single] => single.clone(),
-                    _ => {
-                        return Err(TlsError::InvalidPeerCertificate(io::Error::new(
-                            ErrorKind::InvalidData,
-                            "more than one peer certificate in self-signed mode",
-                        )))
-                    }
-                };
-                Arc::new(SelfSignedCertificateServerCertVerifier::new(peer_cert))
+                let cert = super::expect_single_peer_cert(peer_certs)?;
+                Arc::new(SelfSignedCertificateServerCertVerifier::new(cert))
             }
         };
 

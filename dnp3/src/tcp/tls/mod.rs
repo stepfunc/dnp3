@@ -138,6 +138,22 @@ impl MinTlsVersion {
     }
 }
 
+pub(crate) fn expect_single_peer_cert(
+    peer_certs: Vec<rustls::Certificate>,
+) -> Result<rustls::Certificate, std::io::Error> {
+    match peer_certs.as_slice() {
+        [single] => Ok(single.clone()),
+        &[] => Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "no peer certificate",
+        )),
+        _ => Err(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            "more than one peer certificate in self-signed mode",
+        )),
+    }
+}
+
 pub(crate) fn pki_error(error: webpki::Error) -> rustls::Error {
     use webpki::Error::*;
     match error {

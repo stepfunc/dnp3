@@ -126,22 +126,7 @@ impl TlsServerConfig {
                 Arc::new(CaChainClientCertVerifier::new(roots, verifier))
             }
             CertificateMode::SelfSigned => {
-                let cert = match peer_certs.as_slice() {
-                    &[] => {
-                        return Err(TlsError::InvalidPeerCertificate(io::Error::new(
-                            ErrorKind::InvalidData,
-                            "no peer certificate",
-                        )))
-                    }
-                    [single] => single.clone(),
-                    _ => {
-                        return Err(TlsError::InvalidPeerCertificate(io::Error::new(
-                            ErrorKind::InvalidData,
-                            "more than one peer certificate in self-signed mode",
-                        )))
-                    }
-                };
-
+                let cert = super::expect_single_peer_cert(peer_certs)?;
                 Arc::new(SelfSignedCertificateClientCertVerifier::new(cert))
             }
         };
