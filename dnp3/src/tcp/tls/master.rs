@@ -7,9 +7,7 @@ use std::sync::Arc;
 use crate::app::{ConnectStrategy, Listener};
 use crate::link::LinkErrorMode;
 use crate::master::{MasterChannel, MasterChannelConfig};
-use crate::tcp::tls::{
-    load_certs, load_private_key, CertificateMode, MinTlsVersion, NameVerifier, TlsError,
-};
+use crate::tcp::tls::{CertificateMode, MinTlsVersion, NameVerifier, TlsError};
 use crate::tcp::{wire_master_client, ClientState, ConnectOptions};
 use crate::tcp::{EndpointList, PostConnectionHandler};
 use crate::util::phys::PhysLayer;
@@ -90,74 +88,74 @@ impl TlsClientConfig {
         min_tls_version: MinTlsVersion,
         certificate_mode: CertificateMode,
     ) -> Result<Self, TlsError> {
-        let mut peer_certs = load_certs(peer_cert_path, false)?;
-        let local_certs = load_certs(local_cert_path, true)?;
-        let private_key = load_private_key(private_key_path, password)?;
+        let dns_name = rustls::ServerName::try_from(name)?;
 
-        let builder = rustls::ClientConfig::builder()
-            .with_safe_default_cipher_suites()
-            .with_safe_default_kx_groups()
-            .with_protocol_versions(min_tls_version.to_rustls())
-            .map_err(|err| {
-                TlsError::Other(io::Error::new(ErrorKind::InvalidData, err.to_string()))
-            })?;
+        let peer_certs: Vec<rustls::Certificate> = {
+            let data = std::fs::read(peer_cert_path)?;
+            let certs = pem_util::read_certificates_from_pem(data)?;
+            certs.into_iter().map(rustls::Certificate).collect()
+        };
 
-        let config = match certificate_mode {
+        let local_certs: Vec<rustls::Certificate> = {
+            let data = std::fs::read(local_cert_path)?;
+            let certs = pem_util::read_certificates_from_pem(data)?;
+            certs.into_iter().map(rustls::Certificate).collect()
+        };
+
+        let private_key: rustls::PrivateKey = {
+            let key_bytes = std::fs::read(private_key_path)?;
+            let key = match password {
+                Some(x) => pem_util::PrivateKey::decrypt_from_pem(key_bytes, x)?,
+                None => pem_util::PrivateKey::read_from_pem(key_bytes)?,
+            };
+            rustls::PrivateKey(key.bytes().to_vec())
+        };
+
+        fn trust_anchors(
+            certs: Vec<rustls::Certificate>,
+        ) -> Result<Vec<OwnedTrustAnchor>, webpki::Error> {
+            certs
+                .iter()
+                .map(|x| OwnedTrustAnchor::try_from_cert_der(x.0.as_slice()))
+                .collect()
+        }
+
+        let verifier: Arc<dyn rustls::client::ServerCertVerifier> = match certificate_mode {
             CertificateMode::AuthorityBased => {
                 // Build trust roots
-                let mut root = Vec::with_capacity(peer_certs.len());
-                for cert in &peer_certs {
-                    let cert = OwnedTrustAnchor::try_from_cert_der(&cert.0).map_err(|err| {
-                        TlsError::InvalidPeerCertificate(io::Error::new(
-                            ErrorKind::InvalidData,
-                            err.to_string(),
-                        ))
-                    })?;
-                    root.push(cert);
-                }
-
-                let verifier = NameVerifier::try_create(name.to_string())?;
-
-                builder
-                    .with_custom_certificate_verifier(Arc::new(CommonNameServerCertVerifier::new(
-                        root, verifier,
-                    )))
-                    .with_single_cert(local_certs, private_key)
+                let root: Vec<OwnedTrustAnchor> = trust_anchors(peer_certs)?;
+                let name_verifier = NameVerifier::try_create(name.to_string())?;
+                Arc::new(CommonNameServerCertVerifier::new(root, name_verifier))
             }
             CertificateMode::SelfSigned => {
-                // Set the custom certificate verifier
-                if let Some(peer_cert) = peer_certs.pop() {
-                    if !peer_certs.is_empty() {
+                let peer_cert = match peer_certs.as_slice() {
+                    &[] => {
+                        return Err(TlsError::InvalidPeerCertificate(io::Error::new(
+                            ErrorKind::InvalidData,
+                            "no peer certificate",
+                        )))
+                    }
+                    [single] => single.clone(),
+                    _ => {
                         return Err(TlsError::InvalidPeerCertificate(io::Error::new(
                             ErrorKind::InvalidData,
                             "more than one peer certificate in self-signed mode",
-                        )));
+                        )))
                     }
-
-                    builder
-                        .with_custom_certificate_verifier(Arc::new(
-                            SelfSignedCertificateServerCertVerifier::new(peer_cert),
-                        ))
-                        .with_single_cert(local_certs, private_key)
-                } else {
-                    return Err(TlsError::InvalidPeerCertificate(io::Error::new(
-                        ErrorKind::InvalidData,
-                        "no peer certificate",
-                    )));
-                }
+                };
+                Arc::new(SelfSignedCertificateServerCertVerifier::new(peer_cert))
             }
-        }
-        .map_err(|err| {
-            TlsError::InvalidLocalCertificate(io::Error::new(
-                ErrorKind::InvalidData,
-                err.to_string(),
-            ))
-        })?;
+        };
 
-        let dns_name = rustls::ServerName::try_from(name).map_err(|_| TlsError::InvalidDnsName)?;
+        let config = rustls::ClientConfig::builder()
+            .with_safe_default_cipher_suites()
+            .with_safe_default_kx_groups()
+            .with_protocol_versions(min_tls_version.to_rustls())?
+            .with_custom_certificate_verifier(verifier)
+            .with_single_cert(local_certs, private_key)?;
 
         Ok(Self {
-            config: std::sync::Arc::new(config),
+            config: Arc::new(config),
             dns_name,
         })
     }

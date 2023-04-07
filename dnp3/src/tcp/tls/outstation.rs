@@ -13,10 +13,7 @@ use crate::outstation::{
     OutstationInformation,
 };
 use crate::tcp::client::ClientTask;
-use crate::tcp::tls::{
-    load_certs, load_private_key, CertificateMode, MinTlsVersion, NameVerifier, TlsClientConfig,
-    TlsError,
-};
+use crate::tcp::tls::{CertificateMode, MinTlsVersion, NameVerifier, TlsClientConfig, TlsError};
 use crate::tcp::{ClientState, ConnectOptions, EndpointList, PostConnectionHandler};
 use crate::util::phys::PhysLayer;
 use crate::util::session::{Enabled, Session};
@@ -91,9 +88,26 @@ impl TlsServerConfig {
         min_tls_version: MinTlsVersion,
         certificate_mode: CertificateMode,
     ) -> Result<Self, TlsError> {
-        let mut peer_certs = load_certs(peer_cert_path, false)?;
-        let local_certs = load_certs(local_cert_path, true)?;
-        let private_key = load_private_key(private_key_path, password)?;
+        let peer_certs: Vec<rustls::Certificate> = {
+            let data = std::fs::read(peer_cert_path)?;
+            let certs = pem_util::read_certificates_from_pem(data)?;
+            certs.into_iter().map(rustls::Certificate).collect()
+        };
+
+        let local_certs: Vec<rustls::Certificate> = {
+            let data = std::fs::read(local_cert_path)?;
+            let certs = pem_util::read_certificates_from_pem(data)?;
+            certs.into_iter().map(rustls::Certificate).collect()
+        };
+
+        let private_key: rustls::PrivateKey = {
+            let key_bytes = std::fs::read(private_key_path)?;
+            let key = match password {
+                Some(x) => pem_util::PrivateKey::decrypt_from_pem(key_bytes, x)?,
+                None => pem_util::PrivateKey::read_from_pem(key_bytes)?,
+            };
+            rustls::PrivateKey(key.bytes().to_vec())
+        };
 
         let verifier: Arc<dyn rustls::server::ClientCertVerifier> = match certificate_mode {
             CertificateMode::AuthorityBased => {
@@ -109,43 +123,35 @@ impl TlsServerConfig {
                 }
 
                 let verifier = NameVerifier::try_create(name.to_string())?;
-
                 Arc::new(CaChainClientCertVerifier::new(roots, verifier))
             }
             CertificateMode::SelfSigned => {
-                if let Some(peer_cert) = peer_certs.pop() {
-                    if !peer_certs.is_empty() {
+                let cert = match peer_certs.as_slice() {
+                    &[] => {
+                        return Err(TlsError::InvalidPeerCertificate(io::Error::new(
+                            ErrorKind::InvalidData,
+                            "no peer certificate",
+                        )))
+                    }
+                    [single] => single.clone(),
+                    _ => {
                         return Err(TlsError::InvalidPeerCertificate(io::Error::new(
                             ErrorKind::InvalidData,
                             "more than one peer certificate in self-signed mode",
-                        )));
+                        )))
                     }
+                };
 
-                    Arc::new(SelfSignedCertificateClientCertVerifier::new(peer_cert))
-                } else {
-                    return Err(TlsError::InvalidPeerCertificate(io::Error::new(
-                        ErrorKind::InvalidData,
-                        "no peer certificate",
-                    )));
-                }
+                Arc::new(SelfSignedCertificateClientCertVerifier::new(cert))
             }
         };
 
         let config = rustls::ServerConfig::builder()
             .with_safe_default_cipher_suites()
             .with_safe_default_kx_groups()
-            .with_protocol_versions(min_tls_version.to_rustls())
-            .map_err(|err| {
-                TlsError::Other(io::Error::new(ErrorKind::InvalidData, err.to_string()))
-            })?
+            .with_protocol_versions(min_tls_version.to_rustls())?
             .with_client_cert_verifier(verifier)
-            .with_single_cert(local_certs, private_key)
-            .map_err(|err| {
-                TlsError::InvalidLocalCertificate(io::Error::new(
-                    ErrorKind::InvalidData,
-                    err.to_string(),
-                ))
-            })?;
+            .with_single_cert(local_certs, private_key)?;
 
         Ok(Self {
             config: Arc::new(config),
