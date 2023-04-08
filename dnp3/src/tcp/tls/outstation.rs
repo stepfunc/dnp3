@@ -87,7 +87,6 @@ impl TlsServerConfig {
         min_tls_version: MinTlsVersion,
         certificate_mode: CertificateMode,
     ) -> Result<Self, TlsError> {
-
         let peer_certs: Vec<rustls::Certificate> = {
             let data = std::fs::read(peer_cert_path)?;
             let certs = pem_util::read_certificates_from_pem(data)?;
