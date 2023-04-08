@@ -12,11 +12,12 @@ use crate::outstation::{
     OutstationInformation,
 };
 use crate::tcp::client::ClientTask;
-use crate::tcp::tls::{CertificateMode, MinTlsVersion, NameVerifier, TlsClientConfig, TlsError};
+use crate::tcp::tls::{
+    CertificateMode, MinTlsVersion, NameVerifier, SelfSignedVerifier, TlsClientConfig, TlsError,
+};
 use crate::tcp::{ClientState, ConnectOptions, EndpointList, PostConnectionHandler};
 use crate::util::phys::PhysLayer;
 use crate::util::session::{Enabled, Session};
-use rx509;
 use tokio::net::TcpStream;
 
 use tracing::Instrument;
@@ -194,12 +195,14 @@ impl rustls::server::ClientCertVerifier for CaChainClientCertVerifier {
 }
 
 struct SelfSignedCertificateClientCertVerifier {
-    cert: rustls::Certificate,
+    inner: SelfSignedVerifier,
 }
 
 impl SelfSignedCertificateClientCertVerifier {
     fn new(cert: rustls::Certificate) -> Self {
-        Self { cert }
+        Self {
+            inner: SelfSignedVerifier::new(cert),
+        }
     }
 }
 
@@ -215,9 +218,10 @@ impl rustls::server::ClientCertVerifier for SelfSignedCertificateClientCertVerif
     }
 
     fn client_auth_root_subjects(&self) -> Option<rustls::DistinguishedNames> {
+        // TODO - Is this necessary?!
         // Let rustls extract the subjects
         let mut store = rustls::RootCertStore::empty();
-        let _ = store.add(&self.cert);
+        let _ = store.add(&self.inner.expected_peer_cert);
         #[allow(deprecated)]
         Some(store.subjects())
     }
@@ -228,41 +232,7 @@ impl rustls::server::ClientCertVerifier for SelfSignedCertificateClientCertVerif
         intermediates: &[rustls::Certificate],
         now: std::time::SystemTime,
     ) -> Result<rustls::server::ClientCertVerified, rustls::Error> {
-        // Check that no intermediate certificates are present
-        if !intermediates.is_empty() {
-            return Err(rustls::Error::General(format!(
-                "client sent {} intermediate certificates, expected none",
-                intermediates.len()
-            )));
-        }
-
-        // Check that presented certificate matches byte-for-byte the expected certificate
-        if end_entity != &self.cert {
-            return Err(rustls::Error::InvalidCertificateData(
-                "client certificate doesn't match the expected self-signed certificate".to_string(),
-            ));
-        }
-
-        // Check that the certificate is still valid
-        let parsed_cert = rx509::x509::Certificate::parse(&end_entity.0).map_err(|err| {
-            rustls::Error::InvalidCertificateData(format!(
-                "unable to parse cert with rasn: {err:?}"
-            ))
-        })?;
-
-        let now = now
-            .duration_since(std::time::UNIX_EPOCH)
-            .map_err(|_| rustls::Error::FailedToGetCurrentTime)?;
-        let now = rx509::der::UtcTime::from_seconds_since_epoch(now.as_secs());
-
-        if !parsed_cert.tbs_certificate.value.validity.is_valid(now) {
-            return Err(rustls::Error::InvalidCertificateData(
-                "self-signed certificate is currently not valid".to_string(),
-            ));
-        }
-
-        // We do not validate DNS name. Providing the exact same certificate is sufficient.
-
+        self.inner.verify(end_entity, intermediates, now)?;
         Ok(rustls::server::ClientCertVerified::assertion())
     }
 }

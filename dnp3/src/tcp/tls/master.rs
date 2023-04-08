@@ -6,12 +6,11 @@ use std::sync::Arc;
 use crate::app::{ConnectStrategy, Listener};
 use crate::link::LinkErrorMode;
 use crate::master::{MasterChannel, MasterChannelConfig};
-use crate::tcp::tls::{CertificateMode, MinTlsVersion, NameVerifier, TlsError};
+use crate::tcp::tls::{CertificateMode, MinTlsVersion, NameVerifier, SelfSignedVerifier, TlsError};
 use crate::tcp::{wire_master_client, ClientState, ConnectOptions};
 use crate::tcp::{EndpointList, PostConnectionHandler};
 use crate::util::phys::PhysLayer;
 
-use rx509;
 use tokio::net::TcpStream;
 use tokio_rustls::{rustls, webpki};
 use tracing::Instrument;
@@ -197,8 +196,7 @@ impl rustls::client::ServerCertVerifier for CommonNameServerCertVerifier {
             &chain,
             webpki_now,
         )
-        .map_err(super::pki_error)
-        .map(|_| cert)?;
+        .map_err(super::pki_error)?;
 
         // Check DNS name (including in the Common Name)
         self.verifier.verify(end_entity)?;
@@ -279,12 +277,14 @@ fn prepare<'a, 'b>(
 }
 
 struct SelfSignedCertificateServerCertVerifier {
-    cert: rustls::Certificate,
+    inner: SelfSignedVerifier,
 }
 
 impl SelfSignedCertificateServerCertVerifier {
     fn new(cert: rustls::Certificate) -> Self {
-        Self { cert }
+        Self {
+            inner: SelfSignedVerifier::new(cert),
+        }
     }
 }
 
@@ -298,41 +298,7 @@ impl rustls::client::ServerCertVerifier for SelfSignedCertificateServerCertVerif
         _ocsp_response: &[u8],
         now: std::time::SystemTime,
     ) -> Result<rustls::client::ServerCertVerified, rustls::Error> {
-        // Check that no intermediate certificates are present
-        if !intermediates.is_empty() {
-            return Err(rustls::Error::General(format!(
-                "client sent {} intermediate certificates, expected none",
-                intermediates.len()
-            )));
-        }
-
-        // Check that presented certificate matches byte-for-byte the expected certificate
-        if end_entity != &self.cert {
-            return Err(rustls::Error::InvalidCertificateData(
-                "client certificate doesn't match the expected self-signed certificate".to_string(),
-            ));
-        }
-
-        // Check that the certificate is still valid
-        let parsed_cert = rx509::x509::Certificate::parse(&end_entity.0).map_err(|err| {
-            rustls::Error::InvalidCertificateData(format!(
-                "unable to parse cert with rasn: {err:?}"
-            ))
-        })?;
-
-        let now = now
-            .duration_since(std::time::UNIX_EPOCH)
-            .map_err(|_| rustls::Error::FailedToGetCurrentTime)?;
-        let now = rx509::der::UtcTime::from_seconds_since_epoch(now.as_secs());
-
-        if !parsed_cert.tbs_certificate.value.validity.is_valid(now) {
-            return Err(rustls::Error::InvalidCertificateData(
-                "self-signed certificate is currently not valid".to_string(),
-            ));
-        }
-
-        // We do not validate DNS name. Providing the exact same certificate is sufficient.
-
+        self.inner.verify(end_entity, intermediates, now)?;
         Ok(rustls::client::ServerCertVerified::assertion())
     }
 }
