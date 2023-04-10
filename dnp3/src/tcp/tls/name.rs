@@ -1,5 +1,6 @@
 use crate::tcp::tls::{pki_error, TlsError};
-use tokio_rustls::{rustls, webpki};
+
+use tokio_rustls::rustls;
 
 pub(crate) struct NameVerifier {
     inner: VerifierType,
@@ -55,29 +56,27 @@ pub mod dangerous {
 
 fn verify_dns_name(cert: &rustls::Certificate, server_name: &str) -> Result<(), rustls::Error> {
     // Extract the DNS name
-    let dns_name = webpki::DnsNameRef::try_from_ascii_str(server_name)
-        .map_err(|_| rustls::Error::InvalidCertificateData("invalid DNS name".to_string()))?;
+    let subject_name = webpki::SubjectNameRef::try_from_ascii_str(server_name)
+        .map_err(|_| rustls::Error::General("invalid DNS name".to_string()))?;
 
     // Let webpki parse the cert
     let end_entity_cert = webpki::EndEntityCert::try_from(cert.0.as_ref()).map_err(pki_error)?;
 
     // Try validating the name using webpki. This only checks SAN extensions
-    match end_entity_cert.verify_is_valid_for_dns_name(dns_name) {
+    match end_entity_cert.verify_is_valid_for_subject_name(subject_name) {
         Ok(()) => Ok(()), // Good, we found a SAN extension that fits for the DNS name
         Err(webpki::Error::CertNotValidForName) => {
             // Let's extend our search to the CN
             // Parse the certificate using rasn
             let parsed_cert = rx509::x509::Certificate::parse(&cert.0).map_err(|err| {
-                rustls::Error::InvalidCertificateData(format!(
-                    "unable to parse cert with rasn: {err:?}"
-                ))
+                rustls::Error::General(format!("unable to parse cert with rasn: {err:?}"))
             })?;
 
             // Parse the extensions (if present) and check that no SAN are present
             if let Some(extensions) = &parsed_cert.tbs_certificate.value.extensions {
                 // Parse the extensions
                 let extensions = extensions.parse().map_err(|err| {
-                    rustls::Error::InvalidCertificateData(format!(
+                    rustls::Error::General(format!(
                         "unable to parse certificate extensions with rasn: {err:?}"
                     ))
                 })?;
@@ -89,7 +88,7 @@ fn verify_dns_name(cert: &rustls::Certificate, server_name: &str) -> Result<(), 
                         rx509::x509::ext::SpecificExtension::SubjectAlternativeName(_)
                     )
                 }) {
-                    return Err(rustls::Error::InvalidCertificateData(
+                    return Err(rustls::Error::General(
                         "certificate not valid for name, SAN extensions do not match".to_string(),
                     ));
                 }
@@ -102,20 +101,18 @@ fn verify_dns_name(cert: &rustls::Certificate, server_name: &str) -> Result<(), 
                 .subject
                 .parse()
                 .map_err(|err| {
-                    rustls::Error::InvalidCertificateData(format!(
-                        "unable to parse certificate subject: {err:?}"
-                    ))
+                    rustls::Error::General(format!("unable to parse certificate subject: {err:?}"))
                 })?;
 
             let common_name = subject.common_name.ok_or_else(|| {
-                rustls::Error::InvalidCertificateData(
+                rustls::Error::General(
                     "certificate not valid for name, no SAN and no CN present".to_string(),
                 )
             })?;
 
             match common_name == server_name {
                 true => Ok(()),
-                false => Err(rustls::Error::InvalidCertificateData(
+                false => Err(rustls::Error::General(
                     "certificate not valid for name, no SAN and CN doesn't match".to_string(),
                 )),
             }

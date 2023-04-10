@@ -6,13 +6,13 @@ use std::sync::Arc;
 use crate::app::{ConnectStrategy, Listener};
 use crate::link::LinkErrorMode;
 use crate::master::{MasterChannel, MasterChannelConfig};
-use crate::tcp::tls::{CertificateMode, MinTlsVersion, NameVerifier, SelfSignedVerifier, TlsError};
+use crate::tcp::tls::{CertificateMode, MinTlsVersion, NameVerifier, TlsError};
 use crate::tcp::{wire_master_client, ClientState, ConnectOptions};
 use crate::tcp::{EndpointList, PostConnectionHandler};
 use crate::util::phys::PhysLayer;
 
 use tokio::net::TcpStream;
-use tokio_rustls::{rustls, webpki};
+use tokio_rustls::rustls;
 use tracing::Instrument;
 
 /// TLS configuration
@@ -127,7 +127,8 @@ impl TlsClientConfig {
             }
             CertificateMode::SelfSigned => {
                 let cert = super::expect_single_peer_cert(peer_certs)?;
-                Arc::new(SelfSignedCertificateServerCertVerifier::new(cert))
+                let verifier = sfio_rustls_util::SelfSignedVerifier::create(cert)?;
+                Arc::new(verifier)
             }
         };
 
@@ -274,31 +275,4 @@ fn prepare<'a, 'b>(
         .collect();
 
     Ok((cert, intermediates, trustroots))
-}
-
-struct SelfSignedCertificateServerCertVerifier {
-    inner: SelfSignedVerifier,
-}
-
-impl SelfSignedCertificateServerCertVerifier {
-    fn new(cert: rustls::Certificate) -> Self {
-        Self {
-            inner: SelfSignedVerifier::new(cert),
-        }
-    }
-}
-
-impl rustls::client::ServerCertVerifier for SelfSignedCertificateServerCertVerifier {
-    fn verify_server_cert(
-        &self,
-        end_entity: &rustls::Certificate,
-        intermediates: &[rustls::Certificate],
-        _server_name: &rustls::ServerName,
-        _scts: &mut dyn Iterator<Item = &[u8]>,
-        _ocsp_response: &[u8],
-        now: std::time::SystemTime,
-    ) -> Result<rustls::client::ServerCertVerified, rustls::Error> {
-        self.inner.verify(end_entity, intermediates, now)?;
-        Ok(rustls::client::ServerCertVerified::assertion())
-    }
 }

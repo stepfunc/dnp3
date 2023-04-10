@@ -12,13 +12,12 @@ use crate::outstation::{
     OutstationInformation,
 };
 use crate::tcp::client::ClientTask;
-use crate::tcp::tls::{
-    CertificateMode, MinTlsVersion, NameVerifier, SelfSignedVerifier, TlsClientConfig, TlsError,
-};
+use crate::tcp::tls::{CertificateMode, MinTlsVersion, NameVerifier, TlsClientConfig, TlsError};
 use crate::tcp::{ClientState, ConnectOptions, EndpointList, PostConnectionHandler};
 use crate::util::phys::PhysLayer;
 use crate::util::session::{Enabled, Session};
 use tokio::net::TcpStream;
+use tokio_rustls::rustls::DistinguishedName;
 
 use tracing::Instrument;
 
@@ -122,7 +121,8 @@ impl TlsServerConfig {
             }
             CertificateMode::SelfSigned => {
                 let cert = super::expect_single_peer_cert(peer_certs)?;
-                Arc::new(SelfSignedCertificateClientCertVerifier::new(cert))
+                let verifier = sfio_rustls_util::SelfSignedVerifier::create(cert)?;
+                Arc::new(verifier)
             }
         };
 
@@ -153,7 +153,7 @@ impl TlsServerConfig {
 }
 
 struct CaChainClientCertVerifier {
-    inner: Arc<dyn rustls::server::ClientCertVerifier>,
+    inner: AllowAnyAuthenticatedClient,
     verifier: NameVerifier,
 }
 
@@ -165,17 +165,7 @@ impl CaChainClientCertVerifier {
 }
 
 impl rustls::server::ClientCertVerifier for CaChainClientCertVerifier {
-    fn offer_client_auth(&self) -> bool {
-        // Client must authenticate itself, so we better offer the authentication!
-        true
-    }
-
-    fn client_auth_mandatory(&self) -> Option<bool> {
-        // Client must authenticate itself
-        Some(true)
-    }
-
-    fn client_auth_root_subjects(&self) -> Option<rustls::DistinguishedNames> {
+    fn client_auth_root_subjects(&self) -> &[DistinguishedName] {
         self.inner.client_auth_root_subjects()
     }
 
@@ -194,45 +184,11 @@ impl rustls::server::ClientCertVerifier for CaChainClientCertVerifier {
     }
 }
 
-struct SelfSignedCertificateClientCertVerifier {
-    inner: SelfSignedVerifier,
-}
-
-impl SelfSignedCertificateClientCertVerifier {
-    fn new(cert: rustls::Certificate) -> Self {
-        Self {
-            inner: SelfSignedVerifier::new(cert),
-        }
-    }
-}
-
-impl rustls::server::ClientCertVerifier for SelfSignedCertificateClientCertVerifier {
-    fn offer_client_auth(&self) -> bool {
-        // Client must authenticate itself, so we better offer the authentication!
-        true
-    }
-
-    fn client_auth_mandatory(&self) -> Option<bool> {
-        // Client must authenticate itself
-        Some(true)
-    }
-
-    fn client_auth_root_subjects(&self) -> Option<rustls::DistinguishedNames> {
-        // TODO - Is this necessary?!
-        // Let rustls extract the subjects
-        let mut store = rustls::RootCertStore::empty();
-        let _ = store.add(&self.inner.expected_peer_cert);
-        #[allow(deprecated)]
-        Some(store.subjects())
-    }
-
-    fn verify_client_cert(
-        &self,
-        end_entity: &rustls::Certificate,
-        intermediates: &[rustls::Certificate],
-        now: std::time::SystemTime,
-    ) -> Result<rustls::server::ClientCertVerified, rustls::Error> {
-        self.inner.verify(end_entity, intermediates, now)?;
-        Ok(rustls::server::ClientCertVerified::assertion())
+impl From<sfio_rustls_util::Error> for TlsError {
+    fn from(err: sfio_rustls_util::Error) -> Self {
+        TlsError::Other(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            err.to_string(),
+        ))
     }
 }
