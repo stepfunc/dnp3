@@ -62,6 +62,9 @@
     "sfio-promise": {
       "url": "https://github.com/stepfunc/promise"
     },
+    "sfio-rustls-util": {
+      "url": "https://github.com/stepfunc/rustls-util"
+    },
     "sfio-tokio-ffi": {
       "url": "https://github.com/stepfunc/tokio-ffi"
     },
