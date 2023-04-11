@@ -2,7 +2,6 @@ use std::path::Path;
 use std::sync::Arc;
 
 use tokio_rustls::rustls;
-use tokio_rustls::rustls::server::AllowAnyAuthenticatedClient;
 
 use crate::app::{ConnectStrategy, Listener};
 use crate::link::LinkErrorMode;
@@ -12,12 +11,11 @@ use crate::outstation::{
     OutstationInformation,
 };
 use crate::tcp::client::ClientTask;
-use crate::tcp::tls::{CertificateMode, MinTlsVersion, NameVerifier, TlsClientConfig, TlsError};
+use crate::tcp::tls::{CertificateMode, MinTlsVersion, TlsClientConfig, TlsError};
 use crate::tcp::{ClientState, ConnectOptions, EndpointList, PostConnectionHandler};
 use crate::util::phys::PhysLayer;
 use crate::util::session::{Enabled, Session};
 use tokio::net::TcpStream;
-use tokio_rustls::rustls::DistinguishedName;
 
 use tracing::Instrument;
 
@@ -115,9 +113,11 @@ impl TlsServerConfig {
                 for cert in &peer_certs {
                     roots.add(cert)?;
                 }
-
-                let verifier = NameVerifier::try_create(name.to_string())?;
-                Arc::new(CaChainClientCertVerifier::new(roots, verifier))
+                let verifier = sfio_rustls_util::ClientCertVerifier::new(
+                    roots,
+                    super::dangerous::verifier(name),
+                );
+                Arc::new(verifier)
             }
             CertificateMode::SelfSigned => {
                 let cert = super::expect_single_peer_cert(peer_certs)?;
@@ -149,46 +149,5 @@ impl TlsServerConfig {
                 stream,
             )))),
         }
-    }
-}
-
-struct CaChainClientCertVerifier {
-    inner: AllowAnyAuthenticatedClient,
-    verifier: NameVerifier,
-}
-
-impl CaChainClientCertVerifier {
-    fn new(roots: rustls::RootCertStore, verifier: NameVerifier) -> Self {
-        let inner = AllowAnyAuthenticatedClient::new(roots);
-        Self { inner, verifier }
-    }
-}
-
-impl rustls::server::ClientCertVerifier for CaChainClientCertVerifier {
-    fn client_auth_root_subjects(&self) -> &[DistinguishedName] {
-        self.inner.client_auth_root_subjects()
-    }
-
-    fn verify_client_cert(
-        &self,
-        end_entity: &rustls::Certificate,
-        intermediates: &[rustls::Certificate],
-        now: std::time::SystemTime,
-    ) -> Result<rustls::server::ClientCertVerified, rustls::Error> {
-        self.inner
-            .verify_client_cert(end_entity, intermediates, now)?;
-
-        self.verifier.verify(end_entity)?;
-
-        Ok(rustls::server::ClientCertVerified::assertion())
-    }
-}
-
-impl From<sfio_rustls_util::Error> for TlsError {
-    fn from(err: sfio_rustls_util::Error) -> Self {
-        TlsError::Other(std::io::Error::new(
-            std::io::ErrorKind::Other,
-            err.to_string(),
-        ))
     }
 }

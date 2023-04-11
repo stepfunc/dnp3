@@ -1,13 +1,10 @@
 mod master;
-mod name;
 mod outstation;
 
 pub use master::*;
-pub use name::*;
 pub use outstation::*;
 
 use tokio_rustls::rustls;
-use tokio_rustls::rustls::CertificateError;
 
 /// Determines how the certificate(s) presented by the peer are validated
 ///
@@ -67,6 +64,15 @@ impl From<rustls::Error> for TlsError {
         Self::Other(std::io::Error::new(
             std::io::ErrorKind::InvalidData,
             value.to_string(),
+        ))
+    }
+}
+
+impl From<sfio_rustls_util::Error> for TlsError {
+    fn from(err: sfio_rustls_util::Error) -> Self {
+        Self::Other(std::io::Error::new(
+            std::io::ErrorKind::InvalidData,
+            err.to_string(),
         ))
     }
 }
@@ -163,16 +169,28 @@ pub(crate) fn expect_single_peer_cert(
     }
 }
 
-pub(crate) fn pki_error(error: webpki::Error) -> rustls::Error {
-    use webpki::Error::*;
-    match error {
-        BadDer | BadDerTime => rustls::Error::InvalidCertificate(CertificateError::BadEncoding),
-        InvalidSignatureForPublicKey => {
-            rustls::Error::InvalidCertificate(CertificateError::BadSignature)
+/// Configuration options related to dangerous (less-secure) modes that can only be used
+/// after explicitly opting into them.
+pub mod dangerous {
+
+    use sfio_rustls_util::NameVerifier;
+    use std::sync::atomic::Ordering;
+
+    pub(crate) fn verifier(name: &str) -> NameVerifier {
+        if name == "*" && ALLOW_WILDCARD_PEER_NAMES.load(Ordering::Relaxed) {
+            NameVerifier::any()
+        } else {
+            NameVerifier::equal_to(name.to_string())
         }
-        UnsupportedSignatureAlgorithm | UnsupportedSignatureAlgorithmForPublicKey => {
-            rustls::Error::InvalidCertificate(CertificateError::BadSignature)
-        }
-        e => rustls::Error::General(format!("invalid peer certificate: {e}")),
+    }
+
+    static ALLOW_WILDCARD_PEER_NAMES: std::sync::atomic::AtomicBool =
+        std::sync::atomic::AtomicBool::new(false);
+
+    /// Setting this option will allow the user to specify an "*" for the peer's name
+    /// when creating a [crate::tcp::tls::TlsServerConfig]. This means that the any certificate
+    /// signed by the CA will be allowed
+    pub fn enable_peer_name_wildcards() {
+        ALLOW_WILDCARD_PEER_NAMES.store(true, Ordering::Relaxed);
     }
 }

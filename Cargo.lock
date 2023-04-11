@@ -1286,9 +1286,10 @@ checksum = "91547be5cac1551a6401a7cfa571524bbcb4d9d818b2756cbe3012b48cc79aaf"
 [[package]]
 name = "sfio-rustls-util"
 version = "0.1.0"
-source = "git+https://github.com/stepfunc/rustls-util.git#cd1a60317bf0c3f57ff56a8975489f55856dcb34"
+source = "git+https://github.com/stepfunc/rustls-util.git#c499b2c48df0e4488c9030e0524fbd5d09a946cf"
 dependencies = [
  "rustls",
+ "rustls-webpki",
  "rx509",
 ]
 
