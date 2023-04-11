@@ -90,21 +90,21 @@ impl TlsClientConfig {
 
         let peer_certs: Vec<rustls::Certificate> = {
             let data = std::fs::read(peer_cert_path)?;
-            let certs = pem_util::read_certificates_from_pem(data)?;
+            let certs = sfio_pem_util::read_certificates(data)?;
             certs.into_iter().map(rustls::Certificate).collect()
         };
 
         let local_certs: Vec<rustls::Certificate> = {
             let data = std::fs::read(local_cert_path)?;
-            let certs = pem_util::read_certificates_from_pem(data)?;
+            let certs = sfio_pem_util::read_certificates(data)?;
             certs.into_iter().map(rustls::Certificate).collect()
         };
 
         let private_key: rustls::PrivateKey = {
             let key_bytes = std::fs::read(private_key_path)?;
             let key = match password {
-                Some(x) => pem_util::PrivateKey::decrypt_from_pem(key_bytes, x)?,
-                None => pem_util::PrivateKey::read_from_pem(key_bytes)?,
+                Some(x) => sfio_pem_util::PrivateKey::decrypt_from_pem(key_bytes, x)?,
+                None => sfio_pem_util::PrivateKey::read_from_pem(key_bytes)?,
             };
             rustls::PrivateKey(key.bytes().to_vec())
         };

@@ -74,29 +74,17 @@ impl From<rustls::client::InvalidDnsNameError> for TlsError {
     }
 }
 
-impl From<pem_util::Error> for TlsError {
-    fn from(value: pem_util::Error) -> Self {
-        match value {
-            pem_util::Error::InvalidPem(x) => Self::Other(x),
-            pem_util::Error::DecryptionError(x) => Self::Other(x),
-            pem_util::Error::NoPrivateKey(_) => Self::Other(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "No private key",
-            )),
-            pem_util::Error::MoreThanOnePrivateKey(_) => Self::Other(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "More than one private key",
-            )),
-            pem_util::Error::NoCertificate => Self::Other(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "No certificate in PEM",
-            )),
-        }
+impl From<sfio_pem_util::Error> for TlsError {
+    fn from(err: sfio_pem_util::Error) -> Self {
+        Self::Other(std::io::Error::new(
+            std::io::ErrorKind::Other,
+            err.to_string(),
+        ))
     }
 }
 
 impl std::fmt::Display for TlsError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             Self::InvalidPeerCertificate(err) => {
                 write!(f, "invalid peer certificate file: {err}")

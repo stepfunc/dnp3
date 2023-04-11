@@ -20,7 +20,7 @@ xxhash-rust = { version = "0.8.2", features = ["xxh64"] }
 scursor = "0.1.0"
 
 # TLS dependencies
-pem-util = { git = "https://github.com/stepfunc/pem-util.git", optional = true }
+sfio-pem-util = { git = "https://github.com/stepfunc/pem-util.git", optional = true }
 sfio-rustls-util = { git = "https://github.com/stepfunc/rustls-util.git", optional = true }
 tokio-rustls = { version = "0.24", features = ["dangerous_configuration", "tls12"], default-features = false, optional = true }
 
@@ -41,5 +41,5 @@ tokio = { version = "1", features = ["test-util"] }
 [features]
 default = ["tls", "serial"]
 ffi = [] # this feature flag is only used when building the FFI
-tls = ["pem-util", "tokio-rustls", "sfio-rustls-util"]
+tls = ["sfio-pem-util", "tokio-rustls", "sfio-rustls-util"]
 serial = ["tokio-serial"]

@@ -365,9 +365,9 @@ dependencies = [
  "chrono",
  "clap",
  "futures",
- "pem-util",
  "rand",
  "scursor",
+ "sfio-pem-util",
  "sfio-rustls-util",
  "sfio-tokio-mock-io",
  "tokio",
@@ -944,16 +944,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pem-util"
-version = "0.1.0"
-source = "git+https://github.com/stepfunc/pem-util.git#f1cde6203bb1127389a368dc58558f23ab8cad62"
-dependencies = [
- "pem",
- "pkcs8",
- "zeroize",
-]
-
-[[package]]
 name = "pin-project-lite"
 version = "0.2.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1273,6 +1263,16 @@ dependencies = [
  "nix 0.24.3",
  "regex",
  "winapi",
+]
+
+[[package]]
+name = "sfio-pem-util"
+version = "0.1.0"
+source = "git+https://github.com/stepfunc/pem-util.git#d105725696624f7610cd3cab5bcd0aa1926cfe71"
+dependencies = [
+ "pem",
+ "pkcs8",
+ "zeroize",
 ]
 
 [[package]]
