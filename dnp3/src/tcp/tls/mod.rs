@@ -44,15 +44,6 @@ pub enum TlsError {
     Other(std::io::Error),
 }
 
-impl From<webpki::Error> for TlsError {
-    fn from(value: webpki::Error) -> Self {
-        TlsError::Other(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            value.to_string(),
-        ))
-    }
-}
-
 impl From<std::io::Error> for TlsError {
     fn from(err: std::io::Error) -> Self {
         Self::Other(err)
@@ -147,25 +138,25 @@ impl MinTlsVersion {
 
 pub(crate) fn expect_single_peer_cert(
     peer_certs: Vec<rustls::Certificate>,
-) -> Result<rustls::Certificate, std::io::Error> {
+) -> Result<rustls::Certificate, &'static str> {
     let mut iter = peer_certs.into_iter();
     let first = match iter.next() {
         None => {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                "no peer certificate",
-            ))
+            return Err("no peer certificate");
         }
         Some(x) => x,
     };
 
     if iter.next().is_some() {
-        Err(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            "more than one peer certificate in self-signed mode",
-        ))
+        Err("more than one peer certificate")
     } else {
         Ok(first)
+    }
+}
+
+impl From<&str> for TlsError {
+    fn from(value: &str) -> Self {
+        Self::Other(std::io::Error::new(std::io::ErrorKind::Other, value))
     }
 }
 

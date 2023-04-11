@@ -367,8 +367,6 @@ dependencies = [
  "futures",
  "pem-util",
  "rand",
- "rustls-webpki",
- "rx509",
  "scursor",
  "sfio-rustls-util",
  "sfio-tokio-mock-io",

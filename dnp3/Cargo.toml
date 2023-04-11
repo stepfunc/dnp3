@@ -22,10 +22,7 @@ scursor = "0.1.0"
 # TLS dependencies
 pem-util = { git = "https://github.com/stepfunc/pem-util.git", optional = true }
 sfio-rustls-util = { git = "https://github.com/stepfunc/rustls-util.git", optional = true }
-rx509 = { version = "0.2", optional = true }
 tokio-rustls = { version = "0.24", features = ["dangerous_configuration", "tls12"], default-features = false, optional = true }
-rustls-webpki = { version = "0.100.1", optional = true }
-
 
 # serial dependencies
 tokio-serial = { version = "=5.4.3", optional = true }
@@ -44,5 +41,5 @@ tokio = { version = "1", features = ["test-util"] }
 [features]
 default = ["tls", "serial"]
 ffi = [] # this feature flag is only used when building the FFI
-tls = ["pem-util", "rx509", "tokio-rustls", "rustls-webpki", "sfio-rustls-util"]
+tls = ["pem-util", "tokio-rustls", "sfio-rustls-util"]
 serial = ["tokio-serial"]
