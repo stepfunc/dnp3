@@ -367,8 +367,7 @@ dependencies = [
  "futures",
  "rand",
  "scursor",
- "sfio-pem-util",
- "sfio-rustls-util",
+ "sfio-rustls-config",
  "sfio-tokio-mock-io",
  "tokio",
  "tokio-rustls",
@@ -1282,13 +1281,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "91547be5cac1551a6401a7cfa571524bbcb4d9d818b2756cbe3012b48cc79aaf"
 
 [[package]]
-name = "sfio-rustls-util"
+name = "sfio-rustls-config"
 version = "0.1.0"
-source = "git+https://github.com/stepfunc/rustls-util.git#c499b2c48df0e4488c9030e0524fbd5d09a946cf"
+source = "git+https://github.com/stepfunc/rustls-config.git#779680970cde4653136400c91f61fe8a8d89a107"
 dependencies = [
  "rustls",
  "rustls-webpki",
  "rx509",
+ "sfio-pem-util",
 ]
 
 [[package]]
