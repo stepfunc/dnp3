@@ -1265,16 +1265,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "sfio-pem-util"
-version = "0.1.0"
-source = "git+https://github.com/stepfunc/pem-util.git#d105725696624f7610cd3cab5bcd0aa1926cfe71"
-dependencies = [
- "pem",
- "pkcs8",
- "zeroize",
-]
-
-[[package]]
 name = "sfio-promise"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1283,12 +1273,14 @@ checksum = "91547be5cac1551a6401a7cfa571524bbcb4d9d818b2756cbe3012b48cc79aaf"
 [[package]]
 name = "sfio-rustls-config"
 version = "0.1.0"
-source = "git+https://github.com/stepfunc/rustls-config.git#779680970cde4653136400c91f61fe8a8d89a107"
+source = "git+https://github.com/stepfunc/rustls-config.git#aec044e9eb0518953bcf0f2541117d901fdf1aba"
 dependencies = [
+ "pem",
+ "pkcs8",
  "rustls",
  "rustls-webpki",
  "rx509",
- "sfio-pem-util",
+ "zeroize",
 ]
 
 [[package]]

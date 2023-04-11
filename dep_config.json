@@ -56,14 +56,11 @@
     "scursor": {
       "url": "https://github.com/stepfunc/scursor"
     },
-    "sfio-pem-util": {
-      "url": "https://github.com/stepfunc/pem-util"
-    },
     "sfio-promise": {
       "url": "https://github.com/stepfunc/promise"
     },
-    "sfio-rustls-util": {
-      "url": "https://github.com/stepfunc/rustls-util"
+    "sfio-rustls-config": {
+      "url": "https://github.com/stepfunc/rustls-config"
     },
     "sfio-tokio-ffi": {
       "url": "https://github.com/stepfunc/tokio-ffi"
