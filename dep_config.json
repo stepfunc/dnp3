@@ -50,14 +50,14 @@
     "dnp3-ffi-java": {
       "url": "https://github.com/stepfunc/dnp3"
     },
-    "pem-util": {
-      "url": "https://github.com/stepfunc/pem-util"
-    },
     "rx509": {
       "url": "https://github.com/stepfunc/rasn"
     },
     "scursor": {
       "url": "https://github.com/stepfunc/scursor"
+    },
+    "sfio-pem-util": {
+      "url": "https://github.com/stepfunc/pem-util"
     },
     "sfio-promise": {
       "url": "https://github.com/stepfunc/promise"
