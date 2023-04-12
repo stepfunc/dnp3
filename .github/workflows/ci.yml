@@ -20,11 +20,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v3
       - name: Install Rust ${{ matrix.rust }}
-        uses: actions-rs/toolchain@v1
+        uses: dtolnay/rust-toolchain@v1
         with:
-          profile: minimal
           toolchain: ${{ matrix.rust }}
-          override: true
           components: rustfmt, clippy
       - name: Format
         run: cargo fmt --all -- --check
