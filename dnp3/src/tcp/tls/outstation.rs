@@ -88,7 +88,7 @@ impl TlsServerConfig {
         let config = match certificate_mode {
             CertificateMode::AuthorityBased => sfio_rustls_config::server::authority(
                 min_tls_version.into(),
-                super::dangerous::verifier(name),
+                super::dangerous::client_verifier(name),
                 peer_cert_path,
                 local_cert_path,
                 private_key_path,

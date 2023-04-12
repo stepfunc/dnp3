@@ -91,7 +91,7 @@ impl TlsClientConfig {
         let config = match certificate_mode {
             CertificateMode::AuthorityBased => sfio_rustls_config::client::authority(
                 min_tls_version.into(),
-                super::dangerous::verifier(name),
+                sfio_rustls_config::NameVerifier::equal_to(name.to_string()),
                 peer_cert_path,
                 local_cert_path,
                 private_key_path,

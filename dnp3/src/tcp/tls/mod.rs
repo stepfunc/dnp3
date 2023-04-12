@@ -102,21 +102,21 @@ pub mod dangerous {
     use sfio_rustls_config::NameVerifier;
     use std::sync::atomic::Ordering;
 
-    pub(crate) fn verifier(name: &str) -> NameVerifier {
-        if name == "*" && ALLOW_WILDCARD_PEER_NAMES.load(Ordering::Relaxed) {
+    pub(crate) fn client_verifier(name: &str) -> NameVerifier {
+        if name == "*" && ALLOW_WILDCARD_CLIENT_NAMES.load(Ordering::Relaxed) {
             NameVerifier::any()
         } else {
             NameVerifier::equal_to(name.to_string())
         }
     }
 
-    static ALLOW_WILDCARD_PEER_NAMES: std::sync::atomic::AtomicBool =
+    static ALLOW_WILDCARD_CLIENT_NAMES: std::sync::atomic::AtomicBool =
         std::sync::atomic::AtomicBool::new(false);
 
-    /// Setting this option will allow the user to specify an "*" for the peer's name
+    /// Setting this option will allow the user to specify an "*" for the client's x.509 name
     /// when creating a [crate::tcp::tls::TlsServerConfig]. This means that the any certificate
     /// signed by the CA will be allowed
-    pub fn enable_peer_name_wildcards() {
-        ALLOW_WILDCARD_PEER_NAMES.store(true, Ordering::Relaxed);
+    pub fn enable_client_name_wildcards() {
+        ALLOW_WILDCARD_CLIENT_NAMES.store(true, Ordering::Relaxed);
     }
 }
