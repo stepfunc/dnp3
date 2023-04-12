@@ -74,7 +74,7 @@ impl TlsServerConfig {
     /// Create a TLS server config.
     ///
     /// The name field is what gets verified from the peer certificate. Name verification
-    /// can be disabled by first calling [crate::tcp::tls::dangerous::enable_peer_name_wildcards]
+    /// can be disabled by first calling [crate::tcp::tls::dangerous::enable_client_name_wildcards]
     /// and then passing "*" to this function.
     pub fn new(
         name: &str,
