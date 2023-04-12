@@ -16,7 +16,7 @@ exclude = ["codegen"] # the scala code used to generate parts of the crate
 tracing = "0.1"
 chrono = "0.4"
 tokio = { version = "1", features = ["net", "sync", "io-util", "io-std", "time", "rt", "rt-multi-thread", "macros"] }
-xxhash-rust = { version = "0.8.2", features = ["xxh64"] }
+xxhash-rust = { version = "0.8", features = ["xxh64"] }
 scursor = "0.1.0"
 
 # TLS dependencies
@@ -31,7 +31,7 @@ futures = { version = "0.3.24" }
 clap = { version = "4.0", features = ["derive"] }
 sfio-tokio-mock-io = "0.2.0"
 assert_matches = "1.2"
-tracing-subscriber = "0.2"
+tracing-subscriber = "0.3"
 tokio-util = { version = "0.7", features = ["codec"] }
 tokio-stream = { version = "0.1.1" }
 rand = "0.8"
