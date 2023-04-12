@@ -1,8 +1,8 @@
 ### 1.4.0-rc1 ###
-: :wrench: Update to rustls 0.21.0 which allows peer names with IP addresses in the SAN extension.
-: :wrench: Move common TLS configuration to its own crate shared with our Modbus library.
-: :star: PEM parser now supports extracting PKCS#1 private keys, i.e. PEM files with `BEGIN RSA PRIVATE KEY`.
-: :star: X.509 client name verification may now be disabled in the TLS server via special procedure. See [#291](https://github.com/stepfunc/dnp3/pull/291).
+* :wrench: Update to rustls 0.21.0 which allows peer names with IP addresses in the SAN extension.
+* :wrench: Move common TLS configuration to its own crate shared with our Modbus library.
+* :star: PEM parser now supports extracting PKCS#1 private keys, i.e. PEM files with `BEGIN RSA PRIVATE KEY`.
+* :star: X.509 client name verification may now be disabled in the TLS server via special procedure. See [#291](https://github.com/stepfunc/dnp3/pull/291).
 
 ### 1.3.0 ###
 * :star: Add master and outstation support for device attributes (group 0).
