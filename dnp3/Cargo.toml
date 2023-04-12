@@ -16,7 +16,7 @@ exclude = ["codegen"] # the scala code used to generate parts of the crate
 tracing = "0.1"
 chrono = "0.4"
 tokio = { version = "1", features = ["net", "sync", "io-util", "io-std", "time", "rt", "rt-multi-thread", "macros"] }
-xxhash-rust = { version = "0.8.2", features = ["xxh64"] }
+xxhash-rust = { version = "0.8", features = ["xxh64"] }
 scursor = "0.1.0"
 
 # TLS dependencies
