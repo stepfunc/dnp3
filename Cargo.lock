@@ -419,7 +419,7 @@ dependencies = [
 
 [[package]]
 name = "dnp3"
-version = "1.4.0-rc1"
+version = "1.4.0-rc2"
 dependencies = [
  "assert_matches",
  "chrono",
@@ -441,7 +441,7 @@ dependencies = [
 
 [[package]]
 name = "dnp3-bindings"
-version = "1.4.0-rc1"
+version = "1.4.0-rc2"
 dependencies = [
  "dnp3-schema",
  "oo-bindgen",
@@ -451,7 +451,7 @@ dependencies = [
 
 [[package]]
 name = "dnp3-ffi"
-version = "1.4.0-rc1"
+version = "1.4.0-rc2"
 dependencies = [
  "dnp3",
  "dnp3-schema",
@@ -469,7 +469,7 @@ dependencies = [
 
 [[package]]
 name = "dnp3-ffi-java"
-version = "1.4.0-rc1"
+version = "1.4.0-rc2"
 dependencies = [
  "dnp3-ffi",
  "dnp3-schema",
@@ -479,7 +479,7 @@ dependencies = [
 
 [[package]]
 name = "dnp3-schema"
-version = "1.4.0-rc1"
+version = "1.4.0-rc2"
 dependencies = [
  "oo-bindgen",
  "sfio-tokio-ffi",
@@ -1303,16 +1303,15 @@ checksum = "91547be5cac1551a6401a7cfa571524bbcb4d9d818b2756cbe3012b48cc79aaf"
 
 [[package]]
 name = "sfio-rustls-config"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd5f5c6bb5ba7890841df6890d3f372ef36a908a6c94c1fc32f05b57b226ce2e"
+checksum = "8781e206d0f231ad07f17b66a5eca34b993a741882e505c5d44d903cec77def8"
 dependencies = [
  "pem",
  "pkcs8",
  "rustls",
  "rustls-webpki",
  "rx509",
- "zeroize",
 ]
 
 [[package]]

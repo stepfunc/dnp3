@@ -1,4 +1,4 @@
-### 1.4.0-rc1 ###
+### 1.4.0-rc2 ###
 * :wrench: Update to rustls 0.21.0 which allows peer names with IP addresses in the SAN extension.
 * :wrench: Move common TLS configuration to its own crate shared with our Modbus library.
 * :star: PEM parser now supports extracting PKCS#1 private keys, i.e. PEM files with `BEGIN RSA PRIVATE KEY`.
