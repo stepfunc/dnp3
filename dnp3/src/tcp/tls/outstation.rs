@@ -72,8 +72,8 @@ pub struct TlsServerConfig {
 }
 
 impl TlsServerConfig {
-    /// Create a TLS server configuration
-    #[deprecated(since = "1.4.0", note = "please use `self_signed` or `create`")]
+    /// Legacy method of creating a TLS server configuration
+    #[deprecated(since = "1.4.0", note = "Please use `self_signed` or `create` instead")]
     pub fn new(
         client_subject_name: &str,
         peer_cert_path: &Path,

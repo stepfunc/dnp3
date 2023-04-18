@@ -99,8 +99,19 @@ pub unsafe fn outstation_server_create_tls_server(
         ffi::CertificateMode::AuthorityBased => {
             let expected_subject_name = tls_config.dns_name().to_str()?;
 
+            let expected_subject_name = match expected_subject_name {
+                "*" => {
+                    if tls_config.allow_client_name_wildcard {
+                        None
+                    } else {
+                        Some(expected_subject_name.to_string())
+                    }
+                }
+                _ => Some(expected_subject_name.to_string()),
+            };
+
             TlsServerConfig::create(
-                Some(expected_subject_name.to_string()),
+                expected_subject_name,
                 peer_cert_path,
                 local_cert_path,
                 private_key_path,
