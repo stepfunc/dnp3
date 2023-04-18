@@ -213,8 +213,16 @@ impl TryFrom<ffi::TlsClientConfig> for TlsClientConfig {
         let config = match value.certificate_mode() {
             ffi::CertificateMode::AuthorityBased => {
                 let expected_subject_name = value.dns_name().to_str()?;
+
+                let expected_subject_name =
+                    if value.allow_server_name_wildcard && expected_subject_name == "*" {
+                        None
+                    } else {
+                        Some(expected_subject_name.to_string())
+                    };
+
                 TlsClientConfig::full_pki(
-                    Some(expected_subject_name.to_string()),
+                    expected_subject_name,
                     peer_cert_path,
                     local_cert_path,
                     private_key_path,
