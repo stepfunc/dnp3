@@ -17,7 +17,8 @@ use tracing::Instrument;
 
 /// TLS configuration for a client
 pub struct TlsClientConfig {
-    dns_name: rustls::ServerName,
+    // server name used in SNI - if and only if it's a DNS name, does nothing for IP
+    server_name: rustls::ServerName,
     config: Arc<rustls::ClientConfig>,
 }
 
@@ -78,7 +79,7 @@ pub fn spawn_master_tls_client_2(
 impl TlsClientConfig {
     /// Legacy method for creating a client TLS configuration
     pub fn new(
-        name: &str,
+        server_name: &str,
         peer_cert_path: &Path,
         local_cert_path: &Path,
         private_key_path: &Path,
@@ -86,12 +87,10 @@ impl TlsClientConfig {
         min_tls_version: MinTlsVersion,
         certificate_mode: CertificateMode,
     ) -> Result<Self, TlsError> {
-        let dns_name = rustls::ServerName::try_from(name)?;
-
         let config = match certificate_mode {
             CertificateMode::AuthorityBased => sfio_rustls_config::client::authority(
                 min_tls_version.into(),
-                sfio_rustls_config::NameVerifier::equal_to(name.to_string()),
+                sfio_rustls_config::NameVerifier::equal_to(server_name.to_string()),
                 peer_cert_path,
                 local_cert_path,
                 private_key_path,
@@ -106,9 +105,11 @@ impl TlsClientConfig {
             )?,
         };
 
+        let server_name = rustls::ServerName::try_from(server_name)?;
+
         Ok(Self {
             config: Arc::new(config),
-            dns_name,
+            server_name,
         })
     }
 
@@ -118,7 +119,7 @@ impl TlsClientConfig {
         endpoint: &SocketAddr,
     ) -> Option<PhysLayer> {
         let connector = tokio_rustls::TlsConnector::from(self.config.clone());
-        match connector.connect(self.dns_name.clone(), socket).await {
+        match connector.connect(self.server_name.clone(), socket).await {
             Err(err) => {
                 tracing::warn!("failed to establish TLS session with {endpoint}: {err}");
                 None
