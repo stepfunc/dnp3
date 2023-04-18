@@ -15,7 +15,7 @@ use tokio::net::TcpStream;
 use tokio_rustls::rustls;
 use tracing::Instrument;
 
-/// TLS configuration
+/// TLS configuration for a client
 pub struct TlsClientConfig {
     dns_name: rustls::ServerName,
     config: Arc<rustls::ClientConfig>,
@@ -76,7 +76,7 @@ pub fn spawn_master_tls_client_2(
 }
 
 impl TlsClientConfig {
-    /// Create a TLS master config
+    /// Legacy method for creating a client TLS configuration
     pub fn new(
         name: &str,
         peer_cert_path: &Path,

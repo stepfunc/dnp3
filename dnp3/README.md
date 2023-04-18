@@ -21,8 +21,8 @@ Rust implementation of DNP3 (IEEE 1815) with idiomatic bindings for C, C++, .NET
 # Cargo Features
 
 Default features can be disabled at compile time:
-* `tls` - Build the library with support for TLS (secure Modbus)
-* `serial` - Build the library with support for Modbus RTU and serial ports
+* `tls` - Build the library with support for mutually authenticated TLS
+* `serial` - Build the library with support for serial ports
 
 # License
 

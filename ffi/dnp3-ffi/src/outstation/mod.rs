@@ -76,23 +76,39 @@ pub unsafe fn outstation_server_create_tls_server(
     use std::path::Path;
 
     let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
-    let address = address.to_string_lossy().parse()?;
+    let address = address.to_str()?.parse()?;
 
-    let password = tls_config.password().to_string_lossy();
-    let optional_password = match password.as_ref() {
+    let password = match tls_config.password().to_str()? {
         "" => None,
         password => Some(password),
     };
 
-    let tls_config = TlsServerConfig::new(
-        &tls_config.dns_name().to_string_lossy(),
-        Path::new(tls_config.peer_cert_path().to_string_lossy().as_ref()),
-        Path::new(tls_config.local_cert_path().to_string_lossy().as_ref()),
-        Path::new(tls_config.private_key_path().to_string_lossy().as_ref()),
-        optional_password,
-        tls_config.min_tls_version().into(),
-        tls_config.certificate_mode().into(),
-    )
+    let peer_cert_path = Path::new(tls_config.peer_cert_path().to_str()?);
+    let local_cert_path = Path::new(tls_config.local_cert_path().to_str()?);
+    let private_key_path = Path::new(tls_config.private_key_path().to_str()?);
+    let min_tls_version: dnp3::tcp::tls::MinTlsVersion = tls_config.min_tls_version().into();
+
+    let tls_config = match tls_config.certificate_mode() {
+        ffi::CertificateMode::SelfSigned => TlsServerConfig::self_signed(
+            peer_cert_path,
+            local_cert_path,
+            private_key_path,
+            password,
+            min_tls_version,
+        ),
+        ffi::CertificateMode::AuthorityBased => {
+            let expected_subject_name = tls_config.dns_name().to_str()?;
+
+            TlsServerConfig::create(
+                Some(expected_subject_name.to_string()),
+                peer_cert_path,
+                local_cert_path,
+                private_key_path,
+                password,
+                min_tls_version,
+            )
+        }
+    }
     .map_err(|err| {
         tracing::error!("TLS error: {}", err);
         err
