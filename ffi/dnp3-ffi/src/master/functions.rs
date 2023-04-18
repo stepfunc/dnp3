@@ -201,27 +201,41 @@ impl TryFrom<ffi::TlsClientConfig> for TlsClientConfig {
     fn try_from(value: ffi::TlsClientConfig) -> Result<Self, Self::Error> {
         use std::path::Path;
 
-        let password = value.password().to_string_lossy();
-        let optional_password = match password.as_ref() {
+        let optional_password = match value.password().to_str()? {
             "" => None,
             password => Some(password),
         };
 
-        let ret = TlsClientConfig::new(
-            &value.dns_name().to_string_lossy(),
-            Path::new(value.peer_cert_path().to_string_lossy().as_ref()),
-            Path::new(value.local_cert_path().to_string_lossy().as_ref()),
-            Path::new(value.private_key_path().to_string_lossy().as_ref()),
-            optional_password,
-            value.min_tls_version().into(),
-            value.certificate_mode().into(),
-        )
+        let peer_cert_path = Path::new(value.peer_cert_path().to_str()?);
+        let local_cert_path = Path::new(value.local_cert_path().to_str()?);
+        let private_key_path = Path::new(value.private_key_path().to_str()?);
+
+        let config = match value.certificate_mode() {
+            ffi::CertificateMode::AuthorityBased => {
+                let expected_subject_name = value.dns_name().to_str()?;
+                TlsClientConfig::full_pki(
+                    Some(expected_subject_name.to_string()),
+                    peer_cert_path,
+                    local_cert_path,
+                    private_key_path,
+                    optional_password,
+                    value.min_tls_version().into(),
+                )
+            }
+            ffi::CertificateMode::SelfSigned => TlsClientConfig::self_signed(
+                peer_cert_path,
+                local_cert_path,
+                private_key_path,
+                optional_password,
+                value.min_tls_version().into(),
+            ),
+        }
         .map_err(|err| {
             tracing::error!("TLS error: {}", err);
             err
         })?;
 
-        Ok(ret)
+        Ok(config)
     }
 }
 

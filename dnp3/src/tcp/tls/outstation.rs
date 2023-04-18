@@ -73,7 +73,10 @@ pub struct TlsServerConfig {
 
 impl TlsServerConfig {
     /// Legacy method of creating a TLS server configuration
-    #[deprecated(since = "1.4.0", note = "Please use `self_signed` or `create` instead")]
+    #[deprecated(
+        since = "1.4.0",
+        note = "Please use `full_pki` or `self_signed` instead"
+    )]
     pub fn new(
         client_subject_name: &str,
         peer_cert_path: &Path,
@@ -84,7 +87,7 @@ impl TlsServerConfig {
         certificate_mode: CertificateMode,
     ) -> Result<Self, TlsError> {
         match certificate_mode {
-            CertificateMode::AuthorityBased => Self::create(
+            CertificateMode::AuthorityBased => Self::full_pki(
                 Some(client_subject_name.to_string()),
                 peer_cert_path,
                 local_cert_path,
@@ -102,7 +105,7 @@ impl TlsServerConfig {
         }
     }
 
-    /// Create TLS server configuration that expects a full PKI with an authority, and possibly
+    /// Create a TLS server configuration that expects a full PKI with an authority, and possibly
     /// intermediate CA certificates.
     ///
     /// If `client_subject_name` is specified, than the server will verify name is present in the
@@ -110,7 +113,7 @@ impl TlsServerConfig {
     ///
     /// If `client_subject_name` is set to None, then no client name validate is performed, and
     /// any authenticated client is allowed.
-    pub fn create(
+    pub fn full_pki(
         client_subject_name: Option<String>,
         peer_cert_path: &Path,
         local_cert_path: &Path,

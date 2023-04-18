@@ -533,14 +533,12 @@ fn get_association_config() -> AssociationConfig {
 fn get_tls_self_signed_config() -> Result<TlsClientConfig, Box<dyn std::error::Error>> {
     use std::path::Path;
     // ANCHOR: tls_self_signed_config
-    let config = TlsClientConfig::new(
-        "test.com",
+    let config = TlsClientConfig::self_signed(
         &Path::new("./certs/self_signed/entity2_cert.pem"),
         &Path::new("./certs/self_signed/entity1_cert.pem"),
         &Path::new("./certs/self_signed/entity1_key.pem"),
         None, // no password
         MinTlsVersion::V12,
-        CertificateMode::SelfSigned,
     )?;
     // ANCHOR_END: tls_self_signed_config
     Ok(config)
@@ -550,14 +548,13 @@ fn get_tls_self_signed_config() -> Result<TlsClientConfig, Box<dyn std::error::E
 fn get_tls_authority_config() -> Result<TlsClientConfig, Box<dyn std::error::Error>> {
     use std::path::Path;
     // ANCHOR: tls_ca_chain_config
-    let config = TlsClientConfig::new(
-        "test.com",
+    let config = TlsClientConfig::full_pki(
+        Some("test.com".to_string()),
         &Path::new("./certs/ca_chain/ca_cert.pem"),
         &Path::new("./certs/ca_chain/entity1_cert.pem"),
         &Path::new("./certs/ca_chain/entity1_key.pem"),
         None, // no password
         MinTlsVersion::V12,
-        CertificateMode::AuthorityBased,
     )?;
     // ANCHOR_END: tls_ca_chain_config
     Ok(config)

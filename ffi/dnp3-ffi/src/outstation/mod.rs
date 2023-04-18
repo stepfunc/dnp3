@@ -110,7 +110,7 @@ pub unsafe fn outstation_server_create_tls_server(
                 _ => Some(expected_subject_name.to_string()),
             };
 
-            TlsServerConfig::create(
+            TlsServerConfig::full_pki(
                 expected_subject_name,
                 peer_cert_path,
                 local_cert_path,
