@@ -465,7 +465,6 @@ public class MasterExample {
         Request request = new Request();
         request.addAllObjectsHeader(Variation.GROUP40_VAR0);
         channel.read(association, request).toCompletableFuture().get();
-        System.out.println("read success!");
         break;
       }
       case "rmo":
@@ -474,7 +473,6 @@ public class MasterExample {
         request.addAllObjectsHeader(Variation.GROUP10_VAR0);
         request.addAllObjectsHeader(Variation.GROUP40_VAR0);
         channel.read(association, request).toCompletableFuture().get();
-        System.out.println("read success!");
         break;
       }
       case "cmd":
@@ -483,12 +481,10 @@ public class MasterExample {
         CommandSet commands = new CommandSet();
         Group12Var1 control = Group12Var1.fromCode(ControlCode.fromOpType(OpType.LATCH_ON));
         commands.addG12V1U16(ushort(3), control);
-
         channel
                 .operate(association, CommandMode.SELECT_BEFORE_OPERATE, commands)
                 .toCompletableFuture()
                 .get();
-
         // ANCHOR_END: assoc_control
         break;
       }
@@ -498,13 +494,11 @@ public class MasterExample {
       case "lts":
       {
         channel.synchronizeTime(association, TimeSyncMode.LAN).toCompletableFuture().get();
-        System.out.println("Time sync success!");
         break;
       }
       case "nts":
       {
         channel.synchronizeTime(association, TimeSyncMode.NON_LAN).toCompletableFuture().get();
-        System.out.println("Time sync success!");
         break;
       }
       case "wad":
@@ -513,7 +507,6 @@ public class MasterExample {
         request.addG34v1U8(ubyte(3),ushort(5));
         request.addG34v3U16(ushort(5), 2.5f);
         channel.writeDeadBands(association, request).toCompletableFuture().get();
-        System.out.println("Write dead-bands success!");
         break;
       }
       case "fat":
@@ -522,7 +515,6 @@ public class MasterExample {
         request.addTimeAndInterval(ulong(0), uint(86400000));
         request.addAllObjectsHeader(Variation.GROUP20_VAR0);
         channel.sendAndExpectEmptyResponse(association, FunctionCode.FREEZE_AT_TIME, request).toCompletableFuture().get();
-        System.out.println("Freezer-at-time success");
         break;
       }
       case "rda":
@@ -532,7 +524,6 @@ public class MasterExample {
         request.addSpecificAttribute(AttributeVariations.ALL_ATTRIBUTES_REQUEST, ubyte(0));
         channel.read(association, request).toCompletableFuture().get();
         // ANCHOR_END: read_attributes
-        System.out.println("read device attributes success");
         break;
       }
       case "wda":
@@ -542,7 +533,6 @@ public class MasterExample {
         request.addStringAttribute(AttributeVariations.USER_ASSIGNED_LOCATION, ubyte(0), "Mt. Olympus");
         channel.sendAndExpectEmptyResponse(association, FunctionCode.WRITE, request).toCompletableFuture().get();
         // ANCHOR_END: write_attribute
-        System.out.println("write device attribute success");
         break;
       }
       case "ral":
@@ -550,7 +540,6 @@ public class MasterExample {
         Request request = new Request();
         request.addSpecificAttribute(AttributeVariations.LIST_OF_VARIATIONS, ubyte(0));
         channel.read(association, request).toCompletableFuture().get();
-        System.out.println("read list of attribute variations success");
         break;
       }
       case "crt":
@@ -595,7 +584,6 @@ public class MasterExample {
       case "lsr":
       {
         channel.checkLinkStatus(association).toCompletableFuture().get();
-        System.out.println("Link status success!");
         break;
       }
       default:

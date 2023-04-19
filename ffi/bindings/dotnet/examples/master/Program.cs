@@ -453,13 +453,14 @@ class MainClass
         while (true)
         {
             var input = Console.ReadLine();
+            
+            if(input == "x") {
+                return;
+            }
+            
             try
             {
-                if (!RunOneCommand(channel, association, poll, input).GetAwaiter().GetResult())
-                {
-                    // exit command
-                    return;
-                }
+                RunOneCommand(channel, association, poll, input).GetAwaiter().GetResult();
             }
             catch (Exception ex)
             {
@@ -468,75 +469,68 @@ class MainClass
         }
     }
 
-    private static async Task<bool> RunOneCommand(MasterChannel channel, AssociationId association, PollId poll, String input)
+    private static async Task RunOneCommand(MasterChannel channel, AssociationId association, PollId poll, String input)
     {
         switch (input)
         {
-            case "x":
-                return false;
             case "enable":
                 {
                     channel.Enable();
-                    return true;
+                    break;
                 }
             case "disable":
                 {
                     channel.Disable();
-                    return true;
-                }
+                    break;
+                } 
             case "dln":
                 {
                     channel.SetDecodeLevel(DecodeLevel.Nothing());
-                    return true;
+                    break;
                 }
             case "dlv":
                 {
                     channel.SetDecodeLevel(DecodeLevel.Nothing().WithApplication(AppDecodeLevel.ObjectValues));
-                    return true;
+                    break;
                 }
             case "rao":
                 {
                     var request = new Request();
                     request.AddAllObjectsHeader(Variation.Group40Var0);
-                    var result = await channel.Read(association, request);
-                    Console.WriteLine($"Result: {result}");
-                    return true;
+                    await channel.Read(association, request);
+                    break;
                 }
             case "rmo":
                 {
                     var request = new Request();
                     request.AddAllObjectsHeader(Variation.Group10Var0);
                     request.AddAllObjectsHeader(Variation.Group40Var0);
-                    var result = await channel.Read(association, request);
-                    Console.WriteLine($"Result: {result}");
-                    return true;
+                    await channel.Read(association, request);
+                    break;
                 }
             case "cmd":
                 {
                     // ANCHOR: assoc_control
                     var commands = new CommandSet();
                     commands.AddG12V1U8(3, Group12Var1.FromCode(ControlCode.FromOpType(OpType.LatchOn)));
-                    var result = await channel.Operate(association, CommandMode.SelectBeforeOperate, commands);
-                    Console.WriteLine($"Result: {result}");
+                    await channel.Operate(association, CommandMode.SelectBeforeOperate, commands);
                     // ANCHOR_END: assoc_control
-                    return true;
+                    break;
                 }
             case "evt":
                 {
                     channel.DemandPoll(poll);
-                    return true;
-                }
+                    break;                                        
+                }                
             case "lts":
                 {
                     await channel.SynchronizeTime(association, TimeSyncMode.Lan);
-                    Console.WriteLine("Time sync success");
-                    return true;
+                    break;                                        
                 }
             case "nts":
                 {
-                    await channel.SynchronizeTime(association, TimeSyncMode.NonLan);
-                    Console.WriteLine("Time sync success");
-                    return true;
+                    await channel.SynchronizeTime(association, TimeSyncMode.NonLan);                    
+                    break;
                 }
             case "wad":
                 {
@@ -544,17 +538,15 @@ class MainClass
                     request.AddG34v1U8(3, 5);
                     request.AddG34v3U16(4, 2.5f);
                     await channel.WriteDeadBands(association, request);
-                    Console.WriteLine($"Write dead-bands success");
-                    return true;
+                    break;                    
                 }
             case "fat":
                 {
                     var request = new Request();                    
                     request.AddTimeAndInterval(0, 86400000);
                     request.AddAllObjectsHeader(Variation.Group20Var0);
-                    await channel.SendAndExpectEmptyResponse(association, FunctionCode.FreezeAtTime, request);
-                    Console.WriteLine($"Freeze-at-time success");
-                    return true;
+                    await channel.SendAndExpectEmptyResponse(association, FunctionCode.FreezeAtTime, request);                    
+                    break;
                 }
             case "rda":
                 {
@@ -563,7 +555,7 @@ class MainClass
                     request.AddSpecificAttribute(AttributeVariations.AllAttributesRequest, 0);
                     await channel.Read(association, request);
                     // ANCHOR_END: read_attributes
-                    return true;
+                    break;
                 }
             case "wda":
                 {
@@ -571,15 +563,15 @@ class MainClass
                     var request = new Request();
                     request.AddStringAttribute(AttributeVariations.UserAssignedLocation, 0, "Mt. Olympus");
                     await channel.SendAndExpectEmptyResponse(association, FunctionCode.Write, request);
-                    return true;
                     // ANCHOR_END: write_attribute
+                    break;
                 }
             case "ral":
                 {
                     var request = new Request();
                     request.AddSpecificAttribute(AttributeVariations.ListOfVariations, 0);
                     await channel.Read(association, request);
-                    return true;
+                    break;
                 }
             case "rd":
                 {
@@ -590,7 +582,7 @@ class MainClass
                         PrintFileInfo(info);
                     }
                     // ANCHOR_END: read_directory
-                    return true;
+                    break;
                 }
             case "gfi":
                 {
@@ -598,36 +590,36 @@ class MainClass
                     var info = await channel.GetFileInfo(association, ".");
                     PrintFileInfo(info);
                     // ANCHOR_END: get_file_info
-                    return true;
+                    break;
                 }
             case "rf":
                 {
                     // ANCHOR: read_file
                     channel.ReadFile(association, ".", FileReadConfig.Defaults(), new FileReader());
                     // ANCHOR_END: read_file
-                    return true;
+                    break;
                 }
             case "crt":
                 {
                     var delay = await channel.ColdRestart(association);
                     Console.WriteLine($"Restart delay: {delay}");
-                    return true;
+                    break;
                 }
             case "wrt":
                 {
                     var delay = await channel.WarmRestart(association);
                     Console.WriteLine($"Restart delay: {delay}");
-                    return true;
+                    break;
                 }
             case "lsr":
                 {
                     var result = await channel.CheckLinkStatus(association);
                     Console.WriteLine($"Result: {result}");
-                    return true;
+                    break;
                 }
             default:
                 Console.WriteLine("Unknown command");
-                return true;
+                break;
         }
     }
     private static void PrintFileInfo(FileInfo info)
