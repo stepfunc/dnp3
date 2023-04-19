@@ -419,7 +419,7 @@ dependencies = [
 
 [[package]]
 name = "dnp3"
-version = "1.4.0-rc2"
+version = "1.4.0-rc3"
 dependencies = [
  "assert_matches",
  "chrono",
@@ -441,7 +441,7 @@ dependencies = [
 
 [[package]]
 name = "dnp3-bindings"
-version = "1.4.0-rc2"
+version = "1.4.0-rc3"
 dependencies = [
  "dnp3-schema",
  "oo-bindgen",
@@ -451,7 +451,7 @@ dependencies = [
 
 [[package]]
 name = "dnp3-ffi"
-version = "1.4.0-rc2"
+version = "1.4.0-rc3"
 dependencies = [
  "dnp3",
  "dnp3-schema",
@@ -469,7 +469,7 @@ dependencies = [
 
 [[package]]
 name = "dnp3-ffi-java"
-version = "1.4.0-rc2"
+version = "1.4.0-rc3"
 dependencies = [
  "dnp3-ffi",
  "dnp3-schema",
@@ -479,7 +479,7 @@ dependencies = [
 
 [[package]]
 name = "dnp3-schema"
-version = "1.4.0-rc2"
+version = "1.4.0-rc3"
 dependencies = [
  "oo-bindgen",
  "sfio-tokio-ffi",
