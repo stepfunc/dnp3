@@ -1,3 +1,4 @@
+use sfio_rustls_config::NameVerifier;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -71,13 +72,13 @@ pub struct TlsServerConfig {
 }
 
 impl TlsServerConfig {
-    /// Create a TLS server config.
-    ///
-    /// The name field is what gets verified from the peer certificate. Name verification
-    /// can be disabled by first calling [crate::tcp::tls::dangerous::enable_client_name_wildcards]
-    /// and then passing "*" to this function.
+    /// Legacy method of creating a TLS server configuration
+    #[deprecated(
+        since = "1.4.0",
+        note = "Please use `full_pki` or `self_signed` instead"
+    )]
     pub fn new(
-        name: &str,
+        client_subject_name: &str,
         peer_cert_path: &Path,
         local_cert_path: &Path,
         private_key_path: &Path,
@@ -85,23 +86,82 @@ impl TlsServerConfig {
         min_tls_version: MinTlsVersion,
         certificate_mode: CertificateMode,
     ) -> Result<Self, TlsError> {
-        let config = match certificate_mode {
-            CertificateMode::AuthorityBased => sfio_rustls_config::server::authority(
-                min_tls_version.into(),
-                super::dangerous::client_verifier(name),
+        match certificate_mode {
+            CertificateMode::AuthorityBased => Self::full_pki(
+                Some(client_subject_name.to_string()),
                 peer_cert_path,
                 local_cert_path,
                 private_key_path,
                 password,
-            )?,
-            CertificateMode::SelfSigned => sfio_rustls_config::server::self_signed(
-                min_tls_version.into(),
+                min_tls_version,
+            ),
+            CertificateMode::SelfSigned => Self::self_signed(
                 peer_cert_path,
                 local_cert_path,
                 private_key_path,
                 password,
-            )?,
+                min_tls_version,
+            ),
+        }
+    }
+
+    /// Create a TLS server configuration that expects a full PKI with an authority, and possibly
+    /// intermediate CA certificates.
+    ///
+    /// If `client_subject_name` is specified, than the server will verify name is present in the
+    /// SAN extension or in the Common Name of the client certificate.
+    ///
+    /// If `client_subject_name` is set to None, then no client name validate is performed, and
+    /// any authenticated client is allowed.
+    pub fn full_pki(
+        client_subject_name: Option<String>,
+        peer_cert_path: &Path,
+        local_cert_path: &Path,
+        private_key_path: &Path,
+        password: Option<&str>,
+        min_tls_version: MinTlsVersion,
+    ) -> Result<Self, TlsError> {
+        let name_verifier = match client_subject_name {
+            None => NameVerifier::any(),
+            Some(x) => NameVerifier::equal_to(x),
         };
+
+        let config = sfio_rustls_config::server::authority(
+            min_tls_version.into(),
+            name_verifier,
+            peer_cert_path,
+            local_cert_path,
+            private_key_path,
+            password,
+        )?;
+
+        Ok(Self {
+            config: Arc::new(config),
+        })
+    }
+
+    /// Create a TLS server configuration that expects the client to present a single certificate.
+    ///
+    /// In lieu of performing client subject name validation, the server validates:
+    ///
+    /// 1) That the client presents a single certificate
+    /// 2) That the certificate is a byte-for-byte match with the one loaded in `peer_cert_path`.
+    /// 3) That the certificate's Validity (not before / not after) is currently valid.
+    ///
+    pub fn self_signed(
+        peer_cert_path: &Path,
+        local_cert_path: &Path,
+        private_key_path: &Path,
+        password: Option<&str>,
+        min_tls_version: MinTlsVersion,
+    ) -> Result<Self, TlsError> {
+        let config = sfio_rustls_config::server::self_signed(
+            min_tls_version.into(),
+            peer_cert_path,
+            local_cert_path,
+            private_key_path,
+            password,
+        )?;
 
         Ok(Self {
             config: Arc::new(config),

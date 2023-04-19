@@ -1455,10 +1455,13 @@ fn define_tls_server_config(
 ) -> BackTraced<FunctionArgStructHandle> {
     let min_tls_version = Name::create("min_tls_version")?;
     let certificate_mode = Name::create("certificate_mode")?;
+    let allow_client_name_wildcard = Name::create("allow_client_name_wildcard")?;
 
     let tls_server_config = lib.declare_function_argument_struct("tls_server_config")?;
     let tls_server_config = lib.define_function_argument_struct(tls_server_config)?
-        .add("dns_name", StringType, "Expected name to validate in the presented certificate (only in {enum:certificate_mode.authority_based} mode)")?
+        .add("dns_name", StringType,
+             doc("Subject name which is verified in the presented client certificate, from the SAN extension or in the common name field.")
+            .warning("This argument is only used when used with {enum:certificate_mode.authority_based} "))?
         .add(
             "peer_cert_path",
             StringType,
@@ -1472,7 +1475,7 @@ fn define_tls_server_config(
         .add(
             "private_key_path",
             StringType,
-            "Path to the the PEM-encoded private key",
+            "Path to the PEM-encoded private key",
         )?
         .add(
             "password",
@@ -1485,11 +1488,13 @@ fn define_tls_server_config(
             "Minimum TLS version allowed",
         )?
         .add(certificate_mode.clone(), shared.certificate_mode.clone(), "Certificate validation mode")?
+        .add(allow_client_name_wildcard.clone(), Primitive::Bool, "If set to true, a '*' may be used for {struct:tls_server_config.dns_name} to allow any authenticated client to connect")?
         .doc("TLS server configuration")?
         .end_fields()?
         .begin_initializer("init", InitializerType::Normal, "construct the configuration with defaults")?
         .default_variant(&min_tls_version, "v12")?
         .default_variant(&certificate_mode, "authority_based")?
+        .default(&allow_client_name_wildcard, false)?
         .end_initializer()?
         .build()?;
 

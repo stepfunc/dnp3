@@ -336,10 +336,13 @@ fn define_tls_types(lib: &mut LibraryBuilder) -> BackTraced<TlsTypes> {
 
     let min_tls_version_name = Name::create("min_tls_version")?;
     let certificate_mode_name = Name::create("certificate_mode")?;
+    let allow_server_name_wildcard = Name::create("allow_server_name_wildcard")?;
 
     let tls_client_config = lib.declare_function_argument_struct("tls_client_config")?;
     let tls_client_config = lib.define_function_argument_struct(tls_client_config)?
-        .add("dns_name", StringType, "Expected name to validate in the presented certificate (only in {enum:certificate_mode.authority_based} mode)")?
+        .add("dns_name", StringType,
+             doc("Subject name which is verified in the presented server certificate, from the SAN extension or in the common name field.")
+                 .warning("This argument is only used when used with {enum:certificate_mode.authority_based}"))?
         .add(
             "peer_cert_path",
             StringType,
@@ -366,11 +369,13 @@ fn define_tls_types(lib: &mut LibraryBuilder) -> BackTraced<TlsTypes> {
             "Minimum TLS version allowed",
         )?
         .add(certificate_mode_name.clone(), certificate_mode.clone(), "Certificate validation mode")?
+        .add(allow_server_name_wildcard.clone(), Primitive::Bool, "If set to true, a '*' may be used for {struct:tls_client_config.dns_name} to bypass server name validation")?
         .doc("TLS client configuration")?
         .end_fields()?
         .begin_initializer("init", InitializerType::Normal, "construct the configuration with defaults")?
         .default_variant(&min_tls_version_name, "v12")?
         .default_variant(&certificate_mode_name, "authority_based")?
+        .default(&allow_server_name_wildcard, false)?
         .end_initializer()?
         .build()?;
 
