@@ -8,7 +8,7 @@ slug: /api/master/association/controls
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-You can construct arbitrary sequences of controls using the `Commands` builder class. You can then send these commands to a particular outstation using the association id.
+You can construct arbitrary sequences of binary and analog output headers using a builder class. You can then send these commands to a particular outstation using the association id.
 
 
 <Tabs
@@ -27,9 +27,6 @@ values={[
 {{#include ../dnp3/examples/master.rs:assoc_control}}
 ```
 
-:::note
-The Rust API calls the builder class 'CommandBuilder'.
-:::
 </TabItem>
 <TabItem value="C">
 
@@ -59,11 +56,15 @@ The Rust API calls the builder class 'CommandBuilder'.
 <TabItem value="C#">
 
 ```csharp
+
 {{#include ../ffi/bindings/dotnet/examples/master/Program.cs:assoc_control}}
 ```
 
 </TabItem>
 </Tabs>
 
-The asynchronous operation will return a single `CommandResult` enum that indicates the result. `CommandResult.Success` means the outstation responded with `Success` for all controls in the message. Consult the language-specific documentation for the meaning
-of each error code.
+Calling `operate` begins an asynchronous operation that will complete successfully or with an error code.
+
+The request will only succeed if the outstation returns `CommandStatus.Success` for each of the requested controls.
+
+Consult the language-specific documentation for the meaning of each error code.
