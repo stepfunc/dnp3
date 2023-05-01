@@ -74,7 +74,7 @@ pub struct TlsServerConfig {
 impl TlsServerConfig {
     /// Legacy method of creating a TLS server configuration
     #[deprecated(
-        since = "1.4.0",
+        since = "1.4.1",
         note = "Please use `full_pki` or `self_signed` instead"
     )]
     pub fn new(

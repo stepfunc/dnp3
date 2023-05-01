@@ -1,3 +1,6 @@
+### 1.4.1 ###
+* :bug: Bump rustls to 0.21.1 to resolve [#300](https://github.com/stepfunc/dnp3/issues/300).
+
 ### 1.4.0 ###
 * :wrench: Update to rustls 0.21.0 which allows peer names with IP addresses in the SAN extension.
 * :wrench: Move common TLS configuration to its own crate shared with our Modbus library.
