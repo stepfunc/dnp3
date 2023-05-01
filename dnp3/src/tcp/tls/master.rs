@@ -80,7 +80,7 @@ pub fn spawn_master_tls_client_2(
 impl TlsClientConfig {
     /// Legacy method for creating a client TLS configuration
     #[deprecated(
-        since = "1.4.0",
+        since = "1.4.1",
         note = "Please use `full_pki` or `self_signed` instead"
     )]
     pub fn new(
