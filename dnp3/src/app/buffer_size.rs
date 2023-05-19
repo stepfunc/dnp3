@@ -2,6 +2,7 @@ use crate::util::buffer::Buffer;
 
 /// Validated buffer size for use in configuration structs
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serialization", derive(serde::Serialize, serde::Deserialize))]
 pub struct BufferSize<const MIN_SIZE: usize = 249, const DEFAULT_SIZE: usize = 2048> {
     size: usize,
 }

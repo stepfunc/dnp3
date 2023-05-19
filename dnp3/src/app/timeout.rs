@@ -3,6 +3,8 @@ use std::time::Duration;
 /// A wrapper around a std::time::Duration
 /// that ensures values are in the range `[1ms .. 1hour]`
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serialization", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serialization", serde(transparent))]
 pub struct Timeout {
     pub(crate) value: Duration,
 }
