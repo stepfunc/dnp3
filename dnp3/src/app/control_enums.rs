@@ -14,6 +14,10 @@ use scursor::{WriteCursor, WriteError};
 
 /// Field is used in conjunction with the `OpType` field to specify a control operation
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum TripCloseCode {
     ///  not specified (value == 0)
     Nul,
@@ -53,6 +57,10 @@ impl TripCloseCode {
 
 /// Field used in conjunction with the `TCC` field to specify a control operation
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum OpType {
     ///  not specified (value == 0)
     Nul,
@@ -96,6 +104,10 @@ impl OpType {
 
 /// Enumeration received from an outstation in response to command request
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum CommandStatus {
     ///  command was accepted, initiated, or queued (value == 0)
     Success,

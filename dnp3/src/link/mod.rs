@@ -41,7 +41,10 @@ pub enum LinkErrorMode {
 /// Certain special addresses are not allowed by the standard to be used
 /// as endpoint addresses.
 #[derive(Debug, Copy, Clone, PartialEq, PartialOrd, Eq, Ord)]
-#[cfg_attr(feature = "serialization", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct EndpointAddress {
     address: u16,
 }

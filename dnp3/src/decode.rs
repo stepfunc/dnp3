@@ -1,6 +1,9 @@
 /// Controls the decoding of transmitted and received data at the application, transport, and link layer
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serialization", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct DecodeLevel {
     /// Controls application layer decoding
     pub application: AppDecodeLevel,
@@ -14,7 +17,10 @@ pub struct DecodeLevel {
 
 /// Controls how transmitted and received application-layer fragments are decoded at the INFO log level
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serialization", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum AppDecodeLevel {
     /// Decode nothing
     Nothing,
@@ -28,7 +34,10 @@ pub enum AppDecodeLevel {
 
 /// Controls how transmitted and received transport segments are decoded at the INFO log level
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serialization", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum TransportDecodeLevel {
     /// Decode nothing
     Nothing,
@@ -40,7 +49,10 @@ pub enum TransportDecodeLevel {
 
 /// Controls how transmitted and received link frames are decoded at the INFO log level
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serialization", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum LinkDecodeLevel {
     /// Decode nothing
     Nothing,
@@ -52,7 +64,10 @@ pub enum LinkDecodeLevel {
 
 /// Controls how data transmitted at the physical layer (TCP, serial, etc) is logged
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serialization", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum PhysDecodeLevel {
     /// Log nothing
     Nothing,

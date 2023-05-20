@@ -72,9 +72,14 @@ class EnumModule(enums: List[EnumModel]) extends Module {
         "#[derive(Copy, Clone, Debug, PartialEq, Eq)]"
       }
 
+      def serde = {
+        "#[cfg_attr(feature = \"serialization\", derive(serde::Serialize, serde::Deserialize))]"
+      }
+
 
       model.comments.map(commented).iterator ++
         derives.eol ++
+        serde.eol ++
         bracket(s"pub enum ${model.name}") {
           if(model.captureUnknownValues) {
             values ++ Iterator(commented("captures any value not defined in the enumeration"), "Unknown(u8),")

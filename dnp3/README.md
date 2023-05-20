@@ -24,6 +24,9 @@ Default features can be disabled at compile time:
 * `tls` - Build the library with support for mutually authenticated TLS
 * `serial` - Build the library with support for serial ports
 
+Optional features that may be enabled at compile time:
+* `serialize` - Add [serde](https://docs.rs/crate/serde/latest) de(serialization) support for public configuration types.
+
 # License
 
 This crate is made available under a non-commercial / non-production license.

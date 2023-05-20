@@ -43,7 +43,10 @@ pub enum EventClass {
 
 /// Controls which types are reported during a class 0 READ
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serialization", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct ClassZeroConfig {
     /// If true, Binary Inputs are reported in Class 0 READ requests
     pub binary: bool,
@@ -109,7 +112,10 @@ impl Default for ClassZeroConfig {
 ///
 /// A value of zero means that events will not be buffered for that type.
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-#[cfg_attr(feature = "serialization", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct EventBufferConfig {
     /// maximum number of binary input events (g2)
     pub max_binary: u16,
