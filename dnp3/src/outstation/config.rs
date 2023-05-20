@@ -55,8 +55,10 @@ pub struct OutstationConfig {
     /// event buffers configuration
     pub event_buffer_config: EventBufferConfig,
     /// buffer size for transmitted solicited responses
+    #[cfg_attr(feature = "serialization", serde(default))]
     pub solicited_buffer_size: BufferSize,
     /// buffer size for transmitted unsolicited responses
+    #[cfg_attr(feature = "serialization", serde(default))]
     pub unsolicited_buffer_size: BufferSize,
     /// buffer size for received requests, i.e. the transport reassembly buffer
     pub rx_buffer_size: BufferSize,

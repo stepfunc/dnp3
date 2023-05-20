@@ -6,8 +6,17 @@ use crate::util::buffer::Buffer;
     feature = "serialization",
     derive(serde::Serialize, serde::Deserialize)
 )]
-pub struct BufferSize<const MIN_SIZE: usize = 249, const DEFAULT_SIZE: usize = 2048> {
-    size: usize,
+#[cfg_attr(feature = "serialization", serde(try_from = "usize"))]
+pub struct BufferSize<const MIN_SIZE: usize = 249, const DEFAULT_SIZE: usize = 2048>(usize);
+
+impl<const MIN_SIZE: usize, const DEFAULT_SIZE: usize> TryFrom<usize>
+    for BufferSize<MIN_SIZE, DEFAULT_SIZE>
+{
+    type Error = BufferSizeError;
+
+    fn try_from(value: usize) -> Result<Self, Self::Error> {
+        Self::new(value)
+    }
 }
 
 /// Error type returned for invalid buffer sizes
@@ -24,17 +33,17 @@ impl<const MIN_SIZE: usize, const DEFAULT_SIZE: usize> BufferSize<MIN_SIZE, DEFA
     pub const DEFAULT: usize = DEFAULT_SIZE;
 
     pub(crate) fn create_buffer(&self) -> Buffer {
-        Buffer::new(self.size)
+        Buffer::new(self.0)
     }
 
     /// get the underlying value
     pub fn value(&self) -> usize {
-        self.size
+        self.0
     }
 
     /// construct a [`BufferSize`] with the minimum value
     pub fn min() -> Self {
-        Self { size: Self::MIN }
+        Self(Self::MIN)
     }
 
     /// attempt to construct a [`BufferSize`]
@@ -42,7 +51,7 @@ impl<const MIN_SIZE: usize, const DEFAULT_SIZE: usize> BufferSize<MIN_SIZE, DEFA
         if size < Self::MIN {
             return Err(BufferSizeError::TooSmall(size, Self::MIN));
         }
-        Ok(Self { size })
+        Ok(Self(size))
     }
 }
 
@@ -50,9 +59,7 @@ impl<const MIN_SIZE: usize, const DEFAULT_SIZE: usize> Default
     for BufferSize<MIN_SIZE, DEFAULT_SIZE>
 {
     fn default() -> Self {
-        Self {
-            size: Self::DEFAULT,
-        }
+        Self(Self::DEFAULT)
     }
 }
 
@@ -68,3 +75,17 @@ impl std::fmt::Display for BufferSizeError {
 }
 
 impl std::error::Error for BufferSizeError {}
+
+#[cfg(test)]
+mod test {
+
+    #[test]
+    #[cfg(feature = "serialization")]
+    fn deserialization_enforces_min_size() {
+        assert!(serde_json::from_str::<super::BufferSize>("248").is_err());
+        assert_eq!(
+            249,
+            serde_json::from_str::<super::BufferSize>("249").unwrap().0
+        );
+    }
+}
