@@ -35,7 +35,7 @@ jobs:
       matrix:
         feature-args:
           - "--no-default-features"
-          - "--no-default-features serialization"
+          - "--no-default-features --features serialization"
           - "--no-default-features --features serial"
           - "--no-default-features --features tls"
     runs-on: ubuntu-latest
