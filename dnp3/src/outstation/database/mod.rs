@@ -118,20 +118,28 @@ impl Default for ClassZeroConfig {
 )]
 pub struct EventBufferConfig {
     /// maximum number of binary input events (g2)
+    #[cfg_attr(feature = "serialization", serde(default))]
     pub max_binary: u16,
     /// maximum number of double bit binary input events (g4)
+    #[cfg_attr(feature = "serialization", serde(default))]
     pub max_double_binary: u16,
     /// maximum number of binary output status events (g11)
+    #[cfg_attr(feature = "serialization", serde(default))]
     pub max_binary_output_status: u16,
     /// maximum number of counter events (g22)
+    #[cfg_attr(feature = "serialization", serde(default))]
     pub max_counter: u16,
     /// maximum number of frozen counter events (g23)
+    #[cfg_attr(feature = "serialization", serde(default))]
     pub max_frozen_counter: u16,
     /// maximum number of analog events (g32)
+    #[cfg_attr(feature = "serialization", serde(default))]
     pub max_analog: u16,
     /// maximum number of analog output status events (g42)
+    #[cfg_attr(feature = "serialization", serde(default))]
     pub max_analog_output_status: u16,
     /// maximum number of octet string events (g111)
+    #[cfg_attr(feature = "serialization", serde(default))]
     pub max_octet_string: u16,
 }
 

@@ -45,9 +45,8 @@ pub enum LinkErrorMode {
     feature = "serialization",
     derive(serde::Serialize, serde::Deserialize)
 )]
-pub struct EndpointAddress {
-    address: u16,
-}
+#[cfg_attr(feature = "serialization", serde(try_from = "u16"))]
+pub struct EndpointAddress(u16);
 
 /// The specified address is special and may not be used as an EndpointAddress
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
@@ -76,11 +75,11 @@ impl EndpointAddress {
 
     /// get the raw u16 value of the address
     pub fn raw_value(&self) -> u16 {
-        self.address
+        self.0
     }
 
     pub(crate) const fn raw(address: u16) -> EndpointAddress {
-        EndpointAddress { address }
+        EndpointAddress(address)
     }
 
     pub(crate) fn wrap(&self) -> AnyAddress {
@@ -101,7 +100,7 @@ impl TryFrom<u16> for EndpointAddress {
 
 impl std::fmt::Display for EndpointAddress {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{}", self.address)
+        write!(f, "{}", self.0)
     }
 }
 

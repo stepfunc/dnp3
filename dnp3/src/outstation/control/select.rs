@@ -68,7 +68,7 @@ impl SelectState {
                 return Err(CommandStatus::Timeout);
             }
             Some(elapsed) => {
-                if elapsed > timeout.value {
+                if elapsed > timeout.0 {
                     tracing::warn!("received valid OPERATE after SELECT timeout");
                     return Err(CommandStatus::Timeout);
                 }

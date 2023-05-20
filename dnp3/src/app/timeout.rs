@@ -7,16 +7,20 @@ use std::time::Duration;
     feature = "serialization",
     derive(serde::Serialize, serde::Deserialize)
 )]
-#[cfg_attr(feature = "serialization", serde(transparent))]
-pub struct Timeout {
-    pub(crate) value: Duration,
-}
+#[cfg_attr(feature = "serialization", serde(try_from = "Duration"))]
+pub struct Timeout(pub(crate) Duration);
 
 impl Default for Timeout {
     fn default() -> Self {
-        Self {
-            value: Duration::from_secs(5),
-        }
+        Self(Duration::from_secs(5))
+    }
+}
+
+impl TryFrom<Duration> for Timeout {
+    type Error = TimeoutRangeError;
+
+    fn try_from(value: Duration) -> Result<Self, Self::Error> {
+        Timeout::from_duration(value)
     }
 }
 
@@ -61,19 +65,19 @@ impl Timeout {
             return Err(TimeoutRangeError::TooLarge(value));
         }
 
-        Ok(Self { value })
+        Ok(Self(value))
     }
 
     pub(crate) fn deadline_from_now(self) -> tokio::time::Instant {
         // if this panics due to overflow we have bigger problems than the panic
         // it means the tim value being returned by now() is WAAAY too big
-        tokio::time::Instant::now() + self.value
+        tokio::time::Instant::now() + self.0
     }
 }
 
 impl std::fmt::Display for Timeout {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "{} ms", self.value.as_millis())
+        write!(f, "{} ms", self.0.as_millis())
     }
 }
 
