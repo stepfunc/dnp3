@@ -11,6 +11,10 @@ use tokio_rustls::rustls;
 /// This validation always occurs **after** the handshake signature has been
 /// verified.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum CertificateMode {
     /// Validates the peer certificate against one or more configured trust anchors
     ///
@@ -79,6 +83,10 @@ impl std::error::Error for TlsError {}
 
 /// Minimum TLS version to allow
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum MinTlsVersion {
     /// TLS 1.2
     V12,

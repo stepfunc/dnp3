@@ -27,6 +27,10 @@ pub(crate) mod constant {
 /// Controls how errors in parsed link-layer frames are handled. This behavior
 /// is configurable for physical layers with built-in error correction like TCP
 /// as the connection might be through a terminal server.
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum LinkErrorMode {
     /// Framing errors are discarded. The link-layer parser is reset on any error, and the

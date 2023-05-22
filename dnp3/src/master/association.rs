@@ -27,37 +27,56 @@ use tokio::time::Instant;
 
 /// Configuration for a master association
 #[derive(Debug, Copy, Clone)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct AssociationConfig {
     /// timeout for responses on this association
+    #[cfg_attr(feature = "serialization", serde(default))]
     pub response_timeout: Timeout,
     /// The event classes to disable on startup
+    #[cfg_attr(feature = "serialization", serde(default = "EventClasses::all"))]
     pub disable_unsol_classes: EventClasses,
     /// The event classes to enable on startup
+    #[cfg_attr(feature = "serialization", serde(default = "EventClasses::all"))]
     pub enable_unsol_classes: EventClasses,
     /// Startup integrity classes to ask on master startup and when an outstation restart is detected.
     ///
     /// For conformance, this should be Class 1230.
+    #[cfg_attr(feature = "serialization", serde(default = "Classes::all"))]
     pub startup_integrity_classes: Classes,
     /// automatic time synchronization based on NEED_TIME IIN bit
+    #[cfg_attr(feature = "serialization", serde(default))]
     pub auto_time_sync: Option<TimeSyncProcedure>,
     /// automatic tasks retry strategy
+    #[cfg_attr(feature = "serialization", serde(default))]
     pub auto_tasks_retry_strategy: RetryStrategy,
     /// Keep-alive timeout
     ///
     /// When no bytes are received within this timeout value,
     /// a `REQUEST_LINK_STATUS` request is sent
+    #[cfg_attr(feature = "serialization", serde(default))]
     pub keep_alive_timeout: Option<Duration>,
     /// Automatic integrity scan when a `EVENT_BUFFER_OVERFLOW` is detected
+    #[cfg_attr(feature = "serialization", serde(default))]
     pub auto_integrity_scan_on_buffer_overflow: bool,
     /// Classes to perform an automatic class scan when their IIN bit is detected
+    #[cfg_attr(feature = "serialization", serde(default = "EventClasses::none"))]
     pub event_scan_on_events_available: EventClasses,
     /// The maximum number of user requests (e.g. commands, adhoc reads, etc) that will be queued
     /// before back-pressure is applied by failing requests with TaskError::TooManyRequests
+    #[cfg_attr(
+        feature = "serialization",
+        serde(default = "AssociationConfig::default_max_queued_user_requests")
+    )]
     pub max_queued_user_requests: usize,
 }
 
 impl AssociationConfig {
-    const DEFAULT_MAX_QUEUED_USER_REQUESTS: usize = 16;
+    const fn default_max_queued_user_requests() -> usize {
+        16
+    }
 
     /// Construct an `AssociationConfig` specifying the unsolicited, integrity, and auto event scan behaviors
     ///
@@ -78,7 +97,7 @@ impl AssociationConfig {
             keep_alive_timeout: None,
             auto_integrity_scan_on_buffer_overflow: false,
             event_scan_on_events_available,
-            max_queued_user_requests: Self::DEFAULT_MAX_QUEUED_USER_REQUESTS,
+            max_queued_user_requests: Self::default_max_queued_user_requests(),
         }
     }
 
@@ -95,7 +114,7 @@ impl AssociationConfig {
             keep_alive_timeout: None,
             auto_integrity_scan_on_buffer_overflow: false,
             event_scan_on_events_available: EventClasses::none(),
-            max_queued_user_requests: Self::DEFAULT_MAX_QUEUED_USER_REQUESTS,
+            max_queued_user_requests: Self::default_max_queued_user_requests(),
         }
     }
 }
@@ -112,7 +131,7 @@ impl Default for AssociationConfig {
             keep_alive_timeout: None,
             auto_integrity_scan_on_buffer_overflow: true,
             event_scan_on_events_available: EventClasses::none(),
-            max_queued_user_requests: Self::DEFAULT_MAX_QUEUED_USER_REQUESTS,
+            max_queued_user_requests: Self::default_max_queued_user_requests(),
         }
     }
 }

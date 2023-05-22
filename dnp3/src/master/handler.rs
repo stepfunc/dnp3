@@ -47,18 +47,25 @@ pub struct AssociationHandle {
 
 /// Configuration for a MasterChannel
 #[derive(Copy, Clone, Debug)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct MasterChannelConfig {
     /// Local DNP3 master address
     pub master_address: EndpointAddress,
     /// Decode-level for DNP3 objects
+    #[cfg_attr(feature = "serialization", serde(default))]
     pub decode_level: DecodeLevel,
     /// TX buffer size
     ///
     /// Must be at least 249.
+    #[cfg_attr(feature = "serialization", serde(default))]
     pub tx_buffer_size: BufferSize<249, 2048>,
     /// RX buffer size
     ///
     /// Must be at least 2048.
+    #[cfg_attr(feature = "serialization", serde(default))]
     pub rx_buffer_size: BufferSize<2048, 2048>,
 }
 

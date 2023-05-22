@@ -6,12 +6,16 @@
 )]
 pub struct DecodeLevel {
     /// Controls application layer decoding
+    #[cfg_attr(feature = "serialization", serde(default))]
     pub application: AppDecodeLevel,
     /// Controls transport layer decoding
+    #[cfg_attr(feature = "serialization", serde(default))]
     pub transport: TransportDecodeLevel,
     /// Controls link layer decoding
+    #[cfg_attr(feature = "serialization", serde(default))]
     pub link: LinkDecodeLevel,
     /// Controls the logging of physical layer read/write
+    #[cfg_attr(feature = "serialization", serde(default))]
     pub physical: PhysDecodeLevel,
 }
 
@@ -32,6 +36,12 @@ pub enum AppDecodeLevel {
     ObjectValues,
 }
 
+impl Default for AppDecodeLevel {
+    fn default() -> Self {
+        Self::Nothing
+    }
+}
+
 /// Controls how transmitted and received transport segments are decoded at the INFO log level
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(
@@ -45,6 +55,12 @@ pub enum TransportDecodeLevel {
     Header,
     /// Decode the header and the raw payload as hexadecimal
     Payload,
+}
+
+impl Default for TransportDecodeLevel {
+    fn default() -> Self {
+        Self::Nothing
+    }
 }
 
 /// Controls how transmitted and received link frames are decoded at the INFO log level
@@ -62,6 +78,12 @@ pub enum LinkDecodeLevel {
     Payload,
 }
 
+impl Default for LinkDecodeLevel {
+    fn default() -> Self {
+        Self::Nothing
+    }
+}
+
 /// Controls how data transmitted at the physical layer (TCP, serial, etc) is logged
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(
@@ -75,6 +97,12 @@ pub enum PhysDecodeLevel {
     Length,
     /// Log the length and the actual data that is sent and received
     Data,
+}
+
+impl Default for PhysDecodeLevel {
+    fn default() -> Self {
+        Self::Nothing
+    }
 }
 
 impl DecodeLevel {
