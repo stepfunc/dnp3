@@ -32,6 +32,10 @@ pub enum EventMode {
 
 /// Event class (1/2/3) assignment
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum EventClass {
     /// Class 1 data per the protocol specification
     Class1,
