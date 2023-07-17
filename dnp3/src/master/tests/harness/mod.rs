@@ -47,8 +47,9 @@ pub(crate) async fn create_association(mut config: AssociationConfig) -> TestHar
 
     // Create the association
     let handler = CountHandler::new();
-    let info = CountAssociationInformation::new();
+    let (info, assoc_events) = AssociationInformationEventHandler::pair();
     let num_requests = handler.num_requests.clone();
+
     let association = master
         .add_association(
             outstation_address,
@@ -65,6 +66,7 @@ pub(crate) async fn create_association(mut config: AssociationConfig) -> TestHar
         master,
         association,
         num_requests,
+        assoc_events,
         io: io_handle,
     }
 }
@@ -91,71 +93,69 @@ impl ReadHandler for CountHandler {
     }
 }
 
-struct CountAssociationInformationInner {
-    last_start: Option<crate::app::Sequence>,
-    num_success: u32,
-    num_fail: u32,
-    num_unsol: u32,
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub(crate) enum AssocInfoEvent {
+    TaskStart(
+        crate::master::TaskType,
+        crate::app::FunctionCode,
+        crate::app::Sequence,
+    ),
+    TaskSuccess(
+        crate::master::TaskType,
+        crate::app::FunctionCode,
+        crate::app::Sequence,
+    ),
+    TaskFailure(crate::master::TaskType, crate::master::TaskError),
+    Unsolicited(bool, crate::app::Sequence),
 }
 
-struct CountAssociationInformation {
-    inner: Mutex<CountAssociationInformationInner>,
-}
+pub(crate) struct AssocInfoEventQueue(Arc<Mutex<Vec<AssocInfoEvent>>>);
 
-impl CountAssociationInformation {
-    fn new() -> Self {
-        Self {
-            inner: Mutex::new(CountAssociationInformationInner {
-                last_start: None,
-                num_success: 0,
-                num_fail: 0,
-                num_unsol: 0,
-            }),
-        }
+impl AssocInfoEventQueue {
+    pub(crate) fn pop(&mut self) -> Vec<AssocInfoEvent> {
+        let mut guard = self.0.lock().unwrap();
+        guard.drain(..).collect()
     }
 }
 
-impl AssociationInformation for CountAssociationInformation {
+struct AssociationInformationEventHandler(Arc<Mutex<Vec<AssocInfoEvent>>>);
+
+impl AssociationInformationEventHandler {
+    fn pair() -> (Self, AssocInfoEventQueue) {
+        let events: Arc<Mutex<Vec<AssocInfoEvent>>> = Default::default();
+        (Self(events.clone()), AssocInfoEventQueue(events))
+    }
+
+    fn push(&mut self, event: AssocInfoEvent) {
+        self.0.lock().unwrap().push(event);
+    }
+}
+
+impl AssociationInformation for AssociationInformationEventHandler {
     fn task_start(
         &mut self,
-        _task_type: crate::master::TaskType,
-        _fc: crate::app::FunctionCode,
+        task_type: crate::master::TaskType,
+        fc: crate::app::FunctionCode,
         seq: crate::app::Sequence,
     ) {
-        let mut inner = self.inner.lock().unwrap();
-
-        assert!(inner.last_start.is_none());
-
-        inner.last_start = Some(seq);
+        self.push(AssocInfoEvent::TaskStart(task_type, fc, seq));
     }
 
     fn task_success(
         &mut self,
-        _task_type: crate::master::TaskType,
-        _fc: crate::app::FunctionCode,
+        task_type: crate::master::TaskType,
+        fc: crate::app::FunctionCode,
         seq: crate::app::Sequence,
     ) {
-        let mut inner = self.inner.lock().unwrap();
-
-        assert_eq!(inner.last_start, Some(seq));
-
-        inner.num_success += 1;
-        inner.last_start = None;
+        self.push(AssocInfoEvent::TaskSuccess(task_type, fc, seq));
     }
 
-    fn task_fail(&mut self, _task_type: crate::master::TaskType, _error: crate::master::TaskError) {
-        let mut inner = self.inner.lock().unwrap();
-
-        assert!(inner.last_start.is_some());
-
-        inner.num_fail += 1;
-        inner.last_start = None;
+    fn task_fail(&mut self, task_type: crate::master::TaskType, error: crate::master::TaskError) {
+        self.push(AssocInfoEvent::TaskFailure(task_type, error));
     }
 
-    fn unsolicited_response(&mut self, _is_duplicate: bool, _seq: crate::app::Sequence) {
-        let mut inner = self.inner.lock().unwrap();
-
-        inner.num_unsol += 1;
+    fn unsolicited_response(&mut self, is_duplicate: bool, seq: crate::app::Sequence) {
+        self.push(AssocInfoEvent::Unsolicited(is_duplicate, seq));
     }
 }
 
@@ -164,6 +164,7 @@ pub(crate) struct TestHarness {
     pub(crate) master: MasterChannel,
     pub(crate) association: AssociationHandle,
     pub(crate) num_requests: Arc<AtomicU64>,
+    pub(crate) assoc_events: AssocInfoEventQueue,
     pub(crate) io: sfio_tokio_mock_io::Handle,
 }
 

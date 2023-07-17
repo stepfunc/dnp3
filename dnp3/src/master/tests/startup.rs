@@ -1,12 +1,13 @@
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 
-use crate::app::RetryStrategy;
 use crate::app::Sequence;
+use crate::app::{FunctionCode, RetryStrategy};
 use crate::app::{Iin, Iin1, Iin2};
 use crate::master::association::AssociationConfig;
 use crate::master::request::{Classes, EventClasses};
-use crate::master::ReadRequest;
+use crate::master::tests::harness::AssocInfoEvent;
+use crate::master::{ReadRequest, TaskType};
 
 use super::harness::create_association;
 use super::harness::requests::*;
@@ -17,15 +18,67 @@ async fn master_startup_procedure() {
     let mut seq = Sequence::default();
     let mut harness = create_association(config).await;
 
+    assert_eq!(
+        harness.assoc_events.pop().as_slice(),
+        &[AssocInfoEvent::TaskStart(
+            TaskType::DisableUnsolicited,
+            FunctionCode::DisableUnsolicited,
+            Sequence::new(1)
+        )]
+    );
+
     harness
         .expect_write_and_respond(disable_unsol_request(seq), empty_response(seq.increment()))
         .await;
+
+    assert_eq!(
+        harness.assoc_events.pop().as_slice(),
+        &[
+            AssocInfoEvent::TaskSuccess(
+                TaskType::DisableUnsolicited,
+                FunctionCode::DisableUnsolicited,
+                Sequence::new(1)
+            ),
+            AssocInfoEvent::TaskStart(
+                TaskType::StartupIntegrity,
+                FunctionCode::Read,
+                Sequence::new(2)
+            ),
+        ]
+    );
+
     harness
         .expect_write_and_respond(integrity_poll_request(seq), empty_response(seq.increment()))
         .await;
+
+    assert_eq!(
+        harness.assoc_events.pop().as_slice(),
+        &[
+            AssocInfoEvent::TaskSuccess(
+                TaskType::StartupIntegrity,
+                FunctionCode::Read,
+                Sequence::new(2)
+            ),
+            AssocInfoEvent::TaskStart(
+                TaskType::EnableUnsolicited,
+                FunctionCode::EnableUnsolicited,
+                Sequence::new(3)
+            ),
+        ]
+    );
+
     harness
         .expect_write_and_respond(enable_unsol_request(seq), empty_response(seq.increment()))
         .await;
+
+    assert_eq!(
+        harness.assoc_events.pop().as_slice(),
+        &[AssocInfoEvent::TaskSuccess(
+            TaskType::EnableUnsolicited,
+            FunctionCode::EnableUnsolicited,
+            Sequence::new(3)
+        ),]
+    );
 }
 
 #[tokio::test]
