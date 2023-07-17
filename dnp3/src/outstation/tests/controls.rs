@@ -208,8 +208,7 @@ async fn select_can_time_out() {
     ]);
 
     tokio::time::pause();
-    tokio::time::advance(get_default_config().select_timeout.value + Duration::from_millis(1))
-        .await;
+    tokio::time::advance(get_default_config().select_timeout.0 + Duration::from_millis(1)).await;
 
     // ------------ operate -------------
 

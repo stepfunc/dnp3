@@ -1,18 +1,30 @@
 /// Controls the decoding of transmitted and received data at the application, transport, and link layer
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct DecodeLevel {
     /// Controls application layer decoding
+    #[cfg_attr(feature = "serialization", serde(default))]
     pub application: AppDecodeLevel,
     /// Controls transport layer decoding
+    #[cfg_attr(feature = "serialization", serde(default))]
     pub transport: TransportDecodeLevel,
     /// Controls link layer decoding
+    #[cfg_attr(feature = "serialization", serde(default))]
     pub link: LinkDecodeLevel,
     /// Controls the logging of physical layer read/write
+    #[cfg_attr(feature = "serialization", serde(default))]
     pub physical: PhysDecodeLevel,
 }
 
 /// Controls how transmitted and received application-layer fragments are decoded at the INFO log level
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum AppDecodeLevel {
     /// Decode nothing
     Nothing,
@@ -24,8 +36,18 @@ pub enum AppDecodeLevel {
     ObjectValues,
 }
 
+impl Default for AppDecodeLevel {
+    fn default() -> Self {
+        Self::Nothing
+    }
+}
+
 /// Controls how transmitted and received transport segments are decoded at the INFO log level
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum TransportDecodeLevel {
     /// Decode nothing
     Nothing,
@@ -35,8 +57,18 @@ pub enum TransportDecodeLevel {
     Payload,
 }
 
+impl Default for TransportDecodeLevel {
+    fn default() -> Self {
+        Self::Nothing
+    }
+}
+
 /// Controls how transmitted and received link frames are decoded at the INFO log level
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum LinkDecodeLevel {
     /// Decode nothing
     Nothing,
@@ -46,8 +78,18 @@ pub enum LinkDecodeLevel {
     Payload,
 }
 
+impl Default for LinkDecodeLevel {
+    fn default() -> Self {
+        Self::Nothing
+    }
+}
+
 /// Controls how data transmitted at the physical layer (TCP, serial, etc) is logged
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum PhysDecodeLevel {
     /// Log nothing
     Nothing,
@@ -55,6 +97,12 @@ pub enum PhysDecodeLevel {
     Length,
     /// Log the length and the actual data that is sent and received
     Data,
+}
+
+impl Default for PhysDecodeLevel {
+    fn default() -> Self {
+        Self::Nothing
+    }
 }
 
 impl DecodeLevel {

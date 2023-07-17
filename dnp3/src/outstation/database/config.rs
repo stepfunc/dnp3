@@ -1,5 +1,9 @@
 /// Enum representing all possible `BinaryInput` event variations
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum EventBinaryInputVariation {
     /// Binary Input Event - without time
     Group2Var1,
@@ -11,6 +15,10 @@ pub enum EventBinaryInputVariation {
 
 /// Enum representing all possible `BinaryOutputStatus` event variations
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum EventBinaryOutputStatusVariation {
     /// Binary Output Event - Output Status without time
     Group11Var1,
@@ -20,6 +28,10 @@ pub enum EventBinaryOutputStatusVariation {
 
 /// Enum representing all possible `DoubleBitBinaryInput` event variations
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum EventDoubleBitBinaryInputVariation {
     /// Double-bit Binary Input Event - without time
     Group4Var1,
@@ -31,6 +43,10 @@ pub enum EventDoubleBitBinaryInputVariation {
 
 /// Enum representing all possible `Counter` event variations
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum EventCounterVariation {
     /// Counter Event - 32-bit with flag
     Group22Var1,
@@ -44,6 +60,10 @@ pub enum EventCounterVariation {
 
 /// Enum representing all possible `FrozenCounter` event variations
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum EventFrozenCounterVariation {
     /// Frozen Counter Event - 32-bit with flag
     Group23Var1,
@@ -57,6 +77,10 @@ pub enum EventFrozenCounterVariation {
 
 /// Enum representing all possible `AnalogInput` event variations
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum EventAnalogInputVariation {
     /// Analog Input Event - 32-bit with flag
     Group32Var1,
@@ -78,6 +102,10 @@ pub enum EventAnalogInputVariation {
 
 /// Enum representing all possible `FrozenAnalogInput` event variations
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum EventFrozenAnalogInputVariation {
     /// Frozen Analog Input Event - 32-bit with flag
     Group33Var1,
@@ -99,6 +127,10 @@ pub enum EventFrozenAnalogInputVariation {
 
 /// Enum representing all possible `AnalogOutputStatus` event variations
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum EventAnalogOutputStatusVariation {
     /// Analog Output Event - 32-bit with flag
     Group42Var1,
@@ -120,10 +152,18 @@ pub enum EventAnalogOutputStatusVariation {
 
 // This is always g111vX
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub(crate) struct EventOctetStringVariation;
 
 /// Enum representing all possible `BinaryInput` static variations
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum StaticBinaryInputVariation {
     /// Binary Input - Packed Format
     Group1Var1,
@@ -133,6 +173,10 @@ pub enum StaticBinaryInputVariation {
 
 /// Enum representing all possible `BinaryOutputStatus` static variations
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum StaticBinaryOutputStatusVariation {
     /// Binary Output - Packed Format
     Group10Var1,
@@ -142,6 +186,10 @@ pub enum StaticBinaryOutputStatusVariation {
 
 /// Enum representing all possible `DoubleBitBinaryInput` static variations
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum StaticDoubleBitBinaryInputVariation {
     /// Double-bit Binary Input - Packed Format
     Group3Var1,
@@ -151,6 +199,10 @@ pub enum StaticDoubleBitBinaryInputVariation {
 
 /// Enum representing all possible `Counter` static variations
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum StaticCounterVariation {
     /// Counter - 32-bit with flag
     Group20Var1,
@@ -164,6 +216,10 @@ pub enum StaticCounterVariation {
 
 /// Enum representing all possible `FrozenCounter` static variations
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum StaticFrozenCounterVariation {
     /// Frozen Counter - 32-bit with flag
     Group21Var1,
@@ -181,6 +237,10 @@ pub enum StaticFrozenCounterVariation {
 
 /// Enum representing all possible `AnalogInput` static variations
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum StaticAnalogInputVariation {
     /// Analog Input - 32-bit with flag
     Group30Var1,
@@ -198,6 +258,10 @@ pub enum StaticAnalogInputVariation {
 
 /// Enum representing all possible `FrozenAnalogInput` static variations
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum StaticFrozenAnalogInputVariation {
     /// Frozen Analog Input - 32-bit with flag
     Group31Var1,
@@ -219,6 +283,10 @@ pub enum StaticFrozenAnalogInputVariation {
 
 /// Enum representing all possible `AnalogOutputStatus` static variations
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum StaticAnalogOutputStatusVariation {
     /// Analog Output Status - 32-bit with flag
     Group40Var1,
@@ -232,6 +300,10 @@ pub enum StaticAnalogOutputStatusVariation {
 
 /// this is not currently public, but it could be a future release
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub(crate) enum AnalogInputDeadBandVariation {
     /// Analog Input Dead-band - 16-bit
     Group34Var1,
@@ -243,10 +315,18 @@ pub(crate) enum AnalogInputDeadBandVariation {
 
 // This is always g110vX
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub(crate) struct StaticOctetStringVariation;
 
 /// configuration for a `BinaryInput` point
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct BinaryInputConfig {
     /// default static variation
     pub s_var: StaticBinaryInputVariation,
@@ -256,6 +336,10 @@ pub struct BinaryInputConfig {
 
 /// configuration for a `DoubleBitBinaryInput` point
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct DoubleBitBinaryInputConfig {
     /// default static variation
     pub s_var: StaticDoubleBitBinaryInputVariation,
@@ -265,6 +349,10 @@ pub struct DoubleBitBinaryInputConfig {
 
 /// configuration for a `BinaryOutputStatus` point
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct BinaryOutputStatusConfig {
     /// default static variation
     pub s_var: StaticBinaryOutputStatusVariation,
@@ -274,6 +362,10 @@ pub struct BinaryOutputStatusConfig {
 
 /// configuration for a `Counter` point
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct CounterConfig {
     /// default static variation
     pub s_var: StaticCounterVariation,
@@ -285,6 +377,10 @@ pub struct CounterConfig {
 
 /// configuration for a `FrozenCounter` point
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct FrozenCounterConfig {
     /// default static variation
     pub s_var: StaticFrozenCounterVariation,
@@ -296,6 +392,10 @@ pub struct FrozenCounterConfig {
 
 /// configuration for an `AnalogInput` point
 #[derive(Copy, Clone, Debug, PartialEq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct AnalogInputConfig {
     /// default static variation
     pub s_var: StaticAnalogInputVariation,
@@ -307,6 +407,10 @@ pub struct AnalogInputConfig {
 
 /// configuration for an `AnalogOutputStatus` point
 #[derive(Copy, Clone, Debug, PartialEq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct AnalogOutputStatusConfig {
     /// default static variation
     pub s_var: StaticAnalogOutputStatusVariation,
@@ -319,6 +423,10 @@ pub struct AnalogOutputStatusConfig {
 /// Octet strings don't actually need any configuration b/c the transmitted variation is determined
 /// by the size. This struct is more of a placeholder required by a couple of internal traits.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct OctetStringConfig;
 
 impl BinaryInputConfig {

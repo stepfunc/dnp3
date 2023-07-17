@@ -3,6 +3,10 @@ use std::time::Duration;
 /// Parameterizes the minimum and maximum delays between retries
 /// for a retry strategy based on exponential backoff
 #[derive(Copy, Clone, Debug)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct RetryStrategy {
     pub(crate) min_delay: Duration,
     pub(crate) max_delay: Duration,

@@ -17,6 +17,10 @@ use crate::outstation::FreezeInterval;
 
 /// Controls how a command request is issued
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum CommandMode {
     /// Master will use the `DIRECT_OPERATE` function code in a single request/response
     DirectOperate,
@@ -26,6 +30,10 @@ pub enum CommandMode {
 
 /// Controls which time synchronization procedure is used
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum TimeSyncProcedure {
     /// Master will use the LAN procedure: RECORD_CURRENT_TIME followed by WRITE g50v3
     Lan,
@@ -35,6 +43,10 @@ pub enum TimeSyncProcedure {
 
 /// struct recording which event classes are enabled
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct EventClasses {
     /// enable Class 1
     pub class1: bool,
@@ -46,6 +58,10 @@ pub struct EventClasses {
 
 /// struct recording which event classes and class 0 are enabled
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub struct Classes {
     /// enable class zero
     pub class0: bool,

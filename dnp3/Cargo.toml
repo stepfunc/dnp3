@@ -24,21 +24,29 @@ sfio-rustls-config = { version = "0.1.1", optional = true }
 tokio-rustls = { version = "0.24", features = ["dangerous_configuration", "tls12"], default-features = false, optional = true }
 
 # serial dependencies
-tokio-serial = { version = "=5.4.3", optional = true }
+tokio-serial = { version = "=5.4.3", default-features = false, optional = true }
+
+# serde support
+serde =  { version = "^1.0", features = ["derive"], default-features = false, optional = true }
 
 [dev-dependencies]
-futures = { version = "0.3.24" }
-clap = { version = "4.0", features = ["derive"] }
-sfio-tokio-mock-io = "0.2.0"
 assert_matches = "1.2"
-tracing-subscriber = "0.3"
+clap = { version = "4.0", features = ["derive"] }
+futures = { version = "0.3.24" }
+rand = "0.8"
+serde_json = "1.0.96"
+sfio-tokio-mock-io = "0.2.0"
+tokio = { version = "1", features = ["test-util"] }
 tokio-util = { version = "0.7", features = ["codec"] }
 tokio-stream = { version = "0.1.1" }
-rand = "0.8"
-tokio = { version = "1", features = ["test-util"] }
+tracing-subscriber = "0.3"
+
+
 
 [features]
 default = ["tls", "serial"]
 ffi = [] # this feature flag is only used when building the FFI
 tls = ["sfio-rustls-config", "tokio-rustls"]
 serial = ["tokio-serial"]
+# Public configuration types dervie both serde::Deserialize and serde::Serialize
+serialization = ["serde"]
