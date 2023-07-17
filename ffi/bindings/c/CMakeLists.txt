@@ -27,7 +27,7 @@ else()
     include(FetchContent)
     FetchContent_Declare(
         dnp3
-        URL https://github.com/stepfunc/dnp3/releases/download/${DNP3_VERSION}/dnp3-${DNP3_VERSION}.zip
+        URL https://github.com/stepfunc/dnp3/releases/download/${DNP3_BACKUP_VERSION}/dnp3-${DNP3_BACKUP_VERSION}.zip
     )
 
     FetchContent_GetProperties(dnp3)
