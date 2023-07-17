@@ -6,7 +6,6 @@
     clippy::needless_return,
     clippy::not_unsafe_ptr_arg_deref,
     clippy::let_unit_value,
-    clippy::default_constructed_unit_structs,
     unused_variables,
     dead_code
 )]

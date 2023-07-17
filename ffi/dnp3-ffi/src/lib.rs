@@ -27,9 +27,12 @@ mod tcp;
 mod tracing;
 mod write_dead_band_request;
 
-#[allow(dead_code)]
-#[allow(clippy::derive_partial_eq_without_eq, clippy::useless_conversion)]
-#[allow(clippy::extra_unused_lifetimes)]
+#[allow(
+    dead_code,
+    clippy::derive_partial_eq_without_eq,
+    clippy::useless_conversion,
+    clippy::extra_unused_lifetimes
+)]
 pub mod ffi;
 
 lazy_static::lazy_static! {
