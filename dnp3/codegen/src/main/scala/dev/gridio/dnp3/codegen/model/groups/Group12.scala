@@ -5,7 +5,7 @@ import dev.gridio.dnp3.codegen.model.FixedSizeField._
 import dev.gridio.dnp3.codegen.model.VariationNames._
 
 object Group12 extends ObjectGroup {
-  def variations: List[Variation] = List(Group12Var0, Group12Var1)
+  def variations: List[Variation] = List(Group12Var1)
 
   def group: Byte = 12
 
@@ -13,8 +13,6 @@ object Group12 extends ObjectGroup {
 
   override def groupType: GroupType = GroupType.Command
 }
-
-object Group12Var0 extends AnyVariation(Group12, 0)
 
 object Group12Var1 extends FixedSize(Group12, 1, crob)(
   FixedSizeField("code", CustomFieldTypeU8("ControlCode")),
