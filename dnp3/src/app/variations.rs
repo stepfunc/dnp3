@@ -64,8 +64,6 @@ pub enum Variation {
     Group11Var1,
     /// Binary Output Event - Output Status With Time
     Group11Var2,
-    /// Binary Command - Any Variation
-    Group12Var0,
     /// Binary Command - Control Relay Output Block
     Group12Var1,
     /// Counter - Any Variation
@@ -198,8 +196,6 @@ pub enum Variation {
     Group40Var3,
     /// Analog Output Status - Double-precision With Flag
     Group40Var4,
-    /// Analog Output - Any Variation
-    Group41Var0,
     /// Analog Output - 32-bit With Flag
     Group41Var1,
     /// Analog Output - 16-bit With Flag
@@ -319,7 +315,6 @@ impl Variation {
                 _ => None,
             },
             12 => match var {
-                0 => Some(Variation::Group12Var0),
                 1 => Some(Variation::Group12Var1),
                 _ => None,
             },
@@ -419,7 +414,6 @@ impl Variation {
                 _ => None,
             },
             41 => match var {
-                0 => Some(Variation::Group41Var0),
                 1 => Some(Variation::Group41Var1),
                 2 => Some(Variation::Group41Var2),
                 3 => Some(Variation::Group41Var3),
@@ -506,7 +500,6 @@ impl Variation {
             Variation::Group11Var0 => (11, 0),
             Variation::Group11Var1 => (11, 1),
             Variation::Group11Var2 => (11, 2),
-            Variation::Group12Var0 => (12, 0),
             Variation::Group12Var1 => (12, 1),
             Variation::Group20Var0 => (20, 0),
             Variation::Group20Var1 => (20, 1),
@@ -573,7 +566,6 @@ impl Variation {
             Variation::Group40Var2 => (40, 2),
             Variation::Group40Var3 => (40, 3),
             Variation::Group40Var4 => (40, 4),
-            Variation::Group41Var0 => (41, 0),
             Variation::Group41Var1 => (41, 1),
             Variation::Group41Var2 => (41, 2),
             Variation::Group41Var3 => (41, 3),
@@ -636,7 +628,6 @@ impl Variation {
             Variation::Group11Var0 => "Binary Output Event - Any Variation",
             Variation::Group11Var1 => "Binary Output Event - Output Status Without Time",
             Variation::Group11Var2 => "Binary Output Event - Output Status With Time",
-            Variation::Group12Var0 => "Binary Command - Any Variation",
             Variation::Group12Var1 => "Binary Command - Control Relay Output Block",
             Variation::Group20Var0 => "Counter - Any Variation",
             Variation::Group20Var1 => "Counter - 32-bit With Flag",
@@ -703,7 +694,6 @@ impl Variation {
             Variation::Group40Var2 => "Analog Output Status - 16-bit With Flag",
             Variation::Group40Var3 => "Analog Output Status - Single-precision With Flag",
             Variation::Group40Var4 => "Analog Output Status - Double-precision With Flag",
-            Variation::Group41Var0 => "Analog Output - Any Variation",
             Variation::Group41Var1 => "Analog Output - 32-bit With Flag",
             Variation::Group41Var2 => "Analog Output - 16-bit With Flag",
             Variation::Group41Var3 => "Analog Output - Single-precision",
