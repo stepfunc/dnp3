@@ -28,7 +28,7 @@ where
     pub(crate) fn new() -> Self {
         Self {
             state: None,
-            _phantom: std::marker::PhantomData::default(),
+            _phantom: std::marker::PhantomData,
         }
     }
 

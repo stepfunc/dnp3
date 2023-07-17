@@ -52,7 +52,7 @@ where
             bit_pos: T::NUM_BITS,
             acc,
             byte_pos,
-            _phantom: std::marker::PhantomData::default(),
+            _phantom: std::marker::PhantomData,
         }
     }
 
