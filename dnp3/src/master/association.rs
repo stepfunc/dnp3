@@ -310,7 +310,7 @@ pub(crate) struct Association {
     assoc_info: Box<dyn AssociationInformation>,
     config: AssociationConfig,
     polls: PollMap,
-    next_link_status: Option<Instant>,
+    next_link_status_deadline: Option<Instant>,
     startup_integrity_done: bool,
     events_available: EventClasses,
 }
@@ -323,6 +323,8 @@ impl Association {
         assoc_handler: Box<dyn AssociationHandler>,
         assoc_info: Box<dyn AssociationInformation>,
     ) -> Self {
+        let now = Instant::now();
+
         Self {
             response_timeout: config.response_timeout,
             address,
@@ -336,9 +338,7 @@ impl Association {
             assoc_info,
             config,
             polls: PollMap::new(),
-            next_link_status: config
-                .keep_alive_timeout
-                .map(|delay| Instant::now() + delay),
+            next_link_status_deadline: config.keep_alive_timeout.map(|delay| now + delay),
             startup_integrity_done: false,
             events_available: EventClasses::none(),
         }
@@ -511,7 +511,7 @@ impl Association {
     }
 
     pub(crate) fn on_link_activity(&mut self) {
-        self.next_link_status = self
+        self.next_link_status_deadline = self
             .config
             .keep_alive_timeout
             .map(|timeout| Instant::now() + timeout)
@@ -659,35 +659,47 @@ impl Association {
         }
     }
 
+    fn next_link_status_task(&self, now: Instant) -> Next<Task> {
+        match self.next_link_status_deadline {
+            None => Next::None,
+            Some(next) => {
+                if now >= next {
+                    Next::Now(Task::LinkStatus(Promise::None))
+                } else {
+                    Next::NotBefore(next)
+                }
+            }
+        }
+    }
+
     fn get_next_task(&self, now: Instant) -> Next<Task> {
         // Check for automatic tasks
-        let next = self.auto_tasks.next(&self.config, self);
+        let next_auto_task = self.auto_tasks.next(&self.config, self);
 
-        // Startup task have greater priority
-        if !matches!(next, Next::None) {
-            return next;
+        // Startup tasks must complete prior to polls to link status requests
+        if !matches!(next_auto_task, Next::None) {
+            return next_auto_task;
         }
 
-        // If no automatic tasks to complete, check for lower priority polls or link status request
         match self.polls.next(now) {
-            Next::Now(poll) => Next::Now(Task::Read(ReadTask::PeriodicPoll(poll))),
-            Next::NotBefore(next_poll) => match self.next_link_status {
-                Some(next_link_status) => {
-                    Next::NotBefore(Instant::min(next_link_status, next_poll))
-                }
-                None => Next::NotBefore(next_poll),
-            },
-            Next::None => match self.next_link_status {
-                Some(next) => {
-                    let now = Instant::now();
-                    if now < next {
-                        Next::NotBefore(next)
-                    } else {
-                        Next::Now(Task::LinkStatus(Promise::None))
+            Next::Now(poll) => {
+                // always prioritize polls over link status requests
+                Next::Now(Task::Read(ReadTask::PeriodicPoll(poll)))
+            }
+            Next::NotBefore(next_poll) => {
+                match self.next_link_status_task(now) {
+                    Next::None => Next::NotBefore(next_poll),
+                    Next::Now(x) => Next::Now(x),
+                    Next::NotBefore(next_link_status) => {
+                        // return the earlier one
+                        Next::NotBefore(Instant::min(next_poll, next_link_status))
                     }
                 }
-                None => Next::None,
-            },
+            }
+            Next::None => {
+                // if there are no polls we just defer to the link status
+                self.next_link_status_task(now)
+            }
         }
     }
 }
