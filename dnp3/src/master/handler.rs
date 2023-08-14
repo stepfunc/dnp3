@@ -20,7 +20,7 @@ use crate::master::tasks::get_file_info::GetFileInfoTask;
 use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::restart::{RestartTask, RestartType};
 use crate::master::tasks::time::TimeSyncTask;
-use crate::master::tasks::{NonReadTask, Task};
+use crate::master::tasks::{AppTask, NonReadTask, Task};
 use crate::master::{
     DeadBandHeader, DirReadConfig, DirectoryReader, FileCredentials, FileError, FileInfo,
     FileReadConfig, FileReader, Headers, WriteError,
@@ -336,7 +336,7 @@ impl AssociationHandle {
             FileReaderType::from_reader(reader),
             credentials,
         );
-        self.send_task(Task::NonRead(NonReadTask::FileRead(task)))
+        self.send_task(Task::App(AppTask::NonRead(NonReadTask::FileRead(task))))
             .await
     }
 
@@ -361,7 +361,7 @@ impl AssociationHandle {
     ) -> Result<FileInfo, FileError> {
         let (promise, reply) = Promise::one_shot();
         let task = GetFileInfoTask::new(file_path.to_string(), promise);
-        self.send_task(Task::NonRead(NonReadTask::GetFileInfo(task)))
+        self.send_task(Task::App(AppTask::NonRead(NonReadTask::GetFileInfo(task))))
             .await?;
         reply.await?
     }

@@ -23,7 +23,7 @@ async fn master_startup_procedure() {
         &[AssocInfoEvent::TaskStart(
             TaskType::DisableUnsolicited,
             FunctionCode::DisableUnsolicited,
-            Sequence::new(1)
+            Sequence::new(0)
         )]
     );
 
@@ -37,12 +37,12 @@ async fn master_startup_procedure() {
             AssocInfoEvent::TaskSuccess(
                 TaskType::DisableUnsolicited,
                 FunctionCode::DisableUnsolicited,
-                Sequence::new(1)
+                Sequence::new(0)
             ),
             AssocInfoEvent::TaskStart(
                 TaskType::StartupIntegrity,
                 FunctionCode::Read,
-                Sequence::new(2)
+                Sequence::new(1)
             ),
         ]
     );
@@ -57,12 +57,12 @@ async fn master_startup_procedure() {
             AssocInfoEvent::TaskSuccess(
                 TaskType::StartupIntegrity,
                 FunctionCode::Read,
-                Sequence::new(2)
+                Sequence::new(1)
             ),
             AssocInfoEvent::TaskStart(
                 TaskType::EnableUnsolicited,
                 FunctionCode::EnableUnsolicited,
-                Sequence::new(3)
+                Sequence::new(2)
             ),
         ]
     );
@@ -76,7 +76,7 @@ async fn master_startup_procedure() {
         &[AssocInfoEvent::TaskSuccess(
             TaskType::EnableUnsolicited,
             FunctionCode::EnableUnsolicited,
-            Sequence::new(3)
+            Sequence::new(2)
         ),]
     );
 }

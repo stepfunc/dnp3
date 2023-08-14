@@ -5,7 +5,7 @@ use crate::app::ResponseHeader;
 use crate::master::association::Association;
 use crate::master::error::TaskError;
 use crate::master::request::EventClasses;
-use crate::master::tasks::{NonReadTask, Task};
+use crate::master::tasks::{AppTask, NonReadTask, Task};
 
 #[derive(Clone)]
 pub(crate) enum AutoTask {
@@ -16,7 +16,7 @@ pub(crate) enum AutoTask {
 
 impl AutoTask {
     pub(crate) fn wrap(self) -> Task {
-        Task::NonRead(NonReadTask::Auto(self))
+        Task::App(AppTask::NonRead(NonReadTask::Auto(self)))
     }
 
     pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {

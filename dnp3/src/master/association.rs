@@ -4,8 +4,8 @@ use std::time::Duration;
 use xxhash_rust::xxh64::xxh64;
 
 use crate::app::parse::parser::{HeaderCollection, Response};
-use crate::app::{ExponentialBackOff, RetryStrategy};
-use crate::app::{FunctionCode, Timestamp};
+use crate::app::Timestamp;
+use crate::app::{ExponentialBackOff, FunctionCode, RetryStrategy};
 use crate::app::{Iin, ResponseHeader};
 use crate::app::{Sequence, Timeout};
 use crate::link::EndpointAddress;
@@ -18,7 +18,7 @@ use crate::master::request::{Classes, EventClasses, TimeSyncProcedure};
 use crate::master::tasks::auto::AutoTask;
 use crate::master::tasks::time::TimeSyncTask;
 use crate::master::tasks::NonReadTask::TimeSync;
-use crate::master::tasks::{AssociationTask, ReadTask, Task};
+use crate::master::tasks::{AppTask, AssociationTask, ReadTask, Task};
 use crate::master::{AssociationInformation, ReadHandler, ReadType, TaskType};
 use crate::util::Smallest;
 
@@ -250,7 +250,9 @@ impl TaskStates {
 
         if config.startup_integrity_classes.any() && self.integrity_scan.is_pending() {
             return self.integrity_scan.create_next_task(|| {
-                Task::Read(ReadTask::StartupIntegrity(config.startup_integrity_classes))
+                Task::App(AppTask::Read(ReadTask::StartupIntegrity(
+                    config.startup_integrity_classes,
+                )))
             });
         }
 
@@ -401,6 +403,9 @@ impl Association {
         self.polls.complete(id)
     }
 
+    pub(crate) fn seq(&self) -> Sequence {
+        self.seq
+    }
     pub(crate) fn increment_seq(&mut self) -> Sequence {
         self.seq.increment()
     }
@@ -617,13 +622,22 @@ impl Association {
         .await;
     }
 
-    pub(crate) fn notify_task_start(&mut self, task_type: TaskType, fc: FunctionCode) {
-        self.assoc_info
-            .task_start(task_type, fc, Sequence::new(self.seq.next()))
+    pub(crate) fn notify_task_start(
+        &mut self,
+        task_type: TaskType,
+        fc: FunctionCode,
+        seq: Sequence,
+    ) {
+        self.assoc_info.task_start(task_type, fc, seq)
     }
 
-    pub(crate) fn notify_task_success(&mut self, task_type: TaskType, fc: FunctionCode) {
-        self.assoc_info.task_success(task_type, fc, self.seq);
+    pub(crate) fn notify_task_success(
+        &mut self,
+        task_type: TaskType,
+        fc: FunctionCode,
+        seq: Sequence,
+    ) {
+        self.assoc_info.task_success(task_type, fc, seq);
     }
 
     pub(crate) fn notify_task_fail(&mut self, task_type: TaskType, err: TaskError) {
@@ -684,7 +698,7 @@ impl Association {
         match self.polls.next(now) {
             Next::Now(poll) => {
                 // always prioritize polls over link status requests
-                Next::Now(Task::Read(ReadTask::PeriodicPoll(poll)))
+                Next::Now(Task::App(AppTask::Read(ReadTask::PeriodicPoll(poll))))
             }
             Next::NotBefore(next_poll) => {
                 match self.next_link_status_task(now) {
