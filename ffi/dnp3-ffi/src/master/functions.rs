@@ -1124,6 +1124,7 @@ macro_rules! define_task_from_impl {
                     TaskError::Shutdown => Self::Shutdown,
                     TaskError::Disabled => Self::NoConnection,
                     TaskError::BadEncoding(_) => Self::BadEncoding,
+                    TaskError::RejectedByIin2(_) => Self::IinError,
                 }
             }
         }

@@ -318,17 +318,14 @@ impl NonReadTask {
         }
     }
 
-    pub(crate) async fn handle(
+    pub(crate) async fn handle_response(
         self,
         association: &mut Association,
         response: Response<'_>,
-    ) -> Option<NonReadTask> {
+    ) -> Result<Option<NonReadTask>, TaskError> {
         match self {
             Self::Command(task) => task.handle(response),
-            Self::Auto(task) => match response.objects.ok() {
-                Some(headers) => task.handle(association, response.header, headers),
-                None => None,
-            },
+            Self::Auto(task) => task.handle(association, response),
             Self::TimeSync(task) => task.handle(association, response),
             Self::Restart(task) => task.handle(response),
             Self::DeadBands(task) => task.handle(response),

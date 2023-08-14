@@ -188,7 +188,10 @@ impl FileReadTask {
         self.settings.reader.aborted(FileError::TaskError(err));
     }
 
-    pub(crate) async fn handle(mut self, response: Response<'_>) -> Option<NonReadTask> {
+    pub(crate) async fn handle(
+        mut self,
+        response: Response<'_>,
+    ) -> Result<Option<NonReadTask>, TaskError> {
         let headers = match response.objects {
             Ok(x) => x,
             Err(err) => {
@@ -196,7 +199,7 @@ impl FileReadTask {
                 self.settings
                     .reader
                     .aborted(FileError::TaskError(TaskError::MalformedResponse(err)));
-                return None;
+                return Err(TaskError::MalformedResponse(err));
             }
         };
 
@@ -206,7 +209,7 @@ impl FileReadTask {
                 self.settings
                     .reader
                     .aborted(FileError::TaskError(TaskError::UnexpectedResponseHeaders));
-                return None;
+                return Err(TaskError::UnexpectedResponseHeaders);
             }
             Some(x) => x,
         };
@@ -218,7 +221,7 @@ impl FileReadTask {
             State::Close(_) => Self::handle_close_response(header),
         };
 
-        next.map(NonReadTask::FileRead)
+        Ok(next.map(NonReadTask::FileRead))
     }
 
     fn handle_auth_response(mut settings: Settings, header: ObjectHeader) -> Option<FileReadTask> {

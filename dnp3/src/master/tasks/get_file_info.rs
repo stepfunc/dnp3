@@ -37,7 +37,7 @@ impl GetFileInfoTask {
         self.promise.complete(Err(FileError::TaskError(err)));
     }
 
-    pub(crate) fn handle(self, response: Response) -> Option<NonReadTask> {
+    pub(crate) fn handle(self, response: Response) -> Result<Option<NonReadTask>, TaskError> {
         fn inner(response: Response) -> Result<FileInfo, FileError> {
             let headers = match response.objects {
                 Ok(x) => x,
@@ -69,7 +69,15 @@ impl GetFileInfoTask {
             }
         }
 
-        self.promise.complete(inner(response));
-        None
+        let result = inner(response);
+        let ret = match &result {
+            Ok(_) => Ok(None),
+            Err(err) => match err {
+                FileError::TaskError(x) => Err(*x),
+                _ => Err(TaskError::UnexpectedResponseHeaders),
+            },
+        };
+        self.promise.complete(result);
+        ret
     }
 }

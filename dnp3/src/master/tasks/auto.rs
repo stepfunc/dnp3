@@ -1,7 +1,6 @@
 use crate::app::format::write::HeaderWriter;
-use crate::app::parse::parser::HeaderCollection;
+use crate::app::parse::parser::Response;
 use crate::app::FunctionCode;
-use crate::app::ResponseHeader;
 use crate::master::association::Association;
 use crate::master::error::TaskError;
 use crate::master::request::EventClasses;
@@ -46,26 +45,25 @@ impl AutoTask {
     pub(crate) fn handle(
         self,
         association: &mut Association,
-        header: ResponseHeader,
-        objects: HeaderCollection,
-    ) -> Option<NonReadTask> {
-        if !objects.is_empty() {
+        response: Response<'_>,
+    ) -> Result<Option<NonReadTask>, TaskError> {
+        if !response.raw_objects.is_empty() {
             tracing::warn!("ignoring object headers in reply to {}", self.description());
         }
 
         match &self {
             AutoTask::DisableUnsolicited(_) => {
-                association.on_disable_unsolicited_response(header.iin);
+                association.on_disable_unsolicited_response(response.header.iin);
             }
             AutoTask::EnableUnsolicited(_) => {
-                association.on_enable_unsolicited_response(header.iin);
+                association.on_enable_unsolicited_response(response.header.iin);
             }
             AutoTask::ClearRestartBit => {
-                association.on_clear_restart_iin_response(header.iin);
+                association.on_clear_restart_iin_response(response.header.iin);
             }
         };
 
-        None
+        Ok(None)
     }
 
     pub(crate) fn on_task_error(self, association: Option<&mut Association>, err: TaskError) {
@@ -76,11 +74,14 @@ impl AutoTask {
 
         if let TaskError::RejectedByIin2(iin) = err {
             tracing::warn!("Auto task '{}' rejected by outstation IIN.2: {}. Check your outstation configuration?", self.description(), iin.iin2);
-            return match &self {
+
+            match &self {
                 AutoTask::ClearRestartBit => association.on_clear_restart_iin_response(iin),
                 AutoTask::EnableUnsolicited(_) => association.on_enable_unsolicited_response(iin),
                 AutoTask::DisableUnsolicited(_) => association.on_disable_unsolicited_response(iin),
             };
+
+            return;
         }
 
         match &self {

@@ -418,7 +418,7 @@ impl MasterSession {
                                         }
                                         Ok(association) => {
                                             association.process_iin(response.header.iin);
-                                            return match task.handle(association, response).await {
+                                            return match task.handle_response(association, response).await? {
                                                 Some(next) => {
                                                     Ok(NextStep::Continue(next))
                                                 }
@@ -492,7 +492,7 @@ impl MasterSession {
             return Err(TaskError::MultiFragmentResponse);
         }
 
-        if response.header.iin.has_request_error() {
+        if response.header.iin.has_bad_request_error() {
             return Err(TaskError::RejectedByIin2(response.header.iin));
         }
 

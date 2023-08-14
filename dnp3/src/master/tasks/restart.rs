@@ -57,13 +57,13 @@ impl RestartTask {
         self.promise.complete(Err(err))
     }
 
-    pub(crate) fn handle(self, response: Response) -> Option<NonReadTask> {
+    pub(crate) fn handle(self, response: Response) -> Result<Option<NonReadTask>, TaskError> {
         let headers = match response.objects {
             Ok(x) => x,
             Err(err) => {
                 self.promise
                     .complete(Err(TaskError::MalformedResponse(err)));
-                return None;
+                return Err(TaskError::MalformedResponse(err));
             }
         };
 
@@ -72,7 +72,7 @@ impl RestartTask {
             None => {
                 self.promise
                     .complete(Err(TaskError::UnexpectedResponseHeaders));
-                return None;
+                return Err(TaskError::UnexpectedResponseHeaders);
             }
         };
 
@@ -81,33 +81,25 @@ impl RestartTask {
             None => {
                 self.promise
                     .complete(Err(TaskError::UnexpectedResponseHeaders));
-                return None;
+                return Err(TaskError::UnexpectedResponseHeaders);
             }
         };
 
-        match count {
+        let result: Result<Duration, TaskError> = match count {
             CountVariation::Group52Var1(val) => match val.single() {
-                Some(val) => self
-                    .promise
-                    .complete(Ok(Duration::from_secs(val.time as u64))),
-                None => self
-                    .promise
-                    .complete(Err(TaskError::UnexpectedResponseHeaders)),
+                Some(val) => Ok(Duration::from_secs(val.time as u64)),
+                None => Err(TaskError::UnexpectedResponseHeaders),
             },
             CountVariation::Group52Var2(val) => match val.single() {
-                Some(val) => self
-                    .promise
-                    .complete(Ok(Duration::from_millis(val.time as u64))),
-                None => self
-                    .promise
-                    .complete(Err(TaskError::UnexpectedResponseHeaders)),
+                Some(val) => Ok(Duration::from_millis(val.time as u64)),
+                None => Err(TaskError::UnexpectedResponseHeaders),
             },
-            _ => self
-                .promise
-                .complete(Err(TaskError::UnexpectedResponseHeaders)),
-        }
+            _ => Err(TaskError::UnexpectedResponseHeaders),
+        };
 
-        None
+        self.promise.complete(result);
+
+        result.map(|_| None)
     }
 }
 
