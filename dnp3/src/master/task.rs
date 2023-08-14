@@ -492,6 +492,10 @@ impl MasterSession {
             return Err(TaskError::MultiFragmentResponse);
         }
 
+        if response.header.iin.has_request_error() {
+            return Err(TaskError::RejectedByIin2(response.header.iin));
+        }
+
         Ok(Some(response))
     }
 

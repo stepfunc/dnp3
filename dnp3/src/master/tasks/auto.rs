@@ -68,18 +68,30 @@ impl AutoTask {
         None
     }
 
-    pub(crate) fn on_task_error(self, association: Option<&mut Association>, _err: TaskError) {
-        if let Some(association) = association {
-            match &self {
-                AutoTask::DisableUnsolicited(_) => {
-                    association.on_disable_unsolicited_failure();
-                }
-                AutoTask::EnableUnsolicited(_) => {
-                    association.on_enable_unsolicited_failure();
-                }
-                AutoTask::ClearRestartBit => {
-                    association.on_clear_restart_iin_failure();
-                }
+    pub(crate) fn on_task_error(self, association: Option<&mut Association>, err: TaskError) {
+        let association = match association {
+            None => return,
+            Some(x) => x,
+        };
+
+        if let TaskError::RejectedByIin2(iin) = err {
+            tracing::warn!("Auto task '{}' rejected by outstation IIN.2: {}. Check your outstation configuration?", self.description(), iin.iin2);
+            return match &self {
+                AutoTask::ClearRestartBit => association.on_clear_restart_iin_response(iin),
+                AutoTask::EnableUnsolicited(_) => association.on_enable_unsolicited_response(iin),
+                AutoTask::DisableUnsolicited(_) => association.on_disable_unsolicited_response(iin),
+            };
+        }
+
+        match &self {
+            AutoTask::DisableUnsolicited(_) => {
+                association.on_disable_unsolicited_failure();
+            }
+            AutoTask::EnableUnsolicited(_) => {
+                association.on_enable_unsolicited_failure();
+            }
+            AutoTask::ClearRestartBit => {
+                association.on_clear_restart_iin_failure();
             }
         }
     }

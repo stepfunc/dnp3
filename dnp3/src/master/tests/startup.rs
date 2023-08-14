@@ -7,7 +7,7 @@ use crate::app::{Iin, Iin1, Iin2};
 use crate::master::association::AssociationConfig;
 use crate::master::request::{Classes, EventClasses};
 use crate::master::tests::harness::AssocInfoEvent;
-use crate::master::{ReadRequest, TaskType};
+use crate::master::{ReadRequest, TaskError, TaskType};
 
 use super::harness::create_association;
 use super::harness::requests::*;
@@ -78,6 +78,47 @@ async fn master_startup_procedure() {
             FunctionCode::EnableUnsolicited,
             Sequence::new(2)
         ),]
+    );
+}
+
+#[tokio::test]
+async fn master_calls_task_fail_when_disable_unsolicited_returns_no_func_code_support() {
+    let config = AssociationConfig::default();
+    let mut seq = Sequence::default();
+    let mut harness = create_association(config).await;
+
+    assert_eq!(
+        harness.assoc_events.pop().as_slice(),
+        &[AssocInfoEvent::TaskStart(
+            TaskType::DisableUnsolicited,
+            FunctionCode::DisableUnsolicited,
+            Sequence::new(0)
+        )]
+    );
+
+    let iin = Iin::new(Iin1::default(), Iin2::NO_FUNC_CODE_SUPPORT);
+
+    harness
+        .expect_write_and_respond(
+            disable_unsol_request(seq),
+            empty_response_custom_iin(seq.increment(), iin),
+        )
+        .await;
+
+    assert_eq!(
+        harness.assoc_events.pop().as_slice(),
+        &[
+            AssocInfoEvent::TaskFailure(
+                TaskType::DisableUnsolicited,
+                TaskError::RejectedByIin2(iin),
+            ),
+            // even though disable unsolicited fails, the master should continue performing the startup tasks
+            AssocInfoEvent::TaskStart(
+                TaskType::StartupIntegrity,
+                FunctionCode::Read,
+                Sequence::new(1)
+            ),
+        ]
     );
 }
 

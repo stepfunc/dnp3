@@ -49,6 +49,8 @@ pub enum TaskError {
     Link(LinkError),
     /// An error occurred at the transport/app level
     Transport,
+    /// Outstation returned IIN.2 bit(s) indicating failure
+    RejectedByIin2(Iin),
     /// A response to the task's request was malformed
     MalformedResponse(ObjectParseError),
     /// The response contains headers that don't match the request
@@ -247,6 +249,9 @@ impl std::fmt::Display for TaskError {
             TaskError::NoSuchAssociation(x) => write!(f, "no association with address: {x}"),
             TaskError::BadEncoding(x) => {
                 write!(f, "Encoding error: {x}")
+            }
+            TaskError::RejectedByIin2(iin) => {
+                write!(f, "Rejected by IIN2: {}", iin.iin2)
             }
         }
     }
