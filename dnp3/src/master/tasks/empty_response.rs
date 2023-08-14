@@ -39,21 +39,15 @@ impl EmptyResponseTask {
         self.promise.complete(Err(err.into()))
     }
 
-    pub(crate) fn handle(self, response: Response) -> Option<NonReadTask> {
+    pub(crate) fn handle(self, response: Response) -> Result<Option<NonReadTask>, TaskError> {
         if !response.raw_objects.is_empty() {
             self.promise
                 .complete(Err(WriteError::Task(TaskError::UnexpectedResponseHeaders)));
-            return None;
-        }
-
-        if response.header.iin.has_request_error() {
-            self.promise
-                .complete(Err(WriteError::IinError(response.header.iin.iin2)));
-            return None;
+            return Err(TaskError::UnexpectedResponseHeaders);
         }
 
         self.promise.complete(Ok(()));
 
-        None
+        Ok(None)
     }
 }

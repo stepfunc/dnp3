@@ -1,12 +1,13 @@
 use std::sync::atomic::Ordering;
 use std::time::Duration;
 
-use crate::app::RetryStrategy;
 use crate::app::Sequence;
+use crate::app::{FunctionCode, RetryStrategy};
 use crate::app::{Iin, Iin1, Iin2};
 use crate::master::association::AssociationConfig;
 use crate::master::request::{Classes, EventClasses};
-use crate::master::ReadRequest;
+use crate::master::tests::harness::AssocInfoEvent;
+use crate::master::{ReadRequest, TaskError, TaskType};
 
 use super::harness::create_association;
 use super::harness::requests::*;
@@ -17,15 +18,138 @@ async fn master_startup_procedure() {
     let mut seq = Sequence::default();
     let mut harness = create_association(config).await;
 
+    assert_eq!(
+        harness.assoc_events.pop().as_slice(),
+        &[AssocInfoEvent::TaskStart(
+            TaskType::DisableUnsolicited,
+            FunctionCode::DisableUnsolicited,
+            Sequence::new(0)
+        )]
+    );
+
     harness
         .expect_write_and_respond(disable_unsol_request(seq), empty_response(seq.increment()))
         .await;
+
+    assert_eq!(
+        harness.assoc_events.pop().as_slice(),
+        &[
+            AssocInfoEvent::TaskSuccess(
+                TaskType::DisableUnsolicited,
+                FunctionCode::DisableUnsolicited,
+                Sequence::new(0)
+            ),
+            AssocInfoEvent::TaskStart(
+                TaskType::StartupIntegrity,
+                FunctionCode::Read,
+                Sequence::new(1)
+            ),
+        ]
+    );
+
     harness
         .expect_write_and_respond(integrity_poll_request(seq), empty_response(seq.increment()))
         .await;
+
+    assert_eq!(
+        harness.assoc_events.pop().as_slice(),
+        &[
+            AssocInfoEvent::TaskSuccess(
+                TaskType::StartupIntegrity,
+                FunctionCode::Read,
+                Sequence::new(1)
+            ),
+            AssocInfoEvent::TaskStart(
+                TaskType::EnableUnsolicited,
+                FunctionCode::EnableUnsolicited,
+                Sequence::new(2)
+            ),
+        ]
+    );
+
     harness
         .expect_write_and_respond(enable_unsol_request(seq), empty_response(seq.increment()))
         .await;
+
+    assert_eq!(
+        harness.assoc_events.pop().as_slice(),
+        &[AssocInfoEvent::TaskSuccess(
+            TaskType::EnableUnsolicited,
+            FunctionCode::EnableUnsolicited,
+            Sequence::new(2)
+        ),]
+    );
+}
+
+#[tokio::test]
+async fn master_calls_task_fail_when_auto_tasks_returns_iin2_errors() {
+    let config = AssociationConfig::default();
+    let mut seq = Sequence::default();
+    let mut harness = create_association(config).await;
+
+    assert_eq!(
+        harness.assoc_events.pop().as_slice(),
+        &[AssocInfoEvent::TaskStart(
+            TaskType::DisableUnsolicited,
+            FunctionCode::DisableUnsolicited,
+            Sequence::new(0)
+        )]
+    );
+
+    let iin = Iin::new(Iin1::default(), Iin2::NO_FUNC_CODE_SUPPORT);
+
+    harness
+        .expect_write_and_respond(
+            disable_unsol_request(seq),
+            empty_response_custom_iin(seq.increment(), iin),
+        )
+        .await;
+
+    assert_eq!(
+        harness.assoc_events.pop().as_slice(),
+        &[
+            AssocInfoEvent::TaskFailure(
+                TaskType::DisableUnsolicited,
+                TaskError::RejectedByIin2(iin),
+            ),
+            // even though disable unsolicited fails, the master should continue performing the startup tasks
+            AssocInfoEvent::TaskStart(
+                TaskType::StartupIntegrity,
+                FunctionCode::Read,
+                Sequence::new(1)
+            ),
+        ]
+    );
+
+    let iin = Iin::new(Iin1::default(), Iin2::PARAMETER_ERROR);
+
+    harness
+        .expect_write_and_respond(
+            integrity_poll_request(seq),
+            empty_response_custom_iin(seq.increment(), iin),
+        )
+        .await;
+
+    assert_eq!(
+        harness.assoc_events.pop().as_slice(),
+        &[
+            AssocInfoEvent::TaskFailure(TaskType::StartupIntegrity, TaskError::RejectedByIin2(iin),) // the master will NOT start another task right away if the integrity poll fails
+        ]
+    );
+
+    // auto advance time
+    tokio::time::pause();
+
+    harness.expect_write(integrity_poll_request(seq)).await;
+
+    assert_eq!(
+        harness.assoc_events.pop().as_slice(),
+        &[AssocInfoEvent::TaskStart(
+            TaskType::StartupIntegrity,
+            FunctionCode::Read,
+            Sequence::new(2)
+        )]
+    );
 }
 
 #[tokio::test]

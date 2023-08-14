@@ -1057,6 +1057,7 @@ fn define_command_mode(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
 
 const TASK_ERRORS: &[(&str, &str)] = &[
     ("too_many_requests", "too many user requests queued"),
+    ("iin_error", "outstation returned an IIN.2 error bit"),
     (
         "bad_response",
         "response was malformed or contained object headers",
@@ -1325,7 +1326,6 @@ fn define_time_sync_callback(
             "Outstation did not clear the NEED_TIME IIN bit",
         )?
         .add_error("system_time_not_available", "System time not available")?
-        .add_error("iin_error", "Outstation indicated an error")?
         .add_task_errors()?
         .doc("Possible errors that can occur during a time synchronization procedure")?
         .build()?;

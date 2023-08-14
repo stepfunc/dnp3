@@ -8,5 +8,3 @@ members = [
     "ffi/dnp3-ffi-java",
 ]
 
-[profile.release]
-lto=true

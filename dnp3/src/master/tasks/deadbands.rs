@@ -50,21 +50,14 @@ impl WriteDeadBandsTask {
         self.promise.complete(Err(err.into()))
     }
 
-    pub(crate) fn handle(self, response: Response) -> Option<NonReadTask> {
-        if !response.raw_objects.is_empty() {
+    pub(crate) fn handle(self, response: Response) -> Result<Option<NonReadTask>, TaskError> {
+        if response.raw_objects.is_empty() {
+            self.promise.complete(Ok(()));
+            Ok(None)
+        } else {
             self.promise
                 .complete(Err(WriteError::Task(TaskError::UnexpectedResponseHeaders)));
-            return None;
+            Err(TaskError::UnexpectedResponseHeaders)
         }
-
-        if response.header.iin.has_request_error() {
-            self.promise
-                .complete(Err(WriteError::IinError(response.header.iin.iin2)));
-            return None;
-        }
-
-        self.promise.complete(Ok(()));
-
-        None
     }
 }

@@ -483,7 +483,7 @@ impl Iin {
         })
     }
 
-    pub(crate) fn has_request_error(self) -> bool {
+    pub(crate) fn has_bad_request_error(self) -> bool {
         self.iin2.get_no_func_code_support()
             || self.iin2.get_object_unknown()
             || self.iin2.get_parameter_error()

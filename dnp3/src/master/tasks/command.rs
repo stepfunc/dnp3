@@ -80,27 +80,27 @@ impl CommandTask {
         self.promise.complete(Err(err.into()))
     }
 
-    pub(crate) fn handle(self, response: Response) -> Option<NonReadTask> {
+    pub(crate) fn handle(self, response: Response) -> Result<Option<NonReadTask>, TaskError> {
         let headers = match response.objects {
             Ok(x) => x,
             Err(err) => {
                 self.promise
                     .complete(Err(TaskError::MalformedResponse(err).into()));
-                return None;
+                return Err(TaskError::MalformedResponse(err));
             }
         };
 
         if let Err(err) = self.compare(headers) {
             self.promise.complete(Err(err.into()));
-            return None;
+            return Err(TaskError::UnexpectedResponseHeaders);
         }
 
         match self.state {
-            State::Select => Some(self.change_state(State::Operate).wrap()),
+            State::Select => Ok(Some(self.change_state(State::Operate).wrap())),
             _ => {
                 // Complete w/ success
                 self.promise.complete(Ok(()));
-                None
+                Ok(None)
             }
         }
     }

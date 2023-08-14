@@ -49,9 +49,11 @@ pub enum TaskError {
     Link(LinkError),
     /// An error occurred at the transport/app level
     Transport,
+    /// Outstation returned IIN.2 bit(s) indicating failure
+    RejectedByIin2(Iin),
     /// A response to the task's request was malformed
     MalformedResponse(ObjectParseError),
-    /// The response contains headers that don't match the request
+    /// The response contains unexpected or invalid headers or data that don't match the request
     UnexpectedResponseHeaders,
     /// Non-final response not requesting confirmation
     NonFinWithoutCon,
@@ -133,19 +135,6 @@ pub enum TimeSyncError {
     /// Outstation returned an IIN.2 error
     IinError(Iin2),
 }
-
-impl TimeSyncError {
-    pub(crate) fn from_iin(iin: Iin) -> Result<(), TimeSyncError> {
-        if iin.iin1.get_need_time() {
-            return Err(TimeSyncError::StillNeedsTime);
-        }
-        if iin.has_request_error() {
-            return Err(TimeSyncError::IinError(iin.iin2));
-        }
-        Ok(())
-    }
-}
-
 /// Parent error type for command tasks
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum CommandError {
@@ -247,6 +236,9 @@ impl std::fmt::Display for TaskError {
             TaskError::NoSuchAssociation(x) => write!(f, "no association with address: {x}"),
             TaskError::BadEncoding(x) => {
                 write!(f, "Encoding error: {x}")
+            }
+            TaskError::RejectedByIin2(iin) => {
+                write!(f, "Rejected by IIN2: {}", iin.iin2)
             }
         }
     }

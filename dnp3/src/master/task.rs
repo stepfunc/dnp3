@@ -2,14 +2,14 @@ use tracing::Instrument;
 
 use crate::app::format::write;
 use crate::app::parse::parser::Response;
-use crate::app::{BufferSize, ControlField, FunctionCode, Sequence};
+use crate::app::{BufferSize, ControlField, Sequence};
 use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
 use crate::link::{EndpointAddress, LinkErrorMode};
 use crate::master::association::{AssociationMap, Next};
 use crate::master::error::TaskError;
 use crate::master::messages::{MasterMsg, Message};
-use crate::master::tasks::{AssociationTask, NonReadTask, ReadTask, RequestWriter, Task};
+use crate::master::tasks::{AppTask, AssociationTask, NonReadTask, ReadTask, RequestWriter, Task};
 use crate::master::{Association, MasterChannelConfig};
 use crate::transport::{TransportReader, TransportResponse, TransportWriter};
 use crate::util::buffer::Buffer;
@@ -274,7 +274,7 @@ impl MasterSession {
 
     /// Run a specific task.
     ///
-    /// Returns an error only if shutdown or link layer error occured.
+    /// Returns an error only if shutdown or link layer error occurred.
     async fn run_task(
         &mut self,
         io: &mut PhysLayer,
@@ -283,13 +283,37 @@ impl MasterSession {
         reader: &mut TransportReader,
     ) -> Result<(), RunError> {
         let result = match task.details {
-            Task::Read(t) => {
-                self.run_read_task(io, task.address, t, writer, reader)
-                    .await
-            }
-            Task::NonRead(t) => {
-                self.run_non_read_task(io, task.address, t, writer, reader)
-                    .await
+            Task::App(t) => {
+                let task_type = t.as_task_type();
+                let function = t.function();
+
+                if let Ok(assoc) = self.associations.get_mut(task.address) {
+                    assoc.notify_task_start(task_type, function, assoc.seq());
+                }
+
+                let res: Result<Sequence, TaskError> = match t {
+                    AppTask::Read(t) => {
+                        self.run_read_task(io, task.address, t, writer, reader)
+                            .await
+                    }
+                    AppTask::NonRead(t) => {
+                        self.run_non_read_task(io, task.address, t, writer, reader)
+                            .await
+                    }
+                };
+
+                if let Ok(assoc) = self.associations.get_mut(task.address) {
+                    match res {
+                        Ok(seq) => {
+                            assoc.notify_task_success(task_type, function, seq);
+                        }
+                        Err(err) => {
+                            assoc.notify_task_fail(task_type, err);
+                        }
+                    }
+                }
+
+                res.map(|_| ())
             }
             Task::LinkStatus(promise) => {
                 match self
@@ -327,39 +351,20 @@ impl MasterSession {
         task: NonReadTask,
         writer: &mut TransportWriter,
         reader: &mut TransportReader,
-    ) -> Result<(), TaskError> {
-        let mut next_task = Some(task);
-        while let Some(task) = next_task {
-            let task_type = task.as_task_type();
-            let task_fc = task.function();
+    ) -> Result<Sequence, TaskError> {
+        let mut next = NextStep::Continue(task);
 
-            // Notify task start
-            if let Ok(association) = self.associations.get_mut(destination) {
-                association.notify_task_start(task_type, task_fc);
-            }
-
-            // Execute task
-            let result = self
-                .run_single_non_read_task(io, destination, task, writer, reader)
-                .await;
-
-            // Notify task result
-            if let Ok(association) = self.associations.get_mut(destination) {
-                match result {
-                    Ok(_) => {
-                        association.notify_task_success(task_type, task_fc);
-                    }
-                    Err(err) => {
-                        association.notify_task_fail(task_type, err);
-                    }
+        loop {
+            next = match next {
+                NextStep::Continue(task) => {
+                    self.run_single_non_read_task(io, destination, task, writer, reader)
+                        .await?
+                }
+                NextStep::Complete(seq) => {
+                    return Ok(seq);
                 }
             }
-
-            // Continue to next task (if there's one)
-            next_task = result?;
         }
-
-        Ok(())
     }
 
     async fn run_single_non_read_task(
@@ -369,7 +374,7 @@ impl MasterSession {
         task: NonReadTask,
         writer: &mut TransportWriter,
         reader: &mut TransportReader,
-    ) -> Result<Option<NonReadTask>, TaskError> {
+    ) -> Result<NextStep, TaskError> {
         let seq = match self.send_request(io, destination, &task, writer).await {
             Ok(seq) => seq,
             Err(err) => {
@@ -413,7 +418,14 @@ impl MasterSession {
                                         }
                                         Ok(association) => {
                                             association.process_iin(response.header.iin);
-                                            return Ok(task.handle(association, response).await);
+                                            return match task.handle_response(association, response).await? {
+                                                Some(next) => {
+                                                    Ok(NextStep::Continue(next))
+                                                }
+                                                None => {
+                                                    Ok(NextStep::Complete(seq))
+                                                }
+                                            }
                                         }
                                     }
                                 }
@@ -480,6 +492,10 @@ impl MasterSession {
             return Err(TaskError::MultiFragmentResponse);
         }
 
+        if response.header.iin.has_bad_request_error() {
+            return Err(TaskError::RejectedByIin2(response.header.iin));
+        }
+
         Ok(Some(response))
     }
 
@@ -490,32 +506,22 @@ impl MasterSession {
         mut task: ReadTask,
         writer: &mut TransportWriter,
         reader: &mut TransportReader,
-    ) -> Result<(), TaskError> {
-        if let Ok(association) = self.associations.get_mut(destination) {
-            association.notify_task_start(task.as_task_type(), FunctionCode::Read);
-        }
-
+    ) -> Result<Sequence, TaskError> {
         let result = self
             .execute_read_task(io, destination, &mut task, writer, reader)
             .await;
 
-        let mut association = self.associations.get_mut(destination).ok();
+        let association = self.associations.get_mut(destination).ok();
 
         match result {
             Ok(_) => {
                 if let Some(association) = association {
-                    association.notify_task_success(task.as_task_type(), task.function());
                     task.complete(association);
                 } else {
                     task.on_task_error(None, TaskError::NoSuchAssociation(destination));
                 }
             }
-            Err(err) => {
-                if let Some(association) = &mut association {
-                    association.notify_task_fail(task.as_task_type(), err);
-                }
-                task.on_task_error(association, err)
-            }
+            Err(err) => task.on_task_error(association, err),
         }
 
         result
@@ -528,7 +534,7 @@ impl MasterSession {
         task: &mut ReadTask,
         writer: &mut TransportWriter,
         reader: &mut TransportReader,
-    ) -> Result<(), TaskError> {
+    ) -> Result<Sequence, TaskError> {
         let mut seq = self.send_request(io, destination, task, writer).await?;
         let mut is_first = true;
 
@@ -553,7 +559,7 @@ impl MasterSession {
                                     // continue reading responses on the inner loop
                                     ReadResponseAction::Ignore => continue,
                                     // read task complete
-                                    ReadResponseAction::Complete => return Ok(()),
+                                    ReadResponseAction::Complete => return Ok(seq),
                                     // break to the outer loop and read another response
                                     ReadResponseAction::ReadNext => {
                                         is_first = false;
@@ -623,6 +629,10 @@ impl MasterSession {
 
         if !response.header.control.fin && !response.header.control.con {
             return Err(TaskError::NonFinWithoutCon);
+        }
+
+        if response.header.iin.has_bad_request_error() {
+            return Err(TaskError::RejectedByIin2(response.header.iin));
         }
 
         let association = self.associations.get_mut(destination)?;
@@ -808,4 +818,9 @@ impl MasterSession {
             association.on_link_activity();
         }
     }
+}
+
+enum NextStep {
+    Continue(NonReadTask),
+    Complete(Sequence),
 }

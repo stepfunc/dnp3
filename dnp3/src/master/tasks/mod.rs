@@ -47,11 +47,16 @@ impl AssociationTask {
 
 /// There are two broad categories of tasks. Reads
 /// require handling for multi-fragmented responses.
-pub(crate) enum Task {
+pub(crate) enum AppTask {
     /// Reads require handling for multi-fragmented responses
     Read(ReadTask),
     /// NonRead tasks always require FIR/FIN == 1, but might require multiple read/response cycles, e.g. SBO
     NonRead(NonReadTask),
+}
+
+pub(crate) enum Task {
+    /// An application layer task
+    App(AppTask),
     /// Send link status request
     LinkStatus(Promise<Result<(), TaskError>>),
 }
@@ -62,12 +67,41 @@ pub(crate) enum TaskId {
     Function(FunctionCode),
 }
 
+impl AppTask {
+    pub(crate) fn as_task_type(&self) -> TaskType {
+        match self {
+            AppTask::Read(t) => t.as_task_type(),
+            AppTask::NonRead(t) => t.as_task_type(),
+        }
+    }
+
+    pub(crate) fn function(&self) -> FunctionCode {
+        match self {
+            AppTask::Read(t) => t.function(),
+            AppTask::NonRead(t) => t.function(),
+        }
+    }
+
+    pub(crate) fn on_task_error(self, association: Option<&mut Association>, err: TaskError) {
+        match self {
+            Self::NonRead(task) => task.on_task_error(association, err),
+            Self::Read(task) => task.on_task_error(association, err),
+        }
+    }
+
+    pub(crate) fn get_id(&self) -> TaskId {
+        match self {
+            AppTask::Read(_) => TaskId::Function(FunctionCode::Read),
+            AppTask::NonRead(t) => TaskId::Function(t.function()),
+        }
+    }
+}
+
 impl Task {
     pub(crate) fn on_task_error(self, association: Option<&mut Association>, err: TaskError) {
         match self {
-            Task::NonRead(task) => task.on_task_error(association, err),
-            Task::Read(task) => task.on_task_error(association, err),
-            Task::LinkStatus(promise) => promise.complete(Err(err)),
+            Self::App(task) => task.on_task_error(association, err),
+            Self::LinkStatus(promise) => promise.complete(Err(err)),
         }
     }
 
@@ -76,7 +110,7 @@ impl Task {
     /// Returning Some means the task should proceed, returning None means
     /// the task was cancelled, forget about it.
     pub(crate) fn start(self, association: &mut Association) -> Option<Task> {
-        if let Task::NonRead(task) = self {
+        if let Task::App(AppTask::NonRead(task)) = self {
             return task.start(association).map(|task| task.wrap());
         }
 
@@ -86,8 +120,7 @@ impl Task {
     pub(crate) fn get_id(&self) -> TaskId {
         match self {
             Task::LinkStatus(_) => TaskId::LinkStatus,
-            Task::Read(_) => TaskId::Function(FunctionCode::Read),
-            Task::NonRead(t) => TaskId::Function(t.function()),
+            Task::App(task) => task.get_id(),
         }
     }
 }
@@ -171,7 +204,7 @@ impl From<crate::app::format::WriteError> for TaskError {
 
 impl ReadTask {
     pub(crate) fn wrap(self) -> Task {
-        Task::Read(self)
+        Task::App(AppTask::Read(self))
     }
 
     pub(crate) async fn process_response(
@@ -243,7 +276,7 @@ impl ReadTask {
 
 impl NonReadTask {
     pub(crate) fn wrap(self) -> Task {
-        Task::NonRead(self)
+        Task::App(AppTask::NonRead(self))
     }
 
     pub(crate) fn start(self, association: &mut Association) -> Option<NonReadTask> {
@@ -285,17 +318,14 @@ impl NonReadTask {
         }
     }
 
-    pub(crate) async fn handle(
+    pub(crate) async fn handle_response(
         self,
         association: &mut Association,
         response: Response<'_>,
-    ) -> Option<NonReadTask> {
+    ) -> Result<Option<NonReadTask>, TaskError> {
         match self {
             Self::Command(task) => task.handle(response),
-            Self::Auto(task) => match response.objects.ok() {
-                Some(headers) => task.handle(association, response.header, headers),
-                None => None,
-            },
+            Self::Auto(task) => task.handle(association, response),
             Self::TimeSync(task) => task.handle(association, response),
             Self::Restart(task) => task.handle(response),
             Self::DeadBands(task) => task.handle(response),
