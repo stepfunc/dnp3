@@ -82,7 +82,7 @@ async fn master_startup_procedure() {
 }
 
 #[tokio::test]
-async fn master_calls_task_fail_when_disable_unsolicited_returns_no_func_code_support() {
+async fn master_calls_task_fail_when_auto_tasks_returns_iin2_errors() {
     let config = AssociationConfig::default();
     let mut seq = Sequence::default();
     let mut harness = create_association(config).await;
@@ -119,6 +119,36 @@ async fn master_calls_task_fail_when_disable_unsolicited_returns_no_func_code_su
                 Sequence::new(1)
             ),
         ]
+    );
+
+    let iin = Iin::new(Iin1::default(), Iin2::PARAMETER_ERROR);
+
+    harness
+        .expect_write_and_respond(
+            integrity_poll_request(seq),
+            empty_response_custom_iin(seq.increment(), iin),
+        )
+        .await;
+
+    assert_eq!(
+        harness.assoc_events.pop().as_slice(),
+        &[
+            AssocInfoEvent::TaskFailure(TaskType::StartupIntegrity, TaskError::RejectedByIin2(iin),) // the master will NOT start another task right away if the integrity poll fails
+        ]
+    );
+
+    // auto advance time
+    tokio::time::pause();
+
+    harness.expect_write(integrity_poll_request(seq)).await;
+
+    assert_eq!(
+        harness.assoc_events.pop().as_slice(),
+        &[AssocInfoEvent::TaskStart(
+            TaskType::StartupIntegrity,
+            FunctionCode::Read,
+            Sequence::new(2)
+        )]
     );
 }
 

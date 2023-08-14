@@ -631,6 +631,10 @@ impl MasterSession {
             return Err(TaskError::NonFinWithoutCon);
         }
 
+        if response.header.iin.has_bad_request_error() {
+            return Err(TaskError::RejectedByIin2(response.header.iin));
+        }
+
         let association = self.associations.get_mut(destination)?;
         association.process_iin(response.header.iin);
         task.process_response(association, response.header, response.objects?)
