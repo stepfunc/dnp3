@@ -795,6 +795,21 @@
         }
       ]
     },
+    "mach2": {
+      "id": "mach2",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2019 Nick Fitzgerald, 2021 Yuki Okushi"
+              ]
+            }
+          }
+        }
+      ]
+    },
     "matchers": {
       "id": "matchers",
       "source": "crates.io",
