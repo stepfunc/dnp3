@@ -613,6 +613,7 @@ fn define_outstation_features(lib: &mut LibraryBuilder) -> BackTraced<FunctionAr
     let self_address = Name::create("self_address")?;
     let broadcast = Name::create("broadcast")?;
     let unsolicited = Name::create("unsolicited")?;
+    let respond_to_any_master = Name::create("respond_to_any_master")?;
 
     let features = lib.declare_function_argument_struct("outstation_features")?;
     let features = lib
@@ -632,6 +633,12 @@ fn define_outstation_features(lib: &mut LibraryBuilder) -> BackTraced<FunctionAr
             Primitive::Bool,
             "Respond to enable/disable unsolicited response and produce unsolicited responses",
         )?
+        .add(
+            &respond_to_any_master,
+            Primitive::Bool,
+            doc("Outstation will process every request as if it came from the configured master address")
+                .details("This feature is a hack that can make configuration of some systems easier/more flexible, but should not be used when unsolicited reporting is also required.")
+        )?
         .doc("Optional outstation features that can be enabled or disabled")?
         .end_fields()?
         .begin_initializer(
@@ -642,6 +649,7 @@ fn define_outstation_features(lib: &mut LibraryBuilder) -> BackTraced<FunctionAr
         .default(&self_address, false)?
         .default(&broadcast, true)?
         .default(&unsolicited, true)?
+        .default(&respond_to_any_master, false)?
         .end_initializer()?
         .build()?;
 

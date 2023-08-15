@@ -121,24 +121,29 @@ impl TransportReader {
         match data {
             Ok(ParsedTransportData::Fragment(info, fragment)) => match fragment.to_response() {
                 Ok(response) => Some(TransportResponse::Response(info.source, response)),
-                Err(err) => Some(TransportResponse::Error(err.into())),
+                Err(err) => Some(TransportResponse::Error(info.source, err.into())),
             },
             Ok(ParsedTransportData::LinkLayerMessage(msg)) => {
                 Some(TransportResponse::LinkLayerMessage(msg))
             }
-            Err(err) => Some(TransportResponse::Error(err.into())),
+            Err((err, source)) => Some(TransportResponse::Error(source, err.into())),
         }
     }
 
-    pub(crate) fn pop_request(&mut self, master_address: EndpointAddress) -> RequestGuard<'_> {
+    pub(crate) fn pop_request(
+        &mut self,
+        master_address: Option<EndpointAddress>,
+    ) -> RequestGuard<'_> {
         if let Some(TransportRequest::Request(info, _)) = self.peek_request() {
-            if info.source != master_address {
-                tracing::warn!(
-                    "Discarding ASDU from master address: {} (configured address == {})",
-                    info.source.raw_value(),
-                    master_address.raw_value()
-                );
-                self.pop();
+            if let Some(required_master_addr) = master_address {
+                if info.source != required_master_addr {
+                    tracing::warn!(
+                        "Discarding ASDU from master address: {} (configured address == {})",
+                        info.source.raw_value(),
+                        required_master_addr.raw_value()
+                    );
+                    self.pop();
+                }
             }
         }
         RequestGuard::new(self)
@@ -149,16 +154,22 @@ impl TransportReader {
         match data {
             Ok(ParsedTransportData::Fragment(info, fragment)) => match fragment.to_request() {
                 Ok(request) => Some(TransportRequest::Request(info, request)),
-                Err(err) => Some(TransportRequest::Error(err.into(fragment.control.seq))),
+                Err(err) => Some(TransportRequest::Error(
+                    info.source,
+                    err.into(fragment.control.seq),
+                )),
             },
             Ok(ParsedTransportData::LinkLayerMessage(msg)) => {
                 Some(TransportRequest::LinkLayerMessage(msg))
             }
-            Err(err) => Some(TransportRequest::Error(err.into())),
+            Err((err, source)) => Some(TransportRequest::Error(source, err.into())),
         }
     }
 
-    fn parse(&mut self, peek: bool) -> Option<Result<ParsedTransportData, HeaderParseError>> {
+    fn parse(
+        &mut self,
+        peek: bool,
+    ) -> Option<Result<ParsedTransportData, (HeaderParseError, EndpointAddress)>> {
         let transport_data = if peek {
             self.inner.peek()?
         } else {
@@ -168,7 +179,8 @@ impl TransportReader {
         match transport_data {
             TransportData::Fragment(fragment) => Some(
                 ParsedFragment::parse(fragment.data)
-                    .map(|parsed| ParsedTransportData::Fragment(fragment.info, parsed)),
+                    .map(|parsed| ParsedTransportData::Fragment(fragment.info, parsed))
+                    .map_err(|err| (err, fragment.info.source)),
             ),
             TransportData::LinkLayerMessage(msg) => {
                 Some(Ok(ParsedTransportData::LinkLayerMessage(msg)))

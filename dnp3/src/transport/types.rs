@@ -51,7 +51,7 @@ pub(crate) enum LinkLayerMessageType {
 pub(crate) enum TransportResponse<'a> {
     Response(EndpointAddress, Response<'a>),
     LinkLayerMessage(LinkLayerMessage),
-    Error(TransportResponseError),
+    Error(EndpointAddress, TransportResponseError),
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -75,7 +75,7 @@ impl From<ResponseValidationError> for TransportResponseError {
 pub(crate) enum TransportRequest<'a> {
     Request(FragmentInfo, Request<'a>),
     LinkLayerMessage(LinkLayerMessage),
-    Error(TransportRequestError),
+    Error(EndpointAddress, TransportRequestError),
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]

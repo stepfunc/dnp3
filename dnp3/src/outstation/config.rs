@@ -22,6 +22,7 @@ pub enum Feature {
     feature = "serialization",
     derive(serde::Serialize, serde::Deserialize)
 )]
+#[cfg_attr(not(feature = "ffi"), non_exhaustive)]
 pub struct Features {
     /// if enabled, the outstation responds to the self address (default == Disabled)
     pub self_address: Feature,
@@ -29,6 +30,11 @@ pub struct Features {
     pub broadcast: Feature,
     /// if enabled, the outstation will send process enable/disable unsolicited and produce unsolicited responses (default == Enabled)
     pub unsolicited: Feature,
+    /// if enabled, the outstation will process every request as if it came from the configured master address
+    ///
+    /// This feature is a hack that can make configuration of some systems easier/more flexible, but
+    /// should not be used when unsolicited reporting is also required.
+    pub respond_to_any_master: Feature,
 }
 
 impl Default for Features {
@@ -37,6 +43,7 @@ impl Default for Features {
             self_address: Feature::Disabled,
             broadcast: Feature::Enabled,
             unsolicited: Feature::Enabled,
+            respond_to_any_master: Feature::Disabled,
         }
     }
 }
