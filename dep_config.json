@@ -5,6 +5,7 @@
     "anstream",
     "anstyle",
     "anstyle-parse",
+    "anstyle-query",
     "anstyle-wincon",
     "atty",
     "autocfg",
@@ -14,6 +15,7 @@
     "clap_builder",
     "clap_derive",
     "clap_lex",
+    "colorchoice",
     "concolor-override",
     "concolor-query",
     "dunce",
@@ -793,6 +795,21 @@
         }
       ]
     },
+    "mach2": {
+      "id": "mach2",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2019 Nick Fitzgerald, 2021 Yuki Okushi"
+              ]
+            }
+          }
+        }
+      ]
+    },
     "matchers": {
       "id": "matchers",
       "source": "crates.io",
@@ -1218,6 +1235,21 @@
             "copyright": {
               "Lines": [
                 "Copyright (c) 2019 Eric McCorkle"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "scopeguard": {
+      "id": "scopeguard",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2016-2019 Ulrik Sverdrup \"bluss\" and scopeguard developers"
               ]
             }
           }
