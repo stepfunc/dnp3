@@ -533,6 +533,7 @@ impl From<&ffi::OutstationFeatures> for Features {
             self_address: to_feature(from.self_address()),
             broadcast: to_feature(from.broadcast()),
             unsolicited: to_feature(from.unsolicited()),
+            respond_to_any_master: to_feature(from.respond_to_any_master()),
         }
     }
 }

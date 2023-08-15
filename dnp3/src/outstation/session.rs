@@ -158,10 +158,20 @@ pub(crate) struct SessionConfig {
     select_timeout: Timeout,
     broadcast: Feature,
     unsolicited: Feature,
+    respond_to_any_master: Feature,
     max_unsolicited_retries: Option<usize>,
     unsolicited_retry_delay: std::time::Duration,
     keep_alive_timeout: Option<std::time::Duration>,
     max_controls_per_request: Option<u16>,
+}
+
+impl SessionConfig {
+    fn required_master_address(&self) -> Option<EndpointAddress> {
+        match self.respond_to_any_master {
+            Feature::Enabled => None,
+            Feature::Disabled => Some(self.master_address),
+        }
+    }
 }
 
 pub(crate) struct SessionParameters {
@@ -179,6 +189,7 @@ impl From<OutstationConfig> for SessionConfig {
             select_timeout: config.select_timeout,
             broadcast: config.features.broadcast,
             unsolicited: config.features.unsolicited,
+            respond_to_any_master: config.features.respond_to_any_master,
             max_unsolicited_retries: config.max_unsolicited_retries,
             unsolicited_retry_delay: config.unsolicited_retry_delay,
             keep_alive_timeout: config.keep_alive_timeout,
@@ -256,7 +267,7 @@ pub(crate) struct OutstationSession {
 }
 
 enum Confirm {
-    Yes,
+    Yes(EndpointAddress),
     Timeout,
     NewRequest,
 }
@@ -288,9 +299,9 @@ enum FragmentType<'a> {
 
 #[derive(Copy, Clone)]
 enum ConfirmAction {
-    Confirmed,
+    Confirmed(EndpointAddress),
     NewRequest,
-    EchoLastResponse(Option<Response>),
+    EchoLastResponse(EndpointAddress, Option<Response>),
     ContinueWait,
 }
 
@@ -385,6 +396,7 @@ impl OutstationSession {
         &mut self,
         io: &mut PhysLayer,
         writer: &mut TransportWriter,
+        respond_to: EndpointAddress,
         mut response: Response,
         database: &DatabaseHandle,
     ) -> Result<Response, LinkError> {
@@ -397,7 +409,8 @@ impl OutstationSession {
             }
         }
 
-        self.repeat_solicited(io, writer, response).await?;
+        self.repeat_solicited(io, respond_to, writer, response)
+            .await?;
 
         Ok(response)
     }
@@ -405,6 +418,7 @@ impl OutstationSession {
     async fn repeat_solicited(
         &mut self,
         io: &mut PhysLayer,
+        respond_to: EndpointAddress,
         writer: &mut TransportWriter,
         response: Response,
     ) -> Result<(), LinkError> {
@@ -417,7 +431,7 @@ impl OutstationSession {
             .write(
                 io,
                 self.config.decode_level,
-                self.config.master_address.wrap(),
+                respond_to.wrap(),
                 self.sol_tx_buffer.get(len).unwrap(),
             )
             .await
@@ -702,7 +716,7 @@ impl OutstationSession {
             return Ok(UnsolicitedWaitResult::Timeout);
         }
 
-        let mut guard = reader.pop_request(self.config.master_address);
+        let mut guard = reader.pop_request(self.config.required_master_address());
         let (info, request) = match guard.get() {
             None => return Ok(UnsolicitedWaitResult::ReadNext),
             Some(TransportRequest::Request(info, request)) => {
@@ -713,9 +727,10 @@ impl OutstationSession {
                 self.on_link_activity();
                 return Ok(UnsolicitedWaitResult::ReadNext);
             }
-            Some(TransportRequest::Error(err)) => {
+            Some(TransportRequest::Error(from, err)) => {
                 self.state.deferred_read.clear();
-                self.write_error_response(io, writer, err, database).await?;
+                self.write_error_response(io, from, writer, err, database)
+                    .await?;
                 return Ok(UnsolicitedWaitResult::ReadNext);
             }
         };
@@ -755,8 +770,14 @@ impl OutstationSession {
 
                 let seq = request.header.control.seq;
                 let iin = Iin::default() | Iin2::from(err);
-                self.write_solicited(io, writer, Response::empty_solicited(seq, iin), database)
-                    .await?;
+                self.write_solicited(
+                    io,
+                    writer,
+                    info.source,
+                    Response::empty_solicited(seq, iin),
+                    database,
+                )
+                .await?;
                 Ok(UnsolicitedWaitResult::ReadNext)
             }
             FragmentType::NewNonRead(hash, objects) => {
@@ -772,7 +793,7 @@ impl OutstationSession {
                     .await;
                 if let Some(response) = &mut response {
                     *response = self
-                        .write_solicited(io, writer, *response, database)
+                        .write_solicited(io, writer, info.source, *response, database)
                         .await?;
                 }
                 self.state.last_valid_request = Some(LastValidRequest::new(
@@ -807,7 +828,8 @@ impl OutstationSession {
             }
             FragmentType::RepeatNonRead(_, last_response) => {
                 if let Some(last_response) = last_response {
-                    self.repeat_solicited(io, writer, last_response).await?
+                    self.repeat_solicited(io, info.source, writer, last_response)
+                        .await?
                 }
                 self.state.deferred_read.clear();
                 Ok(UnsolicitedWaitResult::ReadNext)
@@ -898,7 +920,9 @@ impl OutstationSession {
         if let Some(x) = self.state.deferred_read.select(database) {
             tracing::info!("handling deferred READ request");
             let (response, mut series) = self.write_read_response(database, true, x.seq, x.iin2);
-            let response = self.write_solicited(io, writer, response, database).await?;
+            let response = self
+                .write_solicited(io, writer, x.info.source, response, database)
+                .await?;
             self.state.last_valid_request =
                 Some(LastValidRequest::new(x.seq, x.hash, Some(response), series));
 
@@ -929,7 +953,7 @@ impl OutstationSession {
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
     ) -> Result<(), RunError> {
-        let mut guard = reader.pop_request(self.config.master_address);
+        let mut guard = reader.pop_request(self.config.required_master_address());
         match guard.get() {
             Some(TransportRequest::Request(info, request)) => {
                 self.on_link_activity();
@@ -940,7 +964,7 @@ impl OutstationSession {
                     // optional response
                     if let Some(response) = &mut result.response {
                         *response = self
-                            .write_solicited(io, writer, *response, database)
+                            .write_solicited(io, writer, info.source, *response, database)
                             .await?;
 
                         // check if an extra confirmation was added due to broadcast
@@ -968,9 +992,10 @@ impl OutstationSession {
             Some(TransportRequest::LinkLayerMessage(_)) => {
                 self.on_link_activity();
             }
-            Some(TransportRequest::Error(err)) => {
+            Some(TransportRequest::Error(from, err)) => {
                 self.on_link_activity();
-                self.write_error_response(io, writer, err, database).await?;
+                self.write_error_response(io, from, writer, err, database)
+                    .await?;
             }
             None => (),
         }
@@ -1045,6 +1070,7 @@ impl OutstationSession {
     async fn write_error_response(
         &mut self,
         io: &mut PhysLayer,
+        respond_to: EndpointAddress,
         writer: &mut TransportWriter,
         err: TransportRequestError,
         database: &DatabaseHandle,
@@ -1059,8 +1085,14 @@ impl OutstationSession {
 
         if let Some(seq) = seq {
             let iin = Iin::default() | Iin2::NO_FUNC_CODE_SUPPORT;
-            self.write_solicited(io, writer, Response::empty_solicited(seq, iin), database)
-                .await?;
+            self.write_solicited(
+                io,
+                writer,
+                respond_to,
+                Response::empty_solicited(seq, iin),
+                database,
+            )
+            .await?;
         }
         Ok(())
     }
@@ -1982,7 +2014,7 @@ impl OutstationSession {
                 .wait_for_sol_confirm(io, reader, writer, series.ecsn)
                 .await?
             {
-                Confirm::Yes => {
+                Confirm::Yes(respond_to) => {
                     self.state.last_broadcast_type = None;
 
                     database
@@ -1997,7 +2029,8 @@ impl OutstationSession {
                     series.ecsn.increment();
                     let (response, next) =
                         self.write_read_response(database, false, series.ecsn, Iin2::default());
-                    self.write_solicited(io, writer, response, database).await?;
+                    self.write_solicited(io, writer, respond_to, response, database)
+                        .await?;
                     match next {
                         None => return Ok(()),
                         Some(next) => {
@@ -2035,15 +2068,15 @@ impl OutstationSession {
                 }
                 // process data
                 TimeoutStatus::No => {
-                    let mut guard = reader.pop_request(self.config.master_address);
+                    let mut guard = reader.pop_request(self.config.required_master_address());
                     match self.expect_sol_confirm(ecsn, &mut guard) {
                         ConfirmAction::ContinueWait => {
                             // we ignored whatever the request was and logged it elsewhere
                             // just go back to the loop and read another fragment
                         }
-                        ConfirmAction::Confirmed => {
+                        ConfirmAction::Confirmed(respond_to) => {
                             self.info.solicited_confirm_received(ecsn);
-                            return Ok(Confirm::Yes);
+                            return Ok(Confirm::Yes(respond_to));
                         }
                         ConfirmAction::NewRequest => {
                             self.info.solicited_confirm_wait_new_request();
@@ -2051,9 +2084,10 @@ impl OutstationSession {
                             guard.retain();
                             return Ok(Confirm::NewRequest);
                         }
-                        ConfirmAction::EchoLastResponse(response) => {
+                        ConfirmAction::EchoLastResponse(respond_to, response) => {
                             if let Some(response) = response {
-                                self.repeat_solicited(io, writer, response).await?;
+                                self.repeat_solicited(io, respond_to, writer, response)
+                                    .await?;
                             }
                             // per the spec, we restart the confirm timer
                             deadline = self.new_confirm_deadline();
@@ -2074,7 +2108,7 @@ impl OutstationSession {
                 self.on_link_activity();
                 return ConfirmAction::ContinueWait;
             }
-            Some(TransportRequest::Error(_)) => {
+            Some(TransportRequest::Error(_, _)) => {
                 self.on_link_activity();
                 return ConfirmAction::NewRequest;
             }
@@ -2084,14 +2118,16 @@ impl OutstationSession {
         match self.classify(info, request) {
             FragmentType::MalformedRequest(_, _) => ConfirmAction::NewRequest,
             FragmentType::NewRead(_, _) => ConfirmAction::NewRequest,
-            FragmentType::RepeatRead(_, response, _) => ConfirmAction::EchoLastResponse(response),
+            FragmentType::RepeatRead(_, response, _) => {
+                ConfirmAction::EchoLastResponse(info.source, response)
+            }
             FragmentType::NewNonRead(_, _) => ConfirmAction::NewRequest,
             // this should never happen, but if it does, new request is probably best course of action
             FragmentType::RepeatNonRead(_, _) => ConfirmAction::NewRequest,
             FragmentType::Broadcast(_) => ConfirmAction::NewRequest,
             FragmentType::SolicitedConfirm(seq) => {
                 if seq == ecsn {
-                    ConfirmAction::Confirmed
+                    ConfirmAction::Confirmed(info.source)
                 } else {
                     self.info
                         .wrong_solicited_confirm_seq(ecsn, request.header.control.seq);
