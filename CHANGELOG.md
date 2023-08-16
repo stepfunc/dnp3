@@ -1,10 +1,11 @@
-### 1.5.0-rc1 ###
+### 1.5.0 ###
 * :star: Add configuration option that allows outstation to respond to any master. See [#316](https://github.com/stepfunc/dnp3/pull/316).
 * :star: Add optional [serde](https://crates.io/crates/serde) support for public config types in Rust. See [#303](https://github.com/stepfunc/dnp3/pull/303).
 * :wrench: Fix cmake download when building C/C++ examples. See [#307](https://github.com/stepfunc/dnp3/pull/307).
 * :book: Fix FFI docs for g12v1 and remove g12v0 and g41v0. See [#308](https://github.com/stepfunc/dnp3/pull/308)
 * :bug: Fix master task scheduling CPU thrashing under certain conditions. See [#312](https://github.com/stepfunc/dnp3/pull/312).
 * :bug: Fix bug where `AssociationInformation::task_fail` was not properly being called for some tasks. See [#313](https://github.com/stepfunc/dnp3/pull/313).
+* :bug: Update rx509 to 0.2.1 to fix ASN.1 GeneralizedTime parsing. See [RASN #2](https://github.com/stepfunc/rasn/pull/2).
 
 ### 1.4.1 ###
 * :bug: Bump rustls to 0.21.1 to resolve [#300](https://github.com/stepfunc/dnp3/issues/300).
