@@ -1,6 +1,6 @@
 [package]
 name = "dnp3"
-version = "1.5.0-rc1"
+version = "1.5.0"
 authors = ["Step Function I/O LLC <info@stepfunc.io>"]
 edition = "2021"
 license-file = "../LICENSE.txt"
