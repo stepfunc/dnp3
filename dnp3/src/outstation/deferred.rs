@@ -81,7 +81,7 @@ impl DeferredRead {
         self.info = Some(DeferredInfo::new(hash, seq, info, iin2));
     }
 
-    pub(crate) fn select(&mut self, database: &mut DatabaseHandle) -> Option<DeferredInfo> {
+    pub(crate) fn select(&mut self, database: &DatabaseHandle) -> Option<DeferredInfo> {
         match self.info {
             None => None,
             Some(x) => {
