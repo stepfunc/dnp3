@@ -259,13 +259,13 @@ impl Server {
         Shutdown
     }
 
-    async fn accept_loop(&mut self, mut listener: tokio::net::TcpListener) -> Result<(), Shutdown> {
+    async fn accept_loop(&mut self, listener: tokio::net::TcpListener) -> Result<(), Shutdown> {
         loop {
-            self.accept_one(&mut listener).await?;
+            self.accept_one(&listener).await?;
         }
     }
 
-    async fn accept_one(&mut self, listener: &mut tokio::net::TcpListener) -> Result<(), Shutdown> {
+    async fn accept_one(&mut self, listener: &tokio::net::TcpListener) -> Result<(), Shutdown> {
         match listener.accept().await {
             Ok((stream, addr)) => {
                 crate::tcp::configure_server(&stream);

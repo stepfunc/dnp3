@@ -1246,7 +1246,7 @@ impl OutstationSession {
         &mut self,
         seq: Sequence,
         object_headers: HeaderCollection<'_>,
-        database: &mut DatabaseHandle,
+        database: &DatabaseHandle,
     ) -> Response {
         let mut iin2 = Iin2::default();
         let mut empty = true;
@@ -1284,7 +1284,7 @@ impl OutstationSession {
         iin2
     }
 
-    async fn handle_write_attr(&mut self, attr: Attribute<'_>, db: &mut DatabaseHandle) -> Iin2 {
+    async fn handle_write_attr(&mut self, attr: Attribute<'_>, db: &DatabaseHandle) -> Iin2 {
         // first validate that attribute can be written
         if let Err(err) = db.transaction(|db| db.inner.get_attr_map().can_write(attr)) {
             tracing::warn!("Unable to WRITE attribute: {err}");
@@ -1317,7 +1317,7 @@ impl OutstationSession {
     async fn handle_write_analog_deadbands<I, V>(
         &mut self,
         items: CountSequence<'_, Prefix<I, V>>,
-        db: &mut DatabaseHandle,
+        db: &DatabaseHandle,
     ) -> Iin2
     where
         I: Index,
@@ -1352,7 +1352,7 @@ impl OutstationSession {
     async fn handle_single_write_header(
         &mut self,
         header: ObjectHeader<'_>,
-        db: &mut DatabaseHandle,
+        db: &DatabaseHandle,
     ) -> Iin2 {
         match header.details {
             HeaderDetails::OneByteStartStop(_, _, RangedVariation::Group0(_, Some(attr))) => {
