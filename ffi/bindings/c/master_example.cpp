@@ -118,11 +118,11 @@ class ReadHandler : public dnp3::ReadHandler {
         }
     }
 
-    virtual void handle_string_attr(const dnp3::HeaderInfo &info, dnp3::StringAttr attr, uint8_t set, uint8_t variation, const char *value) { 
+    void handle_string_attr(const dnp3::HeaderInfo &info, dnp3::StringAttr attr, uint8_t set, uint8_t variation, const char *value) override {
         std::cout << std::dec << "String Attribute: " << dnp3::to_string(attr) << " set: " << (size_t)set << " var: " << (size_t)variation
                   << " value: " << value
                   << std::endl;
-        
+
     }
 };
 // ANCHOR_END: read_handler
@@ -173,24 +173,24 @@ class CommandTaskCallback : public dnp3::CommandTaskCallback {
 // ANCHOR_END: assoc_control_callback
 
 class ReadTaskCallback : public dnp3::ReadTaskCallback {
-    virtual void on_complete(dnp3::Nothing result)
+    void on_complete(dnp3::Nothing result) override
     {
         std::cout << "read succeeded!" << std::endl;
     }
 
-    virtual void on_failure(dnp3::ReadError error) override
+    void on_failure(dnp3::ReadError error) override
     {
         std::cout << "read failed: " << dnp3::to_string(error) << std::endl;
     }
 };
 
 class TimeSyncTaskCallback : public dnp3::TimeSyncTaskCallback {
-    virtual void on_complete(dnp3::Nothing result)
+    void on_complete(dnp3::Nothing result) override
     {
         std::cout << "time sync succeeded!" << std::endl;
     }
 
-    virtual void on_failure(dnp3::TimeSyncError error) override
+    void on_failure(dnp3::TimeSyncError error) override
     {
         std::cout << "time sync failed: " << dnp3::to_string(error) << std::endl;
     }
@@ -211,19 +211,19 @@ class RestartTaskCallback : public dnp3::RestartTaskCallback {
 };
 
 // ANCHOR: read_directory_callback
-class ReadDirectoryCallback : public dnp3::ReadDirectoryCallback {    
+class ReadDirectoryCallback : public dnp3::ReadDirectoryCallback {
     void on_complete(dnp3::FileInfoIterator &iter) override
-    {        
+    {
         while (iter.next()) {
             const auto info = iter.get();
             print_file_info(info);
-        }        
+        }
     }
 
     void on_failure(dnp3::FileError error) override
     {
         std::cout << "Error reading directory: " << dnp3::to_string(error) << std::endl;
-    }    
+    }
 };
 // ANCHOR_END: read_directory_callback
 
