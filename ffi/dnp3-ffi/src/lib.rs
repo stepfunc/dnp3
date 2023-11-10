@@ -5,7 +5,6 @@ pub(crate) use crate::tracing::*;
 /// but instead just use crate::<name> when invoking an implementation
 pub use command::*;
 pub use connect::*;
-pub use decoding::*;
 pub use handler::*;
 pub use master::*;
 pub use outstation::*;

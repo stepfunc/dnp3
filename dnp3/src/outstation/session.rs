@@ -843,18 +843,16 @@ impl OutstationSession {
         reader: &mut TransportReader,
         deadline: tokio::time::Instant,
     ) -> Result<TimeoutStatus, RunError> {
-        loop {
-            let decode_level = self.config.decode_level;
-            tokio::select! {
-                 res = self.sleep_until(Some(deadline)) => {
-                     res?;
-                     return Ok(TimeoutStatus::Yes);
-                 }
-                 res = reader.read(io, decode_level) => {
-                     res?;
-                     return Ok(TimeoutStatus::No);
-                 }
-            }
+        let decode_level = self.config.decode_level;
+        tokio::select! {
+             res = self.sleep_until(Some(deadline)) => {
+                 res?;
+                 Ok(TimeoutStatus::Yes)
+             }
+             res = reader.read(io, decode_level) => {
+                 res?;
+                 Ok(TimeoutStatus::No)
+             }
         }
     }
 

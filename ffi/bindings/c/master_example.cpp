@@ -173,7 +173,7 @@ class CommandTaskCallback : public dnp3::CommandTaskCallback {
 // ANCHOR_END: assoc_control_callback
 
 class ReadTaskCallback : public dnp3::ReadTaskCallback {
-    void on_complete(dnp3::Nothing result) override
+    virtual void on_complete(dnp3::Nothing result) override
     {
         std::cout << "read succeeded!" << std::endl;
     }
@@ -185,6 +185,7 @@ class ReadTaskCallback : public dnp3::ReadTaskCallback {
 };
 
 class TimeSyncTaskCallback : public dnp3::TimeSyncTaskCallback {
+
     void on_complete(dnp3::Nothing result) override
     {
         std::cout << "time sync succeeded!" << std::endl;
