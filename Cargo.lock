@@ -809,9 +809,9 @@ checksum = "dd8b5dd2ae5ed71462c540258bedcb51965123ad7e7ccf4b9a8cafaa4a63576d"
 
 [[package]]
 name = "oo-bindgen"
-version = "0.8.5"
+version = "0.8.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c7271d34f5187f244b1c647e8820338f8f038b85db0481031a66242144df7a7"
+checksum = "08bdc3553c414516c4e287168049b1f97a89be4d80721bd480e206d97191e024"
 dependencies = [
  "backtrace",
  "clap",
