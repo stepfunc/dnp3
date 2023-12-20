@@ -376,7 +376,7 @@ dependencies = [
 
 [[package]]
 name = "dnp3"
-version = "1.5.0"
+version = "1.5.1-rc1"
 dependencies = [
  "assert_matches",
  "chrono",
@@ -400,7 +400,7 @@ dependencies = [
 
 [[package]]
 name = "dnp3-bindings"
-version = "1.5.0"
+version = "1.5.1-rc1"
 dependencies = [
  "dnp3-schema",
  "oo-bindgen",
@@ -410,7 +410,7 @@ dependencies = [
 
 [[package]]
 name = "dnp3-ffi"
-version = "1.5.0"
+version = "1.5.1-rc1"
 dependencies = [
  "dnp3",
  "dnp3-schema",
@@ -428,7 +428,7 @@ dependencies = [
 
 [[package]]
 name = "dnp3-ffi-java"
-version = "1.5.0"
+version = "1.5.1-rc1"
 dependencies = [
  "dnp3-ffi",
  "dnp3-schema",
@@ -438,7 +438,7 @@ dependencies = [
 
 [[package]]
 name = "dnp3-schema"
-version = "1.5.0"
+version = "1.5.1-rc1"
 dependencies = [
  "oo-bindgen",
  "sfio-tokio-ffi",
@@ -809,9 +809,9 @@ checksum = "dd8b5dd2ae5ed71462c540258bedcb51965123ad7e7ccf4b9a8cafaa4a63576d"
 
 [[package]]
 name = "oo-bindgen"
-version = "0.8.4"
+version = "0.8.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f851acb1e31bb0638f21e44f989f116b80859bfd9a4eccc18fd9def44ddf492a"
+checksum = "3c7271d34f5187f244b1c647e8820338f8f038b85db0481031a66242144df7a7"
 dependencies = [
  "backtrace",
  "clap",
