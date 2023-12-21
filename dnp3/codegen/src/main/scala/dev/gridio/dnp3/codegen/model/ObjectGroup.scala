@@ -28,6 +28,7 @@ object ObjectGroup {
     Group40,
     Group41,
     Group42,
+    Group43,
     Group50,
     Group51,
     Group52,
@@ -97,8 +98,6 @@ trait ObjectGroup {
   def name: String = "Group%s".format(group)
 
   def desc: String
-
-  def hasSizedObjects: Boolean = variations.exists(x => x.isInstanceOf[FixedSizeField])
 
   def groupType : GroupType
 }

@@ -599,7 +599,15 @@ pub trait ReadHandler: Send + Sync {
     ) {
     }
 
-    /// Process an object header of `AnalogOutputStatus` values
+    /// Process an object header of `AnalogOutputCommandEvent` values
+    fn handle_analog_output_command_event(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (AnalogOutputCommandEvent, u16)>,
+    ) {
+    }
+
+    /// Process an object header of `BinaryOutputCommandEvent` values
     fn handle_binary_output_command_event(
         &mut self,
         info: HeaderInfo,
