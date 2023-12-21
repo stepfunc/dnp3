@@ -1,3 +1,4 @@
+use std::net::SocketAddr;
 use tracing::Instrument;
 
 use crate::app::{ConnectStrategy, Listener, Shutdown};
@@ -71,14 +72,24 @@ struct OutstationInfo {
 pub struct Server {
     link_error_mode: LinkErrorMode,
     connection_id: u64,
-    address: std::net::SocketAddr,
+    address: SocketAddr,
     outstations: Vec<OutstationInfo>,
     connection_handler: ServerConnectionHandler,
 }
 
 /// Handle to a running server. Dropping the handle, shuts down the server.
 pub struct ServerHandle {
+    addr: Option<SocketAddr>,
     _tx: tokio::sync::oneshot::Sender<()>,
+}
+
+impl ServerHandle {
+    /// Returns the local address to which this server is bound.
+    ///
+    /// This can be useful, for example, when binding to port 0 to figure out which port was actually bound.
+    pub fn local_addr(&self) -> Option<SocketAddr> {
+        self.addr
+    }
 }
 
 enum ServerConnectionHandler {
@@ -100,7 +111,7 @@ impl ServerConnectionHandler {
 impl Server {
     /// create a TCP server builder object that will eventually be bound
     /// to the specified address
-    pub fn new_tcp_server(link_error_mode: LinkErrorMode, address: std::net::SocketAddr) -> Self {
+    pub fn new_tcp_server(link_error_mode: LinkErrorMode, address: SocketAddr) -> Self {
         Self {
             link_error_mode,
             connection_id: 0,
@@ -114,7 +125,7 @@ impl Server {
     #[cfg(feature = "tls")]
     pub fn new_tls_server(
         link_error_mode: LinkErrorMode,
-        address: std::net::SocketAddr,
+        address: SocketAddr,
         tls_config: crate::tcp::tls::TlsServerConfig,
     ) -> Self {
         Self {
@@ -206,6 +217,8 @@ impl Server {
     ) -> Result<(ServerHandle, impl std::future::Future<Output = Shutdown>), tokio::io::Error> {
         let listener = tokio::net::TcpListener::bind(self.address).await?;
 
+        let addr = listener.local_addr().ok();
+
         let (tx, rx) = tokio::sync::oneshot::channel();
 
         let task = async move {
@@ -215,7 +228,7 @@ impl Server {
                 .await
         };
 
-        let handle = ServerHandle { _tx: tx };
+        let handle = ServerHandle { addr, _tx: tx };
 
         Ok((handle, task))
     }
@@ -223,6 +236,7 @@ impl Server {
     /// Consume the `TcpServer` builder object, bind it to pre-specified port, and spawn the server
     /// task onto the Tokio runtime. Returns a ServerHandle that will shut down the server and all
     /// associated outstations when dropped.
+    ///
     ///
     /// This must be called from within the Tokio runtime
     pub async fn bind(self) -> Result<ServerHandle, tokio::io::Error> {
@@ -279,11 +293,7 @@ impl Server {
         }
     }
 
-    async fn process_connection(
-        &mut self,
-        stream: tokio::net::TcpStream,
-        addr: std::net::SocketAddr,
-    ) {
+    async fn process_connection(&mut self, stream: tokio::net::TcpStream, addr: SocketAddr) {
         let id = self.connection_id;
         self.connection_id = self.connection_id.wrapping_add(1);
 
