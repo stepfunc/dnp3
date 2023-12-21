@@ -42,6 +42,10 @@ pub(crate) enum CountVariation<'a> {
     Group11Var1,
     /// Binary Output Event - Output Status With Time
     Group11Var2,
+    /// Binary Output Command Event - Without Time
+    Group13Var1,
+    /// Binary Output Command Event - With Time
+    Group13Var2,
     /// Counter Event - Any Variation
     Group22Var0,
     /// Counter Event - 32-bit With Flag
@@ -157,6 +161,8 @@ impl<'a> CountVariation<'a> {
             Variation::Group11Var0 => Ok(CountVariation::Group11Var0),
             Variation::Group11Var1 => Ok(CountVariation::Group11Var1),
             Variation::Group11Var2 => Ok(CountVariation::Group11Var2),
+            Variation::Group13Var1 => Ok(CountVariation::Group13Var1),
+            Variation::Group13Var2 => Ok(CountVariation::Group13Var2),
             Variation::Group22Var0 => Ok(CountVariation::Group22Var0),
             Variation::Group22Var1 => Ok(CountVariation::Group22Var1),
             Variation::Group22Var2 => Ok(CountVariation::Group22Var2),
@@ -224,6 +230,8 @@ impl<'a> CountVariation<'a> {
             CountVariation::Group11Var0 => Ok(()),
             CountVariation::Group11Var1 => Ok(()),
             CountVariation::Group11Var2 => Ok(()),
+            CountVariation::Group13Var1 => Ok(()),
+            CountVariation::Group13Var2 => Ok(()),
             CountVariation::Group22Var0 => Ok(()),
             CountVariation::Group22Var1 => Ok(()),
             CountVariation::Group22Var2 => Ok(()),

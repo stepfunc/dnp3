@@ -1,7 +1,8 @@
+use crate::app::control::CommandStatus;
 use std::time::Duration;
 
 use crate::app::types::Timestamp;
-use crate::app::variations::{Group34Var1, Group34Var2, Group34Var3};
+use crate::app::variations::{Group13Var1, Group13Var2, Group34Var1, Group34Var2, Group34Var3};
 use crate::util::bit::bits;
 use crate::util::bit::BitMask;
 use crate::util::bit::Bitfield;
@@ -196,6 +197,36 @@ impl BinaryOutputStatus {
     }
 }
 
+/// Event transferred from master to outstation when the outstation receives a control.
+/// The primary use case of these objects are that they allow one master see that commands
+/// were issued to an outstation from another master.
+///
+/// Maps to group 13 variations 1 and 2.
+///
+/// These objects are part of subset level 4 and are not commonly used.
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+pub struct BinaryOutputCommandEvent {
+    /// commanded state of the binary output
+    ///
+    /// From the spec:
+    ///
+    /// 0 = Latch Off / Trip / NULL, 1 = Latch On / Close. Where the
+    /// commanded state is unknown, the commanded state flag shall be 0.
+    pub commanded_state: bool,
+    /// status from processing the command that triggered this event
+    pub status: CommandStatus,
+    /// associated time
+    pub time: Option<Time>,
+}
+
+impl BinaryOutputCommandEvent {
+    fn extract_state_and_status(value: u8) -> (bool, CommandStatus) {
+        let state = (value & 0b1000_0000) != 0;
+        let status = CommandStatus::from(value & 0b0111_1111);
+        (state, status)
+    }
+}
+
 /// Measurement type corresponding to groups 20 and 22
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub struct Counter {
@@ -310,6 +341,28 @@ impl From<Group34Var2> for AnalogInputDeadBand {
 impl From<Group34Var3> for AnalogInputDeadBand {
     fn from(value: Group34Var3) -> Self {
         AnalogInputDeadBand::F32(value.value)
+    }
+}
+
+impl From<Group13Var1> for BinaryOutputCommandEvent {
+    fn from(value: Group13Var1) -> Self {
+        let (commanded_state, status) = Self::extract_state_and_status(value.flags);
+        Self {
+            commanded_state,
+            status,
+            time: None,
+        }
+    }
+}
+
+impl From<Group13Var2> for BinaryOutputCommandEvent {
+    fn from(value: Group13Var2) -> Self {
+        let (commanded_state, status) = Self::extract_state_and_status(value.flags);
+        Self {
+            commanded_state,
+            status,
+            time: Some(Time::Synchronized(value.time)),
+        }
     }
 }
 

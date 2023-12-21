@@ -66,6 +66,10 @@ pub enum Variation {
     Group11Var2,
     /// Binary Command - Control Relay Output Block
     Group12Var1,
+    /// Binary Output Command Event - Without Time
+    Group13Var1,
+    /// Binary Output Command Event - With Time
+    Group13Var2,
     /// Counter - Any Variation
     Group20Var0,
     /// Counter - 32-bit With Flag
@@ -318,6 +322,11 @@ impl Variation {
                 1 => Some(Variation::Group12Var1),
                 _ => None,
             },
+            13 => match var {
+                1 => Some(Variation::Group13Var1),
+                2 => Some(Variation::Group13Var2),
+                _ => None,
+            },
             20 => match var {
                 0 => Some(Variation::Group20Var0),
                 1 => Some(Variation::Group20Var1),
@@ -501,6 +510,8 @@ impl Variation {
             Variation::Group11Var1 => (11, 1),
             Variation::Group11Var2 => (11, 2),
             Variation::Group12Var1 => (12, 1),
+            Variation::Group13Var1 => (13, 1),
+            Variation::Group13Var2 => (13, 2),
             Variation::Group20Var0 => (20, 0),
             Variation::Group20Var1 => (20, 1),
             Variation::Group20Var2 => (20, 2),
@@ -629,6 +640,8 @@ impl Variation {
             Variation::Group11Var1 => "Binary Output Event - Output Status Without Time",
             Variation::Group11Var2 => "Binary Output Event - Output Status With Time",
             Variation::Group12Var1 => "Binary Command - Control Relay Output Block",
+            Variation::Group13Var1 => "Binary Output Command Event - Without Time",
+            Variation::Group13Var2 => "Binary Output Command Event - With Time",
             Variation::Group20Var0 => "Counter - Any Variation",
             Variation::Group20Var1 => "Counter - 32-bit With Flag",
             Variation::Group20Var2 => "Counter - 16-bit With Flag",
@@ -1414,6 +1427,22 @@ pub(crate) struct Group20Var1 {
     pub(crate) flags: u8,
     /// value field of the variation
     pub(crate) value: u32,
+}
+
+/// Binary Output Command Event - With Time
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) struct Group13Var2 {
+    /// flags field of the variation
+    pub(crate) flags: u8,
+    /// time field of the variation
+    pub(crate) time: Timestamp,
+}
+
+/// Binary Output Command Event - Without Time
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) struct Group13Var1 {
+    /// flags field of the variation
+    pub(crate) flags: u8,
 }
 
 /// Binary Command - Control Relay Output Block
@@ -2802,6 +2831,38 @@ impl FixedSize for Group20Var1 {
     }
 }
 
+impl FixedSize for Group13Var2 {
+    const SIZE: u8 = 7;
+    fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
+        Ok(
+            Group13Var2 {
+                flags: cursor.read_u8()?,
+                time: Timestamp::new(cursor.read_u48_le()?),
+            }
+        )
+    }
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        self.time.write(cursor)?;
+        Ok(())
+    }
+}
+
+impl FixedSize for Group13Var1 {
+    const SIZE: u8 = 1;
+    fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
+        Ok(
+            Group13Var1 {
+                flags: cursor.read_u8()?,
+            }
+        )
+    }
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        Ok(())
+    }
+}
+
 impl FixedSize for Group12Var1 {
     const SIZE: u8 = 11;
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
@@ -3451,6 +3512,18 @@ impl std::fmt::Display for Group20Var1 {
     }
 }
 
+impl std::fmt::Display for Group13Var2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {} time: {}", BinaryFlagFormatter::new(self.flags), self.time)
+    }
+}
+
+impl std::fmt::Display for Group13Var1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {}", BinaryFlagFormatter::new(self.flags))
+    }
+}
+
 impl std::fmt::Display for Group12Var1 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "code: {} count: {} on_time: {} off_time: {} status: {:?}", self.code, self.count, self.on_time, self.off_time, self.status)
@@ -3822,6 +3895,14 @@ impl FixedSizeVariation for Group20Var2 {
 
 impl FixedSizeVariation for Group20Var1 {
     const VARIATION : Variation = Variation::Group20Var1;
+}
+
+impl FixedSizeVariation for Group13Var2 {
+    const VARIATION : Variation = Variation::Group13Var2;
+}
+
+impl FixedSizeVariation for Group13Var1 {
+    const VARIATION : Variation = Variation::Group13Var1;
 }
 
 impl FixedSizeVariation for Group12Var1 {

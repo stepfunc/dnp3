@@ -216,6 +216,9 @@ impl ReadHeader {
                 )
                 .into(),
             ),
+            // group 13
+            AllObjectsVariation::Group13Var1 => None,
+            AllObjectsVariation::Group13Var2 => None,
             // group 20
             AllObjectsVariation::Group20Var0 => Some(StaticReadHeader::Counter(None, None).into()),
             AllObjectsVariation::Group20Var1 => Some(
@@ -681,6 +684,8 @@ impl ReadHeader {
                 )
                 .into(),
             ),
+            CountVariation::Group13Var1 => None,
+            CountVariation::Group13Var2 => None,
             CountVariation::Group22Var0 => Some(EventReadHeader::Counter(None, Some(count)).into()),
             CountVariation::Group22Var1 => Some(
                 EventReadHeader::Counter(Some(EventCounterVariation::Group22Var1), Some(count))
