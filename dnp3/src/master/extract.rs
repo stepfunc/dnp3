@@ -122,6 +122,7 @@ mod test {
         KnownAttr(Known),
         UnknownAttr(AttrSet, u8, String),
         BinaryCommandEvent(Vec<(BinaryOutputCommandEvent, u16)>),
+        AnalogCommandEvent(Vec<(AnalogOutputCommandEvent, u16)>),
     }
 
     #[derive(Default)]
@@ -235,6 +236,14 @@ mod test {
             x: &mut dyn Iterator<Item = (BinaryOutputCommandEvent, u16)>,
         ) {
             self.received.push(Header::BinaryCommandEvent(x.collect()))
+        }
+
+        fn handle_analog_output_command_event(
+            &mut self,
+            _info: HeaderInfo,
+            x: &mut dyn Iterator<Item = (AnalogOutputCommandEvent, u16)>,
+        ) {
+            self.received.push(Header::AnalogCommandEvent(x.collect()))
         }
 
         fn handle_octet_string<'a>(
@@ -542,6 +551,36 @@ mod test {
                     255
                 )])
             ]
+        );
+    }
+
+    #[test]
+    fn handles_g43_object() {
+        let mut handler = MockHandler::new();
+        let objects = HeaderCollection::parse(
+            FunctionCode::UnsolicitedResponse,
+            &[
+                43, // g43v2
+                2, 0x17, 0x01, // count == 1
+                0x07, // index 7,
+                0x08, // status  == Too many ops
+                0xFE, 0xCA,
+            ],
+        )
+        .unwrap();
+
+        extract_measurements_inner(objects, &mut handler);
+
+        assert_eq!(
+            &handler.pop(),
+            &[Header::AnalogCommandEvent(vec![(
+                AnalogOutputCommandEvent {
+                    status: CommandStatus::TooManyOps,
+                    commanded_value: AnalogCommandValue::I16(0xCAFEu16 as i16),
+                    time: None,
+                },
+                7
+            )])]
         );
     }
 }
