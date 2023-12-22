@@ -61,7 +61,7 @@ impl From<dnp3::app::Shutdown> for crate::ffi::ParamError {
     }
 }
 
-impl From<crate::runtime::RuntimeError> for crate::ffi::ParamError {
+impl From<RuntimeError> for crate::ffi::ParamError {
     fn from(err: crate::runtime::RuntimeError) -> Self {
         match err {
             crate::runtime::RuntimeError::RuntimeDestroyed => {

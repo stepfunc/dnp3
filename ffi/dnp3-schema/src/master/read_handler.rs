@@ -189,6 +189,22 @@ pub(crate) fn define(
         )?
         .returns_nothing_by_default()?
         .end_callback()?
+        .begin_callback(
+            "handle_binary_output_command_event",
+            "Handle binary output command events",
+        )?
+        .param(
+            "info",
+            header_info.clone(),
+            "Group/variation and qualifier information",
+        )?
+        .param(
+            "values",
+            shared_def.binary_command_event_it.clone(),
+            iterator_doc,
+        )?
+        .returns_nothing_by_default()?
+        .end_callback()?
         .begin_callback("handle_octet_string", "Handle octet string data")?
         .param(
             "info",

@@ -6,6 +6,7 @@ use std::time::Duration;
 
 pub(crate) struct SharedDefinitions {
     pub error_type: ErrorType<Unvalidated>,
+    pub command_status: EnumHandle,
     pub port_state_listener: AsynchronousInterface,
     pub client_state_listener: AsynchronousInterface,
     pub variation_enum: EnumHandle,
@@ -37,6 +38,8 @@ pub(crate) struct SharedDefinitions {
     pub frozen_analog_it: AbstractIteratorHandle,
     pub analog_output_status_point: UniversalStructHandle,
     pub analog_output_status_it: AbstractIteratorHandle,
+    pub _binary_command_event_point: UniversalStructHandle,
+    pub binary_command_event_it: AbstractIteratorHandle,
     pub _octet_string: FunctionReturnStructHandle,
     pub octet_string_it: AbstractIteratorHandle,
     pub byte_it: AbstractIteratorHandle,
@@ -105,6 +108,8 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> 
         .add_error("other_tls_error", "Other TLS error")?
         .doc("Error type used throughout the library")?
         .build()?;
+
+    let command_status = define_command_status(lib)?;
 
     crate::constants::define(lib)?;
     let decode_level = crate::decoding::define(lib)?;
@@ -272,6 +277,18 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> 
         &timestamp_struct,
     )?;
 
+    let (binary_command_event_point, binary_command_event_it) = build_command_event(
+        "binary_output_command_event",
+        "commanded_state",
+        "Maps to group 13 variations 1 and 2.",
+        doc("Commanded state of the binary output")
+            .details("From the spec:  0 = Latch Off / Trip / NULL, 1 = Latch On / Close. Where the commanded state is unknown, the commanded state flag shall be 0."),
+        Primitive::Bool,
+        &timestamp_struct,
+        &command_status,
+        lib,
+    )?;
+
     let (octet_string, octet_string_it, byte_it) = build_octet_string(lib)?;
 
     let connect_options = define_connect_options(lib, error_type.clone())?;
@@ -282,6 +299,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> 
     let attr = crate::attributes::define(lib)?;
 
     Ok(SharedDefinitions {
+        command_status,
         error_type,
         port_state_listener: define_port_state_listener(lib)?,
         client_state_listener: define_tcp_client_state_listener(lib)?,
@@ -316,6 +334,8 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> 
         frozen_analog_it,
         analog_output_status_point,
         analog_output_status_it,
+        _binary_command_event_point: binary_command_event_point,
+        binary_command_event_it,
         _octet_string: octet_string,
         octet_string_it,
         byte_it,
@@ -849,6 +869,38 @@ fn build_iterator<T: Into<UniversalStructField>>(
     Ok((value_struct, value_iterator))
 }
 
+#[allow(clippy::too_many_arguments)]
+fn build_command_event<T: Into<UniversalStructField>>(
+    name: &str,
+    value_name: &str,
+    doc_details: &str,
+    command_value_docs: Doc<Unvalidated>,
+    command_value_type: T,
+    timestamp_struct: &UniversalStructHandle,
+    command_status: &EnumHandle,
+    lib: &mut LibraryBuilder,
+) -> Result<(UniversalStructHandle, AbstractIteratorHandle), BindingError> {
+    let value_struct_decl = lib.declare_universal_struct(name)?;
+    let value_struct = lib
+        .define_universal_struct(value_struct_decl)?
+        .add("index", Primitive::U16, "Index of the command event")?
+        .add("status", command_status.clone(), "Status from processing the command that triggered this event")?
+        .add(value_name, command_value_type, command_value_docs)?
+        .add("time", timestamp_struct.clone(), "Associated timestamp")?
+        .doc(
+            doc("Event transferred from master to outstation when the outstation receives a corresponding command.")
+                .details("These objects are part of subset level 4 and are not commonly used.")
+                .details(doc_details)
+        )?
+        .end_fields()?
+        .add_full_initializer("init")?
+        .build()?;
+
+    let value_iterator = lib.define_iterator(format!("{name}_iterator"), value_struct.clone())?;
+
+    Ok((value_struct, value_iterator))
+}
+
 fn build_octet_string(
     lib: &mut LibraryBuilder,
 ) -> Result<
@@ -874,4 +926,33 @@ fn build_octet_string(
         lib.define_iterator_with_lifetime("octet_string_iterator", octet_string_struct.clone())?;
 
     Ok((octet_string_struct, octet_string_iterator, byte_it))
+}
+
+fn define_command_status(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
+    let command_status = lib.define_enum("command_status")?
+        .push("success", "command was accepted, initiated, or queued (value == 0)")?
+        .push("timeout", "command timed out before completing (value == 1)")?
+        .push("no_select", "command requires being selected before operate, configuration issue (value == 2)")?
+        .push("format_error", "bad control code or timing values (value == 3)")?
+        .push("not_supported", "command is not implemented (value == 4)")?
+        .push("already_active", "command is all ready in progress or its all ready in that mode (value == 5)")?
+        .push("hardware_error", "something is stopping the command, often a local/remote interlock (value == 6)")?
+        .push("local", "the function governed by the control is in local only control (value == 7)")?
+        .push("too_many_ops", "the command has been done too often and has been throttled (value == 8)")?
+        .push("not_authorized", "the command was rejected because the device denied it or an RTU intercepted it (value == 9)")?
+        .push("automation_inhibit", "command not accepted because it was prevented or inhibited by a local automation process, such as interlocking logic or synchrocheck (value == 10)")?
+        .push("processing_limited", "command not accepted because the device cannot process any more activities than are presently in progress (value == 11)")?
+        .push("out_of_range", "command not accepted because the value is outside the acceptable range permitted for this point (value == 12)")?
+        .push("downstream_local", "command not accepted because the outstation is forwarding the request to another downstream device which reported LOCAL (value == 13)")?
+        .push("already_complete", "command not accepted because the outstation has already completed the requested operation (value == 14)")?
+        .push("blocked", "command not accepted because the requested function is specifically blocked at the outstation (value == 15)")?
+        .push("canceled", "command not accepted because the operation was cancelled (value == 16)")?
+        .push("blocked_other_master", "command not accepted because another master is communicating with the outstation and has exclusive rights to operate this control point (value == 17)")?
+        .push("downstream_fail", "command not accepted because the outstation is forwarding the request to another downstream device which cannot be reached or is otherwise incapable of performing the request (value == 18)")?
+        .push("non_participating", "(deprecated) indicates the outstation shall not issue or perform the control operation (value == 126)")?
+        .push("unknown", "captures any value not defined in the enumeration")?
+        .doc("Enumeration received from an outstation in response to command request")?
+        .build()?;
+
+    Ok(command_status)
 }

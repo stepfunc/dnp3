@@ -141,6 +141,18 @@ class MainClass
             }
         }
 
+        void IReadHandler.HandleBinaryOutputCommandEvent(HeaderInfo info, ICollection<BinaryOutputCommandEvent> values)
+        {
+            Console.WriteLine("Binary Output Command Events:");
+            Console.WriteLine("Qualifier: " + info.Qualifier);
+            Console.WriteLine("Variation: " + info.Variation);
+
+            foreach (var val in values)
+            {
+                Console.WriteLine($"BOCE {val.Index}: Value={val.CommandedState} Status={val.Status} Time={val.Time.Value} ({val.Time.Quality})");
+            }
+        }
+
         public void HandleOctetString(HeaderInfo info, ICollection<OctetString> values)
         {
             Console.WriteLine("Octet Strings:");
@@ -205,6 +217,8 @@ class MainClass
         {
             Console.WriteLine($"Bit-string attribute: {attr} set: {set} variation: {var} length: {value.Count}");
         }
+
+        
     }
     // ANCHOR_END: read_handler
 

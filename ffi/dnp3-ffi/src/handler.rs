@@ -162,6 +162,16 @@ impl ReadHandler for ffi::ReadHandler {
         ffi::ReadHandler::handle_analog_output_status(self, info, &mut iterator);
     }
 
+    fn handle_binary_output_command_event(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (BinaryOutputCommandEvent, u16)>,
+    ) {
+        let info = info.into();
+        let mut iterator = BinaryOutputCommandEventIterator::new(iter);
+        ffi::ReadHandler::handle_binary_output_command_event(self, info, &mut iterator);
+    }
+
     fn handle_octet_string<'a>(
         &mut self,
         info: HeaderInfo,
@@ -556,6 +566,13 @@ implement_iterator!(
     ffi::AnalogOutputStatus
 );
 
+implement_iterator!(
+    BinaryOutputCommandEventIterator,
+    binary_output_command_event_iterator_next,
+    BinaryOutputCommandEvent,
+    ffi::BinaryOutputCommandEvent
+);
+
 impl ffi::BinaryInput {
     pub(crate) fn new(idx: u16, value: BinaryInput) -> Self {
         Self {
@@ -647,6 +664,18 @@ impl ffi::AnalogOutputStatus {
             flags: value.flags.into(),
             time: value.time.into(),
         }
+    }
+}
+
+impl ffi::BinaryOutputCommandEvent {
+    pub(crate) fn new(idx: u16, value: BinaryOutputCommandEvent) -> Self {
+        ffi::BinaryOutputCommandEventFields {
+            index: idx,
+            status: value.status.into(),
+            commanded_state: value.commanded_state,
+            time: value.time.into(),
+        }
+        .into()
     }
 }
 
