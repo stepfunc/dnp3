@@ -162,6 +162,26 @@ impl ReadHandler for ffi::ReadHandler {
         ffi::ReadHandler::handle_analog_output_status(self, info, &mut iterator);
     }
 
+    fn handle_binary_output_command_event(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (BinaryOutputCommandEvent, u16)>,
+    ) {
+        let info = info.into();
+        let mut iterator = BinaryOutputCommandEventIterator::new(iter);
+        ffi::ReadHandler::handle_binary_output_command_event(self, info, &mut iterator);
+    }
+
+    fn handle_analog_output_command_event(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (AnalogOutputCommandEvent, u16)>,
+    ) {
+        let info = info.into();
+        let mut iterator = AnalogOutputCommandEventIterator::new(iter);
+        ffi::ReadHandler::handle_analog_output_command_event(self, info, &mut iterator);
+    }
+
     fn handle_octet_string<'a>(
         &mut self,
         info: HeaderInfo,
@@ -556,6 +576,20 @@ implement_iterator!(
     ffi::AnalogOutputStatus
 );
 
+implement_iterator!(
+    BinaryOutputCommandEventIterator,
+    binary_output_command_event_iterator_next,
+    BinaryOutputCommandEvent,
+    ffi::BinaryOutputCommandEvent
+);
+
+implement_iterator!(
+    AnalogOutputCommandEventIterator,
+    analog_output_command_event_iterator_next,
+    AnalogOutputCommandEvent,
+    ffi::AnalogOutputCommandEvent
+);
+
 impl ffi::BinaryInput {
     pub(crate) fn new(idx: u16, value: BinaryInput) -> Self {
         Self {
@@ -647,6 +681,42 @@ impl ffi::AnalogOutputStatus {
             flags: value.flags.into(),
             time: value.time.into(),
         }
+    }
+}
+
+impl ffi::BinaryOutputCommandEvent {
+    pub(crate) fn new(idx: u16, value: BinaryOutputCommandEvent) -> Self {
+        ffi::BinaryOutputCommandEventFields {
+            index: idx,
+            status: value.status.into(),
+            commanded_state: value.commanded_state,
+            time: value.time.into(),
+        }
+        .into()
+    }
+}
+
+impl ffi::AnalogOutputCommandEvent {
+    fn split(value: AnalogCommandValue) -> (f64, ffi::AnalogCommandType) {
+        match value {
+            AnalogCommandValue::I16(x) => (x.into(), ffi::AnalogCommandType::I16),
+            AnalogCommandValue::I32(x) => (x.into(), ffi::AnalogCommandType::I32),
+            AnalogCommandValue::F32(x) => (x.into(), ffi::AnalogCommandType::F32),
+            AnalogCommandValue::F64(x) => (x, ffi::AnalogCommandType::F64),
+        }
+    }
+
+    pub(crate) fn new(idx: u16, value: AnalogOutputCommandEvent) -> Self {
+        let (commanded_value, command_type) = Self::split(value.commanded_value);
+
+        ffi::AnalogOutputCommandEventFields {
+            index: idx,
+            status: value.status.into(),
+            commanded_value,
+            command_type,
+            time: value.time.into(),
+        }
+        .into()
     }
 }
 

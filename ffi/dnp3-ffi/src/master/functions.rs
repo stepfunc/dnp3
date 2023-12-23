@@ -947,14 +947,14 @@ impl From<Utf8Error> for ffi::ParamError {
     }
 }
 
-impl From<ffi::RetryStrategy> for dnp3::app::RetryStrategy {
+impl From<ffi::RetryStrategy> for RetryStrategy {
     fn from(x: ffi::RetryStrategy) -> Self {
-        dnp3::app::RetryStrategy::new(x.min_delay(), x.max_delay())
+        RetryStrategy::new(x.min_delay(), x.max_delay())
     }
 }
 
 #[cfg(feature = "serial")]
-impl From<ffi::SerialSettings> for dnp3::serial::SerialSettings {
+impl From<ffi::SerialSettings> for SerialSettings {
     fn from(from: ffi::SerialSettings) -> Self {
         Self {
             baud_rate: from.baud_rate(),
