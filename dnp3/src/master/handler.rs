@@ -508,6 +508,7 @@ pub enum ReadType {
 }
 
 /// Trait used to process measurement data received from an outstation
+#[allow(unused_variables)]
 pub trait ReadHandler: Send + Sync {
     /// Called as the first action before any of the type-specific handle methods are invoked
     ///
@@ -515,7 +516,6 @@ pub trait ReadHandler: Send + Sync {
     /// `header` provides the full response header
     ///
     /// Note: The operation may or may not be async depending
-    #[allow(unused_variables)]
     fn begin_fragment(&mut self, read_type: ReadType, header: ResponseHeader) -> MaybeAsync<()> {
         MaybeAsync::ready(())
     }
@@ -527,13 +527,11 @@ pub trait ReadHandler: Send + Sync {
     ///
     /// Note: The operation may or may not be async depending. A typical use case for using async
     /// here would be to publish a message to an async MPSC.
-    #[allow(unused_variables)]
     fn end_fragment(&mut self, read_type: ReadType, header: ResponseHeader) -> MaybeAsync<()> {
         MaybeAsync::ready(())
     }
 
     /// Process an object header of `BinaryInput` values
-    #[allow(unused_variables)]
     fn handle_binary_input(
         &mut self,
         info: HeaderInfo,
@@ -542,7 +540,6 @@ pub trait ReadHandler: Send + Sync {
     }
 
     /// Process an object header of `DoubleBitBinaryInput` values
-    #[allow(unused_variables)]
     fn handle_double_bit_binary_input(
         &mut self,
         info: HeaderInfo,
@@ -551,7 +548,6 @@ pub trait ReadHandler: Send + Sync {
     }
 
     /// Process an object header of `BinaryOutputStatus` values
-    #[allow(unused_variables)]
     fn handle_binary_output_status(
         &mut self,
         info: HeaderInfo,
@@ -560,12 +556,10 @@ pub trait ReadHandler: Send + Sync {
     }
 
     /// Process an object header of `Counter` values
-    #[allow(unused_variables)]
     fn handle_counter(&mut self, info: HeaderInfo, iter: &mut dyn Iterator<Item = (Counter, u16)>) {
     }
 
     /// Process an object header of `FrozenCounter` values
-    #[allow(unused_variables)]
     fn handle_frozen_counter(
         &mut self,
         info: HeaderInfo,
@@ -574,7 +568,6 @@ pub trait ReadHandler: Send + Sync {
     }
 
     /// Process an object header of `AnalogInput` values
-    #[allow(unused_variables)]
     fn handle_analog_input(
         &mut self,
         info: HeaderInfo,
@@ -583,7 +576,6 @@ pub trait ReadHandler: Send + Sync {
     }
 
     /// Process an object header of `FrozenAnalogInput` values
-    #[allow(unused_variables)]
     fn handle_frozen_analog_input(
         &mut self,
         info: HeaderInfo,
@@ -592,7 +584,6 @@ pub trait ReadHandler: Send + Sync {
     }
 
     /// Process an object header of `AnalogInputDeadBand` values
-    #[allow(unused_variables)]
     fn handle_analog_input_dead_band(
         &mut self,
         info: HeaderInfo,
@@ -601,7 +592,6 @@ pub trait ReadHandler: Send + Sync {
     }
 
     /// Process an object header of `AnalogOutputStatus` values
-    #[allow(unused_variables)]
     fn handle_analog_output_status(
         &mut self,
         info: HeaderInfo,
@@ -609,8 +599,23 @@ pub trait ReadHandler: Send + Sync {
     ) {
     }
 
+    /// Process an object header of `AnalogOutputCommandEvent` values
+    fn handle_analog_output_command_event(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (AnalogOutputCommandEvent, u16)>,
+    ) {
+    }
+
+    /// Process an object header of `BinaryOutputCommandEvent` values
+    fn handle_binary_output_command_event(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (BinaryOutputCommandEvent, u16)>,
+    ) {
+    }
+
     /// Process an object header of octet string values
-    #[allow(unused_variables)]
     fn handle_octet_string<'a>(
         &mut self,
         info: HeaderInfo,
@@ -619,7 +624,6 @@ pub trait ReadHandler: Send + Sync {
     }
 
     /// Process a device attribute
-    #[allow(unused_variables)]
     fn handle_device_attribute(&mut self, info: HeaderInfo, attr: AnyAttribute) {}
 }
 

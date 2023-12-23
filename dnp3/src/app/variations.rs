@@ -66,6 +66,10 @@ pub enum Variation {
     Group11Var2,
     /// Binary Command - Control Relay Output Block
     Group12Var1,
+    /// Binary Output Command Event - Without Time
+    Group13Var1,
+    /// Binary Output Command Event - With Time
+    Group13Var2,
     /// Counter - Any Variation
     Group20Var0,
     /// Counter - 32-bit With Flag
@@ -222,6 +226,22 @@ pub enum Variation {
     Group42Var7,
     /// Analog Output Event - Double-precision With Flag and Time
     Group42Var8,
+    /// Analog Output Command Event - 32-bit
+    Group43Var1,
+    /// Analog Output Command Event - 16-bit
+    Group43Var2,
+    /// Analog Output Command Event - 32-bit With Time
+    Group43Var3,
+    /// Analog Output Command Event - 16-bit With Time
+    Group43Var4,
+    /// Analog Output Command Event - Single-precision
+    Group43Var5,
+    /// Analog Output Command Event - Double-precision
+    Group43Var6,
+    /// Analog Output Command Event - Single-precision With Time
+    Group43Var7,
+    /// Analog Output Command Event - Double-precision With Time
+    Group43Var8,
     /// Time and Date - Absolute Time
     Group50Var1,
     /// Time and Date - Absolute time and interval
@@ -316,6 +336,11 @@ impl Variation {
             },
             12 => match var {
                 1 => Some(Variation::Group12Var1),
+                _ => None,
+            },
+            13 => match var {
+                1 => Some(Variation::Group13Var1),
+                2 => Some(Variation::Group13Var2),
                 _ => None,
             },
             20 => match var {
@@ -432,6 +457,17 @@ impl Variation {
                 8 => Some(Variation::Group42Var8),
                 _ => None,
             },
+            43 => match var {
+                1 => Some(Variation::Group43Var1),
+                2 => Some(Variation::Group43Var2),
+                3 => Some(Variation::Group43Var3),
+                4 => Some(Variation::Group43Var4),
+                5 => Some(Variation::Group43Var5),
+                6 => Some(Variation::Group43Var6),
+                7 => Some(Variation::Group43Var7),
+                8 => Some(Variation::Group43Var8),
+                _ => None,
+            },
             50 => match var {
                 1 => Some(Variation::Group50Var1),
                 2 => Some(Variation::Group50Var2),
@@ -501,6 +537,8 @@ impl Variation {
             Variation::Group11Var1 => (11, 1),
             Variation::Group11Var2 => (11, 2),
             Variation::Group12Var1 => (12, 1),
+            Variation::Group13Var1 => (13, 1),
+            Variation::Group13Var2 => (13, 2),
             Variation::Group20Var0 => (20, 0),
             Variation::Group20Var1 => (20, 1),
             Variation::Group20Var2 => (20, 2),
@@ -579,6 +617,14 @@ impl Variation {
             Variation::Group42Var6 => (42, 6),
             Variation::Group42Var7 => (42, 7),
             Variation::Group42Var8 => (42, 8),
+            Variation::Group43Var1 => (43, 1),
+            Variation::Group43Var2 => (43, 2),
+            Variation::Group43Var3 => (43, 3),
+            Variation::Group43Var4 => (43, 4),
+            Variation::Group43Var5 => (43, 5),
+            Variation::Group43Var6 => (43, 6),
+            Variation::Group43Var7 => (43, 7),
+            Variation::Group43Var8 => (43, 8),
             Variation::Group50Var1 => (50, 1),
             Variation::Group50Var2 => (50, 2),
             Variation::Group50Var3 => (50, 3),
@@ -629,6 +675,8 @@ impl Variation {
             Variation::Group11Var1 => "Binary Output Event - Output Status Without Time",
             Variation::Group11Var2 => "Binary Output Event - Output Status With Time",
             Variation::Group12Var1 => "Binary Command - Control Relay Output Block",
+            Variation::Group13Var1 => "Binary Output Command Event - Without Time",
+            Variation::Group13Var2 => "Binary Output Command Event - With Time",
             Variation::Group20Var0 => "Counter - Any Variation",
             Variation::Group20Var1 => "Counter - 32-bit With Flag",
             Variation::Group20Var2 => "Counter - 16-bit With Flag",
@@ -707,6 +755,14 @@ impl Variation {
             Variation::Group42Var6 => "Analog Output Event - Double-precision With Flag",
             Variation::Group42Var7 => "Analog Output Event - Single-precision With Flag and Time",
             Variation::Group42Var8 => "Analog Output Event - Double-precision With Flag and Time",
+            Variation::Group43Var1 => "Analog Output Command Event - 32-bit",
+            Variation::Group43Var2 => "Analog Output Command Event - 16-bit",
+            Variation::Group43Var3 => "Analog Output Command Event - 32-bit With Time",
+            Variation::Group43Var4 => "Analog Output Command Event - 16-bit With Time",
+            Variation::Group43Var5 => "Analog Output Command Event - Single-precision",
+            Variation::Group43Var6 => "Analog Output Command Event - Double-precision",
+            Variation::Group43Var7 => "Analog Output Command Event - Single-precision With Time",
+            Variation::Group43Var8 => "Analog Output Command Event - Double-precision With Time",
             Variation::Group50Var1 => "Time and Date - Absolute Time",
             Variation::Group50Var2 => "Time and Date - Absolute time and interval",
             Variation::Group50Var3 => "Time and Date - Absolute Time at last recorded time",
@@ -793,6 +849,86 @@ pub(crate) struct Group50Var2 {
 pub(crate) struct Group50Var1 {
     /// time field of the variation
     pub(crate) time: Timestamp,
+}
+
+/// Analog Output Command Event - Double-precision With Time
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub(crate) struct Group43Var8 {
+    /// status field of the variation
+    pub(crate) status: CommandStatus,
+    /// value field of the variation
+    pub(crate) value: f64,
+    /// time field of the variation
+    pub(crate) time: Timestamp,
+}
+
+/// Analog Output Command Event - Single-precision With Time
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub(crate) struct Group43Var7 {
+    /// status field of the variation
+    pub(crate) status: CommandStatus,
+    /// value field of the variation
+    pub(crate) value: f32,
+    /// time field of the variation
+    pub(crate) time: Timestamp,
+}
+
+/// Analog Output Command Event - Double-precision
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub(crate) struct Group43Var6 {
+    /// status field of the variation
+    pub(crate) status: CommandStatus,
+    /// value field of the variation
+    pub(crate) value: f64,
+}
+
+/// Analog Output Command Event - Single-precision
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub(crate) struct Group43Var5 {
+    /// status field of the variation
+    pub(crate) status: CommandStatus,
+    /// value field of the variation
+    pub(crate) value: f32,
+}
+
+/// Analog Output Command Event - 16-bit With Time
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) struct Group43Var4 {
+    /// status field of the variation
+    pub(crate) status: CommandStatus,
+    /// value field of the variation
+    pub(crate) value: i16,
+    /// time field of the variation
+    pub(crate) time: Timestamp,
+}
+
+/// Analog Output Command Event - 32-bit With Time
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) struct Group43Var3 {
+    /// status field of the variation
+    pub(crate) status: CommandStatus,
+    /// value field of the variation
+    pub(crate) value: i32,
+    /// time field of the variation
+    pub(crate) time: Timestamp,
+}
+
+/// Analog Output Command Event - 16-bit
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) struct Group43Var2 {
+    /// status field of the variation
+    pub(crate) status: CommandStatus,
+    /// value field of the variation
+    pub(crate) value: i16,
+}
+
+/// Analog Output Command Event - 32-bit
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) struct Group43Var1 {
+    /// status field of the variation
+    pub(crate) status: CommandStatus,
+    /// value field of the variation
+    pub(crate) value: i32,
 }
 
 /// Analog Output Event - Double-precision With Flag and Time
@@ -1416,6 +1552,22 @@ pub(crate) struct Group20Var1 {
     pub(crate) value: u32,
 }
 
+/// Binary Output Command Event - With Time
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) struct Group13Var2 {
+    /// flags field of the variation
+    pub(crate) flags: u8,
+    /// time field of the variation
+    pub(crate) time: Timestamp,
+}
+
+/// Binary Output Command Event - Without Time
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) struct Group13Var1 {
+    /// flags field of the variation
+    pub(crate) flags: u8,
+}
+
 /// Binary Command - Control Relay Output Block
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Group12Var1 {
@@ -1641,6 +1793,150 @@ impl FixedSize for Group50Var1 {
     }
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         self.time.write(cursor)?;
+        Ok(())
+    }
+}
+
+impl FixedSize for Group43Var8 {
+    const SIZE: u8 = 15;
+    fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
+        Ok(
+            Group43Var8 {
+                status: CommandStatus::from(cursor.read_u8()?),
+                value: cursor.read_f64_le()?,
+                time: Timestamp::new(cursor.read_u48_le()?),
+            }
+        )
+    }
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        self.status.write(cursor)?;
+        cursor.write_f64_le(self.value)?;
+        self.time.write(cursor)?;
+        Ok(())
+    }
+}
+
+impl FixedSize for Group43Var7 {
+    const SIZE: u8 = 11;
+    fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
+        Ok(
+            Group43Var7 {
+                status: CommandStatus::from(cursor.read_u8()?),
+                value: cursor.read_f32_le()?,
+                time: Timestamp::new(cursor.read_u48_le()?),
+            }
+        )
+    }
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        self.status.write(cursor)?;
+        cursor.write_f32_le(self.value)?;
+        self.time.write(cursor)?;
+        Ok(())
+    }
+}
+
+impl FixedSize for Group43Var6 {
+    const SIZE: u8 = 9;
+    fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
+        Ok(
+            Group43Var6 {
+                status: CommandStatus::from(cursor.read_u8()?),
+                value: cursor.read_f64_le()?,
+            }
+        )
+    }
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        self.status.write(cursor)?;
+        cursor.write_f64_le(self.value)?;
+        Ok(())
+    }
+}
+
+impl FixedSize for Group43Var5 {
+    const SIZE: u8 = 5;
+    fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
+        Ok(
+            Group43Var5 {
+                status: CommandStatus::from(cursor.read_u8()?),
+                value: cursor.read_f32_le()?,
+            }
+        )
+    }
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        self.status.write(cursor)?;
+        cursor.write_f32_le(self.value)?;
+        Ok(())
+    }
+}
+
+impl FixedSize for Group43Var4 {
+    const SIZE: u8 = 9;
+    fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
+        Ok(
+            Group43Var4 {
+                status: CommandStatus::from(cursor.read_u8()?),
+                value: cursor.read_i16_le()?,
+                time: Timestamp::new(cursor.read_u48_le()?),
+            }
+        )
+    }
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        self.status.write(cursor)?;
+        cursor.write_i16_le(self.value)?;
+        self.time.write(cursor)?;
+        Ok(())
+    }
+}
+
+impl FixedSize for Group43Var3 {
+    const SIZE: u8 = 11;
+    fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
+        Ok(
+            Group43Var3 {
+                status: CommandStatus::from(cursor.read_u8()?),
+                value: cursor.read_i32_le()?,
+                time: Timestamp::new(cursor.read_u48_le()?),
+            }
+        )
+    }
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        self.status.write(cursor)?;
+        cursor.write_i32_le(self.value)?;
+        self.time.write(cursor)?;
+        Ok(())
+    }
+}
+
+impl FixedSize for Group43Var2 {
+    const SIZE: u8 = 3;
+    fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
+        Ok(
+            Group43Var2 {
+                status: CommandStatus::from(cursor.read_u8()?),
+                value: cursor.read_i16_le()?,
+            }
+        )
+    }
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        self.status.write(cursor)?;
+        cursor.write_i16_le(self.value)?;
+        Ok(())
+    }
+}
+
+impl FixedSize for Group43Var1 {
+    const SIZE: u8 = 5;
+    fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
+        Ok(
+            Group43Var1 {
+                status: CommandStatus::from(cursor.read_u8()?),
+                value: cursor.read_i32_le()?,
+            }
+        )
+    }
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        self.status.write(cursor)?;
+        cursor.write_i32_le(self.value)?;
         Ok(())
     }
 }
@@ -2802,6 +3098,38 @@ impl FixedSize for Group20Var1 {
     }
 }
 
+impl FixedSize for Group13Var2 {
+    const SIZE: u8 = 7;
+    fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
+        Ok(
+            Group13Var2 {
+                flags: cursor.read_u8()?,
+                time: Timestamp::new(cursor.read_u48_le()?),
+            }
+        )
+    }
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        self.time.write(cursor)?;
+        Ok(())
+    }
+}
+
+impl FixedSize for Group13Var1 {
+    const SIZE: u8 = 1;
+    fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
+        Ok(
+            Group13Var1 {
+                flags: cursor.read_u8()?,
+            }
+        )
+    }
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.flags)?;
+        Ok(())
+    }
+}
+
 impl FixedSize for Group12Var1 {
     const SIZE: u8 = 11;
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
@@ -3046,6 +3374,54 @@ impl std::fmt::Display for Group50Var2 {
 impl std::fmt::Display for Group50Var1 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "time: {}", self.time)
+    }
+}
+
+impl std::fmt::Display for Group43Var8 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "status: {:?} value: {} time: {}", self.status, self.value, self.time)
+    }
+}
+
+impl std::fmt::Display for Group43Var7 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "status: {:?} value: {} time: {}", self.status, self.value, self.time)
+    }
+}
+
+impl std::fmt::Display for Group43Var6 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "status: {:?} value: {}", self.status, self.value)
+    }
+}
+
+impl std::fmt::Display for Group43Var5 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "status: {:?} value: {}", self.status, self.value)
+    }
+}
+
+impl std::fmt::Display for Group43Var4 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "status: {:?} value: {} time: {}", self.status, self.value, self.time)
+    }
+}
+
+impl std::fmt::Display for Group43Var3 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "status: {:?} value: {} time: {}", self.status, self.value, self.time)
+    }
+}
+
+impl std::fmt::Display for Group43Var2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "status: {:?} value: {}", self.status, self.value)
+    }
+}
+
+impl std::fmt::Display for Group43Var1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "status: {:?} value: {}", self.status, self.value)
     }
 }
 
@@ -3451,6 +3827,18 @@ impl std::fmt::Display for Group20Var1 {
     }
 }
 
+impl std::fmt::Display for Group13Var2 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {} time: {}", BinaryFlagFormatter::new(self.flags), self.time)
+    }
+}
+
+impl std::fmt::Display for Group13Var1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "flags: {}", BinaryFlagFormatter::new(self.flags))
+    }
+}
+
 impl std::fmt::Display for Group12Var1 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "code: {} count: {} on_time: {} off_time: {} status: {:?}", self.code, self.count, self.on_time, self.off_time, self.status)
@@ -3554,6 +3942,38 @@ impl FixedSizeVariation for Group50Var2 {
 
 impl FixedSizeVariation for Group50Var1 {
     const VARIATION : Variation = Variation::Group50Var1;
+}
+
+impl FixedSizeVariation for Group43Var8 {
+    const VARIATION : Variation = Variation::Group43Var8;
+}
+
+impl FixedSizeVariation for Group43Var7 {
+    const VARIATION : Variation = Variation::Group43Var7;
+}
+
+impl FixedSizeVariation for Group43Var6 {
+    const VARIATION : Variation = Variation::Group43Var6;
+}
+
+impl FixedSizeVariation for Group43Var5 {
+    const VARIATION : Variation = Variation::Group43Var5;
+}
+
+impl FixedSizeVariation for Group43Var4 {
+    const VARIATION : Variation = Variation::Group43Var4;
+}
+
+impl FixedSizeVariation for Group43Var3 {
+    const VARIATION : Variation = Variation::Group43Var3;
+}
+
+impl FixedSizeVariation for Group43Var2 {
+    const VARIATION : Variation = Variation::Group43Var2;
+}
+
+impl FixedSizeVariation for Group43Var1 {
+    const VARIATION : Variation = Variation::Group43Var1;
 }
 
 impl FixedSizeVariation for Group42Var8 {
@@ -3822,6 +4242,14 @@ impl FixedSizeVariation for Group20Var2 {
 
 impl FixedSizeVariation for Group20Var1 {
     const VARIATION : Variation = Variation::Group20Var1;
+}
+
+impl FixedSizeVariation for Group13Var2 {
+    const VARIATION : Variation = Variation::Group13Var2;
+}
+
+impl FixedSizeVariation for Group13Var1 {
+    const VARIATION : Variation = Variation::Group13Var1;
 }
 
 impl FixedSizeVariation for Group12Var1 {

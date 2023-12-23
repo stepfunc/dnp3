@@ -88,6 +88,7 @@ pub(crate) fn extract_measurements_inner(
 #[cfg(test)]
 mod test {
     use crate::app::attr::*;
+    use crate::app::control::CommandStatus;
     use crate::app::parse::parser::HeaderCollection;
     use crate::app::*;
     use crate::master::handler::{HeaderInfo, ReadHandler};
@@ -120,6 +121,8 @@ mod test {
         AnalogDeadBand(Vec<(AnalogInputDeadBand, u16)>),
         KnownAttr(Known),
         UnknownAttr(AttrSet, u8, String),
+        BinaryCommandEvent(Vec<(BinaryOutputCommandEvent, u16)>),
+        AnalogCommandEvent(Vec<(AnalogOutputCommandEvent, u16)>),
     }
 
     #[derive(Default)]
@@ -225,6 +228,22 @@ mod test {
             _x: &mut dyn Iterator<Item = (AnalogOutputStatus, u16)>,
         ) {
             unimplemented!()
+        }
+
+        fn handle_binary_output_command_event(
+            &mut self,
+            _info: HeaderInfo,
+            x: &mut dyn Iterator<Item = (BinaryOutputCommandEvent, u16)>,
+        ) {
+            self.received.push(Header::BinaryCommandEvent(x.collect()))
+        }
+
+        fn handle_analog_output_command_event(
+            &mut self,
+            _info: HeaderInfo,
+            x: &mut dyn Iterator<Item = (AnalogOutputCommandEvent, u16)>,
+        ) {
+            self.received.push(Header::AnalogCommandEvent(x.collect()))
         }
 
         fn handle_octet_string<'a>(
@@ -479,5 +498,89 @@ mod test {
         let h2 = Header::KnownAttr(Known::UInt(UIntAttr::LocalTimingAccuracy, 0xCAFE));
         let h3 = Header::UnknownAttr(AttrSet::Private(7), 42, "FOO".to_string());
         assert_eq!(&handler.pop(), &[h1, h2, h3]);
+    }
+
+    #[test]
+    fn handles_g13v1_and_g13v2() {
+        let mut handler = MockHandler::new();
+        let objects = HeaderCollection::parse(
+            FunctionCode::UnsolicitedResponse,
+            &[
+                13, // g13v1
+                1,
+                0x17,
+                0x01,        // count == 1
+                0x07,        // index 7,
+                0b1000_0011, // command_state = true, status == FORMAT_ERROR
+                13,          // g13v2
+                2,
+                0x17,
+                0x01,        // count == 1
+                0xFF,        // index 255
+                0b0000_0000, // command_state = false, status == SUCCESS
+                // timestamp 48
+                0xAA,
+                0xBB,
+                0xCC,
+                0xDD,
+                0xEE,
+                0xFF,
+            ],
+        )
+        .unwrap();
+
+        extract_measurements_inner(objects, &mut handler);
+
+        assert_eq!(
+            &handler.pop(),
+            &[
+                Header::BinaryCommandEvent(vec![(
+                    BinaryOutputCommandEvent {
+                        commanded_state: true,
+                        status: CommandStatus::FormatError,
+                        time: None,
+                    },
+                    7
+                )]),
+                Header::BinaryCommandEvent(vec![(
+                    BinaryOutputCommandEvent {
+                        commanded_state: false,
+                        status: CommandStatus::Success,
+                        time: Some(Time::Synchronized(Timestamp::new(0xFFEEDDCCBBAA))),
+                    },
+                    255
+                )])
+            ]
+        );
+    }
+
+    #[test]
+    fn handles_g43_object() {
+        let mut handler = MockHandler::new();
+        let objects = HeaderCollection::parse(
+            FunctionCode::UnsolicitedResponse,
+            &[
+                43, // g43v2
+                2, 0x17, 0x01, // count == 1
+                0x07, // index 7,
+                0x08, // status  == Too many ops
+                0xFE, 0xCA,
+            ],
+        )
+        .unwrap();
+
+        extract_measurements_inner(objects, &mut handler);
+
+        assert_eq!(
+            &handler.pop(),
+            &[Header::AnalogCommandEvent(vec![(
+                AnalogOutputCommandEvent {
+                    status: CommandStatus::TooManyOps,
+                    commanded_value: AnalogCommandValue::I16(0xCAFEu16 as i16),
+                    time: None,
+                },
+                7
+            )])]
+        );
     }
 }

@@ -42,6 +42,14 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
             gv(12, 1),
             "Binary Output Command - Control Relay Output Block",
         )?
+        .push(
+            gv(13, 1),
+            "Binary Output Command Event - command status without time",
+        )?
+        .push(
+            gv(13, 2),
+            "Binary Output Command Event - command status with time",
+        )?
         .push(gv(20, 0), "Counter - Default variation")?
         .push(gv(20, 1), "Counter - 32-bit with flags")?
         .push(gv(20, 2), "Counter - 16-bit with flags")?
@@ -192,7 +200,6 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
             gv(42, 8),
             "Analog Output Event - Double-precision floating point with time",
         )?
-        /*
         .push(
             gv(43, 1),
             "Analog Output Command Event - 32-bit without time",
@@ -201,14 +208,8 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
             gv(43, 2),
             "Analog Output Command Event - 16-bit without time",
         )?
-        .push(
-            gv(43, 3),
-            "Analog Output Command Event - 32-bit with time",
-        )?
-        .push(
-            gv(43, 4),
-            "Analog Output Command Event - 16-bit with time",
-        )?
+        .push(gv(43, 3), "Analog Output Command Event - 32-bit with time")?
+        .push(gv(43, 4), "Analog Output Command Event - 16-bit with time")?
         .push(
             gv(43, 5),
             "Analog Output Command Event - Single-precision floating point without time",
@@ -225,7 +226,6 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
             gv(43, 8),
             "Analog Output Command Event - Double-precision floating point with time",
         )?
-         */
         .push(gv(50, 1), "Time and Date - Absolute time")?
         .push(gv(50, 2), "Time and Date - Absolute time and interval")?
         .push(

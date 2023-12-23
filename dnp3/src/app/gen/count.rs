@@ -42,6 +42,10 @@ pub(crate) enum CountVariation<'a> {
     Group11Var1,
     /// Binary Output Event - Output Status With Time
     Group11Var2,
+    /// Binary Output Command Event - Without Time
+    Group13Var1,
+    /// Binary Output Command Event - With Time
+    Group13Var2,
     /// Counter Event - Any Variation
     Group22Var0,
     /// Counter Event - 32-bit With Flag
@@ -116,6 +120,22 @@ pub(crate) enum CountVariation<'a> {
     Group42Var7,
     /// Analog Output Event - Double-precision With Flag and Time
     Group42Var8,
+    /// Analog Output Command Event - 32-bit
+    Group43Var1,
+    /// Analog Output Command Event - 16-bit
+    Group43Var2,
+    /// Analog Output Command Event - 32-bit With Time
+    Group43Var3,
+    /// Analog Output Command Event - 16-bit With Time
+    Group43Var4,
+    /// Analog Output Command Event - Single-precision
+    Group43Var5,
+    /// Analog Output Command Event - Double-precision
+    Group43Var6,
+    /// Analog Output Command Event - Single-precision With Time
+    Group43Var7,
+    /// Analog Output Command Event - Double-precision With Time
+    Group43Var8,
     /// Time and Date - Absolute Time
     Group50Var1(CountSequence<'a, Group50Var1>),
     /// Time and Date - Absolute time and interval
@@ -157,6 +177,8 @@ impl<'a> CountVariation<'a> {
             Variation::Group11Var0 => Ok(CountVariation::Group11Var0),
             Variation::Group11Var1 => Ok(CountVariation::Group11Var1),
             Variation::Group11Var2 => Ok(CountVariation::Group11Var2),
+            Variation::Group13Var1 => Ok(CountVariation::Group13Var1),
+            Variation::Group13Var2 => Ok(CountVariation::Group13Var2),
             Variation::Group22Var0 => Ok(CountVariation::Group22Var0),
             Variation::Group22Var1 => Ok(CountVariation::Group22Var1),
             Variation::Group22Var2 => Ok(CountVariation::Group22Var2),
@@ -194,6 +216,14 @@ impl<'a> CountVariation<'a> {
             Variation::Group42Var6 => Ok(CountVariation::Group42Var6),
             Variation::Group42Var7 => Ok(CountVariation::Group42Var7),
             Variation::Group42Var8 => Ok(CountVariation::Group42Var8),
+            Variation::Group43Var1 => Ok(CountVariation::Group43Var1),
+            Variation::Group43Var2 => Ok(CountVariation::Group43Var2),
+            Variation::Group43Var3 => Ok(CountVariation::Group43Var3),
+            Variation::Group43Var4 => Ok(CountVariation::Group43Var4),
+            Variation::Group43Var5 => Ok(CountVariation::Group43Var5),
+            Variation::Group43Var6 => Ok(CountVariation::Group43Var6),
+            Variation::Group43Var7 => Ok(CountVariation::Group43Var7),
+            Variation::Group43Var8 => Ok(CountVariation::Group43Var8),
             Variation::Group50Var1 => Ok(CountVariation::Group50Var1(CountSequence::parse(count, cursor)?)),
             Variation::Group50Var2 => Ok(CountVariation::Group50Var2(CountSequence::parse(count, cursor)?)),
             Variation::Group50Var3 => Ok(CountVariation::Group50Var3(CountSequence::parse(count, cursor)?)),
@@ -224,6 +254,8 @@ impl<'a> CountVariation<'a> {
             CountVariation::Group11Var0 => Ok(()),
             CountVariation::Group11Var1 => Ok(()),
             CountVariation::Group11Var2 => Ok(()),
+            CountVariation::Group13Var1 => Ok(()),
+            CountVariation::Group13Var2 => Ok(()),
             CountVariation::Group22Var0 => Ok(()),
             CountVariation::Group22Var1 => Ok(()),
             CountVariation::Group22Var2 => Ok(()),
@@ -261,6 +293,14 @@ impl<'a> CountVariation<'a> {
             CountVariation::Group42Var6 => Ok(()),
             CountVariation::Group42Var7 => Ok(()),
             CountVariation::Group42Var8 => Ok(()),
+            CountVariation::Group43Var1 => Ok(()),
+            CountVariation::Group43Var2 => Ok(()),
+            CountVariation::Group43Var3 => Ok(()),
+            CountVariation::Group43Var4 => Ok(()),
+            CountVariation::Group43Var5 => Ok(()),
+            CountVariation::Group43Var6 => Ok(()),
+            CountVariation::Group43Var7 => Ok(()),
+            CountVariation::Group43Var8 => Ok(()),
             CountVariation::Group50Var1(seq) => format_count_of_items(f, seq.iter()),
             CountVariation::Group50Var2(seq) => format_count_of_items(f, seq.iter()),
             CountVariation::Group50Var3(seq) => format_count_of_items(f, seq.iter()),
