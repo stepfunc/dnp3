@@ -326,9 +326,9 @@ pub enum AnalogCommandValue {
     I16(i16),
     /// 32-bit integer
     I32(i32),
-    /// single precision float
+    /// single-precision floating point
     F32(f32),
-    /// double precision float
+    /// double-precision floating point
     F64(f64),
 }
 

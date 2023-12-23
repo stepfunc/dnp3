@@ -153,6 +153,18 @@ class MainClass
             }
         }
 
+        void IReadHandler.HandleAnalogOutputCommandEvent(HeaderInfo info, ICollection<AnalogOutputCommandEvent> values)
+        {
+            Console.WriteLine("Analog Output Command Events:");
+            Console.WriteLine("Qualifier: " + info.Qualifier);
+            Console.WriteLine("Variation: " + info.Variation);
+
+            foreach (var val in values)
+            {
+                Console.WriteLine($"AOCE {val.Index}: Value={val.CommandedValue} Type={val.CommandType} Status={val.Status} Time={val.Time.Value} ({val.Time.Quality})");
+            }
+        }
+
         public void HandleOctetString(HeaderInfo info, ICollection<OctetString> values)
         {
             Console.WriteLine("Octet Strings:");

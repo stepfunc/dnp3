@@ -38,8 +38,8 @@ pub(crate) struct SharedDefinitions {
     pub frozen_analog_it: AbstractIteratorHandle,
     pub analog_output_status_point: UniversalStructHandle,
     pub analog_output_status_it: AbstractIteratorHandle,
-    pub _binary_command_event_point: UniversalStructHandle,
     pub binary_command_event_it: AbstractIteratorHandle,
+    pub analog_command_event_it: AbstractIteratorHandle,
     pub _octet_string: FunctionReturnStructHandle,
     pub octet_string_it: AbstractIteratorHandle,
     pub byte_it: AbstractIteratorHandle,
@@ -277,17 +277,11 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> 
         &timestamp_struct,
     )?;
 
-    let (binary_command_event_point, binary_command_event_it) = build_command_event(
-        "binary_output_command_event",
-        "commanded_state",
-        "Maps to group 13 variations 1 and 2.",
-        doc("Commanded state of the binary output")
-            .details("From the spec:  0 = Latch Off / Trip / NULL, 1 = Latch On / Close. Where the commanded state is unknown, the commanded state flag shall be 0."),
-        Primitive::Bool,
-        &timestamp_struct,
-        &command_status,
-        lib,
-    )?;
+    let binary_command_event_it =
+        define_binary_output_command_iterator(&timestamp_struct, &command_status, lib)?;
+
+    let analog_command_event_it =
+        define_analog_output_command_iterator(&timestamp_struct, &command_status, lib)?;
 
     let (octet_string, octet_string_it, byte_it) = build_octet_string(lib)?;
 
@@ -334,8 +328,8 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> 
         frozen_analog_it,
         analog_output_status_point,
         analog_output_status_it,
-        _binary_command_event_point: binary_command_event_point,
         binary_command_event_it,
+        analog_command_event_it,
         _octet_string: octet_string,
         octet_string_it,
         byte_it,
@@ -868,37 +862,64 @@ fn build_iterator<T: Into<UniversalStructField>>(
 
     Ok((value_struct, value_iterator))
 }
-
-#[allow(clippy::too_many_arguments)]
-fn build_command_event<T: Into<UniversalStructField>>(
-    name: &str,
-    value_name: &str,
-    doc_details: &str,
-    command_value_docs: Doc<Unvalidated>,
-    command_value_type: T,
+fn define_binary_output_command_iterator(
     timestamp_struct: &UniversalStructHandle,
     command_status: &EnumHandle,
     lib: &mut LibraryBuilder,
-) -> Result<(UniversalStructHandle, AbstractIteratorHandle), BindingError> {
-    let value_struct_decl = lib.declare_universal_struct(name)?;
+) -> BackTraced<AbstractIteratorHandle> {
+    let value_struct_decl = lib.declare_universal_struct("binary_output_command_event")?;
     let value_struct = lib
         .define_universal_struct(value_struct_decl)?
-        .add("index", Primitive::U16, "Index of the command event")?
+        .add("index", Primitive::U16, "Index of the binary command event")?
         .add("status", command_status.clone(), "Status from processing the command that triggered this event")?
-        .add(value_name, command_value_type, command_value_docs)?
+        .add("commanded_state", Primitive::Bool, doc("Commanded state of the binary output")
+            .details("From the spec:  0 = Latch Off / Trip / NULL, 1 = Latch On / Close. Where the commanded state is unknown, the commanded state flag shall be 0.")
+        )?
         .add("time", timestamp_struct.clone(), "Associated timestamp")?
         .doc(
             doc("Event transferred from master to outstation when the outstation receives a corresponding command.")
+                .details("Maps to group 13 variations 1 and 2.")
                 .details("These objects are part of subset level 4 and are not commonly used.")
-                .details(doc_details)
         )?
         .end_fields()?
         .add_full_initializer("init")?
         .build()?;
 
-    let value_iterator = lib.define_iterator(format!("{name}_iterator"), value_struct.clone())?;
+    let value_iterator =
+        lib.define_iterator("binary_output_command_event_iterator", value_struct.clone())?;
 
-    Ok((value_struct, value_iterator))
+    Ok(value_iterator)
+}
+
+fn define_analog_output_command_iterator(
+    timestamp_struct: &UniversalStructHandle,
+    command_status: &EnumHandle,
+    lib: &mut LibraryBuilder,
+) -> BackTraced<AbstractIteratorHandle> {
+    let analog_command_type = define_analog_command_type(lib)?;
+    let value_struct_decl = lib.declare_universal_struct("analog_output_command_event")?;
+    let value_struct = lib
+        .define_universal_struct(value_struct_decl)?
+        .add("index", Primitive::U16, "Index of the command event")?
+        .add("status", command_status.clone(), "Status from processing the command that triggered this event")?
+        .add("commanded_value", Primitive::Double, doc("Commanded state of the binary output")
+            .details("All of the variations in group 43 are mapped to double-precision floats")
+        )?
+        .add("command_type", analog_command_type, "Describes how the value was encoded in the protocol")?
+        .add("time", timestamp_struct.clone(), "Associated timestamp")?
+        .doc(
+            doc("Event transferred from master to outstation when the outstation receives a corresponding command.")
+                .details("Maps to group 43 variations 1 to 8.")
+                .details("These objects are part of subset level 4 and are not commonly used.")
+        )?
+        .end_fields()?
+        .add_full_initializer("init")?
+        .build()?;
+
+    let value_iterator =
+        lib.define_iterator("analog_output_command_event_iterator", value_struct.clone())?;
+
+    Ok(value_iterator)
 }
 
 fn build_octet_string(
@@ -952,6 +973,18 @@ fn define_command_status(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
         .push("non_participating", "(deprecated) indicates the outstation shall not issue or perform the control operation (value == 126)")?
         .push("unknown", "captures any value not defined in the enumeration")?
         .doc("Enumeration received from an outstation in response to command request")?
+        .build()?;
+
+    Ok(command_status)
+}
+fn define_analog_command_type(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
+    let command_status = lib
+        .define_enum("analog_command_type")?
+        .push("i16", "16-bit integer")?
+        .push("i32", "16-bit integer")?
+        .push("f32", "single-precision floating point")?
+        .push("f64", "double-precision floating point")?
+        .doc(doc("Describes the encoding of the commanded value"))?
         .build()?;
 
     Ok(command_status)
