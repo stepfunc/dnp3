@@ -632,6 +632,23 @@
         }
       ]
     },
+    "getrandom": {
+      "id": "getrandom",
+      "source": "crates.io",
+      "authors": null,
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright 2018 Developers of the Rand project",
+                "Copyright (c) 2014 The Rust Project Developers"
+              ]
+            }
+          }
+        }
+      ]
+    },
     "hmac": {
       "id": "hmac",
       "source": "crates.io",
@@ -1198,6 +1215,21 @@
             "copyright": {
               "Lines": [
                 "Copyright (c) 2016 Joseph Birr-Pixton <jpixton@gmail.com>"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "rustls-pki-types": {
+      "id": "rustls-pki-types",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2023 Dirkjan Ochtman <dirkjan@ochtman.nl>"
               ]
             }
           }
