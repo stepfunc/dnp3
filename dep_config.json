@@ -1727,6 +1727,21 @@
         }
       ]
     },
+    "unescaper": {
+      "id": "unescaper",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2023 Hack Ink"
+              ]
+            }
+          }
+        }
+      ]
+    },
     "unicode-ident": {
       "id": "unicode-ident",
       "source": "crates.io",
