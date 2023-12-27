@@ -1221,6 +1221,21 @@
         }
       ]
     },
+    "rustls-pki-types": {
+      "id": "rustls-pki-types",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2023 Dirkjan Ochtman <dirkjan@ochtman.nl>"
+              ]
+            }
+          }
+        }
+      ]
+    },
     "rustls-webpki": {
       "id": "rustls-webpki",
       "source": "crates.io",
