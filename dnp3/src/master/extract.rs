@@ -123,6 +123,7 @@ mod test {
         UnknownAttr(AttrSet, u8, String),
         BinaryCommandEvent(Vec<(BinaryOutputCommandEvent, u16)>),
         AnalogCommandEvent(Vec<(AnalogOutputCommandEvent, u16)>),
+        G102(Vec<(UnsignedInteger, u16)>),
     }
 
     #[derive(Default)]
@@ -244,6 +245,14 @@ mod test {
             x: &mut dyn Iterator<Item = (AnalogOutputCommandEvent, u16)>,
         ) {
             self.received.push(Header::AnalogCommandEvent(x.collect()))
+        }
+
+        fn handle_unsigned_integer(
+            &mut self,
+            _info: HeaderInfo,
+            x: &mut dyn Iterator<Item = (UnsignedInteger, u16)>,
+        ) {
+            self.received.push(Header::G102(x.collect()))
         }
 
         fn handle_octet_string<'a>(
@@ -581,6 +590,30 @@ mod test {
                 },
                 7
             )])]
+        );
+    }
+
+    #[test]
+    fn handles_g102v1() {
+        let mut handler = MockHandler::new();
+        let objects = HeaderCollection::parse(
+            FunctionCode::UnsolicitedResponse,
+            &[
+                102, // g43v2
+                1,
+                0x00, // 1 byte start/stop
+                0x07, // index 7,
+                0x08, // index 8
+                0xFE, 0xCA,
+            ],
+        )
+        .unwrap();
+
+        extract_measurements_inner(objects, &mut handler);
+
+        assert_eq!(
+            &handler.pop(),
+            &[Header::G102(vec![(UnsignedInteger { value: 0xFE }, 7), (UnsignedInteger { value: 0xCA }, 8)])]
         );
     }
 }
