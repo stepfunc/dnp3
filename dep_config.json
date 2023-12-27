@@ -710,6 +710,21 @@
         }
       ]
     },
+    "io-kit-sys": {
+      "id": "io-kit-sys",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2017-2018 Junji Takakura"
+              ]
+            }
+          }
+        }
+      ]
+    },
     "itoa": {
       "id": "itoa",
       "source": "crates.io",
