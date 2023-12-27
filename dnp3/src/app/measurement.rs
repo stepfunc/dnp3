@@ -3,8 +3,8 @@ use std::time::Duration;
 
 use crate::app::types::Timestamp;
 use crate::app::variations::{
-    Group13Var1, Group13Var2, Group34Var1, Group34Var2, Group34Var3, Group43Var1, Group43Var2,
-    Group43Var3, Group43Var4, Group43Var5, Group43Var6, Group43Var7, Group43Var8,
+    Group102Var1, Group13Var1, Group13Var2, Group34Var1, Group34Var2, Group34Var3, Group43Var1,
+    Group43Var2, Group43Var3, Group43Var4, Group43Var5, Group43Var6, Group43Var7, Group43Var8,
 };
 use crate::util::bit::bits;
 use crate::util::bit::BitMask;
@@ -360,6 +360,13 @@ pub enum AnalogInputDeadBand {
     F32(f32),
 }
 
+/// Type corresponding to g102v1
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub struct UnsignedInteger {
+    /// Value of the type
+    pub value: u8,
+}
+
 impl From<Group34Var1> for AnalogInputDeadBand {
     fn from(value: Group34Var1) -> Self {
         Self::U16(value.value)
@@ -477,6 +484,12 @@ impl From<Group43Var8> for AnalogOutputCommandEvent {
             commanded_value: AnalogCommandValue::F64(value.value),
             time: Some(Time::Synchronized(value.time)),
         }
+    }
+}
+
+impl From<Group102Var1> for UnsignedInteger {
+    fn from(obj: Group102Var1) -> Self {
+        Self { value: obj.value }
     }
 }
 

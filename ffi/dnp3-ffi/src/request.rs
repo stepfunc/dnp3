@@ -372,6 +372,10 @@ impl From<ffi::Variation> for Variation {
             ffi::Variation::Group70Var8 => Variation::Group70Var8,
 
             ffi::Variation::Group80Var1 => Variation::Group80Var1,
+
+            ffi::Variation::Group102Var0 => Variation::Group102Var0,
+            ffi::Variation::Group102Var1 => Variation::Group102Var1,
+
             ffi::Variation::Group110 => Variation::Group110(0),
             ffi::Variation::Group111 => Variation::Group111(0),
             /*
@@ -526,6 +530,10 @@ impl From<Variation> for ffi::Variation {
             Variation::Group70Var8 => ffi::Variation::Group70Var8,
 
             Variation::Group80Var1 => ffi::Variation::Group80Var1,
+
+            Variation::Group102Var0 => ffi::Variation::Group102Var0,
+            Variation::Group102Var1 => ffi::Variation::Group102Var1,
+
             Variation::Group110(_) => ffi::Variation::Group110,
             Variation::Group111(_) => ffi::Variation::Group111,
         }

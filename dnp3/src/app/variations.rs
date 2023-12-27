@@ -282,6 +282,10 @@ pub enum Variation {
     Group70Var8,
     /// Internal Indications - Packed Format
     Group80Var1,
+    /// Unsigned Integer - Any Variation
+    Group102Var0,
+    /// Unsigned Integer - 8-bit
+    Group102Var1,
     /// Octet String - Sized by variation
     Group110(u8),
     /// Octet String Event - Sized by variation
@@ -506,6 +510,11 @@ impl Variation {
                 1 => Some(Variation::Group80Var1),
                 _ => None,
             },
+            102 => match var {
+                0 => Some(Variation::Group102Var0),
+                1 => Some(Variation::Group102Var1),
+                _ => None,
+            },
             110 => Some(Variation::Group110(var)),
             111 => Some(Variation::Group111(var)),
             _ => None,
@@ -645,6 +654,8 @@ impl Variation {
             Variation::Group70Var7 => (70, 7),
             Variation::Group70Var8 => (70, 8),
             Variation::Group80Var1 => (80, 1),
+            Variation::Group102Var0 => (102, 0),
+            Variation::Group102Var1 => (102, 1),
             Variation::Group110(x) => (110, x),
             Variation::Group111(x) => (111, x),
         }
@@ -783,10 +794,19 @@ impl Variation {
             Variation::Group70Var7 => "File-control - file descriptor",
             Variation::Group70Var8 => "File-control - file specification string",
             Variation::Group80Var1 => "Internal Indications - Packed Format",
+            Variation::Group102Var0 => "Unsigned Integer - Any Variation",
+            Variation::Group102Var1 => "Unsigned Integer - 8-bit",
             Variation::Group110(_) => "Octet String - Sized by variation",
             Variation::Group111(_) => "Octet String Event - Sized by variation",
         }
     }
+}
+
+/// Unsigned Integer - 8-bit
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) struct Group102Var1 {
+    /// value field of the variation
+    pub(crate) value: u8,
 }
 
 /// Time Delay - Fine
@@ -1670,6 +1690,21 @@ pub(crate) struct Group1Var2 {
     pub(crate) flags: u8,
 }
 
+
+impl FixedSize for Group102Var1 {
+    const SIZE: u8 = 1;
+    fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError> {
+        Ok(
+            Group102Var1 {
+                value: cursor.read_u8()?,
+            }
+        )
+    }
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u8(self.value)?;
+        Ok(())
+    }
+}
 
 impl FixedSize for Group52Var2 {
     const SIZE: u8 = 2;
@@ -3329,6 +3364,12 @@ impl FixedSize for Group1Var2 {
 }
 
 
+impl std::fmt::Display for Group102Var1 {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(f, "value: {}", self.value)
+    }
+}
+
 impl std::fmt::Display for Group52Var2 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "time: {}", self.time)
@@ -3911,6 +3952,10 @@ impl std::fmt::Display for Group1Var2 {
     }
 }
 
+
+impl FixedSizeVariation for Group102Var1 {
+    const VARIATION : Variation = Variation::Group102Var1;
+}
 
 impl FixedSizeVariation for Group52Var2 {
     const VARIATION : Variation = Variation::Group52Var2;

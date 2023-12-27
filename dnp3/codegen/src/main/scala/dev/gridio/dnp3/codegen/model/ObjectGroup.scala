@@ -35,6 +35,7 @@ object ObjectGroup {
     Group60,
     Group70,
     Group80,
+    Group102,
     Group110,
     Group111,
   )
@@ -65,6 +66,8 @@ object GroupType {
   object StaticFrozenAnalog extends Static
   object StaticAnalogOutputStatus extends Static
   object StaticOctetString extends Static
+
+  object StaticUnsignedInteger extends Static
 
   object BinaryEvent extends Event
   object BinaryOutputEvent extends Event
