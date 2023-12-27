@@ -600,8 +600,7 @@ mod test {
             FunctionCode::UnsolicitedResponse,
             &[
                 102, // g43v2
-                1,
-                0x00, // 1 byte start/stop
+                1, 0x00, // 1 byte start/stop
                 0x07, // index 7,
                 0x08, // index 8
                 0xFE, 0xCA,
@@ -613,7 +612,10 @@ mod test {
 
         assert_eq!(
             &handler.pop(),
-            &[Header::G102(vec![(UnsignedInteger { value: 0xFE }, 7), (UnsignedInteger { value: 0xCA }, 8)])]
+            &[Header::G102(vec![
+                (UnsignedInteger { value: 0xFE }, 7),
+                (UnsignedInteger { value: 0xCA }, 8)
+            ])]
         );
     }
 }
