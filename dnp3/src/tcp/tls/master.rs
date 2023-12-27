@@ -1,5 +1,4 @@
-use sfio_rustls_config::NameVerifier;
-use std::convert::TryFrom;
+use sfio_rustls_config::ServerNameVerification;
 use std::net::{Ipv4Addr, SocketAddr};
 use std::path::Path;
 use std::sync::Arc;
@@ -14,12 +13,13 @@ use crate::util::phys::PhysLayer;
 
 use tokio::net::TcpStream;
 use tokio_rustls::rustls;
+use tokio_rustls::rustls::pki_types::{IpAddr, ServerName};
 use tracing::Instrument;
 
 /// TLS configuration for a client
 pub struct TlsClientConfig {
     // server name used in SNI - if and only if it's a DNS name, does nothing for IP
-    server_name: rustls::ServerName,
+    server_name: ServerName<'static>,
     config: Arc<rustls::ClientConfig>,
 }
 
@@ -129,12 +129,12 @@ impl TlsClientConfig {
     ) -> Result<Self, TlsError> {
         let (name_verifier, server_name) = match server_subject_name {
             None => (
-                NameVerifier::any(),
-                rustls::ServerName::IpAddress(Ipv4Addr::UNSPECIFIED.into()),
+                ServerNameVerification::DisableNameVerification,
+                ServerName::IpAddress(IpAddr::V4(Ipv4Addr::UNSPECIFIED.into())),
             ),
             Some(x) => {
-                let server_name = rustls::ServerName::try_from(x.as_str())?;
-                (NameVerifier::equal_to(x), server_name)
+                let server_name: ServerName<'static> = rustls::pki_types::ServerName::try_from(x)?;
+                (ServerNameVerification::SanOrCommonName, server_name)
             }
         };
 
@@ -178,7 +178,9 @@ impl TlsClientConfig {
 
         Ok(Self {
             //  it doesn't matter what we put here, it just needs to be an IP so that the client won't send an SNI extension
-            server_name: rustls::ServerName::IpAddress(Ipv4Addr::UNSPECIFIED.into()),
+            server_name: rustls::pki_types::ServerName::IpAddress(IpAddr::V4(
+                Ipv4Addr::UNSPECIFIED.into(),
+            )),
             config: Arc::new(config),
         })
     }

@@ -4,7 +4,7 @@ mod outstation;
 pub use master::*;
 pub use outstation::*;
 
-use tokio_rustls::rustls;
+use tokio_rustls::rustls::pki_types;
 
 /// Determines how the certificate(s) presented by the peer are validated
 ///
@@ -57,8 +57,8 @@ impl From<sfio_rustls_config::Error> for TlsError {
     }
 }
 
-impl From<rustls::client::InvalidDnsNameError> for TlsError {
-    fn from(_: rustls::client::InvalidDnsNameError) -> Self {
+impl From<pki_types::InvalidDnsNameError> for TlsError {
+    fn from(_: pki_types::InvalidDnsNameError) -> Self {
         Self::InvalidDnsName
     }
 }
@@ -94,11 +94,13 @@ pub enum MinTlsVersion {
     V13,
 }
 
-impl From<MinTlsVersion> for sfio_rustls_config::MinProtocolVersion {
+impl From<MinTlsVersion> for sfio_rustls_config::ProtocolVersions {
     fn from(value: MinTlsVersion) -> Self {
         match value {
-            MinTlsVersion::V12 => sfio_rustls_config::MinProtocolVersion::V1_2,
-            MinTlsVersion::V13 => sfio_rustls_config::MinProtocolVersion::V1_3,
+            MinTlsVersion::V12 => sfio_rustls_config::ProtocolVersions::v12_only(),
+            MinTlsVersion::V13 => sfio_rustls_config::ProtocolVersions::new()
+                .enable_v12()
+                .enable_v13(),
         }
     }
 }
