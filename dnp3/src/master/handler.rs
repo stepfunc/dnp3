@@ -15,8 +15,8 @@ use crate::master::request::{CommandHeaders, CommandMode, ReadRequest, TimeSyncP
 use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::deadbands::WriteDeadBandsTask;
 use crate::master::tasks::empty_response::EmptyResponseTask;
+use crate::master::tasks::file::get_info::GetFileInfoTask;
 use crate::master::tasks::file::read::{FileReadTask, FileReaderType};
-use crate::master::tasks::get_file_info::GetFileInfoTask;
 use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::restart::{RestartTask, RestartType};
 use crate::master::tasks::time::TimeSyncTask;
@@ -214,7 +214,7 @@ impl AssociationHandle {
 
     /// Perform an asynchronous READ request
     ///
-    /// If successful, the [ReadHandler](crate::master::ReadHandler) will process the received measurement data
+    /// If successful, the [ReadHandler](ReadHandler) will process the received measurement data
     pub async fn read(&mut self, request: ReadRequest) -> Result<(), TaskError> {
         let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), TaskError>>();
         let task = SingleReadTask::new(request, Promise::OneShot(tx));
@@ -240,7 +240,7 @@ impl AssociationHandle {
 
     /// Perform an asynchronous READ request with a custom read handler
     ///
-    /// If successful, the custom [ReadHandler](crate::master::ReadHandler) will process the received measurement data
+    /// If successful, the custom [ReadHandler](ReadHandler) will process the received measurement data
     pub async fn read_with_handler(
         &mut self,
         request: ReadRequest,
@@ -254,7 +254,7 @@ impl AssociationHandle {
 
     /// Perform an asynchronous operate request
     ///
-    /// The actual function code used depends on the value of the [CommandMode](crate::master::CommandMode).
+    /// The actual function code used depends on the value of the [CommandMode](CommandMode).
     pub async fn operate(
         &mut self,
         mode: CommandMode,
@@ -268,7 +268,7 @@ impl AssociationHandle {
 
     /// Perform a WARM_RESTART operation
     ///
-    /// Returns the delay from the outstation's response as a [Duration](std::time::Duration)
+    /// Returns the delay from the outstation's response as a [Duration](Duration)
     pub async fn warm_restart(&mut self) -> Result<Duration, TaskError> {
         let (tx, rx) = tokio::sync::oneshot::channel::<Result<Duration, TaskError>>();
         let task = RestartTask::new(RestartType::WarmRestart, Promise::OneShot(tx));
@@ -278,7 +278,7 @@ impl AssociationHandle {
 
     /// Perform a COLD_RESTART operation
     ///
-    /// Returns the delay from the outstation's response as a [Duration](std::time::Duration)
+    /// Returns the delay from the outstation's response as a [Duration](Duration)
     pub async fn cold_restart(&mut self) -> Result<Duration, TaskError> {
         let (tx, rx) = tokio::sync::oneshot::channel::<Result<Duration, TaskError>>();
         let task = RestartTask::new(RestartType::ColdRestart, Promise::OneShot(tx));

@@ -2,7 +2,7 @@
 
 pub(crate) use crate::tracing::*;
 /// these use statements allow the code in the FFI to not have to known the real locations
-/// but instead just use crate::<name> when invoking an implementation
+/// but instead just use `crate::<name>` when invoking an implementation
 pub use command::*;
 pub use connect::*;
 pub use handler::*;
