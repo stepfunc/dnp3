@@ -630,6 +630,9 @@ impl ReadHeader {
             AllObjectsVariation::Group60Var4 => Some(EventReadHeader::Class3(None).into()),
             // group 80
             AllObjectsVariation::Group80Var1 => None,
+            // group 102
+            AllObjectsVariation::Group102Var0 => None,
+            AllObjectsVariation::Group102Var1 => None,
             // group 110
             AllObjectsVariation::Group110Var0 => Some(StaticReadHeader::OctetString(None).into()),
             // group 111
@@ -1199,6 +1202,9 @@ impl ReadHeader {
             ),
             // group 80
             RangedVariation::Group80Var1(_) => None,
+            // group 102
+            RangedVariation::Group102Var0 => None,
+            RangedVariation::Group102Var1(_) => None,
             // group 110
             RangedVariation::Group110Var0 => {
                 Some(StaticReadHeader::OctetString(Some(range)).into())

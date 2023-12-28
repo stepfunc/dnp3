@@ -40,6 +40,7 @@ pub(crate) struct SharedDefinitions {
     pub analog_output_status_it: AbstractIteratorHandle,
     pub binary_command_event_it: AbstractIteratorHandle,
     pub analog_command_event_it: AbstractIteratorHandle,
+    pub unsigned_integer_it: AbstractIteratorHandle,
     pub _octet_string: FunctionReturnStructHandle,
     pub octet_string_it: AbstractIteratorHandle,
     pub byte_it: AbstractIteratorHandle,
@@ -283,6 +284,8 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> 
     let analog_command_event_it =
         define_analog_output_command_iterator(&timestamp_struct, &command_status, lib)?;
 
+    let unsigned_integer_it = define_unsigned_integer_iterator(lib)?;
+
     let (octet_string, octet_string_it, byte_it) = build_octet_string(lib)?;
 
     let connect_options = define_connect_options(lib, error_type.clone())?;
@@ -330,6 +333,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> 
         analog_output_status_it,
         binary_command_event_it,
         analog_command_event_it,
+        unsigned_integer_it,
         _octet_string: octet_string,
         octet_string_it,
         byte_it,
@@ -918,6 +922,28 @@ fn define_analog_output_command_iterator(
 
     let value_iterator =
         lib.define_iterator("analog_output_command_event_iterator", value_struct.clone())?;
+
+    Ok(value_iterator)
+}
+
+fn define_unsigned_integer_iterator(
+    lib: &mut LibraryBuilder,
+) -> BackTraced<AbstractIteratorHandle> {
+    let value_struct_decl = lib.declare_universal_struct("unsigned_integer")?;
+    let value_struct = lib
+        .define_universal_struct(value_struct_decl)?
+        .add("index", Primitive::U16, "Index of the object")?
+        .add("value", Primitive::U8, "Value of the object")?
+        .doc(
+            doc("Unsigned byte corresponding to group 102 variation 1").details(
+                "These objects are not part of any subset level and are not commonly used.",
+            ),
+        )?
+        .end_fields()?
+        .add_full_initializer("init")?
+        .build()?;
+
+    let value_iterator = lib.define_iterator("unsigned_integer_iterator", value_struct.clone())?;
 
     Ok(value_iterator)
 }

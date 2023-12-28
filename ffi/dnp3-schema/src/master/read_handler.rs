@@ -221,6 +221,22 @@ pub(crate) fn define(
         )?
         .returns_nothing_by_default()?
         .end_callback()?
+        .begin_callback(
+            "handle_unsigned_integer",
+            "Handle unsigned integer values (g102)",
+        )?
+        .param(
+            "info",
+            header_info.clone(),
+            "Group/variation and qualifier information",
+        )?
+        .param(
+            "values",
+            shared_def.unsigned_integer_it.clone(),
+            iterator_doc,
+        )?
+        .returns_nothing_by_default()?
+        .end_callback()?
         .begin_callback("handle_octet_string", "Handle octet string data")?
         .param(
             "info",

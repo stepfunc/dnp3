@@ -49,6 +49,8 @@ object FixedSizeField {
   //enums
   val commandStatus = FixedSizeField("status", EnumFieldType(CommandStatus))
 
+  // 8-bit integer
+  val unsignedByte = FixedSizeField("value", UInt8Field, Some(FieldAttribute.Value))
 }
 
 object VariableFields {
