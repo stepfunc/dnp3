@@ -15,7 +15,7 @@ use crate::master::request::{CommandHeaders, CommandMode, ReadRequest, TimeSyncP
 use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::deadbands::WriteDeadBandsTask;
 use crate::master::tasks::empty_response::EmptyResponseTask;
-use crate::master::tasks::file_read::{FileReadTask, FileReaderType};
+use crate::master::tasks::file::read::{FileReadTask, FileReaderType};
 use crate::master::tasks::get_file_info::GetFileInfoTask;
 use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::restart::{RestartTask, RestartType};

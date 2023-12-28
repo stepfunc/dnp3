@@ -18,14 +18,15 @@ use crate::master::{ReadType, TaskType};
 
 use crate::master::tasks::deadbands::WriteDeadBandsTask;
 use crate::master::tasks::empty_response::EmptyResponseTask;
-use crate::master::tasks::file_read::FileReadTask;
+use crate::master::tasks::file::read::FileReadTask;
 use crate::master::tasks::get_file_info::GetFileInfoTask;
 
 pub(crate) mod auto;
 pub(crate) mod command;
 pub(crate) mod deadbands;
 pub(crate) mod empty_response;
-pub(crate) mod file_read;
+
+pub(crate) mod file;
 pub(crate) mod get_file_info;
 pub(crate) mod read;
 pub(crate) mod restart;
