@@ -182,6 +182,16 @@ impl ReadHandler for ffi::ReadHandler {
         ffi::ReadHandler::handle_analog_output_command_event(self, info, &mut iterator);
     }
 
+    fn handle_unsigned_integer(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (UnsignedInteger, u16)>,
+    ) {
+        let info = info.into();
+        let mut iterator = UnsignedIntegerIterator::new(iter);
+        ffi::ReadHandler::handle_unsigned_integer(self, info, &mut iterator);
+    }
+
     fn handle_octet_string<'a>(
         &mut self,
         info: HeaderInfo,
@@ -590,6 +600,13 @@ implement_iterator!(
     ffi::AnalogOutputCommandEvent
 );
 
+implement_iterator!(
+    UnsignedIntegerIterator,
+    unsigned_integer_iterator_next,
+    UnsignedInteger,
+    ffi::UnsignedInteger
+);
+
 impl ffi::BinaryInput {
     pub(crate) fn new(idx: u16, value: BinaryInput) -> Self {
         Self {
@@ -693,6 +710,15 @@ impl ffi::BinaryOutputCommandEvent {
             time: value.time.into(),
         }
         .into()
+    }
+}
+
+impl ffi::UnsignedInteger {
+    pub(crate) fn new(idx: u16, value: UnsignedInteger) -> Self {
+        ffi::UnsignedInteger {
+            index: idx,
+            value: value.value,
+        }
     }
 }
 

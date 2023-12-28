@@ -165,6 +165,18 @@ class MainClass
             }
         }
 
+        void IReadHandler.HandleUnsignedInteger(HeaderInfo info, ICollection<UnsignedInteger> values)
+        {
+            Console.WriteLine("Unsigned Integers:");
+            Console.WriteLine("Qualifier: " + info.Qualifier);
+            Console.WriteLine("Variation: " + info.Variation);
+
+            foreach (var val in values)
+            {
+                Console.WriteLine($"{val.Index}: Value={val.Value}");
+            }
+        }
+
         public void HandleOctetString(HeaderInfo info, ICollection<OctetString> values)
         {
             Console.WriteLine("Octet Strings:");

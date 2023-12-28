@@ -133,6 +133,7 @@ object RangedVariationModule extends Module {
         case GroupType.StaticCounter => "counter"
         case GroupType.StaticFrozenCounter => "frozen_counter"
         case GroupType.AnalogInputDeadband => "analog_input_dead_band"
+        case GroupType.StaticUnsignedInteger => "unsigned_integer"
         case _ => throw new Exception("unhandled variation")
       }
     }

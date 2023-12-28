@@ -615,6 +615,14 @@ pub trait ReadHandler: Send + Sync {
     ) {
     }
 
+    /// Process an object header of `UnsignedInteger` values
+    fn handle_unsigned_integer(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (UnsignedInteger, u16)>,
+    ) {
+    }
+
     /// Process an object header of octet string values
     fn handle_octet_string<'a>(
         &mut self,

@@ -258,6 +258,9 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
         .push(gv(70, 8), "File control - file specification string")?
         // iin
         .push(gv(80, 1), "Internal Indications - Packed format")?
+        // unsigned integer
+        .push(gv(102, 0), "Unsigned Integer - Default Variation")?
+        .push(gv(102, 1), "Unsigned Integer - 8-bit")?
         // octet strings
         .push("group110", "Octet String")?
         .push("group111", "Octet String Event")?

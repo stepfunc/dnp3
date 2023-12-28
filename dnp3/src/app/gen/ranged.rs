@@ -120,6 +120,10 @@ pub(crate) enum RangedVariation<'a> {
     Group40Var4(RangedSequence<'a, Group40Var4>),
     /// Internal Indications - Packed Format
     Group80Var1(BitSequence<'a>),
+    /// Unsigned Integer - Any Variation
+    Group102Var0,
+    /// Unsigned Integer - 8-bit
+    Group102Var1(RangedSequence<'a, Group102Var1>),
     /// Octet String - Sized by variation
     Group110Var0,
     Group110VarX(u8, RangedBytesSequence<'a>),
@@ -176,6 +180,8 @@ impl<'a> RangedVariation<'a> {
             Variation::Group40Var3 => Ok(RangedVariation::Group40Var3(RangedSequence::parse(range, cursor)?)),
             Variation::Group40Var4 => Ok(RangedVariation::Group40Var4(RangedSequence::parse(range, cursor)?)),
             Variation::Group80Var1 => Ok(RangedVariation::Group80Var1(BitSequence::parse(range, cursor)?)),
+            Variation::Group102Var0 => Ok(RangedVariation::Group102Var0),
+            Variation::Group102Var1 => Ok(RangedVariation::Group102Var1(RangedSequence::parse(range, cursor)?)),
             Variation::Group110(0) => Err(ObjectParseError::ZeroLengthOctetData),
             Variation::Group110(x) => {
                 Ok(RangedVariation::Group110VarX(x, RangedBytesSequence::parse(x, range.get_start(), range.get_count(), cursor)?))
@@ -234,6 +240,8 @@ impl<'a> RangedVariation<'a> {
             Variation::Group40Var3 => Ok(RangedVariation::Group40Var3(RangedSequence::empty())),
             Variation::Group40Var4 => Ok(RangedVariation::Group40Var4(RangedSequence::empty())),
             Variation::Group80Var1 => Ok(RangedVariation::Group80Var1(BitSequence::empty())),
+            Variation::Group102Var0 => Ok(RangedVariation::Group102Var0),
+            Variation::Group102Var1 => Ok(RangedVariation::Group102Var1(RangedSequence::empty())),
             Variation::Group110(0) => Ok(RangedVariation::Group110Var0),
             _ => Err(ObjectParseError::InvalidQualifierForVariation(v, qualifier)),
         }
@@ -289,6 +297,8 @@ impl<'a> RangedVariation<'a> {
             RangedVariation::Group40Var3(seq) => format_indexed_items(f, seq.iter()),
             RangedVariation::Group40Var4(seq) => format_indexed_items(f, seq.iter()),
             RangedVariation::Group80Var1(seq) => format_indexed_items(f, seq.iter()),
+            RangedVariation::Group102Var0 => Ok(()),
+            RangedVariation::Group102Var1(seq) => format_indexed_items(f, seq.iter()),
             RangedVariation::Group110Var0 => Ok(()),
             RangedVariation::Group110VarX(_, seq) => format_indexed_items(f, seq.iter().map(|(x, i)| (Bytes::new(x), i))),
         }
@@ -588,6 +598,16 @@ impl<'a> RangedVariation<'a> {
             }
             RangedVariation::Group80Var1(_) => {
                 false // internal indications
+            }
+            RangedVariation::Group102Var0 => {
+                false // extraction not supported
+            }
+            RangedVariation::Group102Var1(seq) => {
+                handler.handle_unsigned_integer(
+                    HeaderInfo::new(var, qualifier, false, false),
+                    &mut seq.iter().map(|(v,i)| (v.into(), i))
+                );
+                true
             }
             RangedVariation::Group110Var0 => {
                 false
