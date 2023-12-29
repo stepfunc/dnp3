@@ -8,36 +8,7 @@ use crate::master::tasks::NonReadTask;
 use crate::master::{
     FileAction, FileCredentials, FileError, FileReadConfig, FileReader, TaskError,
 };
-
-pub(crate) struct Filename(pub(crate) String);
-
-#[derive(Copy, Clone, Default)]
-struct AuthKey(u32);
-#[derive(Copy, Clone, Default)]
-struct FileHandle(u32);
-#[derive(Copy, Clone, Default)]
-struct BlockNumber(u32);
-
-impl BlockNumber {
-    const LAST_BIT: u32 = 0x80_00_00_00;
-    const BOTTOM_BITS: u32 = !Self::LAST_BIT;
-
-    fn is_last(self) -> bool {
-        (self.0 & Self::LAST_BIT) != 0
-    }
-
-    fn bottom_bits(self) -> u32 {
-        self.0 & Self::BOTTOM_BITS
-    }
-}
-
-impl PartialEq for BlockNumber {
-    fn eq(&self, other: &Self) -> bool {
-        let b1 = self.0 & Self::BOTTOM_BITS;
-        let b2 = other.0 & Self::BOTTOM_BITS;
-        b1 == b2
-    }
-}
+use super::*;
 
 enum ReaderTypes {
     Trait(Box<dyn FileReader>),
