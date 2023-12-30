@@ -1,5 +1,5 @@
 use crate::app::file::{FileStatus, FileType, Group70Var7, Permissions};
-use crate::app::{MaybeAsync, Shutdown, Timestamp};
+use crate::app::{FileMode, MaybeAsync, Shutdown, Timestamp};
 use crate::master::{Promise, TaskError};
 use scursor::ReadCursor;
 use std::fmt::Debug;
@@ -43,6 +43,52 @@ pub struct FileReadConfig {
     /// 1) The size returned by the outstation in the OPEN operation
     /// 2) The total number of bytes actually returned in subsequent READ operations
     pub max_file_size: usize,
+}
+
+/// Files can be opened for writing by creating/truncating or appending to an existing file
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum FileWriteMode {
+    /// Specifies that the file is to be opened for writing. If it already exists, the file is truncated to zero length
+    Write,
+    /// Specifies that the file is to be opened for writing, appending to the end of the file
+    Append,
+}
+
+impl From<FileWriteMode> for FileMode {
+    fn from(value: FileWriteMode) -> Self {
+        match value {
+            FileWriteMode::Write => Self::Write,
+            FileWriteMode::Append => Self::Append,
+        }
+    }
+}
+
+/// Configuration related to reading a file
+#[derive(Copy, Clone, Debug)]
+pub struct FileWriteConfig {
+    pub(crate) max_block_size: u16,
+    pub(crate) mode: FileWriteMode,
+    pub(crate) permissions: Permissions,
+}
+
+impl FileWriteConfig {
+    /// Construct with specified mode and permissions. The block size
+    /// defaults to 1024
+    pub fn new(mode: FileWriteMode, permissions: Permissions) -> Self {
+        Self {
+            max_block_size: 1024,
+            mode,
+            permissions,
+        }
+    }
+
+    /// Set the maximum block size requested by the master during the file open
+    pub fn max_block_size(self, max_block_size: u16) -> Self {
+        Self {
+            max_block_size,
+            ..self
+        }
+    }
 }
 
 /// Configuration related to reading a directory
@@ -121,6 +167,12 @@ pub enum FileError {
     TaskError(TaskError),
 }
 
+impl From<TaskError> for FileError {
+    fn from(err: TaskError) -> Self {
+        FileError::TaskError(err)
+    }
+}
+
 impl std::fmt::Display for FileError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
@@ -165,6 +217,38 @@ pub trait FileReader: Send + Sync + 'static {
     /// Returning ['FileAction::Abort'] will abort the transfer. This allows the application abort
     /// on internal errors like being or by user request.
     fn block_received(&mut self, block_num: u32, data: &[u8]) -> MaybeAsync<FileAction>;
+
+    /// Called when the transfer is aborted before completion due to an error or user request
+    fn aborted(&mut self, err: FileError);
+
+    /// Called when the transfer completes successfully
+    fn completed(&mut self);
+}
+
+/// Callbacks for writing a file
+pub trait FileWriter: Send + Sync + 'static {
+    /// Called when the file is successfully opened by the outstation
+    ///
+    /// May optionally abort the operation
+    fn opened(&mut self, size: u32) -> FileAction;
+
+    /// Called when the next block is needed for writing.
+    ///
+    /// * `total_tx` represents the number of bytes that have been written so far. It can be used as
+    /// an index if the file is from some virtual source like an array.
+    ///
+    /// * `dest` is a mutable buffer into which the application should write data for transfer
+    ///
+    /// The application should return the number of bytes that were written into the `dest` buffer. Returning
+    /// Ok(0) indicates that there is not more data to transfer and that the operation is complete.
+    ///
+    /// Returning ['FileAction::Abort'] will abort the transfer. This allows the application to abort
+    /// on internal errors like being stopped by user request.
+    fn next_block(
+        &mut self,
+        total_tx: usize,
+        dest: &mut [u8],
+    ) -> MaybeAsync<Result<usize, FileAction>>;
 
     /// Called when the transfer is aborted before completion due to an error or user request
     fn aborted(&mut self, err: FileError);

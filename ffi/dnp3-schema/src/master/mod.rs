@@ -902,6 +902,7 @@ fn define_association_information(
         )?
         .push("file_read", "Read a file from the outstation")?
         .push("get_file_info", "Get information about a file")?
+        .push("file_write", "Write a file to the outstation")?
         .doc("Task type used in {interface:association_information}")?
         .build()?;
 

@@ -1,3 +1,4 @@
+use super::*;
 use crate::app::file::*;
 use crate::app::format::write::HeaderWriter;
 use crate::app::format::WriteError;
@@ -8,7 +9,6 @@ use crate::master::tasks::NonReadTask;
 use crate::master::{
     FileAction, FileCredentials, FileError, FileReadConfig, FileReader, TaskError,
 };
-use super::*;
 
 enum ReaderTypes {
     Trait(Box<dyn FileReader>),
@@ -163,26 +163,12 @@ impl FileReadTask {
         mut self,
         response: Response<'_>,
     ) -> Result<Option<NonReadTask>, TaskError> {
-        let headers = match response.objects {
+        let header = match get_only_header(response) {
             Ok(x) => x,
             Err(err) => {
-                tracing::warn!("File operation received malformed response: {err}");
-                self.settings
-                    .reader
-                    .aborted(FileError::TaskError(TaskError::MalformedResponse(err)));
-                return Err(TaskError::MalformedResponse(err));
+                self.settings.reader.aborted(err.into());
+                return Err(err);
             }
-        };
-
-        let header = match headers.get_only_header() {
-            None => {
-                tracing::warn!("File operation response contains unexpected number of headers");
-                self.settings
-                    .reader
-                    .aborted(FileError::TaskError(TaskError::UnexpectedResponseHeaders));
-                return Err(TaskError::UnexpectedResponseHeaders);
-            }
-            Some(x) => x,
         };
 
         let next = match self.state {
@@ -196,28 +182,8 @@ impl FileReadTask {
     }
 
     fn handle_auth_response(mut settings: Settings, header: ObjectHeader) -> Option<FileReadTask> {
-        fn inner(header: ObjectHeader) -> Result<State, FileError> {
-            let obj = match header.details {
-                HeaderDetails::TwoByteFreeFormat(_, FreeFormatVariation::Group70Var2(obj)) => obj,
-                _ => {
-                    tracing::warn!(
-                        "File AUTHENTICATE response contains unexpected variation: {}",
-                        header.variation
-                    );
-                    return Err(FileError::BadResponse);
-                }
-            };
-
-            if obj.auth_key == 0 {
-                tracing::warn!("Outstation returned auth key == 0: no permission to access file");
-                return Err(FileError::NoPermission);
-            }
-
-            Ok(State::Open(AuthKey(obj.auth_key)))
-        }
-
-        match inner(header) {
-            Ok(state) => Some(FileReadTask::new(settings, state)),
+        match handle_auth_response(header) {
+            Ok(key) => Some(FileReadTask::new(settings, State::Open(key))),
             Err(err) => {
                 settings.reader.aborted(err);
                 None
@@ -226,27 +192,7 @@ impl FileReadTask {
     }
 
     fn handle_open_response(mut settings: Settings, header: ObjectHeader) -> Option<FileReadTask> {
-        fn inner(header: ObjectHeader) -> Result<(u32, FileHandle), FileError> {
-            let obj = match header.details {
-                HeaderDetails::TwoByteFreeFormat(_, FreeFormatVariation::Group70Var4(obj)) => obj,
-                _ => {
-                    tracing::warn!(
-                        "File OPEN response contains unexpected variation: {}",
-                        header.variation
-                    );
-                    return Err(FileError::BadResponse);
-                }
-            };
-
-            if obj.status_code != FileStatus::Success {
-                tracing::warn!("Unable to open file (status code == {:?})", obj.status_code);
-                return Err(FileError::BadStatus(obj.status_code));
-            }
-
-            Ok((obj.file_size, FileHandle(obj.file_handle)))
-        }
-
-        match inner(header) {
+        match handle_open_response(header) {
             Ok((file_size, handle)) => {
                 if settings.reader.opened(file_size).is_abort() {
                     tracing::warn!("File transfer aborted by user");
@@ -348,40 +294,10 @@ impl FileReadTask {
     }
 
     fn handle_close_response(header: ObjectHeader) -> Option<FileReadTask> {
-        let obj = match header.details {
-            HeaderDetails::TwoByteFreeFormat(_, FreeFormatVariation::Group70Var4(obj)) => obj,
-            _ => {
-                tracing::warn!(
-                    "File READ response contains unexpected variation: {}",
-                    header.variation
-                );
-                return None;
-            }
-        };
-
-        if obj.status_code != FileStatus::Success {
-            tracing::warn!(
-                "Unable to close file (status code == {:?})",
-                obj.status_code
-            );
-        }
-
+        process_close_response(header);
         None
     }
 }
-
-fn write_auth(credentials: &FileCredentials, writer: &mut HeaderWriter) -> Result<(), WriteError> {
-    let obj = Group70Var2 {
-        auth_key: 0,
-        user_name: &credentials.user_name,
-        password: &credentials.password,
-    };
-    writer.write_free_format(&obj)
-}
-
-// we don't really care what the ID is as we don't support polling for file stuff
-// we can just be cute and write Step Function (SF) on the wire.
-const REQUEST_ID: u16 = u16::from_le_bytes([b'S', b'F']);
 
 fn write_open(
     settings: &Settings,
@@ -406,18 +322,6 @@ fn write_read(rs: ReadState, writer: &mut HeaderWriter) -> Result<(), WriteError
         file_handle: rs.handle.0,
         block_number: rs.block.0,
         file_data: &[],
-    };
-    writer.write_free_format(&obj)
-}
-
-fn write_close(handle: FileHandle, writer: &mut HeaderWriter) -> Result<(), WriteError> {
-    let obj = Group70Var4 {
-        file_handle: handle.0,
-        file_size: 0,
-        max_block_size: 0,
-        request_id: REQUEST_ID,
-        status_code: FileStatus::Success,
-        text: "",
     };
     writer.write_free_format(&obj)
 }

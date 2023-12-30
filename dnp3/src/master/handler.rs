@@ -17,13 +17,14 @@ use crate::master::tasks::deadbands::WriteDeadBandsTask;
 use crate::master::tasks::empty_response::EmptyResponseTask;
 use crate::master::tasks::file::get_info::GetFileInfoTask;
 use crate::master::tasks::file::read::{FileReadTask, FileReaderType};
+use crate::master::tasks::file::write::{FileWriteTask, FileWriterType};
 use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::restart::{RestartTask, RestartType};
 use crate::master::tasks::time::TimeSyncTask;
 use crate::master::tasks::{AppTask, NonReadTask, Task};
 use crate::master::{
     DeadBandHeader, DirReadConfig, DirectoryReader, FileCredentials, FileError, FileInfo,
-    FileReadConfig, FileReader, Headers, WriteError,
+    FileReadConfig, FileReader, FileWriteConfig, FileWriter, Headers, WriteError,
 };
 use crate::util::channel::Sender;
 use crate::util::session::Enabled;
@@ -340,6 +341,24 @@ impl AssociationHandle {
             .await
     }
 
+    /// Start an operation to WRITE a file to the outstation using a [`FileWriter`] to retrieve data
+    pub async fn write_file<T: ToString>(
+        &mut self,
+        remote_file_path: T,
+        config: FileWriteConfig,
+        writer: Box<dyn FileWriter>,
+        credentials: Option<FileCredentials>,
+    ) -> Result<(), Shutdown> {
+        let task = FileWriteTask::start(
+            remote_file_path.to_string(),
+            config,
+            FileWriterType::new(writer),
+            credentials,
+        );
+        self.send_task(Task::App(AppTask::NonRead(NonReadTask::FileWrite(task))))
+            .await
+    }
+
     /// Read a file directory
     pub async fn read_directory<T: ToString>(
         &mut self,
@@ -435,6 +454,8 @@ pub enum TaskType {
     GenericEmptyResponse(FunctionCode),
     /// Read a file from the outstation
     FileRead,
+    /// Write a file to the outstation
+    FileWrite,
     /// Get information about a file
     GetFileInfo,
 }
