@@ -96,160 +96,75 @@ const FILE_HANDLE: u32 = 0xDEADBEEF;
 
 #[tokio::test]
 async fn aborts_when_file_cannot_be_opened() {
-    let (mut harness, events) = start_write_request().await;
-
+    let mut harness = FileWriteHarness::start_write().await;
     harness
-        .process_response(super::file_status(
-            FILE_HANDLE,
-            FILE_SIZE,
+        .respond_to_open(
+            0,
             FileStatus::FileLocked,
-        ))
+            Event::Abort(FileError::BadStatus(FileStatus::FileLocked)),
+        )
         .await;
-
-    assert_eq!(
-        events.pop(),
-        Some(Event::Abort(FileError::BadStatus(FileStatus::FileLocked)))
-    );
-
-    harness.assert_no_events();
 }
 
 #[tokio::test]
 async fn can_write_two_block_file() {
-    let (mut harness, events) = start_write_request().await;
+    let mut harness = FileWriteHarness::start_write().await;
 
-    events.queue_block(Block {
+    harness.events.queue_block(Block {
         last: false,
         data: vec![0xDE, 0xAD],
     });
-    events.queue_block(Block {
+    harness.events.queue_block(Block {
         last: true,
         data: vec![0xBE, 0xEF],
     });
 
-    assert!(events.pop().is_none());
-
     harness
-        .process_response(super::file_status(
-            FILE_HANDLE,
-            FILE_SIZE,
-            FileStatus::Success,
-        ))
+        .respond_to_open(0, FileStatus::Success, Event::Open(FILE_HANDLE, FILE_SIZE))
         .await;
-
-    assert_eq!(events.pop().unwrap(), Event::Open(FILE_HANDLE, FILE_SIZE));
-
-    {
-        let request = harness.pop_write().await;
-        let expected = super::request(
-            FunctionCode::Write,
-            1,
-            &Group70Var5 {
-                file_handle: FILE_HANDLE,
-                block_number: 0,
-                file_data: &[0xDE, 0xAD],
-            },
-        );
-
-        assert_eq!(request, expected);
-    }
-
+    harness.expect_write(1, 0, &[0xDE, 0xAD]).await;
     harness
-        .process_response(super::response(
-            1,
-            &Group70Var6 {
-                file_handle: FILE_HANDLE,
-                block_number: 0,
-                status_code: FileStatus::Success,
-                text: "",
-            },
-        ))
+        .response_to_write(1, FILE_HANDLE, 0, FileStatus::Success)
         .await;
-
-    {
-        // the second and final write
-        let request = harness.pop_write().await;
-        let expected = super::request(
-            FunctionCode::Write,
-            2,
-            &Group70Var5 {
-                file_handle: FILE_HANDLE,
-                block_number: super::last_block(1),
-                file_data: &[0xBE, 0xEF],
-            },
-        );
-
-        assert_eq!(request, expected);
-    }
-
     harness
-        .process_response(super::response(
-            2,
-            &Group70Var6 {
-                file_handle: FILE_HANDLE,
-                block_number: super::last_block(1),
-                status_code: FileStatus::Success,
-                text: "",
-            },
-        ))
+        .expect_write(2, super::last_block(1), &[0xBE, 0xEF])
         .await;
-
-    {
-        // close
-        let request = harness.pop_write().await;
-        let expected = super::request(
-            FunctionCode::CloseFile,
-            3,
-            &Group70Var4 {
-                file_handle: FILE_HANDLE,
-                file_size: 0,
-                max_block_size: 0,
-                request_id: REQUEST_ID,
-                status_code: FileStatus::Success,
-                text: "",
-            },
-        );
-
-        assert_eq!(request, expected);
-    }
-
-    assert!(events.pop().is_none());
-
     harness
-        .process_response(super::response(
-            3,
-            &Group70Var4 {
-                file_handle: FILE_HANDLE,
-                file_size: 0,
-                max_block_size: 0,
-                status_code: FileStatus::Success,
-                text: "",
-                request_id: 0,
-            },
-        ))
+        .response_to_write(2, FILE_HANDLE, super::last_block(1), FileStatus::Success)
         .await;
-
-    assert_eq!(events.pop().unwrap(), Event::Complete);
+    harness.expect_close(3, Event::Complete).await;
 }
 
-async fn start_write_request() -> (TestHarness, EventHandle) {
-    let config = AssociationConfig::quiet();
-    let mut harness = create_association(config).await;
-    let (events, writer) = pair();
+struct FileWriteHarness {
+    inner: TestHarness,
+    events: EventHandle,
+}
 
-    harness
-        .association
-        .write_file(
-            FILE_NAME,
-            FileWriteConfig::new(FileWriteMode::Write, PERMISSIONS, FILE_SIZE)
-                .max_block_size(MAX_BLOCK_SIZE),
-            writer,
-            None,
-        )
-        .await
-        .unwrap();
+impl Drop for FileWriteHarness {
+    fn drop(&mut self) {
+        assert!(self.events.pop().is_none());
+        self.inner.assert_no_events();
+    }
+}
 
-    {
+impl FileWriteHarness {
+    async fn start_write() -> Self {
+        let config = AssociationConfig::quiet();
+        let mut harness = create_association(config).await;
+        let (events, writer) = pair();
+
+        harness
+            .association
+            .write_file(
+                FILE_NAME,
+                FileWriteConfig::new(FileWriteMode::Write, PERMISSIONS, FILE_SIZE)
+                    .max_block_size(MAX_BLOCK_SIZE),
+                writer,
+                None,
+            )
+            .await
+            .unwrap();
+
         // check that it's a file open request
         let request = harness.pop_write().await;
         let expected = super::request(
@@ -268,7 +183,92 @@ async fn start_write_request() -> (TestHarness, EventHandle) {
         );
 
         assert_eq!(request, expected);
+
+        assert!(events.pop().is_none());
+
+        Self {
+            inner: harness,
+            events,
+        }
     }
 
-    (harness, events)
+    async fn respond_to_open(&mut self, seq: u8, status: FileStatus, event: Event) {
+        self.inner
+            .process_response(super::file_status(seq, FILE_HANDLE, FILE_SIZE, status))
+            .await;
+
+        assert_eq!(self.events.pop().unwrap(), event);
+    }
+
+    async fn expect_write(&mut self, seq: u8, block_number: u32, file_data: &[u8]) {
+        let request = self.inner.pop_write().await;
+        let expected = super::request(
+            FunctionCode::Write,
+            seq,
+            &Group70Var5 {
+                file_handle: FILE_HANDLE,
+                block_number,
+                file_data,
+            },
+        );
+
+        assert_eq!(request, expected);
+    }
+
+    async fn response_to_write(
+        &mut self,
+        seq: u8,
+        file_handle: u32,
+        block_number: u32,
+        status_code: FileStatus,
+    ) {
+        self.inner
+            .process_response(super::response(
+                seq,
+                &Group70Var6 {
+                    file_handle,
+                    block_number,
+                    status_code,
+                    text: "",
+                },
+            ))
+            .await;
+    }
+
+    async fn expect_close(&mut self, seq: u8, final_event: Event) {
+        // close
+        let request = self.inner.pop_write().await;
+        let expected = super::request(
+            FunctionCode::CloseFile,
+            seq,
+            &Group70Var4 {
+                file_handle: FILE_HANDLE,
+                file_size: 0,
+                max_block_size: 0,
+                request_id: REQUEST_ID,
+                status_code: FileStatus::Success,
+                text: "",
+            },
+        );
+
+        assert_eq!(request, expected);
+
+        assert!(self.events.pop().is_none());
+
+        self.inner
+            .process_response(super::response(
+                3,
+                &Group70Var4 {
+                    file_handle: FILE_HANDLE,
+                    file_size: 0,
+                    max_block_size: 0,
+                    status_code: FileStatus::Success,
+                    text: "",
+                    request_id: 0,
+                },
+            ))
+            .await;
+
+        assert_eq!(self.events.pop().unwrap(), final_event);
+    }
 }

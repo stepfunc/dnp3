@@ -23,11 +23,7 @@ pub(super) fn fir_and_fin(seq: u8) -> u8 {
     0b1100_0000 | seq
 }
 
-pub(super) fn file_status(file_handle: u32, file_size: u32, status: FileStatus) -> Vec<u8> {
-    file_status_with_seq(0, file_handle, file_size, status)
-}
-
-pub(super) fn file_status_with_seq(
+pub(super) fn file_status(
     seq: u8,
     file_handle: u32,
     file_size: u32,

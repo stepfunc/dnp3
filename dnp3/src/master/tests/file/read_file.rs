@@ -133,7 +133,7 @@ async fn closes_file_on_completion() {
     let data = b"data".as_slice();
 
     harness
-        .process_response(super::file_status(handle, 24, FileStatus::Success))
+        .process_response(super::file_status(0, handle, 24, FileStatus::Success))
         .await;
 
     assert_eq!(events.pop().unwrap(), Event::Open(24));
