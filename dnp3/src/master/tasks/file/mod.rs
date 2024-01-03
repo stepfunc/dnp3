@@ -27,8 +27,8 @@ impl BlockNumber {
         (self.0 & Self::LAST_BIT) != 0
     }
 
-    pub(super) fn set_last(self) -> Self {
-        Self(self.0 | Self::LAST_BIT)
+    pub(super) fn set_last(&mut self) {
+        self.0 |= Self::LAST_BIT;
     }
 
     pub(super) fn bottom_bits(self) -> u32 {

@@ -233,12 +233,12 @@ pub trait FileReader: Send + Sync + 'static {
 }
 
 ///
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct BlockLength {
-    /// Number of bytes that were written to the destination buffer
-    pub length: u16,
+#[derive(Debug)]
+pub struct Block {
     /// True if this was the final block of the file write operation
-    pub last_block: bool,
+    pub last: bool,
+    /// Bytes to be written to the destination buffer
+    pub data: Vec<u8>,
 }
 
 /// Callbacks for writing a file
@@ -250,17 +250,14 @@ pub trait FileWriter: Send + Sync + 'static {
 
     /// Called when the next block is needed for writing.
     ///
-    ///
-    /// * `dest` is a mutable buffer into which the application should write data for transfer
-    ///
-    /// The application will return Some(BlockLength) upon success indicating how data was written to the
-    /// buffer. Returning 0 will terminate the transfer successfully and the master will then attempt to close
-    /// the file. This can be useful if you do not know the file size or cannot detect the last block to be written.
+    /// The application will return Some(Block) upon success. Returning an empty block will terminate the transfer
+    /// successfully and the master will then attempt to close the file. This can be useful if you do not know the
+    /// file size or cannot detect the last block to be written.
     ///
     /// Returning None will fail the transfer. This allows the application to abort if there is an error
     /// reading the file or if the user wishes to terminate the transfer. The master will still attempt to close
     /// the file.
-    fn next_block(&mut self, dest: &mut [u8]) -> MaybeAsync<Option<BlockLength>>;
+    fn next_block(&mut self, max_block_size: u16) -> MaybeAsync<Option<Block>>;
 
     /// Called when the transfer is aborted before completion due to an error or user request
     fn aborted(&mut self, err: FileError);

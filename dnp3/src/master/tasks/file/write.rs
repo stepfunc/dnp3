@@ -5,7 +5,7 @@ use crate::app::{FunctionCode, Group70Var3, Group70Var5, Timestamp};
 use crate::master::tasks::file::*;
 use crate::master::tasks::NonReadTask;
 use crate::master::{
-    BlockLength, FileAction, FileCredentials, FileError, FileWriteConfig, FileWriter, TaskError,
+    Block, FileAction, FileCredentials, FileError, FileWriteConfig, FileWriter, TaskError,
 };
 
 pub(crate) struct FileWriterType {
@@ -27,9 +27,9 @@ impl FileWriterType {
         }
     }
 
-    async fn next_block(&mut self, dest: &mut [u8]) -> Option<BlockLength> {
+    async fn next_block(&mut self, max_block_size: u16) -> Option<Block> {
         if let Some(x) = self.inner.as_mut() {
-            x.next_block(dest).get().await
+            x.next_block(max_block_size).get().await
         } else {
             None
         }
@@ -56,42 +56,22 @@ impl Drop for FileWriterType {
     }
 }
 
-struct BlockBuffer {
-    buffer: Box<[u8]>,
-    current_length: usize,
-}
-
-impl BlockBuffer {
-    fn new(capacity: usize) -> Self {
-        let vec = vec![0; capacity];
-        Self {
-            buffer: vec.into_boxed_slice(),
-            current_length: 0,
-        }
-    }
-
-    fn dest(&mut self) -> &mut [u8] {
-        self.buffer.as_mut()
-    }
-
-    fn block_data(&self) -> &[u8] {
-        &self.buffer[0..self.current_length]
-    }
-
-    fn set_written(&mut self, written: u16) -> Result<(), usize> {
-        if written as usize > self.buffer.len() {
-            Err(self.buffer.len())
-        } else {
-            self.current_length = written as usize;
-            Ok(())
-        }
-    }
-}
-
 struct WriteState {
     handle: FileHandle,
-    next_block: BlockBuffer,
     block_num: BlockNumber,
+    next_block: Vec<u8>,
+}
+
+impl WriteState {
+    fn write_block(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+        let obj = Group70Var5 {
+            file_handle: self.handle.0,
+            block_number: self.block_num.0,
+            file_data: &self.next_block,
+        };
+
+        writer.write_free_format(&obj)
+    }
 }
 
 /// States of the file transfer
@@ -159,7 +139,7 @@ impl FileWriteTask {
         match &self.state {
             State::GetAuth(auth) => write_auth(auth, writer),
             State::Open(auth) => write_open(&self.settings, *auth, writer),
-            State::Write(state) => Self::write_next_block(state, writer),
+            State::Write(state) => state.write_block(writer),
             State::Close(handle) => write_close(*handle, writer),
         }
     }
@@ -191,16 +171,6 @@ impl FileWriteTask {
         Ok(next.map(|s| NonReadTask::FileWrite(FileWriteTask::new(self.settings, s))))
     }
 
-    fn write_next_block(state: &WriteState, writer: &mut HeaderWriter) -> Result<(), WriteError> {
-        let obj = Group70Var5 {
-            file_handle: state.handle.0,
-            block_number: state.block_num.0,
-            file_data: state.next_block.block_data(),
-        };
-
-        writer.write_free_format(&obj)
-    }
-
     fn handle_auth_response(settings: &mut Settings, header: ObjectHeader) -> Option<State> {
         match handle_auth_response(header) {
             Ok(key) => Some(State::Open(key)),
@@ -228,36 +198,28 @@ impl FileWriteTask {
             return Some(State::Close(handle));
         }
 
-        let mut first_block = BlockBuffer::new(settings.config.max_block_size as usize);
-
         // load the first block
-        match settings.writer.next_block(first_block.dest()).await {
-            None => Some(State::Close(handle)),
-            Some(res) => {
-                let next = if let Err(capacity) = first_block.set_written(res.length) {
-                    tracing::error!(
-                        "User returned more data ({}) than capacity of buffer ({})",
-                        res.length,
-                        capacity
-                    );
-                    State::Close(handle)
-                } else {
-                    let block_num = if res.last_block {
-                        BlockNumber::default().set_last()
-                    } else {
-                        BlockNumber::default()
-                    };
+        let next_state = match settings
+            .writer
+            .next_block(settings.config.max_block_size)
+            .await
+        {
+            None => State::Close(handle),
+            Some(block) => {
+                let mut block_num = BlockNumber::default();
+                if block.last {
+                    block_num.set_last()
+                }
 
-                    State::Write(WriteState {
-                        handle,
-                        next_block: first_block,
-                        block_num,
-                    })
-                };
-
-                Some(next)
+                State::Write(WriteState {
+                    handle,
+                    block_num,
+                    next_block: block.data,
+                })
             }
-        }
+        };
+
+        Some(next_state)
     }
 
     async fn handle_write_response(
@@ -314,25 +276,36 @@ impl FileWriteTask {
             return Ok(State::Close(state.handle));
         }
 
-        let len = match settings.writer.next_block(state.next_block.dest()).await {
+        let block = match settings
+            .writer
+            .next_block(settings.config.max_block_size)
+            .await
+        {
             None => {
                 settings.writer.aborted(FileError::AbortByUser);
                 return Err(FileError::AbortByUser);
             }
-            Some(len) => len,
+            Some(x) => x,
         };
 
-        if len.length == 0 {
+        if block.data.is_empty() {
             return Ok(State::Close(state.handle));
         }
 
-        // increment blocks, etc or do this when writing?
         if let Err(max_value) = state.block_num.increment() {
             tracing::warn!("File block number overflowed max value of {max_value}");
             return Err(FileError::BadBlockNum);
         }
 
-        todo!()
+        if block.last {
+            state.block_num.set_last();
+        }
+
+        Ok(State::Write(WriteState {
+            handle: state.handle,
+            block_num: state.block_num,
+            next_block: block.data,
+        }))
     }
 
     fn handle_close_response(settings: &mut Settings, header: ObjectHeader) {
