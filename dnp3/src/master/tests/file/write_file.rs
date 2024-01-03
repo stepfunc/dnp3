@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 
 use crate::master::association::AssociationConfig;
 use crate::master::tasks::file::REQUEST_ID;
-use crate::master::tests::harness::create_association;
+use crate::master::tests::harness::{create_association, TestHarness};
 use crate::master::{Block, FileAction, FileError, FileWriteConfig, FileWriteMode, FileWriter};
 
 #[derive(Debug, PartialEq, Eq)]
@@ -87,51 +87,36 @@ impl FileWriter for MockWriter {
     }
 }
 
+const FILE_NAME: &str = "./test.txt";
+const PERMISSIONS: Permissions = Permissions::same(PermissionSet::all());
+const FILE_SIZE: u32 = 0xCAFE;
+const MAX_BLOCK_SIZE: u16 = 512;
+
+const FILE_HANDLE: u32 = 0xDEADBEEF;
+
 #[tokio::test]
-async fn can_write_a_file() {
-    let config = AssociationConfig::quiet();
-    let mut harness = create_association(config).await;
-    let (events, reader) = pair();
-
-    const FILE_NAME: &str = "./test.txt";
-    const PERMISSIONS: Permissions = Permissions::same(PermissionSet::all());
-    const FILE_SIZE: u32 = 0xCAFE;
-    const MAX_BLOCK_SIZE: u16 = 512;
-
-    const FILE_HANDLE: u32 = 0xDEADBEEF;
+async fn aborts_when_file_cannot_be_opened() {
+    let (mut harness, events) = start_write_request().await;
 
     harness
-        .association
-        .write_file(
-            FILE_NAME,
-            FileWriteConfig::new(FileWriteMode::Write, PERMISSIONS, FILE_SIZE)
-                .max_block_size(MAX_BLOCK_SIZE),
-            reader,
-            None,
-        )
-        .await
-        .unwrap();
+        .process_response(super::file_status(
+            FILE_HANDLE,
+            FILE_SIZE,
+            FileStatus::FileLocked,
+        ))
+        .await;
 
-    {
-        // check that it's a file open request
-        let request = harness.pop_write().await;
-        let expected = super::request(
-            FunctionCode::OpenFile,
-            0,
-            &Group70Var3 {
-                time_of_creation: Timestamp::zero(),
-                permissions: PERMISSIONS,
-                file_name: FILE_NAME,
-                max_block_size: MAX_BLOCK_SIZE,
-                mode: FileMode::Write,
-                file_size: FILE_SIZE,
-                auth_key: 0,
-                request_id: REQUEST_ID,
-            },
-        );
+    assert_eq!(
+        events.pop(),
+        Some(Event::Abort(FileError::BadStatus(FileStatus::FileLocked)))
+    );
 
-        assert_eq!(request, expected);
-    }
+    harness.assert_no_events();
+}
+
+#[tokio::test]
+async fn can_write_two_block_file() {
+    let (mut harness, events) = start_write_request().await;
 
     events.queue_block(Block {
         last: false,
@@ -245,4 +230,45 @@ async fn can_write_a_file() {
         .await;
 
     assert_eq!(events.pop().unwrap(), Event::Complete);
+}
+
+async fn start_write_request() -> (TestHarness, EventHandle) {
+    let config = AssociationConfig::quiet();
+    let mut harness = create_association(config).await;
+    let (events, writer) = pair();
+
+    harness
+        .association
+        .write_file(
+            FILE_NAME,
+            FileWriteConfig::new(FileWriteMode::Write, PERMISSIONS, FILE_SIZE)
+                .max_block_size(MAX_BLOCK_SIZE),
+            writer,
+            None,
+        )
+        .await
+        .unwrap();
+
+    {
+        // check that it's a file open request
+        let request = harness.pop_write().await;
+        let expected = super::request(
+            FunctionCode::OpenFile,
+            0,
+            &Group70Var3 {
+                time_of_creation: Timestamp::zero(),
+                permissions: PERMISSIONS,
+                file_name: FILE_NAME,
+                max_block_size: MAX_BLOCK_SIZE,
+                mode: FileMode::Write,
+                file_size: FILE_SIZE,
+                auth_key: 0,
+                request_id: REQUEST_ID,
+            },
+        );
+
+        assert_eq!(request, expected);
+    }
+
+    (harness, events)
 }
