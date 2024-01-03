@@ -19,6 +19,7 @@ use crate::master::{ReadType, TaskType};
 use crate::master::tasks::deadbands::WriteDeadBandsTask;
 use crate::master::tasks::empty_response::EmptyResponseTask;
 use crate::master::tasks::file::get_info::GetFileInfoTask;
+use crate::master::tasks::file::open::OpenFileTask;
 use crate::master::tasks::file::read::FileReadTask;
 use crate::master::tasks::file::write::FileWriteTask;
 
@@ -159,6 +160,8 @@ pub(crate) enum NonReadTask {
     FileRead(FileReadTask),
     /// write a file to the outstation
     FileWrite(FileWriteTask),
+    /// Open a file on the outstation
+    OpenFile(OpenFileTask),
     /// get info about a file
     GetFileInfo(GetFileInfoTask),
 }
@@ -195,6 +198,7 @@ impl RequestWriter for NonReadTask {
             NonReadTask::FileRead(t) => t.write(writer)?,
             NonReadTask::GetFileInfo(t) => t.write(writer)?,
             NonReadTask::FileWrite(t) => t.write(writer)?,
+            NonReadTask::OpenFile(t) => t.write(writer)?,
         }
         Ok(())
     }
@@ -294,6 +298,7 @@ impl NonReadTask {
             Self::FileRead(_) => Some(self),
             Self::GetFileInfo(_) => Some(self),
             Self::FileWrite(_) => Some(self),
+            Self::OpenFile(_) => Some(self),
         }
     }
 
@@ -308,6 +313,7 @@ impl NonReadTask {
             Self::FileRead(task) => task.function(),
             Self::GetFileInfo(task) => task.function(),
             Self::FileWrite(task) => task.function(),
+            Self::OpenFile(task) => task.function(),
         }
     }
 
@@ -322,6 +328,7 @@ impl NonReadTask {
             Self::FileRead(task) => task.on_task_error(err),
             Self::GetFileInfo(task) => task.on_task_error(err),
             Self::FileWrite(task) => task.on_task_error(err),
+            Self::OpenFile(task) => task.on_task_error(err),
         }
     }
 
@@ -340,6 +347,7 @@ impl NonReadTask {
             Self::FileRead(task) => task.handle(response).await,
             Self::GetFileInfo(task) => task.handle(response),
             Self::FileWrite(task) => task.handle(response).await,
+            Self::OpenFile(task) => task.handle(response),
         }
     }
 
@@ -358,6 +366,7 @@ impl NonReadTask {
             Self::FileRead(_) => TaskType::FileRead,
             Self::GetFileInfo(_) => TaskType::GetFileInfo,
             Self::FileWrite(_) => TaskType::FileWrite,
+            Self::OpenFile(_) => TaskType::FileOpen,
         }
     }
 }

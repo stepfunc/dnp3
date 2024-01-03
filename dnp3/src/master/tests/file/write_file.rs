@@ -8,7 +8,9 @@ use std::sync::{Arc, Mutex};
 use crate::master::association::AssociationConfig;
 use crate::master::tasks::file::REQUEST_ID;
 use crate::master::tests::harness::{create_association, TestHarness};
-use crate::master::{Block, FileAction, FileError, FileWriteConfig, FileWriteMode, FileWriter};
+use crate::master::{
+    Block, FileAction, FileError, FileHandle, FileWriteConfig, FileWriteMode, FileWriter,
+};
 
 #[derive(Debug, PartialEq, Eq)]
 enum Event {
@@ -69,8 +71,8 @@ fn pair() -> (EventHandle, Box<dyn FileWriter>) {
 }
 
 impl FileWriter for MockWriter {
-    fn opened(&mut self, file_handle: u32, file_size: u32) -> FileAction {
-        self.on_event(Event::Open(file_handle, file_size))
+    fn opened(&mut self, file_handle: FileHandle, file_size: u32) -> FileAction {
+        self.on_event(Event::Open(file_handle.into(), file_size))
     }
 
     fn next_block(&mut self, _next_block_size: u16) -> MaybeAsync<Option<Block>> {

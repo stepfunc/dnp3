@@ -3,57 +3,15 @@ use crate::app::format::WriteError;
 use crate::app::parse::free_format::FreeFormatVariation;
 use crate::app::parse::parser::{HeaderDetails, ObjectHeader, Response};
 use crate::app::{FileStatus, Group70Var2, Group70Var4};
-use crate::master::{FileCredentials, FileError, TaskError};
+use crate::master::{AuthKey, FileCredentials, FileError, FileHandle, TaskError};
 
 pub(crate) mod get_info;
+
+pub(crate) mod open;
 pub(crate) mod read;
 pub(crate) mod write;
 
 pub(crate) struct Filename(pub(crate) String);
-
-#[derive(Copy, Clone, Default)]
-pub(super) struct AuthKey(pub(super) u32);
-#[derive(Copy, Clone, Default)]
-pub(super) struct FileHandle(pub(super) u32);
-#[derive(Copy, Clone, Default)]
-pub(super) struct BlockNumber(pub(super) u32);
-
-impl BlockNumber {
-    const LAST_BIT: u32 = 0x80_00_00_00;
-
-    pub(super) const MAX_VALUE: u32 = !Self::LAST_BIT;
-
-    pub(super) fn is_last(self) -> bool {
-        (self.0 & Self::LAST_BIT) != 0
-    }
-
-    pub(super) fn set_last(&mut self) {
-        self.0 |= Self::LAST_BIT;
-    }
-
-    pub(super) fn bottom_bits(self) -> u32 {
-        // The maximum value is also a mask for the bottom bits
-        self.0 & Self::MAX_VALUE
-    }
-
-    pub(super) fn increment(&mut self) -> Result<(), u32> {
-        if self.bottom_bits() < Self::MAX_VALUE {
-            self.0 = self.bottom_bits() + 1;
-            Ok(())
-        } else {
-            Err(Self::MAX_VALUE)
-        }
-    }
-}
-
-// TODO - see if this is really needed for correct behavior
-impl PartialEq for BlockNumber {
-    fn eq(&self, other: &Self) -> bool {
-        let b1 = self.0 & Self::MAX_VALUE;
-        let b2 = other.0 & Self::MAX_VALUE;
-        b1 == b2
-    }
-}
 
 // we don't really care what the ID is as we don't support polling for file stuff
 // we can just be cute and write Step Function (SF) on the wire.
@@ -73,7 +31,7 @@ pub(super) fn write_auth(
 
 pub(super) fn write_close(handle: FileHandle, writer: &mut HeaderWriter) -> Result<(), WriteError> {
     let obj = Group70Var4 {
-        file_handle: handle.0,
+        file_handle: handle.into(),
         file_size: 0,
         max_block_size: 0,
         request_id: REQUEST_ID,
@@ -100,7 +58,7 @@ pub(super) fn handle_auth_response(header: ObjectHeader) -> Result<AuthKey, File
         return Err(FileError::NoPermission);
     }
 
-    Ok(AuthKey(obj.auth_key))
+    Ok(AuthKey::new(obj.auth_key))
 }
 
 fn handle_open_response(header: ObjectHeader) -> Result<(u32, FileHandle), FileError> {
@@ -120,7 +78,7 @@ fn handle_open_response(header: ObjectHeader) -> Result<(u32, FileHandle), FileE
         return Err(FileError::BadStatus(obj.status_code));
     }
 
-    Ok((obj.file_size, FileHandle(obj.file_handle)))
+    Ok((obj.file_size, FileHandle::new(obj.file_handle)))
 }
 
 fn get_only_header(response: Response) -> Result<ObjectHeader, TaskError> {

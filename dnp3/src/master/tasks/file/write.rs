@@ -2,10 +2,12 @@ use crate::app::format::write::HeaderWriter;
 use crate::app::format::WriteError;
 use crate::app::parse::parser::{ObjectHeader, Response};
 use crate::app::{FunctionCode, Group70Var3, Group70Var5, Timestamp};
+use crate::master::file::BlockNumber;
 use crate::master::tasks::file::*;
 use crate::master::tasks::NonReadTask;
 use crate::master::{
-    Block, FileAction, FileCredentials, FileError, FileWriteConfig, FileWriter, TaskError,
+    AuthKey, Block, FileAction, FileCredentials, FileError, FileHandle, FileWriteConfig,
+    FileWriter, TaskError,
 };
 
 pub(crate) struct FileWriterType {
@@ -19,7 +21,7 @@ impl FileWriterType {
         }
     }
 
-    fn opened(&mut self, handle: u32, size: u32) -> FileAction {
+    fn opened(&mut self, handle: FileHandle, size: u32) -> FileAction {
         if let Some(x) = self.inner.as_mut() {
             x.opened(handle, size)
         } else {
@@ -65,8 +67,8 @@ struct WriteState {
 impl WriteState {
     fn write_block(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
         let obj = Group70Var5 {
-            file_handle: self.handle.0,
-            block_number: self.block_num.0,
+            file_handle: self.handle.into(),
+            block_number: self.block_num.wire_value(),
             file_data: &self.next_block,
         };
 
@@ -120,7 +122,7 @@ impl FileWriteTask {
             writer,
         };
         let state = match credentials {
-            None => State::Open(AuthKey::default()),
+            None => State::Open(AuthKey::none()),
             Some(x) => State::GetAuth(x),
         };
         Self::new(settings, state)
@@ -193,7 +195,7 @@ impl FileWriteTask {
             }
         };
 
-        if settings.writer.opened(handle.0, file_size).is_abort() {
+        if settings.writer.opened(handle, file_size).is_abort() {
             tracing::warn!("File transfer aborted by user");
             return Some(State::Close(handle));
         }
@@ -263,10 +265,10 @@ impl FileWriteTask {
             return Err(FileError::BadStatus(obj.status_code));
         }
 
-        if obj.block_number != state.block_num.0 {
+        if obj.block_number != state.block_num.wire_value() {
             tracing::warn!(
                 "Expected block number {} but outstation returned {} in response",
-                state.block_num.0,
+                state.block_num.wire_value(),
                 obj.block_number
             );
             return Err(FileError::BadBlockNum);
@@ -328,7 +330,7 @@ fn write_open(
     let obj = Group70Var3 {
         time_of_creation: Timestamp::zero(),
         permissions: settings.config.permissions,
-        auth_key: key.0,
+        auth_key: key.into(),
         file_size: settings.config.file_size,
         mode: settings.config.mode.into(),
         max_block_size: settings.config.max_block_size,

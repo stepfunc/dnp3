@@ -232,7 +232,7 @@ pub trait FileReader: Send + Sync + 'static {
     fn completed(&mut self);
 }
 
-///
+/// Block of file data
 #[derive(Debug)]
 pub struct Block {
     /// True if this was the final block of the file write operation
@@ -241,12 +241,118 @@ pub struct Block {
     pub data: Vec<u8>,
 }
 
+/// Authentication key used when opening a file
+#[derive(Copy, Clone, Debug)]
+pub struct AuthKey(u32);
+
+impl From<AuthKey> for u32 {
+    fn from(value: AuthKey) -> Self {
+        value.0
+    }
+}
+
+impl AuthKey {
+    /// Construct from a raw u32
+    pub fn new(value: u32) -> Self {
+        Self(value)
+    }
+
+    /// The default authentication key (0)
+    pub fn none() -> Self {
+        Self(0)
+    }
+}
+
+/// File handle assigned by the outstation
+#[derive(Copy, Clone, Debug)]
+pub struct FileHandle(u32);
+
+impl From<FileHandle> for u32 {
+    fn from(value: FileHandle) -> Self {
+        value.0
+    }
+}
+
+impl FileHandle {
+    /// Construct from a raw value
+    pub fn new(value: u32) -> Self {
+        Self(value)
+    }
+}
+
+/// Block number used in file read/write operations
+#[derive(Copy, Clone, Debug, Default)]
+pub struct BlockNumber(u32);
+
+impl BlockNumber {
+    const LAST_BIT: u32 = 0x80_00_00_00;
+
+    /// Maximum possible block number
+    pub const MAX_VALUE: u32 = !Self::LAST_BIT;
+
+    /// Check if this is the last block
+    pub fn is_last(self) -> bool {
+        (self.0 & Self::LAST_BIT) != 0
+    }
+
+    pub(crate) fn new(raw: u32) -> BlockNumber {
+        Self(raw)
+    }
+
+    pub(crate) fn set_last(&mut self) {
+        self.0 |= Self::LAST_BIT;
+    }
+
+    pub(super) fn bottom_bits(self) -> u32 {
+        // The maximum value is also a mask for the bottom bits
+        self.0 & Self::MAX_VALUE
+    }
+
+    pub(crate) fn wire_value(self) -> u32 {
+        self.0
+    }
+
+    pub(super) fn increment(&mut self) -> Result<(), u32> {
+        if self.bottom_bits() < Self::MAX_VALUE {
+            self.0 = self.bottom_bits() + 1;
+            Ok(())
+        } else {
+            Err(Self::MAX_VALUE)
+        }
+    }
+}
+
+// TODO - see if this is really needed for correct behavior
+impl PartialEq for BlockNumber {
+    fn eq(&self, other: &Self) -> bool {
+        let b1 = self.0 & Self::MAX_VALUE;
+        let b2 = other.0 & Self::MAX_VALUE;
+        b1 == b2
+    }
+}
+
+/// The result of opening a file on the outstation
+#[derive(Copy, Clone, Debug)]
+pub struct OpenedFile {
+    /// The handle assigned to the file by the outstation
+    ///
+    /// This should be used in subsequent requests to
+    pub file_handle: FileHandle,
+    /// Maximum block size returned by the outstation
+    ///
+    /// The master should respect this parameter when writing data to a file or
+    /// the transfer may not succeed
+    pub max_block_size: u16,
+    /// Size of the file returned
+    pub file_size: u32,
+}
+
 /// Callbacks for writing a file
 pub trait FileWriter: Send + Sync + 'static {
     /// Called when the file is successfully opened by the outstation
     ///
     /// May optionally abort the operation
-    fn opened(&mut self, handle: u32, size: u32) -> FileAction;
+    fn opened(&mut self, handle: FileHandle, size: u32) -> FileAction;
 
     /// Called when the next block is needed for writing.
     ///

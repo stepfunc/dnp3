@@ -16,6 +16,7 @@ use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::deadbands::WriteDeadBandsTask;
 use crate::master::tasks::empty_response::EmptyResponseTask;
 use crate::master::tasks::file::get_info::GetFileInfoTask;
+use crate::master::tasks::file::open::{OpenFileRequest, OpenFileTask};
 use crate::master::tasks::file::read::{FileReadTask, FileReaderType};
 use crate::master::tasks::file::write::{FileWriteTask, FileWriterType};
 use crate::master::tasks::read::SingleReadTask;
@@ -23,8 +24,8 @@ use crate::master::tasks::restart::{RestartTask, RestartType};
 use crate::master::tasks::time::TimeSyncTask;
 use crate::master::tasks::{AppTask, NonReadTask, Task};
 use crate::master::{
-    DeadBandHeader, DirReadConfig, DirectoryReader, FileCredentials, FileError, FileInfo,
-    FileReadConfig, FileReader, FileWriteConfig, FileWriter, Headers, WriteError,
+    AuthKey, DeadBandHeader, DirReadConfig, DirectoryReader, FileCredentials, FileError, FileInfo,
+    FileReadConfig, FileReader, FileWriteConfig, FileWriter, Headers, OpenedFile, WriteError,
 };
 use crate::util::channel::Sender;
 use crate::util::session::Enabled;
@@ -323,6 +324,34 @@ impl AssociationHandle {
         rx.await?
     }
 
+    /// Open a file on the outstation with the requested parameters
+    pub async fn open_file<T: ToString>(
+        &mut self,
+        file_name: String,
+        auth_key: AuthKey,
+        file_size: u32,
+        file_mode: FileMode,
+        max_block_size: u16,
+    ) -> Result<Result<OpenedFile, FileError>, Shutdown> {
+        let (promise, rx) = Promise::one_shot();
+
+        let task = OpenFileTask {
+            request: OpenFileRequest {
+                file_name,
+                auth_key,
+                file_size,
+                file_mode,
+                max_block_size,
+            },
+            promise,
+        };
+
+        self.send_task(Task::App(AppTask::NonRead(NonReadTask::OpenFile(task))))
+            .await?;
+
+        Ok(rx.await?)
+    }
+
     /// Start an operation to READ a file from the outstation using a [`FileReader`] to receive data
     pub async fn read_file<T: ToString>(
         &mut self,
@@ -456,6 +485,8 @@ pub enum TaskType {
     FileRead,
     /// Write a file to the outstation
     FileWrite,
+    /// Open a file on the outstation
+    FileOpen,
     /// Get information about a file
     GetFileInfo,
 }

@@ -4,8 +4,9 @@ use crate::app::format::WriteError;
 use crate::app::Timestamp;
 use scursor::{ReadCursor, WriteCursor};
 
+/// Mode used when opening files
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub(crate) enum FileMode {
+pub enum FileMode {
     /// Code used for non-open command requests
     Null,
     /// Specifies that an existing file is to be opened for reading

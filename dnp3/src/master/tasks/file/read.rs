@@ -5,9 +5,11 @@ use crate::app::format::WriteError;
 use crate::app::parse::free_format::FreeFormatVariation;
 use crate::app::parse::parser::{HeaderDetails, ObjectHeader, Response};
 use crate::app::{FunctionCode, Timestamp};
+use crate::master::file::BlockNumber;
 use crate::master::tasks::NonReadTask;
 use crate::master::{
-    FileAction, FileCredentials, FileError, FileReadConfig, FileReader, TaskError,
+    AuthKey, FileAction, FileCredentials, FileError, FileHandle, FileReadConfig, FileReader,
+    TaskError,
 };
 
 enum ReaderTypes {
@@ -131,7 +133,7 @@ impl FileReadTask {
             reader,
         };
         let state = match credentials {
-            None => State::Open(AuthKey::default()),
+            None => State::Open(AuthKey::none()),
             Some(x) => State::GetAuth(x),
         };
         Self::new(settings, state)
@@ -232,7 +234,7 @@ impl FileReadTask {
                 }
             };
 
-            let rx_block = BlockNumber(obj.block_number);
+            let rx_block = BlockNumber::new(obj.block_number);
 
             if rx_block.bottom_bits() != rs.block.bottom_bits() {
                 tracing::warn!(
@@ -272,9 +274,12 @@ impl FileReadTask {
             Ok(if rx_block.is_last() {
                 None
             } else {
+                let mut block = BlockNumber::new(obj.block_number);
+                block.increment().map_err(|_| FileError::BadBlockNum)?;
+
                 Some(ReadState {
                     handle: rs.handle,
-                    block: BlockNumber(obj.block_number + 1),
+                    block,
                     total_rx: new_total,
                 })
             })
@@ -307,7 +312,7 @@ fn write_open(
     let obj = Group70Var3 {
         time_of_creation: Timestamp::zero(),
         permissions: Permissions::default(),
-        auth_key: key.0,
+        auth_key: key.into(),
         file_size: 0,
         mode: FileMode::Read,
         max_block_size: settings.config.max_block_size,
@@ -319,8 +324,8 @@ fn write_open(
 
 fn write_read(rs: ReadState, writer: &mut HeaderWriter) -> Result<(), WriteError> {
     let obj = Group70Var5 {
-        file_handle: rs.handle.0,
-        block_number: rs.block.0,
+        file_handle: rs.handle.into(),
+        block_number: rs.block.wire_value(),
         file_data: &[],
     };
     writer.write_free_format(&obj)
