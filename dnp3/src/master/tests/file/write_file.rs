@@ -1,20 +1,18 @@
-use crate::app::parse::free_format::FreeFormatVariation;
-use crate::app::parse::parser::{HeaderDetails, ParsedFragment};
 use crate::app::{
-    FileMode, FileStatus, FunctionCode, Group70Var3, Group70Var5, Group70Var6, MaybeAsync,
-    PermissionSet, Permissions, RequestHeader,
+    FileMode, FileStatus, FunctionCode, Group70Var3, Group70Var4, Group70Var5, Group70Var6,
+    MaybeAsync, PermissionSet, Permissions, Timestamp,
 };
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
 
 use crate::master::association::AssociationConfig;
+use crate::master::tasks::file::REQUEST_ID;
 use crate::master::tests::harness::create_association;
 use crate::master::{Block, FileAction, FileError, FileWriteConfig, FileWriteMode, FileWriter};
 
 #[derive(Debug, PartialEq, Eq)]
 enum Event {
-    Open(u32),
-    NextBlock(u32, Vec<u8>),
+    Open(u32, u32), // handle and size
     Abort(FileError),
     Complete,
 }
@@ -71,8 +69,8 @@ fn pair() -> (EventHandle, Box<dyn FileWriter>) {
 }
 
 impl FileWriter for MockWriter {
-    fn opened(&mut self, size: u32) -> FileAction {
-        self.on_event(Event::Open(size))
+    fn opened(&mut self, file_handle: u32, file_size: u32) -> FileAction {
+        self.on_event(Event::Open(file_handle, file_size))
     }
 
     fn next_block(&mut self, _next_block_size: u16) -> MaybeAsync<Option<Block>> {
@@ -100,6 +98,8 @@ async fn can_write_a_file() {
     const FILE_SIZE: u32 = 0xCAFE;
     const MAX_BLOCK_SIZE: u16 = 512;
 
+    const FILE_HANDLE: u32 = 0xDEADBEEF;
+
     harness
         .association
         .write_file(
@@ -114,19 +114,23 @@ async fn can_write_a_file() {
 
     {
         // check that it's a file open request
-        let open_request = harness.pop_write().await;
-        let (header, var) = expect_free_format_request(&open_request);
-        assert_eq!(header.function, FunctionCode::OpenFile);
-        assert_matches!(
-            var,
-            FreeFormatVariation::Group70Var3(Group70Var3 {
+        let request = harness.pop_write().await;
+        let expected = super::request(
+            FunctionCode::OpenFile,
+            0,
+            &Group70Var3 {
+                time_of_creation: Timestamp::zero(),
+                permissions: PERMISSIONS,
                 file_name: FILE_NAME,
                 max_block_size: MAX_BLOCK_SIZE,
                 mode: FileMode::Write,
                 file_size: FILE_SIZE,
-                ..
-            })
+                auth_key: 0,
+                request_id: REQUEST_ID,
+            },
         );
+
+        assert_eq!(request, expected);
     }
 
     events.queue_block(Block {
@@ -138,45 +142,107 @@ async fn can_write_a_file() {
         data: vec![0xBE, 0xEF],
     });
 
+    assert!(events.pop().is_none());
+
     harness
-        .process_response(super::file_status(22, FILE_SIZE, FileStatus::Success))
+        .process_response(super::file_status(
+            FILE_HANDLE,
+            FILE_SIZE,
+            FileStatus::Success,
+        ))
         .await;
 
+    assert_eq!(events.pop().unwrap(), Event::Open(FILE_HANDLE, FILE_SIZE));
+
     {
-        // the first write
-        let open_request = harness.pop_write().await;
-        let (header, var) = expect_free_format_request(&open_request);
-        assert_eq!(header.function, FunctionCode::Write);
-        assert_matches!(
-            var,
-            FreeFormatVariation::Group70Var5(Group70Var5 {
-                file_handle: 22,
+        let request = harness.pop_write().await;
+        let expected = super::request(
+            FunctionCode::Write,
+            1,
+            &Group70Var5 {
+                file_handle: FILE_HANDLE,
                 block_number: 0,
-                file_data: [0xDE, 0xAD]
-            })
+                file_data: &[0xDE, 0xAD],
+            },
         );
+
+        assert_eq!(request, expected);
     }
 
     harness
         .process_response(super::response(
-            01,
+            1,
             &Group70Var6 {
-                file_handle: 22,
+                file_handle: FILE_HANDLE,
                 block_number: 0,
                 status_code: FileStatus::Success,
                 text: "",
             },
         ))
         .await;
-}
 
-fn expect_free_format_request(data: &[u8]) -> (RequestHeader, FreeFormatVariation) {
-    let parsed = ParsedFragment::parse(&data).unwrap().to_request().unwrap();
-    let objects = parsed.objects.unwrap();
-    let header = objects.get_only_header().unwrap();
-    let obj = match header.details {
-        HeaderDetails::TwoByteFreeFormat(1, x) => x,
-        _ => unreachable!(),
-    };
-    (parsed.header, obj)
+    {
+        // the second and final write
+        let request = harness.pop_write().await;
+        let expected = super::request(
+            FunctionCode::Write,
+            2,
+            &Group70Var5 {
+                file_handle: FILE_HANDLE,
+                block_number: super::last_block(1),
+                file_data: &[0xBE, 0xEF],
+            },
+        );
+
+        assert_eq!(request, expected);
+    }
+
+    harness
+        .process_response(super::response(
+            2,
+            &Group70Var6 {
+                file_handle: FILE_HANDLE,
+                block_number: super::last_block(1),
+                status_code: FileStatus::Success,
+                text: "",
+            },
+        ))
+        .await;
+
+    {
+        // close
+        let request = harness.pop_write().await;
+        let expected = super::request(
+            FunctionCode::CloseFile,
+            3,
+            &Group70Var4 {
+                file_handle: FILE_HANDLE,
+                file_size: 0,
+                max_block_size: 0,
+                request_id: REQUEST_ID,
+                status_code: FileStatus::Success,
+                text: "",
+            },
+        );
+
+        assert_eq!(request, expected);
+    }
+
+    assert!(events.pop().is_none());
+
+    harness
+        .process_response(super::response(
+            3,
+            &Group70Var4 {
+                file_handle: FILE_HANDLE,
+                file_size: 0,
+                max_block_size: 0,
+                status_code: FileStatus::Success,
+                text: "",
+                request_id: 0,
+            },
+        ))
+        .await;
+
+    assert_eq!(events.pop().unwrap(), Event::Complete);
 }

@@ -19,9 +19,9 @@ impl FileWriterType {
         }
     }
 
-    fn opened(&mut self, size: u32) -> FileAction {
+    fn opened(&mut self, handle: u32, size: u32) -> FileAction {
         if let Some(x) = self.inner.as_mut() {
-            x.opened(size)
+            x.opened(handle, size)
         } else {
             FileAction::Abort
         }
@@ -193,7 +193,7 @@ impl FileWriteTask {
             }
         };
 
-        if settings.writer.opened(file_size).is_abort() {
+        if settings.writer.opened(handle.0, file_size).is_abort() {
             tracing::warn!("File transfer aborted by user");
             return Some(State::Close(handle));
         }

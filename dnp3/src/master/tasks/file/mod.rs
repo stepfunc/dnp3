@@ -57,7 +57,7 @@ impl PartialEq for BlockNumber {
 
 // we don't really care what the ID is as we don't support polling for file stuff
 // we can just be cute and write Step Function (SF) on the wire.
-const REQUEST_ID: u16 = u16::from_le_bytes([b'S', b'F']);
+pub(crate) const REQUEST_ID: u16 = u16::from_le_bytes([b'S', b'F']);
 
 pub(super) fn write_auth(
     credentials: &FileCredentials,
@@ -145,7 +145,7 @@ fn get_only_header(response: Response) -> Result<ObjectHeader, TaskError> {
 
 fn process_close_response(header: ObjectHeader) -> Result<(), FileError> {
     let obj = match header.details {
-        HeaderDetails::TwoByteFreeFormat(_, FreeFormatVariation::Group70Var4(obj)) => obj,
+        HeaderDetails::TwoByteFreeFormat(1, FreeFormatVariation::Group70Var4(obj)) => obj,
         _ => {
             tracing::warn!(
                 "File CLOSE response contains unexpected variation: {}",

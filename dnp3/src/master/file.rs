@@ -246,7 +246,7 @@ pub trait FileWriter: Send + Sync + 'static {
     /// Called when the file is successfully opened by the outstation
     ///
     /// May optionally abort the operation
-    fn opened(&mut self, size: u32) -> FileAction;
+    fn opened(&mut self, handle: u32, size: u32) -> FileAction;
 
     /// Called when the next block is needed for writing.
     ///

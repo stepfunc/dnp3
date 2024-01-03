@@ -1,7 +1,7 @@
 use crate::app::format::free_format::FreeFormat;
 use crate::app::format::write::HeaderWriter;
 use crate::app::format::WriteError;
-use crate::app::{FileStatus, Group70Var4, Group70Var5, Group70Var6, Variation};
+use crate::app::{FileStatus, FunctionCode, Group70Var4, Group70Var5, Group70Var6, Variation};
 use scursor::WriteCursor;
 
 mod read_file;
@@ -13,6 +13,10 @@ impl<'a> FreeFormat for Group70Var6<'a> {
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         self.write(cursor)
     }
+}
+
+pub(super) fn last_block(block: u32) -> u32 {
+    1 << 31 | block
 }
 
 pub(super) fn fir_and_fin(seq: u8) -> u8 {
@@ -60,6 +64,19 @@ pub(super) fn file_transport_response(
 
 pub(crate) fn response<T: FreeFormat>(seq: u8, variation: &T) -> Vec<u8> {
     let mut response = [fir_and_fin(seq), 0x81, 0x00, 0x00].to_vec();
+
+    let mut buffer: [u8; 64] = [0; 64];
+    let mut cursor = WriteCursor::new(&mut buffer);
+    let mut writer = HeaderWriter::new(&mut cursor);
+    writer.write_free_format(variation).unwrap();
+
+    response.extend_from_slice(cursor.written());
+
+    response
+}
+
+pub(crate) fn request<T: FreeFormat>(function: FunctionCode, seq: u8, variation: &T) -> Vec<u8> {
+    let mut response = [fir_and_fin(seq), function.as_u8()].to_vec();
 
     let mut buffer: [u8; 64] = [0; 64];
     let mut cursor = WriteCursor::new(&mut buffer);
