@@ -19,17 +19,17 @@ use crate::master::tasks::file::close::CloseFileTask;
 use crate::master::tasks::file::get_info::GetFileInfoTask;
 use crate::master::tasks::file::open::{OpenFileRequest, OpenFileTask};
 use crate::master::tasks::file::read::{FileReadTask, FileReaderType};
-use crate::master::tasks::file::write::{FileWriteTask, FileWriterType};
 use crate::master::tasks::file::write_block::{WriteBlockRequest, WriteBlockTask};
 use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::restart::{RestartTask, RestartType};
 use crate::master::tasks::time::TimeSyncTask;
 use crate::master::tasks::{AppTask, NonReadTask, Task};
 use crate::master::{
-    AuthKey, BlockNumber, DeadBandHeader, DirReadConfig, DirectoryReader, FileCredentials,
-    FileError, FileHandle, FileInfo, FileMode, FileReadConfig, FileReader, FileWriteConfig,
-    FileWriter, Headers, OpenedFile, WriteError,
+    AuthKey, BlockNumber, DeadBandHeader, DirReadConfig, FileCredentials,
+    FileError, FileHandle, FileInfo, FileMode, FileReadConfig, FileReader,
+    Headers, OpenedFile, WriteError,
 };
+use crate::master::tasks::file::directory::DirectoryReader;
 use crate::util::channel::Sender;
 use crate::util::session::Enabled;
 
@@ -407,24 +407,6 @@ impl AssociationHandle {
             .await
     }
 
-    /// Start an operation to WRITE a file to the outstation using a [`FileWriter`] to retrieve data
-    pub async fn write_file<T: ToString>(
-        &mut self,
-        remote_file_path: T,
-        config: FileWriteConfig,
-        writer: Box<dyn FileWriter>,
-        credentials: Option<FileCredentials>,
-    ) -> Result<(), Shutdown> {
-        let task = FileWriteTask::start(
-            remote_file_path.to_string(),
-            config,
-            FileWriterType::new(writer),
-            credentials,
-        );
-        self.send_task(Task::App(AppTask::NonRead(NonReadTask::FileWrite(task))))
-            .await
-    }
-
     /// Read a file directory
     pub async fn read_directory<T: ToString>(
         &mut self,
@@ -520,16 +502,14 @@ pub enum TaskType {
     GenericEmptyResponse(FunctionCode),
     /// Read a file from the outstation
     FileRead,
-    /// Write a file to the outstation
-    FileWrite,
     /// Open a file on the outstation
     FileOpen,
+    /// Write a file block
+    FileWriteBlock,
     /// Close a file on the outstation
     FileClose,
     /// Get information about a file
     GetFileInfo,
-    /// Write a file block
-    FileWriteBlock,
 }
 
 /// callbacks associated with a single master to outstation association

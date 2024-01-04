@@ -22,7 +22,6 @@ use crate::master::tasks::file::close::CloseFileTask;
 use crate::master::tasks::file::get_info::GetFileInfoTask;
 use crate::master::tasks::file::open::OpenFileTask;
 use crate::master::tasks::file::read::FileReadTask;
-use crate::master::tasks::file::write::FileWriteTask;
 use crate::master::tasks::file::write_block::WriteBlockTask;
 
 pub(crate) mod auto;
@@ -160,8 +159,6 @@ pub(crate) enum NonReadTask {
     EmptyResponseTask(EmptyResponseTask),
     /// read file from the outstation
     FileRead(FileReadTask),
-    /// write a file to the outstation
-    FileWrite(FileWriteTask),
     /// Open a file on the outstation
     OpenFile(OpenFileTask),
     /// Close a file on the outstation
@@ -203,7 +200,6 @@ impl RequestWriter for NonReadTask {
             NonReadTask::EmptyResponseTask(t) => t.write(writer)?,
             NonReadTask::FileRead(t) => t.write(writer)?,
             NonReadTask::GetFileInfo(t) => t.write(writer)?,
-            NonReadTask::FileWrite(t) => t.write(writer)?,
             NonReadTask::OpenFile(t) => t.write(writer)?,
             NonReadTask::CloseFile(t) => t.write(writer)?,
             NonReadTask::WriteFileBlock(t) => t.write(writer)?,
@@ -305,7 +301,6 @@ impl NonReadTask {
             Self::EmptyResponseTask(_) => Some(self),
             Self::FileRead(_) => Some(self),
             Self::GetFileInfo(_) => Some(self),
-            Self::FileWrite(_) => Some(self),
             Self::OpenFile(_) => Some(self),
             Self::CloseFile(_) => Some(self),
             Self::WriteFileBlock(_) => Some(self),
@@ -322,7 +317,6 @@ impl NonReadTask {
             Self::EmptyResponseTask(task) => task.function(),
             Self::FileRead(task) => task.function(),
             Self::GetFileInfo(task) => task.function(),
-            Self::FileWrite(task) => task.function(),
             Self::OpenFile(task) => task.function(),
             Self::CloseFile(task) => task.function(),
             Self::WriteFileBlock(task) => task.function(),
@@ -339,7 +333,6 @@ impl NonReadTask {
             Self::EmptyResponseTask(task) => task.on_task_error(err),
             Self::FileRead(task) => task.on_task_error(err),
             Self::GetFileInfo(task) => task.on_task_error(err),
-            Self::FileWrite(task) => task.on_task_error(err),
             Self::OpenFile(task) => task.on_task_error(err),
             Self::CloseFile(task) => task.on_task_error(err),
             Self::WriteFileBlock(task) => task.on_task_error(err),
@@ -360,7 +353,6 @@ impl NonReadTask {
             Self::EmptyResponseTask(task) => task.handle(response),
             Self::FileRead(task) => task.handle(response).await,
             Self::GetFileInfo(task) => task.handle(response),
-            Self::FileWrite(task) => task.handle(response).await,
             Self::OpenFile(task) => task.handle(response),
             Self::CloseFile(task) => task.handle(response),
             Self::WriteFileBlock(task) => task.handle(response),
@@ -381,7 +373,6 @@ impl NonReadTask {
             Self::EmptyResponseTask(_) => TaskType::GenericEmptyResponse(self.function()),
             Self::FileRead(_) => TaskType::FileRead,
             Self::GetFileInfo(_) => TaskType::GetFileInfo,
-            Self::FileWrite(_) => TaskType::FileWrite,
             Self::OpenFile(_) => TaskType::FileOpen,
             Self::CloseFile(_) => TaskType::FileClose,
             Self::WriteFileBlock(_) => TaskType::FileWriteBlock,

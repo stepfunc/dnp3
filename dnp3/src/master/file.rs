@@ -1,8 +1,7 @@
-use crate::app::file::{FileStatus, FileType, Group70Var7, Permissions};
+use crate::app::file::{FileStatus, FileType, Permissions};
 use crate::app::parse::parser::SingleHeaderError;
 use crate::app::{MaybeAsync, ObjectParseError, Shutdown, Timestamp};
-use crate::master::{Promise, TaskError};
-use scursor::ReadCursor;
+use crate::master::TaskError;
 use std::fmt::Debug;
 
 /// Credentials for obtaining a file authorization token from the outstation
@@ -60,41 +59,6 @@ impl From<FileWriteMode> for FileMode {
         match value {
             FileWriteMode::Write => Self::Write,
             FileWriteMode::Append => Self::Append,
-        }
-    }
-}
-
-/// Configuration related to reading a file
-#[derive(Copy, Clone, Debug)]
-pub struct FileWriteConfig {
-    pub(crate) max_block_size: u16,
-    pub(crate) mode: FileWriteMode,
-    pub(crate) permissions: Permissions,
-    pub(crate) file_size: u32,
-}
-
-impl FileWriteConfig {
-    /// Construct with specified mode, permissions, and file size.
-    ///
-    /// The block size defaults to 1024
-    ///
-    /// `file_size` should be a non-zero value when opening a file for writing or appending.
-    /// A file size of 0xFFFFFFFF indicates that the actual file size is unknown. Outstation
-    /// devices are not required to accept unknown file sizes and may reject the request.
-    pub fn new(mode: FileWriteMode, permissions: Permissions, file_size: u32) -> Self {
-        Self {
-            max_block_size: 1024,
-            mode,
-            permissions,
-            file_size,
-        }
-    }
-
-    /// Set the maximum block size requested by the master during the file open
-    pub fn max_block_size(self, max_block_size: u16) -> Self {
-        Self {
-            max_block_size,
-            ..self
         }
     }
 }
@@ -175,6 +139,12 @@ pub enum FileError {
     MaxLengthExceeded,
     /// Generic task error occurred
     TaskError(TaskError),
+}
+
+impl From<tokio::sync::oneshot::error::RecvError> for FileError {
+    fn from(_: tokio::sync::oneshot::error::RecvError) -> Self {
+        Self::TaskError(TaskError::Shutdown)
+    }
 }
 
 impl From<Shutdown> for FileError {
@@ -304,15 +274,6 @@ pub trait FileReader: Send + Sync + 'static {
     fn completed(&mut self);
 }
 
-/// Block of file data
-#[derive(Debug)]
-pub struct Block {
-    /// True if this was the final block of the file write operation
-    pub last: bool,
-    /// Bytes to be written to the destination buffer
-    pub data: Vec<u8>,
-}
-
 /// Authentication key used when opening a file
 #[derive(Copy, Clone, Debug)]
 pub struct AuthKey(u32);
@@ -415,15 +376,6 @@ impl BlockNumber {
     }
 }
 
-// TODO - see if this is really needed for correct behavior
-impl PartialEq for BlockNumber {
-    fn eq(&self, other: &Self) -> bool {
-        let b1 = self.0 & Self::MAX_VALUE;
-        let b2 = other.0 & Self::MAX_VALUE;
-        b1 == b2
-    }
-}
-
 /// The result of opening a file on the outstation
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct OpenedFile {
@@ -440,100 +392,4 @@ pub struct OpenedFile {
     pub max_block_size: u16,
 }
 
-/// Callbacks for writing a file
-pub trait FileWriter: Send + Sync + 'static {
-    /// Called when the file is successfully opened by the outstation
-    ///
-    /// May optionally abort the operation
-    fn opened(&mut self, handle: FileHandle, size: u32) -> FileAction;
 
-    /// Called when the next block is needed for writing.
-    ///
-    /// The application will return Some(Block) upon success. Returning an empty block will terminate the transfer
-    /// successfully and the master will then attempt to close the file. This can be useful if you do not know the
-    /// file size or cannot detect the last block to be written.
-    ///
-    /// Returning None will fail the transfer. This allows the application to abort if there is an error
-    /// reading the file or if the user wishes to terminate the transfer. The master will still attempt to close
-    /// the file.
-    fn next_block(&mut self, max_block_size: u16) -> MaybeAsync<Option<Block>>;
-
-    /// Called when the transfer is aborted before completion due to an error or user request
-    fn aborted(&mut self, err: FileError);
-
-    /// Called when the transfer completes successfully
-    fn completed(&mut self);
-}
-
-pub(crate) struct DirectoryReader {
-    data: Vec<u8>,
-    promise: Option<Promise<Result<Vec<FileInfo>, FileError>>>,
-}
-
-impl DirectoryReader {
-    pub(crate) fn new(promise: Promise<Result<Vec<FileInfo>, FileError>>) -> Self {
-        Self {
-            data: Vec::new(),
-            promise: Some(promise),
-        }
-    }
-}
-
-impl FileReader for DirectoryReader {
-    fn opened(&mut self, _size: u32) -> FileAction {
-        FileAction::Continue
-    }
-
-    fn block_received(&mut self, _block_num: u32, data: &[u8]) -> MaybeAsync<FileAction> {
-        self.data.extend(data);
-        MaybeAsync::ready(FileAction::Continue)
-    }
-
-    fn aborted(&mut self, err: FileError) {
-        if let Some(x) = self.promise.take() {
-            x.complete(Err(err));
-        }
-    }
-
-    fn completed(&mut self) {
-        fn parse(data: &[u8]) -> Result<Vec<FileInfo>, FileError> {
-            let mut cursor = ReadCursor::new(data);
-            let mut items = Vec::new();
-            while !cursor.is_empty() {
-                match Group70Var7::read(&mut cursor) {
-                    Ok(x) => items.push(x),
-                    Err(err) => {
-                        tracing::warn!("Error reading directory information: {err}");
-                        return Err(FileError::BadResponse);
-                    }
-                }
-            }
-            Ok(items.into_iter().map(|x| x.into()).collect())
-        }
-
-        // parse the accumulated data
-
-        let res = parse(self.data.as_slice());
-        if let Some(promise) = self.promise.take() {
-            promise.complete(res);
-        }
-    }
-}
-
-impl<'a> From<Group70Var7<'a>> for FileInfo {
-    fn from(value: Group70Var7<'a>) -> Self {
-        Self {
-            name: value.file_name.to_string(),
-            file_type: value.file_type,
-            size: value.file_size,
-            time_created: value.time_of_creation,
-            permissions: value.permissions,
-        }
-    }
-}
-
-impl From<tokio::sync::oneshot::error::RecvError> for FileError {
-    fn from(_: tokio::sync::oneshot::error::RecvError) -> Self {
-        Self::TaskError(TaskError::Shutdown)
-    }
-}

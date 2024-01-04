@@ -8,10 +8,10 @@ use crate::master::{AuthKey, FileCredentials, FileError, FileHandle};
 pub(crate) mod get_info;
 
 pub(crate) mod close;
+
+pub(crate) mod directory;
 pub(crate) mod open;
 pub(crate) mod read;
-pub(crate) mod write;
-
 pub(crate) mod write_block;
 
 pub(crate) struct Filename(pub(crate) String);

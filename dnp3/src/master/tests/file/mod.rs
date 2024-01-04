@@ -7,7 +7,6 @@ use scursor::WriteCursor;
 mod close_file;
 mod open_file;
 mod read_file;
-mod write_file;
 
 impl<'a> FreeFormat for Group70Var6<'a> {
     const VARIATION: Variation = Variation::Group70Var6;
