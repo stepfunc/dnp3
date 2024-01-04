@@ -344,13 +344,13 @@ pub struct OpenedFile {
     ///
     /// This should be used in subsequent requests to
     pub file_handle: FileHandle,
+    /// Size of the file returned by the outstation
+    pub file_size: u32,
     /// Maximum block size returned by the outstation
     ///
     /// The master should respect this parameter when writing data to a file or
     /// the transfer may not succeed
     pub max_block_size: u16,
-    /// Size of the file returned
-    pub file_size: u32,
 }
 
 /// Callbacks for writing a file
