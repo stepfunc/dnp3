@@ -4,6 +4,7 @@ use crate::app::format::WriteError;
 use crate::app::{FileStatus, FunctionCode, Group70Var4, Group70Var5, Group70Var6, Variation};
 use scursor::WriteCursor;
 
+mod open_file;
 mod read_file;
 mod write_file;
 
@@ -27,6 +28,7 @@ pub(super) fn file_status(
     seq: u8,
     file_handle: u32,
     file_size: u32,
+    max_block_size: u16,
     status_code: FileStatus,
 ) -> Vec<u8> {
     response(
@@ -34,7 +36,7 @@ pub(super) fn file_status(
         &Group70Var4 {
             file_handle,
             file_size,
-            max_block_size: 0,
+            max_block_size,
             request_id: 0,
             status_code,
             text: "",

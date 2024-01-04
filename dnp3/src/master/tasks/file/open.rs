@@ -11,6 +11,7 @@ pub(crate) struct OpenFileRequest {
     pub(crate) auth_key: AuthKey,
     pub(crate) file_size: u32,
     pub(crate) file_mode: FileMode,
+    pub(crate) permissions: Permissions,
     pub(crate) max_block_size: u16,
 }
 
@@ -27,7 +28,7 @@ impl OpenFileTask {
     pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
         let obj = Group70Var3 {
             time_of_creation: Timestamp::zero(),
-            permissions: Permissions::default(),
+            permissions: self.request.permissions,
             auth_key: self.request.auth_key.into(),
             file_size: self.request.file_size,
             mode: self.request.file_mode,

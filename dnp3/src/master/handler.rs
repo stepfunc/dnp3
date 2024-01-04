@@ -327,29 +327,31 @@ impl AssociationHandle {
     /// Open a file on the outstation with the requested parameters
     pub async fn open_file<T: ToString>(
         &mut self,
-        file_name: String,
+        file_name: T,
         auth_key: AuthKey,
+        permissions: Permissions,
         file_size: u32,
         file_mode: FileMode,
         max_block_size: u16,
-    ) -> Result<Result<OpenedFile, FileError>, Shutdown> {
+    ) -> Result<OpenedFile, FileError> {
         let (promise, rx) = Promise::one_shot();
 
         let task = OpenFileTask {
             request: OpenFileRequest {
-                file_name,
+                file_name: file_name.to_string(),
                 auth_key,
                 file_size,
                 file_mode,
+                permissions,
                 max_block_size,
             },
             promise,
         };
 
-        self.send_task(Task::App(AppTask::NonRead(NonReadTask::OpenFile(task))))
-            .await?;
+        let task = Task::App(AppTask::NonRead(NonReadTask::OpenFile(task)));
 
-        Ok(rx.await?)
+        self.send_task(task).await?;
+        rx.await?
     }
 
     /// Start an operation to READ a file from the outstation using a [`FileReader`] to receive data

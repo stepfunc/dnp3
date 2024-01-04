@@ -174,6 +174,12 @@ pub enum FileError {
     TaskError(TaskError),
 }
 
+impl From<Shutdown> for FileError {
+    fn from(_: Shutdown) -> Self {
+        Self::TaskError(TaskError::Shutdown)
+    }
+}
+
 impl From<TaskError> for FileError {
     fn from(err: TaskError) -> Self {
         FileError::TaskError(err)
@@ -264,7 +270,7 @@ impl AuthKey {
 }
 
 /// File handle assigned by the outstation
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct FileHandle(u32);
 
 impl From<FileHandle> for u32 {
@@ -332,7 +338,7 @@ impl PartialEq for BlockNumber {
 }
 
 /// The result of opening a file on the outstation
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct OpenedFile {
     /// The handle assigned to the file by the outstation
     ///
@@ -436,12 +442,6 @@ impl<'a> From<Group70Var7<'a>> for FileInfo {
             time_created: value.time_of_creation,
             permissions: value.permissions,
         }
-    }
-}
-
-impl From<Shutdown> for FileError {
-    fn from(_: Shutdown) -> Self {
-        Self::TaskError(TaskError::Shutdown)
     }
 }
 

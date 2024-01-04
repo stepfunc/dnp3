@@ -102,6 +102,7 @@ async fn aborts_when_file_cannot_be_opened() {
     harness
         .respond_to_open(
             0,
+            MAX_BLOCK_SIZE,
             FileStatus::FileLocked,
             Event::Abort(FileError::BadStatus(FileStatus::FileLocked)),
         )
@@ -122,7 +123,12 @@ async fn can_write_two_block_file() {
     });
 
     harness
-        .respond_to_open(0, FileStatus::Success, Event::Open(FILE_HANDLE, FILE_SIZE))
+        .respond_to_open(
+            0,
+            MAX_BLOCK_SIZE,
+            FileStatus::Success,
+            Event::Open(FILE_HANDLE, FILE_SIZE),
+        )
         .await;
     harness.expect_write(1, 0, &[0xDE, 0xAD]).await;
     harness
@@ -194,9 +200,21 @@ impl FileWriteHarness {
         }
     }
 
-    async fn respond_to_open(&mut self, seq: u8, status: FileStatus, event: Event) {
+    async fn respond_to_open(
+        &mut self,
+        seq: u8,
+        max_block_size: u16,
+        status: FileStatus,
+        event: Event,
+    ) {
         self.inner
-            .process_response(super::file_status(seq, FILE_HANDLE, FILE_SIZE, status))
+            .process_response(super::file_status(
+                seq,
+                FILE_HANDLE,
+                FILE_SIZE,
+                max_block_size,
+                status,
+            ))
             .await;
 
         assert_eq!(self.events.pop().unwrap(), event);
