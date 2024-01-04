@@ -10,7 +10,7 @@ use crate::master::association::Association;
 use crate::master::error::{TaskError, TimeSyncError};
 use crate::master::handler::Promise;
 use crate::master::request::TimeSyncProcedure;
-use crate::master::tasks::NonReadTask;
+use crate::master::tasks::{AppTask, NonReadTask, Task};
 
 use tokio::time::Instant;
 
@@ -24,6 +24,12 @@ enum State {
 pub(crate) struct TimeSyncTask {
     state: State,
     promise: Promise<Result<(), TimeSyncError>>,
+}
+
+impl From<TimeSyncTask> for Task {
+    fn from(value: TimeSyncTask) -> Self {
+        Task::App(AppTask::NonRead(NonReadTask::TimeSync(value)))
+    }
 }
 
 impl TimeSyncProcedure {

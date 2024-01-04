@@ -15,7 +15,9 @@ use crate::master::request::{CommandHeaders, CommandMode, ReadRequest, TimeSyncP
 use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::deadbands::WriteDeadBandsTask;
 use crate::master::tasks::empty_response::EmptyResponseTask;
+use crate::master::tasks::file::authenticate::AuthFileTask;
 use crate::master::tasks::file::close::CloseFileTask;
+use crate::master::tasks::file::directory::DirectoryReader;
 use crate::master::tasks::file::get_info::GetFileInfoTask;
 use crate::master::tasks::file::open::{OpenFileRequest, OpenFileTask};
 use crate::master::tasks::file::read::{FileReadTask, FileReaderType};
@@ -23,13 +25,11 @@ use crate::master::tasks::file::write_block::{WriteBlockRequest, WriteBlockTask}
 use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::restart::{RestartTask, RestartType};
 use crate::master::tasks::time::TimeSyncTask;
-use crate::master::tasks::{AppTask, NonReadTask, Task};
+use crate::master::tasks::Task;
 use crate::master::{
-    AuthKey, BlockNumber, DeadBandHeader, DirReadConfig, FileCredentials,
-    FileError, FileHandle, FileInfo, FileMode, FileReadConfig, FileReader,
-    Headers, OpenedFile, WriteError,
+    AuthKey, BlockNumber, DeadBandHeader, DirReadConfig, FileCredentials, FileError, FileHandle,
+    FileInfo, FileMode, FileReadConfig, FileReader, Headers, OpenedFile, WriteError,
 };
-use crate::master::tasks::file::directory::DirectoryReader;
 use crate::util::channel::Sender;
 use crate::util::session::Enabled;
 
@@ -223,7 +223,7 @@ impl AssociationHandle {
     pub async fn read(&mut self, request: ReadRequest) -> Result<(), TaskError> {
         let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), TaskError>>();
         let task = SingleReadTask::new(request, Promise::OneShot(tx));
-        self.send_task(task.wrap().wrap()).await?;
+        self.send_task(task).await?;
         rx.await?
     }
 
@@ -239,7 +239,7 @@ impl AssociationHandle {
     ) -> Result<(), WriteError> {
         let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), WriteError>>();
         let task = EmptyResponseTask::new(function, headers, Promise::OneShot(tx));
-        self.send_task(task.wrap().wrap()).await?;
+        self.send_task(task).await?;
         rx.await?
     }
 
@@ -253,7 +253,7 @@ impl AssociationHandle {
     ) -> Result<(), TaskError> {
         let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), TaskError>>();
         let task = SingleReadTask::new_with_custom_handler(request, handler, Promise::OneShot(tx));
-        self.send_task(task.wrap().wrap()).await?;
+        self.send_task(task).await?;
         rx.await?
     }
 
@@ -267,7 +267,7 @@ impl AssociationHandle {
     ) -> Result<(), CommandError> {
         let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), CommandError>>();
         let task = CommandTask::from_mode(mode, headers, Promise::OneShot(tx));
-        self.send_task(task.wrap().wrap()).await?;
+        self.send_task(task).await?;
         rx.await?
     }
 
@@ -275,19 +275,20 @@ impl AssociationHandle {
     ///
     /// Returns the delay from the outstation's response as a [Duration](Duration)
     pub async fn warm_restart(&mut self) -> Result<Duration, TaskError> {
-        let (tx, rx) = tokio::sync::oneshot::channel::<Result<Duration, TaskError>>();
-        let task = RestartTask::new(RestartType::WarmRestart, Promise::OneShot(tx));
-        self.send_task(task.wrap().wrap()).await?;
-        rx.await?
+        self.restart(RestartType::WarmRestart).await
     }
 
     /// Perform a COLD_RESTART operation
     ///
     /// Returns the delay from the outstation's response as a [Duration](Duration)
     pub async fn cold_restart(&mut self) -> Result<Duration, TaskError> {
+        self.restart(RestartType::ColdRestart).await
+    }
+
+    async fn restart(&mut self, restart_type: RestartType) -> Result<Duration, TaskError> {
         let (tx, rx) = tokio::sync::oneshot::channel::<Result<Duration, TaskError>>();
-        let task = RestartTask::new(RestartType::ColdRestart, Promise::OneShot(tx));
-        self.send_task(task.wrap().wrap()).await?;
+        let task = RestartTask::new(restart_type, Promise::OneShot(tx));
+        self.send_task(task).await?;
         rx.await?
     }
 
@@ -298,7 +299,7 @@ impl AssociationHandle {
     ) -> Result<(), TimeSyncError> {
         let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), TimeSyncError>>();
         let task = TimeSyncTask::get_procedure(procedure, Promise::OneShot(tx));
-        self.send_task(task.wrap().wrap()).await?;
+        self.send_task(task).await?;
         rx.await?
     }
 
@@ -309,7 +310,7 @@ impl AssociationHandle {
     ) -> Result<(), WriteError> {
         let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), WriteError>>();
         let task = WriteDeadBandsTask::new(headers, Promise::OneShot(tx));
-        self.send_task(task.wrap().wrap()).await?;
+        self.send_task(task).await?;
         rx.await?
     }
 
@@ -324,6 +325,22 @@ impl AssociationHandle {
         let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), TaskError>>();
         self.send_task(Task::LinkStatus(Promise::OneShot(tx)))
             .await?;
+        rx.await?
+    }
+
+    /// Obtain an [`AuthKey`] from the outstation which may then be used to open the file.
+    pub async fn get_file_auth_key<T: ToString>(
+        &mut self,
+        credentials: FileCredentials,
+    ) -> Result<AuthKey, FileError> {
+        let (promise, rx) = Promise::one_shot();
+
+        let task = AuthFileTask {
+            credentials,
+            promise,
+        };
+
+        self.send_task(task).await?;
         rx.await?
     }
 
@@ -350,8 +367,6 @@ impl AssociationHandle {
             },
             promise,
         };
-
-        let task = Task::App(AppTask::NonRead(NonReadTask::OpenFile(task)));
 
         self.send_task(task).await?;
         rx.await?
@@ -403,8 +418,7 @@ impl AssociationHandle {
             FileReaderType::from_reader(reader),
             credentials,
         );
-        self.send_task(Task::App(AppTask::NonRead(NonReadTask::FileRead(task))))
-            .await
+        self.send_task(task).await
     }
 
     /// Read a file directory
@@ -428,8 +442,7 @@ impl AssociationHandle {
     ) -> Result<FileInfo, FileError> {
         let (promise, reply) = Promise::one_shot();
         let task = GetFileInfoTask::new(file_path.to_string(), promise);
-        self.send_task(Task::App(AppTask::NonRead(NonReadTask::GetFileInfo(task))))
-            .await?;
+        self.send_task(task).await?;
         reply.await?
     }
 
@@ -502,6 +515,8 @@ pub enum TaskType {
     GenericEmptyResponse(FunctionCode),
     /// Read a file from the outstation
     FileRead,
+    /// Send username/password and get back an auth key
+    FileAuth,
     /// Open a file on the outstation
     FileOpen,
     /// Write a file block

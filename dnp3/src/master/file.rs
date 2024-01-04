@@ -391,5 +391,3 @@ pub struct OpenedFile {
     /// the transfer may not succeed
     pub max_block_size: u16,
 }
-
-

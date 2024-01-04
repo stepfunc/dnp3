@@ -4,12 +4,18 @@ use crate::app::format::WriteError;
 use crate::app::parse::free_format::FreeFormatVariation;
 use crate::app::parse::parser::{HeaderDetails, Response};
 use crate::app::{FunctionCode, Timestamp};
-use crate::master::tasks::NonReadTask;
+use crate::master::tasks::{AppTask, NonReadTask, Task};
 use crate::master::{FileError, FileInfo, Promise, TaskError};
 
 pub(crate) struct GetFileInfoTask {
     file_name: String,
     promise: Promise<Result<FileInfo, FileError>>,
+}
+
+impl From<GetFileInfoTask> for Task {
+    fn from(value: GetFileInfoTask) -> Self {
+        Task::App(AppTask::NonRead(NonReadTask::GetFileInfo(value)))
+    }
 }
 
 impl GetFileInfoTask {

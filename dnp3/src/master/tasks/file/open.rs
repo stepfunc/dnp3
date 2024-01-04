@@ -4,7 +4,7 @@ use crate::app::parse::free_format::FreeFormatVariation;
 use crate::app::parse::parser::{HeaderDetails, Response};
 use crate::app::{FileStatus, FunctionCode, Group70Var3, Permissions, Timestamp};
 use crate::master::tasks::file::REQUEST_ID;
-use crate::master::tasks::NonReadTask;
+use crate::master::tasks::{AppTask, NonReadTask, Task};
 use crate::master::{AuthKey, FileError, FileHandle, FileMode, OpenedFile, Promise, TaskError};
 pub(crate) struct OpenFileRequest {
     pub(crate) file_name: String,
@@ -18,6 +18,12 @@ pub(crate) struct OpenFileRequest {
 pub(crate) struct OpenFileTask {
     pub(crate) request: OpenFileRequest,
     pub(crate) promise: Promise<Result<OpenedFile, FileError>>,
+}
+
+impl From<OpenFileTask> for Task {
+    fn from(value: OpenFileTask) -> Self {
+        Task::App(AppTask::NonRead(NonReadTask::OpenFile(value)))
+    }
 }
 
 impl OpenFileTask {

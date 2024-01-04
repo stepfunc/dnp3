@@ -6,7 +6,7 @@ use crate::app::parse::free_format::FreeFormatVariation;
 use crate::app::parse::parser::{HeaderDetails, ObjectHeader, Response};
 use crate::app::{FunctionCode, Timestamp};
 use crate::master::file::BlockNumber;
-use crate::master::tasks::NonReadTask;
+use crate::master::tasks::{AppTask, NonReadTask, Task};
 use crate::master::{
     AuthKey, FileAction, FileCredentials, FileError, FileHandle, FileMode, FileReadConfig,
     FileReader, TaskError,
@@ -114,6 +114,12 @@ pub(crate) struct FileReadTask {
     settings: Settings,
     /// state of the read operation determines the next action
     state: State,
+}
+
+impl From<FileReadTask> for Task {
+    fn from(value: FileReadTask) -> Self {
+        Task::App(AppTask::NonRead(NonReadTask::FileRead(value)))
+    }
 }
 
 impl FileReadTask {

@@ -902,6 +902,10 @@ fn define_association_information(
         )?
         .push("file_read", "Read a file from the outstation")?
         .push("get_file_info", "Get information about a file")?
+        .push(
+            "file_auth",
+            "Send username and password and get back an auth key from the outstation",
+        )?
         .push("file_open", "Open a file on the outstation")?
         .push("file_write_block", "Write a file block to the outstation")?
         .push("file_close", "Close a file on the outstation")?

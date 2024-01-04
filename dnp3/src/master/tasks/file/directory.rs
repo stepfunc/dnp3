@@ -1,6 +1,6 @@
-use scursor::ReadCursor;
 use crate::app::{Group70Var7, MaybeAsync};
 use crate::master::{FileAction, FileError, FileInfo, FileReader, Promise};
+use scursor::ReadCursor;
 
 pub(crate) struct DirectoryReader {
     data: Vec<u8>,

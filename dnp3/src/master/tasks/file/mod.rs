@@ -5,11 +5,10 @@ use crate::app::parse::parser::{HeaderDetails, ObjectHeader};
 use crate::app::{FileStatus, Group70Var2, Group70Var4};
 use crate::master::{AuthKey, FileCredentials, FileError, FileHandle};
 
-pub(crate) mod get_info;
-
+pub(crate) mod authenticate;
 pub(crate) mod close;
-
 pub(crate) mod directory;
+pub(crate) mod get_info;
 pub(crate) mod open;
 pub(crate) mod read;
 pub(crate) mod write_block;

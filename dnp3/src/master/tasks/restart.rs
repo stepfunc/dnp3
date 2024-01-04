@@ -5,7 +5,7 @@ use crate::app::parse::parser::Response;
 use crate::app::FunctionCode;
 use crate::master::error::TaskError;
 use crate::master::handler::Promise;
-use crate::master::tasks::NonReadTask;
+use crate::master::tasks::{AppTask, NonReadTask, Task};
 
 /// Type of restart to request
 pub(crate) enum RestartType {
@@ -23,6 +23,12 @@ pub(crate) enum RestartType {
 pub(crate) struct RestartTask {
     restart_type: RestartType,
     promise: Promise<Result<Duration, TaskError>>,
+}
+
+impl From<RestartTask> for Task {
+    fn from(value: RestartTask) -> Self {
+        Task::App(AppTask::NonRead(NonReadTask::Restart(value)))
+    }
 }
 
 impl RestartType {
@@ -43,10 +49,6 @@ impl RestartTask {
             restart_type,
             promise,
         }
-    }
-
-    pub(crate) fn wrap(self) -> NonReadTask {
-        NonReadTask::Restart(self)
     }
 
     pub(crate) fn function(&self) -> FunctionCode {
