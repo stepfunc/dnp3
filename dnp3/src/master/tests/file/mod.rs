@@ -4,6 +4,7 @@ use crate::app::format::WriteError;
 use crate::app::{FileStatus, FunctionCode, Group70Var4, Group70Var5, Group70Var6, Variation};
 use scursor::WriteCursor;
 
+mod close_file;
 mod open_file;
 mod read_file;
 mod write_file;
@@ -24,7 +25,7 @@ pub(super) fn fir_and_fin(seq: u8) -> u8 {
     0b1100_0000 | seq
 }
 
-pub(super) fn file_status(
+pub(super) fn file_status_response(
     seq: u8,
     file_handle: u32,
     file_size: u32,

@@ -182,7 +182,7 @@ impl From<dnp3::app::PermissionSet> for ffi::PermissionSet {
     }
 }
 
-impl From<dnp3::master::FileError> for ffi::FileError {
+impl From<FileError> for ffi::FileError {
     fn from(value: FileError) -> Self {
         match value {
             FileError::BadResponse => ffi::FileError::BadResponse,
@@ -192,6 +192,7 @@ impl From<dnp3::master::FileError> for ffi::FileError {
             FileError::AbortByUser => ffi::FileError::AbortByUser,
             FileError::MaxLengthExceeded => ffi::FileError::MaxLengthExceeded,
             FileError::TaskError(x) => x.into(),
+            FileError::WrongHandle => ffi::FileError::WrongHandle,
         }
     }
 }

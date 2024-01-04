@@ -208,7 +208,7 @@ impl FileWriteHarness {
         event: Event,
     ) {
         self.inner
-            .process_response(super::file_status(
+            .process_response(super::file_status_response(
                 seq,
                 FILE_HANDLE,
                 FILE_SIZE,

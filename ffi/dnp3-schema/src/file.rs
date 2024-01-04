@@ -77,6 +77,10 @@ fn define_file_error(lib: &mut LibraryBuilder) -> BackTraced<ErrorType<Unvalidat
             "max_length_exceeded",
             "Exceeded the maximum length specified by the user",
         )?
+        .add_error(
+            "wrong_handle",
+            "File handle returned by the outstation did not match the request",
+        )?
         .add_task_errors()?
         .build()?;
 

@@ -20,7 +20,7 @@ impl From<CloseFileTask> for Task {
 
 impl CloseFileTask {
     pub(crate) fn function(&self) -> FunctionCode {
-        FunctionCode::OpenFile
+        FunctionCode::CloseFile
     }
 
     pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
@@ -41,7 +41,7 @@ impl CloseFileTask {
     }
 
     pub(crate) fn handle(self, response: Response<'_>) -> Result<Option<NonReadTask>, TaskError> {
-        fn process(response: Response<'_>) -> Result<(), FileError> {
+        fn process(expected_handle: FileHandle, response: Response<'_>) -> Result<(), FileError> {
             let header = response.objects?.get_only_header()?;
 
             let obj = match header.details {
@@ -55,6 +55,10 @@ impl CloseFileTask {
                 }
             };
 
+            if obj.file_handle != expected_handle.into() {
+                return Err(FileError::WrongHandle);
+            }
+
             if obj.status_code != FileStatus::Success {
                 tracing::warn!(
                     "Unable to close file (status code == {:?})",
@@ -66,7 +70,7 @@ impl CloseFileTask {
             Ok(())
         }
 
-        let result = process(response);
+        let result = process(self.handle, response);
         self.promise.complete(result);
 
         match result {

@@ -163,6 +163,8 @@ pub enum FileError {
     BadResponse,
     /// Outstation returned an error status code
     BadStatus(FileStatus),
+    /// File handle returned did not match request
+    WrongHandle,
     /// Outstation indicated no permission to access file
     NoPermission,
     /// Received an unexpected block number
@@ -218,6 +220,9 @@ impl std::fmt::Display for FileError {
             FileError::AbortByUser => f.write_str("aborted by user"),
             FileError::TaskError(t) => std::fmt::Debug::fmt(&t, f),
             FileError::MaxLengthExceeded => f.write_str("exceeded maximum received length"),
+            FileError::WrongHandle => {
+                f.write_str("file handle returned by outstation did not match the request")
+            }
         }
     }
 }
@@ -303,7 +308,7 @@ impl From<FileHandle> for u32 {
 
 impl FileHandle {
     /// Construct from a raw value
-    pub fn new(value: u32) -> Self {
+    pub const fn new(value: u32) -> Self {
         Self(value)
     }
 }

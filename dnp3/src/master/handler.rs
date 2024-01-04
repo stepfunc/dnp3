@@ -15,6 +15,7 @@ use crate::master::request::{CommandHeaders, CommandMode, ReadRequest, TimeSyncP
 use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::deadbands::WriteDeadBandsTask;
 use crate::master::tasks::empty_response::EmptyResponseTask;
+use crate::master::tasks::file::close::CloseFileTask;
 use crate::master::tasks::file::get_info::GetFileInfoTask;
 use crate::master::tasks::file::open::{OpenFileRequest, OpenFileTask};
 use crate::master::tasks::file::read::{FileReadTask, FileReaderType};
@@ -24,8 +25,9 @@ use crate::master::tasks::restart::{RestartTask, RestartType};
 use crate::master::tasks::time::TimeSyncTask;
 use crate::master::tasks::{AppTask, NonReadTask, Task};
 use crate::master::{
-    AuthKey, DeadBandHeader, DirReadConfig, DirectoryReader, FileCredentials, FileError, FileInfo,
-    FileReadConfig, FileReader, FileWriteConfig, FileWriter, Headers, OpenedFile, WriteError,
+    AuthKey, DeadBandHeader, DirReadConfig, DirectoryReader, FileCredentials, FileError,
+    FileHandle, FileInfo, FileReadConfig, FileReader, FileWriteConfig, FileWriter, Headers,
+    OpenedFile, WriteError,
 };
 use crate::util::channel::Sender;
 use crate::util::session::Enabled;
@@ -354,6 +356,16 @@ impl AssociationHandle {
         rx.await?
     }
 
+    /// Close a file on the outstation
+    pub async fn close_file(&mut self, handle: FileHandle) -> Result<(), FileError> {
+        let (promise, rx) = Promise::one_shot();
+
+        let task = CloseFileTask { handle, promise };
+
+        self.send_task(task).await?;
+        rx.await?
+    }
+
     /// Start an operation to READ a file from the outstation using a [`FileReader`] to receive data
     pub async fn read_file<T: ToString>(
         &mut self,
@@ -416,9 +428,9 @@ impl AssociationHandle {
         reply.await?
     }
 
-    async fn send_task(&mut self, task: Task) -> Result<(), Shutdown> {
+    async fn send_task<T: Into<Task>>(&mut self, task: T) -> Result<(), Shutdown> {
         self.master
-            .send_association_message(self.address, AssociationMsgType::QueueTask(task))
+            .send_association_message(self.address, AssociationMsgType::QueueTask(task.into()))
             .await
     }
 

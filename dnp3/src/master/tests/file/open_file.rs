@@ -24,7 +24,13 @@ async fn can_open_file() {
         .await;
 
     harness
-        .process_response(super::file_status(0, 21, 55, 512, FileStatus::Success))
+        .process_response(super::file_status_response(
+            0,
+            21,
+            55,
+            512,
+            FileStatus::Success,
+        ))
         .await;
 
     assert_eq!(
@@ -57,7 +63,13 @@ async fn fails_if_status_not_success() {
         .await;
 
     harness
-        .process_response(super::file_status(0, 21, 0, 512, FileStatus::FileLocked))
+        .process_response(super::file_status_response(
+            0,
+            21,
+            0,
+            512,
+            FileStatus::FileLocked,
+        ))
         .await;
 
     assert_eq!(
