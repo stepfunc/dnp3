@@ -1,6 +1,6 @@
 use crate::app::file::{FileStatus, FileType, Group70Var7, Permissions};
 use crate::app::parse::parser::SingleHeaderError;
-use crate::app::{FileMode, MaybeAsync, ObjectParseError, Shutdown, Timestamp};
+use crate::app::{MaybeAsync, ObjectParseError, Shutdown, Timestamp};
 use crate::master::{Promise, TaskError};
 use scursor::ReadCursor;
 use std::fmt::Debug;
@@ -227,6 +227,45 @@ impl std::fmt::Display for FileError {
     }
 }
 
+/// Mode used when opening files
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum FileMode {
+    /// Code used for non-open command requests
+    Null,
+    /// Specifies that an existing file is to be opened for reading
+    Read,
+    /// Specifies that the file is to be opened for writing, truncating any existing file to length 0
+    Write,
+    /// Specifies that the file is to be opened for writing, appending to the end of the file
+    Append,
+    /// Used to capture reserved values
+    Reserved(u16),
+}
+
+impl FileMode {
+    pub(crate) fn new(value: u16) -> Self {
+        match value {
+            0 => Self::Null,
+            1 => Self::Read,
+            2 => Self::Write,
+            3 => Self::Append,
+            _ => Self::Reserved(value),
+        }
+    }
+
+    pub(crate) fn to_u16(self) -> u16 {
+        match self {
+            Self::Null => 0,
+            Self::Read => 1,
+            Self::Write => 2,
+            Self::Append => 3,
+            Self::Reserved(x) => x,
+        }
+    }
+}
+
+impl std::error::Error for FileError {}
+
 /// Describes whether a file operation should continue (No) or abort (Yes)
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum FileAction {
@@ -317,41 +356,62 @@ impl FileHandle {
 #[derive(Copy, Clone, Debug, Default)]
 pub struct BlockNumber(u32);
 
+/// Error returned when a block cannot be incremented
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct FailedBlockIncrement;
+
+impl std::fmt::Display for FailedBlockIncrement {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "File block number is at maximum value of {} and cannot be incremented",
+            BlockNumber::MAX_VALUE
+        )
+    }
+}
+
+impl std::error::Error for FailedBlockIncrement {}
+
 impl BlockNumber {
-    const LAST_BIT: u32 = 0x80_00_00_00;
+    const TOP_BIT: u32 = 0x80_00_00_00;
 
     /// Maximum possible block number
-    pub const MAX_VALUE: u32 = !Self::LAST_BIT;
+    pub const MAX_VALUE: u32 = !Self::TOP_BIT;
 
     /// Check if this is the last block
     pub fn is_last(self) -> bool {
-        (self.0 & Self::LAST_BIT) != 0
+        (self.0 & Self::TOP_BIT) != 0
+    }
+
+    /// Set the top bit to indicate this is the last block
+    pub fn set_last(&mut self) {
+        self.0 |= Self::TOP_BIT;
+    }
+
+    /// Try to increment the block number. If this fails, the maximum value
+    /// is returned as an error.
+    pub fn increment(&mut self) -> Result<(), FailedBlockIncrement> {
+        let top_bit = self.0 & Self::TOP_BIT;
+        let bottom_bits = self.bottom_bits();
+        if bottom_bits < Self::MAX_VALUE {
+            self.0 = (self.bottom_bits() + 1) | top_bit;
+            Ok(())
+        } else {
+            Err(FailedBlockIncrement)
+        }
     }
 
     pub(crate) fn new(raw: u32) -> BlockNumber {
         Self(raw)
     }
 
-    pub(crate) fn set_last(&mut self) {
-        self.0 |= Self::LAST_BIT;
-    }
-
-    pub(super) fn bottom_bits(self) -> u32 {
+    pub(crate) fn bottom_bits(self) -> u32 {
         // The maximum value is also a mask for the bottom bits
         self.0 & Self::MAX_VALUE
     }
 
     pub(crate) fn wire_value(self) -> u32 {
         self.0
-    }
-
-    pub(super) fn increment(&mut self) -> Result<(), u32> {
-        if self.bottom_bits() < Self::MAX_VALUE {
-            self.0 = self.bottom_bits() + 1;
-            Ok(())
-        } else {
-            Err(Self::MAX_VALUE)
-        }
     }
 }
 

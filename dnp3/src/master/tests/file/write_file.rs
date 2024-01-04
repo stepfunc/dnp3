@@ -1,6 +1,6 @@
 use crate::app::{
-    FileMode, FileStatus, FunctionCode, Group70Var3, Group70Var4, Group70Var5, Group70Var6,
-    MaybeAsync, PermissionSet, Permissions, Timestamp,
+    FileStatus, FunctionCode, Group70Var3, Group70Var4, Group70Var5, Group70Var6, MaybeAsync,
+    PermissionSet, Permissions, Timestamp,
 };
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
@@ -9,7 +9,7 @@ use crate::master::association::AssociationConfig;
 use crate::master::tasks::file::REQUEST_ID;
 use crate::master::tests::harness::{create_association, TestHarness};
 use crate::master::{
-    Block, FileAction, FileError, FileHandle, FileWriteConfig, FileWriteMode, FileWriter,
+    Block, FileAction, FileError, FileHandle, FileMode, FileWriteConfig, FileWriteMode, FileWriter,
 };
 
 #[derive(Debug, PartialEq, Eq)]

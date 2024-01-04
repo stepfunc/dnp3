@@ -20,14 +20,15 @@ use crate::master::tasks::file::get_info::GetFileInfoTask;
 use crate::master::tasks::file::open::{OpenFileRequest, OpenFileTask};
 use crate::master::tasks::file::read::{FileReadTask, FileReaderType};
 use crate::master::tasks::file::write::{FileWriteTask, FileWriterType};
+use crate::master::tasks::file::write_block::{WriteBlockRequest, WriteBlockTask};
 use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::restart::{RestartTask, RestartType};
 use crate::master::tasks::time::TimeSyncTask;
 use crate::master::tasks::{AppTask, NonReadTask, Task};
 use crate::master::{
-    AuthKey, DeadBandHeader, DirReadConfig, DirectoryReader, FileCredentials, FileError,
-    FileHandle, FileInfo, FileReadConfig, FileReader, FileWriteConfig, FileWriter, Headers,
-    OpenedFile, WriteError,
+    AuthKey, BlockNumber, DeadBandHeader, DirReadConfig, DirectoryReader, FileCredentials,
+    FileError, FileHandle, FileInfo, FileMode, FileReadConfig, FileReader, FileWriteConfig,
+    FileWriter, Headers, OpenedFile, WriteError,
 };
 use crate::util::channel::Sender;
 use crate::util::session::Enabled;
@@ -356,6 +357,28 @@ impl AssociationHandle {
         rx.await?
     }
 
+    /// Write a file block to the outstation
+    pub async fn write_file_block(
+        &mut self,
+        handle: FileHandle,
+        block_number: BlockNumber,
+        block_data: Vec<u8>,
+    ) -> Result<(), FileError> {
+        let (promise, rx) = Promise::one_shot();
+
+        let task = WriteBlockTask {
+            request: WriteBlockRequest {
+                handle,
+                block_number,
+                block_data,
+            },
+            promise,
+        };
+
+        self.send_task(task).await?;
+        rx.await?
+    }
+
     /// Close a file on the outstation
     pub async fn close_file(&mut self, handle: FileHandle) -> Result<(), FileError> {
         let (promise, rx) = Promise::one_shot();
@@ -505,6 +528,8 @@ pub enum TaskType {
     FileClose,
     /// Get information about a file
     GetFileInfo,
+    /// Write a file block
+    FileWriteBlock,
 }
 
 /// callbacks associated with a single master to outstation association

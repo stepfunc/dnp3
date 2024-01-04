@@ -12,6 +12,8 @@ pub(crate) mod open;
 pub(crate) mod read;
 pub(crate) mod write;
 
+pub(crate) mod write_block;
+
 pub(crate) struct Filename(pub(crate) String);
 
 // we don't really care what the ID is as we don't support polling for file stuff

@@ -1,8 +1,8 @@
-use crate::app::{FileMode, FileStatus, FunctionCode, Group70Var3, Permissions, Timestamp};
+use crate::app::{FileStatus, FunctionCode, Group70Var3, Permissions, Timestamp};
 use crate::master::association::AssociationConfig;
 use crate::master::tasks::file::REQUEST_ID;
 use crate::master::tests::harness::create_association;
-use crate::master::{AssociationHandle, AuthKey, FileError, FileHandle, OpenedFile};
+use crate::master::{AssociationHandle, AuthKey, FileError, FileHandle, FileMode, OpenedFile};
 
 #[tokio::test]
 async fn can_open_file() {

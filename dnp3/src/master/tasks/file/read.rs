@@ -8,8 +8,8 @@ use crate::app::{FunctionCode, Timestamp};
 use crate::master::file::BlockNumber;
 use crate::master::tasks::NonReadTask;
 use crate::master::{
-    AuthKey, FileAction, FileCredentials, FileError, FileHandle, FileReadConfig, FileReader,
-    TaskError,
+    AuthKey, FileAction, FileCredentials, FileError, FileHandle, FileMode, FileReadConfig,
+    FileReader, TaskError,
 };
 
 enum ReaderTypes {

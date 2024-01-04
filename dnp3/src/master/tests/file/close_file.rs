@@ -32,7 +32,7 @@ fn spawn_close_task(
     mut association: AssociationHandle,
     handle: FileHandle,
 ) -> tokio::task::JoinHandle<Result<(), FileError>> {
-    tokio::spawn({ async move { association.close_file(handle).await } })
+    tokio::spawn(async move { association.close_file(handle).await })
 }
 
 fn close_file(seq: u8, handle: FileHandle) -> Vec<u8> {
