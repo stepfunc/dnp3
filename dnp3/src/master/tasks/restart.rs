@@ -58,21 +58,12 @@ impl RestartTask {
     }
 
     pub(crate) fn handle(self, response: Response) -> Result<Option<NonReadTask>, TaskError> {
-        let headers = match response.objects {
+        let header = match response.get_only_object_header() {
             Ok(x) => x,
             Err(err) => {
-                self.promise
-                    .complete(Err(TaskError::MalformedResponse(err)));
-                return Err(TaskError::MalformedResponse(err));
-            }
-        };
-
-        let header = match headers.get_only_header() {
-            Some(x) => x,
-            None => {
-                self.promise
-                    .complete(Err(TaskError::UnexpectedResponseHeaders));
-                return Err(TaskError::UnexpectedResponseHeaders);
+                let err: TaskError = err.into();
+                self.promise.complete(Err(err));
+                return Err(err);
             }
         };
 

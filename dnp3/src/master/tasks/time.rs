@@ -149,22 +149,21 @@ impl TimeSyncTask {
             }
         };
 
-        let objects = match response.objects {
+        let header = match response.get_only_object_header() {
             Ok(x) => x,
             Err(err) => {
-                let err = TaskError::MalformedResponse(err);
+                let err: TaskError = err.into();
                 self.report_error(association, err.into());
                 return Err(err);
             }
         };
 
-        let delay_ms: Option<u16> = objects.get_only_header().and_then(|x| {
-            if let Some(CountVariation::Group52Var2(seq)) = x.details.count() {
+        let delay_ms: Option<u16> =
+            if let Some(CountVariation::Group52Var2(seq)) = header.details.count() {
                 seq.single().map(|x| x.time)
             } else {
                 None
-            }
-        });
+            };
 
         let delay_ms = match delay_ms {
             Some(x) => x,

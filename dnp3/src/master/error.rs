@@ -12,6 +12,7 @@ use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError;
 
 use crate::app::attr::BadAttribute;
+use crate::app::parse::parser::SingleHeaderError;
 use crate::util::session::{RunError, StopReason};
 
 /// Errors that can occur when adding an association
@@ -293,6 +294,12 @@ impl From<TransportResponseError> for TaskError {
 impl From<ObjectParseError> for TaskError {
     fn from(err: ObjectParseError) -> Self {
         TaskError::MalformedResponse(err)
+    }
+}
+
+impl From<SingleHeaderError> for TaskError {
+    fn from(_: SingleHeaderError) -> Self {
+        TaskError::UnexpectedResponseHeaders
     }
 }
 

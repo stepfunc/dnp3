@@ -1,12 +1,13 @@
 use crate::app::format::write::HeaderWriter;
 use crate::app::format::WriteError;
 use crate::app::parse::free_format::FreeFormatVariation;
-use crate::app::parse::parser::{HeaderDetails, ObjectHeader, Response};
+use crate::app::parse::parser::{HeaderDetails, ObjectHeader};
 use crate::app::{FileStatus, Group70Var2, Group70Var4};
-use crate::master::{AuthKey, FileCredentials, FileError, FileHandle, TaskError};
+use crate::master::{AuthKey, FileCredentials, FileError, FileHandle};
 
 pub(crate) mod get_info;
 
+pub(crate) mod close;
 pub(crate) mod open;
 pub(crate) mod read;
 pub(crate) mod write;
@@ -79,26 +80,6 @@ fn handle_open_response(header: ObjectHeader) -> Result<(u32, FileHandle), FileE
     }
 
     Ok((obj.file_size, FileHandle::new(obj.file_handle)))
-}
-
-fn get_only_header(response: Response) -> Result<ObjectHeader, TaskError> {
-    let headers = match response.objects {
-        Ok(x) => x,
-        Err(err) => {
-            tracing::warn!("File operation received malformed response: {err}");
-            return Err(TaskError::MalformedResponse(err));
-        }
-    };
-
-    let header = match headers.get_only_header() {
-        None => {
-            tracing::warn!("File operation response contains unexpected number of headers");
-            return Err(TaskError::UnexpectedResponseHeaders);
-        }
-        Some(x) => x,
-    };
-
-    Ok(header)
 }
 
 fn process_close_response(header: ObjectHeader) -> Result<(), FileError> {

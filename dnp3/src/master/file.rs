@@ -1,5 +1,6 @@
 use crate::app::file::{FileStatus, FileType, Group70Var7, Permissions};
-use crate::app::{FileMode, MaybeAsync, Shutdown, Timestamp};
+use crate::app::parse::parser::SingleHeaderError;
+use crate::app::{FileMode, MaybeAsync, ObjectParseError, Shutdown, Timestamp};
 use crate::master::{Promise, TaskError};
 use scursor::ReadCursor;
 use std::fmt::Debug;
@@ -177,6 +178,27 @@ pub enum FileError {
 impl From<Shutdown> for FileError {
     fn from(_: Shutdown) -> Self {
         Self::TaskError(TaskError::Shutdown)
+    }
+}
+
+impl From<ObjectParseError> for FileError {
+    fn from(value: ObjectParseError) -> Self {
+        FileError::TaskError(value.into())
+    }
+}
+
+impl From<SingleHeaderError> for FileError {
+    fn from(_: SingleHeaderError) -> Self {
+        Self::TaskError(TaskError::UnexpectedResponseHeaders)
+    }
+}
+
+impl From<FileError> for TaskError {
+    fn from(err: FileError) -> Self {
+        match err {
+            FileError::TaskError(err) => err,
+            _ => TaskError::UnexpectedResponseHeaders,
+        }
     }
 }
 

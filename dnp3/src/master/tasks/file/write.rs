@@ -150,11 +150,16 @@ impl FileWriteTask {
         mut self,
         response: Response<'_>,
     ) -> Result<Option<NonReadTask>, TaskError> {
-        let header = match get_only_header(response) {
+        fn get_header(response: Response) -> Result<ObjectHeader, FileError> {
+            let header = response.objects?.get_only_header()?;
+            Ok(header)
+        }
+
+        let header = match get_header(response) {
             Ok(x) => x,
             Err(err) => {
-                self.settings.writer.aborted(err.into());
-                return Err(err);
+                self.settings.writer.aborted(err);
+                return Err(err.into());
             }
         };
 

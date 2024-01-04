@@ -2,39 +2,35 @@ use crate::app::format::write::HeaderWriter;
 use crate::app::format::WriteError;
 use crate::app::parse::free_format::FreeFormatVariation;
 use crate::app::parse::parser::{HeaderDetails, Response};
-use crate::app::{FileMode, FileStatus, FunctionCode, Group70Var3, Permissions, Timestamp};
+use crate::app::{FileStatus, FunctionCode, Group70Var4};
 use crate::master::tasks::file::REQUEST_ID;
-use crate::master::tasks::NonReadTask;
-use crate::master::{AuthKey, FileError, FileHandle, OpenedFile, Promise, TaskError};
-pub(crate) struct OpenFileRequest {
-    pub(crate) file_name: String,
-    pub(crate) auth_key: AuthKey,
-    pub(crate) file_size: u32,
-    pub(crate) file_mode: FileMode,
-    pub(crate) permissions: Permissions,
-    pub(crate) max_block_size: u16,
+use crate::master::tasks::{AppTask, NonReadTask, Task};
+use crate::master::{FileError, FileHandle, Promise, TaskError};
+
+pub(crate) struct CloseFileTask {
+    pub(crate) handle: FileHandle,
+    pub(crate) promise: Promise<Result<(), FileError>>,
 }
 
-pub(crate) struct OpenFileTask {
-    pub(crate) request: OpenFileRequest,
-    pub(crate) promise: Promise<Result<OpenedFile, FileError>>,
+impl From<CloseFileTask> for Task {
+    fn from(value: CloseFileTask) -> Self {
+        Task::App(AppTask::NonRead(NonReadTask::CloseFile(value)))
+    }
 }
 
-impl OpenFileTask {
+impl CloseFileTask {
     pub(crate) fn function(&self) -> FunctionCode {
         FunctionCode::OpenFile
     }
 
     pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
-        let obj = Group70Var3 {
-            time_of_creation: Timestamp::zero(),
-            permissions: self.request.permissions,
-            auth_key: self.request.auth_key.into(),
-            file_size: self.request.file_size,
-            mode: self.request.file_mode,
-            max_block_size: self.request.max_block_size,
+        let obj = Group70Var4 {
+            file_handle: self.handle.into(),
+            file_size: 0,
+            max_block_size: 0,
             request_id: REQUEST_ID,
-            file_name: &self.request.file_name,
+            status_code: FileStatus::Success,
+            text: "",
         };
 
         writer.write_free_format(&obj)
@@ -45,14 +41,14 @@ impl OpenFileTask {
     }
 
     pub(crate) fn handle(self, response: Response<'_>) -> Result<Option<NonReadTask>, TaskError> {
-        fn process(response: Response<'_>) -> Result<OpenedFile, FileError> {
+        fn process(response: Response<'_>) -> Result<(), FileError> {
             let header = response.objects?.get_only_header()?;
 
             let obj = match header.details {
                 HeaderDetails::TwoByteFreeFormat(_, FreeFormatVariation::Group70Var4(obj)) => obj,
                 _ => {
                     tracing::warn!(
-                        "File OPEN response contains unexpected variation: {}",
+                        "File CLOSE response contains unexpected variation: {}",
                         header.variation
                     );
                     return Err(FileError::BadResponse);
@@ -60,15 +56,14 @@ impl OpenFileTask {
             };
 
             if obj.status_code != FileStatus::Success {
-                tracing::warn!("Unable to open file (status code == {:?})", obj.status_code);
+                tracing::warn!(
+                    "Unable to close file (status code == {:?})",
+                    obj.status_code
+                );
                 return Err(FileError::BadStatus(obj.status_code));
             }
 
-            Ok(OpenedFile {
-                max_block_size: obj.max_block_size,
-                file_handle: FileHandle::new(obj.file_handle),
-                file_size: obj.file_size,
-            })
+            Ok(())
         }
 
         let result = process(response);

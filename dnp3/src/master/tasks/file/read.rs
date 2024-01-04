@@ -165,11 +165,11 @@ impl FileReadTask {
         mut self,
         response: Response<'_>,
     ) -> Result<Option<NonReadTask>, TaskError> {
-        let header = match get_only_header(response) {
+        let header = match response.get_only_object_header() {
             Ok(x) => x,
             Err(err) => {
                 self.settings.reader.aborted(err.into());
-                return Err(err);
+                return Err(err.into());
             }
         };
 

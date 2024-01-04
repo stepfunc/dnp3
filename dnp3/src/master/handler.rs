@@ -489,6 +489,8 @@ pub enum TaskType {
     FileWrite,
     /// Open a file on the outstation
     FileOpen,
+    /// Close a file on the outstation
+    FileClose,
     /// Get information about a file
     GetFileInfo,
 }

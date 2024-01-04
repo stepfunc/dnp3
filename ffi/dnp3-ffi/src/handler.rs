@@ -504,6 +504,7 @@ impl From<TaskType> for ffi::TaskType {
             TaskType::GetFileInfo => ffi::TaskType::GetFileInfo,
             TaskType::FileWrite => ffi::TaskType::FileWrite,
             TaskType::FileOpen => ffi::TaskType::FileOpen,
+            TaskType::FileClose => ffi::TaskType::FileClose,
         }
     }
 }
