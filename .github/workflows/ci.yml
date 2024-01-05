@@ -368,7 +368,7 @@ jobs:
         run: |
           mkdir release
           cd artifacts/c-bindings
-          zip -r ../../release/dnp3-${GITHUB_REF##*/}.zip .
+          zip -r ../../release/dnp3-${{github.ref_name}}.zip .
           cd ../conformance-results
           zip -r ../../release/conformance-results.zip .
       - name: Checkout stepfunc/docs
@@ -382,11 +382,11 @@ jobs:
         run: |
           git config user.name github-actions
           git config user.email github-actions@github.com
-          rm -rf ./dnp3/${GITHUB_REF##*/}
-          mkdir -p ./dnp3/${GITHUB_REF##*/}
-          cp -a ../artifacts/doc/* ./dnp3/${GITHUB_REF##*/}
+          rm -rf ./dnp3/${{github.ref_name}}
+          mkdir -p ./dnp3/${{github.ref_name}}
+          cp -a ../artifacts/doc/* ./dnp3/${{github.ref_name}}
           git add -A
-          git commit -m "[dnp3] Release ${GITHUB_REF##*/}"
+          git commit -m "[dnp3] release ${{github.ref_name}}"
           git push
       - name: Import PGP key
         uses: crazy-max/ghaction-import-gpg@v3
@@ -402,9 +402,9 @@ jobs:
         working-directory: artifacts/java-bindings
         run: >
           shopt -s extglob &&
-          mvn gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2 -DrepositoryId=ossrh -DpomFile=pom.xml -Dfile=$(find dnp3-+([0-9]).+([0-9]).+([0-9])*(-rc+([0-9])).jar) &&
-          mvn gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2 -DrepositoryId=ossrh -DpomFile=pom.xml -Dfile=$(find dnp3-+([0-9]).+([0-9]).+([0-9])*(-rc+([0-9]))-sources.jar) -Dclassifier=sources &&
-          mvn gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2 -DrepositoryId=ossrh -DpomFile=pom.xml -Dfile=$(find dnp3-+([0-9]).+([0-9]).+([0-9])*(-rc+([0-9]))-javadoc.jar) -Dclassifier=javadoc
+          mvn gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2 -DrepositoryId=ossrh -DpomFile=pom.xml -Dfile=dnp3-${{github.ref_name}}.jar) &&
+          mvn gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2 -DrepositoryId=ossrh -DpomFile=pom.xml -Dfile=dnp3-${{github.ref_name}}-sources.jar -Dclassifier=sources &&
+          mvn gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2 -DrepositoryId=ossrh -DpomFile=pom.xml -Dfile=dnp3-${{github.ref_name}}-javadoc.jar -Dclassifier=javadoc
       - name: Publish NuGet package
         shell: bash
         run: dotnet nuget push $(find artifacts/dotnet-bindings/dnp3*.nupkg) -s https://api.nuget.org/v3/index.json -k ${{ secrets.SFIO_NUGET_KEY }}
