@@ -2,43 +2,8 @@ use super::permissions::*;
 use super::*;
 use crate::app::format::WriteError;
 use crate::app::Timestamp;
+use crate::master::FileMode;
 use scursor::{ReadCursor, WriteCursor};
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub(crate) enum FileMode {
-    /// Code used for non-open command requests
-    Null,
-    /// Specifies that an existing file is to be opened for reading
-    Read,
-    /// Specifies that the file is to be opened for writing, truncating any existing file to length 0
-    Write,
-    /// Specifies that the file is to be opened for writing, appending to the end of the file
-    Append,
-    /// Used to capture reserved values
-    Reserved(u16),
-}
-
-impl FileMode {
-    fn new(value: u16) -> Self {
-        match value {
-            0 => Self::Null,
-            1 => Self::Read,
-            2 => Self::Write,
-            3 => Self::Append,
-            _ => Self::Reserved(value),
-        }
-    }
-
-    fn to_u16(self) -> u16 {
-        match self {
-            Self::Null => 0,
-            Self::Read => 1,
-            Self::Write => 2,
-            Self::Append => 3,
-            Self::Reserved(x) => x,
-        }
-    }
-}
 
 /// Group 70 Variation 3 - file command
 ///

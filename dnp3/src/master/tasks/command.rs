@@ -4,7 +4,7 @@ use crate::app::FunctionCode;
 use crate::master::error::{CommandError, CommandResponseError, TaskError};
 use crate::master::handler::Promise;
 use crate::master::request::*;
-use crate::master::tasks::NonReadTask;
+use crate::master::tasks::{AppTask, NonReadTask, Task};
 
 enum State {
     Select,
@@ -16,6 +16,12 @@ pub(crate) struct CommandTask {
     state: State,
     headers: CommandHeaders,
     promise: Promise<Result<(), CommandError>>,
+}
+
+impl From<CommandTask> for Task {
+    fn from(value: CommandTask) -> Self {
+        Task::App(AppTask::NonRead(NonReadTask::Command(value)))
+    }
 }
 
 impl CommandMode {

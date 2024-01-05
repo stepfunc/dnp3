@@ -395,6 +395,12 @@ pub(crate) struct Response<'a> {
     pub(crate) objects: Result<HeaderCollection<'a>, ObjectParseError>,
 }
 
+impl<'a> Response<'a> {
+    pub(crate) fn get_only_object_header(&self) -> Result<ObjectHeader<'a>, SingleHeaderError> {
+        self.objects?.get_only_header()
+    }
+}
+
 #[derive(Copy, Clone)]
 struct ObjectParser<'a> {
     errored: bool,
@@ -408,6 +414,19 @@ struct ObjectParser<'a> {
 pub(crate) struct HeaderCollection<'a> {
     function: FunctionCode,
     data: &'a [u8],
+}
+
+#[derive(Copy, Clone, Debug)]
+pub(crate) enum SingleHeaderError {
+    BadParse(ObjectParseError),
+    NoHeaders,
+    MoreThanOneHeader,
+}
+
+impl From<ObjectParseError> for SingleHeaderError {
+    fn from(err: ObjectParseError) -> Self {
+        Self::BadParse(err)
+    }
 }
 
 impl<'a> HeaderCollection<'a> {
@@ -427,13 +446,13 @@ impl<'a> HeaderCollection<'a> {
         }
     }
 
-    pub(crate) fn get_only_header(&self) -> Option<ObjectHeader<'a>> {
+    pub(crate) fn get_only_header(&self) -> Result<ObjectHeader<'a>, SingleHeaderError> {
         let mut iter = self.iter();
         match iter.next() {
-            None => None,
+            None => Err(SingleHeaderError::NoHeaders),
             Some(x) => match iter.next() {
-                Some(_) => None,
-                None => Some(x),
+                Some(_) => Err(SingleHeaderError::MoreThanOneHeader),
+                None => Ok(x),
             },
         }
     }

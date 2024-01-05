@@ -735,7 +735,7 @@ impl MasterSession {
         writer: &mut TransportWriter,
     ) -> Result<(), LinkError> {
         let mut cursor = self.tx_buffer.write_cursor();
-        crate::app::format::write::confirm_unsolicited(seq, &mut cursor)?;
+        write::confirm_unsolicited(seq, &mut cursor)?;
 
         writer
             .write(io, self.decode_level, destination.wrap(), cursor.written())

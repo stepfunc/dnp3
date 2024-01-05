@@ -9,7 +9,9 @@ import org.joou.UInteger;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 
 // ANCHOR: logging_interface
@@ -581,6 +583,15 @@ public class MasterExample {
         // ANCHOR_END: read_file
         break;
       }
+      case "wf":
+      {
+        // ANCHOR: write_file
+        OpenFile file = channel.openFile(association, "hello_world.txt", uint(0), Permissions.none(), uint(0xFFFFFFFF), FileMode.WRITE, ushort(1024)).toCompletableFuture().get();
+        channel.writeFileBlock(association, file.fileHandle, uint(0), false, getFileLine()).toCompletableFuture().get();
+        channel.writeFileBlock(association, file.fileHandle, uint(1), true, getFileLine()).toCompletableFuture().get();
+        channel.closeFile(association, file.fileHandle).toCompletableFuture().get();
+        // ANCHOR_END: write_file
+      }
       case "lsr":
       {
         channel.checkLinkStatus(association).toCompletableFuture().get();
@@ -590,6 +601,15 @@ public class MasterExample {
         System.out.println("Unknown command");
         break;
     }
+  }
+
+  private static List<UByte> getFileLine() {
+    List<UByte> bytes = new ArrayList<>();
+    byte[] arr = "hello world\n".getBytes(StandardCharsets.UTF_8);
+    for(byte b: arr) {
+      bytes.add(ubyte(b));
+    }
+    return bytes;
   }
 
   private static void runChannel(MasterChannel channel) {

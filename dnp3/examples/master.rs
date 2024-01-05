@@ -257,7 +257,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // create an event poll
     // ANCHOR: add_poll
-    let mut poll = association
+    let poll = association
         .add_poll(
             ReadRequest::ClassScan(Classes::class123()),
             Duration::from_secs(5),
@@ -268,47 +268,67 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // enable communications
     channel.enable().await?;
 
+    let mut handler = CliHandler {
+        poll,
+        channel,
+        association,
+    };
+
     let mut reader = FramedRead::new(tokio::io::stdin(), LinesCodec::new());
 
     loop {
-        match reader.next().await.unwrap()?.as_str() {
-            "x" => return Ok(()),
+        let cmd = reader.next().await.unwrap()?;
+        if cmd == "x" {
+            return Ok(());
+        } else {
+            if let Err(err) = handler.run_one_command(&cmd).await {
+                tracing::error!("Error: {err}");
+            }
+        }
+    }
+}
+
+struct CliHandler {
+    poll: PollHandle,
+    channel: MasterChannel,
+    association: AssociationHandle,
+}
+
+impl CliHandler {
+    async fn run_one_command(&mut self, cmd: &str) -> Result<(), Box<dyn std::error::Error>> {
+        match cmd {
             "enable" => {
-                channel.enable().await?;
+                self.channel.enable().await?;
             }
             "disable" => {
-                channel.disable().await?;
+                self.channel.disable().await?;
             }
             "dln" => {
-                channel.set_decode_level(DecodeLevel::nothing()).await?;
+                self.channel
+                    .set_decode_level(DecodeLevel::nothing())
+                    .await?;
             }
             "dlv" => {
-                channel
+                self.channel
                     .set_decode_level(AppDecodeLevel::ObjectValues.into())
                     .await?;
             }
             "rao" => {
-                if let Err(err) = association
+                self.association
                     .read(ReadRequest::all_objects(Variation::Group40Var0))
-                    .await
-                {
-                    tracing::warn!("error: {}", err);
-                }
+                    .await?;
             }
             "rmo" => {
-                if let Err(err) = association
+                self.association
                     .read(ReadRequest::multiple_headers(&[
                         ReadHeader::all_objects(Variation::Group10Var0),
                         ReadHeader::all_objects(Variation::Group40Var0),
                     ]))
-                    .await
-                {
-                    tracing::warn!("error: {}", err);
-                }
+                    .await?;
             }
             "cmd" => {
                 // ANCHOR: assoc_control
-                if let Err(err) = association
+                self.association
                     .operate(
                         CommandMode::SelectBeforeOperate,
                         CommandBuilder::single_header_u16(
@@ -316,37 +336,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             3u16,
                         ),
                     )
-                    .await
-                {
-                    tracing::warn!("error: {}", err);
-                }
+                    .await?;
                 // ANCHOR_END: assoc_control
             }
-            "evt" => poll.demand().await?,
+            "evt" => self.poll.demand().await?,
             "lts" => {
-                if let Err(err) = association.synchronize_time(TimeSyncProcedure::Lan).await {
-                    tracing::warn!("error: {}", err);
-                }
+                self.association
+                    .synchronize_time(TimeSyncProcedure::Lan)
+                    .await?;
             }
             "nts" => {
-                if let Err(err) = association
+                self.association
                     .synchronize_time(TimeSyncProcedure::NonLan)
-                    .await
-                {
-                    tracing::warn!("error: {}", err);
-                }
+                    .await?;
             }
             "wad" => {
                 // ANCHOR: write_dead_bands
-                if let Err(err) = association
+                self.association
                     .write_dead_bands(vec![
                         DeadBandHeader::group34_var1_u8(vec![(3, 5)]),
                         DeadBandHeader::group34_var3_u16(vec![(4, 2.5)]),
                     ])
-                    .await
-                {
-                    tracing::warn!("error: {}", err);
-                }
+                    .await?
                 // ANCHOR_END: write_dead_bands
             }
             "fat" => {
@@ -357,26 +368,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     // apply this schedule to all counters
                     .add_all_objects(Variation::Group20Var0);
 
-                if let Err(err) = association
+                self.association
                     .send_and_expect_empty_response(FunctionCode::FreezeAtTime, headers)
-                    .await
-                {
-                    tracing::warn!("error: {}", err);
-                }
+                    .await?;
                 // ANCHOR_END: freeze_at_time
             }
             "rda" => {
                 // ANCHOR: read_attributes
-                let result = association
+                self.association
                     .read(ReadRequest::device_attribute(
                         AllAttributes,
                         AttrSet::Default,
                     ))
-                    .await;
-
-                if let Err(err) = result {
-                    tracing::warn!("error: reading device attributes {}", err);
-                }
+                    .await?;
                 // ANCHOR_END: read_attributes
             }
             "wda" => {
@@ -384,93 +388,93 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let headers = Headers::default()
                     .add_attribute(StringAttr::UserAssignedLocation.with_value("Mt. Olympus"));
 
-                let result = association
+                self.association
                     .send_and_expect_empty_response(FunctionCode::Write, headers)
-                    .await;
-
-                if let Err(err) = result {
-                    tracing::warn!("error writing device attribute: {}", err);
-                }
+                    .await?;
                 // ANCHOR_END: write_attribute
             }
             "ral" => {
-                let result = association
+                self.association
                     .read(ReadRequest::device_attribute(
                         VariationListAttr::ListOfVariations,
                         AttrSet::Default,
                     ))
-                    .await;
-
-                if let Err(err) = result {
-                    tracing::warn!("error reading device attributes: {}", err);
-                }
+                    .await?;
             }
             "crt" => {
-                let result = association.cold_restart().await;
-
-                match result {
-                    Ok(delay) => tracing::info!("restart delay: {:?}", delay),
-                    Err(err) => tracing::warn!("error: {}", err),
-                }
+                let delay = self.association.cold_restart().await?;
+                tracing::info!("restart delay: {:?}", delay);
             }
             "wrt" => {
-                let result = association.warm_restart().await;
-
-                match result {
-                    Ok(delay) => tracing::info!("restart delay: {:?}", delay),
-                    Err(err) => tracing::warn!("error: {}", err),
-                }
+                let delay = self.association.warm_restart().await?;
+                tracing::info!("restart delay: {:?}", delay);
             }
             "rd" => {
                 // ANCHOR: read_directory
-                match association
+                let items = self
+                    .association
                     .read_directory(".", DirReadConfig::default(), None)
-                    .await
-                {
-                    Err(err) => {
-                        tracing::warn!("Unable to read directory: {err}");
-                    }
-                    Ok(items) => {
-                        for info in items {
-                            print_file_info(info);
-                        }
-                    }
+                    .await?;
+
+                for info in items {
+                    print_file_info(info);
                 }
                 // ANCHOR_END: read_directory
             }
 
             "gfi" => {
                 // ANCHOR: get_file_info
-                match association.get_file_info(".").await {
-                    Err(err) => {
-                        tracing::warn!("Unable to get file info: {err}");
-                    }
-                    Ok(info) => {
-                        print_file_info(info);
-                    }
-                }
+                let info = self.association.get_file_info(".").await?;
+                print_file_info(info);
                 // ANCHOR_END: get_file_info
             }
             "rf" => {
                 // ANCHOR: read_file
-                if let Err(err) = association
+                self.association
                     .read_file(
                         ".", // this reads the root "directory" file but doesn't parse it
                         FileReadConfig::default(),
                         Box::new(FileLogger),
                         None,
                     )
-                    .await
-                {
-                    tracing::warn!("Unable to start file transfer: {err}");
-                }
+                    .await?;
                 // ANCHOR_END: read_file
             }
+            "wf" => {
+                // ANCHOR: write_file
+                let line = "hello world\n".as_bytes();
+
+                let file = self
+                    .association
+                    .open_file(
+                        "hello_world.txt",
+                        AuthKey::none(),
+                        Permissions::default(),
+                        0xFFFFFFFF, // indicate that we don't know the size
+                        FileMode::Write,
+                        512,
+                    )
+                    .await?;
+
+                // write the 'hello world' line to the file twice
+                let mut block = BlockNumber::default();
+                self.association
+                    .write_file_block(file.file_handle, block, line.to_vec())
+                    .await?;
+                block.increment()?;
+                block.set_last();
+                self.association
+                    .write_file_block(file.file_handle, block, line.to_vec())
+                    .await?;
+                self.association.close_file(file.file_handle).await?;
+                // ANCHOR_END: write_file
+            }
             "lsr" => {
-                tracing::info!("{:?}", association.check_link_status().await);
+                tracing::info!("{:?}", self.association.check_link_status().await);
             }
             s => println!("unknown command: {}", s),
         }
+        Ok(())
     }
 }
 

@@ -4,8 +4,8 @@ use std::str::Utf8Error;
 use std::time::Duration;
 
 use dnp3::app::{
-    BufferSize, ConnectStrategy, Listener, MaybeAsync, RetryStrategy, Timeout, TimeoutRangeError,
-    Timestamp,
+    BufferSize, ConnectStrategy, Listener, MaybeAsync, PermissionSet, Permissions, RetryStrategy,
+    Timeout, TimeoutRangeError, Timestamp,
 };
 use dnp3::link::{EndpointAddress, SpecialAddressError};
 use dnp3::master::*;
@@ -798,8 +798,127 @@ pub(crate) unsafe fn master_channel_get_file_info(
     Ok(())
 }
 
-pub(crate) unsafe fn master_channel_check_link_status(
+pub(crate) unsafe fn master_channel_get_file_auth_key(
     channel: *mut crate::MasterChannel,
+    association: ffi::AssociationId,
+    user_name: &CStr,
+    password: &CStr,
+    callback: ffi::FileAuthCallback,
+) -> Result<(), ffi::ParamError> {
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let address = EndpointAddress::try_new(association.address)?;
+
+    let credentials = FileCredentials {
+        user_name: user_name.to_str()?.to_string(),
+        password: password.to_str()?.to_string(),
+    };
+
+    let promise = sfio_promise::wrap(callback);
+
+    let mut association = AssociationHandle::create(address, channel.handle.clone());
+
+    let task = async move {
+        let res = association.get_file_auth_key(credentials).await;
+        promise.complete(res);
+    };
+
+    channel.runtime.spawn(task)?;
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) unsafe fn master_channel_open_file(
+    channel: *mut crate::MasterChannel,
+    association: ffi::AssociationId,
+    file_name: &CStr,
+    auth_key: u32,
+    permissions: ffi::Permissions,
+    file_size: u32,
+    file_mode: ffi::FileMode,
+    max_block_size: u16,
+    callback: ffi::FileOpenCallback,
+) -> Result<(), ffi::ParamError> {
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let address = EndpointAddress::try_new(association.address)?;
+    let file_name = file_name.to_str()?.to_string();
+    let mut association = AssociationHandle::create(address, channel.handle.clone());
+    let promise = sfio_promise::wrap(callback);
+
+    let task = async move {
+        let res = association
+            .open_file(
+                file_name,
+                AuthKey::new(auth_key),
+                permissions.into(),
+                file_size,
+                file_mode.into(),
+                max_block_size,
+            )
+            .await;
+        promise.complete(res);
+    };
+
+    channel.runtime.spawn(task)?;
+    Ok(())
+}
+
+pub(crate) unsafe fn master_channel_write_file_block(
+    channel: *mut MasterChannel,
+    association: ffi::AssociationId,
+    file_handle: u32,
+    block_number: u32,
+    last_block: bool,
+    block_data: *const crate::ByteCollection,
+    callback: ffi::FileOperationCallback,
+) -> Result<(), ffi::ParamError> {
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let address = EndpointAddress::try_new(association.address)?;
+    let mut association = AssociationHandle::create(address, channel.handle.clone());
+    let block_data = block_data
+        .as_ref()
+        .ok_or(ffi::ParamError::NullParameter)?
+        .inner
+        .clone();
+    let promise = sfio_promise::wrap(callback);
+
+    let mut block_num = BlockNumber::from_ffi_raw(block_number);
+    if last_block {
+        block_num.set_last();
+    }
+
+    let task = async move {
+        let res = association
+            .write_file_block(FileHandle::new(file_handle), block_num, block_data)
+            .await;
+        promise.complete(res);
+    };
+
+    channel.runtime.spawn(task)?;
+    Ok(())
+}
+
+pub(crate) unsafe fn master_channel_close_file(
+    channel: *mut MasterChannel,
+    association: ffi::AssociationId,
+    file_handle: u32,
+    callback: ffi::FileOperationCallback,
+) -> Result<(), ffi::ParamError> {
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let address = EndpointAddress::try_new(association.address)?;
+    let mut association = AssociationHandle::create(address, channel.handle.clone());
+    let promise = sfio_promise::wrap(callback);
+
+    let task = async move {
+        let res = association.close_file(FileHandle::new(file_handle)).await;
+        promise.complete(res);
+    };
+
+    channel.runtime.spawn(task)?;
+    Ok(())
+}
+
+pub(crate) unsafe fn master_channel_check_link_status(
+    channel: *mut MasterChannel,
     association: ffi::AssociationId,
     callback: ffi::LinkStatusCallback,
 ) -> Result<(), ffi::ParamError> {
@@ -886,6 +1005,26 @@ impl From<ClientState> for ffi::ClientState {
             ClientState::WaitAfterFailedConnect(_) => Self::WaitAfterFailedConnect,
             ClientState::WaitAfterDisconnect(_) => Self::WaitAfterDisconnect,
             ClientState::Shutdown => Self::Shutdown,
+        }
+    }
+}
+
+impl From<ffi::Permissions> for Permissions {
+    fn from(value: ffi::Permissions) -> Self {
+        Self {
+            world: value.world.into(),
+            group: value.group.into(),
+            owner: value.owner.into(),
+        }
+    }
+}
+
+impl From<ffi::PermissionSet> for PermissionSet {
+    fn from(value: ffi::PermissionSet) -> Self {
+        Self {
+            execute: value.execute,
+            write: value.write,
+            read: value.read,
         }
     }
 }
@@ -978,6 +1117,16 @@ impl From<ffi::SerialSettings> for SerialSettings {
                 ffi::StopBits::One => StopBits::One,
                 ffi::StopBits::Two => StopBits::Two,
             },
+        }
+    }
+}
+
+impl From<ffi::FileMode> for FileMode {
+    fn from(value: ffi::FileMode) -> Self {
+        match value {
+            ffi::FileMode::Read => Self::Read,
+            ffi::FileMode::Write => Self::Write,
+            ffi::FileMode::Append => Self::Append,
         }
     }
 }
