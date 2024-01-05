@@ -798,6 +798,34 @@ pub(crate) unsafe fn master_channel_get_file_info(
     Ok(())
 }
 
+pub(crate) unsafe fn master_channel_get_file_auth_key(
+    channel: *mut crate::MasterChannel,
+    association: ffi::AssociationId,
+    user_name: &CStr,
+    password: &CStr,
+    callback: ffi::FileAuthCallback,
+) -> Result<(), ffi::ParamError> {
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let address = EndpointAddress::try_new(association.address)?;
+
+    let credentials = FileCredentials {
+        user_name: user_name.to_str()?.to_string(),
+        password: password.to_str()?.to_string(),
+    };
+
+    let promise = sfio_promise::wrap(callback);
+
+    let mut association = AssociationHandle::create(address, channel.handle.clone());
+
+    let task = async move {
+        let res = association.get_file_auth_key(credentials).await;
+        promise.complete(res);
+    };
+
+    channel.runtime.spawn(task)?;
+    Ok(())
+}
+
 #[allow(clippy::too_many_arguments)]
 pub(crate) unsafe fn master_channel_open_file(
     channel: *mut crate::MasterChannel,

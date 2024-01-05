@@ -512,6 +512,23 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         .fails_with(shared.error_type.clone())?
         .build()?;
 
+    let get_file_auth_key_async = lib
+        .define_future_method(
+            "get_file_auth_key",
+            master_channel_class.clone(),
+            shared.file.file_auth_cb.clone(),
+        )?
+        .param(
+            "association",
+            association_id.clone(),
+            "Id of the association",
+        )?
+        .param("username", StringType, "User name")?
+        .param("password", StringType, "Password")?
+        .fails_with(shared.error_type.clone())?
+        .doc("Obtain a file authentication key")?
+        .build()?;
+
     let open_file_async = lib
         .define_future_method("open_file", master_channel_class.clone(), shared.file.file_open_cb.clone())?
         .param(
@@ -665,6 +682,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         .async_method(write_dead_bands_async)?
         .async_method(send_and_expect_empty_response)?
         .async_method(get_file_info_async)?
+        .async_method(get_file_auth_key_async)?
         .async_method(open_file_async)?
         .async_method(write_file_block_async)?
         .async_method(read_directory_async)?

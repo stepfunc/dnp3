@@ -9,6 +9,7 @@ pub(crate) struct FileDefinitions {
     pub(crate) file_mode: EnumHandle,
     pub(crate) file_open_cb: FutureInterfaceHandle,
     pub(crate) file_op_cb: FutureInterfaceHandle,
+    pub(crate) file_auth_cb: FutureInterfaceHandle,
 }
 
 pub(crate) fn define(lib: &mut LibraryBuilder, nothing: EnumHandle) -> BackTraced<FileDefinitions> {
@@ -48,6 +49,14 @@ pub(crate) fn define(lib: &mut LibraryBuilder, nothing: EnumHandle) -> BackTrace
         file_error.clone(),
     )?;
 
+    let file_auth_cb = lib.define_future_interface(
+        "file_auth_callback",
+        "Callback interface used when obtaining an authentication key",
+        Primitive::U32,
+        "File authentication key",
+        file_error.clone(),
+    )?;
+
     Ok(FileDefinitions {
         permissions,
         file_error,
@@ -55,6 +64,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, nothing: EnumHandle) -> BackTrace
         file_mode: define_file_mode(lib)?,
         file_open_cb,
         file_op_cb,
+        file_auth_cb,
     })
 }
 

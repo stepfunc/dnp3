@@ -19,6 +19,20 @@ impl<T> sfio_promise::FutureType<Result<T, WriteError>> for ffi::EmptyResponseCa
         }
     }
 }
+
+impl sfio_promise::FutureType<Result<AuthKey, FileError>> for ffi::FileAuthCallback {
+    fn on_drop() -> Result<AuthKey, FileError> {
+        Err(TaskError::Shutdown.into())
+    }
+
+    fn complete(self, result: Result<AuthKey, FileError>) {
+        match result {
+            Ok(x) => self.on_complete(x.into()),
+            Err(err) => self.on_failure(err.into()),
+        }
+    }
+}
+
 impl sfio_promise::FutureType<Result<OpenFile, FileError>> for ffi::FileOpenCallback {
     fn on_drop() -> Result<OpenFile, FileError> {
         Err(TaskError::Shutdown.into())

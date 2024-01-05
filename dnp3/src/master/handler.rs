@@ -329,7 +329,7 @@ impl AssociationHandle {
     }
 
     /// Obtain an [`AuthKey`] from the outstation which may then be used to open the file.
-    pub async fn get_file_auth_key<T: ToString>(
+    pub async fn get_file_auth_key(
         &mut self,
         credentials: FileCredentials,
     ) -> Result<AuthKey, FileError> {
