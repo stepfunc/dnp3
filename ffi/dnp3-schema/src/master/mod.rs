@@ -557,12 +557,23 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
             association_id.clone(),
             "Id of the association",
         )?
-        .param("handle", Primitive::U32, "Complete path to the remote file")?
+        .param("handle", Primitive::U32, "Handle returned when the file was opened")?
         .param("block_number", Primitive::U32, "Sequential block number in the range [0 .. 0x7FFFFFFF]. The top bit is indicates the final block")?
         .param("final_block", Primitive::Bool, "Indicate that this is the final block")?
         .param("block_data", shared.byte_collection.clone(), "Collection of bytes. This must not be larger than the maximum block size returned by the outstation")?
         .fails_with(shared.error_type.clone())?
         .doc("Asynchronously write a block of file data to the outstation")?
+        .build()?;
+
+    let close_file_async = lib
+        .define_future_method("close_file", master_channel_class.clone(), shared.file.file_op_cb.clone())?
+        .param(
+            "association",
+            association_id.clone(),
+            "Id of the association",
+        )?.param("handle", Primitive::U32, "Handle returned when the file was opened")?
+        .fails_with(shared.error_type.clone())?
+        .doc("Asynchronously close a file")?
         .build()?;
 
     let get_file_info_async = lib
@@ -685,6 +696,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         .async_method(get_file_auth_key_async)?
         .async_method(open_file_async)?
         .async_method(write_file_block_async)?
+        .async_method(close_file_async)?
         .async_method(read_directory_async)?
         .async_method(read_directory_with_auth_async)?
         .async_method(check_link_status_async)?

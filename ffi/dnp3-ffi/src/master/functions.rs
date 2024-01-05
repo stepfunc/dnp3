@@ -897,6 +897,26 @@ pub(crate) unsafe fn master_channel_write_file_block(
     Ok(())
 }
 
+pub(crate) unsafe fn master_channel_close_file(
+    channel: *mut MasterChannel,
+    association: ffi::AssociationId,
+    file_handle: u32,
+    callback: ffi::FileOperationCallback,
+) -> Result<(), ffi::ParamError> {
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let address = EndpointAddress::try_new(association.address)?;
+    let mut association = AssociationHandle::create(address, channel.handle.clone());
+    let promise = sfio_promise::wrap(callback);
+
+    let task = async move {
+        let res = association.close_file(FileHandle::new(file_handle)).await;
+        promise.complete(res);
+    };
+
+    channel.runtime.spawn(task)?;
+    Ok(())
+}
+
 pub(crate) unsafe fn master_channel_check_link_status(
     channel: *mut MasterChannel,
     association: ffi::AssociationId,
