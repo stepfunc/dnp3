@@ -99,27 +99,53 @@ fn define_file_mode(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
 }
 
 fn define_permissions(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructHandle> {
-    let permission_set = lib.declare_universal_struct("permission_set")?;
-    let permission_set = lib
-        .define_universal_struct(permission_set)?
-        .doc("Defines read, write, execute permissions for particular group or user")?
-        .add("execute", Primitive::Bool, "Permission to execute")?
-        .add("write", Primitive::Bool, "Permission to write")?
-        .add("read", Primitive::Bool, "Permission to read")?
-        .end_fields()?
-        .build()?;
+    let permission_set = define_permission_set(lib)?;
+
+    let world = Name::create("world")?;
+    let group = Name::create("group")?;
+    let owner = Name::create("owner")?;
 
     let permissions = lib.declare_universal_struct("permissions")?;
     let permissions = lib
         .define_universal_struct(permissions)?
         .doc("Permissions for world, group, and owner")?
-        .add("world", permission_set.clone(), "World permissions")?
-        .add("group", permission_set.clone(), "Group permissions")?
-        .add("owner", permission_set, "Owner permissions")?
+        .add(world.clone(), permission_set.clone(), "World permissions")?
+        .add(group.clone(), permission_set.clone(), "Group permissions")?
+        .add(owner.clone(), permission_set, "Owner permissions")?
         .end_fields()?
+        .add_full_initializer("init")?
+        .begin_initializer("none", InitializerType::Static, "Permissions with nothing enabled")?
+        .default_struct(&world)?
+        .default_struct(&group)?
+        .default_struct(&owner)?
+        .end_initializer()?
         .build()?;
 
     Ok(permissions)
+}
+
+fn define_permission_set(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructHandle> {
+    let execute = Name::create("execute")?;
+    let write = Name::create("write")?;
+    let read = Name::create("read")?;
+
+    let set = lib.declare_universal_struct("permission_set")?;
+    let set = lib
+        .define_universal_struct(set)?
+        .doc("Defines read, write, execute permissions for particular group or user")?
+        .add(execute.clone(), Primitive::Bool, "Permission to execute")?
+        .add(write.clone(), Primitive::Bool, "Permission to write")?
+        .add(read.clone(), Primitive::Bool, "Permission to read")?
+        .end_fields()?
+        .add_full_initializer("init")?
+        .begin_initializer("none", InitializerType::Normal, "Permission set with nothing enabled")?
+        .default(&execute, false)?
+        .default(&write, false)?
+        .default(&read, false)?
+        .end_initializer()?
+        .build()?;
+
+    Ok(set)
 }
 
 fn define_file_error(lib: &mut LibraryBuilder) -> BackTraced<ErrorType<Unvalidated>> {

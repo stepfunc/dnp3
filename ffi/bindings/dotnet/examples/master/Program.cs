@@ -637,6 +637,16 @@ class MainClass
                     // ANCHOR_END: read_file
                     break;
                 }
+            case "wf":
+                {
+                    // ANCHOR: write_file
+                    var file = await channel.OpenFile(association, "hello_world.txt", 0, Permissions.None(), 0xFFFFFFFF, FileMode.Write, 1024);
+                    await channel.WriteFileBlock(association, file.FileHandle, 0, false, System.Text.Encoding.UTF8.GetBytes("hello world\n"));
+                    await channel.WriteFileBlock(association, file.FileHandle, 1, true, System.Text.Encoding.UTF8.GetBytes("hello world\n"));
+                    await channel.CloseFile(association, file.FileHandle);
+                    // ANCHOR_END: write_file
+                    break;
+                }
             case "crt":
                 {
                     var delay = await channel.ColdRestart(association);
