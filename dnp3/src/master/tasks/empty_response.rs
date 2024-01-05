@@ -1,13 +1,19 @@
 use crate::app::format::write::HeaderWriter;
 use crate::app::parse::parser::Response;
 use crate::app::FunctionCode;
-use crate::master::tasks::NonReadTask;
+use crate::master::tasks::{AppTask, NonReadTask, Task};
 use crate::master::{Headers, Promise, TaskError, WriteError};
 
 pub(crate) struct EmptyResponseTask {
     function: FunctionCode,
     headers: Headers,
     promise: Promise<Result<(), WriteError>>,
+}
+
+impl From<EmptyResponseTask> for Task {
+    fn from(value: EmptyResponseTask) -> Self {
+        Task::App(AppTask::NonRead(NonReadTask::EmptyResponseTask(value)))
+    }
 }
 
 impl EmptyResponseTask {
@@ -21,10 +27,6 @@ impl EmptyResponseTask {
             headers,
             promise,
         }
-    }
-
-    pub(crate) fn wrap(self) -> NonReadTask {
-        NonReadTask::EmptyResponseTask(self)
     }
 
     pub(crate) const fn function(&self) -> FunctionCode {

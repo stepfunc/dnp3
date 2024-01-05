@@ -10,7 +10,7 @@ use crate::master::association::Association;
 use crate::master::error::{TaskError, TimeSyncError};
 use crate::master::handler::Promise;
 use crate::master::request::TimeSyncProcedure;
-use crate::master::tasks::NonReadTask;
+use crate::master::tasks::{AppTask, NonReadTask, Task};
 
 use tokio::time::Instant;
 
@@ -24,6 +24,12 @@ enum State {
 pub(crate) struct TimeSyncTask {
     state: State,
     promise: Promise<Result<(), TimeSyncError>>,
+}
+
+impl From<TimeSyncTask> for Task {
+    fn from(value: TimeSyncTask) -> Self {
+        Task::App(AppTask::NonRead(NonReadTask::TimeSync(value)))
+    }
 }
 
 impl TimeSyncProcedure {
@@ -149,22 +155,21 @@ impl TimeSyncTask {
             }
         };
 
-        let objects = match response.objects {
+        let header = match response.get_only_object_header() {
             Ok(x) => x,
             Err(err) => {
-                let err = TaskError::MalformedResponse(err);
+                let err: TaskError = err.into();
                 self.report_error(association, err.into());
                 return Err(err);
             }
         };
 
-        let delay_ms: Option<u16> = objects.get_only_header().and_then(|x| {
-            if let Some(CountVariation::Group52Var2(seq)) = x.details.count() {
+        let delay_ms: Option<u16> =
+            if let Some(CountVariation::Group52Var2(seq)) = header.details.count() {
                 seq.single().map(|x| x.time)
             } else {
                 None
-            }
-        });
+            };
 
         let delay_ms = match delay_ms {
             Some(x) => x,

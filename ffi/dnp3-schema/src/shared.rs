@@ -44,10 +44,12 @@ pub(crate) struct SharedDefinitions {
     pub _octet_string: FunctionReturnStructHandle,
     pub octet_string_it: AbstractIteratorHandle,
     pub byte_it: AbstractIteratorHandle,
+    pub byte_collection: CollectionHandle,
     pub min_tls_version: EnumHandle,
     pub certificate_mode: EnumHandle,
     pub attr: DeviceAttrTypes,
     pub file: FileDefinitions,
+    pub nothing: EnumHandle,
 }
 
 pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
@@ -295,6 +297,10 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> 
 
     let attr = crate::attributes::define(lib)?;
 
+    let nothing = define_nothing_enum(lib)?;
+
+    let byte_collection = lib.define_collection("byte_collection", Primitive::U8, true)?;
+
     Ok(SharedDefinitions {
         command_status,
         error_type,
@@ -338,8 +344,20 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> 
         octet_string_it,
         byte_it,
         attr,
-        file: crate::file::define(lib)?,
+        file: crate::file::define(lib, nothing.clone())?,
+        nothing,
+        byte_collection,
     })
+}
+
+fn define_nothing_enum(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
+    let nothing = lib
+        .define_enum("nothing")?
+        .push("nothing", "The value type is meaningless")?
+        .doc("A single value enum which is used as a placeholder for futures that don't return a value")?
+        .build()?;
+
+    Ok(nothing)
 }
 
 struct TlsTypes {

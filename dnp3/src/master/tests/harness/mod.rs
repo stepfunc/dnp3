@@ -176,6 +176,10 @@ impl TestHarness {
         );
     }
 
+    pub(crate) fn assert_no_events(&mut self) {
+        assert_eq!(self.io.pop_event(), None);
+    }
+
     pub(crate) async fn pop_write(&mut self) -> Vec<u8> {
         match self.io.next_event().await {
             sfio_tokio_mock_io::Event::Write(data) => data,

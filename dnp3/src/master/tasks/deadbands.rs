@@ -1,12 +1,18 @@
 use crate::app::format::write::HeaderWriter;
 use crate::app::parse::parser::Response;
 use crate::app::FunctionCode;
-use crate::master::tasks::NonReadTask;
+use crate::master::tasks::{AppTask, NonReadTask, Task};
 use crate::master::{DeadBandHeader, DeadBandHeaderVariants, Promise, TaskError, WriteError};
 
 pub(crate) struct WriteDeadBandsTask {
     headers: Vec<DeadBandHeader>,
     promise: Promise<Result<(), WriteError>>,
+}
+
+impl From<WriteDeadBandsTask> for Task {
+    fn from(value: WriteDeadBandsTask) -> Self {
+        Task::App(AppTask::NonRead(NonReadTask::DeadBands(value)))
+    }
 }
 
 impl DeadBandHeaderVariants {
@@ -28,10 +34,6 @@ impl WriteDeadBandsTask {
         promise: Promise<Result<(), WriteError>>,
     ) -> Self {
         Self { headers, promise }
-    }
-
-    pub(crate) fn wrap(self) -> NonReadTask {
-        NonReadTask::DeadBands(self)
     }
 
     pub(crate) const fn function(&self) -> FunctionCode {
