@@ -114,7 +114,11 @@ fn define_permissions(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructHan
         .add(owner.clone(), permission_set, "Owner permissions")?
         .end_fields()?
         .add_full_initializer("init")?
-        .begin_initializer("none", InitializerType::Static, "Permissions with nothing enabled")?
+        .begin_initializer(
+            "none",
+            InitializerType::Static,
+            "Permissions with nothing enabled",
+        )?
         .default_struct(&world)?
         .default_struct(&group)?
         .default_struct(&owner)?
@@ -138,7 +142,11 @@ fn define_permission_set(lib: &mut LibraryBuilder) -> BackTraced<UniversalStruct
         .add(read.clone(), Primitive::Bool, "Permission to read")?
         .end_fields()?
         .add_full_initializer("init")?
-        .begin_initializer("none", InitializerType::Normal, "Permission set with nothing enabled")?
+        .begin_initializer(
+            "none",
+            InitializerType::Normal,
+            "Permission set with nothing enabled",
+        )?
         .default(&execute, false)?
         .default(&write, false)?
         .default(&read, false)?

@@ -566,12 +566,21 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         .build()?;
 
     let close_file_async = lib
-        .define_future_method("close_file", master_channel_class.clone(), shared.file.file_op_cb.clone())?
+        .define_future_method(
+            "close_file",
+            master_channel_class.clone(),
+            shared.file.file_op_cb.clone(),
+        )?
         .param(
             "association",
             association_id.clone(),
             "Id of the association",
-        )?.param("handle", Primitive::U32, "Handle returned when the file was opened")?
+        )?
+        .param(
+            "handle",
+            Primitive::U32,
+            "Handle returned when the file was opened",
+        )?
         .fails_with(shared.error_type.clone())?
         .doc("Asynchronously close a file")?
         .build()?;
