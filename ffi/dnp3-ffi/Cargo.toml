@@ -1,6 +1,6 @@
 [package]
 name = "dnp3-ffi"
-version = "1.5.2"
+version = "1.6.0-M1"
 authors = ["Step Function I/O LLC <info@stepfunc.io>"]
 edition = "2021"
 
