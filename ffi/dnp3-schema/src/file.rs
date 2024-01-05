@@ -8,9 +8,10 @@ pub(crate) struct FileDefinitions {
     pub(crate) file_info: UniversalStructHandle,
     pub(crate) file_mode: EnumHandle,
     pub(crate) file_open_cb: FutureInterfaceHandle,
+    pub(crate) file_op_cb: FutureInterfaceHandle,
 }
 
-pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<FileDefinitions> {
+pub(crate) fn define(lib: &mut LibraryBuilder, nothing: EnumHandle) -> BackTraced<FileDefinitions> {
     let file_type = define_file_type(lib)?;
     let permissions = define_permissions(lib)?;
     let open_file = define_open_file(lib)?;
@@ -39,12 +40,21 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<FileDefinitions> {
         file_error.clone(),
     )?;
 
+    let file_op_cb = lib.define_future_interface(
+        "file_operation_callback",
+        "Callback interface used when closing a file or writing a block of file data",
+        nothing,
+        "Indicates a successful write operation",
+        file_error.clone(),
+    )?;
+
     Ok(FileDefinitions {
         permissions,
         file_error,
         file_info,
         file_mode: define_file_mode(lib)?,
         file_open_cb,
+        file_op_cb,
     })
 }
 

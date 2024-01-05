@@ -797,6 +797,8 @@ pub(crate) unsafe fn master_channel_get_file_info(
     channel.runtime.spawn(task)?;
     Ok(())
 }
+
+#[allow(clippy::too_many_arguments)]
 pub(crate) unsafe fn master_channel_open_file(
     channel: *mut crate::MasterChannel,
     association: ffi::AssociationId,
@@ -824,6 +826,41 @@ pub(crate) unsafe fn master_channel_open_file(
                 file_mode.into(),
                 max_block_size,
             )
+            .await;
+        promise.complete(res);
+    };
+
+    channel.runtime.spawn(task)?;
+    Ok(())
+}
+
+pub(crate) unsafe fn master_channel_write_file_block(
+    channel: *mut MasterChannel,
+    association: ffi::AssociationId,
+    file_handle: u32,
+    block_number: u32,
+    last_block: bool,
+    block_data: *const crate::ByteCollection,
+    callback: ffi::FileOperationCallback,
+) -> Result<(), ffi::ParamError> {
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let address = EndpointAddress::try_new(association.address)?;
+    let mut association = AssociationHandle::create(address, channel.handle.clone());
+    let block_data = block_data
+        .as_ref()
+        .ok_or(ffi::ParamError::NullParameter)?
+        .inner
+        .clone();
+    let promise = sfio_promise::wrap(callback);
+
+    let mut block_num = BlockNumber::from_ffi_raw(block_number);
+    if last_block {
+        block_num.set_last();
+    }
+
+    let task = async move {
+        let res = association
+            .write_file_block(FileHandle::new(file_handle), block_num, block_data)
             .await;
         promise.complete(res);
     };

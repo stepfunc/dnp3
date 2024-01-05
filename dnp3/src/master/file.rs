@@ -362,6 +362,12 @@ impl BlockNumber {
         }
     }
 
+    /// Constructor used only in FFI mode
+    #[cfg(feature = "ffi")]
+    pub fn from_ffi_raw(raw: u32) -> BlockNumber {
+        Self::new(raw)
+    }
+
     pub(crate) fn new(raw: u32) -> BlockNumber {
         Self(raw)
     }

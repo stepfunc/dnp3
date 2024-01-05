@@ -3,6 +3,7 @@
 pub(crate) use crate::tracing::*;
 /// these use statements allow the code in the FFI to not have to known the real locations
 /// but instead just use `crate::<name>` when invoking an implementation
+pub use bytes::*;
 pub use command::*;
 pub use connect::*;
 pub use handler::*;
@@ -14,6 +15,8 @@ pub(crate) use tcp::*;
 pub use write_dead_band_request::*;
 
 pub(crate) mod attr;
+
+mod bytes;
 mod command;
 mod connect;
 mod decoding;

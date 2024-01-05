@@ -32,6 +32,19 @@ impl sfio_promise::FutureType<Result<OpenFile, FileError>> for ffi::FileOpenCall
     }
 }
 
+impl sfio_promise::FutureType<Result<(), FileError>> for ffi::FileOperationCallback {
+    fn on_drop() -> Result<(), FileError> {
+        Err(TaskError::Shutdown.into())
+    }
+
+    fn complete(self, result: Result<(), FileError>) {
+        match result {
+            Ok(()) => self.on_complete(ffi::Nothing::Nothing),
+            Err(err) => self.on_failure(err.into()),
+        }
+    }
+}
+
 impl sfio_promise::FutureType<Result<(), TaskError>> for crate::ffi::ReadTaskCallback {
     fn on_drop() -> Result<(), TaskError> {
         Err(TaskError::Shutdown)
