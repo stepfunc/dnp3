@@ -1,3 +1,9 @@
+### 1.6.0-M1 ###
+* :star: Add master station support for writing files to the outstation. See [#338](https://github.com/stepfunc/dnp3/pull/338).
+* :star: Add master station support for command events (groups 13 and 43). See [#332](https://github.com/stepfunc/dnp3/pull/332).
+* :star: Add master station support for group 102. See [#335](https://github.com/stepfunc/dnp3/pull/335).
+* :star: See TCP port from server in Rust API. [#335](https://github.com/stepfunc/dnp3/pull/331).
+
 ### 1.5.1 ###
 * :wrench: Update to oo-bindgen 0.8.6 to improve Java native library loading. See [oo-bindgen #124](https://github.com/stepfunc/oo_bindgen/pull/124).
 * :bell: **This release only affects the Java distribution**. It is equivalent to 1.5.0 for other distributions.
