@@ -3,7 +3,7 @@ use dnp3::master::*;
 use std::ffi::CString;
 use std::time::Duration;
 
-impl<T> sfio_promise::FutureType<Result<T, WriteError>> for crate::ffi::EmptyResponseCallback {
+impl<T> sfio_promise::FutureType<Result<T, WriteError>> for ffi::EmptyResponseCallback {
     fn on_drop() -> Result<T, WriteError> {
         Err(TaskError::Shutdown.into())
     }
@@ -11,11 +11,23 @@ impl<T> sfio_promise::FutureType<Result<T, WriteError>> for crate::ffi::EmptyRes
     fn complete(self, result: Result<T, WriteError>) {
         match result {
             Ok(_) => {
-                self.on_complete(crate::ffi::Nothing::Nothing);
+                self.on_complete(ffi::Nothing::Nothing);
             }
             Err(err) => {
                 self.on_failure(err.into());
             }
+        }
+    }
+}
+impl sfio_promise::FutureType<Result<OpenFile, FileError>> for ffi::FileOpenCallback {
+    fn on_drop() -> Result<OpenFile, FileError> {
+        Err(TaskError::Shutdown.into())
+    }
+
+    fn complete(self, result: Result<OpenFile, FileError>) {
+        match result {
+            Ok(x) => self.on_complete(x.into()),
+            Err(err) => self.on_failure(err.into()),
         }
     }
 }
@@ -193,6 +205,16 @@ impl From<FileError> for ffi::FileError {
             FileError::MaxLengthExceeded => ffi::FileError::MaxLengthExceeded,
             FileError::TaskError(x) => x.into(),
             FileError::WrongHandle => ffi::FileError::WrongHandle,
+        }
+    }
+}
+
+impl From<OpenFile> for ffi::OpenFile {
+    fn from(value: OpenFile) -> Self {
+        Self {
+            file_handle: value.file_handle.into(),
+            file_size: value.file_size,
+            max_block_size: value.max_block_size,
         }
     }
 }

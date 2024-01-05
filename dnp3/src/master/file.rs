@@ -378,16 +378,16 @@ impl BlockNumber {
 
 /// The result of opening a file on the outstation
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct OpenedFile {
+pub struct OpenFile {
     /// The handle assigned to the file by the outstation
     ///
-    /// This should be used in subsequent requests to
+    /// This must be used in subsequent requests to manipulate the file
     pub file_handle: FileHandle,
     /// Size of the file returned by the outstation
     pub file_size: u32,
     /// Maximum block size returned by the outstation
     ///
-    /// The master should respect this parameter when writing data to a file or
+    /// The master must respect this parameter when writing data to a file or
     /// the transfer may not succeed
     pub max_block_size: u16,
 }

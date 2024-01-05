@@ -5,7 +5,7 @@ use crate::app::parse::parser::{HeaderDetails, Response};
 use crate::app::{FileStatus, FunctionCode, Group70Var3, Permissions, Timestamp};
 use crate::master::tasks::file::REQUEST_ID;
 use crate::master::tasks::{AppTask, NonReadTask, Task};
-use crate::master::{AuthKey, FileError, FileHandle, FileMode, OpenedFile, Promise, TaskError};
+use crate::master::{AuthKey, FileError, FileHandle, FileMode, OpenFile, Promise, TaskError};
 pub(crate) struct OpenFileRequest {
     pub(crate) file_name: String,
     pub(crate) auth_key: AuthKey,
@@ -17,7 +17,7 @@ pub(crate) struct OpenFileRequest {
 
 pub(crate) struct OpenFileTask {
     pub(crate) request: OpenFileRequest,
-    pub(crate) promise: Promise<Result<OpenedFile, FileError>>,
+    pub(crate) promise: Promise<Result<OpenFile, FileError>>,
 }
 
 impl From<OpenFileTask> for Task {
@@ -51,7 +51,7 @@ impl OpenFileTask {
     }
 
     pub(crate) fn handle(self, response: Response<'_>) -> Result<Option<NonReadTask>, TaskError> {
-        fn process(response: Response<'_>) -> Result<OpenedFile, FileError> {
+        fn process(response: Response<'_>) -> Result<OpenFile, FileError> {
             let header = response.objects?.get_only_header()?;
 
             let obj = match header.details {
@@ -70,7 +70,7 @@ impl OpenFileTask {
                 return Err(FileError::BadStatus(obj.status_code));
             }
 
-            Ok(OpenedFile {
+            Ok(OpenFile {
                 max_block_size: obj.max_block_size,
                 file_handle: FileHandle::new(obj.file_handle),
                 file_size: obj.file_size,

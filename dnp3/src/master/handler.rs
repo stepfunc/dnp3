@@ -28,7 +28,7 @@ use crate::master::tasks::time::TimeSyncTask;
 use crate::master::tasks::Task;
 use crate::master::{
     AuthKey, BlockNumber, DeadBandHeader, DirReadConfig, FileCredentials, FileError, FileHandle,
-    FileInfo, FileMode, FileReadConfig, FileReader, Headers, OpenedFile, WriteError,
+    FileInfo, FileMode, FileReadConfig, FileReader, Headers, OpenFile, WriteError,
 };
 use crate::util::channel::Sender;
 use crate::util::session::Enabled;
@@ -353,7 +353,7 @@ impl AssociationHandle {
         file_size: u32,
         file_mode: FileMode,
         max_block_size: u16,
-    ) -> Result<OpenedFile, FileError> {
+    ) -> Result<OpenFile, FileError> {
         let (promise, rx) = Promise::one_shot();
 
         let task = OpenFileTask {

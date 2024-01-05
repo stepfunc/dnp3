@@ -3,6 +3,7 @@ pub(crate) mod request;
 pub(crate) mod write_dead_band_request;
 
 use crate::shared::SharedDefinitions;
+use oo_bindgen::model::Primitive;
 use oo_bindgen::model::*;
 use std::time::Duration;
 
@@ -517,6 +518,27 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         .fails_with(shared.error_type.clone())?
         .build()?;
 
+    let open_file_async = lib
+        .define_future_method("open_file", master_channel_class.clone(), shared.file.file_open_cb.clone())?
+        .param(
+            "association",
+            association_id.clone(),
+            "Id of the association",
+        )?
+        .param("file_name", StringType, "Complete path to the remote file")?
+        .param("auth_key", Primitive::U32, "Optional authentication key (0 == None)")?
+        .param("permissions", shared.file.permissions.clone(), "Permissions sent in the file open request")?
+        .param(
+            "file_size",
+            Primitive::U32,
+            "File size sent in the request (zero when reading). When writing use the actual file size or 0xFFFFFFFF to indicate the size is unknown"
+        )?
+        .param("file_mode", shared.file.file_mode.clone(), "Mode used to open the file")?
+        .param("max_block_size", Primitive::U16, "Requested maximum block size")?
+        .fails_with(shared.error_type.clone())?
+        .doc("Asynchronously open a file")?
+        .build()?;
+
     let get_file_info_async = lib
         .define_future_method("get_file_info", master_channel_class.clone(), file_info_cb)?
         .param(
@@ -634,6 +656,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         .async_method(write_dead_bands_async)?
         .async_method(send_and_expect_empty_response)?
         .async_method(get_file_info_async)?
+        .async_method(open_file_async)?
         .async_method(read_directory_async)?
         .async_method(read_directory_with_auth_async)?
         .async_method(check_link_status_async)?

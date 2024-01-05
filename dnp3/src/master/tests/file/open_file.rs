@@ -2,7 +2,7 @@ use crate::app::{FileStatus, FunctionCode, Group70Var3, Permissions, Timestamp};
 use crate::master::association::AssociationConfig;
 use crate::master::tasks::file::REQUEST_ID;
 use crate::master::tests::harness::create_association;
-use crate::master::{AssociationHandle, AuthKey, FileError, FileHandle, FileMode, OpenedFile};
+use crate::master::{AssociationHandle, AuthKey, FileError, FileHandle, FileMode, OpenFile};
 
 #[tokio::test]
 async fn can_open_file() {
@@ -35,7 +35,7 @@ async fn can_open_file() {
 
     assert_eq!(
         open_task.await.unwrap(),
-        Ok(OpenedFile {
+        Ok(OpenFile {
             file_handle: FileHandle::new(21),
             max_block_size: 512,
             file_size: 55,
@@ -80,7 +80,7 @@ async fn fails_if_status_not_success() {
 
 fn spawn_open_task(
     mut association: AssociationHandle,
-) -> tokio::task::JoinHandle<Result<OpenedFile, FileError>> {
+) -> tokio::task::JoinHandle<Result<OpenFile, FileError>> {
     tokio::spawn({
         async move {
             association

@@ -1,16 +1,20 @@
 use crate::master::TaskErrors;
+use oo_bindgen::model::Primitive;
 use oo_bindgen::model::*;
 
 pub(crate) struct FileDefinitions {
-    // pub(crate) file_status: EnumHandle,
+    pub(crate) permissions: UniversalStructHandle,
     pub(crate) file_error: ErrorType<Unvalidated>,
     pub(crate) file_info: UniversalStructHandle,
+    pub(crate) file_mode: EnumHandle,
+    pub(crate) file_open_cb: FutureInterfaceHandle,
 }
 
 pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<FileDefinitions> {
     let file_type = define_file_type(lib)?;
-
     let permissions = define_permissions(lib)?;
+    let open_file = define_open_file(lib)?;
+    let file_error = define_file_error(lib)?;
 
     let file_info = lib.declare_universal_struct("file_info")?;
     let file_info = lib
@@ -23,15 +27,55 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<FileDefinitions> {
         .add("file_type", file_type, "Simple file or directory")?
         .add("size", Primitive::U32, doc("Size of the file in bytes").details("If a directory, this represents the number of files and directories contained within."))?
         .add("time_created", Primitive::U64, doc("DNP3 timestamp").details("Milliseconds since January 1st, 1970 UTC. Only the lower 48-bits are used"))?
-        .add("permissions", permissions, "Outstation permissions for the file")?
+        .add("permissions", permissions.clone(), "Outstation permissions for the file")?
         .end_fields()?
         .build()?;
 
+    let file_open_cb = lib.define_future_interface(
+        "file_open_callback",
+        "Callback interface used when opening a file",
+        open_file.clone(),
+        "Value describing the open file",
+        file_error.clone(),
+    )?;
+
     Ok(FileDefinitions {
-        //file_status: define_file_status(lib)?,
-        file_error: define_file_error(lib)?,
+        permissions,
+        file_error,
         file_info,
+        file_mode: define_file_mode(lib)?,
+        file_open_cb,
     })
+}
+
+fn define_open_file(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructHandle> {
+    let open_file = lib.declare_universal_struct("open_file")?;
+    let open_file = lib
+        .define_universal_struct(open_file)?
+        .doc("The result of opening a file on the outstation")?
+        .add("file_handle", Primitive::U32,
+             doc("The handle assigned to the file by the outstation")
+            .details("This must be used in subsequent requests to manipulate the file")
+        )?
+        .add("file_size", Primitive::U32, "Size of the file returned by the outstation")?
+        .add("max_block_size", Primitive::U16,
+             doc("Maximum block size returned by the outstation")
+                 .details("The master must respect this value when writing data to a file or the transfer may not succeed"))?
+        .end_fields()?
+        .build()?;
+    Ok(open_file)
+}
+
+fn define_file_mode(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
+    let value = lib
+        .define_enum("file_mode")?
+        .doc("Different modes in which files may be opened")?
+        .push("read", "Specifies that an existing file is to be opened for reading")?
+        .push("write", "Specifies that the file is to be opened for writing, truncating any existing file to length 0")?
+        .push("append", "Specifies that the file is to be opened for writing, appending to the end of the file")?
+        .build()?;
+
+    Ok(value)
 }
 
 fn define_permissions(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructHandle> {

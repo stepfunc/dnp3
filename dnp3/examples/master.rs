@@ -467,7 +467,7 @@ impl CliHandler {
                     .write_file_block(file.file_handle, block, line.to_vec())
                     .await?;
                 self.association.close_file(file.file_handle).await?;
-                // ANCHOR_END: read_file
+                // ANCHOR_END: write_file
             }
             "lsr" => {
                 tracing::info!("{:?}", self.association.check_link_status().await);
