@@ -402,7 +402,7 @@ jobs:
         working-directory: artifacts/java-bindings
         run: >
           shopt -s extglob &&
-          mvn gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2 -DrepositoryId=ossrh -DpomFile=pom.xml -Dfile=dnp3-${{github.ref_name}}.jar) &&
+          mvn gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2 -DrepositoryId=ossrh -DpomFile=pom.xml -Dfile=dnp3-${{github.ref_name}}.jar &&
           mvn gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2 -DrepositoryId=ossrh -DpomFile=pom.xml -Dfile=dnp3-${{github.ref_name}}-sources.jar -Dclassifier=sources &&
           mvn gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2 -DrepositoryId=ossrh -DpomFile=pom.xml -Dfile=dnp3-${{github.ref_name}}-javadoc.jar -Dclassifier=javadoc
       - name: Publish NuGet package
