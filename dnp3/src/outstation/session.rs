@@ -316,15 +316,13 @@ impl NextIdleAction {
     fn select_earliest(self, instant: Option<tokio::time::Instant>) -> Self {
         match instant {
             None => self,
-            Some(instant) => {
-                match self {
-                    NextIdleAction::NoSleep => self,
-                    NextIdleAction::SleepUntilEvent => Self::SleepUnit(instant),
-                    NextIdleAction::SleepUnit(other) => {
-                        Self::SleepUnit(tokio::time::Instant::min(instant, other))
-                    }
+            Some(instant) => match self {
+                NextIdleAction::NoSleep => self,
+                NextIdleAction::SleepUntilEvent => Self::SleepUnit(instant),
+                NextIdleAction::SleepUnit(other) => {
+                    Self::SleepUnit(tokio::time::Instant::min(instant, other))
                 }
-            }
+            },
         }
     }
 }
@@ -509,7 +507,6 @@ impl OutstationSession {
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
     ) -> Result<NextIdleAction, RunError> {
-
         if self.config.unsolicited.is_disabled() {
             return Ok(NextIdleAction::SleepUntilEvent);
         }
@@ -878,7 +875,7 @@ impl OutstationSession {
     async fn sleep_until(&mut self, next_action: NextIdleAction) -> Result<(), RunError> {
         async fn sleep_only(next_action: NextIdleAction) {
             match next_action {
-                NextIdleAction::NoSleep => {},
+                NextIdleAction::NoSleep => {}
                 NextIdleAction::SleepUnit(x) => tokio::time::sleep_until(x).await,
                 NextIdleAction::SleepUntilEvent => crate::util::future::forever().await,
             }
