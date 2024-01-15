@@ -47,6 +47,13 @@ impl OutstationHarness {
         self.expect_response(response).await;
     }
 
+    pub(crate) async fn expect_write(&mut self) -> Vec<u8> {
+        match self.io.next_event().await {
+            sfio_tokio_mock_io::Event::Write(bytes) => bytes,
+            x => panic!("Expected write but got: {x:?}"),
+        }
+    }
+
     pub(crate) async fn expect_response(&mut self, response: &[u8]) {
         assert_eq!(
             self.io.next_event().await,

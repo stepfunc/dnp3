@@ -331,7 +331,15 @@ async fn run_server(mut server: Server) -> Result<(), Box<dyn std::error::Error>
             );
             db.add(i, Some(EventClass::Class1), CounterConfig::default());
             db.add(i, Some(EventClass::Class1), FrozenCounterConfig::default());
-            db.add(i, Some(EventClass::Class1), AnalogInputConfig::default());
+            db.add(
+                i,
+                Some(EventClass::Class1),
+                AnalogInputConfig {
+                    s_var: StaticAnalogInputVariation::Group30Var1,
+                    e_var: EventAnalogInputVariation::Group32Var1,
+                    deadband: 0.0,
+                },
+            );
             db.add(
                 i,
                 Some(EventClass::Class1),
@@ -536,6 +544,8 @@ fn get_outstation_config() -> OutstationConfig {
         EndpointAddress::try_new(1).unwrap(),
         get_event_buffer_config(),
     );
+    config.class_zero.octet_string = true;
+
     // override the default decoding
     config.decode_level.application = AppDecodeLevel::ObjectValues;
     // ANCHOR_END: outstation_config

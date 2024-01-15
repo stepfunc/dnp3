@@ -305,6 +305,28 @@ enum ConfirmAction {
     ContinueWait,
 }
 
+#[derive(Copy, Clone)]
+enum NextIdleAction {
+    NoSleep,
+    SleepUntilEvent,
+    SleepUnit(tokio::time::Instant),
+}
+
+impl NextIdleAction {
+    fn select_earliest(self, instant: Option<tokio::time::Instant>) -> Self {
+        match instant {
+            None => self,
+            Some(instant) => match self {
+                NextIdleAction::NoSleep => self,
+                NextIdleAction::SleepUntilEvent => Self::SleepUnit(instant),
+                NextIdleAction::SleepUnit(other) => {
+                    Self::SleepUnit(tokio::time::Instant::min(instant, other))
+                }
+            },
+        }
+    }
+}
+
 impl OutstationSession {
     pub(crate) fn new(
         initial_state: Enabled,
@@ -449,7 +471,7 @@ impl OutstationSession {
             .await?;
 
         // check to see if we should perform unsolicited
-        let deadline = self.check_unsolicited(io, reader, writer, database).await?;
+        let next_action = self.check_unsolicited(io, reader, writer, database).await?;
 
         // handle a deferred read request if it was produced during unsolicited
         self.handle_deferred_read(io, reader, writer, database)
@@ -458,13 +480,7 @@ impl OutstationSession {
         // check to see if we should perform a link status check
         self.check_link_status(io, writer).await?;
 
-        let deadline = match deadline {
-            Some(deadline) => match self.next_link_status {
-                Some(link_deadline) => Some(tokio::time::Instant::min(deadline, link_deadline)),
-                None => Some(deadline),
-            },
-            None => self.next_link_status,
-        };
+        let next_action = next_action.select_earliest(self.next_link_status);
 
         // wait for an event
         tokio::select! {
@@ -475,7 +491,7 @@ impl OutstationSession {
             _ = database.wait_for_change() => {
                 // wake for unsolicited here
             }
-            res = self.sleep_until(deadline) => {
+            res = self.sleep_until(next_action) => {
                 res?
                 // just wake up
             }
@@ -490,9 +506,9 @@ impl OutstationSession {
         reader: &mut TransportReader,
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
-    ) -> Result<Option<tokio::time::Instant>, RunError> {
+    ) -> Result<NextIdleAction, RunError> {
         if self.config.unsolicited.is_disabled() {
-            return Ok(None);
+            return Ok(NextIdleAction::SleepUntilEvent);
         }
 
         match self.state.unsolicited {
@@ -504,18 +520,18 @@ impl OutstationSession {
                 {
                     UnsolicitedResult::Timeout | UnsolicitedResult::ReturnToIdle => {
                         self.state.unsolicited = UnsolicitedState::NullRequired;
-                        Ok(Some(tokio::time::Instant::now()))
+                        Ok(NextIdleAction::NoSleep)
                     }
                     UnsolicitedResult::Confirmed => {
                         self.state.unsolicited = UnsolicitedState::Ready(None);
-                        Ok(None)
+                        Ok(NextIdleAction::NoSleep)
                     }
                 }
             }
             UnsolicitedState::Ready(deadline) => {
                 if let Some(deadline) = deadline {
                     if tokio::time::Instant::now() < deadline {
-                        return Ok(Some(deadline)); // not ready yet
+                        return Ok(NextIdleAction::SleepUnit(deadline)); // not ready yet
                     }
                 }
 
@@ -526,19 +542,19 @@ impl OutstationSession {
                 {
                     None => {
                         // there was nothing to send
-                        Ok(None)
+                        Ok(NextIdleAction::SleepUntilEvent)
                     }
                     Some(UnsolicitedResult::Timeout) | Some(UnsolicitedResult::ReturnToIdle) => {
                         let retry_at = self.new_unsolicited_retry_deadline();
                         self.state.unsolicited = UnsolicitedState::Ready(Some(retry_at));
-                        Ok(Some(retry_at))
+                        Ok(NextIdleAction::SleepUnit(retry_at))
                     }
                     Some(UnsolicitedResult::Confirmed) => {
                         database
                             .clear_written_events(self.application.as_mut())
                             .await;
                         self.state.unsolicited = UnsolicitedState::Ready(None);
-                        Ok(None)
+                        Ok(NextIdleAction::NoSleep)
                     }
                 }
             }
@@ -845,7 +861,7 @@ impl OutstationSession {
     ) -> Result<TimeoutStatus, RunError> {
         let decode_level = self.config.decode_level;
         tokio::select! {
-             res = self.sleep_until(Some(deadline)) => {
+             res = self.sleep_until(NextIdleAction::SleepUnit(deadline)) => {
                  res?;
                  Ok(TimeoutStatus::Yes)
              }
@@ -856,20 +872,18 @@ impl OutstationSession {
         }
     }
 
-    async fn sleep_until(&mut self, instant: Option<tokio::time::Instant>) -> Result<(), RunError> {
-        async fn sleep_only(instant: Option<tokio::time::Instant>) {
-            match instant {
-                Some(x) => tokio::time::sleep_until(x).await,
-                None => {
-                    // sleep forever
-                    crate::util::future::forever().await;
-                }
+    async fn sleep_until(&mut self, next_action: NextIdleAction) -> Result<(), RunError> {
+        async fn sleep_only(next_action: NextIdleAction) {
+            match next_action {
+                NextIdleAction::NoSleep => {}
+                NextIdleAction::SleepUnit(x) => tokio::time::sleep_until(x).await,
+                NextIdleAction::SleepUntilEvent => crate::util::future::forever().await,
             }
         }
 
         loop {
             tokio::select! {
-                 _ = sleep_only(instant) => {
+                 _ = sleep_only(next_action) => {
                         return Ok(());
                  }
                  res = self.handle_next_message() => {

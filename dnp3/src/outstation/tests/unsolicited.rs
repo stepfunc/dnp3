@@ -1,5 +1,7 @@
+use crate::app::gen::prefixed::PrefixedVariation;
 use crate::app::measurement::*;
-use crate::app::Timestamp;
+use crate::app::parse::parser::{HeaderDetails, ParsedFragment};
+use crate::app::{BufferSize, Timestamp};
 use crate::outstation::config::OutstationConfig;
 use crate::outstation::database::*;
 use crate::outstation::{BufferState, ClassCount, TypeCount};
@@ -301,6 +303,72 @@ async fn handles_disable_unsolicited_during_unsolicited_confirm_wait() {
     // check that no other unsolicited responses are sent
     tokio::time::pause();
     harness.check_no_events();
+}
+
+#[tokio::test]
+async fn sends_unsolicited_from_one_update() {
+    let mut config = get_default_unsolicited_config();
+    config.unsolicited_buffer_size = BufferSize::min();
+    config.event_buffer_config.max_analog = 1001;
+    let mut harness = new_harness(config);
+    confirm_null_unsolicited(&mut harness).await;
+    enable_unsolicited(&mut harness).await;
+
+    harness.handle.database.transaction(|db| {
+        for i in 0..1000 {
+            db.add(
+                i,
+                Some(EventClass::Class1),
+                AnalogInputConfig {
+                    s_var: StaticAnalogInputVariation::Group30Var1,
+                    e_var: EventAnalogInputVariation::Group32Var1, // 5  bytes
+                    deadband: 0.0,
+                },
+            );
+        }
+    });
+
+    harness.handle.database.transaction(|db| {
+        let value = AnalogInput {
+            value: 98.6,
+            flags: Flags { value: 0 },
+            time: None,
+        };
+
+        for i in 0..1000 {
+            db.update(i, &value, UpdateOptions::detect_event());
+        }
+    });
+
+    let mut total_fragments: usize = 0;
+    let mut total_events = 0;
+
+    loop {
+        let rx = harness.expect_write().await;
+        let response = ParsedFragment::parse(&rx).unwrap().to_response().unwrap();
+        let mut num_events = 0;
+        match response.objects.unwrap().get_only_header().unwrap().details {
+            HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group32Var1(seq)) => {
+                num_events += seq.iter().count()
+            }
+            x => panic!("Unexpected header: {x:?}"),
+        }
+
+        total_fragments += 1;
+        total_events += num_events;
+
+        // confirm the fragment
+        let confirm = &[uns_confirm(response.header.control.seq.value()), 0x00];
+        harness.send_and_process(confirm).await;
+
+        // terminate when the outstation indicates there are no more events
+        if !response.header.iin.iin1.get_class_1_events() {
+            break;
+        }
+    }
+
+    assert_eq!(total_events, 1000);
+    assert!(total_fragments > 10);
 }
 
 #[tokio::test]
