@@ -1,3 +1,6 @@
+### 1.5.2 ###
+* :bug: Fix bug where the outstation would sleep before all unsolicited data was transmitted. See [#341](https://github.com/stepfunc/dnp3/pull/341).
+
 ### 1.5.1 ###
 * :wrench: Update to oo-bindgen 0.8.6 to improve Java native library loading. See [oo-bindgen #124](https://github.com/stepfunc/oo_bindgen/pull/124).
 * :bell: **This release only affects the Java distribution**. It is equivalent to 1.5.0 for other distributions.
