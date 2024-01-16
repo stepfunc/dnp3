@@ -1,6 +1,6 @@
 [package]
 name = "dnp3-bindings"
-version = "1.5.1"
+version = "1.5.2"
 authors = ["Step Function I/O LLC <info@stepfunc.io>"]
 edition = "2021"
 
