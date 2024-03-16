@@ -255,15 +255,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .await?;
     // ANCHOR_END: association_create
 
-    // create an event poll
-    // ANCHOR: add_poll
+    // create a periodic poll for the static (current values) that you care about
+    let range1 = ReadHeader::two_byte_range(Variation::Group30Var0, 2 ,5);
+    let range2 = ReadHeader::two_byte_range(Variation::Group30Var0, 7 ,9);
+
+    // poll for these two ranges every 2 seconds
     let mut poll = association
         .add_poll(
-            ReadRequest::ClassScan(Classes::class123()),
-            Duration::from_secs(5),
+            ReadRequest::multiple_headers(&[range1, range2]),
+            Duration::from_secs(2),
         )
         .await?;
-    // ANCHOR_END: add_poll
 
     // enable communications
     channel.enable().await?;
@@ -516,10 +518,10 @@ fn get_association_config() -> AssociationConfig {
     let mut config = AssociationConfig::new(
         // disable unsolicited first (Class 1/2/3)
         EventClasses::all(),
-        // after the integrity poll, enable unsolicited (Class 1/2/3)
-        EventClasses::all(),
-        // perform startup integrity poll with Class 1/2/3/0
-        Classes::all(),
+        // do NOT re-enable unsolicited reporting
+        EventClasses::none(),
+        // don't integrity scan unless you actually need to see everything in the meter once at startup
+        Classes::none(),
         // don't automatically scan Class 1/2/3 when the corresponding IIN bit is asserted
         EventClasses::none(),
     );
