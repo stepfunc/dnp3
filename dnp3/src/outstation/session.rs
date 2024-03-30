@@ -739,7 +739,7 @@ impl OutstationSession {
                 self.on_link_activity();
                 (info, request)
             }
-            Some(TransportRequest::LinkLayerMessage(_)) => {
+            Some(TransportRequest::LinkLayerMessage) => {
                 self.on_link_activity();
                 return Ok(UnsolicitedWaitResult::ReadNext);
             }
@@ -1001,7 +1001,7 @@ impl OutstationSession {
                     }
                 }
             }
-            Some(TransportRequest::LinkLayerMessage(_)) => {
+            Some(TransportRequest::LinkLayerMessage) => {
                 self.on_link_activity();
             }
             Some(TransportRequest::Error(from, err)) => {
@@ -2116,7 +2116,7 @@ impl OutstationSession {
                 self.on_link_activity();
                 (info, request)
             }
-            Some(TransportRequest::LinkLayerMessage(_)) => {
+            Some(TransportRequest::LinkLayerMessage) => {
                 self.on_link_activity();
                 return ConfirmAction::ContinueWait;
             }
