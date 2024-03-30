@@ -21,10 +21,7 @@ pub(crate) enum StaticReadHeader {
     FrozenCounter(Option<StaticFrozenCounterVariation>, Option<IndexRange>),
     Analog(Option<StaticAnalogInputVariation>, Option<IndexRange>),
     #[allow(dead_code)] // TODO - this can be removed if we support these request
-    FrozenAnalog(
-        Option<StaticFrozenAnalogInputVariation>,
-        Option<IndexRange>
-    ),
+    FrozenAnalog(Option<StaticFrozenAnalogInputVariation>, Option<IndexRange>),
     AnalogOutputStatus(
         Option<StaticAnalogOutputStatusVariation>,
         Option<IndexRange>,

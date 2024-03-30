@@ -21,6 +21,7 @@ mod struct_constructors;
 
 enum OutstationServerState {
     Configuring(dnp3::tcp::Server),
+    #[allow(dead_code)]
     Running(ServerHandle),
 }
 
@@ -184,7 +185,6 @@ pub unsafe fn outstation_server_bind(server: *mut OutstationServer) -> Result<()
 
     server.runtime.spawn(task)?;
     server.state = OutstationServerState::Running(handle);
-    // TODO - why do we leak it?
     Box::leak(server);
     Ok(())
 }
