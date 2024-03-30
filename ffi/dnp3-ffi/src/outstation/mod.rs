@@ -173,8 +173,8 @@ pub unsafe fn outstation_server_bind(server: *mut OutstationServer) -> Result<()
     if server.is_null() {
         return Err(ffi::ParamError::NullParameter);
     }
+    // TODO - this pattern doesn't look correct
     let mut server = Box::from_raw(server);
-
     let server_handle = match server.state {
         OutstationServerState::Configuring(server) => server,
         OutstationServerState::Running(_) => return Err(ffi::ParamError::ServerAlreadyStarted),
@@ -184,6 +184,7 @@ pub unsafe fn outstation_server_bind(server: *mut OutstationServer) -> Result<()
 
     server.runtime.spawn(task)?;
     server.state = OutstationServerState::Running(handle);
+    // TODO - why do we leak it?
     Box::leak(server);
     Ok(())
 }
