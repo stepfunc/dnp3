@@ -428,11 +428,6 @@ pub(crate) enum InsertError {
     Overflow { created: u64, discarded: u64 },
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub(crate) struct EventWriteError {
-    pub(crate) count: usize,
-}
-
 impl EventBuffer {
     pub(crate) fn new(config: EventBufferConfig) -> Self {
         let max_size = config.max_events();

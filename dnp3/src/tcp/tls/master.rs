@@ -1,5 +1,4 @@
 use sfio_rustls_config::NameVerifier;
-use std::convert::TryFrom;
 use std::net::{Ipv4Addr, SocketAddr};
 use std::path::Path;
 use std::sync::Arc;

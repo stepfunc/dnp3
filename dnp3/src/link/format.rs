@@ -47,7 +47,7 @@ impl<'a> FrameData<'a> {
 // this can all be statically verified not to panic since the buffer is a constant length
 pub(crate) fn format_header_fixed_size(
     header: Header,
-    buffer: &mut [u8; super::constant::LINK_HEADER_LENGTH],
+    buffer: &mut [u8; constant::LINK_HEADER_LENGTH],
 ) {
     fn to_le(x: u16) -> (u8, u8) {
         let low = (x & 0xFF) as u8;

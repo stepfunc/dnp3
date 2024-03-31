@@ -10,9 +10,6 @@ pub(crate) trait ControlType: Debug {
     /// make a copy of this control type with a new status code
     fn with_status(&self, status: CommandStatus) -> Self;
 
-    /// get the command status
-    fn status(&self) -> CommandStatus;
-
     /// select a control on a handler
     fn select(
         self,
@@ -33,10 +30,6 @@ pub(crate) trait ControlType: Debug {
 impl ControlType for Group12Var1 {
     fn with_status(&self, status: CommandStatus) -> Self {
         Self { status, ..*self }
-    }
-
-    fn status(&self) -> CommandStatus {
-        self.status
     }
 
     fn select(
@@ -64,10 +57,6 @@ impl ControlType for Group41Var1 {
         Self { status, ..*self }
     }
 
-    fn status(&self) -> CommandStatus {
-        self.status
-    }
-
     fn select(
         self,
         transaction: &mut ControlTransaction,
@@ -91,10 +80,6 @@ impl ControlType for Group41Var1 {
 impl ControlType for Group41Var2 {
     fn with_status(&self, status: CommandStatus) -> Self {
         Self { status, ..*self }
-    }
-
-    fn status(&self) -> CommandStatus {
-        self.status
     }
 
     fn select(
@@ -122,10 +107,6 @@ impl ControlType for Group41Var3 {
         Self { status, ..*self }
     }
 
-    fn status(&self) -> CommandStatus {
-        self.status
-    }
-
     fn select(
         self,
         transaction: &mut ControlTransaction,
@@ -149,10 +130,6 @@ impl ControlType for Group41Var3 {
 impl ControlType for Group41Var4 {
     fn with_status(&self, status: CommandStatus) -> Self {
         Self { status, ..*self }
-    }
-
-    fn status(&self) -> CommandStatus {
-        self.status
     }
 
     fn select(

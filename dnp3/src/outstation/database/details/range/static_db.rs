@@ -232,10 +232,10 @@ where
         range: IndexRange,
         variation: Option<T::StaticVariation>,
     ) -> Option<VariationRange> {
-        for (_index, point) in self.inner.range_mut((
-            std::ops::Bound::Included(&range.start),
-            std::ops::Bound::Included(&range.stop),
-        )) {
+        for (_index, point) in self
+            .inner
+            .range_mut((Bound::Included(&range.start), Bound::Included(&range.stop)))
+        {
             // for every point in the range, we copy the current value into a distinct 'selected' cell
             // when writing the response(s) we use the selected value
             // this allows the outstation to send consistent snapshot of the values when a multi-fragment response is required

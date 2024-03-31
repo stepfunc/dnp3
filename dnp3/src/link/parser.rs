@@ -16,14 +16,14 @@ enum ParseState {
 
 pub(crate) struct FramePayload {
     length: usize,
-    buffer: [u8; super::constant::MAX_FRAME_PAYLOAD_LENGTH],
+    buffer: [u8; constant::MAX_FRAME_PAYLOAD_LENGTH],
 }
 
 impl FramePayload {
     pub(crate) fn new() -> Self {
         Self {
             length: 0,
-            buffer: [0; super::constant::MAX_FRAME_PAYLOAD_LENGTH],
+            buffer: [0; constant::MAX_FRAME_PAYLOAD_LENGTH],
         }
     }
 

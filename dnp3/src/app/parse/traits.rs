@@ -20,10 +20,6 @@ pub(crate) trait Index: Copy + Clone + FixedSize + PartialEq + Display {
     fn next(self) -> Self;
     fn widen_to_u16(self) -> u16;
 
-    fn is_zero(&self) -> bool {
-        *self == Self::zero()
-    }
-
     fn one() -> Self {
         Self::zero().next()
     }
