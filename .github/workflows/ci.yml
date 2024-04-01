@@ -292,13 +292,15 @@ jobs:
             mv ./ffi/dnp3-ffi-java/dnp3-ffi-java.cdx.json ffi-modules/$target
           done
       - name: Create FFI third-party-licenses.txt
-        run: echo 'woah' > third-party-licenses.txt
+        run: allow-list gen-licenses-dir -l ffi-modules -b dnp3-ffi.cdx.json -c dep_config.json > third-party-licenses.txt
+      - name: Create FFI third-party-licenses-java.txt
+        run: allow-list gen-licenses-dir -l ffi-modules -b dnp3-ffi-java.cdx.json -c dep_config.json > third-party-licenses-java.txt
       - name: Package C/C++ bindings
         run: cargo run --bin dnp3-bindings -- --c --package ./ffi-modules --options ./packaging.json -f third-party-licenses.txt
       - name: Package .NET bindings
         run: cargo run --bin dnp3-bindings -- --dotnet --package ./ffi-modules --options ./packaging.json -f third-party-licenses.txt
       - name: Package Java bindings
-        run: cargo run --bin dnp3-bindings -- --java --package ./ffi-modules --options ./packaging.json -f third-party-licenses.txt
+        run: cargo run --bin dnp3-bindings -- --java --package ./ffi-modules --options ./packaging.json -f third-party-licenses-java.txt
       - name: Upload C/C++ bindings
         uses: actions/upload-artifact@v3
         with:
