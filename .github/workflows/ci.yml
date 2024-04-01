@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install Rust ${{ matrix.rust }}
         uses: dtolnay/rust-toolchain@master
         with:
@@ -41,7 +41,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install Rust
         uses: dtolnay/rust-toolchain@master
         with:
@@ -65,7 +65,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install Rust ${{ matrix.rust }}
         uses: dtolnay/rust-toolchain@master
         with:
@@ -80,7 +80,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install Rust ${{ matrix.rust }}
         uses: dtolnay/rust-toolchain@stable
       - name: Install doxygen 1.9.5
@@ -125,7 +125,7 @@ jobs:
             test: false
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install Rust
         uses: dtolnay/rust-toolchain@master
         with:
@@ -170,7 +170,7 @@ jobs:
           - x86_64-apple-darwin # 64-bit macOS (10.7+, Lion+)
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Caching
@@ -218,7 +218,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -247,7 +247,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install dependencies
         working-directory: guide
         run: yarn install
@@ -269,10 +269,10 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Install Cargo CycloneDx
         run: cargo install cargo-cyclonedx
-      - name: Install allow-list tool
+      - name: Install custom allow-list tool
         run: cargo install --git https://github.com/stepfunc/bom-tools.git
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
   # Package all the generated bindings
   packaging:
     needs: [bom, documentation, bindings-windows, bindings-macos, bindings-linux]
@@ -284,7 +284,7 @@ jobs:
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}
         uses: Swatinem/rust-cache@v2
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Download compiled FFI
         uses: actions/download-artifact@v3
         with:
@@ -323,7 +323,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Caching
@@ -337,7 +337,7 @@ jobs:
         shell: bash
         run: (cd ffi/bindings/java/dnp3 && sudo mvn install)
       - name: Checkout dnp4s
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: stepfunc/dnp4s
           ssh-key: ${{ secrets.DNP4S_SSH_KEY }}
@@ -372,7 +372,7 @@ jobs:
           cd ../conformance-results
           zip -r ../../release/conformance-results.zip .
       - name: Checkout stepfunc/docs
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: stepfunc/docs
           ssh-key: ${{ secrets.SFIO_DOCS_SSH_KEY }}
