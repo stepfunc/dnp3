@@ -270,7 +270,7 @@ jobs:
       - name: Install Cargo CycloneDx
         run: cargo install cargo-cyclonedx
       - name: Install allow-list tool
-        run: cargo install https://github.com/stepfunc/bom-tools.git
+        run: cargo install --git https://github.com/stepfunc/bom-tools.git
       - name: Checkout
         uses: actions/checkout@v3
   # Package all the generated bindings
