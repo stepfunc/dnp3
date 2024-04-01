@@ -262,7 +262,9 @@ jobs:
         with:
           name: doc
           path: ~/doc
-  bom:
+  # Package all the generated bindings
+  packaging:
+    needs: [documentation, bindings-windows, bindings-macos, bindings-linux]
     runs-on: ubuntu-latest
     steps:
       - name: Install Rust
@@ -271,15 +273,6 @@ jobs:
         run: cargo install cargo-cyclonedx
       - name: Install custom allow-list tool
         run: cargo install --git https://github.com/stepfunc/bom-tools.git
-      - name: Checkout
-        uses: actions/checkout@v4
-  # Package all the generated bindings
-  packaging:
-    needs: [bom, documentation, bindings-windows, bindings-macos, bindings-linux]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
       - name: Caching
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}
         uses: Swatinem/rust-cache@v2
@@ -290,6 +283,14 @@ jobs:
         with:
           name: ffi-modules
           path: ffi-modules
+      - name: Create SBOMs
+        run: |
+          for dir in ffi-modules/*; do
+            target=`basename "${dir}"`
+            cargo cyclonedx -f json --target $target
+            mv ./ffi/dnp3-ffi/dnp3-ffi.cdx.json ffi-modules/$target
+            mv ./ffi/dnp3-ffi-java/dnp3-ffi-java.cdx.json ffi-modules/$target
+          done
       - name: Create FFI third-party-licenses.txt
         run: echo 'woah' > third-party-licenses.txt
       - name: Package C/C++ bindings
