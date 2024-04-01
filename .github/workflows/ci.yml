@@ -265,21 +265,14 @@ jobs:
   bom:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v3
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Install Cargo CycloneDx
         run: cargo install cargo-cyclonedx
-      - name: Checkout BOM tools repo
+      - name: Install allow-list tool
+        run: cargo install https://github.com/stepfunc/bom-tools.git
+      - name: Checkout
         uses: actions/checkout@v3
-        with:
-          repository: stepfunc/bom-tools
-          ref: 0.1.0
-          path: bom-tools
-      - name: Install allow-list
-        working-directory: bom-tools
-        run: cargo install --path ./allow-list
   # Package all the generated bindings
   packaging:
     needs: [bom, documentation, bindings-windows, bindings-macos, bindings-linux]
