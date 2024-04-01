@@ -137,9 +137,9 @@ jobs:
       - name: Create FFI modules DIR
         run: mkdir ffi-modules\${{ matrix.target }}
       - name: Build FFI
-        run: cargo build -p dnp3-ffi --release --target ${{ matrix.target }} --message-format json | Out-File -encoding "UTF8" .\ffi-modules\${{ matrix.target }}\build.jni.log
+        run: cargo build -p dnp3-ffi --release --target ${{ matrix.target }}
       - name: Build JNI
-        run: cargo build -p dnp3-ffi-java --release --target ${{ matrix.target }} --message-format json | Out-File -encoding "UTF8" .\ffi-modules\${{ matrix.target }}\build.jni.log
+        run: cargo build -p dnp3-ffi-java --release --target ${{ matrix.target }}
       - name: Copy the FFI and JNI libs
         shell: pwsh
         run: |
@@ -179,9 +179,9 @@ jobs:
       - name: Create FFI modules dir
         run: mkdir -p ffi-modules/${{ matrix.target }}
       - name: Build FFI
-        run: cargo build -p dnp3-ffi --release --message-format json > ffi-modules/${{ matrix.target }}/build.ffi.log
+        run: cargo build -p dnp3-ffi --release
       - name: Build JNI
-        run: cargo build -p dnp3-ffi-java --release --message-format json > ffi-modules/${{ matrix.target }}/build.jni.log
+        run: cargo build -p dnp3-ffi-java --release
       - name: Copy the FFI and JNI libs
         run: |
           cp ./target/release/libdnp3_ffi.dylib ./ffi-modules/${{ matrix.target }}
@@ -231,9 +231,9 @@ jobs:
       - name: Create FFI modules dir
         run: mkdir -p ffi-modules/${{ matrix.target }}
       - name: Build FFI
-        run: cross build -p dnp3-ffi --release --target ${{ matrix.target }} --message-format json > ffi-modules/${{ matrix.target }}/build.ffi.log
+        run: cross build -p dnp3-ffi --release --target ${{ matrix.target }}
       - name: Build JNI
-        run: cross build -p dnp3-ffi-java --release --target ${{ matrix.target }} --message-format json > ffi-modules/${{ matrix.target }}/build.jni.log
+        run: cross build -p dnp3-ffi-java --release --target ${{ matrix.target }}
       - name: Copy the FFI and JNI libs
         run: |
           cp ./target/${{ matrix.target }}/release/libdnp3_ffi.so ./ffi-modules/${{ matrix.target }}
@@ -278,9 +278,9 @@ jobs:
           repository: stepfunc/bom-tools
           ref: 0.1.0
           path: bom-tools
-      - name: Install BOM tools
+      - name: Install allow-list
         working-directory: bom-tools
-        run: cargo install --path bom-tools
+        run: cargo install --path allow-list
       - name: Checkout
         uses: actions/checkout@v3
       - name: Download compiled FFI
@@ -289,13 +289,11 @@ jobs:
           name: ffi-modules
           path: ffi-modules
       - name: Create FFI third-party-licenses.txt
-        run: bom-tools gen-licenses-dir ./ffi-modules build.ffi.log ./dep_config.json > third-party-licenses.txt
+        run: echo 'woah' > third-party-licenses.txt
       - name: Package C/C++ bindings
         run: cargo run --bin dnp3-bindings -- --c --package ./ffi-modules --options ./packaging.json -f third-party-licenses.txt
       - name: Package .NET bindings
         run: cargo run --bin dnp3-bindings -- --dotnet --package ./ffi-modules --options ./packaging.json -f third-party-licenses.txt
-      - name: Create JNI third-party-licenses.txt
-        run: bom-tools gen-licenses-dir ./ffi-modules build.jni.log ./dep_config.json > third-party-licenses.txt
       - name: Package Java bindings
         run: cargo run --bin dnp3-bindings -- --java --package ./ffi-modules --options ./packaging.json -f third-party-licenses.txt
       - name: Upload C/C++ bindings
