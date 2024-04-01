@@ -1,7 +1,4 @@
 use crate::app::attr::Attribute;
-use crate::app::parse::count::CountSequence;
-use crate::app::parse::prefix::Prefix;
-use crate::app::parse::traits::{FixedSizeVariation, Index};
 use crate::app::variations::Group50Var2;
 use crate::app::RequestHeader;
 use crate::app::Sequence;
@@ -548,69 +545,5 @@ impl ControlSupport<Group41Var4> for DefaultControlHandler {
         _database: &mut DatabaseHandle,
     ) -> CommandStatus {
         self.status
-    }
-}
-
-trait HasCommandStatus {
-    fn status(&self) -> CommandStatus;
-    fn with_status(&self, status: CommandStatus) -> Self;
-}
-
-trait ControlSupportExt<T>: ControlSupport<T>
-where
-    T: FixedSizeVariation + HasCommandStatus,
-{
-    fn operate<I, F>(
-        &mut self,
-        seq: CountSequence<Prefix<I, T>>,
-        op_type: OperateType,
-        database: &mut DatabaseHandle,
-        mut func: F,
-    ) where
-        F: FnMut(T, I),
-        I: Index,
-    {
-        for item in seq.iter() {
-            let status = {
-                if item.value.status() == CommandStatus::Success {
-                    ControlSupport::<T>::operate(
-                        self,
-                        item.value,
-                        item.index.widen_to_u16(),
-                        op_type,
-                        database,
-                    )
-                } else {
-                    CommandStatus::FormatError
-                }
-            };
-            func(item.value.with_status(status), item.index)
-        }
-    }
-
-    fn select<I, F>(
-        &mut self,
-        seq: CountSequence<Prefix<I, T>>,
-        database: &mut DatabaseHandle,
-        mut func: F,
-    ) where
-        F: FnMut(T, I),
-        I: Index,
-    {
-        for item in seq.iter() {
-            let status = {
-                if item.value.status() == CommandStatus::Success {
-                    ControlSupport::<T>::select(
-                        self,
-                        item.value,
-                        item.index.widen_to_u16(),
-                        database,
-                    )
-                } else {
-                    CommandStatus::FormatError
-                }
-            };
-            func(item.value.with_status(status), item.index)
-        }
     }
 }

@@ -25,5 +25,5 @@ serial = ["dnp3/serial"]
 [build-dependencies]
 dnp3-schema = { path = "../dnp3-schema" }
 oo-bindgen = "0.8"
-sfio-tracing-ffi = "0.8"
+sfio-tracing-ffi = "0.8.1"
 sfio-tokio-ffi = "0.8"

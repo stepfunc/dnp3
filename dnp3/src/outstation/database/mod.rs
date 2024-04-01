@@ -356,7 +356,7 @@ impl From<TypeError> for AttrDefError {
 /// Core database implementation shared between an outstation task and the user facing API.
 /// This type is always guarded by a `DatabaseHandle` which provides a transactional API.
 pub struct Database {
-    pub(crate) inner: crate::outstation::database::details::database::Database,
+    pub(crate) inner: details::database::Database,
 }
 
 impl Database {
@@ -367,11 +367,7 @@ impl Database {
         config: EventBufferConfig,
     ) -> Self {
         Self {
-            inner: crate::outstation::database::details::database::Database::new(
-                max_read_selection,
-                class_zero_config,
-                config,
-            ),
+            inner: details::database::Database::new(max_read_selection, class_zero_config, config),
         }
     }
 

@@ -18,7 +18,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install Rust ${{ matrix.rust }}
         uses: dtolnay/rust-toolchain@master
         with:
@@ -41,7 +41,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install Rust
         uses: dtolnay/rust-toolchain@master
         with:
@@ -65,7 +65,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install Rust ${{ matrix.rust }}
         uses: dtolnay/rust-toolchain@master
         with:
@@ -80,7 +80,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install Rust ${{ matrix.rust }}
         uses: dtolnay/rust-toolchain@stable
       - name: Install doxygen 1.9.5
@@ -125,7 +125,7 @@ jobs:
             test: false
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install Rust
         uses: dtolnay/rust-toolchain@master
         with:
@@ -137,9 +137,9 @@ jobs:
       - name: Create FFI modules DIR
         run: mkdir ffi-modules\${{ matrix.target }}
       - name: Build FFI
-        run: cargo build -p dnp3-ffi --release --target ${{ matrix.target }} --message-format json | Out-File -encoding "UTF8" .\ffi-modules\${{ matrix.target }}\build.jni.log
+        run: cargo build -p dnp3-ffi --release --target ${{ matrix.target }}
       - name: Build JNI
-        run: cargo build -p dnp3-ffi-java --release --target ${{ matrix.target }} --message-format json | Out-File -encoding "UTF8" .\ffi-modules\${{ matrix.target }}\build.jni.log
+        run: cargo build -p dnp3-ffi-java --release --target ${{ matrix.target }}
       - name: Copy the FFI and JNI libs
         shell: pwsh
         run: |
@@ -170,7 +170,7 @@ jobs:
           - x86_64-apple-darwin # 64-bit macOS (10.7+, Lion+)
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Caching
@@ -179,9 +179,9 @@ jobs:
       - name: Create FFI modules dir
         run: mkdir -p ffi-modules/${{ matrix.target }}
       - name: Build FFI
-        run: cargo build -p dnp3-ffi --release --message-format json > ffi-modules/${{ matrix.target }}/build.ffi.log
+        run: cargo build -p dnp3-ffi --release
       - name: Build JNI
-        run: cargo build -p dnp3-ffi-java --release --message-format json > ffi-modules/${{ matrix.target }}/build.jni.log
+        run: cargo build -p dnp3-ffi-java --release
       - name: Copy the FFI and JNI libs
         run: |
           cp ./target/release/libdnp3_ffi.dylib ./ffi-modules/${{ matrix.target }}
@@ -218,7 +218,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -231,9 +231,9 @@ jobs:
       - name: Create FFI modules dir
         run: mkdir -p ffi-modules/${{ matrix.target }}
       - name: Build FFI
-        run: cross build -p dnp3-ffi --release --target ${{ matrix.target }} --message-format json > ffi-modules/${{ matrix.target }}/build.ffi.log
+        run: cross build -p dnp3-ffi --release --target ${{ matrix.target }}
       - name: Build JNI
-        run: cross build -p dnp3-ffi-java --release --target ${{ matrix.target }} --message-format json > ffi-modules/${{ matrix.target }}/build.jni.log
+        run: cross build -p dnp3-ffi-java --release --target ${{ matrix.target }}
       - name: Copy the FFI and JNI libs
         run: |
           cp ./target/${{ matrix.target }}/release/libdnp3_ffi.so ./ffi-modules/${{ matrix.target }}
@@ -247,7 +247,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install dependencies
         working-directory: guide
         run: yarn install
@@ -269,35 +269,38 @@ jobs:
     steps:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+      - name: Install Cargo CycloneDx
+        run: cargo install cargo-cyclonedx
+      - name: Install custom allow-list tool
+        run: cargo install --git https://github.com/stepfunc/bom-tools.git
       - name: Caching
         if: ${{ !startsWith(github.ref, 'refs/tags/') }}
         uses: Swatinem/rust-cache@v2
-      - name: Checkout BOM tools repo
-        uses: actions/checkout@v3
-        with:
-          repository: stepfunc/bom-tools
-          ref: 0.1.0
-          path: bom-tools
-      - name: Install BOM tools
-        working-directory: bom-tools
-        run: cargo install --path bom-tools
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Download compiled FFI
         uses: actions/download-artifact@v3
         with:
           name: ffi-modules
           path: ffi-modules
+      - name: Create SBOMs
+        run: |
+          for dir in ffi-modules/*; do
+            target=`basename "${dir}"`
+            cargo cyclonedx -f json --target $target
+            mv ./ffi/dnp3-ffi/dnp3-ffi.cdx.json ffi-modules/$target
+            mv ./ffi/dnp3-ffi-java/dnp3-ffi-java.cdx.json ffi-modules/$target
+          done
       - name: Create FFI third-party-licenses.txt
-        run: bom-tools gen-licenses-dir ./ffi-modules build.ffi.log ./dep_config.json > third-party-licenses.txt
+        run: allow-list gen-licenses-dir -l ffi-modules -b dnp3-ffi.cdx.json -c dep_config.json > third-party-licenses.txt
+      - name: Create FFI third-party-licenses-java.txt
+        run: allow-list gen-licenses-dir -l ffi-modules -b dnp3-ffi-java.cdx.json -c dep_config.json > third-party-licenses-java.txt
       - name: Package C/C++ bindings
         run: cargo run --bin dnp3-bindings -- --c --package ./ffi-modules --options ./packaging.json -f third-party-licenses.txt
       - name: Package .NET bindings
         run: cargo run --bin dnp3-bindings -- --dotnet --package ./ffi-modules --options ./packaging.json -f third-party-licenses.txt
-      - name: Create JNI third-party-licenses.txt
-        run: bom-tools gen-licenses-dir ./ffi-modules build.jni.log ./dep_config.json > third-party-licenses.txt
       - name: Package Java bindings
-        run: cargo run --bin dnp3-bindings -- --java --package ./ffi-modules --options ./packaging.json -f third-party-licenses.txt
+        run: cargo run --bin dnp3-bindings -- --java --package ./ffi-modules --options ./packaging.json -f third-party-licenses-java.txt
       - name: Upload C/C++ bindings
         uses: actions/upload-artifact@v3
         with:
@@ -323,7 +326,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Caching
@@ -337,7 +340,7 @@ jobs:
         shell: bash
         run: (cd ffi/bindings/java/dnp3 && sudo mvn install)
       - name: Checkout dnp4s
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: stepfunc/dnp4s
           ssh-key: ${{ secrets.DNP4S_SSH_KEY }}
@@ -372,7 +375,7 @@ jobs:
           cd ../conformance-results
           zip -r ../../release/conformance-results.zip .
       - name: Checkout stepfunc/docs
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
         with:
           repository: stepfunc/docs
           ssh-key: ${{ secrets.SFIO_DOCS_SSH_KEY }}

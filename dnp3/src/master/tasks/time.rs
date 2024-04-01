@@ -315,9 +315,14 @@ mod tests {
     use crate::app::Sequence;
     use crate::app::*;
     use crate::link::EndpointAddress;
-    use crate::master::handler::{AssociationHandler, NullReadHandler};
+    use crate::master::handler::AssociationHandler;
     use crate::master::tasks::RequestWriter;
-    use crate::master::{AssociationConfig, NullAssociationInformation};
+    use crate::master::{AssociationConfig, AssociationInformation, ReadHandler};
+
+    struct NullReadHandler;
+    impl ReadHandler for NullReadHandler {}
+    struct NullAssociationInformation;
+    impl AssociationInformation for NullAssociationInformation {}
 
     use scursor::WriteCursor;
 

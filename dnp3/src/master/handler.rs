@@ -2,7 +2,6 @@ use std::time::{Duration, SystemTime};
 
 use crate::app::attr::*;
 use crate::app::measurement::*;
-use crate::app::variations::Variation;
 use crate::app::*;
 
 use crate::decode::DecodeLevel;
@@ -31,7 +30,7 @@ use crate::util::session::Enabled;
 /// Handle to a master communication channel. This handle controls
 /// a task running on the Tokio Runtime.
 ///
-/// It provides a uniform API for all of the various types of communication channels supported
+/// It provides a uniform API for all the various types of communication channels supported
 /// by the library.
 #[derive(Debug, Clone)]
 pub struct MasterChannel {
@@ -461,10 +460,6 @@ pub trait AssociationInformation: Send + Sync {
     fn unsolicited_response(&mut self, _is_duplicate: bool, _seq: Sequence) {}
 }
 
-pub(crate) struct NullAssociationInformation;
-
-impl AssociationInformation for NullAssociationInformation {}
-
 /// Information about the object header and specific variation
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct HeaderInfo {
@@ -645,8 +640,3 @@ pub(crate) fn handle_attribute(
         }
     }
 }
-
-/// read handler that does nothing
-#[derive(Copy, Clone)]
-pub(crate) struct NullReadHandler;
-impl ReadHandler for NullReadHandler {}

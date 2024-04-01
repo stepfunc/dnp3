@@ -632,6 +632,23 @@
         }
       ]
     },
+    "getrandom": {
+      "id": "getrandom",
+      "source": "crates.io",
+      "authors": null,
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2018-2024 The rust-random Project Developers",
+                "Copyright (c) 2014 The Rust Project Developers"
+              ]
+            }
+          }
+        }
+      ]
+    },
     "hmac": {
       "id": "hmac",
       "source": "crates.io",

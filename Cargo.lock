@@ -1204,9 +1204,9 @@ dependencies = [
 
 [[package]]
 name = "sfio-tracing-ffi"
-version = "0.8.0"
+version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "94955ac2db413b6f32297e862581db2c05f6312881939393f4b68f173a8be8b4"
+checksum = "e1be29c84c2a7b298e74b8882c3167818f43e8ce1d73840cd35e2c34e791cf5c"
 dependencies = [
  "oo-bindgen",
 ]

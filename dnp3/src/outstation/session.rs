@@ -15,7 +15,6 @@ use crate::app::variations::{
     Group34Var1, Group34Var2, Group34Var3, Group50Var1, Group50Var3, Group52Var1, Group52Var2,
 };
 use crate::app::*;
-use crate::app::{ControlField, Iin, Iin1, Iin2, ResponseFunction, ResponseHeader};
 use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
 use crate::link::header::BroadcastConfirmMode;
@@ -739,7 +738,7 @@ impl OutstationSession {
                 self.on_link_activity();
                 (info, request)
             }
-            Some(TransportRequest::LinkLayerMessage(_)) => {
+            Some(TransportRequest::LinkLayerMessage) => {
                 self.on_link_activity();
                 return Ok(UnsolicitedWaitResult::ReadNext);
             }
@@ -1001,7 +1000,7 @@ impl OutstationSession {
                     }
                 }
             }
-            Some(TransportRequest::LinkLayerMessage(_)) => {
+            Some(TransportRequest::LinkLayerMessage) => {
                 self.on_link_activity();
             }
             Some(TransportRequest::Error(from, err)) => {
@@ -2116,7 +2115,7 @@ impl OutstationSession {
                 self.on_link_activity();
                 (info, request)
             }
-            Some(TransportRequest::LinkLayerMessage(_)) => {
+            Some(TransportRequest::LinkLayerMessage) => {
                 self.on_link_activity();
                 return ConfirmAction::ContinueWait;
             }

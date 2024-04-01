@@ -163,7 +163,7 @@ impl MasterSession {
                             return self.handle_fragment_while_idle(io, writer, source, response).await
                         }
                         Some(TransportResponse::LinkLayerMessage(msg)) => self.notify_link_activity(msg.source),
-                        Some(TransportResponse::Error(_, _)) => return Ok(()), // ignore the malformed response
+                        Some(TransportResponse::Error(_)) => return Ok(()), // ignore the malformed response
                         None => return Ok(()),
                    }
                 }
@@ -196,7 +196,7 @@ impl MasterSession {
                             return self.handle_fragment_while_idle(io, writer, source, response).await
                         }
                         Some(TransportResponse::LinkLayerMessage(msg)) => self.notify_link_activity(msg.source),
-                        Some(TransportResponse::Error(_, _)) => return Ok(()), // ignore the malformed response
+                        Some(TransportResponse::Error(_)) => return Ok(()), // ignore the malformed response
                         None => return Ok(()),
                    }
                 }
@@ -436,7 +436,7 @@ impl MasterSession {
                             }
                         }
                         Some(TransportResponse::LinkLayerMessage(msg)) => self.notify_link_activity(msg.source),
-                        Some(TransportResponse::Error(_, err)) => {
+                        Some(TransportResponse::Error(err)) => {
                             task.on_task_error(self.associations.get_mut(destination).ok(), err.into());
                             return Err(err.into());
                         },
@@ -569,7 +569,7 @@ impl MasterSession {
                                 }
                             }
                             Some(TransportResponse::LinkLayerMessage(msg)) => self.notify_link_activity(msg.source),
-                            Some(TransportResponse::Error(_, err)) => return Err(err.into()),
+                            Some(TransportResponse::Error(err)) => return Err(err.into()),
                             None => continue
                         }
                     }
@@ -735,7 +735,7 @@ impl MasterSession {
         writer: &mut TransportWriter,
     ) -> Result<(), LinkError> {
         let mut cursor = self.tx_buffer.write_cursor();
-        crate::app::format::write::confirm_unsolicited(seq, &mut cursor)?;
+        write::confirm_unsolicited(seq, &mut cursor)?;
 
         writer
             .write(io, self.decode_level, destination.wrap(), cursor.written())
@@ -802,7 +802,7 @@ impl MasterSession {
                             self.notify_link_activity(msg.source);
                             return Ok(());
                         }
-                        Some(TransportResponse::Error(_, _)) => return Err(TaskError::UnexpectedResponseHeaders),
+                        Some(TransportResponse::Error(_)) => return Err(TaskError::UnexpectedResponseHeaders),
                         None => continue,
                     }
                 }

@@ -1,4 +1,3 @@
-use std::convert::TryFrom;
 use std::time::{Duration, SystemTime};
 
 use crate::app::measurement::DoubleBit;

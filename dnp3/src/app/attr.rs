@@ -1042,7 +1042,7 @@ impl Display for BadAttribute {
 
 pub(crate) enum AttrWriteError {
     /// underlying cursor error
-    Cursor(WriteError),
+    Cursor,
     /// attribute value could not be encoded
     BadAttribute(BadAttribute),
 }
@@ -1054,8 +1054,8 @@ impl From<BadAttribute> for AttrWriteError {
 }
 
 impl From<WriteError> for AttrWriteError {
-    fn from(err: WriteError) -> Self {
-        AttrWriteError::Cursor(err)
+    fn from(_: WriteError) -> Self {
+        AttrWriteError::Cursor
     }
 }
 
@@ -1472,7 +1472,7 @@ impl<'a> Attribute<'a> {
 impl From<AttrWriteError> for TaskError {
     fn from(value: AttrWriteError) -> Self {
         match value {
-            AttrWriteError::Cursor(_) => TaskError::WriteError,
+            AttrWriteError::Cursor => TaskError::WriteError,
             AttrWriteError::BadAttribute(x) => TaskError::BadEncoding(BadEncoding::Attribute(x)),
         }
     }

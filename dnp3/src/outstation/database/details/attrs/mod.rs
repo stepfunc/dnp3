@@ -146,7 +146,7 @@ impl Selection {
                     let mut writer = HeaderWriter::new(cursor);
                     if let Err(err) = writer.write_attribute(attr) {
                         match err {
-                            AttrWriteError::Cursor(_) => return false, // out of space
+                            AttrWriteError::Cursor => return false, // out of space
                             AttrWriteError::BadAttribute(err) => {
                                 tracing::error!("Unable to write attribute: {}", err);
                             }
