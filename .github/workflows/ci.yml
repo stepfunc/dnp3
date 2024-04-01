@@ -108,7 +108,7 @@ jobs:
           cp -a ffi/bindings/java/dnp3/target/apidocs ~/doc/java
           rm ffi/bindings/c/generated/logo.png ffi/bindings/c/generated/doxygen-awesome.css
       - name: Upload documentation
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v3
         with:
           name: doc
           path: ~/doc
