@@ -10,28 +10,44 @@
     "atty",
     "autocfg",
     "backtrace",
+    "bindgen",
     "cc",
+    "cexpr",
+    "clang-sys",
     "clap",
     "clap_builder",
     "clap_derive",
     "clap_lex",
+    "cmake",
     "colorchoice",
     "concolor-override",
     "concolor-query",
     "dunce",
+    "either",
     "errno",
+    "fs_extra",
     "gimli",
+    "glob",
     "heck",
+    "home",
     "io-lifetimes",
     "is-terminal",
-    "miniz_oxide",
+    "itertools",
+    "lazycell",
+    "libloading",
     "linux-raw-sys",
+    "mirai-annotations",
+    "minimal-lexical",
+    "miniz_oxide",
+    "nom",
     "object",
     "oo-bindgen",
     "os_str_bytes",
+    "paste",
     "pathdiff",
     "pest",
     "platforms",
+    "prettyplease",
     "proc-macro-error",
     "proc-macro-error-attr",
     "dnp3-schema",
@@ -119,6 +135,37 @@
             "copyright": {
               "Lines": [
                 "Copyright (c) 2014 Benjamin Sago"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "aws-lc-rs": {
+      "id": "aws-lc-rs",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "ISC": {
+            "copyright": {
+              "Lines": [
+                "Copyright Amazon.com, Inc. or its affiliates"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "aws-lc-sys": {
+      "id": "aws-lc-sys",
+      "source": "crates.io",
+      "licenses": [
+        "OpenSSL",
+        {
+          "ISC": {
+            "copyright": {
+              "Lines": [
+                "Copyright Amazon.com, Inc. or its affiliates"
               ]
             }
           }
