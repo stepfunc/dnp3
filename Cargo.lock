@@ -1361,9 +1361,9 @@ checksum = "91547be5cac1551a6401a7cfa571524bbcb4d9d818b2756cbe3012b48cc79aaf"
 
 [[package]]
 name = "sfio-rustls-config"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fcec186ffd52837c44df73de088078971806fb510d4bd0ed8ce54e9aaa011b0a"
+checksum = "e83d4abfb37f3e9b78c794f256f25bf4082f8704eeea6c10cc43c2bbdb9d57b8"
 dependencies = [
  "pem",
  "pkcs8",

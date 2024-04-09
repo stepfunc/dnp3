@@ -1196,31 +1196,6 @@
         }
       ]
     },
-    "ring": {
-      "id": "ring",
-      "source": "crates.io",
-      "licenses": [
-        {
-          "MIT": {
-            "copyright": {
-              "Lines": [
-                "Copyright (c) 2015-2016 the fiat-crypto authors (see https://github.com/mit-plv/fiat-crypto/blob/master/AUTHORS)"
-              ]
-            }
-          }
-        },
-        {
-          "ISC": {
-            "copyright": {
-              "Lines": [
-                "Copyright 2015-2016 Brian Smith"
-              ]
-            }
-          }
-        },
-        "OpenSSL"
-      ]
-    },
     "rustls": {
       "id": "rustls",
       "source": "crates.io",
