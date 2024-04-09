@@ -20,8 +20,8 @@ xxhash-rust = { version = "0.8", features = ["xxh64"] }
 scursor = "0.1.0"
 
 # TLS dependencies
-sfio-rustls-config = { version = "0.2.0", optional = true }
-tokio-rustls = { version = "0.25", features = ["tls12"], default-features = false, optional = true }
+sfio-rustls-config = { version = "0.3.0", optional = true }
+tokio-rustls = { version = "0.26.0", features = ["tls12"], default-features = false, optional = true }
 
 # serial dependencies
 tokio-serial = { version = "=5.4.3", default-features = false, optional = true }
