@@ -4,7 +4,6 @@ use tracing::Instrument;
 use crate::app::{ConnectStrategy, Listener, Shutdown};
 use crate::link::LinkErrorMode;
 use crate::outstation::task::OutstationTask;
-use crate::outstation::OutstationHandle;
 use crate::outstation::*;
 use crate::tcp::client::ClientTask;
 use crate::tcp::server::{NewSession, ServerTask};

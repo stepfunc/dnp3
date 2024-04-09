@@ -121,12 +121,12 @@ impl TransportReader {
         match data {
             Ok(ParsedTransportData::Fragment(info, fragment)) => match fragment.to_response() {
                 Ok(response) => Some(TransportResponse::Response(info.source, response)),
-                Err(err) => Some(TransportResponse::Error(info.source, err.into())),
+                Err(err) => Some(TransportResponse::Error(err.into())),
             },
             Ok(ParsedTransportData::LinkLayerMessage(msg)) => {
                 Some(TransportResponse::LinkLayerMessage(msg))
             }
-            Err((err, source)) => Some(TransportResponse::Error(source, err.into())),
+            Err((err, _)) => Some(TransportResponse::Error(err.into())),
         }
     }
 
@@ -159,8 +159,8 @@ impl TransportReader {
                     err.into(fragment.control.seq),
                 )),
             },
-            Ok(ParsedTransportData::LinkLayerMessage(msg)) => {
-                Some(TransportRequest::LinkLayerMessage(msg))
+            Ok(ParsedTransportData::LinkLayerMessage(_)) => {
+                Some(TransportRequest::LinkLayerMessage)
             }
             Err((err, source)) => Some(TransportRequest::Error(source, err.into())),
         }

@@ -2,7 +2,6 @@ use crate::attr::FfiAttrValue;
 use dnp3::app::attr::*;
 use dnp3::app::measurement::*;
 use dnp3::app::*;
-use dnp3::app::{ResponseFunction, ResponseHeader};
 use dnp3::master::{
     AssociationHandler, AssociationInformation, HeaderInfo, ReadHandler, ReadType, TaskError,
     TaskType,

@@ -1,5 +1,4 @@
 use crate::app::control::*;
-use crate::app::measurement::Flags;
 use crate::app::measurement::*;
 use crate::app::{FunctionCode, QualifierCode};
 use crate::util::bit::bits::{BIT_6, BIT_7};

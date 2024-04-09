@@ -188,7 +188,7 @@ impl std::fmt::Display for FileError {
             FileError::NoPermission => f.write_str("no permission"),
             FileError::BadBlockNum => f.write_str("bad block number"),
             FileError::AbortByUser => f.write_str("aborted by user"),
-            FileError::TaskError(t) => std::fmt::Debug::fmt(&t, f),
+            FileError::TaskError(t) => Debug::fmt(&t, f),
             FileError::MaxLengthExceeded => f.write_str("exceeded maximum received length"),
             FileError::WrongHandle => {
                 f.write_str("file handle returned by outstation did not match the request")

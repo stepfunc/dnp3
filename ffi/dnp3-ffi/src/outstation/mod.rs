@@ -21,6 +21,7 @@ mod struct_constructors;
 
 enum OutstationServerState {
     Configuring(dnp3::tcp::Server),
+    #[allow(dead_code)]
     Running(ServerHandle),
 }
 
@@ -173,8 +174,8 @@ pub unsafe fn outstation_server_bind(server: *mut OutstationServer) -> Result<()
     if server.is_null() {
         return Err(ffi::ParamError::NullParameter);
     }
+    // TODO - this pattern doesn't look correct
     let mut server = Box::from_raw(server);
-
     let server_handle = match server.state {
         OutstationServerState::Configuring(server) => server,
         OutstationServerState::Running(_) => return Err(ffi::ParamError::ServerAlreadyStarted),

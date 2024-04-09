@@ -178,7 +178,7 @@ impl TlsClientConfig {
 
         Ok(Self {
             //  it doesn't matter what we put here, it just needs to be an IP so that the client won't send an SNI extension
-            server_name: rustls::pki_types::ServerName::IpAddress(IpAddr::V4(
+            server_name: ServerName::IpAddress(IpAddr::V4(
                 Ipv4Addr::UNSPECIFIED.into(),
             )),
             config: Arc::new(config),
