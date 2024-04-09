@@ -51,12 +51,15 @@
     "proc-macro-error",
     "proc-macro-error-attr",
     "dnp3-schema",
+    "ring",
     "rustc-demangle",
+    "rustc-hash",
     "rustix",
     "same-file",
     "semver",
     "semver-parser",
     "serde_derive",
+    "shlex",
     "strsim",
     "termcolor",
     "ucd-trie",
@@ -64,6 +67,7 @@
     "utf8parse",
     "version_check",
     "walkdir",
+    "which",
     "winapi-util"
   ],
   "vendor": {
