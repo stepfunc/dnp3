@@ -1,16 +1,10 @@
 use super::*;
 use crate::app::file::*;
-use crate::app::format::write::HeaderWriter;
-use crate::app::format::WriteError;
-use crate::app::parse::free_format::FreeFormatVariation;
-use crate::app::parse::parser::{HeaderDetails, ObjectHeader, Response};
+use crate::app::parse::parser::Response;
 use crate::app::{FunctionCode, Timestamp};
 use crate::master::file::BlockNumber;
 use crate::master::tasks::{AppTask, NonReadTask, Task};
-use crate::master::{
-    AuthKey, FileAction, FileCredentials, FileError, FileHandle, FileMode, FileReadConfig,
-    FileReader, TaskError,
-};
+use crate::master::{FileAction, FileMode, FileReadConfig, FileReader, TaskError};
 
 enum ReaderTypes {
     Trait(Box<dyn FileReader>),

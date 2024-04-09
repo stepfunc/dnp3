@@ -1,5 +1,4 @@
 use crate::master::TaskErrors;
-use oo_bindgen::model::Primitive;
 use oo_bindgen::model::*;
 
 pub(crate) struct FileDefinitions {

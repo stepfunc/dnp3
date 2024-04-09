@@ -68,7 +68,7 @@ impl MockReader {
             .expect("call set_rx_frame_info(..) before running test");
         let fragment = Fragment {
             info: FragmentInfo::new(self.frame_id, info.source, info.broadcast),
-            data: &self.buffer.get(count).unwrap(),
+            data: self.buffer.get(count).unwrap(),
         };
         Some(fragment)
     }

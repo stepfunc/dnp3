@@ -255,10 +255,10 @@ mod test {
             self.received.push(Header::G102(x.collect()))
         }
 
-        fn handle_octet_string<'a>(
+        fn handle_octet_string(
             &mut self,
             _info: HeaderInfo,
-            _x: &mut dyn Iterator<Item = (&'a [u8], u16)>,
+            _x: &mut dyn Iterator<Item = (&[u8], u16)>,
         ) {
             unimplemented!()
         }
@@ -279,9 +279,7 @@ mod test {
                         KnownAttribute::UInt(x, v) => Known::UInt(x, v),
                         KnownAttribute::Bool(x, v) => Known::Bool(x, v),
                         KnownAttribute::Float(x, v) => Known::Float(x, v),
-                        KnownAttribute::OctetString(x, v) => {
-                            Known::Octets(x, v.iter().copied().collect())
-                        }
+                        KnownAttribute::OctetString(x, v) => Known::Octets(x, v.to_vec()),
                         KnownAttribute::DNP3Time(x, v) => Known::Time(x, v),
                     };
                     self.received.push(Header::KnownAttr(known));

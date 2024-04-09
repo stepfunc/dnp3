@@ -133,7 +133,7 @@ impl TlsClientConfig {
                 ServerName::IpAddress(IpAddr::V4(Ipv4Addr::UNSPECIFIED.into())),
             ),
             Some(x) => {
-                let server_name: ServerName<'static> = rustls::pki_types::ServerName::try_from(x)?;
+                let server_name: ServerName<'static> = ServerName::try_from(x)?;
                 (ServerNameVerification::SanOrCommonName, server_name)
             }
         };
@@ -178,9 +178,7 @@ impl TlsClientConfig {
 
         Ok(Self {
             //  it doesn't matter what we put here, it just needs to be an IP so that the client won't send an SNI extension
-            server_name: ServerName::IpAddress(IpAddr::V4(
-                Ipv4Addr::UNSPECIFIED.into(),
-            )),
+            server_name: ServerName::IpAddress(IpAddr::V4(Ipv4Addr::UNSPECIFIED.into())),
             config: Arc::new(config),
         })
     }

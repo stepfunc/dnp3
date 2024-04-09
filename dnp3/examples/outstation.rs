@@ -507,9 +507,9 @@ fn get_ca_chain_config() -> Result<TlsServerConfig, Box<dyn std::error::Error>> 
     // ANCHOR: tls_ca_chain_config
     let config = TlsServerConfig::full_pki(
         Some("test.com".to_string()),
-        &Path::new("./certs/ca_chain/ca_cert.pem"),
-        &Path::new("./certs/ca_chain/entity2_cert.pem"),
-        &Path::new("./certs/ca_chain/entity2_key.pem"),
+        Path::new("./certs/ca_chain/ca_cert.pem"),
+        Path::new("./certs/ca_chain/entity2_cert.pem"),
+        Path::new("./certs/ca_chain/entity2_key.pem"),
         None, // no password
         MinTlsVersion::V12,
     )?;
@@ -523,9 +523,9 @@ fn get_self_signed_config() -> Result<TlsServerConfig, Box<dyn std::error::Error
     use std::path::Path;
     // ANCHOR: tls_self_signed_config
     let config = TlsServerConfig::self_signed(
-        &Path::new("./certs/self_signed/entity1_cert.pem"),
-        &Path::new("./certs/self_signed/entity2_cert.pem"),
-        &Path::new("./certs/self_signed/entity2_key.pem"),
+        Path::new("./certs/self_signed/entity1_cert.pem"),
+        Path::new("./certs/self_signed/entity2_cert.pem"),
+        Path::new("./certs/self_signed/entity2_key.pem"),
         None, // no password
         MinTlsVersion::V12,
     )?;

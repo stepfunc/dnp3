@@ -56,5 +56,5 @@ async fn lan_procedure() {
         .test_request_response(WRITE_LAST_RECORDED_TIME, EMPTY_RESPONSE_SEQ1)
         .await;
 
-    harness.check_events(&[Event::WriteAbsoluteTime(Timestamp::new(0 + 0xCAFE))]);
+    harness.check_events(&[Event::WriteAbsoluteTime(Timestamp::new(0xCAFE))]);
 }
