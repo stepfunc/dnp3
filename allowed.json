@@ -40,7 +40,6 @@
     "minimal-lexical",
     "miniz_oxide",
     "nom",
-    "nu-ansi-term",
     "object",
     "oo-bindgen",
     "os_str_bytes",
@@ -952,6 +951,22 @@
         }
       ]
     },
+    "nu-ansi-term": {
+      "id": "nu-ansi-term",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2014 Benjamin Sago",
+                "Copyright (c) 2021-2022 The Nushell Project Developers"
+              ]
+            }
+          }
+        }
+      ]
+    },
     "num-integer": {
       "id": "num-integer",
       "source": "crates.io",
@@ -1009,6 +1024,21 @@
       ]
     },
     "opaque-debug": {
+      "id": "opaque-debug",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2018-2019 The RustCrypto Project Developers"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "overload": {
       "id": "opaque-debug",
       "source": "crates.io",
       "licenses": [
