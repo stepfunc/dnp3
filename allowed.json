@@ -51,7 +51,6 @@
     "proc-macro-error",
     "proc-macro-error-attr",
     "dnp3-schema",
-    "ring",
     "rustc-demangle",
     "rustc-hash",
     "rustix",
@@ -139,37 +138,6 @@
             "copyright": {
               "Lines": [
                 "Copyright (c) 2014 Benjamin Sago"
-              ]
-            }
-          }
-        }
-      ]
-    },
-    "aws-lc-rs": {
-      "id": "aws-lc-rs",
-      "source": "crates.io",
-      "licenses": [
-        {
-          "ISC": {
-            "copyright": {
-              "Lines": [
-                "Copyright Amazon.com, Inc. or its affiliates"
-              ]
-            }
-          }
-        }
-      ]
-    },
-    "aws-lc-sys": {
-      "id": "aws-lc-sys",
-      "source": "crates.io",
-      "licenses": [
-        "OpenSSL",
-        {
-          "ISC": {
-            "copyright": {
-              "Lines": [
-                "Copyright Amazon.com, Inc. or its affiliates"
               ]
             }
           }
@@ -1245,6 +1213,31 @@
             }
           }
         }
+      ]
+    },
+    "ring": {
+      "id": "ring",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2015-2016 the fiat-crypto authors (see https://github.com/mit-plv/fiat-crypto/blob/master/AUTHORS)"
+              ]
+            }
+          }
+        },
+        {
+          "ISC": {
+            "copyright": {
+              "Lines": [
+                "Copyright 2015-2016 Brian Smith"
+              ]
+            }
+          }
+        },
+        "OpenSSL"
       ]
     },
     "rustls": {
