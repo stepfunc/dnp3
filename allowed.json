@@ -40,6 +40,7 @@
     "minimal-lexical",
     "miniz_oxide",
     "nom",
+    "nu-ansi-term",
     "object",
     "oo-bindgen",
     "os_str_bytes",
