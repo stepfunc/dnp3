@@ -11,7 +11,7 @@ crate-type = ["rlib", "cdylib"]
 lazy_static = "1.0"
 tracing = "0.1"
 tracing-core = "0.1"
-tracing-subscriber = "0.2"
+tracing-subscriber = { version = "0.3", features = ["chrono", "json"] }
 dnp3 = { path = "../../dnp3", default-features = false, features = ["ffi"] }
 tokio = { version = "1.0", features = ["rt-multi-thread"] }
 num_cpus = "1"
@@ -25,5 +25,5 @@ serial = ["dnp3/serial"]
 [build-dependencies]
 dnp3-schema = { path = "../dnp3-schema" }
 oo-bindgen = "0.8"
-sfio-tracing-ffi = "0.8.1"
+sfio-tracing-ffi = "0.9.0"
 sfio-tokio-ffi = "0.8"
