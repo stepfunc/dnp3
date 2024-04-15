@@ -8,22 +8,52 @@ use crate::link::parser::{FramePayload, Parser};
 use crate::link::LinkErrorMode;
 use crate::util::phys::PhysLayer;
 
+use crate::link;
 use scursor::ReadCursor;
+
+/// How many link frames might be required to transport this much application data?
+const fn num_link_frames(fragment_size: usize) -> usize {
+    let full_link_frames = fragment_size / link::constant::MAX_APP_BYTES_PER_FRAME;
+
+    if fragment_size % link::constant::MAX_APP_BYTES_PER_FRAME == 0 {
+        full_link_frames
+    } else {
+        full_link_frames + 1
+    }
+}
+
+/// Given a fragment size, how should we size our read buffer
+const fn read_buffer_size(fragment_size: usize) -> usize {
+    let num_frames = num_link_frames(fragment_size);
+
+    let size = if num_frames == 0 {
+        link::constant::MAX_LINK_FRAME_LENGTH
+    } else {
+        num_frames * link::constant::MAX_LINK_FRAME_LENGTH
+    };
+
+    // we add 1 to this number for transports like UDP to detect under-sized reads
+    size + 1
+}
 
 pub(crate) struct Reader {
     parser: Parser,
     begin: usize,
     end: usize,
-    buffer: [u8; super::constant::MAX_LINK_FRAME_LENGTH],
+    buffer: Box<[u8]>,
 }
 
 impl Reader {
-    pub(crate) fn new(mode: LinkErrorMode) -> Self {
+    pub(crate) fn new(mode: LinkErrorMode, max_fragment_size: usize) -> Self {
+        let buffer_size = read_buffer_size(max_fragment_size);
+
+        tracing::info!("link read buffer size: {buffer_size}");
+
         Self {
             parser: Parser::new(mode),
             begin: 0,
             end: 0,
-            buffer: [0; super::constant::MAX_LINK_FRAME_LENGTH],
+            buffer: vec![0; buffer_size].into_boxed_slice(),
         }
     }
 

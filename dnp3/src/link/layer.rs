@@ -40,6 +40,7 @@ impl Reply {
 impl Layer {
     pub(crate) fn new(
         error_mode: LinkErrorMode,
+        max_rx_fragment_size: usize,
         endpoint_type: EndpointType,
         self_address: Feature,
         local_address: EndpointAddress,
@@ -49,7 +50,7 @@ impl Layer {
             self_address,
             local_address,
             secondary_state: SecondaryState::NotReset,
-            reader: super::reader::Reader::new(error_mode),
+            reader: super::reader::Reader::new(error_mode, max_rx_fragment_size),
             tx_buffer: [0; super::constant::LINK_HEADER_LENGTH],
         }
     }

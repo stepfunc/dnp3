@@ -21,16 +21,17 @@ impl Reader {
     pub(crate) fn master(
         link_error_mode: LinkErrorMode,
         source: EndpointAddress,
-        max_tx_buffer: usize,
+        max_rx_buffer: usize,
     ) -> Self {
         Self {
             link: crate::link::layer::Layer::new(
                 link_error_mode,
+                max_rx_buffer,
                 EndpointType::Master,
                 Feature::Disabled,
                 source,
             ),
-            assembler: Assembler::new(max_tx_buffer),
+            assembler: Assembler::new(max_rx_buffer),
             pending_link_layer_message: None,
         }
     }
@@ -44,6 +45,7 @@ impl Reader {
         Self {
             link: crate::link::layer::Layer::new(
                 link_error_mode,
+                max_rx_buffer,
                 EndpointType::Outstation,
                 self_address,
                 source,
