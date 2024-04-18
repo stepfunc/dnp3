@@ -36,7 +36,16 @@ const fn read_buffer_size(fragment_size: usize) -> usize {
     size + 1
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) enum ReadMode {
+    /// We're reading from a stream (TCP, serial, etc.) where link-layer frames MAY span separate calls to read
+    Stream,
+    /// We're reading datagrams (UDP) where link-layer frames MAY NOT span separate calls to read
+    Datagram,
+}
+
 pub(crate) struct Reader {
+    read_mode: ReadMode,
     parser: Parser,
     begin: usize,
     end: usize,
@@ -47,9 +56,8 @@ impl Reader {
     pub(crate) fn new(mode: LinkErrorMode, max_fragment_size: usize) -> Self {
         let buffer_size = read_buffer_size(max_fragment_size);
 
-        tracing::info!("link read buffer size: {buffer_size}");
-
         Self {
+            read_mode: ReadMode::Stream,
             parser: Parser::new(mode),
             begin: 0,
             end: 0,
@@ -74,62 +82,83 @@ impl Reader {
         level: DecodeLevel,
     ) -> Result<Header, LinkError> {
         loop {
-            if let Some(header) = self.read_partial(io, payload, level).await? {
-                return Ok(header);
+            // how much data is currently in the buffer?
+            let length = self.end - self.begin;
+
+            if length == 0 {
+                // anytime we've consumed
+                self.begin = 0;
+                self.end = 0;
+                self.read_more_data(io, level).await?;
+            } else {
+                match self.parse_buffer(payload, level)? {
+                    None => {
+                        if self.read_mode == ReadMode::Datagram {
+                            // We didn't read a frame this iteration even though there was data in the buffer.
+                            // This means that our datagram didn't contain a complete frame
+                            tracing::warn!("Partial datagram of length {length} did not contain a full link-layer frame. Resetting link-layer parser.");
+                            self.begin = 0;
+                            self.end = 0;
+                            self.parser.reset();
+                            self.read_more_data(io, level).await?;
+                        }
+                    }
+                    Some(header) => return Ok(header),
+                }
             }
         }
     }
 
-    pub(crate) async fn read_partial(
+    pub(crate) async fn read_more_data(
         &mut self,
         io: &mut PhysLayer,
+        level: DecodeLevel,
+    ) -> Result<(), LinkError> {
+        // if we've consumed all the data, we need to shift contents
+        if self.end == self.buffer.len() {
+            self.buffer.copy_within(self.begin..self.end, 0);
+            self.end -= self.begin;
+            self.begin = 0;
+        }
+
+        // now we can read more data
+        let count = io
+            .read(&mut self.buffer[self.end..], level.physical)
+            .await?;
+
+        if count == 0 {
+            return Err(LinkError::Stdio(ErrorKind::UnexpectedEof));
+        }
+
+        self.end += count;
+        Ok(())
+    }
+
+    /// Read from the physical layer no more than once
+    pub(crate) fn parse_buffer(
+        &mut self,
         payload: &mut FramePayload,
         level: DecodeLevel,
     ) -> Result<Option<Header>, LinkError> {
-
-        // if all bytes are consumed, ensure these are set back to zero
-        if self.begin == self.end {
-            self.begin = 0;
-            self.end = 0;
-        }
-
         // the readable portion of the buffer
         let mut cursor = ReadCursor::new(&self.buffer[self.begin..self.end]);
         let start = cursor.remaining();
         let result = self.parser.parse(&mut cursor, payload)?;
-        self.begin += start - cursor.remaining();
+        let consumed = start - cursor.remaining();
+        self.begin += consumed;
         match result {
             // complete frame
             Some(header) => {
                 if level.link.enabled() {
                     tracing::info!(
-                            "LINK RX - {}",
-                            LinkDisplay::new(header, payload.get(), level.link)
-                        );
+                        "LINK RX - {}",
+                        LinkDisplay::new(header, payload.get(), level.link)
+                    );
                 }
                 Ok(Some(header))
             }
             // parser can't make progress without more bytes
-            None => {
-                // if the buffer is full, we need to shift its contents
-                if self.end == self.buffer.len() {
-                    self.buffer.copy_within(self.begin..self.end, 0);
-                    self.end -= self.begin;
-                    self.begin = 0;
-                }
-
-                // now we can read more data
-                let count = io
-                    .read(&mut self.buffer[self.end..], level.physical)
-                    .await?;
-
-                if count == 0 {
-                    return Err(LinkError::Stdio(ErrorKind::UnexpectedEof));
-                }
-
-                self.end += count;
-                Ok(None)
-            }
+            None => Ok(None),
         }
     }
 }
