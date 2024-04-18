@@ -92,7 +92,7 @@ impl Layer {
         level: DecodeLevel,
         payload: &mut FramePayload,
     ) -> Result<Option<FrameInfo>, LinkError> {
-        let header = self.reader.read(io, payload, level).await?;
+        let header = self.reader.read_frame(io, payload, level).await?;
         let (info, reply) = self.process_header(&header);
         if let Some(reply) = reply {
             let header = self.get_header(reply);

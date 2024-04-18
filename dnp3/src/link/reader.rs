@@ -64,57 +64,71 @@ impl Reader {
     }
 
     /**
-    Returns a future that keeps reading until a frame is received or an error is returned
-    This future can be dropped without losing any state.
+       Returns a future that keeps reading until a frame is received or an error is returned
+       This future can be dropped without losing any state.
     */
-    pub(crate) async fn read(
+    pub(crate) async fn read_frame(
         &mut self,
         io: &mut PhysLayer,
         payload: &mut FramePayload,
         level: DecodeLevel,
     ) -> Result<Header, LinkError> {
         loop {
-            // if all bytes are consumed, ensure these are set back to zero
-            if self.begin == self.end {
-                self.begin = 0;
-                self.end = 0;
+            if let Some(header) = self.read_partial(io, payload, level).await? {
+                return Ok(header);
             }
+        }
+    }
 
-            // the readable portion of the buffer
-            let mut cursor = ReadCursor::new(&self.buffer[self.begin..self.end]);
-            let start = cursor.remaining();
-            let result = self.parser.parse(&mut cursor, payload)?;
-            self.begin += start - cursor.remaining();
-            match result {
-                // complete frame
-                Some(header) => {
-                    if level.link.enabled() {
-                        tracing::info!(
+    pub(crate) async fn read_partial(
+        &mut self,
+        io: &mut PhysLayer,
+        payload: &mut FramePayload,
+        level: DecodeLevel,
+    ) -> Result<Option<Header>, LinkError> {
+
+        // if all bytes are consumed, ensure these are set back to zero
+        if self.begin == self.end {
+            self.begin = 0;
+            self.end = 0;
+        }
+
+        // the readable portion of the buffer
+        let mut cursor = ReadCursor::new(&self.buffer[self.begin..self.end]);
+        let start = cursor.remaining();
+        let result = self.parser.parse(&mut cursor, payload)?;
+        self.begin += start - cursor.remaining();
+        match result {
+            // complete frame
+            Some(header) => {
+                if level.link.enabled() {
+                    tracing::info!(
                             "LINK RX - {}",
                             LinkDisplay::new(header, payload.get(), level.link)
                         );
-                    }
-                    return Ok(header);
                 }
-                // parser can't make progress without more bytes
-                None => {
-                    // if the buffer is full, we need to shift its contents
-                    if self.end == super::constant::MAX_LINK_FRAME_LENGTH {
-                        self.buffer.copy_within(self.begin..self.end, 0);
-                        self.end -= self.begin;
-                        self.begin = 0;
-                    }
-
-                    // now we can read more data
-                    let count = io
-                        .read(&mut self.buffer[self.end..], level.physical)
-                        .await?;
-                    if count == 0 {
-                        return Err(LinkError::Stdio(ErrorKind::UnexpectedEof));
-                    }
-
-                    self.end += count;
+                Ok(Some(header))
+            }
+            // parser can't make progress without more bytes
+            None => {
+                // if the buffer is full, we need to shift its contents
+                if self.end == self.buffer.len() {
+                    self.buffer.copy_within(self.begin..self.end, 0);
+                    self.end -= self.begin;
+                    self.begin = 0;
                 }
+
+                // now we can read more data
+                let count = io
+                    .read(&mut self.buffer[self.end..], level.physical)
+                    .await?;
+
+                if count == 0 {
+                    return Err(LinkError::Stdio(ErrorKind::UnexpectedEof));
+                }
+
+                self.end += count;
+                Ok(None)
             }
         }
     }
