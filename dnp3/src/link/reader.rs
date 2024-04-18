@@ -211,9 +211,8 @@ impl Reader {
     ) -> Result<Option<Header>, LinkError> {
         // the readable portion of the buffer
         let mut cursor = ReadCursor::new(self.buffer.readable());
-        let start = cursor.remaining();
         let result = self.parser.parse(&mut cursor, payload)?;
-        let consumed = start - cursor.remaining();
+        let consumed = cursor.position();
         self.buffer.advance_read(consumed);
         match result {
             // complete frame

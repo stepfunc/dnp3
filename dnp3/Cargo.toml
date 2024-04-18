@@ -17,7 +17,7 @@ tracing = "0.1"
 chrono = "0.4"
 tokio = { version = "1", features = ["net", "sync", "io-util", "io-std", "time", "rt", "rt-multi-thread", "macros"] }
 xxhash-rust = { version = "0.8", features = ["xxh64"] }
-scursor = "0.1.0"
+scursor = "0.2.0"
 
 # TLS dependencies
 sfio-rustls-config = { version = "0.3.2", optional = true }
