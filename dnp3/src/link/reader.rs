@@ -78,9 +78,57 @@ pub(crate) enum LinkReadMode {
 pub(crate) struct Reader {
     read_mode: LinkReadMode,
     parser: Parser,
+    buffer: ReadBuffer,
+}
+
+struct ReadBuffer {
     begin: usize,
     end: usize,
     buffer: Box<[u8]>,
+}
+
+impl ReadBuffer {
+    fn new(buffer_size: usize) -> Self {
+        Self {
+            begin: 0,
+            end: 0,
+            buffer: vec![0; buffer_size].into_boxed_slice(),
+        }
+    }
+    fn shift_unread_bytes(&mut self) {
+        self.buffer.copy_within(self.begin..self.end, 0);
+        self.end -= self.begin;
+        self.begin = 0;
+    }
+
+    fn writable(&mut self) -> &mut [u8] {
+        self.buffer[self.end..].as_mut()
+    }
+
+    fn readable(&mut self) -> &[u8] {
+        self.buffer[self.begin..self.end].as_ref()
+    }
+
+    fn advance_write(&mut self, count: usize) {
+        self.end += count;
+    }
+
+    fn advance_read(&mut self, count: usize) {
+        self.begin += count;
+    }
+
+    fn is_full(&self) -> bool {
+        self.end == self.buffer.len()
+    }
+
+    fn reset(&mut self) {
+        self.begin = 0;
+        self.end = 0;
+    }
+
+    fn num_bytes_unread(&self) -> usize {
+        self.end - self.begin
+    }
 }
 
 impl Reader {
@@ -90,15 +138,12 @@ impl Reader {
         Self {
             read_mode: link_modes.read_mode,
             parser: Parser::new(link_modes.error_mode),
-            begin: 0,
-            end: 0,
-            buffer: vec![0; buffer_size].into_boxed_slice(),
+            buffer: ReadBuffer::new(buffer_size),
         }
     }
 
     pub(crate) fn reset(&mut self) {
-        self.begin = 0;
-        self.end = 0;
+        self.buffer.reset();
         self.parser.reset();
     }
 
@@ -114,12 +159,10 @@ impl Reader {
     ) -> Result<Header, LinkError> {
         loop {
             // how much data is currently in the buffer?
-            let length = self.end - self.begin;
+            let length = self.buffer.num_bytes_unread();
 
             if length == 0 {
-                // anytime we've consumed
-                self.begin = 0;
-                self.end = 0;
+                self.buffer.reset();
                 self.read_more_data(io, level).await?;
             } else {
                 match self.parse_buffer(payload, level)? {
@@ -128,8 +171,7 @@ impl Reader {
                             // We didn't read a frame this iteration even though there was data in the buffer.
                             // This means that our datagram didn't contain a complete frame
                             tracing::warn!("Partial datagram of length {length} did not contain a full link-layer frame. Resetting link-layer parser.");
-                            self.begin = 0;
-                            self.end = 0;
+                            self.buffer.reset();
                             self.parser.reset();
                             self.read_more_data(io, level).await?;
                         }
@@ -146,22 +188,18 @@ impl Reader {
         level: DecodeLevel,
     ) -> Result<(), LinkError> {
         // if we've consumed all the data, we need to shift contents
-        if self.end == self.buffer.len() {
-            self.buffer.copy_within(self.begin..self.end, 0);
-            self.end -= self.begin;
-            self.begin = 0;
+        if self.buffer.is_full() {
+            self.buffer.shift_unread_bytes();
         }
 
         // now we can read more data
-        let count = io
-            .read(&mut self.buffer[self.end..], level.physical)
-            .await?;
+        let count = io.read(self.buffer.writable(), level.physical).await?;
 
         if count == 0 {
             return Err(LinkError::Stdio(ErrorKind::UnexpectedEof));
         }
 
-        self.end += count;
+        self.buffer.advance_write(count);
         Ok(())
     }
 
@@ -172,11 +210,11 @@ impl Reader {
         level: DecodeLevel,
     ) -> Result<Option<Header>, LinkError> {
         // the readable portion of the buffer
-        let mut cursor = ReadCursor::new(&self.buffer[self.begin..self.end]);
+        let mut cursor = ReadCursor::new(self.buffer.readable());
         let start = cursor.remaining();
         let result = self.parser.parse(&mut cursor, payload)?;
         let consumed = start - cursor.remaining();
-        self.begin += consumed;
+        self.buffer.advance_read(consumed);
         match result {
             // complete frame
             Some(header) => {
