@@ -2,7 +2,8 @@ use crate::app::parse::parser::ParsedFragment;
 use crate::app::HeaderParseError;
 use crate::decode::{AppDecodeLevel, DecodeLevel};
 use crate::link::error::LinkError;
-use crate::link::{EndpointAddress, LinkErrorMode};
+use crate::link::reader::LinkModes;
+use crate::link::EndpointAddress;
 use crate::outstation::Feature;
 use crate::transport::{
     FragmentInfo, LinkLayerMessage, TransportData, TransportRequest, TransportResponse,
@@ -52,28 +53,23 @@ impl<'a> Drop for RequestGuard<'a> {
 
 impl TransportReader {
     pub(crate) fn master(
-        link_error_mode: LinkErrorMode,
+        link_modes: LinkModes,
         address: EndpointAddress,
         rx_buffer_size: usize,
     ) -> Self {
         Self {
-            inner: InnerReaderType::master(link_error_mode, address, rx_buffer_size),
+            inner: InnerReaderType::master(link_modes, address, rx_buffer_size),
         }
     }
 
     pub(crate) fn outstation(
-        link_error_mode: LinkErrorMode,
+        link_modes: LinkModes,
         address: EndpointAddress,
         self_address: Feature,
         rx_buffer_size: usize,
     ) -> Self {
         Self {
-            inner: InnerReaderType::outstation(
-                link_error_mode,
-                address,
-                self_address,
-                rx_buffer_size,
-            ),
+            inner: InnerReaderType::outstation(link_modes, address, self_address, rx_buffer_size),
         }
     }
 

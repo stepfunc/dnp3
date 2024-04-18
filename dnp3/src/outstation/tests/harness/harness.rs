@@ -3,7 +3,8 @@ use tokio::task::JoinHandle;
 
 use crate::decode::AppDecodeLevel;
 use crate::link::header::{BroadcastConfirmMode, FrameInfo, FrameType};
-use crate::link::{EndpointAddress, LinkErrorMode};
+use crate::link::reader::LinkModes;
+use crate::link::EndpointAddress;
 use crate::outstation::config::{Feature, OutstationConfig};
 use crate::outstation::database::EventBufferConfig;
 use crate::outstation::task::OutstationTask;
@@ -128,7 +129,7 @@ fn new_harness_impl(
 
     let (task, handle) = OutstationTask::create(
         Enabled::Yes,
-        LinkErrorMode::Close,
+        LinkModes::test(),
         config,
         application,
         MockOutstationInformation::new(sender.clone()),

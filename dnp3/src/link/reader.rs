@@ -36,16 +36,47 @@ const fn read_buffer_size(fragment_size: usize) -> usize {
     size + 1
 }
 
+/// Combines the error and read modes
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct LinkModes {
+    pub(crate) error_mode: LinkErrorMode,
+    pub(crate) read_mode: LinkReadMode,
+}
+
+impl LinkModes {
+    pub(crate) const fn stream(error_mode: LinkErrorMode) -> Self {
+        Self {
+            error_mode,
+            read_mode: LinkReadMode::Stream,
+        }
+    }
+
+    pub(crate) const fn serial() -> Self {
+        Self {
+            error_mode: LinkErrorMode::Discard,
+            read_mode: LinkReadMode::Stream,
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) const fn test() -> Self {
+        Self {
+            error_mode: LinkErrorMode::Close,
+            read_mode: LinkReadMode::Stream,
+        }
+    }
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub(crate) enum ReadMode {
-    /// We're reading from a stream (TCP, serial, etc.) where link-layer frames MAY span separate calls to read
+pub(crate) enum LinkReadMode {
+    /// Reading from a stream (TCP, serial, etc.) where link-layer frames MAY span separate calls to read
     Stream,
-    /// We're reading datagrams (UDP) where link-layer frames MAY NOT span separate calls to read
+    /// Reading datagrams (UDP) where link-layer frames MAY NOT span separate calls to read
     Datagram,
 }
 
 pub(crate) struct Reader {
-    read_mode: ReadMode,
+    read_mode: LinkReadMode,
     parser: Parser,
     begin: usize,
     end: usize,
@@ -53,12 +84,12 @@ pub(crate) struct Reader {
 }
 
 impl Reader {
-    pub(crate) fn new(mode: LinkErrorMode, max_fragment_size: usize) -> Self {
+    pub(crate) fn new(link_modes: LinkModes, max_fragment_size: usize) -> Self {
         let buffer_size = read_buffer_size(max_fragment_size);
 
         Self {
-            read_mode: ReadMode::Stream,
-            parser: Parser::new(mode),
+            read_mode: link_modes.read_mode,
+            parser: Parser::new(link_modes.error_mode),
             begin: 0,
             end: 0,
             buffer: vec![0; buffer_size].into_boxed_slice(),
@@ -93,7 +124,7 @@ impl Reader {
             } else {
                 match self.parse_buffer(payload, level)? {
                     None => {
-                        if self.read_mode == ReadMode::Datagram {
+                        if self.read_mode == LinkReadMode::Datagram {
                             // We didn't read a frame this iteration even though there was data in the buffer.
                             // This means that our datagram didn't contain a complete frame
                             tracing::warn!("Partial datagram of length {length} did not contain a full link-layer frame. Resetting link-layer parser.");

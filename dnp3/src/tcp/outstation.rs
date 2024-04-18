@@ -2,6 +2,7 @@ use std::net::SocketAddr;
 use tracing::Instrument;
 
 use crate::app::{ConnectStrategy, Listener, Shutdown};
+use crate::link::reader::{LinkModes, LinkReadMode};
 use crate::link::LinkErrorMode;
 use crate::outstation::task::OutstationTask;
 use crate::outstation::*;
@@ -33,7 +34,7 @@ pub fn spawn_outstation_tcp_client(
     let main_addr = endpoints.main_addr().to_string();
     let (task, handle) = OutstationTask::create(
         Enabled::No,
-        link_error_mode,
+        LinkModes::stream(link_error_mode),
         config,
         application,
         information,
@@ -69,7 +70,7 @@ struct OutstationInfo {
 /// A builder for creating a TCP server with one or more outstation instances
 /// associated with it
 pub struct Server {
-    link_error_mode: LinkErrorMode,
+    link_modes: LinkModes,
     connection_id: u64,
     address: SocketAddr,
     outstations: Vec<OutstationInfo>,
@@ -112,7 +113,10 @@ impl Server {
     /// to the specified address
     pub fn new_tcp_server(link_error_mode: LinkErrorMode, address: SocketAddr) -> Self {
         Self {
-            link_error_mode,
+            link_modes: LinkModes {
+                error_mode: link_error_mode,
+                read_mode: LinkReadMode::Stream,
+            },
             connection_id: 0,
             address,
             outstations: Vec::new(),
@@ -128,7 +132,7 @@ impl Server {
         tls_config: crate::tcp::tls::TlsServerConfig,
     ) -> Self {
         Self {
-            link_error_mode,
+            link_modes: LinkModes::stream(link_error_mode),
             connection_id: 0,
             address,
             outstations: Vec::new(),
@@ -155,7 +159,7 @@ impl Server {
 
         let (task, handle) = OutstationTask::create(
             Enabled::Yes,
-            self.link_error_mode,
+            self.link_modes,
             config,
             application,
             information,

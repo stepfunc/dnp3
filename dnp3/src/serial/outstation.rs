@@ -1,7 +1,7 @@
 use crate::app::{Listener, MaybeAsync, RetryStrategy};
 use tracing::Instrument;
 
-use crate::link::LinkErrorMode;
+use crate::link::reader::LinkModes;
 use crate::outstation::task::OutstationTask;
 use crate::outstation::{
     ControlHandler, OutstationApplication, OutstationConfig, OutstationHandle,
@@ -32,7 +32,7 @@ pub fn spawn_outstation_serial(
     let serial = crate::serial::open(path, settings)?;
     let (mut task, handle) = OutstationTask::create(
         Enabled::Yes,
-        LinkErrorMode::Discard,
+        LinkModes::serial(),
         config,
         application,
         information,
@@ -82,7 +82,7 @@ pub fn spawn_outstation_serial_2(
 ) -> OutstationHandle {
     let (task, handle) = OutstationTask::create(
         Enabled::Yes,
-        LinkErrorMode::Discard,
+        LinkModes::serial(),
         config,
         application,
         information,

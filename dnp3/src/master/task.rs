@@ -5,7 +5,7 @@ use crate::app::parse::parser::Response;
 use crate::app::{BufferSize, ControlField, Sequence};
 use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
-use crate::link::{EndpointAddress, LinkErrorMode};
+use crate::link::EndpointAddress;
 use crate::master::association::{AssociationMap, Next};
 use crate::master::error::TaskError;
 use crate::master::messages::{MasterMsg, Message};
@@ -16,6 +16,7 @@ use crate::util::buffer::Buffer;
 use crate::util::channel::Receiver;
 use crate::util::phys::PhysLayer;
 
+use crate::link::reader::LinkModes;
 use crate::util::session::{Enabled, RunError, StopReason};
 use tokio::time::Instant;
 
@@ -29,7 +30,7 @@ pub(crate) struct MasterTask {
 impl MasterTask {
     pub(crate) fn new(
         initial_state: Enabled,
-        link_error_mode: LinkErrorMode,
+        link_modes: LinkModes,
         config: MasterChannelConfig,
         messages: Receiver<Message>,
     ) -> Self {
@@ -40,7 +41,7 @@ impl MasterTask {
             messages,
         );
         let (reader, writer) = crate::transport::create_master_transport_layer(
-            link_error_mode,
+            link_modes,
             config.master_address,
             config.rx_buffer_size,
         );

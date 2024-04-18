@@ -1,7 +1,8 @@
 use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
 use crate::link::header::FrameInfo;
-use crate::link::{EndpointAddress, LinkErrorMode};
+use crate::link::reader::LinkModes;
+use crate::link::EndpointAddress;
 use crate::outstation::Feature;
 use crate::transport::{Fragment, FragmentInfo, TransportData};
 use crate::util::buffer::Buffer;
@@ -16,12 +17,12 @@ pub(crate) struct MockReader {
 }
 
 impl MockReader {
-    pub(crate) fn master(_: LinkErrorMode, _: EndpointAddress, rx_buffer_size: usize) -> Self {
+    pub(crate) fn master(_: LinkModes, _: EndpointAddress, rx_buffer_size: usize) -> Self {
         Self::new(rx_buffer_size)
     }
 
     pub(crate) fn outstation(
-        _: LinkErrorMode,
+        _: LinkModes,
         _: EndpointAddress,
         _self_address: Feature,
         rx_buffer_size: usize,

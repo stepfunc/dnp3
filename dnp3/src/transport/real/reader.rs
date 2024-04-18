@@ -3,7 +3,8 @@ use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
 use crate::link::header::FrameType;
 use crate::link::parser::FramePayload;
-use crate::link::{EndpointAddress, LinkErrorMode};
+use crate::link::reader::LinkModes;
+use crate::link::EndpointAddress;
 use crate::outstation::Feature;
 use crate::transport::real::assembler::{Assembler, AssemblyState};
 use crate::transport::real::display::SegmentDisplay;
@@ -19,13 +20,13 @@ pub(crate) struct Reader {
 
 impl Reader {
     pub(crate) fn master(
-        link_error_mode: LinkErrorMode,
+        link_modes: LinkModes,
         source: EndpointAddress,
         max_rx_buffer: usize,
     ) -> Self {
         Self {
             link: crate::link::layer::Layer::new(
-                link_error_mode,
+                link_modes,
                 max_rx_buffer,
                 EndpointType::Master,
                 Feature::Disabled,
@@ -37,14 +38,14 @@ impl Reader {
     }
 
     pub(crate) fn outstation(
-        link_error_mode: LinkErrorMode,
+        link_modes: LinkModes,
         source: EndpointAddress,
         self_address: Feature,
         max_rx_buffer: usize,
     ) -> Self {
         Self {
             link: crate::link::layer::Layer::new(
-                link_error_mode,
+                link_modes,
                 max_rx_buffer,
                 EndpointType::Outstation,
                 self_address,

@@ -8,7 +8,8 @@ use crate::link::header::{
     AnyAddress, BroadcastConfirmMode, ControlField, FrameInfo, FrameType, Header,
 };
 use crate::link::parser::FramePayload;
-use crate::link::{EndpointAddress, LinkErrorMode};
+use crate::link::reader::LinkModes;
+use crate::link::EndpointAddress;
 use crate::outstation::Feature;
 use crate::util::phys::PhysLayer;
 
@@ -39,7 +40,7 @@ impl Reply {
 
 impl Layer {
     pub(crate) fn new(
-        error_mode: LinkErrorMode,
+        link_modes: LinkModes,
         max_rx_fragment_size: usize,
         endpoint_type: EndpointType,
         self_address: Feature,
@@ -50,7 +51,7 @@ impl Layer {
             self_address,
             local_address,
             secondary_state: SecondaryState::NotReset,
-            reader: super::reader::Reader::new(error_mode, max_rx_fragment_size),
+            reader: super::reader::Reader::new(link_modes, max_rx_fragment_size),
             tx_buffer: [0; super::constant::LINK_HEADER_LENGTH],
         }
     }

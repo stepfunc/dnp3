@@ -19,6 +19,7 @@ use crate::util::session::{Enabled, Session};
 use tokio::net::TcpStream;
 use tokio_rustls::rustls::pki_types::ServerName;
 
+use crate::link::reader::LinkModes;
 use tracing::Instrument;
 
 /// Spawn a TLS client task onto the `Tokio` runtime. The task runs until the returned handle is dropped.
@@ -41,7 +42,7 @@ pub fn spawn_outstation_tls_client(
     let main_addr = endpoints.main_addr().to_string();
     let (task, handle) = OutstationTask::create(
         Enabled::No,
-        link_error_mode,
+        LinkModes::stream(link_error_mode),
         config,
         application,
         information,

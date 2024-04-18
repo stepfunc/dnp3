@@ -5,7 +5,8 @@ use tokio::task::JoinHandle;
 use crate::app::{BufferSize, Timeout};
 use crate::decode::AppDecodeLevel;
 use crate::link::header::{FrameInfo, FrameType};
-use crate::link::{EndpointAddress, LinkErrorMode};
+use crate::link::reader::LinkModes;
+use crate::link::EndpointAddress;
 use crate::master::association::AssociationConfig;
 use crate::master::handler::{AssociationHandle, MasterChannel, ReadHandler};
 use crate::master::task::MasterTask;
@@ -37,7 +38,7 @@ pub(crate) async fn create_association(mut config: AssociationConfig) -> TestHar
 
     // Create the master session
     let (tx, rx) = crate::util::channel::request_channel();
-    let mut task = MasterTask::new(Enabled::Yes, LinkErrorMode::Close, task_config, rx);
+    let mut task = MasterTask::new(Enabled::Yes, LinkModes::serial(), task_config, rx);
 
     let mut master = MasterChannel::new(tx);
 

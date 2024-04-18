@@ -1,6 +1,7 @@
 use tracing::Instrument;
 
 use crate::app::{ConnectStrategy, Listener};
+use crate::link::reader::LinkModes;
 use crate::link::LinkErrorMode;
 use crate::master::task::MasterTask;
 use crate::master::{MasterChannel, MasterChannelConfig};
@@ -43,7 +44,7 @@ pub fn spawn_master_tcp_client_2(
 ) -> MasterChannel {
     let main_addr = endpoints.main_addr().to_string();
     let (mut task, handle) = wire_master_client(
-        link_error_mode,
+        LinkModes::stream(link_error_mode),
         endpoints,
         config,
         connect_strategy,
@@ -61,7 +62,7 @@ pub fn spawn_master_tcp_client_2(
 }
 
 pub(crate) fn wire_master_client(
-    link_error_mode: LinkErrorMode,
+    link_modes: LinkModes,
     endpoints: EndpointList,
     config: MasterChannelConfig,
     connect_strategy: ConnectStrategy,
@@ -70,7 +71,7 @@ pub(crate) fn wire_master_client(
     listener: Box<dyn Listener<ClientState>>,
 ) -> (ClientTask, MasterChannel) {
     let (tx, rx) = crate::util::channel::request_channel();
-    let session = Session::master(MasterTask::new(Enabled::No, link_error_mode, config, rx));
+    let session = Session::master(MasterTask::new(Enabled::No, link_modes, config, rx));
     let client = ClientTask::new(
         session,
         endpoints,
