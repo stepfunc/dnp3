@@ -173,8 +173,8 @@ impl Reader {
                             tracing::warn!("Partial datagram of length {length} did not contain a full link-layer frame. Resetting link-layer parser.");
                             self.buffer.reset();
                             self.parser.reset();
-                            self.read_more_data(io, level).await?;
                         }
+                        self.read_more_data(io, level).await?;
                     }
                     Some(header) => return Ok(header),
                 }
