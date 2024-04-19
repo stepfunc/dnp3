@@ -203,7 +203,7 @@ impl Reader {
         Ok(())
     }
 
-    /// Read from the physical layer no more than once
+    /// Parse data currently available in the buffer
     pub(crate) fn parse_buffer(
         &mut self,
         payload: &mut FramePayload,
