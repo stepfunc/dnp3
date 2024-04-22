@@ -2,12 +2,12 @@ use crate::decode::PhysDecodeLevel;
 use std::net::SocketAddr;
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use crate::util::udp::UdpLayer;
 
 /// Source or destination at the physical layer from which a link frame was read/written
-#[derive(Default, Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) enum PhysAddr {
     /// The default type used for everything other than UDP
-    #[default]
     None,
     /// Frames carried over UDP come to/from a SocketAddr
     Udp(SocketAddr),
@@ -16,7 +16,7 @@ pub(crate) enum PhysAddr {
 /// encapsulates all possible physical layers as an enum
 pub(crate) enum PhysLayer {
     Tcp(tokio::net::TcpStream),
-    Udp(tokio::net::UdpSocket),
+    Udp(UdpLayer),
     /// TLS type is boxed because its size is huge
     #[cfg(feature = "tls")]
     Tls(Box<tokio_rustls::TlsStream<tokio::net::TcpStream>>),
@@ -41,6 +41,7 @@ impl std::fmt::Debug for PhysLayer {
     }
 }
 
+
 impl PhysLayer {
     pub(crate) async fn read(
         &mut self,
@@ -53,8 +54,7 @@ impl PhysLayer {
                 (count, PhysAddr::None)
             }
             Self::Udp(x) => {
-                let (count, source) = x.recv_from(buffer).await?;
-                (count, PhysAddr::Udp(source))
+                x.read(buffer).await?
             }
             #[cfg(feature = "tls")]
             Self::Tls(x) => {
@@ -93,13 +93,7 @@ impl PhysLayer {
 
         match self {
             Self::Tcp(x) => x.write_all(data).await,
-            Self::Udp(x) => {
-                let count = x.send(data).await?;
-                if count < data.len() {
-                    tracing::error!("UDP under-write");
-                }
-                Ok(())
-            }
+            Self::Udp(x) => x.write_all(data).await,
             #[cfg(feature = "tls")]
             Self::Tls(x) => x.write_all(data).await,
             #[cfg(feature = "serial")]

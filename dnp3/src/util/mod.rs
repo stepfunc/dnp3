@@ -6,6 +6,7 @@ pub(crate) mod future;
 pub(crate) mod phys;
 pub(crate) mod session;
 pub(crate) mod slice_ext;
+pub(crate) mod udp;
 
 pub(crate) struct Smallest<T>
 where
