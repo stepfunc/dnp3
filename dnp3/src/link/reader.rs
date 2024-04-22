@@ -6,7 +6,7 @@ use crate::link::error::LinkError;
 use crate::link::header::Header;
 use crate::link::parser::{FramePayload, Parser};
 use crate::link::LinkErrorMode;
-use crate::util::phys::PhysLayer;
+use crate::util::phys::{PhysAddr, PhysLayer};
 
 use crate::link;
 use scursor::ReadCursor;
@@ -156,14 +156,16 @@ impl Reader {
         io: &mut PhysLayer,
         payload: &mut FramePayload,
         level: DecodeLevel,
-    ) -> Result<Header, LinkError> {
+    ) -> Result<(Header, PhysAddr), LinkError> {
+        let mut addr = PhysAddr::None;
+
         loop {
             // how much data is currently in the buffer?
             let length = self.buffer.num_bytes_unread();
 
             if length == 0 {
                 self.buffer.reset();
-                self.read_more_data(io, level).await?;
+                addr = self.read_more_data(io, level).await?;
             } else {
                 match self.parse_buffer(payload, level)? {
                     None => {
@@ -174,9 +176,9 @@ impl Reader {
                             self.buffer.reset();
                             self.parser.reset();
                         }
-                        self.read_more_data(io, level).await?;
+                        addr = self.read_more_data(io, level).await?;
                     }
-                    Some(header) => return Ok(header),
+                    Some(header) => return Ok((header, addr)),
                 }
             }
         }
@@ -186,21 +188,21 @@ impl Reader {
         &mut self,
         io: &mut PhysLayer,
         level: DecodeLevel,
-    ) -> Result<(), LinkError> {
+    ) -> Result<PhysAddr, LinkError> {
         // if we've consumed all the data, we need to shift contents
         if self.buffer.is_full() {
             self.buffer.shift_unread_bytes();
         }
 
         // now we can read more data
-        let (count, _addr) = io.read(self.buffer.writable(), level.physical).await?;
+        let (count, addr) = io.read(self.buffer.writable(), level.physical).await?;
 
         if count == 0 {
             return Err(LinkError::Stdio(ErrorKind::UnexpectedEof));
         }
 
         self.buffer.advance_write(count);
-        Ok(())
+        Ok(addr)
     }
 
     /// Parse data currently available in the buffer

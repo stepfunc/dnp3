@@ -1,4 +1,5 @@
 use crate::link::EndpointAddress;
+use crate::util::phys::PhysAddr;
 
 use super::function::Function;
 
@@ -127,6 +128,7 @@ pub(crate) struct FrameInfo {
     pub(crate) source: EndpointAddress,
     pub(crate) broadcast: Option<BroadcastConfirmMode>,
     pub(crate) frame_type: FrameType,
+    pub(crate) phys_addr: PhysAddr,
 }
 
 impl FrameInfo {
@@ -134,11 +136,13 @@ impl FrameInfo {
         source: EndpointAddress,
         broadcast: Option<BroadcastConfirmMode>,
         frame_type: FrameType,
+        phys_addr: PhysAddr,
     ) -> Self {
         Self {
             source,
             broadcast,
             frame_type,
+            phys_addr,
         }
     }
 }

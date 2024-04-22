@@ -11,7 +11,7 @@ use crate::link::parser::FramePayload;
 use crate::link::reader::LinkModes;
 use crate::link::EndpointAddress;
 use crate::outstation::Feature;
-use crate::util::phys::PhysLayer;
+use crate::util::phys::{PhysAddr, PhysLayer};
 
 enum SecondaryState {
     NotReset,
@@ -93,8 +93,8 @@ impl Layer {
         level: DecodeLevel,
         payload: &mut FramePayload,
     ) -> Result<Option<FrameInfo>, LinkError> {
-        let header = self.reader.read_frame(io, payload, level).await?;
-        let (info, reply) = self.process_header(&header);
+        let (header, addr) = self.reader.read_frame(io, payload, level).await?;
+        let (info, reply) = self.process_header(header, addr);
         if let Some(reply) = reply {
             let header = self.get_header(reply);
             if level.link.enabled() {
@@ -105,7 +105,11 @@ impl Layer {
         Ok(info)
     }
 
-    fn process_header(&mut self, header: &Header) -> (Option<FrameInfo>, Option<Reply>) {
+    fn process_header(
+        &mut self,
+        header: Header,
+        addr: PhysAddr,
+    ) -> (Option<FrameInfo>, Option<Reply>) {
         // ignore frames sent from the same endpoint type
         if header.control.master == self.endpoint_type.dir_bit() {
             //  we don't log this
@@ -178,7 +182,7 @@ impl Layer {
                 }
 
                 (
-                    Some(FrameInfo::new(source, broadcast, FrameType::Data)),
+                    Some(FrameInfo::new(source, broadcast, FrameType::Data, addr)),
                     None,
                 )
             }
@@ -215,7 +219,7 @@ impl Layer {
                         if header.control.fcb == expected {
                             self.secondary_state = SecondaryState::Reset(!expected);
                             (
-                                Some(FrameInfo::new(source, broadcast, FrameType::Data)),
+                                Some(FrameInfo::new(source, broadcast, FrameType::Data, addr)),
                                 response,
                             )
                         } else {
@@ -236,6 +240,7 @@ impl Layer {
                         source,
                         broadcast,
                         FrameType::LinkStatusRequest,
+                        addr,
                     )),
                     Some(Reply::new(source, Function::SecLinkStatus)),
                 )
@@ -245,6 +250,7 @@ impl Layer {
                     source,
                     broadcast,
                     FrameType::LinkStatusResponse,
+                    addr,
                 )),
                 None,
             ),
