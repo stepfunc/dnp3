@@ -84,12 +84,13 @@ impl MockReader {
         }
 
         self.num_reads += 1;
-        self.count = io
+        let (count, _) = io
             .read(
                 self.buffer.get_mut(self.buffer.len()).unwrap(),
                 level.physical,
             )
             .await?;
+        self.count = count;
         self.frame_id = self.frame_id.wrapping_add(1);
         Ok(())
     }

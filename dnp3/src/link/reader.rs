@@ -193,7 +193,7 @@ impl Reader {
         }
 
         // now we can read more data
-        let count = io.read(self.buffer.writable(), level.physical).await?;
+        let (count, _addr) = io.read(self.buffer.writable(), level.physical).await?;
 
         if count == 0 {
             return Err(LinkError::Stdio(ErrorKind::UnexpectedEof));

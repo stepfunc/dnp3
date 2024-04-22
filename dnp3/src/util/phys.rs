@@ -1,11 +1,23 @@
 use crate::decode::PhysDecodeLevel;
+use std::net::SocketAddr;
 
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
-// encapsulates all possible physical layers as an enum
+/// Source or destination at the physical layer from which a link frame was read/written
+#[derive(Default, Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) enum PhysAddr {
+    /// The default type used for everything other than UDP
+    #[default]
+    None,
+    /// Frames carried over UDP come to/from a SocketAddr
+    Udp(SocketAddr),
+}
+
+/// encapsulates all possible physical layers as an enum
 pub(crate) enum PhysLayer {
     Tcp(tokio::net::TcpStream),
-    // TLS type is boxed because its size is huge
+    Udp(tokio::net::UdpSocket),
+    /// TLS type is boxed because its size is huge
     #[cfg(feature = "tls")]
     Tls(Box<tokio_rustls::TlsStream<tokio::net::TcpStream>>),
     #[cfg(feature = "serial")]
@@ -18,6 +30,7 @@ impl std::fmt::Debug for PhysLayer {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             PhysLayer::Tcp(_) => f.write_str("Tcp"),
+            PhysLayer::Udp(_) => f.write_str("Udp"),
             #[cfg(feature = "tls")]
             PhysLayer::Tls(_) => f.write_str("Tls"),
             #[cfg(feature = "serial")]
@@ -33,15 +46,31 @@ impl PhysLayer {
         &mut self,
         buffer: &mut [u8],
         level: PhysDecodeLevel,
-    ) -> Result<usize, std::io::Error> {
-        let length = match self {
-            Self::Tcp(x) => x.read(buffer).await?,
+    ) -> Result<(usize, PhysAddr), std::io::Error> {
+        let (length, addr) = match self {
+            Self::Tcp(x) => {
+                let count = x.read(buffer).await?;
+                (count, PhysAddr::None)
+            }
+            Self::Udp(x) => {
+                let (count, source) = x.recv_from(buffer).await?;
+                (count, PhysAddr::Udp(source))
+            }
             #[cfg(feature = "tls")]
-            Self::Tls(x) => x.read(buffer).await?,
+            Self::Tls(x) => {
+                let count = x.read(buffer).await?;
+                (count, PhysAddr::None)
+            }
             #[cfg(feature = "serial")]
-            Self::Serial(x) => x.read(buffer).await?,
+            Self::Serial(x) => {
+                let count = x.read(buffer).await?;
+                (count, PhysAddr::None)
+            }
             #[cfg(test)]
-            Self::Mock(x) => x.read(buffer).await?,
+            Self::Mock(x) => {
+                let count = x.read(buffer).await?;
+                (count, PhysAddr::None)
+            }
         };
 
         if level.enabled() {
@@ -50,7 +79,7 @@ impl PhysLayer {
             }
         }
 
-        Ok(length)
+        Ok((length, addr))
     }
 
     pub(crate) async fn write(
@@ -64,6 +93,13 @@ impl PhysLayer {
 
         match self {
             Self::Tcp(x) => x.write_all(data).await,
+            Self::Udp(x) => {
+                let count = x.send(data).await?;
+                if count < data.len() {
+                    tracing::error!("UDP under-write");
+                }
+                Ok(())
+            }
             #[cfg(feature = "tls")]
             Self::Tls(x) => x.write_all(data).await,
             #[cfg(feature = "serial")]
