@@ -116,7 +116,7 @@ impl TransportReader {
 
         match data {
             Ok(ParsedTransportData::Fragment(info, fragment)) => match fragment.to_response() {
-                Ok(response) => Some(TransportResponse::Response(info.source, response)),
+                Ok(response) => Some(TransportResponse::Response(info.addr, response)),
                 Err(err) => Some(TransportResponse::Error(err.into())),
             },
             Ok(ParsedTransportData::LinkLayerMessage(msg)) => {
@@ -132,10 +132,10 @@ impl TransportReader {
     ) -> RequestGuard<'_> {
         if let Some(TransportRequest::Request(info, _)) = self.peek_request() {
             if let Some(required_master_addr) = master_address {
-                if info.source != required_master_addr {
+                if info.addr.link != required_master_addr {
                     tracing::warn!(
                         "Discarding ASDU from master address: {} (configured address == {})",
-                        info.source.raw_value(),
+                        info.addr.link.raw_value(),
                         required_master_addr.raw_value()
                     );
                     self.pop();
@@ -151,7 +151,7 @@ impl TransportReader {
             Ok(ParsedTransportData::Fragment(info, fragment)) => match fragment.to_request() {
                 Ok(request) => Some(TransportRequest::Request(info, request)),
                 Err(err) => Some(TransportRequest::Error(
-                    info.source,
+                    info.addr.link,
                     err.into(fragment.control.seq),
                 )),
             },
@@ -176,7 +176,7 @@ impl TransportReader {
             TransportData::Fragment(fragment) => Some(
                 ParsedFragment::parse(fragment.data)
                     .map(|parsed| ParsedTransportData::Fragment(fragment.info, parsed))
-                    .map_err(|err| (err, fragment.info.source)),
+                    .map_err(|err| (err, fragment.info.addr.link)),
             ),
             TransportData::LinkLayerMessage(msg) => {
                 Some(Ok(ParsedTransportData::LinkLayerMessage(msg)))

@@ -159,9 +159,9 @@ impl MasterSession {
                 result = reader.read(io, decode_level) => {
                    result?;
                    match reader.pop_response() {
-                        Some(TransportResponse::Response(source, response)) => {
-                            self.notify_link_activity(source);
-                            return self.handle_fragment_while_idle(io, writer, source, response).await
+                        Some(TransportResponse::Response(addr, response)) => {
+                            self.notify_link_activity(addr.link);
+                            return self.handle_fragment_while_idle(io, writer, addr.link, response).await
                         }
                         Some(TransportResponse::LinkLayerMessage(msg)) => self.notify_link_activity(msg.source),
                         Some(TransportResponse::Error(_)) => return Ok(()), // ignore the malformed response
@@ -192,9 +192,9 @@ impl MasterSession {
                 result = reader.read(io, decode_level) => {
                    result?;
                    match reader.pop_response() {
-                        Some(TransportResponse::Response(source, response)) => {
-                            self.notify_link_activity(source);
-                            return self.handle_fragment_while_idle(io, writer, source, response).await
+                        Some(TransportResponse::Response(addr, response)) => {
+                            self.notify_link_activity(addr.link);
+                            return self.handle_fragment_while_idle(io, writer, addr.link, response).await
                         }
                         Some(TransportResponse::LinkLayerMessage(msg)) => self.notify_link_activity(msg.source),
                         Some(TransportResponse::Error(_)) => return Ok(()), // ignore the malformed response
@@ -401,11 +401,11 @@ impl MasterSession {
                     }
 
                     match reader.pop_response() {
-                        Some(TransportResponse::Response(source, response)) => {
-                            self.notify_link_activity(source);
+                        Some(TransportResponse::Response(addr, response)) => {
+                            self.notify_link_activity(addr.link);
 
                             let result = self
-                                .validate_non_read_response(destination, seq, io, writer, source, response)
+                                .validate_non_read_response(destination, seq, io, writer, addr.link, response)
                                 .await;
 
                             match result {
@@ -553,9 +553,9 @@ impl MasterSession {
                     x = reader.read(io, self.decode_level) => {
                         x?;
                         match reader.pop_response() {
-                            Some(TransportResponse::Response(source, response)) => {
-                                self.notify_link_activity(source);
-                                let action = self.process_read_response(destination, is_first, seq, task, io, writer, source, response).await?;
+                            Some(TransportResponse::Response(addr, response)) => {
+                                self.notify_link_activity(addr.link);
+                                let action = self.process_read_response(destination, is_first, seq, task, io, writer, addr.link, response).await?;
                                 match action {
                                     // continue reading responses on the inner loop
                                     ReadResponseAction::Ignore => continue,
@@ -794,9 +794,9 @@ impl MasterSession {
                 x = reader.read(io, self.decode_level) => {
                     x?;
                     match reader.pop_response() {
-                        Some(TransportResponse::Response(source, response)) => {
-                            self.notify_link_activity(source);
-                            self.handle_fragment_while_idle(io, writer, source, response).await?;
+                        Some(TransportResponse::Response(addr, response)) => {
+                            self.notify_link_activity(addr.link);
+                            self.handle_fragment_while_idle(io, writer, addr.link, response).await?;
                             return Err(TaskError::UnexpectedResponseHeaders);
                         }
                         Some(TransportResponse::LinkLayerMessage(msg)) => {

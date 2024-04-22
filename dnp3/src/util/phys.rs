@@ -1,8 +1,8 @@
 use crate::decode::PhysDecodeLevel;
 use std::net::SocketAddr;
 
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use crate::util::udp::UdpLayer;
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 /// Source or destination at the physical layer from which a link frame was read/written
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -41,7 +41,6 @@ impl std::fmt::Debug for PhysLayer {
     }
 }
 
-
 impl PhysLayer {
     pub(crate) async fn read(
         &mut self,
@@ -53,9 +52,7 @@ impl PhysLayer {
                 let count = x.read(buffer).await?;
                 (count, PhysAddr::None)
             }
-            Self::Udp(x) => {
-                x.read(buffer).await?
-            }
+            Self::Udp(x) => x.read(buffer).await?,
             #[cfg(feature = "tls")]
             Self::Tls(x) => {
                 let count = x.read(buffer).await?;

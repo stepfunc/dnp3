@@ -4,7 +4,7 @@ use crate::link::header::FrameInfo;
 use crate::link::reader::LinkModes;
 use crate::link::EndpointAddress;
 use crate::outstation::Feature;
-use crate::transport::{Fragment, FragmentInfo, TransportData};
+use crate::transport::{Fragment, FragmentAddr, FragmentInfo, TransportData};
 use crate::util::buffer::Buffer;
 use crate::util::phys::{PhysAddr, PhysLayer};
 
@@ -67,8 +67,12 @@ impl MockReader {
         let info = self
             .info
             .expect("call set_rx_frame_info(..) before running test");
+        let addr = FragmentAddr {
+            link: info.source,
+            phys: PhysAddr::None,
+        };
         let fragment = Fragment {
-            info: FragmentInfo::new(self.frame_id, info.source, info.broadcast, PhysAddr::None),
+            info: FragmentInfo::new(self.frame_id, addr, info.broadcast),
             data: self.buffer.get(count).unwrap(),
         };
         Some(fragment)

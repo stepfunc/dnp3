@@ -788,7 +788,7 @@ impl OutstationSession {
                 self.write_solicited(
                     io,
                     writer,
-                    info.source,
+                    info.addr.link,
                     Response::empty_solicited(seq, iin),
                     database,
                 )
@@ -808,7 +808,7 @@ impl OutstationSession {
                     .await;
                 if let Some(response) = &mut response {
                     *response = self
-                        .write_solicited(io, writer, info.source, *response, database)
+                        .write_solicited(io, writer, info.addr.link, *response, database)
                         .await?;
                 }
                 self.state.last_valid_request = Some(LastValidRequest::new(
@@ -843,7 +843,7 @@ impl OutstationSession {
             }
             FragmentType::RepeatNonRead(_, last_response) => {
                 if let Some(last_response) = last_response {
-                    self.repeat_solicited(io, info.source, writer, last_response)
+                    self.repeat_solicited(io, info.addr.link, writer, last_response)
                         .await?
                 }
                 self.state.deferred_read.clear();
@@ -932,7 +932,7 @@ impl OutstationSession {
             tracing::info!("handling deferred READ request");
             let (response, mut series) = self.write_read_response(database, true, x.seq, x.iin2);
             let response = self
-                .write_solicited(io, writer, x.info.source, response, database)
+                .write_solicited(io, writer, x.info.addr.link, response, database)
                 .await?;
             self.state.last_valid_request =
                 Some(LastValidRequest::new(x.seq, x.hash, Some(response), series));
@@ -975,7 +975,7 @@ impl OutstationSession {
                     // optional response
                     if let Some(response) = &mut result.response {
                         *response = self
-                            .write_solicited(io, writer, info.source, *response, database)
+                            .write_solicited(io, writer, info.addr.link, *response, database)
                             .await?;
 
                         // check if an extra confirmation was added due to broadcast
@@ -2130,7 +2130,7 @@ impl OutstationSession {
             FragmentType::MalformedRequest(_, _) => ConfirmAction::NewRequest,
             FragmentType::NewRead(_, _) => ConfirmAction::NewRequest,
             FragmentType::RepeatRead(_, response, _) => {
-                ConfirmAction::EchoLastResponse(info.source, response)
+                ConfirmAction::EchoLastResponse(info.addr.link, response)
             }
             FragmentType::NewNonRead(_, _) => ConfirmAction::NewRequest,
             // this should never happen, but if it does, new request is probably best course of action
@@ -2138,7 +2138,7 @@ impl OutstationSession {
             FragmentType::Broadcast(_) => ConfirmAction::NewRequest,
             FragmentType::SolicitedConfirm(seq) => {
                 if seq == ecsn {
-                    ConfirmAction::Confirmed(info.source)
+                    ConfirmAction::Confirmed(info.addr.link)
                 } else {
                     self.info
                         .wrong_solicited_confirm_seq(ecsn, request.header.control.seq);

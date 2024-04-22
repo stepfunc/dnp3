@@ -5,25 +5,30 @@ use crate::link::EndpointAddress;
 use crate::util::phys::PhysAddr;
 
 #[derive(Debug, Copy, Clone)]
+pub(crate) struct FragmentAddr {
+    /// remote link address
+    pub(crate) link: EndpointAddress,
+    /// remote physical-layer address
+    pub(crate) phys: PhysAddr,
+}
+
+#[derive(Debug, Copy, Clone)]
 pub(crate) struct FragmentInfo {
     pub(crate) id: u32,
-    pub(crate) source: EndpointAddress,
+    pub(crate) addr: FragmentAddr,
     pub(crate) broadcast: Option<BroadcastConfirmMode>,
-    pub(crate) phys_addr: PhysAddr,
 }
 
 impl FragmentInfo {
     pub(crate) fn new(
         id: u32,
-        source: EndpointAddress,
+        addr: FragmentAddr,
         broadcast: Option<BroadcastConfirmMode>,
-        phys_addr: PhysAddr,
     ) -> Self {
         FragmentInfo {
             id,
-            source,
+            addr,
             broadcast,
-            phys_addr,
         }
     }
 }
@@ -53,7 +58,7 @@ pub(crate) enum LinkLayerMessageType {
 }
 
 pub(crate) enum TransportResponse<'a> {
-    Response(EndpointAddress, Response<'a>),
+    Response(FragmentAddr, Response<'a>),
     LinkLayerMessage(LinkLayerMessage),
     Error(TransportResponseError),
 }

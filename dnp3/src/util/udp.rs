@@ -1,11 +1,10 @@
 use crate::util::phys::PhysAddr;
 
 pub(crate) struct UdpLayer {
-    socket: tokio::net::UdpSocket
+    socket: tokio::net::UdpSocket,
 }
 
 impl UdpLayer {
-
     pub(crate) async fn read(
         &mut self,
         buffer: &mut [u8],
