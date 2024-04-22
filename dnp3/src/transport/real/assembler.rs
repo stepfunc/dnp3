@@ -156,7 +156,8 @@ impl Assembler {
             Ok(_) => {
                 if header.fin {
                     let frame_id = self.frame_id;
-                    let info = FragmentInfo::new(frame_id, info.source, info.broadcast);
+                    let info =
+                        FragmentInfo::new(frame_id, info.source, info.broadcast, info.phys_addr);
                     self.frame_id = self.frame_id.wrapping_add(1);
                     self.state = InternalState::Complete(info, new_length)
                 } else {

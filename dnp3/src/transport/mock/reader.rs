@@ -6,7 +6,7 @@ use crate::link::EndpointAddress;
 use crate::outstation::Feature;
 use crate::transport::{Fragment, FragmentInfo, TransportData};
 use crate::util::buffer::Buffer;
-use crate::util::phys::PhysLayer;
+use crate::util::phys::{PhysAddr, PhysLayer};
 
 pub(crate) struct MockReader {
     num_reads: usize,
@@ -68,7 +68,7 @@ impl MockReader {
             .info
             .expect("call set_rx_frame_info(..) before running test");
         let fragment = Fragment {
-            info: FragmentInfo::new(self.frame_id, info.source, info.broadcast),
+            info: FragmentInfo::new(self.frame_id, info.source, info.broadcast, PhysAddr::None),
             data: self.buffer.get(count).unwrap(),
         };
         Some(fragment)

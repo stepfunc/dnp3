@@ -2,12 +2,14 @@ use crate::app::parse::parser::{Request, Response};
 use crate::app::{HeaderParseError, RequestValidationError, ResponseValidationError, Sequence};
 use crate::link::header::BroadcastConfirmMode;
 use crate::link::EndpointAddress;
+use crate::util::phys::PhysAddr;
 
 #[derive(Debug, Copy, Clone)]
 pub(crate) struct FragmentInfo {
     pub(crate) id: u32,
     pub(crate) source: EndpointAddress,
     pub(crate) broadcast: Option<BroadcastConfirmMode>,
+    pub(crate) phys_addr: PhysAddr,
 }
 
 impl FragmentInfo {
@@ -15,11 +17,13 @@ impl FragmentInfo {
         id: u32,
         source: EndpointAddress,
         broadcast: Option<BroadcastConfirmMode>,
+        phys_addr: PhysAddr,
     ) -> Self {
         FragmentInfo {
             id,
             source,
             broadcast,
+            phys_addr,
         }
     }
 }
