@@ -84,7 +84,7 @@ impl From<ResponseValidationError> for TransportResponseError {
 pub(crate) enum TransportRequest<'a> {
     Request(FragmentInfo, Request<'a>),
     LinkLayerMessage,
-    Error(EndpointAddress, TransportRequestError),
+    Error(FragmentAddr, TransportRequestError),
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]

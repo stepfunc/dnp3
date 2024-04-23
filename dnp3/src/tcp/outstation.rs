@@ -12,7 +12,7 @@ use crate::tcp::{
     AddressFilter, ClientState, ConnectOptions, EndpointList, FilterError, PostConnectionHandler,
 };
 use crate::util::channel::Sender;
-use crate::util::phys::PhysLayer;
+use crate::util::phys::{PhysAddr, PhysLayer};
 use crate::util::session::{Enabled, Session};
 
 /// Spawn a TCP client task onto the `Tokio` runtime. The task runs until the returned handle is dropped.
@@ -36,6 +36,7 @@ pub fn spawn_outstation_tcp_client(
         Enabled::No,
         LinkModes::stream(link_error_mode),
         config,
+        PhysAddr::None,
         application,
         information,
         control_handler,
@@ -161,6 +162,7 @@ impl Server {
             Enabled::Yes,
             self.link_modes,
             config,
+            PhysAddr::None,
             application,
             information,
             control_handler,

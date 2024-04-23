@@ -329,6 +329,8 @@ mod tests {
     struct NullAssociationInformation;
     impl AssociationInformation for NullAssociationInformation {}
 
+    use crate::transport::FragmentAddr;
+    use crate::util::phys::PhysAddr;
     use scursor::WriteCursor;
 
     use super::*;
@@ -380,9 +382,14 @@ mod tests {
         Association,
         tokio::sync::oneshot::Receiver<Result<(), TimeSyncError>>,
     ) {
+        let dest = FragmentAddr {
+            link: EndpointAddress::try_new(1).unwrap(),
+            phys: PhysAddr::None,
+        };
+
         let system_time = Timestamp::try_from_system_time(SystemTime::now()).unwrap();
         let association = Association::new(
-            EndpointAddress::try_new(1).unwrap(),
+            dest,
             AssociationConfig::default(),
             Box::new(NullReadHandler),
             handler(system_time),

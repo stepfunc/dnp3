@@ -14,7 +14,7 @@ use crate::outstation::{
 use crate::tcp::client::ClientTask;
 use crate::tcp::tls::{CertificateMode, MinTlsVersion, TlsClientConfig, TlsError};
 use crate::tcp::{ClientState, ConnectOptions, EndpointList, PostConnectionHandler};
-use crate::util::phys::PhysLayer;
+use crate::util::phys::{PhysAddr, PhysLayer};
 use crate::util::session::{Enabled, Session};
 use tokio::net::TcpStream;
 use tokio_rustls::rustls::pki_types::ServerName;
@@ -44,6 +44,7 @@ pub fn spawn_outstation_tls_client(
         Enabled::No,
         LinkModes::stream(link_error_mode),
         config,
+        PhysAddr::None,
         application,
         information,
         control_handler,

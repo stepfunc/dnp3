@@ -6,7 +6,8 @@ use crate::link::reader::LinkModes;
 use crate::link::EndpointAddress;
 use crate::outstation::Feature;
 use crate::transport::{
-    FragmentInfo, LinkLayerMessage, TransportData, TransportRequest, TransportResponse,
+    FragmentAddr, FragmentInfo, LinkLayerMessage, TransportData, TransportRequest,
+    TransportResponse,
 };
 use crate::util::phys::PhysLayer;
 
@@ -151,7 +152,7 @@ impl TransportReader {
             Ok(ParsedTransportData::Fragment(info, fragment)) => match fragment.to_request() {
                 Ok(request) => Some(TransportRequest::Request(info, request)),
                 Err(err) => Some(TransportRequest::Error(
-                    info.addr.link,
+                    info.addr,
                     err.into(fragment.control.seq),
                 )),
             },
@@ -165,7 +166,7 @@ impl TransportReader {
     fn parse(
         &mut self,
         peek: bool,
-    ) -> Option<Result<ParsedTransportData, (HeaderParseError, EndpointAddress)>> {
+    ) -> Option<Result<ParsedTransportData, (HeaderParseError, FragmentAddr)>> {
         let transport_data = if peek {
             self.inner.peek()?
         } else {
@@ -176,7 +177,7 @@ impl TransportReader {
             TransportData::Fragment(fragment) => Some(
                 ParsedFragment::parse(fragment.data)
                     .map(|parsed| ParsedTransportData::Fragment(fragment.info, parsed))
-                    .map_err(|err| (err, fragment.info.addr.link)),
+                    .map_err(|err| (err, fragment.info.addr)),
             ),
             TransportData::LinkLayerMessage(msg) => {
                 Some(Ok(ParsedTransportData::LinkLayerMessage(msg)))

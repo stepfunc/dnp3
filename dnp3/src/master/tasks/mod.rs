@@ -2,7 +2,6 @@ use crate::app::format::write::HeaderWriter;
 use crate::app::parse::parser::{HeaderCollection, Response};
 use crate::app::FunctionCode;
 use crate::app::ResponseHeader;
-use crate::link::EndpointAddress;
 use crate::master::association::Association;
 use crate::master::error::TaskError;
 use crate::master::extract::extract_measurements;
@@ -49,7 +48,6 @@ impl AssociationTask {
         Self { dest, details }
     }
 }
-
 
 /// There are two broad categories of tasks. Reads
 /// require handling for multi-fragmented responses.

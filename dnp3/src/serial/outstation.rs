@@ -9,7 +9,7 @@ use crate::outstation::{
 };
 use crate::serial::task::SerialTask;
 use crate::serial::{PortState, SerialSettings};
-use crate::util::phys::PhysLayer;
+use crate::util::phys::{PhysAddr, PhysLayer};
 use crate::util::session::{Enabled, Session};
 
 /// Spawn an outstation task onto the `Tokio` runtime. The task runs until the returned handle is dropped or
@@ -34,6 +34,7 @@ pub fn spawn_outstation_serial(
         Enabled::Yes,
         LinkModes::serial(),
         config,
+        PhysAddr::None,
         application,
         information,
         control_handler,
@@ -84,6 +85,7 @@ pub fn spawn_outstation_serial_2(
         Enabled::Yes,
         LinkModes::serial(),
         config,
+        PhysAddr::None,
         application,
         information,
         control_handler,

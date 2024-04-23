@@ -29,7 +29,9 @@ use crate::master::{
     AuthKey, BlockNumber, DeadBandHeader, DirReadConfig, FileCredentials, FileError, FileHandle,
     FileInfo, FileMode, FileReadConfig, FileReader, Headers, OpenFile, WriteError,
 };
+use crate::transport::FragmentAddr;
 use crate::util::channel::Sender;
+use crate::util::phys::PhysAddr;
 use crate::util::session::Enabled;
 
 /// Handle to a master communication channel. This handle controls
@@ -132,8 +134,12 @@ impl MasterChannel {
         assoc_information: Box<dyn AssociationInformation>,
     ) -> Result<AssociationHandle, AssociationError> {
         let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), AssociationError>>();
+        let addr = FragmentAddr {
+            link: address,
+            phys: PhysAddr::None,
+        };
         self.send_master_message(MasterMsg::AddAssociation(
-            address,
+            addr,
             config,
             read_handler,
             assoc_handler,

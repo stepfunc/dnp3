@@ -131,6 +131,7 @@ fn new_harness_impl(
         Enabled::Yes,
         LinkModes::test(),
         config,
+        PhysAddr::None,
         application,
         MockOutstationInformation::new(sender.clone()),
         MockControlHandler::new(sender.clone()),

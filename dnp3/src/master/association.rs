@@ -22,9 +22,9 @@ use crate::master::tasks::{AppTask, AssociationTask, ReadTask, Task};
 use crate::master::{AssociationInformation, ReadHandler, ReadType, TaskType};
 use crate::util::Smallest;
 
+use crate::transport::FragmentAddr;
 use crate::util::session::RunError;
 use tokio::time::Instant;
-use crate::transport::FragmentAddr;
 
 /// Configuration for a master association
 #[derive(Debug, Copy, Clone)]

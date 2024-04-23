@@ -293,10 +293,7 @@ impl MasterSession {
                 }
 
                 let res: Result<Sequence, TaskError> = match t {
-                    AppTask::Read(t) => {
-                        self.run_read_task(io, task.dest, t, writer, reader)
-                            .await
-                    }
+                    AppTask::Read(t) => self.run_read_task(io, task.dest, t, writer, reader).await,
                     AppTask::NonRead(t) => {
                         self.run_non_read_task(io, task.dest, t, writer, reader)
                             .await
@@ -723,7 +720,7 @@ impl MasterSession {
         let mut cursor = self.tx_buffer.write_cursor();
         write::confirm_solicited(seq, &mut cursor)?;
         writer
-            .write(io, self.decode_level, dest.link.wrap(), dest.phys, cursor.written())
+            .write(io, self.decode_level, dest, cursor.written())
             .await?;
         Ok(())
     }
@@ -739,7 +736,7 @@ impl MasterSession {
         write::confirm_unsolicited(seq, &mut cursor)?;
 
         writer
-            .write(io, self.decode_level, dest.link.wrap(), dest.phys, cursor.written())
+            .write(io, self.decode_level, dest, cursor.written())
             .await?;
         Ok(())
     }
@@ -762,7 +759,7 @@ impl MasterSession {
             write::start_request(ControlField::request(seq), request.function(), &mut cursor)?;
         request.write(&mut hw)?;
         writer
-            .write(io, self.decode_level, addr.link.wrap(), addr.phys, cursor.written())
+            .write(io, self.decode_level, addr, cursor.written())
             .await?;
         Ok(seq)
     }
@@ -780,7 +777,7 @@ impl MasterSession {
         // Send link status request
         tracing::info!("sending link status request (for {})", destination.link);
         writer
-            .write_link_status_request(io, self.decode_level, destination)
+            .send_link_status_request(io, self.decode_level, destination)
             .await?;
 
         loop {

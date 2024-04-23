@@ -2,10 +2,9 @@ use crate::app::parse::parser::{FragmentDisplay, ParsedFragment};
 use crate::app::EndpointType;
 use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
-use crate::link::header::AnyAddress;
 use crate::link::EndpointAddress;
 use crate::transport::FragmentAddr;
-use crate::util::phys::{PhysAddr, PhysLayer};
+use crate::util::phys::PhysLayer;
 
 /// This type definition is used so that we can mock the transport writer during testing.
 /// If Rust eventually allows `async fn` in traits, this could be removed
@@ -33,8 +32,7 @@ impl TransportWriter {
         &mut self,
         io: &mut PhysLayer,
         level: DecodeLevel,
-        destination: AnyAddress,
-        phys_addr: PhysAddr,
+        destination: FragmentAddr,
         fragment: &[u8],
     ) -> Result<(), LinkError> {
         if level.application.enabled() {
@@ -43,17 +41,15 @@ impl TransportWriter {
                 tracing::info!("APP TX - {}", x);
             }
         }
-        self.inner.write(io, level, destination, phys_addr, fragment).await
+        self.inner.write(io, level, destination, fragment).await
     }
 
-    pub(crate) async fn write_link_status_request(
+    pub(crate) async fn send_link_status_request(
         &mut self,
         io: &mut PhysLayer,
         level: DecodeLevel,
-        destination: FragmentAddr,
+        dest: FragmentAddr,
     ) -> Result<(), LinkError> {
-        self.inner
-            .write_link_status_request(io, destination, level)
-            .await
+        self.inner.write_link_status_request(io, dest, level).await
     }
 }
