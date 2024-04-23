@@ -315,6 +315,8 @@ impl NextIdleAction {
 }
 
 impl OutstationSession {
+
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         initial_state: Enabled,
         messages: Receiver<OutstationMessage>,
