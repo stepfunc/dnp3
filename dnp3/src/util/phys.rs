@@ -82,6 +82,7 @@ impl PhysLayer {
     pub(crate) async fn write(
         &mut self,
         data: &[u8],
+        addr: PhysAddr,
         level: PhysDecodeLevel,
     ) -> Result<(), std::io::Error> {
         if level.enabled() {
@@ -90,7 +91,7 @@ impl PhysLayer {
 
         match self {
             Self::Tcp(x) => x.write_all(data).await,
-            Self::Udp(x) => x.write_all(data).await,
+            Self::Udp(x) => x.write_all(data, addr).await,
             #[cfg(feature = "tls")]
             Self::Tls(x) => x.write_all(data).await,
             #[cfg(feature = "serial")]

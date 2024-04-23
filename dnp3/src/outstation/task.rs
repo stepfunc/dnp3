@@ -5,8 +5,8 @@ use crate::outstation::database::DatabaseHandle;
 use crate::outstation::session::OutstationSession;
 use crate::outstation::traits::{ControlHandler, OutstationApplication, OutstationInformation};
 use crate::outstation::OutstationHandle;
-use crate::transport::{TransportReader, TransportWriter};
-use crate::util::phys::PhysLayer;
+use crate::transport::{FragmentAddr, TransportReader, TransportWriter};
+use crate::util::phys::{PhysAddr, PhysLayer};
 use crate::util::session::{Enabled, RunError, StopReason};
 
 pub(crate) enum ConfigurationChange {
@@ -39,6 +39,7 @@ impl OutstationTask {
         initial_state: Enabled,
         link_modes: LinkModes,
         config: OutstationConfig,
+        phys_addr: PhysAddr,
         application: Box<dyn OutstationApplication>,
         information: Box<dyn OutstationInformation>,
         control_handler: Box<dyn ControlHandler>,
@@ -55,10 +56,15 @@ impl OutstationTask {
             config.features.self_address,
             config.rx_buffer_size,
         );
+        let destination = FragmentAddr {
+            link: config.master_address,
+            phys: phys_addr,
+        };
         let task = Self {
             session: OutstationSession::new(
                 initial_state,
                 rx,
+                destination,
                 config.into(),
                 config.into(),
                 application,

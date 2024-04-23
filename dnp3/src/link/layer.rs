@@ -100,7 +100,8 @@ impl Layer {
             if level.link.enabled() {
                 tracing::info!("LINK TX - {}", LinkDisplay::new(header, &[], level.link));
             }
-            io.write(self.format_reply(header), level.physical).await?
+            io.write(self.format_reply(header), addr, level.physical)
+                .await?
         }
         Ok(info)
     }

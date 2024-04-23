@@ -7,6 +7,7 @@ use crate::master::handler::Promise;
 use crate::master::poll::PollMsg;
 use crate::master::tasks::Task;
 use crate::master::{AssociationConfig, AssociationHandler, AssociationInformation, ReadHandler};
+use crate::transport::FragmentAddr;
 use crate::util::session::Enabled;
 
 /// Messages sent from the handles to the master task via an mpsc.
@@ -22,7 +23,7 @@ pub(crate) enum MasterMsg {
     EnableCommunication(Enabled),
     /// Add an association to the master
     AddAssociation(
-        EndpointAddress,
+        FragmentAddr,
         AssociationConfig,
         Box<dyn ReadHandler>,
         Box<dyn AssociationHandler>,

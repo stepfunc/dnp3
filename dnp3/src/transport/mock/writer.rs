@@ -3,7 +3,8 @@ use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
 use crate::link::header::AnyAddress;
 use crate::link::EndpointAddress;
-use crate::util::phys::PhysLayer;
+use crate::transport::FragmentAddr;
+use crate::util::phys::{PhysAddr, PhysLayer};
 
 pub(crate) struct MockWriter {
     num_writes: usize,
@@ -26,10 +27,10 @@ impl MockWriter {
         &mut self,
         io: &mut PhysLayer,
         level: DecodeLevel,
-        _: AnyAddress,
+        destination: FragmentAddr,
         fragment: &[u8],
     ) -> Result<(), LinkError> {
-        io.write(fragment, level.physical).await?;
+        io.write(fragment, destination.phys, level.physical).await?;
         self.num_writes += 1;
         Ok(())
     }
@@ -37,10 +38,9 @@ impl MockWriter {
     pub(crate) async fn write_link_status_request(
         &mut self,
         _: &mut PhysLayer,
+        _: FragmentAddr,
         _: DecodeLevel,
-        _: AnyAddress,
     ) -> Result<(), LinkError> {
-        // ignore this yet
         Ok(())
     }
 }
