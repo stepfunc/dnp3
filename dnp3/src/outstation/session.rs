@@ -315,7 +315,6 @@ impl NextIdleAction {
 }
 
 impl OutstationSession {
-
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         initial_state: Enabled,
@@ -347,7 +346,10 @@ impl OutstationSession {
     }
 
     fn required_master_address(&self) -> Option<EndpointAddress> {
-        Some(self.destination.link)
+        match self.config.respond_to_any_master {
+            Feature::Enabled => None,
+            Feature::Disabled => Some(self.destination.link),
+        }
     }
 
     pub(crate) fn enabled(&self) -> Enabled {
@@ -639,7 +641,7 @@ impl OutstationSession {
         );
         Some(Response::new(header, cursor.written().len()))
     }
-    
+
     async fn perform_unsolicited_response_series(
         &mut self,
         database: &mut DatabaseHandle,
@@ -955,7 +957,7 @@ impl OutstationSession {
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
     ) -> Result<(), RunError> {
-        let mut guard = reader.pop_request(Some(self.destination.link));
+        let mut guard = reader.pop_request(self.required_master_address());
         match guard.get() {
             Some(TransportRequest::Request(info, request)) => {
                 self.on_link_activity();
