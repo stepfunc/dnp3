@@ -7,9 +7,10 @@ use crate::link::EndpointAddress;
 use crate::transport::real::display::SegmentDisplay;
 use crate::transport::real::header::Header;
 use crate::transport::real::sequence::Sequence;
-use crate::util::phys::PhysLayer;
+use crate::util::phys::{PhysAddr, PhysLayer};
 
 use scursor::WriteCursor;
+use crate::transport::FragmentAddr;
 
 pub(crate) struct Writer {
     endpoint_type: EndpointType,
@@ -37,6 +38,7 @@ impl Writer {
         io: &mut PhysLayer,
         level: DecodeLevel,
         destination: AnyAddress,
+        phys_addr: PhysAddr,
         fragment: &[u8],
     ) -> Result<(), LinkError> {
         let chunks = fragment.chunks(crate::link::constant::MAX_APP_BYTES_PER_FRAME);
@@ -69,7 +71,7 @@ impl Writer {
             if level.link.header_enabled() {
                 tracing::info!("LINK TX - {}", data.to_link_display(level.link));
             }
-            io.write(data.frame, level.physical).await?;
+            io.write(data.frame, phys_addr, level.physical).await?;
         }
 
         Ok(())
@@ -78,21 +80,21 @@ impl Writer {
     pub(crate) async fn write_link_status_request(
         &mut self,
         io: &mut PhysLayer,
+        destination: FragmentAddr,
         level: DecodeLevel,
-        destination: AnyAddress,
     ) -> Result<(), LinkError> {
         let mut cursor = WriteCursor::new(&mut self.buffer);
         let header = crate::link::header::Header::request_link_status(
             self.endpoint_type.dir_bit(),
-            destination,
-            self.local_address.wrap(),
+            destination.link,
+            self.local_address,
         );
 
         let data = format_header_only(header, &mut cursor)?;
         if level.link.enabled() {
             tracing::info!("LINK TX - {}", data.to_link_display(level.link));
         }
-        io.write(data.frame, level.physical).await?;
+        io.write(data.frame, destination.phys, level.physical).await?;
 
         Ok(())
     }

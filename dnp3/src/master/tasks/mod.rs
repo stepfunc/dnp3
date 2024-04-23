@@ -24,6 +24,7 @@ use crate::master::tasks::file::get_info::GetFileInfoTask;
 use crate::master::tasks::file::open::OpenFileTask;
 use crate::master::tasks::file::read::FileReadTask;
 use crate::master::tasks::file::write_block::WriteBlockTask;
+use crate::transport::FragmentAddr;
 
 pub(crate) mod auto;
 pub(crate) mod command;
@@ -37,17 +38,18 @@ pub(crate) mod time;
 
 /// Queued task requiring I/O
 pub(crate) struct AssociationTask {
-    /// Outstation address
-    pub(crate) address: EndpointAddress,
+    /// Destination addresses for tasks
+    pub(crate) dest: FragmentAddr,
     /// Actual task to perform
     pub(crate) details: Task,
 }
 
 impl AssociationTask {
-    pub(crate) fn new(address: EndpointAddress, details: Task) -> Self {
-        Self { address, details }
+    pub(crate) fn new(dest: FragmentAddr, details: Task) -> Self {
+        Self { dest, details }
     }
 }
+
 
 /// There are two broad categories of tasks. Reads
 /// require handling for multi-fragmented responses.

@@ -27,10 +27,7 @@ use crate::outstation::database::{DatabaseHandle, ResponseInfo};
 use crate::outstation::deferred::DeferredRead;
 use crate::outstation::task::{ConfigurationChange, OutstationMessage};
 use crate::outstation::traits::*;
-use crate::transport::{
-    FragmentInfo, RequestGuard, TransportReader, TransportRequest, TransportRequestError,
-    TransportWriter,
-};
+use crate::transport::{FragmentAddr, FragmentInfo, RequestGuard, TransportReader, TransportRequest, TransportRequestError, TransportWriter};
 use crate::util::buffer::Buffer;
 use crate::util::channel::Receiver;
 use crate::util::phys::PhysLayer;
@@ -408,6 +405,7 @@ impl OutstationSession {
                 io,
                 self.config.decode_level,
                 self.config.master_address.wrap(),
+                // TODO - have a default master address for unsolcited
                 self.unsol_tx_buffer.get(len).unwrap(),
             )
             .await
@@ -417,7 +415,7 @@ impl OutstationSession {
         &mut self,
         io: &mut PhysLayer,
         writer: &mut TransportWriter,
-        respond_to: EndpointAddress,
+        respond_to: FragmentAddr,
         mut response: Response,
         database: &DatabaseHandle,
     ) -> Result<Response, LinkError> {
@@ -439,7 +437,7 @@ impl OutstationSession {
     async fn repeat_solicited(
         &mut self,
         io: &mut PhysLayer,
-        respond_to: EndpointAddress,
+        respond_to: FragmentAddr,
         writer: &mut TransportWriter,
         response: Response,
     ) -> Result<(), LinkError> {
@@ -452,7 +450,8 @@ impl OutstationSession {
             .write(
                 io,
                 self.config.decode_level,
-                respond_to.wrap(),
+                respond_to.link.wrap(),
+                respond_to.phys,
                 self.sol_tx_buffer.get(len).unwrap(),
             )
             .await

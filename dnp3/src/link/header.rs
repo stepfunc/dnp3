@@ -184,13 +184,13 @@ impl Header {
 
     pub(crate) fn request_link_status(
         is_master: bool,
-        destination: AnyAddress,
-        source: AnyAddress,
+        destination: EndpointAddress,
+        source: EndpointAddress,
     ) -> Self {
         Self::new(
             ControlField::new(is_master, Function::PriRequestLinkStatus),
-            destination,
-            source,
+            destination.wrap(),
+            source.wrap(),
         )
     }
 }

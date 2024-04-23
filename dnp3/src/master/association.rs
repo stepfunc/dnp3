@@ -24,6 +24,7 @@ use crate::util::Smallest;
 
 use crate::util::session::RunError;
 use tokio::time::Instant;
+use crate::transport::FragmentAddr;
 
 /// Configuration for a master association
 #[derive(Debug, Copy, Clone)]
@@ -300,7 +301,7 @@ impl LastUnsolFragment {
 /// as defined by the DNP3 standard. A master manages requests
 /// and responses for multiple associations (i.e. multi-drop).
 pub(crate) struct Association {
-    address: EndpointAddress,
+    address: FragmentAddr,
     response_timeout: Timeout,
     seq: Sequence,
     last_unsol_frag: Option<LastUnsolFragment>,
@@ -319,7 +320,7 @@ pub(crate) struct Association {
 
 impl Association {
     pub(crate) fn new(
-        address: EndpointAddress,
+        address: FragmentAddr,
         config: AssociationConfig,
         read_handler: Box<dyn ReadHandler>,
         assoc_handler: Box<dyn AssociationHandler>,
@@ -437,7 +438,7 @@ impl Association {
 
     pub(crate) fn on_restart_iin_observed(&mut self) {
         if self.auto_tasks.clear_restart_iin.is_idle() {
-            tracing::warn!("device restart detected (address == {})", self.address);
+            tracing::warn!("device restart detected (address == {})", self.address.link);
             self.auto_tasks.on_restart_iin();
             self.startup_integrity_done = false;
         }
@@ -762,12 +763,12 @@ impl AssociationMap {
     }
 
     pub(crate) fn register(&mut self, session: Association) -> Result<(), AssociationError> {
-        if self.map.contains_key(&session.address) {
-            return Err(AssociationError::DuplicateAddress(session.address));
+        if self.map.contains_key(&session.address.link) {
+            return Err(AssociationError::DuplicateAddress(session.address.link));
         }
 
-        self.priority.push_back(session.address);
-        self.map.insert(session.address, session);
+        self.priority.push_back(session.address.link);
+        self.map.insert(session.address.link, session);
         Ok(())
     }
 
