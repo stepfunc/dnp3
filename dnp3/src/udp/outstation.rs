@@ -1,3 +1,4 @@
+use crate::app::Timeout;
 use crate::link::reader::LinkModes;
 use crate::link::{LinkErrorMode, LinkReadMode};
 use crate::outstation::task::OutstationTask;
@@ -11,7 +12,6 @@ use crate::udp::UdpSocketMode;
 use crate::util::phys::PhysAddr;
 use crate::util::session::{Enabled, Session};
 use std::net::SocketAddr;
-use std::time::Duration;
 use tracing::Instrument;
 
 /// UDP outstation configuration
@@ -26,7 +26,7 @@ pub struct OutstationUdpConfig {
     /// Read mode to use, this should typically be set to [`LinkReadMode::Datagram`].
     pub link_read_mode: LinkReadMode,
     /// Period to wait before retrying after a failure to bind/connect the UDP socket
-    pub retry_delay: Duration,
+    pub retry_delay: Timeout,
 }
 
 impl OutstationUdpConfig {

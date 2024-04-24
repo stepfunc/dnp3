@@ -6,8 +6,8 @@ use crate::udp::layer::UdpFactory;
 use crate::udp::task::UdpTask;
 use crate::util::session::{Enabled, Session};
 
+use crate::app::Timeout;
 use std::net::SocketAddr;
-use std::time::Duration;
 use tracing::Instrument;
 
 /// Spawn a task onto the `Tokio` runtime. The task runs until the returned handle, and any
@@ -17,13 +17,14 @@ use tracing::Instrument;
 /// Use Runtime::enter() if required.
 pub fn spawn_master_udp(
     local_endpoint: SocketAddr,
-    retry_delay: Duration,
+    read_mode: LinkReadMode,
+    retry_delay: Timeout,
     config: MasterChannelConfig,
 ) -> MasterChannel {
     let (tx, rx) = crate::util::channel::request_channel();
     let link_modes = LinkModes {
         error_mode: LinkErrorMode::Discard,
-        read_mode: LinkReadMode::Datagram,
+        read_mode,
     };
 
     let session = Session::master(MasterTask::new(Enabled::No, link_modes, config, rx));

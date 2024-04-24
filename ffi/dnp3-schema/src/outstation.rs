@@ -482,6 +482,46 @@ fn define_outstation(
         )?
         .build_static("create_serial_session_2")?;
 
+    let udp_config = define_outstation_udp_config(lib, shared)?;
+
+    let outstation_create_udp = lib
+        .define_function("outstation_create_udp")?
+        .param(
+            "runtime",
+            shared.runtime_class.clone(),
+            "runtime on which to spawn the outstation",
+        )?
+        .param("udp_config", udp_config, "UDP configuration")?
+        .param(
+            "config",
+            types.outstation_config.clone(),
+            "outstation configuration",
+        )?
+        .param(
+            "application",
+            types.outstation_application.clone(),
+            "application interface",
+        )?
+        .param(
+            "information",
+            types.outstation_information.clone(),
+            "informational events interface",
+        )?
+        .param(
+            "control_handler",
+            types.control_handler.clone(),
+            "control handler interface",
+        )?
+        .returns(
+            outstation.clone(),
+            "Outstation instance or {null} if the port cannot be opened",
+        )?
+        .fails_with(shared.error_type.clone())?
+        .doc(
+            doc("Create an outstation instance running on a serial port which is tolerant to the serial port being added and removed")
+        )?
+        .build_static("outstation_create_udp")?;
+
     let destructor = lib.define_destructor(
         outstation.clone(),
         doc("Free resources of the outstation.").warning("This does not shutdown the outstation. Only {class:outstation_server.[destructor]} will properly shutdown the outstation.")
@@ -524,6 +564,7 @@ fn define_outstation(
         .static_method(outstation_create_serial_session_2_fn)?
         .static_method(outstation_create_tcp_client_fn)?
         .static_method(outstation_create_tls_client_fn)?
+        .static_method(outstation_create_udp)?
         .method(enable)?
         .method(disable)?
         .method(execute_transaction)?
@@ -532,6 +573,46 @@ fn define_outstation(
         .build()?;
 
     Ok(outstation)
+}
+
+fn define_outstation_udp_config(
+    lib: &mut LibraryBuilder,
+    shared: &SharedDefinitions,
+) -> BackTraced<FunctionArgStructHandle> {
+    let value = lib.declare_function_argument_struct("outstation_udp_config")?;
+
+    let value = lib
+        .define_function_argument_struct(value)?
+        .add(
+            "local_endpoint",
+            StringType,
+            "Local endpoint to which the UDP socket is bound. Must be a socket address (ip:port)",
+        )?
+        .add(
+            "remote_endpoint",
+            StringType,
+            "Remote endpoint where outbound requests are sent. Must be a socket address (ip:port)",
+        )?
+        .add(
+            "socket_mode",
+            shared.udp_socket_mode.clone(),
+            "UDP socket mode to use",
+        )?
+        .add(
+            "link_read_mode",
+            shared.link_read_mode.clone(),
+            "Read mode to use, this should typically be set to {enum:link_read_mode.datagram}",
+        )?
+        .add(
+            "retry_delay",
+            DurationType::Milliseconds,
+            "Period to wait before retrying after a failure to bind or connect the UDP socket",
+        )?
+        .doc("UDP outstation configuration")?
+        .end_fields()?
+        .build()?;
+
+    Ok(value)
 }
 
 fn define_class_zero_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
