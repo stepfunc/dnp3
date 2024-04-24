@@ -32,10 +32,10 @@ pub struct OutstationUdpConfig {
 impl OutstationUdpConfig {
     fn factory(&self) -> UdpFactory {
         match self.socket_mode {
-            UdpSocketMode::OneToOne => UdpFactory::bound(self.local_endpoint),
-            UdpSocketMode::OneToMany => {
+            UdpSocketMode::OneToOne => {
                 UdpFactory::connected(self.local_endpoint, self.remote_endpoint)
             }
+            UdpSocketMode::OneToMany => UdpFactory::bound(self.local_endpoint),
         }
     }
 
