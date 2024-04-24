@@ -5,7 +5,7 @@ use crate::link::display::LinkDisplay;
 use crate::link::error::LinkError;
 use crate::link::header::Header;
 use crate::link::parser::{FramePayload, Parser};
-use crate::link::LinkErrorMode;
+use crate::link::{LinkErrorMode, LinkReadMode};
 use crate::util::phys::{PhysAddr, PhysLayer};
 
 use crate::link;
@@ -51,6 +51,13 @@ impl LinkModes {
         }
     }
 
+    pub(crate) const fn datagram(error_mode: LinkErrorMode) -> Self {
+        Self {
+            error_mode,
+            read_mode: LinkReadMode::Datagram,
+        }
+    }
+
     pub(crate) const fn serial() -> Self {
         Self {
             error_mode: LinkErrorMode::Discard,
@@ -65,14 +72,6 @@ impl LinkModes {
             read_mode: LinkReadMode::Stream,
         }
     }
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub(crate) enum LinkReadMode {
-    /// Reading from a stream (TCP, serial, etc.) where link-layer frames MAY span separate calls to read
-    Stream,
-    /// Reading datagrams (UDP) where link-layer frames MAY NOT span separate calls to read
-    Datagram,
 }
 
 pub(crate) struct Reader {

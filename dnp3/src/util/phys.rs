@@ -1,7 +1,7 @@
 use crate::decode::PhysDecodeLevel;
 use std::net::SocketAddr;
 
-use crate::util::udp::UdpLayer;
+use crate::udp::layer::UdpLayer;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 
 /// Source or destination at the physical layer from which a link frame was read/written

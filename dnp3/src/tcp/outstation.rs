@@ -2,8 +2,8 @@ use std::net::SocketAddr;
 use tracing::Instrument;
 
 use crate::app::{ConnectStrategy, Listener, Shutdown};
-use crate::link::reader::{LinkModes, LinkReadMode};
-use crate::link::LinkErrorMode;
+use crate::link::reader::LinkModes;
+use crate::link::{LinkErrorMode, LinkReadMode};
 use crate::outstation::task::OutstationTask;
 use crate::outstation::*;
 use crate::tcp::client::ClientTask;
