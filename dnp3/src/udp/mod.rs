@@ -1,7 +1,9 @@
 pub(crate) mod layer;
+mod master;
 mod outstation;
 mod task;
 
+pub use master::*;
 pub use outstation::*;
 
 /// Describes how the UDP socket reads and writes datagrams from remote endpoint(s)
