@@ -37,7 +37,6 @@ use crate::util::session::Enabled;
 
 /// Master channels may be Udp or of a "stream" type such as TCP
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(not(feature = "ffi"), non_exhaustive)]
 pub enum MasterChannelType {
     /// UDP aka datagram based
     Udp,
@@ -105,6 +104,11 @@ impl MasterChannel {
             sender,
             channel_type,
         }
+    }
+
+    /// retrieve the channel type
+    pub fn get_channel_type(&self) -> MasterChannelType {
+        self.channel_type
     }
 
     /// enable communications

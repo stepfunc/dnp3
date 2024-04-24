@@ -79,7 +79,9 @@ pub fn spawn_outstation_udp(
     let future = async move {
         let _ = task
             .run()
-            .instrument(tracing::info_span!("dnp3-outstation-udp"))
+            .instrument(
+                tracing::info_span!("dnp3-outstation-udp", "endpoint" = ?udp_config.local_endpoint),
+            )
             .await;
     };
     tokio::spawn(future);
