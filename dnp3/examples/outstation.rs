@@ -18,6 +18,7 @@ use tokio_util::codec::LinesCodec;
 use dnp3::serial::*;
 #[cfg(feature = "tls")]
 use dnp3::tcp::tls::*;
+use dnp3::udp::{spawn_outstation_udp, OutstationUdpConfig, UdpSocketMode};
 
 /// example of using the outstation API asynchronously from within the Tokio runtime
 ///
@@ -41,6 +42,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     match transport {
         "tcp" => run_tcp_server().await,
         "tcp-client" => run_tcp_client().await,
+        "udp" => run_udp().await,
         #[cfg(feature = "serial")]
         "serial" => run_serial().await,
         #[cfg(feature = "tls")]
@@ -243,6 +245,26 @@ async fn run_tcp_server() -> Result<(), Box<dyn std::error::Error>> {
     // ANCHOR_END: create_tcp_server
 
     run_server(server).await
+}
+
+async fn run_udp() -> Result<(), Box<dyn std::error::Error>> {
+    let udp_config = OutstationUdpConfig {
+        local_endpoint: "127.0.0.1:20000".parse().unwrap(),
+        remote_endpoint: "127.0.0.1:20001".parse().unwrap(),
+        socket_mode: UdpSocketMode::OneToOne,
+        link_read_mode: LinkReadMode::Datagram,
+        retry_delay: Duration::from_secs(5),
+    };
+
+    let outstation = spawn_outstation_udp(
+        udp_config,
+        get_outstation_config(),
+        Box::new(ExampleOutstationApplication),
+        Box::new(ExampleOutstationInformation),
+        Box::new(ExampleControlHandler),
+    );
+
+    run_outstation(outstation).await
 }
 
 async fn run_tcp_client() -> Result<(), Box<dyn std::error::Error>> {

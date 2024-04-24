@@ -16,20 +16,20 @@ use tracing::Instrument;
 
 /// UDP outstation configuration
 #[derive(Copy, Clone, Debug)]
-pub struct UdpOutstationConfig {
+pub struct OutstationUdpConfig {
     /// Local endpoint to which the UDP socket is bound
-    local_endpoint: SocketAddr,
+    pub local_endpoint: SocketAddr,
     /// Remote endpoint
-    remote_endpoint: SocketAddr,
+    pub remote_endpoint: SocketAddr,
     /// UDP socket mode to use
-    socket_mode: UdpSocketMode,
+    pub socket_mode: UdpSocketMode,
     /// Read mode to use, this should typically be set to [`LinkReadMode::Datagram`].
-    link_read_mode: LinkReadMode,
+    pub link_read_mode: LinkReadMode,
     /// Period to wait before retrying after a failure to bind/connect the UDP socket
-    retry_delay: Duration,
+    pub retry_delay: Duration,
 }
 
-impl UdpOutstationConfig {
+impl OutstationUdpConfig {
     fn factory(&self) -> UdpFactory {
         match self.socket_mode {
             UdpSocketMode::OneToOne => UdpFactory::bound(self.local_endpoint),
@@ -54,7 +54,7 @@ impl UdpOutstationConfig {
 /// **Note**: This function may only be called from within the runtime itself, and panics otherwise.
 /// Use Runtime::enter() if required.
 pub fn spawn_outstation_udp(
-    udp_config: UdpOutstationConfig,
+    udp_config: OutstationUdpConfig,
     config: OutstationConfig,
     application: Box<dyn OutstationApplication>,
     information: Box<dyn OutstationInformation>,

@@ -1,4 +1,5 @@
 use crate::util::phys::{PhysAddr, PhysLayer};
+use std::io::ErrorKind;
 use std::net::SocketAddr;
 
 enum UdpType {
@@ -72,14 +73,11 @@ impl UdpType {
         buffer: &mut [u8],
     ) -> Result<(usize, PhysAddr), std::io::Error> {
         match self {
-            Self::Bound(x) => {
-                let (count, source) = x.recv_from(buffer).await?;
-                Ok((count, PhysAddr::Udp(source)))
-            }
-            Self::Connected(x) => {
-                let count = x.recv(buffer).await?;
-                Ok((count, PhysAddr::None))
-            }
+            Self::Bound(x) => x
+                .recv_from(buffer)
+                .await
+                .map(|(x, s)| (x, PhysAddr::Udp(s))),
+            Self::Connected(x) => x.recv(buffer).await.map(|x| (x, PhysAddr::None)),
         }
     }
 
@@ -93,7 +91,7 @@ impl UdpType {
                 let addr = match addr {
                     PhysAddr::None => {
                         return Err(std::io::Error::new(
-                            std::io::ErrorKind::Other,
+                            ErrorKind::Other,
                             "No destination specified for un-connected UDP socket",
                         ))
                     }
@@ -111,7 +109,19 @@ impl UdpLayer {
         &mut self,
         buffer: &mut [u8],
     ) -> Result<(usize, PhysAddr), std::io::Error> {
-        let (count, source) = self.inner.read(buffer).await?;
+        let (count, source) = loop {
+            match self.inner.read(buffer).await {
+                Ok(x) => break x,
+                Err(err) => {
+                    if err.kind() == ErrorKind::ConnectionReset {
+                        tracing::warn!("Trapped ICMP UDP reset: {}", err);
+                    } else {
+                        return Err(err);
+                    }
+                }
+            }
+        };
+
         if count == buffer.len() {
             tracing::error!("UDP under-read w/ buffer size == {count}");
         }
