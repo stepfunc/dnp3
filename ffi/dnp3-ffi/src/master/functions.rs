@@ -1160,6 +1160,7 @@ impl From<AssociationError> for ffi::ParamError {
         match error {
             AssociationError::Shutdown => Self::MasterAlreadyShutdown,
             AssociationError::DuplicateAddress(_) => Self::AssociationDuplicateAddress,
+            AssociationError::WrongChannelType { .. } => Self::WrongChannelType,
         }
     }
 }

@@ -326,7 +326,7 @@ async fn run_server(mut server: Server) -> Result<(), Box<dyn std::error::Error>
     )?;
     // ANCHOR_END: tcp_server_spawn_outstation
 
-    // setup the outstation's database before we spawn it
+    // set up the outstation's database before we spawn it
     // ANCHOR: database_init
     outstation.transaction(|db| {
         // initialize 10 points of each type

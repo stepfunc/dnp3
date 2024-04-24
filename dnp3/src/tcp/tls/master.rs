@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use crate::app::{ConnectStrategy, Listener};
 use crate::link::LinkErrorMode;
-use crate::master::{MasterChannel, MasterChannelConfig};
+use crate::master::{MasterChannel, MasterChannelConfig, MasterChannelType};
 use crate::tcp::tls::{CertificateMode, MinTlsVersion, TlsError};
 use crate::tcp::{wire_master_client, ClientState, ConnectOptions};
 use crate::tcp::{EndpointList, PostConnectionHandler};
@@ -62,6 +62,7 @@ pub fn spawn_master_tls_client_2(
     let main_addr = endpoints.main_addr().to_string();
     let (mut task, handle) = wire_master_client(
         LinkModes::stream(link_error_mode),
+        MasterChannelType::Stream,
         endpoints,
         config,
         connect_strategy,

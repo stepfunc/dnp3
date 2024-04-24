@@ -1,3 +1,4 @@
+use std::net::SocketAddr;
 use std::time::{Duration, SystemTime};
 
 use crate::app::attr::*;
@@ -34,6 +35,16 @@ use crate::util::channel::Sender;
 use crate::util::phys::PhysAddr;
 use crate::util::session::Enabled;
 
+/// Master channels may be Udp or of a "stream" type such as TCP
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(not(feature = "ffi"), non_exhaustive)]
+pub enum MasterChannelType {
+    /// UDP aka datagram based
+    Udp,
+    /// Stream-oriented e.g. TCP
+    Stream,
+}
+
 /// Handle to a master communication channel. This handle controls
 /// a task running on the Tokio Runtime.
 ///
@@ -41,6 +52,7 @@ use crate::util::session::Enabled;
 /// by the library.
 #[derive(Debug, Clone)]
 pub struct MasterChannel {
+    channel_type: MasterChannelType,
     sender: Sender<Message>,
 }
 
@@ -88,8 +100,11 @@ impl MasterChannelConfig {
 }
 
 impl MasterChannel {
-    pub(crate) fn new(sender: Sender<Message>) -> Self {
-        Self { sender }
+    pub(crate) fn new(sender: Sender<Message>, channel_type: MasterChannelType) -> Self {
+        Self {
+            sender,
+            channel_type,
+        }
     }
 
     /// enable communications
@@ -121,7 +136,19 @@ impl MasterChannel {
         rx.await?
     }
 
-    /// Create a new association:
+    fn assert_channel_type(&self, required: MasterChannelType) -> Result<(), AssociationError> {
+        if self.channel_type == required {
+            Ok(())
+        } else {
+            Err(AssociationError::WrongChannelType {
+                actual: self.channel_type,
+                required,
+            })
+        }
+    }
+
+    /// Create a new association on any stream-based channel (TCP, TLS, serial)
+    ///
     /// * `address` is the DNP3 link-layer address of the outstation
     /// * `config` controls the behavior of the master for this outstation
     /// * `handler` is a callback trait invoked when events occur for this outstation
@@ -133,10 +160,47 @@ impl MasterChannel {
         assoc_handler: Box<dyn AssociationHandler>,
         assoc_information: Box<dyn AssociationInformation>,
     ) -> Result<AssociationHandle, AssociationError> {
+        self.assert_channel_type(MasterChannelType::Stream)?;
+
         let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), AssociationError>>();
         let addr = FragmentAddr {
             link: address,
             phys: PhysAddr::None,
+        };
+        self.send_master_message(MasterMsg::AddAssociation(
+            addr,
+            config,
+            read_handler,
+            assoc_handler,
+            assoc_information,
+            Promise::OneShot(tx),
+        ))
+        .await?;
+        rx.await?
+            .map(|_| (AssociationHandle::new(address, self.clone())))
+    }
+
+    /// Create a new association on a UDP-based channel.
+    ///
+    /// * `address` is the DNP3 link-layer address of the outstation
+    /// * `destination` is IP address and port of the outstation
+    /// * `config` controls the behavior of the master for this outstation
+    /// * `handler` is a callback trait invoked when events occur for this outstation
+    pub async fn add_udp_association(
+        &mut self,
+        address: EndpointAddress,
+        destination: SocketAddr,
+        config: AssociationConfig,
+        read_handler: Box<dyn ReadHandler>,
+        assoc_handler: Box<dyn AssociationHandler>,
+        assoc_information: Box<dyn AssociationInformation>,
+    ) -> Result<AssociationHandle, AssociationError> {
+        self.assert_channel_type(MasterChannelType::Udp)?;
+
+        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), AssociationError>>();
+        let addr = FragmentAddr {
+            link: address,
+            phys: PhysAddr::Udp(destination),
         };
         self.send_master_message(MasterMsg::AddAssociation(
             addr,

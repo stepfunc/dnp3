@@ -10,7 +10,9 @@ use crate::link::EndpointAddress;
 use crate::master::association::AssociationConfig;
 use crate::master::handler::{AssociationHandle, MasterChannel, ReadHandler};
 use crate::master::task::MasterTask;
-use crate::master::{AssociationHandler, AssociationInformation, HeaderInfo, MasterChannelConfig};
+use crate::master::{
+    AssociationHandler, AssociationInformation, HeaderInfo, MasterChannelConfig, MasterChannelType,
+};
 use crate::util::phys::{PhysAddr, PhysLayer};
 use crate::util::session::{Enabled, RunError};
 
@@ -40,7 +42,7 @@ pub(crate) async fn create_association(mut config: AssociationConfig) -> TestHar
     let (tx, rx) = crate::util::channel::request_channel();
     let mut task = MasterTask::new(Enabled::Yes, LinkModes::serial(), task_config, rx);
 
-    let mut master = MasterChannel::new(tx);
+    let mut master = MasterChannel::new(tx, MasterChannelType::Stream);
 
     task.set_rx_frame_info(FrameInfo::new(
         outstation_address,

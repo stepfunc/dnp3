@@ -1,10 +1,9 @@
 use crate::app::EndpointType;
 use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
-use crate::link::header::AnyAddress;
 use crate::link::EndpointAddress;
 use crate::transport::FragmentAddr;
-use crate::util::phys::{PhysAddr, PhysLayer};
+use crate::util::phys::PhysLayer;
 
 pub(crate) struct MockWriter {
     num_writes: usize,

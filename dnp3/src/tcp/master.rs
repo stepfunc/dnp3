@@ -4,7 +4,7 @@ use crate::app::{ConnectStrategy, Listener};
 use crate::link::reader::LinkModes;
 use crate::link::LinkErrorMode;
 use crate::master::task::MasterTask;
-use crate::master::{MasterChannel, MasterChannelConfig};
+use crate::master::{MasterChannel, MasterChannelConfig, MasterChannelType};
 use crate::tcp::client::ClientTask;
 use crate::tcp::EndpointList;
 use crate::tcp::{ClientState, ConnectOptions, PostConnectionHandler};
@@ -45,6 +45,7 @@ pub fn spawn_master_tcp_client_2(
     let main_addr = endpoints.main_addr().to_string();
     let (mut task, handle) = wire_master_client(
         LinkModes::stream(link_error_mode),
+        MasterChannelType::Stream,
         endpoints,
         config,
         connect_strategy,
@@ -61,8 +62,10 @@ pub fn spawn_master_tcp_client_2(
     handle
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn wire_master_client(
     link_modes: LinkModes,
+    channel_type: MasterChannelType,
     endpoints: EndpointList,
     config: MasterChannelConfig,
     connect_strategy: ConnectStrategy,
@@ -80,5 +83,5 @@ pub(crate) fn wire_master_client(
         connection_handler,
         listener,
     );
-    (client, MasterChannel::new(tx))
+    (client, MasterChannel::new(tx, channel_type))
 }

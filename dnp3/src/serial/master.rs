@@ -38,5 +38,5 @@ pub fn spawn_master_serial(
             .await;
     };
     tokio::spawn(future);
-    MasterChannel::new(tx)
+    MasterChannel::new(tx, MasterChannelType::Stream)
 }
