@@ -254,6 +254,9 @@ public class OutstationExample {
       case "tcp":
         runTcp(runtime);
         break;
+      case "udp":
+        runUdp(runtime);
+        break;
       case "serial":
         runSerial(runtime);
         break;
@@ -290,6 +293,26 @@ public class OutstationExample {
     } finally {
       server.shutdown();
     }
+  }
+
+  private static void runUdp(Runtime runtime) {
+    // ANCHOR: create_udp
+    OutstationUdpConfig udpConfig = new OutstationUdpConfig(
+      "127.0.0.1:20000",
+      "127.0.0.1:20001"
+    );
+
+    Outstation outstation = Outstation.createUdp(
+            runtime,
+            udpConfig,
+            getOutstationConfig(),
+            new TestOutstationApplication(),
+            new TestOutstationInformation(),
+            new TestControlHandler()
+    );
+    // ANCHOR_END: create_udp
+
+    runOutstation(outstation);
   }
 
   private static void runSerial(Runtime runtime) {
