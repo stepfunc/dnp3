@@ -386,7 +386,7 @@ dependencies = [
  "oo-bindgen",
  "sfio-promise",
  "sfio-tokio-ffi",
- "sfio-tracing-ffi 0.9.0",
+ "sfio-tracing-ffi",
  "tokio",
  "tracing",
  "tracing-core",
@@ -409,7 +409,7 @@ version = "1.6.0-M2"
 dependencies = [
  "oo-bindgen",
  "sfio-tokio-ffi",
- "sfio-tracing-ffi 0.8.1",
+ "sfio-tracing-ffi",
 ]
 
 [[package]]
@@ -1151,15 +1151,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "258bfa6a7160e6e19effd9dcd3601c10432eda4b36daa45b58030605ad332586"
 dependencies = [
  "tokio",
-]
-
-[[package]]
-name = "sfio-tracing-ffi"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e1be29c84c2a7b298e74b8882c3167818f43e8ce1d73840cd35e2c34e791cf5c"
-dependencies = [
- "oo-bindgen",
 ]
 
 [[package]]
