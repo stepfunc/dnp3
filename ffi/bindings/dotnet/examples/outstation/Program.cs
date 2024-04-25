@@ -318,6 +318,27 @@ class ExampleOutstation
         RunOutstation(outstation);
     }
 
+    private static void RunUdp(Runtime runtime)
+    {
+        // ANCHOR: create_udp
+        var config = new OutstationUdpConfig(
+            "127.0.0.1:20000",
+            "127.0.0.1:20001"
+        );
+
+        var outstation = Outstation.CreateUdp(
+            runtime,
+            config,
+            GetOutstationConfig(),
+            new TestOutstationApplication(),
+            new TestOutstationInformation(),
+            new TestControlHandler()
+        );
+        // ANCHOR_END: create_udp
+
+        RunOutstation(outstation);
+    }
+
     private static void RunTls(Runtime runtime, TlsServerConfig config)
     {
         // ANCHOR: create_tls_server
@@ -386,6 +407,9 @@ class ExampleOutstation
             {
                 case "tcp":
                     RunTcp(runtime);
+                    break;
+                case "udp":
+                    RunUdp(runtime);
                     break;
                 case "serial":
                     RunSerial(runtime);
