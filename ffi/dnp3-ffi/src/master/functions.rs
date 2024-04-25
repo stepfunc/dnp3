@@ -16,6 +16,7 @@ use dnp3::tcp::ClientState;
 use dnp3::serial::*;
 #[cfg(feature = "tls")]
 use dnp3::tcp::tls::*;
+use dnp3::udp::spawn_master_udp;
 
 use crate::{ffi, ByteIterator};
 
@@ -281,6 +282,34 @@ pub(crate) unsafe fn master_channel_create_serial(
         serial_params.into(),
         retry_delay,
         Box::new(listener),
+    );
+
+    let channel = MasterChannel {
+        runtime: runtime.handle(),
+        handle: channel,
+    };
+
+    Ok(Box::into_raw(Box::new(channel)))
+}
+pub(crate) unsafe fn master_channel_create_udp(
+    runtime: *mut crate::runtime::Runtime,
+    config: ffi::MasterChannelConfig,
+    local_endpoint: &CStr,
+    link_read_mode: ffi::LinkReadMode,
+    retry_delay: Duration,
+) -> Result<*mut MasterChannel, ffi::ParamError> {
+    let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
+    let config = convert_config(config)?;
+    let local_endpoint: SocketAddr = local_endpoint.to_str()?.parse()?;
+
+    // enter the runtime context so that we can spawn
+    let _enter = runtime.enter();
+
+    let channel = spawn_master_udp(
+        local_endpoint,
+        link_read_mode.into(),
+        Timeout::from_duration(retry_delay)?,
+        config,
     );
 
     let channel = MasterChannel {

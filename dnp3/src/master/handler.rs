@@ -62,7 +62,7 @@ pub struct AssociationHandle {
     master: MasterChannel,
 }
 
-/// Configuration for a MasterChannel
+/// Configuration for a MasterChannel that is independent of the physical layer
 #[derive(Copy, Clone, Debug)]
 #[cfg_attr(
     feature = "serialization",
