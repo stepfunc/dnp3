@@ -253,7 +253,7 @@ async fn run_udp() -> Result<(), Box<dyn std::error::Error>> {
         remote_endpoint: "127.0.0.1:20001".parse().unwrap(),
         socket_mode: UdpSocketMode::OneToOne,
         link_read_mode: LinkReadMode::Datagram,
-        retry_delay: Duration::from_secs(5),
+        retry_delay: Timeout::from_secs(5)?,
     };
 
     let outstation = spawn_outstation_udp(

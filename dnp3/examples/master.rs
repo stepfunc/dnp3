@@ -600,7 +600,7 @@ fn create_udp_channel() -> Result<MasterChannel, Box<dyn std::error::Error>> {
     let channel = spawn_master_udp(
         "127.0.0.1:20001".parse()?,
         LinkReadMode::Datagram,
-        Duration::from_secs(5),
+        Timeout::from_secs(5)?,
         get_master_channel_config()?,
     );
     // ANCHOR_END: create_master_udp_channel
