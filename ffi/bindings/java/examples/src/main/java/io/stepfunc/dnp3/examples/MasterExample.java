@@ -381,6 +381,35 @@ public class MasterExample {
     }
   }
 
+  private static void runUdp(Runtime runtime) throws Exception {
+    // ANCHOR: create_udp_channel
+    MasterChannel channel =
+            MasterChannel.createUdpChannel(
+                    runtime,
+                    getMasterChannelConfig(),
+                    "127.0.0.1:20001",
+                    LinkReadMode.DATAGRAM,
+                    Duration.ofSeconds(5)
+            );
+    // ANCHOR_END: create_udp_channel
+
+    try {
+      AssociationId association =
+              channel.addUdpAssociation(
+                      ushort(1024),
+                      "127.0.0.1:20000",
+                      getAssociationConfig(),
+                      new TestReadHandler(),
+                      new TestAssociationHandler(),
+                      new TestAssociationInformation());
+
+      runAssociation(channel, association);
+    }
+    finally {
+      channel.shutdown();
+    }
+  }
+
   private static void runSerial(Runtime runtime) throws Exception {
     // ANCHOR: create_serial_channel
     MasterChannel channel =
@@ -433,6 +462,9 @@ public class MasterExample {
     switch(type) {
       case "tcp":
         runTcp(runtime);
+        break;
+      case "udp":
+        runUdp(runtime);
         break;
       case "serial":
         runSerial(runtime);
@@ -612,24 +644,12 @@ public class MasterExample {
     return bytes;
   }
 
-  private static void runChannel(MasterChannel channel) {
-
-    // Create the association
-    // ANCHOR: association_create
-    AssociationId association =
-        channel.addAssociation(
-            ushort(1024),
-            getAssociationConfig(),
-            new TestReadHandler(),
-            new TestAssociationHandler(),
-            new TestAssociationInformation());
-    // ANCHOR_END: association_create
-
+  private static void runAssociation(MasterChannel channel, AssociationId association) {
     // Create a periodic poll
     // ANCHOR: add_poll
     PollId poll =
-        channel.addPoll(
-            association, Request.classRequest(false, true, true, true), Duration.ofSeconds(5));
+            channel.addPoll(
+                    association, Request.classRequest(false, true, true, true), Duration.ofSeconds(5));
     // ANCHOR_END: add_poll
 
     // start communications
@@ -649,6 +669,22 @@ public class MasterExample {
         System.out.println("Error: " + ex);
       }
     }
+  }
+
+  private static void runChannel(MasterChannel channel) {
+
+    // Create the association
+    // ANCHOR: association_create
+    AssociationId association =
+        channel.addAssociation(
+            ushort(1024),
+            getAssociationConfig(),
+            new TestReadHandler(),
+            new TestAssociationHandler(),
+            new TestAssociationInformation());
+    // ANCHOR_END: association_create
+
+    runAssociation(channel, association);
   }
 
   private static void printFileInfo(FileInfo info) {

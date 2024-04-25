@@ -375,6 +375,28 @@ void run_serial(dnp3::Runtime &runtime)
     run_outstation(outstation);
 }
 
+void run_udp(dnp3::Runtime &runtime)
+{
+    // ANCHOR: create_udp
+    dnp3::OutstationUdpConfig udp_config(
+        "127.0.0.1:20000",
+        "127.0.0.1:20001"
+    );
+
+    auto outstation = dnp3::Outstation::create_udp(
+        runtime,
+        udp_config,
+        get_outstation_config(),
+        std::make_unique<MyOutstationApplication>(),
+        std::make_unique<MyOutstationInformation>(),
+        std::make_unique<MyControlHandler>()
+    );
+
+    // ANCHOR_END: create_udp
+
+    run_outstation(outstation);
+}
+
 void run_tls_server(dnp3::Runtime &runtime, const dnp3::TlsServerConfig &config)
 {
     // ANCHOR: create_tls_server
@@ -439,6 +461,9 @@ int main(int argc, char *argv[])
     }
     else if (strcmp(type, "tcp-client") == 0) {
         run_tcp_client(runtime);
+    }
+    else if (strcmp(type, "udp") == 0) {
+        run_udp(runtime);
     }
     else if (strcmp(type, "serial") == 0) {
         run_serial(runtime);

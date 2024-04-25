@@ -133,7 +133,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
             doc("Create a UDP master channel on the local endpoint")
                 .details("The returned master must be gracefully shutdown with {class:master_channel.[destructor]} when done.")
         )?
-        .build_static("master_channel_create_udp")?;
+        .build_static("create_udp_channel")?;
 
     let channel_destructor = lib.define_destructor(
         master_channel_class.clone(),
