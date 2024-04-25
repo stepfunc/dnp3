@@ -1,4 +1,5 @@
 use std::ffi::{CStr, CString};
+use std::net::SocketAddr;
 use std::ptr::{null, null_mut};
 use std::str::Utf8Error;
 use std::time::Duration;
@@ -15,6 +16,7 @@ use dnp3::tcp::ClientState;
 use dnp3::serial::*;
 #[cfg(feature = "tls")]
 use dnp3::tcp::tls::*;
+use dnp3::udp::spawn_master_udp;
 
 use crate::{ffi, ByteIterator};
 
@@ -289,6 +291,34 @@ pub(crate) unsafe fn master_channel_create_serial(
 
     Ok(Box::into_raw(Box::new(channel)))
 }
+pub(crate) unsafe fn master_channel_create_udp(
+    runtime: *mut crate::runtime::Runtime,
+    config: ffi::MasterChannelConfig,
+    local_endpoint: &CStr,
+    link_read_mode: ffi::LinkReadMode,
+    retry_delay: Duration,
+) -> Result<*mut MasterChannel, ffi::ParamError> {
+    let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
+    let config = convert_config(config)?;
+    let local_endpoint: SocketAddr = local_endpoint.to_str()?.parse()?;
+
+    // enter the runtime context so that we can spawn
+    let _enter = runtime.enter();
+
+    let channel = spawn_master_udp(
+        local_endpoint,
+        link_read_mode.into(),
+        Timeout::from_duration(retry_delay)?,
+        config,
+    );
+
+    let channel = MasterChannel {
+        runtime: runtime.handle(),
+        handle: channel,
+    };
+
+    Ok(Box::into_raw(Box::new(channel)))
+}
 
 pub(crate) unsafe fn master_channel_destroy(channel: *mut MasterChannel) {
     if !channel.is_null() {
@@ -322,39 +352,79 @@ pub(crate) unsafe fn master_channel_add_association(
 ) -> Result<ffi::AssociationId, ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::try_new(address)?;
+    let config: AssociationConfig = config.try_into()?;
 
-    let config = AssociationConfig {
-        response_timeout: Timeout::from_duration(Duration::from_millis(config.response_timeout))?,
-        disable_unsol_classes: convert_event_classes(config.disable_unsol_classes()),
-        enable_unsol_classes: convert_event_classes(config.enable_unsol_classes()),
-        startup_integrity_classes: convert_classes(config.startup_integrity_classes()),
-        auto_time_sync: convert_auto_time_sync(&config.auto_time_sync()),
-        auto_tasks_retry_strategy: RetryStrategy::new(
-            config.auto_tasks_retry_strategy.min_delay(),
-            config.auto_tasks_retry_strategy.max_delay(),
-        ),
-        keep_alive_timeout: if config.keep_alive_timeout() == Duration::from_secs(0) {
-            None
-        } else {
-            Some(config.keep_alive_timeout())
-        },
-        auto_integrity_scan_on_buffer_overflow: config.auto_integrity_scan_on_buffer_overflow(),
-        event_scan_on_events_available: convert_event_classes(
-            config.event_scan_on_events_available(),
-        ),
-        max_queued_user_requests: config.max_queued_user_requests as usize,
-    };
-
-    channel.runtime.block_on(channel.handle.add_association(
+    let future = channel.handle.add_association(
         address,
         config,
         Box::new(read_handler),
         Box::new(assoc_handler),
         Box::new(assoc_info),
-    ))??;
+    );
+
+    channel.runtime.block_on(future)??;
     Ok(ffi::AssociationId {
         address: address.raw_value(),
     })
+}
+
+pub(crate) unsafe fn master_channel_add_udp_association(
+    channel: *mut MasterChannel,
+    address: u16,
+    destination: &CStr,
+    config: ffi::AssociationConfig,
+    read_handler: ffi::ReadHandler,
+    assoc_handler: ffi::AssociationHandler,
+    assoc_info: ffi::AssociationInformation,
+) -> Result<ffi::AssociationId, ffi::ParamError> {
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let address = EndpointAddress::try_new(address)?;
+    let config: AssociationConfig = config.try_into()?;
+    let destination: SocketAddr = destination.to_str()?.parse()?;
+
+    let future = channel.handle.add_udp_association(
+        address,
+        destination,
+        config,
+        Box::new(read_handler),
+        Box::new(assoc_handler),
+        Box::new(assoc_info),
+    );
+
+    channel.runtime.block_on(future)??;
+    Ok(ffi::AssociationId {
+        address: address.raw_value(),
+    })
+}
+
+impl TryFrom<ffi::AssociationConfig> for AssociationConfig {
+    type Error = ffi::ParamError;
+
+    fn try_from(config: ffi::AssociationConfig) -> Result<Self, Self::Error> {
+        Ok(AssociationConfig {
+            response_timeout: Timeout::from_duration(Duration::from_millis(
+                config.response_timeout,
+            ))?,
+            disable_unsol_classes: convert_event_classes(config.disable_unsol_classes()),
+            enable_unsol_classes: convert_event_classes(config.enable_unsol_classes()),
+            startup_integrity_classes: convert_classes(config.startup_integrity_classes()),
+            auto_time_sync: convert_auto_time_sync(&config.auto_time_sync()),
+            auto_tasks_retry_strategy: RetryStrategy::new(
+                config.auto_tasks_retry_strategy.min_delay(),
+                config.auto_tasks_retry_strategy.max_delay(),
+            ),
+            keep_alive_timeout: if config.keep_alive_timeout() == Duration::from_secs(0) {
+                None
+            } else {
+                Some(config.keep_alive_timeout())
+            },
+            auto_integrity_scan_on_buffer_overflow: config.auto_integrity_scan_on_buffer_overflow(),
+            event_scan_on_events_available: convert_event_classes(
+                config.event_scan_on_events_available(),
+            ),
+            max_queued_user_requests: config.max_queued_user_requests as usize,
+        })
+    }
 }
 
 impl From<TimeoutRangeError> for ffi::ParamError {
@@ -1160,6 +1230,7 @@ impl From<AssociationError> for ffi::ParamError {
         match error {
             AssociationError::Shutdown => Self::MasterAlreadyShutdown,
             AssociationError::DuplicateAddress(_) => Self::AssociationDuplicateAddress,
+            AssociationError::WrongChannelType { .. } => Self::WrongChannelType,
         }
     }
 }

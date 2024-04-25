@@ -18,6 +18,7 @@ use dnp3::serial::*;
 use dnp3::tcp::tls::*;
 
 use dnp3::outstation::FreezeInterval;
+use dnp3::udp::spawn_master_udp;
 use std::process::exit;
 
 /// read handler that does nothing
@@ -225,7 +226,7 @@ impl FileReader for FileLogger {
   The program initializes a master channel based on the command line argument and then enters a loop
   reading console input allowing the user to perform common tasks interactively.
 
-  All of the configuration values are hard-coded but can be changed with a recompile.
+  All the configuration values are hard-coded but can be changed with a recompile.
 */
 // ANCHOR: runtime_init
 #[tokio::main(flavor = "multi_thread")]
@@ -243,17 +244,35 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // spawn the master channel based on the command line argument
     let mut channel = create_channel()?;
 
-    // ANCHOR: association_create
-    let mut association = channel
-        .add_association(
-            EndpointAddress::try_new(1024)?,
-            get_association_config(),
-            ExampleReadHandler::boxed(),
-            Box::new(ExampleAssociationHandler),
-            Box::new(ExampleAssociationInformation),
-        )
-        .await?;
-    // ANCHOR_END: association_create
+    let mut association = match channel.get_channel_type() {
+        MasterChannelType::Udp => {
+            // ANCHOR: association_create_udp
+            channel
+                .add_udp_association(
+                    EndpointAddress::try_new(1024)?,
+                    "127.0.0.1:20000".parse()?,
+                    get_association_config(),
+                    ExampleReadHandler::boxed(),
+                    Box::new(ExampleAssociationHandler),
+                    Box::new(ExampleAssociationInformation),
+                )
+                .await?
+            // ANCHOR_END: association_create_udp
+        }
+        MasterChannelType::Stream => {
+            // ANCHOR: association_create
+            channel
+                .add_association(
+                    EndpointAddress::try_new(1024)?,
+                    get_association_config(),
+                    ExampleReadHandler::boxed(),
+                    Box::new(ExampleAssociationHandler),
+                    Box::new(ExampleAssociationInformation),
+                )
+                .await?
+            // ANCHOR_END: association_create
+        }
+    };
 
     // create an event poll
     // ANCHOR: add_poll
@@ -483,12 +502,13 @@ fn create_channel() -> Result<MasterChannel, Box<dyn std::error::Error>> {
         [_, x] => x,
         _ => {
             eprintln!("please specify a transport:");
-            eprintln!("usage: master <transport> (tcp, serial, tls-ca, tls-self-signed)");
+            eprintln!("usage: master <transport> (tcp, udp, serial, tls-ca, tls-self-signed)");
             exit(-1);
         }
     };
     match transport {
         "tcp" => create_tcp_channel(),
+        "udp" => create_udp_channel(),
         #[cfg(feature = "serial")]
         "serial" => create_serial_channel(),
         #[cfg(feature = "tls")]
@@ -572,6 +592,18 @@ fn create_tcp_channel() -> Result<MasterChannel, Box<dyn std::error::Error>> {
         NullListener::create(),
     );
     // ANCHOR_END: create_master_tcp_channel
+    Ok(channel)
+}
+
+fn create_udp_channel() -> Result<MasterChannel, Box<dyn std::error::Error>> {
+    // ANCHOR: create_master_udp_channel
+    let channel = spawn_master_udp(
+        "127.0.0.1:20001".parse()?,
+        LinkReadMode::Datagram,
+        Timeout::from_secs(5)?,
+        get_master_channel_config()?,
+    );
+    // ANCHOR_END: create_master_udp_channel
     Ok(channel)
 }
 

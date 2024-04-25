@@ -5,12 +5,15 @@ use tokio::task::JoinHandle;
 use crate::app::{BufferSize, Timeout};
 use crate::decode::AppDecodeLevel;
 use crate::link::header::{FrameInfo, FrameType};
-use crate::link::{EndpointAddress, LinkErrorMode};
+use crate::link::reader::LinkModes;
+use crate::link::EndpointAddress;
 use crate::master::association::AssociationConfig;
 use crate::master::handler::{AssociationHandle, MasterChannel, ReadHandler};
 use crate::master::task::MasterTask;
-use crate::master::{AssociationHandler, AssociationInformation, HeaderInfo, MasterChannelConfig};
-use crate::util::phys::PhysLayer;
+use crate::master::{
+    AssociationHandler, AssociationInformation, HeaderInfo, MasterChannelConfig, MasterChannelType,
+};
+use crate::util::phys::{PhysAddr, PhysLayer};
 use crate::util::session::{Enabled, RunError};
 
 pub(crate) mod requests;
@@ -37,11 +40,16 @@ pub(crate) async fn create_association(mut config: AssociationConfig) -> TestHar
 
     // Create the master session
     let (tx, rx) = crate::util::channel::request_channel();
-    let mut task = MasterTask::new(Enabled::Yes, LinkErrorMode::Close, task_config, rx);
+    let mut task = MasterTask::new(Enabled::Yes, LinkModes::serial(), task_config, rx);
 
-    let mut master = MasterChannel::new(tx);
+    let mut master = MasterChannel::new(tx, MasterChannelType::Stream);
 
-    task.set_rx_frame_info(FrameInfo::new(outstation_address, None, FrameType::Data));
+    task.set_rx_frame_info(FrameInfo::new(
+        outstation_address,
+        None,
+        FrameType::Data,
+        PhysAddr::None,
+    ));
 
     let master_task = tokio::spawn(async move { task.run(&mut io).await });
 

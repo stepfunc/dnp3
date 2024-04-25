@@ -3,7 +3,7 @@ use std::time::Duration;
 use tracing::Instrument;
 
 use crate::app::{Listener, RetryStrategy};
-use crate::link::LinkErrorMode;
+use crate::link::reader::LinkModes;
 use crate::master::task::MasterTask;
 use crate::master::*;
 use crate::serial::{PortState, SerialSettings};
@@ -23,7 +23,7 @@ pub fn spawn_master_serial(
 ) -> MasterChannel {
     let log_path = path.to_owned();
     let (tx, rx) = crate::util::channel::request_channel();
-    let task = MasterTask::new(Enabled::No, LinkErrorMode::Discard, config, rx);
+    let task = MasterTask::new(Enabled::No, LinkModes::serial(), config, rx);
     let mut serial = super::task::SerialTask::new(
         path,
         serial_settings,
@@ -38,5 +38,5 @@ pub fn spawn_master_serial(
             .await;
     };
     tokio::spawn(future);
-    MasterChannel::new(tx)
+    MasterChannel::new(tx, MasterChannelType::Stream)
 }

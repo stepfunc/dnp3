@@ -2,7 +2,6 @@ use crate::app::format::write::HeaderWriter;
 use crate::app::parse::parser::{HeaderCollection, Response};
 use crate::app::FunctionCode;
 use crate::app::ResponseHeader;
-use crate::link::EndpointAddress;
 use crate::master::association::Association;
 use crate::master::error::TaskError;
 use crate::master::extract::extract_measurements;
@@ -24,6 +23,7 @@ use crate::master::tasks::file::get_info::GetFileInfoTask;
 use crate::master::tasks::file::open::OpenFileTask;
 use crate::master::tasks::file::read::FileReadTask;
 use crate::master::tasks::file::write_block::WriteBlockTask;
+use crate::transport::FragmentAddr;
 
 pub(crate) mod auto;
 pub(crate) mod command;
@@ -37,15 +37,15 @@ pub(crate) mod time;
 
 /// Queued task requiring I/O
 pub(crate) struct AssociationTask {
-    /// Outstation address
-    pub(crate) address: EndpointAddress,
+    /// Destination addresses for tasks
+    pub(crate) dest: FragmentAddr,
     /// Actual task to perform
     pub(crate) details: Task,
 }
 
 impl AssociationTask {
-    pub(crate) fn new(address: EndpointAddress, details: Task) -> Self {
-        Self { address, details }
+    pub(crate) fn new(dest: FragmentAddr, details: Task) -> Self {
+        Self { dest, details }
     }
 }
 

@@ -4,7 +4,7 @@ use std::time::Duration;
 
 pub use database::*;
 use dnp3::app::{BufferSize, BufferSizeError, Listener, MaybeAsync, Timeout};
-use dnp3::link::{EndpointAddress, LinkErrorMode};
+use dnp3::link::{EndpointAddress, LinkErrorMode, LinkReadMode};
 use dnp3::outstation::database::{ClassZeroConfig, EventBufferConfig};
 use dnp3::outstation::{ConnectionState, Feature, Features, OutstationConfig, OutstationHandle};
 use dnp3::tcp::{FilterError, ServerHandle};
@@ -14,6 +14,7 @@ use crate::{ffi, Runtime, RuntimeHandle};
 
 #[cfg(feature = "tls")]
 use dnp3::tcp::tls::TlsServerConfig;
+use dnp3::udp::{OutstationUdpConfig, UdpSocketMode};
 
 mod adapters;
 mod database;
@@ -433,6 +434,35 @@ pub(crate) unsafe fn outstation_create_serial_session_2(
     Ok(Box::into_raw(handle))
 }
 
+pub(crate) unsafe fn outstation_create_udp(
+    runtime: *mut crate::Runtime,
+    udp_config: ffi::OutstationUdpConfig,
+    config: ffi::OutstationConfig,
+    application: ffi::OutstationApplication,
+    information: ffi::OutstationInformation,
+    control_handler: ffi::ControlHandler,
+) -> Result<*mut crate::Outstation, ffi::ParamError> {
+    let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
+    let config = convert_outstation_config(config)?;
+    let udp_config = convert_udp_config(udp_config)?;
+
+    let _enter = runtime.enter();
+    let handle = dnp3::udp::spawn_outstation_udp(
+        udp_config,
+        config,
+        Box::new(application),
+        Box::new(information),
+        Box::new(control_handler),
+    );
+
+    let handle = Box::new(crate::Outstation {
+        handle,
+        runtime: runtime.handle(),
+    });
+
+    Ok(Box::into_raw(handle))
+}
+
 pub(crate) unsafe fn outstation_transaction(
     outstation: *mut Outstation,
     callback: ffi::DatabaseTransaction,
@@ -467,6 +497,18 @@ pub unsafe fn outstation_disable(
     let outstation = outstation.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     outstation.runtime.block_on(outstation.handle.disable())??;
     Ok(())
+}
+
+unsafe fn convert_udp_config(
+    config: ffi::OutstationUdpConfig,
+) -> Result<OutstationUdpConfig, ffi::ParamError> {
+    Ok(OutstationUdpConfig {
+        local_endpoint: CStr::from_ptr(config.local_endpoint).to_str()?.parse()?,
+        remote_endpoint: CStr::from_ptr(config.remote_endpoint).to_str()?.parse()?,
+        socket_mode: config.socket_mode().into(),
+        link_read_mode: config.link_read_mode().into(),
+        retry_delay: Timeout::from_millis(config.retry_delay)?,
+    })
 }
 
 fn convert_outstation_config(
@@ -509,6 +551,15 @@ impl Listener<ConnectionState> for ffi::ConnectionStateListener {
     fn update(&mut self, value: ConnectionState) -> MaybeAsync<()> {
         self.on_change(value.into());
         MaybeAsync::ready(())
+    }
+}
+
+impl From<ffi::UdpSocketMode> for UdpSocketMode {
+    fn from(value: ffi::UdpSocketMode) -> Self {
+        match value {
+            ffi::UdpSocketMode::OneToOne => UdpSocketMode::OneToOne,
+            ffi::UdpSocketMode::OneToMany => UdpSocketMode::OneToMany,
+        }
     }
 }
 
@@ -574,6 +625,15 @@ impl From<ffi::LinkErrorMode> for LinkErrorMode {
         match from {
             ffi::LinkErrorMode::Close => LinkErrorMode::Close,
             ffi::LinkErrorMode::Discard => LinkErrorMode::Discard,
+        }
+    }
+}
+
+impl From<ffi::LinkReadMode> for LinkReadMode {
+    fn from(from: ffi::LinkReadMode) -> Self {
+        match from {
+            ffi::LinkReadMode::Datagram => LinkReadMode::Datagram,
+            ffi::LinkReadMode::Stream => LinkReadMode::Stream,
         }
     }
 }

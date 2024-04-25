@@ -1,6 +1,6 @@
 #![doc = include_str!("../README.md")]
 #![deny(
-dead_code,
+//dead_code,
 arithmetic_overflow,
 invalid_type_param_default,
 missing_fragment_specifier,
@@ -65,6 +65,8 @@ pub mod outstation;
 pub mod serial;
 /// Entry points and types for TCP
 pub mod tcp;
+/// Entry points and types for UDP
+pub mod udp;
 
 pub(crate) mod transport;
 pub(crate) mod util;

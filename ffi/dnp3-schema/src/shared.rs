@@ -50,6 +50,8 @@ pub(crate) struct SharedDefinitions {
     pub attr: DeviceAttrTypes,
     pub file: FileDefinitions,
     pub nothing: EnumHandle,
+    pub udp_socket_mode: EnumHandle,
+    pub link_read_mode: EnumHandle,
 }
 
 pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
@@ -109,6 +111,10 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> 
         .add_error("invalid_private_key", "Invalid private key file")?
         .add_error("invalid_dns_name", "Invalid DNS name")?
         .add_error("other_tls_error", "Other TLS error")?
+        .add_error(
+            "wrong_channel_type",
+            "This operation cannot be performed on this channel type",
+        )?
         .doc("Error type used throughout the library")?
         .build()?;
 
@@ -347,6 +353,8 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> 
         file: crate::file::define(lib, nothing.clone())?,
         nothing,
         byte_collection,
+        udp_socket_mode: define_udp_socket_mode(lib)?,
+        link_read_mode: define_line_read_mode(lib)?,
     })
 }
 
@@ -1032,4 +1040,32 @@ fn define_analog_command_type(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle
         .build()?;
 
     Ok(command_status)
+}
+
+fn define_udp_socket_mode(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
+    let value = lib
+        .define_enum("udp_socket_mode")?
+        .push("one_to_one", "The UDP endpoint will only communicate with the specified remote endpoint")?
+        .push("one_to_many",
+              doc("The UDP endpoint will accept packets any remote endpoint.")
+                  .details("When this mode is used with an outstation, the outstation will respond to the address from which the request was sent. It will use the supplied remote endpoint only for sending unsolicited responses.")
+        )?
+        .doc("Describes how the UDP socket reads and writes datagrams from remote endpoint(s)")?
+        .build()?;
+
+    Ok(value)
+}
+
+fn define_line_read_mode(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
+    let value = lib
+        .define_enum("link_read_mode")?
+        .push("stream", "Reading from a stream (TCP, serial, etc.) where link-layer frames MAY span separate calls to read")?
+        .push("datagram", "Reading datagrams (UDP) where link-layer frames MAY NOT span separate calls to read")?
+        .doc(
+            doc("Controls how the link-layer parser treats frames that span multiple calls to read of the physical layer.")
+                .details("UDP is unique in that the specification requires that link layer frames be wholly contained within datagrams, but this can be relaxed by configuration.")
+        )?
+        .build()?;
+
+    Ok(value)
 }

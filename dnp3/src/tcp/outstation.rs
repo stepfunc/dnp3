@@ -2,7 +2,8 @@ use std::net::SocketAddr;
 use tracing::Instrument;
 
 use crate::app::{ConnectStrategy, Listener, Shutdown};
-use crate::link::LinkErrorMode;
+use crate::link::reader::LinkModes;
+use crate::link::{LinkErrorMode, LinkReadMode};
 use crate::outstation::task::OutstationTask;
 use crate::outstation::*;
 use crate::tcp::client::ClientTask;
@@ -11,7 +12,7 @@ use crate::tcp::{
     AddressFilter, ClientState, ConnectOptions, EndpointList, FilterError, PostConnectionHandler,
 };
 use crate::util::channel::Sender;
-use crate::util::phys::PhysLayer;
+use crate::util::phys::{PhysAddr, PhysLayer};
 use crate::util::session::{Enabled, Session};
 
 /// Spawn a TCP client task onto the `Tokio` runtime. The task runs until the returned handle is dropped.
@@ -33,8 +34,9 @@ pub fn spawn_outstation_tcp_client(
     let main_addr = endpoints.main_addr().to_string();
     let (task, handle) = OutstationTask::create(
         Enabled::No,
-        link_error_mode,
+        LinkModes::stream(link_error_mode),
         config,
+        PhysAddr::None,
         application,
         information,
         control_handler,
@@ -69,7 +71,7 @@ struct OutstationInfo {
 /// A builder for creating a TCP server with one or more outstation instances
 /// associated with it
 pub struct Server {
-    link_error_mode: LinkErrorMode,
+    link_modes: LinkModes,
     connection_id: u64,
     address: SocketAddr,
     outstations: Vec<OutstationInfo>,
@@ -112,7 +114,10 @@ impl Server {
     /// to the specified address
     pub fn new_tcp_server(link_error_mode: LinkErrorMode, address: SocketAddr) -> Self {
         Self {
-            link_error_mode,
+            link_modes: LinkModes {
+                error_mode: link_error_mode,
+                read_mode: LinkReadMode::Stream,
+            },
             connection_id: 0,
             address,
             outstations: Vec::new(),
@@ -128,7 +133,7 @@ impl Server {
         tls_config: crate::tcp::tls::TlsServerConfig,
     ) -> Self {
         Self {
-            link_error_mode,
+            link_modes: LinkModes::stream(link_error_mode),
             connection_id: 0,
             address,
             outstations: Vec::new(),
@@ -155,8 +160,9 @@ impl Server {
 
         let (task, handle) = OutstationTask::create(
             Enabled::Yes,
-            self.link_error_mode,
+            self.link_modes,
             config,
+            PhysAddr::None,
             application,
             information,
             control_handler,

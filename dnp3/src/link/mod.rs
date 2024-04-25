@@ -41,6 +41,23 @@ pub enum LinkErrorMode {
     Close,
 }
 
+/// Controls how the link-layer parser treats frames that span multiple calls to read of
+/// the physical layer.
+///
+/// UDP is unique in that the specification requires that link layer frames be wholly contained
+/// within datagrams, but this can be relaxed by configuration.
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum LinkReadMode {
+    /// Reading from a stream (TCP, serial, etc.) where link-layer frames MAY span separate calls to read
+    Stream,
+    /// Reading datagrams (UDP) where link-layer frames MAY NOT span separate calls to read
+    Datagram,
+}
+
 /// Represents a validated 16-bit endpoint address for a master or an outstation
 /// Certain special addresses are not allowed by the standard to be used
 /// as endpoint addresses.

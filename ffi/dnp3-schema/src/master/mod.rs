@@ -110,7 +110,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         .param("config",master_channel_config.clone(), "Generic configuration for the channel")?
         .param("path", StringType, "Path to the serial device. Generally /dev/tty0 on Linux and COM1 on Windows.")?
         .param("serial_params",shared.serial_port_settings.clone(), "Serial port settings")?
-        .param("open_retry_delay", DurationType::Milliseconds, "delay between attempts to open the serial port")?
+        .param("open_retry_delay", DurationType::Milliseconds, "Delay between attempts to open the serial port")?
         .param("listener",shared.port_state_listener.clone(), "Listener to receive updates on the status of the serial port")?
         .returns(master_channel_class.clone(), "Handle to the master created, {null} if an error occurred")?
         .fails_with(shared.error_type.clone())?
@@ -119,6 +119,21 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
                 .details("The returned master must be gracefully shutdown with {class:master_channel.[destructor]} when done.")
         )?
         .build_static("create_serial_channel")?;
+
+    let master_channel_create_udp_fn = lib
+        .define_function("master_channel_create_udp")?
+        .param("runtime",shared.runtime_class.clone(), "Runtime to use to drive asynchronous operations of the master")?
+        .param("config",master_channel_config.clone(), "Generic configuration for the channel")?
+        .param("local_endpoint", StringType, "Local endpoint on which to bind the UDP socket")?
+        .param("link_read_mode", shared.link_read_mode.clone(), "Determines how the link-layer parser treats frame that span datagrams. Typically set to {enum:link_read_mode.datagram}")?
+        .param("retry_delay", DurationType::Milliseconds, "Amount of time to wait after a failed attempt to bind the UDP socket")?
+        .returns(master_channel_class.clone(), "Handle to the master created, {null} if an error occurred")?
+        .fails_with(shared.error_type.clone())?
+        .doc(
+            doc("Create a UDP master channel on the local endpoint")
+                .details("The returned master must be gracefully shutdown with {class:master_channel.[destructor]} when done.")
+        )?
+        .build_static("master_channel_create_udp")?;
 
     let channel_destructor = lib.define_destructor(
         master_channel_class.clone(),
@@ -253,6 +268,43 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
             Primitive::U16,
             "DNP3 data-link address of the remote outstation",
         )?
+        .param(
+            "config",
+            association_config.clone(),
+            "Association configuration",
+        )?
+        .param(
+            "read_handler",
+            read_handler.clone(),
+            "Interface uses to load measurement data",
+        )?
+        .param(
+            "association_handler",
+            association_handler_interface.clone(),
+            "Association specific callbacks such as time synchronization",
+        )?
+        .param(
+            "association_information",
+            association_information_interface.clone(),
+            "Association information interface",
+        )?
+        .returns(association_id.clone(), "Id of the association")?
+        .fails_with(shared.error_type.clone())?
+        .doc("Add an association to the channel")?
+        .build()?;
+
+    let add_udp_association_method = lib
+        .define_method("add_udp_association", master_channel_class.clone())?
+        .param(
+            "address",
+            Primitive::U16,
+            "DNP3 data-link address of the remote outstation",
+        )?
+        .param(
+            "destination",
+            StringType,
+            "IP address and port of the outstation",
+        )?
         .param("config", association_config, "Association configuration")?
         .param(
             "read_handler",
@@ -271,7 +323,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         )?
         .returns(association_id.clone(), "Id of the association")?
         .fails_with(shared.error_type.clone())?
-        .doc("Add an association to the channel")?
+        .doc("Add a UDP association to the channel")?
         .build()?;
 
     let remove_association_method = lib
@@ -681,9 +733,11 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         .static_method(master_channel_create_tls_fn)?
         .static_method(master_channel_create_tls_2_fn)?
         .static_method(master_channel_create_serial_fn)?
+        .static_method(master_channel_create_udp_fn)?
         .method(enable_method)?
         .method(disable_method)?
         .method(add_association_method)?
+        .method(add_udp_association_method)?
         .method(remove_association_method)?
         .method(set_decode_level_method)?
         .method(get_decode_level_method)?
@@ -886,7 +940,7 @@ fn define_master_channel_config(
     let rx_buffer_size = Name::create("rx_buffer_size")?;
 
     let config = lib.define_function_argument_struct(config)?
-        .doc("Generic configuration for a MasterChannel")?
+        .doc("Configuration for a MasterChannel that is independent of the physical layer")?
         .add("address", Primitive::U16, "Local DNP3 data-link address")?
         .add(decode_level.clone(), shared.decode_level.clone(), "Decoding level for this master. You can modify this later on with {class:master_channel.set_decode_level()}.")?
         .add(tx_buffer_size.clone(), Primitive::U16, doc("TX buffer size").details("Must be at least 249"))?

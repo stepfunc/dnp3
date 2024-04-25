@@ -5,17 +5,18 @@ use crate::app::parse::parser::Response;
 use crate::app::{BufferSize, ControlField, Sequence};
 use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
-use crate::link::{EndpointAddress, LinkErrorMode};
+use crate::link::EndpointAddress;
 use crate::master::association::{AssociationMap, Next};
 use crate::master::error::TaskError;
 use crate::master::messages::{MasterMsg, Message};
 use crate::master::tasks::{AppTask, AssociationTask, NonReadTask, ReadTask, RequestWriter, Task};
 use crate::master::{Association, MasterChannelConfig};
-use crate::transport::{TransportReader, TransportResponse, TransportWriter};
+use crate::transport::{FragmentAddr, TransportReader, TransportResponse, TransportWriter};
 use crate::util::buffer::Buffer;
 use crate::util::channel::Receiver;
 use crate::util::phys::PhysLayer;
 
+use crate::link::reader::LinkModes;
 use crate::util::session::{Enabled, RunError, StopReason};
 use tokio::time::Instant;
 
@@ -29,7 +30,7 @@ pub(crate) struct MasterTask {
 impl MasterTask {
     pub(crate) fn new(
         initial_state: Enabled,
-        link_error_mode: LinkErrorMode,
+        link_modes: LinkModes,
         config: MasterChannelConfig,
         messages: Receiver<Message>,
     ) -> Self {
@@ -40,7 +41,7 @@ impl MasterTask {
             messages,
         );
         let (reader, writer) = crate::transport::create_master_transport_layer(
-            link_error_mode,
+            link_modes,
             config.master_address,
             config.rx_buffer_size,
         );
@@ -118,7 +119,7 @@ impl MasterSession {
             let result = match self.get_next_task() {
                 Next::Now(task) => {
                     let id = task.details.get_id();
-                    let address = task.address.raw_value();
+                    let address = task.dest.link.raw_value();
                     self.run_task(io, task, writer, reader)
                         .instrument(tracing::info_span!("task", "type" = ?id, "dest" = address))
                         .await
@@ -158,9 +159,9 @@ impl MasterSession {
                 result = reader.read(io, decode_level) => {
                    result?;
                    match reader.pop_response() {
-                        Some(TransportResponse::Response(source, response)) => {
-                            self.notify_link_activity(source);
-                            return self.handle_fragment_while_idle(io, writer, source, response).await
+                        Some(TransportResponse::Response(addr, response)) => {
+                            self.notify_link_activity(addr.link);
+                            return self.handle_fragment_while_idle(io, writer, addr, response).await
                         }
                         Some(TransportResponse::LinkLayerMessage(msg)) => self.notify_link_activity(msg.source),
                         Some(TransportResponse::Error(_)) => return Ok(()), // ignore the malformed response
@@ -191,9 +192,9 @@ impl MasterSession {
                 result = reader.read(io, decode_level) => {
                    result?;
                    match reader.pop_response() {
-                        Some(TransportResponse::Response(source, response)) => {
-                            self.notify_link_activity(source);
-                            return self.handle_fragment_while_idle(io, writer, source, response).await
+                        Some(TransportResponse::Response(addr, response)) => {
+                            self.notify_link_activity(addr.link);
+                            return self.handle_fragment_while_idle(io, writer, addr, response).await
                         }
                         Some(TransportResponse::LinkLayerMessage(msg)) => self.notify_link_activity(msg.source),
                         Some(TransportResponse::Error(_)) => return Ok(()), // ignore the malformed response
@@ -287,22 +288,19 @@ impl MasterSession {
                 let task_type = t.as_task_type();
                 let function = t.function();
 
-                if let Ok(assoc) = self.associations.get_mut(task.address) {
+                if let Ok(assoc) = self.associations.get_mut(task.dest.link) {
                     assoc.notify_task_start(task_type, function, assoc.seq());
                 }
 
                 let res: Result<Sequence, TaskError> = match t {
-                    AppTask::Read(t) => {
-                        self.run_read_task(io, task.address, t, writer, reader)
-                            .await
-                    }
+                    AppTask::Read(t) => self.run_read_task(io, task.dest, t, writer, reader).await,
                     AppTask::NonRead(t) => {
-                        self.run_non_read_task(io, task.address, t, writer, reader)
+                        self.run_non_read_task(io, task.dest, t, writer, reader)
                             .await
                     }
                 };
 
-                if let Ok(assoc) = self.associations.get_mut(task.address) {
+                if let Ok(assoc) = self.associations.get_mut(task.dest.link) {
                     match res {
                         Ok(seq) => {
                             assoc.notify_task_success(task_type, function, seq);
@@ -317,7 +315,7 @@ impl MasterSession {
             }
             Task::LinkStatus(promise) => {
                 match self
-                    .run_link_status_task(io, task.address, writer, reader)
+                    .run_link_status_task(io, task.dest, writer, reader)
                     .await
                 {
                     Ok(result) => {
@@ -347,7 +345,7 @@ impl MasterSession {
     async fn run_non_read_task(
         &mut self,
         io: &mut PhysLayer,
-        destination: EndpointAddress,
+        dest: FragmentAddr,
         task: NonReadTask,
         writer: &mut TransportWriter,
         reader: &mut TransportReader,
@@ -357,7 +355,7 @@ impl MasterSession {
         loop {
             next = match next {
                 NextStep::Continue(task) => {
-                    self.run_single_non_read_task(io, destination, task, writer, reader)
+                    self.run_single_non_read_task(io, dest, task, writer, reader)
                         .await?
                 }
                 NextStep::Complete(seq) => {
@@ -370,48 +368,48 @@ impl MasterSession {
     async fn run_single_non_read_task(
         &mut self,
         io: &mut PhysLayer,
-        destination: EndpointAddress,
+        dest: FragmentAddr,
         task: NonReadTask,
         writer: &mut TransportWriter,
         reader: &mut TransportReader,
     ) -> Result<NextStep, TaskError> {
-        let seq = match self.send_request(io, destination, &task, writer).await {
+        let seq = match self.send_request(io, dest, &task, writer).await {
             Ok(seq) => seq,
             Err(err) => {
-                task.on_task_error(self.associations.get_mut(destination).ok(), err);
+                task.on_task_error(self.associations.get_mut(dest.link).ok(), err);
                 return Err(err);
             }
         };
 
-        let timeout = self.associations.get_timeout(destination)?;
+        let timeout = self.associations.get_timeout(dest.link)?;
         let deadline = timeout.deadline_from_now();
 
         loop {
             tokio::select! {
                 _ = tokio::time::sleep_until(deadline) => {
                     tracing::warn!("no response within timeout: {}", timeout);
-                    task.on_task_error(self.associations.get_mut(destination).ok(), TaskError::ResponseTimeout);
+                    task.on_task_error(self.associations.get_mut(dest.link).ok(), TaskError::ResponseTimeout);
                     return Err(TaskError::ResponseTimeout);
                 }
                 x = reader.read(io, self.decode_level) => {
                     if let Err(err) = x {
-                        task.on_task_error(self.associations.get_mut(destination).ok(), err.into());
+                        task.on_task_error(self.associations.get_mut(dest.link).ok(), err.into());
                         return Err(err.into());
                     }
 
                     match reader.pop_response() {
                         Some(TransportResponse::Response(source, response)) => {
-                            self.notify_link_activity(source);
+                            self.notify_link_activity(dest.link);
 
                             let result = self
-                                .validate_non_read_response(destination, seq, io, writer, source, response)
+                                .validate_non_read_response(dest, seq, io, writer, source, response)
                                 .await;
 
                             match result {
                                 // continue reading responses until timeout
                                 Ok(None) => continue,
                                 Ok(Some(response)) => {
-                                    match self.associations.get_mut(destination) {
+                                    match self.associations.get_mut(dest.link) {
                                         Err(x) => {
                                             task.on_task_error(None, x.into());
                                             return Err(x.into());
@@ -430,14 +428,14 @@ impl MasterSession {
                                     }
                                 }
                                 Err(err) => {
-                                    task.on_task_error(self.associations.get_mut(destination).ok(), err);
+                                    task.on_task_error(self.associations.get_mut(dest.link).ok(), err);
                                     return Err(err);
                                 }
                             }
                         }
                         Some(TransportResponse::LinkLayerMessage(msg)) => self.notify_link_activity(msg.source),
                         Some(TransportResponse::Error(err)) => {
-                            task.on_task_error(self.associations.get_mut(destination).ok(), err.into());
+                            task.on_task_error(self.associations.get_mut(dest.link).ok(), err.into());
                             return Err(err.into());
                         },
                         None => continue,
@@ -447,7 +445,7 @@ impl MasterSession {
                     match y {
                         Ok(_) => (), // unless shutdown, proceed to next event
                         Err(err) => {
-                            task.on_task_error(self.associations.get_mut(destination).ok(), err.into());
+                            task.on_task_error(self.associations.get_mut(dest.link).ok(), err.into());
                             return Err(err.into());
                         }
                     }
@@ -458,11 +456,11 @@ impl MasterSession {
 
     async fn validate_non_read_response<'a>(
         &mut self,
-        destination: EndpointAddress,
+        destination: FragmentAddr,
         seq: Sequence,
         io: &mut PhysLayer,
         writer: &mut TransportWriter,
-        source: EndpointAddress,
+        source: FragmentAddr,
         response: Response<'a>,
     ) -> Result<Option<Response<'a>>, TaskError> {
         if response.header.function.is_unsolicited() {
@@ -471,11 +469,11 @@ impl MasterSession {
             return Ok(None);
         }
 
-        if source != destination {
+        if source.link != destination.link {
             tracing::warn!(
                 "Received response from {} while expecting response from {}",
-                source,
-                destination
+                source.link,
+                destination.link
             );
             return Ok(None);
         }
@@ -502,23 +500,23 @@ impl MasterSession {
     async fn run_read_task(
         &mut self,
         io: &mut PhysLayer,
-        destination: EndpointAddress,
+        dest: FragmentAddr,
         mut task: ReadTask,
         writer: &mut TransportWriter,
         reader: &mut TransportReader,
     ) -> Result<Sequence, TaskError> {
         let result = self
-            .execute_read_task(io, destination, &mut task, writer, reader)
+            .execute_read_task(io, dest, &mut task, writer, reader)
             .await;
 
-        let association = self.associations.get_mut(destination).ok();
+        let association = self.associations.get_mut(dest.link).ok();
 
         match result {
             Ok(_) => {
                 if let Some(association) = association {
                     task.complete(association);
                 } else {
-                    task.on_task_error(None, TaskError::NoSuchAssociation(destination));
+                    task.on_task_error(None, TaskError::NoSuchAssociation(dest.link));
                 }
             }
             Err(err) => task.on_task_error(association, err),
@@ -530,17 +528,17 @@ impl MasterSession {
     async fn execute_read_task(
         &mut self,
         io: &mut PhysLayer,
-        destination: EndpointAddress,
+        dest: FragmentAddr,
         task: &mut ReadTask,
         writer: &mut TransportWriter,
         reader: &mut TransportReader,
     ) -> Result<Sequence, TaskError> {
-        let mut seq = self.send_request(io, destination, task, writer).await?;
+        let mut seq = self.send_request(io, dest, task, writer).await?;
         let mut is_first = true;
 
         // read responses until we get a FIN or an error occurs
         loop {
-            let timeout = self.associations.get_timeout(destination)?;
+            let timeout = self.associations.get_timeout(dest.link)?;
             let deadline = timeout.deadline_from_now();
 
             loop {
@@ -552,9 +550,9 @@ impl MasterSession {
                     x = reader.read(io, self.decode_level) => {
                         x?;
                         match reader.pop_response() {
-                            Some(TransportResponse::Response(source, response)) => {
-                                self.notify_link_activity(source);
-                                let action = self.process_read_response(destination, is_first, seq, task, io, writer, source, response).await?;
+                            Some(TransportResponse::Response(addr, response)) => {
+                                self.notify_link_activity(addr.link);
+                                let action = self.process_read_response(dest, is_first, seq, task, io, writer, addr, response).await?;
                                 match action {
                                     // continue reading responses on the inner loop
                                     ReadResponseAction::Ignore => continue,
@@ -563,7 +561,7 @@ impl MasterSession {
                                     // break to the outer loop and read another response
                                     ReadResponseAction::ReadNext => {
                                         is_first = false;
-                                        seq = self.associations.get_mut(destination)?.increment_seq();
+                                        seq = self.associations.get_mut(addr.link)?.increment_seq();
                                         break;
                                     }
                                 }
@@ -584,13 +582,13 @@ impl MasterSession {
     #[allow(clippy::too_many_arguments)] // TODO
     async fn process_read_response(
         &mut self,
-        destination: EndpointAddress,
+        destination: FragmentAddr,
         is_first: bool,
         seq: Sequence,
         task: &mut ReadTask,
         io: &mut PhysLayer,
         writer: &mut TransportWriter,
-        source: EndpointAddress,
+        source: FragmentAddr,
         response: Response<'_>,
     ) -> Result<ReadResponseAction, TaskError> {
         if response.header.function.is_unsolicited() {
@@ -599,11 +597,11 @@ impl MasterSession {
             return Ok(ReadResponseAction::Ignore);
         }
 
-        if source != destination {
+        if source.link != destination.link {
             tracing::warn!(
                 "Received response from {} while expecting response from {}",
-                source,
-                destination
+                source.link,
+                destination.link
             );
             return Ok(ReadResponseAction::Ignore);
         }
@@ -635,7 +633,7 @@ impl MasterSession {
             return Err(TaskError::RejectedByIin2(response.header.iin));
         }
 
-        let association = self.associations.get_mut(destination)?;
+        let association = self.associations.get_mut(destination.link)?;
         association.process_iin(response.header.iin);
         task.process_response(association, response.header, response.objects?)
             .await;
@@ -662,7 +660,7 @@ impl MasterSession {
         &mut self,
         io: &mut PhysLayer,
         writer: &mut TransportWriter,
-        source: EndpointAddress,
+        source: FragmentAddr,
         response: Response<'_>,
     ) -> Result<(), RunError> {
         if response.header.function.is_unsolicited() {
@@ -680,17 +678,17 @@ impl MasterSession {
 
     async fn handle_unsolicited(
         &mut self,
-        source: EndpointAddress,
+        source: FragmentAddr,
         response: &Response<'_>,
         io: &mut PhysLayer,
         writer: &mut TransportWriter,
     ) -> Result<(), LinkError> {
-        let association = match self.associations.get_mut(source).ok() {
+        let association = match self.associations.get_mut(source.link).ok() {
             Some(x) => x,
             None => {
                 tracing::warn!(
                     "received unsolicited response from unknown address: {}",
-                    source
+                    source.link
                 );
                 return Ok(());
             }
@@ -715,14 +713,14 @@ impl MasterSession {
     async fn confirm_solicited(
         &mut self,
         io: &mut PhysLayer,
-        destination: EndpointAddress,
+        dest: FragmentAddr,
         seq: Sequence,
         writer: &mut TransportWriter,
     ) -> Result<(), LinkError> {
         let mut cursor = self.tx_buffer.write_cursor();
         write::confirm_solicited(seq, &mut cursor)?;
         writer
-            .write(io, self.decode_level, destination.wrap(), cursor.written())
+            .write(io, self.decode_level, dest, cursor.written())
             .await?;
         Ok(())
     }
@@ -730,7 +728,7 @@ impl MasterSession {
     async fn confirm_unsolicited(
         &mut self,
         io: &mut PhysLayer,
-        destination: EndpointAddress,
+        dest: FragmentAddr,
         seq: Sequence,
         writer: &mut TransportWriter,
     ) -> Result<(), LinkError> {
@@ -738,7 +736,7 @@ impl MasterSession {
         write::confirm_unsolicited(seq, &mut cursor)?;
 
         writer
-            .write(io, self.decode_level, destination.wrap(), cursor.written())
+            .write(io, self.decode_level, dest, cursor.written())
             .await?;
         Ok(())
     }
@@ -746,7 +744,7 @@ impl MasterSession {
     async fn send_request<U>(
         &mut self,
         io: &mut PhysLayer,
-        address: EndpointAddress,
+        addr: FragmentAddr,
         request: &U,
         writer: &mut TransportWriter,
     ) -> Result<Sequence, TaskError>
@@ -754,14 +752,14 @@ impl MasterSession {
         U: RequestWriter,
     {
         // format the request
-        let association = self.associations.get_mut(address)?;
+        let association = self.associations.get_mut(addr.link)?;
         let seq = association.increment_seq();
         let mut cursor = self.tx_buffer.write_cursor();
         let mut hw =
             write::start_request(ControlField::request(seq), request.function(), &mut cursor)?;
         request.write(&mut hw)?;
         writer
-            .write(io, self.decode_level, address.wrap(), cursor.written())
+            .write(io, self.decode_level, addr, cursor.written())
             .await?;
         Ok(seq)
     }
@@ -772,18 +770,18 @@ impl MasterSession {
     async fn run_link_status_task(
         &mut self,
         io: &mut PhysLayer,
-        destination: EndpointAddress,
+        destination: FragmentAddr,
         writer: &mut TransportWriter,
         reader: &mut TransportReader,
     ) -> Result<(), TaskError> {
         // Send link status request
-        tracing::info!("sending link status request (for {})", destination);
+        tracing::info!("sending link status request (for {})", destination.link);
         writer
-            .write_link_status_request(io, self.decode_level, destination.wrap())
+            .send_link_status_request(io, self.decode_level, destination)
             .await?;
 
         loop {
-            let timeout = self.associations.get_timeout(destination)?;
+            let timeout = self.associations.get_timeout(destination.link)?;
             // Wait for something on the link
             tokio::select! {
                 _ = tokio::time::sleep_until(timeout.deadline_from_now()) => {
@@ -793,9 +791,9 @@ impl MasterSession {
                 x = reader.read(io, self.decode_level) => {
                     x?;
                     match reader.pop_response() {
-                        Some(TransportResponse::Response(source, response)) => {
-                            self.notify_link_activity(source);
-                            self.handle_fragment_while_idle(io, writer, source, response).await?;
+                        Some(TransportResponse::Response(addr, response)) => {
+                            self.notify_link_activity(addr.link);
+                            self.handle_fragment_while_idle(io, writer, addr, response).await?;
                             return Err(TaskError::UnexpectedResponseHeaders);
                         }
                         Some(TransportResponse::LinkLayerMessage(msg)) => {
