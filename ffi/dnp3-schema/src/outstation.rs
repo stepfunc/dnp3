@@ -614,8 +614,12 @@ fn define_outstation_udp_config(
         )?
         .doc("UDP outstation configuration")?
         .end_fields()?
-        .begin_initializer("init", InitializerType::Normal, "Initialize the configuration with default settings for unspecified parameter")?
-        .default(&retry_delay,  Duration::from_secs(5))?
+        .begin_initializer(
+            "init",
+            InitializerType::Normal,
+            "Initialize the configuration with default settings for unspecified parameter",
+        )?
+        .default(&retry_delay, Duration::from_secs(5))?
         .default_variant(&link_read_mode, "datagram")?
         .default_variant(&socket_mode, "one_to_one")?
         .end_initializer()?
