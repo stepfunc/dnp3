@@ -581,6 +581,10 @@ fn define_outstation_udp_config(
 ) -> BackTraced<FunctionArgStructHandle> {
     let value = lib.declare_function_argument_struct("outstation_udp_config")?;
 
+    let retry_delay = Name::create("retry_delay")?;
+    let link_read_mode = Name::create("link_read_mode")?;
+    let socket_mode = Name::create("socket_mode")?;
+
     let value = lib
         .define_function_argument_struct(value)?
         .add(
@@ -599,17 +603,22 @@ fn define_outstation_udp_config(
             "UDP socket mode to use",
         )?
         .add(
-            "link_read_mode",
+            link_read_mode.clone(),
             shared.link_read_mode.clone(),
             "Read mode to use, this should typically be set to {enum:link_read_mode.datagram}",
         )?
         .add(
-            "retry_delay",
+            retry_delay.clone(),
             DurationType::Milliseconds,
             "Period to wait before retrying after a failure to bind or connect the UDP socket",
         )?
         .doc("UDP outstation configuration")?
         .end_fields()?
+        .begin_initializer("init", InitializerType::Normal, "Initialize the configuration with default settings for unspecified parameter")?
+        .default(&retry_delay,  Duration::from_secs(5))?
+        .default_variant(&link_read_mode, "datagram")?
+        .default_variant(&socket_mode, "one_to_one")?
+        .end_initializer()?
         .build()?;
 
     Ok(value)
