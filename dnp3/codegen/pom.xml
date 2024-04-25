@@ -4,7 +4,7 @@
 
     <groupId>dev.gridio.dnp3</groupId>
     <artifactId>dnp3-model</artifactId>
-    <version>1.6.0-M1</version>
+    <version>1.6.0-M2</version>
     <packaging>jar</packaging>
 
     <name>dnp3-rs model</name>

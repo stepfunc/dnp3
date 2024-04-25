@@ -58,6 +58,7 @@ impl LinkModes {
         }
     }
 
+    #[cfg(feature = "serial")]
     pub(crate) const fn serial() -> Self {
         Self {
             error_mode: LinkErrorMode::Discard,

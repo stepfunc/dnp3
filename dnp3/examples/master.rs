@@ -1,3 +1,4 @@
+//! Example master application
 use std::time::Duration;
 
 use tokio_stream::StreamExt;

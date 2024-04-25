@@ -1,3 +1,4 @@
+//! Example master application
 use dnp3::app::control::*;
 use dnp3::app::measurement::*;
 use dnp3::app::*;
