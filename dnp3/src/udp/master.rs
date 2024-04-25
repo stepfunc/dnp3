@@ -10,7 +10,7 @@ use crate::app::Timeout;
 use std::net::SocketAddr;
 use tracing::Instrument;
 
-/// Spawn a task onto the `Tokio` runtime. The task runs until the returned handle, and any
+/// Spawn a UDP master task onto the `Tokio` runtime. The task runs until the returned handle, and any
 /// `AssociationHandle` created from it, are dropped.
 ///
 /// **Note**: This function may only be called from within the runtime itself, and panics otherwise.
