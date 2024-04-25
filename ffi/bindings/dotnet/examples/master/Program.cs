@@ -366,6 +366,39 @@ class MainClass
         }
     }
 
+    private static void RunUdp(Runtime runtime)
+    {
+        // ANCHOR: create_udp_channel
+        var channel = MasterChannel.CreateUdpChannel(
+            runtime,
+            GetMasterChannelConfig(),
+            "127.0.0.1:20001",
+            LinkReadMode.Datagram,
+            TimeSpan.FromSeconds(5)
+        );
+        // ANCHOR_END: create_serial_channel
+
+        try
+        {
+            // ANCHOR: association_create_udp
+            var association = channel.AddUdpAssociation(
+                1024,
+                "127.0.0.1:20000",
+                GetAssociationConfig(),
+                new TestReadHandler(),
+                new TestAssociationHandler(),
+                new TestAssociationInformation()
+            );
+            // ANCHOR_END: association_create_udp
+
+            RunAssociation(channel, association);
+        }
+        finally
+        {
+            channel.Shutdown();
+        }
+    }
+
     private static void RunSerial(Runtime runtime)
     {
         // ANCHOR: create_serial_channel
@@ -447,6 +480,9 @@ class MainClass
                 case "tcp":
                     RunTcp(runtime);
                     break;
+                case "udp":
+                    RunUdp(runtime);
+                    break;
                 case "serial":
                     RunSerial(runtime);
                     break;
@@ -469,6 +505,35 @@ class MainClass
         }
     }
 
+    private static void RunAssociation(MasterChannel channel, AssociationId association)
+    {
+        // ANCHOR: add_poll
+        var poll = channel.AddPoll(association, Request.ClassRequest(false, true, true, true), TimeSpan.FromSeconds(5));
+        // ANCHOR_END: add_poll
+
+        // start communications
+        channel.Enable();
+
+        while (true)
+        {
+            var input = Console.ReadLine();
+
+            if (input == "x")
+            {
+                return;
+            }
+
+            try
+            {
+                RunOneCommand(channel, association, poll, input).GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error: {ex}");
+            }
+        }
+    }
+
     private static void RunChannel(MasterChannel channel)
     {
         // ANCHOR: association_create
@@ -481,30 +546,7 @@ class MainClass
         );
         // ANCHOR_END: association_create
 
-        // ANCHOR: add_poll
-        var poll = channel.AddPoll(association, Request.ClassRequest(false, true, true, true), TimeSpan.FromSeconds(5));
-        // ANCHOR_END: add_poll
-
-        // start communications
-        channel.Enable();
-
-        while (true)
-        {
-            var input = Console.ReadLine();
-            
-            if(input == "x") {
-                return;
-            }
-            
-            try
-            {
-                RunOneCommand(channel, association, poll, input).GetAwaiter().GetResult();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error: {ex}");
-            }
-        }
+        RunAssociation(channel, association);
     }
 
     private static async Task RunOneCommand(MasterChannel channel, AssociationId association, PollId poll, String input)
