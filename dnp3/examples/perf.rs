@@ -1,3 +1,4 @@
+//! Performance test
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::time::Instant;
 
