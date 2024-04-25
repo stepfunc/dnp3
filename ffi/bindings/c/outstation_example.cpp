@@ -462,6 +462,9 @@ int main(int argc, char *argv[])
     else if (strcmp(type, "tcp-client") == 0) {
         run_tcp_client(runtime);
     }
+    else if (strcmp(type, "udp") == 0) {
+        run_udp(runtime);
+    }
     else if (strcmp(type, "serial") == 0) {
         run_serial(runtime);
     }
