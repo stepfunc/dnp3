@@ -520,7 +520,7 @@ fn define_outstation(
         .doc(
             doc("Create an outstation instance running on a serial port which is tolerant to the serial port being added and removed")
         )?
-        .build_static("outstation_create_udp")?;
+        .build_static("create_udp")?;
 
     let destructor = lib.define_destructor(
         outstation.clone(),

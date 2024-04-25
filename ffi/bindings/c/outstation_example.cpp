@@ -383,7 +383,7 @@ void run_udp(dnp3::Runtime &runtime)
         "127.0.0.1:20001"
     );
 
-    auto outstation = dnp3::Outstation::outstation_create_udp(
+    auto outstation = dnp3::Outstation::create_udp(
         runtime,
         udp_config,
         get_outstation_config(),
