@@ -253,6 +253,43 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
             Primitive::U16,
             "DNP3 data-link address of the remote outstation",
         )?
+        .param(
+            "config",
+            association_config.clone(),
+            "Association configuration",
+        )?
+        .param(
+            "read_handler",
+            read_handler.clone(),
+            "Interface uses to load measurement data",
+        )?
+        .param(
+            "association_handler",
+            association_handler_interface.clone(),
+            "Association specific callbacks such as time synchronization",
+        )?
+        .param(
+            "association_information",
+            association_information_interface.clone(),
+            "Association information interface",
+        )?
+        .returns(association_id.clone(), "Id of the association")?
+        .fails_with(shared.error_type.clone())?
+        .doc("Add an association to the channel")?
+        .build()?;
+
+    let add_udp_association_method = lib
+        .define_method("add_udp_association", master_channel_class.clone())?
+        .param(
+            "address",
+            Primitive::U16,
+            "DNP3 data-link address of the remote outstation",
+        )?
+        .param(
+            "destination",
+            StringType,
+            "IP address and port of the outstation",
+        )?
         .param("config", association_config, "Association configuration")?
         .param(
             "read_handler",
@@ -271,7 +308,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         )?
         .returns(association_id.clone(), "Id of the association")?
         .fails_with(shared.error_type.clone())?
-        .doc("Add an association to the channel")?
+        .doc("Add a UDP association to the channel")?
         .build()?;
 
     let remove_association_method = lib
@@ -684,6 +721,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         .method(enable_method)?
         .method(disable_method)?
         .method(add_association_method)?
+        .method(add_udp_association_method)?
         .method(remove_association_method)?
         .method(set_decode_level_method)?
         .method(get_decode_level_method)?
