@@ -6,7 +6,7 @@ use crate::outstation::{
     ConnectionState, ControlHandler, OutstationApplication, OutstationConfig, OutstationHandle,
     OutstationInformation,
 };
-use crate::tcp::server::{NewSession, ServerTask};
+use crate::tcp::server_task::{NewSession, ServerTask};
 use crate::tcp::{AddressFilter, FilterError};
 use crate::util::channel::Sender;
 use crate::util::phys::{PhysAddr, PhysLayer};
