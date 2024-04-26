@@ -67,7 +67,7 @@ impl WildcardIPv4 {
                 _ => true,
             }
         }
-        // wildcards conflict if all of the bytes match
+        // wildcards conflict if all the bytes match
         matches(self.b3, other.b3)
             && matches(self.b2, other.b2)
             && matches(self.b1, other.b1)
