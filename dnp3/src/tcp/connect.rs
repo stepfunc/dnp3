@@ -45,7 +45,7 @@ impl ConnectOptions {
     }
 }
 
-/// All of the state required to establish a TCP or TLS connection including the retry logic
+/// All the state required to establish a TCP or TLS connection including the retry logic
 pub(crate) struct Connector {
     endpoints: EndpointList,
     options: ConnectOptions,
