@@ -1,4 +1,3 @@
-pub use address_filter::*;
 pub use connect::*;
 pub use endpoint_list::*;
 pub use master::*;
@@ -9,7 +8,6 @@ pub use outstation::*;
 #[cfg(feature = "tls")]
 pub mod tls;
 
-mod address_filter;
 mod connect;
 mod endpoint_list;
 mod master;
