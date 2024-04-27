@@ -3,6 +3,7 @@ pub use endpoint_list::*;
 pub use master::*;
 pub use no_delay::*;
 pub use outstation::*;
+pub use server_handle::*;
 
 /// Entry points and types for TLS
 #[cfg(feature = "tls")]
@@ -13,6 +14,7 @@ mod endpoint_list;
 mod master;
 mod no_delay;
 mod outstation;
+mod server_handle;
 
 pub(crate) mod client;
 

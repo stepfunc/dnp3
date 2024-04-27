@@ -1,14 +1,19 @@
 use std::time::Duration;
 
-/// A wrapper around a std::time::Duration
-/// that ensures values are in the range `[1ms .. 1hour]`
+/// A wrapper around a std::time::Duration that ensures values are in the range `[1ms .. 1hour]`
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(
     feature = "serialization",
     derive(serde::Serialize, serde::Deserialize)
 )]
 #[cfg_attr(feature = "serialization", serde(try_from = "Duration"))]
-pub struct Timeout(pub(crate) Duration);
+pub struct Timeout(Duration);
+
+impl From<Timeout> for Duration {
+    fn from(value: Timeout) -> Self {
+        value.0
+    }
+}
 
 impl Default for Timeout {
     fn default() -> Self {

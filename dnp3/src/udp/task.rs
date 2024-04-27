@@ -18,7 +18,7 @@ impl UdpTask {
         loop {
             self.session.wait_for_enabled().await?;
             if let Delay::Yes = self.run_one().await? {
-                if let Err(reason) = self.session.wait_for_retry(self.retry_delay.0).await {
+                if let Err(reason) = self.session.wait_for_retry(self.retry_delay.into()).await {
                     Self::handle_stop(reason)?;
                 }
             }

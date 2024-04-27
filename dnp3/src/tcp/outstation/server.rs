@@ -7,7 +7,7 @@ use crate::outstation::{
     OutstationInformation,
 };
 use crate::tcp::server_task::{NewSession, ServerTask};
-use crate::tcp::{AddressFilter, FilterError};
+use crate::tcp::{AddressFilter, FilterError, ServerHandle};
 use crate::util::channel::Sender;
 use crate::util::phys::{PhysAddr, PhysLayer};
 use crate::util::session::{Enabled, Session};
@@ -29,21 +29,6 @@ pub struct Server {
     address: SocketAddr,
     outstations: Vec<OutstationInfo>,
     connection_handler: ServerConnectionHandler,
-}
-
-/// Handle to a running server. Dropping the handle, shuts down the server.
-pub struct ServerHandle {
-    addr: Option<SocketAddr>,
-    _tx: tokio::sync::oneshot::Sender<()>,
-}
-
-impl ServerHandle {
-    /// Returns the local address to which this server is bound.
-    ///
-    /// This can be useful, for example, when binding to port 0 to figure out which port was actually bound.
-    pub fn local_addr(&self) -> Option<SocketAddr> {
-        self.addr
-    }
 }
 
 enum ServerConnectionHandler {
@@ -221,7 +206,7 @@ impl Server {
         tracing::info!("shutting down outstations");
 
         for x in self.outstations.iter_mut() {
-            // best effort to shutdown outstations before exiting
+            // best effort to shut down outstations before exiting
             let _ = x.handle.shutdown().await;
         }
 

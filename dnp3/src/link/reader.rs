@@ -1,5 +1,3 @@
-use std::io::ErrorKind;
-
 use crate::decode::DecodeLevel;
 use crate::link::display::LinkDisplay;
 use crate::link::error::LinkError;
@@ -196,10 +194,6 @@ impl Reader {
 
         // now we can read more data
         let (count, addr) = io.read(self.buffer.writable(), level.physical).await?;
-
-        if count == 0 {
-            return Err(LinkError::Stdio(ErrorKind::UnexpectedEof));
-        }
 
         self.buffer.advance_write(count);
         Ok(addr)
