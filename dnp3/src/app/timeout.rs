@@ -7,7 +7,7 @@ use std::time::Duration;
     derive(serde::Serialize, serde::Deserialize)
 )]
 #[cfg_attr(feature = "serialization", serde(try_from = "Duration"))]
-pub struct Timeout(Duration);
+pub struct Timeout(pub(crate) Duration);
 
 impl From<Timeout> for Duration {
     fn from(value: Timeout) -> Self {

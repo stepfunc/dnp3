@@ -50,6 +50,10 @@ impl MockReader {
 
     pub(crate) fn reset(&mut self) {}
 
+    pub(crate) fn seed_link(&mut self, _: &[u8]) -> Result<(), scursor::WriteError> {
+        unimplemented!()
+    }
+
     pub(crate) fn peek(&self) -> Option<TransportData> {
         Some(TransportData::Fragment(self.get(self.count)?))
     }

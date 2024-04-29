@@ -11,6 +11,7 @@ use crate::tcp::{AddressFilter, FilterError, ServerHandle};
 use crate::util::channel::Sender;
 use crate::util::phys::{PhysAddr, PhysLayer};
 use crate::util::session::{Enabled, Session};
+use crate::util::shutdown::ShutdownListener;
 use std::net::SocketAddr;
 use tracing::Instrument;
 
@@ -161,16 +162,19 @@ impl Server {
 
         let addr = listener.local_addr().ok();
 
-        let (tx, rx) = tokio::sync::oneshot::channel();
+        let (token, shutdown_rx) = crate::util::shutdown::shutdown_token();
 
         let task = async move {
             let local = self.address;
-            self.run(listener, rx)
+            self.run(listener, shutdown_rx)
                 .instrument(tracing::info_span!("tcp-server", "listen" = ?local))
                 .await
         };
 
-        let handle = ServerHandle { addr, _tx: tx };
+        let handle = ServerHandle {
+            addr,
+            _token: token,
+        };
 
         Ok((handle, task))
     }
@@ -190,7 +194,7 @@ impl Server {
     async fn run(
         &mut self,
         listener: tokio::net::TcpListener,
-        rx: tokio::sync::oneshot::Receiver<()>,
+        mut shutdown_rx: ShutdownListener,
     ) -> Shutdown {
         tracing::info!("accepting connections");
 
@@ -198,7 +202,7 @@ impl Server {
              _ = self.accept_loop(listener) => {
                 // if the accept loop shuts down we exit
              }
-             _ = rx => {
+             _ = shutdown_rx.listen() => {
                 // if we get the message or shutdown we exit
              }
         }

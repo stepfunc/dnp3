@@ -52,6 +52,10 @@ impl MasterTask {
         }
     }
 
+    pub(crate) fn seed_link(&mut self, seed_data: &[u8]) -> Result<(), scursor::WriteError> {
+        self.reader.seed_link(seed_data)
+    }
+
     #[cfg(test)]
     pub(crate) fn set_rx_frame_info(&mut self, info: crate::link::header::FrameInfo) {
         self.reader.get_inner().set_rx_frame_info(info);

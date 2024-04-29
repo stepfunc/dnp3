@@ -9,11 +9,15 @@ use crate::util::channel::{Receiver, Sender};
 use crate::util::phys::PhysLayer;
 use crate::util::session::{Enabled, Session};
 
+use crate::tcp::ServerHandle;
+use crate::util::future::forever;
+use crate::util::shutdown::ShutdownListener;
 use scursor::ReadCursor;
 use std::io::ErrorKind;
 use std::net::SocketAddr;
+use std::num::NonZeroUsize;
 use std::time::Duration;
-use tokio::net::TcpListener;
+use tokio::net::{TcpListener, TcpStream};
 use tracing::Instrument;
 
 /// Spawn a TCP server that accept connections from outstations
@@ -21,58 +25,77 @@ use tracing::Instrument;
 ///
 pub async fn spawn_master_tcp_server(
     addr: SocketAddr,
+    max_link_id_tasks: NonZeroUsize,
+    link_id_decode_level: PhysDecodeLevel,
     handler: Box<dyn ConnectionHandler>,
-) -> std::io::Result<()> {
+) -> std::io::Result<ServerHandle> {
     let listener = TcpListener::bind(addr).await?;
 
     let (tx, rx) = crate::util::channel::request_channel();
 
+    let (token, shutdown_listener) = crate::util::shutdown::shutdown_token();
+
     let accept_task = AcceptTask {
         conn_id: 0,
+        pending_link_id_tasks: 0,
+        max_link_id_tasks,
+        link_id_decode_level,
         listener,
+        shutdown_listener,
         handler,
         id_task_results: rx,
         id_task_sender: tx,
     };
 
     let task = async move {
-        let _ = accept_task
-            .run()
-            .instrument(tracing::info_span!("master-tcp-server", addr = ?addr))
-            .await;
-    };
+        let _ = accept_task.run().await;
+    }
+    .instrument(tracing::info_span!("master-tcp-server", addr = ?addr));
 
     tokio::spawn(task);
 
-    Ok(())
+    let handle = ServerHandle {
+        addr: None,
+        _token: token,
+    };
+
+    Ok(handle)
+}
+
+/// Error type indicating the connection should be rejected
+#[derive(Copy, Clone, Debug)]
+pub struct Reject;
+
+/// Information returned by user code to configure an accepted connection
+#[derive(Copy, Clone, Debug)]
+pub struct AcceptConfig {
+    /// Link error mode that will be used
+    pub error_mode: LinkErrorMode,
+    /// Configuration for the channel
+    pub config: MasterChannelConfig,
 }
 
 /// Determines what action will be taken when a TCP connection is accepted
 #[derive(Copy, Clone, Debug)]
 pub enum AcceptAction {
-    /// Reject the connection, the socket will be closed
-    Reject,
-    /// Read a link-layer frame to determine the identity of the connecting device
-    ///
-    /// This is typically the outstation sending an unsolicited message
-    GetLinkIdentity {
-        /// How long the server should wait to receive a link-layer header
-        /// before dropping the connection
-        timeout: Timeout,
-    },
+    /// This is typically the outstation sending an unsolicited message.
+    GetLinkIdentity(Timeout),
     /// Accept the connection
-    Accept {
-        /// Configuration for the channel
-        config: MasterChannelConfig,
-        /// Link error mode that will be used
-        error_mode: LinkErrorMode,
-    },
+    Accept(AcceptConfig),
 }
 
 /// Callbacks to user code that determine how the server processes connections
 pub trait ConnectionHandler: Send {
     /// Filter the connection solely based on the remote address
-    fn accept_tcp_connection(&mut self, addr: SocketAddr) -> AcceptAction;
+    fn accept_tcp_connection(&mut self, addr: SocketAddr) -> Result<AcceptAction, Reject>;
+
+    /// Filter the connection solely based on the remote address
+    fn accept_link_id(
+        &mut self,
+        addr: SocketAddr,
+        source: u16,
+        destination: u16,
+    ) -> Result<AcceptConfig, Reject>;
 
     /// Start a communication session that was previously accepted
     ///
@@ -80,20 +103,54 @@ pub trait ConnectionHandler: Send {
     fn start(&mut self, channel: MasterChannel, addr: SocketAddr);
 }
 
-type IdentifyLinkResult = std::io::Result<(PhysLayer, LinkIdentity)>;
+type LinkIdResult = std::io::Result<(PhysLayer, SocketAddr, LinkIdentity)>;
 
 struct AcceptTask {
     conn_id: u64,
+    pending_link_id_tasks: usize,
+    max_link_id_tasks: NonZeroUsize,
+    link_id_decode_level: PhysDecodeLevel,
     listener: TcpListener,
+    shutdown_listener: ShutdownListener,
     handler: Box<dyn ConnectionHandler>,
-    id_task_results: Receiver<IdentifyLinkResult>,
-    id_task_sender: Sender<IdentifyLinkResult>,
+    id_task_results: Receiver<LinkIdResult>,
+    id_task_sender: Sender<LinkIdResult>,
+}
+
+enum TaskEvent {
+    Accept(TcpStream, SocketAddr),
+    LinkId(LinkIdResult),
 }
 
 impl AcceptTask {
-    async fn run(mut self) -> std::io::Result<()> {
+    async fn run(mut self) -> Result<(), Shutdown> {
         loop {
-            self.accept_one().await?;
+            let event = match self.next_event().await {
+                Ok(res) => res?,
+                Err(err) => {
+                    tracing::warn!("I/O error, exiting: {err}");
+                    return Err(Shutdown);
+                }
+            };
+
+            self.process_event(event);
+        }
+    }
+
+    fn process_event(&mut self, event: TaskEvent) {
+        match event {
+            TaskEvent::Accept(stream, addr) => {
+                self.handle_accept(stream, addr);
+            }
+            TaskEvent::LinkId(res) => {
+                self.pending_link_id_tasks -= 1;
+                match res {
+                    Ok((phys, addr, id)) => self.handle_link_identity(phys, addr, id),
+                    Err(err) => {
+                        tracing::warn!("unable to identify remote link: {err}");
+                    }
+                }
+            }
         }
     }
 
@@ -103,30 +160,76 @@ impl AcceptTask {
         ret
     }
 
-    async fn accept_one(&mut self) -> std::io::Result<()> {
-        let (stream, addr) = self.listener.accept().await?;
+    async fn next_event(&mut self) -> std::io::Result<Result<TaskEvent, Shutdown>> {
+        let can_accept = self.pending_link_id_tasks < self.max_link_id_tasks.get();
 
-        let phys = PhysLayer::Tcp(stream);
-
-        match self.handler.accept_tcp_connection(addr) {
-            AcceptAction::Reject => {
-                tracing::info!("rejected connection from {addr}");
-                return Ok(());
-            }
-            AcceptAction::Accept { config, error_mode } => {
-                self.spawn_session(phys, addr, config, error_mode);
-            }
-            AcceptAction::GetLinkIdentity { timeout } => {
-                // spawn a task to identify the remote link layer
-                tokio::spawn(identify_link(
-                    phys,
-                    timeout.into(),
-                    self.id_task_sender.clone(),
-                ));
+        let accept_connection = async {
+            if can_accept {
+                self.listener.accept().await
+            } else {
+                forever().await
             }
         };
 
-        Ok(())
+        tokio::select! {
+            res = accept_connection  => {
+                let (stream, addr) = res?;
+               Ok(Ok(TaskEvent::Accept(stream, addr)))
+            }
+            res = self.id_task_results.receive() => {
+                // unwrap is fine b/c both the sending and receiving sides of the channel are owned by this struct
+                let id = res.expect("bad channel logic");
+                Ok(Ok(TaskEvent::LinkId(id)))
+            }
+            _ = self.shutdown_listener.listen() => {
+                Ok(Err(Shutdown))
+            }
+        }
+    }
+
+    fn handle_link_identity(&mut self, phys: PhysLayer, addr: SocketAddr, id: LinkIdentity) {
+        match self.handler.accept_link_id(addr, id.source, id.destination) {
+            Ok(x) => {
+                self.spawn_session(
+                    phys,
+                    addr,
+                    x.config,
+                    x.error_mode,
+                    id.header_bytes.as_slice(),
+                );
+            }
+            Err(Reject) => {
+                tracing::warn!(
+                    "Dropping connection from {addr:?} with source = {} and destination = {}",
+                    id.source,
+                    id.destination
+                );
+            }
+        }
+    }
+
+    fn handle_accept(&mut self, stream: TcpStream, addr: SocketAddr) {
+        let phys = PhysLayer::Tcp(stream);
+
+        match self.handler.accept_tcp_connection(addr) {
+            Err(Reject) => {
+                tracing::info!("rejected connection from {addr}");
+            }
+            Ok(AcceptAction::Accept(x)) => {
+                self.spawn_session(phys, addr, x.config, x.error_mode, &[]);
+            }
+            Ok(AcceptAction::GetLinkIdentity(timeout)) => {
+                // spawn a task to identify the remote link layer
+                tokio::spawn(identify_link(
+                    phys,
+                    self.link_id_decode_level,
+                    addr,
+                    timeout.into(),
+                    self.id_task_sender.clone(),
+                ));
+                self.pending_link_id_tasks += 1;
+            }
+        }
     }
 
     fn spawn_session(
@@ -135,10 +238,16 @@ impl AcceptTask {
         addr: SocketAddr,
         config: MasterChannelConfig,
         error_mode: LinkErrorMode,
-    ) -> u64 {
-        let conn_id = self.next_conn_id();
+        seed_data: &[u8],
+    ) {
         let (tx, rx) = crate::util::channel::request_channel();
-        let task = MasterTask::new(Enabled::No, LinkModes::stream(error_mode), config, rx);
+        let mut task = MasterTask::new(Enabled::No, LinkModes::stream(error_mode), config, rx);
+        if let Err(err) = task.seed_link(seed_data) {
+            tracing::error!("unable to seed link layer: {err:?}");
+            return;
+        }
+
+        let conn_id = self.next_conn_id();
 
         let task = SessionTask {
             phys,
@@ -155,8 +264,6 @@ impl AcceptTask {
         let channel = MasterChannel::new(tx, MasterChannelType::Stream);
 
         self.handler.start(channel, addr);
-
-        conn_id
     }
 }
 
@@ -174,29 +281,33 @@ impl SessionTask {
     }
 }
 
+type HeaderBytes = [u8; link::constant::LINK_HEADER_LENGTH];
+
 #[derive(Copy, Clone, Debug)]
 struct LinkIdentity {
     source: u16,
     destination: u16,
-    header_bytes: [u8; link::constant::LINK_HEADER_LENGTH],
+    header_bytes: HeaderBytes,
 }
-
-type HeaderBytes = [u8; link::constant::LINK_HEADER_LENGTH];
 
 async fn identify_link(
     mut phys: PhysLayer,
+    link_id_decode_level: PhysDecodeLevel,
+    addr: SocketAddr,
     timeout: Duration,
-    mut reply_to: Sender<IdentifyLinkResult>,
+    mut reply_to: Sender<LinkIdResult>,
 ) {
-    let result = identify_or_timeout(&mut phys, timeout).await;
-    let _ = reply_to.send(result.map(|x| (phys, x))).await;
+    let result = identify_or_timeout(&mut phys, link_id_decode_level, timeout).await;
+    let reply = result.map(|x| (phys, addr, x));
+    let _ = reply_to.send(reply).await;
 }
 
 async fn identify_or_timeout(
     layer: &mut PhysLayer,
+    decode_level: PhysDecodeLevel,
     timeout: Duration,
 ) -> std::io::Result<LinkIdentity> {
-    match tokio::time::timeout(timeout, read_link_identity(layer)).await {
+    match tokio::time::timeout(timeout, read_link_identity(layer, decode_level)).await {
         Ok(Ok(id)) => Ok(id),
         Ok(Err(err)) => Err(std::io::Error::new(ErrorKind::Other, err)),
         Err(_) => Err(std::io::Error::new(
@@ -206,13 +317,19 @@ async fn identify_or_timeout(
     }
 }
 
-async fn read_link_identity(layer: &mut PhysLayer) -> std::io::Result<LinkIdentity> {
-    async fn read_header(layer: &mut PhysLayer) -> std::io::Result<HeaderBytes> {
+async fn read_link_identity(
+    layer: &mut PhysLayer,
+    decode_level: PhysDecodeLevel,
+) -> std::io::Result<LinkIdentity> {
+    async fn read_header(
+        layer: &mut PhysLayer,
+        decode_level: PhysDecodeLevel,
+    ) -> std::io::Result<HeaderBytes> {
         let mut header = [0; link::constant::LINK_HEADER_LENGTH];
         let mut count = 0;
         loop {
             let remaining = &mut header[count..link::constant::LINK_HEADER_LENGTH];
-            let (num, _) = layer.read(remaining, PhysDecodeLevel::Nothing).await?;
+            let (num, _) = layer.read(remaining, decode_level).await?;
             count += num;
             if count == link::constant::LINK_HEADER_LENGTH {
                 return Ok(header);
@@ -229,7 +346,7 @@ async fn read_link_identity(layer: &mut PhysLayer) -> std::io::Result<LinkIdenti
         Ok((destination, source))
     }
 
-    let header_bytes = read_header(layer).await?;
+    let header_bytes = read_header(layer, decode_level).await?;
 
     let (destination, source) = read_addr(&header_bytes)
         .map_err(|_| std::io::Error::new(ErrorKind::Other, "Bad read logic"))?;

@@ -7,7 +7,7 @@ use crate::link::{LinkErrorMode, LinkReadMode};
 use crate::util::phys::{PhysAddr, PhysLayer};
 
 use crate::link;
-use scursor::ReadCursor;
+use scursor::{ReadCursor, WriteCursor};
 
 /// How many link frames might be required to transport this much application data?
 const fn num_link_frames(fragment_size: usize) -> usize {
@@ -138,6 +138,13 @@ impl Reader {
             parser: Parser::new(link_modes.error_mode),
             buffer: ReadBuffer::new(buffer_size),
         }
+    }
+
+    pub(crate) fn seed(&mut self, seed_data: &[u8]) -> Result<(), scursor::WriteError> {
+        let mut cursor = WriteCursor::new(self.buffer.writable());
+        cursor.write_bytes(seed_data)?;
+        self.buffer.advance_write(seed_data.len());
+        Ok(())
     }
 
     pub(crate) fn reset(&mut self) {
