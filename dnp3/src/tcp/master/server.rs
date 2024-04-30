@@ -20,9 +20,10 @@ use std::time::Duration;
 use tokio::net::{TcpListener, TcpStream};
 use tracing::Instrument;
 
-/// Spawn a TCP server that accept connections from outstations
+/// Spawn a TCP server that accepts connections from outstations
 ///
-///
+/// The behavior of each connection is controlled by callbacks to a user-defined
+/// implementation of the [`ConnectionHandler`] trait.
 pub async fn spawn_master_tcp_server(
     addr: SocketAddr,
     max_link_id_tasks: NonZeroUsize,
@@ -75,19 +76,27 @@ pub struct AcceptConfig {
     pub config: MasterChannelConfig,
 }
 
-/// Determines what action will be taken when a TCP connection is accepted
+/// Determines what action will be taken when a TCP connection is accepted from an outstation
 #[derive(Copy, Clone, Debug)]
 pub enum AcceptAction {
-    /// This is typically the outstation sending an unsolicited message.
+    /// Request that server attempt to identify the outstation by reading a link-layer header from the physical
+    /// layer within a timeout.
+    ///
+    /// This header is typically the beginning of an unsolicited fragment from the outstation.
     GetLinkIdentity(Timeout),
-    /// Accept the connection
+    /// Accept the connection, providing configuration information needed to create a [`MasterChannel`]
     Accept(AcceptConfig),
 }
 
 /// Callbacks to user code that determine how the server processes connections
 pub trait ConnectionHandler: Send {
     /// Filter the connection solely based on the remote address
-    fn accept_tcp_connection(&mut self, addr: SocketAddr) -> Result<AcceptAction, Reject>;
+    fn accept(&mut self, addr: SocketAddr) -> Result<AcceptAction, Reject>;
+
+    /// Start a communication session that was previously accepted using only the socket address
+    ///
+    /// The user may add associations to the channel and then enable it
+    fn start(&mut self, channel: MasterChannel, addr: SocketAddr);
 
     /// Filter the connection solely based on the remote address
     fn accept_link_id(
@@ -97,10 +106,16 @@ pub trait ConnectionHandler: Send {
         destination: u16,
     ) -> Result<AcceptConfig, Reject>;
 
-    /// Start a communication session that was previously accepted
+    /// Start a communication session that was previously accepted using link identity information.
     ///
     /// The user may add associations to the channel and then enable it
-    fn start(&mut self, channel: MasterChannel, addr: SocketAddr);
+    fn start_with_link_id(
+        &mut self,
+        channel: MasterChannel,
+        addr: SocketAddr,
+        source: u16,
+        destination: u16,
+    );
 }
 
 type LinkIdResult = std::io::Result<(PhysLayer, SocketAddr, LinkIdentity)>;
@@ -196,6 +211,7 @@ impl AcceptTask {
                     x.config,
                     x.error_mode,
                     id.header_bytes.as_slice(),
+                    Some(id),
                 );
             }
             Err(Reject) => {
@@ -211,12 +227,12 @@ impl AcceptTask {
     fn handle_accept(&mut self, stream: TcpStream, addr: SocketAddr) {
         let phys = PhysLayer::Tcp(stream);
 
-        match self.handler.accept_tcp_connection(addr) {
+        match self.handler.accept(addr) {
             Err(Reject) => {
                 tracing::info!("rejected connection from {addr}");
             }
             Ok(AcceptAction::Accept(x)) => {
-                self.spawn_session(phys, addr, x.config, x.error_mode, &[]);
+                self.spawn_session(phys, addr, x.config, x.error_mode, &[], None);
             }
             Ok(AcceptAction::GetLinkIdentity(timeout)) => {
                 // spawn a task to identify the remote link layer
@@ -239,6 +255,7 @@ impl AcceptTask {
         config: MasterChannelConfig,
         error_mode: LinkErrorMode,
         seed_data: &[u8],
+        link_id: Option<LinkIdentity>,
     ) {
         let (tx, rx) = crate::util::channel::request_channel();
         let mut task = MasterTask::new(Enabled::No, LinkModes::stream(error_mode), config, rx);
@@ -263,7 +280,12 @@ impl AcceptTask {
 
         let channel = MasterChannel::new(tx, MasterChannelType::Stream);
 
-        self.handler.start(channel, addr);
+        match link_id {
+            Some(id) => self
+                .handler
+                .start_with_link_id(channel, addr, id.source, id.destination),
+            None => self.handler.start(channel, addr),
+        }
     }
 }
 
