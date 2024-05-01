@@ -8,6 +8,7 @@ use crate::master::{MasterChannel, MasterChannelConfig, MasterChannelType};
 use crate::util::channel::{Receiver, Sender};
 use crate::util::phys::PhysLayer;
 use crate::util::session::{Enabled, Session};
+use std::future::Future;
 
 use crate::tcp::ServerHandle;
 use crate::util::future::forever;
@@ -24,11 +25,11 @@ use tracing::Instrument;
 ///
 /// The behavior of each connection is controlled by callbacks to a user-defined
 /// implementation of the [`ConnectionHandler`] trait.
-pub async fn spawn_master_tcp_server(
+pub async fn spawn_master_tcp_server<C: ConnectionHandler>(
     addr: SocketAddr,
     max_link_id_tasks: NonZeroUsize,
     link_id_decode_level: PhysDecodeLevel,
-    handler: Box<dyn ConnectionHandler>,
+    handler: C,
 ) -> std::io::Result<ServerHandle> {
     let listener = TcpListener::bind(addr).await?;
 
@@ -49,7 +50,9 @@ pub async fn spawn_master_tcp_server(
     };
 
     let task = async move {
+        tracing::info!("accepting connections");
         let _ = accept_task.run().await;
+        tracing::info!("shutdown");
     }
     .instrument(tracing::info_span!("master-tcp-server", addr = ?addr));
 
@@ -89,14 +92,21 @@ pub enum AcceptAction {
 }
 
 /// Callbacks to user code that determine how the server processes connections
-pub trait ConnectionHandler: Send {
+pub trait ConnectionHandler: Send + 'static {
     /// Filter the connection solely based on the remote address
-    fn accept(&mut self, addr: SocketAddr) -> Result<AcceptAction, Reject>;
+    fn accept(
+        &mut self,
+        addr: SocketAddr,
+    ) -> impl Future<Output = Result<AcceptAction, Reject>> + Send;
 
     /// Start a communication session that was previously accepted using only the socket address
     ///
     /// The user may add associations to the channel and then enable it
-    fn start(&mut self, channel: MasterChannel, addr: SocketAddr);
+    fn start(
+        &mut self,
+        channel: MasterChannel,
+        addr: SocketAddr,
+    ) -> impl Future<Output = ()> + Send;
 
     /// Filter the connection solely based on the remote address
     fn accept_link_id(
@@ -104,7 +114,7 @@ pub trait ConnectionHandler: Send {
         addr: SocketAddr,
         source: u16,
         destination: u16,
-    ) -> Result<AcceptConfig, Reject>;
+    ) -> impl Future<Output = Result<AcceptConfig, Reject>> + Send;
 
     /// Start a communication session that was previously accepted using link identity information.
     ///
@@ -115,19 +125,19 @@ pub trait ConnectionHandler: Send {
         addr: SocketAddr,
         source: u16,
         destination: u16,
-    );
+    ) -> impl Future<Output = ()> + Send;
 }
 
 type LinkIdResult = std::io::Result<(PhysLayer, SocketAddr, LinkIdentity)>;
 
-struct AcceptTask {
+struct AcceptTask<C: ConnectionHandler> {
     conn_id: u64,
     pending_link_id_tasks: usize,
     max_link_id_tasks: NonZeroUsize,
     link_id_decode_level: PhysDecodeLevel,
     listener: TcpListener,
     shutdown_listener: ShutdownListener,
-    handler: Box<dyn ConnectionHandler>,
+    handler: C,
     id_task_results: Receiver<LinkIdResult>,
     id_task_sender: Sender<LinkIdResult>,
 }
@@ -137,7 +147,7 @@ enum TaskEvent {
     LinkId(LinkIdResult),
 }
 
-impl AcceptTask {
+impl<C: ConnectionHandler> AcceptTask<C> {
     async fn run(mut self) -> Result<(), Shutdown> {
         loop {
             let event = match self.next_event().await {
@@ -148,19 +158,19 @@ impl AcceptTask {
                 }
             };
 
-            self.process_event(event);
+            self.process_event(event).await;
         }
     }
 
-    fn process_event(&mut self, event: TaskEvent) {
+    async fn process_event(&mut self, event: TaskEvent) {
         match event {
             TaskEvent::Accept(stream, addr) => {
-                self.handle_accept(stream, addr);
+                self.handle_accept(stream, addr).await;
             }
             TaskEvent::LinkId(res) => {
                 self.pending_link_id_tasks -= 1;
                 match res {
-                    Ok((phys, addr, id)) => self.handle_link_identity(phys, addr, id),
+                    Ok((phys, addr, id)) => self.handle_link_identity(phys, addr, id).await,
                     Err(err) => {
                         tracing::warn!("unable to identify remote link: {err}");
                     }
@@ -202,8 +212,12 @@ impl AcceptTask {
         }
     }
 
-    fn handle_link_identity(&mut self, phys: PhysLayer, addr: SocketAddr, id: LinkIdentity) {
-        match self.handler.accept_link_id(addr, id.source, id.destination) {
+    async fn handle_link_identity(&mut self, phys: PhysLayer, addr: SocketAddr, id: LinkIdentity) {
+        match self
+            .handler
+            .accept_link_id(addr, id.source, id.destination)
+            .await
+        {
             Ok(x) => {
                 self.spawn_session(
                     phys,
@@ -212,7 +226,8 @@ impl AcceptTask {
                     x.error_mode,
                     id.header_bytes.as_slice(),
                     Some(id),
-                );
+                )
+                .await;
             }
             Err(Reject) => {
                 tracing::warn!(
@@ -224,15 +239,16 @@ impl AcceptTask {
         }
     }
 
-    fn handle_accept(&mut self, stream: TcpStream, addr: SocketAddr) {
+    async fn handle_accept(&mut self, stream: TcpStream, addr: SocketAddr) {
         let phys = PhysLayer::Tcp(stream);
 
-        match self.handler.accept(addr) {
+        match self.handler.accept(addr).await {
             Err(Reject) => {
                 tracing::info!("rejected connection from {addr}");
             }
             Ok(AcceptAction::Accept(x)) => {
-                self.spawn_session(phys, addr, x.config, x.error_mode, &[], None);
+                self.spawn_session(phys, addr, x.config, x.error_mode, &[], None)
+                    .await;
             }
             Ok(AcceptAction::GetLinkIdentity(timeout)) => {
                 // spawn a task to identify the remote link layer
@@ -248,7 +264,7 @@ impl AcceptTask {
         }
     }
 
-    fn spawn_session(
+    async fn spawn_session(
         &mut self,
         phys: PhysLayer,
         addr: SocketAddr,
@@ -281,10 +297,12 @@ impl AcceptTask {
         let channel = MasterChannel::new(tx, MasterChannelType::Stream);
 
         match link_id {
-            Some(id) => self
-                .handler
-                .start_with_link_id(channel, addr, id.source, id.destination),
-            None => self.handler.start(channel, addr),
+            Some(id) => {
+                self.handler
+                    .start_with_link_id(channel, addr, id.source, id.destination)
+                    .await
+            }
+            None => self.handler.start(channel, addr).await,
         }
     }
 }
@@ -360,9 +378,9 @@ async fn read_link_identity(
     }
 
     fn read_addr(header: &HeaderBytes) -> Result<(u16, u16), ReadError> {
-        // just skip over the 0x0564 | LENGTH | CTRL
         let mut cursor = ReadCursor::new(header);
-        cursor.read_bytes(5)?;
+        // just skip over the 0x0564 | LENGTH | CTRL
+        cursor.read_bytes(4)?;
         let destination = cursor.read_u16_le()?;
         let source = cursor.read_u16_le()?;
         Ok((destination, source))
