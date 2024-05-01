@@ -25,13 +25,17 @@ use tracing::Instrument;
 ///
 /// The behavior of each connection is controlled by callbacks to a user-defined
 /// implementation of the [`ConnectionHandler`] trait.
+///
+/// `addr` - local address to which the TCP listener is bound
 pub async fn spawn_master_tcp_server<C: ConnectionHandler>(
-    addr: SocketAddr,
+    local_addr: SocketAddr,
     max_link_id_tasks: NonZeroUsize,
     link_id_decode_level: PhysDecodeLevel,
     handler: C,
 ) -> std::io::Result<ServerHandle> {
-    let listener = TcpListener::bind(addr).await?;
+    let listener = TcpListener::bind(local_addr).await?;
+
+    let assigned_addr = listener.local_addr().ok();
 
     let (tx, rx) = crate::util::channel::request_channel();
 
@@ -54,12 +58,12 @@ pub async fn spawn_master_tcp_server<C: ConnectionHandler>(
         let _ = accept_task.run().await;
         tracing::info!("shutdown");
     }
-    .instrument(tracing::info_span!("master-tcp-server", addr = ?addr));
+    .instrument(tracing::info_span!("master-tcp-server", addr = ?local_addr));
 
     tokio::spawn(task);
 
     let handle = ServerHandle {
-        addr: None,
+        addr: assigned_addr,
         _token: token,
     };
 
