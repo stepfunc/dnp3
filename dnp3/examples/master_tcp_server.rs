@@ -1,12 +1,10 @@
 //! Example of running a master as a TCP server
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use std::num::NonZeroUsize;
 
 use tokio_stream::StreamExt;
 use tokio_util::codec::{FramedRead, LinesCodec};
 
-use dnp3::app::*;
 use dnp3::decode::*;
 use dnp3::link::*;
 use dnp3::master::*;
@@ -65,9 +63,7 @@ impl ConnectionHandler {
 
 impl dnp3::tcp::ConnectionHandler for ConnectionHandler {
     async fn accept(&mut self, _: SocketAddr) -> Result<AcceptAction, Reject> {
-        Ok(AcceptAction::GetLinkIdentity(
-            Timeout::from_secs(1).unwrap(),
-        ))
+        Ok(AcceptAction::GetLinkIdentity)
     }
 
     async fn start(&mut self, _: MasterChannel, _: SocketAddr) {
@@ -124,8 +120,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let _server = spawn_master_tcp_server(
         "127.0.0.1:20000".parse()?,
-        NonZeroUsize::new(10).unwrap(),
-        PhysDecodeLevel::Data,
+        LinkIdConfig::default().decode_level(PhysDecodeLevel::Data),
         ConnectionHandler {
             channels: Default::default(),
         },

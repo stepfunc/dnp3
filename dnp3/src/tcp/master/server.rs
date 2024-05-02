@@ -21,16 +21,61 @@ use std::time::Duration;
 use tokio::net::{TcpListener, TcpStream};
 use tracing::Instrument;
 
+/// Configuration that controls how the server performs remote link identification
+#[derive(Copy, Clone, Debug)]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
+pub struct LinkIdConfig {
+    max_tasks: NonZeroUsize,
+    timeout: Timeout,
+    decode_level: PhysDecodeLevel,
+}
+
+impl LinkIdConfig {
+    /// Set the maximum number of simultaneous tasks used to perform link identification
+    ///
+    /// New connections are until a task is available
+    pub fn max_tasks(self, max_tasks: NonZeroUsize) -> Self {
+        Self { max_tasks, ..self }
+    }
+
+    /// Set the maximum number of time period to wait before receiving a link frame from the outstation
+    pub fn timeout(self, timeout: Timeout) -> Self {
+        Self { timeout, ..self }
+    }
+
+    /// Set the decode level to use when reading the link header used for identification
+    pub fn decode_level(self, decode_level: PhysDecodeLevel) -> Self {
+        Self {
+            decode_level,
+            ..self
+        }
+    }
+}
+
+impl Default for LinkIdConfig {
+    fn default() -> Self {
+        Self {
+            max_tasks: NonZeroUsize::new(16).unwrap(),
+            timeout: Timeout::from_secs(5).unwrap(),
+            decode_level: PhysDecodeLevel::Nothing,
+        }
+    }
+}
+
 /// Spawn a TCP server that accepts connections from outstations
 ///
 /// The behavior of each connection is controlled by callbacks to a user-defined
 /// implementation of the [`ConnectionHandler`] trait.
 ///
-/// `addr` - local address to which the TCP listener is bound
+/// `addr` - local address on which the server will accept connection
+/// `link_id_config` - Configuration used when identifying outstations based on transmitted link-frames
+/// `handler` - Callbacks used to accept and start communication sessions
 pub async fn spawn_master_tcp_server<C: ConnectionHandler>(
     local_addr: SocketAddr,
-    max_link_id_tasks: NonZeroUsize,
-    link_id_decode_level: PhysDecodeLevel,
+    link_id_config: LinkIdConfig,
     handler: C,
 ) -> std::io::Result<ServerHandle> {
     let listener = TcpListener::bind(local_addr).await?;
@@ -44,8 +89,7 @@ pub async fn spawn_master_tcp_server<C: ConnectionHandler>(
     let accept_task = AcceptTask {
         conn_id: 0,
         pending_link_id_tasks: 0,
-        max_link_id_tasks,
-        link_id_decode_level,
+        link_id_config,
         listener,
         shutdown_listener,
         handler,
@@ -90,7 +134,7 @@ pub enum AcceptAction {
     /// layer within a timeout.
     ///
     /// This header is typically the beginning of an unsolicited fragment from the outstation.
-    GetLinkIdentity(Timeout),
+    GetLinkIdentity,
     /// Accept the connection, providing configuration information needed to create a [`MasterChannel`]
     Accept(AcceptConfig),
 }
@@ -137,8 +181,7 @@ type LinkIdResult = std::io::Result<(PhysLayer, SocketAddr, LinkIdentity)>;
 struct AcceptTask<C: ConnectionHandler> {
     conn_id: u64,
     pending_link_id_tasks: usize,
-    max_link_id_tasks: NonZeroUsize,
-    link_id_decode_level: PhysDecodeLevel,
+    link_id_config: LinkIdConfig,
     listener: TcpListener,
     shutdown_listener: ShutdownListener,
     handler: C,
@@ -190,7 +233,7 @@ impl<C: ConnectionHandler> AcceptTask<C> {
     }
 
     async fn next_event(&mut self) -> std::io::Result<Result<TaskEvent, Shutdown>> {
-        let can_accept = self.pending_link_id_tasks < self.max_link_id_tasks.get();
+        let can_accept = self.pending_link_id_tasks < self.link_id_config.max_tasks.get();
 
         let accept_connection = async {
             if can_accept {
@@ -254,13 +297,13 @@ impl<C: ConnectionHandler> AcceptTask<C> {
                 self.spawn_session(phys, addr, x.config, x.error_mode, &[], None)
                     .await;
             }
-            Ok(AcceptAction::GetLinkIdentity(timeout)) => {
+            Ok(AcceptAction::GetLinkIdentity) => {
                 // spawn a task to identify the remote link layer
                 tokio::spawn(identify_link(
                     phys,
-                    self.link_id_decode_level,
+                    self.link_id_config.decode_level,
                     addr,
-                    timeout.into(),
+                    self.link_id_config.timeout.into(),
                     self.id_task_sender.clone(),
                 ));
                 self.pending_link_id_tasks += 1;
