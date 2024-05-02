@@ -34,6 +34,19 @@ pub struct LinkIdConfig {
 }
 
 impl LinkIdConfig {
+    /// Initial with default values:
+    ///
+    /// * max_tasks = 16
+    /// * timeout = 5 seconds
+    /// * decode_level = Nothing
+    pub fn new() -> Self {
+        Self {
+            max_tasks: NonZeroUsize::new(16).unwrap(),
+            timeout: Timeout::from_secs(5).unwrap(),
+            decode_level: PhysDecodeLevel::Nothing,
+        }
+    }
+
     /// Set the maximum number of simultaneous tasks used to perform link identification
     ///
     /// New connections are until a task is available
@@ -57,11 +70,7 @@ impl LinkIdConfig {
 
 impl Default for LinkIdConfig {
     fn default() -> Self {
-        Self {
-            max_tasks: NonZeroUsize::new(16).unwrap(),
-            timeout: Timeout::from_secs(5).unwrap(),
-            decode_level: PhysDecodeLevel::Nothing,
-        }
+        Self::new()
     }
 }
 
