@@ -18,6 +18,7 @@ use dnp3::serial::*;
 use dnp3::tcp::tls::*;
 use dnp3::udp::spawn_master_udp;
 
+use crate::ffi::ParamError;
 use crate::{ffi, ByteIterator};
 
 pub struct FileInfoIterator {
@@ -90,7 +91,7 @@ pub(crate) unsafe fn master_channel_create_tcp_2(
     listener: ffi::ClientStateListener,
 ) -> Result<*mut MasterChannel, ffi::ParamError> {
     let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
-    let config = convert_config(config)?;
+    let config: MasterChannelConfig = config.try_into()?;
     let endpoints = endpoints.as_ref().ok_or(ffi::ParamError::NullParameter)?;
     let connect_options = options
         .as_ref()
@@ -166,7 +167,7 @@ pub(crate) unsafe fn master_channel_create_tls_2(
     tls_config: ffi::TlsClientConfig,
 ) -> Result<*mut MasterChannel, ffi::ParamError> {
     let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
-    let config = convert_config(config)?;
+    let config: MasterChannelConfig = config.try_into()?;
     let endpoints = endpoints.as_ref().ok_or(ffi::ParamError::NullParameter)?;
     let connect_options = connect_options
         .as_ref()
@@ -271,7 +272,7 @@ pub(crate) unsafe fn master_channel_create_serial(
     listener: ffi::PortStateListener,
 ) -> Result<*mut MasterChannel, ffi::ParamError> {
     let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
-    let config = convert_config(config)?;
+    let config: MasterChannelConfig = config.try_into()?;
 
     // enter the runtime context so that we can spawn
     let _enter = runtime.enter();
@@ -299,7 +300,7 @@ pub(crate) unsafe fn master_channel_create_udp(
     retry_delay: Duration,
 ) -> Result<*mut MasterChannel, ffi::ParamError> {
     let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
-    let config = convert_config(config)?;
+    let config: MasterChannelConfig = config.try_into()?;
     let local_endpoint: SocketAddr = local_endpoint.to_str()?.parse()?;
 
     // enter the runtime context so that we can spawn
@@ -1137,17 +1138,19 @@ pub(crate) unsafe fn endpoint_list_add(list: *mut EndpointList, endpoint: &CStr)
     }
 }
 
-fn convert_config(
-    config: ffi::MasterChannelConfig,
-) -> Result<MasterChannelConfig, ffi::ParamError> {
-    let address = EndpointAddress::try_new(config.address())?;
+impl TryFrom<ffi::MasterChannelConfig> for MasterChannelConfig {
+    type Error = ParamError;
 
-    Ok(MasterChannelConfig {
-        master_address: address,
-        decode_level: config.decode_level().clone().into(),
-        tx_buffer_size: BufferSize::new(config.tx_buffer_size() as usize)?,
-        rx_buffer_size: BufferSize::new(config.rx_buffer_size() as usize)?,
-    })
+    fn try_from(config: ffi::MasterChannelConfig) -> Result<Self, Self::Error> {
+        let address = EndpointAddress::try_new(config.address())?;
+
+        Ok(MasterChannelConfig {
+            master_address: address,
+            decode_level: config.decode_level().clone().into(),
+            tx_buffer_size: BufferSize::new(config.tx_buffer_size() as usize)?,
+            rx_buffer_size: BufferSize::new(config.rx_buffer_size() as usize)?,
+        })
+    }
 }
 
 impl From<Utf8Error> for ffi::ParamError {

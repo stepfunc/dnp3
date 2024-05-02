@@ -1,5 +1,6 @@
 pub(crate) mod read_handler;
 pub(crate) mod request;
+pub(crate) mod server;
 pub(crate) mod write_dead_band_request;
 
 use crate::shared::SharedDefinitions;
@@ -12,6 +13,13 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
     let master_channel_config = define_master_channel_config(lib, shared)?;
 
     let master_channel_class = lib.declare_class("master_channel")?;
+
+    server::define_connection_handler(
+        lib,
+        shared,
+        master_channel_config.clone(),
+        master_channel_class.clone(),
+    )?;
 
     let write_dead_band_request = crate::master::write_dead_band_request::define(lib)?;
     let empty_response_callback = define_empty_response_callback(lib, shared.nothing.clone())?;
@@ -931,15 +939,15 @@ fn define_association_config(
 fn define_master_channel_config(
     lib: &mut LibraryBuilder,
     shared: &SharedDefinitions,
-) -> BackTraced<FunctionArgStructHandle> {
-    let config = lib.declare_function_argument_struct("master_channel_config")?;
+) -> BackTraced<UniversalStructHandle> {
+    let config = lib.declare_universal_struct("master_channel_config")?;
 
     let decode_level = Name::create("decode_level")?;
 
     let tx_buffer_size = Name::create("tx_buffer_size")?;
     let rx_buffer_size = Name::create("rx_buffer_size")?;
 
-    let config = lib.define_function_argument_struct(config)?
+    let config = lib.define_universal_struct(config)?
         .doc("Configuration for a MasterChannel that is independent of the physical layer")?
         .add("address", Primitive::U16, "Local DNP3 data-link address")?
         .add(decode_level.clone(), shared.decode_level.clone(), "Decoding level for this master. You can modify this later on with {class:master_channel.set_decode_level()}.")?

@@ -115,6 +115,10 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> 
             "wrong_channel_type",
             "This operation cannot be performed on this channel type",
         )?
+        .add_error(
+            "consumed",
+            "This object is consumed and cannot be used again",
+        )?
         .doc("Error type used throughout the library")?
         .build()?;
 
