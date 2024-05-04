@@ -1137,9 +1137,9 @@ dependencies = [
 
 [[package]]
 name = "sfio-tokio-ffi"
-version = "0.8.0"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7264a1340f2fa1d79e749b85c1f9965dedbd811d1dfb32a6b354e8253cad2286"
+checksum = "f18d418ee525a2027c0b3e1ab34dc050e1f676834b93389829d40aed2bfefecb"
 dependencies = [
  "oo-bindgen",
 ]

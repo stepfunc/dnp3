@@ -1,5 +1,6 @@
 pub(crate) mod read_handler;
 pub(crate) mod request;
+pub(crate) mod server;
 pub(crate) mod write_dead_band_request;
 
 use crate::shared::SharedDefinitions;
@@ -199,7 +200,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         )?
         .param(
             "config",
-            master_channel_config,
+            master_channel_config.clone(),
             "Generic configuration for the channel",
         )?
         .param(
@@ -726,7 +727,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         .doc("Asynchronously perform a link status check")?
         .build()?;
 
-    lib.define_class(&master_channel_class)?
+    let master_channel_class = lib.define_class(&master_channel_class)?
         .destructor(channel_destructor)?
         .static_method(master_channel_create_tcp_fn)?
         .static_method(master_channel_create_tcp_2_fn)?
@@ -769,6 +770,13 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
                 .warning("The class methods that return a value (e.g. as {class:master_channel.add_association()}) cannot be called from within a callback.")
         )?
         .build()?;
+
+    server::define_server_components(
+        lib,
+        shared,
+        master_channel_config.clone(),
+        master_channel_class.declaration(),
+    )?;
 
     Ok(())
 }
@@ -931,15 +939,15 @@ fn define_association_config(
 fn define_master_channel_config(
     lib: &mut LibraryBuilder,
     shared: &SharedDefinitions,
-) -> BackTraced<FunctionArgStructHandle> {
-    let config = lib.declare_function_argument_struct("master_channel_config")?;
+) -> BackTraced<UniversalStructHandle> {
+    let config = lib.declare_universal_struct("master_channel_config")?;
 
     let decode_level = Name::create("decode_level")?;
 
     let tx_buffer_size = Name::create("tx_buffer_size")?;
     let rx_buffer_size = Name::create("rx_buffer_size")?;
 
-    let config = lib.define_function_argument_struct(config)?
+    let config = lib.define_universal_struct(config)?
         .doc("Configuration for a MasterChannel that is independent of the physical layer")?
         .add("address", Primitive::U16, "Local DNP3 data-link address")?
         .add(decode_level.clone(), shared.decode_level.clone(), "Decoding level for this master. You can modify this later on with {class:master_channel.set_decode_level()}.")?

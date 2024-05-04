@@ -682,7 +682,7 @@ impl EventBuffer {
             .events
             .iter()
             .filter(|(_, e)| e.state.get() == EventState::Unselected && selector(e))
-            .take(limit.unwrap_or(usize::max_value()))
+            .take(limit.unwrap_or(usize::MAX))
         {
             evt.state.set(EventState::Selected);
             count += 1;

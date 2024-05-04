@@ -1,7 +1,6 @@
 use std::time::Duration;
 
-/// A wrapper around a std::time::Duration
-/// that ensures values are in the range `[1ms .. 1hour]`
+/// A wrapper around a std::time::Duration that ensures values are in the range `[1ms .. 1hour]`
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(
     feature = "serialization",
@@ -9,6 +8,12 @@ use std::time::Duration;
 )]
 #[cfg_attr(feature = "serialization", serde(try_from = "Duration"))]
 pub struct Timeout(pub(crate) Duration);
+
+impl From<Timeout> for Duration {
+    fn from(value: Timeout) -> Self {
+        value.0
+    }
+}
 
 impl Default for Timeout {
     fn default() -> Self {
@@ -38,6 +43,19 @@ impl Timeout {
     pub const MIN: Duration = Duration::from_millis(1);
     /// maximum allowed timeout value as a duration
     pub const MAX: Duration = Duration::from_secs(60 * 60); // one hour
+
+    /// construct from a duration, saturating at the minimum and maximum
+    pub fn saturating(value: Duration) -> Self {
+        if value < Self::MIN {
+            return Self(Self::MIN);
+        }
+
+        if value > Self::MAX {
+            return Self(Self::MAX);
+        }
+
+        Self(value)
+    }
 
     /// try to construct a `Timeout` from a count of seconds
     ///

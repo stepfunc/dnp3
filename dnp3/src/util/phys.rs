@@ -1,4 +1,5 @@
 use crate::decode::PhysDecodeLevel;
+use std::io::ErrorKind;
 use std::net::SocketAddr;
 
 use crate::udp::layer::UdpLayer;
@@ -69,6 +70,13 @@ impl PhysLayer {
                 (count, PhysAddr::None)
             }
         };
+
+        if length == 0 {
+            return Err(std::io::Error::new(
+                ErrorKind::UnexpectedEof,
+                "read return 0",
+            ));
+        }
 
         if level.enabled() {
             if let Some(x) = buffer.get(0..length) {

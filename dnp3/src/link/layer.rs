@@ -56,6 +56,10 @@ impl Layer {
         }
     }
 
+    pub(crate) fn seed(&mut self, seed_data: &[u8]) -> Result<(), scursor::WriteError> {
+        self.reader.seed(seed_data)
+    }
+
     pub(crate) fn reset(&mut self) {
         self.secondary_state = SecondaryState::NotReset;
         self.reader.reset();

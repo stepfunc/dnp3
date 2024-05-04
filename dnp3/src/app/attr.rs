@@ -892,10 +892,7 @@ impl<'a> Iterator for VariationListIter<'a> {
         let variation = *self.data.first()?;
         let prop = *self.data.get(1)?;
 
-        self.data = match self.data.get(2..) {
-            Some(x) => x,
-            None => &[],
-        };
+        self.data = self.data.get(2..).unwrap_or_default();
 
         Some(AttrItem {
             variation,

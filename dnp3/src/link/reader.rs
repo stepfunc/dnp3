@@ -1,5 +1,3 @@
-use std::io::ErrorKind;
-
 use crate::decode::DecodeLevel;
 use crate::link::display::LinkDisplay;
 use crate::link::error::LinkError;
@@ -9,7 +7,7 @@ use crate::link::{LinkErrorMode, LinkReadMode};
 use crate::util::phys::{PhysAddr, PhysLayer};
 
 use crate::link;
-use scursor::ReadCursor;
+use scursor::{ReadCursor, WriteCursor};
 
 /// How many link frames might be required to transport this much application data?
 const fn num_link_frames(fragment_size: usize) -> usize {
@@ -142,6 +140,13 @@ impl Reader {
         }
     }
 
+    pub(crate) fn seed(&mut self, seed_data: &[u8]) -> Result<(), scursor::WriteError> {
+        let mut cursor = WriteCursor::new(self.buffer.writable());
+        cursor.write_bytes(seed_data)?;
+        self.buffer.advance_write(seed_data.len());
+        Ok(())
+    }
+
     pub(crate) fn reset(&mut self) {
         self.buffer.reset();
         self.parser.reset();
@@ -196,10 +201,6 @@ impl Reader {
 
         // now we can read more data
         let (count, addr) = io.read(self.buffer.writable(), level.physical).await?;
-
-        if count == 0 {
-            return Err(LinkError::Stdio(ErrorKind::UnexpectedEof));
-        }
 
         self.buffer.advance_write(count);
         Ok(addr)

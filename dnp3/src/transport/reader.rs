@@ -79,6 +79,10 @@ impl TransportReader {
         &mut self.inner
     }
 
+    pub(crate) fn seed_link(&mut self, seed_data: &[u8]) -> Result<(), scursor::WriteError> {
+        self.inner.seed_link(seed_data)
+    }
+
     pub(crate) async fn read(
         &mut self,
         io: &mut PhysLayer,
