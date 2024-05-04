@@ -66,7 +66,7 @@ where
     let difference: u64 = time.timestamp().raw_value() - cto.timestamp().raw_value();
 
     // too big of a difference to encode
-    if difference > u16::max_value().into() {
+    if difference > u16::MAX.into() {
         return Ok(Continue::NewHeader);
     }
 
