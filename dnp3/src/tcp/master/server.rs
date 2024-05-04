@@ -34,7 +34,7 @@ pub struct LinkIdConfig {
 }
 
 impl LinkIdConfig {
-    /// Initial with default values:
+    /// Initialize with default values:
     ///
     /// * max_tasks = 16
     /// * timeout = 5 seconds

@@ -1,4 +1,5 @@
 use crate::attributes::DeviceAttrTypes;
+use crate::decoding::DecodeLevels;
 use crate::file::FileDefinitions;
 use crate::gv;
 use oo_bindgen::model::*;
@@ -15,6 +16,7 @@ pub(crate) struct SharedDefinitions {
     pub endpoint_list: ClassHandle,
     pub connect_strategy: FunctionArgStructHandle,
     pub tls_client_config: FunctionArgStructHandle,
+    pub levels: DecodeLevels,
     pub decode_level: UniversalStructHandle,
     pub serial_port_settings: FunctionArgStructHandle,
     pub link_error_mode: EnumHandle,
@@ -125,7 +127,8 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> 
     let command_status = define_command_status(lib)?;
 
     crate::constants::define(lib)?;
-    let decode_level = crate::decoding::define(lib)?;
+    let levels = crate::decoding::define_levels(lib)?;
+    let decode_level = crate::decoding::define_decode_level_struct(lib, &levels)?;
     let runtime_class = sfio_tokio_ffi::define(lib, error_type.clone())?;
 
     let control_field_struct = lib.declare_callback_argument_struct("control_field")?;
@@ -322,6 +325,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> 
         endpoint_list,
         connect_strategy,
         tls_client_config: tls.tls_client_config,
+        levels,
         decode_level,
         retry_strategy: define_retry_strategy(lib)?,
         serial_port_settings: define_serial_port_settings(lib)?,

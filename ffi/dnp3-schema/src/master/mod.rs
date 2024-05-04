@@ -771,7 +771,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         )?
         .build()?;
 
-    server::define_connection_handler(
+    server::define_server_components(
         lib,
         shared,
         master_channel_config.clone(),
