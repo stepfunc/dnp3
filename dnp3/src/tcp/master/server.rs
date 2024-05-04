@@ -221,6 +221,7 @@ impl<C: ConnectionHandler> AcceptTask<C> {
     async fn process_event(&mut self, event: TaskEvent) {
         match event {
             TaskEvent::Accept(stream, addr) => {
+                tracing::info!("accepted connection from {addr:?}");
                 self.handle_accept(stream, addr).await;
             }
             TaskEvent::LinkId(res) => {
