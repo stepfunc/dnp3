@@ -1,6 +1,6 @@
 [package]
 name = "dnp3"
-version = "1.6.0-M2"
+version = "1.6.0-M3"
 
 authors = ["Step Function I/O LLC <info@stepfunc.io>"]
 description = "Rust implementation of DNP3 (IEEE 1815) with idiomatic bindings for C, C++, .NET, and Java"
