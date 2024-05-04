@@ -222,6 +222,7 @@ impl<C: ConnectionHandler> AcceptTask<C> {
         match event {
             TaskEvent::Accept(stream, addr) => {
                 tracing::info!("accepted connection from {addr:?}");
+                crate::tcp::configure_server(&stream);
                 self.handle_accept(stream, addr).await;
             }
             TaskEvent::LinkId(res) => {
