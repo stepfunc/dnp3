@@ -243,37 +243,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ANCHOR_END: logging
 
     // spawn the master channel based on the command line argument
-    let mut channel = create_channel()?;
-
-    let mut association = match channel.get_channel_type() {
-        MasterChannelType::Udp => {
-            // ANCHOR: association_create_udp
-            channel
-                .add_udp_association(
-                    EndpointAddress::try_new(1024)?,
-                    "127.0.0.1:20000".parse()?,
-                    get_association_config(),
-                    ExampleReadHandler::boxed(),
-                    Box::new(ExampleAssociationHandler),
-                    Box::new(ExampleAssociationInformation),
-                )
-                .await?
-            // ANCHOR_END: association_create_udp
-        }
-        MasterChannelType::Stream => {
-            // ANCHOR: association_create
-            channel
-                .add_association(
-                    EndpointAddress::try_new(1024)?,
-                    get_association_config(),
-                    ExampleReadHandler::boxed(),
-                    Box::new(ExampleAssociationHandler),
-                    Box::new(ExampleAssociationInformation),
-                )
-                .await?
-            // ANCHOR_END: association_create
-        }
-    };
+    let (mut channel, mut association) = create_channel_and_association().await?;
 
     // create an event poll
     // ANCHOR: add_poll
@@ -497,7 +467,8 @@ impl CliHandler {
 }
 
 // create the specified channel based on the command line argument
-fn create_channel() -> Result<MasterChannel, Box<dyn std::error::Error>> {
+async fn create_channel_and_association(
+) -> Result<(MasterChannel, AssociationHandle), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
     let transport: &str = match args.as_slice() {
         [_, x] => x,
@@ -508,14 +479,34 @@ fn create_channel() -> Result<MasterChannel, Box<dyn std::error::Error>> {
         }
     };
     match transport {
-        "tcp" => create_tcp_channel(),
-        "udp" => create_udp_channel(),
+        "tcp" => {
+            let mut channel = create_tcp_channel()?;
+            let assoc = add_association(&mut channel).await?;
+            Ok((channel, assoc))
+        }
+        "udp" => {
+            let mut channel = create_udp_channel()?;
+            let assoc = add_udp_association(&mut channel).await?;
+            Ok((channel, assoc))
+        }
         #[cfg(feature = "serial")]
-        "serial" => create_serial_channel(),
+        "serial" => {
+            let mut channel = create_serial_channel()?;
+            let assoc = add_association(&mut channel).await?;
+            Ok((channel, assoc))
+        }
         #[cfg(feature = "tls")]
-        "tls-ca" => create_tls_channel(get_tls_authority_config()?),
+        "tls-ca" => {
+            let mut channel = create_tls_channel(get_tls_authority_config()?)?;
+            let assoc = add_association(&mut channel).await?;
+            Ok((channel, assoc))
+        }
         #[cfg(feature = "tls")]
-        "tls-self-signed" => create_tls_channel(get_tls_self_signed_config()?),
+        "tls-self-signed" => {
+            let mut channel = create_tls_channel(get_tls_self_signed_config()?)?;
+            let assoc = add_association(&mut channel).await?;
+            Ok((channel, assoc))
+        }
         _ => {
             eprintln!(
                 "unknown transport '{}', options are (tcp, serial, tls-ca, tls-self-signed)",
@@ -524,6 +515,41 @@ fn create_channel() -> Result<MasterChannel, Box<dyn std::error::Error>> {
             exit(-1);
         }
     }
+}
+
+async fn add_association(
+    channel: &mut MasterChannel,
+) -> Result<AssociationHandle, Box<dyn std::error::Error>> {
+    // ANCHOR: association_create
+    let association = channel
+        .add_association(
+            EndpointAddress::try_new(1024)?,
+            get_association_config(),
+            ExampleReadHandler::boxed(),
+            Box::new(ExampleAssociationHandler),
+            Box::new(ExampleAssociationInformation),
+        )
+        .await?;
+    // ANCHOR_END: association_create
+    Ok(association)
+}
+
+async fn add_udp_association(
+    channel: &mut MasterChannel,
+) -> Result<AssociationHandle, Box<dyn std::error::Error>> {
+    // ANCHOR: association_create_udp
+    let association = channel
+        .add_udp_association(
+            EndpointAddress::try_new(1024)?,
+            "127.0.0.1:20000".parse()?,
+            get_association_config(),
+            ExampleReadHandler::boxed(),
+            Box::new(ExampleAssociationHandler),
+            Box::new(ExampleAssociationInformation),
+        )
+        .await?;
+    // ANCHOR_END: association_create_udp
+    Ok(association)
 }
 
 // ANCHOR: master_channel_config
