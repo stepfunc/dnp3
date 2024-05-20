@@ -1,7 +1,6 @@
-use crate::app::attr::AnyAttribute;
+use crate::app::attr::{AnyAttribute, Attribute};
 use crate::app::measurement::*;
-use crate::app::{MaybeAsync, ResponseHeader};
-use crate::master::{HeaderInfo, ReadType};
+use crate::app::{MaybeAsync, QualifierCode, ResponseHeader, Variation};
 
 /// Trait used to process measurement data received from an outstation
 #[allow(unused_variables)]
@@ -129,4 +128,69 @@ pub trait ReadHandler: Send + Sync {
 
     /// Process a device attribute
     fn handle_device_attribute(&mut self, info: HeaderInfo, attr: AnyAttribute) {}
+}
+
+pub(crate) fn handle_attribute(
+    var: Variation,
+    qualifier: QualifierCode,
+    attr: &Option<Attribute>,
+    handler: &mut dyn ReadHandler,
+) {
+    if let Some(attr) = attr {
+        match AnyAttribute::try_from(attr) {
+            Ok(attr) => {
+                handler
+                    .handle_device_attribute(HeaderInfo::new(var, qualifier, false, false), attr);
+            }
+            Err(err) => {
+                tracing::warn!(
+                    "Expected attribute type {:?} but received {:?}",
+                    err.expected,
+                    err.actual
+                );
+            }
+        }
+    }
+}
+
+/// Information about the object header and specific variation
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct HeaderInfo {
+    /// underlying variation in the response
+    pub variation: Variation,
+    /// qualifier code used in the response
+    pub qualifier: QualifierCode,
+    /// true if the received variation is an event type, false otherwise
+    pub is_event: bool,
+    /// true if a flags byte is present on the underlying variation, false otherwise
+    pub has_flags: bool,
+}
+
+impl HeaderInfo {
+    pub(crate) fn new(
+        variation: Variation,
+        qualifier: QualifierCode,
+        is_event: bool,
+        has_flags: bool,
+    ) -> Self {
+        Self {
+            variation,
+            qualifier,
+            is_event,
+            has_flags,
+        }
+    }
+}
+
+/// Describes the source of a read event
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum ReadType {
+    /// Startup integrity poll
+    StartupIntegrity,
+    /// Unsolicited message
+    Unsolicited,
+    /// Single poll requested by the user
+    SinglePoll,
+    /// Periodic poll configured by the user
+    PeriodicPoll,
 }
