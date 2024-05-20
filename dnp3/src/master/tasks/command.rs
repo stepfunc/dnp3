@@ -2,7 +2,7 @@ use crate::app::format::write::HeaderWriter;
 use crate::app::parse::parser::{HeaderCollection, Response};
 use crate::app::FunctionCode;
 use crate::master::error::{CommandError, CommandResponseError, TaskError};
-use crate::master::handler::Promise;
+use crate::master::promise::Promise;
 use crate::master::request::*;
 use crate::master::tasks::{AppTask, NonReadTask, Task};
 

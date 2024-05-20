@@ -10,6 +10,7 @@ use crate::master::association::AssociationConfig;
 use crate::master::error::{AssociationError, CommandError, PollError, TaskError, TimeSyncError};
 use crate::master::messages::{AssociationMsg, AssociationMsgType, MasterMsg, Message};
 use crate::master::poll::{PollHandle, PollMsg};
+use crate::master::promise::Promise;
 use crate::master::request::{CommandHeaders, CommandMode, ReadRequest, TimeSyncProcedure};
 use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::deadbands::WriteDeadBandsTask;
@@ -528,32 +529,6 @@ impl AssociationHandle {
         self.master
             .send_association_message(self.address, AssociationMsgType::Poll(msg))
             .await
-    }
-}
-
-/// A generic callback type that must be invoked once and only once.
-/// The user can select to implement it using FnOnce or a
-/// one-shot reply channel
-pub(crate) enum Promise<T> {
-    /// nothing happens when the promise is completed
-    None,
-    /// one-shot reply channel is consumed when the promise is completed
-    OneShot(tokio::sync::oneshot::Sender<T>),
-}
-
-impl<T> Promise<T> {
-    pub(crate) fn one_shot() -> (Self, tokio::sync::oneshot::Receiver<T>) {
-        let (tx, rx) = tokio::sync::oneshot::channel();
-        (Self::OneShot(tx), rx)
-    }
-
-    pub(crate) fn complete(self, value: T) {
-        match self {
-            Promise::None => {}
-            Promise::OneShot(s) => {
-                s.send(value).ok();
-            }
-        }
     }
 }
 

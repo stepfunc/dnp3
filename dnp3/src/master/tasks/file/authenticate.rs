@@ -3,8 +3,9 @@ use crate::app::format::WriteError;
 use crate::app::parse::free_format::FreeFormatVariation;
 use crate::app::parse::parser::{HeaderDetails, Response};
 use crate::app::{FunctionCode, Group70Var2};
+use crate::master::promise::Promise;
 use crate::master::tasks::{AppTask, NonReadTask, Task};
-use crate::master::{AuthKey, FileCredentials, FileError, Promise, TaskError};
+use crate::master::{AuthKey, FileCredentials, FileError, TaskError};
 
 pub(crate) struct AuthFileTask {
     pub(crate) credentials: FileCredentials,

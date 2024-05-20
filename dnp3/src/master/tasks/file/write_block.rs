@@ -3,8 +3,9 @@ use crate::app::format::WriteError;
 use crate::app::parse::free_format::FreeFormatVariation;
 use crate::app::parse::parser::{HeaderDetails, Response};
 use crate::app::{FileStatus, FunctionCode, Group70Var5};
+use crate::master::promise::Promise;
 use crate::master::tasks::{AppTask, NonReadTask, Task};
-use crate::master::{BlockNumber, FileError, FileHandle, Promise, TaskError};
+use crate::master::{BlockNumber, FileError, FileHandle, TaskError};
 
 pub(crate) struct WriteBlockRequest {
     pub(crate) handle: FileHandle,

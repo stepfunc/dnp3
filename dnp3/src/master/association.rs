@@ -11,7 +11,7 @@ use crate::app::{Sequence, Timeout};
 use crate::link::EndpointAddress;
 use crate::master::error::{AssociationError, TaskError, TimeSyncError};
 use crate::master::extract::extract_measurements;
-use crate::master::handler::{AssociationHandler, Promise};
+use crate::master::handler::AssociationHandler;
 use crate::master::messages::AssociationMsgType;
 use crate::master::poll::{PollHandle, PollMap, PollMsg};
 use crate::master::request::{Classes, EventClasses, TimeSyncProcedure};
@@ -22,6 +22,7 @@ use crate::master::tasks::{AppTask, AssociationTask, ReadTask, Task};
 use crate::master::{AssociationInformation, ReadHandler, ReadType, TaskType};
 use crate::util::Smallest;
 
+use crate::master::promise::Promise;
 use crate::transport::FragmentAddr;
 use crate::util::session::RunError;
 use tokio::time::Instant;

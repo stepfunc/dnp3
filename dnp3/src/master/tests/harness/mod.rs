@@ -8,8 +8,8 @@ use crate::link::header::{FrameInfo, FrameType};
 use crate::link::reader::LinkModes;
 use crate::link::EndpointAddress;
 use crate::master::association::AssociationConfig;
-use crate::master::handler::{AssociationHandle, MasterChannel, ReadHandler};
 use crate::master::task::MasterTask;
+use crate::master::{AssociationHandle, MasterChannel, ReadHandler};
 use crate::master::{
     AssociationHandler, AssociationInformation, HeaderInfo, MasterChannelConfig, MasterChannelType,
 };
@@ -22,7 +22,7 @@ struct DefaultAssociationHandler;
 impl AssociationHandler for DefaultAssociationHandler {}
 
 pub(crate) async fn create_association(mut config: AssociationConfig) -> TestHarness {
-    // use a 1 second timeout for all tests
+    // use a 1-second timeout for all tests
     config.response_timeout = Timeout::from_secs(1).unwrap();
 
     let (io, io_handle) = sfio_tokio_mock_io::mock();

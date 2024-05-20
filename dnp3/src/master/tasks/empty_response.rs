@@ -1,8 +1,9 @@
 use crate::app::format::write::HeaderWriter;
 use crate::app::parse::parser::Response;
 use crate::app::FunctionCode;
+use crate::master::promise::Promise;
 use crate::master::tasks::{AppTask, NonReadTask, Task};
-use crate::master::{Headers, Promise, TaskError, WriteError};
+use crate::master::{Headers, TaskError, WriteError};
 
 pub(crate) struct EmptyResponseTask {
     function: FunctionCode,
