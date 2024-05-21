@@ -8,7 +8,7 @@ use crate::app::FunctionCode;
 use crate::app::Timestamp;
 use crate::master::association::Association;
 use crate::master::error::{TaskError, TimeSyncError};
-use crate::master::handler::Promise;
+use crate::master::promise::Promise;
 use crate::master::request::TimeSyncProcedure;
 use crate::master::tasks::{AppTask, NonReadTask, Task};
 

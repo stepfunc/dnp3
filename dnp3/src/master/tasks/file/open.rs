@@ -3,9 +3,10 @@ use crate::app::format::WriteError;
 use crate::app::parse::free_format::FreeFormatVariation;
 use crate::app::parse::parser::{HeaderDetails, Response};
 use crate::app::{FileStatus, FunctionCode, Group70Var3, Permissions, Timestamp};
+use crate::master::promise::Promise;
 use crate::master::tasks::file::REQUEST_ID;
 use crate::master::tasks::{AppTask, NonReadTask, Task};
-use crate::master::{AuthKey, FileError, FileHandle, FileMode, OpenFile, Promise, TaskError};
+use crate::master::{AuthKey, FileError, FileHandle, FileMode, OpenFile, TaskError};
 pub(crate) struct OpenFileRequest {
     pub(crate) file_name: String,
     pub(crate) auth_key: AuthKey,

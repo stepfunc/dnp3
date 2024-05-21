@@ -3,7 +3,7 @@ use crate::app::measurement::*;
 use crate::app::parse::parser::{HeaderCollection, HeaderDetails, ObjectHeader};
 use crate::app::variations::*;
 use crate::app::ResponseHeader;
-use crate::master::handler::ReadHandler;
+use crate::master::ReadHandler;
 use crate::master::ReadType;
 
 /// Extract measurements from a HeaderCollection, sinking them into
@@ -91,7 +91,7 @@ mod test {
     use crate::app::control::CommandStatus;
     use crate::app::parse::parser::HeaderCollection;
     use crate::app::*;
-    use crate::master::handler::{HeaderInfo, ReadHandler};
+    use crate::master::{HeaderInfo, ReadHandler};
 
     use super::*;
 

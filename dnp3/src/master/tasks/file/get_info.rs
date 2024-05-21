@@ -4,8 +4,9 @@ use crate::app::format::WriteError;
 use crate::app::parse::free_format::FreeFormatVariation;
 use crate::app::parse::parser::{HeaderDetails, Response};
 use crate::app::{FunctionCode, Timestamp};
+use crate::master::promise::Promise;
 use crate::master::tasks::{AppTask, NonReadTask, Task};
-use crate::master::{FileError, FileInfo, Promise, TaskError};
+use crate::master::{FileError, FileInfo, TaskError};
 
 pub(crate) struct GetFileInfoTask {
     file_name: String,

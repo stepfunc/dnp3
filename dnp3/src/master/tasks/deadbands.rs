@@ -1,8 +1,9 @@
 use crate::app::format::write::HeaderWriter;
 use crate::app::parse::parser::Response;
 use crate::app::FunctionCode;
+use crate::master::promise::Promise;
 use crate::master::tasks::{AppTask, NonReadTask, Task};
-use crate::master::{DeadBandHeader, DeadBandHeaderVariants, Promise, TaskError, WriteError};
+use crate::master::{DeadBandHeader, DeadBandHeaderVariants, TaskError, WriteError};
 
 pub(crate) struct WriteDeadBandsTask {
     headers: Vec<DeadBandHeader>,

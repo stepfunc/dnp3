@@ -4,7 +4,7 @@ use crate::app::gen::count::CountVariation;
 use crate::app::parse::parser::Response;
 use crate::app::FunctionCode;
 use crate::master::error::TaskError;
-use crate::master::handler::Promise;
+use crate::master::promise::Promise;
 use crate::master::tasks::{AppTask, NonReadTask, Task};
 
 /// Type of restart to request
