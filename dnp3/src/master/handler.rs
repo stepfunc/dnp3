@@ -129,8 +129,8 @@ impl MasterChannel {
 
     /// Get the current decoding level used by this master
     pub async fn get_decode_level(&mut self) -> Result<DecodeLevel, Shutdown> {
-        let (tx, rx) = tokio::sync::oneshot::channel::<Result<DecodeLevel, Shutdown>>();
-        self.send_master_message(MasterMsg::GetDecodeLevel(Promise::OneShot(tx)))
+        let (promise, rx) = Promise::one_shot();
+        self.send_master_message(MasterMsg::GetDecodeLevel(promise))
             .await?;
         rx.await?
     }
@@ -161,7 +161,7 @@ impl MasterChannel {
     ) -> Result<AssociationHandle, AssociationError> {
         self.assert_channel_type(MasterChannelType::Stream)?;
 
-        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), AssociationError>>();
+        let (promise, rx) = Promise::one_shot();
         let addr = FragmentAddr {
             link: address,
             phys: PhysAddr::None,
@@ -172,7 +172,7 @@ impl MasterChannel {
             read_handler,
             assoc_handler,
             assoc_information,
-            Promise::OneShot(tx),
+            promise,
         ))
         .await?;
         rx.await?
@@ -196,7 +196,7 @@ impl MasterChannel {
     ) -> Result<AssociationHandle, AssociationError> {
         self.assert_channel_type(MasterChannelType::Udp)?;
 
-        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), AssociationError>>();
+        let (promise, rx) = Promise::one_shot();
         let addr = FragmentAddr {
             link: address,
             phys: PhysAddr::Udp(destination),
@@ -207,7 +207,7 @@ impl MasterChannel {
             read_handler,
             assoc_handler,
             assoc_information,
-            Promise::OneShot(tx),
+            promise,
         ))
         .await?;
         rx.await?
@@ -266,14 +266,9 @@ impl AssociationHandle {
         request: ReadRequest,
         period: Duration,
     ) -> Result<PollHandle, PollError> {
-        let (tx, rx) = tokio::sync::oneshot::channel::<Result<PollHandle, PollError>>();
-        self.send_poll_message(PollMsg::AddPoll(
-            self.clone(),
-            request,
-            period,
-            Promise::OneShot(tx),
-        ))
-        .await?;
+        let (promise, rx) = Promise::one_shot();
+        self.send_poll_message(PollMsg::AddPoll(self.clone(), request, period, promise))
+            .await?;
         rx.await?
     }
 
@@ -289,8 +284,8 @@ impl AssociationHandle {
     ///
     /// If successful, the [ReadHandler](ReadHandler) will process the received measurement data
     pub async fn read(&mut self, request: ReadRequest) -> Result<(), TaskError> {
-        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), TaskError>>();
-        let task = SingleReadTask::new(request, Promise::OneShot(tx));
+        let (promise, rx) = Promise::one_shot();
+        let task = SingleReadTask::new(request, promise);
         self.send_task(task).await?;
         rx.await?
     }
@@ -305,8 +300,8 @@ impl AssociationHandle {
         function: FunctionCode,
         headers: Headers,
     ) -> Result<(), WriteError> {
-        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), WriteError>>();
-        let task = EmptyResponseTask::new(function, headers, Promise::OneShot(tx));
+        let (promise, rx) = Promise::one_shot();
+        let task = EmptyResponseTask::new(function, headers, promise);
         self.send_task(task).await?;
         rx.await?
     }
@@ -319,8 +314,8 @@ impl AssociationHandle {
         request: ReadRequest,
         handler: Box<dyn ReadHandler>,
     ) -> Result<(), TaskError> {
-        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), TaskError>>();
-        let task = SingleReadTask::new_with_custom_handler(request, handler, Promise::OneShot(tx));
+        let (promise, rx) = Promise::one_shot();
+        let task = SingleReadTask::new_with_custom_handler(request, handler, promise);
         self.send_task(task).await?;
         rx.await?
     }
@@ -333,8 +328,8 @@ impl AssociationHandle {
         mode: CommandMode,
         headers: CommandHeaders,
     ) -> Result<(), CommandError> {
-        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), CommandError>>();
-        let task = CommandTask::from_mode(mode, headers, Promise::OneShot(tx));
+        let (promise, rx) = Promise::one_shot();
+        let task = CommandTask::from_mode(mode, headers, promise);
         self.send_task(task).await?;
         rx.await?
     }
@@ -354,8 +349,8 @@ impl AssociationHandle {
     }
 
     async fn restart(&mut self, restart_type: RestartType) -> Result<Duration, TaskError> {
-        let (tx, rx) = tokio::sync::oneshot::channel::<Result<Duration, TaskError>>();
-        let task = RestartTask::new(restart_type, Promise::OneShot(tx));
+        let (promise, rx) = Promise::one_shot();
+        let task = RestartTask::new(restart_type, promise);
         self.send_task(task).await?;
         rx.await?
     }
@@ -365,8 +360,8 @@ impl AssociationHandle {
         &mut self,
         procedure: TimeSyncProcedure,
     ) -> Result<(), TimeSyncError> {
-        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), TimeSyncError>>();
-        let task = TimeSyncTask::get_procedure(procedure, Promise::OneShot(tx));
+        let (promise, rx) = Promise::one_shot();
+        let task = TimeSyncTask::get_procedure(procedure, Some(promise));
         self.send_task(task).await?;
         rx.await?
     }
@@ -376,8 +371,8 @@ impl AssociationHandle {
         &mut self,
         headers: Vec<DeadBandHeader>,
     ) -> Result<(), WriteError> {
-        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), WriteError>>();
-        let task = WriteDeadBandsTask::new(headers, Promise::OneShot(tx));
+        let (promise, rx) = Promise::one_shot();
+        let task = WriteDeadBandsTask::new(headers, promise);
         self.send_task(task).await?;
         rx.await?
     }
@@ -390,9 +385,8 @@ impl AssociationHandle {
     /// If a [`TaskError::UnexpectedResponseHeaders`] is returned, the link might be alive
     /// but it didn't answer with the expected `LINK_STATUS`.
     pub async fn check_link_status(&mut self) -> Result<(), TaskError> {
-        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), TaskError>>();
-        self.send_task(Task::LinkStatus(Promise::OneShot(tx)))
-            .await?;
+        let (promise, rx) = Promise::one_shot();
+        self.send_task(Task::LinkStatus(promise)).await?;
         rx.await?
     }
 
