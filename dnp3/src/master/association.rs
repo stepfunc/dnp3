@@ -261,7 +261,7 @@ impl TaskStates {
         if self.time_sync.is_pending() {
             if let Some(procedure) = config.auto_time_sync {
                 return self.time_sync.create_next_task(|| {
-                    TimeSync(TimeSyncTask::get_procedure(procedure, Promise::None)).wrap()
+                    TimeSync(TimeSyncTask::get_procedure(procedure, None)).wrap()
                 });
             }
         }
@@ -680,7 +680,7 @@ impl Association {
             None => Next::None,
             Some(next) => {
                 if now >= next {
-                    Next::Now(Task::LinkStatus(Promise::None))
+                    Next::Now(Task::LinkStatus(Promise::null()))
                 } else {
                     Next::NotBefore(next)
                 }

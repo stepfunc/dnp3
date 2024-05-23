@@ -318,19 +318,11 @@ impl MasterSession {
                 res.map(|_| ())
             }
             Task::LinkStatus(promise) => {
-                match self
+                let res = self
                     .run_link_status_task(io, task.dest, writer, reader)
-                    .await
-                {
-                    Ok(result) => {
-                        promise.complete(Ok(result));
-                        Ok(())
-                    }
-                    Err(err) => {
-                        promise.complete(Err(err));
-                        Err(err)
-                    }
-                }
+                    .await;
+                promise.complete(res);
+                res
             }
         };
 

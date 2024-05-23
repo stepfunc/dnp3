@@ -23,7 +23,7 @@ enum State {
 
 pub(crate) struct TimeSyncTask {
     state: State,
-    promise: Promise<Result<(), TimeSyncError>>,
+    promise: Option<Promise<Result<(), TimeSyncError>>>,
 }
 
 impl From<TimeSyncTask> for Task {
@@ -42,7 +42,7 @@ impl TimeSyncProcedure {
 }
 
 impl TimeSyncTask {
-    fn new(state: State, promise: Promise<Result<(), TimeSyncError>>) -> Self {
+    fn new(state: State, promise: Option<Promise<Result<(), TimeSyncError>>>) -> Self {
         Self { state, promise }
     }
 
@@ -52,7 +52,7 @@ impl TimeSyncTask {
 
     pub(crate) fn get_procedure(
         procedure: TimeSyncProcedure,
-        promise: Promise<Result<(), TimeSyncError>>,
+        promise: Option<Promise<Result<(), TimeSyncError>>>,
     ) -> Self {
         Self::new(procedure.get_start_state(), promise)
     }
@@ -110,12 +110,12 @@ impl TimeSyncTask {
 
     pub(crate) fn on_task_error(self, association: Option<&mut Association>, err: TaskError) {
         match self.promise {
-            Promise::None => {
+            None => {
                 if let Some(association) = association {
                     association.on_time_sync_failure(err.into());
                 }
             }
-            _ => self.promise.complete(Err(err.into())),
+            Some(x) => x.complete(Err(err.into())),
         }
     }
 
@@ -292,15 +292,15 @@ impl TimeSyncTask {
 
     fn report_success(self, association: &mut Association) {
         match self.promise {
-            Promise::None => association.on_time_sync_success(),
-            _ => self.promise.complete(Ok(())),
+            None => association.on_time_sync_success(),
+            Some(x) => x.complete(Ok(())),
         }
     }
 
     fn report_error(self, association: &mut Association, error: TimeSyncError) {
         match self.promise {
-            Promise::None => association.on_time_sync_failure(error),
-            _ => self.promise.complete(Err(error)),
+            None => association.on_time_sync_failure(error),
+            Some(x) => x.complete(Err(error)),
         }
     }
 }
@@ -395,9 +395,8 @@ mod tests {
             handler(system_time),
             Box::new(NullAssociationInformation),
         );
-        let (tx, rx) = tokio::sync::oneshot::channel();
-        let task =
-            NonReadTask::TimeSync(TimeSyncTask::get_procedure(procedure, Promise::OneShot(tx)));
+        let (promise, rx) = Promise::one_shot();
+        let task = NonReadTask::TimeSync(TimeSyncTask::get_procedure(procedure, Some(promise)));
 
         (task, system_time, association, rx)
     }
