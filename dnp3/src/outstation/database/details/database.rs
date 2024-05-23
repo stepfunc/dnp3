@@ -2,13 +2,17 @@ use crate::app::Iin2;
 use crate::master::EventClasses;
 use crate::outstation::database::details::event::buffer::{EventBuffer, InsertError};
 use crate::outstation::database::details::range::static_db::{
-    PointConfig, StaticDatabase, Updatable,
+    PointConfig, StaticDatabase, Updatable, UpdatableFlags,
 };
 use crate::outstation::database::read::ReadHeader;
 use crate::outstation::database::{
-    ClassZeroConfig, EventBufferConfig, ResponseInfo, UpdateInfo, UpdateOptions,
+    ClassZeroConfig, EventBufferConfig, ResponseInfo, UpdateFlagsType, UpdateInfo, UpdateOptions,
 };
 
+use crate::app::measurement::{
+    AnalogInput, AnalogOutputStatus, BinaryInput, BinaryOutputStatus, Counter,
+    DoubleBitBinaryInput, Flags, FrozenCounter, Time,
+};
 use crate::outstation::database::details::attrs::map::SetMap;
 use crate::outstation::{BufferState, OutstationApplication};
 use scursor::WriteCursor;
@@ -96,6 +100,55 @@ impl Database {
         T: Updatable,
     {
         self.static_db.get::<T>(index)
+    }
+
+    pub(crate) fn update_flags(
+        &mut self,
+        index: u16,
+        flags_type: UpdateFlagsType,
+        flags: Flags,
+        time: Time,
+        options: UpdateOptions,
+    ) -> UpdateInfo {
+        match flags_type {
+            UpdateFlagsType::BinaryInput => {
+                self.update_flags_by_type::<BinaryInput>(index, flags, time, options)
+            }
+            UpdateFlagsType::DoubleBitBinaryInput => {
+                self.update_flags_by_type::<DoubleBitBinaryInput>(index, flags, time, options)
+            }
+            UpdateFlagsType::BinaryOutputStatus => {
+                self.update_flags_by_type::<BinaryOutputStatus>(index, flags, time, options)
+            }
+            UpdateFlagsType::Counter => {
+                self.update_flags_by_type::<Counter>(index, flags, time, options)
+            }
+            UpdateFlagsType::FrozenCounter => {
+                self.update_flags_by_type::<FrozenCounter>(index, flags, time, options)
+            }
+            UpdateFlagsType::AnalogInput => {
+                self.update_flags_by_type::<AnalogInput>(index, flags, time, options)
+            }
+            UpdateFlagsType::AnalogOutputStatus => {
+                self.update_flags_by_type::<AnalogOutputStatus>(index, flags, time, options)
+            }
+        }
+    }
+
+    pub(crate) fn update_flags_by_type<T: UpdatableFlags>(
+        &mut self,
+        index: u16,
+        flags: Flags,
+        timestamp: Time,
+        options: UpdateOptions,
+    ) -> UpdateInfo {
+        match self.static_db.get::<T>(index) {
+            None => UpdateInfo::NoPoint,
+            Some(mut x) => {
+                x.update_flags(flags, timestamp);
+                self.update::<T>(&x, index, options)
+            }
+        }
     }
 
     pub(crate) fn update<T>(&mut self, value: &T, index: u16, options: UpdateOptions) -> UpdateInfo
