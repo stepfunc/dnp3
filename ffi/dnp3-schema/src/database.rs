@@ -60,6 +60,22 @@ fn define_update_options(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStru
     Ok(update_options)
 }
 
+fn define_update_flags_type(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
+    let x = lib
+        .define_enum("update_flags_type")?
+        .doc("Point type on which to update the flags")?
+        .push("binary_input", "Binary input")?
+        .push("double_bit_binary_input", "Doubl-bit binary input ")?
+        .push("binary_output_status", "Binary output status")?
+        .push("counter", "Counter")?
+        .push("frozen_counter", "Frozen counter")?
+        .push("analog_input", "Analog input")?
+        .push("analog_output_status", "Analog output status")?
+        .build()?;
+
+    Ok(x)
+}
+
 fn define_binary_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
     let binary_static_variation = lib
         .define_enum("static_binary_input_variation")?
@@ -543,8 +559,23 @@ pub(crate) fn define_database(
         .build()?;
 
     let update_info = define_update_info(lib)?;
-
     let update_options = define_update_options(lib)?;
+
+    let update_flags_type = define_update_flags_type(lib)?;
+
+    let update_flags = lib
+        .define_method("update_flags", database.clone())?
+        .doc(
+            doc("Update the flags for the specified point without changing the value")
+                .details("This is equivalent to getting the current value, changing the flags and the timestamp, then calling update")
+        )?
+        .param("index", Primitive::U16, "Index on which to perform the operation")?
+        .param("flags_type", update_flags_type, "Point type on which to perform the operation")?
+        .param("flags", shared_def.flags.clone(), "New flags applied to the point")?
+        .param("time", shared_def.timestamp.clone(), "New timestamp applied to the point")?
+        .param("options", update_options.clone(), "Options that control how events and static values are handled")?
+        .returns(update_info.clone(), "Provides detailed information about what occurred during the update operation")?
+        .build()?;
 
     // Binary Input
     let binary_config = define_binary_config(lib)?;
@@ -1220,6 +1251,8 @@ pub(crate) fn define_database(
 
     let database = lib
         .define_class(&database)?
+        // works on all types
+        .method(update_flags)?
         // binary methods
         .method(add_binary)?
         .method(remove_binary)?

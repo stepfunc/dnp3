@@ -575,6 +575,14 @@ class ExampleOutstation
                         });
                         break;
                     }
+                case "aif":
+                    {
+                        outstation.Transaction(db =>
+                        {
+                            db.UpdateFlags(7, UpdateFlagsType.AnalogInput, new Flags(Flag.CommLost), Now(), detectEvent);
+                        });
+                        break;
+                    }                    
                 case "aos":
                     {
                         outstation.Transaction(db =>

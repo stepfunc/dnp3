@@ -115,6 +115,43 @@ macro_rules! implement_database_point_operations {
     };
 }
 
+pub(crate) unsafe fn database_update_flags(
+    instance: *mut crate::Database,
+    index: u16,
+    flags_type: ffi::UpdateFlagsType,
+    flags: ffi::Flags,
+    time: ffi::Timestamp,
+    options: ffi::UpdateOptions,
+) -> ffi::UpdateInfo {
+    let db = match instance.as_mut() {
+        None => return ffi::UpdateInfoFields::default().into(),
+        Some(db) => db,
+    };
+
+    db.update_flags(
+        index,
+        flags_type.into(),
+        (&flags).into(),
+        (&time).into(),
+        options.into(),
+    )
+    .into()
+}
+
+impl From<ffi::UpdateFlagsType> for UpdateFlagsType {
+    fn from(value: ffi::UpdateFlagsType) -> Self {
+        match value {
+            ffi::UpdateFlagsType::BinaryInput => Self::BinaryInput,
+            ffi::UpdateFlagsType::DoubleBitBinaryInput => Self::DoubleBitBinaryInput,
+            ffi::UpdateFlagsType::BinaryOutputStatus => Self::BinaryOutputStatus,
+            ffi::UpdateFlagsType::Counter => Self::Counter,
+            ffi::UpdateFlagsType::FrozenCounter => Self::FrozenCounter,
+            ffi::UpdateFlagsType::AnalogInput => Self::AnalogInput,
+            ffi::UpdateFlagsType::AnalogOutputStatus => Self::AnalogOutputStatus,
+        }
+    }
+}
+
 implement_database_point_operations!(
     database_add_binary_input,
     database_remove_binary_input,

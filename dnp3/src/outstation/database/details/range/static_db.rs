@@ -33,7 +33,7 @@ pub(crate) trait Updatable: Insertable + Clone + Default {
 }
 
 pub(crate) trait UpdatableFlags: Updatable {
-    fn update_flags(&mut self, flags: Flags, time: Time);
+    fn update_flags(&mut self, flags: Flags, time: Option<Time>);
 }
 
 #[derive(Copy, Clone)]
@@ -748,9 +748,9 @@ impl Updatable for BinaryInput {
 }
 
 impl UpdatableFlags for BinaryInput {
-    fn update_flags(&mut self, flags: Flags, time: Time) {
+    fn update_flags(&mut self, flags: Flags, time: Option<Time>) {
         self.flags = flags;
-        self.time = Some(time);
+        self.time = time;
     }
 }
 
@@ -776,9 +776,9 @@ impl Updatable for DoubleBitBinaryInput {
 }
 
 impl UpdatableFlags for DoubleBitBinaryInput {
-    fn update_flags(&mut self, flags: Flags, time: Time) {
+    fn update_flags(&mut self, flags: Flags, time: Option<Time>) {
         self.flags = flags;
-        self.time = Some(time);
+        self.time = time;
     }
 }
 
@@ -804,9 +804,9 @@ impl Updatable for BinaryOutputStatus {
 }
 
 impl UpdatableFlags for BinaryOutputStatus {
-    fn update_flags(&mut self, flags: Flags, time: Time) {
+    fn update_flags(&mut self, flags: Flags, time: Option<Time>) {
         self.flags = flags;
-        self.time = Some(time);
+        self.time = time;
     }
 }
 impl Updatable for Counter {
@@ -831,9 +831,9 @@ impl Updatable for Counter {
 }
 
 impl UpdatableFlags for Counter {
-    fn update_flags(&mut self, flags: Flags, time: Time) {
+    fn update_flags(&mut self, flags: Flags, time: Option<Time>) {
         self.flags = flags;
-        self.time = Some(time);
+        self.time = time;
     }
 }
 
@@ -859,9 +859,9 @@ impl Updatable for FrozenCounter {
 }
 
 impl UpdatableFlags for FrozenCounter {
-    fn update_flags(&mut self, flags: Flags, time: Time) {
+    fn update_flags(&mut self, flags: Flags, time: Option<Time>) {
         self.flags = flags;
-        self.time = Some(time);
+        self.time = time;
     }
 }
 
@@ -887,9 +887,9 @@ impl Updatable for AnalogInput {
 }
 
 impl UpdatableFlags for AnalogInput {
-    fn update_flags(&mut self, flags: Flags, time: Time) {
+    fn update_flags(&mut self, flags: Flags, time: Option<Time>) {
         self.flags = flags;
-        self.time = Some(time);
+        self.time = time;
     }
 }
 
@@ -915,9 +915,9 @@ impl Updatable for AnalogOutputStatus {
 }
 
 impl UpdatableFlags for AnalogOutputStatus {
-    fn update_flags(&mut self, flags: Flags, time: Time) {
+    fn update_flags(&mut self, flags: Flags, time: Option<Time>) {
         self.flags = flags;
-        self.time = Some(time);
+        self.time = time;
     }
 }
 

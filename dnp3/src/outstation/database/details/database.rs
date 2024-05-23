@@ -107,7 +107,7 @@ impl Database {
         index: u16,
         flags_type: UpdateFlagsType,
         flags: Flags,
-        time: Time,
+        time: Option<Time>,
         options: UpdateOptions,
     ) -> UpdateInfo {
         match flags_type {
@@ -139,7 +139,7 @@ impl Database {
         &mut self,
         index: u16,
         flags: Flags,
-        timestamp: Time,
+        timestamp: Option<Time>,
         options: UpdateOptions,
     ) -> UpdateInfo {
         match self.static_db.get::<T>(index) {

@@ -496,7 +496,7 @@ async fn run_outstation(
                     7,
                     UpdateFlagsType::AnalogInput,
                     Flags::COMM_LOST,
-                    get_current_time(),
+                    Some(get_current_time()),
                     UpdateOptions::detect_event(),
                 );
             }),

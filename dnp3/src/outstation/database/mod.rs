@@ -307,7 +307,7 @@ pub trait Update<T> {
     fn update2(&mut self, index: u16, value: &T, options: UpdateOptions) -> UpdateInfo;
 }
 
-/// Point on which to update the flags
+/// Point type on which to update the flags
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum UpdateFlagsType {
@@ -331,13 +331,13 @@ pub enum UpdateFlagsType {
 pub trait UpdateFlags {
     /// Update the flags for the specified point without changing the value
     ///
-    /// This is equivalent to getting the current value, changing the flags and the value, then updating
+    /// This is equivalent to getting the current value, changing the flags and the timestamp, then calling update
     fn update_flags(
         &mut self,
         index: u16,
         flags_type: UpdateFlagsType,
         flags: Flags,
-        time: Time,
+        time: Option<Time>,
         options: UpdateOptions,
     ) -> UpdateInfo;
 }
@@ -518,7 +518,7 @@ impl UpdateFlags for Database {
         index: u16,
         flags_type: UpdateFlagsType,
         flags: Flags,
-        time: Time,
+        time: Option<Time>,
         options: UpdateOptions,
     ) -> UpdateInfo {
         self.inner
