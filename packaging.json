@@ -10,6 +10,11 @@
       "dotnet": true,
       "java": false
     },
+    "aarch64-apple-darwin": {
+      "cpp": false,
+      "dotnet": true,
+      "java": true
+    },
     "x86_64-apple-darwin": {
       "cpp": false,
       "dotnet": true,
