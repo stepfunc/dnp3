@@ -20,14 +20,13 @@ impl<T> Promise<T> {
         Self { inner: None }
     }
 
+    fn new(inner: Inner<T>) -> Self {
+        Self { inner: Some(inner) }
+    }
+
     pub(crate) fn one_shot() -> (Self, tokio::sync::oneshot::Receiver<T>) {
         let (tx, rx) = tokio::sync::oneshot::channel();
-        (
-            Self {
-                inner: Some(Inner::OneShot(tx)),
-            },
-            rx,
-        )
+        (Self::new(Inner::OneShot(tx)), rx)
     }
 
     pub(crate) fn complete(mut self, value: T) {
