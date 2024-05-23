@@ -491,6 +491,15 @@ async fn run_outstation(
                     );
                 })
             }
+            "aif" => outstation.transaction(|db| {
+                db.update_flags(
+                    7,
+                    UpdateFlagsType::AnalogInput,
+                    Flags::COMM_LOST,
+                    get_current_time(),
+                    UpdateOptions::detect_event(),
+                );
+            }),
             "aos" => {
                 analog_output_status_value += 1.0;
                 outstation.transaction(|db| {
