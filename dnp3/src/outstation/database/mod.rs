@@ -307,6 +307,41 @@ pub trait Update<T> {
     fn update2(&mut self, index: u16, value: &T, options: UpdateOptions) -> UpdateInfo;
 }
 
+/// Point type on which to update the flags
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum UpdateFlagsType {
+    /// Binary input
+    BinaryInput,
+    /// Double-bit binary input
+    DoubleBitBinaryInput,
+    /// Binary output status
+    BinaryOutputStatus,
+    /// Counter
+    Counter,
+    /// Frozen counter
+    FrozenCounter,
+    /// Analog input
+    AnalogInput,
+    /// Analog output status
+    AnalogOutputStatus,
+}
+
+/// Trait for updating flags on a point without changing the current value of the point
+pub trait UpdateFlags {
+    /// Update the flags for the specified point without changing the value
+    ///
+    /// This is equivalent to getting the current value, changing the flags and the timestamp, then calling update
+    fn update_flags(
+        &mut self,
+        index: u16,
+        flags_type: UpdateFlagsType,
+        flags: Flags,
+        time: Option<Time>,
+        options: UpdateOptions,
+    ) -> UpdateInfo;
+}
+
 /// Trait for getting the current value in the database
 pub trait Get<T> {
     /// retrieve the current value off the database.
@@ -474,6 +509,20 @@ impl DatabaseHandle {
 
     pub(crate) fn reset(&mut self) {
         self.inner.lock().unwrap().inner.reset()
+    }
+}
+
+impl UpdateFlags for Database {
+    fn update_flags(
+        &mut self,
+        index: u16,
+        flags_type: UpdateFlagsType,
+        flags: Flags,
+        time: Option<Time>,
+        options: UpdateOptions,
+    ) -> UpdateInfo {
+        self.inner
+            .update_flags(index, flags_type, flags, time, options)
     }
 }
 

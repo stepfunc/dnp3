@@ -32,6 +32,10 @@ pub(crate) trait Updatable: Insertable + Clone + Default {
     fn enabled_class_zero(config: &ClassZeroConfig) -> bool;
 }
 
+pub(crate) trait UpdatableFlags: Updatable {
+    fn update_flags(&mut self, flags: Flags, time: Option<Time>);
+}
+
 #[derive(Copy, Clone)]
 pub(crate) struct IndexRange {
     start: u16,
@@ -743,6 +747,13 @@ impl Updatable for BinaryInput {
     }
 }
 
+impl UpdatableFlags for BinaryInput {
+    fn update_flags(&mut self, flags: Flags, time: Option<Time>) {
+        self.flags = flags;
+        self.time = time;
+    }
+}
+
 impl Updatable for DoubleBitBinaryInput {
     type StaticVariation = StaticDoubleBitBinaryInputVariation;
     type Detector = FlagsDetector;
@@ -761,6 +772,13 @@ impl Updatable for DoubleBitBinaryInput {
 
     fn enabled_class_zero(config: &ClassZeroConfig) -> bool {
         config.double_bit_binary
+    }
+}
+
+impl UpdatableFlags for DoubleBitBinaryInput {
+    fn update_flags(&mut self, flags: Flags, time: Option<Time>) {
+        self.flags = flags;
+        self.time = time;
     }
 }
 
@@ -785,6 +803,12 @@ impl Updatable for BinaryOutputStatus {
     }
 }
 
+impl UpdatableFlags for BinaryOutputStatus {
+    fn update_flags(&mut self, flags: Flags, time: Option<Time>) {
+        self.flags = flags;
+        self.time = time;
+    }
+}
 impl Updatable for Counter {
     type StaticVariation = StaticCounterVariation;
     type Detector = Deadband<u32>;
@@ -803,6 +827,13 @@ impl Updatable for Counter {
 
     fn enabled_class_zero(config: &ClassZeroConfig) -> bool {
         config.counter
+    }
+}
+
+impl UpdatableFlags for Counter {
+    fn update_flags(&mut self, flags: Flags, time: Option<Time>) {
+        self.flags = flags;
+        self.time = time;
     }
 }
 
@@ -827,6 +858,13 @@ impl Updatable for FrozenCounter {
     }
 }
 
+impl UpdatableFlags for FrozenCounter {
+    fn update_flags(&mut self, flags: Flags, time: Option<Time>) {
+        self.flags = flags;
+        self.time = time;
+    }
+}
+
 impl Updatable for AnalogInput {
     type StaticVariation = StaticAnalogInputVariation;
     type Detector = Deadband<f64>;
@@ -848,6 +886,13 @@ impl Updatable for AnalogInput {
     }
 }
 
+impl UpdatableFlags for AnalogInput {
+    fn update_flags(&mut self, flags: Flags, time: Option<Time>) {
+        self.flags = flags;
+        self.time = time;
+    }
+}
+
 impl Updatable for AnalogOutputStatus {
     type StaticVariation = StaticAnalogOutputStatusVariation;
     type Detector = Deadband<f64>;
@@ -866,6 +911,13 @@ impl Updatable for AnalogOutputStatus {
 
     fn enabled_class_zero(config: &ClassZeroConfig) -> bool {
         config.analog_output_status
+    }
+}
+
+impl UpdatableFlags for AnalogOutputStatus {
+    fn update_flags(&mut self, flags: Flags, time: Option<Time>) {
+        self.flags = flags;
+        self.time = time;
     }
 }
 
