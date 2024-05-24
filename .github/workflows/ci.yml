@@ -162,12 +162,15 @@ jobs:
         run: cargo run --bin dnp3-bindings -- --java -r ${{ matrix.target }} -a ./target/${{ matrix.target }}/release
   # Build bindings on MacOS [64-bit macOS (10.7+, Lion+) (x86_64-apple-darwin)]
   bindings-macos:
-    runs-on: macos-latest
     strategy:
       fail-fast: false
       matrix:
-        target:
-          - x86_64-apple-darwin # 64-bit macOS (10.7+, Lion+)
+        include:
+          - runner: macos-14
+            target: aarch64-apple-darwin
+          - runner: macos-13
+            target: x86_64-apple-darwin
+    runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
