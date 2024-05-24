@@ -32,6 +32,7 @@
     "home",
     "io-lifetimes",
     "is-terminal",
+    "is_terminal_polyfill",
     "itertools",
     "lazycell",
     "libloading",
