@@ -1,6 +1,6 @@
 [package]
 name = "dnp3-ffi"
-version = "1.6.0-RC1"
+version = "1.6.0"
 
 # inherit from workspace
 rust-version.workspace = true
