@@ -32,5 +32,5 @@ non_ascii_idents = "deny"
 unreachable_pub = "deny"
 trivial_casts = "deny"
 missing_docs = "deny"
-unused = "deny"
+unused = { level = "deny", priority = -1 }
 missing_copy_implementations = "deny"

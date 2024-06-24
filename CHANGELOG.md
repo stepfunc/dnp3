@@ -1,5 +1,5 @@
 
-### 1.6.0-RC1 ###
+### 1.6.0 ###
 * :star: Add master station support for writing files to the outstation. See [#338](https://github.com/stepfunc/dnp3/pull/338).
 * :star: Add master station support for command events (groups 13 and 43). See [#332](https://github.com/stepfunc/dnp3/pull/332).
 * :star: Add master station support for group 102. See [#335](https://github.com/stepfunc/dnp3/pull/335).
