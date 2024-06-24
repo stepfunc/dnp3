@@ -97,8 +97,8 @@ object PrefixedVariationModule extends Module {
         case GroupType.AnalogEvent => "analog_input"
         case GroupType.FrozenAnalogEvent => "frozen_analog_input"
         case GroupType.AnalogOutputEvent => "analog_output_status"
-        case GroupType.AnalogOutputCommandEvent => "analog_output_command"
-        case GroupType.BinaryOutputCommandEvent => "binary_output_command"
+        case GroupType.AnalogOutputCommandEvent => "analog_output_command_event"
+        case GroupType.BinaryOutputCommandEvent => "binary_output_command_event"
         case _ => throw new Exception("unhandled variation")
       }
 

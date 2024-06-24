@@ -1,3 +1,4 @@
+//! Example master application
 use std::time::Duration;
 
 use tokio_stream::StreamExt;
@@ -18,6 +19,7 @@ use dnp3::serial::*;
 use dnp3::tcp::tls::*;
 
 use dnp3::outstation::FreezeInterval;
+use dnp3::udp::spawn_master_udp;
 use std::process::exit;
 
 /// read handler that does nothing
@@ -161,10 +163,10 @@ impl ReadHandler for ExampleReadHandler {
         }
     }
 
-    fn handle_octet_string<'a>(
+    fn handle_octet_string(
         &mut self,
         info: HeaderInfo,
-        iter: &mut dyn Iterator<Item = (&'a [u8], u16)>,
+        iter: &mut dyn Iterator<Item = (&[u8], u16)>,
     ) {
         println!("Octet Strings:");
         println!("Qualifier: {}", info.qualifier);
@@ -225,7 +227,7 @@ impl FileReader for FileLogger {
   The program initializes a master channel based on the command line argument and then enters a loop
   reading console input allowing the user to perform common tasks interactively.
 
-  All of the configuration values are hard-coded but can be changed with a recompile.
+  All the configuration values are hard-coded but can be changed with a recompile.
 */
 // ANCHOR: runtime_init
 #[tokio::main(flavor = "multi_thread")]
@@ -241,23 +243,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ANCHOR_END: logging
 
     // spawn the master channel based on the command line argument
-    let mut channel = create_channel()?;
-
-    // ANCHOR: association_create
-    let mut association = channel
-        .add_association(
-            EndpointAddress::try_new(1024)?,
-            get_association_config(),
-            ExampleReadHandler::boxed(),
-            Box::new(ExampleAssociationHandler),
-            Box::new(ExampleAssociationInformation),
-        )
-        .await?;
-    // ANCHOR_END: association_create
+    let (mut channel, mut association) = create_channel_and_association().await?;
 
     // create an event poll
     // ANCHOR: add_poll
-    let mut poll = association
+    let poll = association
         .add_poll(
             ReadRequest::ClassScan(Classes::class123()),
             Duration::from_secs(5),
@@ -268,47 +258,65 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // enable communications
     channel.enable().await?;
 
+    let mut handler = CliHandler {
+        poll,
+        channel,
+        association,
+    };
+
     let mut reader = FramedRead::new(tokio::io::stdin(), LinesCodec::new());
 
     loop {
-        match reader.next().await.unwrap()?.as_str() {
-            "x" => return Ok(()),
+        let cmd = reader.next().await.unwrap()?;
+        if cmd == "x" {
+            return Ok(());
+        } else if let Err(err) = handler.run_one_command(&cmd).await {
+            tracing::error!("Error: {err}");
+        }
+    }
+}
+
+struct CliHandler {
+    poll: PollHandle,
+    channel: MasterChannel,
+    association: AssociationHandle,
+}
+
+impl CliHandler {
+    async fn run_one_command(&mut self, cmd: &str) -> Result<(), Box<dyn std::error::Error>> {
+        match cmd {
             "enable" => {
-                channel.enable().await?;
+                self.channel.enable().await?;
             }
             "disable" => {
-                channel.disable().await?;
+                self.channel.disable().await?;
             }
             "dln" => {
-                channel.set_decode_level(DecodeLevel::nothing()).await?;
+                self.channel
+                    .set_decode_level(DecodeLevel::nothing())
+                    .await?;
             }
             "dlv" => {
-                channel
+                self.channel
                     .set_decode_level(AppDecodeLevel::ObjectValues.into())
                     .await?;
             }
             "rao" => {
-                if let Err(err) = association
+                self.association
                     .read(ReadRequest::all_objects(Variation::Group40Var0))
-                    .await
-                {
-                    tracing::warn!("error: {}", err);
-                }
+                    .await?;
             }
             "rmo" => {
-                if let Err(err) = association
+                self.association
                     .read(ReadRequest::multiple_headers(&[
                         ReadHeader::all_objects(Variation::Group10Var0),
                         ReadHeader::all_objects(Variation::Group40Var0),
                     ]))
-                    .await
-                {
-                    tracing::warn!("error: {}", err);
-                }
+                    .await?;
             }
             "cmd" => {
                 // ANCHOR: assoc_control
-                if let Err(err) = association
+                self.association
                     .operate(
                         CommandMode::SelectBeforeOperate,
                         CommandBuilder::single_header_u16(
@@ -316,37 +324,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             3u16,
                         ),
                     )
-                    .await
-                {
-                    tracing::warn!("error: {}", err);
-                }
+                    .await?;
                 // ANCHOR_END: assoc_control
             }
-            "evt" => poll.demand().await?,
+            "evt" => self.poll.demand().await?,
             "lts" => {
-                if let Err(err) = association.synchronize_time(TimeSyncProcedure::Lan).await {
-                    tracing::warn!("error: {}", err);
-                }
+                self.association
+                    .synchronize_time(TimeSyncProcedure::Lan)
+                    .await?;
             }
             "nts" => {
-                if let Err(err) = association
+                self.association
                     .synchronize_time(TimeSyncProcedure::NonLan)
-                    .await
-                {
-                    tracing::warn!("error: {}", err);
-                }
+                    .await?;
             }
             "wad" => {
                 // ANCHOR: write_dead_bands
-                if let Err(err) = association
+                self.association
                     .write_dead_bands(vec![
                         DeadBandHeader::group34_var1_u8(vec![(3, 5)]),
                         DeadBandHeader::group34_var3_u16(vec![(4, 2.5)]),
                     ])
-                    .await
-                {
-                    tracing::warn!("error: {}", err);
-                }
+                    .await?
                 // ANCHOR_END: write_dead_bands
             }
             "fat" => {
@@ -357,26 +356,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     // apply this schedule to all counters
                     .add_all_objects(Variation::Group20Var0);
 
-                if let Err(err) = association
+                self.association
                     .send_and_expect_empty_response(FunctionCode::FreezeAtTime, headers)
-                    .await
-                {
-                    tracing::warn!("error: {}", err);
-                }
+                    .await?;
                 // ANCHOR_END: freeze_at_time
             }
             "rda" => {
                 // ANCHOR: read_attributes
-                let result = association
+                self.association
                     .read(ReadRequest::device_attribute(
                         AllAttributes,
                         AttrSet::Default,
                     ))
-                    .await;
-
-                if let Err(err) = result {
-                    tracing::warn!("error: reading device attributes {}", err);
-                }
+                    .await?;
                 // ANCHOR_END: read_attributes
             }
             "wda" => {
@@ -384,115 +376,137 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let headers = Headers::default()
                     .add_attribute(StringAttr::UserAssignedLocation.with_value("Mt. Olympus"));
 
-                let result = association
+                self.association
                     .send_and_expect_empty_response(FunctionCode::Write, headers)
-                    .await;
-
-                if let Err(err) = result {
-                    tracing::warn!("error writing device attribute: {}", err);
-                }
+                    .await?;
                 // ANCHOR_END: write_attribute
             }
             "ral" => {
-                let result = association
+                self.association
                     .read(ReadRequest::device_attribute(
                         VariationListAttr::ListOfVariations,
                         AttrSet::Default,
                     ))
-                    .await;
-
-                if let Err(err) = result {
-                    tracing::warn!("error reading device attributes: {}", err);
-                }
+                    .await?;
             }
             "crt" => {
-                let result = association.cold_restart().await;
-
-                match result {
-                    Ok(delay) => tracing::info!("restart delay: {:?}", delay),
-                    Err(err) => tracing::warn!("error: {}", err),
-                }
+                let delay = self.association.cold_restart().await?;
+                tracing::info!("restart delay: {:?}", delay);
             }
             "wrt" => {
-                let result = association.warm_restart().await;
-
-                match result {
-                    Ok(delay) => tracing::info!("restart delay: {:?}", delay),
-                    Err(err) => tracing::warn!("error: {}", err),
-                }
+                let delay = self.association.warm_restart().await?;
+                tracing::info!("restart delay: {:?}", delay);
             }
             "rd" => {
                 // ANCHOR: read_directory
-                match association
+                let items = self
+                    .association
                     .read_directory(".", DirReadConfig::default(), None)
-                    .await
-                {
-                    Err(err) => {
-                        tracing::warn!("Unable to read directory: {err}");
-                    }
-                    Ok(items) => {
-                        for info in items {
-                            print_file_info(info);
-                        }
-                    }
+                    .await?;
+
+                for info in items {
+                    print_file_info(info);
                 }
                 // ANCHOR_END: read_directory
             }
 
             "gfi" => {
                 // ANCHOR: get_file_info
-                match association.get_file_info(".").await {
-                    Err(err) => {
-                        tracing::warn!("Unable to get file info: {err}");
-                    }
-                    Ok(info) => {
-                        print_file_info(info);
-                    }
-                }
+                let info = self.association.get_file_info(".").await?;
+                print_file_info(info);
                 // ANCHOR_END: get_file_info
             }
             "rf" => {
                 // ANCHOR: read_file
-                if let Err(err) = association
+                self.association
                     .read_file(
                         ".", // this reads the root "directory" file but doesn't parse it
                         FileReadConfig::default(),
                         Box::new(FileLogger),
                         None,
                     )
-                    .await
-                {
-                    tracing::warn!("Unable to start file transfer: {err}");
-                }
+                    .await?;
                 // ANCHOR_END: read_file
             }
+            "wf" => {
+                // ANCHOR: write_file
+                let line = "hello world\n".as_bytes();
+
+                let file = self
+                    .association
+                    .open_file(
+                        "hello_world.txt",
+                        AuthKey::none(),
+                        Permissions::default(),
+                        0xFFFFFFFF, // indicate that we don't know the size
+                        FileMode::Write,
+                        512,
+                    )
+                    .await?;
+
+                // write the 'hello world' line to the file twice
+                let mut block = BlockNumber::default();
+                self.association
+                    .write_file_block(file.file_handle, block, line.to_vec())
+                    .await?;
+                block.increment()?;
+                block.set_last();
+                self.association
+                    .write_file_block(file.file_handle, block, line.to_vec())
+                    .await?;
+                self.association.close_file(file.file_handle).await?;
+                // ANCHOR_END: write_file
+            }
             "lsr" => {
-                tracing::info!("{:?}", association.check_link_status().await);
+                tracing::info!("{:?}", self.association.check_link_status().await);
             }
             s => println!("unknown command: {}", s),
         }
+        Ok(())
     }
 }
 
 // create the specified channel based on the command line argument
-fn create_channel() -> Result<MasterChannel, Box<dyn std::error::Error>> {
+async fn create_channel_and_association(
+) -> Result<(MasterChannel, AssociationHandle), Box<dyn std::error::Error>> {
     let args: Vec<String> = std::env::args().collect();
     let transport: &str = match args.as_slice() {
         [_, x] => x,
         _ => {
             eprintln!("please specify a transport:");
-            eprintln!("usage: master <transport> (tcp, serial, tls-ca, tls-self-signed)");
+            eprintln!("usage: master <transport> (tcp, udp, serial, tls-ca, tls-self-signed)");
             exit(-1);
         }
     };
     match transport {
-        "tcp" => create_tcp_channel(),
+        "tcp" => {
+            let mut channel = create_tcp_channel()?;
+            let assoc = add_association(&mut channel).await?;
+            Ok((channel, assoc))
+        }
+        "udp" => {
+            let mut channel = create_udp_channel()?;
+            let assoc = add_udp_association(&mut channel).await?;
+            Ok((channel, assoc))
+        }
         #[cfg(feature = "serial")]
-        "serial" => create_serial_channel(),
+        "serial" => {
+            let mut channel = create_serial_channel()?;
+            let assoc = add_association(&mut channel).await?;
+            Ok((channel, assoc))
+        }
         #[cfg(feature = "tls")]
-        "tls-ca" => create_tls_channel(get_tls_authority_config()?),
+        "tls-ca" => {
+            let mut channel = create_tls_channel(get_tls_authority_config()?)?;
+            let assoc = add_association(&mut channel).await?;
+            Ok((channel, assoc))
+        }
         #[cfg(feature = "tls")]
-        "tls-self-signed" => create_tls_channel(get_tls_self_signed_config()?),
+        "tls-self-signed" => {
+            let mut channel = create_tls_channel(get_tls_self_signed_config()?)?;
+            let assoc = add_association(&mut channel).await?;
+            Ok((channel, assoc))
+        }
         _ => {
             eprintln!(
                 "unknown transport '{}', options are (tcp, serial, tls-ca, tls-self-signed)",
@@ -501,6 +515,41 @@ fn create_channel() -> Result<MasterChannel, Box<dyn std::error::Error>> {
             exit(-1);
         }
     }
+}
+
+async fn add_association(
+    channel: &mut MasterChannel,
+) -> Result<AssociationHandle, Box<dyn std::error::Error>> {
+    // ANCHOR: association_create
+    let association = channel
+        .add_association(
+            EndpointAddress::try_new(1024)?,
+            get_association_config(),
+            ExampleReadHandler::boxed(),
+            Box::new(ExampleAssociationHandler),
+            Box::new(ExampleAssociationInformation),
+        )
+        .await?;
+    // ANCHOR_END: association_create
+    Ok(association)
+}
+
+async fn add_udp_association(
+    channel: &mut MasterChannel,
+) -> Result<AssociationHandle, Box<dyn std::error::Error>> {
+    // ANCHOR: association_create_udp
+    let association = channel
+        .add_udp_association(
+            EndpointAddress::try_new(1024)?,
+            "127.0.0.1:20000".parse()?,
+            get_association_config(),
+            ExampleReadHandler::boxed(),
+            Box::new(ExampleAssociationHandler),
+            Box::new(ExampleAssociationInformation),
+        )
+        .await?;
+    // ANCHOR_END: association_create_udp
+    Ok(association)
 }
 
 // ANCHOR: master_channel_config
@@ -534,9 +583,9 @@ fn get_tls_self_signed_config() -> Result<TlsClientConfig, Box<dyn std::error::E
     use std::path::Path;
     // ANCHOR: tls_self_signed_config
     let config = TlsClientConfig::self_signed(
-        &Path::new("./certs/self_signed/entity2_cert.pem"),
-        &Path::new("./certs/self_signed/entity1_cert.pem"),
-        &Path::new("./certs/self_signed/entity1_key.pem"),
+        Path::new("./certs/self_signed/entity2_cert.pem"),
+        Path::new("./certs/self_signed/entity1_cert.pem"),
+        Path::new("./certs/self_signed/entity1_key.pem"),
         None, // no password
         MinTlsVersion::V12,
     )?;
@@ -550,9 +599,9 @@ fn get_tls_authority_config() -> Result<TlsClientConfig, Box<dyn std::error::Err
     // ANCHOR: tls_ca_chain_config
     let config = TlsClientConfig::full_pki(
         Some("test.com".to_string()),
-        &Path::new("./certs/ca_chain/ca_cert.pem"),
-        &Path::new("./certs/ca_chain/entity1_cert.pem"),
-        &Path::new("./certs/ca_chain/entity1_key.pem"),
+        Path::new("./certs/ca_chain/ca_cert.pem"),
+        Path::new("./certs/ca_chain/entity1_cert.pem"),
+        Path::new("./certs/ca_chain/entity1_key.pem"),
         None, // no password
         MinTlsVersion::V12,
     )?;
@@ -570,6 +619,18 @@ fn create_tcp_channel() -> Result<MasterChannel, Box<dyn std::error::Error>> {
         NullListener::create(),
     );
     // ANCHOR_END: create_master_tcp_channel
+    Ok(channel)
+}
+
+fn create_udp_channel() -> Result<MasterChannel, Box<dyn std::error::Error>> {
+    // ANCHOR: create_master_udp_channel
+    let channel = spawn_master_udp(
+        "127.0.0.1:20001".parse()?,
+        LinkReadMode::Datagram,
+        Timeout::from_secs(5)?,
+        get_master_channel_config()?,
+    );
+    // ANCHOR_END: create_master_udp_channel
     Ok(channel)
 }
 

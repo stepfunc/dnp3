@@ -1,6 +1,6 @@
 use crate::link::header::FrameInfo;
 use crate::transport::real::header::Header;
-use crate::transport::{Fragment, FragmentInfo};
+use crate::transport::{Fragment, FragmentAddr, FragmentInfo};
 use crate::util::buffer::Buffer;
 
 #[derive(Copy, Clone)]
@@ -156,7 +156,11 @@ impl Assembler {
             Ok(_) => {
                 if header.fin {
                     let frame_id = self.frame_id;
-                    let info = FragmentInfo::new(frame_id, info.source, info.broadcast);
+                    let addr = FragmentAddr {
+                        link: info.source,
+                        phys: info.phys_addr,
+                    };
+                    let info = FragmentInfo::new(frame_id, addr, info.broadcast);
                     self.frame_id = self.frame_id.wrapping_add(1);
                     self.state = InternalState::Complete(info, new_length)
                 } else {

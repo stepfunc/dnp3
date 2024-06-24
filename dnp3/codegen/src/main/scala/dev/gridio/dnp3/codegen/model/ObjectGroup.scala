@@ -15,6 +15,7 @@ object ObjectGroup {
     Group10,
     Group11,
     Group12,
+    Group13,
     Group20,
     Group21,
     Group22,
@@ -27,12 +28,14 @@ object ObjectGroup {
     Group40,
     Group41,
     Group42,
+    Group43,
     Group50,
     Group51,
     Group52,
     Group60,
     Group70,
     Group80,
+    Group102,
     Group110,
     Group111,
   )
@@ -63,6 +66,8 @@ object GroupType {
   object StaticFrozenAnalog extends Static
   object StaticAnalogOutputStatus extends Static
   object StaticOctetString extends Static
+
+  object StaticUnsignedInteger extends Static
 
   object BinaryEvent extends Event
   object BinaryOutputEvent extends Event
@@ -96,8 +101,6 @@ trait ObjectGroup {
   def name: String = "Group%s".format(group)
 
   def desc: String
-
-  def hasSizedObjects: Boolean = variations.exists(x => x.isInstanceOf[FixedSizeField])
 
   def groupType : GroupType
 }

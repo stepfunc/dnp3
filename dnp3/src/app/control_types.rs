@@ -96,7 +96,7 @@ mod test {
     #[test]
     fn correctly_converts_control_code_to_and_from_u8() {
         test_control_code_round_trip(
-            0b10_1_1_0100,
+            0b1011_0100,
             ControlCode {
                 tcc: TripCloseCode::Trip,
                 clear: true,
@@ -106,7 +106,7 @@ mod test {
         );
 
         test_control_code_round_trip(
-            0b10_0_1_0100,
+            0b1001_0100,
             ControlCode {
                 tcc: TripCloseCode::Trip,
                 clear: false,
@@ -116,7 +116,7 @@ mod test {
         );
 
         test_control_code_round_trip(
-            0b10_1_0_0100,
+            0b1010_0100,
             ControlCode {
                 tcc: TripCloseCode::Trip,
                 clear: true,
@@ -126,7 +126,7 @@ mod test {
         );
 
         test_control_code_round_trip(
-            0b11_0_0_0000,
+            0b1100_0000,
             ControlCode {
                 tcc: TripCloseCode::Reserved,
                 clear: false,

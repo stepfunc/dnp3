@@ -161,6 +161,36 @@ impl ReadHandler for ffi::ReadHandler {
         ffi::ReadHandler::handle_analog_output_status(self, info, &mut iterator);
     }
 
+    fn handle_binary_output_command_event(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (BinaryOutputCommandEvent, u16)>,
+    ) {
+        let info = info.into();
+        let mut iterator = BinaryOutputCommandEventIterator::new(iter);
+        ffi::ReadHandler::handle_binary_output_command_event(self, info, &mut iterator);
+    }
+
+    fn handle_analog_output_command_event(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (AnalogOutputCommandEvent, u16)>,
+    ) {
+        let info = info.into();
+        let mut iterator = AnalogOutputCommandEventIterator::new(iter);
+        ffi::ReadHandler::handle_analog_output_command_event(self, info, &mut iterator);
+    }
+
+    fn handle_unsigned_integer(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (UnsignedInteger, u16)>,
+    ) {
+        let info = info.into();
+        let mut iterator = UnsignedIntegerIterator::new(iter);
+        ffi::ReadHandler::handle_unsigned_integer(self, info, &mut iterator);
+    }
+
     fn handle_octet_string<'a>(
         &mut self,
         info: HeaderInfo,
@@ -225,7 +255,7 @@ impl ReadHandler for ffi::ReadHandler {
                 ffi::ReadHandler::handle_bool_attr(self, info, e.into(), set.value(), var, v);
             }
             FfiAttrValue::OctetString(e, v) => {
-                let mut iter = ByteIterator::new(v);
+                let mut iter = crate::ByteIterator::new(v);
                 let e = e.map(|x| x.into()).unwrap_or(ffi::OctetStringAttr::Unknown);
                 ffi::ReadHandler::handle_octet_string_attr(
                     self,
@@ -241,7 +271,7 @@ impl ReadHandler for ffi::ReadHandler {
                 ffi::ReadHandler::handle_time_attr(self, info, e, set.value(), var, v.raw_value());
             }
             FfiAttrValue::BitString(v) => {
-                let mut iter = ByteIterator::new(v);
+                let mut iter = crate::ByteIterator::new(v);
                 ffi::ReadHandler::handle_bit_string_attr(
                     self,
                     info,
@@ -471,6 +501,10 @@ impl From<TaskType> for ffi::TaskType {
             TaskType::GenericEmptyResponse(_) => ffi::TaskType::GenericEmptyResponse,
             TaskType::FileRead => ffi::TaskType::FileRead,
             TaskType::GetFileInfo => ffi::TaskType::GetFileInfo,
+            TaskType::FileWriteBlock => ffi::TaskType::FileWriteBlock,
+            TaskType::FileOpen => ffi::TaskType::FileOpen,
+            TaskType::FileClose => ffi::TaskType::FileClose,
+            TaskType::FileAuth => ffi::TaskType::FileAuth,
         }
     }
 }
@@ -553,6 +587,27 @@ implement_iterator!(
     analog_output_status_iterator_next,
     AnalogOutputStatus,
     ffi::AnalogOutputStatus
+);
+
+implement_iterator!(
+    BinaryOutputCommandEventIterator,
+    binary_output_command_event_iterator_next,
+    BinaryOutputCommandEvent,
+    ffi::BinaryOutputCommandEvent
+);
+
+implement_iterator!(
+    AnalogOutputCommandEventIterator,
+    analog_output_command_event_iterator_next,
+    AnalogOutputCommandEvent,
+    ffi::AnalogOutputCommandEvent
+);
+
+implement_iterator!(
+    UnsignedIntegerIterator,
+    unsigned_integer_iterator_next,
+    UnsignedInteger,
+    ffi::UnsignedInteger
 );
 
 impl ffi::BinaryInput {
@@ -649,10 +704,55 @@ impl ffi::AnalogOutputStatus {
     }
 }
 
+impl ffi::BinaryOutputCommandEvent {
+    pub(crate) fn new(idx: u16, value: BinaryOutputCommandEvent) -> Self {
+        ffi::BinaryOutputCommandEventFields {
+            index: idx,
+            status: value.status.into(),
+            commanded_state: value.commanded_state,
+            time: value.time.into(),
+        }
+        .into()
+    }
+}
+
+impl ffi::UnsignedInteger {
+    pub(crate) fn new(idx: u16, value: UnsignedInteger) -> Self {
+        ffi::UnsignedInteger {
+            index: idx,
+            value: value.value,
+        }
+    }
+}
+
+impl ffi::AnalogOutputCommandEvent {
+    fn split(value: AnalogCommandValue) -> (f64, ffi::AnalogCommandType) {
+        match value {
+            AnalogCommandValue::I16(x) => (x.into(), ffi::AnalogCommandType::I16),
+            AnalogCommandValue::I32(x) => (x.into(), ffi::AnalogCommandType::I32),
+            AnalogCommandValue::F32(x) => (x.into(), ffi::AnalogCommandType::F32),
+            AnalogCommandValue::F64(x) => (x, ffi::AnalogCommandType::F64),
+        }
+    }
+
+    pub(crate) fn new(idx: u16, value: AnalogOutputCommandEvent) -> Self {
+        let (commanded_value, command_type) = Self::split(value.commanded_value);
+
+        ffi::AnalogOutputCommandEventFields {
+            index: idx,
+            status: value.status.into(),
+            commanded_value,
+            command_type,
+            time: value.time.into(),
+        }
+        .into()
+    }
+}
+
 pub struct OctetStringIterator<'a> {
     inner: &'a mut dyn Iterator<Item = (&'a [u8], u16)>,
     next: Option<ffi::OctetString<'a>>,
-    current_byte_it: Option<ByteIterator<'a>>,
+    current_byte_it: Option<crate::ByteIterator<'a>>,
 }
 
 impl<'a> OctetStringIterator<'a> {
@@ -667,7 +767,9 @@ impl<'a> OctetStringIterator<'a> {
     fn next(&mut self) {
         if let Some((bytes, idx)) = self.inner.next() {
             self.current_byte_it = None;
-            let byte_it_ref = self.current_byte_it.get_or_insert(ByteIterator::new(bytes));
+            let byte_it_ref = self
+                .current_byte_it
+                .get_or_insert(crate::ByteIterator::new(bytes));
             self.next = Some(ffi::OctetString::new(idx, byte_it_ref));
         } else {
             self.next = None;
@@ -687,42 +789,10 @@ pub unsafe fn octet_string_iterator_next(
 }
 
 impl<'a> ffi::OctetString<'a> {
-    fn new(idx: u16, it: &mut ByteIterator<'a>) -> Self {
+    fn new(idx: u16, it: &mut crate::ByteIterator<'a>) -> Self {
         Self {
             index: idx,
             value: it as *mut _,
-        }
-    }
-}
-
-pub struct ByteIterator<'a> {
-    inner: std::slice::Iter<'a, u8>,
-    next: Option<u8>,
-}
-
-impl<'a> ByteIterator<'a> {
-    pub(crate) fn new(bytes: &'a [u8]) -> Self {
-        Self {
-            inner: bytes.iter(),
-            next: None,
-        }
-    }
-
-    fn next(&mut self) {
-        self.next = self.inner.next().copied()
-    }
-}
-
-pub unsafe fn byte_iterator_next(it: *mut ByteIterator) -> *const u8 {
-    let it = it.as_mut();
-    match it {
-        None => std::ptr::null(),
-        Some(x) => {
-            x.next();
-            match &x.next {
-                None => std::ptr::null(),
-                Some(x) => x,
-            }
         }
     }
 }

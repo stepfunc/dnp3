@@ -1,3 +1,4 @@
+//! Performance test
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::time::Instant;
 
@@ -33,10 +34,8 @@ enum Action {
 #[derive(Parser, Debug)]
 #[clap(author, version, about, long_about = None)]
 struct Cli {
-    #[clap(short, long, value_parser, default_value_t = 20000)]
-    port: u16,
     #[clap(long, value_parser, default_value_t = 1)]
-    sessions: u16,
+    sessions: usize,
     #[clap(short, long, value_parser, default_value_t = 100)]
     values: usize,
     #[clap(long, value_parser, default_value_t = 10)]
@@ -77,9 +76,7 @@ async fn run(args: Cli) {
             .init();
     }
 
-    let port_range: std::ops::Range<u16> = args.port..args.port + args.sessions;
-
-    let mut harness = TestHarness::create(port_range, config).await;
+    let mut harness = TestHarness::create(args.sessions, config).await;
     println!("settings: {:?}", args);
 
     println!("starting up...");
@@ -123,10 +120,10 @@ struct TestHarness {
 }
 
 impl TestHarness {
-    async fn create(ports: std::ops::Range<u16>, config: TestConfig) -> Self {
+    async fn create(count: usize, config: TestConfig) -> Self {
         let mut pairs = Vec::new();
-        for port in ports {
-            pairs.push(Pair::spawn(port, config).await)
+        for _ in 0..count {
+            pairs.push(Pair::spawn(config).await)
         }
         Self { pairs }
     }
@@ -222,7 +219,7 @@ struct Pair {
 }
 
 impl Pair {
-    const LOCALHOST: std::net::IpAddr = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
+    const LOCALHOST: IpAddr = IpAddr::V4(Ipv4Addr::LOCALHOST);
 
     fn update_values(&mut self) {
         self.outstation.transaction(|db| {
@@ -240,9 +237,10 @@ impl Pair {
         assert_eq!(self.rx.recv().await.unwrap(), self.values.len());
     }
 
-    async fn spawn(port: u16, config: TestConfig) -> Self {
-        let (server, outstation) = Self::spawn_outstation(port, config).await;
-        let (master, assoc, measurements, rx) = Self::spawn_master(port, config).await;
+    async fn spawn(config: TestConfig) -> Self {
+        let (server, outstation) = Self::spawn_outstation(config).await;
+        let assigned_port = server.local_addr().unwrap().port();
+        let (master, assoc, measurements, rx) = Self::spawn_master(assigned_port, config).await;
 
         Self {
             values: measurements,
@@ -254,9 +252,9 @@ impl Pair {
         }
     }
 
-    async fn spawn_outstation(port: u16, config: TestConfig) -> (ServerHandle, OutstationHandle) {
+    async fn spawn_outstation(config: TestConfig) -> (ServerHandle, OutstationHandle) {
         let mut server =
-            Server::new_tcp_server(LinkErrorMode::Close, SocketAddr::new(Self::LOCALHOST, port));
+            Server::new_tcp_server(LinkErrorMode::Close, SocketAddr::new(Self::LOCALHOST, 0));
         let outstation = server
             .add_outstation(
                 Self::get_outstation_config(config.outstation_level),

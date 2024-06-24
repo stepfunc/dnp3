@@ -12,15 +12,25 @@ use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError;
 
 use crate::app::attr::BadAttribute;
+use crate::app::parse::parser::SingleHeaderError;
+use crate::master::MasterChannelType;
 use crate::util::session::{RunError, StopReason};
 
 /// Errors that can occur when adding an association
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(not(feature = "ffi"), non_exhaustive)]
 pub enum AssociationError {
-    /// the master task has shutdown
+    /// Master task has shutdown
     Shutdown,
-    /// the specified address is already in use
+    /// Specified address is already in use
     DuplicateAddress(EndpointAddress),
+    /// Channel is not the correct type for that operation
+    WrongChannelType {
+        /// Actual type of the channel
+        actual: MasterChannelType,
+        /// Channel type required for the requested operation
+        required: MasterChannelType,
+    },
 }
 
 /// Errors that can occur while executing a master task
@@ -153,6 +163,10 @@ impl std::fmt::Display for AssociationError {
             AssociationError::DuplicateAddress(address) => write!(
                 f,
                 "master already contains association with outstation address: {address}"
+            ),
+            AssociationError::WrongChannelType { actual, required } => write!(
+                f,
+                "operation requires master channel type to be {required:?} but it is {actual:?}"
             ),
         }
     }
@@ -293,6 +307,12 @@ impl From<TransportResponseError> for TaskError {
 impl From<ObjectParseError> for TaskError {
     fn from(err: ObjectParseError) -> Self {
         TaskError::MalformedResponse(err)
+    }
+}
+
+impl From<SingleHeaderError> for TaskError {
+    fn from(_: SingleHeaderError) -> Self {
+        TaskError::UnexpectedResponseHeaders
     }
 }
 

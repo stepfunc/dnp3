@@ -5,10 +5,11 @@ use crate::app::format::write::HeaderWriter;
 use crate::app::Shutdown;
 use crate::master::association::Next;
 use crate::master::error::PollError;
-use crate::master::handler::{AssociationHandle, Promise};
+use crate::master::handler::AssociationHandle;
 use crate::master::request::ReadRequest;
 use crate::util::Smallest;
 
+use crate::master::promise::Promise;
 use tokio::time::Instant;
 
 /// Periodic poll representation

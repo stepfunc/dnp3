@@ -420,18 +420,8 @@ void run_command(const std::string &cmd, dnp3::MasterChannel &channel, dnp3::Ass
     }
 }
 
-void run_channel(dnp3::MasterChannel &channel)
+void run_association(dnp3::MasterChannel &channel, dnp3::AssociationId assoc)
 {
-    // ANCHOR: association_create
-    auto assoc = channel.add_association(
-        1024,
-        get_association_config(),
-        std::make_unique<ReadHandler>(),
-        std::make_unique<AssociationHandler>(),
-        std::make_unique<AssociationInformation>()
-    );
-    // ANCHOR_END: association_create
-
     // ANCHOR: add_poll
     auto event_scan = dnp3::Request::class_request(false, true, true, true);
     const auto event_poll = channel.add_poll(assoc, event_scan, std::chrono::seconds(10));
@@ -450,11 +440,21 @@ void run_channel(dnp3::MasterChannel &channel)
             try {
                 run_command(cmd, channel, assoc, event_poll);
             }
-            catch (const std::exception& ex) {
+            catch (const std::exception &ex) {
                 std::cout << "Exception: " << ex.what() << std::endl;
             }
         }
     }
+}
+
+void run_channel(dnp3::MasterChannel &channel)
+{
+    // ANCHOR: association_create
+    auto assoc = channel.add_association(1024, get_association_config(), std::make_unique<ReadHandler>(), std::make_unique<AssociationHandler>(),
+                                         std::make_unique<AssociationInformation>());
+    // ANCHOR_END: association_create
+
+    run_association(channel, assoc);
 }
 
 void run_tcp_client(dnp3::Runtime &runtime)
@@ -472,6 +472,33 @@ void run_tcp_client(dnp3::Runtime &runtime)
     // ANCHOR_END: create_master_tcp_channel
 
     run_channel(channel);
+}
+
+void run_udp(dnp3::Runtime &runtime)
+{
+    // ANCHOR: create_master_udp_channel
+    dnp3::EndpointList endpoints(std::string("127.0.0.1:20000"));
+
+    auto channel = dnp3::MasterChannel::create_udp_channel(
+        runtime,
+        get_master_channel_config(),
+        "127.0.0.1:20001",
+        dnp3::LinkReadMode::datagram,
+        std::chrono::seconds(5)
+    );
+    // ANCHOR_END: create_master_udp_channel
+
+     // ANCHOR: create_udp_association
+    auto assoc = channel.add_udp_association(
+        1024, "127.0.0.1:20000",
+        get_association_config(),
+        std::make_unique<ReadHandler>(),
+        std::make_unique<AssociationHandler>(),
+        std::make_unique<AssociationInformation>()
+    );
+    // ANCHOR_END: create_udp_association
+
+    run_association(channel, assoc);
 }
 
 void run_serial(dnp3::Runtime &runtime)
@@ -564,6 +591,9 @@ int main(int argc, char *argv[])
 
     if (strcmp(type, "tcp") == 0) {
         run_tcp_client(runtime);
+    }
+    else if (strcmp(type, "udp") == 0) {
+        run_udp(runtime);
     }
     else if (strcmp(type, "serial") == 0) {
         run_serial(runtime);

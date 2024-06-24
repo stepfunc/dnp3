@@ -1,62 +1,19 @@
-use tracing::Instrument;
-
-use crate::app::{ConnectStrategy, Listener, Shutdown};
-use crate::link::LinkErrorMode;
+use crate::app::{Listener, Shutdown};
+use crate::link::reader::LinkModes;
+use crate::link::{LinkErrorMode, LinkReadMode};
 use crate::outstation::task::OutstationTask;
-use crate::outstation::*;
-use crate::tcp::client::ClientTask;
-use crate::tcp::server::{NewSession, ServerTask};
-use crate::tcp::{
-    AddressFilter, ClientState, ConnectOptions, EndpointList, FilterError, PostConnectionHandler,
+use crate::outstation::{
+    ConnectionState, ControlHandler, OutstationApplication, OutstationConfig, OutstationHandle,
+    OutstationInformation,
 };
+use crate::tcp::server_task::{NewSession, ServerTask};
+use crate::tcp::{AddressFilter, FilterError, ServerHandle};
 use crate::util::channel::Sender;
-use crate::util::phys::PhysLayer;
+use crate::util::phys::{PhysAddr, PhysLayer};
 use crate::util::session::{Enabled, Session};
-
-/// Spawn a TCP client task onto the `Tokio` runtime. The task runs until the returned handle is dropped.
-///
-/// **Note**: This function may only be called from within the runtime itself, and panics otherwise.
-/// Use Runtime::enter() if required.
-#[allow(clippy::too_many_arguments)]
-pub fn spawn_outstation_tcp_client(
-    link_error_mode: LinkErrorMode,
-    endpoints: EndpointList,
-    connect_strategy: ConnectStrategy,
-    connect_options: ConnectOptions,
-    config: OutstationConfig,
-    application: Box<dyn OutstationApplication>,
-    information: Box<dyn OutstationInformation>,
-    control_handler: Box<dyn ControlHandler>,
-    listener: Box<dyn Listener<ClientState>>,
-) -> OutstationHandle {
-    let main_addr = endpoints.main_addr().to_string();
-    let (task, handle) = OutstationTask::create(
-        Enabled::No,
-        link_error_mode,
-        config,
-        application,
-        information,
-        control_handler,
-    );
-    let session = Session::outstation(task);
-    let mut client = ClientTask::new(
-        session,
-        endpoints,
-        connect_strategy,
-        connect_options,
-        PostConnectionHandler::Tcp,
-        listener,
-    );
-
-    let future = async move {
-        client
-            .run()
-            .instrument(tracing::info_span!("dnp3-outstation-tcp-client", "endpoint" = ?main_addr))
-            .await;
-    };
-    tokio::spawn(future);
-    handle
-}
+use crate::util::shutdown::ShutdownListener;
+use std::net::SocketAddr;
+use tracing::Instrument;
 
 struct OutstationInfo {
     filter: AddressFilter,
@@ -68,16 +25,11 @@ struct OutstationInfo {
 /// A builder for creating a TCP server with one or more outstation instances
 /// associated with it
 pub struct Server {
-    link_error_mode: LinkErrorMode,
+    link_modes: LinkModes,
     connection_id: u64,
-    address: std::net::SocketAddr,
+    address: SocketAddr,
     outstations: Vec<OutstationInfo>,
     connection_handler: ServerConnectionHandler,
-}
-
-/// Handle to a running server. Dropping the handle, shuts down the server.
-pub struct ServerHandle {
-    _tx: tokio::sync::oneshot::Sender<()>,
 }
 
 enum ServerConnectionHandler {
@@ -99,9 +51,12 @@ impl ServerConnectionHandler {
 impl Server {
     /// create a TCP server builder object that will eventually be bound
     /// to the specified address
-    pub fn new_tcp_server(link_error_mode: LinkErrorMode, address: std::net::SocketAddr) -> Self {
+    pub fn new_tcp_server(link_error_mode: LinkErrorMode, address: SocketAddr) -> Self {
         Self {
-            link_error_mode,
+            link_modes: LinkModes {
+                error_mode: link_error_mode,
+                read_mode: LinkReadMode::Stream,
+            },
             connection_id: 0,
             address,
             outstations: Vec::new(),
@@ -113,11 +68,11 @@ impl Server {
     #[cfg(feature = "tls")]
     pub fn new_tls_server(
         link_error_mode: LinkErrorMode,
-        address: std::net::SocketAddr,
+        address: SocketAddr,
         tls_config: crate::tcp::tls::TlsServerConfig,
     ) -> Self {
         Self {
-            link_error_mode,
+            link_modes: LinkModes::stream(link_error_mode),
             connection_id: 0,
             address,
             outstations: Vec::new(),
@@ -126,7 +81,6 @@ impl Server {
     }
 
     /// associate an outstation with the TcpServer, but do not spawn it
-    #[allow(clippy::too_many_arguments)]
     pub fn add_outstation_no_spawn(
         &mut self,
         config: OutstationConfig,
@@ -144,8 +98,9 @@ impl Server {
 
         let (task, handle) = OutstationTask::create(
             Enabled::Yes,
-            self.link_error_mode,
+            self.link_modes,
             config,
+            PhysAddr::None,
             application,
             information,
             control_handler,
@@ -205,16 +160,21 @@ impl Server {
     ) -> Result<(ServerHandle, impl std::future::Future<Output = Shutdown>), tokio::io::Error> {
         let listener = tokio::net::TcpListener::bind(self.address).await?;
 
-        let (tx, rx) = tokio::sync::oneshot::channel();
+        let addr = listener.local_addr().ok();
+
+        let (token, shutdown_rx) = crate::util::shutdown::shutdown_token();
 
         let task = async move {
             let local = self.address;
-            self.run(listener, rx)
+            self.run(listener, shutdown_rx)
                 .instrument(tracing::info_span!("tcp-server", "listen" = ?local))
                 .await
         };
 
-        let handle = ServerHandle { _tx: tx };
+        let handle = ServerHandle {
+            addr,
+            _token: token,
+        };
 
         Ok((handle, task))
     }
@@ -222,6 +182,7 @@ impl Server {
     /// Consume the `TcpServer` builder object, bind it to pre-specified port, and spawn the server
     /// task onto the Tokio runtime. Returns a ServerHandle that will shut down the server and all
     /// associated outstations when dropped.
+    ///
     ///
     /// This must be called from within the Tokio runtime
     pub async fn bind(self) -> Result<ServerHandle, tokio::io::Error> {
@@ -233,7 +194,7 @@ impl Server {
     async fn run(
         &mut self,
         listener: tokio::net::TcpListener,
-        rx: tokio::sync::oneshot::Receiver<()>,
+        mut shutdown_rx: ShutdownListener,
     ) -> Shutdown {
         tracing::info!("accepting connections");
 
@@ -241,7 +202,7 @@ impl Server {
              _ = self.accept_loop(listener) => {
                 // if the accept loop shuts down we exit
              }
-             _ = rx => {
+             _ = shutdown_rx.listen() => {
                 // if we get the message or shutdown we exit
              }
         }
@@ -249,7 +210,7 @@ impl Server {
         tracing::info!("shutting down outstations");
 
         for x in self.outstations.iter_mut() {
-            // best effort to shutdown outstations before exiting
+            // best effort to shut down outstations before exiting
             let _ = x.handle.shutdown().await;
         }
 
@@ -278,11 +239,7 @@ impl Server {
         }
     }
 
-    async fn process_connection(
-        &mut self,
-        stream: tokio::net::TcpStream,
-        addr: std::net::SocketAddr,
-    ) {
+    async fn process_connection(&mut self, stream: tokio::net::TcpStream, addr: SocketAddr) {
         let id = self.connection_id;
         self.connection_id = self.connection_id.wrapping_add(1);
 

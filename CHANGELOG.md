@@ -1,3 +1,13 @@
+
+### 1.6.0 ###
+* :star: Add master station support for writing files to the outstation. See [#338](https://github.com/stepfunc/dnp3/pull/338).
+* :star: Add master station support for command events (groups 13 and 43). See [#332](https://github.com/stepfunc/dnp3/pull/332).
+* :star: Add master station support for group 102. See [#335](https://github.com/stepfunc/dnp3/pull/335).
+* :star: Add master and outstation support for UDP. See [#353](https://github.com/stepfunc/dnp3/pull/353).
+* :star: Add master station support for acting as a TCP server. See [#358](https://github.com/stepfunc/dnp3/pull/358).
+* :star: Add ability to update flags and timestamp without knowing the current value. See [#365](https://github.com/stepfunc/dnp3/pull/365).
+* :star: Obtain TCP port from server in Rust API. [#331](https://github.com/stepfunc/dnp3/pull/331).
+
 ### 1.5.2 ###
 * :bug: Fix bug where the outstation would sleep before all unsolicited data was transmitted. See [#341](https://github.com/stepfunc/dnp3/pull/341).
 

@@ -1,11 +1,12 @@
 use std::ffi::{CStr, CString};
+use std::net::SocketAddr;
 use std::ptr::{null, null_mut};
 use std::str::Utf8Error;
 use std::time::Duration;
 
 use dnp3::app::{
-    BufferSize, ConnectStrategy, Listener, MaybeAsync, RetryStrategy, Timeout, TimeoutRangeError,
-    Timestamp,
+    BufferSize, ConnectStrategy, Listener, MaybeAsync, PermissionSet, Permissions, RetryStrategy,
+    Timeout, TimeoutRangeError, Timestamp,
 };
 use dnp3::link::{EndpointAddress, SpecialAddressError};
 use dnp3::master::*;
@@ -15,7 +16,9 @@ use dnp3::tcp::ClientState;
 use dnp3::serial::*;
 #[cfg(feature = "tls")]
 use dnp3::tcp::tls::*;
+use dnp3::udp::spawn_master_udp;
 
+use crate::ffi::ParamError;
 use crate::{ffi, ByteIterator};
 
 pub struct FileInfoIterator {
@@ -88,7 +91,7 @@ pub(crate) unsafe fn master_channel_create_tcp_2(
     listener: ffi::ClientStateListener,
 ) -> Result<*mut MasterChannel, ffi::ParamError> {
     let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
-    let config = convert_config(config)?;
+    let config: MasterChannelConfig = config.try_into()?;
     let endpoints = endpoints.as_ref().ok_or(ffi::ParamError::NullParameter)?;
     let connect_options = options
         .as_ref()
@@ -164,7 +167,7 @@ pub(crate) unsafe fn master_channel_create_tls_2(
     tls_config: ffi::TlsClientConfig,
 ) -> Result<*mut MasterChannel, ffi::ParamError> {
     let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
-    let config = convert_config(config)?;
+    let config: MasterChannelConfig = config.try_into()?;
     let endpoints = endpoints.as_ref().ok_or(ffi::ParamError::NullParameter)?;
     let connect_options = connect_options
         .as_ref()
@@ -269,7 +272,7 @@ pub(crate) unsafe fn master_channel_create_serial(
     listener: ffi::PortStateListener,
 ) -> Result<*mut MasterChannel, ffi::ParamError> {
     let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
-    let config = convert_config(config)?;
+    let config: MasterChannelConfig = config.try_into()?;
 
     // enter the runtime context so that we can spawn
     let _enter = runtime.enter();
@@ -280,6 +283,34 @@ pub(crate) unsafe fn master_channel_create_serial(
         serial_params.into(),
         retry_delay,
         Box::new(listener),
+    );
+
+    let channel = MasterChannel {
+        runtime: runtime.handle(),
+        handle: channel,
+    };
+
+    Ok(Box::into_raw(Box::new(channel)))
+}
+pub(crate) unsafe fn master_channel_create_udp(
+    runtime: *mut crate::runtime::Runtime,
+    config: ffi::MasterChannelConfig,
+    local_endpoint: &CStr,
+    link_read_mode: ffi::LinkReadMode,
+    retry_delay: Duration,
+) -> Result<*mut MasterChannel, ffi::ParamError> {
+    let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
+    let config: MasterChannelConfig = config.try_into()?;
+    let local_endpoint: SocketAddr = local_endpoint.to_str()?.parse()?;
+
+    // enter the runtime context so that we can spawn
+    let _enter = runtime.enter();
+
+    let channel = spawn_master_udp(
+        local_endpoint,
+        link_read_mode.into(),
+        Timeout::from_duration(retry_delay)?,
+        config,
     );
 
     let channel = MasterChannel {
@@ -322,39 +353,79 @@ pub(crate) unsafe fn master_channel_add_association(
 ) -> Result<ffi::AssociationId, ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
     let address = EndpointAddress::try_new(address)?;
+    let config: AssociationConfig = config.try_into()?;
 
-    let config = AssociationConfig {
-        response_timeout: Timeout::from_duration(Duration::from_millis(config.response_timeout))?,
-        disable_unsol_classes: convert_event_classes(config.disable_unsol_classes()),
-        enable_unsol_classes: convert_event_classes(config.enable_unsol_classes()),
-        startup_integrity_classes: convert_classes(config.startup_integrity_classes()),
-        auto_time_sync: convert_auto_time_sync(&config.auto_time_sync()),
-        auto_tasks_retry_strategy: RetryStrategy::new(
-            config.auto_tasks_retry_strategy.min_delay(),
-            config.auto_tasks_retry_strategy.max_delay(),
-        ),
-        keep_alive_timeout: if config.keep_alive_timeout() == Duration::from_secs(0) {
-            None
-        } else {
-            Some(config.keep_alive_timeout())
-        },
-        auto_integrity_scan_on_buffer_overflow: config.auto_integrity_scan_on_buffer_overflow(),
-        event_scan_on_events_available: convert_event_classes(
-            config.event_scan_on_events_available(),
-        ),
-        max_queued_user_requests: config.max_queued_user_requests as usize,
-    };
-
-    channel.runtime.block_on(channel.handle.add_association(
+    let future = channel.handle.add_association(
         address,
         config,
         Box::new(read_handler),
         Box::new(assoc_handler),
         Box::new(assoc_info),
-    ))??;
+    );
+
+    channel.runtime.block_on(future)??;
     Ok(ffi::AssociationId {
         address: address.raw_value(),
     })
+}
+
+pub(crate) unsafe fn master_channel_add_udp_association(
+    channel: *mut MasterChannel,
+    address: u16,
+    destination: &CStr,
+    config: ffi::AssociationConfig,
+    read_handler: ffi::ReadHandler,
+    assoc_handler: ffi::AssociationHandler,
+    assoc_info: ffi::AssociationInformation,
+) -> Result<ffi::AssociationId, ffi::ParamError> {
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let address = EndpointAddress::try_new(address)?;
+    let config: AssociationConfig = config.try_into()?;
+    let destination: SocketAddr = destination.to_str()?.parse()?;
+
+    let future = channel.handle.add_udp_association(
+        address,
+        destination,
+        config,
+        Box::new(read_handler),
+        Box::new(assoc_handler),
+        Box::new(assoc_info),
+    );
+
+    channel.runtime.block_on(future)??;
+    Ok(ffi::AssociationId {
+        address: address.raw_value(),
+    })
+}
+
+impl TryFrom<ffi::AssociationConfig> for AssociationConfig {
+    type Error = ffi::ParamError;
+
+    fn try_from(config: ffi::AssociationConfig) -> Result<Self, Self::Error> {
+        Ok(AssociationConfig {
+            response_timeout: Timeout::from_duration(Duration::from_millis(
+                config.response_timeout,
+            ))?,
+            disable_unsol_classes: convert_event_classes(config.disable_unsol_classes()),
+            enable_unsol_classes: convert_event_classes(config.enable_unsol_classes()),
+            startup_integrity_classes: convert_classes(config.startup_integrity_classes()),
+            auto_time_sync: convert_auto_time_sync(&config.auto_time_sync()),
+            auto_tasks_retry_strategy: RetryStrategy::new(
+                config.auto_tasks_retry_strategy.min_delay(),
+                config.auto_tasks_retry_strategy.max_delay(),
+            ),
+            keep_alive_timeout: if config.keep_alive_timeout() == Duration::from_secs(0) {
+                None
+            } else {
+                Some(config.keep_alive_timeout())
+            },
+            auto_integrity_scan_on_buffer_overflow: config.auto_integrity_scan_on_buffer_overflow(),
+            event_scan_on_events_available: convert_event_classes(
+                config.event_scan_on_events_available(),
+            ),
+            max_queued_user_requests: config.max_queued_user_requests as usize,
+        })
+    }
 }
 
 impl From<TimeoutRangeError> for ffi::ParamError {
@@ -798,8 +869,127 @@ pub(crate) unsafe fn master_channel_get_file_info(
     Ok(())
 }
 
-pub(crate) unsafe fn master_channel_check_link_status(
+pub(crate) unsafe fn master_channel_get_file_auth_key(
     channel: *mut crate::MasterChannel,
+    association: ffi::AssociationId,
+    user_name: &CStr,
+    password: &CStr,
+    callback: ffi::FileAuthCallback,
+) -> Result<(), ffi::ParamError> {
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let address = EndpointAddress::try_new(association.address)?;
+
+    let credentials = FileCredentials {
+        user_name: user_name.to_str()?.to_string(),
+        password: password.to_str()?.to_string(),
+    };
+
+    let promise = sfio_promise::wrap(callback);
+
+    let mut association = AssociationHandle::create(address, channel.handle.clone());
+
+    let task = async move {
+        let res = association.get_file_auth_key(credentials).await;
+        promise.complete(res);
+    };
+
+    channel.runtime.spawn(task)?;
+    Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(crate) unsafe fn master_channel_open_file(
+    channel: *mut crate::MasterChannel,
+    association: ffi::AssociationId,
+    file_name: &CStr,
+    auth_key: u32,
+    permissions: ffi::Permissions,
+    file_size: u32,
+    file_mode: ffi::FileMode,
+    max_block_size: u16,
+    callback: ffi::FileOpenCallback,
+) -> Result<(), ffi::ParamError> {
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let address = EndpointAddress::try_new(association.address)?;
+    let file_name = file_name.to_str()?.to_string();
+    let mut association = AssociationHandle::create(address, channel.handle.clone());
+    let promise = sfio_promise::wrap(callback);
+
+    let task = async move {
+        let res = association
+            .open_file(
+                file_name,
+                AuthKey::new(auth_key),
+                permissions.into(),
+                file_size,
+                file_mode.into(),
+                max_block_size,
+            )
+            .await;
+        promise.complete(res);
+    };
+
+    channel.runtime.spawn(task)?;
+    Ok(())
+}
+
+pub(crate) unsafe fn master_channel_write_file_block(
+    channel: *mut MasterChannel,
+    association: ffi::AssociationId,
+    file_handle: u32,
+    block_number: u32,
+    last_block: bool,
+    block_data: *const crate::ByteCollection,
+    callback: ffi::FileOperationCallback,
+) -> Result<(), ffi::ParamError> {
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let address = EndpointAddress::try_new(association.address)?;
+    let mut association = AssociationHandle::create(address, channel.handle.clone());
+    let block_data = block_data
+        .as_ref()
+        .ok_or(ffi::ParamError::NullParameter)?
+        .inner
+        .clone();
+    let promise = sfio_promise::wrap(callback);
+
+    let mut block_num = BlockNumber::from_ffi_raw(block_number);
+    if last_block {
+        block_num.set_last();
+    }
+
+    let task = async move {
+        let res = association
+            .write_file_block(FileHandle::new(file_handle), block_num, block_data)
+            .await;
+        promise.complete(res);
+    };
+
+    channel.runtime.spawn(task)?;
+    Ok(())
+}
+
+pub(crate) unsafe fn master_channel_close_file(
+    channel: *mut MasterChannel,
+    association: ffi::AssociationId,
+    file_handle: u32,
+    callback: ffi::FileOperationCallback,
+) -> Result<(), ffi::ParamError> {
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let address = EndpointAddress::try_new(association.address)?;
+    let mut association = AssociationHandle::create(address, channel.handle.clone());
+    let promise = sfio_promise::wrap(callback);
+
+    let task = async move {
+        let res = association.close_file(FileHandle::new(file_handle)).await;
+        promise.complete(res);
+    };
+
+    channel.runtime.spawn(task)?;
+    Ok(())
+}
+
+pub(crate) unsafe fn master_channel_check_link_status(
+    channel: *mut MasterChannel,
     association: ffi::AssociationId,
     callback: ffi::LinkStatusCallback,
 ) -> Result<(), ffi::ParamError> {
@@ -890,6 +1080,26 @@ impl From<ClientState> for ffi::ClientState {
     }
 }
 
+impl From<ffi::Permissions> for Permissions {
+    fn from(value: ffi::Permissions) -> Self {
+        Self {
+            world: value.world.into(),
+            group: value.group.into(),
+            owner: value.owner.into(),
+        }
+    }
+}
+
+impl From<ffi::PermissionSet> for PermissionSet {
+    fn from(value: ffi::PermissionSet) -> Self {
+        Self {
+            execute: value.execute,
+            write: value.write,
+            read: value.read,
+        }
+    }
+}
+
 #[cfg(feature = "serial")]
 impl Listener<PortState> for ffi::PortStateListener {
     fn update(&mut self, value: PortState) -> MaybeAsync<()> {
@@ -928,17 +1138,19 @@ pub(crate) unsafe fn endpoint_list_add(list: *mut EndpointList, endpoint: &CStr)
     }
 }
 
-fn convert_config(
-    config: ffi::MasterChannelConfig,
-) -> Result<MasterChannelConfig, ffi::ParamError> {
-    let address = EndpointAddress::try_new(config.address())?;
+impl TryFrom<ffi::MasterChannelConfig> for MasterChannelConfig {
+    type Error = ParamError;
 
-    Ok(MasterChannelConfig {
-        master_address: address,
-        decode_level: config.decode_level().clone().into(),
-        tx_buffer_size: BufferSize::new(config.tx_buffer_size() as usize)?,
-        rx_buffer_size: BufferSize::new(config.rx_buffer_size() as usize)?,
-    })
+    fn try_from(config: ffi::MasterChannelConfig) -> Result<Self, Self::Error> {
+        let address = EndpointAddress::try_new(config.address())?;
+
+        Ok(MasterChannelConfig {
+            master_address: address,
+            decode_level: config.decode_level().clone().into(),
+            tx_buffer_size: BufferSize::new(config.tx_buffer_size() as usize)?,
+            rx_buffer_size: BufferSize::new(config.rx_buffer_size() as usize)?,
+        })
+    }
 }
 
 impl From<Utf8Error> for ffi::ParamError {
@@ -947,14 +1159,14 @@ impl From<Utf8Error> for ffi::ParamError {
     }
 }
 
-impl From<ffi::RetryStrategy> for dnp3::app::RetryStrategy {
+impl From<ffi::RetryStrategy> for RetryStrategy {
     fn from(x: ffi::RetryStrategy) -> Self {
-        dnp3::app::RetryStrategy::new(x.min_delay(), x.max_delay())
+        RetryStrategy::new(x.min_delay(), x.max_delay())
     }
 }
 
 #[cfg(feature = "serial")]
-impl From<ffi::SerialSettings> for dnp3::serial::SerialSettings {
+impl From<ffi::SerialSettings> for SerialSettings {
     fn from(from: ffi::SerialSettings) -> Self {
         Self {
             baud_rate: from.baud_rate(),
@@ -978,6 +1190,16 @@ impl From<ffi::SerialSettings> for dnp3::serial::SerialSettings {
                 ffi::StopBits::One => StopBits::One,
                 ffi::StopBits::Two => StopBits::Two,
             },
+        }
+    }
+}
+
+impl From<ffi::FileMode> for FileMode {
+    fn from(value: ffi::FileMode) -> Self {
+        match value {
+            ffi::FileMode::Read => Self::Read,
+            ffi::FileMode::Write => Self::Write,
+            ffi::FileMode::Append => Self::Append,
         }
     }
 }
@@ -1011,6 +1233,7 @@ impl From<AssociationError> for ffi::ParamError {
         match error {
             AssociationError::Shutdown => Self::MasterAlreadyShutdown,
             AssociationError::DuplicateAddress(_) => Self::AssociationDuplicateAddress,
+            AssociationError::WrongChannelType { .. } => Self::WrongChannelType,
         }
     }
 }

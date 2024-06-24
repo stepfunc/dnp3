@@ -395,6 +395,12 @@ pub(crate) struct Response<'a> {
     pub(crate) objects: Result<HeaderCollection<'a>, ObjectParseError>,
 }
 
+impl<'a> Response<'a> {
+    pub(crate) fn get_only_object_header(&self) -> Result<ObjectHeader<'a>, SingleHeaderError> {
+        self.objects?.get_only_header()
+    }
+}
+
 #[derive(Copy, Clone)]
 struct ObjectParser<'a> {
     errored: bool,
@@ -408,6 +414,19 @@ struct ObjectParser<'a> {
 pub(crate) struct HeaderCollection<'a> {
     function: FunctionCode,
     data: &'a [u8],
+}
+
+#[derive(Copy, Clone, Debug)]
+pub(crate) enum SingleHeaderError {
+    BadParse,
+    NoHeaders,
+    MoreThanOneHeader,
+}
+
+impl From<ObjectParseError> for SingleHeaderError {
+    fn from(_: ObjectParseError) -> Self {
+        Self::BadParse
+    }
 }
 
 impl<'a> HeaderCollection<'a> {
@@ -427,13 +446,13 @@ impl<'a> HeaderCollection<'a> {
         }
     }
 
-    pub(crate) fn get_only_header(&self) -> Option<ObjectHeader<'a>> {
+    pub(crate) fn get_only_header(&self) -> Result<ObjectHeader<'a>, SingleHeaderError> {
         let mut iter = self.iter();
         match iter.next() {
-            None => None,
+            None => Err(SingleHeaderError::NoHeaders),
             Some(x) => match iter.next() {
-                Some(_) => None,
-                None => Some(x),
+                Some(_) => Err(SingleHeaderError::MoreThanOneHeader),
+                None => Ok(x),
             },
         }
     }
@@ -1126,7 +1145,7 @@ mod test {
     fn parses_specific_attribute_in_range() {
         let input: &[u8] = &[0x00, 0xCA, 0x00, 0x07, 0x07, 0x02, 0x01, 42];
 
-        let mut headers = ObjectParser::parse(FunctionCode::Response, &input)
+        let mut headers = ObjectParser::parse(FunctionCode::Response, input)
             .unwrap()
             .iter();
 
@@ -1157,7 +1176,7 @@ mod test {
     fn parses_specific_attribute_in_read_request() {
         let input: &[u8] = &[0x00, 0xCA, 0x00, 0x07, 0x07];
 
-        let mut headers = ObjectParser::parse(FunctionCode::Read, &input)
+        let mut headers = ObjectParser::parse(FunctionCode::Read, input)
             .unwrap()
             .iter();
 
@@ -1174,7 +1193,7 @@ mod test {
     #[test]
     fn range_parsing_fails_for_specific_attribute_with_count_equal_two() {
         let input: &[u8] = &[0x00, 0xCA, 0x00, 0x07, 0x08, 0x02, 0x01, 42];
-        let err = ObjectParser::parse(FunctionCode::Response, &input).unwrap_err();
+        let err = ObjectParser::parse(FunctionCode::Response, input).unwrap_err();
         assert_eq!(
             err,
             ObjectParseError::BadAttribute(AttrParseError::CountNotOne(2))
@@ -1187,7 +1206,7 @@ mod test {
             70, 5, 0x5B, 0x01, 12, 0x00, 0x01, 0x02, 0x03, 0x04, 0xAA, 0xBB, 0xCC, 0xDD, b'd',
             b'a', b't', b'a',
         ];
-        let headers = ObjectParser::parse(FunctionCode::Response, &input).unwrap();
+        let headers = ObjectParser::parse(FunctionCode::Response, input).unwrap();
         let header = headers.iter().next().unwrap();
 
         assert_eq!(header.variation, Variation::Group70Var5);

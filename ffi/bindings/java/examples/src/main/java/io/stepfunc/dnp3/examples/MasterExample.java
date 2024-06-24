@@ -9,7 +9,9 @@ import org.joou.UInteger;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.List;
 
 // ANCHOR: logging_interface
@@ -379,6 +381,35 @@ public class MasterExample {
     }
   }
 
+  private static void runUdp(Runtime runtime) throws Exception {
+    // ANCHOR: create_udp_channel
+    MasterChannel channel =
+            MasterChannel.createUdpChannel(
+                    runtime,
+                    getMasterChannelConfig(),
+                    "127.0.0.1:20001",
+                    LinkReadMode.DATAGRAM,
+                    Duration.ofSeconds(5)
+            );
+    // ANCHOR_END: create_udp_channel
+
+    try {
+      AssociationId association =
+              channel.addUdpAssociation(
+                      ushort(1024),
+                      "127.0.0.1:20000",
+                      getAssociationConfig(),
+                      new TestReadHandler(),
+                      new TestAssociationHandler(),
+                      new TestAssociationInformation());
+
+      runAssociation(channel, association);
+    }
+    finally {
+      channel.shutdown();
+    }
+  }
+
   private static void runSerial(Runtime runtime) throws Exception {
     // ANCHOR: create_serial_channel
     MasterChannel channel =
@@ -431,6 +462,9 @@ public class MasterExample {
     switch(type) {
       case "tcp":
         runTcp(runtime);
+        break;
+      case "udp":
+        runUdp(runtime);
         break;
       case "serial":
         runSerial(runtime);
@@ -581,6 +615,15 @@ public class MasterExample {
         // ANCHOR_END: read_file
         break;
       }
+      case "wf":
+      {
+        // ANCHOR: write_file
+        OpenFile file = channel.openFile(association, "hello_world.txt", uint(0), Permissions.none(), uint(0xFFFFFFFF), FileMode.WRITE, ushort(1024)).toCompletableFuture().get();
+        channel.writeFileBlock(association, file.fileHandle, uint(0), false, getFileLine()).toCompletableFuture().get();
+        channel.writeFileBlock(association, file.fileHandle, uint(1), true, getFileLine()).toCompletableFuture().get();
+        channel.closeFile(association, file.fileHandle).toCompletableFuture().get();
+        // ANCHOR_END: write_file
+      }
       case "lsr":
       {
         channel.checkLinkStatus(association).toCompletableFuture().get();
@@ -592,24 +635,21 @@ public class MasterExample {
     }
   }
 
-  private static void runChannel(MasterChannel channel) {
+  private static List<UByte> getFileLine() {
+    List<UByte> bytes = new ArrayList<>();
+    byte[] arr = "hello world\n".getBytes(StandardCharsets.UTF_8);
+    for(byte b: arr) {
+      bytes.add(ubyte(b));
+    }
+    return bytes;
+  }
 
-    // Create the association
-    // ANCHOR: association_create
-    AssociationId association =
-        channel.addAssociation(
-            ushort(1024),
-            getAssociationConfig(),
-            new TestReadHandler(),
-            new TestAssociationHandler(),
-            new TestAssociationInformation());
-    // ANCHOR_END: association_create
-
+  private static void runAssociation(MasterChannel channel, AssociationId association) {
     // Create a periodic poll
     // ANCHOR: add_poll
     PollId poll =
-        channel.addPoll(
-            association, Request.classRequest(false, true, true, true), Duration.ofSeconds(5));
+            channel.addPoll(
+                    association, Request.classRequest(false, true, true, true), Duration.ofSeconds(5));
     // ANCHOR_END: add_poll
 
     // start communications
@@ -629,6 +669,22 @@ public class MasterExample {
         System.out.println("Error: " + ex);
       }
     }
+  }
+
+  private static void runChannel(MasterChannel channel) {
+
+    // Create the association
+    // ANCHOR: association_create
+    AssociationId association =
+        channel.addAssociation(
+            ushort(1024),
+            getAssociationConfig(),
+            new TestReadHandler(),
+            new TestAssociationHandler(),
+            new TestAssociationInformation());
+    // ANCHOR_END: association_create
+
+    runAssociation(channel, association);
   }
 
   private static void printFileInfo(FileInfo info) {

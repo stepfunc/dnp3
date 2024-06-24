@@ -2,10 +2,12 @@ use crate::app::parse::parser::ParsedFragment;
 use crate::app::HeaderParseError;
 use crate::decode::{AppDecodeLevel, DecodeLevel};
 use crate::link::error::LinkError;
-use crate::link::{EndpointAddress, LinkErrorMode};
+use crate::link::reader::LinkModes;
+use crate::link::EndpointAddress;
 use crate::outstation::Feature;
 use crate::transport::{
-    FragmentInfo, LinkLayerMessage, TransportData, TransportRequest, TransportResponse,
+    FragmentAddr, FragmentInfo, LinkLayerMessage, TransportData, TransportRequest,
+    TransportResponse,
 };
 use crate::util::phys::PhysLayer;
 
@@ -52,34 +54,33 @@ impl<'a> Drop for RequestGuard<'a> {
 
 impl TransportReader {
     pub(crate) fn master(
-        link_error_mode: LinkErrorMode,
+        link_modes: LinkModes,
         address: EndpointAddress,
         rx_buffer_size: usize,
     ) -> Self {
         Self {
-            inner: InnerReaderType::master(link_error_mode, address, rx_buffer_size),
+            inner: InnerReaderType::master(link_modes, address, rx_buffer_size),
         }
     }
 
     pub(crate) fn outstation(
-        link_error_mode: LinkErrorMode,
+        link_modes: LinkModes,
         address: EndpointAddress,
         self_address: Feature,
         rx_buffer_size: usize,
     ) -> Self {
         Self {
-            inner: InnerReaderType::outstation(
-                link_error_mode,
-                address,
-                self_address,
-                rx_buffer_size,
-            ),
+            inner: InnerReaderType::outstation(link_modes, address, self_address, rx_buffer_size),
         }
     }
 
     #[cfg(test)]
     pub(crate) fn get_inner(&mut self) -> &mut InnerReaderType {
         &mut self.inner
+    }
+
+    pub(crate) fn seed_link(&mut self, seed_data: &[u8]) -> Result<(), scursor::WriteError> {
+        self.inner.seed_link(seed_data)
     }
 
     pub(crate) async fn read(
@@ -120,7 +121,7 @@ impl TransportReader {
 
         match data {
             Ok(ParsedTransportData::Fragment(info, fragment)) => match fragment.to_response() {
-                Ok(response) => Some(TransportResponse::Response(info.source, response)),
+                Ok(response) => Some(TransportResponse::Response(info.addr, response)),
                 Err(err) => Some(TransportResponse::Error(err.into())),
             },
             Ok(ParsedTransportData::LinkLayerMessage(msg)) => {
@@ -136,10 +137,10 @@ impl TransportReader {
     ) -> RequestGuard<'_> {
         if let Some(TransportRequest::Request(info, _)) = self.peek_request() {
             if let Some(required_master_addr) = master_address {
-                if info.source != required_master_addr {
+                if info.addr.link != required_master_addr {
                     tracing::warn!(
                         "Discarding ASDU from master address: {} (configured address == {})",
-                        info.source.raw_value(),
+                        info.addr.link.raw_value(),
                         required_master_addr.raw_value()
                     );
                     self.pop();
@@ -155,7 +156,7 @@ impl TransportReader {
             Ok(ParsedTransportData::Fragment(info, fragment)) => match fragment.to_request() {
                 Ok(request) => Some(TransportRequest::Request(info, request)),
                 Err(err) => Some(TransportRequest::Error(
-                    info.source,
+                    info.addr,
                     err.into(fragment.control.seq),
                 )),
             },
@@ -169,7 +170,7 @@ impl TransportReader {
     fn parse(
         &mut self,
         peek: bool,
-    ) -> Option<Result<ParsedTransportData, (HeaderParseError, EndpointAddress)>> {
+    ) -> Option<Result<ParsedTransportData, (HeaderParseError, FragmentAddr)>> {
         let transport_data = if peek {
             self.inner.peek()?
         } else {
@@ -180,7 +181,7 @@ impl TransportReader {
             TransportData::Fragment(fragment) => Some(
                 ParsedFragment::parse(fragment.data)
                     .map(|parsed| ParsedTransportData::Fragment(fragment.info, parsed))
-                    .map_err(|err| (err, fragment.info.source)),
+                    .map_err(|err| (err, fragment.info.addr)),
             ),
             TransportData::LinkLayerMessage(msg) => {
                 Some(Ok(ParsedTransportData::LinkLayerMessage(msg)))

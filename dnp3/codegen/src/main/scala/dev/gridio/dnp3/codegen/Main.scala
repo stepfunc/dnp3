@@ -7,10 +7,10 @@ import dev.gridio.dnp3.codegen.render.modules._
 
 object Main {
 
-  val appPath: Path = FileSystems.getDefault.getPath("../src/app/")
-  val implPath: Path = appPath.resolve("gen");
+  private val appPath: Path = FileSystems.getDefault.getPath("../src/app/")
+  private val implPath: Path = appPath.resolve("gen");
 
-  object CommonUseStatements extends Module {
+  private object CommonUseStatements extends Module {
     override def lines(implicit indentation: Indentation): Iterator[String] = {
       "use crate::app::parse::traits::{FixedSize, FixedSizeVariation};".eol ++
       "use crate::app::control::{CommandStatus, ControlCode};".eol ++

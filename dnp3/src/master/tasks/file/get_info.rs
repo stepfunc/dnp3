@@ -4,12 +4,19 @@ use crate::app::format::WriteError;
 use crate::app::parse::free_format::FreeFormatVariation;
 use crate::app::parse::parser::{HeaderDetails, Response};
 use crate::app::{FunctionCode, Timestamp};
-use crate::master::tasks::NonReadTask;
-use crate::master::{FileError, FileInfo, Promise, TaskError};
+use crate::master::promise::Promise;
+use crate::master::tasks::{AppTask, NonReadTask, Task};
+use crate::master::{FileError, FileInfo, TaskError};
 
 pub(crate) struct GetFileInfoTask {
     file_name: String,
     promise: Promise<Result<FileInfo, FileError>>,
+}
+
+impl From<GetFileInfoTask> for Task {
+    fn from(value: GetFileInfoTask) -> Self {
+        Task::App(AppTask::NonRead(NonReadTask::GetFileInfo(value)))
+    }
 }
 
 impl GetFileInfoTask {
@@ -39,28 +46,14 @@ impl GetFileInfoTask {
 
     pub(crate) fn handle(self, response: Response) -> Result<Option<NonReadTask>, TaskError> {
         fn inner(response: Response) -> Result<FileInfo, FileError> {
-            let headers = match response.objects {
-                Ok(x) => x,
-                Err(err) => {
-                    tracing::warn!("File operation received malformed response: {err}");
-                    return Err(FileError::TaskError(TaskError::MalformedResponse(err)));
-                }
-            };
-
-            let header = match headers.get_only_header() {
-                None => {
-                    tracing::warn!("File operation response contains unexpected number of headers");
-                    return Err(FileError::TaskError(TaskError::UnexpectedResponseHeaders));
-                }
-                Some(x) => x,
-            };
+            let header = response.objects?.get_only_header()?;
 
             match header.details {
                 HeaderDetails::TwoByteFreeFormat(_, FreeFormatVariation::Group70Var7(obj)) => {
                     Ok(obj.into())
                 }
                 HeaderDetails::TwoByteFreeFormat(_, FreeFormatVariation::Group70Var4(obj)) => {
-                    if !obj.text.is_empty() {
+                    if obj.status_code != FileStatus::Success {
                         tracing::warn!("Unable to get file info: {}", obj.text);
                     }
                     Err(FileError::BadStatus(obj.status_code))

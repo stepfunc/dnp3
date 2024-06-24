@@ -1,7 +1,7 @@
-use crate::app::file::{FileStatus, FileType, Group70Var7, Permissions};
-use crate::app::{MaybeAsync, Shutdown, Timestamp};
-use crate::master::{Promise, TaskError};
-use scursor::ReadCursor;
+use crate::app::file::{FileStatus, FileType, Permissions};
+use crate::app::parse::parser::SingleHeaderError;
+use crate::app::{MaybeAsync, ObjectParseError, Shutdown, Timestamp};
+use crate::master::TaskError;
 use std::fmt::Debug;
 
 /// Credentials for obtaining a file authorization token from the outstation
@@ -43,6 +43,24 @@ pub struct FileReadConfig {
     /// 1) The size returned by the outstation in the OPEN operation
     /// 2) The total number of bytes actually returned in subsequent READ operations
     pub max_file_size: usize,
+}
+
+/// Files can be opened for writing by creating/truncating or appending to an existing file
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum FileWriteMode {
+    /// Specifies that the file is to be opened for writing. If it already exists, the file is truncated to zero length
+    Write,
+    /// Specifies that the file is to be opened for writing, appending to the end of the file
+    Append,
+}
+
+impl From<FileWriteMode> for FileMode {
+    fn from(value: FileWriteMode) -> Self {
+        match value {
+            FileWriteMode::Write => Self::Write,
+            FileWriteMode::Append => Self::Append,
+        }
+    }
 }
 
 /// Configuration related to reading a directory
@@ -109,6 +127,8 @@ pub enum FileError {
     BadResponse,
     /// Outstation returned an error status code
     BadStatus(FileStatus),
+    /// File handle returned did not match request
+    WrongHandle,
     /// Outstation indicated no permission to access file
     NoPermission,
     /// Received an unexpected block number
@@ -121,6 +141,45 @@ pub enum FileError {
     TaskError(TaskError),
 }
 
+impl From<tokio::sync::oneshot::error::RecvError> for FileError {
+    fn from(_: tokio::sync::oneshot::error::RecvError) -> Self {
+        Self::TaskError(TaskError::Shutdown)
+    }
+}
+
+impl From<Shutdown> for FileError {
+    fn from(_: Shutdown) -> Self {
+        Self::TaskError(TaskError::Shutdown)
+    }
+}
+
+impl From<ObjectParseError> for FileError {
+    fn from(value: ObjectParseError) -> Self {
+        FileError::TaskError(value.into())
+    }
+}
+
+impl From<SingleHeaderError> for FileError {
+    fn from(_: SingleHeaderError) -> Self {
+        Self::TaskError(TaskError::UnexpectedResponseHeaders)
+    }
+}
+
+impl From<FileError> for TaskError {
+    fn from(err: FileError) -> Self {
+        match err {
+            FileError::TaskError(err) => err,
+            _ => TaskError::UnexpectedResponseHeaders,
+        }
+    }
+}
+
+impl From<TaskError> for FileError {
+    fn from(err: TaskError) -> Self {
+        FileError::TaskError(err)
+    }
+}
+
 impl std::fmt::Display for FileError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
@@ -131,9 +190,51 @@ impl std::fmt::Display for FileError {
             FileError::AbortByUser => f.write_str("aborted by user"),
             FileError::TaskError(t) => Debug::fmt(&t, f),
             FileError::MaxLengthExceeded => f.write_str("exceeded maximum received length"),
+            FileError::WrongHandle => {
+                f.write_str("file handle returned by outstation did not match the request")
+            }
         }
     }
 }
+
+/// Mode used when opening files
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum FileMode {
+    /// Code used for non-open command requests
+    Null,
+    /// Specifies that an existing file is to be opened for reading
+    Read,
+    /// Specifies that the file is to be opened for writing, truncating any existing file to length 0
+    Write,
+    /// Specifies that the file is to be opened for writing, appending to the end of the file
+    Append,
+    /// Used to capture reserved values
+    Reserved(u16),
+}
+
+impl FileMode {
+    pub(crate) fn new(value: u16) -> Self {
+        match value {
+            0 => Self::Null,
+            1 => Self::Read,
+            2 => Self::Write,
+            3 => Self::Append,
+            _ => Self::Reserved(value),
+        }
+    }
+
+    pub(crate) fn to_u16(self) -> u16 {
+        match self {
+            Self::Null => 0,
+            Self::Read => 1,
+            Self::Write => 2,
+            Self::Append => 3,
+            Self::Reserved(x) => x,
+        }
+    }
+}
+
+impl std::error::Error for FileError {}
 
 /// Describes whether a file operation should continue (No) or abort (Yes)
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -173,81 +274,126 @@ pub trait FileReader: Send + Sync + 'static {
     fn completed(&mut self);
 }
 
-pub(crate) struct DirectoryReader {
-    data: Vec<u8>,
-    promise: Option<Promise<Result<Vec<FileInfo>, FileError>>>,
-}
+/// Authentication key used when opening a file
+#[derive(Copy, Clone, Debug)]
+pub struct AuthKey(u32);
 
-impl DirectoryReader {
-    pub(crate) fn new(promise: Promise<Result<Vec<FileInfo>, FileError>>) -> Self {
-        Self {
-            data: Vec::new(),
-            promise: Some(promise),
-        }
+impl From<AuthKey> for u32 {
+    fn from(value: AuthKey) -> Self {
+        value.0
     }
 }
 
-impl FileReader for DirectoryReader {
-    fn opened(&mut self, _size: u32) -> FileAction {
-        FileAction::Continue
+impl AuthKey {
+    /// Construct from a raw u32
+    pub fn new(value: u32) -> Self {
+        Self(value)
     }
 
-    fn block_received(&mut self, _block_num: u32, data: &[u8]) -> MaybeAsync<FileAction> {
-        self.data.extend(data);
-        MaybeAsync::ready(FileAction::Continue)
-    }
-
-    fn aborted(&mut self, err: FileError) {
-        if let Some(x) = self.promise.take() {
-            x.complete(Err(err));
-        }
-    }
-
-    fn completed(&mut self) {
-        fn parse(data: &[u8]) -> Result<Vec<FileInfo>, FileError> {
-            let mut cursor = ReadCursor::new(data);
-            let mut items = Vec::new();
-            while !cursor.is_empty() {
-                match Group70Var7::read(&mut cursor) {
-                    Ok(x) => items.push(x),
-                    Err(err) => {
-                        tracing::warn!("Error reading directory information: {err}");
-                        return Err(FileError::BadResponse);
-                    }
-                }
-            }
-            Ok(items.into_iter().map(|x| x.into()).collect())
-        }
-
-        // parse the accumulated data
-
-        let res = parse(self.data.as_slice());
-        if let Some(promise) = self.promise.take() {
-            promise.complete(res);
-        }
+    /// The default authentication key (0)
+    pub fn none() -> Self {
+        Self(0)
     }
 }
 
-impl<'a> From<Group70Var7<'a>> for FileInfo {
-    fn from(value: Group70Var7<'a>) -> Self {
-        Self {
-            name: value.file_name.to_string(),
-            file_type: value.file_type,
-            size: value.file_size,
-            time_created: value.time_of_creation,
-            permissions: value.permissions,
+/// File handle assigned by the outstation
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct FileHandle(u32);
+
+impl From<FileHandle> for u32 {
+    fn from(value: FileHandle) -> Self {
+        value.0
+    }
+}
+
+impl FileHandle {
+    /// Construct from a raw value
+    pub const fn new(value: u32) -> Self {
+        Self(value)
+    }
+}
+
+/// Block number used in file read/write operations
+#[derive(Copy, Clone, Debug, Default)]
+pub struct BlockNumber(u32);
+
+/// Error returned when a block cannot be incremented
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct FailedBlockIncrement;
+
+impl std::fmt::Display for FailedBlockIncrement {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "File block number is at maximum value of {} and cannot be incremented",
+            BlockNumber::MAX_VALUE
+        )
+    }
+}
+
+impl std::error::Error for FailedBlockIncrement {}
+
+impl BlockNumber {
+    const TOP_BIT: u32 = 0x80_00_00_00;
+
+    /// Maximum possible block number
+    pub const MAX_VALUE: u32 = !Self::TOP_BIT;
+
+    /// Check if this is the last block
+    pub fn is_last(self) -> bool {
+        (self.0 & Self::TOP_BIT) != 0
+    }
+
+    /// Set the top bit to indicate this is the last block
+    pub fn set_last(&mut self) {
+        self.0 |= Self::TOP_BIT;
+    }
+
+    /// Try to increment the block number. If this fails, the maximum value
+    /// is returned as an error.
+    pub fn increment(&mut self) -> Result<(), FailedBlockIncrement> {
+        let top_bit = self.0 & Self::TOP_BIT;
+        let bottom_bits = self.bottom_bits();
+        if bottom_bits < Self::MAX_VALUE {
+            self.0 = (self.bottom_bits() + 1) | top_bit;
+            Ok(())
+        } else {
+            Err(FailedBlockIncrement)
         }
     }
-}
 
-impl From<Shutdown> for FileError {
-    fn from(_: Shutdown) -> Self {
-        Self::TaskError(TaskError::Shutdown)
+    /// Constructor used only in FFI mode
+    #[cfg(feature = "ffi")]
+    pub fn from_ffi_raw(raw: u32) -> BlockNumber {
+        Self::new(raw)
+    }
+
+    pub(crate) fn new(raw: u32) -> BlockNumber {
+        Self(raw)
+    }
+
+    pub(crate) fn bottom_bits(self) -> u32 {
+        // The maximum value is also a mask for the bottom bits
+        self.0 & Self::MAX_VALUE
+    }
+
+    pub(crate) fn wire_value(self) -> u32 {
+        self.0
     }
 }
 
-impl From<tokio::sync::oneshot::error::RecvError> for FileError {
-    fn from(_: tokio::sync::oneshot::error::RecvError) -> Self {
-        Self::TaskError(TaskError::Shutdown)
-    }
+/// The result of opening a file on the outstation
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct OpenFile {
+    /// The handle assigned to the file by the outstation
+    ///
+    /// This must be used in subsequent requests to manipulate the file
+    pub file_handle: FileHandle,
+    /// Size of the file returned by the outstation
+    pub file_size: u32,
+    /// Maximum block size returned by the outstation
+    ///
+    /// The master must respect this parameter when writing data to a file or
+    /// the transfer may not succeed
+    pub max_block_size: u16,
 }

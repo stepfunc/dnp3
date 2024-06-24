@@ -1,14 +1,20 @@
 use crate::app::format::write::HeaderWriter;
 use crate::master::error::TaskError;
-use crate::master::handler::Promise;
+use crate::master::promise::Promise;
 use crate::master::request::ReadRequest;
-use crate::master::tasks::ReadTask;
+use crate::master::tasks::{AppTask, ReadTask, Task};
 use crate::master::ReadHandler;
 
 pub(crate) struct SingleReadTask {
     request: ReadRequest,
     pub(crate) custom_handler: Option<Box<dyn ReadHandler>>,
     promise: Promise<Result<(), TaskError>>,
+}
+
+impl From<SingleReadTask> for Task {
+    fn from(value: SingleReadTask) -> Self {
+        Task::App(AppTask::Read(ReadTask::SingleRead(value)))
+    }
 }
 
 impl SingleReadTask {
@@ -30,10 +36,6 @@ impl SingleReadTask {
             custom_handler: Some(custom_handler),
             promise,
         }
-    }
-
-    pub(crate) fn wrap(self) -> ReadTask {
-        ReadTask::SingleRead(self)
     }
 
     pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {

@@ -2,7 +2,14 @@ use oo_bindgen::model::*;
 
 const NOTHING: &str = "nothing";
 
-pub fn define(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructHandle> {
+pub(crate) struct DecodeLevels {
+    pub(crate) app: EnumHandle,
+    pub(crate) transport: EnumHandle,
+    pub(crate) link: EnumHandle,
+    pub(crate) phys: EnumHandle,
+}
+
+pub fn define_levels(lib: &mut LibraryBuilder) -> BackTraced<DecodeLevels> {
     let app_decode_level_enum = lib
         .define_enum("app_decode_level")?
         .push(NOTHING, "Decode nothing")?
@@ -48,6 +55,18 @@ pub fn define(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructHandle> {
         .doc("Controls how data transmitted at the physical layer (TCP, serial, etc) is logged")?
         .build()?;
 
+    Ok(DecodeLevels {
+        app: app_decode_level_enum,
+        transport: transport_decode_level_enum,
+        link: link_decode_level_enum,
+        phys: phys_decode_level_enum,
+    })
+}
+
+pub fn define_decode_level_struct(
+    lib: &mut LibraryBuilder,
+    levels: &DecodeLevels,
+) -> BackTraced<UniversalStructHandle> {
     let application_field = Name::create("application")?;
     let transport_field = Name::create("transport")?;
     let link_field = Name::create("link")?;
@@ -55,10 +74,10 @@ pub fn define(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructHandle> {
 
     let decode_level_struct = lib.declare_universal_struct("decode_level")?;
     let decode_level_struct = lib.define_universal_struct(decode_level_struct)?
-        .add(&application_field, app_decode_level_enum, "Controls application fragment decoding")?
-        .add(&transport_field, transport_decode_level_enum, "Controls transport segment layer decoding")?
-        .add(&link_field, link_decode_level_enum, "Controls link frame decoding")?
-        .add(&physical_field, phys_decode_level_enum, "Controls the logging of physical layer read/write")?
+        .add(&application_field, levels.app.clone(), "Controls application fragment decoding")?
+        .add(&transport_field, levels.transport.clone(), "Controls transport segment layer decoding")?
+        .add(&link_field, levels.link.clone(), "Controls link frame decoding")?
+        .add(&physical_field, levels.phys.clone(), "Controls the logging of physical layer read/write")?
         .doc("Controls the decoding of transmitted and received data at the application, transport, link, and physical layers")?
         .end_fields()?
         .begin_initializer("init", InitializerType::Normal, "Initialize log levels to defaults")?

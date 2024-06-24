@@ -1,24 +1,26 @@
-use sfio_rustls_config::NameVerifier;
+use sfio_rustls_config::ServerNameVerification;
 use std::net::{Ipv4Addr, SocketAddr};
 use std::path::Path;
 use std::sync::Arc;
 
 use crate::app::{ConnectStrategy, Listener};
 use crate::link::LinkErrorMode;
-use crate::master::{MasterChannel, MasterChannelConfig};
+use crate::master::{MasterChannel, MasterChannelConfig, MasterChannelType};
 use crate::tcp::tls::{CertificateMode, MinTlsVersion, TlsError};
 use crate::tcp::{wire_master_client, ClientState, ConnectOptions};
 use crate::tcp::{EndpointList, PostConnectionHandler};
 use crate::util::phys::PhysLayer;
 
+use crate::link::reader::LinkModes;
 use tokio::net::TcpStream;
 use tokio_rustls::rustls;
+use tokio_rustls::rustls::pki_types::{IpAddr, ServerName};
 use tracing::Instrument;
 
 /// TLS configuration for a client
 pub struct TlsClientConfig {
     // server name used in SNI - if and only if it's a DNS name, does nothing for IP
-    server_name: rustls::ServerName,
+    server_name: ServerName<'static>,
     config: Arc<rustls::ClientConfig>,
 }
 
@@ -59,7 +61,8 @@ pub fn spawn_master_tls_client_2(
 ) -> MasterChannel {
     let main_addr = endpoints.main_addr().to_string();
     let (mut task, handle) = wire_master_client(
-        link_error_mode,
+        LinkModes::stream(link_error_mode),
+        MasterChannelType::Stream,
         endpoints,
         config,
         connect_strategy,
@@ -128,12 +131,12 @@ impl TlsClientConfig {
     ) -> Result<Self, TlsError> {
         let (name_verifier, server_name) = match server_subject_name {
             None => (
-                NameVerifier::any(),
-                rustls::ServerName::IpAddress(Ipv4Addr::UNSPECIFIED.into()),
+                ServerNameVerification::DisableNameVerification,
+                ServerName::IpAddress(IpAddr::V4(Ipv4Addr::UNSPECIFIED.into())),
             ),
             Some(x) => {
-                let server_name = rustls::ServerName::try_from(x.as_str())?;
-                (NameVerifier::equal_to(x), server_name)
+                let server_name: ServerName<'static> = ServerName::try_from(x)?;
+                (ServerNameVerification::SanOrCommonName, server_name)
             }
         };
 
@@ -177,7 +180,7 @@ impl TlsClientConfig {
 
         Ok(Self {
             //  it doesn't matter what we put here, it just needs to be an IP so that the client won't send an SNI extension
-            server_name: rustls::ServerName::IpAddress(Ipv4Addr::UNSPECIFIED.into()),
+            server_name: ServerName::IpAddress(IpAddr::V4(Ipv4Addr::UNSPECIFIED.into())),
             config: Arc::new(config),
         })
     }

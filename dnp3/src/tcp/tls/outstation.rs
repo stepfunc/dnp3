@@ -1,4 +1,4 @@
-use sfio_rustls_config::NameVerifier;
+use sfio_rustls_config::ClientNameVerification;
 use std::path::Path;
 use std::sync::Arc;
 
@@ -14,10 +14,12 @@ use crate::outstation::{
 use crate::tcp::client::ClientTask;
 use crate::tcp::tls::{CertificateMode, MinTlsVersion, TlsClientConfig, TlsError};
 use crate::tcp::{ClientState, ConnectOptions, EndpointList, PostConnectionHandler};
-use crate::util::phys::PhysLayer;
+use crate::util::phys::{PhysAddr, PhysLayer};
 use crate::util::session::{Enabled, Session};
 use tokio::net::TcpStream;
+use tokio_rustls::rustls::pki_types::ServerName;
 
+use crate::link::reader::LinkModes;
 use tracing::Instrument;
 
 /// Spawn a TLS client task onto the `Tokio` runtime. The task runs until the returned handle is dropped.
@@ -40,8 +42,9 @@ pub fn spawn_outstation_tls_client(
     let main_addr = endpoints.main_addr().to_string();
     let (task, handle) = OutstationTask::create(
         Enabled::No,
-        link_error_mode,
+        LinkModes::stream(link_error_mode),
         config,
+        PhysAddr::None,
         application,
         information,
         control_handler,
@@ -121,14 +124,17 @@ impl TlsServerConfig {
         password: Option<&str>,
         min_tls_version: MinTlsVersion,
     ) -> Result<Self, TlsError> {
-        let name_verifier = match client_subject_name {
-            None => NameVerifier::any(),
-            Some(x) => NameVerifier::equal_to(x),
+        let name_verification = match client_subject_name {
+            None => ClientNameVerification::None,
+            Some(name) => {
+                let name: ServerName<'static> = name.try_into()?;
+                ClientNameVerification::SanOrCommonName(name)
+            }
         };
 
         let config = sfio_rustls_config::server::authority(
             min_tls_version.into(),
-            name_verifier,
+            name_verification,
             peer_cert_path,
             local_cert_path,
             private_key_path,

@@ -2,12 +2,11 @@ use crate::app::format::write::HeaderWriter;
 use crate::app::parse::parser::{HeaderCollection, Response};
 use crate::app::FunctionCode;
 use crate::app::ResponseHeader;
-use crate::link::EndpointAddress;
 use crate::master::association::Association;
 use crate::master::error::TaskError;
 use crate::master::extract::extract_measurements;
-use crate::master::handler::Promise;
 use crate::master::poll::Poll;
+use crate::master::promise::Promise;
 use crate::master::request::{Classes, EventClasses};
 use crate::master::tasks::auto::AutoTask;
 use crate::master::tasks::command::CommandTask;
@@ -18,30 +17,35 @@ use crate::master::{ReadType, TaskType};
 
 use crate::master::tasks::deadbands::WriteDeadBandsTask;
 use crate::master::tasks::empty_response::EmptyResponseTask;
-use crate::master::tasks::file_read::FileReadTask;
-use crate::master::tasks::get_file_info::GetFileInfoTask;
+use crate::master::tasks::file::authenticate::AuthFileTask;
+use crate::master::tasks::file::close::CloseFileTask;
+use crate::master::tasks::file::get_info::GetFileInfoTask;
+use crate::master::tasks::file::open::OpenFileTask;
+use crate::master::tasks::file::read::FileReadTask;
+use crate::master::tasks::file::write_block::WriteBlockTask;
+use crate::transport::FragmentAddr;
 
 pub(crate) mod auto;
 pub(crate) mod command;
 pub(crate) mod deadbands;
 pub(crate) mod empty_response;
-pub(crate) mod file_read;
-pub(crate) mod get_file_info;
+
+pub(crate) mod file;
 pub(crate) mod read;
 pub(crate) mod restart;
 pub(crate) mod time;
 
 /// Queued task requiring I/O
 pub(crate) struct AssociationTask {
-    /// Outstation address
-    pub(crate) address: EndpointAddress,
+    /// Destination addresses for tasks
+    pub(crate) dest: FragmentAddr,
     /// Actual task to perform
     pub(crate) details: Task,
 }
 
 impl AssociationTask {
-    pub(crate) fn new(address: EndpointAddress, details: Task) -> Self {
-        Self { address, details }
+    pub(crate) fn new(dest: FragmentAddr, details: Task) -> Self {
+        Self { dest, details }
     }
 }
 
@@ -154,8 +158,16 @@ pub(crate) enum NonReadTask {
     DeadBands(WriteDeadBandsTask),
     /// Generic task for anything that doesn't have response object headers
     EmptyResponseTask(EmptyResponseTask),
-    /// read file from the outstation
+    /// Read file from the outstation
     FileRead(FileReadTask),
+    /// Send username/password and get back an auth key
+    AuthFile(AuthFileTask),
+    /// Open a file on the outstation
+    OpenFile(OpenFileTask),
+    /// Close a file on the outstation
+    CloseFile(CloseFileTask),
+    /// Write a file block
+    WriteFileBlock(WriteBlockTask),
     /// get info about a file
     GetFileInfo(GetFileInfoTask),
 }
@@ -191,6 +203,10 @@ impl RequestWriter for NonReadTask {
             NonReadTask::EmptyResponseTask(t) => t.write(writer)?,
             NonReadTask::FileRead(t) => t.write(writer)?,
             NonReadTask::GetFileInfo(t) => t.write(writer)?,
+            NonReadTask::OpenFile(t) => t.write(writer)?,
+            NonReadTask::CloseFile(t) => t.write(writer)?,
+            NonReadTask::WriteFileBlock(t) => t.write(writer)?,
+            NonReadTask::AuthFile(t) => t.write(writer)?,
         }
         Ok(())
     }
@@ -289,6 +305,10 @@ impl NonReadTask {
             Self::EmptyResponseTask(_) => Some(self),
             Self::FileRead(_) => Some(self),
             Self::GetFileInfo(_) => Some(self),
+            Self::OpenFile(_) => Some(self),
+            Self::CloseFile(_) => Some(self),
+            Self::WriteFileBlock(_) => Some(self),
+            Self::AuthFile(_) => Some(self),
         }
     }
 
@@ -302,6 +322,10 @@ impl NonReadTask {
             Self::EmptyResponseTask(task) => task.function(),
             Self::FileRead(task) => task.function(),
             Self::GetFileInfo(task) => task.function(),
+            Self::OpenFile(task) => task.function(),
+            Self::CloseFile(task) => task.function(),
+            Self::WriteFileBlock(task) => task.function(),
+            Self::AuthFile(task) => task.function(),
         }
     }
 
@@ -315,6 +339,10 @@ impl NonReadTask {
             Self::EmptyResponseTask(task) => task.on_task_error(err),
             Self::FileRead(task) => task.on_task_error(err),
             Self::GetFileInfo(task) => task.on_task_error(err),
+            Self::OpenFile(task) => task.on_task_error(err),
+            Self::CloseFile(task) => task.on_task_error(err),
+            Self::WriteFileBlock(task) => task.on_task_error(err),
+            Self::AuthFile(task) => task.on_task_error(err),
         }
     }
 
@@ -332,6 +360,10 @@ impl NonReadTask {
             Self::EmptyResponseTask(task) => task.handle(response),
             Self::FileRead(task) => task.handle(response).await,
             Self::GetFileInfo(task) => task.handle(response),
+            Self::OpenFile(task) => task.handle(response),
+            Self::CloseFile(task) => task.handle(response),
+            Self::WriteFileBlock(task) => task.handle(response),
+            Self::AuthFile(task) => task.handle(response),
         }
     }
 
@@ -349,6 +381,10 @@ impl NonReadTask {
             Self::EmptyResponseTask(_) => TaskType::GenericEmptyResponse(self.function()),
             Self::FileRead(_) => TaskType::FileRead,
             Self::GetFileInfo(_) => TaskType::GetFileInfo,
+            Self::AuthFile(_) => TaskType::GetFileInfo,
+            Self::OpenFile(_) => TaskType::FileOpen,
+            Self::CloseFile(_) => TaskType::FileClose,
+            Self::WriteFileBlock(_) => TaskType::FileWriteBlock,
         }
     }
 }

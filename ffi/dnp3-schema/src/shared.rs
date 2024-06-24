@@ -1,4 +1,5 @@
 use crate::attributes::DeviceAttrTypes;
+use crate::decoding::DecodeLevels;
 use crate::file::FileDefinitions;
 use crate::gv;
 use oo_bindgen::model::*;
@@ -6,6 +7,7 @@ use std::time::Duration;
 
 pub(crate) struct SharedDefinitions {
     pub error_type: ErrorType<Unvalidated>,
+    pub command_status: EnumHandle,
     pub port_state_listener: AsynchronousInterface,
     pub client_state_listener: AsynchronousInterface,
     pub variation_enum: EnumHandle,
@@ -14,6 +16,7 @@ pub(crate) struct SharedDefinitions {
     pub endpoint_list: ClassHandle,
     pub connect_strategy: FunctionArgStructHandle,
     pub tls_client_config: FunctionArgStructHandle,
+    pub levels: DecodeLevels,
     pub decode_level: UniversalStructHandle,
     pub serial_port_settings: FunctionArgStructHandle,
     pub link_error_mode: EnumHandle,
@@ -21,6 +24,8 @@ pub(crate) struct SharedDefinitions {
     pub control_field_struct: CallbackArgStructHandle,
     pub g12v1_struct: UniversalStructHandle,
     pub function_code: EnumHandle,
+    pub flags: UniversalStructHandle,
+    pub timestamp: UniversalStructHandle,
     pub binary_point: UniversalStructHandle,
     pub binary_it: AbstractIteratorHandle,
     pub double_bit_binary_point: UniversalStructHandle,
@@ -37,13 +42,20 @@ pub(crate) struct SharedDefinitions {
     pub frozen_analog_it: AbstractIteratorHandle,
     pub analog_output_status_point: UniversalStructHandle,
     pub analog_output_status_it: AbstractIteratorHandle,
+    pub binary_command_event_it: AbstractIteratorHandle,
+    pub analog_command_event_it: AbstractIteratorHandle,
+    pub unsigned_integer_it: AbstractIteratorHandle,
     pub _octet_string: FunctionReturnStructHandle,
     pub octet_string_it: AbstractIteratorHandle,
     pub byte_it: AbstractIteratorHandle,
+    pub byte_collection: CollectionHandle,
     pub min_tls_version: EnumHandle,
     pub certificate_mode: EnumHandle,
     pub attr: DeviceAttrTypes,
     pub file: FileDefinitions,
+    pub nothing: EnumHandle,
+    pub udp_socket_mode: EnumHandle,
+    pub link_read_mode: EnumHandle,
 }
 
 pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
@@ -103,11 +115,22 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> 
         .add_error("invalid_private_key", "Invalid private key file")?
         .add_error("invalid_dns_name", "Invalid DNS name")?
         .add_error("other_tls_error", "Other TLS error")?
+        .add_error(
+            "wrong_channel_type",
+            "This operation cannot be performed on this channel type",
+        )?
+        .add_error(
+            "consumed",
+            "This object is consumed and cannot be used again",
+        )?
         .doc("Error type used throughout the library")?
         .build()?;
 
+    let command_status = define_command_status(lib)?;
+
     crate::constants::define(lib)?;
-    let decode_level = crate::decoding::define(lib)?;
+    let levels = crate::decoding::define_levels(lib)?;
+    let decode_level = crate::decoding::define_decode_level_struct(lib, &levels)?;
     let runtime_class = sfio_tokio_ffi::define(lib, error_type.clone())?;
 
     let control_field_struct = lib.declare_callback_argument_struct("control_field")?;
@@ -272,6 +295,14 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> 
         &timestamp_struct,
     )?;
 
+    let binary_command_event_it =
+        define_binary_output_command_iterator(&timestamp_struct, &command_status, lib)?;
+
+    let analog_command_event_it =
+        define_analog_output_command_iterator(&timestamp_struct, &command_status, lib)?;
+
+    let unsigned_integer_it = define_unsigned_integer_iterator(lib)?;
+
     let (octet_string, octet_string_it, byte_it) = build_octet_string(lib)?;
 
     let connect_options = define_connect_options(lib, error_type.clone())?;
@@ -281,7 +312,12 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> 
 
     let attr = crate::attributes::define(lib)?;
 
+    let nothing = define_nothing_enum(lib)?;
+
+    let byte_collection = lib.define_collection("byte_collection", Primitive::U8, true)?;
+
     Ok(SharedDefinitions {
+        command_status,
         error_type,
         port_state_listener: define_port_state_listener(lib)?,
         client_state_listener: define_tcp_client_state_listener(lib)?,
@@ -291,6 +327,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> 
         endpoint_list,
         connect_strategy,
         tls_client_config: tls.tls_client_config,
+        levels,
         decode_level,
         retry_strategy: define_retry_strategy(lib)?,
         serial_port_settings: define_serial_port_settings(lib)?,
@@ -300,6 +337,8 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> 
         control_field_struct,
         g12v1_struct,
         function_code: define_function_code(lib)?,
+        flags: flags_struct,
+        timestamp: timestamp_struct,
         binary_point,
         binary_it,
         double_bit_binary_point,
@@ -316,12 +355,29 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> 
         frozen_analog_it,
         analog_output_status_point,
         analog_output_status_it,
+        binary_command_event_it,
+        analog_command_event_it,
+        unsigned_integer_it,
         _octet_string: octet_string,
         octet_string_it,
         byte_it,
         attr,
-        file: crate::file::define(lib)?,
+        file: crate::file::define(lib, nothing.clone())?,
+        nothing,
+        byte_collection,
+        udp_socket_mode: define_udp_socket_mode(lib)?,
+        link_read_mode: define_line_read_mode(lib)?,
     })
+}
+
+fn define_nothing_enum(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
+    let nothing = lib
+        .define_enum("nothing")?
+        .push("nothing", "The value type is meaningless")?
+        .doc("A single value enum which is used as a placeholder for futures that don't return a value")?
+        .build()?;
+
+    Ok(nothing)
 }
 
 struct TlsTypes {
@@ -848,6 +904,87 @@ fn build_iterator<T: Into<UniversalStructField>>(
 
     Ok((value_struct, value_iterator))
 }
+fn define_binary_output_command_iterator(
+    timestamp_struct: &UniversalStructHandle,
+    command_status: &EnumHandle,
+    lib: &mut LibraryBuilder,
+) -> BackTraced<AbstractIteratorHandle> {
+    let value_struct_decl = lib.declare_universal_struct("binary_output_command_event")?;
+    let value_struct = lib
+        .define_universal_struct(value_struct_decl)?
+        .add("index", Primitive::U16, "Index of the binary command event")?
+        .add("status", command_status.clone(), "Status from processing the command that triggered this event")?
+        .add("commanded_state", Primitive::Bool, doc("Commanded state of the binary output")
+            .details("From the spec:  0 = Latch Off / Trip / NULL, 1 = Latch On / Close. Where the commanded state is unknown, the commanded state flag shall be 0.")
+        )?
+        .add("time", timestamp_struct.clone(), "Associated timestamp")?
+        .doc(
+            doc("Event transferred from master to outstation when the outstation receives a corresponding command.")
+                .details("Maps to group 13 variations 1 and 2.")
+                .details("These objects are part of subset level 4 and are not commonly used.")
+        )?
+        .end_fields()?
+        .add_full_initializer("init")?
+        .build()?;
+
+    let value_iterator =
+        lib.define_iterator("binary_output_command_event_iterator", value_struct.clone())?;
+
+    Ok(value_iterator)
+}
+
+fn define_analog_output_command_iterator(
+    timestamp_struct: &UniversalStructHandle,
+    command_status: &EnumHandle,
+    lib: &mut LibraryBuilder,
+) -> BackTraced<AbstractIteratorHandle> {
+    let analog_command_type = define_analog_command_type(lib)?;
+    let value_struct_decl = lib.declare_universal_struct("analog_output_command_event")?;
+    let value_struct = lib
+        .define_universal_struct(value_struct_decl)?
+        .add("index", Primitive::U16, "Index of the command event")?
+        .add("status", command_status.clone(), "Status from processing the command that triggered this event")?
+        .add("commanded_value", Primitive::Double, doc("Commanded state of the binary output")
+            .details("All of the variations in group 43 are mapped to double-precision floats")
+        )?
+        .add("command_type", analog_command_type, "Describes how the value was encoded in the protocol")?
+        .add("time", timestamp_struct.clone(), "Associated timestamp")?
+        .doc(
+            doc("Event transferred from master to outstation when the outstation receives a corresponding command.")
+                .details("Maps to group 43 variations 1 to 8.")
+                .details("These objects are part of subset level 4 and are not commonly used.")
+        )?
+        .end_fields()?
+        .add_full_initializer("init")?
+        .build()?;
+
+    let value_iterator =
+        lib.define_iterator("analog_output_command_event_iterator", value_struct.clone())?;
+
+    Ok(value_iterator)
+}
+
+fn define_unsigned_integer_iterator(
+    lib: &mut LibraryBuilder,
+) -> BackTraced<AbstractIteratorHandle> {
+    let value_struct_decl = lib.declare_universal_struct("unsigned_integer")?;
+    let value_struct = lib
+        .define_universal_struct(value_struct_decl)?
+        .add("index", Primitive::U16, "Index of the object")?
+        .add("value", Primitive::U8, "Value of the object")?
+        .doc(
+            doc("Unsigned byte corresponding to group 102 variation 1").details(
+                "These objects are not part of any subset level and are not commonly used.",
+            ),
+        )?
+        .end_fields()?
+        .add_full_initializer("init")?
+        .build()?;
+
+    let value_iterator = lib.define_iterator("unsigned_integer_iterator", value_struct.clone())?;
+
+    Ok(value_iterator)
+}
 
 fn build_octet_string(
     lib: &mut LibraryBuilder,
@@ -874,4 +1011,73 @@ fn build_octet_string(
         lib.define_iterator_with_lifetime("octet_string_iterator", octet_string_struct.clone())?;
 
     Ok((octet_string_struct, octet_string_iterator, byte_it))
+}
+
+fn define_command_status(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
+    let command_status = lib.define_enum("command_status")?
+        .push("success", "command was accepted, initiated, or queued (value == 0)")?
+        .push("timeout", "command timed out before completing (value == 1)")?
+        .push("no_select", "command requires being selected before operate, configuration issue (value == 2)")?
+        .push("format_error", "bad control code or timing values (value == 3)")?
+        .push("not_supported", "command is not implemented (value == 4)")?
+        .push("already_active", "command is all ready in progress or its all ready in that mode (value == 5)")?
+        .push("hardware_error", "something is stopping the command, often a local/remote interlock (value == 6)")?
+        .push("local", "the function governed by the control is in local only control (value == 7)")?
+        .push("too_many_ops", "the command has been done too often and has been throttled (value == 8)")?
+        .push("not_authorized", "the command was rejected because the device denied it or an RTU intercepted it (value == 9)")?
+        .push("automation_inhibit", "command not accepted because it was prevented or inhibited by a local automation process, such as interlocking logic or synchrocheck (value == 10)")?
+        .push("processing_limited", "command not accepted because the device cannot process any more activities than are presently in progress (value == 11)")?
+        .push("out_of_range", "command not accepted because the value is outside the acceptable range permitted for this point (value == 12)")?
+        .push("downstream_local", "command not accepted because the outstation is forwarding the request to another downstream device which reported LOCAL (value == 13)")?
+        .push("already_complete", "command not accepted because the outstation has already completed the requested operation (value == 14)")?
+        .push("blocked", "command not accepted because the requested function is specifically blocked at the outstation (value == 15)")?
+        .push("canceled", "command not accepted because the operation was cancelled (value == 16)")?
+        .push("blocked_other_master", "command not accepted because another master is communicating with the outstation and has exclusive rights to operate this control point (value == 17)")?
+        .push("downstream_fail", "command not accepted because the outstation is forwarding the request to another downstream device which cannot be reached or is otherwise incapable of performing the request (value == 18)")?
+        .push("non_participating", "(deprecated) indicates the outstation shall not issue or perform the control operation (value == 126)")?
+        .push("unknown", "captures any value not defined in the enumeration")?
+        .doc("Enumeration received from an outstation in response to command request")?
+        .build()?;
+
+    Ok(command_status)
+}
+fn define_analog_command_type(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
+    let command_status = lib
+        .define_enum("analog_command_type")?
+        .push("i16", "16-bit integer")?
+        .push("i32", "16-bit integer")?
+        .push("f32", "single-precision floating point")?
+        .push("f64", "double-precision floating point")?
+        .doc(doc("Describes the encoding of the commanded value"))?
+        .build()?;
+
+    Ok(command_status)
+}
+
+fn define_udp_socket_mode(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
+    let value = lib
+        .define_enum("udp_socket_mode")?
+        .push("one_to_one", "The UDP endpoint will only communicate with the specified remote endpoint")?
+        .push("one_to_many",
+              doc("The UDP endpoint will accept packets any remote endpoint.")
+                  .details("When this mode is used with an outstation, the outstation will respond to the address from which the request was sent. It will use the supplied remote endpoint only for sending unsolicited responses.")
+        )?
+        .doc("Describes how the UDP socket reads and writes datagrams from remote endpoint(s)")?
+        .build()?;
+
+    Ok(value)
+}
+
+fn define_line_read_mode(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
+    let value = lib
+        .define_enum("link_read_mode")?
+        .push("stream", "Reading from a stream (TCP, serial, etc.) where link-layer frames MAY span separate calls to read")?
+        .push("datagram", "Reading datagrams (UDP) where link-layer frames MAY NOT span separate calls to read")?
+        .doc(
+            doc("Controls how the link-layer parser treats frames that span multiple calls to read of the physical layer.")
+                .details("UDP is unique in that the specification requires that link layer frames be wholly contained within datagrams, but this can be relaxed by configuration.")
+        )?
+        .build()?;
+
+    Ok(value)
 }

@@ -8,9 +8,9 @@ use crate::app::FunctionCode;
 use crate::app::Timestamp;
 use crate::master::association::Association;
 use crate::master::error::{TaskError, TimeSyncError};
-use crate::master::handler::Promise;
+use crate::master::promise::Promise;
 use crate::master::request::TimeSyncProcedure;
-use crate::master::tasks::NonReadTask;
+use crate::master::tasks::{AppTask, NonReadTask, Task};
 
 use tokio::time::Instant;
 
@@ -23,7 +23,13 @@ enum State {
 
 pub(crate) struct TimeSyncTask {
     state: State,
-    promise: Promise<Result<(), TimeSyncError>>,
+    promise: Option<Promise<Result<(), TimeSyncError>>>,
+}
+
+impl From<TimeSyncTask> for Task {
+    fn from(value: TimeSyncTask) -> Self {
+        Task::App(AppTask::NonRead(NonReadTask::TimeSync(value)))
+    }
 }
 
 impl TimeSyncProcedure {
@@ -36,7 +42,7 @@ impl TimeSyncProcedure {
 }
 
 impl TimeSyncTask {
-    fn new(state: State, promise: Promise<Result<(), TimeSyncError>>) -> Self {
+    fn new(state: State, promise: Option<Promise<Result<(), TimeSyncError>>>) -> Self {
         Self { state, promise }
     }
 
@@ -46,7 +52,7 @@ impl TimeSyncTask {
 
     pub(crate) fn get_procedure(
         procedure: TimeSyncProcedure,
-        promise: Promise<Result<(), TimeSyncError>>,
+        promise: Option<Promise<Result<(), TimeSyncError>>>,
     ) -> Self {
         Self::new(procedure.get_start_state(), promise)
     }
@@ -104,12 +110,12 @@ impl TimeSyncTask {
 
     pub(crate) fn on_task_error(self, association: Option<&mut Association>, err: TaskError) {
         match self.promise {
-            Promise::None => {
+            None => {
                 if let Some(association) = association {
                     association.on_time_sync_failure(err.into());
                 }
             }
-            _ => self.promise.complete(Err(err.into())),
+            Some(x) => x.complete(Err(err.into())),
         }
     }
 
@@ -149,22 +155,21 @@ impl TimeSyncTask {
             }
         };
 
-        let objects = match response.objects {
+        let header = match response.get_only_object_header() {
             Ok(x) => x,
             Err(err) => {
-                let err = TaskError::MalformedResponse(err);
+                let err: TaskError = err.into();
                 self.report_error(association, err.into());
                 return Err(err);
             }
         };
 
-        let delay_ms: Option<u16> = objects.get_only_header().and_then(|x| {
-            if let Some(CountVariation::Group52Var2(seq)) = x.details.count() {
+        let delay_ms: Option<u16> =
+            if let Some(CountVariation::Group52Var2(seq)) = header.details.count() {
                 seq.single().map(|x| x.time)
             } else {
                 None
-            }
-        });
+            };
 
         let delay_ms = match delay_ms {
             Some(x) => x,
@@ -287,15 +292,15 @@ impl TimeSyncTask {
 
     fn report_success(self, association: &mut Association) {
         match self.promise {
-            Promise::None => association.on_time_sync_success(),
-            _ => self.promise.complete(Ok(())),
+            None => association.on_time_sync_success(),
+            Some(x) => x.complete(Ok(())),
         }
     }
 
     fn report_error(self, association: &mut Association, error: TimeSyncError) {
         match self.promise {
-            Promise::None => association.on_time_sync_failure(error),
-            _ => self.promise.complete(Err(error)),
+            None => association.on_time_sync_failure(error),
+            Some(x) => x.complete(Err(error)),
         }
     }
 }
@@ -324,6 +329,8 @@ mod tests {
     struct NullAssociationInformation;
     impl AssociationInformation for NullAssociationInformation {}
 
+    use crate::transport::FragmentAddr;
+    use crate::util::phys::PhysAddr;
     use scursor::WriteCursor;
 
     use super::*;
@@ -375,17 +382,21 @@ mod tests {
         Association,
         tokio::sync::oneshot::Receiver<Result<(), TimeSyncError>>,
     ) {
+        let dest = FragmentAddr {
+            link: EndpointAddress::try_new(1).unwrap(),
+            phys: PhysAddr::None,
+        };
+
         let system_time = Timestamp::try_from_system_time(SystemTime::now()).unwrap();
         let association = Association::new(
-            EndpointAddress::try_new(1).unwrap(),
+            dest,
             AssociationConfig::default(),
             Box::new(NullReadHandler),
             handler(system_time),
             Box::new(NullAssociationInformation),
         );
-        let (tx, rx) = tokio::sync::oneshot::channel();
-        let task =
-            NonReadTask::TimeSync(TimeSyncTask::get_procedure(procedure, Promise::OneShot(tx)));
+        let (promise, rx) = Promise::one_shot();
+        let task = NonReadTask::TimeSync(TimeSyncTask::get_procedure(procedure, Some(promise)));
 
         (task, system_time, association, rx)
     }

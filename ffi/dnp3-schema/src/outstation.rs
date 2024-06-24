@@ -482,6 +482,46 @@ fn define_outstation(
         )?
         .build_static("create_serial_session_2")?;
 
+    let udp_config = define_outstation_udp_config(lib, shared)?;
+
+    let outstation_create_udp = lib
+        .define_function("outstation_create_udp")?
+        .param(
+            "runtime",
+            shared.runtime_class.clone(),
+            "runtime on which to spawn the outstation",
+        )?
+        .param("udp_config", udp_config, "UDP configuration")?
+        .param(
+            "config",
+            types.outstation_config.clone(),
+            "outstation configuration",
+        )?
+        .param(
+            "application",
+            types.outstation_application.clone(),
+            "application interface",
+        )?
+        .param(
+            "information",
+            types.outstation_information.clone(),
+            "informational events interface",
+        )?
+        .param(
+            "control_handler",
+            types.control_handler.clone(),
+            "control handler interface",
+        )?
+        .returns(
+            outstation.clone(),
+            "Outstation instance or {null} if the port cannot be opened",
+        )?
+        .fails_with(shared.error_type.clone())?
+        .doc(
+            doc("Create an outstation instance running on a serial port which is tolerant to the serial port being added and removed")
+        )?
+        .build_static("create_udp")?;
+
     let destructor = lib.define_destructor(
         outstation.clone(),
         doc("Free resources of the outstation.").warning("This does not shutdown the outstation. Only {class:outstation_server.[destructor]} will properly shutdown the outstation.")
@@ -524,6 +564,7 @@ fn define_outstation(
         .static_method(outstation_create_serial_session_2_fn)?
         .static_method(outstation_create_tcp_client_fn)?
         .static_method(outstation_create_tls_client_fn)?
+        .static_method(outstation_create_udp)?
         .method(enable)?
         .method(disable)?
         .method(execute_transaction)?
@@ -532,6 +573,59 @@ fn define_outstation(
         .build()?;
 
     Ok(outstation)
+}
+
+fn define_outstation_udp_config(
+    lib: &mut LibraryBuilder,
+    shared: &SharedDefinitions,
+) -> BackTraced<FunctionArgStructHandle> {
+    let value = lib.declare_function_argument_struct("outstation_udp_config")?;
+
+    let retry_delay = Name::create("retry_delay")?;
+    let link_read_mode = Name::create("link_read_mode")?;
+    let socket_mode = Name::create("socket_mode")?;
+
+    let value = lib
+        .define_function_argument_struct(value)?
+        .add(
+            "local_endpoint",
+            StringType,
+            "Local endpoint to which the UDP socket is bound. Must be a socket address (ip:port)",
+        )?
+        .add(
+            "remote_endpoint",
+            StringType,
+            "Remote endpoint where outbound requests are sent. Must be a socket address (ip:port)",
+        )?
+        .add(
+            "socket_mode",
+            shared.udp_socket_mode.clone(),
+            "UDP socket mode to use",
+        )?
+        .add(
+            link_read_mode.clone(),
+            shared.link_read_mode.clone(),
+            "Read mode to use, this should typically be set to {enum:link_read_mode.datagram}",
+        )?
+        .add(
+            retry_delay.clone(),
+            DurationType::Milliseconds,
+            "Period to wait before retrying after a failure to bind or connect the UDP socket",
+        )?
+        .doc("UDP outstation configuration")?
+        .end_fields()?
+        .begin_initializer(
+            "init",
+            InitializerType::Normal,
+            "Initialize the configuration with default settings for unspecified parameter",
+        )?
+        .default(&retry_delay, Duration::from_secs(5))?
+        .default_variant(&link_read_mode, "datagram")?
+        .default_variant(&socket_mode, "one_to_one")?
+        .end_initializer()?
+        .build()?;
+
+    Ok(value)
 }
 
 fn define_class_zero_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
@@ -1232,8 +1326,6 @@ fn define_control_handler(
     database_handle: &ClassHandle,
     shared_def: &SharedDefinitions,
 ) -> BackTraced<AsynchronousInterface> {
-    let command_status = define_command_status(lib)?;
-
     let operate_type = lib
         .define_enum("operate_type")?
         .push(
@@ -1277,7 +1369,7 @@ fn define_control_handler(
             database_handle.declaration(),
             "Database handle",
         )?
-        .returns(command_status.clone(), "Command status")?
+        .returns(shared_def.command_status.clone(), "Command status")?
         .end_callback()?
         //------
         .begin_callback("operate_g12v1", "Operate a control point")?
@@ -1289,7 +1381,7 @@ fn define_control_handler(
             database_handle.declaration(),
             "Database handle",
         )?
-        .returns(command_status.clone(), "Command status")?
+        .returns(shared_def.command_status.clone(), "Command status")?
         .end_callback()?
         //------
         .begin_callback("select_g41v1", select_g40_doc.clone())?
@@ -1300,7 +1392,7 @@ fn define_control_handler(
             database_handle.declaration(),
             "Database handle",
         )?
-        .returns(command_status.clone(), "Command status")?
+        .returns(shared_def.command_status.clone(), "Command status")?
         .end_callback()?
         //------
         .begin_callback("operate_g41v1", "Operate a control point")?
@@ -1312,7 +1404,7 @@ fn define_control_handler(
             database_handle.declaration(),
             "Database handle",
         )?
-        .returns(command_status.clone(), "Command status")?
+        .returns(shared_def.command_status.clone(), "Command status")?
         .end_callback()?
         //------
         .begin_callback("select_g41v2", select_g40_doc.clone())?
@@ -1323,7 +1415,7 @@ fn define_control_handler(
             database_handle.declaration(),
             "Database handle",
         )?
-        .returns(command_status.clone(), "Command status")?
+        .returns(shared_def.command_status.clone(), "Command status")?
         .end_callback()?
         //------
         .begin_callback("operate_g41v2", "Operate a control point")?
@@ -1335,7 +1427,7 @@ fn define_control_handler(
             database_handle.declaration(),
             "Database handle",
         )?
-        .returns(command_status.clone(), "Command status")?
+        .returns(shared_def.command_status.clone(), "Command status")?
         .end_callback()?
         //------
         .begin_callback("select_g41v3", select_g40_doc.clone())?
@@ -1346,7 +1438,7 @@ fn define_control_handler(
             database_handle.declaration(),
             "Database handle",
         )?
-        .returns(command_status.clone(), "Command status")?
+        .returns(shared_def.command_status.clone(), "Command status")?
         .end_callback()?
         //------
         .begin_callback("operate_g41v3", "Operate a control point")?
@@ -1358,7 +1450,7 @@ fn define_control_handler(
             database_handle.declaration(),
             "Database handle",
         )?
-        .returns(command_status.clone(), "Command status")?
+        .returns(shared_def.command_status.clone(), "Command status")?
         .end_callback()?
         //------
         .begin_callback("select_g41v4", select_g40_doc)?
@@ -1369,7 +1461,7 @@ fn define_control_handler(
             database_handle.declaration(),
             "Database handle",
         )?
-        .returns(command_status.clone(), "Command status")?
+        .returns(shared_def.command_status.clone(), "Command status")?
         .end_callback()?
         //------
         .begin_callback("operate_g41v4", "Operate a control point")?
@@ -1381,7 +1473,7 @@ fn define_control_handler(
             database_handle.declaration(),
             "Database handle",
         )?
-        .returns(command_status, "Command status")?
+        .returns(shared_def.command_status.clone(), "Command status")?
         .end_callback()?
         //------
         .build_async()?;
@@ -1507,33 +1599,4 @@ fn define_tls_server_config(
         .build()?;
 
     Ok(tls_server_config)
-}
-
-fn define_command_status(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
-    let command_status = lib.define_enum("command_status")?
-    .push("success", "command was accepted, initiated, or queued (value == 0)")?
-    .push("timeout", "command timed out before completing (value == 1)")?
-    .push("no_select", "command requires being selected before operate, configuration issue (value == 2)")?
-    .push("format_error", "bad control code or timing values (value == 3)")?
-    .push("not_supported", "command is not implemented (value == 4)")?
-    .push("already_active", "command is all ready in progress or its all ready in that mode (value == 5)")?
-    .push("hardware_error", "something is stopping the command, often a local/remote interlock (value == 6)")?
-    .push("local", "the function governed by the control is in local only control (value == 7)")?
-    .push("too_many_ops", "the command has been done too often and has been throttled (value == 8)")?
-    .push("not_authorized", "the command was rejected because the device denied it or an RTU intercepted it (value == 9)")?
-    .push("automation_inhibit", "command not accepted because it was prevented or inhibited by a local automation process, such as interlocking logic or synchrocheck (value == 10)")?
-    .push("processing_limited", "command not accepted because the device cannot process any more activities than are presently in progress (value == 11)")?
-    .push("out_of_range", "command not accepted because the value is outside the acceptable range permitted for this point (value == 12)")?
-    .push("downstream_local", "command not accepted because the outstation is forwarding the request to another downstream device which reported LOCAL (value == 13)")?
-    .push("already_complete", "command not accepted because the outstation has already completed the requested operation (value == 14)")?
-    .push("blocked", "command not accepted because the requested function is specifically blocked at the outstation (value == 15)")?
-    .push("canceled", "command not accepted because the operation was cancelled (value == 16)")?
-    .push("blocked_other_master", "command not accepted because another master is communicating with the outstation and has exclusive rights to operate this control point (value == 17)")?
-    .push("downstream_fail", "command not accepted because the outstation is forwarding the request to another downstream device which cannot be reached or is otherwise incapable of performing the request (value == 18)")?
-    .push("non_participating", "(deprecated) indicates the outstation shall not issue or perform the control operation (value == 126)")?
-    .push("unknown", "captures any value not defined in the enumeration")?
-    .doc("Enumeration received from an outstation in response to command request")?
-    .build()?;
-
-    Ok(command_status)
 }

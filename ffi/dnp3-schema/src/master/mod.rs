@@ -1,5 +1,6 @@
 pub(crate) mod read_handler;
 pub(crate) mod request;
+pub(crate) mod server;
 pub(crate) mod write_dead_band_request;
 
 use crate::shared::SharedDefinitions;
@@ -13,14 +14,8 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
 
     let master_channel_class = lib.declare_class("master_channel")?;
 
-    let nothing = lib
-        .define_enum("nothing")?
-        .push("nothing", "the only value this enum has")?
-        .doc("A single value enum which is used as a placeholder for futures that don't return a value")?
-        .build()?;
-
     let write_dead_band_request = crate::master::write_dead_band_request::define(lib)?;
-    let empty_response_callback = define_empty_response_callback(lib, nothing.clone())?;
+    let empty_response_callback = define_empty_response_callback(lib, shared.nothing.clone())?;
 
     let master_channel_create_tcp_fn = lib
         .define_function("master_channel_create_tcp")?
@@ -116,7 +111,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         .param("config",master_channel_config.clone(), "Generic configuration for the channel")?
         .param("path", StringType, "Path to the serial device. Generally /dev/tty0 on Linux and COM1 on Windows.")?
         .param("serial_params",shared.serial_port_settings.clone(), "Serial port settings")?
-        .param("open_retry_delay", DurationType::Milliseconds, "delay between attempts to open the serial port")?
+        .param("open_retry_delay", DurationType::Milliseconds, "Delay between attempts to open the serial port")?
         .param("listener",shared.port_state_listener.clone(), "Listener to receive updates on the status of the serial port")?
         .returns(master_channel_class.clone(), "Handle to the master created, {null} if an error occurred")?
         .fails_with(shared.error_type.clone())?
@@ -125,6 +120,21 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
                 .details("The returned master must be gracefully shutdown with {class:master_channel.[destructor]} when done.")
         )?
         .build_static("create_serial_channel")?;
+
+    let master_channel_create_udp_fn = lib
+        .define_function("master_channel_create_udp")?
+        .param("runtime",shared.runtime_class.clone(), "Runtime to use to drive asynchronous operations of the master")?
+        .param("config",master_channel_config.clone(), "Generic configuration for the channel")?
+        .param("local_endpoint", StringType, "Local endpoint on which to bind the UDP socket")?
+        .param("link_read_mode", shared.link_read_mode.clone(), "Determines how the link-layer parser treats frame that span datagrams. Typically set to {enum:link_read_mode.datagram}")?
+        .param("retry_delay", DurationType::Milliseconds, "Amount of time to wait after a failed attempt to bind the UDP socket")?
+        .returns(master_channel_class.clone(), "Handle to the master created, {null} if an error occurred")?
+        .fails_with(shared.error_type.clone())?
+        .doc(
+            doc("Create a UDP master channel on the local endpoint")
+                .details("The returned master must be gracefully shutdown with {class:master_channel.[destructor]} when done.")
+        )?
+        .build_static("create_udp_channel")?;
 
     let channel_destructor = lib.define_destructor(
         master_channel_class.clone(),
@@ -190,7 +200,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         )?
         .param(
             "config",
-            master_channel_config,
+            master_channel_config.clone(),
             "Generic configuration for the channel",
         )?
         .param(
@@ -259,6 +269,43 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
             Primitive::U16,
             "DNP3 data-link address of the remote outstation",
         )?
+        .param(
+            "config",
+            association_config.clone(),
+            "Association configuration",
+        )?
+        .param(
+            "read_handler",
+            read_handler.clone(),
+            "Interface uses to load measurement data",
+        )?
+        .param(
+            "association_handler",
+            association_handler_interface.clone(),
+            "Association specific callbacks such as time synchronization",
+        )?
+        .param(
+            "association_information",
+            association_information_interface.clone(),
+            "Association information interface",
+        )?
+        .returns(association_id.clone(), "Id of the association")?
+        .fails_with(shared.error_type.clone())?
+        .doc("Add an association to the channel")?
+        .build()?;
+
+    let add_udp_association_method = lib
+        .define_method("add_udp_association", master_channel_class.clone())?
+        .param(
+            "address",
+            Primitive::U16,
+            "DNP3 data-link address of the remote outstation",
+        )?
+        .param(
+            "destination",
+            StringType,
+            "IP address and port of the outstation",
+        )?
         .param("config", association_config, "Association configuration")?
         .param(
             "read_handler",
@@ -277,7 +324,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         )?
         .returns(association_id.clone(), "Id of the association")?
         .fails_with(shared.error_type.clone())?
-        .doc("Add an association to the channel")?
+        .doc("Add a UDP association to the channel")?
         .build()?;
 
     let remove_association_method = lib
@@ -339,7 +386,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         .doc("Get the decoding level for the channel")?
         .build()?;
 
-    let read_callback = define_read_callback(lib, nothing.clone())?;
+    let read_callback = define_read_callback(lib, shared.nothing.clone())?;
 
     let read_async = lib
         .define_future_method("read", master_channel_class.clone(), read_callback.clone())?
@@ -417,7 +464,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
 
     let command = define_command_builder(lib, shared)?;
     let command_mode = define_command_mode(lib)?;
-    let command_cb = define_command_callback(lib, nothing.clone())?;
+    let command_cb = define_command_callback(lib, shared.nothing.clone())?;
 
     let operate_async = lib
         .define_future_method("operate", master_channel_class.clone(), command_cb)?
@@ -433,7 +480,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         .build()?;
 
     let time_sync_mode = define_time_sync_mode(lib)?;
-    let time_sync_cb = define_time_sync_callback(lib, nothing.clone())?;
+    let time_sync_cb = define_time_sync_callback(lib, shared.nothing.clone())?;
 
     let perform_time_sync_async = lib
         .define_future_method(
@@ -517,6 +564,79 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         .fails_with(shared.error_type.clone())?
         .build()?;
 
+    let get_file_auth_key_async = lib
+        .define_future_method(
+            "get_file_auth_key",
+            master_channel_class.clone(),
+            shared.file.file_auth_cb.clone(),
+        )?
+        .param(
+            "association",
+            association_id.clone(),
+            "Id of the association",
+        )?
+        .param("username", StringType, "User name")?
+        .param("password", StringType, "Password")?
+        .fails_with(shared.error_type.clone())?
+        .doc("Obtain a file authentication key")?
+        .build()?;
+
+    let open_file_async = lib
+        .define_future_method("open_file", master_channel_class.clone(), shared.file.file_open_cb.clone())?
+        .param(
+            "association",
+            association_id.clone(),
+            "Id of the association",
+        )?
+        .param("file_name", StringType, "Complete path to the remote file")?
+        .param("auth_key", Primitive::U32, "Optional authentication key (0 == None)")?
+        .param("permissions", shared.file.permissions.clone(), "Permissions sent in the file open request")?
+        .param(
+            "file_size",
+            Primitive::U32,
+            "File size sent in the request (zero when reading). When writing use the actual file size or 0xFFFFFFFF to indicate the size is unknown"
+        )?
+        .param("file_mode", shared.file.file_mode.clone(), "Mode used to open the file")?
+        .param("max_block_size", Primitive::U16, "Requested maximum block size")?
+        .fails_with(shared.error_type.clone())?
+        .doc("Asynchronously open a file")?
+        .build()?;
+
+    let write_file_block_async = lib
+        .define_future_method("write_file_block", master_channel_class.clone(), shared.file.file_op_cb.clone())?
+        .param(
+            "association",
+            association_id.clone(),
+            "Id of the association",
+        )?
+        .param("handle", Primitive::U32, "Handle returned when the file was opened")?
+        .param("block_number", Primitive::U32, "Sequential block number in the range [0 .. 0x7FFFFFFF]. The top bit is indicates the final block")?
+        .param("final_block", Primitive::Bool, "Indicate that this is the final block")?
+        .param("block_data", shared.byte_collection.clone(), "Collection of bytes. This must not be larger than the maximum block size returned by the outstation")?
+        .fails_with(shared.error_type.clone())?
+        .doc("Asynchronously write a block of file data to the outstation")?
+        .build()?;
+
+    let close_file_async = lib
+        .define_future_method(
+            "close_file",
+            master_channel_class.clone(),
+            shared.file.file_op_cb.clone(),
+        )?
+        .param(
+            "association",
+            association_id.clone(),
+            "Id of the association",
+        )?
+        .param(
+            "handle",
+            Primitive::U32,
+            "Handle returned when the file was opened",
+        )?
+        .fails_with(shared.error_type.clone())?
+        .doc("Asynchronously close a file")?
+        .build()?;
+
     let get_file_info_async = lib
         .define_future_method("get_file_info", master_channel_class.clone(), file_info_cb)?
         .param(
@@ -594,7 +714,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         )?
         .build()?;
 
-    let link_status_cb = define_link_status_callback(lib, nothing)?;
+    let link_status_cb = define_link_status_callback(lib, shared.nothing.clone())?;
 
     let check_link_status_async = lib
         .define_future_method(
@@ -607,16 +727,18 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         .doc("Asynchronously perform a link status check")?
         .build()?;
 
-    lib.define_class(&master_channel_class)?
+    let master_channel_class = lib.define_class(&master_channel_class)?
         .destructor(channel_destructor)?
         .static_method(master_channel_create_tcp_fn)?
         .static_method(master_channel_create_tcp_2_fn)?
         .static_method(master_channel_create_tls_fn)?
         .static_method(master_channel_create_tls_2_fn)?
         .static_method(master_channel_create_serial_fn)?
+        .static_method(master_channel_create_udp_fn)?
         .method(enable_method)?
         .method(disable_method)?
         .method(add_association_method)?
+        .method(add_udp_association_method)?
         .method(remove_association_method)?
         .method(set_decode_level_method)?
         .method(get_decode_level_method)?
@@ -634,6 +756,10 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         .async_method(write_dead_bands_async)?
         .async_method(send_and_expect_empty_response)?
         .async_method(get_file_info_async)?
+        .async_method(get_file_auth_key_async)?
+        .async_method(open_file_async)?
+        .async_method(write_file_block_async)?
+        .async_method(close_file_async)?
         .async_method(read_directory_async)?
         .async_method(read_directory_with_auth_async)?
         .async_method(check_link_status_async)?
@@ -644,6 +770,13 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
                 .warning("The class methods that return a value (e.g. as {class:master_channel.add_association()}) cannot be called from within a callback.")
         )?
         .build()?;
+
+    server::define_server_components(
+        lib,
+        shared,
+        master_channel_config.clone(),
+        master_channel_class.declaration(),
+    )?;
 
     Ok(())
 }
@@ -806,16 +939,16 @@ fn define_association_config(
 fn define_master_channel_config(
     lib: &mut LibraryBuilder,
     shared: &SharedDefinitions,
-) -> BackTraced<FunctionArgStructHandle> {
-    let config = lib.declare_function_argument_struct("master_channel_config")?;
+) -> BackTraced<UniversalStructHandle> {
+    let config = lib.declare_universal_struct("master_channel_config")?;
 
     let decode_level = Name::create("decode_level")?;
 
     let tx_buffer_size = Name::create("tx_buffer_size")?;
     let rx_buffer_size = Name::create("rx_buffer_size")?;
 
-    let config = lib.define_function_argument_struct(config)?
-        .doc("Generic configuration for a MasterChannel")?
+    let config = lib.define_universal_struct(config)?
+        .doc("Configuration for a MasterChannel that is independent of the physical layer")?
         .add("address", Primitive::U16, "Local DNP3 data-link address")?
         .add(decode_level.clone(), shared.decode_level.clone(), "Decoding level for this master. You can modify this later on with {class:master_channel.set_decode_level()}.")?
         .add(tx_buffer_size.clone(), Primitive::U16, doc("TX buffer size").details("Must be at least 249"))?
@@ -902,6 +1035,13 @@ fn define_association_information(
         )?
         .push("file_read", "Read a file from the outstation")?
         .push("get_file_info", "Get information about a file")?
+        .push(
+            "file_auth",
+            "Send username and password and get back an auth key from the outstation",
+        )?
+        .push("file_open", "Open a file on the outstation")?
+        .push("file_write_block", "Write a file block to the outstation")?
+        .push("file_close", "Close a file on the outstation")?
         .doc("Task type used in {interface:association_information}")?
         .build()?;
 

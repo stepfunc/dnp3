@@ -2,8 +2,8 @@ use crate::app::parse::parser::{FragmentDisplay, ParsedFragment};
 use crate::app::EndpointType;
 use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
-use crate::link::header::AnyAddress;
 use crate::link::EndpointAddress;
+use crate::transport::FragmentAddr;
 use crate::util::phys::PhysLayer;
 
 /// This type definition is used so that we can mock the transport writer during testing.
@@ -32,7 +32,7 @@ impl TransportWriter {
         &mut self,
         io: &mut PhysLayer,
         level: DecodeLevel,
-        destination: AnyAddress,
+        destination: FragmentAddr,
         fragment: &[u8],
     ) -> Result<(), LinkError> {
         if level.application.enabled() {
@@ -44,14 +44,12 @@ impl TransportWriter {
         self.inner.write(io, level, destination, fragment).await
     }
 
-    pub(crate) async fn write_link_status_request(
+    pub(crate) async fn send_link_status_request(
         &mut self,
         io: &mut PhysLayer,
         level: DecodeLevel,
-        destination: AnyAddress,
+        dest: FragmentAddr,
     ) -> Result<(), LinkError> {
-        self.inner
-            .write_link_status_request(io, level, destination)
-            .await
+        self.inner.write_link_status_request(io, dest, level).await
     }
 }

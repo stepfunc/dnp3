@@ -10,37 +10,56 @@
     "atty",
     "autocfg",
     "backtrace",
+    "bindgen",
     "cc",
+    "cexpr",
+    "clang-sys",
     "clap",
     "clap_builder",
     "clap_derive",
     "clap_lex",
+    "cmake",
     "colorchoice",
     "concolor-override",
     "concolor-query",
     "dunce",
+    "either",
     "errno",
+    "fs_extra",
     "gimli",
+    "glob",
     "heck",
+    "home",
     "io-lifetimes",
     "is-terminal",
-    "miniz_oxide",
+    "is_terminal_polyfill",
+    "itertools",
+    "lazycell",
+    "libloading",
     "linux-raw-sys",
+    "mirai-annotations",
+    "minimal-lexical",
+    "miniz_oxide",
+    "nom",
     "object",
     "oo-bindgen",
     "os_str_bytes",
+    "paste",
     "pathdiff",
     "pest",
     "platforms",
+    "prettyplease",
     "proc-macro-error",
     "proc-macro-error-attr",
     "dnp3-schema",
     "rustc-demangle",
+    "rustc-hash",
     "rustix",
     "same-file",
     "semver",
     "semver-parser",
     "serde_derive",
+    "shlex",
     "strsim",
     "termcolor",
     "ucd-trie",
@@ -48,6 +67,7 @@
     "utf8parse",
     "version_check",
     "walkdir",
+    "which",
     "winapi-util"
   ],
   "vendor": {
@@ -710,6 +730,21 @@
         }
       ]
     },
+    "io-kit-sys": {
+      "id": "io-kit-sys",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2017-2018 Junji Takakura"
+              ]
+            }
+          }
+        }
+      ]
+    },
     "itoa": {
       "id": "itoa",
       "source": "crates.io",
@@ -917,6 +952,22 @@
         }
       ]
     },
+    "nu-ansi-term": {
+      "id": "nu-ansi-term",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2014 Benjamin Sago",
+                "Copyright (c) 2021-2022 The Nushell Project Developers"
+              ]
+            }
+          }
+        }
+      ]
+    },
     "num-integer": {
       "id": "num-integer",
       "source": "crates.io",
@@ -974,6 +1025,21 @@
       ]
     },
     "opaque-debug": {
+      "id": "opaque-debug",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2018-2019 The RustCrypto Project Developers"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "overload": {
       "id": "opaque-debug",
       "source": "crates.io",
       "licenses": [
@@ -1215,6 +1281,21 @@
             "copyright": {
               "Lines": [
                 "Copyright (c) 2016 Joseph Birr-Pixton <jpixton@gmail.com>"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "rustls-pki-types": {
+      "id": "rustls-pki-types",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2023 Dirkjan Ochtman <dirkjan@ochtman.nl>"
               ]
             }
           }
@@ -1691,6 +1772,21 @@
             "copyright": {
               "Lines": [
                 "Copyright (c) 2014 Paho Lurie-Gregg"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "unescaper": {
+      "id": "unescaper",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2023 Hack Ink"
               ]
             }
           }

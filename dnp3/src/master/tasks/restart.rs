@@ -4,8 +4,8 @@ use crate::app::gen::count::CountVariation;
 use crate::app::parse::parser::Response;
 use crate::app::FunctionCode;
 use crate::master::error::TaskError;
-use crate::master::handler::Promise;
-use crate::master::tasks::NonReadTask;
+use crate::master::promise::Promise;
+use crate::master::tasks::{AppTask, NonReadTask, Task};
 
 /// Type of restart to request
 pub(crate) enum RestartType {
@@ -23,6 +23,12 @@ pub(crate) enum RestartType {
 pub(crate) struct RestartTask {
     restart_type: RestartType,
     promise: Promise<Result<Duration, TaskError>>,
+}
+
+impl From<RestartTask> for Task {
+    fn from(value: RestartTask) -> Self {
+        Task::App(AppTask::NonRead(NonReadTask::Restart(value)))
+    }
 }
 
 impl RestartType {
@@ -45,10 +51,6 @@ impl RestartTask {
         }
     }
 
-    pub(crate) fn wrap(self) -> NonReadTask {
-        NonReadTask::Restart(self)
-    }
-
     pub(crate) fn function(&self) -> FunctionCode {
         self.restart_type.function()
     }
@@ -58,21 +60,12 @@ impl RestartTask {
     }
 
     pub(crate) fn handle(self, response: Response) -> Result<Option<NonReadTask>, TaskError> {
-        let headers = match response.objects {
+        let header = match response.get_only_object_header() {
             Ok(x) => x,
             Err(err) => {
-                self.promise
-                    .complete(Err(TaskError::MalformedResponse(err)));
-                return Err(TaskError::MalformedResponse(err));
-            }
-        };
-
-        let header = match headers.get_only_header() {
-            Some(x) => x,
-            None => {
-                self.promise
-                    .complete(Err(TaskError::UnexpectedResponseHeaders));
-                return Err(TaskError::UnexpectedResponseHeaders);
+                let err: TaskError = err.into();
+                self.promise.complete(Err(err));
+                return Err(err);
             }
         };
 

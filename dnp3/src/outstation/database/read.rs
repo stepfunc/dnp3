@@ -218,6 +218,9 @@ impl ReadHeader {
                 )
                 .into(),
             ),
+            // group 13
+            AllObjectsVariation::Group13Var1 => None,
+            AllObjectsVariation::Group13Var2 => None,
             // group 20
             AllObjectsVariation::Group20Var0 => Some(StaticReadHeader::Counter(None, None).into()),
             AllObjectsVariation::Group20Var1 => Some(
@@ -613,6 +616,15 @@ impl ReadHeader {
                 )
                 .into(),
             ),
+            // group 43,
+            AllObjectsVariation::Group43Var1 => None,
+            AllObjectsVariation::Group43Var2 => None,
+            AllObjectsVariation::Group43Var3 => None,
+            AllObjectsVariation::Group43Var4 => None,
+            AllObjectsVariation::Group43Var5 => None,
+            AllObjectsVariation::Group43Var6 => None,
+            AllObjectsVariation::Group43Var7 => None,
+            AllObjectsVariation::Group43Var8 => None,
             // group 60
             AllObjectsVariation::Group60Var1 => Some(StaticReadHeader::Class0.into()),
             AllObjectsVariation::Group60Var2 => Some(EventReadHeader::Class1(None).into()),
@@ -620,6 +632,9 @@ impl ReadHeader {
             AllObjectsVariation::Group60Var4 => Some(EventReadHeader::Class3(None).into()),
             // group 80
             AllObjectsVariation::Group80Var1 => None,
+            // group 102
+            AllObjectsVariation::Group102Var0 => None,
+            AllObjectsVariation::Group102Var1 => None,
             // group 110
             AllObjectsVariation::Group110Var0 => Some(StaticReadHeader::OctetString(None).into()),
             // group 111
@@ -683,6 +698,8 @@ impl ReadHeader {
                 )
                 .into(),
             ),
+            CountVariation::Group13Var1 => None,
+            CountVariation::Group13Var2 => None,
             CountVariation::Group22Var0 => Some(EventReadHeader::Counter(None, Some(count)).into()),
             CountVariation::Group22Var1 => Some(
                 EventReadHeader::Counter(Some(EventCounterVariation::Group22Var1), Some(count))
@@ -882,6 +899,14 @@ impl ReadHeader {
                 )
                 .into(),
             ),
+            CountVariation::Group43Var1 => None,
+            CountVariation::Group43Var2 => None,
+            CountVariation::Group43Var3 => None,
+            CountVariation::Group43Var4 => None,
+            CountVariation::Group43Var5 => None,
+            CountVariation::Group43Var6 => None,
+            CountVariation::Group43Var7 => None,
+            CountVariation::Group43Var8 => None,
             CountVariation::Group50Var1(_) => None,
             CountVariation::Group50Var2(_) => None,
             CountVariation::Group50Var3(_) => None,
@@ -1179,6 +1204,9 @@ impl ReadHeader {
             ),
             // group 80
             RangedVariation::Group80Var1(_) => None,
+            // group 102
+            RangedVariation::Group102Var0 => None,
+            RangedVariation::Group102Var1(_) => None,
             // group 110
             RangedVariation::Group110Var0 => {
                 Some(StaticReadHeader::OctetString(Some(range)).into())

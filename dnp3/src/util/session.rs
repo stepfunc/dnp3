@@ -21,6 +21,15 @@ pub(crate) enum StopReason {
     Shutdown,
 }
 
+impl std::fmt::Display for StopReason {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            StopReason::Disable => write!(f, "disabled"),
+            StopReason::Shutdown => write!(f, "shutdown"),
+        }
+    }
+}
+
 /// Communication sessions might terminate due to being explicitly stopped or because their was some I/O error
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum RunError {
@@ -28,6 +37,15 @@ pub(crate) enum RunError {
     Stop(StopReason),
     /// Error occurred due to underlying I/O or bad link data
     Link(LinkError),
+}
+
+impl std::fmt::Display for RunError {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        match self {
+            RunError::Stop(err) => write!(f, "{err}"),
+            RunError::Link(err) => write!(f, "{err}"),
+        }
+    }
 }
 
 impl From<Shutdown> for StopReason {

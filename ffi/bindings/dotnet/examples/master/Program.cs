@@ -141,6 +141,42 @@ class MainClass
             }
         }
 
+        void IReadHandler.HandleBinaryOutputCommandEvent(HeaderInfo info, ICollection<BinaryOutputCommandEvent> values)
+        {
+            Console.WriteLine("Binary Output Command Events:");
+            Console.WriteLine("Qualifier: " + info.Qualifier);
+            Console.WriteLine("Variation: " + info.Variation);
+
+            foreach (var val in values)
+            {
+                Console.WriteLine($"BOCE {val.Index}: Value={val.CommandedState} Status={val.Status} Time={val.Time.Value} ({val.Time.Quality})");
+            }
+        }
+
+        void IReadHandler.HandleAnalogOutputCommandEvent(HeaderInfo info, ICollection<AnalogOutputCommandEvent> values)
+        {
+            Console.WriteLine("Analog Output Command Events:");
+            Console.WriteLine("Qualifier: " + info.Qualifier);
+            Console.WriteLine("Variation: " + info.Variation);
+
+            foreach (var val in values)
+            {
+                Console.WriteLine($"AOCE {val.Index}: Value={val.CommandedValue} Type={val.CommandType} Status={val.Status} Time={val.Time.Value} ({val.Time.Quality})");
+            }
+        }
+
+        void IReadHandler.HandleUnsignedInteger(HeaderInfo info, ICollection<UnsignedInteger> values)
+        {
+            Console.WriteLine("Unsigned Integers:");
+            Console.WriteLine("Qualifier: " + info.Qualifier);
+            Console.WriteLine("Variation: " + info.Variation);
+
+            foreach (var val in values)
+            {
+                Console.WriteLine($"{val.Index}: Value={val.Value}");
+            }
+        }
+
         public void HandleOctetString(HeaderInfo info, ICollection<OctetString> values)
         {
             Console.WriteLine("Octet Strings:");
@@ -205,6 +241,8 @@ class MainClass
         {
             Console.WriteLine($"Bit-string attribute: {attr} set: {set} variation: {var} length: {value.Count}");
         }
+
+        
     }
     // ANCHOR_END: read_handler
 
@@ -328,6 +366,39 @@ class MainClass
         }
     }
 
+    private static void RunUdp(Runtime runtime)
+    {
+        // ANCHOR: create_udp_channel
+        var channel = MasterChannel.CreateUdpChannel(
+            runtime,
+            GetMasterChannelConfig(),
+            "127.0.0.1:20001",
+            LinkReadMode.Datagram,
+            TimeSpan.FromSeconds(5)
+        );
+        // ANCHOR_END: create_serial_channel
+
+        try
+        {
+            // ANCHOR: association_create_udp
+            var association = channel.AddUdpAssociation(
+                1024,
+                "127.0.0.1:20000",
+                GetAssociationConfig(),
+                new TestReadHandler(),
+                new TestAssociationHandler(),
+                new TestAssociationInformation()
+            );
+            // ANCHOR_END: association_create_udp
+
+            RunAssociation(channel, association);
+        }
+        finally
+        {
+            channel.Shutdown();
+        }
+    }
+
     private static void RunSerial(Runtime runtime)
     {
         // ANCHOR: create_serial_channel
@@ -409,6 +480,9 @@ class MainClass
                 case "tcp":
                     RunTcp(runtime);
                     break;
+                case "udp":
+                    RunUdp(runtime);
+                    break;
                 case "serial":
                     RunSerial(runtime);
                     break;
@@ -431,6 +505,35 @@ class MainClass
         }
     }
 
+    private static void RunAssociation(MasterChannel channel, AssociationId association)
+    {
+        // ANCHOR: add_poll
+        var poll = channel.AddPoll(association, Request.ClassRequest(false, true, true, true), TimeSpan.FromSeconds(5));
+        // ANCHOR_END: add_poll
+
+        // start communications
+        channel.Enable();
+
+        while (true)
+        {
+            var input = Console.ReadLine();
+
+            if (input == "x")
+            {
+                return;
+            }
+
+            try
+            {
+                RunOneCommand(channel, association, poll, input).GetAwaiter().GetResult();
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error: {ex}");
+            }
+        }
+    }
+
     private static void RunChannel(MasterChannel channel)
     {
         // ANCHOR: association_create
@@ -443,30 +546,7 @@ class MainClass
         );
         // ANCHOR_END: association_create
 
-        // ANCHOR: add_poll
-        var poll = channel.AddPoll(association, Request.ClassRequest(false, true, true, true), TimeSpan.FromSeconds(5));
-        // ANCHOR_END: add_poll
-
-        // start communications
-        channel.Enable();
-
-        while (true)
-        {
-            var input = Console.ReadLine();
-            
-            if(input == "x") {
-                return;
-            }
-            
-            try
-            {
-                RunOneCommand(channel, association, poll, input).GetAwaiter().GetResult();
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine($"Error: {ex}");
-            }
-        }
+        RunAssociation(channel, association);
     }
 
     private static async Task RunOneCommand(MasterChannel channel, AssociationId association, PollId poll, String input)
@@ -597,6 +677,16 @@ class MainClass
                     // ANCHOR: read_file
                     channel.ReadFile(association, ".", FileReadConfig.Defaults(), new FileReader());
                     // ANCHOR_END: read_file
+                    break;
+                }
+            case "wf":
+                {
+                    // ANCHOR: write_file
+                    var file = await channel.OpenFile(association, "hello_world.txt", 0, Permissions.None(), 0xFFFFFFFF, FileMode.Write, 1024);
+                    await channel.WriteFileBlock(association, file.FileHandle, 0, false, System.Text.Encoding.UTF8.GetBytes("hello world\n"));
+                    await channel.WriteFileBlock(association, file.FileHandle, 1, true, System.Text.Encoding.UTF8.GetBytes("hello world\n"));
+                    await channel.CloseFile(association, file.FileHandle);
+                    // ANCHOR_END: write_file
                     break;
                 }
             case "crt":

@@ -1,7 +1,6 @@
+use std::net::SocketAddr;
 use std::time::{Duration, SystemTime};
 
-use crate::app::attr::*;
-use crate::app::measurement::*;
 use crate::app::*;
 
 use crate::decode::DecodeLevel;
@@ -10,22 +9,40 @@ use crate::master::association::AssociationConfig;
 use crate::master::error::{AssociationError, CommandError, PollError, TaskError, TimeSyncError};
 use crate::master::messages::{AssociationMsg, AssociationMsgType, MasterMsg, Message};
 use crate::master::poll::{PollHandle, PollMsg};
+use crate::master::promise::Promise;
 use crate::master::request::{CommandHeaders, CommandMode, ReadRequest, TimeSyncProcedure};
 use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::deadbands::WriteDeadBandsTask;
 use crate::master::tasks::empty_response::EmptyResponseTask;
-use crate::master::tasks::file_read::{FileReadTask, FileReaderType};
-use crate::master::tasks::get_file_info::GetFileInfoTask;
+use crate::master::tasks::file::authenticate::AuthFileTask;
+use crate::master::tasks::file::close::CloseFileTask;
+use crate::master::tasks::file::directory::DirectoryReader;
+use crate::master::tasks::file::get_info::GetFileInfoTask;
+use crate::master::tasks::file::open::{OpenFileRequest, OpenFileTask};
+use crate::master::tasks::file::read::{FileReadTask, FileReaderType};
+use crate::master::tasks::file::write_block::{WriteBlockRequest, WriteBlockTask};
 use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::restart::{RestartTask, RestartType};
 use crate::master::tasks::time::TimeSyncTask;
-use crate::master::tasks::{AppTask, NonReadTask, Task};
+use crate::master::tasks::Task;
 use crate::master::{
-    DeadBandHeader, DirReadConfig, DirectoryReader, FileCredentials, FileError, FileInfo,
-    FileReadConfig, FileReader, Headers, WriteError,
+    AuthKey, BlockNumber, DeadBandHeader, DirReadConfig, FileCredentials, FileError, FileHandle,
+    FileInfo, FileMode, FileReadConfig, FileReader, Headers, OpenFile, ReadHandler, WriteError,
 };
+use crate::transport::FragmentAddr;
 use crate::util::channel::Sender;
+use crate::util::phys::PhysAddr;
 use crate::util::session::Enabled;
+
+/// Master channels may be Udp or of a "stream" type such as TCP
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum MasterChannelType {
+    /// UDP aka datagram based
+    Udp,
+    /// Stream-oriented e.g. TCP
+    Stream,
+}
 
 /// Handle to a master communication channel. This handle controls
 /// a task running on the Tokio Runtime.
@@ -34,6 +51,7 @@ use crate::util::session::Enabled;
 /// by the library.
 #[derive(Debug, Clone)]
 pub struct MasterChannel {
+    channel_type: MasterChannelType,
     sender: Sender<Message>,
 }
 
@@ -44,7 +62,7 @@ pub struct AssociationHandle {
     master: MasterChannel,
 }
 
-/// Configuration for a MasterChannel
+/// Configuration for a MasterChannel that is independent of the physical layer
 #[derive(Copy, Clone, Debug)]
 #[cfg_attr(
     feature = "serialization",
@@ -81,8 +99,11 @@ impl MasterChannelConfig {
 }
 
 impl MasterChannel {
-    pub(crate) fn new(sender: Sender<Message>) -> Self {
-        Self { sender }
+    pub(crate) fn new(sender: Sender<Message>, channel_type: MasterChannelType) -> Self {
+        Self {
+            sender,
+            channel_type,
+        }
     }
 
     /// enable communications
@@ -108,13 +129,25 @@ impl MasterChannel {
 
     /// Get the current decoding level used by this master
     pub async fn get_decode_level(&mut self) -> Result<DecodeLevel, Shutdown> {
-        let (tx, rx) = tokio::sync::oneshot::channel::<Result<DecodeLevel, Shutdown>>();
-        self.send_master_message(MasterMsg::GetDecodeLevel(Promise::OneShot(tx)))
+        let (promise, rx) = Promise::one_shot();
+        self.send_master_message(MasterMsg::GetDecodeLevel(promise))
             .await?;
         rx.await?
     }
 
-    /// Create a new association:
+    fn assert_channel_type(&self, required: MasterChannelType) -> Result<(), AssociationError> {
+        if self.channel_type == required {
+            Ok(())
+        } else {
+            Err(AssociationError::WrongChannelType {
+                actual: self.channel_type,
+                required,
+            })
+        }
+    }
+
+    /// Create a new association on any stream-based channel (TCP, TLS, serial)
+    ///
     /// * `address` is the DNP3 link-layer address of the outstation
     /// * `config` controls the behavior of the master for this outstation
     /// * `handler` is a callback trait invoked when events occur for this outstation
@@ -126,14 +159,55 @@ impl MasterChannel {
         assoc_handler: Box<dyn AssociationHandler>,
         assoc_information: Box<dyn AssociationInformation>,
     ) -> Result<AssociationHandle, AssociationError> {
-        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), AssociationError>>();
+        self.assert_channel_type(MasterChannelType::Stream)?;
+
+        let (promise, rx) = Promise::one_shot();
+        let addr = FragmentAddr {
+            link: address,
+            phys: PhysAddr::None,
+        };
         self.send_master_message(MasterMsg::AddAssociation(
-            address,
+            addr,
             config,
             read_handler,
             assoc_handler,
             assoc_information,
-            Promise::OneShot(tx),
+            promise,
+        ))
+        .await?;
+        rx.await?
+            .map(|_| (AssociationHandle::new(address, self.clone())))
+    }
+
+    /// Create a new association on a UDP-based channel.
+    ///
+    /// * `address` is the DNP3 link-layer address of the outstation
+    /// * `destination` is IP address and port of the outstation
+    /// * `config` controls the behavior of the master for this outstation
+    /// * `handler` is a callback trait invoked when events occur for this outstation
+    pub async fn add_udp_association(
+        &mut self,
+        address: EndpointAddress,
+        destination: SocketAddr,
+        config: AssociationConfig,
+        read_handler: Box<dyn ReadHandler>,
+        assoc_handler: Box<dyn AssociationHandler>,
+        assoc_information: Box<dyn AssociationInformation>,
+    ) -> Result<AssociationHandle, AssociationError> {
+        self.assert_channel_type(MasterChannelType::Udp)?;
+
+        let (promise, rx) = Promise::one_shot();
+        let addr = FragmentAddr {
+            link: address,
+            phys: PhysAddr::Udp(destination),
+        };
+        self.send_master_message(MasterMsg::AddAssociation(
+            addr,
+            config,
+            read_handler,
+            assoc_handler,
+            assoc_information,
+            promise,
         ))
         .await?;
         rx.await?
@@ -192,14 +266,9 @@ impl AssociationHandle {
         request: ReadRequest,
         period: Duration,
     ) -> Result<PollHandle, PollError> {
-        let (tx, rx) = tokio::sync::oneshot::channel::<Result<PollHandle, PollError>>();
-        self.send_poll_message(PollMsg::AddPoll(
-            self.clone(),
-            request,
-            period,
-            Promise::OneShot(tx),
-        ))
-        .await?;
+        let (promise, rx) = Promise::one_shot();
+        self.send_poll_message(PollMsg::AddPoll(self.clone(), request, period, promise))
+            .await?;
         rx.await?
     }
 
@@ -213,11 +282,11 @@ impl AssociationHandle {
 
     /// Perform an asynchronous READ request
     ///
-    /// If successful, the [ReadHandler](crate::master::ReadHandler) will process the received measurement data
+    /// If successful, the [ReadHandler](ReadHandler) will process the received measurement data
     pub async fn read(&mut self, request: ReadRequest) -> Result<(), TaskError> {
-        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), TaskError>>();
-        let task = SingleReadTask::new(request, Promise::OneShot(tx));
-        self.send_task(task.wrap().wrap()).await?;
+        let (promise, rx) = Promise::one_shot();
+        let task = SingleReadTask::new(request, promise);
+        self.send_task(task).await?;
         rx.await?
     }
 
@@ -231,57 +300,58 @@ impl AssociationHandle {
         function: FunctionCode,
         headers: Headers,
     ) -> Result<(), WriteError> {
-        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), WriteError>>();
-        let task = EmptyResponseTask::new(function, headers, Promise::OneShot(tx));
-        self.send_task(task.wrap().wrap()).await?;
+        let (promise, rx) = Promise::one_shot();
+        let task = EmptyResponseTask::new(function, headers, promise);
+        self.send_task(task).await?;
         rx.await?
     }
 
     /// Perform an asynchronous READ request with a custom read handler
     ///
-    /// If successful, the custom [ReadHandler](crate::master::ReadHandler) will process the received measurement data
+    /// If successful, the custom [ReadHandler](ReadHandler) will process the received measurement data
     pub async fn read_with_handler(
         &mut self,
         request: ReadRequest,
         handler: Box<dyn ReadHandler>,
     ) -> Result<(), TaskError> {
-        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), TaskError>>();
-        let task = SingleReadTask::new_with_custom_handler(request, handler, Promise::OneShot(tx));
-        self.send_task(task.wrap().wrap()).await?;
+        let (promise, rx) = Promise::one_shot();
+        let task = SingleReadTask::new_with_custom_handler(request, handler, promise);
+        self.send_task(task).await?;
         rx.await?
     }
 
     /// Perform an asynchronous operate request
     ///
-    /// The actual function code used depends on the value of the [CommandMode](crate::master::CommandMode).
+    /// The actual function code used depends on the value of the [CommandMode](CommandMode).
     pub async fn operate(
         &mut self,
         mode: CommandMode,
         headers: CommandHeaders,
     ) -> Result<(), CommandError> {
-        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), CommandError>>();
-        let task = CommandTask::from_mode(mode, headers, Promise::OneShot(tx));
-        self.send_task(task.wrap().wrap()).await?;
+        let (promise, rx) = Promise::one_shot();
+        let task = CommandTask::from_mode(mode, headers, promise);
+        self.send_task(task).await?;
         rx.await?
     }
 
     /// Perform a WARM_RESTART operation
     ///
-    /// Returns the delay from the outstation's response as a [Duration](std::time::Duration)
+    /// Returns the delay from the outstation's response as a [Duration](Duration)
     pub async fn warm_restart(&mut self) -> Result<Duration, TaskError> {
-        let (tx, rx) = tokio::sync::oneshot::channel::<Result<Duration, TaskError>>();
-        let task = RestartTask::new(RestartType::WarmRestart, Promise::OneShot(tx));
-        self.send_task(task.wrap().wrap()).await?;
-        rx.await?
+        self.restart(RestartType::WarmRestart).await
     }
 
     /// Perform a COLD_RESTART operation
     ///
-    /// Returns the delay from the outstation's response as a [Duration](std::time::Duration)
+    /// Returns the delay from the outstation's response as a [Duration](Duration)
     pub async fn cold_restart(&mut self) -> Result<Duration, TaskError> {
-        let (tx, rx) = tokio::sync::oneshot::channel::<Result<Duration, TaskError>>();
-        let task = RestartTask::new(RestartType::ColdRestart, Promise::OneShot(tx));
-        self.send_task(task.wrap().wrap()).await?;
+        self.restart(RestartType::ColdRestart).await
+    }
+
+    async fn restart(&mut self, restart_type: RestartType) -> Result<Duration, TaskError> {
+        let (promise, rx) = Promise::one_shot();
+        let task = RestartTask::new(restart_type, promise);
+        self.send_task(task).await?;
         rx.await?
     }
 
@@ -290,9 +360,9 @@ impl AssociationHandle {
         &mut self,
         procedure: TimeSyncProcedure,
     ) -> Result<(), TimeSyncError> {
-        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), TimeSyncError>>();
-        let task = TimeSyncTask::get_procedure(procedure, Promise::OneShot(tx));
-        self.send_task(task.wrap().wrap()).await?;
+        let (promise, rx) = Promise::one_shot();
+        let task = TimeSyncTask::get_procedure(procedure, Some(promise));
+        self.send_task(task).await?;
         rx.await?
     }
 
@@ -301,9 +371,9 @@ impl AssociationHandle {
         &mut self,
         headers: Vec<DeadBandHeader>,
     ) -> Result<(), WriteError> {
-        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), WriteError>>();
-        let task = WriteDeadBandsTask::new(headers, Promise::OneShot(tx));
-        self.send_task(task.wrap().wrap()).await?;
+        let (promise, rx) = Promise::one_shot();
+        let task = WriteDeadBandsTask::new(headers, promise);
+        self.send_task(task).await?;
         rx.await?
     }
 
@@ -315,9 +385,84 @@ impl AssociationHandle {
     /// If a [`TaskError::UnexpectedResponseHeaders`] is returned, the link might be alive
     /// but it didn't answer with the expected `LINK_STATUS`.
     pub async fn check_link_status(&mut self) -> Result<(), TaskError> {
-        let (tx, rx) = tokio::sync::oneshot::channel::<Result<(), TaskError>>();
-        self.send_task(Task::LinkStatus(Promise::OneShot(tx)))
-            .await?;
+        let (promise, rx) = Promise::one_shot();
+        self.send_task(Task::LinkStatus(promise)).await?;
+        rx.await?
+    }
+
+    /// Obtain an [`AuthKey`] from the outstation which may then be used to open the file.
+    pub async fn get_file_auth_key(
+        &mut self,
+        credentials: FileCredentials,
+    ) -> Result<AuthKey, FileError> {
+        let (promise, rx) = Promise::one_shot();
+
+        let task = AuthFileTask {
+            credentials,
+            promise,
+        };
+
+        self.send_task(task).await?;
+        rx.await?
+    }
+
+    /// Open a file on the outstation with the requested parameters
+    pub async fn open_file<T: ToString>(
+        &mut self,
+        file_name: T,
+        auth_key: AuthKey,
+        permissions: Permissions,
+        file_size: u32,
+        file_mode: FileMode,
+        max_block_size: u16,
+    ) -> Result<OpenFile, FileError> {
+        let (promise, rx) = Promise::one_shot();
+
+        let task = OpenFileTask {
+            request: OpenFileRequest {
+                file_name: file_name.to_string(),
+                auth_key,
+                file_size,
+                file_mode,
+                permissions,
+                max_block_size,
+            },
+            promise,
+        };
+
+        self.send_task(task).await?;
+        rx.await?
+    }
+
+    /// Write a file block to the outstation
+    pub async fn write_file_block(
+        &mut self,
+        handle: FileHandle,
+        block_number: BlockNumber,
+        block_data: Vec<u8>,
+    ) -> Result<(), FileError> {
+        let (promise, rx) = Promise::one_shot();
+
+        let task = WriteBlockTask {
+            request: WriteBlockRequest {
+                handle,
+                block_number,
+                block_data,
+            },
+            promise,
+        };
+
+        self.send_task(task).await?;
+        rx.await?
+    }
+
+    /// Close a file on the outstation
+    pub async fn close_file(&mut self, handle: FileHandle) -> Result<(), FileError> {
+        let (promise, rx) = Promise::one_shot();
+
+        let task = CloseFileTask { handle, promise };
+
+        self.send_task(task).await?;
         rx.await?
     }
 
@@ -335,8 +480,7 @@ impl AssociationHandle {
             FileReaderType::from_reader(reader),
             credentials,
         );
-        self.send_task(Task::App(AppTask::NonRead(NonReadTask::FileRead(task))))
-            .await
+        self.send_task(task).await
     }
 
     /// Read a file directory
@@ -360,14 +504,13 @@ impl AssociationHandle {
     ) -> Result<FileInfo, FileError> {
         let (promise, reply) = Promise::one_shot();
         let task = GetFileInfoTask::new(file_path.to_string(), promise);
-        self.send_task(Task::App(AppTask::NonRead(NonReadTask::GetFileInfo(task))))
-            .await?;
+        self.send_task(task).await?;
         reply.await?
     }
 
-    async fn send_task(&mut self, task: Task) -> Result<(), Shutdown> {
+    async fn send_task<T: Into<Task>>(&mut self, task: T) -> Result<(), Shutdown> {
         self.master
-            .send_association_message(self.address, AssociationMsgType::QueueTask(task))
+            .send_association_message(self.address, AssociationMsgType::QueueTask(task.into()))
             .await
     }
 
@@ -375,32 +518,6 @@ impl AssociationHandle {
         self.master
             .send_association_message(self.address, AssociationMsgType::Poll(msg))
             .await
-    }
-}
-
-/// A generic callback type that must be invoked once and only once.
-/// The user can select to implement it using FnOnce or a
-/// one-shot reply channel
-pub(crate) enum Promise<T> {
-    /// nothing happens when the promise is completed
-    None,
-    /// one-shot reply channel is consumed when the promise is completed
-    OneShot(tokio::sync::oneshot::Sender<T>),
-}
-
-impl<T> Promise<T> {
-    pub(crate) fn one_shot() -> (Self, tokio::sync::oneshot::Receiver<T>) {
-        let (tx, rx) = tokio::sync::oneshot::channel();
-        (Self::OneShot(tx), rx)
-    }
-
-    pub(crate) fn complete(self, value: T) {
-        match self {
-            Promise::None => {}
-            Promise::OneShot(s) => {
-                s.send(value).ok();
-            }
-        }
     }
 }
 
@@ -434,6 +551,14 @@ pub enum TaskType {
     GenericEmptyResponse(FunctionCode),
     /// Read a file from the outstation
     FileRead,
+    /// Send username/password and get back an auth key
+    FileAuth,
+    /// Open a file on the outstation
+    FileOpen,
+    /// Write a file block
+    FileWriteBlock,
+    /// Close a file on the outstation
+    FileClose,
     /// Get information about a file
     GetFileInfo,
 }
@@ -458,185 +583,4 @@ pub trait AssociationInformation: Send + Sync {
 
     /// Called when an unsolicited response is received
     fn unsolicited_response(&mut self, _is_duplicate: bool, _seq: Sequence) {}
-}
-
-/// Information about the object header and specific variation
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct HeaderInfo {
-    /// underlying variation in the response
-    pub variation: Variation,
-    /// qualifier code used in the response
-    pub qualifier: QualifierCode,
-    /// true if the received variation is an event type, false otherwise
-    pub is_event: bool,
-    /// true if a flags byte is present on the underlying variation, false otherwise
-    pub has_flags: bool,
-}
-
-impl HeaderInfo {
-    pub(crate) fn new(
-        variation: Variation,
-        qualifier: QualifierCode,
-        is_event: bool,
-        has_flags: bool,
-    ) -> Self {
-        Self {
-            variation,
-            qualifier,
-            is_event,
-            has_flags,
-        }
-    }
-}
-
-/// Describes the source of a read event
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum ReadType {
-    /// Startup integrity poll
-    StartupIntegrity,
-    /// Unsolicited message
-    Unsolicited,
-    /// Single poll requested by the user
-    SinglePoll,
-    /// Periodic poll configured by the user
-    PeriodicPoll,
-}
-
-/// Trait used to process measurement data received from an outstation
-pub trait ReadHandler: Send + Sync {
-    /// Called as the first action before any of the type-specific handle methods are invoked
-    ///
-    /// `read_type` provides information about what triggered the call, e.g. response vs unsolicited
-    /// `header` provides the full response header
-    ///
-    /// Note: The operation may or may not be async depending
-    #[allow(unused_variables)]
-    fn begin_fragment(&mut self, read_type: ReadType, header: ResponseHeader) -> MaybeAsync<()> {
-        MaybeAsync::ready(())
-    }
-
-    /// Called as the last action after all of the type-specific handle methods have been invoked
-    ///
-    /// `read_type` provides information about what triggered the call, e.g. response vs unsolicited
-    /// `header` provides the full response header
-    ///
-    /// Note: The operation may or may not be async depending. A typical use case for using async
-    /// here would be to publish a message to an async MPSC.
-    #[allow(unused_variables)]
-    fn end_fragment(&mut self, read_type: ReadType, header: ResponseHeader) -> MaybeAsync<()> {
-        MaybeAsync::ready(())
-    }
-
-    /// Process an object header of `BinaryInput` values
-    #[allow(unused_variables)]
-    fn handle_binary_input(
-        &mut self,
-        info: HeaderInfo,
-        iter: &mut dyn Iterator<Item = (BinaryInput, u16)>,
-    ) {
-    }
-
-    /// Process an object header of `DoubleBitBinaryInput` values
-    #[allow(unused_variables)]
-    fn handle_double_bit_binary_input(
-        &mut self,
-        info: HeaderInfo,
-        iter: &mut dyn Iterator<Item = (DoubleBitBinaryInput, u16)>,
-    ) {
-    }
-
-    /// Process an object header of `BinaryOutputStatus` values
-    #[allow(unused_variables)]
-    fn handle_binary_output_status(
-        &mut self,
-        info: HeaderInfo,
-        iter: &mut dyn Iterator<Item = (BinaryOutputStatus, u16)>,
-    ) {
-    }
-
-    /// Process an object header of `Counter` values
-    #[allow(unused_variables)]
-    fn handle_counter(&mut self, info: HeaderInfo, iter: &mut dyn Iterator<Item = (Counter, u16)>) {
-    }
-
-    /// Process an object header of `FrozenCounter` values
-    #[allow(unused_variables)]
-    fn handle_frozen_counter(
-        &mut self,
-        info: HeaderInfo,
-        iter: &mut dyn Iterator<Item = (FrozenCounter, u16)>,
-    ) {
-    }
-
-    /// Process an object header of `AnalogInput` values
-    #[allow(unused_variables)]
-    fn handle_analog_input(
-        &mut self,
-        info: HeaderInfo,
-        iter: &mut dyn Iterator<Item = (AnalogInput, u16)>,
-    ) {
-    }
-
-    /// Process an object header of `FrozenAnalogInput` values
-    #[allow(unused_variables)]
-    fn handle_frozen_analog_input(
-        &mut self,
-        info: HeaderInfo,
-        iter: &mut dyn Iterator<Item = (FrozenAnalogInput, u16)>,
-    ) {
-    }
-
-    /// Process an object header of `AnalogInputDeadBand` values
-    #[allow(unused_variables)]
-    fn handle_analog_input_dead_band(
-        &mut self,
-        info: HeaderInfo,
-        iter: &mut dyn Iterator<Item = (AnalogInputDeadBand, u16)>,
-    ) {
-    }
-
-    /// Process an object header of `AnalogOutputStatus` values
-    #[allow(unused_variables)]
-    fn handle_analog_output_status(
-        &mut self,
-        info: HeaderInfo,
-        iter: &mut dyn Iterator<Item = (AnalogOutputStatus, u16)>,
-    ) {
-    }
-
-    /// Process an object header of octet string values
-    #[allow(unused_variables)]
-    fn handle_octet_string<'a>(
-        &mut self,
-        info: HeaderInfo,
-        iter: &'a mut dyn Iterator<Item = (&'a [u8], u16)>,
-    ) {
-    }
-
-    /// Process a device attribute
-    #[allow(unused_variables)]
-    fn handle_device_attribute(&mut self, info: HeaderInfo, attr: AnyAttribute) {}
-}
-
-pub(crate) fn handle_attribute(
-    var: Variation,
-    qualifier: QualifierCode,
-    attr: &Option<Attribute>,
-    handler: &mut dyn ReadHandler,
-) {
-    if let Some(attr) = attr {
-        match AnyAttribute::try_from(attr) {
-            Ok(attr) => {
-                handler
-                    .handle_device_attribute(HeaderInfo::new(var, qualifier, false, false), attr);
-            }
-            Err(err) => {
-                tracing::warn!(
-                    "Expected attribute type {:?} but received {:?}",
-                    err.expected,
-                    err.actual
-                );
-            }
-        }
-    }
 }

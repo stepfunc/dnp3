@@ -1,11 +1,18 @@
 [package]
 name = "dnp3-bindings"
-version = "1.5.2"
-authors = ["Step Function I/O LLC <info@stepfunc.io>"]
-edition = "2021"
+version = "1.6.0"
+
+# inherit from workspace
+rust-version.workspace = true
+edition.workspace = true
+license-file.workspace = true
+homepage.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 [dependencies]
-oo-bindgen = "0.8"
+oo-bindgen = { workspace = true }
 dnp3-schema = { path = "../dnp3-schema" }
 tracing-subscriber = "0.3"
 tracing = "0.1"

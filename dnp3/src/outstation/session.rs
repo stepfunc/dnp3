@@ -28,8 +28,8 @@ use crate::outstation::deferred::DeferredRead;
 use crate::outstation::task::{ConfigurationChange, OutstationMessage};
 use crate::outstation::traits::*;
 use crate::transport::{
-    FragmentInfo, RequestGuard, TransportReader, TransportRequest, TransportRequestError,
-    TransportWriter,
+    FragmentAddr, FragmentInfo, RequestGuard, TransportReader, TransportRequest,
+    TransportRequestError, TransportWriter,
 };
 use crate::util::buffer::Buffer;
 use crate::util::channel::Receiver;
@@ -152,7 +152,6 @@ impl LastValidRequest {
 
 pub(crate) struct SessionConfig {
     decode_level: DecodeLevel,
-    master_address: EndpointAddress,
     confirm_timeout: Timeout,
     select_timeout: Timeout,
     broadcast: Feature,
@@ -163,27 +162,15 @@ pub(crate) struct SessionConfig {
     keep_alive_timeout: Option<std::time::Duration>,
     max_controls_per_request: Option<u16>,
 }
-
-impl SessionConfig {
-    fn required_master_address(&self) -> Option<EndpointAddress> {
-        match self.respond_to_any_master {
-            Feature::Enabled => None,
-            Feature::Disabled => Some(self.master_address),
-        }
-    }
-}
-
 pub(crate) struct SessionParameters {
     max_read_headers_per_request: u16,
     sol_tx_buffer_size: BufferSize<249, 2048>,
     unsol_tx_buffer_size: BufferSize<249, 2048>,
 }
-
 impl From<OutstationConfig> for SessionConfig {
     fn from(config: OutstationConfig) -> Self {
         SessionConfig {
             decode_level: config.decode_level,
-            master_address: config.master_address,
             confirm_timeout: config.confirm_timeout,
             select_timeout: config.select_timeout,
             broadcast: config.features.broadcast,
@@ -258,6 +245,7 @@ pub(crate) struct OutstationSession {
     sol_tx_buffer: Buffer,
     unsol_tx_buffer: Buffer,
     config: SessionConfig,
+    destination: FragmentAddr,
     state: SessionState,
     application: Box<dyn OutstationApplication>,
     info: Box<dyn OutstationInformation>,
@@ -266,7 +254,7 @@ pub(crate) struct OutstationSession {
 }
 
 enum Confirm {
-    Yes(EndpointAddress),
+    Yes(FragmentAddr),
     Timeout,
     NewRequest,
 }
@@ -298,9 +286,9 @@ enum FragmentType<'a> {
 
 #[derive(Copy, Clone)]
 enum ConfirmAction {
-    Confirmed(EndpointAddress),
+    Confirmed(FragmentAddr),
     NewRequest,
-    EchoLastResponse(EndpointAddress, Option<Response>),
+    EchoLastResponse(FragmentAddr, Option<Response>),
     ContinueWait,
 }
 
@@ -327,9 +315,11 @@ impl NextIdleAction {
 }
 
 impl OutstationSession {
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn new(
         initial_state: Enabled,
         messages: Receiver<OutstationMessage>,
+        destination: FragmentAddr,
         config: SessionConfig,
         param: SessionParameters,
         application: Box<dyn OutstationApplication>,
@@ -351,6 +341,14 @@ impl OutstationSession {
             info: information,
             control_handler,
             next_link_status,
+            destination,
+        }
+    }
+
+    fn required_master_address(&self) -> Option<EndpointAddress> {
+        match self.config.respond_to_any_master {
+            Feature::Enabled => None,
+            Feature::Disabled => Some(self.destination.link),
         }
     }
 
@@ -407,7 +405,7 @@ impl OutstationSession {
             .write(
                 io,
                 self.config.decode_level,
-                self.config.master_address.wrap(),
+                self.destination,
                 self.unsol_tx_buffer.get(len).unwrap(),
             )
             .await
@@ -417,7 +415,7 @@ impl OutstationSession {
         &mut self,
         io: &mut PhysLayer,
         writer: &mut TransportWriter,
-        respond_to: EndpointAddress,
+        respond_to: FragmentAddr,
         mut response: Response,
         database: &DatabaseHandle,
     ) -> Result<Response, LinkError> {
@@ -439,7 +437,7 @@ impl OutstationSession {
     async fn repeat_solicited(
         &mut self,
         io: &mut PhysLayer,
-        respond_to: EndpointAddress,
+        respond_to: FragmentAddr,
         writer: &mut TransportWriter,
         response: Response,
     ) -> Result<(), LinkError> {
@@ -452,7 +450,7 @@ impl OutstationSession {
             .write(
                 io,
                 self.config.decode_level,
-                respond_to.wrap(),
+                respond_to,
                 self.sol_tx_buffer.get(len).unwrap(),
             )
             .await
@@ -572,11 +570,7 @@ impl OutstationSession {
             }
 
             writer
-                .write_link_status_request(
-                    io,
-                    self.config.decode_level,
-                    self.config.master_address.wrap(),
-                )
+                .send_link_status_request(io, self.config.decode_level, self.destination)
                 .await?;
 
             self.on_link_activity();
@@ -648,7 +642,6 @@ impl OutstationSession {
         Some(Response::new(header, cursor.written().len()))
     }
 
-    #[allow(clippy::too_many_arguments)]
     async fn perform_unsolicited_response_series(
         &mut self,
         database: &mut DatabaseHandle,
@@ -731,7 +724,7 @@ impl OutstationSession {
             return Ok(UnsolicitedWaitResult::Timeout);
         }
 
-        let mut guard = reader.pop_request(self.config.required_master_address());
+        let mut guard = reader.pop_request(self.required_master_address());
         let (info, request) = match guard.get() {
             None => return Ok(UnsolicitedWaitResult::ReadNext),
             Some(TransportRequest::Request(info, request)) => {
@@ -788,7 +781,7 @@ impl OutstationSession {
                 self.write_solicited(
                     io,
                     writer,
-                    info.source,
+                    info.addr,
                     Response::empty_solicited(seq, iin),
                     database,
                 )
@@ -808,7 +801,7 @@ impl OutstationSession {
                     .await;
                 if let Some(response) = &mut response {
                     *response = self
-                        .write_solicited(io, writer, info.source, *response, database)
+                        .write_solicited(io, writer, info.addr, *response, database)
                         .await?;
                 }
                 self.state.last_valid_request = Some(LastValidRequest::new(
@@ -843,7 +836,7 @@ impl OutstationSession {
             }
             FragmentType::RepeatNonRead(_, last_response) => {
                 if let Some(last_response) = last_response {
-                    self.repeat_solicited(io, info.source, writer, last_response)
+                    self.repeat_solicited(io, info.addr, writer, last_response)
                         .await?
                 }
                 self.state.deferred_read.clear();
@@ -930,9 +923,9 @@ impl OutstationSession {
     ) -> Result<(), RunError> {
         if let Some(x) = self.state.deferred_read.select(database) {
             tracing::info!("handling deferred READ request");
-            let (response, mut series) = self.write_read_response(database, true, x.seq, x.iin2);
+            let (response, mut series) = self.format_read_response(database, true, x.seq, x.iin2);
             let response = self
-                .write_solicited(io, writer, x.info.source, response, database)
+                .write_solicited(io, writer, x.info.addr, response, database)
                 .await?;
             self.state.last_valid_request =
                 Some(LastValidRequest::new(x.seq, x.hash, Some(response), series));
@@ -964,7 +957,7 @@ impl OutstationSession {
         writer: &mut TransportWriter,
         database: &mut DatabaseHandle,
     ) -> Result<(), RunError> {
-        let mut guard = reader.pop_request(self.config.required_master_address());
+        let mut guard = reader.pop_request(self.required_master_address());
         match guard.get() {
             Some(TransportRequest::Request(info, request)) => {
                 self.on_link_activity();
@@ -975,7 +968,7 @@ impl OutstationSession {
                     // optional response
                     if let Some(response) = &mut result.response {
                         *response = self
-                            .write_solicited(io, writer, info.source, *response, database)
+                            .write_solicited(io, writer, info.addr, *response, database)
                             .await?;
 
                         // check if an extra confirmation was added due to broadcast
@@ -1030,7 +1023,7 @@ impl OutstationSession {
                 Some(LastValidRequest::new(seq, hash, Some(response), None))
             }
             FragmentType::NewRead(hash, objects) => {
-                let (response, series) = self.write_first_read_response(database, seq, objects);
+                let (response, series) = self.format_first_read_response(database, seq, objects);
                 Some(LastValidRequest::new(seq, hash, Some(response), series))
             }
             FragmentType::RepeatRead(hash, _, objects) => {
@@ -1038,7 +1031,7 @@ impl OutstationSession {
                 // also reply to duplicate READ requests from idle, but this
                 // is plainly wrong since it can't possibly handle a multi-fragmented
                 // response correctly. Answering a repeat READ with a fresh response is harmless
-                let (response, series) = self.write_first_read_response(database, seq, objects);
+                let (response, series) = self.format_first_read_response(database, seq, objects);
                 Some(LastValidRequest::new(seq, hash, Some(response), series))
             }
             FragmentType::NewNonRead(hash, objects) => {
@@ -1081,7 +1074,7 @@ impl OutstationSession {
     async fn write_error_response(
         &mut self,
         io: &mut PhysLayer,
-        respond_to: EndpointAddress,
+        respond_to: FragmentAddr,
         writer: &mut TransportWriter,
         err: TransportRequestError,
         database: &DatabaseHandle,
@@ -1108,17 +1101,17 @@ impl OutstationSession {
         Ok(())
     }
 
-    fn write_first_read_response(
+    fn format_first_read_response(
         &mut self,
         database: &mut DatabaseHandle,
         seq: Sequence,
         object_headers: HeaderCollection,
     ) -> (Response, Option<ResponseSeries>) {
         let iin2 = database.select(&object_headers);
-        self.write_read_response(database, true, seq, iin2)
+        self.format_read_response(database, true, seq, iin2)
     }
 
-    fn write_read_response(
+    fn format_read_response(
         &mut self,
         database: &mut DatabaseHandle,
         fir: bool,
@@ -2039,7 +2032,7 @@ impl OutstationSession {
                     // format the next response in the series
                     series.ecsn.increment();
                     let (response, next) =
-                        self.write_read_response(database, false, series.ecsn, Iin2::default());
+                        self.format_read_response(database, false, series.ecsn, Iin2::default());
                     self.write_solicited(io, writer, respond_to, response, database)
                         .await?;
                     match next {
@@ -2079,7 +2072,7 @@ impl OutstationSession {
                 }
                 // process data
                 TimeoutStatus::No => {
-                    let mut guard = reader.pop_request(self.config.required_master_address());
+                    let mut guard = reader.pop_request(self.required_master_address());
                     match self.expect_sol_confirm(ecsn, &mut guard) {
                         ConfirmAction::ContinueWait => {
                             // we ignored whatever the request was and logged it elsewhere
@@ -2130,7 +2123,7 @@ impl OutstationSession {
             FragmentType::MalformedRequest(_, _) => ConfirmAction::NewRequest,
             FragmentType::NewRead(_, _) => ConfirmAction::NewRequest,
             FragmentType::RepeatRead(_, response, _) => {
-                ConfirmAction::EchoLastResponse(info.source, response)
+                ConfirmAction::EchoLastResponse(info.addr, response)
             }
             FragmentType::NewNonRead(_, _) => ConfirmAction::NewRequest,
             // this should never happen, but if it does, new request is probably best course of action
@@ -2138,7 +2131,7 @@ impl OutstationSession {
             FragmentType::Broadcast(_) => ConfirmAction::NewRequest,
             FragmentType::SolicitedConfirm(seq) => {
                 if seq == ecsn {
-                    ConfirmAction::Confirmed(info.source)
+                    ConfirmAction::Confirmed(info.addr)
                 } else {
                     self.info
                         .wrong_solicited_confirm_seq(ecsn, request.header.control.seq);

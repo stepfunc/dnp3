@@ -1,3 +1,4 @@
+//! Example master application
 use dnp3::app::control::*;
 use dnp3::app::measurement::*;
 use dnp3::app::*;
@@ -18,6 +19,7 @@ use tokio_util::codec::LinesCodec;
 use dnp3::serial::*;
 #[cfg(feature = "tls")]
 use dnp3::tcp::tls::*;
+use dnp3::udp::{spawn_outstation_udp, OutstationUdpConfig, UdpSocketMode};
 
 /// example of using the outstation API asynchronously from within the Tokio runtime
 ///
@@ -41,6 +43,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     match transport {
         "tcp" => run_tcp_server().await,
         "tcp-client" => run_tcp_client().await,
+        "udp" => run_udp().await,
         #[cfg(feature = "serial")]
         "serial" => run_serial().await,
         #[cfg(feature = "tls")]
@@ -245,6 +248,26 @@ async fn run_tcp_server() -> Result<(), Box<dyn std::error::Error>> {
     run_server(server).await
 }
 
+async fn run_udp() -> Result<(), Box<dyn std::error::Error>> {
+    let udp_config = OutstationUdpConfig {
+        local_endpoint: "127.0.0.1:20000".parse().unwrap(),
+        remote_endpoint: "127.0.0.1:20001".parse().unwrap(),
+        socket_mode: UdpSocketMode::OneToOne,
+        link_read_mode: LinkReadMode::Datagram,
+        retry_delay: Timeout::from_secs(5)?,
+    };
+
+    let outstation = spawn_outstation_udp(
+        udp_config,
+        get_outstation_config(),
+        Box::new(ExampleOutstationApplication),
+        Box::new(ExampleOutstationInformation),
+        Box::new(ExampleControlHandler),
+    );
+
+    run_outstation(outstation).await
+}
+
 async fn run_tcp_client() -> Result<(), Box<dyn std::error::Error>> {
     let outstation = spawn_outstation_tcp_client(
         LinkErrorMode::Close,
@@ -304,7 +327,7 @@ async fn run_server(mut server: Server) -> Result<(), Box<dyn std::error::Error>
     )?;
     // ANCHOR_END: tcp_server_spawn_outstation
 
-    // setup the outstation's database before we spawn it
+    // set up the outstation's database before we spawn it
     // ANCHOR: database_init
     outstation.transaction(|db| {
         // initialize 10 points of each type
@@ -468,6 +491,15 @@ async fn run_outstation(
                     );
                 })
             }
+            "aif" => outstation.transaction(|db| {
+                db.update_flags(
+                    7,
+                    UpdateFlagsType::AnalogInput,
+                    Flags::COMM_LOST,
+                    Some(get_current_time()),
+                    UpdateOptions::detect_event(),
+                );
+            }),
             "aos" => {
                 analog_output_status_value += 1.0;
                 outstation.transaction(|db| {
@@ -507,9 +539,9 @@ fn get_ca_chain_config() -> Result<TlsServerConfig, Box<dyn std::error::Error>> 
     // ANCHOR: tls_ca_chain_config
     let config = TlsServerConfig::full_pki(
         Some("test.com".to_string()),
-        &Path::new("./certs/ca_chain/ca_cert.pem"),
-        &Path::new("./certs/ca_chain/entity2_cert.pem"),
-        &Path::new("./certs/ca_chain/entity2_key.pem"),
+        Path::new("./certs/ca_chain/ca_cert.pem"),
+        Path::new("./certs/ca_chain/entity2_cert.pem"),
+        Path::new("./certs/ca_chain/entity2_key.pem"),
         None, // no password
         MinTlsVersion::V12,
     )?;
@@ -523,9 +555,9 @@ fn get_self_signed_config() -> Result<TlsServerConfig, Box<dyn std::error::Error
     use std::path::Path;
     // ANCHOR: tls_self_signed_config
     let config = TlsServerConfig::self_signed(
-        &Path::new("./certs/self_signed/entity1_cert.pem"),
-        &Path::new("./certs/self_signed/entity2_cert.pem"),
-        &Path::new("./certs/self_signed/entity2_key.pem"),
+        Path::new("./certs/self_signed/entity1_cert.pem"),
+        Path::new("./certs/self_signed/entity2_cert.pem"),
+        Path::new("./certs/self_signed/entity2_key.pem"),
         None, // no password
         MinTlsVersion::V12,
     )?;

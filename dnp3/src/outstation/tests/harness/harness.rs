@@ -3,7 +3,8 @@ use tokio::task::JoinHandle;
 
 use crate::decode::AppDecodeLevel;
 use crate::link::header::{BroadcastConfirmMode, FrameInfo, FrameType};
-use crate::link::{EndpointAddress, LinkErrorMode};
+use crate::link::reader::LinkModes;
+use crate::link::EndpointAddress;
 use crate::outstation::config::{Feature, OutstationConfig};
 use crate::outstation::database::EventBufferConfig;
 use crate::outstation::task::OutstationTask;
@@ -12,7 +13,7 @@ use crate::outstation::tests::harness::{
     MockOutstationApplication, MockOutstationInformation,
 };
 use crate::outstation::OutstationHandle;
-use crate::util::phys::PhysLayer;
+use crate::util::phys::{PhysAddr, PhysLayer};
 use crate::util::session::{Enabled, RunError};
 
 pub(crate) fn get_default_config() -> OutstationConfig {
@@ -128,8 +129,9 @@ fn new_harness_impl(
 
     let (task, handle) = OutstationTask::create(
         Enabled::Yes,
-        LinkErrorMode::Close,
+        LinkModes::test(),
         config,
+        PhysAddr::None,
         application,
         MockOutstationInformation::new(sender.clone()),
         MockControlHandler::new(sender.clone()),
@@ -141,7 +143,12 @@ fn new_harness_impl(
 
     task.get_reader()
         .get_inner()
-        .set_rx_frame_info(FrameInfo::new(master_address, broadcast, FrameType::Data));
+        .set_rx_frame_info(FrameInfo::new(
+            master_address,
+            broadcast,
+            FrameType::Data,
+            PhysAddr::None,
+        ));
 
     let (io, io_handle) = sfio_tokio_mock_io::mock();
 

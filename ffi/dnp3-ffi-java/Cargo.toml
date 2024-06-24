@@ -1,9 +1,16 @@
 [package]
 name = "dnp3-ffi-java"
-version = "1.5.2"
-authors = ["Step Function I/O LLC <info@stepfunc.io>"]
-edition = "2018"
+version = "1.6.0"
 build = "build.rs"
+
+# inherit from workspace
+rust-version.workspace = true
+edition.workspace = true
+license-file.workspace = true
+homepage.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
 
 [lib]
 crate-type = ["cdylib"]
@@ -19,4 +26,4 @@ serial = ["dnp3-ffi/serial"]
 
 [build-dependencies]
 dnp3-schema = { path = "../dnp3-schema" }
-oo-bindgen = "0.8"
+oo-bindgen = { workspace = true }
