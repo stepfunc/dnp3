@@ -12,17 +12,14 @@ use dnp3::app::attr::{AttrProp, Attribute, StringAttr};
 use dnp3::tcp::*;
 use std::net::SocketAddr;
 use std::path::PathBuf;
-use std::process::exit;
 use std::time::Duration;
 use tokio_stream::StreamExt;
 use tokio_util::codec::FramedRead;
 use tokio_util::codec::LinesCodec;
 
-#[cfg(feature = "serial")]
 use dnp3::serial::*;
 
 // Define enums for clap to parse serial settings
-#[cfg(feature = "serial")]
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
 enum DataBitsArg {
     Five,
@@ -31,14 +28,12 @@ enum DataBitsArg {
     Eight,
 }
 
-#[cfg(feature = "serial")]
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
 enum StopBitsArg {
     One,
     Two,
 }
 
-#[cfg(feature = "serial")]
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
 enum ParityArg {
     None,
@@ -46,7 +41,6 @@ enum ParityArg {
     Even,
 }
 
-#[cfg(feature = "serial")]
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
 enum FlowControlArg {
     None,
@@ -54,7 +48,6 @@ enum FlowControlArg {
     Hardware,
 }
 
-#[cfg(feature = "serial")]
 impl From<DataBitsArg> for DataBits {
     fn from(value: DataBitsArg) -> Self {
         match value {
@@ -66,7 +59,6 @@ impl From<DataBitsArg> for DataBits {
     }
 }
 
-#[cfg(feature = "serial")]
 impl From<StopBitsArg> for StopBits {
     fn from(value: StopBitsArg) -> Self {
         match value {
@@ -76,7 +68,6 @@ impl From<StopBitsArg> for StopBits {
     }
 }
 
-#[cfg(feature = "serial")]
 impl From<ParityArg> for Parity {
     fn from(value: ParityArg) -> Self {
         match value {
@@ -87,7 +78,6 @@ impl From<ParityArg> for Parity {
     }
 }
 
-#[cfg(feature = "serial")]
 impl From<FlowControlArg> for FlowControl {
     fn from(value: FlowControlArg) -> Self {
         match value {
@@ -97,7 +87,6 @@ impl From<FlowControlArg> for FlowControl {
         }
     }
 }
-#[cfg(feature = "tls")]
 use dnp3::tcp::tls::*;
 use dnp3::udp::{spawn_outstation_udp, OutstationUdpConfig, UdpSocketMode};
 
@@ -146,11 +135,11 @@ enum TransportCommand {
         #[arg(short, long, default_value = "127.0.0.1:20001")]
         remote_endpoint: SocketAddr,
     },
-    #[cfg(feature = "serial")]
+
     /// Use serial transport
     Serial {
         /// Serial port name
-        #[arg(short, long, default_value = "/dev/ttySIM1")]
+        #[arg(short, long, default_value = "/dev/ttyS0")]
         port: String,
 
         /// Baud rate
@@ -173,7 +162,7 @@ enum TransportCommand {
         #[arg(long, value_enum, default_value_t = FlowControlArg::None)]
         flow_control: FlowControlArg,
     },
-    #[cfg(feature = "tls")]
+
     /// Use TLS with CA chain transport
     TlsCa {
         /// IP address and port to bind to
@@ -196,7 +185,7 @@ enum TransportCommand {
         #[arg(long, default_value = "./certs/ca_chain/entity2_key.pem")]
         entity_key: PathBuf,
     },
-    #[cfg(feature = "tls")]
+
     /// Use TLS with self-signed certificates
     TlsSelfSigned {
         /// IP address and port to bind to
@@ -259,7 +248,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             );
             run_udp(*local_endpoint, *remote_endpoint, &cli).await
         }
-        #[cfg(feature = "serial")]
+
         TransportCommand::Serial {
             port,
             baud_rate,
@@ -280,7 +269,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             )
             .await
         }
-        #[cfg(feature = "tls")]
+
         TransportCommand::TlsCa {
             endpoint,
             domain,
@@ -292,7 +281,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             let config = get_ca_chain_config(domain, ca_cert, entity_cert, entity_key)?;
             run_tls_server(*endpoint, config, &cli).await
         }
-        #[cfg(feature = "tls")]
+
         TransportCommand::TlsSelfSigned {
             endpoint,
             peer_cert,
@@ -537,7 +526,6 @@ async fn run_tcp_client(endpoint: SocketAddr, cli: &Cli) -> Result<(), Box<dyn s
     run_outstation(outstation).await
 }
 
-#[cfg(feature = "serial")]
 async fn run_serial(
     port: &str,
     baud_rate: u32,
@@ -574,7 +562,6 @@ async fn run_serial(
     run_outstation(outstation).await
 }
 
-#[cfg(feature = "tls")]
 async fn run_tls_server(
     endpoint: SocketAddr,
     config: TlsServerConfig,
@@ -819,7 +806,6 @@ fn get_current_time() -> Time {
     Time::Synchronized(Timestamp::new(epoch_time.as_millis() as u64))
 }
 
-#[cfg(feature = "tls")]
 fn get_ca_chain_config(
     domain: &str,
     ca_cert: &PathBuf,
@@ -840,7 +826,6 @@ fn get_ca_chain_config(
     Ok(config)
 }
 
-#[cfg(feature = "tls")]
 fn get_self_signed_config(
     peer_cert: &PathBuf,
     entity_cert: &PathBuf,

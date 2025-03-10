@@ -125,6 +125,15 @@ impl std::fmt::Display for EndpointAddress {
     }
 }
 
+impl std::str::FromStr for EndpointAddress {
+    type Err = std::num::ParseIntError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let value = s.parse::<u16>()?;
+        Ok(EndpointAddress::raw(value))
+    }
+}
+
 #[cfg(test)]
 pub(crate) mod test_data {
     use crate::link::function::Function;

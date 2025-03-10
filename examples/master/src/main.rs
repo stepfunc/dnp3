@@ -11,12 +11,9 @@ use dnp3::app::*;
 use dnp3::decode::*;
 use dnp3::link::*;
 use dnp3::master::*;
-use dnp3::tcp::*;
-
-#[cfg(feature = "serial")]
 use dnp3::serial::*;
-#[cfg(feature = "tls")]
 use dnp3::tcp::tls::*;
+use dnp3::tcp::*;
 
 use dnp3::outstation::FreezeInterval;
 use dnp3::udp::spawn_master_udp;
@@ -489,19 +486,19 @@ async fn create_channel_and_association(
             let assoc = add_udp_association(&mut channel).await?;
             Ok((channel, assoc))
         }
-        #[cfg(feature = "serial")]
+
         "serial" => {
             let mut channel = create_serial_channel()?;
             let assoc = add_association(&mut channel).await?;
             Ok((channel, assoc))
         }
-        #[cfg(feature = "tls")]
+
         "tls-ca" => {
             let mut channel = create_tls_channel(get_tls_authority_config()?)?;
             let assoc = add_association(&mut channel).await?;
             Ok((channel, assoc))
         }
-        #[cfg(feature = "tls")]
+
         "tls-self-signed" => {
             let mut channel = create_tls_channel(get_tls_self_signed_config()?)?;
             let assoc = add_association(&mut channel).await?;
@@ -578,7 +575,6 @@ fn get_association_config() -> AssociationConfig {
 }
 // ANCHOR_END: association_config
 
-#[cfg(feature = "tls")]
 fn get_tls_self_signed_config() -> Result<TlsClientConfig, Box<dyn std::error::Error>> {
     use std::path::Path;
     // ANCHOR: tls_self_signed_config
@@ -593,7 +589,6 @@ fn get_tls_self_signed_config() -> Result<TlsClientConfig, Box<dyn std::error::E
     Ok(config)
 }
 
-#[cfg(feature = "tls")]
 fn get_tls_authority_config() -> Result<TlsClientConfig, Box<dyn std::error::Error>> {
     use std::path::Path;
     // ANCHOR: tls_ca_chain_config
@@ -634,7 +629,6 @@ fn create_udp_channel() -> Result<MasterChannel, Box<dyn std::error::Error>> {
     Ok(channel)
 }
 
-#[cfg(feature = "serial")]
 fn create_serial_channel() -> Result<MasterChannel, Box<dyn std::error::Error>> {
     // ANCHOR: create_master_serial_channel
     let channel = spawn_master_serial(
@@ -648,7 +642,6 @@ fn create_serial_channel() -> Result<MasterChannel, Box<dyn std::error::Error>> 
     Ok(channel)
 }
 
-#[cfg(feature = "tls")]
 fn create_tls_channel(
     tls_config: TlsClientConfig,
 ) -> Result<MasterChannel, Box<dyn std::error::Error>> {
