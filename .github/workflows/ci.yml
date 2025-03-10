@@ -318,12 +318,12 @@ jobs:
       - name: Upload Java bindings
         uses: actions/upload-artifact@v4
         with:
-          name: java-bindings
+          name: java-bindings-jar
           path: ffi/bindings/java/dnp3/target/*.jar
       - name: Upload Java pom.xml
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: java-bindings
+          name: java-bindings-pom
           path: ffi/bindings/java/dnp3/pom.xml
   # Run the conformance tests
   conformance:
