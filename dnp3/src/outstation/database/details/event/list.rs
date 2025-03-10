@@ -196,10 +196,7 @@ impl<T> VecList<T> {
     where
         F: Fn(&T) -> bool,
     {
-        let index = match self.find_first(&predicate) {
-            None => return None,
-            Some(x) => x,
-        };
+        let index = self.find_first(&predicate)?;
 
         if self.remove_at(index) {
             return self.storage.get(index.value).map(|x| &x.data);

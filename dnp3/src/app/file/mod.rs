@@ -134,7 +134,8 @@ impl FileType {
 }
 
 fn byte_length(s: &str) -> Result<u16, crate::app::format::Overflow> {
-    crate::app::format::to_u16(s.as_bytes().len())
+    // str.len() returns the length in bytes, which is equivalent to s.as_bytes().len()
+    crate::app::format::to_u16(s.len())
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

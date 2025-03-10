@@ -17,7 +17,7 @@ impl<'a> LinkDisplay<'a> {
     }
 }
 
-impl<'a> std::fmt::Display for LinkDisplay<'a> {
+impl std::fmt::Display for LinkDisplay<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         if self.level.header_enabled() {
             write!(

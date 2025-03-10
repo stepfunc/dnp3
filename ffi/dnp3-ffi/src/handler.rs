@@ -25,10 +25,7 @@ impl<'a> AttrItemIter<'a> {
 }
 
 pub(crate) unsafe fn attr_item_iter_next(iter: *mut crate::AttrItemIter) -> Option<&ffi::AttrItem> {
-    let iter = match iter.as_mut() {
-        None => return None,
-        Some(x) => x,
-    };
+    let iter = iter.as_mut()?;
 
     iter.current = iter.inner.next().map(|x| x.into());
 

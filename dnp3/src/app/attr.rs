@@ -885,7 +885,7 @@ impl From<AttrProp> for u8 {
     }
 }
 
-impl<'a> Iterator for VariationListIter<'a> {
+impl Iterator for VariationListIter<'_> {
     type Item = AttrItem;
 
     fn next(&mut self) -> Option<Self::Item> {

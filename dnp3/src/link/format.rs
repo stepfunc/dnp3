@@ -38,7 +38,7 @@ pub(crate) struct FrameData<'a> {
     payload_only: &'a [u8],
 }
 
-impl<'a> FrameData<'a> {
+impl FrameData<'_> {
     pub(crate) fn to_link_display(&self, level: LinkDecodeLevel) -> LinkDisplay {
         LinkDisplay::new(self.header, self.payload_only, level)
     }
