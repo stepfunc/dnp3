@@ -18,99 +18,12 @@ use tokio_util::codec::FramedRead;
 use tokio_util::codec::LinesCodec;
 
 use dnp3::serial::*;
-
-// Define enums for clap to parse serial settings
-#[derive(Debug, Clone, Copy, clap::ValueEnum)]
-enum DataBitsArg {
-    Five,
-    Six,
-    Seven,
-    Eight,
-}
-
-#[derive(Debug, Clone, Copy, clap::ValueEnum)]
-enum StopBitsArg {
-    One,
-    Two,
-}
-
-#[derive(Debug, Clone, Copy, clap::ValueEnum)]
-enum ParityArg {
-    None,
-    Odd,
-    Even,
-}
-
-#[derive(Debug, Clone, Copy, clap::ValueEnum)]
-enum FlowControlArg {
-    None,
-    Software,
-    Hardware,
-}
-
-impl From<DataBitsArg> for DataBits {
-    fn from(value: DataBitsArg) -> Self {
-        match value {
-            DataBitsArg::Five => DataBits::Five,
-            DataBitsArg::Six => DataBits::Six,
-            DataBitsArg::Seven => DataBits::Seven,
-            DataBitsArg::Eight => DataBits::Eight,
-        }
-    }
-}
-
-impl From<StopBitsArg> for StopBits {
-    fn from(value: StopBitsArg) -> Self {
-        match value {
-            StopBitsArg::One => StopBits::One,
-            StopBitsArg::Two => StopBits::Two,
-        }
-    }
-}
-
-impl From<ParityArg> for Parity {
-    fn from(value: ParityArg) -> Self {
-        match value {
-            ParityArg::None => Parity::None,
-            ParityArg::Odd => Parity::Odd,
-            ParityArg::Even => Parity::Even,
-        }
-    }
-}
-
-impl From<FlowControlArg> for FlowControl {
-    fn from(value: FlowControlArg) -> Self {
-        match value {
-            FlowControlArg::None => FlowControl::None,
-            FlowControlArg::Software => FlowControl::Software,
-            FlowControlArg::Hardware => FlowControl::Hardware,
-        }
-    }
-}
+use dnp3_cli_utils::LogLevel;
+use dnp3_cli_utils::serial::{DataBitsArg, StopBitsArg, ParityArg, FlowControlArg};
 use dnp3::tcp::tls::*;
 use dnp3::udp::{spawn_outstation_udp, OutstationUdpConfig, UdpSocketMode};
 
 /// DNP3 Outstation example application
-#[derive(Debug, Clone, Copy, clap::ValueEnum)]
-enum LogLevel {
-    Trace,
-    Debug,
-    Info,
-    Warn,
-    Error,
-}
-
-impl From<LogLevel> for tracing::Level {
-    fn from(value: LogLevel) -> Self {
-        match value {
-            LogLevel::Trace => tracing::Level::TRACE,
-            LogLevel::Debug => tracing::Level::DEBUG,
-            LogLevel::Info => tracing::Level::INFO,
-            LogLevel::Warn => tracing::Level::WARN,
-            LogLevel::Error => tracing::Level::ERROR,
-        }
-    }
-}
 
 #[derive(Debug, Parser)]
 #[command(name = "outstation")]

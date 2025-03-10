@@ -377,6 +377,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "dnp3-cli-utils"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "dnp3",
+ "tracing",
+]
+
+[[package]]
 name = "dnp3-ffi"
 version = "1.6.0"
 dependencies = [
@@ -451,6 +460,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "dnp3",
+ "dnp3-cli-utils",
  "tokio",
  "tokio-stream",
  "tokio-util",
