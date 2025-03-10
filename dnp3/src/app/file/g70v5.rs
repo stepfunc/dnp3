@@ -47,7 +47,7 @@ mod test {
     const OBJECT: Group70Var5 = Group70Var5 {
         file_handle: 0x01020304,
         block_number: 0xFECAADDE,
-        file_data: &[b'd', b'a', b't', b'a'],
+        file_data: b"data",
     };
 
     const DATA: &[u8] = &[

@@ -8,7 +8,7 @@ mod close_file;
 mod open_file;
 mod read_file;
 
-impl<'a> FreeFormat for Group70Var6<'a> {
+impl FreeFormat for Group70Var6<'_> {
     const VARIATION: Variation = Variation::Group70Var6;
 
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
@@ -17,7 +17,7 @@ impl<'a> FreeFormat for Group70Var6<'a> {
 }
 
 pub(super) fn last_block(block: u32) -> u32 {
-    1 << 31 | block
+    (1 << 31) | block
 }
 
 pub(super) fn fir_and_fin(seq: u8) -> u8 {
