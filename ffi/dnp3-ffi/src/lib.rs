@@ -1,4 +1,8 @@
-#![allow(clippy::missing_safety_doc, clippy::default_constructed_unit_structs)]
+#![allow(
+    clippy::missing_safety_doc,
+    clippy::default_constructed_unit_structs,
+    clippy::needless_lifetimes
+)]
 
 pub(crate) use crate::tracing::*;
 /// these use statements allow the code in the FFI to not have to known the real locations
