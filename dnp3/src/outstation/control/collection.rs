@@ -247,11 +247,7 @@ impl<'a> ControlCollection<'a> {
     pub(crate) fn from(headers: HeaderCollection<'a>) -> Result<Self, BadControlHeader> {
         // do one pass to ensure that all headers are control headers
         let non_control_header: Option<BadControlHeader> = headers.iter().find_map(|x| {
-            if let Err(header) = x.to_control_header() {
-                Some(header)
-            } else {
-                None
-            }
+            x.to_control_header().err()
         });
 
         if let Some(err) = non_control_header {
