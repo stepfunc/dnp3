@@ -1,4 +1,5 @@
-//! Example master application
+//! Example outstation application
+use clap::{Parser, Subcommand};
 use dnp3::app::control::*;
 use dnp3::app::measurement::*;
 use dnp3::app::*;
@@ -9,6 +10,8 @@ use dnp3::outstation::*;
 
 use dnp3::app::attr::{AttrProp, Attribute, StringAttr};
 use dnp3::tcp::*;
+use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::process::exit;
 use std::time::Duration;
 use tokio_stream::StreamExt;
@@ -21,41 +24,210 @@ use dnp3::serial::*;
 use dnp3::tcp::tls::*;
 use dnp3::udp::{spawn_outstation_udp, OutstationUdpConfig, UdpSocketMode};
 
-/// example of using the outstation API asynchronously from within the Tokio runtime
-///
-/// The application takes a single command line argument specifying the desired transport
+/// DNP3 Outstation example application
+#[derive(Debug, Parser)]
+#[command(name = "outstation")]
+#[command(about = "DNP3 Outstation example application", long_about = None)]
+struct Cli {
+    /// Log level to use
+    #[arg(short, long, default_value = "info")]
+    log_level: String,
+
+    /// Outstation address (DNP3 address of the outstation)
+    #[arg(short, long, default_value = "1024")]
+    outstation_address: EndpointAddress,
+
+    /// Master address (DNP3 address of the master)
+    #[arg(short, long, default_value = "1")]
+    master_address: EndpointAddress,
+
+    #[command(subcommand)]
+    transport: TransportCommand,
+}
+
+#[derive(Debug, Subcommand)]
+enum TransportCommand {
+    /// Use TCP server transport
+    TcpServer {
+        /// IP address and port to bind to
+        #[arg(short, long, default_value = "127.0.0.1:20000")]
+        endpoint: SocketAddr,
+    },
+    /// Use TCP client transport
+    TcpClient {
+        /// IP address and port to connect to
+        #[arg(short, long, default_value = "127.0.0.1:20000")]
+        endpoint: SocketAddr,
+    },
+    /// Use UDP transport
+    Udp {
+        /// Local IP address and port to bind to
+        #[arg(short, long, default_value = "127.0.0.1:20000")]
+        local_endpoint: SocketAddr,
+
+        /// Remote IP address and port to send to
+        #[arg(short, long, default_value = "127.0.0.1:20001")]
+        remote_endpoint: SocketAddr,
+    },
+    #[cfg(feature = "serial")]
+    /// Use serial transport
+    Serial {
+        /// Serial port name
+        #[arg(short, long, default_value = "/dev/ttySIM1")]
+        port: String,
+
+        /// Baud rate
+        #[arg(short, long, default_value = "9600")]
+        baud_rate: u32,
+
+        /// Data bits
+        #[arg(long, default_value = "8")]
+        data_bits: u8,
+
+        /// Stop bits
+        #[arg(long, default_value = "1")]
+        stop_bits: u8,
+
+        /// Parity
+        #[arg(long, default_value = "none")]
+        parity: String,
+
+        /// Flow control
+        #[arg(long, default_value = "none")]
+        flow_control: String,
+    },
+    #[cfg(feature = "tls")]
+    /// Use TLS with CA chain transport
+    TlsCa {
+        /// IP address and port to bind to
+        #[arg(short, long, default_value = "127.0.0.1:20001")]
+        endpoint: SocketAddr,
+
+        /// Domain name to verify
+        #[arg(long, default_value = "test.com")]
+        domain: String,
+
+        /// Path to CA certificate file
+        #[arg(long, default_value = "./certs/ca_chain/ca_cert.pem")]
+        ca_cert: PathBuf,
+
+        /// Path to entity certificate file
+        #[arg(long, default_value = "./certs/ca_chain/entity2_cert.pem")]
+        entity_cert: PathBuf,
+
+        /// Path to entity private key file
+        #[arg(long, default_value = "./certs/ca_chain/entity2_key.pem")]
+        entity_key: PathBuf,
+    },
+    #[cfg(feature = "tls")]
+    /// Use TLS with self-signed certificates
+    TlsSelfSigned {
+        /// IP address and port to bind to
+        #[arg(short, long, default_value = "127.0.0.1:20001")]
+        endpoint: SocketAddr,
+
+        /// Path to peer certificate file
+        #[arg(long, default_value = "./certs/self_signed/entity1_cert.pem")]
+        peer_cert: PathBuf,
+
+        /// Path to entity certificate file
+        #[arg(long, default_value = "./certs/self_signed/entity2_cert.pem")]
+        entity_cert: PathBuf,
+
+        /// Path to entity private key file
+        #[arg(long, default_value = "./certs/self_signed/entity2_key.pem")]
+        entity_key: PathBuf,
+    },
+}
+
+/// Example of using the outstation API asynchronously from within the Tokio runtime
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // Parse command line arguments
+    let cli = Cli::parse();
+
+    // Initialize logging
+    let log_level = match cli.log_level.to_lowercase().as_str() {
+        "trace" => tracing::Level::TRACE,
+        "debug" => tracing::Level::DEBUG,
+        "info" => tracing::Level::INFO,
+        "warn" => tracing::Level::WARN,
+        "error" => tracing::Level::ERROR,
+        _ => tracing::Level::INFO,
+    };
+
     tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::INFO)
+        .with_max_level(log_level)
         .with_target(false)
         .init();
 
-    let args: Vec<String> = std::env::args().collect();
-    let transport: &str = match args.as_slice() {
-        [_, x] => x,
-        _ => {
-            eprintln!("please specify a transport:");
-            eprintln!("usage: outstation <transport> (tcp, serial, tls-ca, tls-self-signed)");
-            exit(-1);
+    // Process the transport command
+    match &cli.transport {
+        TransportCommand::TcpServer { endpoint } => {
+            tracing::info!("Starting TCP server on {}", endpoint);
+            run_tcp_server(*endpoint, &cli).await
         }
-    };
-    match transport {
-        "tcp" => run_tcp_server().await,
-        "tcp-client" => run_tcp_client().await,
-        "udp" => run_udp().await,
-        #[cfg(feature = "serial")]
-        "serial" => run_serial().await,
-        #[cfg(feature = "tls")]
-        "tls-ca" => run_tls_server(get_ca_chain_config()?).await,
-        #[cfg(feature = "tls")]
-        "tls-self-signed" => run_tls_server(get_self_signed_config()?).await,
-        _ => {
-            eprintln!(
-                "unknown transport '{}', options are (tcp, serial, tls-ca, tls-self-signed)",
-                transport
+        TransportCommand::TcpClient { endpoint } => {
+            tracing::info!("Starting TCP client to {}", endpoint);
+            run_tcp_client(*endpoint, &cli).await
+        }
+        TransportCommand::Udp {
+            local_endpoint,
+            remote_endpoint,
+        } => {
+            tracing::info!(
+                "Starting UDP transport from {} to {}",
+                local_endpoint,
+                remote_endpoint
             );
-            exit(-1);
+            run_udp(*local_endpoint, *remote_endpoint, &cli).await
+        }
+        #[cfg(feature = "serial")]
+        TransportCommand::Serial {
+            port,
+            baud_rate,
+            data_bits,
+            stop_bits,
+            parity,
+            flow_control,
+        } => {
+            tracing::info!("Starting serial transport on {}", port);
+            run_serial(
+                port,
+                *baud_rate,
+                *data_bits,
+                *stop_bits,
+                parity,
+                flow_control,
+                &cli,
+            )
+            .await
+        }
+        #[cfg(feature = "tls")]
+        TransportCommand::TlsCa {
+            endpoint,
+            domain,
+            ca_cert,
+            entity_cert,
+            entity_key,
+        } => {
+            tracing::info!("Starting TLS server with CA chain on {}", endpoint);
+            let config = get_ca_chain_config(domain, ca_cert, entity_cert, entity_key)?;
+            run_tls_server(*endpoint, config, &cli).await
+        }
+        #[cfg(feature = "tls")]
+        TransportCommand::TlsSelfSigned {
+            endpoint,
+            peer_cert,
+            entity_cert,
+            entity_key,
+        } => {
+            tracing::info!(
+                "Starting TLS server with self-signed certificates on {}",
+                endpoint
+            );
+            let config = get_self_signed_config(peer_cert, entity_cert, entity_key)?;
+            run_tls_server(*endpoint, config, &cli).await
         }
     }
 }
@@ -240,18 +412,22 @@ impl ControlSupport<Group41Var4> for ExampleControlHandler {
 }
 // ANCHOR_END: control_handler
 
-async fn run_tcp_server() -> Result<(), Box<dyn std::error::Error>> {
+async fn run_tcp_server(endpoint: SocketAddr, cli: &Cli) -> Result<(), Box<dyn std::error::Error>> {
     // ANCHOR: create_tcp_server
-    let server = Server::new_tcp_server(LinkErrorMode::Close, "127.0.0.1:20000".parse()?);
+    let server = Server::new_tcp_server(LinkErrorMode::Close, endpoint);
     // ANCHOR_END: create_tcp_server
 
-    run_server(server).await
+    run_server(server, cli).await
 }
 
-async fn run_udp() -> Result<(), Box<dyn std::error::Error>> {
+async fn run_udp(
+    local_endpoint: SocketAddr,
+    remote_endpoint: SocketAddr,
+    cli: &Cli,
+) -> Result<(), Box<dyn std::error::Error>> {
     let udp_config = OutstationUdpConfig {
-        local_endpoint: "127.0.0.1:20000".parse().unwrap(),
-        remote_endpoint: "127.0.0.1:20001".parse().unwrap(),
+        local_endpoint,
+        remote_endpoint,
         socket_mode: UdpSocketMode::OneToOne,
         link_read_mode: LinkReadMode::Datagram,
         retry_delay: Timeout::from_secs(5)?,
@@ -259,7 +435,7 @@ async fn run_udp() -> Result<(), Box<dyn std::error::Error>> {
 
     let outstation = spawn_outstation_udp(
         udp_config,
-        get_outstation_config(),
+        get_outstation_config_from_cli(cli),
         Box::new(ExampleOutstationApplication),
         Box::new(ExampleOutstationInformation),
         Box::new(ExampleControlHandler),
@@ -268,13 +444,13 @@ async fn run_udp() -> Result<(), Box<dyn std::error::Error>> {
     run_outstation(outstation).await
 }
 
-async fn run_tcp_client() -> Result<(), Box<dyn std::error::Error>> {
+async fn run_tcp_client(endpoint: SocketAddr, cli: &Cli) -> Result<(), Box<dyn std::error::Error>> {
     let outstation = spawn_outstation_tcp_client(
         LinkErrorMode::Close,
-        EndpointList::single("127.0.0.1:20000".to_string()),
+        EndpointList::single(endpoint.to_string()),
         ConnectStrategy::default(),
         ConnectOptions::default(),
-        get_outstation_config(),
+        get_outstation_config_from_cli(cli),
         Box::new(ExampleOutstationApplication),
         Box::new(ExampleOutstationInformation),
         Box::new(ExampleControlHandler),
@@ -285,13 +461,64 @@ async fn run_tcp_client() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[cfg(feature = "serial")]
-async fn run_serial() -> Result<(), Box<dyn std::error::Error>> {
+async fn run_serial(
+    port: &str,
+    baud_rate: u32,
+    data_bits: u8,
+    stop_bits: u8,
+    parity: &str,
+    flow_control: &str,
+    cli: &Cli,
+) -> Result<(), Box<dyn std::error::Error>> {
     // ANCHOR: create_serial_server
+    // Parse serial settings
+    let mut settings = SerialSettings::default();
+    settings.baud_rate = baud_rate;
+
+    // Parse data bits
+    settings.data_bits = match data_bits {
+        5 => DataBits::Five,
+        6 => DataBits::Six,
+        7 => DataBits::Seven,
+        8 => DataBits::Eight,
+        _ => {
+            return Err(format!("Invalid data bits: {}", data_bits).into());
+        }
+    };
+
+    // Parse stop bits
+    settings.stop_bits = match stop_bits {
+        1 => StopBits::One,
+        2 => StopBits::Two,
+        _ => {
+            return Err(format!("Invalid stop bits: {}", stop_bits).into());
+        }
+    };
+
+    // Parse parity
+    settings.parity = match parity.to_lowercase().as_str() {
+        "none" => Parity::None,
+        "odd" => Parity::Odd,
+        "even" => Parity::Even,
+        _ => {
+            return Err(format!("Invalid parity: {}", parity).into());
+        }
+    };
+
+    // Parse flow control
+    settings.flow_control = match flow_control.to_lowercase().as_str() {
+        "none" => FlowControl::None,
+        "software" => FlowControl::Software,
+        "hardware" => FlowControl::Hardware,
+        _ => {
+            return Err(format!("Invalid flow control: {}", flow_control).into());
+        }
+    };
+
     let outstation = spawn_outstation_serial_2(
-        // change this for a real port
-        "/dev/ttySIM1",
-        SerialSettings::default(),
-        get_outstation_config(),
+        port,
+        settings,
+        get_outstation_config_from_cli(cli),
         RetryStrategy::new(Duration::from_secs(1), Duration::from_secs(60)),
         // customizable trait that controls outstation behavior
         Box::new(ExampleOutstationApplication),
@@ -307,18 +534,22 @@ async fn run_serial() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 #[cfg(feature = "tls")]
-async fn run_tls_server(config: TlsServerConfig) -> Result<(), Box<dyn std::error::Error>> {
+async fn run_tls_server(
+    endpoint: SocketAddr,
+    config: TlsServerConfig,
+    cli: &Cli,
+) -> Result<(), Box<dyn std::error::Error>> {
     // ANCHOR: create_tls_server
-    let server = Server::new_tls_server(LinkErrorMode::Close, "127.0.0.1:20001".parse()?, config);
+    let server = Server::new_tls_server(LinkErrorMode::Close, endpoint, config);
     // ANCHOR_END: create_tls_server
 
-    run_server(server).await
+    run_server(server, cli).await
 }
 
-async fn run_server(mut server: Server) -> Result<(), Box<dyn std::error::Error>> {
+async fn run_server(mut server: Server, cli: &Cli) -> Result<(), Box<dyn std::error::Error>> {
     // ANCHOR: tcp_server_spawn_outstation
     let outstation = server.add_outstation(
-        get_outstation_config(),
+        get_outstation_config_from_cli(cli),
         Box::new(ExampleOutstationApplication),
         Box::new(ExampleOutstationInformation),
         Box::new(ExampleControlHandler),
@@ -404,6 +635,20 @@ async fn run_outstation(
     let mut analog_output_status_value = 0.0;
 
     let mut reader = FramedRead::new(tokio::io::stdin(), LinesCodec::new());
+
+    tracing::info!("Outstation started. Available commands:");
+    tracing::info!("  x - exit");
+    tracing::info!("  enable - enable the outstation");
+    tracing::info!("  disable - disable the outstation");
+    tracing::info!("  bi - toggle binary input");
+    tracing::info!("  dbbi - toggle double bit binary input");
+    tracing::info!("  bos - toggle binary output status");
+    tracing::info!("  co - increment counter");
+    tracing::info!("  fco - increment frozen counter");
+    tracing::info!("  ai - increment analog input");
+    tracing::info!("  aif - set analog input flag to COMM_LOST");
+    tracing::info!("  aos - increment analog output status");
+    tracing::info!("  os - set octet string to 'Hello'");
 
     loop {
         match reader.next().await.unwrap()?.as_str() {
@@ -534,14 +779,18 @@ fn get_current_time() -> Time {
 }
 
 #[cfg(feature = "tls")]
-fn get_ca_chain_config() -> Result<TlsServerConfig, Box<dyn std::error::Error>> {
-    use std::path::Path;
+fn get_ca_chain_config(
+    domain: &str,
+    ca_cert: &PathBuf,
+    entity_cert: &PathBuf,
+    entity_key: &PathBuf,
+) -> Result<TlsServerConfig, Box<dyn std::error::Error>> {
     // ANCHOR: tls_ca_chain_config
     let config = TlsServerConfig::full_pki(
-        Some("test.com".to_string()),
-        Path::new("./certs/ca_chain/ca_cert.pem"),
-        Path::new("./certs/ca_chain/entity2_cert.pem"),
-        Path::new("./certs/ca_chain/entity2_key.pem"),
+        Some(domain.to_string()),
+        ca_cert,
+        entity_cert,
+        entity_key,
         None, // no password
         MinTlsVersion::V12,
     )?;
@@ -551,13 +800,16 @@ fn get_ca_chain_config() -> Result<TlsServerConfig, Box<dyn std::error::Error>> 
 }
 
 #[cfg(feature = "tls")]
-fn get_self_signed_config() -> Result<TlsServerConfig, Box<dyn std::error::Error>> {
-    use std::path::Path;
+fn get_self_signed_config(
+    peer_cert: &PathBuf,
+    entity_cert: &PathBuf,
+    entity_key: &PathBuf,
+) -> Result<TlsServerConfig, Box<dyn std::error::Error>> {
     // ANCHOR: tls_self_signed_config
     let config = TlsServerConfig::self_signed(
-        Path::new("./certs/self_signed/entity1_cert.pem"),
-        Path::new("./certs/self_signed/entity2_cert.pem"),
-        Path::new("./certs/self_signed/entity2_key.pem"),
+        peer_cert,
+        entity_cert,
+        entity_key,
         None, // no password
         MinTlsVersion::V12,
     )?;
@@ -566,14 +818,14 @@ fn get_self_signed_config() -> Result<TlsServerConfig, Box<dyn std::error::Error
     Ok(config)
 }
 
-fn get_outstation_config() -> OutstationConfig {
+fn get_outstation_config_from_cli(cli: &Cli) -> OutstationConfig {
     // ANCHOR: outstation_config
-    // create an outstation configuration with default values
+    // create an outstation configuration with values from CLI
     let mut config = OutstationConfig::new(
         // outstation address
-        EndpointAddress::try_new(1024).unwrap(),
+        cli.outstation_address,
         // master address
-        EndpointAddress::try_new(1).unwrap(),
+        cli.master_address,
         get_event_buffer_config(),
     );
     config.class_zero.octet_string = true;
