@@ -7,8 +7,6 @@ use crate::outstation::database::{Database, DatabaseHandle};
 use crate::outstation::task::{ConfigurationChange, OutstationMessage};
 use crate::util::channel::Sender;
 
-/// configuration types
-
 /// database API to add/remove/update values
 pub mod database;
 
