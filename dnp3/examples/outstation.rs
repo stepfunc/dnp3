@@ -20,6 +20,83 @@ use tokio_util::codec::LinesCodec;
 
 #[cfg(feature = "serial")]
 use dnp3::serial::*;
+
+// Define enums for clap to parse serial settings
+#[cfg(feature = "serial")]
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+enum DataBitsArg {
+    Five,
+    Six,
+    Seven,
+    Eight,
+}
+
+#[cfg(feature = "serial")]
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+enum StopBitsArg {
+    One,
+    Two,
+}
+
+#[cfg(feature = "serial")]
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+enum ParityArg {
+    None,
+    Odd,
+    Even,
+}
+
+#[cfg(feature = "serial")]
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+enum FlowControlArg {
+    None,
+    Software,
+    Hardware,
+}
+
+#[cfg(feature = "serial")]
+impl From<DataBitsArg> for DataBits {
+    fn from(value: DataBitsArg) -> Self {
+        match value {
+            DataBitsArg::Five => DataBits::Five,
+            DataBitsArg::Six => DataBits::Six,
+            DataBitsArg::Seven => DataBits::Seven,
+            DataBitsArg::Eight => DataBits::Eight,
+        }
+    }
+}
+
+#[cfg(feature = "serial")]
+impl From<StopBitsArg> for StopBits {
+    fn from(value: StopBitsArg) -> Self {
+        match value {
+            StopBitsArg::One => StopBits::One,
+            StopBitsArg::Two => StopBits::Two,
+        }
+    }
+}
+
+#[cfg(feature = "serial")]
+impl From<ParityArg> for Parity {
+    fn from(value: ParityArg) -> Self {
+        match value {
+            ParityArg::None => Parity::None,
+            ParityArg::Odd => Parity::Odd,
+            ParityArg::Even => Parity::Even,
+        }
+    }
+}
+
+#[cfg(feature = "serial")]
+impl From<FlowControlArg> for FlowControl {
+    fn from(value: FlowControlArg) -> Self {
+        match value {
+            FlowControlArg::None => FlowControl::None,
+            FlowControlArg::Software => FlowControl::Software,
+            FlowControlArg::Hardware => FlowControl::Hardware,
+        }
+    }
+}
 #[cfg(feature = "tls")]
 use dnp3::tcp::tls::*;
 use dnp3::udp::{spawn_outstation_udp, OutstationUdpConfig, UdpSocketMode};
@@ -81,20 +158,20 @@ enum TransportCommand {
         baud_rate: u32,
 
         /// Data bits
-        #[arg(long, default_value = "8")]
-        data_bits: u8,
+        #[arg(long, value_enum, default_value_t = DataBitsArg::Eight)]
+        data_bits: DataBitsArg,
 
         /// Stop bits
-        #[arg(long, default_value = "1")]
-        stop_bits: u8,
+        #[arg(long, value_enum, default_value_t = StopBitsArg::One)]
+        stop_bits: StopBitsArg,
 
         /// Parity
-        #[arg(long, default_value = "none")]
-        parity: String,
+        #[arg(long, value_enum, default_value_t = ParityArg::None)]
+        parity: ParityArg,
 
         /// Flow control
-        #[arg(long, default_value = "none")]
-        flow_control: String,
+        #[arg(long, value_enum, default_value_t = FlowControlArg::None)]
+        flow_control: FlowControlArg,
     },
     #[cfg(feature = "tls")]
     /// Use TLS with CA chain transport
@@ -197,8 +274,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 *baud_rate,
                 *data_bits,
                 *stop_bits,
-                parity,
-                flow_control,
+                *parity,
+                *flow_control,
                 &cli,
             )
             .await
@@ -464,56 +541,20 @@ async fn run_tcp_client(endpoint: SocketAddr, cli: &Cli) -> Result<(), Box<dyn s
 async fn run_serial(
     port: &str,
     baud_rate: u32,
-    data_bits: u8,
-    stop_bits: u8,
-    parity: &str,
-    flow_control: &str,
+    data_bits: DataBitsArg,
+    stop_bits: StopBitsArg,
+    parity: ParityArg,
+    flow_control: FlowControlArg,
     cli: &Cli,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // ANCHOR: create_serial_server
-    // Parse serial settings
+    // Setup serial settings with values from Clap
     let mut settings = SerialSettings::default();
     settings.baud_rate = baud_rate;
-
-    // Parse data bits
-    settings.data_bits = match data_bits {
-        5 => DataBits::Five,
-        6 => DataBits::Six,
-        7 => DataBits::Seven,
-        8 => DataBits::Eight,
-        _ => {
-            return Err(format!("Invalid data bits: {}", data_bits).into());
-        }
-    };
-
-    // Parse stop bits
-    settings.stop_bits = match stop_bits {
-        1 => StopBits::One,
-        2 => StopBits::Two,
-        _ => {
-            return Err(format!("Invalid stop bits: {}", stop_bits).into());
-        }
-    };
-
-    // Parse parity
-    settings.parity = match parity.to_lowercase().as_str() {
-        "none" => Parity::None,
-        "odd" => Parity::Odd,
-        "even" => Parity::Even,
-        _ => {
-            return Err(format!("Invalid parity: {}", parity).into());
-        }
-    };
-
-    // Parse flow control
-    settings.flow_control = match flow_control.to_lowercase().as_str() {
-        "none" => FlowControl::None,
-        "software" => FlowControl::Software,
-        "hardware" => FlowControl::Hardware,
-        _ => {
-            return Err(format!("Invalid flow control: {}", flow_control).into());
-        }
-    };
+    settings.data_bits = data_bits.into();
+    settings.stop_bits = stop_bits.into();
+    settings.parity = parity.into();
+    settings.flow_control = flow_control.into();
 
     let outstation = spawn_outstation_serial_2(
         port,
