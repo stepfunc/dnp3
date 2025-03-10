@@ -11,7 +11,7 @@ use dnp3::outstation::*;
 use dnp3::app::attr::{AttrProp, Attribute, StringAttr};
 use dnp3::tcp::*;
 use std::net::SocketAddr;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tokio_stream::StreamExt;
 use tokio_util::codec::FramedRead;
@@ -537,12 +537,13 @@ async fn run_serial(
 ) -> Result<(), Box<dyn std::error::Error>> {
     // ANCHOR: create_serial_server
     // Setup serial settings with values from Clap
-    let mut settings = SerialSettings::default();
-    settings.baud_rate = baud_rate;
-    settings.data_bits = data_bits.into();
-    settings.stop_bits = stop_bits.into();
-    settings.parity = parity.into();
-    settings.flow_control = flow_control.into();
+    let settings = SerialSettings {
+        baud_rate,
+        data_bits: data_bits.into(),
+        stop_bits: stop_bits.into(),
+        parity: parity.into(),
+        flow_control: flow_control.into(),
+    };
 
     let outstation = spawn_outstation_serial_2(
         port,
@@ -808,9 +809,9 @@ fn get_current_time() -> Time {
 
 fn get_ca_chain_config(
     domain: &str,
-    ca_cert: &PathBuf,
-    entity_cert: &PathBuf,
-    entity_key: &PathBuf,
+    ca_cert: &Path,
+    entity_cert: &Path,
+    entity_key: &Path,
 ) -> Result<TlsServerConfig, Box<dyn std::error::Error>> {
     // ANCHOR: tls_ca_chain_config
     let config = TlsServerConfig::full_pki(
@@ -827,9 +828,9 @@ fn get_ca_chain_config(
 }
 
 fn get_self_signed_config(
-    peer_cert: &PathBuf,
-    entity_cert: &PathBuf,
-    entity_key: &PathBuf,
+    peer_cert: &Path,
+    entity_cert: &Path,
+    entity_key: &Path,
 ) -> Result<TlsServerConfig, Box<dyn std::error::Error>> {
     // ANCHOR: tls_self_signed_config
     let config = TlsServerConfig::self_signed(
