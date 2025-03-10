@@ -91,13 +91,34 @@ use dnp3::tcp::tls::*;
 use dnp3::udp::{spawn_outstation_udp, OutstationUdpConfig, UdpSocketMode};
 
 /// DNP3 Outstation example application
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+enum LogLevel {
+    Trace,
+    Debug,
+    Info,
+    Warn,
+    Error,
+}
+
+impl From<LogLevel> for tracing::Level {
+    fn from(value: LogLevel) -> Self {
+        match value {
+            LogLevel::Trace => tracing::Level::TRACE,
+            LogLevel::Debug => tracing::Level::DEBUG,
+            LogLevel::Info => tracing::Level::INFO,
+            LogLevel::Warn => tracing::Level::WARN,
+            LogLevel::Error => tracing::Level::ERROR,
+        }
+    }
+}
+
 #[derive(Debug, Parser)]
 #[command(name = "outstation")]
 #[command(about = "DNP3 Outstation example application", long_about = None)]
 struct Cli {
     /// Log level to use
-    #[arg(short, long, default_value = "info")]
-    log_level: String,
+    #[arg(short, long, value_enum, default_value_t = LogLevel::Info)]
+    log_level: LogLevel,
 
     /// Outstation address (DNP3 address of the outstation)
     #[arg(short, long, default_value = "1024")]
@@ -213,14 +234,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
 
     // Initialize logging
-    let log_level = match cli.log_level.to_lowercase().as_str() {
-        "trace" => tracing::Level::TRACE,
-        "debug" => tracing::Level::DEBUG,
-        "info" => tracing::Level::INFO,
-        "warn" => tracing::Level::WARN,
-        "error" => tracing::Level::ERROR,
-        _ => tracing::Level::INFO,
-    };
+    let log_level: tracing::Level = cli.log_level.into();
 
     tracing_subscriber::fmt()
         .with_max_level(log_level)
