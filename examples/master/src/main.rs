@@ -24,7 +24,6 @@ use std::path::{Path, PathBuf};
 use dnp3_cli_utils::serial::{DataBitsArg, FlowControlArg, ParityArg, StopBitsArg};
 use dnp3_cli_utils::LogLevel;
 
-/// DNP3 Master example application
 #[derive(Debug, Parser)]
 #[command(name = "master")]
 #[command(about = "DNP3 Master example application", long_about = None)]

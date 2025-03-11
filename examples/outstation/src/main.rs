@@ -23,8 +23,6 @@ use dnp3::udp::{spawn_outstation_udp, OutstationUdpConfig, UdpSocketMode};
 use dnp3_cli_utils::serial::{DataBitsArg, FlowControlArg, ParityArg, StopBitsArg};
 use dnp3_cli_utils::LogLevel;
 
-/// DNP3 Outstation example application
-
 #[derive(Debug, Parser)]
 #[command(name = "outstation")]
 #[command(about = "DNP3 Outstation example application", long_about = None)]
