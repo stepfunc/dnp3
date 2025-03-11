@@ -28,7 +28,7 @@ use dnp3_cli_utils::LogLevel;
 #[derive(Debug, Parser)]
 #[command(name = "master")]
 #[command(about = "DNP3 Master example application", long_about = None)]
-struct Cli {
+struct CliArgs {
     /// Log level to use
     #[arg(short, long, value_enum, default_value_t = LogLevel::Info)]
     log_level: LogLevel,
@@ -363,11 +363,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ANCHOR_END: runtime_init
 
     // Parse command line arguments
-    let cli = Cli::parse();
+    let args = CliArgs::parse();
 
     // ANCHOR: logging
     // Initialize logging
-    let log_level: tracing::Level = cli.log_level.into();
+    let log_level: tracing::Level = args.log_level.into();
 
     tracing_subscriber::fmt()
         .with_max_level(log_level)
@@ -376,7 +376,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ANCHOR_END: logging
 
     // spawn the master channel based on the command line argument
-    let (mut channel, mut association) = create_channel_and_association(&cli).await?;
+    let (mut channel, mut association) = create_channel_and_association(&args).await?;
 
     // create an event poll
     // ANCHOR: add_poll
@@ -601,7 +601,7 @@ impl CliHandler {
 
 // create the specified channel based on the command line argument
 async fn create_channel_and_association(
-    cli: &Cli,
+    cli: &CliArgs,
 ) -> Result<(MasterChannel, AssociationHandle), Box<dyn std::error::Error>> {
     match &cli.transport {
         TransportCommand::TcpClient {

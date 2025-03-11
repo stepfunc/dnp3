@@ -28,7 +28,7 @@ use dnp3_cli_utils::LogLevel;
 #[derive(Debug, Parser)]
 #[command(name = "outstation")]
 #[command(about = "DNP3 Outstation example application", long_about = None)]
-struct Cli {
+struct CliArgs {
     /// Log level to use
     #[arg(short, long, value_enum, default_value_t = LogLevel::Info)]
     log_level: LogLevel,
@@ -144,10 +144,10 @@ enum TransportCommand {
 #[tokio::main(flavor = "multi_thread")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Parse command line arguments
-    let cli = Cli::parse();
+    let args = CliArgs::parse();
 
     // Initialize logging
-    let log_level: tracing::Level = cli.log_level.into();
+    let log_level: tracing::Level = args.log_level.into();
 
     tracing_subscriber::fmt()
         .with_max_level(log_level)
@@ -155,14 +155,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init();
 
     // Process the transport command
-    match &cli.transport {
+    match &args.transport {
         TransportCommand::TcpServer { endpoint } => {
             tracing::info!("Starting TCP server on {}", endpoint);
-            run_tcp_server(*endpoint, &cli).await
+            run_tcp_server(*endpoint, &args).await
         }
         TransportCommand::TcpClient { endpoint } => {
             tracing::info!("Starting TCP client to {}", endpoint);
-            run_tcp_client(*endpoint, &cli).await
+            run_tcp_client(*endpoint, &args).await
         }
         TransportCommand::Udp {
             local_endpoint,
@@ -173,7 +173,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 local_endpoint,
                 remote_endpoint
             );
-            run_udp(*local_endpoint, *remote_endpoint, &cli).await
+            run_udp(*local_endpoint, *remote_endpoint, &args).await
         }
 
         TransportCommand::Serial {
@@ -192,7 +192,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 *stop_bits,
                 *parity,
                 *flow_control,
-                &cli,
+                &args,
             )
             .await
         }
@@ -206,7 +206,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         } => {
             tracing::info!("Starting TLS server with CA chain on {}", endpoint);
             let config = get_ca_chain_config(domain, ca_cert, entity_cert, entity_key)?;
-            run_tls_server(*endpoint, config, &cli).await
+            run_tls_server(*endpoint, config, &args).await
         }
 
         TransportCommand::TlsSelfSigned {
@@ -220,7 +220,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 endpoint
             );
             let config = get_self_signed_config(peer_cert, entity_cert, entity_key)?;
-            run_tls_server(*endpoint, config, &cli).await
+            run_tls_server(*endpoint, config, &args).await
         }
     }
 }
@@ -405,7 +405,10 @@ impl ControlSupport<Group41Var4> for ExampleControlHandler {
 }
 // ANCHOR_END: control_handler
 
-async fn run_tcp_server(endpoint: SocketAddr, cli: &Cli) -> Result<(), Box<dyn std::error::Error>> {
+async fn run_tcp_server(
+    endpoint: SocketAddr,
+    cli: &CliArgs,
+) -> Result<(), Box<dyn std::error::Error>> {
     // ANCHOR: create_tcp_server
     let server = Server::new_tcp_server(LinkErrorMode::Close, endpoint);
     // ANCHOR_END: create_tcp_server
@@ -416,7 +419,7 @@ async fn run_tcp_server(endpoint: SocketAddr, cli: &Cli) -> Result<(), Box<dyn s
 async fn run_udp(
     local_endpoint: SocketAddr,
     remote_endpoint: SocketAddr,
-    cli: &Cli,
+    cli: &CliArgs,
 ) -> Result<(), Box<dyn std::error::Error>> {
     let udp_config = OutstationUdpConfig {
         local_endpoint,
@@ -437,7 +440,10 @@ async fn run_udp(
     run_outstation(outstation).await
 }
 
-async fn run_tcp_client(endpoint: SocketAddr, cli: &Cli) -> Result<(), Box<dyn std::error::Error>> {
+async fn run_tcp_client(
+    endpoint: SocketAddr,
+    cli: &CliArgs,
+) -> Result<(), Box<dyn std::error::Error>> {
     let outstation = spawn_outstation_tcp_client(
         LinkErrorMode::Close,
         EndpointList::single(endpoint.to_string()),
@@ -460,7 +466,7 @@ async fn run_serial(
     stop_bits: StopBitsArg,
     parity: ParityArg,
     flow_control: FlowControlArg,
-    cli: &Cli,
+    cli: &CliArgs,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // ANCHOR: create_serial_server
     // Setup serial settings with values from Clap
@@ -493,7 +499,7 @@ async fn run_serial(
 async fn run_tls_server(
     endpoint: SocketAddr,
     config: TlsServerConfig,
-    cli: &Cli,
+    cli: &CliArgs,
 ) -> Result<(), Box<dyn std::error::Error>> {
     // ANCHOR: create_tls_server
     let server = Server::new_tls_server(LinkErrorMode::Close, endpoint, config);
@@ -502,7 +508,7 @@ async fn run_tls_server(
     run_server(server, cli).await
 }
 
-async fn run_server(mut server: Server, cli: &Cli) -> Result<(), Box<dyn std::error::Error>> {
+async fn run_server(mut server: Server, cli: &CliArgs) -> Result<(), Box<dyn std::error::Error>> {
     // ANCHOR: tcp_server_spawn_outstation
     let outstation = server.add_outstation(
         get_outstation_config_from_cli(cli),
@@ -772,7 +778,7 @@ fn get_self_signed_config(
     Ok(config)
 }
 
-fn get_outstation_config_from_cli(cli: &Cli) -> OutstationConfig {
+fn get_outstation_config_from_cli(cli: &CliArgs) -> OutstationConfig {
     // ANCHOR: outstation_config
     // create an outstation configuration with values from CLI
     let mut config = OutstationConfig::new(
