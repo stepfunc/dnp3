@@ -8,6 +8,7 @@ license-file = "../../LICENSE.txt"
 
 [dependencies]
 dnp3 = { path = "../../dnp3", features = ["tls", "serial"] }
+dnp3-cli-utils = { path = "../cli-utils" }
 tokio = { version = "1", features = ["net", "sync", "io-util", "io-std", "time", "rt", "rt-multi-thread", "macros"] }
 tokio-stream = "0.1.1"
 tokio-util = { version = "0.7", features = ["codec"] }

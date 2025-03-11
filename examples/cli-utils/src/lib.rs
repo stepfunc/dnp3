@@ -1,5 +1,5 @@
 //! Shared CLI utilities for DNP3 examples
-//! 
+//!
 //! This crate contains shared types and utilities for DNP3 example CLI applications.
 
 use clap::ValueEnum;

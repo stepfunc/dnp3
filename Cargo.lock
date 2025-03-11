@@ -434,6 +434,7 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "dnp3",
+ "dnp3-cli-utils",
  "tokio",
  "tokio-stream",
  "tokio-util",

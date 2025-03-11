@@ -18,10 +18,10 @@ use tokio_util::codec::FramedRead;
 use tokio_util::codec::LinesCodec;
 
 use dnp3::serial::*;
-use dnp3_cli_utils::LogLevel;
-use dnp3_cli_utils::serial::{DataBitsArg, StopBitsArg, ParityArg, FlowControlArg};
 use dnp3::tcp::tls::*;
 use dnp3::udp::{spawn_outstation_udp, OutstationUdpConfig, UdpSocketMode};
+use dnp3_cli_utils::serial::{DataBitsArg, FlowControlArg, ParityArg, StopBitsArg};
+use dnp3_cli_utils::LogLevel;
 
 /// DNP3 Outstation example application
 
