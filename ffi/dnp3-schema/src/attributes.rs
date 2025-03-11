@@ -220,7 +220,7 @@ trait UnknownCase {
         Self: Sized;
 }
 
-impl<'a> UnknownCase for EnumBuilder<'a> {
+impl UnknownCase for EnumBuilder<'_> {
     fn add_unknown(self) -> BindResult<Self> {
         self.push(
             "unknown",
@@ -240,7 +240,7 @@ fn define_attr_enum(
     for attr in ATTRIBUTES.iter().filter(|x| x.attr_type == typ) {
         builder = builder.push(
             attr.name,
-            &format!("Variation {} - {}", attr.variation, attr.desc),
+            format!("Variation {} - {}", attr.variation, attr.desc),
         )?;
     }
 

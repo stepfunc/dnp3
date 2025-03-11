@@ -1219,7 +1219,7 @@ mod test {
             crate::app::file::Group70Var5 {
                 file_handle: 0x04030201,
                 block_number: 0xDDCCBBAA,
-                file_data: &[b'd', b'a', b't', b'a'],
+                file_data: b"data",
             }
         );
     }

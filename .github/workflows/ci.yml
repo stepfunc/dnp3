@@ -108,9 +108,9 @@ jobs:
           cp -a ffi/bindings/java/dnp3/target/apidocs ~/doc/java
           rm ffi/bindings/c/generated/logo.png ffi/bindings/c/generated/doxygen-awesome.css
       - name: Upload documentation
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: doc
+          name: doc-api
           path: ~/doc
     # Build bindings on Windows x64 [64-bit MSVC (Windows 7+) (x86_64-pc-windows-msvc)] and x86 [32-bit MSVC (Windows 7+) (i686-pc-windows-msvc)]
   bindings-windows:
@@ -147,9 +147,9 @@ jobs:
           Copy-Item -Path ./target/${{ matrix.target }}/release/dnp3_ffi.dll.lib -Destination ffi-modules/${{ matrix.target }}
           Copy-Item -Path ./target/${{ matrix.target }}/release/dnp3_ffi_java.dll -Destination ffi-modules/${{ matrix.target }}
       - name: Upload compiled FFI modules
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: ffi-modules
+          name: ffi-modules-${{ matrix.target }}
           path: ffi-modules
       - name: Test C Bindings
         if: ${{ matrix.test }}
@@ -190,9 +190,9 @@ jobs:
           cp ./target/release/libdnp3_ffi.dylib ./ffi-modules/${{ matrix.target }}
           cp ./target/release/libdnp3_ffi_java.dylib ./ffi-modules/${{ matrix.target }}
       - name: Upload compiled FFI modules
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: ffi-modules
+          name: ffi-modules-${{ matrix.target }}
           path: ffi-modules
       - name: Test .NET bindings
         run: cargo run --bin dnp3-bindings -- --dotnet
@@ -242,9 +242,9 @@ jobs:
           cp ./target/${{ matrix.target }}/release/libdnp3_ffi.so ./ffi-modules/${{ matrix.target }}
           cp ./target/${{ matrix.target }}/release/libdnp3_ffi_java.so ./ffi-modules/${{ matrix.target }}
       - name: Upload compiled FFI modules
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: ffi-modules
+          name: ffi-modules-${{ matrix.target }}
           path: ffi-modules
   guide:
     runs-on: ubuntu-latest
@@ -261,9 +261,9 @@ jobs:
          mkdir -p ~/doc/guide
          mv build/* ~/doc/guide
       - name: Upload guide
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: doc
+          name: doc-guide
           path: ~/doc
   # Package all the generated bindings
   packaging:
@@ -282,10 +282,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
       - name: Download compiled FFI
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
-          name: ffi-modules
           path: ffi-modules
+          pattern: ffi-modules-*
+          merge-multiple: true
       - name: Create SBOMs
         run: |
           for dir in ffi-modules/*; do
@@ -305,24 +306,24 @@ jobs:
       - name: Package Java bindings
         run: cargo run --bin dnp3-bindings -- --java --package ./ffi-modules --options ./packaging.json -f third-party-licenses-java.txt
       - name: Upload C/C++ bindings
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: c-bindings
           path: ffi/bindings/c/generated/*
       - name: Upload .NET bindings
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: dotnet-bindings
           path: ffi/bindings/dotnet/nupkg/dnp3*
       - name: Upload Java bindings
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: java-bindings
+          name: java-bindings-jar
           path: ffi/bindings/java/dnp3/target/*.jar
       - name: Upload Java pom.xml
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
-          name: java-bindings
+          name: java-bindings-pom
           path: ffi/bindings/java/dnp3/pom.xml
   # Run the conformance tests
   conformance:
@@ -357,7 +358,7 @@ jobs:
         run: sudo mvn --batch-mode scala:run
       - name: Upload conformance test results
         if: always()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: conformance-results
           path: conformance/results
@@ -367,7 +368,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Download all artifacts
-        uses: actions/download-artifact@v2
+        uses: actions/download-artifact@v4
         with:
           path: artifacts
       - name: Package C Bindings and Conformance Results

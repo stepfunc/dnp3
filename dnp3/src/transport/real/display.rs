@@ -17,7 +17,7 @@ impl<'a> SegmentDisplay<'a> {
     }
 }
 
-impl<'a> std::fmt::Display for SegmentDisplay<'a> {
+impl std::fmt::Display for SegmentDisplay<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         if self.level.header_enabled() {
             write!(

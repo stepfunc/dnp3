@@ -1,0 +1,12 @@
+[package]
+name = "dnp3-cli-utils"
+version = "0.1.0"
+edition = "2021"
+authors = ["Step Function I/O LLC <info@stepfunc.io>"]
+description = "Shared CLI utilities for DNP3 examples"
+license-file = "../../LICENSE.txt"
+
+[dependencies]
+dnp3 = { path = "../../dnp3", features = ["tls", "serial"] }
+tracing = "0.1"
+clap = { version = "4.0", features = ["derive"] }

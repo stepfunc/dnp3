@@ -9,7 +9,7 @@ pub(crate) trait FreeFormat {
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError>;
 }
 
-impl<'a> FreeFormat for Group70Var2<'a> {
+impl FreeFormat for Group70Var2<'_> {
     const VARIATION: Variation = Variation::Group70Var2;
 
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
@@ -17,7 +17,7 @@ impl<'a> FreeFormat for Group70Var2<'a> {
     }
 }
 
-impl<'a> FreeFormat for Group70Var3<'a> {
+impl FreeFormat for Group70Var3<'_> {
     const VARIATION: Variation = Variation::Group70Var3;
 
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
@@ -25,7 +25,7 @@ impl<'a> FreeFormat for Group70Var3<'a> {
     }
 }
 
-impl<'a> FreeFormat for Group70Var4<'a> {
+impl FreeFormat for Group70Var4<'_> {
     const VARIATION: Variation = Variation::Group70Var4;
 
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
@@ -33,7 +33,7 @@ impl<'a> FreeFormat for Group70Var4<'a> {
     }
 }
 
-impl<'a> FreeFormat for Group70Var5<'a> {
+impl FreeFormat for Group70Var5<'_> {
     const VARIATION: Variation = Variation::Group70Var5;
 
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
@@ -41,7 +41,7 @@ impl<'a> FreeFormat for Group70Var5<'a> {
     }
 }
 
-impl<'a> FreeFormat for Group70Var7<'a> {
+impl FreeFormat for Group70Var7<'_> {
     const VARIATION: Variation = Variation::Group70Var7;
 
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {

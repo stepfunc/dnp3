@@ -48,7 +48,7 @@ impl<'a> ControlTransaction<'a> {
     }
 }
 
-impl<'a> ControlSupport<Group12Var1> for ControlTransaction<'a> {
+impl ControlSupport<Group12Var1> for ControlTransaction<'_> {
     fn select(
         &mut self,
         control: Group12Var1,
@@ -71,7 +71,7 @@ impl<'a> ControlSupport<Group12Var1> for ControlTransaction<'a> {
     }
 }
 
-impl<'a> ControlSupport<Group41Var1> for ControlTransaction<'a> {
+impl ControlSupport<Group41Var1> for ControlTransaction<'_> {
     fn select(
         &mut self,
         control: Group41Var1,
@@ -94,7 +94,7 @@ impl<'a> ControlSupport<Group41Var1> for ControlTransaction<'a> {
     }
 }
 
-impl<'a> ControlSupport<Group41Var2> for ControlTransaction<'a> {
+impl ControlSupport<Group41Var2> for ControlTransaction<'_> {
     fn select(
         &mut self,
         control: Group41Var2,
@@ -117,7 +117,7 @@ impl<'a> ControlSupport<Group41Var2> for ControlTransaction<'a> {
     }
 }
 
-impl<'a> ControlSupport<Group41Var3> for ControlTransaction<'a> {
+impl ControlSupport<Group41Var3> for ControlTransaction<'_> {
     fn select(
         &mut self,
         control: Group41Var3,
@@ -140,7 +140,7 @@ impl<'a> ControlSupport<Group41Var3> for ControlTransaction<'a> {
     }
 }
 
-impl<'a> ControlSupport<Group41Var4> for ControlTransaction<'a> {
+impl ControlSupport<Group41Var4> for ControlTransaction<'_> {
     fn select(
         &mut self,
         control: Group41Var4,
@@ -246,13 +246,8 @@ impl<'a> ControlCollection<'a> {
 
     pub(crate) fn from(headers: HeaderCollection<'a>) -> Result<Self, BadControlHeader> {
         // do one pass to ensure that all headers are control headers
-        let non_control_header: Option<BadControlHeader> = headers.iter().find_map(|x| {
-            if let Err(header) = x.to_control_header() {
-                Some(header)
-            } else {
-                None
-            }
-        });
+        let non_control_header: Option<BadControlHeader> =
+            headers.iter().find_map(|x| x.to_control_header().err());
 
         if let Some(err) = non_control_header {
             return Err(err);
@@ -359,7 +354,7 @@ impl<'a> Iterator for ControlHeaderIterator<'a> {
     }
 }
 
-impl<'a> ControlHeader<'a> {
+impl ControlHeader<'_> {
     fn respond_with_status(
         &self,
         cursor: &mut WriteCursor,

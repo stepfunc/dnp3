@@ -307,7 +307,7 @@ pub trait ControlSupport<T> {
     ///
     /// * `control` value of the control
     /// * `op_type` enumeration describing how the master requested the control operation. Most implementations
-    ///             should just ignore this argument as the behavior is the same regardless.
+    ///   should just ignore this argument as the behavior is the same regardless.
     /// * `index` index of the control
     /// * `database` reference to the database
     ///

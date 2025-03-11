@@ -44,7 +44,7 @@ impl<'a> RequestGuard<'a> {
     }
 }
 
-impl<'a> Drop for RequestGuard<'a> {
+impl Drop for RequestGuard<'_> {
     fn drop(&mut self) {
         if !self.canceled {
             self.reader.pop()

@@ -5,11 +5,11 @@ use crate::util::bit::Bitfield;
 use scursor::{ReadCursor, ReadError};
 
 fn num_bytes_for_bits(count: usize) -> usize {
-    (count + 7) / 8
+    count.div_ceil(8)
 }
 
 fn num_bytes_for_double_bits(count: usize) -> usize {
-    (count + 3) / 4
+    count.div_ceil(4)
 }
 
 /// zero-copy type used to iterate over a collection of bits without allocating

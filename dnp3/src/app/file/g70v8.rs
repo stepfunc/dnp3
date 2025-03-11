@@ -38,7 +38,7 @@ mod test {
         file_specification: "test",
     };
 
-    const DATA: &[u8] = &[b't', b'e', b's', b't'];
+    const DATA: &[u8] = b"test";
 
     #[test]
     fn writes_valid_object() {

@@ -3,10 +3,15 @@ resolver = "2"
 
 members = [
     "dnp3",
+    "examples/master",
+    "examples/outstation",
+    "examples/master_tcp_server",
+    "examples/perf",
     "ffi/dnp3-schema",
     "ffi/dnp3-ffi",
     "ffi/dnp3-bindings",
     "ffi/dnp3-ffi-java",
+
 ]
 
 [workspace.dependencies]

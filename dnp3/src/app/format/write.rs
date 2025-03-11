@@ -236,7 +236,7 @@ mod test {
         let data = Group70Var5 {
             file_handle: 0xFFEEDDCC,
             block_number: 0x01ABCDEF,
-            file_data: &[b'h', b'i'],
+            file_data: b"hi",
         };
 
         writer.write_free_format(&data).unwrap();

@@ -885,7 +885,7 @@ impl From<AttrProp> for u8 {
     }
 }
 
-impl<'a> Iterator for VariationListIter<'a> {
+impl Iterator for VariationListIter<'_> {
     type Item = AttrItem;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -941,7 +941,7 @@ pub enum AttrValue<'a> {
     AttrList(VariationList<'a>),
 }
 
-impl<'a> AttrValue<'a> {
+impl AttrValue<'_> {
     pub(crate) fn data_type(&self) -> AttrDataType {
         match self {
             Self::VisibleString(_) => AttrDataType::VisibleString,
@@ -1301,7 +1301,7 @@ pub struct Attribute<'a> {
     pub value: AttrValue<'a>,
 }
 
-impl<'a> Attribute<'a> {
+impl Attribute<'_> {
     pub(crate) fn to_owned(self) -> Option<OwnedAttribute> {
         let value = self.value.to_owned()?;
         Some(OwnedAttribute {

@@ -121,7 +121,7 @@ impl<'a> PhysDisplay<'a> {
     }
 }
 
-impl<'a> std::fmt::Display for PhysDisplay<'a> {
+impl std::fmt::Display for PhysDisplay<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "{} bytes", self.data.len())?;
         if self.level.data_enabled() {

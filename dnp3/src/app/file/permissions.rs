@@ -113,7 +113,7 @@ impl Permissions {
     const OR: Mask = Mask::bit(8);
 
     fn value(self) -> u16 {
-        self.world.value() | self.group.value() << 3 | self.owner.value() << 6
+        self.world.value() | (self.group.value() << 3) | (self.owner.value() << 6)
     }
 
     pub(crate) fn write(&self, cursor: &mut WriteCursor) -> Result<(), scursor::WriteError> {
