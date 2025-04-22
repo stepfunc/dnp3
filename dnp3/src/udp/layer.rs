@@ -90,10 +90,9 @@ impl UdpType {
             UdpType::Bound(s) => {
                 let addr = match addr {
                     PhysAddr::None => {
-                        return Err(std::io::Error::new(
-                            ErrorKind::Other,
+                        return Err(std::io::Error::other(
                             "No destination specified for un-connected UDP socket",
-                        ))
+                        ));
                     }
                     PhysAddr::Udp(x) => x,
                 };

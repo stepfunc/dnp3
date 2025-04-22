@@ -2,6 +2,7 @@
   "build_only": [
     "addr2line",
     "adler",
+    "adler2",
     "anstream",
     "anstyle",
     "anstyle-parse",
@@ -13,6 +14,7 @@
     "bindgen",
     "cc",
     "cexpr",
+    "cfg_aliases",
     "clang-sys",
     "clap",
     "clap_builder",
@@ -366,6 +368,21 @@
             "copyright": {
               "Lines": [
                 "Copyright (c) 2015 David Cuddeback"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "core-foundation": {
+      "id": "core-foundation",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2012-2013 Mozilla Foundation"
               ]
             }
           }
@@ -1829,6 +1846,21 @@
             "copyright": {
               "Lines": [
                 "Copyright (c) 2015-2018 The winapi-rs Developers"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "windows-link": {
+      "id": "windows-link",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) Microsoft Corporation"
               ]
             }
           }
