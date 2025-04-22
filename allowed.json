@@ -2,6 +2,7 @@
   "build_only": [
     "addr2line",
     "adler",
+    "adler2",
     "anstream",
     "anstyle",
     "anstyle-parse",
