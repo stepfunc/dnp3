@@ -28,7 +28,7 @@ xxhash-rust = { version = "0.8", features = ["xxh64"] }
 scursor = "0.2.0"
 
 # TLS dependencies
-sfio-rustls-config = { version = "0.3.2", optional = true }
+sfio-rustls-config = { git = "https://github.com/stepfunc/rustls-config.git", branch = "feature/aws-lc-rs", optional = true }
 tokio-rustls = { version = "0.26.0", features = ["tls12"], default-features = false, optional = true }
 
 # serial dependencies
