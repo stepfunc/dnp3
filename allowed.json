@@ -14,6 +14,7 @@
     "bindgen",
     "cc",
     "cexpr",
+    "cfg_aliases",
     "clang-sys",
     "clap",
     "clap_builder",
