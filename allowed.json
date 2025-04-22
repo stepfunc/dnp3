@@ -1836,6 +1836,21 @@
         }
       ]
     },
+    "windows-link": {
+      "id": "windows-link",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) Microsoft Corporation"
+              ]
+            }
+          }
+        }
+      ]
+    },
     "windows-sys": {
       "id": "windows-sys",
       "source": "crates.io",
