@@ -14,7 +14,6 @@ use crate::tcp::ServerHandle;
 use crate::util::future::forever;
 use crate::util::shutdown::ShutdownListener;
 use scursor::ReadCursor;
-use std::io::ErrorKind;
 use std::net::SocketAddr;
 use std::num::NonZeroUsize;
 use std::time::Duration;
@@ -407,11 +406,8 @@ async fn identify_or_timeout(
 ) -> std::io::Result<LinkIdentity> {
     match tokio::time::timeout(timeout, read_link_identity(layer, decode_level)).await {
         Ok(Ok(id)) => Ok(id),
-        Ok(Err(err)) => Err(std::io::Error::new(ErrorKind::Other, err)),
-        Err(_) => Err(std::io::Error::new(
-            ErrorKind::Other,
-            "No link header within timeout",
-        )),
+        Ok(Err(err)) => Err(std::io::Error::other(err)),
+        Err(_) => Err(std::io::Error::other("No link header within timeout")),
     }
 }
 
@@ -446,8 +442,8 @@ async fn read_link_identity(
 
     let header_bytes = read_header(layer, decode_level).await?;
 
-    let (destination, source) = read_addr(&header_bytes)
-        .map_err(|_| std::io::Error::new(ErrorKind::Other, "Bad read logic"))?;
+    let (destination, source) =
+        read_addr(&header_bytes).map_err(|_| std::io::Error::other("Bad read logic"))?;
 
     Ok(LinkIdentity {
         source,
