@@ -374,6 +374,21 @@
         }
       ]
     },
+    "core-foundation": {
+      "id": "core-foundation",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2012-2013 Mozilla Foundation"
+              ]
+            }
+          }
+        }
+      ]
+    },
     "core-foundation-sys": {
       "id": "core-foundation-sys",
       "source": "crates.io",
