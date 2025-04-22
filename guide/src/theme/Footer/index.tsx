@@ -9,7 +9,7 @@ import React from 'react';
 import clsx from 'clsx';
 
 import Link from '@docusaurus/Link';
-import {useThemeConfig} from '@docusaurus/theme-common';
+import { useThemeConfig } from '@docusaurus/theme-common';
 import useBaseUrl from '@docusaurus/useBaseUrl';
 import styles from './styles.module.css';
 
@@ -35,19 +35,19 @@ function FooterLink({to, href, label, prependBaseUrlToHref, ...props}: any) {
   );
 }
 
-const FooterLogo = ({url, alt}) => (
+const FooterLogo = ({url, alt}: {url: string; alt: string}) => (
   <img className="footer__logo" alt={alt} src={url} />
 );
 
 function Footer(): JSX.Element | null {
-  const {footer} = useThemeConfig();
-
-  const {copyright, links = [], logo = {}} = footer || {};
-  const logoUrl = useBaseUrl(logo.src);
+  const { footer } = useThemeConfig();
 
   if (!footer) {
     return null;
   }
+  
+  const { copyright, links = [], logo = {} } = footer;
+  const logoUrl = useBaseUrl(logo.src);
 
   return (
     <footer
@@ -57,7 +57,7 @@ function Footer(): JSX.Element | null {
       <div className="container">
         {links && links.length > 0 && (
           <div className="row footer__links">
-            {links.map((linkItem, i) => (
+            {links.map((linkItem: any, i: number) => (
               <div key={i} className="col footer__col">
                 {linkItem.title != null ? (
                   <h4 className="footer__title">{linkItem.title}</h4>
@@ -66,7 +66,7 @@ function Footer(): JSX.Element | null {
                 Array.isArray(linkItem.items) &&
                 linkItem.items.length > 0 ? (
                   <ul className="footer__items">
-                    {linkItem.items.map((item, key) =>
+                    {linkItem.items.map((item: any, key: number) =>
                       item.html ? (
                         <li
                           key={key}

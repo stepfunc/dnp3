@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const visit = require('unist-util-visit');
+const { visit } = require('unist-util-visit');
 
 function findSample(filename, anchor) {
     const file = fs.readFileSync(filename, 'utf8');

@@ -3,7 +3,8 @@ const samplePlugin = require('./plugins/sample');
 const mermaidPlugin = require('./plugins/mermaid');
 const sitedata = require('./sitedata.json');
 
-module.exports = {
+/** @type {import('@docusaurus/types').Config} */
+const config = {
   title: `DNP3 ${sitedata.version}`,
   tagline: 'Pretty sure we don\'t need this page, just the docs',
   url: 'https://docs.stepfunc.io',
@@ -13,14 +14,18 @@ module.exports = {
   favicon: 'images/brand/favicon.png',
   organizationName: 'stepfunc', // Usually your GitHub org/user name.
   projectName: 'dnp3', // Usually your repo name.
+  
+  /** @type {import('@docusaurus/preset-classic').ThemeConfig} */
   themeConfig: {
+    // Use new theme object structure
     prism: {
-      theme: require('prism-react-renderer/themes/vsLight'),
+      theme: require('prism-react-renderer').themes.vsLight,
       additionalLanguages: ['rust', 'java', 'csharp', 'cmake'],
     },
     colorMode: {
       defaultMode: 'light',
       disableSwitch: true,
+      respectPrefersColorScheme: false,
     },
     navbar: {
       title: `DNP3 ${sitedata.version}`,
@@ -83,6 +88,7 @@ module.exports = {
   presets: [
     [
       '@docusaurus/preset-classic',
+      /** @type {import('@docusaurus/preset-classic').Options} */
       {
         docs: {
           sidebarPath: require.resolve('./sidebars.js'),
@@ -99,3 +105,5 @@ module.exports = {
   ],
   plugins: [path.resolve(__dirname, './plugins/changelog')],
 };
+
+module.exports = config;

@@ -1,5 +1,5 @@
 const path = require('path');
-const visit = require('unist-util-visit');
+const { visit } = require('unist-util-visit');
 
 module.exports = function mermaid(options = {}) {
     return (tree, file) => {
