@@ -39,17 +39,9 @@ serde =  { version = "^1.0", features = ["derive"], default-features = false, op
 
 [dev-dependencies]
 assert_matches = "1.2"
-clap = { version = "4.0", features = ["derive"] }
-futures = { version = "0.3.24" }
-rand = "0.8"
 serde_json = "1.0.96"
 sfio-tokio-mock-io = "0.2.0"
 tokio = { version = "1", features = ["test-util"] }
-tokio-util = { version = "0.7", features = ["codec"] }
-tokio-stream = { version = "0.1.1" }
-tracing-subscriber = "0.3"
-
-
 
 [features]
 default = ["tls", "serial"]
