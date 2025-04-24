@@ -4,3 +4,11 @@ passthrough = [
     "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS",
     "CARGO_TARGET_ARM_UNKNOWN_LINUX_MUSLEABIHF_RUSTFLAGS",
 ]
+
+[target.arm-unknown-linux-gnueabihf]
+pre-build = [
+    "apt -y install libclang1 llvm",
+    "curl -LO https://github.com/stepfunc/bindgen-static/raw/refs/heads/exe/bindgen",
+    "chmod +x bindgen",
+    "mv bindgen /usr/local/bin",
+]
