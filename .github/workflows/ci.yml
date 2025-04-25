@@ -238,7 +238,7 @@ jobs:
       - name: Create FFI modules dir
         run: mkdir -p ffi-modules/${{ matrix.target }}
       - name: Build FFI
-        run: cross build -p dnp3-ffi --release --target ${{ matrix.target }}
+        run: cross -vv build -p dnp3-ffi --release --target ${{ matrix.target }}
       - name: Build JNI
         run: cross build -p dnp3-ffi-java --release --target ${{ matrix.target }}
       - name: Copy the FFI and JNI libs
