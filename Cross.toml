@@ -5,10 +5,10 @@ passthrough = [
     "CARGO_TARGET_ARM_UNKNOWN_LINUX_MUSLEABIHF_RUSTFLAGS",
 ]
 
+# The targets below need bindgen to compile aws-lc-rs
+
 [target.arm-unknown-linux-gnueabihf]
-pre-build = [
-    "apt -y install libclang1 llvm",
-    "curl -LO https://github.com/stepfunc/bindgen-static/raw/refs/heads/exe/bindgen",
-    "chmod +x bindgen",
-    "mv bindgen /usr/local/bin",
-]
+pre-build = "install-bindgen.sh"
+
+[target.armv7-unknown-linux-gnueabihf]
+pre-build = "install-bindgen.sh"
