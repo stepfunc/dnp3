@@ -244,12 +244,12 @@ jobs:
         run: cross build -p dnp3-ffi-java --release --target ${{ matrix.cases.target }} --no-default-features --features serial,${{ matrix.cases.tls-crypto }}
       - name: Copy the FFI and JNI libs
         run: |
-          cp ./target/${{ matrix.target }}/release/libdnp3_ffi.so ./ffi-modules/${{ matrix.target }}
-          cp ./target/${{ matrix.target }}/release/libdnp3_ffi_java.so ./ffi-modules/${{ matrix.target }}
+          cp ./target/${{ matrix.cases.target }}/release/libdnp3_ffi.so ./ffi-modules/${{ matrix.cases.target }}
+          cp ./target/${{ matrix.cases.target }}/release/libdnp3_ffi_java.so ./ffi-modules/${{ matrix.cases.target }}
       - name: Upload compiled FFI modules
         uses: actions/upload-artifact@v4
         with:
-          name: ffi-modules-${{ matrix.target }}
+          name: ffi-modules-${{ matrix.cases.target }}
           path: ffi-modules
   guide:
     runs-on: ubuntu-latest
