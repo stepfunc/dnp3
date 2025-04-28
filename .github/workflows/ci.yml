@@ -37,7 +37,8 @@ jobs:
           - "--no-default-features"
           - "--no-default-features --features serialization"
           - "--no-default-features --features serial"
-          - "--no-default-features --features tls"
+          - "--no-default-features --features tls-ring"
+          - "--no-default-features --features tls-aws-lc"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
