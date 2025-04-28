@@ -68,9 +68,6 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
-      - name: Caching
-        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-        uses: Swatinem/rust-cache@v2
       - name: Run Rust unit tests
         run: cargo test
   # Build API documentation packages
@@ -83,9 +80,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
       - name: Install doxygen 1.9.5
         run: wget -q https://github.com/stepfunc/ci-files/raw/main/doxygen/doxygen-1.9.5.linux.bin.tar.gz -O- | sudo tar --strip-components=1 -C /usr -xz doxygen-1.9.5
-      - name: Caching
-        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-        uses: Swatinem/rust-cache@v2
       - name: Build FFI and JNI
         run: cargo build --release -p dnp3-ffi -p dnp3-ffi-java
       - name: Build Rustdoc
@@ -133,15 +127,12 @@ jobs:
         with:
           toolchain: stable
           targets: ${{ matrix.target }}
-      - name: Caching
-        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-        uses: Swatinem/rust-cache@v2
       - name: Create FFI modules DIR
         run: mkdir ffi-modules\${{ matrix.target }}
       - name: Build FFI
-        run: cargo build -p dnp3-ffi --release --target ${{ matrix.target }}
+        run: cargo build -p dnp3-ffi --release --target ${{ matrix.target }} --no-default-features --features serial,tls-aws-lc
       - name: Build JNI
-        run: cargo build -p dnp3-ffi-java --release --target ${{ matrix.target }}
+        run: cargo build -p dnp3-ffi-java --release --target ${{ matrix.target }} --no-default-features --features serial,tls-aws-lc
       - name: Copy the FFI and JNI libs
         shell: pwsh
         run: |
@@ -178,15 +169,12 @@ jobs:
         uses: actions/checkout@v4
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
-      - name: Caching
-        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-        uses: Swatinem/rust-cache@v2
       - name: Create FFI modules dir
         run: mkdir -p ffi-modules/${{ matrix.target }}
       - name: Build FFI
-        run: cargo build -p dnp3-ffi --release
+        run: cargo build -p dnp3-ffi --release --no-default-features --features serial,tls-aws-lc
       - name: Build JNI
-        run: cargo build -p dnp3-ffi-java --release
+        run: cargo build -p dnp3-ffi-java --release --no-default-features --features serial,tls-aws-lc
       - name: Copy the FFI and JNI libs
         run: |
           cp ./target/release/libdnp3_ffi.dylib ./ffi-modules/${{ matrix.target }}
@@ -284,9 +272,6 @@ jobs:
         run: cargo install cargo-cyclonedx
       - name: Install custom allow-list tool
         run: cargo install --git https://github.com/stepfunc/bom-tools.git
-      - name: Caching
-        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-        uses: Swatinem/rust-cache@v2
       - name: Checkout
         uses: actions/checkout@v4
       - name: Download compiled FFI
@@ -341,9 +326,6 @@ jobs:
         uses: actions/checkout@v4
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
-      - name: Caching
-        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-        uses: Swatinem/rust-cache@v2
       - name: Build JNI
         run: cargo build --release -p dnp3-ffi-java
       - name: Build Java bindings
