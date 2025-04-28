@@ -215,13 +215,16 @@ jobs:
             tls-crypto: "tls-aws-lc"
           - target: i686-unknown-linux-gnu # 32-bit Linux (kernel 3.2+, glibc 2.17+)
             tls-crypto: "tls-aws-lc"
-          #- x86_64-unknown-linux-musl # 64-bit Linux with MUSL
+          - target: x86_64-unknown-linux-musl # 64-bit Linux with MUSL
+            tls-crypto: "tls-ring"
           - target: arm-unknown-linux-gnueabihf # ARMv6 Linux, hardfloat (kernel 3.2, glibc 2.17)
             tls-crypto: "tls-ring"
-          #- arm-unknown-linux-musleabihf # ARMv6 Linux with MUSL, hardfloat
+          - target: arm-unknown-linux-musleabihf # ARMv6 Linux with MUSL, hardfloat
+            tls-crypto: "tls-ring"
           - target: aarch64-unknown-linux-gnu # ARM64 Linux (kernel 4.2, glibc 2.17+)
             tls-crypto: "tls-aws-lc"
-          #- aarch64-unknown-linux-musl # ARM64 Linux with MUSL
+          - target: aarch64-unknown-linux-musl # ARM64 Linux with MUSL
+            tls-crypto: "tls-ring"
           - target: armv7-unknown-linux-gnueabihf # ARMv7 Linux, hardfloat (kernel 3.2, glibc 2.17)
             tls-crypto: "tls-ring"
           - target: arm-unknown-linux-gnueabi # ARMv6 Linux (kernel 3.2, glibc 2.17)
