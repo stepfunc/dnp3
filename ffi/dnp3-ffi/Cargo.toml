@@ -25,8 +25,10 @@ num_cpus = "1"
 sfio-promise = "0.2"
 
 [features]
-default = ["tls", "serial"]
-tls = ["dnp3/tls"]
+default = ["tls-ring", "serial"]
+tls = []
+tls-ring = ["tls", "dnp3/tls-ring"]
+tls-aws-lc = ["tls", "dnp3/tls-aws-lc"]
 serial = ["dnp3/serial"]
 
 [build-dependencies]

@@ -20,8 +20,9 @@ jni = "0.19"
 dnp3-ffi = { path = "../dnp3-ffi", default-features = false }
 
 [features]
-default = ["tls", "serial"]
-tls = ["dnp3-ffi/tls"]
+default = ["tls-ring", "serial"]
+tls-ring = ["dnp3-ffi/tls-ring"]
+tls-aws-lc = ["dnp3-ffi/tls-aws-lc"]
 serial = ["dnp3-ffi/serial"]
 
 [build-dependencies]

@@ -7,6 +7,6 @@ description = "Shared CLI utilities for DNP3 examples"
 license-file = "../../LICENSE.txt"
 
 [dependencies]
-dnp3 = { path = "../../dnp3", features = ["tls", "serial"] }
+dnp3 = { path = "../../dnp3", features = ["tls-ring", "serial"] }
 tracing = "0.1"
 clap = { version = "4.0", features = ["derive"] }
