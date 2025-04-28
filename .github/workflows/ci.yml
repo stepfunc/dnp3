@@ -210,16 +210,22 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target:
-          - x86_64-unknown-linux-gnu # 64-bit Linux (kernel 2.6.32+, glibc 2.11+)
-          - i686-unknown-linux-gnu # 32-bit Linux (kernel 3.2+, glibc 2.17+)
+        cases:
+          - target: x86_64-unknown-linux-gnu # 64-bit Linux (kernel 2.6.32+, glibc 2.11+)
+            tls-crypto: "tls-aws-lc"
+          - target: i686-unknown-linux-gnu # 32-bit Linux (kernel 3.2+, glibc 2.17+)
+            tls-crypto: "tls-aws-lc"
           #- x86_64-unknown-linux-musl # 64-bit Linux with MUSL
-          - arm-unknown-linux-gnueabihf # ARMv6 Linux, hardfloat (kernel 3.2, glibc 2.17)
+          - target: arm-unknown-linux-gnueabihf # ARMv6 Linux, hardfloat (kernel 3.2, glibc 2.17)
+            tls-crypto: "tls-ring"
           #- arm-unknown-linux-musleabihf # ARMv6 Linux with MUSL, hardfloat
-          - aarch64-unknown-linux-gnu # ARM64 Linux (kernel 4.2, glibc 2.17+)
+          - target: aarch64-unknown-linux-gnu # ARM64 Linux (kernel 4.2, glibc 2.17+)
+            tls-crypto: "tls-aws-lc"
           #- aarch64-unknown-linux-musl # ARM64 Linux with MUSL
-          - armv7-unknown-linux-gnueabihf # ARMv7 Linux, hardfloat (kernel 3.2, glibc 2.17)
-          - arm-unknown-linux-gnueabi # ARMv6 Linux (kernel 3.2, glibc 2.17)
+          - target: armv7-unknown-linux-gnueabihf # ARMv7 Linux, hardfloat (kernel 3.2, glibc 2.17)
+            tls-crypto: "tls-ring"
+          - target: arm-unknown-linux-gnueabi # ARMv6 Linux (kernel 3.2, glibc 2.17)
+            tls-crypto: "tls-ring"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -227,15 +233,15 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
+          targets: ${{ matrix.cases.target }}
       - name: Install Rust Cross
         run: cargo install cross
       - name: Create FFI modules dir
         run: mkdir -p ffi-modules/${{ matrix.target }}
       - name: Build FFI
-        run: cross -vv build -p dnp3-ffi --release --target ${{ matrix.target }}
+        run: cross -vv build -p dnp3-ffi --release --target ${{ matrix.cases.target }} --no-default-features --features serial,${{ matrix.cases.tls-crypto }}
       - name: Build JNI
-        run: cross build -p dnp3-ffi-java --release --target ${{ matrix.target }}
+        run: cross build -p dnp3-ffi-java --release --target ${{ matrix.cases.target }} --no-default-features --features serial,${{ matrix.cases.tls-crypto }}
       - name: Copy the FFI and JNI libs
         run: |
           cp ./target/${{ matrix.target }}/release/libdnp3_ffi.so ./ffi-modules/${{ matrix.target }}
