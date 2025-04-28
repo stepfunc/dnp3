@@ -47,11 +47,8 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
-      - name: Caching
-        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-        uses: Swatinem/rust-cache@v2
       - name: Build the workspace with the features
-        run: cargo build --release ${{ matrix.feature-args }}
+        run: cargo build --release -p dnp3 -p dnp3-ffi -p dnp3-ffi-java ${{ matrix.feature-args }}
   # Run the unit tests on Windows and Linux
   test:
     strategy:
@@ -230,10 +227,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
-#      - name: Caching
-#        if: ${{ !startsWith(github.ref, 'refs/tags/') }}
-#        uses: Swatinem/rust-cache@v2
+          targets: ${{ matrix.target }}g
       - name: Install Rust Cross
         run: cargo install cross
       - name: Create FFI modules dir
