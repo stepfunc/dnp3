@@ -28,7 +28,7 @@ xxhash-rust = { version = "0.8", features = ["xxh64"] }
 scursor = "0.2.0"
 
 # TLS dependencies
-sfio-rustls-config = { git = "https://github.com/stepfunc/rustls-config.git", branch = "feature/aws-lc-rs", optional = true }
+sfio-rustls-config = { git = "https://github.com/stepfunc/rustls-config.git", branch = "main", optional = true }
 tokio-rustls = { version = "0.26.0", features = ["tls12"], default-features = false, optional = true }
 
 # serial dependencies
@@ -46,7 +46,8 @@ tokio = { version = "1", features = ["test-util"] }
 [features]
 default = ["tls", "serial"]
 ffi = [] # this feature flag is only used when building the FFI
-tls = ["sfio-rustls-config", "tokio-rustls"]
+tls = ["sfio-rustls-config/crypto-ring", "tokio-rustls"]
+tls-aws-lc = ["sfio-rustls-config/crypto-aws-lc-rs", "tokio-rustls"]
 serial = ["tokio-serial"]
 # Public configuration types dervie both serde::Deserialize and serde::Serialize
 serialization = ["serde"]

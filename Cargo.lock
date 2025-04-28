@@ -1293,6 +1293,7 @@ dependencies = [
  "aws-lc-rs",
  "log",
  "once_cell",
+ "ring",
  "rustls-pki-types",
  "rustls-webpki",
  "subtle",
@@ -1441,7 +1442,7 @@ checksum = "91547be5cac1551a6401a7cfa571524bbcb4d9d818b2756cbe3012b48cc79aaf"
 [[package]]
 name = "sfio-rustls-config"
 version = "0.4.0"
-source = "git+https://github.com/stepfunc/rustls-config.git?branch=feature/aws-lc-rs#32bea9bc47a143304db1769ff52e49a49cd75d6e"
+source = "git+https://github.com/stepfunc/rustls-config.git?branch=main#1453db3bd400394972887b3914e62f7d5bbd7c74"
 dependencies = [
  "pem",
  "pkcs8",
