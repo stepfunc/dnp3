@@ -230,17 +230,17 @@ jobs:
       - name: Create FFI modules dir
         run: mkdir -p ffi-modules/${{ matrix.target }}
       - name: Build FFI
-        run: cross build -p dnp3-ffi --release --target ${{ matrix.cases.features }} --no-default-features --features serial,${{ matrix.cases.features }}
+        run: cross build -p dnp3-ffi --release --target ${{ matrix.cases.target }} --no-default-features --features serial,${{ matrix.cases.features }}
       - name: Build JNI
-        run: cross build -p dnp3-ffi-java --release --target ${{ matrix.cases.features }} --no-default-features --features serial,${{ matrix.cases.features }}
+        run: cross build -p dnp3-ffi-java --release --target ${{ matrix.cases.target }} --no-default-features --features serial,${{ matrix.cases.features }}
       - name: Copy the FFI and JNI libs
         run: |
-          cp ./target/${{ matrix.cases.features }}/release/libdnp3_ffi.so ./ffi-modules/${{ matrix.cases.features }}
-          cp ./target/${{ matrix.cases.features }}/release/libdnp3_ffi_java.so ./ffi-modules/${{ matrix.cases.features }}
+          cp ./target/${{ matrix.cases.target }}/release/libdnp3_ffi.so ./ffi-modules/${{ matrix.cases.target }}
+          cp ./target/${{ matrix.cases.target }}/release/libdnp3_ffi_java.so ./ffi-modules/${{ matrix.cases.target }}
       - name: Upload compiled FFI modules
         uses: actions/upload-artifact@v4
         with:
-          name: ffi-modules-${{ matrix.cases.features }}
+          name: ffi-modules-${{ matrix.cases.target }}
           path: ffi-modules
   guide:
     runs-on: ubuntu-latest
