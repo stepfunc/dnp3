@@ -528,21 +528,21 @@ impl Random {
     }
 
     fn measurement(&mut self) -> Measurement {
-        match self.inner.gen_range(0..=2) {
+        match self.inner.random_range(0..=2) {
             0 => Measurement::Binary(
                 Self::normalize_flags(BinaryInput::new(
-                    self.inner.gen(),
+                    self.inner.random(),
                     self.flags(),
                     self.time(),
                 )),
                 self.index(),
             ),
             1 => Measurement::Counter(
-                Counter::new(self.inner.gen(), self.flags(), self.time()),
+                Counter::new(self.inner.random(), self.flags(), self.time()),
                 self.index(),
             ),
             2 => {
-                let value: u16 = self.inner.gen();
+                let value: u16 = self.inner.random();
                 Measurement::Analog(
                     AnalogInput::new(value as f64, self.flags(), self.time()),
                     self.index(),
@@ -553,15 +553,15 @@ impl Random {
     }
 
     fn index(&mut self) -> u16 {
-        self.inner.gen_range(0..self.max_index)
+        self.inner.random_range(0..self.max_index)
     }
 
     fn flags(&mut self) -> Flags {
-        Flags::new(self.inner.gen())
+        Flags::new(self.inner.random())
     }
 
     fn time(&mut self) -> Time {
-        Time::Synchronized(Timestamp::new(self.inner.gen()))
+        Time::Synchronized(Timestamp::new(self.inner.random()))
     }
 }
 

@@ -7,7 +7,7 @@ use tokio::net::{TcpSocket, TcpStream};
 
 pub(crate) enum PostConnectionHandler {
     Tcp,
-    #[cfg(feature = "tls")]
+    #[cfg(feature = "enable-tls")]
     Tls(crate::tcp::tls::TlsClientConfig),
 }
 
@@ -19,7 +19,7 @@ impl PostConnectionHandler {
     ) -> Option<PhysLayer> {
         match self {
             Self::Tcp => Some(PhysLayer::Tcp(socket)),
-            #[cfg(feature = "tls")]
+            #[cfg(feature = "enable-tls")]
             Self::Tls(config) => config.handle_connection(socket, _endpoint).await,
         }
     }

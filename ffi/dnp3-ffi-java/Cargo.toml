@@ -21,7 +21,9 @@ dnp3-ffi = { path = "../dnp3-ffi", default-features = false }
 
 [features]
 default = ["tls", "serial"]
-tls = ["dnp3-ffi/tls"]
+enable-tls = []
+tls = ["enable-tls", "dnp3-ffi/tls"]
+tls-aws-lc = ["enable-tls", "dnp3-ffi/tls-aws-lc"]
 serial = ["dnp3-ffi/serial"]
 
 [build-dependencies]

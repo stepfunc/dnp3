@@ -26,7 +26,9 @@ sfio-promise = "0.2"
 
 [features]
 default = ["tls", "serial"]
-tls = ["dnp3/tls"]
+enable-tls = []
+tls = ["enable-tls", "dnp3/tls"]
+tls-aws-lc = ["enable-tls", "dnp3/tls-aws-lc"]
 serial = ["dnp3/serial"]
 
 [build-dependencies]

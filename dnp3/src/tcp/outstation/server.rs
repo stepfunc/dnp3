@@ -34,7 +34,7 @@ pub struct Server {
 
 enum ServerConnectionHandler {
     Tcp,
-    #[cfg(feature = "tls")]
+    #[cfg(feature = "enable-tls")]
     Tls(crate::tcp::tls::TlsServerConfig),
 }
 
@@ -42,7 +42,7 @@ impl ServerConnectionHandler {
     async fn handle(&mut self, socket: tokio::net::TcpStream) -> Result<PhysLayer, String> {
         match self {
             Self::Tcp => Ok(PhysLayer::Tcp(socket)),
-            #[cfg(feature = "tls")]
+            #[cfg(feature = "enable-tls")]
             Self::Tls(config) => config.handle_connection(socket).await,
         }
     }
@@ -65,7 +65,7 @@ impl Server {
     }
 
     /// create a TLS server builder object that will eventually be bound to the specified address
-    #[cfg(feature = "tls")]
+    #[cfg(feature = "enable-tls")]
     pub fn new_tls_server(
         link_error_mode: LinkErrorMode,
         address: SocketAddr,
