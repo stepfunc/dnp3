@@ -19,7 +19,7 @@ pub(crate) enum PhysLayer {
     Tcp(tokio::net::TcpStream),
     Udp(UdpLayer),
     /// TLS type is boxed because its size is huge
-    #[cfg(feature = "tls")]
+    #[cfg(feature = "enable-tls")]
     Tls(Box<tokio_rustls::TlsStream<tokio::net::TcpStream>>),
     #[cfg(feature = "serial")]
     Serial(tokio_serial::SerialStream),
@@ -32,7 +32,7 @@ impl std::fmt::Debug for PhysLayer {
         match self {
             PhysLayer::Tcp(_) => f.write_str("Tcp"),
             PhysLayer::Udp(_) => f.write_str("Udp"),
-            #[cfg(feature = "tls")]
+            #[cfg(feature = "enable-tls")]
             PhysLayer::Tls(_) => f.write_str("Tls"),
             #[cfg(feature = "serial")]
             PhysLayer::Serial(_) => f.write_str("Serial"),
@@ -54,7 +54,7 @@ impl PhysLayer {
                 (count, PhysAddr::None)
             }
             Self::Udp(x) => x.read(buffer).await?,
-            #[cfg(feature = "tls")]
+            #[cfg(feature = "enable-tls")]
             Self::Tls(x) => {
                 let count = x.read(buffer).await?;
                 (count, PhysAddr::None)
@@ -100,7 +100,7 @@ impl PhysLayer {
         match self {
             Self::Tcp(x) => x.write_all(data).await,
             Self::Udp(x) => x.write_all(data, addr).await,
-            #[cfg(feature = "tls")]
+            #[cfg(feature = "enable-tls")]
             Self::Tls(x) => x.write_all(data).await,
             #[cfg(feature = "serial")]
             Self::Serial(x) => x.write_all(data).await,

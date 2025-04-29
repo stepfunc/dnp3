@@ -14,7 +14,7 @@ use dnp3::tcp::ClientState;
 
 #[cfg(feature = "serial")]
 use dnp3::serial::*;
-#[cfg(feature = "tls")]
+#[cfg(feature = "enable-tls")]
 use dnp3::tcp::tls::*;
 use dnp3::udp::spawn_master_udp;
 
@@ -139,7 +139,7 @@ pub(crate) unsafe fn master_channel_create_tls(
     )
 }
 
-#[cfg(not(feature = "tls"))]
+#[cfg(not(feature = "enable-tls"))]
 #[allow(clippy::too_many_arguments)]
 pub(crate) unsafe fn master_channel_create_tls_2(
     _runtime: *mut crate::runtime::Runtime,
@@ -154,7 +154,7 @@ pub(crate) unsafe fn master_channel_create_tls_2(
     Err(ffi::ParamError::NoSupport)
 }
 
-#[cfg(feature = "tls")]
+#[cfg(feature = "enable-tls")]
 #[allow(clippy::too_many_arguments)]
 pub(crate) unsafe fn master_channel_create_tls_2(
     runtime: *mut crate::runtime::Runtime,
@@ -197,7 +197,7 @@ pub(crate) unsafe fn master_channel_create_tls_2(
     Ok(Box::into_raw(Box::new(channel)))
 }
 
-#[cfg(feature = "tls")]
+#[cfg(feature = "enable-tls")]
 impl TryFrom<ffi::TlsClientConfig> for TlsClientConfig {
     type Error = ffi::ParamError;
 
@@ -1283,7 +1283,7 @@ impl FileReader for ffi::FileReader {
     }
 }
 
-#[cfg(feature = "tls")]
+#[cfg(feature = "enable-tls")]
 impl From<TlsError> for ffi::ParamError {
     fn from(error: TlsError) -> Self {
         match error {
@@ -1296,7 +1296,7 @@ impl From<TlsError> for ffi::ParamError {
     }
 }
 
-#[cfg(feature = "tls")]
+#[cfg(feature = "enable-tls")]
 impl From<ffi::MinTlsVersion> for MinTlsVersion {
     fn from(from: ffi::MinTlsVersion) -> Self {
         match from {
@@ -1306,7 +1306,7 @@ impl From<ffi::MinTlsVersion> for MinTlsVersion {
     }
 }
 
-#[cfg(feature = "tls")]
+#[cfg(feature = "enable-tls")]
 impl From<ffi::CertificateMode> for CertificateMode {
     fn from(from: ffi::CertificateMode) -> Self {
         match from {

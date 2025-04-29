@@ -12,7 +12,7 @@ pub use struct_constructors::*;
 
 use crate::{ffi, Runtime, RuntimeHandle};
 
-#[cfg(feature = "tls")]
+#[cfg(feature = "enable-tls")]
 use dnp3::tcp::tls::TlsServerConfig;
 use dnp3::udp::{OutstationUdpConfig, UdpSocketMode};
 
@@ -58,7 +58,7 @@ pub unsafe fn outstation_server_destroy(server: *mut OutstationServer) {
     }
 }
 
-#[cfg(not(feature = "tls"))]
+#[cfg(not(feature = "enable-tls"))]
 pub unsafe fn outstation_server_create_tls_server(
     _runtime: *mut Runtime,
     _link_error_mode: ffi::LinkErrorMode,
@@ -68,7 +68,7 @@ pub unsafe fn outstation_server_create_tls_server(
     Err(ffi::ParamError::NoSupport)
 }
 
-#[cfg(feature = "tls")]
+#[cfg(feature = "enable-tls")]
 pub unsafe fn outstation_server_create_tls_server(
     runtime: *mut Runtime,
     link_error_mode: ffi::LinkErrorMode,
@@ -239,7 +239,7 @@ pub(crate) unsafe fn outstation_create_tcp_client(
     Ok(Box::into_raw(handle))
 }
 
-#[cfg(not(feature = "tls"))]
+#[cfg(not(feature = "enable-tls"))]
 #[allow(clippy::too_many_arguments)] // TODO
 pub(crate) unsafe fn outstation_create_tls_client(
     _runtime: *mut crate::Runtime,
@@ -257,7 +257,7 @@ pub(crate) unsafe fn outstation_create_tls_client(
     Err(ffi::ParamError::NoSupport)
 }
 
-#[cfg(feature = "tls")]
+#[cfg(feature = "enable-tls")]
 #[allow(clippy::too_many_arguments)] // TODO
 pub(crate) unsafe fn outstation_create_tls_client(
     runtime: *mut crate::Runtime,

@@ -6,7 +6,7 @@ pub use outstation::*;
 pub use server_handle::*;
 
 /// Entry points and types for TLS
-#[cfg(feature = "tls")]
+#[cfg(feature = "enable-tls")]
 pub mod tls;
 
 mod connect;

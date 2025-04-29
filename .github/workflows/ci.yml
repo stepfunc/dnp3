@@ -200,23 +200,23 @@ jobs:
       matrix:
         cases:
           - target: x86_64-unknown-linux-gnu # 64-bit Linux (kernel 2.6.32+, glibc 2.11+)
-            tls-crypto: "tls-aws-lc"
+            features: "tls-aws-lc"
           - target: i686-unknown-linux-gnu # 32-bit Linux (kernel 3.2+, glibc 2.17+)
-            tls-crypto: "tls-aws-lc"
+            features: "tls-aws-lc"
           - target: x86_64-unknown-linux-musl # 64-bit Linux with MUSL
-            tls-crypto: "tls-ring"
+            features: "tls"
           - target: arm-unknown-linux-gnueabihf # ARMv6 Linux, hardfloat (kernel 3.2, glibc 2.17)
-            tls-crypto: "tls-ring"
+            features: "tls"
           - target: arm-unknown-linux-musleabihf # ARMv6 Linux with MUSL, hardfloat
-            tls-crypto: "tls-ring"
+            features: "tls"
           - target: aarch64-unknown-linux-gnu # ARM64 Linux (kernel 4.2, glibc 2.17+)
-            tls-crypto: "tls-aws-lc"
+            features: "tls-aws-lc"
           - target: aarch64-unknown-linux-musl # ARM64 Linux with MUSL
-            tls-crypto: "tls-ring"
+            features: "tls"
           - target: armv7-unknown-linux-gnueabihf # ARMv7 Linux, hardfloat (kernel 3.2, glibc 2.17)
-            tls-crypto: "tls-ring"
+            features: "tls"
           - target: arm-unknown-linux-gnueabi # ARMv6 Linux (kernel 3.2, glibc 2.17)
-            tls-crypto: "tls-ring"
+            features: "tls"
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -230,17 +230,17 @@ jobs:
       - name: Create FFI modules dir
         run: mkdir -p ffi-modules/${{ matrix.target }}
       - name: Build FFI
-        run: cross build -p dnp3-ffi --release --target ${{ matrix.cases.target }} --no-default-features --features serial,${{ matrix.cases.tls-crypto }}
+        run: cross build -p dnp3-ffi --release --target ${{ matrix.cases.features }} --no-default-features --features serial,${{ matrix.cases.features }}
       - name: Build JNI
-        run: cross build -p dnp3-ffi-java --release --target ${{ matrix.cases.target }} --no-default-features --features serial,${{ matrix.cases.tls-crypto }}
+        run: cross build -p dnp3-ffi-java --release --target ${{ matrix.cases.features }} --no-default-features --features serial,${{ matrix.cases.features }}
       - name: Copy the FFI and JNI libs
         run: |
-          cp ./target/${{ matrix.cases.target }}/release/libdnp3_ffi.so ./ffi-modules/${{ matrix.cases.target }}
-          cp ./target/${{ matrix.cases.target }}/release/libdnp3_ffi_java.so ./ffi-modules/${{ matrix.cases.target }}
+          cp ./target/${{ matrix.cases.features }}/release/libdnp3_ffi.so ./ffi-modules/${{ matrix.cases.features }}
+          cp ./target/${{ matrix.cases.features }}/release/libdnp3_ffi_java.so ./ffi-modules/${{ matrix.cases.features }}
       - name: Upload compiled FFI modules
         uses: actions/upload-artifact@v4
         with:
-          name: ffi-modules-${{ matrix.cases.target }}
+          name: ffi-modules-${{ matrix.cases.features }}
           path: ffi-modules
   guide:
     runs-on: ubuntu-latest
