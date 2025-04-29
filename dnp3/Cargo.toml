@@ -44,11 +44,11 @@ sfio-tokio-mock-io = "0.2.0"
 tokio = { version = "1", features = ["test-util"] }
 
 [features]
-default = ["tls-ring", "serial"]
-tls = [] # not enabled directly
+default = ["tls", "serial"]
+enable-tls = [] # not enabled directly
 ffi = [] # this feature flag is only used when building the FFI
-tls-ring = ["tls", "sfio-rustls-config/crypto-ring", "tokio-rustls"]
-tls-aws-lc = ["tls", "sfio-rustls-config/crypto-aws-lc", "tokio-rustls"]
+tls = ["enable-tls", "sfio-rustls-config/crypto-ring", "tokio-rustls"]
+tls-aws-lc = ["enable-tls", "sfio-rustls-config/crypto-aws-lc", "tokio-rustls"]
 serial = ["tokio-serial"]
 # Public configuration types dervie both serde::Deserialize and serde::Serialize
 serialization = ["serde"]

@@ -7,7 +7,7 @@ description = "DNP3 Outstation example application"
 license-file = "../../LICENSE.txt"
 
 [dependencies]
-dnp3 = { path = "../../dnp3", features = ["tls-ring", "serial"] }
+dnp3 = { path = "../../dnp3", features = ["tls", "serial"] }
 dnp3-cli-utils = { path = "../cli-utils" }
 tokio = { version = "1", features = ["net", "sync", "io-util", "io-std", "time", "rt", "rt-multi-thread", "macros"] }
 tokio-stream = "0.1.1"
