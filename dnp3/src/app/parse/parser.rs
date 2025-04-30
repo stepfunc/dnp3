@@ -707,6 +707,21 @@ mod test {
 
     use super::*;
 
+    struct EnableZeroLengthStringsGuard;
+
+    impl EnableZeroLengthStringsGuard {
+        fn new() -> Self {
+            crate::app::options::parse_zero_length_strings(true);
+            Self
+        }
+    }
+
+    impl Drop for EnableZeroLengthStringsGuard {
+        fn drop(&mut self) {
+            crate::app::options::parse_zero_length_strings(false);
+        }
+    }
+
     fn test_parse_error(input: &[u8], func: FunctionCode, err: ObjectParseError) {
         assert_eq!(ObjectParser::parse(func, input).err().unwrap(), err);
     }
@@ -1139,6 +1154,27 @@ mod test {
             FunctionCode::Response,
             ObjectParseError::ZeroLengthOctetData,
         );
+    }
+
+    #[test]
+    fn g110v0_can_be_parsed_via_global_setting() {
+        let _guard = EnableZeroLengthStringsGuard::new();
+        let mut headers =
+            ObjectParser::parse(FunctionCode::Response, &[0x6E, 0x00, 0x00, 0x07, 0x07])
+                .unwrap()
+                .iter();
+        let first = headers.next().unwrap();
+        assert!(headers.next().is_none());
+        match first.details {
+            HeaderDetails::OneByteStartStop(7, 7, RangedVariation::Group110VarX(0, seq)) => {
+                let mut iter = seq.iter();
+                let first: (&[u8], u16) = iter.next().unwrap();
+                let empty: &[u8] = &[];
+                assert_eq!(first, (empty, 7));
+                assert_eq!(iter.next(), None);
+            }
+            _ => unreachable!(),
+        }
     }
 
     #[test]
