@@ -15,6 +15,7 @@ object RangedVariationModule extends Module {
       "use crate::app::parse::bit::{BitSequence, DoubleBitSequence};".eol ++
       "use crate::master::{ReadHandler, HeaderInfo};".eol ++
       "use crate::app::ObjectParseError;".eol ++
+      "use crate::app::parse::options::ParseOptions;".eol ++
       space ++
       "use scursor::ReadCursor;".eol ++
       space ++
@@ -79,7 +80,7 @@ object RangedVariationModule extends Module {
 
       case v : SizedByVariation => {
         bracketComma(s"Variation::${v.parent.name}(x) =>") {
-          s"Ok(RangedVariation::${v.parent.name}VarX(x, RangedBytesSequence::parse(x, range.get_start(), range.get_count(), cursor)?))".eol
+          s"Ok(RangedVariation::${v.parent.name}VarX(x, RangedBytesSequence::parse(options, x, range.get_start(), range.get_count(), cursor)?))".eol
         }
       }
       case SpecificAttribute => {
@@ -185,7 +186,7 @@ object RangedVariationModule extends Module {
     }
     
     bracket("impl<'a> RangedVariation<'a>") {
-      bracket("pub(crate) fn parse_non_read(v: Variation, qualifier: QualifierCode, range: Range, cursor: &mut ReadCursor<'a>) -> Result<RangedVariation<'a>, ObjectParseError>") {
+      bracket("pub(crate) fn parse_non_read(v: Variation, qualifier: QualifierCode, range: Range, options: ParseOptions, cursor: &mut ReadCursor<'a>) -> Result<RangedVariation<'a>, ObjectParseError>") {
         bracket("match v") {
           variations.flatMap(getNonReadMatcher).iterator ++ "_ => Err(ObjectParseError::InvalidQualifierForVariation(v, qualifier)),".eol
         }

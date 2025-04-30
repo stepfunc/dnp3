@@ -17,6 +17,7 @@ use crate::decode::AppDecodeLevel;
 
 use crate::app::attr::Attribute;
 use crate::app::parse::free_format::FreeFormatVariation;
+use crate::app::parse::options::ParseOptions;
 use scursor::ReadCursor;
 
 #[derive(Copy, Clone)]
@@ -360,6 +361,7 @@ impl<'a> Response<'a> {
 struct ObjectParser<'a> {
     errored: bool,
     function: FunctionCode,
+    options: ParseOptions,
     cursor: ReadCursor<'a>,
 }
 
@@ -450,8 +452,9 @@ impl<'a> ObjectParser<'a> {
         Ok(HeaderCollection { function, data })
     }
 
-    fn one_pass(function: FunctionCode, data: &'a [u8]) -> Self {
+    fn one_pass(options: ParseOptions, function: FunctionCode, data: &'a [u8]) -> Self {
         ObjectParser {
+            options,
             cursor: ReadCursor::new(data),
             function,
             errored: false,
@@ -625,6 +628,7 @@ impl Variation {
 
 impl<'a> RangedVariation<'a> {
     pub(crate) fn parse(
+        options: ParseOptions,
         function: FunctionCode,
         qualifier: QualifierCode,
         v: Variation,
@@ -633,7 +637,7 @@ impl<'a> RangedVariation<'a> {
     ) -> Result<RangedVariation<'a>, ObjectParseError> {
         match function {
             FunctionCode::Read => Self::parse_read(v, qualifier),
-            _ => Self::parse_non_read(v, qualifier, range, cursor),
+            _ => Self::parse_non_read(v, qualifier, range, options, cursor),
         }
     }
 }

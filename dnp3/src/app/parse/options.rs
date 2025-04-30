@@ -1,5 +1,6 @@
 use std::sync::atomic::Ordering;
 
+#[derive(Copy, Clone)]
 pub(crate) struct ParseOptions {
     pub(crate) parse_zero_length_strings: bool,
 }

@@ -69,12 +69,13 @@ where
 
 impl<'a> RangedBytesSequence<'a> {
     pub(crate) fn parse(
+        options: ParseOptions,
         variation: u8,
         index: u16,
         count: usize,
         cursor: &mut ReadCursor<'a>,
     ) -> Result<Self, ObjectParseError> {
-        if variation == 0 && !ParseOptions::get().parse_zero_length_strings {
+        if variation == 0 && !options.parse_zero_length_strings {
             return Err(ObjectParseError::ZeroLengthOctetData);
         }
 
