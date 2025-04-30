@@ -60,6 +60,12 @@ pub(crate) mod variations;
 pub(crate) mod format;
 mod parse_error;
 
+/// Global options for the application layer. These are workarounds
+/// that allow us to tweak behaviors, e.g., parsing 0-length strings,
+/// in a global manner. In a future 2.0, these options will be configurable
+/// on individual master and outstation sessions.
+pub mod options;
+
 #[rustfmt::skip]
 pub(crate) mod gen {
     pub(crate) mod all;

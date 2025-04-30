@@ -1,20 +1,20 @@
 use std::sync::atomic::Ordering;
 
 pub(crate) struct ParseOptions {
-    pub(crate) allow_zero_length_string: bool,
+    pub(crate) parse_zero_length_strings: bool,
 }
 
-static ALLOW_ZERO_LENGTH_STRINGS: std::sync::atomic::AtomicBool =
+static PARSE_ZERO_LENGTH_STRINGS: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(false);
 
 impl ParseOptions {
     pub(crate) fn get() -> Self {
         Self {
-            allow_zero_length_string: ALLOW_ZERO_LENGTH_STRINGS.load(Ordering::Relaxed),
+            parse_zero_length_strings: PARSE_ZERO_LENGTH_STRINGS.load(Ordering::Relaxed),
         }
     }
 
-    pub(crate) fn enable_zero_length_strings() {
-        ALLOW_ZERO_LENGTH_STRINGS.store(true, Ordering::Relaxed)
+    pub(crate) fn parse_zero_length_strings(enabled: bool) {
+        PARSE_ZERO_LENGTH_STRINGS.store(enabled, Ordering::Relaxed)
     }
 }

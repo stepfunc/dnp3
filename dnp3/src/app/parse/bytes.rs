@@ -1,6 +1,7 @@
 use crate::app::parse::traits::FixedSize;
 use crate::app::parse_error::ObjectParseError;
 
+use crate::app::parse::options::ParseOptions;
 use scursor::ReadCursor;
 
 /// Wrapper around an underlying u8 slice
@@ -73,7 +74,7 @@ impl<'a> RangedBytesSequence<'a> {
         count: usize,
         cursor: &mut ReadCursor<'a>,
     ) -> Result<Self, ObjectParseError> {
-        if variation == 0 {
+        if variation == 0 && !ParseOptions::get().parse_zero_length_strings {
             return Err(ObjectParseError::ZeroLengthOctetData);
         }
 
