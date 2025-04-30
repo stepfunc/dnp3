@@ -19,51 +19,6 @@ use crate::app::attr::Attribute;
 use crate::app::parse::free_format::FreeFormatVariation;
 use scursor::ReadCursor;
 
-pub(crate) fn format_count_of_items<T, V>(f: &mut Formatter, iter: T) -> std::fmt::Result
-where
-    T: Iterator<Item = V>,
-    V: std::fmt::Display,
-{
-    for x in iter {
-        write!(f, "\n{x}")?;
-    }
-    Ok(())
-}
-
-pub(crate) fn format_indexed_items<T, V, I>(f: &mut Formatter, iter: T) -> std::fmt::Result
-where
-    T: Iterator<Item = (V, I)>,
-    V: std::fmt::Display,
-    I: std::fmt::Display,
-{
-    for (v, i) in iter {
-        write!(f, "\nindex: {i} {v}")?;
-    }
-    Ok(())
-}
-
-pub(crate) fn format_prefixed_items<T, V, I>(f: &mut Formatter, iter: T) -> std::fmt::Result
-where
-    T: Iterator<Item = Prefix<I, V>>,
-    V: FixedSizeVariation,
-    I: Index,
-{
-    for x in iter {
-        write!(f, "\nindex: {} {}", x.index, x.value)?;
-    }
-    Ok(())
-}
-
-pub(crate) fn format_optional_attribute(
-    f: &mut Formatter,
-    attr: &Option<Attribute>,
-) -> std::fmt::Result {
-    if let Some(attr) = attr {
-        attr.format(f)?;
-    }
-    Ok(())
-}
-
 #[derive(Copy, Clone)]
 pub(crate) struct ParsedFragment<'a> {
     pub(crate) control: ControlField,
@@ -691,6 +646,51 @@ impl QualifierCode {
             None => Err(ObjectParseError::UnknownQualifier(x)),
         }
     }
+}
+
+pub(crate) fn format_count_of_items<T, V>(f: &mut Formatter, iter: T) -> std::fmt::Result
+where
+    T: Iterator<Item = V>,
+    V: std::fmt::Display,
+{
+    for x in iter {
+        write!(f, "\n{x}")?;
+    }
+    Ok(())
+}
+
+pub(crate) fn format_indexed_items<T, V, I>(f: &mut Formatter, iter: T) -> std::fmt::Result
+where
+    T: Iterator<Item = (V, I)>,
+    V: std::fmt::Display,
+    I: std::fmt::Display,
+{
+    for (v, i) in iter {
+        write!(f, "\nindex: {i} {v}")?;
+    }
+    Ok(())
+}
+
+pub(crate) fn format_prefixed_items<T, V, I>(f: &mut Formatter, iter: T) -> std::fmt::Result
+where
+    T: Iterator<Item = Prefix<I, V>>,
+    V: FixedSizeVariation,
+    I: Index,
+{
+    for x in iter {
+        write!(f, "\nindex: {} {}", x.index, x.value)?;
+    }
+    Ok(())
+}
+
+pub(crate) fn format_optional_attribute(
+    f: &mut Formatter,
+    attr: &Option<Attribute>,
+) -> std::fmt::Result {
+    if let Some(attr) = attr {
+        attr.format(f)?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]
