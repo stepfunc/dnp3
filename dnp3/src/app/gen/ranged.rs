@@ -182,7 +182,6 @@ impl<'a> RangedVariation<'a> {
             Variation::Group80Var1 => Ok(RangedVariation::Group80Var1(BitSequence::parse(range, cursor)?)),
             Variation::Group102Var0 => Ok(RangedVariation::Group102Var0),
             Variation::Group102Var1 => Ok(RangedVariation::Group102Var1(RangedSequence::parse(range, cursor)?)),
-            Variation::Group110(0) => Err(ObjectParseError::ZeroLengthOctetData),
             Variation::Group110(x) => {
                 Ok(RangedVariation::Group110VarX(x, RangedBytesSequence::parse(x, range.get_start(), range.get_count(), cursor)?))
             },

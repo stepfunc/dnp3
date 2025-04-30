@@ -78,7 +78,6 @@ object RangedVariationModule extends Module {
       }
 
       case v : SizedByVariation => {
-        s"Variation::${v.parent.name}(0) => Err(ObjectParseError::ZeroLengthOctetData),".eol ++
         bracketComma(s"Variation::${v.parent.name}(x) =>") {
           s"Ok(RangedVariation::${v.parent.name}VarX(x, RangedBytesSequence::parse(x, range.get_start(), range.get_count(), cursor)?))".eol
         }
