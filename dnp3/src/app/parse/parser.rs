@@ -76,7 +76,7 @@ impl<'a> ParsedFragment<'a> {
         Ok(Request {
             header: RequestHeader::new(self.control, self.function),
             raw_fragment: self.raw_fragment,
-            raw_objects: self.raw_objects,
+            //raw_objects: self.raw_objects,
             objects: self.objects,
         })
     }
@@ -351,7 +351,7 @@ impl HeaderDetails<'_> {
 pub(crate) struct Request<'a> {
     pub(crate) header: RequestHeader,
     pub(crate) raw_fragment: &'a [u8],
-    pub(crate) raw_objects: &'a [u8],
+    //pub(crate) raw_objects: &'a [u8],
     pub(crate) objects: Result<HeaderCollection<'a>, ObjectParseError>,
 }
 
@@ -734,21 +734,6 @@ mod test {
 
     use super::*;
 
-    struct EnableZeroLengthStringsGuard;
-
-    impl EnableZeroLengthStringsGuard {
-        fn new() -> Self {
-            crate::app::options::parse_zero_length_strings(true);
-            Self
-        }
-    }
-
-    impl Drop for EnableZeroLengthStringsGuard {
-        fn drop(&mut self) {
-            crate::app::options::parse_zero_length_strings(false);
-        }
-    }
-
     fn test_parse_error(input: &[u8], func: FunctionCode, err: ObjectParseError) {
         assert_eq!(
             ObjectParser::parse(ParseOptions::default(), func, input)
@@ -820,7 +805,7 @@ mod test {
         };
 
         assert_eq!(request.header, expected);
-        assert_eq!(request.raw_objects, &[0xAA]);
+        //assert_eq!(request.raw_objects, &[0xAA]);
         assert_eq!(
             request.objects.err().unwrap(),
             ObjectParseError::InsufficientBytes
@@ -1201,10 +1186,12 @@ mod test {
     }
 
     #[test]
-    fn g110v0_can_be_parsed_via_global_setting() {
-        let _guard = EnableZeroLengthStringsGuard::new();
+    fn g110v0_can_be_parsed_if_enabled() {
+        let options = ParseOptions {
+            parse_zero_length_strings: true,
+        };
         let mut headers = ObjectParser::parse(
-            ParseOptions::default(),
+            options,
             FunctionCode::Response,
             &[0x6E, 0x00, 0x00, 0x07, 0x07],
         )
