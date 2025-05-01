@@ -1,3 +1,4 @@
+use crate::app::parse::options::ParseOptions;
 use crate::app::parse::parser::ParsedFragment;
 use crate::app::HeaderParseError;
 use crate::decode::{AppDecodeLevel, DecodeLevel};
@@ -19,6 +20,7 @@ pub(crate) type InnerReaderType = crate::transport::real::reader::Reader;
 pub(crate) type InnerReaderType = crate::transport::mock::reader::MockReader;
 
 pub(crate) struct TransportReader {
+    parse_options: ParseOptions,
     inner: InnerReaderType,
 }
 
@@ -55,21 +57,25 @@ impl Drop for RequestGuard<'_> {
 impl TransportReader {
     pub(crate) fn master(
         link_modes: LinkModes,
+        parse_options: ParseOptions,
         address: EndpointAddress,
         rx_buffer_size: usize,
     ) -> Self {
         Self {
+            parse_options,
             inner: InnerReaderType::master(link_modes, address, rx_buffer_size),
         }
     }
 
     pub(crate) fn outstation(
         link_modes: LinkModes,
+        parse_options: ParseOptions,
         address: EndpointAddress,
         self_address: Feature,
         rx_buffer_size: usize,
     ) -> Self {
         Self {
+            parse_options,
             inner: InnerReaderType::outstation(link_modes, address, self_address, rx_buffer_size),
         }
     }
@@ -97,7 +103,7 @@ impl TransportReader {
 
     fn decode(&self, level: AppDecodeLevel) {
         if let Some(TransportData::Fragment(fragment)) = self.inner.peek() {
-            match ParsedFragment::parse(fragment.data) {
+            match ParsedFragment::parse(self.parse_options, fragment.data) {
                 Ok(fragment) => {
                     tracing::info!("APP RX - {}", fragment.display(level));
                 }
@@ -179,7 +185,7 @@ impl TransportReader {
 
         match transport_data {
             TransportData::Fragment(fragment) => Some(
-                ParsedFragment::parse(fragment.data)
+                ParsedFragment::parse(self.parse_options, fragment.data)
                     .map(|parsed| ParsedTransportData::Fragment(fragment.info, parsed))
                     .map_err(|err| (err, fragment.info.addr)),
             ),

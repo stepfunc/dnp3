@@ -11,6 +11,7 @@ use crate::tcp::{wire_master_client, ClientState, ConnectOptions};
 use crate::tcp::{EndpointList, PostConnectionHandler};
 use crate::util::phys::PhysLayer;
 
+use crate::app::parse::options::ParseOptions;
 use crate::link::reader::LinkModes;
 use tokio::net::TcpStream;
 use tokio_rustls::rustls;
@@ -62,6 +63,7 @@ pub fn spawn_master_tls_client_2(
     let main_addr = endpoints.main_addr().to_string();
     let (mut task, handle) = wire_master_client(
         LinkModes::stream(link_error_mode),
+        ParseOptions::get_static(),
         MasterChannelType::Stream,
         endpoints,
         config,

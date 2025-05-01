@@ -24,6 +24,7 @@ use scursor::ReadCursor;
 pub(crate) struct ParsedFragment<'a> {
     pub(crate) control: ControlField,
     pub(crate) function: FunctionCode,
+    pub(crate) options: ParseOptions,
     pub(crate) iin: Option<Iin>,
     pub(crate) objects: Result<HeaderCollection<'a>, ObjectParseError>,
     pub(crate) raw_fragment: &'a [u8],
@@ -108,7 +109,10 @@ impl<'a> ParsedFragment<'a> {
         })
     }
 
-    fn parse_no_logging(fragment: &'a [u8]) -> Result<Self, HeaderParseError> {
+    fn parse_no_logging(
+        options: ParseOptions,
+        fragment: &'a [u8],
+    ) -> Result<Self, HeaderParseError> {
         let mut cursor = ReadCursor::new(fragment);
 
         let control = ControlField::parse(&mut cursor)?;
@@ -127,8 +131,9 @@ impl<'a> ParsedFragment<'a> {
         let fragment = Self {
             control,
             function,
+            options,
             iin,
-            objects: HeaderCollection::parse(function, objects),
+            objects: HeaderCollection::parse(options, function, objects),
             raw_fragment: fragment,
             raw_objects: objects,
         };
@@ -136,8 +141,11 @@ impl<'a> ParsedFragment<'a> {
         Ok(fragment)
     }
 
-    pub(crate) fn parse(fragment: &'a [u8]) -> Result<Self, HeaderParseError> {
-        Self::parse_no_logging(fragment)
+    pub(crate) fn parse(
+        options: ParseOptions,
+        fragment: &'a [u8],
+    ) -> Result<Self, HeaderParseError> {
+        Self::parse_no_logging(options, fragment)
     }
 }
 
@@ -286,9 +294,12 @@ impl std::fmt::Display for FragmentDisplay<'_> {
             }
             Err(err) => {
                 // if an error occurred, we re-parse the object headers so we can log any headers before the error
-                for header in
-                    ObjectParser::one_pass(self.fragment.function, self.fragment.raw_objects)
-                        .flatten()
+                for header in ObjectParser::one_pass(
+                    self.fragment.options,
+                    self.fragment.function,
+                    self.fragment.raw_objects,
+                )
+                .flatten()
                 {
                     f.write_str("\n")?;
                     header.format(self.level.object_values(), f)?;
@@ -336,7 +347,7 @@ impl HeaderDetails<'_> {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug)]
 pub(crate) struct Request<'a> {
     pub(crate) header: RequestHeader,
     pub(crate) raw_fragment: &'a [u8],
@@ -344,7 +355,7 @@ pub(crate) struct Request<'a> {
     pub(crate) objects: Result<HeaderCollection<'a>, ObjectParseError>,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug)]
 pub(crate) struct Response<'a> {
     pub(crate) header: ResponseHeader,
     pub(crate) raw_objects: &'a [u8],
@@ -367,8 +378,9 @@ struct ObjectParser<'a> {
 
 /// An abstract collection of pre-validated object headers
 /// that can provide an iterator of the headers.
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug)]
 pub(crate) struct HeaderCollection<'a> {
+    options: ParseOptions,
     function: FunctionCode,
     data: &'a [u8],
 }
@@ -387,9 +399,13 @@ impl From<ObjectParseError> for SingleHeaderError {
 }
 
 impl<'a> HeaderCollection<'a> {
-    /// parse the the raw header data in accordance with the provided function code
-    pub(crate) fn parse(function: FunctionCode, data: &'a [u8]) -> Result<Self, ObjectParseError> {
-        ObjectParser::parse(function, data)
+    /// parse the raw header data in accordance with the provided function code
+    pub(crate) fn parse(
+        options: ParseOptions,
+        function: FunctionCode,
+        data: &'a [u8],
+    ) -> Result<Self, ObjectParseError> {
+        ObjectParser::parse(options, function, data)
     }
 
     pub(crate) fn is_empty(&self) -> bool {
@@ -399,7 +415,7 @@ impl<'a> HeaderCollection<'a> {
     /// return and iterator of the headers that lazily parses them
     pub(crate) fn iter(&self) -> HeaderIterator<'a> {
         HeaderIterator {
-            parser: ObjectParser::one_pass(self.function, self.data),
+            parser: ObjectParser::one_pass(self.options, self.function, self.data),
         }
     }
 
@@ -439,17 +455,22 @@ impl<'a> Iterator for HeaderIterator<'a> {
 
 impl<'a> ObjectParser<'a> {
     pub(crate) fn parse(
+        options: ParseOptions,
         function: FunctionCode,
         data: &'a [u8],
     ) -> Result<HeaderCollection<'a>, ObjectParseError> {
         // we first do a single pass to ensure the ASDU is well-formed, returning an error if it occurs
-        for result in ObjectParser::one_pass(function, data) {
+        for result in ObjectParser::one_pass(options, function, data) {
             result?;
         }
 
         // now we know that we know the headers are well-formed, our 2nd pass
         // can use the HeaderCollection iterator implementation to read them
-        Ok(HeaderCollection { function, data })
+        Ok(HeaderCollection {
+            options,
+            function,
+            data,
+        })
     }
 
     fn one_pass(options: ParseOptions, function: FunctionCode, data: &'a [u8]) -> Self {
@@ -523,6 +544,7 @@ impl<'a> ObjectParser<'a> {
         let stop = self.cursor.read_u8()?;
         let range = Range::from(start as u16, stop as u16)?;
         let data = RangedVariation::parse(
+            self.options,
             self.function,
             QualifierCode::Range8,
             v,
@@ -540,6 +562,7 @@ impl<'a> ObjectParser<'a> {
         let stop = self.cursor.read_u16_le()?;
         let range = Range::from(start, stop)?;
         let data = RangedVariation::parse(
+            self.options,
             self.function,
             QualifierCode::Range16,
             v,
@@ -727,12 +750,17 @@ mod test {
     }
 
     fn test_parse_error(input: &[u8], func: FunctionCode, err: ObjectParseError) {
-        assert_eq!(ObjectParser::parse(func, input).err().unwrap(), err);
+        assert_eq!(
+            ObjectParser::parse(ParseOptions::default(), func, input)
+                .err()
+                .unwrap(),
+            err
+        );
     }
 
     fn test_request_validation_error(input: &[u8], err: RequestValidationError) {
         assert_eq!(
-            ParsedFragment::parse(input)
+            ParsedFragment::parse(ParseOptions::default(), input)
                 .unwrap()
                 .to_request()
                 .err()
@@ -743,7 +771,7 @@ mod test {
 
     fn test_response_validation_error(input: &[u8], err: ResponseValidationError) {
         assert_eq!(
-            ParsedFragment::parse(input)
+            ParsedFragment::parse(ParseOptions::default(), input)
                 .unwrap()
                 .to_response()
                 .err()
@@ -776,7 +804,7 @@ mod test {
     #[test]
     fn parses_valid_request() {
         let fragment = &[0xC2, 0x02, 0xAA];
-        let request = ParsedFragment::parse(fragment)
+        let request = ParsedFragment::parse(ParseOptions::default(), fragment)
             .unwrap()
             .to_request()
             .unwrap();
@@ -802,7 +830,7 @@ mod test {
     #[test]
     fn parses_valid_unsolicited_response() {
         let fragment = &[0b11010010, 0x82, 0xFF, 0xAA, 0x01, 0x02];
-        let response = ParsedFragment::parse(fragment)
+        let response = ParsedFragment::parse(ParseOptions::default(), fragment)
             .unwrap()
             .to_response()
             .unwrap();
@@ -856,7 +884,7 @@ mod test {
     #[test]
     fn confirms_may_or_may_not_have_uns_set() {
         {
-            let request = ParsedFragment::parse(&[0b11010000, 0x00])
+            let request = ParsedFragment::parse(ParseOptions::default(), &[0b11010000, 0x00])
                 .unwrap()
                 .to_request()
                 .unwrap();
@@ -864,7 +892,7 @@ mod test {
             assert!(request.header.control.uns);
         }
         {
-            let request = ParsedFragment::parse(&[0b11000000, 0x00])
+            let request = ParsedFragment::parse(ParseOptions::default(), &[0b11000000, 0x00])
                 .unwrap()
                 .to_request()
                 .unwrap();
@@ -876,6 +904,7 @@ mod test {
     #[test]
     fn parses_integrity_scan() {
         let vec: Vec<HeaderDetails> = ObjectParser::parse(
+            ParseOptions::default(),
             FunctionCode::Read,
             &[
                 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06, 0x3C, 0x01, 0x06,
@@ -908,9 +937,10 @@ mod test {
     #[test]
     fn parses_analog_output() {
         let header = &[0x29, 0x01, 0x17, 0x01, 0xFF, 0x01, 0x02, 0x03, 0x04, 0x00];
-        let mut headers = ObjectParser::parse(FunctionCode::Operate, header)
-            .unwrap()
-            .iter();
+        let mut headers =
+            ObjectParser::parse(ParseOptions::default(), FunctionCode::Operate, header)
+                .unwrap()
+                .iter();
 
         let items: Vec<Prefix<u8, Group41Var1>> = assert_matches!(
             headers.next().unwrap().details,
@@ -933,9 +963,10 @@ mod test {
     #[test]
     fn parses_range_of_g3v1() {
         let header = &[0x03, 0x01, 0x00, 0x01, 0x04, 0b11_10_01_00];
-        let mut headers = ObjectParser::parse(FunctionCode::Response, header)
-            .unwrap()
-            .iter();
+        let mut headers =
+            ObjectParser::parse(ParseOptions::default(), FunctionCode::Response, header)
+                .unwrap()
+                .iter();
 
         let items: Vec<(DoubleBit, u16)> = assert_matches!(
             headers.next().unwrap().details,
@@ -957,9 +988,10 @@ mod test {
     #[test]
     fn parses_count_of_time() {
         let header = &[0x32, 0x01, 0x07, 0x01, 0xFF, 0xFE, 0xFD, 0xFC, 0xFB, 0xFA];
-        let mut headers = HeaderCollection::parse(FunctionCode::Write, header)
-            .unwrap()
-            .iter();
+        let mut headers =
+            HeaderCollection::parse(ParseOptions::default(), FunctionCode::Write, header)
+                .unwrap()
+                .iter();
 
         let items: Vec<Group50Var1> = assert_matches!(
             headers.next().unwrap().details,
@@ -980,9 +1012,10 @@ mod test {
     fn parses_range_of_g1v2_as_non_read() {
         let input = [0x01, 0x02, 0x00, 0x02, 0x03, 0xAA, 0xBB];
 
-        let mut headers = HeaderCollection::parse(FunctionCode::Response, &input)
-            .unwrap()
-            .iter();
+        let mut headers =
+            HeaderCollection::parse(ParseOptions::default(), FunctionCode::Response, &input)
+                .unwrap()
+                .iter();
 
         let items: Vec<(Group1Var2, u16)> = assert_matches!(
             headers.next().unwrap().details,
@@ -1003,9 +1036,10 @@ mod test {
     fn parses_range_of_g1v2_as_read() {
         let input = [0x01, 0x02, 0x00, 0x02, 0x03, 0x01, 0x02, 0x00, 0x07, 0x09];
 
-        let mut headers = HeaderCollection::parse(FunctionCode::Read, &input)
-            .unwrap()
-            .iter();
+        let mut headers =
+            HeaderCollection::parse(ParseOptions::default(), FunctionCode::Read, &input)
+                .unwrap()
+                .iter();
 
         assert_matches!(
             headers.next().unwrap().details,
@@ -1028,9 +1062,10 @@ mod test {
     fn parses_g34_var1_with_count_and_prefix() {
         let input = [0x22, 0x01, 0x17, 0x01, 0x03, 0xCA, 0xFE];
 
-        let mut headers = HeaderCollection::parse(FunctionCode::Write, &input)
-            .unwrap()
-            .iter();
+        let mut headers =
+            HeaderCollection::parse(ParseOptions::default(), FunctionCode::Write, &input)
+                .unwrap()
+                .iter();
 
         assert_matches!(
             headers.next().unwrap().details,
@@ -1047,9 +1082,10 @@ mod test {
     fn parses_range_of_g80v1() {
         // this is what is typically sent to clear the restart IIN
         let input = [0x50, 0x01, 0x00, 0x07, 0x07, 0x00];
-        let mut headers = HeaderCollection::parse(FunctionCode::Write, &input)
-            .unwrap()
-            .iter();
+        let mut headers =
+            HeaderCollection::parse(ParseOptions::default(), FunctionCode::Write, &input)
+                .unwrap()
+                .iter();
 
         let vec: Vec<(bool, u16)> = assert_matches!(
             headers.next().unwrap().details,
@@ -1067,9 +1103,10 @@ mod test {
         let input = [
             0x32, 0x02, 0x07, 0x01, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0xAA, 0xBB, 0xCC, 0xDD,
         ];
-        let mut headers = HeaderCollection::parse(FunctionCode::Write, &input)
-            .unwrap()
-            .iter();
+        let mut headers =
+            HeaderCollection::parse(ParseOptions::default(), FunctionCode::Write, &input)
+                .unwrap()
+                .iter();
 
         let received = match headers.next().unwrap().details {
             HeaderDetails::OneByteCount(01, CountVariation::Group50Var2(seq)) => {
@@ -1091,9 +1128,10 @@ mod test {
     #[test]
     fn parses_group110var0_as_read() {
         let input = [0x6E, 0x00, 0x00, 0x02, 0x03];
-        let mut headers = HeaderCollection::parse(FunctionCode::Read, &input)
-            .unwrap()
-            .iter();
+        let mut headers =
+            HeaderCollection::parse(ParseOptions::default(), FunctionCode::Read, &input)
+                .unwrap()
+                .iter();
         assert_matches!(
             headers.next().unwrap().details,
             HeaderDetails::OneByteStartStop(02, 03, RangedVariation::Group110Var0)
@@ -1116,9 +1154,10 @@ mod test {
     #[test]
     fn parses_group110var1_as_non_read() {
         let input = [0x6E, 0x01, 0x00, 0x01, 0x02, 0xAA, 0xBB];
-        let mut headers = ObjectParser::parse(FunctionCode::Response, &input)
-            .unwrap()
-            .iter();
+        let mut headers =
+            ObjectParser::parse(ParseOptions::default(), FunctionCode::Response, &input)
+                .unwrap()
+                .iter();
 
         let bytes: Vec<(&[u8], u16)> = assert_matches!(
             headers.next().unwrap().details,
@@ -1136,9 +1175,10 @@ mod test {
         let input = [
             0x6F, 0x01, 0x28, 0x02, 0x00, 0x01, 0x00, 0xAA, 0x02, 0x00, 0xBB,
         ];
-        let mut headers = ObjectParser::parse(FunctionCode::Response, &input)
-            .unwrap()
-            .iter();
+        let mut headers =
+            ObjectParser::parse(ParseOptions::default(), FunctionCode::Response, &input)
+                .unwrap()
+                .iter();
 
         let bytes: Vec<(&[u8], u16)> = assert_matches!(
             headers.next().unwrap().details,
@@ -1163,10 +1203,13 @@ mod test {
     #[test]
     fn g110v0_can_be_parsed_via_global_setting() {
         let _guard = EnableZeroLengthStringsGuard::new();
-        let mut headers =
-            ObjectParser::parse(FunctionCode::Response, &[0x6E, 0x00, 0x00, 0x07, 0x07])
-                .unwrap()
-                .iter();
+        let mut headers = ObjectParser::parse(
+            ParseOptions::default(),
+            FunctionCode::Response,
+            &[0x6E, 0x00, 0x00, 0x07, 0x07],
+        )
+        .unwrap()
+        .iter();
         let first = headers.next().unwrap();
         assert!(headers.next().is_none());
         match first.details {
@@ -1185,9 +1228,10 @@ mod test {
     fn parses_specific_attribute_in_range() {
         let input: &[u8] = &[0x00, 0xCA, 0x00, 0x07, 0x07, 0x02, 0x01, 42];
 
-        let mut headers = ObjectParser::parse(FunctionCode::Response, input)
-            .unwrap()
-            .iter();
+        let mut headers =
+            ObjectParser::parse(ParseOptions::default(), FunctionCode::Response, input)
+                .unwrap()
+                .iter();
 
         let first = headers.next().unwrap();
         assert!(headers.next().is_none());
@@ -1216,7 +1260,7 @@ mod test {
     fn parses_specific_attribute_in_read_request() {
         let input: &[u8] = &[0x00, 0xCA, 0x00, 0x07, 0x07];
 
-        let mut headers = ObjectParser::parse(FunctionCode::Read, input)
+        let mut headers = ObjectParser::parse(ParseOptions::default(), FunctionCode::Read, input)
             .unwrap()
             .iter();
 
@@ -1233,7 +1277,8 @@ mod test {
     #[test]
     fn range_parsing_fails_for_specific_attribute_with_count_equal_two() {
         let input: &[u8] = &[0x00, 0xCA, 0x00, 0x07, 0x08, 0x02, 0x01, 42];
-        let err = ObjectParser::parse(FunctionCode::Response, input).unwrap_err();
+        let err = ObjectParser::parse(ParseOptions::default(), FunctionCode::Response, input)
+            .unwrap_err();
         assert_eq!(
             err,
             ObjectParseError::BadAttribute(AttrParseError::CountNotOne(2))
@@ -1246,7 +1291,8 @@ mod test {
             70, 5, 0x5B, 0x01, 12, 0x00, 0x01, 0x02, 0x03, 0x04, 0xAA, 0xBB, 0xCC, 0xDD, b'd',
             b'a', b't', b'a',
         ];
-        let headers = ObjectParser::parse(FunctionCode::Response, input).unwrap();
+        let headers =
+            ObjectParser::parse(ParseOptions::default(), FunctionCode::Response, input).unwrap();
         let header = headers.iter().next().unwrap();
 
         assert_eq!(header.variation, Variation::Group70Var5);

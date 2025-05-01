@@ -417,6 +417,7 @@ mod tests {
     }
 
     mod non_lan {
+        use crate::app::parse::options::ParseOptions;
         use crate::app::parse::parser::ParsedFragment;
         use crate::app::parse::traits::FixedSize;
         use crate::app::parse::traits::FixedSizeVariation;
@@ -493,7 +494,7 @@ mod tests {
                     .write(cursor)
                     .unwrap();
                 }
-                let response = ParsedFragment::parse(cursor.written())
+                let response = ParsedFragment::parse(ParseOptions::default(), cursor.written())
                     .unwrap()
                     .to_response()
                     .unwrap();

@@ -2,6 +2,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use tokio::task::JoinHandle;
 
+use crate::app::parse::options::ParseOptions;
 use crate::app::{BufferSize, Timeout};
 use crate::decode::AppDecodeLevel;
 use crate::link::header::{FrameInfo, FrameType};
@@ -40,7 +41,13 @@ pub(crate) async fn create_association(mut config: AssociationConfig) -> TestHar
 
     // Create the master session
     let (tx, rx) = crate::util::channel::request_channel();
-    let mut task = MasterTask::new(Enabled::Yes, LinkModes::serial(), task_config, rx);
+    let mut task = MasterTask::new(
+        Enabled::Yes,
+        LinkModes::serial(),
+        ParseOptions::default(),
+        task_config,
+        rx,
+    );
 
     let mut master = MasterChannel::new(tx, MasterChannelType::Stream);
 

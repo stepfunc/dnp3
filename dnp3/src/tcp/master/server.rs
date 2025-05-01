@@ -10,6 +10,7 @@ use crate::util::phys::PhysLayer;
 use crate::util::session::{Enabled, Session};
 use std::future::Future;
 
+use crate::app::parse::options::ParseOptions;
 use crate::tcp::ServerHandle;
 use crate::util::future::forever;
 use crate::util::shutdown::ShutdownListener;
@@ -98,6 +99,7 @@ pub async fn spawn_master_tcp_server<C: ConnectionHandler>(
         conn_id: 0,
         pending_link_id_tasks: 0,
         link_id_config,
+        parse_options: ParseOptions::get_static(),
         listener,
         shutdown_listener,
         handler,
@@ -190,6 +192,7 @@ struct AcceptTask<C: ConnectionHandler> {
     conn_id: u64,
     pending_link_id_tasks: usize,
     link_id_config: LinkIdConfig,
+    parse_options: ParseOptions,
     listener: TcpListener,
     shutdown_listener: ShutdownListener,
     handler: C,
@@ -280,6 +283,7 @@ impl<C: ConnectionHandler> AcceptTask<C> {
                     phys,
                     addr,
                     x.config,
+                    self.parse_options,
                     x.error_mode,
                     id.header_bytes.as_slice(),
                     Some(id),
@@ -304,8 +308,16 @@ impl<C: ConnectionHandler> AcceptTask<C> {
                 tracing::info!("rejected connection from {addr}");
             }
             Ok(AcceptAction::Accept(x)) => {
-                self.spawn_session(phys, addr, x.config, x.error_mode, &[], None)
-                    .await;
+                self.spawn_session(
+                    phys,
+                    addr,
+                    x.config,
+                    self.parse_options,
+                    x.error_mode,
+                    &[],
+                    None,
+                )
+                .await;
             }
             Ok(AcceptAction::GetLinkIdentity) => {
                 // spawn a task to identify the remote link layer
@@ -326,12 +338,19 @@ impl<C: ConnectionHandler> AcceptTask<C> {
         phys: PhysLayer,
         addr: SocketAddr,
         config: MasterChannelConfig,
+        parse_options: ParseOptions,
         error_mode: LinkErrorMode,
         seed_data: &[u8],
         link_id: Option<LinkIdentity>,
     ) {
         let (tx, rx) = crate::util::channel::request_channel();
-        let mut task = MasterTask::new(Enabled::No, LinkModes::stream(error_mode), config, rx);
+        let mut task = MasterTask::new(
+            Enabled::No,
+            LinkModes::stream(error_mode),
+            parse_options,
+            config,
+            rx,
+        );
         if let Err(err) = task.seed_link(seed_data) {
             tracing::error!("unable to seed link layer: {err:?}");
             return;

@@ -1,3 +1,4 @@
+use crate::app::parse::options::ParseOptions;
 use crate::app::parse::parser::{FragmentDisplay, ParsedFragment};
 use crate::app::EndpointType;
 use crate::decode::DecodeLevel;
@@ -36,7 +37,7 @@ impl TransportWriter {
         fragment: &[u8],
     ) -> Result<(), LinkError> {
         if level.application.enabled() {
-            if let Ok(fragment) = ParsedFragment::parse(fragment) {
+            if let Ok(fragment) = ParsedFragment::parse(ParseOptions::write_only(), fragment) {
                 let x: FragmentDisplay = fragment.display(level.application);
                 tracing::info!("APP TX - {}", x);
             }

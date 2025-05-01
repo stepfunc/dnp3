@@ -1,3 +1,4 @@
+use crate::app::parse::options::ParseOptions;
 use crate::decode::DecodeLevel;
 use crate::link::reader::LinkModes;
 use crate::outstation::config::*;
@@ -38,6 +39,7 @@ impl OutstationTask {
     pub(crate) fn create(
         initial_state: Enabled,
         link_modes: LinkModes,
+        parse_options: ParseOptions,
         config: OutstationConfig,
         phys_addr: PhysAddr,
         application: Box<dyn OutstationApplication>,
@@ -52,6 +54,7 @@ impl OutstationTask {
         );
         let (reader, writer) = crate::transport::create_outstation_transport_layer(
             link_modes,
+            parse_options,
             config.outstation_address,
             config.features.self_address,
             config.rx_buffer_size,

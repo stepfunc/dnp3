@@ -1,6 +1,4 @@
-use std::sync::{Arc, Mutex};
-use tokio::task::JoinHandle;
-
+use crate::app::parse::options::ParseOptions;
 use crate::decode::AppDecodeLevel;
 use crate::link::header::{BroadcastConfirmMode, FrameInfo, FrameType};
 use crate::link::reader::LinkModes;
@@ -15,6 +13,8 @@ use crate::outstation::tests::harness::{
 use crate::outstation::OutstationHandle;
 use crate::util::phys::{PhysAddr, PhysLayer};
 use crate::util::session::{Enabled, RunError};
+use std::sync::{Arc, Mutex};
+use tokio::task::JoinHandle;
 
 pub(crate) fn get_default_config() -> OutstationConfig {
     let mut config = get_default_unsolicited_config();
@@ -130,6 +130,7 @@ fn new_harness_impl(
     let (task, handle) = OutstationTask::create(
         Enabled::Yes,
         LinkModes::test(),
+        ParseOptions::get_static(),
         config,
         PhysAddr::None,
         application,

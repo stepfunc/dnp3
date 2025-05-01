@@ -19,6 +19,7 @@ use crate::util::session::{Enabled, Session};
 use tokio::net::TcpStream;
 use tokio_rustls::rustls::pki_types::ServerName;
 
+use crate::app::parse::options::ParseOptions;
 use crate::link::reader::LinkModes;
 use tracing::Instrument;
 
@@ -43,6 +44,7 @@ pub fn spawn_outstation_tls_client(
     let (task, handle) = OutstationTask::create(
         Enabled::No,
         LinkModes::stream(link_error_mode),
+        ParseOptions::get_static(),
         config,
         PhysAddr::None,
         application,

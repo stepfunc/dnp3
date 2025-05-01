@@ -89,6 +89,7 @@ pub(crate) fn extract_measurements_inner(
 mod test {
     use crate::app::attr::*;
     use crate::app::control::CommandStatus;
+    use crate::app::parse::options::ParseOptions;
     use crate::app::parse::parser::HeaderCollection;
     use crate::app::*;
     use crate::master::{HeaderInfo, ReadHandler};
@@ -292,6 +293,7 @@ mod test {
     fn g2v3_without_cto_yields_invalid_time() {
         let mut handler = MockHandler::new();
         let objects = HeaderCollection::parse(
+            ParseOptions::default(),
             FunctionCode::Response,
             &[0x02, 0x03, 0x17, 0x01, 0x07, 0x01, 0xFF, 0xFF],
         )
@@ -315,6 +317,7 @@ mod test {
     fn g2v3_with_synchronized_cto_yields_synchronized_time() {
         let mut handler = MockHandler::new();
         let objects = HeaderCollection::parse(
+            ParseOptions::default(),
             FunctionCode::Response,
             // g50v1       count: 1   -------- time: 1 ------------------
             &[
@@ -341,6 +344,7 @@ mod test {
     fn g2v3_with_unsynchronized_cto_yields_unsynchronized_time() {
         let mut handler = MockHandler::new();
         let objects = HeaderCollection::parse(
+            ParseOptions::default(),
             FunctionCode::Response,
             // g50v2   count: 1    --------- time: 2 -----------------
             &[
@@ -367,6 +371,7 @@ mod test {
     fn can_calculate_maximum_timestamp() {
         let mut handler = MockHandler::new();
         let objects = HeaderCollection::parse(
+            ParseOptions::default(),
             FunctionCode::Response,
             // g50v1      count: 1  --------- time: 0xFFFFFE ----------
             &[
@@ -393,6 +398,7 @@ mod test {
     fn cto_overflow_of_u48_yields_invalid_time() {
         let mut handler = MockHandler::new();
         let objects = HeaderCollection::parse(
+            ParseOptions::default(),
             FunctionCode::Response,
             // g50v1      count: 1  --------- time: 0xFFFFFE ----------
             &[
@@ -419,6 +425,7 @@ mod test {
     fn handles_frozen_analog_event() {
         let mut handler = MockHandler::new();
         let objects = HeaderCollection::parse(
+            ParseOptions::default(),
             FunctionCode::Response,
             &[
                 33, 3, 0x17, 0x01, 0x07, 0x01, 0xDE, 0xAD, 0xCA, 0xFE, 0x01, 0x02, 0x03, 0x04,
@@ -444,6 +451,7 @@ mod test {
     fn handles_analog_input_dead_band() {
         let mut handler = MockHandler::new();
         let objects = HeaderCollection::parse(
+            ParseOptions::default(),
             FunctionCode::Response,
             &[0x22, 1, 0x00, 0x01, 0x02, 0xCA, 0xFE, 0xDE, 0xAD],
         )
@@ -462,6 +470,7 @@ mod test {
     fn handles_static_frozen_analog() {
         let mut handler = MockHandler::new();
         let objects = HeaderCollection::parse(
+            ParseOptions::default(),
             FunctionCode::Response,
             &[31, 2, 0x00, 0x07, 0x07, 0x01, 0xCA, 0xFE],
         )
@@ -484,6 +493,7 @@ mod test {
     fn handles_device_attrs() {
         let mut handler = MockHandler::new();
         let objects = HeaderCollection::parse(
+            ParseOptions::default(),
             FunctionCode::Response,
             &[
                 // group 0 var 252 - default set == 0 - one byte count and prefix
@@ -511,6 +521,7 @@ mod test {
     fn handles_g13v1_and_g13v2() {
         let mut handler = MockHandler::new();
         let objects = HeaderCollection::parse(
+            ParseOptions::default(),
             FunctionCode::UnsolicitedResponse,
             &[
                 13, // g13v1
@@ -565,6 +576,7 @@ mod test {
     fn handles_g43_object() {
         let mut handler = MockHandler::new();
         let objects = HeaderCollection::parse(
+            ParseOptions::default(),
             FunctionCode::UnsolicitedResponse,
             &[
                 43, // g43v2
@@ -595,6 +607,7 @@ mod test {
     fn handles_g102v1() {
         let mut handler = MockHandler::new();
         let objects = HeaderCollection::parse(
+            ParseOptions::default(),
             FunctionCode::UnsolicitedResponse,
             &[
                 102, // g43v2
