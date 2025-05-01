@@ -1704,7 +1704,7 @@ mod test {
 
     #[test]
     fn parses_attr_list() {
-        let mut cursor = ReadCursor::new(&[ATTR_LIST, 0x06, 20, 00, 21, 01, 22, 02]);
+        let mut cursor = ReadCursor::new(&[ATTR_LIST, 0x06, 20, 00, 21, 1, 22, 2]);
         let parsed_list: Vec<AttrItem> = match AttrValue::parse(&mut cursor).unwrap() {
             AttrValue::AttrList(x) => x.iter().collect(),
             _ => unreachable!(),

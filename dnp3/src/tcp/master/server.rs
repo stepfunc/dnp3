@@ -333,6 +333,7 @@ impl<C: ConnectionHandler> AcceptTask<C> {
         }
     }
 
+    #[allow(clippy::too_many_arguments)]
     async fn spawn_session(
         &mut self,
         phys: PhysLayer,

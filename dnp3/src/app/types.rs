@@ -167,7 +167,7 @@ mod test {
 
     #[test]
     fn conversion_from_timestamp_to_datetime_utc_cannot_overflow() {
-        let timestamp = Timestamp::new(std::u64::MAX);
+        let timestamp = Timestamp::new(u64::MAX);
         timestamp.to_datetime_utc();
     }
 

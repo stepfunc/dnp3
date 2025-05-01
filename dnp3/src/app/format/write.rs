@@ -248,9 +248,9 @@ mod test {
         assert_eq!(
             cursor.written(),
             [
-                70, 05, 0x5B, // var and qualifier
+                70, 5, 0x5B, // var and qualifier
                 0x01, // count
-                10, 00, // length
+                10, 0, // length
                 0xCC, 0xDD, 0xEE, 0xFF, 0xEF, 0xCD, 0xAB, 0x01, b'h', b'i'
             ]
         );

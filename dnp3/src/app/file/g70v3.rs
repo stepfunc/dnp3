@@ -125,7 +125,7 @@ mod test {
         0xEE, 0xDD, 0xCC, 0xBB, 0xAA, 0b01010101, // permissions
         0b00000001, 0xFE, // authentication key
         0xCA, 0xAD, 0xDE, 0xDD, // file size
-        0xCC, 0xBB, 0xAA, 03, // mode
+        0xCC, 0xBB, 0xAA, 3, // mode
         00, 42, // max block size
         00, 0xFF, // request id
         0xEE, b's', // filename

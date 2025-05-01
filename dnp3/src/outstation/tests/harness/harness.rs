@@ -125,7 +125,7 @@ fn new_harness_impl(
 ) -> OutstationHarness {
     let (sender, receiver) = event_handlers();
 
-    let (data, application) = MockOutstationApplication::new(sender.clone());
+    let (data, application) = MockOutstationApplication::create(sender.clone());
 
     let (task, handle) = OutstationTask::create(
         Enabled::Yes,
@@ -134,8 +134,8 @@ fn new_harness_impl(
         config,
         PhysAddr::None,
         application,
-        MockOutstationInformation::new(sender.clone()),
-        MockControlHandler::new(sender.clone()),
+        MockOutstationInformation::create(sender.clone()),
+        MockControlHandler::create(sender.clone()),
     );
 
     let mut task = Box::new(task);

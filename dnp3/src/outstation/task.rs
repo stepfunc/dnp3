@@ -36,6 +36,7 @@ pub(crate) struct OutstationTask {
 
 impl OutstationTask {
     /// create an `OutstationTask` and return it along with a `DatabaseHandle` for updating it
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn create(
         initial_state: Enabled,
         link_modes: LinkModes,

@@ -62,8 +62,8 @@ mod test {
 
     const DATA: &[u8] = &[
         4, // file handle
-        3, 2, 1, 03, // block number
-        00, 00, 00, 8,    // status code
+        3, 2, 1, 3, // block number
+        0, 0, 0, 8,    // status code
         b'w', // text
         b'a', b't',
     ];

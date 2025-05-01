@@ -7,7 +7,8 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<()> {
         .param("enabled", Bool, "If true, enable the parsing of zero length strings")?
         .doc(
             doc("Enable or disable the parsing of zero-length strings, e.g., Group 110/111 Variation 0")
-                .details("This is disabled by default for security reasons as enabling it can allow resource exhaustion attacks.")             
+                .details("This is disabled by default for security reasons as enabling it can allow resource exhaustion attacks.")
+                .details("This global option is a work-around to preserve API compatability until a future 2.0 release")
         )?
         .build_static("parse_zero_length_strings")?;
 

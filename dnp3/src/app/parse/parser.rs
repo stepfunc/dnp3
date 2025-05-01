@@ -76,7 +76,6 @@ impl<'a> ParsedFragment<'a> {
         Ok(Request {
             header: RequestHeader::new(self.control, self.function),
             raw_fragment: self.raw_fragment,
-            //raw_objects: self.raw_objects,
             objects: self.objects,
         })
     }
@@ -351,7 +350,6 @@ impl HeaderDetails<'_> {
 pub(crate) struct Request<'a> {
     pub(crate) header: RequestHeader,
     pub(crate) raw_fragment: &'a [u8],
-    //pub(crate) raw_objects: &'a [u8],
     pub(crate) objects: Result<HeaderCollection<'a>, ObjectParseError>,
 }
 
@@ -805,7 +803,6 @@ mod test {
         };
 
         assert_eq!(request.header, expected);
-        //assert_eq!(request.raw_objects, &[0xAA]);
         assert_eq!(
             request.objects.err().unwrap(),
             ObjectParseError::InsufficientBytes
@@ -929,7 +926,7 @@ mod test {
 
         let items: Vec<Prefix<u8, Group41Var1>> = assert_matches!(
             headers.next().unwrap().details,
-            HeaderDetails::OneByteCountAndPrefix(01, PrefixedVariation::<u8>::Group41Var1(seq)) => seq.iter().collect()
+            HeaderDetails::OneByteCountAndPrefix(1, PrefixedVariation::<u8>::Group41Var1(seq)) => seq.iter().collect()
         );
 
         assert_eq!(
@@ -955,7 +952,7 @@ mod test {
 
         let items: Vec<(DoubleBit, u16)> = assert_matches!(
             headers.next().unwrap().details,
-            HeaderDetails::OneByteStartStop(01, 04, RangedVariation::Group3Var1(seq)) => seq.iter().collect()
+            HeaderDetails::OneByteStartStop(1, 4, RangedVariation::Group3Var1(seq)) => seq.iter().collect()
         );
 
         assert_eq!(
@@ -980,7 +977,7 @@ mod test {
 
         let items: Vec<Group50Var1> = assert_matches!(
             headers.next().unwrap().details,
-            HeaderDetails::OneByteCount(01, CountVariation::Group50Var1(seq)) => seq.iter().collect()
+            HeaderDetails::OneByteCount(1, CountVariation::Group50Var1(seq)) => seq.iter().collect()
         );
 
         assert_eq!(
@@ -1004,7 +1001,7 @@ mod test {
 
         let items: Vec<(Group1Var2, u16)> = assert_matches!(
             headers.next().unwrap().details,
-            HeaderDetails::OneByteStartStop(02, 03, RangedVariation::Group1Var2(seq)) => seq.iter().collect()
+            HeaderDetails::OneByteStartStop(2, 3, RangedVariation::Group1Var2(seq)) => seq.iter().collect()
         );
 
         assert_eq!(
@@ -1028,14 +1025,14 @@ mod test {
 
         assert_matches!(
             headers.next().unwrap().details,
-            HeaderDetails::OneByteStartStop(02, 03, RangedVariation::Group1Var2(seq)) => {
+            HeaderDetails::OneByteStartStop(2, 3, RangedVariation::Group1Var2(seq)) => {
                 assert!(seq.iter().next().is_none())
             }
         );
 
         assert_matches!(
             headers.next().unwrap().details,
-            HeaderDetails::OneByteStartStop(07, 09, RangedVariation::Group1Var2(seq)) => {
+            HeaderDetails::OneByteStartStop(7, 9, RangedVariation::Group1Var2(seq)) => {
                 assert!(seq.iter().next().is_none())
             }
         );
@@ -1054,7 +1051,7 @@ mod test {
 
         assert_matches!(
             headers.next().unwrap().details,
-            HeaderDetails::OneByteCountAndPrefix(01, PrefixedVariation::Group34Var1(seq)) => {
+            HeaderDetails::OneByteCountAndPrefix(1, PrefixedVariation::Group34Var1(seq)) => {
                 let prefix = seq.single().unwrap();
                 assert_eq!(prefix, Prefix { index: 0x03, value: Group34Var1 { value: 0xFECA }});
             }
@@ -1074,7 +1071,7 @@ mod test {
 
         let vec: Vec<(bool, u16)> = assert_matches!(
             headers.next().unwrap().details,
-            HeaderDetails::OneByteStartStop(07, 07, RangedVariation::Group80Var1(seq)) => {
+            HeaderDetails::OneByteStartStop(7, 7, RangedVariation::Group80Var1(seq)) => {
                 seq.iter().collect()
             }
         );
@@ -1094,7 +1091,7 @@ mod test {
                 .iter();
 
         let received = match headers.next().unwrap().details {
-            HeaderDetails::OneByteCount(01, CountVariation::Group50Var2(seq)) => {
+            HeaderDetails::OneByteCount(1, CountVariation::Group50Var2(seq)) => {
                 seq.single().unwrap()
             }
             _ => unreachable!(),
@@ -1119,7 +1116,7 @@ mod test {
                 .iter();
         assert_matches!(
             headers.next().unwrap().details,
-            HeaderDetails::OneByteStartStop(02, 03, RangedVariation::Group110Var0)
+            HeaderDetails::OneByteStartStop(2, 3, RangedVariation::Group110Var0)
         );
         assert_matches!(headers.next(), None);
     }
@@ -1146,7 +1143,7 @@ mod test {
 
         let bytes: Vec<(&[u8], u16)> = assert_matches!(
             headers.next().unwrap().details,
-            HeaderDetails::OneByteStartStop(01, 02, RangedVariation::Group110VarX(0x01, seq)) => {
+            HeaderDetails::OneByteStartStop(1, 2, RangedVariation::Group110VarX(0x01, seq)) => {
                 seq.iter().collect()
             }
         );

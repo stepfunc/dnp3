@@ -4,8 +4,8 @@ use crate::outstation::database::*;
 use crate::outstation::tests::harness::*;
 
 const EMPTY_READ: &[u8] = &[0xC0, 0x01];
-const READ_CLASS_0: &[u8] = &[0xC0, 0x01, 60, 01, 0x06];
-const READ_CLASS_123: &[u8] = &[0xC0, 0x01, 60, 02, 0x06, 60, 03, 0x06, 60, 04, 0x06];
+const READ_CLASS_0: &[u8] = &[0xC0, 0x01, 60, 1, 0x06];
+const READ_CLASS_123: &[u8] = &[0xC0, 0x01, 60, 2, 0x06, 60, 3, 0x06, 60, 4, 0x06];
 const CONFIRM_SEQ_0: &[u8] = &[0xC0, 0x00];
 const UNS_CONFIRM_SEQ_0: &[u8] = &[0b11010000, 0x00];
 const CONFIRM_SEQ_1: &[u8] = &[0xC1, 0x00];

@@ -237,11 +237,12 @@ impl FileMode {
 impl std::error::Error for FileError {}
 
 /// Describes whether a file operation should continue (No) or abort (Yes)
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Default)]
 pub enum FileAction {
     /// Abort the operation
     Abort,
     /// Continue the operation
+    #[default]
     Continue,
 }
 
