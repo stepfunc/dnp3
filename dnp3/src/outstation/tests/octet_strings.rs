@@ -24,6 +24,32 @@ async fn objects_of_same_length_are_encoded_in_a_single_header() {
 }
 
 #[tokio::test]
+async fn can_transmit_zero_length_octet_string() {
+    let mut harness = new_harness(get_default_config());
+
+    harness.handle.transaction(|db| {
+        for i in 0..3 {
+            db.add(i, Some(Class1), OctetStringConfig);
+            db.update(
+                i,
+                &OctetString::new(&[]).unwrap(),
+                UpdateOptions::no_event(),
+            );
+        }
+    });
+
+    harness
+        .test_request_response(
+            &[0xC0, 0x01, 110, 0, 0x06],
+            // respond with a single header with 3 group 110 var 0, indices 0 to 2 all containing value []
+            &[0xC0, 0x81, 0x80, 0x00, 110, 0, 1, 0, 0, 2, 0],
+        )
+        .await;
+
+    harness.check_no_events();
+}
+
+#[tokio::test]
 async fn objects_of_different_lengths_are_encoded_in_individual_headers() {
     let mut harness = new_harness(get_default_config());
 
