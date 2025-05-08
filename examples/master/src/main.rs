@@ -36,6 +36,10 @@ struct CliArgs {
     #[arg(short, long, default_value = "1")]
     master_address: EndpointAddress,
 
+    /// If true, enable the parsing of zero-length octet strings
+    #[arg(short = 'z', long)]
+    parse_zero_length_strings: bool,
+
     #[command(subcommand)]
     transport: TransportCommand,
 }
@@ -363,6 +367,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Parse command line arguments
     let args = CliArgs::parse();
+
+    if args.parse_zero_length_strings {
+        tracing::info!("enabled zero-length octet string parsing");
+        options::parse_zero_length_strings(true);
+    }
 
     // ANCHOR: logging
     // Initialize logging
