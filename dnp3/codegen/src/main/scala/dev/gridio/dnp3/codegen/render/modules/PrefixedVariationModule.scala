@@ -53,7 +53,6 @@ object PrefixedVariationModule extends Module {
         s"Variation::Group0(var) => Ok(PrefixedVariation::Group0(crate::app::attr::Attribute::parse_prefixed::<I>(var, count, cursor)?)),".eol
       }
       case Group111AnyVar => {
-        "Variation::Group111(0) => Err(ObjectParseError::ZeroLengthOctetData),".eol ++
           "Variation::Group111(x) => Ok(PrefixedVariation::Group111VarX(x, PrefixedBytesSequence::parse(options, x, count, cursor)?)),".eol
       }
       case _ => {
