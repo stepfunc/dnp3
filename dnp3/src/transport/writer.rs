@@ -37,7 +37,7 @@ impl TransportWriter {
         fragment: &[u8],
     ) -> Result<(), LinkError> {
         if level.application.enabled() {
-            match ParsedFragment::parse(ParseOptions::write_only(), fragment) {
+            match ParsedFragment::parse(ParseOptions::parse_everything(), fragment) {
                 Ok(parsed) => {
                     let x: FragmentDisplay = parsed.display(level.application);
                     tracing::info!("APP TX - {}", x);

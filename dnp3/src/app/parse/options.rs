@@ -6,7 +6,7 @@ pub(crate) struct ParseOptions {
 }
 
 impl ParseOptions {
-    pub(crate) fn write_only() -> Self {
+    pub(crate) fn parse_everything() -> Self {
         Self {
             parse_zero_length_strings: true,
         }
