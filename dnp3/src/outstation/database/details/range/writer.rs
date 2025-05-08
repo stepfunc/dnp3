@@ -325,11 +325,11 @@ mod tests {
                 1,
                 0x01,
                 // start
-                01,
-                00,
+                1,
+                0,
                 // stop
-                09,
-                00,
+                9,
+                0,
                 // first byte
                 0b0101_0101,
                 // second byte
@@ -369,11 +369,11 @@ mod tests {
                 1,
                 0x01,
                 // start
-                01,
-                00,
+                1,
+                0,
                 // stop
-                05,
-                00,
+                5,
+                0,
                 // first byte
                 0b0011_1001,
                 // second byte
@@ -413,11 +413,11 @@ mod tests {
                 1,
                 0x01,
                 // start
-                01,
-                00,
+                1,
+                0,
                 // stop
-                09,
-                00,
+                9,
+                0,
                 // first byte
                 0b0011_1001,
                 // second byte
@@ -445,9 +445,9 @@ mod tests {
             cursor.written(),
             [
                 // g1v2 - 16-bit start/stop
-                1, 2, 0x01, 02, 00, 02, 00, 0x81,
+                1, 2, 0x01, 2, 0, 2, 0, 0x81,
                 // same header
-                1, 2, 0x01, 02, 00, 02, 00, 0x81,
+                1, 2, 0x01, 2, 0, 2, 0, 0x81,
             ]
         )
     }
@@ -468,9 +468,9 @@ mod tests {
             cursor.written(),
             [
                 // g1v2 - 16-bit start/stop
-                1, 2, 0x01, 01, 00, 01, 00, 0x81,
+                1, 2, 0x01, 1, 0, 1, 0, 0x81,
                 // same header but with index == 3
-                1, 2, 0x01, 03, 00, 03, 00, 0x81,
+                1, 2, 0x01, 3, 0, 3, 0, 0x81,
             ]
         )
     }

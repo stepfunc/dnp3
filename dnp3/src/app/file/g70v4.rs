@@ -72,7 +72,7 @@ mod test {
         4, // file handle
         3, 2, 1, 0xDD, // file size
         0xCC, 0xBB, 0xAA, 00, // max block size
-        04, 42, // request id
+        4, 42, // request id
         00, 3,    // status code
         b'w', // text
         b'a', b't',

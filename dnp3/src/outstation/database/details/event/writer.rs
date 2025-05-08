@@ -356,7 +356,7 @@ mod tests {
             .write(
                 &mut cursor,
                 &value,
-                06,
+                6,
                 EventBinaryInputVariation::Group2Var1,
             )
             .unwrap();
@@ -364,7 +364,7 @@ mod tests {
             cursor.written(),
             &[
                 // g2v3 (count == 1) (index == 6) (flags == 0x81)
-                02, 01, 0x28, 0x01, 0x00, 0x06, 0x00, 0x81
+                2, 1, 0x28, 0x01, 0x00, 0x06, 0x00, 0x81
             ]
         );
 
@@ -372,7 +372,7 @@ mod tests {
             .write(
                 &mut cursor,
                 &value,
-                07,
+                7,
                 EventBinaryInputVariation::Group2Var1,
             )
             .unwrap();
@@ -380,7 +380,7 @@ mod tests {
             cursor.written(),
             &[
                 // same as before but with count == 2
-                02, 01, 0x28, 0x02, 0x00, 0x06, 0x00, 0x81, // next index and value
+                2, 1, 0x28, 0x02, 0x00, 0x06, 0x00, 0x81, // next index and value
                 0x07, 0x00, 0x81
             ]
         );
@@ -394,7 +394,7 @@ mod tests {
 
         let expected = [
             // g2v3 (count == 1) (index == 6) (flags == 0x81)
-            02u8, 01, 0x28, 0x01, 0x00, 0x06, 0x00, 0x81,
+            2, 1, 0x28, 0x01, 0x00, 0x06, 0x00, 0x81,
         ];
 
         {
@@ -403,7 +403,7 @@ mod tests {
                 .write(
                     &mut cursor,
                     &value,
-                    06,
+                    6,
                     EventBinaryInputVariation::Group2Var1,
                 )
                 .unwrap();
@@ -417,7 +417,7 @@ mod tests {
                 .write(
                     &mut cursor,
                     &value,
-                    07,
+                    7,
                     EventAnalogInputVariation::Group32Var1
                 )
                 .is_err());
@@ -439,7 +439,7 @@ mod tests {
             .write(
                 &mut cursor,
                 &binary,
-                06,
+                6,
                 EventBinaryInputVariation::Group2Var1,
             )
             .unwrap();
@@ -448,7 +448,7 @@ mod tests {
             cursor.written(),
             &[
                 // g1v2 count == 1
-                02, 01, 0x28, 0x01, 0x00, 0x06, 0x00, 0x81
+                2, 1, 0x28, 0x01, 0x00, 0x06, 0x00, 0x81
             ]
         );
 
@@ -456,7 +456,7 @@ mod tests {
             .write(
                 &mut cursor,
                 &analog,
-                07,
+                7,
                 EventAnalogInputVariation::Group32Var1,
             )
             .unwrap();
@@ -465,9 +465,9 @@ mod tests {
             cursor.written(),
             &[
                 // same as before
-                02, 01, 0x28, 0x01, 0x00, 0x06, 0x00, 0x81,
+                2, 1, 0x28, 0x01, 0x00, 0x06, 0x00, 0x81,
                 // g32v1 (count == 1) (index == 7) (flags == 0x01) (value == 27)
-                32, 01, 0x28, 0x01, 0x00, 07, 00, 0x01, 27, 0, 0, 0
+                32, 1, 0x28, 0x01, 0x00, 7, 0, 0x01, 27, 0, 0, 0
             ]
         );
     }
@@ -484,7 +484,7 @@ mod tests {
                 .write(
                     &mut cursor,
                     &value,
-                    06,
+                    6,
                     EventBinaryInputVariation::Group2Var3,
                 )
                 .unwrap();
@@ -492,9 +492,9 @@ mod tests {
                 cursor.written(),
                 &[
                     // synchronized CTO header
-                    51, 01, 0x07, 0x01, 1, 0, 0, 0, 0, 0,
+                    51, 1, 0x07, 0x01, 1, 0, 0, 0, 0, 0,
                     // g2v3 (count of 1) with relative timestamp of zero
-                    02, 03, 0x28, 0x01, 0x00, 06, 00, 0x81, 0, 0,
+                    2, 3, 0x28, 0x01, 0x00, 6, 00, 0x81, 0, 0,
                 ]
             );
         }
@@ -505,7 +505,7 @@ mod tests {
                 .write(
                     &mut cursor,
                     &value,
-                    07,
+                    7,
                     EventBinaryInputVariation::Group2Var3,
                 )
                 .unwrap();
@@ -514,10 +514,10 @@ mod tests {
                 cursor.written(),
                 &[
                     // same CTO
-                    51, 01, 0x07, 0x01, 1, 0, 0, 0, 0, 0, // count updated to 2
-                    02, 03, 0x28, 0x02, 0x00, 06, 00, 0x81, 0, 0,
+                    51, 1, 0x07, 0x01, 1, 0, 0, 0, 0, 0, // count updated to 2
+                    2, 3, 0x28, 0x02, 0x00, 6, 0, 0x81, 0, 0,
                     // new index, value, and relative timestamp of 27
-                    07, 00, 0x01, 27, 0
+                    7, 0, 0x01, 27, 0
                 ]
             );
         }
@@ -535,7 +535,7 @@ mod tests {
                 .write(
                     &mut cursor,
                     &value,
-                    06,
+                    6,
                     EventBinaryInputVariation::Group2Var3,
                 )
                 .unwrap();
@@ -543,9 +543,9 @@ mod tests {
                 cursor.written(),
                 &[
                     // synchronized CTO header
-                    51, 01, 0x07, 0x01, 1, 0, 0, 0, 0, 0,
+                    51, 1, 0x07, 0x01, 1, 0, 0, 0, 0, 0,
                     // g2v3 (count of 1) with relative timestamp of zero
-                    02, 03, 0x28, 0x01, 0x00, 06, 00, 0x81, 0, 0,
+                    2, 3, 0x28, 0x01, 0x00, 6, 0, 0x81, 0, 0,
                 ]
             );
         }
@@ -556,7 +556,7 @@ mod tests {
                 .write(
                     &mut cursor,
                     &value,
-                    07,
+                    7,
                     EventBinaryInputVariation::Group2Var3,
                 )
                 .unwrap();
@@ -565,13 +565,12 @@ mod tests {
                 cursor.written(),
                 &[
                     // synchronized CTO header
-                    51, 01, 0x07, 0x01, 1, 0, 0, 0, 0, 0,
+                    51, 1, 0x07, 0x01, 1, 0, 0, 0, 0, 0,
                     // g2v3 (count of 1) with relative timestamp of zero
-                    02, 03, 0x28, 0x01, 0x00, 06, 00, 0x81, 0, 0,
-                    // unsynchronized CTO header
-                    51, 02, 0x07, 0x01, 2, 0, 0, 0, 0, 0,
+                    2, 3, 0x28, 0x01, 0x00, 6, 0, 0x81, 0, 0, // unsynchronized CTO header
+                    51, 2, 0x07, 0x01, 2, 0, 0, 0, 0, 0,
                     // g2v3 (count of 1) with relative timestamp of zero
-                    02, 03, 0x28, 0x01, 0x00, 07, 00, 0x01, 0, 0,
+                    2, 3, 0x28, 0x01, 0x00, 7, 0, 0x01, 0, 0,
                 ]
             );
         }
@@ -589,7 +588,7 @@ mod tests {
                 .write(
                     &mut cursor,
                     &value,
-                    06,
+                    6,
                     EventBinaryInputVariation::Group2Var3,
                 )
                 .unwrap();
@@ -597,9 +596,9 @@ mod tests {
                 cursor.written(),
                 &[
                     // synchronized CTO header
-                    51, 01, 0x07, 0x01, 0, 0, 0, 0, 0, 0,
+                    51, 1, 0x07, 0x01, 0, 0, 0, 0, 0, 0,
                     // g2v3 (count of 1) with relative timestamp of zero
-                    02, 03, 0x28, 0x01, 0x00, 06, 00, 0x81, 0, 0,
+                    2, 3, 0x28, 0x01, 0x00, 6, 0, 0x81, 0, 0,
                 ]
             );
         }
@@ -610,7 +609,7 @@ mod tests {
                 .write(
                     &mut cursor,
                     &value,
-                    06,
+                    6,
                     EventBinaryInputVariation::Group2Var3,
                 )
                 .unwrap();
@@ -619,13 +618,12 @@ mod tests {
                 cursor.written(),
                 &[
                     // synchronized CTO header
-                    51, 01, 0x07, 0x01, 0, 0, 0, 0, 0, 0,
+                    51, 1, 0x07, 0x01, 0, 0, 0, 0, 0, 0,
                     // g2v3 (count of 1) with relative timestamp of zero
-                    02, 03, 0x28, 0x01, 0x00, 06, 00, 0x81, 0, 0,
-                    // synchronized CTO header
-                    51, 01, 0x07, 0x01, 0, 0, 0x01, 0, 0, 0,
+                    2, 3, 0x28, 0x01, 0x00, 6, 0, 0x81, 0, 0, // synchronized CTO header
+                    51, 1, 0x07, 0x01, 0, 0, 0x01, 0, 0, 0,
                     // g2v3 (count of 1) with relative timestamp of zero
-                    02, 03, 0x28, 0x01, 0x00, 06, 00, 0x81, 0, 0,
+                    2, 3, 0x28, 0x01, 0x00, 6, 0, 0x81, 0, 0,
                 ]
             );
         }

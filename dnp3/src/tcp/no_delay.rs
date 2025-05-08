@@ -37,11 +37,11 @@ pub fn disable_client_tcp_no_delay() {
 /// By default, TCP_NODELAY is set to true for all server TCP/TLS connections. This disables Nagle's
 /// algorithm causing the OS to send data written to socket ASAP without waiting. This reduces
 /// latency and is usually the appropriate setting for DNP3. This library always writes data
-/// in units of link-layer frames so the default setting might cause more TCP fragmentation
+/// in units of link-layer frames, so the default setting might cause more TCP fragmentation
 /// if clients send requests that exceed a single link-layer frame.
 ///
 /// Calling this function will enable Nagle's algorithm for all future TCP connections accepted by servers.
-/// This would typically be called prior to creating any TCP/TLS servers.
+/// This would typically be called before creating any TCP/TLS servers.
 ///
 /// In a future 2.0 release, this flag will likely be settable on a per-session basis but is done
 /// globally to preserve API compatibility

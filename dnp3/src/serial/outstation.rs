@@ -1,6 +1,5 @@
+use crate::app::parse::options::ParseOptions;
 use crate::app::{Listener, MaybeAsync, RetryStrategy};
-use tracing::Instrument;
-
 use crate::link::reader::LinkModes;
 use crate::outstation::task::OutstationTask;
 use crate::outstation::{
@@ -11,6 +10,7 @@ use crate::serial::task::SerialTask;
 use crate::serial::{PortState, SerialSettings};
 use crate::util::phys::{PhysAddr, PhysLayer};
 use crate::util::session::{Enabled, Session};
+use tracing::Instrument;
 
 /// Spawn an outstation task onto the `Tokio` runtime. The task runs until the returned handle is dropped or
 /// a serial port error occurs, e.g. a serial port is removed from the OS. It attempts to open
@@ -33,6 +33,7 @@ pub fn spawn_outstation_serial(
     let (mut task, handle) = OutstationTask::create(
         Enabled::Yes,
         LinkModes::serial(),
+        ParseOptions::get_static(),
         config,
         PhysAddr::None,
         application,
@@ -84,6 +85,7 @@ pub fn spawn_outstation_serial_2(
     let (task, handle) = OutstationTask::create(
         Enabled::Yes,
         LinkModes::serial(),
+        ParseOptions::get_static(),
         config,
         PhysAddr::None,
         application,

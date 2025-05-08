@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use oo_bindgen::model::*;
 
+mod app_options;
 pub(crate) mod attributes;
 mod constants;
 mod database;
@@ -72,7 +73,8 @@ pub fn build_lib() -> BackTraced<Library> {
     );
 
     // global settings
-    crate::tcp::define(&mut builder)?;
+    tcp::define(&mut builder)?;
+    app_options::define(&mut builder)?;
 
     // Shared stuff
     let shared_def = shared::define(&mut builder)?;
@@ -81,8 +83,8 @@ pub fn build_lib() -> BackTraced<Library> {
     sfio_tracing_ffi::define(&mut builder, shared_def.error_type.clone())?;
 
     // master and outstation APIs
-    crate::master::define(&mut builder, &shared_def)?;
-    crate::outstation::define(&mut builder, &shared_def)?;
+    master::define(&mut builder, &shared_def)?;
+    outstation::define(&mut builder, &shared_def)?;
 
     let library = builder.build()?;
 

@@ -143,7 +143,6 @@ impl Permissions {
 }
 
 #[cfg(test)]
-
 mod test {
     use super::*;
 

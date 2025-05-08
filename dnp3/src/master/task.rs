@@ -16,6 +16,7 @@ use crate::util::buffer::Buffer;
 use crate::util::channel::Receiver;
 use crate::util::phys::PhysLayer;
 
+use crate::app::parse::options::ParseOptions;
 use crate::link::reader::LinkModes;
 use crate::util::session::{Enabled, RunError, StopReason};
 use tokio::time::Instant;
@@ -31,6 +32,7 @@ impl MasterTask {
     pub(crate) fn new(
         initial_state: Enabled,
         link_modes: LinkModes,
+        parse_options: ParseOptions,
         config: MasterChannelConfig,
         messages: Receiver<Message>,
     ) -> Self {
@@ -42,6 +44,7 @@ impl MasterTask {
         );
         let (reader, writer) = crate::transport::create_master_transport_layer(
             link_modes,
+            parse_options,
             config.master_address,
             config.rx_buffer_size,
         );

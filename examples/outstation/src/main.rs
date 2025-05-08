@@ -726,6 +726,13 @@ async fn run_outstation(
                     UpdateOptions::detect_event(),
                 );
             }),
+            "zos" => outstation.transaction(|db| {
+                db.update(
+                    7,
+                    &OctetString::new(&[]).unwrap(),
+                    UpdateOptions::detect_event(),
+                );
+            }),
             s => println!("unknown command: {}", s),
         }
     }

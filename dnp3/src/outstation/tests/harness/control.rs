@@ -10,7 +10,7 @@ pub(crate) struct MockControlHandler {
 }
 
 impl MockControlHandler {
-    pub(crate) fn new(events: EventSender) -> Box<dyn ControlHandler> {
+    pub(crate) fn create(events: EventSender) -> Box<dyn ControlHandler> {
         Box::new(Self { events })
     }
 }

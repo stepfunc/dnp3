@@ -14,12 +14,6 @@ enum Event {
     Complete,
 }
 
-impl Default for FileAction {
-    fn default() -> Self {
-        FileAction::Continue
-    }
-}
-
 #[derive(Default)]
 struct State {
     action: FileAction,

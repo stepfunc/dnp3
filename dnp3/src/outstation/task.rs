@@ -1,3 +1,4 @@
+use crate::app::parse::options::ParseOptions;
 use crate::decode::DecodeLevel;
 use crate::link::reader::LinkModes;
 use crate::outstation::config::*;
@@ -35,9 +36,11 @@ pub(crate) struct OutstationTask {
 
 impl OutstationTask {
     /// create an `OutstationTask` and return it along with a `DatabaseHandle` for updating it
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn create(
         initial_state: Enabled,
         link_modes: LinkModes,
+        parse_options: ParseOptions,
         config: OutstationConfig,
         phys_addr: PhysAddr,
         application: Box<dyn OutstationApplication>,
@@ -52,6 +55,7 @@ impl OutstationTask {
         );
         let (reader, writer) = crate::transport::create_outstation_transport_layer(
             link_modes,
+            parse_options,
             config.outstation_address,
             config.features.self_address,
             config.rx_buffer_size,

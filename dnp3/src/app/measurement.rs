@@ -815,20 +815,18 @@ impl OctetString {
 
     /// Creates a new octet string.
     ///
-    /// The `value` parameter must have a length of [1, 255],
-    /// otherwise it will return an error.
+    /// The `value` parameter must have a length <= 255 bytes. Zero-length (empty)
+    /// octet strings may be constructed and transmitted, although the standard
+    /// explicitly disallows them and they are not parsed by this library by default.
     pub fn new(value: &[u8]) -> Result<Self, OctetStringLengthError> {
         let len = value.len();
-        if len == 0 {
-            return Err(OctetStringLengthError::ZeroLength);
-        }
 
-        if len > 255 {
+        if len > Self::MAX_SIZE {
             return Err(OctetStringLengthError::MoreThan255Octets);
         }
 
         let mut result = Self {
-            value: [0u8; 255],
+            value: [0u8; Self::MAX_SIZE],
             len: len as u8,
         };
         result.value[..len].copy_from_slice(value);
@@ -855,8 +853,9 @@ impl OctetString {
 /// Errors when creating an octet string
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum OctetStringLengthError {
-    /// Zero-length octet strings are explicitely disallowed
-    /// by the standard.
+    /// The standard explicitly disallows zero-length octet strings; however, many implementations
+    /// use them anyway. This error variant is now unused by the library as the library allows zero-length
+    /// strings to be contructed and transmitted, but will not parse them by default.
     ZeroLength,
     /// Octet strings can only hold up to 255 octets.
     MoreThan255Octets,
@@ -875,11 +874,8 @@ mod tests {
     }
 
     #[test]
-    fn new_octet_string_zero_length() {
-        assert_eq!(
-            Err(OctetStringLengthError::ZeroLength),
-            OctetString::new(&[])
-        );
+    fn allows_creating_zero_length_octet_string() {
+        assert!(OctetString::new(&[]).is_ok());
     }
 
     #[test]

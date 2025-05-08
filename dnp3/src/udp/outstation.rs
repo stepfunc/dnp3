@@ -1,3 +1,4 @@
+use crate::app::parse::options::ParseOptions;
 use crate::app::Timeout;
 use crate::link::reader::LinkModes;
 use crate::link::{LinkErrorMode, LinkReadMode};
@@ -63,6 +64,7 @@ pub fn spawn_outstation_udp(
     let (task, handle) = OutstationTask::create(
         Enabled::Yes,
         udp_config.link_modes(),
+        ParseOptions::get_static(),
         config,
         PhysAddr::Udp(udp_config.remote_endpoint),
         application,

@@ -1,10 +1,11 @@
 use crate::outstation::database::{Add, AnalogInputConfig, EventClass};
 use crate::outstation::tests::harness::*;
 
-fn config(dead_band: f64) -> AnalogInputConfig {
-    let mut config = AnalogInputConfig::default();
-    config.deadband = dead_band;
-    config
+fn config(deadband: f64) -> AnalogInputConfig {
+    AnalogInputConfig {
+        deadband,
+        ..Default::default()
+    }
 }
 
 #[tokio::test]

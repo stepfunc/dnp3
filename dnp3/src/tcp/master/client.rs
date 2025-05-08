@@ -1,5 +1,6 @@
 use tracing::Instrument;
 
+use crate::app::parse::options::ParseOptions;
 use crate::app::{ConnectStrategy, Listener};
 use crate::link::reader::LinkModes;
 use crate::link::LinkErrorMode;
@@ -45,6 +46,7 @@ pub fn spawn_master_tcp_client_2(
     let main_addr = endpoints.main_addr().to_string();
     let (mut task, handle) = wire_master_client(
         LinkModes::stream(link_error_mode),
+        ParseOptions::get_static(),
         MasterChannelType::Stream,
         endpoints,
         config,
@@ -65,6 +67,7 @@ pub fn spawn_master_tcp_client_2(
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn wire_master_client(
     link_modes: LinkModes,
+    parse_options: ParseOptions,
     channel_type: MasterChannelType,
     endpoints: EndpointList,
     config: MasterChannelConfig,
@@ -74,7 +77,13 @@ pub(crate) fn wire_master_client(
     listener: Box<dyn Listener<ClientState>>,
 ) -> (ClientTask, MasterChannel) {
     let (tx, rx) = crate::util::channel::request_channel();
-    let session = Session::master(MasterTask::new(Enabled::No, link_modes, config, rx));
+    let session = Session::master(MasterTask::new(
+        Enabled::No,
+        link_modes,
+        parse_options,
+        config,
+        rx,
+    ));
     let client = ClientTask::new(
         session,
         endpoints,

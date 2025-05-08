@@ -5,6 +5,7 @@
 )]
 
 pub(crate) use crate::tracing::*;
+pub(crate) use app_options::*;
 /// these use statements allow the code in the FFI to not have to known the real locations
 /// but instead just use `crate::<name>` when invoking an implementation
 pub use bytes::*;
@@ -33,6 +34,7 @@ mod tcp;
 mod tracing;
 mod write_dead_band_request;
 
+mod app_options;
 #[allow(
     dead_code,
     clippy::derive_partial_eq_without_eq,

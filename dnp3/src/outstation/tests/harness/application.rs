@@ -26,7 +26,7 @@ impl ApplicationData {
 }
 
 impl MockOutstationApplication {
-    pub(crate) fn new(
+    pub(crate) fn create(
         events: EventSender,
     ) -> (Arc<Mutex<ApplicationData>>, Box<dyn OutstationApplication>) {
         let data = Arc::new(Mutex::new(ApplicationData::new()));

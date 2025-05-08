@@ -18,6 +18,7 @@ use crate::app::parse::bytes::*;
 use crate::app::parse::bit::{BitSequence, DoubleBitSequence};
 use crate::master::{ReadHandler, HeaderInfo};
 use crate::app::ObjectParseError;
+use crate::app::parse::options::ParseOptions;
 
 use scursor::ReadCursor;
 
@@ -130,7 +131,7 @@ pub(crate) enum RangedVariation<'a> {
 }
 
 impl<'a> RangedVariation<'a> {
-    pub(crate) fn parse_non_read(v: Variation, qualifier: QualifierCode, range: Range, cursor: &mut ReadCursor<'a>) -> Result<RangedVariation<'a>, ObjectParseError> {
+    pub(crate) fn parse_non_read(v: Variation, qualifier: QualifierCode, range: Range, options: ParseOptions, cursor: &mut ReadCursor<'a>) -> Result<RangedVariation<'a>, ObjectParseError> {
         match v {
             Variation::Group0Var254 => Ok(RangedVariation::Group0Var254),
             Variation::Group0(var) => Ok(RangedVariation::Group0(var, Some(crate::app::attr::Attribute::parse_from_range(var, range, cursor)?))),
@@ -182,9 +183,8 @@ impl<'a> RangedVariation<'a> {
             Variation::Group80Var1 => Ok(RangedVariation::Group80Var1(BitSequence::parse(range, cursor)?)),
             Variation::Group102Var0 => Ok(RangedVariation::Group102Var0),
             Variation::Group102Var1 => Ok(RangedVariation::Group102Var1(RangedSequence::parse(range, cursor)?)),
-            Variation::Group110(0) => Err(ObjectParseError::ZeroLengthOctetData),
             Variation::Group110(x) => {
-                Ok(RangedVariation::Group110VarX(x, RangedBytesSequence::parse(x, range.get_start(), range.get_count(), cursor)?))
+                Ok(RangedVariation::Group110VarX(x, RangedBytesSequence::parse(options, x, range.get_start(), range.get_count(), cursor)?))
             },
             _ => Err(ObjectParseError::InvalidQualifierForVariation(v, qualifier)),
         }

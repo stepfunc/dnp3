@@ -1,3 +1,4 @@
+use crate::app::parse::options::ParseOptions;
 use crate::app::parse::parser::{FragmentDisplay, ParsedFragment};
 use crate::app::EndpointType;
 use crate::decode::DecodeLevel;
@@ -36,9 +37,14 @@ impl TransportWriter {
         fragment: &[u8],
     ) -> Result<(), LinkError> {
         if level.application.enabled() {
-            if let Ok(fragment) = ParsedFragment::parse(fragment) {
-                let x: FragmentDisplay = fragment.display(level.application);
-                tracing::info!("APP TX - {}", x);
+            match ParsedFragment::parse(ParseOptions::parse_everything(), fragment) {
+                Ok(parsed) => {
+                    let x: FragmentDisplay = parsed.display(level.application);
+                    tracing::info!("APP TX - {}", x);
+                }
+                Err(err) => {
+                    tracing::error!("error decoding transmitted fragment: {err}");
+                }
             }
         }
         self.inner.write(io, level, destination, fragment).await

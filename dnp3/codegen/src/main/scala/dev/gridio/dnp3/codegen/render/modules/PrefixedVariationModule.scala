@@ -13,6 +13,7 @@ object PrefixedVariationModule extends Module {
       "use crate::app::parse::traits::{FixedSize, Index};".eol ++
       "use crate::app::parse::prefix::Prefix;".eol ++
       "use crate::app::parse::bytes::*;".eol ++
+      "use crate::app::parse::options::ParseOptions;".eol ++
       "use crate::app::measurement::Time;".eol ++
       "use crate::master::{ReadHandler, HeaderInfo};".eol ++
       "use crate::app::ObjectParseError;".eol ++
@@ -52,8 +53,7 @@ object PrefixedVariationModule extends Module {
         s"Variation::Group0(var) => Ok(PrefixedVariation::Group0(crate::app::attr::Attribute::parse_prefixed::<I>(var, count, cursor)?)),".eol
       }
       case Group111AnyVar => {
-        "Variation::Group111(0) => Err(ObjectParseError::ZeroLengthOctetData),".eol ++
-          "Variation::Group111(x) => Ok(PrefixedVariation::Group111VarX(x, PrefixedBytesSequence::parse(x, count, cursor)?)),".eol
+          "Variation::Group111(x) => Ok(PrefixedVariation::Group111VarX(x, PrefixedBytesSequence::parse(options, x, count, cursor)?)),".eol
       }
       case _ => {
         s"Variation::${v.name} => Ok(PrefixedVariation::${v.name}(CountSequence::parse(count, cursor)?)),".eol
@@ -156,7 +156,7 @@ object PrefixedVariationModule extends Module {
     }
 
     bracket("impl<'a, I> PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Display") {
-      bracket("pub(crate) fn parse(v: Variation, count: u16, cursor: &mut ReadCursor<'a>) -> Result<PrefixedVariation<'a, I>, ObjectParseError>") {
+      bracket("pub(crate) fn parse(v: Variation, count: u16, options: ParseOptions, cursor: &mut ReadCursor<'a>) -> Result<PrefixedVariation<'a, I>, ObjectParseError>") {
         bracket("match v") {
           variations.flatMap(parseMatcher) ++ "_ => Err(ObjectParseError::InvalidQualifierForVariation(v, I::COUNT_AND_PREFIX_QUALIFIER)),".eol
         }

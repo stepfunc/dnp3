@@ -1,7 +1,7 @@
 use crate::outstation::tests::harness::*;
 use crate::outstation::traits::RestartDelay;
 
-const CLEAR_RESTART_IIN: &[u8] = &[0xC0, 0x02, 80, 1, 0x00, 07, 07, 0x00];
+const CLEAR_RESTART_IIN: &[u8] = &[0xC0, 0x02, 80, 1, 0x00, 7, 7, 0x00];
 const RESPONSE_NO_RESTART_IIN: &[u8] = &[0xC0, 0x81, 0x00, 0x00];
 const COLD_RESTART: &[u8] = &[0xC0, 13];
 const WARM_RESTART: &[u8] = &[0xC0, 14];

@@ -9,7 +9,7 @@ pub(crate) struct MockOutstationInformation {
 }
 
 impl MockOutstationInformation {
-    pub(crate) fn new(events: EventSender) -> Box<dyn OutstationInformation> {
+    pub(crate) fn create(events: EventSender) -> Box<dyn OutstationInformation> {
         Box::new(Self { events })
     }
 }

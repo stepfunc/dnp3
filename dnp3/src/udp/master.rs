@@ -6,6 +6,7 @@ use crate::udp::layer::UdpFactory;
 use crate::udp::task::UdpTask;
 use crate::util::session::{Enabled, Session};
 
+use crate::app::parse::options::ParseOptions;
 use crate::app::Timeout;
 use std::net::SocketAddr;
 use tracing::Instrument;
@@ -27,7 +28,13 @@ pub fn spawn_master_udp(
         read_mode,
     };
 
-    let session = Session::master(MasterTask::new(Enabled::No, link_modes, config, rx));
+    let session = Session::master(MasterTask::new(
+        Enabled::No,
+        link_modes,
+        ParseOptions::get_static(),
+        config,
+        rx,
+    ));
     let task = UdpTask {
         session,
         factory: UdpFactory::bound(local_endpoint),
