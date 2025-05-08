@@ -578,7 +578,7 @@ impl<'a> ObjectParser<'a> {
         v: Variation,
     ) -> Result<ObjectHeader<'a>, ObjectParseError> {
         let count = self.cursor.read_u8()?;
-        let data = PrefixedVariation::<u8>::parse(v, count as u16, &mut self.cursor)?;
+        let data = PrefixedVariation::<u8>::parse(v, count.into(), self.options, &mut self.cursor)?;
         Ok(ObjectHeader::new(
             v,
             HeaderDetails::OneByteCountAndPrefix(count, data),
@@ -590,7 +590,7 @@ impl<'a> ObjectParser<'a> {
         v: Variation,
     ) -> Result<ObjectHeader<'a>, ObjectParseError> {
         let count = self.cursor.read_u16_le()?;
-        let data = PrefixedVariation::<u16>::parse(v, count, &mut self.cursor)?;
+        let data = PrefixedVariation::<u16>::parse(v, count, self.options, &mut self.cursor)?;
         Ok(ObjectHeader::new(
             v,
             HeaderDetails::TwoByteCountAndPrefix(count, data),

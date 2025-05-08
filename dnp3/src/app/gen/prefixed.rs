@@ -16,6 +16,7 @@ use crate::app::parse::parser::*;
 use crate::app::parse::traits::{FixedSize, Index};
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::bytes::*;
+use crate::app::parse::options::ParseOptions;
 use crate::app::measurement::Time;
 use crate::master::{ReadHandler, HeaderInfo};
 use crate::app::ObjectParseError;
@@ -147,7 +148,7 @@ pub(crate) enum PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt:
 }
 
 impl<'a, I> PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Display {
-    pub(crate) fn parse(v: Variation, count: u16, cursor: &mut ReadCursor<'a>) -> Result<PrefixedVariation<'a, I>, ObjectParseError> {
+    pub(crate) fn parse(v: Variation, count: u16, options: ParseOptions, cursor: &mut ReadCursor<'a>) -> Result<PrefixedVariation<'a, I>, ObjectParseError> {
         match v {
             Variation::Group0(var) => Ok(PrefixedVariation::Group0(crate::app::attr::Attribute::parse_prefixed::<I>(var, count, cursor)?)),
             Variation::Group2Var1 => Ok(PrefixedVariation::Group2Var1(CountSequence::parse(count, cursor)?)),
@@ -209,7 +210,7 @@ impl<'a, I> PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Dis
             Variation::Group43Var7 => Ok(PrefixedVariation::Group43Var7(CountSequence::parse(count, cursor)?)),
             Variation::Group43Var8 => Ok(PrefixedVariation::Group43Var8(CountSequence::parse(count, cursor)?)),
             Variation::Group111(0) => Err(ObjectParseError::ZeroLengthOctetData),
-            Variation::Group111(x) => Ok(PrefixedVariation::Group111VarX(x, PrefixedBytesSequence::parse(x, count, cursor)?)),
+            Variation::Group111(x) => Ok(PrefixedVariation::Group111VarX(x, PrefixedBytesSequence::parse(options, x, count, cursor)?)),
             _ => Err(ObjectParseError::InvalidQualifierForVariation(v, I::COUNT_AND_PREFIX_QUALIFIER)),
         }
     }

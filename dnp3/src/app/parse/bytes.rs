@@ -102,11 +102,12 @@ where
     T: FixedSize,
 {
     pub(crate) fn parse(
+        options: ParseOptions,
         variation: u8,
         count: u16,
         cursor: &mut ReadCursor<'a>,
     ) -> Result<Self, ObjectParseError> {
-        if variation == 0 {
+        if variation == 0 && !options.parse_zero_length_strings {
             return Err(ObjectParseError::ZeroLengthOctetData);
         }
 
@@ -156,6 +157,10 @@ where
     type Item = (&'a [u8], T);
 
     fn next(&mut self) -> Option<Self::Item> {
+        if self.remaining == 0 {
+            return None;
+        }
+
         let index = match T::read(&mut self.cursor) {
             Ok(x) => x,
             _ => return None,
