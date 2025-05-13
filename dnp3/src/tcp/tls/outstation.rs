@@ -43,7 +43,7 @@ pub fn spawn_outstation_tls_client(
     tls_config: TlsClientConfig,
 ) -> OutstationHandle {
     let handler = SimpleConnectHandler::create(endpoints, connect_strategy);
-    let main_addr = handler.main_endpoint();
+    let main_addr = handler.main_address();
     let (task, handle) = OutstationTask::create(
         Enabled::No,
         LinkModes::stream(link_error_mode),

@@ -142,6 +142,12 @@ impl ClientTask {
             }
         }
 
+        match hostname {
+            None => tracing::info!("connecting to {addr}"),
+            Some(host) => tracing::info!("connecting to {addr} ({host})"),
+        }
+        self.connect_handler.connecting(addr, hostname);
+
         let fut = socket.connect(addr);
         let result = match self.connect_options.timeout {
             None => fut.await,

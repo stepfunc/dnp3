@@ -61,7 +61,7 @@ pub fn spawn_master_tls_client_2(
     tls_config: TlsClientConfig,
 ) -> MasterChannel {
     let handler = SimpleConnectHandler::create(endpoints, connect_strategy);
-    let main_addr = handler.main_endpoint();
+    let main_addr = handler.main_address();
     let (mut task, handle) = wire_master_client(
         LinkModes::stream(link_error_mode),
         ParseOptions::get_static(),

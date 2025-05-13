@@ -47,11 +47,25 @@ impl From<String> for Endpoint {
 
 /// Controls how TCP and TLS clients connect to endpoints
 pub(crate) trait ConnectorHandler: Send {
-    /// Endpoint that will be logged in conjunction with a tracing span
+    /// Endpoint that will be logged by default in conjunction with a tracing span
     fn main_endpoint(&self) -> Endpoint;
+
+    /// String data used in tracing span to identify the communication session.
+    ///
+    /// This is typically the SocketAddr or hostname of the main endpoint, but
+    /// can be overridden by the user to be anything e.g., a unique name
+    fn main_address(&self) -> String {
+        match self.main_endpoint().inner {
+            EndpointInner::Address(x) => x.to_string(),
+            EndpointInner::Hostname(x) => x.to_string(),
+        }
+    }
 
     /// Return the next endpoint to which a connection will be attempted
     fn next(&mut self) -> Result<Endpoint, Duration>;
+
+    /// Notification that a connection attempt is being made
+    fn connecting(&mut self, addr: SocketAddr, hostname: Option<&str>);
 
     /// Notification that connection operation failed
     fn connect_failed(&mut self, addr: SocketAddr, hostname: Option<&str>);
@@ -109,6 +123,8 @@ impl ConnectorHandler for SimpleConnectHandler {
             }
         }
     }
+
+    fn connecting(&mut self, _: SocketAddr, _: Option<&str>) {}
 
     fn connect_failed(&mut self, _: SocketAddr, _: Option<&str>) {}
 

@@ -44,7 +44,7 @@ pub fn spawn_master_tcp_client_2(
     listener: Box<dyn Listener<ClientState>>,
 ) -> MasterChannel {
     let connect_handler = SimpleConnectHandler::create(endpoints, connect_strategy);
-    let main_addr = connect_handler.main_endpoint();
+    let main_addr = connect_handler.main_address();
     let (mut task, handle) = wire_master_client(
         LinkModes::stream(link_error_mode),
         ParseOptions::get_static(),
