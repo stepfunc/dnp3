@@ -7,7 +7,9 @@ use crate::link::LinkErrorMode;
 use crate::outstation::task::OutstationTask;
 use crate::outstation::*;
 use crate::tcp::client::ClientTask;
-use crate::tcp::{ClientState, ConnectOptions, EndpointList, PostConnectionHandler};
+use crate::tcp::{
+    ClientState, ConnectOptions, EndpointList, PostConnectionHandler, SimpleConnectHandler,
+};
 use crate::util::phys::PhysAddr;
 use crate::util::session::{Enabled, Session};
 
@@ -27,7 +29,8 @@ pub fn spawn_outstation_tcp_client(
     control_handler: Box<dyn ControlHandler>,
     listener: Box<dyn Listener<ClientState>>,
 ) -> OutstationHandle {
-    let main_addr = endpoints.main_addr().to_string();
+    let handler = SimpleConnectHandler::create(endpoints, connect_strategy);
+    let main_addr = handler.main_endpoint();
     let (task, handle) = OutstationTask::create(
         Enabled::No,
         LinkModes::stream(link_error_mode),
@@ -41,8 +44,7 @@ pub fn spawn_outstation_tcp_client(
     let session = Session::outstation(task);
     let mut client = ClientTask::new(
         session,
-        endpoints,
-        connect_strategy,
+        handler,
         connect_options,
         PostConnectionHandler::Tcp,
         listener,

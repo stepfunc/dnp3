@@ -13,7 +13,9 @@ use crate::outstation::{
 };
 use crate::tcp::client::ClientTask;
 use crate::tcp::tls::{CertificateMode, MinTlsVersion, TlsClientConfig, TlsError};
-use crate::tcp::{ClientState, ConnectOptions, EndpointList, PostConnectionHandler};
+use crate::tcp::{
+    ClientState, ConnectOptions, EndpointList, PostConnectionHandler, SimpleConnectHandler,
+};
 use crate::util::phys::{PhysAddr, PhysLayer};
 use crate::util::session::{Enabled, Session};
 use tokio::net::TcpStream;
@@ -40,7 +42,8 @@ pub fn spawn_outstation_tls_client(
     listener: Box<dyn Listener<ClientState>>,
     tls_config: TlsClientConfig,
 ) -> OutstationHandle {
-    let main_addr = endpoints.main_addr().to_string();
+    let handler = SimpleConnectHandler::create(endpoints, connect_strategy);
+    let main_addr = handler.main_endpoint();
     let (task, handle) = OutstationTask::create(
         Enabled::No,
         LinkModes::stream(link_error_mode),
@@ -54,8 +57,7 @@ pub fn spawn_outstation_tls_client(
     let session = Session::outstation(task);
     let mut client = ClientTask::new(
         session,
-        endpoints,
-        connect_strategy,
+        handler,
         connect_options,
         PostConnectionHandler::Tls(tls_config),
         listener,

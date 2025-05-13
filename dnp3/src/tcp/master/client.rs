@@ -7,8 +7,8 @@ use crate::link::LinkErrorMode;
 use crate::master::task::MasterTask;
 use crate::master::{MasterChannel, MasterChannelConfig, MasterChannelType};
 use crate::tcp::client::ClientTask;
-use crate::tcp::EndpointList;
 use crate::tcp::{ClientState, ConnectOptions, PostConnectionHandler};
+use crate::tcp::{ConnectorHandler, EndpointList, SimpleConnectHandler};
 use crate::util::session::{Enabled, Session};
 
 /// Spawn a task onto the `Tokio` runtime. The task runs until the returned handle, and any
@@ -43,14 +43,14 @@ pub fn spawn_master_tcp_client_2(
     connect_options: ConnectOptions,
     listener: Box<dyn Listener<ClientState>>,
 ) -> MasterChannel {
-    let main_addr = endpoints.main_addr().to_string();
+    let connect_handler = SimpleConnectHandler::create(endpoints, connect_strategy);
+    let main_addr = connect_handler.main_endpoint();
     let (mut task, handle) = wire_master_client(
         LinkModes::stream(link_error_mode),
         ParseOptions::get_static(),
         MasterChannelType::Stream,
-        endpoints,
+        connect_handler,
         config,
-        connect_strategy,
         connect_options,
         PostConnectionHandler::Tcp,
         listener,
@@ -69,9 +69,8 @@ pub(crate) fn wire_master_client(
     link_modes: LinkModes,
     parse_options: ParseOptions,
     channel_type: MasterChannelType,
-    endpoints: EndpointList,
+    connect_handler: Box<dyn ConnectorHandler>,
     config: MasterChannelConfig,
-    connect_strategy: ConnectStrategy,
     connect_options: ConnectOptions,
     connection_handler: PostConnectionHandler,
     listener: Box<dyn Listener<ClientState>>,
@@ -86,8 +85,7 @@ pub(crate) fn wire_master_client(
     ));
     let client = ClientTask::new(
         session,
-        endpoints,
-        connect_strategy,
+        connect_handler,
         connect_options,
         connection_handler,
         listener,

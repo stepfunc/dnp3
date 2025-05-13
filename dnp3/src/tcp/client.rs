@@ -1,38 +1,34 @@
-use crate::app::{ConnectStrategy, Listener, RetryStrategy, Shutdown};
-use crate::tcp::{ClientState, ConnectOptions, Connector, EndpointList, PostConnectionHandler};
+use crate::app::{Listener, Shutdown};
+use crate::tcp::{
+    ClientState, ConnectOptions, ConnectorHandler, Endpoint, EndpointInner, PostConnectionHandler,
+};
 use crate::util::phys::PhysLayer;
 use crate::util::session::{RunError, Session, StopReason};
+use std::net::SocketAddr;
+use std::sync::Arc;
 use std::time::Duration;
+use tokio::net::TcpSocket;
 
 pub(crate) struct ClientTask {
     session: Session,
-    connector: Connector,
-    reconnect_delay: Duration,
+    connect_handler: Box<dyn ConnectorHandler>,
+    connect_options: ConnectOptions,
+    post_connection: PostConnectionHandler,
     listener: Box<dyn Listener<ClientState>>,
 }
 
 impl ClientTask {
     pub(crate) fn new(
         session: Session,
-        endpoints: EndpointList,
-        connect_strategy: ConnectStrategy,
+        connect_handler: Box<dyn ConnectorHandler>,
         connect_options: ConnectOptions,
-        connection_handler: PostConnectionHandler,
+        post_connection: PostConnectionHandler,
         listener: Box<dyn Listener<ClientState>>,
     ) -> Self {
-        let retry_strategy = RetryStrategy::new(
-            connect_strategy.min_connect_delay,
-            connect_strategy.max_connect_delay,
-        );
-
         Self {
-            connector: Connector::new(
-                endpoints,
-                connect_options,
-                retry_strategy,
-                connection_handler,
-            ),
-            reconnect_delay: connect_strategy.reconnect_delay,
+            connect_handler,
+            connect_options,
+            post_connection,
             session,
             listener,
         }
@@ -61,10 +57,11 @@ impl ClientTask {
 
     async fn run_one_connection(&mut self) -> Result<(), StopReason> {
         self.listener.update(ClientState::Connecting).get().await;
-        match self.connector.connect().await {
-            Ok(phys) => {
+
+        match self.connect().await {
+            Ok((phys, addr, hostname)) => {
                 self.listener.update(ClientState::Connected).get().await;
-                self.run_phys(phys).await
+                self.run_phys(phys, addr, hostname).await
             }
             Err(delay) => {
                 tracing::info!("waiting {} ms to retry connection", delay.as_millis());
@@ -77,24 +74,126 @@ impl ClientTask {
         }
     }
 
-    async fn run_phys(&mut self, mut phys: PhysLayer) -> Result<(), StopReason> {
+    async fn connect(&mut self) -> Result<(PhysLayer, SocketAddr, Option<Arc<String>>), Duration> {
+        loop {
+            let endpoint = self.connect_handler.next()?;
+            if let Some((phys, addr, hostname)) = self.connect_to_endpoint(endpoint).await {
+                self.connect_handler
+                    .connected(addr, hostname.as_ref().map(|x| x.as_str()));
+                return Ok((phys, addr, hostname));
+            }
+        }
+    }
+
+    async fn connect_to_endpoint(
+        &mut self,
+        endpoint: Endpoint,
+    ) -> Option<(PhysLayer, SocketAddr, Option<Arc<String>>)> {
+        match endpoint.inner {
+            EndpointInner::Address(addr) => {
+                self.connect_to_addr(addr).await.map(|x| (x, addr, None))
+            }
+            EndpointInner::Hostname(hostname) => {
+                match tokio::net::lookup_host(hostname.as_str()).await {
+                    Ok(addrs) => {
+                        for addr in addrs {
+                            if let Some(x) = self.connect_to_addr(addr).await {
+                                return Some((x, addr, Some(hostname.clone())));
+                            }
+                        }
+                        None
+                    }
+                    Err(err) => {
+                        tracing::warn!("Unable to resolve: '{hostname}', err: {err}");
+                        self.connect_handler.resolution_failed(hostname.as_str());
+                        None
+                    }
+                }
+            }
+        }
+    }
+
+    async fn connect_to_addr(&mut self, addr: SocketAddr) -> Option<PhysLayer> {
+        let result = if addr.is_ipv4() {
+            TcpSocket::new_v4()
+        } else {
+            TcpSocket::new_v6()
+        };
+
+        let socket = match result {
+            Ok(x) => x,
+            Err(err) => {
+                tracing::warn!("unable to create socket: {}", err);
+                return None;
+            }
+        };
+
+        if let Some(local) = self.connect_options.local_endpoint {
+            if let Err(err) = socket.bind(local) {
+                tracing::warn!("unable to bind socket to {}: {}", local, err);
+                return None;
+            }
+        }
+
+        let fut = socket.connect(addr);
+        let result = match self.connect_options.timeout {
+            None => fut.await,
+            Some(timeout) => match tokio::time::timeout(timeout, fut).await {
+                Ok(x) => x,
+                Err(_) => {
+                    tracing::warn!(
+                        "unable to connect to {} within timeout of {:?}",
+                        addr,
+                        timeout
+                    );
+                    return None;
+                }
+            },
+        };
+
+        let stream = match result {
+            Ok(x) => x,
+            Err(err) => {
+                tracing::warn!("failed to connect to {}: {}", addr, err);
+                return None;
+            }
+        };
+
+        crate::tcp::configure_client(&stream);
+
+        let phys = match self.post_connection.post_connect(stream, &addr).await {
+            Some(x) => x,
+            None => {
+                return None;
+            }
+        };
+
+        tracing::info!("connected to {}", addr);
+
+        Some(phys)
+    }
+
+    async fn run_phys(
+        &mut self,
+        mut phys: PhysLayer,
+        addr: SocketAddr,
+        hostname: Option<Arc<String>>,
+    ) -> Result<(), StopReason> {
         match self.session.run(&mut phys).await {
             RunError::Stop(s) => Err(s),
             RunError::Link(err) => {
                 tracing::warn!("connection lost - {}", err);
+                let hostname = hostname.as_ref().map(|x| x.as_str());
+                let reconnect_delay = self.connect_handler.disconnected(addr, hostname);
 
                 self.listener
-                    .update(ClientState::WaitAfterDisconnect(self.reconnect_delay))
+                    .update(ClientState::WaitAfterDisconnect(reconnect_delay))
                     .get()
                     .await;
 
-                if !self.reconnect_delay.is_zero() {
-                    tracing::warn!(
-                        "waiting {} ms to reconnect",
-                        self.reconnect_delay.as_millis()
-                    );
-
-                    self.session.wait_for_retry(self.reconnect_delay).await?;
+                if !reconnect_delay.is_zero() {
+                    tracing::warn!("waiting {reconnect_delay:?} to reconnect");
+                    self.session.wait_for_retry(reconnect_delay).await?;
                 }
 
                 Ok(())

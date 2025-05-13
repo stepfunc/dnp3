@@ -7,7 +7,7 @@ use crate::app::{ConnectStrategy, Listener};
 use crate::link::LinkErrorMode;
 use crate::master::{MasterChannel, MasterChannelConfig, MasterChannelType};
 use crate::tcp::tls::{CertificateMode, MinTlsVersion, TlsError};
-use crate::tcp::{wire_master_client, ClientState, ConnectOptions};
+use crate::tcp::{wire_master_client, ClientState, ConnectOptions, SimpleConnectHandler};
 use crate::tcp::{EndpointList, PostConnectionHandler};
 use crate::util::phys::PhysLayer;
 
@@ -60,14 +60,14 @@ pub fn spawn_master_tls_client_2(
     listener: Box<dyn Listener<ClientState>>,
     tls_config: TlsClientConfig,
 ) -> MasterChannel {
-    let main_addr = endpoints.main_addr().to_string();
+    let handler = SimpleConnectHandler::create(endpoints, connect_strategy);
+    let main_addr = handler.main_endpoint();
     let (mut task, handle) = wire_master_client(
         LinkModes::stream(link_error_mode),
         ParseOptions::get_static(),
         MasterChannelType::Stream,
-        endpoints,
+        handler,
         config,
-        connect_strategy,
         connect_options,
         PostConnectionHandler::Tls(tls_config),
         listener,
