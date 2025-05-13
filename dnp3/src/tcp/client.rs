@@ -90,14 +90,17 @@ impl ClientTask {
         endpoint: Endpoint,
     ) -> Option<(PhysLayer, SocketAddr, Option<Arc<String>>)> {
         match endpoint.inner {
-            EndpointInner::Address(addr) => {
-                self.connect_to_addr(addr).await.map(|x| (x, addr, None))
-            }
+            EndpointInner::Address(addr) => self
+                .connect_to_addr(addr, None)
+                .await
+                .map(|x| (x, addr, None)),
             EndpointInner::Hostname(hostname) => {
                 match tokio::net::lookup_host(hostname.as_str()).await {
                     Ok(addrs) => {
                         for addr in addrs {
-                            if let Some(x) = self.connect_to_addr(addr).await {
+                            if let Some(x) =
+                                self.connect_to_addr(addr, Some(hostname.as_str())).await
+                            {
                                 return Some((x, addr, Some(hostname.clone())));
                             }
                         }
@@ -113,7 +116,11 @@ impl ClientTask {
         }
     }
 
-    async fn connect_to_addr(&mut self, addr: SocketAddr) -> Option<PhysLayer> {
+    async fn connect_to_addr(
+        &mut self,
+        addr: SocketAddr,
+        hostname: Option<&str>,
+    ) -> Option<PhysLayer> {
         let result = if addr.is_ipv4() {
             TcpSocket::new_v4()
         } else {
@@ -141,6 +148,7 @@ impl ClientTask {
             Some(timeout) => match tokio::time::timeout(timeout, fut).await {
                 Ok(x) => x,
                 Err(_) => {
+                    self.connect_handler.connect_failed(addr, hostname);
                     tracing::warn!(
                         "unable to connect to {} within timeout of {:?}",
                         addr,

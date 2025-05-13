@@ -46,7 +46,7 @@ impl From<String> for Endpoint {
 }
 
 /// Controls how TCP and TLS clients connect to endpoints
-pub trait ConnectorHandler: Send {
+pub(crate) trait ConnectorHandler: Send {
     /// Endpoint that will be logged in conjunction with a tracing span
     fn main_endpoint(&self) -> Endpoint;
 
