@@ -88,26 +88,30 @@ pub trait ClientConnectionHandler: Send {
     /// can be overridden by the user to be anything e.g., a unique name / UUID / etc.
     fn endpoint_span_name(&self) -> String;
 
+    /// Notification that a previously successful connection failed. The task will sleep for the specified
+    /// duration before attempting another connection
+    fn disconnected(&mut self, addr: SocketAddr, hostname: Option<&str>) -> Duration;
+
     /// Return the next endpoint to which a connection will be attempted or indicate that
     /// the connecting task should sleep for a period of time.
     fn next(&mut self) -> Result<ConnectionInfo, Duration>;
 
     /// Notification that a connection attempt is being made
-    fn connecting(&mut self, addr: SocketAddr, hostname: Option<&str>);
+    #[allow(unused)]
+    fn connecting(&mut self, addr: SocketAddr, hostname: Option<&str>) {}
 
     /// Notification that connection operation failed
-    fn connect_failed(&mut self, addr: SocketAddr, hostname: Option<&str>);
+    #[allow(unused)]
+    fn connect_failed(&mut self, addr: SocketAddr, hostname: Option<&str>) {}
 
     /// Notification that a connection attempt succeeded
-    fn connected(&mut self, addr: SocketAddr, hostname: Option<&str>);
-
-    /// Notification that a previously successful connection failed. The task will sleep for the specified
-    /// duration before attempting another connection
-    fn disconnected(&mut self, addr: SocketAddr, hostname: Option<&str>) -> Duration;
+    #[allow(unused)]
+    fn connected(&mut self, addr: SocketAddr, hostname: Option<&str>) {}
 
     /// Notification that DNS resolution failed. The task will sleep for the specified
     /// duration before attempting another connection.
-    fn resolution_failed(&mut self, host_name: &str);
+    #[allow(unused)]
+    fn resolution_failed(&mut self, host_name: &str) {}
 }
 
 pub(crate) struct SimpleConnectHandler {
@@ -145,6 +149,10 @@ impl ClientConnectionHandler for SimpleConnectHandler {
         }
     }
 
+    fn disconnected(&mut self, _: SocketAddr, _: Option<&str>) -> Duration {
+        self.reconnect_delay
+    }
+
     fn next(&mut self) -> Result<ConnectionInfo, Duration> {
         match self.endpoints.get(self.next) {
             None => {
@@ -165,18 +173,8 @@ impl ClientConnectionHandler for SimpleConnectHandler {
         }
     }
 
-    fn connecting(&mut self, _: SocketAddr, _: Option<&str>) {}
-
-    fn connect_failed(&mut self, _: SocketAddr, _: Option<&str>) {}
-
     fn connected(&mut self, _: SocketAddr, _: Option<&str>) {
         self.next = 0;
         self.backoff.on_success();
     }
-
-    fn disconnected(&mut self, _: SocketAddr, _: Option<&str>) -> Duration {
-        self.reconnect_delay
-    }
-
-    fn resolution_failed(&mut self, _: &str) {}
 }

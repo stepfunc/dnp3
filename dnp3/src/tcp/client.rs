@@ -201,7 +201,7 @@ impl ClientTask {
         match self.session.run(&mut phys).await {
             RunError::Stop(s) => Err(s),
             RunError::Link(err) => {
-                tracing::warn!("connection lost - {}", err);
+                tracing::warn!("connection to {addr} failed: {err}");
                 let hostname = hostname.as_ref().map(|x| x.as_str());
                 let reconnect_delay = self.connect_handler.disconnected(addr, hostname);
 
