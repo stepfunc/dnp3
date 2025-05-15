@@ -280,6 +280,8 @@ jobs:
           path: ffi-modules
           pattern: ffi-modules-*
           merge-multiple: true
+      - name: List directory
+        run: ls -Rls ffi-modules*
       - name: Create SBOMs
         run: |
           for dir in ffi-modules/*; do
