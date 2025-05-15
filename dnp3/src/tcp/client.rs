@@ -1,6 +1,6 @@
 use crate::app::{Listener, Shutdown};
 use crate::tcp::{
-    ClientState, ConnectionInfo, ClientConnectionHandler, EndpointInner, PostConnectionHandler,
+    ClientConnectionHandler, ClientState, ConnectionInfo, EndpointInner, PostConnectionHandler,
 };
 use crate::util::phys::PhysLayer;
 use crate::util::session::{RunError, Session, StopReason};

@@ -149,7 +149,7 @@ pub enum AcceptAction {
     Accept(AcceptConfig),
 }
 
-/// Callbacks to user code that determine how the server processes connections
+/// Callbacks to user code that determine how a master acting as a TCP or TLS server processes connections
 pub trait ConnectionHandler: Send + 'static {
     /// Filter the connection solely based on the remote address
     fn accept(

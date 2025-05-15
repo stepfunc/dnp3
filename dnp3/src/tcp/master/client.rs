@@ -7,8 +7,8 @@ use crate::link::LinkErrorMode;
 use crate::master::task::MasterTask;
 use crate::master::{MasterChannel, MasterChannelConfig, MasterChannelType};
 use crate::tcp::client::ClientTask;
-use crate::tcp::{ClientState, ConnectOptions, PostConnectionHandler};
 use crate::tcp::{ClientConnectionHandler, EndpointList, SimpleConnectHandler};
+use crate::tcp::{ClientState, ConnectOptions, PostConnectionHandler};
 use crate::util::session::{Enabled, Session};
 
 /// Spawn a task onto the `Tokio` runtime. The task runs until the returned handle, and any
