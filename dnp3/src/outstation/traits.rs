@@ -193,8 +193,8 @@ pub trait OutstationApplication: Sync + Send + 'static {
         MaybeAsync::ready(())
     }
 
-    /// Called in response to a WRITE request containing a group 0 object for purposes of storing
-    /// the value in non-volatile memory. The attribute is automatically updated updated in the
+    /// Called in response to a WRITE request containing a group 0 object to store
+    /// the value in non-volatile memory. The attribute is automatically updated in the
     /// in-memory database.
     ///
     /// This callback is only invoked for attributes that have been defined as write-able in the
