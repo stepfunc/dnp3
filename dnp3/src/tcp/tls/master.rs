@@ -60,21 +60,23 @@ pub fn spawn_master_tls_client_2(
     listener: Box<dyn Listener<ClientState>>,
     tls_config: TlsClientConfig,
 ) -> MasterChannel {
-    let handler = SimpleConnectHandler::create(endpoints, connect_strategy);
-    let main_addr = handler.main_address();
+    let handler = SimpleConnectHandler::create(endpoints, connect_options, connect_strategy);
+    let name = handler.endpoint_span_name();
     let (mut task, handle) = wire_master_client(
         LinkModes::stream(link_error_mode),
         ParseOptions::get_static(),
         MasterChannelType::Stream,
         handler,
         config,
-        connect_options,
         PostConnectionHandler::Tls(tls_config),
         listener,
     );
     let future = async move {
         task.run()
-            .instrument(tracing::info_span!("dnp3-master-tls-client", "endpoint" = ?main_addr))
+            .instrument(tracing::info_span!(
+                "dnp3-master-tls-client",
+                "endpoint" = name
+            ))
             .await;
     };
     tokio::spawn(future);

@@ -29,8 +29,8 @@ pub fn spawn_outstation_tcp_client(
     control_handler: Box<dyn ControlHandler>,
     listener: Box<dyn Listener<ClientState>>,
 ) -> OutstationHandle {
-    let handler = SimpleConnectHandler::create(endpoints, connect_strategy);
-    let main_addr = handler.main_address();
+    let handler = SimpleConnectHandler::create(endpoints, connect_options, connect_strategy);
+    let name = handler.endpoint_span_name();
     let (task, handle) = OutstationTask::create(
         Enabled::No,
         LinkModes::stream(link_error_mode),
@@ -42,18 +42,12 @@ pub fn spawn_outstation_tcp_client(
         control_handler,
     );
     let session = Session::outstation(task);
-    let mut client = ClientTask::new(
-        session,
-        handler,
-        connect_options,
-        PostConnectionHandler::Tcp,
-        listener,
-    );
+    let mut client = ClientTask::new(session, handler, PostConnectionHandler::Tcp, listener);
 
     let future = async move {
         client
             .run()
-            .instrument(tracing::info_span!("dnp3-outstation-tcp-client", "endpoint" = ?main_addr))
+            .instrument(tracing::info_span!("dnp3-outstation-tcp-client", "endpoint" = ?name))
             .await;
     };
     tokio::spawn(future);

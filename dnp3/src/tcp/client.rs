@@ -1,6 +1,6 @@
 use crate::app::{Listener, Shutdown};
 use crate::tcp::{
-    ClientState, ConnectOptions, ConnectorHandler, Endpoint, EndpointInner, PostConnectionHandler,
+    ClientState, ConnectionInfo, ClientConnectionHandler, EndpointInner, PostConnectionHandler,
 };
 use crate::util::phys::PhysLayer;
 use crate::util::session::{RunError, Session, StopReason};
@@ -11,8 +11,7 @@ use tokio::net::TcpSocket;
 
 pub(crate) struct ClientTask {
     session: Session,
-    connect_handler: Box<dyn ConnectorHandler>,
-    connect_options: ConnectOptions,
+    connect_handler: Box<dyn ClientConnectionHandler>,
     post_connection: PostConnectionHandler,
     listener: Box<dyn Listener<ClientState>>,
 }
@@ -20,14 +19,12 @@ pub(crate) struct ClientTask {
 impl ClientTask {
     pub(crate) fn new(
         session: Session,
-        connect_handler: Box<dyn ConnectorHandler>,
-        connect_options: ConnectOptions,
+        connect_handler: Box<dyn ClientConnectionHandler>,
         post_connection: PostConnectionHandler,
         listener: Box<dyn Listener<ClientState>>,
     ) -> Self {
         Self {
             connect_handler,
-            connect_options,
             post_connection,
             session,
             listener,
@@ -76,8 +73,8 @@ impl ClientTask {
 
     async fn connect(&mut self) -> Result<(PhysLayer, SocketAddr, Option<Arc<String>>), Duration> {
         loop {
-            let endpoint = self.connect_handler.next()?;
-            if let Some((phys, addr, hostname)) = self.connect_to_endpoint(endpoint).await {
+            let conn_info = self.connect_handler.next()?;
+            if let Some((phys, addr, hostname)) = self.connect_to_endpoint(conn_info).await {
                 self.connect_handler
                     .connected(addr, hostname.as_ref().map(|x| x.as_str()));
                 return Ok((phys, addr, hostname));
@@ -87,19 +84,25 @@ impl ClientTask {
 
     async fn connect_to_endpoint(
         &mut self,
-        endpoint: Endpoint,
+        info: ConnectionInfo,
     ) -> Option<(PhysLayer, SocketAddr, Option<Arc<String>>)> {
-        match endpoint.inner {
+        match info.endpoint.inner {
             EndpointInner::Address(addr) => self
-                .connect_to_addr(addr, None)
+                .connect_to_addr(addr, info.timeout, info.local_endpoint, None)
                 .await
                 .map(|x| (x, addr, None)),
             EndpointInner::Hostname(hostname) => {
                 match tokio::net::lookup_host(hostname.as_str()).await {
                     Ok(addrs) => {
                         for addr in addrs {
-                            if let Some(x) =
-                                self.connect_to_addr(addr, Some(hostname.as_str())).await
+                            if let Some(x) = self
+                                .connect_to_addr(
+                                    addr,
+                                    info.timeout,
+                                    info.local_endpoint,
+                                    Some(hostname.as_str()),
+                                )
+                                .await
                             {
                                 return Some((x, addr, Some(hostname.clone())));
                             }
@@ -119,6 +122,8 @@ impl ClientTask {
     async fn connect_to_addr(
         &mut self,
         addr: SocketAddr,
+        timeout: Option<Duration>,
+        local_endpoint: Option<SocketAddr>,
         hostname: Option<&str>,
     ) -> Option<PhysLayer> {
         let result = if addr.is_ipv4() {
@@ -135,7 +140,7 @@ impl ClientTask {
             }
         };
 
-        if let Some(local) = self.connect_options.local_endpoint {
+        if let Some(local) = local_endpoint {
             if let Err(err) = socket.bind(local) {
                 tracing::warn!("unable to bind socket to {}: {}", local, err);
                 return None;
@@ -149,7 +154,7 @@ impl ClientTask {
         self.connect_handler.connecting(addr, hostname);
 
         let fut = socket.connect(addr);
-        let result = match self.connect_options.timeout {
+        let result = match timeout {
             None => fut.await,
             Some(timeout) => match tokio::time::timeout(timeout, fut).await {
                 Ok(x) => x,

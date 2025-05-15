@@ -8,7 +8,7 @@ use crate::master::task::MasterTask;
 use crate::master::{MasterChannel, MasterChannelConfig, MasterChannelType};
 use crate::tcp::client::ClientTask;
 use crate::tcp::{ClientState, ConnectOptions, PostConnectionHandler};
-use crate::tcp::{ConnectorHandler, EndpointList, SimpleConnectHandler};
+use crate::tcp::{ClientConnectionHandler, EndpointList, SimpleConnectHandler};
 use crate::util::session::{Enabled, Session};
 
 /// Spawn a task onto the `Tokio` runtime. The task runs until the returned handle, and any
@@ -43,35 +43,33 @@ pub fn spawn_master_tcp_client_2(
     connect_options: ConnectOptions,
     listener: Box<dyn Listener<ClientState>>,
 ) -> MasterChannel {
-    let connect_handler = SimpleConnectHandler::create(endpoints, connect_strategy);
-    let main_addr = connect_handler.main_address();
+    let connect_handler =
+        SimpleConnectHandler::create(endpoints, connect_options, connect_strategy);
+    let name = connect_handler.endpoint_span_name();
     let (mut task, handle) = wire_master_client(
         LinkModes::stream(link_error_mode),
         ParseOptions::get_static(),
         MasterChannelType::Stream,
         connect_handler,
         config,
-        connect_options,
         PostConnectionHandler::Tcp,
         listener,
     );
     let future = async move {
         task.run()
-            .instrument(tracing::info_span!("dnp3-master-tcp-client", "endpoint" = ?main_addr))
+            .instrument(tracing::info_span!("dnp3-master-tcp-client", "endpoint" = ?name))
             .await;
     };
     tokio::spawn(future);
     handle
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn wire_master_client(
     link_modes: LinkModes,
     parse_options: ParseOptions,
     channel_type: MasterChannelType,
-    connect_handler: Box<dyn ConnectorHandler>,
+    connect_handler: Box<dyn ClientConnectionHandler>,
     config: MasterChannelConfig,
-    connect_options: ConnectOptions,
     connection_handler: PostConnectionHandler,
     listener: Box<dyn Listener<ClientState>>,
 ) -> (ClientTask, MasterChannel) {
@@ -83,12 +81,6 @@ pub(crate) fn wire_master_client(
         config,
         rx,
     ));
-    let client = ClientTask::new(
-        session,
-        connect_handler,
-        connect_options,
-        connection_handler,
-        listener,
-    );
+    let client = ClientTask::new(session, connect_handler, connection_handler, listener);
     (client, MasterChannel::new(tx, channel_type))
 }

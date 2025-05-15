@@ -1,5 +1,5 @@
 use crate::app::{ConnectStrategy, ExponentialBackOff, RetryStrategy};
-use crate::tcp::EndpointList;
+use crate::tcp::{ConnectOptions, EndpointList};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -15,7 +15,7 @@ pub struct Endpoint {
 pub(crate) enum EndpointInner {
     /// Socket address, e.g. 192.168.1.42:20000
     Address(SocketAddr),
-    /// resolve using a hostname
+    /// resolve using a hostname, e.g. www.google.com:443
     Hostname(Arc<String>),
 }
 
@@ -45,24 +45,52 @@ impl From<String> for Endpoint {
     }
 }
 
-/// Controls how TCP and TLS clients connect to endpoints
-pub(crate) trait ConnectorHandler: Send {
-    /// Endpoint that will be logged by default in conjunction with a tracing span
-    fn main_endpoint(&self) -> Endpoint;
+/// Information about the next connection attempt
+#[derive(Clone, Debug)]
+pub struct ConnectionInfo {
+    pub(crate) endpoint: Endpoint,
+    pub(crate) timeout: Option<Duration>,
+    pub(crate) local_endpoint: Option<SocketAddr>,
+}
 
-    /// String data used in tracing span to identify the communication session.
-    ///
-    /// This is typically the SocketAddr or hostname of the main endpoint, but
-    /// can be overridden by the user to be anything e.g., a unique name
-    fn main_address(&self) -> String {
-        match self.main_endpoint().inner {
-            EndpointInner::Address(x) => x.to_string(),
-            EndpointInner::Hostname(x) => x.to_string(),
+impl ConnectionInfo {
+    /// Instantiate with just the endpoint defined and all other parameters
+    /// set to their default values.
+    pub fn new(endpoint: Endpoint) -> Self {
+        Self {
+            endpoint,
+            timeout: None,
+            local_endpoint: None,
         }
     }
 
-    /// Return the next endpoint to which a connection will be attempted
-    fn next(&mut self) -> Result<Endpoint, Duration>;
+    /// Sets a user-level connection timeout. This field defaults to [`None`]
+    /// meaning that OS's default timeout mechanism is used.
+    pub fn set_timeout(&mut self, timeout: Duration) {
+        self.timeout = Some(timeout);
+    }
+
+    /// Set the local address to which the socket is bound. If not specified, then any available
+    /// adapter may be used with an OS-assigned port.
+    pub fn set_local_endpoint(&mut self, local: SocketAddr) {
+        self.local_endpoint = Some(local);
+    }
+}
+
+/// Gives the user fine-grained control over how TCP and TLS clients connect to endpoints
+pub(crate) trait ClientConnectionHandler: Send {
+    /// When a client communication session is first created, this function is called once
+    /// to generate a string used in a `tracing::span`, e.g.:
+    ///
+    /// { endpoint = <endpoint_span_name> }
+    ///
+    /// This string is typically the SocketAddr or hostname of the main endpoint, but
+    /// can be overridden by the user to be anything e.g., a unique name / UUID / etc.
+    fn endpoint_span_name(&self) -> String;
+
+    /// Return the next endpoint to which a connection will be attempted or indicate that
+    /// the connecting task should sleep for a period of time.
+    fn next(&mut self) -> Result<ConnectionInfo, Duration>;
 
     /// Notification that a connection attempt is being made
     fn connecting(&mut self, addr: SocketAddr, hostname: Option<&str>);
@@ -85,6 +113,7 @@ pub(crate) trait ConnectorHandler: Send {
 pub(crate) struct SimpleConnectHandler {
     next: usize,
     endpoints: Vec<Endpoint>,
+    options: ConnectOptions,
     backoff: ExponentialBackOff,
     reconnect_delay: Duration,
 }
@@ -92,11 +121,13 @@ pub(crate) struct SimpleConnectHandler {
 impl SimpleConnectHandler {
     pub(crate) fn create(
         list: EndpointList,
+        options: ConnectOptions,
         connect_strategy: ConnectStrategy,
-    ) -> Box<dyn ConnectorHandler> {
+    ) -> Box<dyn ClientConnectionHandler> {
         Box::new(Self {
             next: 0,
             endpoints: list.endpoints(),
+            options,
             backoff: ExponentialBackOff::new(RetryStrategy::new(
                 connect_strategy.min_connect_delay,
                 connect_strategy.max_connect_delay,
@@ -106,12 +137,15 @@ impl SimpleConnectHandler {
     }
 }
 
-impl ConnectorHandler for SimpleConnectHandler {
-    fn main_endpoint(&self) -> Endpoint {
-        self.endpoints[0].clone()
+impl ClientConnectionHandler for SimpleConnectHandler {
+    fn endpoint_span_name(&self) -> String {
+        match &self.endpoints[0].inner {
+            EndpointInner::Address(x) => x.to_string(),
+            EndpointInner::Hostname(x) => x.to_string(),
+        }
     }
 
-    fn next(&mut self) -> Result<Endpoint, Duration> {
+    fn next(&mut self) -> Result<ConnectionInfo, Duration> {
         match self.endpoints.get(self.next) {
             None => {
                 self.next = 0;
@@ -119,7 +153,14 @@ impl ConnectorHandler for SimpleConnectHandler {
             }
             Some(x) => {
                 self.next += 1;
-                Ok(x.clone())
+                let mut info = ConnectionInfo::new(x.clone());
+                if let Some(x) = self.options.timeout {
+                    info.set_timeout(x);
+                }
+                if let Some(x) = self.options.local_endpoint {
+                    info.set_local_endpoint(x);
+                }
+                Ok(info)
             }
         }
     }

@@ -42,8 +42,8 @@ pub fn spawn_outstation_tls_client(
     listener: Box<dyn Listener<ClientState>>,
     tls_config: TlsClientConfig,
 ) -> OutstationHandle {
-    let handler = SimpleConnectHandler::create(endpoints, connect_strategy);
-    let main_addr = handler.main_address();
+    let handler = SimpleConnectHandler::create(endpoints, connect_options, connect_strategy);
+    let name = handler.endpoint_span_name();
     let (task, handle) = OutstationTask::create(
         Enabled::No,
         LinkModes::stream(link_error_mode),
@@ -58,7 +58,6 @@ pub fn spawn_outstation_tls_client(
     let mut client = ClientTask::new(
         session,
         handler,
-        connect_options,
         PostConnectionHandler::Tls(tls_config),
         listener,
     );
@@ -66,7 +65,7 @@ pub fn spawn_outstation_tls_client(
     let future = async move {
         client
             .run()
-            .instrument(tracing::info_span!("dnp3-outstation-tls-client", "endpoint" = ?main_addr))
+            .instrument(tracing::info_span!("dnp3-outstation-tls-client", "endpoint" = ?name))
             .await;
     };
     tokio::spawn(future);
