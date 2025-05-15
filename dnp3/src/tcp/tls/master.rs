@@ -7,7 +7,9 @@ use crate::app::{ConnectStrategy, Listener};
 use crate::link::LinkErrorMode;
 use crate::master::{MasterChannel, MasterChannelConfig, MasterChannelType};
 use crate::tcp::tls::{CertificateMode, MinTlsVersion, TlsError};
-use crate::tcp::{wire_master_client, ClientState, ConnectOptions, SimpleConnectHandler};
+use crate::tcp::{
+    wire_master_client, ClientConnectionHandler, ClientState, ConnectOptions, SimpleConnectHandler,
+};
 use crate::tcp::{EndpointList, PostConnectionHandler};
 use crate::util::phys::PhysLayer;
 
@@ -26,7 +28,7 @@ pub struct TlsClientConfig {
 }
 
 /// Spawn a task onto the `Tokio` runtime. The task runs until the returned handle, and any
-/// `AssociationHandle` created from it, are dropped.
+/// `AssociationHandle` created from it is dropped.
 ///
 /// **Note**: This function may only be called from within the runtime itself, and panics otherwise.
 /// Use Runtime::enter() if required.
@@ -61,12 +63,25 @@ pub fn spawn_master_tls_client_2(
     tls_config: TlsClientConfig,
 ) -> MasterChannel {
     let handler = SimpleConnectHandler::create(endpoints, connect_options, connect_strategy);
-    let name = handler.endpoint_span_name();
+    spawn_master_tls_client_3(link_error_mode, config, handler, listener, tls_config)
+}
+
+/// Just like [spawn_master_tls_client_2], but this variant provides fine-grained
+/// control over the connection management using a user-defined implementation
+/// of [`ClientConnectionHandler`]
+pub fn spawn_master_tls_client_3(
+    link_error_mode: LinkErrorMode,
+    config: MasterChannelConfig,
+    connection_handler: Box<dyn ClientConnectionHandler>,
+    listener: Box<dyn Listener<ClientState>>,
+    tls_config: TlsClientConfig,
+) -> MasterChannel {
+    let name = connection_handler.endpoint_span_name();
     let (mut task, handle) = wire_master_client(
         LinkModes::stream(link_error_mode),
         ParseOptions::get_static(),
         MasterChannelType::Stream,
-        handler,
+        connection_handler,
         config,
         PostConnectionHandler::Tls(tls_config),
         listener,
