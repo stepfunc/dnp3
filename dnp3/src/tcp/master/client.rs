@@ -12,7 +12,7 @@ use crate::tcp::{ClientState, ConnectOptions, PostConnectionHandler};
 use crate::util::session::{Enabled, Session};
 
 /// Spawn a task onto the `Tokio` runtime. The task runs until the returned handle, and any
-/// `AssociationHandle` created from it, are dropped.
+/// `AssociationHandle` created from it is dropped.
 ///
 /// **Note**: This function may only be called from within the runtime itself, and panics otherwise.
 /// Use Runtime::enter() if required.
@@ -45,12 +45,24 @@ pub fn spawn_master_tcp_client_2(
 ) -> MasterChannel {
     let connect_handler =
         SimpleConnectHandler::create(endpoints, connect_options, connect_strategy);
-    let name = connect_handler.endpoint_span_name();
+    spawn_master_tcp_client_3(link_error_mode, config, connect_handler, listener)
+}
+
+/// Just like [spawn_master_tcp_client_2], but this variant provides fine-grained
+/// control over the connection management using a user-defined implementation
+/// of [`ClientConnectionHandler`]
+pub fn spawn_master_tcp_client_3(
+    link_error_mode: LinkErrorMode,
+    config: MasterChannelConfig,
+    connection_handler: Box<dyn ClientConnectionHandler>,
+    listener: Box<dyn Listener<ClientState>>,
+) -> MasterChannel {
+    let name = connection_handler.endpoint_span_name();
     let (mut task, handle) = wire_master_client(
         LinkModes::stream(link_error_mode),
         ParseOptions::get_static(),
         MasterChannelType::Stream,
-        connect_handler,
+        connection_handler,
         config,
         PostConnectionHandler::Tcp,
         listener,
