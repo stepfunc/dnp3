@@ -282,8 +282,8 @@ pub enum OperateType {
 
 /// select, operate, direct operate, or direct operate no-ack a control point
 pub trait ControlSupport<T> {
-    /// Select a control point, but do not operate. Implementors can think of
-    /// this function ask the question "is this control supported"?
+    /// Select a control point but do not operate. Implementors can think of
+    /// this function asking "is this control supported"?
     ///
     /// Most implementations should not alter the database in this method. It
     /// is only provided in the event that some event counters reflected via the API
