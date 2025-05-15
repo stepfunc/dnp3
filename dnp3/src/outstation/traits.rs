@@ -235,7 +235,7 @@ pub enum BroadcastAction {
     IgnoredByConfiguration,
     /// Outstation was unable to parse the object headers and ignored the request
     BadObjectHeaders,
-    /// Outstation ignore the broadcast message b/c the function is not supported via Broadcast
+    /// Outstation ignored the broadcast message b/c the function is not supported via Broadcast
     UnsupportedFunction(FunctionCode),
 }
 
