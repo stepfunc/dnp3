@@ -45,7 +45,7 @@ pub fn spawn_outstation_tcp_client(
 
 /// Spawn a TCP client task onto the `Tokio` runtime. The task runs until the returned handle is dropped.
 ///
-/// This function is similar to [`spawn_outstation_tcp_client`] but provides more fine-grained control over
+/// This function is similar to [`spawn_outstation_tcp_client`] but provides fine-grained control over
 /// connection management via a user implementation of the [`ClientConnectionHandler`] trait.
 ///
 /// **Note**: This function may only be called from within the runtime itself, and panics otherwise.
