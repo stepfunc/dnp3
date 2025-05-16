@@ -285,7 +285,9 @@ jobs:
       - name: Create SBOMs
         run: |
           for dir in ffi-modules/*; do
+            echo "dir is: $dir"
             target=`basename "${dir}"`
+            echo "target is: $target"
             cargo cyclonedx -f json --target $target
             mv ./ffi/dnp3-ffi/dnp3-ffi.cdx.json ffi-modules/$target
             mv ./ffi/dnp3-ffi-java/dnp3-ffi-java.cdx.json ffi-modules/$target
