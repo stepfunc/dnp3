@@ -7,6 +7,7 @@
     clippy::needless_return,
     clippy::not_unsafe_ptr_arg_deref,
     clippy::let_unit_value,
+    clippy::uninlined_format_args,
     unused_variables,
     dead_code,
     static_mut_refs

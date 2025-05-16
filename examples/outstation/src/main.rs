@@ -733,7 +733,7 @@ async fn run_outstation(
                     UpdateOptions::detect_event(),
                 );
             }),
-            s => println!("unknown command: {}", s),
+            s => println!("unknown command: {s}"),
         }
     }
 }
