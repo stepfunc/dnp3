@@ -292,6 +292,11 @@ jobs:
             mv ./ffi/dnp3-ffi/dnp3-ffi.cdx.json ffi-modules/$target
             mv ./ffi/dnp3-ffi-java/dnp3-ffi-java.cdx.json ffi-modules/$target
           done
+      - name: Upload C packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: c-packages
+          path: ffi-modules/*
       - name: Create FFI third-party-licenses.txt
         run: allow-list gen-licenses-dir -l ffi-modules -b dnp3-ffi.cdx.json -c allowed.json > third-party-licenses.txt
       - name: Create FFI third-party-licenses-java.txt
