@@ -189,7 +189,7 @@ mod test {
         let short = Bytes::new(&[0x01, 0x02, 0x03]);
         let long = Bytes::new(&[0x01, 0x02, 0x03, 0x04]);
 
-        assert_eq!(format!("{}", short), "[01, 02, 03]");
-        assert_eq!(format!("{}", long), "length = 4, [01, 02, 03] ...");
+        assert_eq!(format!("{short}"), "[01, 02, 03]");
+        assert_eq!(format!("{long}"), "length = 4, [01, 02, 03] ...");
     }
 }

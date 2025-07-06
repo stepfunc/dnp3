@@ -1,0 +1,8 @@
+version: 2
+updates:
+  # Disable npm ecosystem updates for the guide directory
+  - package-ecosystem: "npm"
+    directory: "/guide"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 0

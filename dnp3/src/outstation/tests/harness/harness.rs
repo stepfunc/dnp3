@@ -75,7 +75,7 @@ impl OutstationHarness {
         for event in expected {
             let next = self.events.next().await;
             if next != *event {
-                panic!("Expected {:?} but next event is {:?}", event, next);
+                panic!("Expected {event:?} but next event is {next:?}");
             }
         }
     }
@@ -85,17 +85,17 @@ impl OutstationHarness {
             match self.events.poll() {
                 Some(next) => {
                     if next != *event {
-                        panic!("Expected {:?} but next event is {:?}", event, next)
+                        panic!("Expected {event:?} but next event is {next:?}")
                     }
                 }
-                None => panic!("Expected {:?} but no event ready", event),
+                None => panic!("Expected {event:?} but no event ready"),
             }
         }
     }
 
     pub(crate) fn check_no_events(&mut self) {
         if let Some(x) = self.events.poll() {
-            panic!("expected no events, but next event is: {:?}", x)
+            panic!("expected no events, but next event is: {x:?}")
         }
     }
 }
