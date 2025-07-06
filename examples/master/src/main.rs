@@ -304,12 +304,12 @@ impl ReadHandler for ExampleReadHandler {
         println!("Variation: {}", info.variation);
 
         for (x, idx) in iter {
-            println!("Octet String {}: Value={:X?}", idx, x);
+            println!("Octet String {idx}: Value={x:X?}");
         }
     }
 
     fn handle_device_attribute(&mut self, _info: HeaderInfo, attr: AnyAttribute) {
-        println!("Device attribute: {:?}", attr)
+        println!("Device attribute: {attr:?}")
     }
 }
 // ANCHOR_END: read_handler
@@ -601,7 +601,7 @@ impl CliHandler {
             "lsr" => {
                 tracing::info!("{:?}", self.association.check_link_status().await);
             }
-            s => println!("unknown command: {}", s),
+            s => println!("unknown command: {s}"),
         }
         Ok(())
     }
