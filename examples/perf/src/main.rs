@@ -77,12 +77,12 @@ async fn run(args: Cli) {
     }
 
     let mut harness = TestHarness::create(args.sessions, config).await;
-    println!("settings: {:?}", args);
+    println!("settings: {args:?}");
 
     println!("starting up...");
     harness.wait_for_startup().await;
     let duration = std::time::Duration::from_secs(args.seconds as u64);
-    println!("iterating for {:?}...", duration);
+    println!("iterating for {duration:?}...");
 
     let start = Instant::now();
     let iterations = match args.action {
@@ -92,8 +92,8 @@ async fn run(args: Cli) {
     let elapsed = start.elapsed();
     let values = config.num_values * iterations;
 
-    println!("elapsed time: {:?}", elapsed);
-    println!("num requests: {}", iterations);
+    println!("elapsed time: {elapsed:?}");
+    println!("num requests: {iterations}");
     println!(
         "requests/sec: {:.1}",
         (iterations as f64) / elapsed.as_secs_f64()
@@ -315,7 +315,7 @@ impl Pair {
         let mut master = dnp3::tcp::spawn_master_tcp_client(
             LinkErrorMode::Close,
             Self::get_master_config(config.master_level),
-            EndpointList::single(format!("127.0.0.1:{}", port)),
+            EndpointList::single(format!("127.0.0.1:{port}")),
             ConnectStrategy::default(),
             NullListener::create(),
         );
