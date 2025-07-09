@@ -7,13 +7,13 @@ Rust implementation of DNP3 (IEEE 1815) with idiomatic bindings for C, C++, .NET
 # Features
 
 - Subset Level 3 master and outstation components in a single library
-- Written in safe Rust with idiomatic bindings for C, C++ .NET Core, and Java.
-- Supports TCP, TLS,  and serial communication channels
-- TLS is implemented using [rustls](https://github.com/rustls/rustls) not openssl.
+- Written in safe Rust with idiomatic bindings for C, C++, .NET Core, and Java.
+- Supports TCP, TLS, and serial communication channels
+- TLS is implemented using [rustls](https://github.com/rustls/rustls) not OpenSSL.
 - Automatic mapping between DNP3 and higher-level measurement types
 - Built-in logging and protocol decoding
 - Blazing fast (and secure) zero-copy / zero-allocation parsing of application data
-- Fully asynchronous implementation scales to the OS limit.
+- Fully asynchronous implementation scales to the OS limit
 - Runs on all platforms and operating systems supported by the [Tokio](https://tokio.rs/) runtime:
   - Official support for: Windows x64 and Linux x64, AArch64, ARMv7 and ARMv6
   - Unofficial support: MacOS, PowerPC, MIPS, FreeBSD, and others
@@ -22,7 +22,7 @@ Rust implementation of DNP3 (IEEE 1815) with idiomatic bindings for C, C++, .NET
 
 Default features can be disabled at compile time:
 * `tls` - Build the library with support for mutually authenticated TLS using [ring](https://crates.io/crates/ring) for cryptography.
-* `tls-aws-lc` - Sames as the `tls` feature but uses [aws-lc-rs](https://crates.io/crates/aws-lc-rs) for cryptography.
+* `tls-aws-lc` - Same as the `tls` feature but uses [aws-lc-rs](https://crates.io/crates/aws-lc-rs) for cryptography.
 * `serial` - Build the library with support for serial ports
 
 Optional features that may be enabled at compile time:
@@ -43,5 +43,5 @@ Please inquire about commercial licensing on our website:
 
 ## Bindings
 
-Bindings in C, C++, java, and .NET Core are available for this library. See the
+Bindings in C, C++, Java, and .NET Core are available for this library. See the
 [documentation](https://stepfunc.io/products/libraries/dnp3/) for more details.
