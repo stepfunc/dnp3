@@ -1,0 +1,45 @@
+import React, { useEffect, useRef, useState } from "react";
+import mermaid from "mermaid";
+
+// Initialize mermaid once
+mermaid.initialize({
+	startOnLoad: false,
+	theme: 'neutral',
+	securityLevel: 'loose',
+	fontFamily: 'inherit',
+});
+
+const Mermaid = ({ chart }) => {
+	const ref = useRef(null);
+	const [svg, setSvg] = useState('');
+
+	useEffect(() => {
+		const renderChart = async () => {
+			if (chart && ref.current) {
+				try {
+					const id = 'mermaid-' + Math.random().toString(36).substr(2, 9);
+					const { svg: renderedSvg } = await mermaid.render(id, chart);
+					setSvg(renderedSvg);
+				} catch (error) {
+					console.error('Mermaid rendering error:', error);
+					// Fallback to showing the raw chart text
+					if (ref.current) {
+						ref.current.innerHTML = `<pre style="background: #f5f5f5; padding: 10px; border-radius: 4px;">${chart}</pre>`;
+					}
+				}
+			}
+		};
+
+		renderChart();
+	}, [chart]);
+
+	useEffect(() => {
+		if (svg && ref.current) {
+			ref.current.innerHTML = svg;
+		}
+	}, [svg]);
+
+	return <div ref={ref} style={{textAlign: "center", margin: "20px 0"}} />;
+};
+
+export default Mermaid;
