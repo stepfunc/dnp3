@@ -2,6 +2,8 @@ const path = require('path');
 const samplePlugin = require('./plugins/sample');
 const mermaidPlugin = require('./plugins/mermaid');
 const sitedata = require('./sitedata.json');
+const {themes} = require('prism-react-renderer');
+const vsLight = themes.vsLight;
 
 module.exports = {
   title: `DNP3 ${sitedata.version}`,
@@ -15,7 +17,7 @@ module.exports = {
   projectName: 'dnp3', // Usually your repo name.
   themeConfig: {
     prism: {
-      theme: require('prism-react-renderer/themes/vsLight'),
+      theme: vsLight,
       additionalLanguages: ['rust', 'java', 'csharp', 'cmake'],
     },
     colorMode: {
