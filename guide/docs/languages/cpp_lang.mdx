@@ -18,7 +18,7 @@ B[dnp3.hpp]
 C[dnp3.cpp]
 F[dnp3.o]
 D[dnp3.h]
-E[librodbus_ffi.so]
+E[libdnp3_ffi.so]
 A -- #include --> B
 C -- #include --> B
 C -- #include --> D
@@ -71,7 +71,7 @@ Uncaught exceptions thrown in callbacks will terminate the program. Always wrap 
 
 ### Iterators
 
-Iterators are wrapped in a class for easier manipulation. Iterating on them should done like so:
+Iterators are wrapped in a class for easier manipulation. Iterating on them should be done like so:
 
 ```cpp
 while(iter.next()) {

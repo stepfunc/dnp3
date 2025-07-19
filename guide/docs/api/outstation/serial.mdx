@@ -75,8 +75,8 @@ values={[
 </Tabs>
 
 :::warning
-There is also `Outstation::CreateSerialSession` method which opens the port on the calling thread and fails if it is not immediately available. The task spawned
-by this thread will also shut down of the serial port is removed from the OS, e.g. if a USB to serial adapter is physically unplugged.
+There is also an `Outstation::CreateSerialSession` method which opens the port on the calling thread and fails if it is not immediately available. The task spawned
+by this thread will also shut down if the serial port is removed from the OS, e.g. if a USB to serial adapter is physically unplugged.
 
 The fault-tolerant variant was added in the `1.1.0` release and is the preferred way of spawning a serial outstation. The non-fault tolerant version will be
 removed in the next MAJOR release.
