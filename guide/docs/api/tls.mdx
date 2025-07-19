@@ -75,7 +75,7 @@ TLS configuration is configured using the `TlsClientConfig` or `TlsServerConfig`
 - `private_key_path`:
   * Path to the PEM file containing the encrypted or plaintext private key corresponding to the public key in the presented certificate.
 - `password`:
-  * Password used to decrypt the private key file. This field should be left empty if the file is not encrypted. See the next section for more details.
+  * Password used to decrypt the private key file. If the private key file is not encrypted, pass an empty string (`""`) for this field. Do not use `null` or omit this parameter. This applies to all language bindings (Rust, C, C++, Java, C#). See the next section for more details.
 - `min_tls_version`:
   * Minimum TLS version to support. Setting this to `Tls1_3` will force the usage of TLSv1.3.
 - `certificate_mode`:
