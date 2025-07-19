@@ -1,33 +1,54 @@
-# Website
+# DNP3 Documentation Website
 
-This website is built using [Docusaurus 2](https://v2.docusaurus.io/), a modern static website generator.
+This website is built using [Docusaurus 3](https://docusaurus.io/), a modern static website generator.
+
+## Ubuntu Setup
+
+Install Node.js and npm:
+
+```bash
+# Update package index
+sudo apt update
+
+# Install Node.js v20 (recommended) or v18.19+ (minimum)
+# For Node.js v20 (recommended):
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
+
+# For Node.js v18 (if v20 is not available):
+# curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+# sudo apt install -y nodejs
+
+# Verify installation
+node --version
+npm --version
+
+```
 
 ## Installation
 
+Install the project dependencies:
+
 ```console
-yarn install
+npm install
 ```
 
 ## Local Development
 
+Start the development server:
+
 ```console
-yarn start
+npm run start
 ```
 
-This command starts a local development server and open up a browser window. Most changes are reflected live without having to restart the server.
+This command starts a local development server and opens a browser window. Most changes are reflected live without having to restart the server.
 
 ## Build
 
+Generate static content:
+
 ```console
-yarn build
+npm run build
 ```
 
 This command generates static content into the `build` directory and can be served using any static contents hosting service.
-
-## Deployment
-
-```console
-GIT_USER=<Your GitHub username> USE_SSH=true yarn deploy
-```
-
-If you are using GitHub pages for hosting, this command is a convenient way to build the website and push to the `gh-pages` branch.
