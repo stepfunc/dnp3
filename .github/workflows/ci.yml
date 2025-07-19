@@ -248,11 +248,11 @@ jobs:
         uses: actions/checkout@v4
       - name: Install dependencies
         working-directory: guide
-        run: yarn install
+        run: npm ci
       - name: Build guide
         working-directory: guide
         run: |
-         yarn build
+         npm run build
          mkdir -p ~/doc/guide
          mv build/* ~/doc/guide
       - name: Upload guide
