@@ -37,7 +37,6 @@ object FixedSizeVariationModule extends Module {
       case x : EnumFieldType => x.model.name
       case x : CustomFieldTypeU8 => x.structName
       case TimestampField => "Timestamp"
-      case _ => throw new Exception(s"Unhandled field type: ${f.toString}")
     }
   }
 
@@ -53,7 +52,6 @@ object FixedSizeVariationModule extends Module {
       case EnumFieldType(_) => "u8"
       case CustomFieldTypeU8(_) => "u8"
       case TimestampField => "u48_le"
-      case _ => throw new Exception(s"Unhandled field type: ${f.toString}")
     }
   }
 
