@@ -9,7 +9,7 @@ import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
 You can use the `Database` class to manipulate the measurement types and values that the outstation exposes to the master. Note that while it's called a "database", it's really just
-a in-memory data structure protected by a mutex.
+an in-memory data structure protected by a mutex.
 
 All database operations are executed inside a transaction protected by a mutex. Operations within a transaction are applied to the database and the
 event buffers atomically. If unsolicited responses are enabled, the outstation will automatically decide if an unsolicited response
@@ -17,7 +17,7 @@ should be sent at the end of the transaction.
 
 The database may be accessed in a transaction in two different ways:
 
-1. When measurement values need to updated due to some external changes, the user can call `Outstation.transaction` to acquire
+1. When measurement values need to be updated due to external changes, the user can call `Outstation.transaction` to acquire
 a locked reference to the database and make changes.
 
 2. Callbacks on the `ControlHandler` provide a `DatabaseHandle` which also has an identical `transaction method`. Similarly, the freeze operations on
@@ -161,7 +161,6 @@ The standard predefines a number of attributes belonging to the default set (ind
 will also enforce that only certain variations are writable. Writable variations in the default set are:
 
 * Variation 206 - User-assigned secondary operator name
-* Variation 207 - User-assigned primary operator name
 * Variation 207 - User-assigned primary operator name
 * Variation 244 - User-assigned owner name
 * Variation 245 - User-assigned location

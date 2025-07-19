@@ -16,7 +16,7 @@ status code is returned  for every control in the message. The library actually 
 
 ## Handling SELECT
 
-The `select*` methods of `ControlHandler` are called when a properly formatted `SELECT` messaged is received from the master.  Selecting a control
+The `select*` methods of `ControlHandler` are called when a properly formatted `SELECT` message is received from the master.  Selecting a control
 point should never cause the point to operate.  Instead, think of this request from the master to mean, "Do you support this?"
 
 ```mermaid
@@ -49,7 +49,7 @@ efficient way to update feedback points is to do a single transaction in the `Co
 
 :::note
 The OperateType enum lets you identify which of the three operate function codes invoked the method. You can probably ignore this value. The specification
-requires all three control methodologies be supported and result in the same action.
+requires all three control methodologies to be supported and result in the same action.
 :::
 
 <Tabs
