@@ -83,7 +83,7 @@ Set the number of runtime threads to `0` to default to the number of system core
 
 ## Callbacks
 
-The runtime's thread pool invokes callbacks from the library to user code. If you block during a callback, an entire thread is made unavailable for task execution. If all threads in a thread pool are blocked, no communication sessions will execute until
+The runtime's thread pool invokes callbacks from the library to user code. If you block during a callback, an entire thread is made unavailable for task execution. If all threads are blocked, no communication sessions will execute until
 a thread becomes unblocked.
 
 For example, when you receive a log message via a callback, a synchronous call to write the message to a file will block a thread. If this frequently occurs on all your pool threads, it can cause poor throughput or even task starvation. 
@@ -109,7 +109,7 @@ that permanently blocks, `shutdown` will cause a deadlock.
 If you cannot ensure a clean shutdown, you can use `Runtime.set_shutdown_timeout(..)` to put an upper
 time limit on the eventual shut down. You would call this method immediately after creating the Runtime.
 
-**Shutting down the runtime using a timeout can leak memory as worker threads are be aborted if the timeout occurs. Only
+**Shutting down the runtime using a timeout can leak memory as worker threads will be aborted if the timeout occurs. Only
 use this method if you are exiting the process anyway.**
 :::
 

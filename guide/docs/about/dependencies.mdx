@@ -14,15 +14,15 @@ and libraries tend to have many dependencies.
 Our library only depends directly on a handful of third-party libraries; however, those libraries pull in dozens of their own dependencies. Here's how we manage
 our direct and indirect dependencies.
 
-## Dependency Whitelisting
+## Dependency Allowlisting
 
-We use a dependency whitelist to ensure that we never incorporate dependencies into our builds unless they are manually approved. During each CI build, the following
+We use a dependency allowlist to ensure that we never incorporate dependencies into our builds unless they are manually approved. During each CI build, the following
 checks are performed:
 
-* Check every dependency against the whitelist. Our CI packaging will fail if add a dependency is added with a license that has not been pre-approved.
+* Check every dependency against the allowlist. Our CI packaging will fail if a dependency is added with a license that has not been pre-approved.
 * Produce a license report called `third-party-licenses.txt` that consolidates all the dependency and license information. We include this document in all of
 our binary distributions.
-* Ignore projects that are 100% copyrighted by Step Function I/O, e.g. the library itself and some dependencies we share between with our other protocol libraries.
+* Ignore projects that are 100% copyrighted by Step Function I/O, e.g. the library itself and some dependencies we share with our other protocol libraries.
 
 :::note
 The license report file differs slightly for the Java library as it incorporates some additional components for the JNI functionality.
@@ -32,7 +32,7 @@ The license report file differs slightly for the Java library as it incorporates
 ## Proprietary Compatible
 
 All dependencies of the library have licenses that are both mutually compatible and compatible with commercial/proprietary products. We don't allow the
-incorporation of strong copyleft licenses such as the GPL. You can see a complete list of allowed dependencies and licenses in <a href={`${sitedata.github_url}/blob/${sitedata.version}/dep_config.json`}>deps_config.json</a>.
+incorporation of strong copyleft licenses such as the GPL. You can see a complete list of allowed dependencies and licenses in <a href={`${sitedata.github_url}/blob/${sitedata.version}/allowed.json`}>allowed.json</a>.
 
 ## Disclaimer
 
