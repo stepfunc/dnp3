@@ -2,7 +2,8 @@ package dev.gridio.dnp3.codegen.render.modules
 
 import dev.gridio.dnp3.codegen.model.groups.SpecificAttribute
 import dev.gridio.dnp3.codegen.model.{AnyVariation, FixedSize, GroupType, ObjectGroup, SizedByVariation, Variation}
-import dev.gridio.dnp3.codegen.render._
+import dev.gridio.dnp3.codegen.render.*
+import dev.gridio.dnp3.codegen.render.given_Conversion_String_RenderString
 
 object VariationEnumModule extends Module {
 

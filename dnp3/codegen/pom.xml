@@ -12,11 +12,11 @@
     <description>Code generation for dnp3-rs</description>
 
     <properties>
-        <maven-scala.plugin.version>4.3.1</maven-scala.plugin.version>
+        <maven-scala.plugin.version>4.8.1</maven-scala.plugin.version>
         <maven-source-plugin.version>2.1.2</maven-source-plugin.version>
         <maven-bundle.version>2.1.0</maven-bundle.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <scala.version>2.13.4</scala.version>
+        <scala.version>3.3.1</scala.version>
     </properties>
 
     <licenses>
@@ -107,6 +107,14 @@
                     </execution>
                 </executions>
             </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+                <version>3.5.1</version>
+                <configuration>
+                    <mainClass>dev.gridio.dnp3.codegen.Main</mainClass>
+                </configuration>
+            </plugin>
         </plugins>
 
     </build>
@@ -114,14 +122,14 @@
     <dependencies>
         <dependency>
             <groupId>org.scala-lang</groupId>
-            <artifactId>scala-library</artifactId>
+            <artifactId>scala3-library_3</artifactId>
             <version>${scala.version}</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
             <groupId>org.scalatest</groupId>
-            <artifactId>scalatest_2.13</artifactId>
-            <version>3.1.1</version>
+            <artifactId>scalatest_3</artifactId>
+            <version>3.2.17</version>
             <scope>test</scope>
         </dependency>
     </dependencies>

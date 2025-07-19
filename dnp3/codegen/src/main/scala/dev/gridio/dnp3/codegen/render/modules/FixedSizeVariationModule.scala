@@ -2,7 +2,8 @@ package dev.gridio.dnp3.codegen.render.modules
 
 import dev.gridio.dnp3.codegen.model._
 import dev.gridio.dnp3.codegen.model.groups.{Group12Var1, Group1Var2, Group41Var1, Group41Var2, Group41Var3, Group41Var4}
-import dev.gridio.dnp3.codegen.render._
+import dev.gridio.dnp3.codegen.render.*
+import dev.gridio.dnp3.codegen.render.given_Conversion_String_RenderString
 
 object FixedSizeVariationModule extends Module {
 
@@ -36,7 +37,6 @@ object FixedSizeVariationModule extends Module {
       case x : EnumFieldType => x.model.name
       case x : CustomFieldTypeU8 => x.structName
       case TimestampField => "Timestamp"
-      case _ => throw new Exception(s"Unhandled field type: ${f.toString}")
     }
   }
 
@@ -52,7 +52,6 @@ object FixedSizeVariationModule extends Module {
       case EnumFieldType(_) => "u8"
       case CustomFieldTypeU8(_) => "u8"
       case TimestampField => "u48_le"
-      case _ => throw new Exception(s"Unhandled field type: ${f.toString}")
     }
   }
 

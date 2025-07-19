@@ -2,7 +2,8 @@ package dev.gridio.dnp3.codegen.render.modules
 
 import dev.gridio.dnp3.codegen.model._
 import dev.gridio.dnp3.codegen.model.groups._
-import dev.gridio.dnp3.codegen.render._
+import dev.gridio.dnp3.codegen.render.*
+import dev.gridio.dnp3.codegen.render.given_Conversion_String_RenderString
 
 object PrefixedVariationModule extends Module {
 

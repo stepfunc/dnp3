@@ -1,7 +1,8 @@
 package dev.gridio.dnp3.codegen.render.modules
 
 import dev.gridio.dnp3.codegen.model._
-import dev.gridio.dnp3.codegen.render._
+import dev.gridio.dnp3.codegen.render.*
+import dev.gridio.dnp3.codegen.render.given_Conversion_String_RenderString
 
 object ConversionsModule extends Module {
 
@@ -69,6 +70,7 @@ object ConversionsModule extends Module {
             field.typ match {
               case TimestampField => "self.time.into()"
               case UInt8Field if field.isFlags => "self.get_wire_flags()"
+              case _ => throw new Exception(s"Unhandled field type in binary conversion: ${field.typ}")
             }
           }
 
@@ -119,6 +121,7 @@ object ConversionsModule extends Module {
           field.typ match {
             case TimestampField => "self.time.into()"
             case UInt8Field if field.isFlags => "self.get_wire_flags()"
+            case _ => throw new Exception(s"Unhandled field type in double bit binary conversion: ${field.typ}")
           }
         }
 
@@ -181,6 +184,7 @@ object ConversionsModule extends Module {
             case UInt16Field if field.isValue => "self.value as u16"
             case UInt32Field if field.isValue => "self.value"
             case UInt8Field if field.isFlags => "self.flags.value"
+            case _ => throw new Exception(s"Unhandled field type in counter conversion: ${field.typ}")
           }
         }
 
@@ -266,6 +270,7 @@ object ConversionsModule extends Module {
             case UInt8Field if field.isFlags => "self.flags.value"
             case EnumFieldType(_) => s"self.${field.name}"
             case _ if field.isValue => "self.value"
+            case _ => throw new Exception(s"Unhandled field type in analog conversion: ${field.typ}")
           }
         }
 
@@ -280,6 +285,7 @@ object ConversionsModule extends Module {
              case S16Field => "self.to_i16()"
              case S32Field => "self.to_i32()"
              case Float32Field => "self.to_f32()"
+             case _ => throw new Exception(s"Unhandled value type in analog cast conversion")
            }
         }
 
@@ -289,6 +295,7 @@ object ConversionsModule extends Module {
             case UInt8Field if field.isFlags => "_wire_flags.value"
             case EnumFieldType(_) => s"self.${field.name}"
             case _ if field.isValue => "_wire_value"
+            case _ => throw new Exception(s"Unhandled field type in analog cast conversion: ${field.typ}")
           }
         }
 
