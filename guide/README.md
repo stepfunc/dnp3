@@ -10,9 +10,14 @@ Install Node.js and npm:
 # Update package index
 sudo apt update
 
-# Install Node.js (v18 or later required for Docusaurus 3)
+# Install Node.js v20 (recommended) or v18.19+ (minimum)
+# For Node.js v20 (recommended):
 curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
 sudo apt install -y nodejs
+
+# For Node.js v18 (if v20 is not available):
+# curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+# sudo apt install -y nodejs
 
 # Verify installation
 node --version
