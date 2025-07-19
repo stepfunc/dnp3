@@ -17,7 +17,7 @@ should be sent at the end of the transaction.
 
 The database may be accessed in a transaction in two different ways:
 
-1. When measurement values need to updated due to external changes, the user can call `Outstation.transaction` to acquire
+1. When measurement values need to be updated due to external changes, the user can call `Outstation.transaction` to acquire
 a locked reference to the database and make changes.
 
 2. Callbacks on the `ControlHandler` provide a `DatabaseHandle` which also has an identical `transaction method`. Similarly, the freeze operations on
