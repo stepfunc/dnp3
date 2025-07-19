@@ -2,7 +2,8 @@ package dev.gridio.dnp3.codegen.render.modules
 
 import dev.gridio.dnp3.codegen.model._
 import dev.gridio.dnp3.codegen.model.groups.{Group12Var1, Group1Var2, Group41Var1, Group41Var2, Group41Var3, Group41Var4}
-import dev.gridio.dnp3.codegen.render._
+import dev.gridio.dnp3.codegen.render.*
+import dev.gridio.dnp3.codegen.render.given_Conversion_String_RenderString
 
 object FixedSizeVariationModule extends Module {
 

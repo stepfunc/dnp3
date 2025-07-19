@@ -14,10 +14,7 @@ use scursor::{WriteCursor, WriteError};
 
 /// Field is used in conjunction with the `OpType` field to specify a control operation
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(
-    feature = "serialization",
-    derive(serde::Serialize, serde::Deserialize)
-)]
+#[cfg_attr(feature = "serialization", derive(serde::Serialize, serde::Deserialize))]
 pub enum TripCloseCode {
     ///  not specified (value == 0)
     Nul,
@@ -42,7 +39,7 @@ impl TripCloseCode {
             _ => TripCloseCode::Unknown(x),
         }
     }
-
+    
     /// convert the enum to its underlying value
     pub fn as_u8(self) -> u8 {
         match self {
@@ -57,10 +54,7 @@ impl TripCloseCode {
 
 /// Field used in conjunction with the `TCC` field to specify a control operation
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(
-    feature = "serialization",
-    derive(serde::Serialize, serde::Deserialize)
-)]
+#[cfg_attr(feature = "serialization", derive(serde::Serialize, serde::Deserialize))]
 pub enum OpType {
     ///  not specified (value == 0)
     Nul,
@@ -88,7 +82,7 @@ impl OpType {
             _ => OpType::Unknown(x),
         }
     }
-
+    
     /// convert the enum to its underlying value
     pub fn as_u8(self) -> u8 {
         match self {
@@ -104,10 +98,7 @@ impl OpType {
 
 /// Enumeration received from an outstation in response to command request
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(
-    feature = "serialization",
-    derive(serde::Serialize, serde::Deserialize)
-)]
+#[cfg_attr(feature = "serialization", derive(serde::Serialize, serde::Deserialize))]
 pub enum CommandStatus {
     ///  command was accepted, initiated, or queued (value == 0)
     Success,
@@ -180,7 +171,7 @@ impl CommandStatus {
             _ => CommandStatus::Unknown(x),
         }
     }
-
+    
     /// convert the enum to its underlying value
     pub fn as_u8(self) -> u8 {
         match self {
@@ -207,8 +198,9 @@ impl CommandStatus {
             CommandStatus::Unknown(x) => x,
         }
     }
-
+    
     pub(crate) fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.as_u8())
     }
 }
+
