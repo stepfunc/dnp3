@@ -80,6 +80,44 @@ module.exports = {
       ],
       copyright: `Copyright © ${new Date().getFullYear()} Step Function I/O LLC`,
     },
+    mermaid: {
+      theme: {
+        light: 'base',
+        dark: 'dark',
+      },
+      options: {
+        themeVariables: {
+          // Primary colors matching the guide
+          primaryColor: '#e4f3ff',
+          primaryTextColor: '#004e98',
+          primaryBorderColor: '#004e98',
+          
+          // Line and edge colors
+          lineColor: '#0056a7',
+          
+          // Background colors
+          background: '#ffffff',
+          mainBkg: '#e4f3ff',
+          secondBkg: '#f5f6f7',
+          
+          // Font
+          fontFamily: 'system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, sans-serif',
+          fontSize: '14px',
+          
+          // Flowchart specific
+          nodeBkg: '#e4f3ff',
+          nodeTextColor: '#004e98',
+          edgeLabelBackground: '#ffffff',
+          
+          // Sequence diagram specific
+          actorBkg: '#e4f3ff',
+          actorBorder: '#004e98',
+          actorTextColor: '#004e98',
+          signalColor: '#004e98',
+          signalTextColor: '#004e98',
+        },
+      },
+    },
   },
   presets: [
     [
