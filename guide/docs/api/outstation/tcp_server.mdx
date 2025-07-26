@@ -145,9 +145,9 @@ The examples above use `AddressFilter.any()` which allows any master IP to conne
 
 ```mermaid
 graph LR
-A[Master] --> B[TCP Server ]
+A[Master] --> B[TCP Server]
 subgraph Application
-B --*.*.*.*--> c[Outstation]
+B -->|\*.\*.\*.\*| c[Outstation]
 end
 ```
 

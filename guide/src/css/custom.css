@@ -48,3 +48,87 @@
   font-size: 14px;
   opacity: 0.5;
 }
+
+/* Mermaid diagram theming to match the guide colors */
+:root {
+  --mermaid-primary: #004e98;
+  --mermaid-primary-dark: #004689;
+  --mermaid-primary-darker: #004281;
+  --mermaid-primary-darkest: #00376a;
+  --mermaid-primary-light: #0056a7;
+  --mermaid-primary-lighter: #005aaf;
+  --mermaid-primary-lightest: #0065c6;
+  --mermaid-background: #f5f6f7;
+  --mermaid-node-background: #e4f3ff;
+  --mermaid-node-border: #004e98;
+  --mermaid-text: #2c3e50;
+  --mermaid-link: #0056a7;
+}
+
+/* Override Mermaid default theme */
+.mermaid {
+  background-color: transparent;
+}
+
+/* Graph nodes */
+.mermaid .node rect,
+.mermaid .node circle,
+.mermaid .node ellipse,
+.mermaid .node polygon {
+  fill: var(--mermaid-node-background) !important;
+  stroke: var(--mermaid-node-border) !important;
+  stroke-width: 2px !important;
+}
+
+/* Node text */
+.mermaid .node .label {
+  color: var(--mermaid-primary) !important;
+  fill: var(--mermaid-primary) !important;
+}
+
+/* Graph edges/lines */
+.mermaid .edgePath .path {
+  stroke: var(--mermaid-link) !important;
+  stroke-width: 2px !important;
+}
+
+/* Arrow markers */
+.mermaid .edgePath marker path {
+  fill: var(--mermaid-link) !important;
+  stroke: var(--mermaid-link) !important;
+}
+
+/* Edge labels */
+.mermaid .edgeLabel {
+  background-color: white !important;
+  color: var(--mermaid-text) !important;
+}
+
+.mermaid .edgeLabel rect {
+  fill: white !important;
+  stroke: none !important;
+}
+
+/* Sequence diagram specific */
+.mermaid .actor {
+  fill: var(--mermaid-node-background) !important;
+  stroke: var(--mermaid-node-border) !important;
+}
+
+.mermaid .actor-line {
+  stroke: var(--mermaid-primary-light) !important;
+}
+
+.mermaid .messageLine0,
+.mermaid .messageLine1 {
+  stroke: var(--mermaid-link) !important;
+}
+
+.mermaid .messageText {
+  fill: var(--mermaid-text) !important;
+}
+
+/* Flowchart specific */
+.mermaid .flowchart-link {
+  stroke: var(--mermaid-link) !important;
+}
