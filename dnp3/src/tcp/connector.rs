@@ -77,7 +77,7 @@ impl ConnectionInfo {
     }
 }
 
-/// Gives the user fine-grained control over how TCP and TLS clients connect to endpoints
+/// Provides fine-grained control over how TCP and TLS clients connect to endpoints
 pub trait ClientConnectionHandler: Send {
     /// When a client communication session is first created, this function is called once
     /// to generate a string used in a `tracing::span`, e.g.:
