@@ -13,7 +13,10 @@ use crate::outstation::{
 };
 use crate::tcp::client::ClientTask;
 use crate::tcp::tls::{CertificateMode, MinTlsVersion, TlsClientConfig, TlsError};
-use crate::tcp::{ClientState, ConnectOptions, EndpointList, PostConnectionHandler};
+use crate::tcp::{
+    ClientConnectionHandler, ClientState, ConnectOptions, EndpointList, PostConnectionHandler,
+    SimpleConnectHandler,
+};
 use crate::util::phys::{PhysAddr, PhysLayer};
 use crate::util::session::{Enabled, Session};
 use tokio::net::TcpStream;
@@ -40,7 +43,39 @@ pub fn spawn_outstation_tls_client(
     listener: Box<dyn Listener<ClientState>>,
     tls_config: TlsClientConfig,
 ) -> OutstationHandle {
-    let main_addr = endpoints.main_addr().to_string();
+    let connect_handler =
+        SimpleConnectHandler::create(endpoints, connect_options, connect_strategy);
+    spawn_outstation_tls_client_2(
+        link_error_mode,
+        config,
+        connect_handler,
+        application,
+        information,
+        control_handler,
+        listener,
+        tls_config,
+    )
+}
+
+/// Spawn a TLS client task onto the `Tokio` runtime. The task runs until the returned handle is dropped.
+///
+/// This function is similar to [`spawn_outstation_tls_client`] but provides fine-grained control over
+/// connection management via a user implementation of the [`ClientConnectionHandler`] trait.
+///
+/// **Note**: This function may only be called from within the runtime itself, and panics otherwise.
+/// Use Runtime::enter() if required.
+#[allow(clippy::too_many_arguments)]
+pub fn spawn_outstation_tls_client_2(
+    link_error_mode: LinkErrorMode,
+    config: OutstationConfig,
+    connect_handler: Box<dyn ClientConnectionHandler>,
+    application: Box<dyn OutstationApplication>,
+    information: Box<dyn OutstationInformation>,
+    control_handler: Box<dyn ControlHandler>,
+    listener: Box<dyn Listener<ClientState>>,
+    tls_config: TlsClientConfig,
+) -> OutstationHandle {
+    let name = connect_handler.endpoint_span_name();
     let (task, handle) = OutstationTask::create(
         Enabled::No,
         LinkModes::stream(link_error_mode),
@@ -54,9 +89,7 @@ pub fn spawn_outstation_tls_client(
     let session = Session::outstation(task);
     let mut client = ClientTask::new(
         session,
-        endpoints,
-        connect_strategy,
-        connect_options,
+        connect_handler,
         PostConnectionHandler::Tls(tls_config),
         listener,
     );
@@ -64,7 +97,7 @@ pub fn spawn_outstation_tls_client(
     let future = async move {
         client
             .run()
-            .instrument(tracing::info_span!("dnp3-outstation-tls-client", "endpoint" = ?main_addr))
+            .instrument(tracing::info_span!("dnp3-outstation-tls-client", "endpoint" = ?name))
             .await;
     };
     tokio::spawn(future);

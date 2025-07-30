@@ -1,4 +1,5 @@
 pub use connect::*;
+pub use connector::*;
 pub use endpoint_list::*;
 pub use master::*;
 pub use no_delay::*;
@@ -10,6 +11,7 @@ pub use server_handle::*;
 pub mod tls;
 
 mod connect;
+mod connector;
 mod endpoint_list;
 mod master;
 mod no_delay;

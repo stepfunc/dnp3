@@ -193,8 +193,8 @@ pub trait OutstationApplication: Sync + Send + 'static {
         MaybeAsync::ready(())
     }
 
-    /// Called in response to a WRITE request containing a group 0 object for purposes of storing
-    /// the value in non-volatile memory. The attribute is automatically updated updated in the
+    /// Called in response to a WRITE request containing a group 0 object to store
+    /// the value in non-volatile memory. The attribute is automatically updated in the
     /// in-memory database.
     ///
     /// This callback is only invoked for attributes that have been defined as write-able in the
@@ -235,7 +235,7 @@ pub enum BroadcastAction {
     IgnoredByConfiguration,
     /// Outstation was unable to parse the object headers and ignored the request
     BadObjectHeaders,
-    /// Outstation ignore the broadcast message b/c the function is not supported via Broadcast
+    /// Outstation ignored the broadcast message b/c the function is not supported via Broadcast
     UnsupportedFunction(FunctionCode),
 }
 
@@ -282,8 +282,8 @@ pub enum OperateType {
 
 /// select, operate, direct operate, or direct operate no-ack a control point
 pub trait ControlSupport<T> {
-    /// Select a control point, but do not operate. Implementors can think of
-    /// this function ask the question "is this control supported"?
+    /// Select a control point but do not operate. Implementors can think of
+    /// this function asking "is this control supported"?
     ///
     /// Most implementations should not alter the database in this method. It
     /// is only provided in the event that some event counters reflected via the API

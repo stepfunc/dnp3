@@ -13,6 +13,7 @@ mod outstation;
 mod shared;
 mod tcp;
 mod variation;
+mod client_connection_handler;
 
 pub(crate) fn gv(g: u8, v: u8) -> String {
     format!("group{g}_var{v}")
