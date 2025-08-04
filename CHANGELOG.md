@@ -1,4 +1,14 @@
 
+### 1.7.0-M1 ###
+* :star: Add outstation ConnectionManager with fine-grained connection control for TCP and TLS clients. See [#381](https://github.com/stepfunc/dnp3/pull/381).
+  * New Rust API: `spawn_outstation_tcp_client_2()` and `spawn_outstation_tls_client_2()` functions with `ClientConnectionHandler` trait
+  * New FFI API: `outstation_create_tcp_client_with_handler()` and `outstation_create_tls_client_with_handler()` functions
+  * Provides dynamic endpoint selection, custom retry logic, connection lifecycle notifications, and DNS resolution handling
+* :star: Add optional support for parsing and transmission of zero-length octet strings via global setting. See [#379](https://github.com/stepfunc/dnp3/pull/379).
+* :star: Add optional support for AWS libcrypto (aws-lc-rs) as TLS backend. See [#378](https://github.com/stepfunc/dnp3/pull/378).
+* :wrench: Better CLI examples with improved organization and documentation. See [#375](https://github.com/stepfunc/dnp3/pull/375).
+* :book: Update TLS documentation to clarify empty string behavior for certificate passwords and improve grammar. See [#389](https://github.com/stepfunc/dnp3/pull/389).
+
 ### 1.6.0 ###
 * :star: Add master station support for writing files to the outstation. See [#338](https://github.com/stepfunc/dnp3/pull/338).
 * :star: Add master station support for command events (groups 13 and 43). See [#332](https://github.com/stepfunc/dnp3/pull/332).
