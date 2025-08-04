@@ -399,6 +399,63 @@ fn define_outstation(
         .fails_with(shared.error_type.clone())?
         .doc(doc("Create an outstation instance running as a TLS client"))?
         .build_static("create_tls_client")?;
+    let outstation_create_tls_client_with_handler_fn = lib
+        .define_function("outstation_create_tls_client_with_handler")?
+        .param(
+            "runtime",
+            shared.runtime_class.clone(),
+            "runtime on which to spawn the outstation",
+        )?
+        .param(
+            "link_error_mode",
+            shared.link_error_mode.clone(),
+            "Controls how link errors are handled with respect to the TCP session",
+        )?
+        .param(
+            "span_name",
+            StringType,
+            "Span name used for tracing the connection",
+        )?
+        .param(
+            "config",
+            types.outstation_config.clone(),
+            "outstation configuration",
+        )?
+        .param(
+            "application",
+            types.outstation_application.clone(),
+            "application interface",
+        )?
+        .param(
+            "information",
+            types.outstation_information.clone(),
+            "informational events interface",
+        )?
+        .param(
+            "control_handler",
+            types.control_handler.clone(),
+            "control handler interface",
+        )?
+        .param(
+            "listener",
+            shared.client_state_listener.clone(),
+            "Connection listener used to receive updates on the status of the connection",
+        )?
+        .param(
+            "connection_handler",
+            types.client_connection_handler.clone(),
+            "Connection handler providing fine-grained control over connection management",
+        )?
+        .param(
+            "tls_config",
+            shared.tls_client_config.clone(),
+            "TLS client configuration",
+        )?
+        .returns(outstation.clone(), "Outstation instance")?
+        .fails_with(shared.error_type.clone())?
+        .doc(doc("Create an outstation instance running as a TLS client with fine-grained connection management")
+            .details("This function provides fine-grained control over connection management via a user implementation of the ClientConnectionHandler interface."))?
+        .build_static("create_tls_client_with_handler")?;
 
     let outstation_create_serial_session_fn = lib
         .define_function("outstation_create_serial_session")?
@@ -620,6 +677,7 @@ fn define_outstation(
         .static_method(outstation_create_tcp_client_fn)?
         .static_method(outstation_create_tcp_client_with_handler_fn)?
         .static_method(outstation_create_tls_client_fn)?
+        .static_method(outstation_create_tls_client_with_handler_fn)?
         .static_method(outstation_create_udp)?
         .method(enable)?
         .method(disable)?

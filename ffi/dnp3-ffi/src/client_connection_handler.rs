@@ -32,7 +32,9 @@ pub(crate) unsafe fn next_endpoint_action_connect_to(
     let action = match instance.as_mut() {
         Some(x) => x,
         None => {
-            tracing::warn!("next_endpoint_action_connect_to called with null NextEndpointAction instance");
+            tracing::warn!(
+                "next_endpoint_action_connect_to called with null NextEndpointAction instance"
+            );
             return ParamError::NullParameter;
         }
     };
@@ -46,7 +48,9 @@ pub(crate) unsafe fn next_endpoint_action_connect_to(
             s.to_string()
         }
         Err(_) => {
-            tracing::warn!("next_endpoint_action_connect_to called with invalid UTF-8 endpoint string");
+            tracing::warn!(
+                "next_endpoint_action_connect_to called with invalid UTF-8 endpoint string"
+            );
             return ParamError::InvalidSocketAddress;
         }
     };
@@ -91,7 +95,9 @@ pub(crate) unsafe fn next_endpoint_action_sleep_for(
     let action = match instance.as_mut() {
         Some(x) => x,
         None => {
-            tracing::warn!("next_endpoint_action_sleep_for called with null NextEndpointAction instance");
+            tracing::warn!(
+                "next_endpoint_action_sleep_for called with null NextEndpointAction instance"
+            );
             return ParamError::NullParameter;
         }
     };
