@@ -15,7 +15,42 @@ pub(crate) fn define(
             "Provides fine-grained control over how TCP and TLS clients connect to endpoints"
         )?
         .begin_callback(
-            "next", 
+            "disconnected",
+            "Notification that a previously successful connection failed. The task will sleep for the specified duration before attempting another connection"
+        )?
+        .param("addr", StringType, "Socket address that was disconnected")?
+        .param("hostname", StringType, "Optional hostname (empty string if none)")?
+        .returns(DurationType::Milliseconds, "Amount of time to sleep before attempting to reconnect")?
+        .end_callback()?
+        .begin_callback(
+            "connecting",
+            "Notification that a connection attempt is being made"
+        )?
+        .param("addr", StringType, "Socket address being connected to")?
+        .param("hostname", StringType, "Optional hostname (empty string if none)")?
+        .end_callback()?
+        .begin_callback(
+            "connect_failed",
+            "Notification that connection operation failed"
+        )?
+        .param("addr", StringType, "Socket address that failed to connect")?
+        .param("hostname", StringType, "Optional hostname (empty string if none)")?
+        .end_callback()?
+        .begin_callback(
+            "connected",
+            "Notification that a connection attempt succeeded"
+        )?
+        .param("addr", StringType, "Socket address that connected successfully")?
+        .param("hostname", StringType, "Optional hostname (empty string if none)")?
+        .end_callback()?
+        .begin_callback(
+            "resolution_failed",
+            "Notification that DNS resolution failed"
+        )?
+        .param("hostname", StringType, "Hostname that failed to resolve")?
+        .end_callback()?
+        .begin_callback(
+            "next",
             "Called to get the next endpoint to connect to or to sleep for a duration. Use the provided action object to specify the response."
         )?
         .param("action", next_endpoint_action.declaration(), "Action object to specify next endpoint or sleep duration")?
