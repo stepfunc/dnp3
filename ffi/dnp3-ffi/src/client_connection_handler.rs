@@ -31,12 +31,24 @@ pub(crate) unsafe fn next_endpoint_action_connect_to(
 ) -> ParamError {
     let action = match instance.as_mut() {
         Some(x) => x,
-        None => return ParamError::NullParameter,
+        None => {
+            tracing::warn!("next_endpoint_action_connect_to called with null NextEndpointAction instance");
+            return ParamError::NullParameter;
+        }
     };
 
     let endpoint_str = match endpoint.to_str() {
-        Ok(s) => s.to_string(),
-        Err(_) => return ParamError::InvalidSocketAddress,
+        Ok(s) => {
+            if s.is_empty() {
+                tracing::warn!("next_endpoint_action_connect_to called with empty endpoint string");
+                return ParamError::InvalidSocketAddress;
+            }
+            s.to_string()
+        }
+        Err(_) => {
+            tracing::warn!("next_endpoint_action_connect_to called with invalid UTF-8 endpoint string");
+            return ParamError::InvalidSocketAddress;
+        }
     };
 
     let timeout = if timeout_ms.is_zero() {
@@ -51,9 +63,15 @@ pub(crate) unsafe fn next_endpoint_action_connect_to(
         match local_endpoint.to_str() {
             Ok(s) => match SocketAddr::from_str(s) {
                 Ok(addr) => Some(addr),
-                Err(_) => return ParamError::InvalidSocketAddress,
+                Err(_) => {
+                    tracing::warn!("next_endpoint_action_connect_to called with invalid local endpoint address: {}", s);
+                    return ParamError::InvalidSocketAddress;
+                }
             },
-            Err(_) => return ParamError::InvalidSocketAddress,
+            Err(_) => {
+                tracing::warn!("next_endpoint_action_connect_to called with invalid UTF-8 local endpoint string");
+                return ParamError::InvalidSocketAddress;
+            }
         }
     };
 
@@ -72,8 +90,15 @@ pub(crate) unsafe fn next_endpoint_action_sleep_for(
 ) -> ParamError {
     let action = match instance.as_mut() {
         Some(x) => x,
-        None => return ParamError::NullParameter,
+        None => {
+            tracing::warn!("next_endpoint_action_sleep_for called with null NextEndpointAction instance");
+            return ParamError::NullParameter;
+        }
     };
+
+    if duration.is_zero() {
+        tracing::warn!("next_endpoint_action_sleep_for called with zero duration");
+    }
 
     action.action = Some(NextEndpointActionType::SleepFor(duration));
     ParamError::Ok
