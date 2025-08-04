@@ -353,6 +353,96 @@ void run_tcp_client(dnp3::Runtime &runtime)
         client_state_listener([](ClientState state) { std::cout << "ClientState: " << to_string(state) << std::endl; })
     );
 
+    // Enable the outstation to start connecting
+    outstation.enable();
+    run_outstation(outstation);
+}
+
+class MyConnectionHandler : public ClientConnectionHandler {
+private:
+    std::vector<std::string> endpoints;
+    size_t current_endpoint;
+    int connection_attempts;
+    bool cycle_completed;
+
+public:
+    MyConnectionHandler() : current_endpoint(0), connection_attempts(0), cycle_completed(false) {
+        endpoints.push_back("127.0.0.1:20000");
+        endpoints.push_back("127.0.0.1:20001");
+        endpoints.push_back("127.0.0.1:20002");
+    }
+
+    void next(NextEndpointAction& action) override {
+        // If we just completed a full cycle, add a delay before starting the next one
+        if (cycle_completed) {
+            std::cout << "ConnectionManager: Completed cycle through all endpoints, waiting 5 seconds before next round" << std::endl;
+            action.sleep_for(std::chrono::seconds(5));
+            cycle_completed = false;
+            return;
+        }
+
+        std::string endpoint = endpoints[current_endpoint];
+        std::cout << "ConnectionManager: Attempting to connect to " << endpoint << " (endpoint "
+                  << (current_endpoint + 1) << " of " << endpoints.size() << ")" << std::endl;
+        // Connect with 10 second timeout
+        action.connect_to(endpoint, std::chrono::milliseconds(10000), "");
+
+        // Cycle through endpoints for round-robin behavior
+        current_endpoint = (current_endpoint + 1) % endpoints.size();
+
+        // If we just wrapped around to 0, we completed a cycle
+        if (current_endpoint == 0) {
+            cycle_completed = true;
+        }
+    }
+
+    std::chrono::steady_clock::duration disconnected(const char* addr, const char* hostname) override {
+        connection_attempts++;
+        auto delay_seconds = std::min(30, 1 << std::min(connection_attempts - 1, 5)); // Cap at 32 seconds
+        std::cout << "ConnectionManager: Disconnected from " << addr
+                  << ", reconnecting in " << delay_seconds << " seconds (attempt "
+                  << connection_attempts << ")" << std::endl;
+        return std::chrono::seconds(delay_seconds);
+    }
+
+    void connecting(const char* addr, const char* hostname) override {
+        std::cout << "ConnectionManager: Connecting to " << addr << std::endl;
+    }
+
+    void connected(const char* addr, const char* hostname) override {
+        connection_attempts = 0; // Reset on successful connection
+        std::cout << "ConnectionManager: Connected to " << addr << std::endl;
+    }
+
+    void connect_failed(const char* addr, const char* hostname) override {
+        std::cout << "ConnectionManager: Connection failed to " << addr << std::endl;
+    }
+
+    void resolution_failed(const char* hostname) override {
+        std::cout << "ConnectionManager: DNS resolution failed for " << hostname << std::endl;
+    }
+};
+
+void run_tcp_client_with_connection_manager(dnp3::Runtime &runtime)
+{
+    // Create outstation with connection manager
+    auto outstation = Outstation::create_tcp_client_with_handler(
+        runtime,
+        LinkErrorMode::discard,
+        "custom-outstation", // span name for tracing
+        get_outstation_config(),
+        std::make_unique<MyOutstationApplication>(),
+        std::make_unique<MyOutstationInformation>(),
+        std::make_unique<MyControlHandler>(),
+        client_state_listener([](ClientState state) {
+            std::cout << "ClientState: " << to_string(state) << std::endl;
+        }),
+        std::make_unique<MyConnectionHandler>()
+    );
+
+    std::cout << "Outstation started with ConnectionManager - will try multiple endpoints with exponential backoff" << std::endl;
+    // Enable the outstation to start connecting
+    outstation.enable();
     run_outstation(outstation);
 }
 
@@ -450,7 +540,7 @@ int main(int argc, char *argv[])
 
     if (argc != 2) {
         std::cout << "you must specify a transport type" << std::endl;
-        std::cout << "usage: cpp-outstation-example <channel> (tcp, serial, tls-ca, tls-self-signed)" << std::endl;
+        std::cout << "usage: cpp-outstation-example <channel> (tcp, tcp-client, tcp-client-manager, serial, udp, tls-ca, tls-self-signed)" << std::endl;
         return -1;
     }
 
@@ -461,6 +551,9 @@ int main(int argc, char *argv[])
     }
     else if (strcmp(type, "tcp-client") == 0) {
         run_tcp_client(runtime);
+    }
+    else if (strcmp(type, "tcp-client-manager") == 0) {
+        run_tcp_client_with_connection_manager(runtime);
     }
     else if (strcmp(type, "udp") == 0) {
         run_udp(runtime);
