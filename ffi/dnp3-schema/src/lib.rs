@@ -4,6 +4,7 @@ use oo_bindgen::model::*;
 
 mod app_options;
 pub(crate) mod attributes;
+mod client_connection_handler;
 mod constants;
 mod database;
 mod decoding;

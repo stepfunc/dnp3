@@ -7,12 +7,12 @@ use crate::link::LinkErrorMode;
 use crate::master::task::MasterTask;
 use crate::master::{MasterChannel, MasterChannelConfig, MasterChannelType};
 use crate::tcp::client::ClientTask;
-use crate::tcp::EndpointList;
+use crate::tcp::{ClientConnectionHandler, EndpointList, SimpleConnectHandler};
 use crate::tcp::{ClientState, ConnectOptions, PostConnectionHandler};
 use crate::util::session::{Enabled, Session};
 
 /// Spawn a task onto the `Tokio` runtime. The task runs until the returned handle, and any
-/// `AssociationHandle` created from it, are dropped.
+/// `AssociationHandle` created from it is dropped.
 ///
 /// **Note**: This function may only be called from within the runtime itself, and panics otherwise.
 /// Use Runtime::enter() if required.
@@ -43,36 +43,45 @@ pub fn spawn_master_tcp_client_2(
     connect_options: ConnectOptions,
     listener: Box<dyn Listener<ClientState>>,
 ) -> MasterChannel {
-    let main_addr = endpoints.main_addr().to_string();
+    let connect_handler =
+        SimpleConnectHandler::create(endpoints, connect_options, connect_strategy);
+    spawn_master_tcp_client_3(link_error_mode, config, connect_handler, listener)
+}
+
+/// Just like [spawn_master_tcp_client_2], but this variant provides fine-grained
+/// control over the connection management using a user-defined implementation
+/// of [`ClientConnectionHandler`]
+pub fn spawn_master_tcp_client_3(
+    link_error_mode: LinkErrorMode,
+    config: MasterChannelConfig,
+    connection_handler: Box<dyn ClientConnectionHandler>,
+    listener: Box<dyn Listener<ClientState>>,
+) -> MasterChannel {
+    let name = connection_handler.endpoint_span_name();
     let (mut task, handle) = wire_master_client(
         LinkModes::stream(link_error_mode),
         ParseOptions::get_static(),
         MasterChannelType::Stream,
-        endpoints,
+        connection_handler,
         config,
-        connect_strategy,
-        connect_options,
         PostConnectionHandler::Tcp,
         listener,
     );
     let future = async move {
         task.run()
-            .instrument(tracing::info_span!("dnp3-master-tcp-client", "endpoint" = ?main_addr))
+            .instrument(tracing::info_span!("dnp3-master-tcp-client", "endpoint" = ?name))
             .await;
     };
     tokio::spawn(future);
     handle
 }
 
-#[allow(clippy::too_many_arguments)]
 pub(crate) fn wire_master_client(
     link_modes: LinkModes,
     parse_options: ParseOptions,
     channel_type: MasterChannelType,
-    endpoints: EndpointList,
+    connect_handler: Box<dyn ClientConnectionHandler>,
     config: MasterChannelConfig,
-    connect_strategy: ConnectStrategy,
-    connect_options: ConnectOptions,
     connection_handler: PostConnectionHandler,
     listener: Box<dyn Listener<ClientState>>,
 ) -> (ClientTask, MasterChannel) {
@@ -84,13 +93,6 @@ pub(crate) fn wire_master_client(
         config,
         rx,
     ));
-    let client = ClientTask::new(
-        session,
-        endpoints,
-        connect_strategy,
-        connect_options,
-        connection_handler,
-        listener,
-    );
+    let client = ClientTask::new(session, connect_handler, connection_handler, listener);
     (client, MasterChannel::new(tx, channel_type))
 }

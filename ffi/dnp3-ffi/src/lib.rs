@@ -9,6 +9,7 @@ pub(crate) use app_options::*;
 /// these use statements allow the code in the FFI to not have to known the real locations
 /// but instead just use `crate::<name>` when invoking an implementation
 pub use bytes::*;
+pub use client_connection_handler::*;
 pub use command::*;
 pub use connect::*;
 pub use handler::*;
@@ -22,6 +23,7 @@ pub use write_dead_band_request::*;
 pub(crate) mod attr;
 
 mod bytes;
+mod client_connection_handler;
 mod command;
 mod connect;
 mod decoding;

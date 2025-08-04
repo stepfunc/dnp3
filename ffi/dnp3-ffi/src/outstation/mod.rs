@@ -10,6 +10,7 @@ use dnp3::outstation::{ConnectionState, Feature, Features, OutstationConfig, Out
 use dnp3::tcp::{FilterError, ServerHandle};
 pub use struct_constructors::*;
 
+use crate::client_connection_handler::ClientConnectionHandlerAdapter;
 use crate::{ffi, Runtime, RuntimeHandle};
 
 #[cfg(feature = "enable-tls")]
@@ -239,6 +240,48 @@ pub(crate) unsafe fn outstation_create_tcp_client(
     Ok(Box::into_raw(handle))
 }
 
+#[allow(clippy::too_many_arguments)]
+pub unsafe fn outstation_create_tcp_client_with_handler(
+    runtime: *mut crate::Runtime,
+    link_error_mode: ffi::LinkErrorMode,
+    span_name: &CStr,
+    config: ffi::OutstationConfig,
+    application: ffi::OutstationApplication,
+    information: ffi::OutstationInformation,
+    control_handler: ffi::ControlHandler,
+    listener: ffi::ClientStateListener,
+    connection_handler: ffi::ClientConnectionHandler,
+) -> Result<*mut crate::Outstation, ffi::ParamError> {
+    let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
+    let span_name = span_name
+        .to_str()
+        .map_err(|_| ffi::ParamError::InvalidSocketAddress)?;
+
+    let config = convert_outstation_config(config)?;
+
+    // Create a wrapper connection handler that implements the Rust trait
+    let connection_handler =
+        ClientConnectionHandlerAdapter::new(connection_handler, span_name.to_string());
+
+    let _enter = runtime.enter();
+    let handle = dnp3::tcp::spawn_outstation_tcp_client_2(
+        link_error_mode.into(),
+        config,
+        Box::new(connection_handler),
+        Box::new(application),
+        Box::new(information),
+        Box::new(control_handler),
+        Box::new(listener),
+    );
+
+    let handle = Box::new(crate::Outstation {
+        handle,
+        runtime: runtime.handle(),
+    });
+
+    Ok(Box::into_raw(handle))
+}
+
 #[cfg(not(feature = "enable-tls"))]
 #[allow(clippy::too_many_arguments)] // TODO
 pub(crate) unsafe fn outstation_create_tls_client(
@@ -289,6 +332,69 @@ pub(crate) unsafe fn outstation_create_tls_client(
         connect_strategy.into(),
         connect_options,
         config,
+        Box::new(application),
+        Box::new(information),
+        Box::new(control_handler),
+        Box::new(listener),
+        tls_config,
+    );
+
+    let handle = Box::new(crate::Outstation {
+        handle,
+        runtime: runtime.handle(),
+    });
+
+    Ok(Box::into_raw(handle))
+}
+
+#[cfg(not(feature = "enable-tls"))]
+#[allow(clippy::too_many_arguments)]
+pub unsafe fn outstation_create_tls_client_with_handler(
+    _runtime: *mut crate::Runtime,
+    _link_error_mode: ffi::LinkErrorMode,
+    _span_name: &CStr,
+    _config: ffi::OutstationConfig,
+    _application: ffi::OutstationApplication,
+    _information: ffi::OutstationInformation,
+    _control_handler: ffi::ControlHandler,
+    _listener: ffi::ClientStateListener,
+    _connection_handler: ffi::ClientConnectionHandler,
+    _tls_config: ffi::TlsClientConfig,
+) -> Result<*mut crate::Outstation, ffi::ParamError> {
+    Err(ffi::ParamError::NoSupport)
+}
+
+#[cfg(feature = "enable-tls")]
+#[allow(clippy::too_many_arguments)]
+pub unsafe fn outstation_create_tls_client_with_handler(
+    runtime: *mut crate::Runtime,
+    link_error_mode: ffi::LinkErrorMode,
+    span_name: &CStr,
+    config: ffi::OutstationConfig,
+    application: ffi::OutstationApplication,
+    information: ffi::OutstationInformation,
+    control_handler: ffi::ControlHandler,
+    listener: ffi::ClientStateListener,
+    connection_handler: ffi::ClientConnectionHandler,
+    tls_config: ffi::TlsClientConfig,
+) -> Result<*mut crate::Outstation, ffi::ParamError> {
+    let runtime = runtime.as_ref().ok_or(ffi::ParamError::NullParameter)?;
+    let span_name = span_name
+        .to_str()
+        .map_err(|_| ffi::ParamError::InvalidSocketAddress)?;
+
+    let config = convert_outstation_config(config)?;
+    let tls_config = tls_config.try_into()?;
+
+    // Create a wrapper connection handler that implements the Rust trait
+    let connection_handler =
+        ClientConnectionHandlerAdapter::new(connection_handler, span_name.to_string());
+
+    let _enter = runtime.enter();
+    let handle = dnp3::tcp::tls::spawn_outstation_tls_client_2(
+        link_error_mode.into(),
+        config,
+        Box::new(connection_handler),
         Box::new(application),
         Box::new(information),
         Box::new(control_handler),

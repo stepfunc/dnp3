@@ -227,7 +227,7 @@ jobs:
       - name: Install Rust Cross
         run: cargo install cross
       - name: Create FFI modules dir
-        run: mkdir -p ffi-modules/${{ matrix.target }}
+        run: mkdir -p ffi-modules/${{ matrix.cases.target }}
       - name: Build FFI
         run: cross build -p dnp3-ffi --release --target ${{ matrix.cases.target }} --no-default-features --features serial,${{ matrix.cases.features }}
       - name: Build JNI
