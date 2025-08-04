@@ -56,7 +56,6 @@ pub(crate) struct SharedDefinitions {
     pub nothing: EnumHandle,
     pub udp_socket_mode: EnumHandle,
     pub link_read_mode: EnumHandle,
-    pub client_connection_handler: AsynchronousInterface,
 }
 
 pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> {
@@ -317,8 +316,6 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> 
 
     let byte_collection = lib.define_collection("byte_collection", Primitive::U8, true)?;
 
-    let client_connection_handler = crate::client_connection_handler::define(lib)?;
-
     Ok(SharedDefinitions {
         command_status,
         error_type,
@@ -370,7 +367,6 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> 
         byte_collection,
         udp_socket_mode: define_udp_socket_mode(lib)?,
         link_read_mode: define_line_read_mode(lib)?,
-        client_connection_handler,
     })
 }
 

@@ -10,6 +10,7 @@ struct OutstationTypes {
     outstation_information: AsynchronousInterface,
     control_handler: AsynchronousInterface,
     connection_state_listener: AsynchronousInterface,
+    client_connection_handler: AsynchronousInterface,
 }
 
 impl OutstationTypes {
@@ -26,6 +27,7 @@ impl OutstationTypes {
             outstation_information: define_outstation_information(lib, shared)?,
             control_handler: define_control_handler(lib, &database_handle, shared)?,
             connection_state_listener: define_connection_state_listener(lib)?,
+            client_connection_handler: crate::client_connection_handler::define(lib, shared)?,
         })
     }
 }
