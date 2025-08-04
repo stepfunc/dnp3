@@ -4,7 +4,7 @@
 
     <groupId>io.stepfunc.dnp3</groupId>
     <artifactId>examples</artifactId>
-    <version>1.6.0</version>
+    <version>1.7.0-M1</version>
 
     <properties>
         <maven.compiler.source>1.8</maven.compiler.source>
@@ -16,7 +16,7 @@
         <dependency>
             <groupId>io.stepfunc</groupId>
             <artifactId>dnp3</artifactId>
-            <version>1.6.0</version>
+            <version>1.7.0-M1</version>
         </dependency>
     </dependencies>
 </project>
