@@ -58,7 +58,6 @@ jobs:
           - windows-latest
         rust:
           - stable
-          - beta
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
@@ -378,32 +377,104 @@ jobs:
         run: |
           git config user.name github-actions
           git config user.email github-actions@github.com
+          # Pull latest changes to avoid conflicts
+          git pull
+          # Remove and recreate docs directory
           rm -rf ./dnp3/${{github.ref_name}}
           mkdir -p ./dnp3/${{github.ref_name}}
-          cp -a ../artifacts/doc/* ./dnp3/${{github.ref_name}}
+          cp -a ../artifacts/doc-api/* ./dnp3/${{github.ref_name}}
+          cp -a ../artifacts/doc-guide/* ./dnp3/${{github.ref_name}}
+          # Check if there are actual changes to commit
           git add -A
-          git commit -m "[dnp3] release ${{github.ref_name}}"
-          git push
+          if git diff --staged --quiet; then
+            echo "No changes to commit - docs already up to date"
+          else
+            git commit -m "[dnp3] release ${{github.ref_name}}"
+            git push
+          fi
       - name: Import PGP key
         uses: crazy-max/ghaction-import-gpg@v3
         with:
           gpg-private-key: ${{ secrets.SFIO_PGP_PRIVATE_KEY }}
           passphrase: ${{ secrets.SFIO_PGP_PRIVATE_KEY_PASSPHRASE }}
-      - name: Login to OSSRH
+      - name: Setup Maven Central credentials
         uses: whelk-io/maven-settings-xml-action@v14
         with:
-          servers: '[{ "id": "ossrh", "username": "${{ secrets.SFIO_OSSRH_USERNAME }}", "password": "${{ secrets.SFIO_OSSRH_PASSWORD }}" }]'
-      - name: Deploy Java
+          servers: '[{ "id": "central", "username": "${{ secrets.MAVEN_CENTRAL_USERNAME }}", "password": "${{ secrets.MAVEN_CENTRAL_TOKEN }}" }]'
+      - name: Deploy Java to Maven Central
         shell: bash
-        working-directory: artifacts/java-bindings
-        run: >
-          shopt -s extglob &&
-          mvn gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2 -DrepositoryId=ossrh -DpomFile=pom.xml -Dfile=dnp3-${{github.ref_name}}.jar &&
-          mvn gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2 -DrepositoryId=ossrh -DpomFile=pom.xml -Dfile=dnp3-${{github.ref_name}}-sources.jar -Dclassifier=sources &&
-          mvn gpg:sign-and-deploy-file -Durl=https://oss.sonatype.org/service/local/staging/deploy/maven2 -DrepositoryId=ossrh -DpomFile=pom.xml -Dfile=dnp3-${{github.ref_name}}-javadoc.jar -Dclassifier=javadoc
+        working-directory: artifacts
+        run: |
+          # Check if artifact already exists in Maven Central
+          if curl -f -s -o /dev/null "https://repo1.maven.org/maven2/io/stepfunc/dnp3/${{github.ref_name}}/dnp3-${{github.ref_name}}.jar"; then
+            echo "Artifact io.stepfunc:dnp3:${{github.ref_name}} already exists in Maven Central - skipping deployment"
+          else
+            echo "Artifact not found in Maven Central - proceeding with deployment"
+            
+            # Create Maven repository structure (starting from groupId)
+            mkdir -p io/stepfunc/dnp3/${{github.ref_name}}
+            
+            # Copy artifacts to bundle directory
+            cp java-bindings-pom/pom.xml io/stepfunc/dnp3/${{github.ref_name}}/dnp3-${{github.ref_name}}.pom
+            cp java-bindings-jar/dnp3-${{github.ref_name}}.jar io/stepfunc/dnp3/${{github.ref_name}}/
+            cp java-bindings-jar/dnp3-${{github.ref_name}}-sources.jar io/stepfunc/dnp3/${{github.ref_name}}/
+            cp java-bindings-jar/dnp3-${{github.ref_name}}-javadoc.jar io/stepfunc/dnp3/${{github.ref_name}}/
+            
+            # Sign all files
+            cd io/stepfunc/dnp3/${{github.ref_name}}
+            for file in *.jar *.pom; do
+              gpg --batch --yes --pinentry-mode loopback --passphrase "${{ secrets.SFIO_PGP_PRIVATE_KEY_PASSPHRASE }}" --armor --detach-sign "$file"
+            done
+            
+            # Generate checksums
+            for file in *.jar *.pom; do
+              md5sum "$file" | cut -d' ' -f1 > "$file.md5"
+              sha1sum "$file" | cut -d' ' -f1 > "$file.sha1"
+            done
+            
+            # Create bundle zip
+            cd ../../../..
+            zip -r bundle.zip io/
+            
+            # Create base64 encoded token for Authorization header
+            AUTH_TOKEN=$(echo -n "${{ secrets.MAVEN_CENTRAL_USERNAME }}:${{ secrets.MAVEN_CENTRAL_TOKEN }}" | base64 -w 0)
+            
+            # Upload bundle to Central Portal
+            echo "Uploading bundle to Central Portal..."
+            RESPONSE=$(curl -X POST \
+              https://central.sonatype.com/api/v1/publisher/upload \
+              -H "Authorization: Bearer $AUTH_TOKEN" \
+              -H "Content-Type: multipart/form-data" \
+              -F "bundle=@bundle.zip;type=application/octet-stream" \
+              -F "publishingType=AUTOMATIC" \
+              --fail-with-body \
+              -w "\nHTTP_STATUS:%{http_code}")
+            
+            # Extract HTTP status code
+            HTTP_STATUS=$(echo "$RESPONSE" | grep "HTTP_STATUS:" | cut -d: -f2)
+            BODY=$(echo "$RESPONSE" | sed '$d')  # Remove last line with status code
+            
+            echo "Response: $BODY"
+            echo "HTTP Status: $HTTP_STATUS"
+            
+            # Extract deployment ID if successful
+            if [[ $HTTP_STATUS -ge 200 && $HTTP_STATUS -lt 300 ]]; then
+              DEPLOYMENT_ID=$(echo "$BODY" | grep -o '"deploymentId"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4)
+              echo "✅ Upload successful! Deployment ID: $DEPLOYMENT_ID"
+              echo "The deployment will be automatically published to Maven Central after validation."
+            else
+              echo "❌ Upload failed with status $HTTP_STATUS"
+              exit 1
+            fi
+          fi
       - name: Publish NuGet package
         shell: bash
-        run: dotnet nuget push $(find artifacts/dotnet-bindings/dnp3*.nupkg) -s https://api.nuget.org/v3/index.json -k ${{ secrets.SFIO_NUGET_KEY }}
+        run: |
+          # Use --skip-duplicate to make this idempotent
+          dotnet nuget push $(find artifacts/dotnet-bindings/dnp3*.nupkg) \
+            -s https://api.nuget.org/v3/index.json \
+            -k ${{ secrets.SFIO_NUGET_KEY }} \
+            --skip-duplicate
       - name: Create GitHub release
         uses: softprops/action-gh-release@v1
         with:
@@ -411,6 +482,6 @@ jobs:
           files: |
             release/*.zip
             artifacts/dotnet-bindings/dnp3*
-            artifacts/java-bindings/*.jar
+            artifacts/java-bindings-jar/*.jar
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
