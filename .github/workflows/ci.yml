@@ -350,9 +350,18 @@ jobs:
         with:
           name: conformance-results
           path: conformance/results
+  # Quality gate to ensure all tests pass before releases
+  quality-gate:
+    needs: [linting, test, features, conformance]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Quality checks passed
+        run: echo "✅ All quality checks passed successfully"
+  
   # Release jobs - each can run independently and is idempotent
   release-docs:
-    needs: [packaging]
+    needs: [packaging, quality-gate]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
@@ -389,7 +398,7 @@ jobs:
           fi
   
   release-maven:
-    needs: [packaging]
+    needs: [packaging, quality-gate]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
@@ -478,7 +487,7 @@ jobs:
           fi
   
   release-nuget:
-    needs: [packaging]
+    needs: [packaging, quality-gate]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
