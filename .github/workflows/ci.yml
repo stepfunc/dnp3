@@ -350,22 +350,18 @@ jobs:
         with:
           name: conformance-results
           path: conformance/results
-  release:
-    needs: [packaging, features, conformance, guide]
+  # Release jobs - each can run independently and is idempotent
+  release-docs:
+    needs: [documentation, guide]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
-      - name: Download all artifacts
+      - name: Download documentation artifacts
         uses: actions/download-artifact@v4
         with:
           path: artifacts
-      - name: Package C Bindings and Conformance Results
-        run: |
-          mkdir release
-          cd artifacts/c-bindings
-          zip -r ../../release/dnp3-${{github.ref_name}}.zip .
-          cd ../conformance-results
-          zip -r ../../release/conformance-results.zip .
+          pattern: doc-*
+          merge-multiple: true
       - name: Checkout stepfunc/docs
         uses: actions/checkout@v4
         with:
@@ -392,15 +388,23 @@ jobs:
             git commit -m "[dnp3] release ${{github.ref_name}}"
             git push
           fi
+  
+  release-maven:
+    needs: [packaging]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download Java artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          pattern: java-bindings-*
+          merge-multiple: true
       - name: Import PGP key
         uses: crazy-max/ghaction-import-gpg@v3
         with:
           gpg-private-key: ${{ secrets.SFIO_PGP_PRIVATE_KEY }}
           passphrase: ${{ secrets.SFIO_PGP_PRIVATE_KEY_PASSPHRASE }}
-      - name: Setup Maven Central credentials
-        uses: whelk-io/maven-settings-xml-action@v14
-        with:
-          servers: '[{ "id": "central", "username": "${{ secrets.MAVEN_CENTRAL_USERNAME }}", "password": "${{ secrets.MAVEN_CENTRAL_TOKEN }}" }]'
       - name: Deploy Java to Maven Central
         shell: bash
         working-directory: artifacts
@@ -467,6 +471,17 @@ jobs:
               exit 1
             fi
           fi
+  
+  release-nuget:
+    needs: [packaging]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download .NET artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: dotnet-bindings
+          path: artifacts/dotnet-bindings
       - name: Publish NuGet package
         shell: bash
         run: |
@@ -475,6 +490,23 @@ jobs:
             -s https://api.nuget.org/v3/index.json \
             -k ${{ secrets.SFIO_NUGET_KEY }} \
             --skip-duplicate
+  
+  create-github-release:
+    needs: [release-docs, release-maven, release-nuget]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Download all release artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Package C Bindings and Conformance Results
+        run: |
+          mkdir release
+          cd artifacts/c-bindings
+          zip -r ../../release/dnp3-${{github.ref_name}}.zip .
+          cd ../conformance-results
+          zip -r ../../release/conformance-results.zip .
       - name: Create GitHub release
         uses: softprops/action-gh-release@v1
         with:
