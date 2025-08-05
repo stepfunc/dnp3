@@ -407,11 +407,17 @@ jobs:
         shell: bash
         working-directory: artifacts
         run: |
-          # Check if artifact already exists in Maven Central
+          # Check if artifact already exists or is being published
           if curl -f -s -o /dev/null "https://repo1.maven.org/maven2/io/stepfunc/dnp3/${{github.ref_name}}/dnp3-${{github.ref_name}}.jar"; then
-            echo "Artifact io.stepfunc:dnp3:${{github.ref_name}} already exists in Maven Central - skipping deployment"
+            echo "✅ Artifact io.stepfunc:dnp3:${{github.ref_name}} already exists in Maven Central - skipping deployment"
           else
-            echo "Artifact not found in Maven Central - proceeding with deployment"
+            echo "Artifact not found in Maven Central - checking if deployment is in progress..."
+            
+            # Create base64 encoded token for Authorization header
+            AUTH_TOKEN=$(echo -n "${{ secrets.MAVEN_CENTRAL_USERNAME }}:${{ secrets.MAVEN_CENTRAL_TOKEN }}" | base64 -w 0)
+            
+            # Try to upload - if it fails due to duplicate, that means it's already being processed
+            echo "Attempting to upload to Central Portal..."
             
             # Create Maven repository structure (starting from groupId)
             mkdir -p io/stepfunc/dnp3/${{github.ref_name}}
@@ -438,9 +444,6 @@ jobs:
             cd ../../../..
             zip -r bundle.zip io/
             
-            # Create base64 encoded token for Authorization header
-            AUTH_TOKEN=$(echo -n "${{ secrets.MAVEN_CENTRAL_USERNAME }}:${{ secrets.MAVEN_CENTRAL_TOKEN }}" | base64 -w 0)
-            
             # Upload bundle to Central Portal
             echo "Uploading bundle to Central Portal..."
             RESPONSE=$(curl -X POST \
@@ -449,8 +452,8 @@ jobs:
               -H "Content-Type: multipart/form-data" \
               -F "bundle=@bundle.zip;type=application/octet-stream" \
               -F "publishingType=AUTOMATIC" \
-              --fail-with-body \
-              -w "\nHTTP_STATUS:%{http_code}")
+              -w "\nHTTP_STATUS:%{http_code}" \
+              -s)
             
             # Extract HTTP status code
             HTTP_STATUS=$(echo "$RESPONSE" | grep "HTTP_STATUS:" | cut -d: -f2)
@@ -459,13 +462,17 @@ jobs:
             echo "Response: $BODY"
             echo "HTTP Status: $HTTP_STATUS"
             
-            # Extract deployment ID if successful
+            # Handle response
             if [[ $HTTP_STATUS -ge 200 && $HTTP_STATUS -lt 300 ]]; then
-              DEPLOYMENT_ID=$(echo "$BODY" | grep -o '"deploymentId"[[:space:]]*:[[:space:]]*"[^"]*"' | cut -d'"' -f4)
+              # The API returns the deployment ID as plain text, not JSON
+              DEPLOYMENT_ID=$(echo "$BODY" | tr -d '[:space:]')
               echo "✅ Upload successful! Deployment ID: $DEPLOYMENT_ID"
               echo "The deployment will be automatically published to Maven Central after validation."
+            elif [[ $HTTP_STATUS -eq 400 ]] && [[ "$BODY" =~ "duplicate" || "$BODY" =~ "already exists" || "$BODY" =~ "PUBLISHED" ]]; then
+              echo "✅ Version ${{github.ref_name}} is already uploaded or being processed - skipping deployment"
             else
               echo "❌ Upload failed with status $HTTP_STATUS"
+              echo "Error details: $BODY"
               exit 1
             fi
           fi
