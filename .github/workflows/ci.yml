@@ -261,7 +261,7 @@ jobs:
           path: ~/doc
   # Package all the generated bindings
   packaging:
-    needs: [documentation, bindings-windows, bindings-macos, bindings-linux]
+    needs: [documentation, guide, bindings-windows, bindings-macos, bindings-linux]
     runs-on: ubuntu-latest
     steps:
       - name: Install Rust
