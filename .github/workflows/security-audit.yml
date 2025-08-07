@@ -1,0 +1,59 @@
+name: Security Audit
+
+on:
+  schedule:
+    # Run daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  # Allow manual trigger for testing
+  workflow_dispatch:
+  # Also run on push to main to catch issues early
+  push:
+    branches:
+      - main
+    paths:
+      - '**/Cargo.toml'
+      - '**/Cargo.lock'
+      - '.github/workflows/security-audit.yml'
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run RustSec Advisory Check
+        uses: rustsec/audit-check@v2
+        continue-on-error: true
+        id: audit
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Upload SARIF results to GitHub Security tab
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: rustsec.sarif
+          
+      # Create a job summary that's visible in the Actions tab
+      - name: Create job summary
+        if: failure() || steps.audit.outcome == 'failure'
+        run: |
+          echo "## 🚨 Security Vulnerabilities Detected" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "The security audit has detected vulnerabilities in the dependencies." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Required Actions:" >> $GITHUB_STEP_SUMMARY
+          echo "1. Check the [Security tab](/${{ github.repository }}/security/code-scanning) for details" >> $GITHUB_STEP_SUMMARY
+          echo "2. Run \`cargo audit\` locally to see the full report" >> $GITHUB_STEP_SUMMARY
+          echo "3. Update affected dependencies using \`cargo update\`" >> $GITHUB_STEP_SUMMARY
+          echo "4. Review if these vulnerabilities affect your production deployments" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Workflow run:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
+          
+      # Fail the workflow if vulnerabilities were found
+      - name: Check audit results
+        if: steps.audit.outcome == 'failure'
+        run: |
+          echo "Security vulnerabilities detected. Check the Security tab for details."
+          exit 1
