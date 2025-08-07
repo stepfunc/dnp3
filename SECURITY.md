@@ -32,10 +32,42 @@ For commercial users, all formal response obligations are governed solely by the
 
 To stay up to date:
 
-- **Watch this repository**: Click “Watch” → “Custom” → enable “Releases” and “Security alerts”
+- **Watch this repository**: Click "Watch" → "Custom" → enable "Releases" and "Security alerts"
 - Use the
   [GitHub Security Advisories RSS feed](https://github.blog/changelog/2022-10-25-syndicate-github-security-advisories-with-rss/)
 - Use tools like `cargo audit` or your organization's OSS scanners
+
+## Supply Chain Security
+
+We take supply chain security seriously and have implemented the following measures:
+
+### Automated Vulnerability Scanning
+
+- **Nightly audits**: Dependencies are automatically scanned daily at 2 AM UTC using `cargo audit`
+- **Pull request checks**: All PRs are checked for vulnerabilities before merging
+- **Immediate notifications**: Maintainers receive automated alerts when vulnerabilities are detected
+- **GitHub Security tab integration**: Vulnerability information is surfaced in the repository's Security tab
+
+### Dependency Management
+
+- **Minimal dependencies**: We strive to minimize external dependencies where practical
+- **Regular updates**: Dependencies are regularly reviewed and updated to address known vulnerabilities
+- **Lock file commits**: `Cargo.lock` is committed to ensure reproducible builds
+- **Audit before release**: All releases undergo security audit as part of the CI/CD pipeline
+
+### For Users
+
+To check for vulnerabilities in your deployment:
+
+```bash
+# Install cargo-audit
+cargo install cargo-audit --locked
+
+# Run audit in your project
+cargo audit
+```
+
+We recommend integrating `cargo audit` into your CI/CD pipeline for continuous monitoring.
 
 ## Commercial Support
 
