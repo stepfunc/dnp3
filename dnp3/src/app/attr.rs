@@ -1005,7 +1005,7 @@ impl OwnedAttrValue {
         }
     }
 
-    pub(crate) fn view(&self) -> AttrValue {
+    pub(crate) fn view(&self) -> AttrValue<'_> {
         match self {
             OwnedAttrValue::VisibleString(x) => AttrValue::VisibleString(x.as_str()),
             OwnedAttrValue::UnsignedInt(x) => AttrValue::UnsignedInt(*x),
@@ -1335,7 +1335,7 @@ impl OwnedAttribute {
         }
     }
 
-    pub(crate) fn view(&self) -> Attribute {
+    pub(crate) fn view(&self) -> Attribute<'_> {
         Attribute {
             set: self.set,
             variation: self.variation,

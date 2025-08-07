@@ -337,7 +337,7 @@ impl HeaderDetails<'_> {
         }
     }
 
-    pub(crate) fn count(&self) -> Option<&CountVariation> {
+    pub(crate) fn count(&self) -> Option<&CountVariation<'_>> {
         match self {
             HeaderDetails::OneByteCount(_, objects) => Some(objects),
             HeaderDetails::TwoByteCount(_, objects) => Some(objects),

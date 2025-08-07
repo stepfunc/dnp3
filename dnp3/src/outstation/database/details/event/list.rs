@@ -121,7 +121,7 @@ impl<'a, T> Iterator for ListIterator<'a, T> {
 }
 
 impl<T> VecList<T> {
-    pub(crate) fn iter(&self) -> ListIterator<T> {
+    pub(crate) fn iter(&self) -> ListIterator<'_, T> {
         ListIterator {
             list: self,
             current: self.state.map(|x| x.head),

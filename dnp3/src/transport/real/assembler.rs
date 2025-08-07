@@ -46,7 +46,7 @@ impl Assembler {
         self.state = InternalState::Empty;
     }
 
-    pub(crate) fn peek(&self) -> Option<Fragment> {
+    pub(crate) fn peek(&self) -> Option<Fragment<'_>> {
         match self.state {
             InternalState::Complete(info, size) => {
                 let data = self
@@ -59,7 +59,7 @@ impl Assembler {
         }
     }
 
-    pub(crate) fn pop(&mut self) -> Option<Fragment> {
+    pub(crate) fn pop(&mut self) -> Option<Fragment<'_>> {
         match self.state {
             InternalState::Complete(info, size) => {
                 self.state = InternalState::Empty;

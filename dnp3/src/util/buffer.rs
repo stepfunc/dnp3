@@ -11,7 +11,7 @@ impl Buffer {
         }
     }
 
-    pub(crate) fn write_cursor(&mut self) -> WriteCursor {
+    pub(crate) fn write_cursor(&mut self) -> WriteCursor<'_> {
         WriteCursor::new(self.inner.as_mut())
     }
 
