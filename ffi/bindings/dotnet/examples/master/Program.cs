@@ -243,6 +243,13 @@ class MainClass
         }
 
         
+        public void HandleAbsTime(HeaderInfo info, Timestamp time)
+        {
+            Console.WriteLine("Absolute Time:");
+            Console.WriteLine("Qualifier: " + info.Qualifier);
+            Console.WriteLine("Variation: " + info.Variation);
+            Console.WriteLine($"Time: {time.Value} ({time.Quality})");
+        }
     }
     // ANCHOR_END: read_handler
 
