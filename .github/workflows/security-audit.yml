@@ -29,29 +29,34 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Run RustSec Advisory Check
-        uses: rustsec/audit-check@v2
-        continue-on-error: true
+      - name: Install cargo-binstall
+        uses: cargo-bins/cargo-binstall@main
+
+      - name: Install cargo-audit binary (fast)
+        run: cargo binstall cargo-audit@0.20.0 --no-confirm
+
+      - name: Run security audit
         id: audit
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if cargo audit --json > audit.json 2>&1; then
+            echo "audit_failed=false" >> $GITHUB_OUTPUT
+          else
+            echo "audit_failed=true" >> $GITHUB_OUTPUT
+          fi
           
-      - name: Upload SARIF results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: rustsec.sarif
+          # Always show the human-readable output
+          cargo audit || true
           
       # Create a job summary that's visible in the Actions tab
       - name: Create job summary
-        if: failure() || steps.audit.outcome == 'failure'
+        if: steps.audit.outputs.audit_failed == 'true'
         run: |
           echo "## 🚨 Security Vulnerabilities Detected" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "The security audit has detected vulnerabilities in the dependencies." >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Required Actions:" >> $GITHUB_STEP_SUMMARY
-          echo "1. Check the [Security tab](/${{ github.repository }}/security/code-scanning) for details" >> $GITHUB_STEP_SUMMARY
+          echo "1. Review the audit output above for details" >> $GITHUB_STEP_SUMMARY
           echo "2. Run \`cargo audit\` locally to see the full report" >> $GITHUB_STEP_SUMMARY
           echo "3. Update affected dependencies using \`cargo update\`" >> $GITHUB_STEP_SUMMARY
           echo "4. Review if these vulnerabilities affect your production deployments" >> $GITHUB_STEP_SUMMARY
@@ -60,7 +65,7 @@ jobs:
           
       # Fail the workflow if vulnerabilities were found
       - name: Check audit results
-        if: steps.audit.outcome == 'failure'
+        if: steps.audit.outputs.audit_failed == 'true'
         run: |
-          echo "Security vulnerabilities detected. Check the Security tab for details."
+          echo "::error::Security vulnerabilities detected in dependencies"
           exit 1
