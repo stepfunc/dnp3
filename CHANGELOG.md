@@ -1,4 +1,10 @@
 
+### 1.7.0-M2 ###
+* :shield: Add security policy and automated supply chain scanning. See [#394](https://github.com/stepfunc/dnp3/pull/394).
+* :wrench: Add quality gate to prevent releases when tests fail. See [#393](https://github.com/stepfunc/dnp3/pull/393).
+* :bug: Fix Maven Central deployment issues for post-OSSRH era.
+* :wrench: Refactor release workflow into separate idempotent jobs for improved reliability.
+
 ### 1.7.0-M1 ###
 * :star: Add outstation ConnectionManager with fine-grained connection control for TCP and TLS clients. See [#381](https://github.com/stepfunc/dnp3/pull/381).
   * New Rust API: `spawn_outstation_tcp_client_2()` and `spawn_outstation_tls_client_2()` functions with `ClientConnectionHandler` trait
