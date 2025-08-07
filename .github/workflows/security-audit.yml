@@ -14,6 +14,13 @@ on:
       - '**/Cargo.toml'
       - '**/Cargo.lock'
       - '.github/workflows/security-audit.yml'
+  # Run on PRs to test before merging
+  pull_request:
+    # Uncomment these paths once we verify the workflow runs correctly
+    # paths:
+    #   - '**/Cargo.toml'
+    #   - '**/Cargo.lock'
+    #   - '.github/workflows/security-audit.yml'
 
 jobs:
   audit:
