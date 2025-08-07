@@ -41,7 +41,7 @@ impl<'a> RequestGuard<'a> {
         self.canceled = true
     }
 
-    pub(crate) fn get(&mut self) -> Option<TransportRequest> {
+    pub(crate) fn get(&mut self) -> Option<TransportRequest<'_>> {
         self.reader.peek_request()
     }
 }
@@ -122,7 +122,7 @@ impl TransportReader {
         self.inner.pop();
     }
 
-    pub(crate) fn pop_response(&mut self) -> Option<TransportResponse> {
+    pub(crate) fn pop_response(&mut self) -> Option<TransportResponse<'_>> {
         let data = self.parse(false)?;
 
         match data {
@@ -156,7 +156,7 @@ impl TransportReader {
         RequestGuard::new(self)
     }
 
-    fn peek_request(&mut self) -> Option<TransportRequest> {
+    fn peek_request(&mut self) -> Option<TransportRequest<'_>> {
         let data = self.parse(true)?;
         match data {
             Ok(ParsedTransportData::Fragment(info, fragment)) => match fragment.to_request() {
@@ -176,7 +176,7 @@ impl TransportReader {
     fn parse(
         &mut self,
         peek: bool,
-    ) -> Option<Result<ParsedTransportData, (HeaderParseError, FragmentAddr)>> {
+    ) -> Option<Result<ParsedTransportData<'_>, (HeaderParseError, FragmentAddr)>> {
         let transport_data = if peek {
             self.inner.peek()?
         } else {

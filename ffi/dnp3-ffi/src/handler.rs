@@ -24,7 +24,9 @@ impl<'a> AttrItemIter<'a> {
     }
 }
 
-pub(crate) unsafe fn attr_item_iter_next(iter: *mut crate::AttrItemIter) -> Option<&ffi::AttrItem> {
+pub(crate) unsafe fn attr_item_iter_next(
+    iter: *mut crate::AttrItemIter<'_>,
+) -> Option<&ffi::AttrItem> {
     let iter = iter.as_mut()?;
 
     iter.current = iter.inner.next().map(|x| x.into());
@@ -526,7 +528,7 @@ macro_rules! implement_iterator {
             }
         }
 
-        pub unsafe fn $ffi_func_name(it: *mut $it_name) -> Option<&$ffi_type> {
+        pub unsafe fn $ffi_func_name(it: *mut $it_name<'_>) -> Option<&$ffi_type> {
             let it = it.as_mut();
             it.map(|it| {
                 it.next();
@@ -776,8 +778,8 @@ impl<'a> OctetStringIterator<'a> {
 }
 
 pub unsafe fn octet_string_iterator_next(
-    it: *mut OctetStringIterator,
-) -> Option<&ffi::OctetString> {
+    it: *mut OctetStringIterator<'_>,
+) -> Option<&ffi::OctetString<'_>> {
     let it = it.as_mut();
     it.and_then(|it| {
         it.next();

@@ -39,7 +39,7 @@ pub(crate) struct FrameData<'a> {
 }
 
 impl FrameData<'_> {
-    pub(crate) fn to_link_display(&self, level: LinkDecodeLevel) -> LinkDisplay {
+    pub(crate) fn to_link_display(&self, level: LinkDecodeLevel) -> LinkDisplay<'_> {
         LinkDisplay::new(self.header, self.payload_only, level)
     }
 }

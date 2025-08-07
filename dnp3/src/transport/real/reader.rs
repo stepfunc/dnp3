@@ -62,7 +62,7 @@ impl Reader {
         self.pending_link_layer_message = None;
     }
 
-    pub(crate) fn pop(&mut self) -> Option<TransportData> {
+    pub(crate) fn pop(&mut self) -> Option<TransportData<'_>> {
         if let Some(msg) = self.pending_link_layer_message.take() {
             return Some(TransportData::LinkLayerMessage(msg));
         }
@@ -70,7 +70,7 @@ impl Reader {
         self.assembler.pop().map(TransportData::Fragment)
     }
 
-    pub(crate) fn peek(&self) -> Option<TransportData> {
+    pub(crate) fn peek(&self) -> Option<TransportData<'_>> {
         if let Some(msg) = self.pending_link_layer_message {
             return Some(TransportData::LinkLayerMessage(msg));
         }
