@@ -42,8 +42,6 @@ assert_matches = "1.2"
 serde_json = "1.0.96"
 sfio-tokio-mock-io = "0.2.0"
 tokio = { version = "1", features = ["test-util"] }
-# TEST VULNERABILITY - Remove this before merging!
-time = "=0.1.45"
 
 [features]
 default = ["tls", "serial"]
