@@ -246,6 +246,15 @@ pub(crate) fn define(
         .param("values", shared_def.octet_string_it.clone(), iterator_doc)?
         .returns_nothing_by_default()?
         .end_callback()?
+        .begin_callback("handle_abs_time", "Handle an absolute time value (g50v1)")?
+        .param(
+            "info",
+            header_info.clone(),
+            "Group/variation and qualifier information",
+        )?
+        .param("time", shared_def.timestamp.clone(), "Absolute time value received from the outstation. The quality is always set to synchronized for g50v1.")?
+        .returns_nothing_by_default()?
+        .end_callback()?
         // group 0 callbacks
         .begin_callback("handle_string_attr", "Handle a known or unknown visible string device attribute")?
         .param(

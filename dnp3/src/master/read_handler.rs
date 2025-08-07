@@ -1,6 +1,6 @@
 use crate::app::attr::{AnyAttribute, Attribute};
 use crate::app::measurement::*;
-use crate::app::{MaybeAsync, QualifierCode, ResponseHeader, Variation};
+use crate::app::{MaybeAsync, QualifierCode, ResponseHeader, Timestamp, Variation};
 
 /// Trait used to process measurement data received from an outstation
 #[allow(unused_variables)]
@@ -128,6 +128,18 @@ pub trait ReadHandler: Send + Sync {
 
     /// Process a device attribute
     fn handle_device_attribute(&mut self, info: HeaderInfo, attr: AnyAttribute) {}
+
+    /// Process an absolute time value (g50v1)
+    ///
+    /// This method is called when the master receives a response containing
+    /// Group 50 Variation 1 (absolute time). The DNP3 specification defines
+    /// g50v1 as representing the current time of the outstation.
+    ///
+    /// Note: While the protocol structure allows for multiple time values,
+    /// semantically only a single absolute time value makes sense. If the
+    /// response contains a count != 1, a warning will be logged and this
+    /// callback will not be invoked.
+    fn handle_abs_time(&mut self, info: HeaderInfo, time: Timestamp) {}
 }
 
 pub(crate) fn handle_attribute(
