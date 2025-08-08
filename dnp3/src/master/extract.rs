@@ -1,4 +1,3 @@
-
 use crate::app::gen::count::CountVariation;
 use crate::app::measurement::*;
 use crate::app::parse::count::CountSequence;
