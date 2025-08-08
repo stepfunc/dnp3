@@ -200,6 +200,14 @@ impl ReadHandler for ffi::ReadHandler {
         ffi::ReadHandler::handle_octet_string(self, info, &mut iterator);
     }
 
+    fn handle_abs_time(&mut self, info: HeaderInfo, time: Timestamp) {
+        let ffi_timestamp = ffi::Timestamp {
+            value: time.raw_value(),
+            quality: ffi::TimeQuality::SynchronizedTime.into(),
+        };
+        ffi::ReadHandler::handle_abs_time(self, info.into(), ffi_timestamp);
+    }
+
     fn handle_device_attribute(&mut self, info: HeaderInfo, attr: AnyAttribute) {
         let info: ffi::HeaderInfo = info.into();
         let (set, var, value) = FfiAttrValue::extract(attr);

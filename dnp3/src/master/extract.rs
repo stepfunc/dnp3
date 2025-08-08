@@ -1,10 +1,11 @@
 use crate::app::gen::count::CountVariation;
 use crate::app::measurement::*;
+use crate::app::parse::count::CountSequence;
 use crate::app::parse::parser::{HeaderCollection, HeaderDetails, ObjectHeader};
 use crate::app::variations::*;
 use crate::app::ResponseHeader;
-use crate::master::ReadHandler;
 use crate::master::ReadType;
+use crate::master::{HeaderInfo, ReadHandler};
 
 /// Extract measurements from a HeaderCollection, sinking them into
 /// something that implements `MeasurementHandler`
@@ -33,6 +34,22 @@ pub(crate) fn extract_measurements_inner(
         item.map_or(prev, |x| Some(Time::Unsynchronized(x.time)))
     }
 
+    fn extract_g50v1(
+        seq: &CountSequence<Group50Var1>,
+        header: &ObjectHeader,
+        handler: &mut dyn ReadHandler,
+    ) -> bool {
+        if let Some(item) = seq.single() {
+            handler.handle_abs_time(
+                HeaderInfo::new(header.variation, header.details.qualifier(), false, false),
+                item.time,
+            );
+            true
+        } else {
+            false
+        }
+    }
+
     fn handle(
         cto: Option<Time>,
         header: ObjectHeader,
@@ -51,6 +68,13 @@ pub(crate) fn extract_measurements_inner(
             }
             HeaderDetails::TwoByteCount(1, CountVariation::Group51Var2(seq)) => {
                 return extract_cto_g51v2(cto, seq.single())
+            }
+            // handle g50v1 - absolute time (only count == 1 is valid)
+            HeaderDetails::OneByteCount(1, CountVariation::Group50Var1(seq)) => {
+                extract_g50v1(seq, &header, handler)
+            }
+            HeaderDetails::TwoByteCount(1, CountVariation::Group50Var1(seq)) => {
+                extract_g50v1(seq, &header, handler)
             }
             // everything else
             HeaderDetails::OneByteStartStop(_, _, var) => {
@@ -125,6 +149,7 @@ mod test {
         BinaryCommandEvent(Vec<(BinaryOutputCommandEvent, u16)>),
         AnalogCommandEvent(Vec<(AnalogOutputCommandEvent, u16)>),
         G102(Vec<(UnsignedInteger, u16)>),
+        AbsTime(Timestamp),
     }
 
     #[derive(Default)]
@@ -286,6 +311,10 @@ mod test {
                     self.received.push(Header::KnownAttr(known));
                 }
             }
+        }
+
+        fn handle_abs_time(&mut self, _info: HeaderInfo, time: Timestamp) {
+            self.received.push(Header::AbsTime(time));
         }
     }
 
@@ -628,5 +657,82 @@ mod test {
                 (UnsignedInteger { value: 0xCA }, 8)
             ])]
         );
+    }
+
+    #[test]
+    fn handles_g50v1_with_count_1() {
+        let mut handler = MockHandler::new();
+        let objects = HeaderCollection::parse(
+            ParseOptions::default(),
+            FunctionCode::Response,
+            // g50v1       count: 1   -------- time: 0x060504030201 ------------------
+            &[0x32, 0x01, 0x07, 0x01, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06],
+        )
+        .unwrap();
+
+        extract_measurements_inner(objects, &mut handler);
+
+        assert_eq!(
+            &handler.pop(),
+            &[Header::AbsTime(Timestamp::new(0x060504030201))]
+        );
+    }
+
+    #[test]
+    fn handles_g50v1_with_two_byte_count() {
+        let mut handler = MockHandler::new();
+        let objects = HeaderCollection::parse(
+            ParseOptions::default(),
+            FunctionCode::Response,
+            // g50v1       count: 1 (two bytes)   -------- time: 0xAABBCCDDEEFF ------------------
+            &[
+                0x32, 0x01, 0x08, 0x01, 0x00, 0xFF, 0xEE, 0xDD, 0xCC, 0xBB, 0xAA,
+            ],
+        )
+        .unwrap();
+
+        extract_measurements_inner(objects, &mut handler);
+
+        assert_eq!(
+            &handler.pop(),
+            &[Header::AbsTime(Timestamp::new(0xAABBCCDDEEFF))]
+        );
+    }
+
+    #[test]
+    fn ignores_g50v1_with_count_greater_than_1() {
+        let mut handler = MockHandler::new();
+        let objects = HeaderCollection::parse(
+            ParseOptions::default(),
+            FunctionCode::Response,
+            // g50v1       count: 2   -------- time1 ------ time2 ------
+            &[
+                0x32, 0x01, 0x07, 0x02, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x11, 0x12, 0x13, 0x14,
+                0x15, 0x16,
+            ],
+        )
+        .unwrap();
+
+        extract_measurements_inner(objects, &mut handler);
+
+        // Should not receive any time values since count > 1
+        assert_eq!(&handler.pop(), &[]);
+    }
+
+    #[test]
+    fn handles_g50v1_with_count_0() {
+        let mut handler = MockHandler::new();
+        let objects = HeaderCollection::parse(
+            ParseOptions::default(),
+            FunctionCode::Response,
+            // g50v1       count: 0
+            &[0x32, 0x01, 0x07, 0x00],
+        )
+        .unwrap();
+
+        extract_measurements_inner(objects, &mut handler);
+
+        // Should not receive any time values since count == 0
+        assert_eq!(&handler.pop(), &[]);
     }
 }
