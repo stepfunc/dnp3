@@ -1,0 +1,17 @@
+# Configuration for cargo-audit security scanning
+
+[advisories]
+# Ignore specific vulnerabilities that have been reviewed and determined to be non-exploitable
+ignore = [
+    # CVE-2025-58160 / GHSA-xwfj-jgwm-7wp5: ANSI escape sequence injection in tracing-subscriber
+    # 
+    # This vulnerability is not exploitable in our codebase because:
+    # 1. DNP3 protocol data is never logged as strings - all bytes are hex formatted (e.g. [01, 02, 03])
+    # 2. ANSI escape sequences in DNP3 payloads would be rendered as harmless hex bytes like "1B 5B 33 31 6D"
+    # 3. We only log structured data (numeric values, enums) and hex-formatted byte arrays
+    # 4. No untrusted user input is ever passed directly to the logger as a string
+    #
+    # Even if malicious DNP3 packets contained ANSI escape sequences, they would be displayed
+    # as hex bytes rather than being interpreted by the terminal.
+    "RUSTSEC-2025-0055",
+]
