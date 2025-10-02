@@ -176,7 +176,7 @@ impl MasterChannel {
         ))
         .await?;
         rx.await?
-            .map(|_| (AssociationHandle::new(address, self.clone())))
+            .map(|_| AssociationHandle::new(address, self.clone()))
     }
 
     /// Create a new association on a UDP-based channel.
@@ -211,7 +211,7 @@ impl MasterChannel {
         ))
         .await?;
         rx.await?
-            .map(|_| (AssociationHandle::new(address, self.clone())))
+            .map(|_| AssociationHandle::new(address, self.clone()))
     }
 
     /// Remove an association
