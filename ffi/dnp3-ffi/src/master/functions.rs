@@ -1047,6 +1047,7 @@ fn convert_auto_time_sync(config: &ffi::AutoTimeSync) -> Option<TimeSyncProcedur
         ffi::AutoTimeSync::None => None,
         ffi::AutoTimeSync::Lan => Some(TimeSyncProcedure::Lan),
         ffi::AutoTimeSync::NonLan => Some(TimeSyncProcedure::NonLan),
+        ffi::AutoTimeSync::DirectWriteAbsTime => Some(TimeSyncProcedure::DirectWriteAbsTime),
     }
 }
 
@@ -1218,6 +1219,7 @@ impl From<ffi::TimeSyncMode> for TimeSyncProcedure {
         match x {
             ffi::TimeSyncMode::Lan => Self::Lan,
             ffi::TimeSyncMode::NonLan => Self::NonLan,
+            ffi::TimeSyncMode::DirectWriteAbsTime => Self::DirectWriteAbsTime,
         }
     }
 }

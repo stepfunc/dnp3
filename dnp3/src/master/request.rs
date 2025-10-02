@@ -34,11 +34,19 @@ pub enum CommandMode {
     feature = "serialization",
     derive(serde::Serialize, serde::Deserialize)
 )]
+#[non_exhaustive]
 pub enum TimeSyncProcedure {
     /// Master will use the LAN procedure: RECORD_CURRENT_TIME followed by WRITE g50v3
     Lan,
     /// Master will use the non-LAN procedure: DELAY_MEASUREMENT followed by WRITE g50v1
     NonLan,
+    /// Master will directly WRITE g50v1 (absolute time) without delay measurement
+    ///
+    /// **WARNING**: This is a non-conformant workaround for outstations that do not support
+    /// the DELAY_MEASURE function code. This method does NOT account for network latency
+    /// and may result in inaccurate time synchronization. Use only when the outstation
+    /// does not support standard time synchronization procedures.
+    DirectWriteAbsTime,
 }
 
 /// struct recording which event classes are enabled
