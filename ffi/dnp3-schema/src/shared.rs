@@ -1005,6 +1005,7 @@ fn build_octet_string(
         .add("value", byte_it.clone(), "Point value")?
         .doc("Octet String point")?
         .end_fields()?
+        .add_full_initializer("init")?
         .build()?;
 
     let octet_string_iterator =
