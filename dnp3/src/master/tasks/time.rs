@@ -16,10 +16,9 @@ use tokio::time::Instant;
 
 enum State {
     MeasureDelay(Option<Instant>),
-    WriteAbsoluteTime(Timestamp),
+    WriteAbsoluteTime(Option<Timestamp>),
     RecordCurrentTime(Option<Timestamp>),
     WriteLastRecordedTime(Timestamp),
-    DirectWriteAbsTime,
 }
 
 pub(crate) struct TimeSyncTask {
@@ -38,7 +37,7 @@ impl TimeSyncProcedure {
         match self {
             TimeSyncProcedure::Lan => State::RecordCurrentTime(None),
             TimeSyncProcedure::NonLan => State::MeasureDelay(None),
-            TimeSyncProcedure::DirectWriteAbsTime => State::DirectWriteAbsTime,
+            TimeSyncProcedure::DirectWriteAbsTime => State::WriteAbsoluteTime(None),
         }
     }
 }
@@ -76,7 +75,20 @@ impl TimeSyncTask {
                     }
                 }
             }
-            State::WriteAbsoluteTime(_) => Some(self),
+            State::WriteAbsoluteTime(time) => {
+                if time.is_none() {
+                    *time = association.get_system_time();
+                    match time {
+                        Some(_) => Some(self),
+                        None => {
+                            self.report_error(association, TimeSyncError::SystemTimeNotAvailable);
+                            None
+                        }
+                    }
+                } else {
+                    Some(self)
+                }
+            }
             State::RecordCurrentTime(time) => {
                 *time = association.get_system_time();
 
@@ -89,16 +101,6 @@ impl TimeSyncTask {
                 }
             }
             State::WriteLastRecordedTime(_) => Some(self),
-            State::DirectWriteAbsTime => match association.get_system_time() {
-                Some(timestamp) => {
-                    self.state = State::WriteAbsoluteTime(timestamp);
-                    Some(self)
-                }
-                None => {
-                    self.report_error(association, TimeSyncError::SystemTimeNotAvailable);
-                    None
-                }
-            },
         }
     }
 
@@ -108,17 +110,17 @@ impl TimeSyncTask {
             State::WriteAbsoluteTime(_) => FunctionCode::Write,
             State::RecordCurrentTime(_) => FunctionCode::RecordCurrentTime,
             State::WriteLastRecordedTime(_) => FunctionCode::Write,
-            State::DirectWriteAbsTime => FunctionCode::Write,
         }
     }
 
     pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         match self.state {
             State::MeasureDelay(_) => Ok(()),
-            State::WriteAbsoluteTime(x) => writer.write_count_of_one(Group50Var1 { time: x }),
+            State::WriteAbsoluteTime(x) => writer.write_count_of_one(Group50Var1 {
+                time: x.expect("WriteAbsoluteTime timestamp must be set by start()"),
+            }),
             State::RecordCurrentTime(_) => Ok(()),
             State::WriteLastRecordedTime(x) => writer.write_count_of_one(Group50Var3 { time: x }),
-            State::DirectWriteAbsTime => Ok(()), // Should never be reached as it transitions in start()
         }
     }
 
@@ -146,10 +148,6 @@ impl TimeSyncTask {
             }
             State::WriteLastRecordedTime(_) => {
                 self.handle_write_last_recorded_time(association, response)
-            }
-            State::DirectWriteAbsTime => {
-                // Should never be reached as it transitions to WriteAbsoluteTime in start()
-                self.handle_write_absolute_time(association, response)
             }
         }
     }
@@ -228,7 +226,7 @@ impl TimeSyncTask {
         };
 
         Ok(Some(
-            self.change_state(State::WriteAbsoluteTime(timestamp))
+            self.change_state(State::WriteAbsoluteTime(Some(timestamp)))
                 .wrap(),
         ))
     }
