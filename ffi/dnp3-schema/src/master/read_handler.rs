@@ -66,6 +66,7 @@ pub(crate) fn define(
         )?
         .doc("Information about the object header and specific variation")?
         .end_fields()?
+        .add_full_initializer("init")?
         .build()?;
 
     let read_type = define_read_type_enum(lib)?;
