@@ -861,6 +861,10 @@ fn define_association_config(
             "non_lan",
             "Perform automatic time sync with Delay Measurement (0x17) function code",
         )?
+        .push(
+            "direct_write_abs_time",
+            "Directly write absolute time (g50v1) without delay measurement. WARNING: This is a non-conformant workaround for outstations that do not support DELAY_MEASURE. Does not account for network latency.",
+        )?
         .doc("Automatic time synchronization configuration")?
         .build()?;
 
@@ -1491,6 +1495,10 @@ fn define_time_sync_mode(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
         .push(
             "non_lan",
             "Perform a non-LAN time sync with Delay Measurement (0x17) function code",
+        )?
+        .push(
+            "direct_write_abs_time",
+            "Directly write absolute time (g50v1) without delay measurement. WARNING: This is a non-conformant workaround for outstations that do not support DELAY_MEASURE. Does not account for network latency.",
         )?
         .doc("Time synchronization mode")?
         .build()?;

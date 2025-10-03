@@ -16,7 +16,7 @@ use tokio::time::Instant;
 
 enum State {
     MeasureDelay(Option<Instant>),
-    WriteAbsoluteTime(Timestamp),
+    WriteAbsoluteTime(Option<Timestamp>),
     RecordCurrentTime(Option<Timestamp>),
     WriteLastRecordedTime(Timestamp),
 }
@@ -37,6 +37,7 @@ impl TimeSyncProcedure {
         match self {
             TimeSyncProcedure::Lan => State::RecordCurrentTime(None),
             TimeSyncProcedure::NonLan => State::MeasureDelay(None),
+            TimeSyncProcedure::DirectWriteAbsTime => State::WriteAbsoluteTime(None),
         }
     }
 }
@@ -74,7 +75,20 @@ impl TimeSyncTask {
                     }
                 }
             }
-            State::WriteAbsoluteTime(_) => Some(self),
+            State::WriteAbsoluteTime(time) => {
+                if time.is_none() {
+                    *time = association.get_system_time();
+                    match time {
+                        Some(_) => Some(self),
+                        None => {
+                            self.report_error(association, TimeSyncError::SystemTimeNotAvailable);
+                            None
+                        }
+                    }
+                } else {
+                    Some(self)
+                }
+            }
             State::RecordCurrentTime(time) => {
                 *time = association.get_system_time();
 
@@ -102,7 +116,9 @@ impl TimeSyncTask {
     pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         match self.state {
             State::MeasureDelay(_) => Ok(()),
-            State::WriteAbsoluteTime(x) => writer.write_count_of_one(Group50Var1 { time: x }),
+            State::WriteAbsoluteTime(x) => writer.write_count_of_one(Group50Var1 {
+                time: x.expect("WriteAbsoluteTime timestamp must be set by start()"),
+            }),
             State::RecordCurrentTime(_) => Ok(()),
             State::WriteLastRecordedTime(x) => writer.write_count_of_one(Group50Var3 { time: x }),
         }
@@ -210,7 +226,7 @@ impl TimeSyncTask {
         };
 
         Ok(Some(
-            self.change_state(State::WriteAbsoluteTime(timestamp))
+            self.change_state(State::WriteAbsoluteTime(Some(timestamp)))
                 .wrap(),
         ))
     }
@@ -967,6 +983,62 @@ mod tests {
             }
 
             task
+        }
+    }
+
+    mod direct_write_abs_time {
+        use super::*;
+
+        #[test]
+        fn transitions_to_write_absolute_time() {
+            let (task, system_time, mut association, _rx) = direct_write_setup();
+            let task = task.start(&mut association).unwrap();
+
+            // Should have transitioned to WriteAbsoluteTime
+            assert_eq!(task.function(), FunctionCode::Write);
+
+            // Verify it writes g50v1 with the system time
+            let mut buffer = [0; 20];
+            let mut cursor = WriteCursor::new(&mut buffer);
+            let mut writer = start_request(
+                ControlField::request(Sequence::default()),
+                task.function(),
+                &mut cursor,
+            )
+            .unwrap();
+            task.write(&mut writer).unwrap();
+            let request = writer.to_parsed().to_request().unwrap();
+
+            let header = request.objects.unwrap().get_only_header().unwrap();
+            match header.details.count().unwrap() {
+                CountVariation::Group50Var1(seq) => {
+                    assert_eq!(seq.single().unwrap().time, system_time);
+                }
+                _ => panic!("expected g50v1, not g50v3"),
+            }
+        }
+
+        #[test]
+        fn no_system_time_available() {
+            let (task, _system_time, mut association, mut rx) = direct_write_setup();
+            association.get_system_time(); // Empty the time
+
+            assert!(task.start(&mut association).is_none());
+            assert_eq!(
+                rx.try_recv().unwrap(),
+                Err(TimeSyncError::SystemTimeNotAvailable)
+            );
+        }
+
+        fn direct_write_setup() -> (
+            NonReadTask,
+            Timestamp,
+            Association,
+            tokio::sync::oneshot::Receiver<Result<(), TimeSyncError>>,
+        ) {
+            time_sync_setup(TimeSyncProcedure::DirectWriteAbsTime, |time| {
+                Box::new(SingleTimestampTestHandler::new(time))
+            })
         }
     }
 }
