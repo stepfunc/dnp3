@@ -1,4 +1,5 @@
 use crate::app::{ConnectStrategy, ExponentialBackOff, RetryStrategy};
+use crate::link::EndpointAddress;
 use crate::tcp::{ConnectOptions, EndpointList};
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -45,12 +46,18 @@ impl From<String> for Endpoint {
     }
 }
 
+#[derive(Default, Copy, Clone, Debug)]
+pub(crate) struct SessionSettings {
+    pub(crate) master_address: Option<EndpointAddress>,
+}
+
 /// Information about the next connection attempt
 #[derive(Clone, Debug)]
 pub struct ConnectionInfo {
     pub(crate) endpoint: Endpoint,
     pub(crate) timeout: Option<Duration>,
     pub(crate) local_endpoint: Option<SocketAddr>,
+    pub(crate) settings: SessionSettings,
 }
 
 impl ConnectionInfo {
@@ -61,6 +68,7 @@ impl ConnectionInfo {
             endpoint,
             timeout: None,
             local_endpoint: None,
+            settings: Default::default(),
         }
     }
 
@@ -74,6 +82,11 @@ impl ConnectionInfo {
     /// adapter may be used with an OS-assigned port.
     pub fn set_local_endpoint(&mut self, local: SocketAddr) {
         self.local_endpoint = Some(local);
+    }
+
+    /// Use a different master address for this endpoint
+    pub fn set_master_address(&mut self, address: EndpointAddress) {
+        self.settings.master_address = Some(address);
     }
 }
 
