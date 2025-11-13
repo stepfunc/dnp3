@@ -651,7 +651,27 @@ dnp3_tls_client_config_t get_self_signed_tls_config()
 }
 
 // create a channel based on the command line arguments
-dnp3_param_error_t create_and_run_channel(int argc, char *argv[], dnp3_runtime_t *runtime)
+dnp3_param_error_t create_and_run_channel(const char* type, dnp3_runtime_t *runtime)
+{
+    if (strcmp(type, "tcp") == 0) {
+        return run_tcp_channel(runtime);
+    }
+    else if (strcmp(type, "serial") == 0) {
+        return run_serial_channel(runtime);
+    }
+    else if (strcmp(type, "tls-ca") == 0) {
+        return run_tls_channel(runtime, get_ca_tls_config());
+    }
+    else if (strcmp(type, "tls-self-signed") == 0) {
+        return run_tls_channel(runtime, get_self_signed_tls_config());
+    }
+    else {
+        printf("unknown channel type: %s\n", type);
+        return -1;
+    }
+}
+
+int main(int argc, char *argv[])
 {
     if(argc != 2) {
         printf("you must specify a transport type\n");
@@ -659,26 +679,6 @@ dnp3_param_error_t create_and_run_channel(int argc, char *argv[], dnp3_runtime_t
         return -1;
     }
 
-    if (strcmp(argv[1], "tcp") == 0) {
-        return run_tcp_channel(runtime);
-    }
-    else if (strcmp(argv[1], "serial") == 0) {
-        return run_serial_channel(runtime);
-    }
-    else if (strcmp(argv[1], "tls-ca") == 0) {
-        return run_tls_channel(runtime, get_ca_tls_config());
-    }
-    else if (strcmp(argv[1], "tls-self-signed") == 0) {
-        return run_tls_channel(runtime, get_self_signed_tls_config());
-    }
-    else {
-        printf("unknown channel type: %s\n", argv[1]);
-        return -1;
-    }
-}
-
-int main(int argc, char *argv[])
-{
     // ANCHOR: logging_init
     // initialize logging with the default configuration
     dnp3_configure_logging(dnp3_logging_config_init(), get_logger());
@@ -697,7 +697,7 @@ int main(int argc, char *argv[])
     }
 
     // create a channel based on the cmd line arguments and run it
-    int res = create_and_run_channel(argc, argv, runtime);
+    int res = create_and_run_channel(argv[1], runtime);
     
     // ANCHOR: runtime_destroy
     dnp3_runtime_destroy(runtime);

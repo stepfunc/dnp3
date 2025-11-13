@@ -74,7 +74,12 @@ impl ClientTask {
     async fn connect(&mut self) -> Result<(PhysLayer, SocketAddr, Option<Arc<String>>), Duration> {
         loop {
             let conn_info = self.connect_handler.next()?;
+            let settings = conn_info.settings;
             if let Some((phys, addr, hostname)) = self.connect_to_endpoint(conn_info).await {
+                if let Some(master_address) = settings.master_address {
+                    self.session.change_master_address(master_address);
+                }
+
                 self.connect_handler
                     .connected(addr, hostname.as_ref().map(|x| x.as_str()));
                 return Ok((phys, addr, hostname));

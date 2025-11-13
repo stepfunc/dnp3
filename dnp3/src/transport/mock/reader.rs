@@ -54,17 +54,17 @@ impl MockReader {
         unimplemented!()
     }
 
-    pub(crate) fn peek(&self) -> Option<TransportData> {
+    pub(crate) fn peek(&self) -> Option<TransportData<'_>> {
         Some(TransportData::Fragment(self.get(self.count)?))
     }
 
-    pub(crate) fn pop(&mut self) -> Option<TransportData> {
+    pub(crate) fn pop(&mut self) -> Option<TransportData<'_>> {
         let count = self.count;
         self.count = 0;
         Some(TransportData::Fragment(self.get(count)?))
     }
 
-    fn get(&self, count: usize) -> Option<Fragment> {
+    fn get(&self, count: usize) -> Option<Fragment<'_>> {
         if count == 0 {
             return None;
         }

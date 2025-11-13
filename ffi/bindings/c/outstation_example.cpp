@@ -360,16 +360,20 @@ void run_tcp_client(dnp3::Runtime &runtime)
 
 class MyConnectionHandler : public ClientConnectionHandler {
 private:
-    std::vector<std::string> endpoints;
+    struct Target {
+        std::string endpoint;
+        uint16_t master_address;
+    };
+    std::vector<Target> endpoints;
     size_t current_endpoint;
     int connection_attempts;
     bool cycle_completed;
 
 public:
     MyConnectionHandler() : current_endpoint(0), connection_attempts(0), cycle_completed(false) {
-        endpoints.push_back("127.0.0.1:20000");
-        endpoints.push_back("127.0.0.1:20001");
-        endpoints.push_back("127.0.0.1:20002");
+        endpoints.push_back({"127.0.0.1:20000", 1});
+        endpoints.push_back({"127.0.0.1:20001", 2});
+        endpoints.push_back({"127.0.0.1:20002", 3});
     }
 
     void next(NextEndpointAction& action) override {
@@ -381,11 +385,24 @@ public:
             return;
         }
 
-        std::string endpoint = endpoints[current_endpoint];
-        std::cout << "ConnectionManager: Attempting to connect to " << endpoint << " (endpoint "
+        const auto target = endpoints[current_endpoint];
+        std::cout << "ConnectionManager: Attempting to connect to " << target.endpoint << " (endpoint "
                   << (current_endpoint + 1) << " of " << endpoints.size() << ")" << std::endl;
-        // Connect with 10 second timeout
-        action.connect_to(endpoint, std::chrono::milliseconds(10000), "");
+        // Connect with 10 second timeout using the ConnectionInfo builder
+        ConnectionInfo info;
+        if (info.set_endpoint(target.endpoint) != ParamError::ok) {
+            std::cout << "ConnectionManager: Failed to set endpoint: " << target.endpoint << std::endl;
+            action.sleep_for(std::chrono::seconds(5));
+            return;
+        }
+        // give each endpoint its own master address to demonstrate per-connection overrides
+        if (info.set_master_address(target.master_address) != ParamError::ok) {
+            std::cout << "ConnectionManager: Failed to set master address: " << target.master_address << std::endl;
+            action.sleep_for(std::chrono::seconds(5));
+            return;
+        }
+        info.set_timeout(std::chrono::milliseconds(10000));
+        action.connect_to(info);
 
         // Cycle through endpoints for round-robin behavior
         current_endpoint = (current_endpoint + 1) % endpoints.size();
@@ -530,19 +547,19 @@ dnp3::TlsServerConfig get_tls_self_signed_config()
 
 int main(int argc, char *argv[])
 {
-    Logging::configure(LoggingConfig(), logger(
-        [](LogLevel level, std::string message) {
-            std::cout << message;
-        }
-    ));
-
-    auto runtime = Runtime(RuntimeConfig());
-
     if (argc != 2) {
         std::cout << "you must specify a transport type" << std::endl;
         std::cout << "usage: cpp-outstation-example <channel> (tcp, tcp-client, tcp-client-manager, serial, udp, tls-ca, tls-self-signed)" << std::endl;
         return -1;
     }
+
+    Logging::configure(LoggingConfig(), logger(
+            [](LogLevel level, std::string message) {
+                std::cout << message;
+            }
+    ));
+
+    auto runtime = Runtime(RuntimeConfig());
 
     const auto type = argv[1];
 

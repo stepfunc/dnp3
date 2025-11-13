@@ -352,6 +352,10 @@ impl OutstationSession {
         }
     }
 
+    pub(crate) fn change_master_address(&mut self, address: EndpointAddress) {
+        self.destination.link = address;
+    }
+
     pub(crate) fn enabled(&self) -> Enabled {
         self.enabled
     }

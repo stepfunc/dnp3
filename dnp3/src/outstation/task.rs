@@ -1,6 +1,7 @@
 use crate::app::parse::options::ParseOptions;
 use crate::decode::DecodeLevel;
 use crate::link::reader::LinkModes;
+use crate::link::EndpointAddress;
 use crate::outstation::config::*;
 use crate::outstation::database::DatabaseHandle;
 use crate::outstation::session::OutstationSession;
@@ -90,6 +91,10 @@ impl OutstationTask {
 
     pub(crate) fn enabled(&self) -> Enabled {
         self.session.enabled()
+    }
+
+    pub(crate) fn change_master_address(&mut self, address: EndpointAddress) {
+        self.session.change_master_address(address);
     }
 
     /// run the outstation task asynchronously until a `SessionError` occurs

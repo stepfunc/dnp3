@@ -669,16 +669,8 @@ int run_tls_server(dnp3_runtime_t *runtime, dnp3_tls_server_config_t config)
     return ret;
 }
 
-int run_transport(int argc, char *argv[], dnp3_runtime_t* runtime)
+int run_transport(const char* type, dnp3_runtime_t* runtime)
 {    
-    if (argc != 2) {
-        printf("you must specify a transport type\n");
-        printf("usage: outstation-example <channel> (tcp, serial, tls-ca, tls-self-signed)\n");
-        return -1;
-    }
-
-    const char* type = argv[1];
-
     if (strcmp(type, "tcp") == 0) {
         return run_tcp_server(runtime);
     }
@@ -692,13 +684,19 @@ int run_transport(int argc, char *argv[], dnp3_runtime_t* runtime)
         return run_tls_server(runtime, get_tls_self_signed_config());
     }
     else {
-        printf("unknown channel type: %s\n", argv[1]);
+        printf("unknown channel type: %s\n", type);
         return -1;
     }
 }
 
 int main(int argc, char *argv[])
 {
+    if (argc != 2) {
+        printf("you must specify a transport type\n");
+        printf("usage: outstation-example <channel> (tcp, serial, tls-ca, tls-self-signed)\n");
+        return -1;
+    }
+
     // initialize logging with the default configuration
     dnp3_configure_logging(dnp3_logging_config_init(), get_logger());
     
@@ -716,7 +714,7 @@ int main(int argc, char *argv[])
     }
 
     // use the command line arguments to run a specific transport type
-    int ret = run_transport(argc, argv, runtime);
+    int ret = run_transport(argv[1], runtime);
 
     // cleanup the runtime before exit
     dnp3_runtime_destroy(runtime);

@@ -573,6 +573,12 @@ dnp3::TlsClientConfig get_self_signed_tls_config()
 
 int main(int argc, char *argv[])
 {
+    if (argc != 2) {
+        std::cout << "you must specify a transport type" << std::endl;
+        std::cout << "usage: cpp-master-example <channel> (tcp, serial, tls-ca, tls-self-signed)" << std::endl;
+        return -1;
+    }
+
     // ANCHOR: logging_init
     dnp3::Logging::configure(dnp3::LoggingConfig(), std::make_unique<Logger>());
     // ANCHOR_END: logging_init
@@ -580,12 +586,6 @@ int main(int argc, char *argv[])
     // ANCHOR: runtime_create
     auto runtime = dnp3::Runtime(dnp3::RuntimeConfig());
     // ANCHOR_END: runtime_create
-
-    if (argc != 2) {
-        std::cout << "you must specify a transport type" << std::endl;
-        std::cout << "usage: cpp-outstation-example <channel> (tcp, serial, tls-ca, tls-self-signed)" << std::endl;
-        return -1;
-    }
 
     const auto type = argv[1];
 

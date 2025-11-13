@@ -1,4 +1,5 @@
 use crate::app::{ConnectStrategy, ExponentialBackOff, RetryStrategy};
+use crate::link::EndpointAddress;
 use crate::tcp::{ConnectOptions, EndpointList};
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -45,12 +46,18 @@ impl From<String> for Endpoint {
     }
 }
 
+#[derive(Default, Copy, Clone, Debug)]
+pub(crate) struct SessionSettings {
+    pub(crate) master_address: Option<EndpointAddress>,
+}
+
 /// Information about the next connection attempt
 #[derive(Clone, Debug)]
 pub struct ConnectionInfo {
     pub(crate) endpoint: Endpoint,
     pub(crate) timeout: Option<Duration>,
     pub(crate) local_endpoint: Option<SocketAddr>,
+    pub(crate) settings: SessionSettings,
 }
 
 impl ConnectionInfo {
@@ -61,6 +68,7 @@ impl ConnectionInfo {
             endpoint,
             timeout: None,
             local_endpoint: None,
+            settings: Default::default(),
         }
     }
 
@@ -70,10 +78,37 @@ impl ConnectionInfo {
         self.timeout = Some(timeout);
     }
 
-    /// Set the local address to which the socket is bound. If not specified, then any available
-    /// adapter may be used with an OS-assigned port.
+    /// Set the local address to which the socket is bound.
+    ///
+    /// If not specified, the OS will select the network adapter based on the routing table
+    /// for the destination address, and assign an ephemeral port.
+    ///
+    /// # Use Cases
+    ///
+    /// This is primarily useful for enforcing network segmentation in multi-homed systems,
+    /// such as OT gateways that bridge device and enterprise networks. By explicitly binding
+    /// to a specific adapter, you ensure traffic goes out the correct interface regardless
+    /// of routing table configuration, providing defense against misconfiguration.
+    ///
+    /// # Port Selection
+    ///
+    /// Typically you should specify port 0 to let the OS assign an ephemeral port while
+    /// forcing a specific network adapter. Using a specific non-zero port is rarely needed
+    /// for client connections and may cause bind failures if the port is already in use.
     pub fn set_local_endpoint(&mut self, local: SocketAddr) {
         self.local_endpoint = Some(local);
+    }
+
+    /// Change the master address for this and all subsequent connections.
+    ///
+    /// The master address change is persistent and remains active across reconnections
+    /// until explicitly changed again. This is useful when an outstation needs to communicate
+    /// with different masters at different endpoints, such as during failover scenarios or
+    /// when connecting to a backup master.
+    ///
+    /// By default, the outstation uses the master address specified in its configuration.
+    pub fn set_master_address(&mut self, address: EndpointAddress) {
+        self.settings.master_address = Some(address);
     }
 }
 

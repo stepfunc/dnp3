@@ -1,5 +1,6 @@
 use crate::app::Shutdown;
 use crate::link::error::LinkError;
+use crate::link::EndpointAddress;
 use crate::util::phys::PhysLayer;
 use std::time::Duration;
 
@@ -95,6 +96,17 @@ impl Session {
     pub(crate) fn outstation(task: crate::outstation::task::OutstationTask) -> Self {
         Self {
             inner: SessionType::Outstation(Box::new(task)),
+        }
+    }
+
+    pub(crate) fn change_master_address(&mut self, address: EndpointAddress) {
+        match &mut self.inner {
+            SessionType::Master(_) => {
+                tracing::warn!("Attempted to change master address on a master session. This feature is only supported for outstation clients.");
+            }
+            SessionType::Outstation(x) => {
+                x.change_master_address(address);
+            }
         }
     }
 
