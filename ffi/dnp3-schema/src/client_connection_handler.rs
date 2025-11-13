@@ -94,7 +94,7 @@ fn define_connection_info(
         .param(
             "timeout_ms",
             DurationType::Milliseconds,
-            "Connection timeout (0 means use OS default)",
+            "Connection timeout",
         )?
         .doc(doc("Set the connection timeout").details(
             "Optional: If not called, the operating system's default timeout will be used",
@@ -117,7 +117,6 @@ fn define_connection_info(
                 .details("Optional: If not called, the OS will select the network adapter based on the routing table for the destination address, and assign an ephemeral port.")
                 .details("This is primarily useful for enforcing network segmentation in multi-homed systems, such as OT gateways that bridge device and enterprise networks. By explicitly binding to a specific adapter, you ensure traffic goes out the correct interface regardless of routing table configuration.")
                 .details("Typically you should specify port 0 to let the OS assign an ephemeral port while forcing a specific network adapter. Using a specific non-zero port is rarely needed for client connections and may cause bind failures if the port is already in use.")
-                .details("Pass an empty string to explicitly use the default OS behavior.")
         )?
         .build()?;
 
@@ -136,9 +135,13 @@ fn define_connection_info(
         )?
         .build()?;
 
+    let destructor =
+        lib.define_destructor(connection_info.clone(), "Destroy a ConnectionInfo instance")?;
+
     let connection_info = lib
         .define_class(&connection_info)?
         .constructor(constructor)?
+        .destructor(destructor)?
         .method(set_endpoint)?
         .method(set_timeout)?
         .method(set_local_endpoint)?

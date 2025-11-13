@@ -32,9 +32,7 @@ impl ConnectionInfo {
     }
 
     pub(crate) fn set_timeout(&mut self, timeout: Duration) {
-        if !timeout.is_zero() {
-            self.timeout = Some(timeout);
-        }
+        self.timeout = Some(timeout);
     }
 
     pub(crate) fn set_local_endpoint(&mut self, local: SocketAddr) {
@@ -83,6 +81,12 @@ pub(crate) unsafe fn connection_info_create() -> *mut ConnectionInfo {
     Box::into_raw(Box::new(ConnectionInfo::new()))
 }
 
+pub(crate) unsafe fn connection_info_destroy(instance: *mut ConnectionInfo) {
+    if !instance.is_null() {
+        drop(Box::from_raw(instance));
+    }
+}
+
 pub(crate) unsafe fn connection_info_set_endpoint(
     instance: *mut ConnectionInfo,
     endpoint: &CStr,
@@ -129,10 +133,6 @@ pub(crate) unsafe fn connection_info_set_local_endpoint(
             return ParamError::NullParameter;
         }
     };
-
-    if local_endpoint.to_bytes().is_empty() {
-        return ParamError::Ok; // Empty string means don't set it
-    }
 
     let local_addr = match local_endpoint.to_str() {
         Ok(s) => match SocketAddr::from_str(s) {
