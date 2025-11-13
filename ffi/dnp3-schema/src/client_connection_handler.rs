@@ -1,13 +1,15 @@
 use oo_bindgen::model::{
-    AsynchronousInterface, BackTraced, DurationType, LibraryBuilder, StringType,
+    doc, AsynchronousInterface, BackTraced, DurationType, LibraryBuilder, Primitive, StringType,
 };
 
 pub(crate) fn define(
     lib: &mut LibraryBuilder,
     shared: &crate::shared::SharedDefinitions,
 ) -> BackTraced<AsynchronousInterface> {
-    // Define the NextEndpointAction abstract class first
-    let next_endpoint_action = define_next_endpoint_action(lib, shared)?;
+    // Define the ConnectionInfo class first
+    let connection_info = define_connection_info(lib, shared)?;
+    // Define the NextEndpointAction abstract class
+    let next_endpoint_action = define_next_endpoint_action(lib, shared, &connection_info)?;
 
     let handler = lib
         .define_interface(
@@ -60,28 +62,103 @@ pub(crate) fn define(
     Ok(handler)
 }
 
+fn define_connection_info(
+    lib: &mut LibraryBuilder,
+    shared: &crate::shared::SharedDefinitions,
+) -> BackTraced<oo_bindgen::model::ClassHandle> {
+    let connection_info = lib.declare_class("connection_info")?;
+
+    let constructor = lib
+        .define_constructor(connection_info.clone())?
+        .doc("Create a new ConnectionInfo. You must call set_endpoint() before using it.")?
+        .build()?;
+
+    let set_endpoint = lib
+        .define_method("set_endpoint", connection_info.clone())?
+        .param(
+            "endpoint",
+            StringType,
+            "Endpoint to connect to (hostname or IP:port)",
+        )?
+        .returns(
+            shared.error_type.clone_enum(),
+            "Error status - Ok if successful",
+        )?
+        .doc(doc("Set the endpoint to connect to").details(
+            "This method must be called before passing the ConnectionInfo to connect_to()",
+        ))?
+        .build()?;
+
+    let set_timeout = lib
+        .define_method("set_timeout", connection_info.clone())?
+        .param(
+            "timeout_ms",
+            DurationType::Milliseconds,
+            "Connection timeout (0 means use OS default)",
+        )?
+        .doc(doc("Set the connection timeout").details(
+            "Optional: If not called, the operating system's default timeout will be used",
+        ))?
+        .build()?;
+
+    let set_local_endpoint = lib
+        .define_method("set_local_endpoint", connection_info.clone())?
+        .param(
+            "local_endpoint",
+            StringType,
+            "Local address to bind to",
+        )?
+        .returns(
+            shared.error_type.clone_enum(),
+            "Error status - Ok if successful",
+        )?
+        .doc(
+            doc("Set the local endpoint to bind to")
+                .details("Optional: If not called, any available network adapter will be used with an OS-assigned port. Pass an empty string to explicitly use the default behavior.")
+        )?
+        .build()?;
+
+    let set_master_address = lib
+        .define_method("set_master_address", connection_info.clone())?
+        .param("address", Primitive::U16, "Master link-layer address")?
+        .returns(
+            shared.error_type.clone_enum(),
+            "Error status - Ok if successful",
+        )?
+        .doc(
+            doc("Change the master address for this and all subsequent connections")
+                .details("Optional: The master address change is persistent and remains active across reconnections until explicitly changed again.")
+                .details("This is useful when an outstation needs to communicate with different masters at different endpoints, such as during failover scenarios or when connecting to a backup master.")
+                .details("If not called, the outstation uses the master address specified in its configuration.")
+        )?
+        .build()?;
+
+    let connection_info = lib
+        .define_class(&connection_info)?
+        .constructor(constructor)?
+        .method(set_endpoint)?
+        .method(set_timeout)?
+        .method(set_local_endpoint)?
+        .method(set_master_address)?
+        .doc("Builder for configuring connection parameters")?
+        .build()?;
+
+    Ok(connection_info)
+}
+
 fn define_next_endpoint_action(
     lib: &mut LibraryBuilder,
     shared: &crate::shared::SharedDefinitions,
+    connection_info: &oo_bindgen::model::ClassHandle,
 ) -> BackTraced<oo_bindgen::model::ClassHandle> {
     let next_endpoint_action = lib.declare_class("next_endpoint_action")?;
 
     let connect_to = lib
         .define_method("connect_to", next_endpoint_action.clone())?
         .param(
-            "endpoint",
-            StringType,
-            "Endpoint to connect to (hostname or IP:port)",
-        )?
-        .param(
-            "timeout_ms",
-            DurationType::Milliseconds,
-            "Connection timeout (0 means use OS default)",
-        )?
-        .param(
-            "local_endpoint",
-            StringType,
-            "Local address to bind to (empty string means any)",
+            "info",
+            connection_info.declaration(),
+            "Connection information including endpoint and optional parameters",
         )?
         .returns(
             shared.error_type.clone_enum(),
