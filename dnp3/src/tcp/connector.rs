@@ -78,8 +78,23 @@ impl ConnectionInfo {
         self.timeout = Some(timeout);
     }
 
-    /// Set the local address to which the socket is bound. If not specified, then any available
-    /// adapter may be used with an OS-assigned port.
+    /// Set the local address to which the socket is bound.
+    ///
+    /// If not specified, the OS will select the network adapter based on the routing table
+    /// for the destination address, and assign an ephemeral port.
+    ///
+    /// # Use Cases
+    ///
+    /// This is primarily useful for enforcing network segmentation in multi-homed systems,
+    /// such as OT gateways that bridge device and enterprise networks. By explicitly binding
+    /// to a specific adapter, you ensure traffic goes out the correct interface regardless
+    /// of routing table configuration, providing defense against misconfiguration.
+    ///
+    /// # Port Selection
+    ///
+    /// Typically you should specify port 0 to let the OS assign an ephemeral port while
+    /// forcing a specific network adapter. Using a specific non-zero port is rarely needed
+    /// for client connections and may cause bind failures if the port is already in use.
     pub fn set_local_endpoint(&mut self, local: SocketAddr) {
         self.local_endpoint = Some(local);
     }

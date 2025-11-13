@@ -114,7 +114,10 @@ fn define_connection_info(
         )?
         .doc(
             doc("Set the local endpoint to bind to")
-                .details("Optional: If not called, any available network adapter will be used with an OS-assigned port. Pass an empty string to explicitly use the default behavior.")
+                .details("Optional: If not called, the OS will select the network adapter based on the routing table for the destination address, and assign an ephemeral port.")
+                .details("This is primarily useful for enforcing network segmentation in multi-homed systems, such as OT gateways that bridge device and enterprise networks. By explicitly binding to a specific adapter, you ensure traffic goes out the correct interface regardless of routing table configuration.")
+                .details("Typically you should specify port 0 to let the OS assign an ephemeral port while forcing a specific network adapter. Using a specific non-zero port is rarely needed for client connections and may cause bind failures if the port is already in use.")
+                .details("Pass an empty string to explicitly use the default OS behavior.")
         )?
         .build()?;
 
