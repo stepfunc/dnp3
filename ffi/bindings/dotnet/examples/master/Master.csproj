@@ -13,7 +13,7 @@
     </When>
     <Otherwise>
       <ItemGroup>
-        <PackageReference Include="dnp3" Version="1.7.0-M1" />
+        <PackageReference Include="dnp3" Version="1.7.0-RC1" />
       </ItemGroup>
     </Otherwise>
   </Choose>

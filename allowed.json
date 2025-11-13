@@ -27,6 +27,7 @@
     "dunce",
     "either",
     "errno",
+    "find-msvc-tools",
     "fs_extra",
     "gimli",
     "glob",
@@ -45,6 +46,7 @@
     "nom",
     "object",
     "oo-bindgen",
+    "once_cell_polyfill",
     "os_str_bytes",
     "paste",
     "pathdiff",
@@ -1403,6 +1405,17 @@
     },
     "serde": {
       "id": "serde",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": "NotPresent"
+          }
+        }
+      ]
+    },
+    "serde_core": {
+      "id": "serde_core",
       "source": "crates.io",
       "licenses": [
         {

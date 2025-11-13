@@ -1,18 +1,21 @@
 
-### 1.7.0-M2 ###
-* :shield: Add security policy and automated supply chain scanning. See [#394](https://github.com/stepfunc/dnp3/pull/394).
-* :wrench: Add quality gate to prevent releases when tests fail. See [#393](https://github.com/stepfunc/dnp3/pull/393).
-* :bug: Fix Maven Central deployment issues for post-OSSRH era.
-* :wrench: Refactor release workflow into separate idempotent jobs for improved reliability.
-
-### 1.7.0-M1 ###
-* :star: Add outstation ConnectionManager with fine-grained connection control for TCP and TLS clients. See [#381](https://github.com/stepfunc/dnp3/pull/381).
+### 1.7.0-RC1 ###
+* :star: Add outstation ConnectionManager with fine-grained connection control for TCP and TLS clients. See [#381](https://github.com/stepfunc/dnp3/pull/381), [#406](https://github.com/stepfunc/dnp3/pull/406).
   * New Rust API: `spawn_outstation_tcp_client_2()` and `spawn_outstation_tls_client_2()` functions with `ClientConnectionHandler` trait
   * New FFI API: `outstation_create_tcp_client_with_handler()` and `outstation_create_tls_client_with_handler()` functions
   * Provides dynamic endpoint selection, custom retry logic, connection lifecycle notifications, and DNS resolution handling
+  * Per-connection master address override via `ConnectionInfo::set_master_address()` for failover scenarios
+* :star: Add DirectWriteAbsTime time sync procedure for non-conformant outstations. See [#403](https://github.com/stepfunc/dnp3/pull/403).
+  * Writes Group 50 Var 1 directly without delay measurement for outstations that don't properly implement IEEE-1815 time sync
 * :star: Add optional support for parsing and transmission of zero-length octet strings via global setting. See [#379](https://github.com/stepfunc/dnp3/pull/379).
 * :star: Add optional support for AWS libcrypto (aws-lc-rs) as TLS backend. See [#378](https://github.com/stepfunc/dnp3/pull/378).
+* :star: Make OctetString constructor public in Java bindings. See [#402](https://github.com/stepfunc/dnp3/pull/402).
+* :star: Make HeaderInfo constructor public for mockability in tests. See [#404](https://github.com/stepfunc/dnp3/pull/404).
+* :shield: Add security policy and automated supply chain scanning. See [#394](https://github.com/stepfunc/dnp3/pull/394).
+* :wrench: Add quality gate to prevent releases when tests fail. See [#393](https://github.com/stepfunc/dnp3/pull/393).
+* :wrench: Automate cargo publish to crates.io in CI release process. See [#407](https://github.com/stepfunc/dnp3/pull/407).
 * :wrench: Better CLI examples with improved organization and documentation. See [#375](https://github.com/stepfunc/dnp3/pull/375).
+* :wrench: Refactor release workflow into separate idempotent jobs for improved reliability.
 * :book: Update TLS documentation to clarify empty string behavior for certificate passwords and improve grammar. See [#389](https://github.com/stepfunc/dnp3/pull/389).
 
 ### 1.6.0 ###
