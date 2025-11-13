@@ -356,8 +356,27 @@ jobs:
     steps:
       - name: Quality checks passed
         run: echo "✅ All quality checks passed successfully"
-  
+
   # Release jobs - each can run independently and is idempotent
+  release-crates-io:
+    needs: [quality-gate]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Publish to crates.io
+        run: |
+          VERSION=${{github.ref_name}}
+          if curl -f -s "https://crates.io/api/v1/crates/dnp3/$VERSION" > /dev/null 2>&1; then
+            echo "✅ dnp3 $VERSION already published to crates.io - skipping"
+          else
+            echo "Publishing dnp3 $VERSION to crates.io..."
+            cargo publish -p dnp3 --token ${{ secrets.CRATES_PUBLISH_TOKEN }}
+          fi
+
   release-docs:
     needs: [packaging, quality-gate]
     runs-on: ubuntu-latest
@@ -504,7 +523,7 @@ jobs:
             --skip-duplicate
   
   create-github-release:
-    needs: [release-docs, release-maven, release-nuget]
+    needs: [release-docs, release-maven, release-nuget, release-crates-io]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
