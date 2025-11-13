@@ -1611,14 +1611,15 @@ dependencies = [
 
 [[package]]
 name = "tokio-serial"
-version = "5.4.3"
+version = "5.4.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e5488e0c75c70e880823aebc3ad4ac0a6da6f48d95bc1b9a52bd3200d6f1e724"
+checksum = "aa1d5427f11ba7c5e6384521cfd76f2d64572ff29f3f4f7aa0f496282923fdc8"
 dependencies = [
  "cfg-if",
  "futures",
  "log",
  "mio-serial",
+ "serialport",
  "tokio",
 ]
 
