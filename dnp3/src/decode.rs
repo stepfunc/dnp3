@@ -25,8 +25,10 @@ pub struct DecodeLevel {
     feature = "serialization",
     derive(serde::Serialize, serde::Deserialize)
 )]
+#[derive(Default)]
 pub enum AppDecodeLevel {
     /// Decode nothing
+    #[default]
     Nothing,
     /// Decode the header-only
     Header,
@@ -36,31 +38,21 @@ pub enum AppDecodeLevel {
     ObjectValues,
 }
 
-impl Default for AppDecodeLevel {
-    fn default() -> Self {
-        Self::Nothing
-    }
-}
-
 /// Controls how transmitted and received transport segments are decoded at the INFO log level
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(
     feature = "serialization",
     derive(serde::Serialize, serde::Deserialize)
 )]
+#[derive(Default)]
 pub enum TransportDecodeLevel {
     /// Decode nothing
+    #[default]
     Nothing,
     /// Decode the header
     Header,
     /// Decode the header and the raw payload as hexadecimal
     Payload,
-}
-
-impl Default for TransportDecodeLevel {
-    fn default() -> Self {
-        Self::Nothing
-    }
 }
 
 /// Controls how transmitted and received link frames are decoded at the INFO log level
@@ -69,19 +61,15 @@ impl Default for TransportDecodeLevel {
     feature = "serialization",
     derive(serde::Serialize, serde::Deserialize)
 )]
+#[derive(Default)]
 pub enum LinkDecodeLevel {
     /// Decode nothing
+    #[default]
     Nothing,
     /// Decode the header
     Header,
     /// Decode the header and the raw payload as hexadecimal
     Payload,
-}
-
-impl Default for LinkDecodeLevel {
-    fn default() -> Self {
-        Self::Nothing
-    }
 }
 
 /// Controls how data transmitted at the physical layer (TCP, serial, etc) is logged
@@ -90,19 +78,15 @@ impl Default for LinkDecodeLevel {
     feature = "serialization",
     derive(serde::Serialize, serde::Deserialize)
 )]
+#[derive(Default)]
 pub enum PhysDecodeLevel {
     /// Log nothing
+    #[default]
     Nothing,
     /// Log only the length of data that is sent and received
     Length,
     /// Log the length and the actual data that is sent and received
     Data,
-}
-
-impl Default for PhysDecodeLevel {
-    fn default() -> Self {
-        Self::Nothing
-    }
 }
 
 impl DecodeLevel {

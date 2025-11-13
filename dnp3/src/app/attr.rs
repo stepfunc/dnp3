@@ -127,9 +127,10 @@ pub mod var {
 }
 
 /// Set to which a device attribute belongs
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Default)]
 pub enum AttrSet {
     /// The default attribute set defined by DNP3.org
+    #[default]
     Default,
     /// Non-zero privately defined attribute set
     Private(u8),
@@ -165,12 +166,6 @@ impl AttrSet {
         }
 
         Ok(Self::new(value))
-    }
-}
-
-impl Default for AttrSet {
-    fn default() -> Self {
-        Self::Default
     }
 }
 
