@@ -84,7 +84,14 @@ impl ConnectionInfo {
         self.local_endpoint = Some(local);
     }
 
-    /// Use a different master address for this endpoint
+    /// Change the master address for this and all subsequent connections.
+    ///
+    /// The master address change is persistent and remains active across reconnections
+    /// until explicitly changed again. This is useful when an outstation needs to communicate
+    /// with different masters at different endpoints, such as during failover scenarios or
+    /// when connecting to a backup master.
+    ///
+    /// By default, the outstation uses the master address specified in its configuration.
     pub fn set_master_address(&mut self, address: EndpointAddress) {
         self.settings.master_address = Some(address);
     }
