@@ -35,8 +35,16 @@ impl ConnectionInfo {
         self.timeout = Some(timeout);
     }
 
+    pub(crate) fn clear_timeout(&mut self) {
+        self.timeout = None;
+    }
+
     pub(crate) fn set_local_endpoint(&mut self, local: SocketAddr) {
         self.local_endpoint = Some(local);
+    }
+
+    pub(crate) fn clear_local_endpoint(&mut self) {
+        self.local_endpoint = None;
     }
 
     pub(crate) fn set_master_address(&mut self, address: u16) -> ParamError {
@@ -120,6 +128,14 @@ pub(crate) unsafe fn connection_info_set_timeout(instance: *mut ConnectionInfo, 
     }
 }
 
+pub(crate) unsafe fn connection_info_clear_timeout(instance: *mut ConnectionInfo) {
+    if let Some(info) = instance.as_mut() {
+        info.clear_timeout();
+    } else {
+        tracing::warn!("connection_info_clear_timeout called with null ConnectionInfo instance");
+    }
+}
+
 pub(crate) unsafe fn connection_info_set_local_endpoint(
     instance: *mut ConnectionInfo,
     local_endpoint: &CStr,
@@ -155,6 +171,16 @@ pub(crate) unsafe fn connection_info_set_local_endpoint(
 
     info.set_local_endpoint(local_addr);
     ParamError::Ok
+}
+
+pub(crate) unsafe fn connection_info_clear_local_endpoint(instance: *mut ConnectionInfo) {
+    if let Some(info) = instance.as_mut() {
+        info.clear_local_endpoint();
+    } else {
+        tracing::warn!(
+            "connection_info_clear_local_endpoint called with null ConnectionInfo instance"
+        );
+    }
 }
 
 pub(crate) unsafe fn connection_info_set_master_address(

@@ -384,8 +384,15 @@ public:
         std::string endpoint = endpoints[current_endpoint];
         std::cout << "ConnectionManager: Attempting to connect to " << endpoint << " (endpoint "
                   << (current_endpoint + 1) << " of " << endpoints.size() << ")" << std::endl;
-        // Connect with 10 second timeout
-        action.connect_to(endpoint, std::chrono::milliseconds(10000), "");
+        // Connect with 10 second timeout using the ConnectionInfo builder
+        ConnectionInfo info;
+        if (info.set_endpoint(endpoint) != ParamError::ok) {
+            std::cout << "ConnectionManager: Failed to set endpoint: " << endpoint << std::endl;
+            action.sleep_for(std::chrono::seconds(5));
+            return;
+        }
+        info.set_timeout(std::chrono::milliseconds(10000));
+        action.connect_to(info);
 
         // Cycle through endpoints for round-robin behavior
         current_endpoint = (current_endpoint + 1) % endpoints.size();

@@ -101,6 +101,11 @@ fn define_connection_info(
         ))?
         .build()?;
 
+    let clear_timeout = lib
+        .define_method("clear_timeout", connection_info.clone())?
+        .doc("Clear any previously configured timeout so the OS default is used")?
+        .build()?;
+
     let set_local_endpoint = lib
         .define_method("set_local_endpoint", connection_info.clone())?
         .param(
@@ -118,6 +123,11 @@ fn define_connection_info(
                 .details("This is primarily useful for enforcing network segmentation in multi-homed systems, such as OT gateways that bridge device and enterprise networks. By explicitly binding to a specific adapter, you ensure traffic goes out the correct interface regardless of routing table configuration.")
                 .details("Typically you should specify port 0 to let the OS assign an ephemeral port while forcing a specific network adapter. Using a specific non-zero port is rarely needed for client connections and may cause bind failures if the port is already in use.")
         )?
+        .build()?;
+
+    let clear_local_endpoint = lib
+        .define_method("clear_local_endpoint", connection_info.clone())?
+        .doc("Clear any previously configured local endpoint so the OS chooses the interface and port")?
         .build()?;
 
     let set_master_address = lib
@@ -144,9 +154,16 @@ fn define_connection_info(
         .destructor(destructor)?
         .method(set_endpoint)?
         .method(set_timeout)?
+        .method(clear_timeout)?
         .method(set_local_endpoint)?
+        .method(clear_local_endpoint)?
         .method(set_master_address)?
-        .doc("Builder for configuring connection parameters")?
+        .doc(
+            doc("Builder for configuring connection parameters")
+                .details("Instances are passed to {class:next_endpoint_action.connect_to()} inside {interface:client_connection_handler.next()}.")
+                .details("You may construct a new instance for each callback to {interface:client_connection_handler.next()} or reuse a single instance to reduce allocations.")
+                .details("When reusing, call {class:connection_info.clear_timeout()} or {class:connection_info.clear_local_endpoint()} before setting new values if you need to revert to the default timeout or adapter selection."),
+        )?
         .build()?;
 
     Ok(connection_info)
