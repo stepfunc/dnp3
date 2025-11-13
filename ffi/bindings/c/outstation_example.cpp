@@ -360,16 +360,20 @@ void run_tcp_client(dnp3::Runtime &runtime)
 
 class MyConnectionHandler : public ClientConnectionHandler {
 private:
-    std::vector<std::string> endpoints;
+    struct Target {
+        std::string endpoint;
+        uint16_t master_address;
+    };
+    std::vector<Target> endpoints;
     size_t current_endpoint;
     int connection_attempts;
     bool cycle_completed;
 
 public:
     MyConnectionHandler() : current_endpoint(0), connection_attempts(0), cycle_completed(false) {
-        endpoints.push_back("127.0.0.1:20000");
-        endpoints.push_back("127.0.0.1:20001");
-        endpoints.push_back("127.0.0.1:20002");
+        endpoints.push_back({"127.0.0.1:20000", 1});
+        endpoints.push_back({"127.0.0.1:20001", 2});
+        endpoints.push_back({"127.0.0.1:20002", 3});
     }
 
     void next(NextEndpointAction& action) override {
@@ -381,13 +385,19 @@ public:
             return;
         }
 
-        std::string endpoint = endpoints[current_endpoint];
-        std::cout << "ConnectionManager: Attempting to connect to " << endpoint << " (endpoint "
+        const auto target = endpoints[current_endpoint];
+        std::cout << "ConnectionManager: Attempting to connect to " << target.endpoint << " (endpoint "
                   << (current_endpoint + 1) << " of " << endpoints.size() << ")" << std::endl;
         // Connect with 10 second timeout using the ConnectionInfo builder
         ConnectionInfo info;
-        if (info.set_endpoint(endpoint) != ParamError::ok) {
-            std::cout << "ConnectionManager: Failed to set endpoint: " << endpoint << std::endl;
+        if (info.set_endpoint(target.endpoint) != ParamError::ok) {
+            std::cout << "ConnectionManager: Failed to set endpoint: " << target.endpoint << std::endl;
+            action.sleep_for(std::chrono::seconds(5));
+            return;
+        }
+        // give each endpoint its own master address to demonstrate per-connection overrides
+        if (info.set_master_address(target.master_address) != ParamError::ok) {
+            std::cout << "ConnectionManager: Failed to set master address: " << target.master_address << std::endl;
             action.sleep_for(std::chrono::seconds(5));
             return;
         }
