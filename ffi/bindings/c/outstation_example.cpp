@@ -547,19 +547,19 @@ dnp3::TlsServerConfig get_tls_self_signed_config()
 
 int main(int argc, char *argv[])
 {
-    Logging::configure(LoggingConfig(), logger(
-        [](LogLevel level, std::string message) {
-            std::cout << message;
-        }
-    ));
-
-    auto runtime = Runtime(RuntimeConfig());
-
     if (argc != 2) {
         std::cout << "you must specify a transport type" << std::endl;
         std::cout << "usage: cpp-outstation-example <channel> (tcp, tcp-client, tcp-client-manager, serial, udp, tls-ca, tls-self-signed)" << std::endl;
         return -1;
     }
+
+    Logging::configure(LoggingConfig(), logger(
+            [](LogLevel level, std::string message) {
+                std::cout << message;
+            }
+    ));
+
+    auto runtime = Runtime(RuntimeConfig());
 
     const auto type = argv[1];
 
