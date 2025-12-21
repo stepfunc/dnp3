@@ -8,9 +8,7 @@ slug: /api/outstation/tcp_server
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-You can bind one or more outstation instances to a TCP server using an `AddressFilter`. Unlike most server protocols, each outstation instance can only
-communicate with one client at a time. This is because DNP3 is stateful and maintains event data for a specific master. If you need to support more than
-one master connection on the same port, you must preconfigure each master IP address and associate it with a specific outstation instance.
+Bind one or more outstation instances to a TCP server using an `AddressFilter`. Unlike most server protocols, each outstation can only communicate with one client at a time because DNP3 maintains event data for a specific master. To support multiple masters on the same port, preconfigure each master IP address and associate it with a specific outstation instance.
 
 ```mermaid
 graph TD
@@ -24,7 +22,7 @@ end
 
 ## Creating a server
 
-Begin by creating a `TCPServer` instance. Keep in mind that creating a server doesn't initiate `bind/listen` immediately. Endpoints are specified in the format `<address>:<port>`. Addresses may be specified as any valid IPv4 or IPv6 local endpoint, such as:
+Create a `TCPServer` instance. Creating a server doesn't initiate `bind/listen` immediately. Specify endpoints as `<address>:<port>` where address is any valid IPv4 or IPv6 local endpoint:
 
 * `127.0.0.1` for localhost only
 * `0.0.0.0` for all adapters
