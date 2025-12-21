@@ -208,5 +208,5 @@ openssl req -x509 -newkey rsa:4096 -keyout ./master_key.pem -out ./master_cert.p
 ```
 - Generate the outstation certificate:
 ```
-openssl req -x509 -newkey rsa:4096 -keyout ./outstation_key.pem -out ./outstation/entity2_cert.pem -subj "/C=US/ST=Oregon/L=Bend/O=Test/CN=DO NOT USE" -addext "subjectAltName=DNS:test.com" -nodes -days 365
+openssl req -x509 -newkey rsa:4096 -keyout ./outstation_key.pem -out ./outstation_cert.pem -subj "/C=US/ST=Oregon/L=Bend/O=Test/CN=DO NOT USE" -addext "subjectAltName=DNS:test.com" -nodes -days 365
 ```
