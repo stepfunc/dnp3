@@ -8,20 +8,17 @@ slug: /api/outstation/database
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-You can use the `Database` class to manipulate the measurement types and values that the outstation exposes to the master. Note that while it's called a "database", it's really just
-an in-memory data structure protected by a mutex.
+Use the `Database` class to manage measurements the outstation exposes to the master. Despite the name, it's just an in-memory data structure protected by a mutex.
 
 All database operations are executed inside a transaction protected by a mutex. Operations within a transaction are applied to the database and the
 event buffers atomically. If unsolicited responses are enabled, the outstation will automatically decide if an unsolicited response
 should be sent at the end of the transaction.
 
-The database may be accessed in a transaction in two different ways:
+Access the database in a transaction two ways:
 
-1. When measurement values need to be updated due to external changes, the user can call `Outstation.transaction` to acquire
-a locked reference to the database and make changes.
+1. Call `Outstation.transaction` to acquire a locked reference and make changes.
 
-2. Callbacks on the `ControlHandler` provide a `DatabaseHandle` which also has an identical `transaction method`. Similarly, the freeze operations on
-`OutstationApplication` provide this handle as well.
+2. `ControlHandler` callbacks and `OutstationApplication` freeze operations provide a `DatabaseHandle` with an identical `transaction` method.
 
 :::tip
 Structure any common update code to operate on the `Database` type and not depend on `Outstation` or `DatabaseHandle`.
@@ -29,7 +26,7 @@ Structure any common update code to operate on the `Database` type and not depen
 
 ## Adding Points
 
-You must initialize the points before the outstation exposes any measurement data. While you should do this when you create the outstation, you can add points to a running outstation as well. Each measurement type has unique configuration including:
+Initialize points before the outstation exposes measurement data. This is typically done at creation, but you can add points to a running outstation. Each measurement type has unique configuration:
 
 * An optional event class assignment for the point
 * Default static and event variations for the type
@@ -40,7 +37,7 @@ The default static and event variations for each point type may not do what you 
 some DNP3 event variations don't carry a timestamp. This can be confusing to new users who expect to see a timestamp
 value that changes as the outstation receives events.
 
-Refer to the documentation for each variation to understand the data associated with it.
+See the documentation for each variation to understand its data.
 :::
 
 When you add a point, it is assigned the following default value with `RESTART` flags:
@@ -53,9 +50,7 @@ When you add a point, it is assigned the following default value with `RESTART` 
 Update the value after adding the point if you don't want a connecting master to see the points with a `RESTART` flag set.
 
 :::tip
-The example code below only shows the definition of contiguous ranges of points, however, the library efficiently supports
-using discontiguous ranges as well. In fact, no matter how you define the indices, the library always uses a [BTreeMap](https://doc.rust-lang.org/std/collections/struct.BTreeMap.html)
-to store static values and their configuration.
+The examples show contiguous point ranges, but discontiguous ranges work efficiently too. The library uses a [BTreeMap](https://doc.rust-lang.org/std/collections/struct.BTreeMap.html) internally regardless of how you define indices.
 :::
 
 <Tabs

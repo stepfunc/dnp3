@@ -8,7 +8,7 @@ slug: /api/logging
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-The library provides highly-contextual logging using the [tracing](https://crates.io/crates/tracing) crate. If you're using Rust, refer to the
+The library uses the [tracing](https://crates.io/crates/tracing) crate for contextual logging. Rust users should refer to the
 tracing documentation for details.
 
 In comparison, the bindings use a rigid logging interface with a single callback method to record a message. Configurable options include:
@@ -87,7 +87,7 @@ use.
 
 ## Example Output
 
-The logs provide a wealth of contextual metadata so you can:
+Logs include contextual metadata so you can:
 
 * Determine which communication session produced the message
 * Understand what state the software was in when the event occurred
@@ -103,16 +103,14 @@ INFO DNP3-Master-TCP{endpoint="127.0.0.1:20000"}:Task{type=Function(DisableUnsol
 
 ## Protocol Decoding
 
-Protocol decoding is configurable on a per-communication channel basis, such as all traffic on a TCP socket or a serial port. You can specify the
-`DecodeLevel` when you create a master or outstation or adjust it at runtime. This struct controls the level of decoding (including none) that takes place for each layer of the
-protocol stack, including:
+Configure protocol decoding per communication channel (TCP socket, serial port, etc.) by setting `DecodeLevel` when creating a master or outstation, or adjust it at runtime. This controls decoding for each layer of the protocol stack:
 
 * Application-layer headers, object headers, and object values
 * Transport-layer header and payload
 * Link-layer header and payload
 * Physical-layer length and data bytes
 
-Refer to the language-specific API documentation for the meaning of each enumeration value. The decoding can even show the value of individual fields within objects:
+See the language-specific API documentation for enumeration values. Decoding can show individual field values within objects:
 
 ```
 APP TX - ctrl: [fir: true fin: true con: false uns: false seq: 1] func: Write ... (len = 6)
