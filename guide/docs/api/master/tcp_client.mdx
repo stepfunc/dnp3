@@ -8,8 +8,7 @@ slug: /api/master/tcp_client
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-A `MasterChannel` presents the same interface once you create it, regardless of the underlying transport. You can create a TCP client channel using the runtime,
-configuration data, and a callback to observe the status of the connection.
+A `MasterChannel` presents the same interface regardless of transport. Create a TCP client channel using the runtime, configuration data, and a connection status callback.
 
 <Tabs
 groupId="language"
@@ -65,7 +64,7 @@ The function is called within the context of the Tokio runtime, and is therefore
 
 ## Enabling
 
-A `MasterChannel` won't start communicating until you call the `enable` method. This gives you the opportunity to configure all the associations on the channel, as discussed in the next section. You can also `disable` the channel to put it in an inactive state.
+A `MasterChannel` won't communicate until you call `enable`. This lets you configure all associations first. Call `disable` to put the channel in an inactive state.
 
 ## LinkErrorMode
 
@@ -74,8 +73,7 @@ close the connection. However, you can treat a TCP channel like a serial port by
 
 ## EndpointList
 
-An `EndpointList` is a list of remote endpoints that the master will try to connect to. It must contain at least one entry, with the option to include additional backup
-addresses. The channel will round-robin through this list until it establishes a connection. The list may contain endpoints consisting of a `<host>:<port>` tuple where "host" is one of the following:
+An `EndpointList` contains remote endpoints the master will try to connect to. It must have at least one entry; additional entries serve as backups. The channel round-robins through the list until connected. Each endpoint is a `<host>:<port>` tuple where "host" is:
 
 * IPv4 address
 * IPv6 address

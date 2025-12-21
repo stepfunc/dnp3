@@ -95,7 +95,7 @@ target_link_libraries(my_awesome_project PRIVATE dnp3)
 
 ## Mapping
 
-Many of the concepts built into higher-level languages are just design patterns or idioms in C. When you see these higher levels patterns discussed in this guide, you can use the idioms to understand how they map to C.
+Many concepts built into higher-level languages are just design patterns or idioms in C. Use the idioms below to understand how they map to C.
 
 ### Classes
 
@@ -138,7 +138,7 @@ typedef struct dnp3_logger_t
 * `on_destroy` is the destructor that cleans up the `ctx`.
 * `on_message` is a function pointer used to dispatch a log message.
 
-Keep in mind that this example only contains a single method. Other interfaces will contain several methods.
+This example only contains a single method. Other interfaces contain several methods.
 
 :::warning
 Always use [C99 struct initialization](https://en.cppreference.com/w/c/language/struct_initialization) when defining interfaces
