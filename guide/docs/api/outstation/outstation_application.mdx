@@ -65,7 +65,7 @@ A provided reference to a `DatabaseHandle` may be used to copy counters to froze
 When defining an attribute, you may specify that it is writable. When the outstation receives a WRITE request containing
 an attribute it follows this procedure:
 
-1. If the attribute is has not been defined the outstation returns `IIN2.NO_FUNC_CODE_SUPPORT`.
+1. If the attribute has not been defined the outstation returns `IIN2.NO_FUNC_CODE_SUPPORT`.
 2. If the attribute is defined, but the value is not of the correct type the outstation returns `IIN.PARAMETER_ERROR`.
 3. The outstation then calls the appropriate handler to ask user code to validate and persist the new value. Rust has a single callback method
 whereas the bindings have a callback method for each type of attribute. These callbacks may return false to reject the WRITE. For example,

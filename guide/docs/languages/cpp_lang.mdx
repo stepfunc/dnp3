@@ -93,8 +93,8 @@ Collections are taken through a constant reference to a `std::vector`. The eleme
 
 ### Classes
 
-Classes have a opaque pointer inside and therefore cannot be copied. They can be moved around with `std::move`. If a method
-is called on a moved class it throw a `std::logic_error`.
+Classes have an opaque pointer inside and therefore cannot be copied. They can be moved around with `std::move`. If a method
+is called on a moved class it will throw a `std::logic_error`.
 
 The class destructor will call the underlying C destructor automatically.
 
@@ -110,7 +110,7 @@ function as an argument available in the `dnp3::functional` namespace.
 ### Async methods
 
 C++ doesn't have a robust model for asynchronous computations in the standard library (yet). You can only extract a value
-from a C++ `std::future` using the blocking `get` method and there is no way to chain asynchronously chain futures.
+from a C++ `std::future` using the blocking `get` method and there is no way to asynchronously chain futures.
 
 Asynchronous methods are mapped to callback interfaces with two methods:
 

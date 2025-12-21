@@ -88,7 +88,7 @@ a thread becomes unblocked.
 
 For example, when you receive a log message via a callback, a synchronous call to write the message to a file will block a thread. If this frequently occurs on all your pool threads, it can cause poor throughput or even task starvation. 
 
-For best results, avoid blocking whenever possible in your applications. Instead, you should defer blocking calls to dedicated worker threads, such as a user-managed thread that write log messages to file.
+For best results, avoid blocking whenever possible in your applications. Instead, you should defer blocking calls to dedicated worker threads, such as a user-managed thread that writes log messages to file.
 
 
 
