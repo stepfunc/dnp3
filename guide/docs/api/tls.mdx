@@ -8,9 +8,7 @@ slug: /api/tls
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-Masters and outstations may optionally use TLS which protects DNP3 communication by adding encryption and authentication. The DNP3 library uses
-[rustls](https://github.com/rustls/rustls), a modern TLS library written in safe Rust. It does **not** depend on OpenSSL or other system libraries, but will
-interoperate seamlessly with other implementations.
+Masters and outstations can use TLS for encryption and authentication. The library uses [rustls](https://github.com/rustls/rustls), a modern TLS library written in safe Rust. It does **not** depend on OpenSSL or other system libraries, but interoperates seamlessly with other implementations.
 
 Rustls has been [reviewed](https://github.com/rustls/rustls/raw/main/audit/TLS-01-report.pdf) by a third party and is production ready. It
 [outperforms](https://jbp.io/2019/07/01/rustls-vs-openssl-performance.html) OpenSSL in almost every aspect and has the backing of the
@@ -62,11 +60,10 @@ We recommend using TLS to secure DNP3 and caution the industry to avoid home-gro
 
 ## Configuration
 
-TLS configuration is configured using the `TlsClientConfig` or `TlsServerConfig` structures. They are very similar and contain the following fields:
+Configure TLS using `TlsClientConfig` or `TlsServerConfig`. Both contain these fields:
 
 - `name`:
-  * The client and the server both verify that the certificate presented by the peer is valid for this name. Check out the next section for the gory details on
-  name validation.
+  * Both client and server verify the peer's certificate is valid for this name. See the next section for name validation details.
   * The client will advertise this name through a Server Name Indication (SNI) extension in the `Client Hello`.
 - `peer_cert_path`:
   * Path to the unencrypted PEM file containing the trusted root certificate(s) or the peer self-signed certificate.
