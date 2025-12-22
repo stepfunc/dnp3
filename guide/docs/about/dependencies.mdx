@@ -8,11 +8,9 @@ slug: /dependencies
 import useBaseUrl from '@docusaurus/useBaseUrl';
 import sitedata from '../../sitedata.json'
 
-Rust's package manager (`cargo`) makes it easy to work with external dependencies. This is wonderful for development, but means that Rust applications
-and libraries tend to have many dependencies.
+Rust's package manager (`cargo`) makes it easy to work with external dependencies. This is great for development, but means Rust applications and libraries tend to have many dependencies.
 
-Our library only depends directly on a handful of third-party libraries; however, those libraries pull in dozens of their own dependencies. Here's how we manage
-our direct and indirect dependencies.
+Our library depends directly on a handful of third-party libraries, but those pull in dozens of their own. Here's how we manage dependencies.
 
 ## Dependency Allowlisting
 

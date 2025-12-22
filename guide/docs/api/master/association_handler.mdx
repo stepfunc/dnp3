@@ -8,10 +8,9 @@ slug: /api/master/association_handler
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-The `AssociationHandler` interface handles all the per-association callbacks that are unrelated to measurement data. It contains a single method (`get_current_time`)
-to retrieve a UTC timestamp used to synchronize the time on the outstation.
+`AssociationHandler` handles per-association callbacks unrelated to measurement data. It contains a single method (`get_current_time`) to retrieve a UTC timestamp for time synchronization.
 
-Typically, you'd return the system time in `get_current_time` which is kept synchronized via NTP. However, you can use a different clock if desired. For example, you might want a data concentrator to receive time from an upstream DNP3 master while maintaining an offset from an internal clock. The examples below demonstrate how to implement an `AssociationHandler` that retrieves the system time.
+Typically, return the system time (synchronized via NTP) in `get_current_time`. You can use a different clock if desired—for example, a data concentrator receiving time from an upstream DNP3 master. The examples below retrieve the system time.
 
 <Tabs
 groupId="language"

@@ -8,7 +8,7 @@ slug: /api/outstation/application
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-The `OutstationApplication` interface provides callbacks for dynamic events and information that the outstation requires from your application:
+`OutstationApplication` provides callbacks for dynamic events and information the outstation requires:
 
 * Internal Indication (IIN) bits
 * Processing requests to WRITE the time
@@ -19,8 +19,7 @@ The `OutstationApplication` interface provides callbacks for dynamic events and 
 
 ## ApplicationIin
 
-The outstation will call `OutstationApplication::getApplicationIin()` whenever the system performs a solicited or unsolicited response. It will merge
-private IIN bits with the bits returned by the `ApplicationIin` structure, which contains four internal indication bits that you can control:
+The outstation calls `OutstationApplication::getApplicationIin()` for every solicited or unsolicited response, merging your `ApplicationIin` bits with internal IIN bits. You control four bits:
 
 * `needTime`: Outstation requires time synchronization
 * `localControl`: Some output points are in local mode
@@ -52,10 +51,10 @@ If you must implement this functionality to pass conformance tests or due to cus
 
 `OutstationApplication` contains two methods related to freezing counters:
 
-* `freezeCountersAll`: This is called when a counter freeze operation is received using the All Points (0x06) qualifier.
-* `freezeCountersRange`: This is  called when a counter freeze operation is received using 8-bit (0x00) or 16-bit (0x01) range qualifiers.
+* `freezeCountersAll`: Called for freeze operations using the All Points (0x06) qualifier.
+* `freezeCountersRange`: Called for freeze operations using 8-bit (0x00) or 16-bit (0x01) range qualifiers.
 
-A provided reference to a `DatabaseHandle` may be used to copy counters to frozen counters. The `FreezeType` parameter lets you choose between two types of supported freeze operations:
+Use the provided `DatabaseHandle` to copy counters to frozen counters. `FreezeType` specifies the operation:
 
 * `IMMEDIATE_FREEZE`: Copy the current value of a counter to the associated frozen counter point.
 * `FREEZE_AND_CLEAR`: Copy the current value of a counter to the associated frozen counter point and clear the current value to 0.
@@ -65,7 +64,7 @@ A provided reference to a `DatabaseHandle` may be used to copy counters to froze
 When defining an attribute, you may specify that it is writable. When the outstation receives a WRITE request containing
 an attribute it follows this procedure:
 
-1. If the attribute is has not been defined the outstation returns `IIN2.NO_FUNC_CODE_SUPPORT`.
+1. If the attribute has not been defined the outstation returns `IIN2.NO_FUNC_CODE_SUPPORT`.
 2. If the attribute is defined, but the value is not of the correct type the outstation returns `IIN.PARAMETER_ERROR`.
 3. The outstation then calls the appropriate handler to ask user code to validate and persist the new value. Rust has a single callback method
 whereas the bindings have a callback method for each type of attribute. These callbacks may return false to reject the WRITE. For example,

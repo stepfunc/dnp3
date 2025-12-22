@@ -8,8 +8,7 @@ slug: /api/master/read_handler
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-The `ReadHandler` interface is used to receive values from the outstation as it is received by the master. This callback interface is specified
-for each association you create and is invoked for both unsolicited responses and responses to READ requests.
+The `ReadHandler` interface receives measurement values from the outstation. Specify it for each association; it's invoked for both unsolicited responses and READ responses.
 
 When a response is parsed and determined to carry measurement data, `ReadHandler` callbacks are executed in the following order:
 
@@ -35,9 +34,7 @@ Since responses may consist of multiple fragments, you can inspect the `Response
 in a response series.
 :::
 
-It is possible to send a read request with a specific `ReadHandler` by using the `MasterChannel::read_with_handler()` method.
-All the response data associated with the request will be forwarded to the `ReadHandler` specified as an argument instead of
-going to the handler specified at the creation of the association.
+Use `MasterChannel::read_with_handler()` to send a read request with a specific `ReadHandler`. Response data goes to the specified handler instead of the association's default handler.
 
 ## Device Attributes
 

@@ -24,7 +24,7 @@ A DNP3 outstation is a field device that provides measurement data and controls 
 * Capacitor banks
 * Voltage-regulators
 
-If you use DNP3 over TCP/IP, the outstation typically acts as a TCP server. This lets it accept connections from one or more masters acting as a TCP client.
+Over TCP/IP, the outstation typically acts as a server, accepting connections from one or more masters acting as TCP clients.
 
 :::note
 Unlike typical client/server architecture where multiple clients can access the same server, DNP3 statefully buffers event data for a specific master.
@@ -33,8 +33,7 @@ If you plan to connect multiple masters to the same TCP endpoint, you must preco
 
 ### Virtual RTUs
 
-You can also use a DNP3 outstation to transfer measurement and control data from a utility SCADA system to a historian or automation process. This is also known as a virtual remote terminal unit (RTU) since you implement it as a software
-processor within the SCADA server without separate physical hardware.
+A DNP3 outstation can transfer measurement and control data from a SCADA system to a historian or automation process. This is called a virtual RTU—a software processor within the SCADA server with no separate physical hardware.
 
 ```mermaid
 graph LR

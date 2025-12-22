@@ -18,7 +18,7 @@ Tokio is a modern evolution of libraries like [libuv (C)](https://libuv.org/) an
 
 ## Lifetime
 
-You must create a `Runtime` before any communication can take place. It is a shared resource for multiple communication sessions that is typically created just after initializing logging. It is also the last component to shut down; see below for more details about runtime shutdown.
+Create a `Runtime` before any communication can take place. It's a shared resource for multiple sessions, typically created just after initializing logging and shut down last when exiting.
 
 :::note
 Rust users can share the runtime with other libraries that also use Tokio. The bindings don't currently support sharing a runtime, but this will be possible in a future release.
@@ -88,7 +88,7 @@ a thread becomes unblocked.
 
 For example, when you receive a log message via a callback, a synchronous call to write the message to a file will block a thread. If this frequently occurs on all your pool threads, it can cause poor throughput or even task starvation. 
 
-For best results, avoid blocking whenever possible in your applications. Instead, you should defer blocking calls to dedicated worker threads, such as a user-managed thread that write log messages to file.
+Avoid blocking in callbacks whenever possible. Defer blocking calls to dedicated worker threads, such as a separate thread that writes log messages to file.
 
 
 
@@ -106,8 +106,7 @@ worker threads have been joined.
 A blocked worker thread can cause shutdown to deadlock. For example, if a communication channel makes a callback to user code
 that permanently blocks, `shutdown` will cause a deadlock.
 
-If you cannot ensure a clean shutdown, you can use `Runtime.set_shutdown_timeout(..)` to put an upper
-time limit on the eventual shut down. You would call this method immediately after creating the Runtime.
+If you cannot ensure a clean shutdown, use `Runtime.set_shutdown_timeout(..)` to set an upper time limit. Call this method immediately after creating the Runtime.
 
 **Shutting down the runtime using a timeout can leak memory as worker threads will be aborted if the timeout occurs. Only
 use this method if you are exiting the process anyway.**
@@ -166,7 +165,7 @@ Runtime shutdown is implicit when the runtime object gets destroyed.
 ```
 
 :::note
-If you don't call `Shutdown` before exiting, the JVM will shutdown the runtime in its finalize method. However, garbage collection is not deterministic, so your program may never properly exit. Make sure you explicitly shut down the runtime before exiting.
+If you don't call `Shutdown` before exiting, the JVM will shutdown the runtime in its finalize method. However, garbage collection is not deterministic, so your program may never properly exit. Always explicitly shut down the runtime before exiting.
 :::
 
 </TabItem>
@@ -177,12 +176,8 @@ If you don't call `Shutdown` before exiting, the JVM will shutdown the runtime i
 ```
 
 :::note
-If you don't call `Shutdown` before exiting, the .NET runtime will shut down the runtime in its finalizer (also called the destructor). Again, you should explicitly shut down the runtime before exiting instead of relying on this behavior.
+If you don't call `Shutdown` before exiting, the .NET runtime will shut down the runtime in its finalizer. Always explicitly shut down the runtime instead of relying on this behavior.
 :::
 
 </TabItem>
 </Tabs>
-
-:::tip
-
-:::
