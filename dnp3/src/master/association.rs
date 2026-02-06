@@ -306,6 +306,7 @@ pub(crate) struct Association {
     response_timeout: Timeout,
     seq: Sequence,
     last_unsol_frag: Option<LastUnsolFragment>,
+    last_iin: Option<Iin>,
     request_queue: VecDeque<Task>,
     max_request_queue_size: usize,
     auto_tasks: TaskStates,
@@ -334,6 +335,7 @@ impl Association {
             address,
             seq: Sequence::default(),
             last_unsol_frag: None,
+            last_iin: None,
             request_queue: VecDeque::new(),
             max_request_queue_size: config.max_queued_user_requests,
             auto_tasks: TaskStates::new(),
@@ -393,12 +395,17 @@ impl Association {
         self.auto_tasks.reset();
         self.startup_integrity_done = false;
 
-        // Clear last unsolicited fragment
+        // Clear last unsolicited fragment and IIN
         self.last_unsol_frag = None;
+        self.last_iin = None;
     }
 
     pub(crate) fn get_system_time(&self) -> Option<Timestamp> {
         self.assoc_handler.get_current_time()
+    }
+
+    pub(crate) fn get_last_iin(&self) -> Option<Iin> {
+        self.last_iin
     }
 
     pub(crate) fn complete_poll(&mut self, id: u64) {
@@ -417,6 +424,7 @@ impl Association {
     }
 
     pub(crate) fn process_iin(&mut self, iin: Iin) {
+        self.last_iin = Some(iin);
         if iin.iin1.get_device_restart() {
             self.on_restart_iin_observed()
         }
@@ -753,6 +761,13 @@ impl AssociationMap {
     pub(crate) fn get_timeout(&self, address: EndpointAddress) -> Result<Timeout, TaskError> {
         match self.map.get(&address) {
             Some(x) => Ok(x.response_timeout),
+            None => Err(TaskError::NoSuchAssociation(address)),
+        }
+    }
+
+    pub(crate) fn get_last_iin(&self, address: EndpointAddress) -> Result<Option<Iin>, TaskError> {
+        match self.map.get(&address) {
+            Some(x) => Ok(x.get_last_iin()),
             None => Err(TaskError::NoSuchAssociation(address)),
         }
     }

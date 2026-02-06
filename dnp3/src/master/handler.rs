@@ -135,6 +135,18 @@ impl MasterChannel {
         rx.await?
     }
 
+    /// Get the last IIN (Internal Indications) received from the specified outstation
+    pub async fn get_last_iin(
+        &mut self,
+        address: EndpointAddress,
+    ) -> Result<Option<Iin>, TaskError> {
+        let (promise, rx) = Promise::one_shot();
+        self.send_master_message(MasterMsg::GetLastIin(address, promise))
+            .await
+            .map_err(|_| TaskError::Shutdown)?;
+        rx.await.map_err(|_| TaskError::Shutdown)?
+    }
+
     fn assert_channel_type(&self, required: MasterChannelType) -> Result<(), AssociationError> {
         if self.channel_type == required {
             Ok(())
