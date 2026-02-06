@@ -205,8 +205,8 @@ impl From<dnp3::app::Permissions> for ffi::Permissions {
     fn from(value: dnp3::app::Permissions) -> Self {
         Self {
             world: value.world.into(),
-            group: value.world.into(),
-            owner: value.group.into(),
+            group: value.group.into(),
+            owner: value.owner.into(),
         }
     }
 }
