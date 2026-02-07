@@ -34,7 +34,7 @@ jobs:
         uses: cargo-bins/cargo-binstall@main
 
       - name: Install cargo-audit binary (fast)
-        run: cargo binstall cargo-audit@0.22.0 --no-confirm
+        run: cargo binstall cargo-audit@0.22.1 --no-confirm
 
       - name: Run security audit
         id: audit
