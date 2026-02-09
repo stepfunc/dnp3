@@ -1031,6 +1031,44 @@ pub(crate) unsafe fn master_channel_get_decode_level(
     Ok(result.into())
 }
 
+/// Raw IIN bytes from the most recent response on an association
+#[repr(C)]
+pub struct RawIin {
+    /// IIN byte 1
+    pub iin1: u8,
+    /// IIN byte 2
+    pub iin2: u8,
+    /// true if a response has been received
+    pub is_valid: bool,
+}
+
+pub(crate) unsafe fn master_channel_get_last_iin(
+    channel: *mut MasterChannel,
+    association: ffi::AssociationId,
+) -> Result<RawIin, ffi::ParamError> {
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let address = EndpointAddress::try_new(association.address)?;
+
+    let result = channel
+        .runtime
+        .block_on(channel.handle.get_last_iin(address))
+        .map_err(|_| ffi::ParamError::MasterAlreadyShutdown)?;
+
+    match result {
+        Ok(Some(iin)) => Ok(RawIin {
+            iin1: iin.iin1.value,
+            iin2: iin.iin2.value,
+            is_valid: true,
+        }),
+        Ok(None) => Ok(RawIin {
+            iin1: 0,
+            iin2: 0,
+            is_valid: false,
+        }),
+        Err(_) => Err(ffi::ParamError::AssociationDoesNotExist),
+    }
+}
+
 fn convert_event_classes(config: &ffi::EventClasses) -> EventClasses {
     EventClasses::new(config.class1, config.class2, config.class3)
 }
@@ -1420,5 +1458,21 @@ impl From<ffi::FunctionCode> for dnp3::app::FunctionCode {
             ffi::FunctionCode::Response => Self::Response,
             ffi::FunctionCode::UnsolicitedResponse => Self::UnsolicitedResponse,
         }
+    }
+}
+
+#[allow(clippy::missing_safety_doc)]
+#[no_mangle]
+pub unsafe extern "C" fn dnp3_master_channel_get_last_iin(
+    instance: *mut crate::MasterChannel,
+    association: ffi::AssociationId,
+    out: *mut RawIin,
+) -> std::os::raw::c_int {
+    match master_channel_get_last_iin(instance, association) {
+        Ok(x) => {
+            out.write(x);
+            ffi::ParamError::Ok.into()
+        }
+        Err(err) => err.into(),
     }
 }

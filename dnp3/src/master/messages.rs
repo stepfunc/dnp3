@@ -1,4 +1,4 @@
-use crate::app::Shutdown;
+use crate::app::{Iin, Shutdown};
 use crate::decode::DecodeLevel;
 use crate::link::EndpointAddress;
 use crate::master::error::PollError;
@@ -36,6 +36,8 @@ pub(crate) enum MasterMsg {
     SetDecodeLevel(DecodeLevel),
     /// Get the decoding level
     GetDecodeLevel(Promise<Result<DecodeLevel, Shutdown>>),
+    /// Get the last IIN received on an association
+    GetLastIin(EndpointAddress, Promise<Result<Option<Iin>, TaskError>>),
 }
 
 pub(crate) struct AssociationMsg {

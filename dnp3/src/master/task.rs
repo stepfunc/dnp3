@@ -273,6 +273,9 @@ impl MasterSession {
             MasterMsg::GetDecodeLevel(promise) => {
                 promise.complete(Ok(self.decode_level));
             }
+            MasterMsg::GetLastIin(address, promise) => {
+                promise.complete(self.associations.get_last_iin(address));
+            }
         }
     }
 

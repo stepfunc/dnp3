@@ -205,8 +205,8 @@ impl From<dnp3::app::Permissions> for ffi::Permissions {
     fn from(value: dnp3::app::Permissions) -> Self {
         Self {
             world: value.world.into(),
-            group: value.world.into(),
-            owner: value.group.into(),
+            group: value.group.into(),
+            owner: value.owner.into(),
         }
     }
 }
@@ -225,7 +225,28 @@ impl From<FileError> for ffi::FileError {
     fn from(value: FileError) -> Self {
         match value {
             FileError::BadResponse => ffi::FileError::BadResponse,
-            FileError::BadStatus(_) => ffi::FileError::BadStatus,
+            FileError::BadStatus(status) => {
+                use dnp3::app::FileStatus;
+                match status {
+                    FileStatus::Success => ffi::FileError::BadStatus, // should not happen
+                    FileStatus::PermissionDenied => ffi::FileError::StatusPermissionDenied,
+                    FileStatus::InvalidMode => ffi::FileError::StatusInvalidMode,
+                    FileStatus::FileNotFound => ffi::FileError::StatusFileNotFound,
+                    FileStatus::FileLocked => ffi::FileError::StatusFileLocked,
+                    FileStatus::TooManyOpen => ffi::FileError::StatusTooManyOpen,
+                    FileStatus::InvalidHandle => ffi::FileError::StatusInvalidHandle,
+                    FileStatus::WriteBlockSize => ffi::FileError::StatusWriteBlockSize,
+                    FileStatus::CommLost => ffi::FileError::StatusCommLost,
+                    FileStatus::CannotAbort => ffi::FileError::StatusCannotAbort,
+                    FileStatus::NotOpened => ffi::FileError::StatusNotOpened,
+                    FileStatus::HandleExpired => ffi::FileError::StatusHandleExpired,
+                    FileStatus::BufferOverrun => ffi::FileError::StatusBufferOverrun,
+                    FileStatus::Fatal => ffi::FileError::StatusFatal,
+                    FileStatus::BlockSeq => ffi::FileError::StatusBlockSeq,
+                    FileStatus::Undefined => ffi::FileError::StatusUndefined,
+                    FileStatus::Other(_) => ffi::FileError::BadStatus, // unknown status code
+                }
+            }
             FileError::NoPermission => ffi::FileError::NoPermission,
             FileError::BadBlockNum => ffi::FileError::BadBlockNum,
             FileError::AbortByUser => ffi::FileError::AbortByUser,

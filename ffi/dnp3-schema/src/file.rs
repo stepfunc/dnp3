@@ -163,7 +163,7 @@ fn define_file_error(lib: &mut LibraryBuilder) -> BackTraced<ErrorType<Unvalidat
             ExceptionType::UncheckedException,
         )?
         .doc("Errors that can occur during file transfer")?
-        .add_error("bad_status", "Outstation returned an error status code")?
+        .add_error("bad_status", "Outstation returned an unrecognized error status code")?
         .add_error(
             "no_permission",
             "Outstation indicated no permission to access file",
@@ -177,6 +177,67 @@ fn define_file_error(lib: &mut LibraryBuilder) -> BackTraced<ErrorType<Unvalidat
         .add_error(
             "wrong_handle",
             "File handle returned by the outstation did not match the request",
+        )?
+        // File status variants (expanded from BadStatus payload)
+        .add_error(
+            "status_permission_denied",
+            "Permission denied due to improper authentication key, user name, or password",
+        )?
+        .add_error(
+            "status_invalid_mode",
+            "An unsupported or unknown operation mode was requested",
+        )?
+        .add_error(
+            "status_file_not_found",
+            "Requested file does not exist",
+        )?
+        .add_error(
+            "status_file_locked",
+            "Requested file is already in use",
+        )?
+        .add_error(
+            "status_too_many_open",
+            "File could not be opened because of limit on the number of open files",
+        )?
+        .add_error(
+            "status_invalid_handle",
+            "There is no file opened with the handle in the request",
+        )?
+        .add_error(
+            "status_write_block_size",
+            "Outstation is unable to negotiate a suitable write block size",
+        )?
+        .add_error(
+            "status_comm_lost",
+            "Communications were lost or cannot be established with end device where file resides",
+        )?
+        .add_error(
+            "status_cannot_abort",
+            "Abort request was unsuccessful because the outstation is unable or not programmed to abort",
+        )?
+        .add_error(
+            "status_not_opened",
+            "File handle does not reference an opened file",
+        )?
+        .add_error(
+            "status_handle_expired",
+            "File closed due to inactivity timeout",
+        )?
+        .add_error(
+            "status_buffer_overrun",
+            "Too much file data was received for outstation to process",
+        )?
+        .add_error(
+            "status_fatal",
+            "An error occurred in file processing that prevents any further activity with this file",
+        )?
+        .add_error(
+            "status_block_seq",
+            "The block number did not have the expected sequence number",
+        )?
+        .add_error(
+            "status_undefined",
+            "An undefined file error occurred on the outstation",
         )?
         .add_task_errors()?
         .build()?;
