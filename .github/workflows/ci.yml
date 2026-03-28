@@ -15,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Install Rust ${{ matrix.rust }}
         uses: dtolnay/rust-toolchain@master
         with:
@@ -39,7 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Install Rust
         uses: dtolnay/rust-toolchain@master
         with:
@@ -59,7 +59,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Install Rust ${{ matrix.rust }}
         uses: dtolnay/rust-toolchain@master
         with:
@@ -71,7 +71,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Install Rust ${{ matrix.rust }}
         uses: dtolnay/rust-toolchain@stable
       - name: Install doxygen 1.9.5
@@ -96,7 +96,7 @@ jobs:
           cp -a ffi/bindings/java/dnp3/target/apidocs ~/doc/java
           rm ffi/bindings/c/generated/logo.png ffi/bindings/c/generated/doxygen-awesome.css
       - name: Upload documentation
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: doc-api
           path: ~/doc
@@ -113,7 +113,7 @@ jobs:
             test: false
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Install NASM
         run: |
           choco install nasm
@@ -136,7 +136,7 @@ jobs:
           Copy-Item -Path ./target/${{ matrix.target }}/release/dnp3_ffi.dll.lib -Destination ffi-modules/${{ matrix.target }}
           Copy-Item -Path ./target/${{ matrix.target }}/release/dnp3_ffi_java.dll -Destination ffi-modules/${{ matrix.target }}
       - name: Upload compiled FFI modules
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ffi-modules-${{ matrix.target }}
           path: ffi-modules
@@ -162,7 +162,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Create FFI modules dir
@@ -176,7 +176,7 @@ jobs:
           cp ./target/release/libdnp3_ffi.dylib ./ffi-modules/${{ matrix.target }}
           cp ./target/release/libdnp3_ffi_java.dylib ./ffi-modules/${{ matrix.target }}
       - name: Upload compiled FFI modules
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ffi-modules-${{ matrix.target }}
           path: ffi-modules
@@ -216,7 +216,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -234,7 +234,7 @@ jobs:
           cp ./target/${{ matrix.cases.target }}/release/libdnp3_ffi.so ./ffi-modules/${{ matrix.cases.target }}
           cp ./target/${{ matrix.cases.target }}/release/libdnp3_ffi_java.so ./ffi-modules/${{ matrix.cases.target }}
       - name: Upload compiled FFI modules
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: ffi-modules-${{ matrix.cases.target }}
           path: ffi-modules
@@ -242,7 +242,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Install dependencies
         working-directory: guide
         run: npm ci
@@ -253,7 +253,7 @@ jobs:
          mkdir -p ~/doc/guide
          mv build/* ~/doc/guide
       - name: Upload guide
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: doc-guide
           path: ~/doc
@@ -269,9 +269,9 @@ jobs:
       - name: Install custom allow-list tool
         run: cargo install --git https://github.com/stepfunc/bom-tools.git
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Download compiled FFI
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           path: ffi-modules
           pattern: ffi-modules-*
@@ -295,22 +295,22 @@ jobs:
       - name: Package Java bindings
         run: cargo run --bin dnp3-bindings -- --java --package ./ffi-modules --options ./packaging.json -f third-party-licenses-java.txt
       - name: Upload C/C++ bindings
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: c-bindings
           path: ffi/bindings/c/generated/*
       - name: Upload .NET bindings
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: dotnet-bindings
           path: ffi/bindings/dotnet/nupkg/dnp3*
       - name: Upload Java bindings
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: java-bindings-jar
           path: ffi/bindings/java/dnp3/target/*.jar
       - name: Upload Java pom.xml
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: java-bindings-pom
           path: ffi/bindings/java/dnp3/pom.xml
@@ -319,7 +319,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Build JNI
@@ -330,7 +330,7 @@ jobs:
         shell: bash
         run: (cd ffi/bindings/java/dnp3 && sudo mvn install)
       - name: Checkout dnp4s
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: stepfunc/dnp4s
           ssh-key: ${{ secrets.DNP4S_SSH_KEY }}
@@ -344,7 +344,7 @@ jobs:
         run: sudo mvn --batch-mode scala:run
       - name: Upload conformance test results
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: conformance-results
           path: conformance/results
@@ -364,7 +364,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Publish to crates.io
@@ -383,12 +383,12 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Download documentation artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           path: artifacts
           pattern: doc-*
       - name: Checkout stepfunc/docs
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           repository: stepfunc/docs
           ssh-key: ${{ secrets.SFIO_DOCS_SSH_KEY }}
@@ -420,7 +420,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Download Java artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           path: artifacts
           pattern: java-bindings-*
@@ -509,7 +509,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Download .NET artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           name: dotnet-bindings
           path: artifacts/dotnet-bindings
@@ -528,7 +528,7 @@ jobs:
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Download all release artifacts
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           path: artifacts
       - name: Package C Bindings and Conformance Results
