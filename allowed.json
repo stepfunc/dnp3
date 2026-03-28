@@ -806,6 +806,21 @@
         }
       ]
     },
+    "jni-sys-macros": {
+      "id": "jni-sys-macros",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2015 The rust-jni-sys Developers"
+              ]
+            }
+          }
+        }
+      ]
+    },
     "lazy_static": {
       "id": "lazy_static",
       "source": "crates.io",
