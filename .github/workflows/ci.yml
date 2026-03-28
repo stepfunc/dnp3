@@ -425,7 +425,7 @@ jobs:
           path: artifacts
           pattern: java-bindings-*
       - name: Import PGP key
-        uses: crazy-max/ghaction-import-gpg@v3
+        uses: crazy-max/ghaction-import-gpg@v7
         with:
           gpg-private-key: ${{ secrets.SFIO_PGP_PRIVATE_KEY }}
           passphrase: ${{ secrets.SFIO_PGP_PRIVATE_KEY_PASSPHRASE }}
@@ -539,7 +539,7 @@ jobs:
           cd ../conformance-results
           zip -r ../../release/conformance-results.zip .
       - name: Create GitHub release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           draft: true
           files: |
