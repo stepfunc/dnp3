@@ -1961,6 +1961,17 @@
           }
         }
       ]
+    },
+    "zmij": {
+      "id": "zmij",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": "NotPresent"
+          }
+        }
+      ]
     }
   }
 }
