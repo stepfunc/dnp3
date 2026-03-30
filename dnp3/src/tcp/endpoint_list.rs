@@ -1,4 +1,6 @@
-use crate::tcp::Endpoint;
+use crate::app::ConnectStrategy;
+use crate::tcp::connector::SimpleConnectHandler;
+use crate::tcp::{ClientConnectionHandler, ConnectOptions, Endpoint};
 
 /// List of IP endpoints
 ///
@@ -32,5 +34,24 @@ impl EndpointList {
     /// Add an IP endpoint
     pub fn add(&mut self, addr: String) {
         self.endpoints.push(addr);
+    }
+
+    /// Create a [`ClientConnectionHandler`] from this endpoint list with the
+    /// given [`ConnectStrategy`] and default [`ConnectOptions`].
+    pub fn into_connect_handler(
+        self,
+        strategy: ConnectStrategy,
+    ) -> Box<dyn ClientConnectionHandler> {
+        SimpleConnectHandler::create(self, ConnectOptions::default(), strategy)
+    }
+
+    /// Create a [`ClientConnectionHandler`] from this endpoint list with the
+    /// given [`ConnectStrategy`] and [`ConnectOptions`].
+    pub fn into_connect_handler_with_options(
+        self,
+        strategy: ConnectStrategy,
+        options: ConnectOptions,
+    ) -> Box<dyn ClientConnectionHandler> {
+        SimpleConnectHandler::create(self, options, strategy)
     }
 }
