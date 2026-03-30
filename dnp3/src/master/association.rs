@@ -14,6 +14,7 @@ use crate::master::extract::extract_measurements;
 use crate::master::handler::AssociationHandler;
 use crate::master::messages::AssociationMsgType;
 use crate::master::poll::{PollHandle, PollMap, PollMsg};
+use crate::master::request::ReadRequest;
 use crate::master::request::{Classes, EventClasses, TimeSyncProcedure};
 use crate::master::tasks::auto::AutoTask;
 use crate::master::tasks::time::TimeSyncTask;
@@ -346,6 +347,10 @@ impl Association {
             startup_integrity_done: false,
             events_available: EventClasses::none(),
         }
+    }
+
+    pub(crate) fn add_poll(&mut self, request: ReadRequest, period: Duration) -> u64 {
+        self.polls.add(request, period)
     }
 
     pub(crate) fn process_message(&mut self, msg: AssociationMsgType, is_connected: bool) {

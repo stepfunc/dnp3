@@ -43,9 +43,6 @@ struct CliArgs {
     transport: TransportCommand,
 }
 
-type SetupResult =
-    Result<(MasterChannel, AssociationHandle, MasterTask), Box<dyn std::error::Error>>;
-
 #[derive(Debug, Subcommand)]
 enum TransportCommand {
     /// Use TCP client transport
@@ -398,24 +395,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ANCHOR_END: logging
 
     // create the master channel based on the command line argument
-    let (channel, mut association, task) = setup(&args)?;
+    let (mut handler, task) = setup(&args)?;
     tokio::spawn(task.run());
-
-    // create an event poll
-    // ANCHOR: add_poll
-    let poll = association
-        .add_poll(
-            ReadRequest::ClassScan(Classes::class123()),
-            Duration::from_secs(5),
-        )
-        .await?;
-    // ANCHOR_END: add_poll
-
-    let mut handler = CliHandler {
-        poll,
-        channel,
-        association,
-    };
 
     let mut reader = FramedRead::new(tokio::io::stdin(), LinesCodec::new());
 
@@ -619,7 +600,7 @@ impl CliHandler {
     }
 }
 
-fn setup(cli: &CliArgs) -> SetupResult {
+fn setup(cli: &CliArgs) -> Result<(CliHandler, MasterTask), Box<dyn std::error::Error>> {
     match &cli.transport {
         TransportCommand::TcpClient(args) => args.setup(cli.master_address),
         TransportCommand::Udp(args) => args.setup(cli.master_address),
@@ -632,17 +613,29 @@ fn setup(cli: &CliArgs) -> SetupResult {
 fn create_stream_builder(
     master_address: EndpointAddress,
     outstation_address: EndpointAddress,
-) -> Result<(MasterBuilder, MasterChannel, AssociationHandle), Box<dyn std::error::Error>> {
+) -> Result<(MasterBuilder, CliHandler), Box<dyn std::error::Error>> {
     let (mut builder, channel) = MasterBuilder::new(get_master_channel_config(master_address)?);
     builder.enable();
-    let association = builder.add_association(
+    let mut assoc = builder.new_association(
         outstation_address,
         get_association_config(),
         ExampleReadHandler::boxed(),
         Box::new(ExampleAssociationHandler),
         Box::new(ExampleAssociationInformation),
-    )?;
-    Ok((builder, channel, association))
+    );
+    let poll = assoc.add_poll(
+        ReadRequest::ClassScan(Classes::class123()),
+        Duration::from_secs(5),
+    );
+    let association = builder.add_association(assoc)?;
+    Ok((
+        builder,
+        CliHandler {
+            poll,
+            channel,
+            association,
+        },
+    ))
 }
 
 // ANCHOR: master_channel_config
@@ -674,42 +667,63 @@ fn get_association_config() -> AssociationConfig {
 // ANCHOR_END: association_config
 
 impl TcpClientArgs {
-    fn setup(&self, master_address: EndpointAddress) -> SetupResult {
-        let (builder, channel, association) =
-            create_stream_builder(master_address, self.outstation_address)?;
-        let handler = EndpointList::new(self.endpoint.to_string(), &[])
+    fn setup(
+        &self,
+        master_address: EndpointAddress,
+    ) -> Result<(CliHandler, MasterTask), Box<dyn std::error::Error>> {
+        let (builder, handler) = create_stream_builder(master_address, self.outstation_address)?;
+        let connect = EndpointList::new(self.endpoint.to_string(), &[])
             .into_connect_handler(ConnectStrategy::default());
-        let task = builder.into_tcp(LinkErrorMode::Close, handler, NullListener::create());
-        Ok((channel, association, task))
+        Ok((
+            handler,
+            builder.into_tcp(LinkErrorMode::Close, connect, NullListener::create()),
+        ))
     }
 }
 
 impl UdpArgs {
-    fn setup(&self, master_address: EndpointAddress) -> SetupResult {
+    fn setup(
+        &self,
+        master_address: EndpointAddress,
+    ) -> Result<(CliHandler, MasterTask), Box<dyn std::error::Error>> {
         let (mut builder, channel) =
             UdpMasterBuilder::new(get_master_channel_config(master_address)?);
         builder.enable();
-        let association = builder.add_association(
+        let mut assoc = builder.new_association(
             self.outstation_address,
             self.remote_endpoint,
             get_association_config(),
             ExampleReadHandler::boxed(),
             Box::new(ExampleAssociationHandler),
             Box::new(ExampleAssociationInformation),
-        )?;
+        );
+        let poll = assoc.add_poll(
+            ReadRequest::ClassScan(Classes::class123()),
+            Duration::from_secs(5),
+        );
+        let association = builder.add_association(assoc)?;
         let task = builder.into_udp(
             self.local_endpoint,
             LinkReadMode::Datagram,
             Timeout::from_secs(5)?,
         );
-        Ok((channel, association, task))
+        Ok((
+            CliHandler {
+                poll,
+                channel,
+                association,
+            },
+            task,
+        ))
     }
 }
 
 impl SerialArgs {
-    fn setup(&self, master_address: EndpointAddress) -> SetupResult {
-        let (builder, channel, association) =
-            create_stream_builder(master_address, self.outstation_address)?;
+    fn setup(
+        &self,
+        master_address: EndpointAddress,
+    ) -> Result<(CliHandler, MasterTask), Box<dyn std::error::Error>> {
+        let (builder, handler) = create_stream_builder(master_address, self.outstation_address)?;
         let settings = SerialSettings {
             baud_rate: self.baud_rate,
             data_bits: self.data_bits.into(),
@@ -717,21 +731,25 @@ impl SerialArgs {
             parity: self.parity.into(),
             flow_control: self.flow_control.into(),
         };
-        let task = builder.into_serial(
-            &self.port,
-            settings,
-            Duration::from_secs(1),
-            NullListener::create(),
-        );
-        Ok((channel, association, task))
+        Ok((
+            handler,
+            builder.into_serial(
+                &self.port,
+                settings,
+                Duration::from_secs(1),
+                NullListener::create(),
+            ),
+        ))
     }
 }
 
 impl TlsCaArgs {
-    fn setup(&self, master_address: EndpointAddress) -> SetupResult {
-        let (builder, channel, association) =
-            create_stream_builder(master_address, self.outstation_address)?;
-        let handler = EndpointList::new(self.endpoint.to_string(), &[])
+    fn setup(
+        &self,
+        master_address: EndpointAddress,
+    ) -> Result<(CliHandler, MasterTask), Box<dyn std::error::Error>> {
+        let (builder, handler) = create_stream_builder(master_address, self.outstation_address)?;
+        let connect = EndpointList::new(self.endpoint.to_string(), &[])
             .into_connect_handler(ConnectStrategy::default());
         let tls_config = TlsClientConfig::full_pki(
             Some(self.domain.to_string()),
@@ -741,21 +759,25 @@ impl TlsCaArgs {
             None,
             MinTlsVersion::V12,
         )?;
-        let task = builder.into_tls(
-            LinkErrorMode::Close,
+        Ok((
             handler,
-            NullListener::create(),
-            tls_config,
-        );
-        Ok((channel, association, task))
+            builder.into_tls(
+                LinkErrorMode::Close,
+                connect,
+                NullListener::create(),
+                tls_config,
+            ),
+        ))
     }
 }
 
 impl TlsSelfSignedArgs {
-    fn setup(&self, master_address: EndpointAddress) -> SetupResult {
-        let (builder, channel, association) =
-            create_stream_builder(master_address, self.outstation_address)?;
-        let handler = EndpointList::new(self.endpoint.to_string(), &[])
+    fn setup(
+        &self,
+        master_address: EndpointAddress,
+    ) -> Result<(CliHandler, MasterTask), Box<dyn std::error::Error>> {
+        let (builder, handler) = create_stream_builder(master_address, self.outstation_address)?;
+        let connect = EndpointList::new(self.endpoint.to_string(), &[])
             .into_connect_handler(ConnectStrategy::default());
         let tls_config = TlsClientConfig::self_signed(
             &self.peer_cert,
@@ -764,13 +786,15 @@ impl TlsSelfSignedArgs {
             None,
             MinTlsVersion::V12,
         )?;
-        let task = builder.into_tls(
-            LinkErrorMode::Close,
+        Ok((
             handler,
-            NullListener::create(),
-            tls_config,
-        );
-        Ok((channel, association, task))
+            builder.into_tls(
+                LinkErrorMode::Close,
+                connect,
+                NullListener::create(),
+                tls_config,
+            ),
+        ))
     }
 }
 

@@ -5,6 +5,8 @@ use tracing::Instrument;
 
 use super::association::{Association, AssociationMap};
 use super::handler::{AssociationHandle, MasterChannel, MasterChannelConfig, MasterChannelType};
+use super::poll::PollHandle;
+use super::request::ReadRequest;
 use super::task::MasterTask as InnerMasterTask;
 use super::{
     AssociationConfig, AssociationError, AssociationHandler, AssociationInformation, ReadHandler,
@@ -49,6 +51,17 @@ pub struct UdpMasterBuilder {
     config: MasterChannelConfig,
     enabled: Enabled,
     associations: AssociationMap,
+}
+
+/// Builder for configuring an association and its polls before registration.
+///
+/// Created via [`MasterBuilder::new_association`] or [`UdpMasterBuilder::new_association`].
+/// Add polls with [`add_poll`](Self::add_poll), then register with
+/// [`MasterBuilder::add_association`] or [`UdpMasterBuilder::add_association`].
+pub struct AssociationBuilder {
+    address: EndpointAddress,
+    channel: MasterChannel,
+    association: Association,
 }
 
 /// A master task bound to a transport. Call [`run`](Self::run) to execute
@@ -141,30 +154,43 @@ impl MasterBuilder {
         self.enabled = Enabled::Yes;
     }
 
-    /// Register an association with the master before the task is running.
-    ///
-    /// Returns an [`AssociationHandle`] that can be used for post-run operations.
-    /// Async methods on the handle require the task to be running.
-    pub fn add_association(
-        &mut self,
+    /// Create an [`AssociationBuilder`] for configuring an association and its
+    /// polls before registration.
+    pub fn new_association(
+        &self,
         address: EndpointAddress,
         config: AssociationConfig,
         read_handler: Box<dyn ReadHandler>,
         assoc_handler: Box<dyn AssociationHandler>,
         assoc_information: Box<dyn AssociationInformation>,
-    ) -> Result<AssociationHandle, AssociationError> {
+    ) -> AssociationBuilder {
         let addr = FragmentAddr {
             link: address,
             phys: PhysAddr::None,
         };
-        self.associations.register(Association::new(
-            addr,
-            config,
-            read_handler,
-            assoc_handler,
-            assoc_information,
-        ))?;
-        Ok(AssociationHandle::new(address, self.channel.clone()))
+        AssociationBuilder {
+            address,
+            channel: self.channel.clone(),
+            association: Association::new(
+                addr,
+                config,
+                read_handler,
+                assoc_handler,
+                assoc_information,
+            ),
+        }
+    }
+
+    /// Register a configured association with the master.
+    ///
+    /// Returns an [`AssociationHandle`] that can be used for post-run operations.
+    /// Async methods on the handle require the task to be running.
+    pub fn add_association(
+        &mut self,
+        builder: AssociationBuilder,
+    ) -> Result<AssociationHandle, AssociationError> {
+        self.associations.register(builder.association)?;
+        Ok(AssociationHandle::new(builder.address, builder.channel))
     }
 
     /// Bind to a TCP transport, consuming the builder.
@@ -280,34 +306,47 @@ impl UdpMasterBuilder {
         self.enabled = Enabled::Yes;
     }
 
-    /// Register a UDP association with the master before the task is running.
+    /// Create an [`AssociationBuilder`] for configuring a UDP association and
+    /// its polls before registration.
     ///
     /// * `address` is the DNP3 link-layer address of the outstation
     /// * `destination` is the IP address and port of the outstation
-    ///
-    /// Returns an [`AssociationHandle`] that can be used for post-run operations.
-    /// Async methods on the handle require the task to be running.
-    pub fn add_association(
-        &mut self,
+    pub fn new_association(
+        &self,
         address: EndpointAddress,
         destination: SocketAddr,
         config: AssociationConfig,
         read_handler: Box<dyn ReadHandler>,
         assoc_handler: Box<dyn AssociationHandler>,
         assoc_information: Box<dyn AssociationInformation>,
-    ) -> Result<AssociationHandle, AssociationError> {
+    ) -> AssociationBuilder {
         let addr = FragmentAddr {
             link: address,
             phys: PhysAddr::Udp(destination),
         };
-        self.associations.register(Association::new(
-            addr,
-            config,
-            read_handler,
-            assoc_handler,
-            assoc_information,
-        ))?;
-        Ok(AssociationHandle::new(address, self.channel.clone()))
+        AssociationBuilder {
+            address,
+            channel: self.channel.clone(),
+            association: Association::new(
+                addr,
+                config,
+                read_handler,
+                assoc_handler,
+                assoc_information,
+            ),
+        }
+    }
+
+    /// Register a configured association with the master.
+    ///
+    /// Returns an [`AssociationHandle`] that can be used for post-run operations.
+    /// Async methods on the handle require the task to be running.
+    pub fn add_association(
+        &mut self,
+        builder: AssociationBuilder,
+    ) -> Result<AssociationHandle, AssociationError> {
+        self.associations.register(builder.association)?;
+        Ok(AssociationHandle::new(builder.address, builder.channel))
     }
 
     /// Bind to a UDP transport, consuming the builder.
@@ -338,6 +377,20 @@ impl UdpMasterBuilder {
                 retry_delay,
             }),
         }
+    }
+}
+
+impl AssociationBuilder {
+    /// Add a periodic poll to the association.
+    ///
+    /// Returns a [`PollHandle`] that can be used for post-run operations.
+    /// Async methods on the handle require the task to be running.
+    pub fn add_poll(&mut self, request: ReadRequest, period: Duration) -> PollHandle {
+        let id = self.association.add_poll(request, period);
+        PollHandle::new(
+            AssociationHandle::new(self.address, self.channel.clone()),
+            id,
+        )
     }
 }
 
