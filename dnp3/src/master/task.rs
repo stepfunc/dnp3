@@ -36,11 +36,30 @@ impl MasterTask {
         config: MasterChannelConfig,
         messages: Receiver<Message>,
     ) -> Self {
-        let session = MasterSession::new(
+        Self::with_associations(
             initial_state,
+            AssociationMap::new(),
+            link_modes,
+            parse_options,
+            config,
+            messages,
+        )
+    }
+
+    pub(crate) fn with_associations(
+        enabled: Enabled,
+        associations: AssociationMap,
+        link_modes: LinkModes,
+        parse_options: ParseOptions,
+        config: MasterChannelConfig,
+        messages: Receiver<Message>,
+    ) -> Self {
+        let session = MasterSession::new(
+            enabled,
             config.decode_level,
             config.tx_buffer_size,
             messages,
+            associations,
         );
         let (reader, writer) = crate::transport::create_master_transport_layer(
             link_modes,
@@ -105,11 +124,12 @@ impl MasterSession {
         decode_level: DecodeLevel,
         tx_buffer_size: BufferSize<249, 2048>,
         messages: Receiver<Message>,
+        associations: AssociationMap,
     ) -> Self {
         Self {
             enabled: initial_state,
             decode_level,
-            associations: AssociationMap::new(),
+            associations,
             messages,
             tx_buffer: tx_buffer_size.create_buffer(),
         }

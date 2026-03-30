@@ -1,4 +1,5 @@
 pub use association::*;
+pub use builder::*;
 pub use error::*;
 pub use file::*;
 pub use handler::*;
@@ -7,6 +8,7 @@ pub use read_handler::*;
 pub use request::*;
 
 mod association;
+mod builder;
 mod error;
 mod file;
 mod handler;
