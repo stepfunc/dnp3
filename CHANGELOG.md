@@ -1,4 +1,8 @@
 
+### 1.7.0-RC2 ###
+* :shield: Update `rustls-webpki` to 0.103.12 to resolve [RUSTSEC-2026-0098](https://rustsec.org/advisories/RUSTSEC-2026-0098) and [RUSTSEC-2026-0099](https://rustsec.org/advisories/RUSTSEC-2026-0099), both concerning incorrect acceptance of X.509 name constraints. Exposure is limited to TLS configurations using `CertificateMode::AuthorityBased`; `SelfSigned` mode bypasses the affected code path.
+* :bell: **This update only affects the prebuilt binary distributions of the bindings (C/C++, .NET, Java).** Rust consumers of the `dnp3` crate pick up the patched `rustls-webpki` automatically on rebuild.
+
 ### 1.7.0-RC1 ###
 * :star: Add outstation ConnectionManager with fine-grained connection control for TCP and TLS clients. See [#381](https://github.com/stepfunc/dnp3/pull/381), [#406](https://github.com/stepfunc/dnp3/pull/406).
   * New Rust API: `spawn_outstation_tcp_client_2()` and `spawn_outstation_tls_client_2()` functions with `ClientConnectionHandler` trait
