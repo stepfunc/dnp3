@@ -3,7 +3,9 @@ use std::sync::{Arc, Mutex};
 use crate::app::{MaybeAsync, Timestamp};
 use crate::outstation::database::DatabaseHandle;
 use crate::outstation::tests::harness::{Event, EventSender};
-use crate::outstation::traits::{OutstationApplication, RequestError, RestartDelay};
+use crate::outstation::traits::{
+    ApplicationIin, OutstationApplication, RequestError, RestartDelay,
+};
 use crate::outstation::{BufferState, FreezeIndices, FreezeType};
 
 pub(crate) struct MockOutstationApplication {
@@ -14,6 +16,7 @@ pub(crate) struct MockOutstationApplication {
 pub(crate) struct ApplicationData {
     pub(crate) processing_delay: u16,
     pub(crate) restart_delay: Option<RestartDelay>,
+    pub(crate) application_iin: ApplicationIin,
 }
 
 impl ApplicationData {
@@ -21,6 +24,7 @@ impl ApplicationData {
         Self {
             processing_delay: 0,
             restart_delay: None,
+            application_iin: ApplicationIin::default(),
         }
     }
 }
@@ -37,6 +41,10 @@ impl MockOutstationApplication {
 impl OutstationApplication for MockOutstationApplication {
     fn get_processing_delay_ms(&self) -> u16 {
         self.data.lock().unwrap().processing_delay
+    }
+
+    fn get_application_iin(&self) -> ApplicationIin {
+        self.data.lock().unwrap().application_iin
     }
 
     fn write_absolute_time(&mut self, time: Timestamp) -> Result<(), RequestError> {

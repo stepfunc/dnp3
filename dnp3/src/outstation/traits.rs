@@ -17,6 +17,22 @@ pub struct ApplicationIin {
     pub device_trouble: bool,
     /// IIN2.5 Configuration corrupt
     pub config_corrupt: bool,
+    /// IIN1.1: Class 1 events available.
+    ///
+    /// Set this only if your application maintains an event queue upstream of the DNP3 event
+    /// buffer and there are pending class 1 events not yet pushed in via `transaction`. The
+    /// stack already sets this bit automatically when the in-memory event buffer holds class 1
+    /// events; this field is OR'd with that bit, so `false` is a no-op. Most applications
+    /// should leave this `false`.
+    pub class_1_events: bool,
+    /// IIN1.2: Class 2 events available.
+    ///
+    /// See [`ApplicationIin::class_1_events`] for the same caveats applied to class 2.
+    pub class_2_events: bool,
+    /// IIN1.3: Class 3 events available.
+    ///
+    /// See [`ApplicationIin::class_1_events`] for the same caveats applied to class 3.
+    pub class_3_events: bool,
 }
 
 /// Enumeration returned for cold/warm restart

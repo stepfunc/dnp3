@@ -1,6 +1,7 @@
 use crate::app::measurement::{BinaryInput, Flags, Time};
 use crate::app::Timestamp;
 use crate::outstation::database::{Add, BinaryInputConfig, EventClass, Update, UpdateOptions};
+use crate::outstation::traits::ApplicationIin;
 
 use super::harness::*;
 
@@ -96,4 +97,102 @@ async fn buffer_overflow() {
     harness
         .test_request_response(READ_CLASS_123, EMPTY_RESPONSE)
         .await;
+}
+
+#[tokio::test]
+async fn application_iin_forces_class_event_bits_with_empty_buffer() {
+    let mut harness = new_harness(get_default_config());
+
+    harness.application_data.lock().unwrap().application_iin = ApplicationIin {
+        class_1_events: true,
+        class_2_events: true,
+        class_3_events: true,
+        ..ApplicationIin::default()
+    };
+
+    // Empty event buffer; integrity poll for class 1/2/3.
+    // Expected IIN1 = 0x80 (RESTART) | 0x02 (CLASS_1) | 0x04 (CLASS_2) | 0x08 (CLASS_3) = 0x8E.
+    harness
+        .test_request_response(READ_CLASS_123, &[0xC0, 0x81, 0x8E, 0x00])
+        .await;
+}
+
+#[tokio::test]
+async fn application_iin_class_event_fields_default_false_is_a_noop() {
+    let mut harness = new_harness(get_default_config());
+
+    // Sanity-check: leaving the new fields at their default `false` produces unchanged
+    // behavior for an empty-buffer class 1/2/3 poll. Guards against accidental forcing.
+    harness
+        .test_request_response(READ_CLASS_123, EMPTY_RESPONSE)
+        .await;
+}
+
+#[tokio::test]
+async fn application_iin_class_1_events_maps_to_iin1_bit_1() {
+    let mut harness = new_harness(get_default_config());
+    harness.application_data.lock().unwrap().application_iin = ApplicationIin {
+        class_1_events: true,
+        ..ApplicationIin::default()
+    };
+    // IIN1 = 0x80 (RESTART) | 0x02 (CLASS_1) = 0x82.
+    harness
+        .test_request_response(READ_CLASS_123, &[0xC0, 0x81, 0x82, 0x00])
+        .await;
+}
+
+#[tokio::test]
+async fn application_iin_class_2_events_maps_to_iin1_bit_2() {
+    let mut harness = new_harness(get_default_config());
+    harness.application_data.lock().unwrap().application_iin = ApplicationIin {
+        class_2_events: true,
+        ..ApplicationIin::default()
+    };
+    // IIN1 = 0x80 (RESTART) | 0x04 (CLASS_2) = 0x84.
+    harness
+        .test_request_response(READ_CLASS_123, &[0xC0, 0x81, 0x84, 0x00])
+        .await;
+}
+
+#[tokio::test]
+async fn application_iin_class_3_events_maps_to_iin1_bit_3() {
+    let mut harness = new_harness(get_default_config());
+    harness.application_data.lock().unwrap().application_iin = ApplicationIin {
+        class_3_events: true,
+        ..ApplicationIin::default()
+    };
+    // IIN1 = 0x80 (RESTART) | 0x08 (CLASS_3) = 0x88.
+    harness
+        .test_request_response(READ_CLASS_123, &[0xC0, 0x81, 0x88, 0x00])
+        .await;
+}
+
+#[tokio::test]
+async fn application_iin_class_event_override_or_s_with_buffer_derived_bits() {
+    let mut harness = new_harness(get_default_config());
+
+    // Override asserts class 2 only.
+    harness.application_data.lock().unwrap().application_iin = ApplicationIin {
+        class_2_events: true,
+        ..ApplicationIin::default()
+    };
+
+    // Push a class 1 event into the in-memory buffer; do NOT drain it via this read.
+    harness.handle.database.transaction(|database| {
+        database.add(0, Some(EventClass::Class1), BinaryInputConfig::default());
+        database.update(
+            0,
+            &BinaryInput::new(true, Flags::ONLINE, Time::Synchronized(Timestamp::new(0))),
+            UpdateOptions::default(),
+        );
+    });
+
+    // Read class 0 (static data only) so the class 1 event remains unwritten and the
+    // buffer-derived CLASS_1 bit is set when get_response_iin runs.
+    // Expected IIN1 = 0x80 (RESTART) | 0x02 (CLASS_1 from buffer) | 0x04 (CLASS_2 from override) = 0x86.
+    let read_class_0: &[u8] = &[0xC0, 0x01, 0x3C, 0x01, 0x06];
+    let expected: &[u8] = &[
+        0xC0, 0x81, 0x86, 0x00, 0x01, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01,
+    ];
+    harness.test_request_response(read_class_0, expected).await;
 }

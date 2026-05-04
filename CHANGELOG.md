@@ -1,5 +1,7 @@
 
 ### 1.7.0-RC2 ###
+* :star: Allow application to indicate pending class events held in external storage via new `class_1_events` / `class_2_events` / `class_3_events` fields on `ApplicationIin`. Useful for outstations that buffer events upstream of the DNP3 stack and need the master to keep polling while they drain. See [#419](https://github.com/stepfunc/dnp3/issues/419).
+* :warning: **Breaking change (FFI all-fields constructor):** `ApplicationIin` gains three new fields, so the auto-generated all-fields constructor in C++/C#/Java goes from 4-arg to 7-arg. The no-arg `ApplicationIin()` constructor is unchanged (the new fields default to `false`). Rust callers using `..Default::default()` are unaffected; positional struct literals must be updated.
 * :shield: Update `rustls-webpki` to 0.103.12 to resolve [RUSTSEC-2026-0098](https://rustsec.org/advisories/RUSTSEC-2026-0098) and [RUSTSEC-2026-0099](https://rustsec.org/advisories/RUSTSEC-2026-0099), both concerning incorrect acceptance of X.509 name constraints. Exposure is limited to TLS configurations using `CertificateMode::AuthorityBased`; `SelfSigned` mode bypasses the affected code path.
 * :bell: **This update only affects the prebuilt binary distributions of the bindings (C/C++, .NET, Java).** Rust consumers of the `dnp3` crate pick up the patched `rustls-webpki` automatically on rebuild.
 

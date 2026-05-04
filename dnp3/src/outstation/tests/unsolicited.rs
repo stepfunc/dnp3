@@ -5,6 +5,7 @@ use crate::app::parse::parser::{HeaderDetails, ParsedFragment};
 use crate::app::{BufferSize, Timestamp};
 use crate::outstation::config::OutstationConfig;
 use crate::outstation::database::*;
+use crate::outstation::traits::ApplicationIin;
 use crate::outstation::{BufferState, ClassCount, TypeCount};
 
 use super::harness::*;
@@ -441,5 +442,29 @@ async fn buffer_overflow_issue() {
                 0x00, // Current value
             ],
         )
+        .await;
+}
+
+#[tokio::test]
+async fn application_iin_class_event_override_appears_in_unsolicited_response() {
+    let mut harness = new_harness(get_default_unsolicited_config());
+    confirm_null_unsolicited(&mut harness).await;
+    enable_unsolicited(&mut harness).await;
+
+    // Override asserts class 2 events on top of whatever the buffer reports.
+    harness.application_data.lock().unwrap().application_iin = ApplicationIin {
+        class_2_events: true,
+        ..ApplicationIin::default()
+    };
+
+    generate_binary_event(&mut harness.handle.database);
+
+    // The class 1 event is delivered in this very frame, so by the time get_response_iin runs
+    // the buffer-derived CLASS_1 bit is already cleared. The override adds CLASS_2 on top.
+    // IIN1 = 0x80 (RESTART) | 0x04 (CLASS_2 from override) = 0x84.
+    harness
+        .expect_response(&[
+            0xF1, 0x82, 0x84, 0x00, 0x02, 0x01, 0x28, 0x01, 0x00, 0x00, 0x00, 0x81,
+        ])
         .await;
 }

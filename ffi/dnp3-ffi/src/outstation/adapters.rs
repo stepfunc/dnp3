@@ -248,6 +248,9 @@ impl From<ffi::ApplicationIin> for ApplicationIin {
             local_control: from.local_control(),
             device_trouble: from.device_trouble(),
             config_corrupt: from.config_corrupt(),
+            class_1_events: from.class_1_events(),
+            class_2_events: from.class_2_events(),
+            class_3_events: from.class_3_events(),
         }
     }
 }

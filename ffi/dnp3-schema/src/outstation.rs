@@ -1051,6 +1051,9 @@ fn define_application_iin(lib: &mut LibraryBuilder) -> BackTraced<UniversalStruc
     let local_control = Name::create("local_control")?;
     let device_trouble = Name::create("device_trouble")?;
     let config_corrupt = Name::create("config_corrupt")?;
+    let class_1_events = Name::create("class_1_events")?;
+    let class_2_events = Name::create("class_2_events")?;
+    let class_3_events = Name::create("class_3_events")?;
 
     let application_iin = lib.declare_universal_struct("application_iin")?;
     let application_iin = lib
@@ -1075,6 +1078,21 @@ fn define_application_iin(lib: &mut LibraryBuilder) -> BackTraced<UniversalStruc
             Primitive::Bool,
             "IIN2.5 - Configuration corrupt",
         )?
+        .add(
+            class_1_events.clone(),
+            Primitive::Bool,
+            "IIN1.1 - Class 1 events available. Set this only if your application maintains an event queue upstream of the DNP3 event buffer and there are pending class 1 events not yet pushed in via a transaction. The stack already sets this bit automatically when the in-memory event buffer holds class 1 events; this field is OR'd with that bit, so false is a no-op. Most applications should leave this false.",
+        )?
+        .add(
+            class_2_events.clone(),
+            Primitive::Bool,
+            "IIN1.2 - Class 2 events available. See class_1_events for the same caveats applied to class 2.",
+        )?
+        .add(
+            class_3_events.clone(),
+            Primitive::Bool,
+            "IIN1.3 - Class 3 events available. See class_1_events for the same caveats applied to class 3.",
+        )?
         .doc("Application-controlled IIN bits")?
         .end_fields()?
         .begin_initializer(
@@ -1086,6 +1104,9 @@ fn define_application_iin(lib: &mut LibraryBuilder) -> BackTraced<UniversalStruc
         .default(&local_control, false)?
         .default(&device_trouble, false)?
         .default(&config_corrupt, false)?
+        .default(&class_1_events, false)?
+        .default(&class_2_events, false)?
+        .default(&class_3_events, false)?
         .end_initializer()?
         .build()?;
 

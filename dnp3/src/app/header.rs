@@ -403,6 +403,18 @@ impl BitOr<ApplicationIin> for Iin {
             self |= Iin2::CONFIG_CORRUPT;
         }
 
+        if rhs.class_1_events {
+            self |= Iin1::CLASS_1_EVENTS;
+        }
+
+        if rhs.class_2_events {
+            self |= Iin1::CLASS_2_EVENTS;
+        }
+
+        if rhs.class_3_events {
+            self |= Iin1::CLASS_3_EVENTS;
+        }
+
         self
     }
 }
