@@ -140,7 +140,7 @@ impl<'a> Iterator for RangedBytesIterator<'a> {
         }
         let bytes = self.cursor.read_bytes(self.size).ok()?;
         let index = self.index;
-        self.index += 1;
+        self.index = self.index.saturating_add(1);
         self.remaining -= 1;
         Some((bytes, index))
     }

@@ -1153,6 +1153,25 @@ mod test {
     }
 
     #[test]
+    fn parses_group110var1_at_max_index() {
+        let input = [0x6E, 0x01, 0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0xAA];
+        let mut headers =
+            ObjectParser::parse(ParseOptions::default(), FunctionCode::Response, &input)
+                .unwrap()
+                .iter();
+
+        let bytes: Vec<(&[u8], u16)> = assert_matches!(
+            headers.next().unwrap().details,
+            HeaderDetails::TwoByteStartStop(0xFFFF, 0xFFFF, RangedVariation::Group110VarX(0x01, seq)) => {
+                seq.iter().collect()
+            }
+        );
+
+        assert_eq!(bytes, vec![([0xAA].as_slice(), 0xFFFF)]);
+        assert_matches!(headers.next(), None);
+    }
+
+    #[test]
     fn parses_group111var1_as_non_read() {
         let input = [
             0x6F, 0x01, 0x28, 0x02, 0x00, 0x01, 0x00, 0xAA, 0x02, 0x00, 0xBB,
