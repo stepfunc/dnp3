@@ -184,5 +184,5 @@ async fn freeze_at_time_no_ack() {
         )),
     )]);
 
-    assert_eq!(harness.io.pop_event(), None);
+    harness.expect_no_response();
 }

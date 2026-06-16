@@ -204,3 +204,38 @@ async fn confirm_can_time_out() {
         .wait_for_events(&[Event::SolicitedConfirmTimeout(0)])
         .await;
 }
+
+// Regression test for #423: an event transmitted but not confirmed before a hard link
+// drop must be RETAINED and RE-ARMED on the next connection against the same database —
+// re-advertised in the class IIN and re-reported on read, and NOT leaked into an
+// unrelated response. Without the teardown reset the event is stranded in the `Written`
+// state: never re-selected, never re-reported, and not even advertised as pending.
+#[tokio::test]
+async fn re_arms_unconfirmed_events_after_link_drop() {
+    let mut harness = new_harness(get_default_config());
+
+    harness.handle.database.transaction(create_binary_and_event);
+
+    // read the event, then drop the link before CONFIRM so it stays in the `Written` state
+    harness
+        .test_request_response(READ_CLASS_123, BINARY_EVENT_RESPONSE)
+        .await;
+    harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
+
+    let harness = harness.drop_link().await;
+
+    // reconnect against the same database
+    let mut harness = harness.reconnect();
+
+    // the unconfirmed event is re-armed: advertised as pending in the class IIN, but NOT
+    // dumped into this unrelated (empty) read
+    harness
+        .test_request_response(EMPTY_READ, EMPTY_RESPONSE_WITH_PENDING_EVENTS)
+        .await;
+
+    // ...and re-reported when its class is read
+    harness
+        .test_request_response(READ_CLASS_123, BINARY_EVENT_RESPONSE)
+        .await;
+    harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
+}

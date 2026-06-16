@@ -35,6 +35,21 @@ pub(crate) struct OutstationTask {
     database: DatabaseHandle,
 }
 
+/// RAII guard that re-arms per-connection state on session teardown.
+struct SessionTeardown<'a> {
+    task: &'a mut OutstationTask,
+}
+
+impl Drop for SessionTeardown<'_> {
+    fn drop(&mut self) {
+        // re-arm, don't clear: unconfirmed events return to Unselected for re-delivery
+        self.task.database.reset();
+        self.task.reader.reset();
+        self.task.writer.reset();
+        self.task.session.reset_session_state();
+    }
+}
+
 impl OutstationTask {
     /// create an `OutstationTask` and return it along with a `DatabaseHandle` for updating it
     #[allow(clippy::too_many_arguments)]
@@ -97,17 +112,16 @@ impl OutstationTask {
         self.session.change_master_address(address);
     }
 
-    /// run the outstation task asynchronously until a `SessionError` occurs
+    /// run the outstation task asynchronously until a `RunError` occurs
+    ///
+    /// Cancel-safe: per-connection state is re-armed by `SessionTeardown`'s `Drop`, so
+    /// dropping this future tears down exactly as returning from it does.
     pub(crate) async fn run(&mut self, io: &mut PhysLayer) -> RunError {
-        let res = self
-            .session
-            .run(io, &mut self.reader, &mut self.writer, &mut self.database)
-            .await;
-
-        self.reader.reset();
-        self.writer.reset();
-
-        res
+        let guard = SessionTeardown { task: self };
+        let task = &mut *guard.task; // reborrow so Drop can reset after the run future releases its borrows
+        task.session
+            .run(io, &mut task.reader, &mut task.writer, &mut task.database)
+            .await
     }
 
     /// process received outstation messages while idle without a session

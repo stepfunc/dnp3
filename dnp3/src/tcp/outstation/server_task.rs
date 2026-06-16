@@ -63,6 +63,8 @@ impl ServerTask {
             res = self.session.run(io) => {
                 Err(res)
             }
+            // a new connection cancels the session.run() future above; this relies on
+            // session.run() being cancel-safe
             x = self.receiver.receive() => {
                 Ok(x?)
             }

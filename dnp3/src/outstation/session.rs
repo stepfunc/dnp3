@@ -374,10 +374,16 @@ impl OutstationSession {
     ) -> RunError {
         loop {
             if let Err(err) = self.run_idle_state(io, reader, writer, database).await {
-                self.state.reset();
+                // teardown (including self.state.reset()) is handled by SessionTeardown
+                // in OutstationTask::run, so it also covers a cancelled run future
                 return err;
             }
         }
+    }
+
+    /// reset the per-connection session state between communication sessions
+    pub(crate) fn reset_session_state(&mut self) {
+        self.state.reset();
     }
 
     async fn write_unsolicited(
