@@ -11,7 +11,7 @@ use crate::tcp::server_task::{NewSession, ServerTask};
 use crate::tcp::{AddressFilter, FilterError, ServerHandle};
 use crate::util::channel::Sender;
 use crate::util::phys::{PhysAddr, PhysLayer};
-use crate::util::session::{Enabled, Session};
+use crate::util::session::Enabled;
 use crate::util::shutdown::ShutdownListener;
 use std::net::SocketAddr;
 use tracing::Instrument;
@@ -108,7 +108,7 @@ impl Server {
             control_handler,
         );
 
-        let (mut adapter, tx) = ServerTask::create(Session::outstation(task), listener);
+        let (mut adapter, tx) = ServerTask::create(task, listener);
 
         let outstation = OutstationInfo {
             filter,

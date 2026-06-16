@@ -1,10 +1,11 @@
 use tracing::Instrument;
 
 use crate::app::{Listener, Shutdown};
+use crate::outstation::task::OutstationTask;
 use crate::outstation::ConnectionState;
 use crate::util::channel::{request_channel, Receiver, Sender};
 use crate::util::phys::PhysLayer;
-use crate::util::session::{Enabled, RunError, Session, StopReason};
+use crate::util::session::{Enabled, RunError, StopReason};
 
 /// message that gets sent to OutstationTaskAdapter when
 /// it needs to switch to a new session
@@ -20,23 +21,23 @@ impl NewSession {
     }
 }
 
-/// Wraps a session allowing it to receive new physical layers from a server component
+/// Wraps an outstation task allowing it to receive new physical layers from a server component
 pub(crate) struct ServerTask {
     receiver: Receiver<NewSession>,
-    session: Session,
+    task: OutstationTask,
     listener: Box<dyn Listener<ConnectionState>>,
 }
 
 impl ServerTask {
     pub(crate) fn create(
-        session: Session,
+        task: OutstationTask,
         listener: Box<dyn Listener<ConnectionState>>,
     ) -> (Self, Sender<NewSession>) {
         let (tx, rx) = request_channel();
         (
             Self {
                 receiver: rx,
-                session,
+                task,
                 listener,
             },
             tx,
@@ -49,7 +50,7 @@ impl ServerTask {
                 session = self.receiver.receive() => {
                     return session;
                 }
-                ret = self.session.process_next_message() => {
+                ret = self.task.process_next_message() => {
                     if let Err(StopReason::Shutdown) = ret {
                         return Err(Shutdown);
                     }
@@ -60,7 +61,7 @@ impl ServerTask {
 
     async fn run_one_session(&mut self, io: &mut PhysLayer) -> Result<NewSession, RunError> {
         tokio::select! {
-            res = self.session.run(io) => {
+            res = self.task.run(io) => {
                 Err(res)
             }
             // a new connection cancels the session.run() future above; this relies on
@@ -111,7 +112,7 @@ impl ServerTask {
                     session.replace(self.wait_for_session().await?);
                 }
                 Some(s) => {
-                    if self.session.enabled() == Enabled::Yes {
+                    if self.task.enabled() == Enabled::Yes {
                         if let Some(s) = self.run_new_session(s).await? {
                             session.replace(s);
                         }
