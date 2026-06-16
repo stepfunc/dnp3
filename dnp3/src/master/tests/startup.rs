@@ -154,8 +154,10 @@ async fn master_calls_task_fail_when_auto_tasks_returns_iin2_errors() {
 
 #[tokio::test]
 async fn master_startup_procedure_skips_integrity_poll_if_none() {
-    let mut config = AssociationConfig::default();
-    config.startup_integrity_classes = Classes::none();
+    let config = AssociationConfig {
+        startup_integrity_classes: Classes::none(),
+        ..Default::default()
+    };
     let mut seq = Sequence::default();
     let mut harness = create_association(config).await;
 
@@ -191,9 +193,11 @@ async fn master_startup_procedure_skips_integrity_poll_if_none() {
 
 #[tokio::test]
 async fn master_startup_procedure_skips_disable_unsol_if_none() {
-    let mut config = AssociationConfig::default();
-    config.disable_unsol_classes = EventClasses::none();
-    config.enable_unsol_classes = EventClasses::none();
+    let config = AssociationConfig {
+        disable_unsol_classes: EventClasses::none(),
+        enable_unsol_classes: EventClasses::none(),
+        ..Default::default()
+    };
     let mut seq = Sequence::default();
     let mut harness = create_association(config).await;
 
@@ -386,9 +390,13 @@ async fn ignore_duplicate_unsolicited_response() {
 
 #[tokio::test]
 async fn master_startup_retry_procedure() {
-    let mut config = AssociationConfig::default();
-    config.auto_tasks_retry_strategy =
-        RetryStrategy::new(Duration::from_secs(1), Duration::from_secs(3));
+    let config = AssociationConfig {
+        auto_tasks_retry_strategy: RetryStrategy::new(
+            Duration::from_secs(1),
+            Duration::from_secs(3),
+        ),
+        ..Default::default()
+    };
     let mut seq = Sequence::default();
     let mut harness = create_association(config).await;
 

@@ -12,8 +12,10 @@ const CLASS_1_EVENTS: Iin = Iin::new(Iin1::new(0x02), Iin2::new(0x00));
 
 #[tokio::test]
 async fn auto_integrity_scan_on_buffer_overflow() {
-    let mut config = AssociationConfig::default();
-    config.auto_integrity_scan_on_buffer_overflow = true;
+    let config = AssociationConfig {
+        auto_integrity_scan_on_buffer_overflow: true,
+        ..Default::default()
+    };
     let mut seq = Sequence::default();
     let mut harness = create_association(config).await;
 
@@ -37,8 +39,10 @@ async fn auto_integrity_scan_on_buffer_overflow() {
 
 #[tokio::test]
 async fn auto_integrity_scan_on_buffer_overflow_disabled() {
-    let mut config = AssociationConfig::default();
-    config.auto_integrity_scan_on_buffer_overflow = false;
+    let config = AssociationConfig {
+        auto_integrity_scan_on_buffer_overflow: false,
+        ..Default::default()
+    };
     let mut seq = Sequence::default();
     let mut harness = create_association(config).await;
 
@@ -57,8 +61,10 @@ async fn auto_integrity_scan_on_buffer_overflow_disabled() {
 
 #[tokio::test]
 async fn auto_event_class_scan() {
-    let mut config = AssociationConfig::default();
-    config.event_scan_on_events_available = EventClasses::all();
+    let config = AssociationConfig {
+        event_scan_on_events_available: EventClasses::all(),
+        ..Default::default()
+    };
     let mut seq = Sequence::default();
     let mut harness = create_association(config).await;
 
@@ -82,8 +88,10 @@ async fn auto_event_class_scan() {
 
 #[tokio::test]
 async fn auto_event_class_ignore_one_class_scan() {
-    let mut config = AssociationConfig::default();
-    config.event_scan_on_events_available = EventClasses::new(false, true, true);
+    let config = AssociationConfig {
+        event_scan_on_events_available: EventClasses::new(false, true, true),
+        ..Default::default()
+    };
     let mut seq = Sequence::default();
     let mut harness = create_association(config).await;
 
@@ -102,8 +110,10 @@ async fn auto_event_class_ignore_one_class_scan() {
 
 #[tokio::test]
 async fn auto_event_class_scan_disabled() {
-    let mut config = AssociationConfig::default();
-    config.event_scan_on_events_available = EventClasses::none();
+    let config = AssociationConfig {
+        event_scan_on_events_available: EventClasses::none(),
+        ..Default::default()
+    };
     let mut seq = Sequence::default();
     let mut harness = create_association(config).await;
 

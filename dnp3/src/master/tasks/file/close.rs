@@ -56,7 +56,7 @@ impl CloseFileTask {
                 }
             };
 
-            if obj.file_handle != expected_handle.into() {
+            if obj.file_handle != u32::from(expected_handle) {
                 return Err(FileError::WrongHandle);
             }
 
