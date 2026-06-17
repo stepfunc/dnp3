@@ -425,9 +425,10 @@ jobs:
           path: artifacts
           pattern: java-bindings-*
       - name: Import PGP key
+        id: import_gpg
         uses: crazy-max/ghaction-import-gpg@v7
         with:
-          gpg-private-key: ${{ secrets.SFIO_PGP_PRIVATE_KEY }}
+          gpg_private_key: ${{ secrets.SFIO_PGP_PRIVATE_KEY }}
           passphrase: ${{ secrets.SFIO_PGP_PRIVATE_KEY_PASSPHRASE }}
       - name: Deploy Java to Maven Central
         shell: bash
@@ -457,7 +458,7 @@ jobs:
             # Sign all files
             cd io/stepfunc/dnp3/${{github.ref_name}}
             for file in *.jar *.pom; do
-              gpg --batch --yes --pinentry-mode loopback --passphrase "${{ secrets.SFIO_PGP_PRIVATE_KEY_PASSPHRASE }}" --armor --detach-sign "$file"
+              gpg --batch --yes --pinentry-mode loopback --local-user "${{ steps.import_gpg.outputs.fingerprint }}" --passphrase "${{ secrets.SFIO_PGP_PRIVATE_KEY_PASSPHRASE }}" --armor --detach-sign "$file"
             done
             
             # Generate checksums
