@@ -1249,10 +1249,35 @@ pub(crate) fn define_database(
 
     // TODO: Add a getter for octet strings
 
+    let discard_unselected_events = lib
+        .define_method("discard_unselected_events", database.clone())?
+        .doc(
+            doc("Discard undelivered events of the given classes from the event buffer")
+                .details("Only events that are NOT part of an in-flight response/confirm exchange are removed.")
+                .details(
+                    "This is a lossy operation outside normal event-delivery semantics. Discarded \
+                    events are gone; they are not re-reported and no confirmation callback fires \
+                    for them. Discarding may also clear the event buffer overflow (IIN 2.3) flag \
+                    if it frees enough space.",
+                )
+                .warning(
+                    "Intended only for specialized integrations that must drop undelivered data \
+                    on disconnect. Standard outstations should not use it.",
+                ),
+        )?
+        .param(
+            "classes",
+            shared_def.event_classes.clone(),
+            "Classes of events to discard",
+        )?
+        .returns(Primitive::U32, "Number of events discarded")?
+        .build()?;
+
     let database = lib
         .define_class(&database)?
         // works on all types
         .method(update_flags)?
+        .method(discard_unselected_events)?
         // binary methods
         .method(add_binary)?
         .method(remove_binary)?

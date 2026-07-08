@@ -77,6 +77,10 @@ impl Database {
         }
     }
 
+    pub(crate) fn discard_unselected_events(&mut self, classes: EventClasses) -> usize {
+        self.event_buffer.remove_unselected_by_class(classes)
+    }
+
     pub(crate) fn select_event_classes(&mut self, classes: EventClasses) -> usize {
         self.event_buffer.select_by_class(classes, None)
     }

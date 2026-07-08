@@ -847,7 +847,7 @@ fn define_association_config(
     lib: &mut LibraryBuilder,
     shared: &SharedDefinitions,
 ) -> BackTraced<FunctionArgStructHandle> {
-    let event_classes = define_event_classes(lib)?;
+    let event_classes = shared.event_classes.clone();
     let classes = define_classes(lib)?;
 
     let auto_time_sync_enum = lib
@@ -1105,43 +1105,6 @@ fn define_association_information(
         .build_async()?;
 
     Ok(handle)
-}
-
-fn define_event_classes(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
-    let class1 = Name::create("class1")?;
-    let class2 = Name::create("class2")?;
-    let class3 = Name::create("class3")?;
-
-    let event_classes = lib.declare_function_argument_struct("event_classes")?;
-    let event_classes = lib
-        .define_function_argument_struct(event_classes)?
-        .add(&class1, Primitive::Bool, "Class 1 events")?
-        .add(&class2, Primitive::Bool, "Class 2 events")?
-        .add(&class3, Primitive::Bool, "Class 3 events")?
-        .doc("Event classes")?
-        .end_fields()?
-        .add_full_initializer("init")?
-        .begin_initializer(
-            "all",
-            InitializerType::Static,
-            "Initialize all classes to true",
-        )?
-        .default(&class1, true)?
-        .default(&class2, true)?
-        .default(&class3, true)?
-        .end_initializer()?
-        .begin_initializer(
-            "none",
-            InitializerType::Static,
-            "Initialize all classes to false",
-        )?
-        .default(&class1, false)?
-        .default(&class2, false)?
-        .default(&class3, false)?
-        .end_initializer()?
-        .build()?;
-
-    Ok(event_classes)
 }
 
 fn define_classes(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {

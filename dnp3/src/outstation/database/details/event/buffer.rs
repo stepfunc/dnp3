@@ -633,6 +633,23 @@ impl EventBuffer {
         count
     }
 
+    pub(crate) fn remove_unselected_by_class(&mut self, classes: EventClasses) -> usize {
+        let total = &mut self.total;
+        let count = self.events.remove_all(|event| {
+            if event.state.get() == EventState::Unselected && classes.matches(event.class) {
+                total.decrement(event);
+                true
+            } else {
+                false
+            }
+        });
+
+        if !self.is_any_full() {
+            self.is_overflown = false;
+        }
+        count
+    }
+
     pub(crate) fn buffer_state(&self) -> BufferState {
         self.total.into()
     }
@@ -1156,6 +1173,114 @@ mod tests {
             assert_eq!(buffer.clear_written(&mut mock), 1);
             assert_eq!(buffer.unwritten_classes(), remaining_classes);
         }
+    }
+
+    #[test]
+    fn discards_only_unselected_events_of_matching_classes() {
+        let mut buffer = EventBuffer::new(EventBufferConfig::all_types(3));
+
+        insert_events(&mut buffer);
+
+        // events 1 (counter) and 3 (binary) are class 2
+        assert_eq!(
+            2,
+            buffer.remove_unselected_by_class(EventClass::Class2.into())
+        );
+        assert_eq!(
+            buffer.unwritten_classes(),
+            EventClass::Class1 | EventClass::Class3
+        );
+
+        assert_eq!(3, buffer.remove_unselected_by_class(EventClasses::all()));
+        assert_eq!(buffer.unwritten_classes(), EventClasses::none());
+
+        // discarded events never produce further activity
+        assert_eq!(0, buffer.select_by_class(EventClasses::all(), None));
+    }
+
+    #[test]
+    fn discard_leaves_selected_and_written_events_alone() {
+        let mut buffer = EventBuffer::new(EventBufferConfig::all_types(3));
+
+        insert_events(&mut buffer);
+
+        // select the two class 1 events (ids 0 and 4)
+        assert_eq!(2, buffer.select_by_class(EventClass::Class1.into(), None));
+
+        // enough space for the binary (id 0) but not the analog (id 4),
+        // leaving one Written and one still Selected
+        let mut backing = [0u8; 10];
+        let mut cursor = WriteCursor::new(backing.as_mut());
+        assert_eq!(buffer.write_events(&mut cursor), Err(1));
+
+        // only the three unselected events (ids 1, 2, 3) are discarded
+        assert_eq!(3, buffer.remove_unselected_by_class(EventClasses::all()));
+        assert_eq!(buffer.unwritten_classes(), EventClass::Class1.into());
+
+        // the in-flight events complete their normal confirm flow,
+        // and event_cleared fires ONLY for them - never for discarded events
+        let mut mock = MockApplication::default();
+        assert_eq!(1, buffer.clear_written(&mut mock));
+        assert_eq!(mock.events.pop_front(), Some(Event::Clear(0)));
+        assert_eq!(mock.events.pop_front(), None);
+
+        // the previously selected analog (id 4) is still deliverable
+        let mut backing = [0u8; 64];
+        let mut cursor = WriteCursor::new(backing.as_mut());
+        buffer.reset();
+        assert_eq!(1, buffer.select_by_class(EventClasses::all(), None));
+        assert_eq!(1, buffer.write_events(&mut cursor).unwrap());
+        assert_eq!(1, buffer.clear_written(&mut mock));
+        assert_eq!(mock.events.pop_front(), Some(Event::Clear(4)));
+        assert_eq!(mock.events.pop_front(), None);
+    }
+
+    #[test]
+    fn discard_after_reset_removes_all_events() {
+        let mut buffer = EventBuffer::new(EventBufferConfig::all_types(3));
+
+        insert_events(&mut buffer);
+
+        // everything is in-flight: discard is a no-op
+        assert_eq!(5, buffer.select_by_class(EventClasses::all(), None));
+        assert_eq!(0, buffer.remove_unselected_by_class(EventClasses::all()));
+
+        // session teardown re-arms the buffer, making everything eligible
+        buffer.reset();
+        assert_eq!(5, buffer.remove_unselected_by_class(EventClasses::all()));
+        assert_eq!(buffer.unwritten_classes(), EventClasses::none());
+    }
+
+    #[test]
+    fn discard_clears_overflow_flag_when_space_is_freed() {
+        let mut buffer = EventBuffer::new(EventBufferConfig::all_types(1));
+
+        let binary = BinaryInput::new(true, Flags::ONLINE, Time::synchronized(0));
+
+        buffer
+            .insert(
+                1,
+                EventClass::Class1,
+                &binary,
+                EventBinaryInputVariation::Group2Var1,
+            )
+            .unwrap();
+
+        assert!(buffer
+            .insert(
+                1,
+                EventClass::Class1,
+                &binary,
+                EventBinaryInputVariation::Group2Var1,
+            )
+            .is_err());
+
+        assert!(buffer.is_overflown());
+        assert_eq!(
+            1,
+            buffer.remove_unselected_by_class(EventClass::Class1.into())
+        );
+        assert!(!buffer.is_overflown());
     }
 
     #[test]
