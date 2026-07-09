@@ -10,7 +10,7 @@ use crate::master::EventClasses;
 use crate::outstation::database::read::ReadHeader;
 
 use crate::app::attr::{AttrProp, AttrSet, OwnedAttribute, TypeError};
-use crate::outstation::OutstationApplication;
+use crate::outstation::{ClassCount, OutstationApplication};
 use scursor::WriteCursor;
 
 mod config;
@@ -409,7 +409,8 @@ impl Database {
     /// Discard undelivered events of the given classes from the event buffer.
     ///
     /// Only events that are NOT part of an in-flight response/confirm exchange are
-    /// removed. Returns the number of events discarded.
+    /// removed. Returns the number of events discarded on a per-class basis; classes
+    /// not selected for discard always report zero.
     ///
     /// This is a lossy operation outside normal event-delivery semantics. Discarded
     /// events are gone; they are not re-reported and no confirmation callback fires
@@ -425,7 +426,7 @@ impl Database {
     ///     handle.transaction(|db| db.discard_unselected_events(EventClasses::new(false, true, false)));
     /// }
     /// ```
-    pub fn discard_unselected_events(&mut self, classes: EventClasses) -> usize {
+    pub fn discard_unselected_events(&mut self, classes: EventClasses) -> ClassCount {
         self.inner.discard_unselected_events(classes)
     }
 

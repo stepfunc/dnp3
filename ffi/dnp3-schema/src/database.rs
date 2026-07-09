@@ -1270,7 +1270,10 @@ pub(crate) fn define_database(
             shared_def.event_classes.clone(),
             "Classes of events to discard",
         )?
-        .returns(Primitive::U32, "Number of events discarded")?
+        .returns(
+            shared_def.class_count.clone(),
+            "Number of events discarded on a per-class basis. Classes not selected for discard always report zero.",
+        )?
         .build()?;
 
     let database = lib

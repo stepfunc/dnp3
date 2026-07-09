@@ -118,18 +118,18 @@ macro_rules! implement_database_point_operations {
 pub(crate) unsafe fn database_discard_unselected_events(
     instance: *mut crate::Database,
     classes: ffi::EventClasses,
-) -> u32 {
+) -> ffi::ClassCount {
     let db = match instance.as_mut() {
-        None => return 0,
+        None => return dnp3::outstation::ClassCount::default().into(),
         Some(db) => db,
     };
 
-    let count = db.discard_unselected_events(dnp3::master::EventClasses::new(
+    db.discard_unselected_events(dnp3::master::EventClasses::new(
         classes.class1,
         classes.class2,
         classes.class3,
-    ));
-    u32::try_from(count).unwrap_or(u32::MAX)
+    ))
+    .into()
 }
 
 pub(crate) unsafe fn database_update_flags(

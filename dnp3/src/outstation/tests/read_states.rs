@@ -264,7 +264,14 @@ async fn discards_unselected_events_on_demand_after_link_drop() {
         .handle
         .database
         .transaction(|db| db.discard_unselected_events(crate::master::EventClasses::all()));
-    assert_eq!(discarded, 1);
+    assert_eq!(
+        discarded,
+        crate::outstation::ClassCount {
+            num_class_1: 1,
+            num_class_2: 0,
+            num_class_3: 0
+        }
+    );
 
     let mut harness = harness.reconnect();
 

@@ -633,11 +633,17 @@ impl EventBuffer {
         count
     }
 
-    pub(crate) fn remove_unselected_by_class(&mut self, classes: EventClasses) -> usize {
+    pub(crate) fn remove_unselected_by_class(&mut self, classes: EventClasses) -> ClassCount {
         let total = &mut self.total;
-        let count = self.events.remove_all(|event| {
+        let mut count = ClassCount::default();
+        self.events.remove_all(|event| {
             if event.state.get() == EventState::Unselected && classes.matches(event.class) {
                 total.decrement(event);
+                match event.class {
+                    EventClass::Class1 => count.num_class_1 += 1,
+                    EventClass::Class2 => count.num_class_2 += 1,
+                    EventClass::Class3 => count.num_class_3 += 1,
+                }
                 true
             } else {
                 false
@@ -1043,6 +1049,14 @@ mod tests {
         }
     }
 
+    fn class_counts(num_class_1: usize, num_class_2: usize, num_class_3: usize) -> ClassCount {
+        ClassCount {
+            num_class_1,
+            num_class_2,
+            num_class_3,
+        }
+    }
+
     fn insert_events(buffer: &mut EventBuffer) {
         buffer
             .insert(
@@ -1183,7 +1197,7 @@ mod tests {
 
         // events 1 (counter) and 3 (binary) are class 2
         assert_eq!(
-            2,
+            class_counts(0, 2, 0),
             buffer.remove_unselected_by_class(EventClass::Class2.into())
         );
         assert_eq!(
@@ -1191,7 +1205,10 @@ mod tests {
             EventClass::Class1 | EventClass::Class3
         );
 
-        assert_eq!(3, buffer.remove_unselected_by_class(EventClasses::all()));
+        assert_eq!(
+            class_counts(2, 0, 1),
+            buffer.remove_unselected_by_class(EventClasses::all())
+        );
         assert_eq!(buffer.unwritten_classes(), EventClasses::none());
 
         // discarded events never produce further activity
@@ -1214,7 +1231,10 @@ mod tests {
         assert_eq!(buffer.write_events(&mut cursor), Err(1));
 
         // only the three unselected events (ids 1, 2, 3) are discarded
-        assert_eq!(3, buffer.remove_unselected_by_class(EventClasses::all()));
+        assert_eq!(
+            class_counts(0, 2, 1),
+            buffer.remove_unselected_by_class(EventClasses::all())
+        );
         assert_eq!(buffer.unwritten_classes(), EventClass::Class1.into());
 
         // the in-flight events complete their normal confirm flow,
@@ -1243,11 +1263,16 @@ mod tests {
 
         // everything is in-flight: discard is a no-op
         assert_eq!(5, buffer.select_by_class(EventClasses::all(), None));
-        assert_eq!(0, buffer.remove_unselected_by_class(EventClasses::all()));
+        assert!(buffer
+            .remove_unselected_by_class(EventClasses::all())
+            .is_empty());
 
         // session teardown re-arms the buffer, making everything eligible
         buffer.reset();
-        assert_eq!(5, buffer.remove_unselected_by_class(EventClasses::all()));
+        assert_eq!(
+            class_counts(2, 2, 1),
+            buffer.remove_unselected_by_class(EventClasses::all())
+        );
         assert_eq!(buffer.unwritten_classes(), EventClasses::none());
     }
 
@@ -1277,7 +1302,7 @@ mod tests {
 
         assert!(buffer.is_overflown());
         assert_eq!(
-            1,
+            class_counts(1, 0, 0),
             buffer.remove_unselected_by_class(EventClass::Class1.into())
         );
         assert!(!buffer.is_overflown());

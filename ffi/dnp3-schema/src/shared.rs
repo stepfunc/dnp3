@@ -16,6 +16,7 @@ pub(crate) struct SharedDefinitions {
     pub endpoint_list: ClassHandle,
     pub connect_strategy: FunctionArgStructHandle,
     pub event_classes: FunctionArgStructHandle,
+    pub class_count: UniversalStructHandle,
     pub tls_client_config: FunctionArgStructHandle,
     pub levels: DecodeLevels,
     pub decode_level: UniversalStructHandle,
@@ -328,6 +329,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> 
         endpoint_list,
         connect_strategy,
         event_classes: define_event_classes(lib)?,
+        class_count: define_class_count(lib)?,
         tls_client_config: tls.tls_client_config,
         levels,
         decode_level,
@@ -407,6 +409,20 @@ fn define_event_classes(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStruc
         .build()?;
 
     Ok(event_classes)
+}
+
+fn define_class_count(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructHandle> {
+    let class_count = lib.declare_universal_struct("class_count")?;
+    let class_count = lib
+        .define_universal_struct(class_count)?
+        .doc("A count of events on a per-class basis")?
+        .add("num_class_1", Primitive::U32, "Number of class 1 events")?
+        .add("num_class_2", Primitive::U32, "Number of class 2 events")?
+        .add("num_class_3", Primitive::U32, "Number of class 3 events")?
+        .end_fields()?
+        .build()?;
+
+    Ok(class_count)
 }
 
 fn define_nothing_enum(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
