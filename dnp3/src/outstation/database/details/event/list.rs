@@ -259,12 +259,7 @@ impl<T> VecList<T> {
                 return Some(entry.create_index(current));
             }
 
-            match entry.metadata.next {
-                Some(next) => {
-                    current = next;
-                }
-                None => return None,
-            }
+            current = entry.metadata.next?;
         }
     }
 

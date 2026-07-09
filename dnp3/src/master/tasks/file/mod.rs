@@ -17,7 +17,7 @@ pub(crate) struct Filename(pub(crate) String);
 
 // we don't really care what the ID is as we don't support polling for file stuff
 // we can just be cute and write Step Function (SF) on the wire.
-pub(crate) const REQUEST_ID: u16 = u16::from_le_bytes([b'S', b'F']);
+pub(crate) const REQUEST_ID: u16 = u16::from_le_bytes(*b"SF");
 
 pub(super) fn write_auth(
     credentials: &FileCredentials,
