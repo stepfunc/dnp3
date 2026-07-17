@@ -46,19 +46,19 @@ pub enum ConnectionState {
     Disconnected,
 }
 
-/// Information about the remaining number of class events in the buffer
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+/// A count of events on a per-class basis
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub struct ClassCount {
-    /// number of class 1 events remaining in the buffer
+    /// number of class 1 events
     pub num_class_1: usize,
-    /// number of class 2 events remaining in the buffer
+    /// number of class 2 events
     pub num_class_2: usize,
-    /// number of class 3 events remaining in the buffer
+    /// number of class 3 events
     pub num_class_3: usize,
 }
 
 impl ClassCount {
-    /// true if there is no remaining class 1, 2, or 3 data in the buffers
+    /// true if the count of class 1, 2, and 3 events are all zero
     pub fn is_empty(&self) -> bool {
         self.num_class_1 == 0 && self.num_class_2 == 0 && self.num_class_3 == 0
     }

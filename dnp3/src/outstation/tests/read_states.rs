@@ -239,3 +239,50 @@ async fn re_arms_unconfirmed_events_after_link_drop() {
         .await;
     harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
 }
+
+// Test for #427: an application that explicitly discards undelivered events from its
+// disconnect handler sees them dropped rather than re-reported. The #423 teardown reset
+// runs before the application observes the disconnect, so an event that was in-flight
+// (Written, awaiting CONFIRM) when the link dropped is back in the unselected state and
+// therefore eligible for discard.
+#[tokio::test]
+async fn discards_unselected_events_on_demand_after_link_drop() {
+    let mut harness = new_harness(get_default_config());
+
+    harness.handle.database.transaction(create_binary_and_event);
+
+    // read the event, then drop the link before CONFIRM so it stays in the `Written` state
+    harness
+        .test_request_response(READ_CLASS_123, BINARY_EVENT_RESPONSE)
+        .await;
+    harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
+
+    let harness = harness.drop_link().await;
+
+    // what a bespoke integration would do from its disconnect handler
+    let discarded = harness
+        .handle
+        .database
+        .transaction(|db| db.discard_unselected_events(crate::master::EventClasses::all()));
+    assert_eq!(
+        discarded,
+        crate::outstation::ClassCount {
+            num_class_1: 1,
+            num_class_2: 0,
+            num_class_3: 0
+        }
+    );
+
+    let mut harness = harness.reconnect();
+
+    // no pending events advertised in the class IIN...
+    harness
+        .test_request_response(EMPTY_READ, EMPTY_RESPONSE)
+        .await;
+
+    // ...and nothing re-reported when its class is read
+    harness
+        .test_request_response(READ_CLASS_123, EMPTY_RESPONSE)
+        .await;
+    harness.check_no_events();
+}

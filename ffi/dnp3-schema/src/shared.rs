@@ -15,6 +15,8 @@ pub(crate) struct SharedDefinitions {
     pub connect_options: ClassHandle,
     pub endpoint_list: ClassHandle,
     pub connect_strategy: FunctionArgStructHandle,
+    pub event_classes: FunctionArgStructHandle,
+    pub class_count: UniversalStructHandle,
     pub tls_client_config: FunctionArgStructHandle,
     pub levels: DecodeLevels,
     pub decode_level: UniversalStructHandle,
@@ -326,6 +328,8 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> 
         connect_options,
         endpoint_list,
         connect_strategy,
+        event_classes: define_event_classes(lib)?,
+        class_count: define_class_count(lib)?,
         tls_client_config: tls.tls_client_config,
         levels,
         decode_level,
@@ -368,6 +372,57 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> 
         udp_socket_mode: define_udp_socket_mode(lib)?,
         link_read_mode: define_line_read_mode(lib)?,
     })
+}
+
+fn define_event_classes(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
+    let class1 = Name::create("class1")?;
+    let class2 = Name::create("class2")?;
+    let class3 = Name::create("class3")?;
+
+    let event_classes = lib.declare_function_argument_struct("event_classes")?;
+    let event_classes = lib
+        .define_function_argument_struct(event_classes)?
+        .add(&class1, Primitive::Bool, "Class 1 events")?
+        .add(&class2, Primitive::Bool, "Class 2 events")?
+        .add(&class3, Primitive::Bool, "Class 3 events")?
+        .doc("Event classes")?
+        .end_fields()?
+        .add_full_initializer("init")?
+        .begin_initializer(
+            "all",
+            InitializerType::Static,
+            "Initialize all classes to true",
+        )?
+        .default(&class1, true)?
+        .default(&class2, true)?
+        .default(&class3, true)?
+        .end_initializer()?
+        .begin_initializer(
+            "none",
+            InitializerType::Static,
+            "Initialize all classes to false",
+        )?
+        .default(&class1, false)?
+        .default(&class2, false)?
+        .default(&class3, false)?
+        .end_initializer()?
+        .build()?;
+
+    Ok(event_classes)
+}
+
+fn define_class_count(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructHandle> {
+    let class_count = lib.declare_universal_struct("class_count")?;
+    let class_count = lib
+        .define_universal_struct(class_count)?
+        .doc("A count of events on a per-class basis")?
+        .add("num_class_1", Primitive::U32, "Number of class 1 events")?
+        .add("num_class_2", Primitive::U32, "Number of class 2 events")?
+        .add("num_class_3", Primitive::U32, "Number of class 3 events")?
+        .end_fields()?
+        .build()?;
+
+    Ok(class_count)
 }
 
 fn define_nothing_enum(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {

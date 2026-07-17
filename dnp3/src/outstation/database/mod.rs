@@ -10,7 +10,7 @@ use crate::master::EventClasses;
 use crate::outstation::database::read::ReadHeader;
 
 use crate::app::attr::{AttrProp, AttrSet, OwnedAttribute, TypeError};
-use crate::outstation::OutstationApplication;
+use crate::outstation::{ClassCount, OutstationApplication};
 use scursor::WriteCursor;
 
 mod config;
@@ -404,6 +404,30 @@ impl Database {
         Self {
             inner: details::database::Database::new(max_read_selection, class_zero_config, config),
         }
+    }
+
+    /// Discard undelivered events of the given classes from the event buffer.
+    ///
+    /// Only events that are NOT part of an in-flight response/confirm exchange are
+    /// removed. Returns the number of events discarded on a per-class basis; classes
+    /// not selected for discard always report zero.
+    ///
+    /// This is a lossy operation outside normal event-delivery semantics. Discarded
+    /// events are gone; they are not re-reported and no confirmation callback fires
+    /// for them. Discarding may also clear the event buffer overflow (IIN 2.3) flag
+    /// if it frees enough space. Intended only for specialized integrations that must
+    /// drop undelivered data on disconnect. Standard outstations should not use it.
+    ///
+    /// ```no_run
+    /// use dnp3::master::EventClasses;
+    /// use dnp3::outstation::database::DatabaseHandle;
+    ///
+    /// fn discard_class_2(handle: &mut DatabaseHandle) {
+    ///     handle.transaction(|db| db.discard_unselected_events(EventClasses::new(false, true, false)));
+    /// }
+    /// ```
+    pub fn discard_unselected_events(&mut self, classes: EventClasses) -> ClassCount {
+        self.inner.discard_unselected_events(classes)
     }
 
     /// Define an attribute that will be exposed to the master

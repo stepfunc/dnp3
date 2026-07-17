@@ -32,28 +32,11 @@ impl OutstationTypes {
     }
 }
 
-pub(crate) fn define_buffer_state(lib: &mut LibraryBuilder) -> BackTraced<UniversalStructHandle> {
-    let class_count = lib.declare_universal_struct("class_count")?;
-    let class_count = lib
-        .define_universal_struct(class_count)?
-        .doc("Remaining number of events in the buffer after a confirm on a per-class basis")?
-        .add(
-            "num_class_1",
-            Primitive::U32,
-            "Number of class 1 events remaining in the buffer",
-        )?
-        .add(
-            "num_class_2",
-            Primitive::U32,
-            "Number of class 2 events remaining in the buffer",
-        )?
-        .add(
-            "num_class_3",
-            Primitive::U32,
-            "Number of class 3 events remaining in the buffer",
-        )?
-        .end_fields()?
-        .build()?;
+pub(crate) fn define_buffer_state(
+    lib: &mut LibraryBuilder,
+    shared: &SharedDefinitions,
+) -> BackTraced<UniversalStructHandle> {
+    let class_count = shared.class_count.clone();
 
     let type_count = lib.declare_universal_struct("type_count")?;
     let type_count = lib
@@ -1166,7 +1149,7 @@ fn define_outstation_application(
 
     let application_iin = define_application_iin(lib)?;
 
-    let buffer_state = define_buffer_state(lib)?;
+    let buffer_state = define_buffer_state(lib, shared)?;
 
     let freeze_not_supported = freeze_result.value("not_supported")?;
 

@@ -14,7 +14,7 @@ use crate::app::measurement::{
     DoubleBitBinaryInput, Flags, FrozenCounter, Time,
 };
 use crate::outstation::database::details::attrs::map::SetMap;
-use crate::outstation::{BufferState, OutstationApplication};
+use crate::outstation::{BufferState, ClassCount, OutstationApplication};
 use scursor::WriteCursor;
 
 pub(crate) struct Database {
@@ -75,6 +75,10 @@ impl Database {
             }
             ReadHeader::Attr(header) => self.attrs.select(header),
         }
+    }
+
+    pub(crate) fn discard_unselected_events(&mut self, classes: EventClasses) -> ClassCount {
+        self.event_buffer.remove_unselected_by_class(classes)
     }
 
     pub(crate) fn select_event_classes(&mut self, classes: EventClasses) -> usize {
