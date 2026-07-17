@@ -43,6 +43,32 @@ cargo won't select by default.)
 Review and publish the **draft** GitHub release CI created. The publishers are
 idempotent, so re-running the tag's workflow safely retries any that failed.
 
+## Dependencies
+
+Dependency security is handled **continuously**, not at release time:
+`.github/workflows/security-audit.yml` runs `cargo audit` daily and on every
+PR/`main` push that touches `Cargo.toml`/`Cargo.lock`, and fails on advisories.
+Security patches land as their own PRs as advisories appear — they are not
+batched onto releases.
+
+The release's dependency responsibilities are therefore narrow:
+
+- **Gate, don't churn:** the security audit must be green on the `prepare` PR
+  (it runs automatically because the PR touches `Cargo.lock`). Don't tag if it's
+  red. The prebuilt bindings (C/.NET/Java) freeze whatever is in `Cargo.lock` at
+  tag time, so a clean audit at the tag is what protects binding consumers —
+  pure-Rust crate consumers re-resolve on their own.
+- **Freshen early, once per cycle:** do the routine "update dependencies" pass
+  at the *first* RC/milestone of a new minor version, not at each RC and not at
+  the final release. Late-cycle dependency churn undermines the stabilization
+  the RC process exists to provide. Subsequent RCs and the final release take
+  **security patches only** (targeted `cargo update -p <crate>`).
+- **Respect deliberate pins:** some dependencies are exact-pinned for documented
+  reasons (e.g. `tokio-serial = "=5.4.5"`, pinned because upstream historically
+  shipped without changelogs, git tags, or GitHub releases, so bumps must be
+  reviewed by hand). Update these intentionally, in their own commit with a note
+  — never via a blanket `cargo update`.
+
 ## CHANGELOG conventions
 
 - Each release candidate gets its own `### X.Y.Z-RCn ###` section while the
