@@ -1,7 +1,7 @@
 
 ### 1.7.0-RC2 ###
 * :star: Add `Database::discard_unselected_events()` to drop undelivered events of selected classes on demand, e.g. from a disconnect handler. Returns per-class discard counts. Opt-in and lossy by design. See [#427](https://github.com/stepfunc/dnp3/issues/427).
-* :shield: Update `rustls-webpki` to 0.103.12 to resolve [RUSTSEC-2026-0098](https://rustsec.org/advisories/RUSTSEC-2026-0098) and [RUSTSEC-2026-0099](https://rustsec.org/advisories/RUSTSEC-2026-0099), both concerning incorrect acceptance of X.509 name constraints. Exposure is limited to TLS configurations using `CertificateMode::AuthorityBased`; `SelfSigned` mode bypasses the affected code path.
+* :shield: Update `rustls-webpki` to 0.103.13 to resolve [RUSTSEC-2026-0098](https://rustsec.org/advisories/RUSTSEC-2026-0098) and [RUSTSEC-2026-0099](https://rustsec.org/advisories/RUSTSEC-2026-0099), both concerning incorrect acceptance of X.509 name constraints. Exposure is limited to TLS configurations using `CertificateMode::AuthorityBased`; `SelfSigned` mode bypasses the affected code path.
 * :bell: **This update only affects the prebuilt binary distributions of the bindings (C/C++, .NET, Java).** Rust consumers of the `dnp3` crate pick up the patched `rustls-webpki` automatically on rebuild.
 
 ### 1.7.0-RC1 ###
