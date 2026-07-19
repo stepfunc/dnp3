@@ -117,14 +117,8 @@ impl Server {
         };
         self.outstations.push(outstation);
 
-        let endpoint = self.address;
-        let address = config.outstation_address.raw_value();
         let future = async move {
-            let _ = adapter.run()
-                .instrument(
-                    tracing::info_span!("dnp3-outstation-tcp", "listen" = ?endpoint, "addr" = address),
-                )
-                .await;
+            let _ = adapter.run().await;
         };
         Ok((handle, future))
     }
@@ -141,6 +135,8 @@ impl Server {
         listener: Box<dyn Listener<ConnectionState>>,
         filter: AddressFilter,
     ) -> Result<OutstationHandle, FilterError> {
+        let endpoint = self.address;
+        let address = config.outstation_address.raw_value();
         let (handle, future) = self.add_outstation_no_spawn(
             config,
             application,
@@ -149,7 +145,9 @@ impl Server {
             listener,
             filter,
         )?;
-        tokio::spawn(future);
+        tokio::spawn(future.instrument(
+            tracing::info_span!("dnp3-outstation-tcp", "listen" = ?endpoint, "addr" = address),
+        ));
         Ok(handle)
     }
 
@@ -180,15 +178,9 @@ impl Server {
         listener: tokio::net::TcpListener,
     ) -> (ServerHandle, impl std::future::Future<Output = Shutdown>) {
         let addr = listener.local_addr().ok();
-        let local = addr.unwrap_or(self.address);
-
         let (token, shutdown_rx) = crate::util::shutdown::shutdown_token();
 
-        let task = async move {
-            self.run(listener, shutdown_rx)
-                .instrument(tracing::info_span!("tcp-server", "listen" = ?local))
-                .await
-        };
+        let task = async move { self.run(listener, shutdown_rx).await };
 
         let handle = ServerHandle {
             addr,
@@ -205,8 +197,10 @@ impl Server {
     ///
     /// This must be called from within the Tokio runtime
     pub async fn bind(self) -> Result<ServerHandle, tokio::io::Error> {
+        let configured_address = self.address;
         let (handle, future) = self.bind_no_spawn().await?;
-        tokio::spawn(future);
+        let local = handle.local_addr().unwrap_or(configured_address);
+        tokio::spawn(future.instrument(tracing::info_span!("tcp-server", "listen" = ?local)));
         Ok(handle)
     }
 

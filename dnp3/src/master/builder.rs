@@ -1,9 +1,6 @@
 use std::net::SocketAddr;
 use std::time::Duration;
 
-use tokio::time::Instant;
-use tracing::Instrument;
-
 use super::association::{Association, AssociationMap};
 use super::handler::{AssociationHandle, MasterChannel, MasterChannelConfig, MasterChannelType};
 use super::poll::PollHandle;
@@ -24,6 +21,7 @@ use crate::udp::task::UdpTask;
 use crate::util::channel::Receiver;
 use crate::util::phys::PhysAddr;
 use crate::util::session::{Enabled, Session};
+use tokio::time::Instant;
 
 /// Builder for configuring a stream-based master task (TCP, TLS, serial)
 /// before binding it to a transport.
@@ -416,7 +414,6 @@ impl MasterTaskType {
 
 impl TcpTask {
     async fn run(self) {
-        let name = self.connect_handler.endpoint_span_name();
         let session = Session::master(self.inner);
         let mut client = ClientTask::new(
             session,
@@ -424,17 +421,13 @@ impl TcpTask {
             PostConnectionHandler::Tcp,
             self.listener,
         );
-        client
-            .run()
-            .instrument(tracing::info_span!("dnp3-master-tcp-client", "endpoint" = ?name))
-            .await;
+        client.run().await;
     }
 }
 
 #[cfg(feature = "enable-tls")]
 impl TlsTask {
     async fn run(self) {
-        let name = self.connect_handler.endpoint_span_name();
         let session = Session::master(self.inner);
         let mut client = ClientTask::new(
             session,
@@ -442,10 +435,7 @@ impl TlsTask {
             PostConnectionHandler::Tls(self.tls_config),
             self.listener,
         );
-        client
-            .run()
-            .instrument(tracing::info_span!("dnp3-master-tls-client", "endpoint" = ?name))
-            .await;
+        client.run().await;
     }
 }
 
@@ -460,10 +450,7 @@ impl SerialTask {
             self.retry_strategy,
             self.listener,
         );
-        serial
-            .run()
-            .instrument(tracing::info_span!("dnp3-master-serial", "port" = ?self.path))
-            .await;
+        serial.run().await;
     }
 }
 
@@ -476,10 +463,7 @@ impl UdpMasterTask {
             factory: UdpFactory::bound(local_endpoint),
             retry_delay: self.retry_delay,
         };
-        let _ = task
-            .run()
-            .instrument(tracing::info_span!("dnp3-master-udp", "endpoint" = ?local_endpoint))
-            .await;
+        let _ = task.run().await;
     }
 }
 

@@ -26,7 +26,6 @@ pub struct SerialOutstationTask {
 }
 
 struct OneShotSerialOutstationTask {
-    path: String,
     serial: tokio_serial::SerialStream,
     task: OutstationTask,
 }
@@ -52,7 +51,7 @@ impl SerialOutstation {
     ) -> std::io::Result<SerialOutstationTask> {
         let serial = crate::serial::open(path, settings)?;
         Ok(SerialOutstationTask {
-            inner: OneShotSerialOutstationTask::new(path, serial, self.task),
+            inner: OneShotSerialOutstationTask::new(serial, self.task),
         })
     }
 }
@@ -66,21 +65,13 @@ impl SerialOutstationTask {
 }
 
 impl OneShotSerialOutstationTask {
-    fn new(path: &str, serial: tokio_serial::SerialStream, task: OutstationTask) -> Self {
-        Self {
-            path: path.to_owned(),
-            serial,
-            task,
-        }
+    fn new(serial: tokio_serial::SerialStream, task: OutstationTask) -> Self {
+        Self { serial, task }
     }
 
     async fn run(mut self) {
         let mut io = PhysLayer::Serial(self.serial);
-        let _ = self
-            .task
-            .run(&mut io)
-            .instrument(tracing::info_span!("dnp3-outstation-serial", "port" = ?self.path))
-            .await;
+        let _ = self.task.run(&mut io).await;
     }
 }
 
@@ -121,7 +112,12 @@ pub fn spawn_outstation_serial(
 ) -> std::io::Result<OutstationHandle> {
     let serial = crate::serial::open(path, settings)?;
     let (task, handle) = create_outstation(config, application, information, control_handler);
-    tokio::spawn(OneShotSerialOutstationTask::new(path, serial, task).run());
+    let log_path = path.to_owned();
+    tokio::spawn(
+        OneShotSerialOutstationTask::new(serial, task)
+            .run()
+            .instrument(tracing::info_span!("dnp3-outstation-serial", "port" = ?log_path)),
+    );
     Ok(handle)
 }
 
