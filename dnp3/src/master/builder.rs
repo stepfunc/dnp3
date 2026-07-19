@@ -70,8 +70,7 @@ pub struct AssociationBuilder<'a> {
 /// A master task bound to a transport. Call [`run`](Self::run) to execute
 /// the event loop.
 ///
-/// Created by [`MasterBuilder::into_tcp`], [`MasterBuilder::into_tls`],
-/// [`MasterBuilder::into_serial`], or [`UdpMasterBuilder::into_udp`].
+/// Created by binding a [`MasterBuilder`] or [`UdpMasterBuilder`] to a transport.
 #[must_use = "a MasterTask does nothing unless you call .run()"]
 pub struct MasterTask {
     inner: MasterTaskType,

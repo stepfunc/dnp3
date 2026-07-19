@@ -46,6 +46,7 @@ tokio = { version = "1", features = ["test-util"] }
 
 [features]
 default = ["tls", "serial"]
+unstable = []
 enable-tls = [] # not enabled directly
 ffi = [] # this feature flag is only used when building the FFI
 tls = ["enable-tls", "sfio-rustls-config/crypto-ring", "tokio-rustls"]

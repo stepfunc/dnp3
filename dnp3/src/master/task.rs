@@ -87,6 +87,7 @@ impl MasterTask {
         self.session.enabled
     }
 
+    #[cfg(feature = "unstable")]
     pub(crate) fn start(&mut self, now: Instant) {
         self.session.associations.start(now);
     }

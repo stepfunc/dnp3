@@ -27,11 +27,13 @@ pub(crate) struct Poll {
 
 /// Map of all the polls of an association
 pub(crate) struct PollMap {
+    #[cfg(feature = "unstable")]
     timer_state: TimerState,
     id: u64,
     polls: BTreeMap<u64, Poll>,
 }
 
+#[cfg(feature = "unstable")]
 #[derive(Copy, Clone, PartialEq)]
 enum TimerState {
     Deferred,
@@ -41,12 +43,14 @@ enum TimerState {
 impl PollMap {
     pub(crate) fn new() -> Self {
         Self {
+            #[cfg(feature = "unstable")]
             timer_state: TimerState::Running,
             id: 0,
             polls: BTreeMap::new(),
         }
     }
 
+    #[cfg(feature = "unstable")]
     pub(crate) fn new_deferred() -> Self {
         Self {
             timer_state: TimerState::Deferred,
@@ -58,10 +62,13 @@ impl PollMap {
     pub(crate) fn add(&mut self, request: ReadRequest, period: Duration) -> u64 {
         let id = self.id;
         self.id += 1;
+        #[cfg(feature = "unstable")]
         let poll = match self.timer_state {
             TimerState::Deferred => Poll::new_deferred(id, request, period),
             TimerState::Running => Poll::new(id, request, period),
         };
+        #[cfg(not(feature = "unstable"))]
+        let poll = Poll::new(id, request, period);
         self.polls.insert(id, poll);
         id
     }
@@ -69,6 +76,7 @@ impl PollMap {
     /// Start all timers that were deferred during configuration.
     ///
     /// Returns `true` only when this call transitions the map to running.
+    #[cfg(feature = "unstable")]
     pub(crate) fn start(&mut self, now: Instant) -> bool {
         if self.timer_state == TimerState::Running {
             return false;
@@ -131,6 +139,7 @@ impl Poll {
         }
     }
 
+    #[cfg(feature = "unstable")]
     fn new_deferred(id: u64, request: ReadRequest, period: Duration) -> Self {
         Self {
             id,
@@ -140,6 +149,7 @@ impl Poll {
         }
     }
 
+    #[cfg(feature = "unstable")]
     fn start(&mut self, now: Instant) {
         self.next = now.checked_add(self.period);
     }
@@ -230,7 +240,7 @@ impl PollHandle {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "unstable"))]
 mod tests {
     use super::*;
     use crate::master::Classes;

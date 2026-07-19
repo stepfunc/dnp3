@@ -15,6 +15,7 @@ use crate::master::extract::extract_measurements;
 use crate::master::handler::AssociationHandler;
 use crate::master::messages::AssociationMsgType;
 use crate::master::poll::{PollHandle, PollMap, PollMsg};
+#[cfg(feature = "unstable")]
 use crate::master::request::ReadRequest;
 use crate::master::request::{Classes, EventClasses, TimeSyncProcedure};
 use crate::master::tasks::auto::AutoTask;
@@ -350,6 +351,7 @@ impl Association {
         }
     }
 
+    #[cfg(feature = "unstable")]
     pub(crate) fn new_deferred(
         address: FragmentAddr,
         config: AssociationConfig,
@@ -376,6 +378,7 @@ impl Association {
         }
     }
 
+    #[cfg(feature = "unstable")]
     pub(crate) fn start(&mut self, now: Instant) {
         if self.polls.start(now) {
             self.next_link_status_deadline =
@@ -383,6 +386,7 @@ impl Association {
         }
     }
 
+    #[cfg(feature = "unstable")]
     pub(crate) fn add_poll(&mut self, request: ReadRequest, period: Duration) -> u64 {
         self.polls.add(request, period)
     }
@@ -789,6 +793,7 @@ impl AssociationMap {
         }
     }
 
+    #[cfg(feature = "unstable")]
     pub(crate) fn start(&mut self, now: Instant) {
         for association in self.map.values_mut() {
             association.start(now);
@@ -890,7 +895,7 @@ impl AssociationMap {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "unstable"))]
 mod timer_tests {
     use super::*;
     use crate::master::{AssociationHandler, AssociationInformation, ReadHandler};
