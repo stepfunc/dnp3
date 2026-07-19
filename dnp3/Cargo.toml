@@ -46,6 +46,8 @@ tokio = { version = "1", features = ["test-util"] }
 
 [features]
 default = ["tls", "serial"]
+# APIs behind this feature are exempt from semantic versioning guarantees and
+# may change or be removed in any release, including patch releases.
 unstable = []
 enable-tls = [] # not enabled directly
 ffi = [] # this feature flag is only used when building the FFI
