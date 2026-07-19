@@ -3,7 +3,7 @@ use crate::tcp::{
     ClientConnectionHandler, ClientState, ConnectionInfo, EndpointInner, PostConnectionHandler,
 };
 use crate::util::phys::PhysLayer;
-use crate::util::session::{RunError, Session, StopReason};
+use crate::util::session::{Enabled, RunError, Session, StopReason};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -38,8 +38,10 @@ impl ClientTask {
 
     async fn run_impl(&mut self) -> Result<(), Shutdown> {
         loop {
-            self.listener.update(ClientState::Disabled).get().await;
-            self.session.wait_for_enabled().await?;
+            if self.session.enabled() == Enabled::No {
+                self.listener.update(ClientState::Disabled).get().await;
+                self.session.wait_for_enabled().await?;
+            }
             if let Err(StopReason::Shutdown) = self.run_connection().await {
                 return Err(Shutdown);
             }

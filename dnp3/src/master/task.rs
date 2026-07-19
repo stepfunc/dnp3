@@ -87,6 +87,10 @@ impl MasterTask {
         self.session.enabled
     }
 
+    pub(crate) fn start(&mut self, now: Instant) {
+        self.session.associations.start(now);
+    }
+
     pub(crate) async fn run(&mut self, io: &mut PhysLayer) -> RunError {
         let ret = self
             .session

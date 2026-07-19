@@ -1,3 +1,4 @@
+use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, VecDeque};
 use std::time::Duration;
 
@@ -346,6 +347,39 @@ impl Association {
             next_link_status_deadline: config.keep_alive_timeout.map(|delay| now + delay),
             startup_integrity_done: false,
             events_available: EventClasses::none(),
+        }
+    }
+
+    pub(crate) fn new_deferred(
+        address: FragmentAddr,
+        config: AssociationConfig,
+        read_handler: Box<dyn ReadHandler>,
+        assoc_handler: Box<dyn AssociationHandler>,
+        assoc_info: Box<dyn AssociationInformation>,
+    ) -> Self {
+        Self {
+            response_timeout: config.response_timeout,
+            address,
+            seq: Sequence::default(),
+            last_unsol_frag: None,
+            request_queue: VecDeque::new(),
+            max_request_queue_size: config.max_queued_user_requests,
+            auto_tasks: TaskStates::new(),
+            read_handler,
+            assoc_handler,
+            assoc_info,
+            config,
+            polls: PollMap::new_deferred(),
+            next_link_status_deadline: None,
+            startup_integrity_done: false,
+            events_available: EventClasses::none(),
+        }
+    }
+
+    pub(crate) fn start(&mut self, now: Instant) {
+        if self.polls.start(now) {
+            self.next_link_status_deadline =
+                self.config.keep_alive_timeout.map(|delay| now + delay);
         }
     }
 
@@ -755,6 +789,12 @@ impl AssociationMap {
         }
     }
 
+    pub(crate) fn start(&mut self, now: Instant) {
+        for association in self.map.values_mut() {
+            association.start(now);
+        }
+    }
+
     pub(crate) fn get_timeout(&self, address: EndpointAddress) -> Result<Timeout, TaskError> {
         match self.map.get(&address) {
             Some(x) => Ok(x.response_timeout),
@@ -769,13 +809,21 @@ impl AssociationMap {
     }
 
     pub(crate) fn register(&mut self, session: Association) -> Result<(), AssociationError> {
-        if self.map.contains_key(&session.address.link) {
-            return Err(AssociationError::DuplicateAddress(session.address.link));
-        }
+        self.register_and_get(session).map(|_| ())
+    }
 
-        self.priority.push_back(session.address.link);
-        self.map.insert(session.address.link, session);
-        Ok(())
+    pub(crate) fn register_and_get(
+        &mut self,
+        session: Association,
+    ) -> Result<&mut Association, AssociationError> {
+        let address = session.address.link;
+        match self.map.entry(address) {
+            Entry::Occupied(_) => Err(AssociationError::DuplicateAddress(address)),
+            Entry::Vacant(entry) => {
+                self.priority.push_back(address);
+                Ok(entry.insert(session))
+            }
+        }
     }
 
     pub(crate) fn remove(&mut self, address: EndpointAddress) {
@@ -839,5 +887,58 @@ impl AssociationMap {
 
         // No task found
         Next::None
+    }
+}
+
+#[cfg(test)]
+mod timer_tests {
+    use super::*;
+    use crate::master::{AssociationHandler, AssociationInformation, ReadHandler};
+    use crate::util::phys::PhysAddr;
+
+    struct NullReadHandler;
+    impl ReadHandler for NullReadHandler {}
+
+    struct NullAssociationHandler;
+    impl AssociationHandler for NullAssociationHandler {}
+
+    struct NullAssociationInformation;
+    impl AssociationInformation for NullAssociationInformation {}
+
+    fn deferred_association(keep_alive_timeout: Duration) -> Association {
+        let mut config = AssociationConfig::quiet();
+        config.keep_alive_timeout = Some(keep_alive_timeout);
+        Association::new_deferred(
+            FragmentAddr {
+                link: EndpointAddress::try_new(1).unwrap(),
+                phys: PhysAddr::None,
+            },
+            config,
+            Box::new(NullReadHandler),
+            Box::new(NullAssociationHandler),
+            Box::new(NullAssociationInformation),
+        )
+    }
+
+    #[test]
+    fn deferred_keep_alive_is_scheduled_from_start_time() {
+        let timeout = Duration::from_secs(5);
+        let start = Instant::now();
+        let mut association = deferred_association(timeout);
+
+        assert_eq!(association.next_link_status_deadline, None);
+        association.start(start);
+        assert_eq!(association.next_link_status_deadline, Some(start + timeout));
+    }
+
+    #[test]
+    fn starting_twice_does_not_reset_keep_alive_deadline() {
+        let timeout = Duration::from_secs(5);
+        let start = Instant::now();
+        let mut association = deferred_association(timeout);
+
+        association.start(start);
+        association.start(start + Duration::from_secs(1));
+        assert_eq!(association.next_link_status_deadline, Some(start + timeout));
     }
 }

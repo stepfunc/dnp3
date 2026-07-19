@@ -1,6 +1,7 @@
 use std::net::SocketAddr;
 use std::time::Duration;
 
+use tokio::time::Instant;
 use tracing::Instrument;
 
 use super::association::{Association, AssociationMap};
@@ -53,15 +54,17 @@ pub struct UdpMasterBuilder {
     associations: AssociationMap,
 }
 
-/// Builder for configuring an association and its polls before registration.
+/// Builder for configuring an association and its polls before the master task
+/// starts.
 ///
-/// Created via [`MasterBuilder::new_association`] or [`UdpMasterBuilder::new_association`].
-/// Add polls with [`add_poll`](Self::add_poll), then register with
-/// [`MasterBuilder::add_association`] or [`UdpMasterBuilder::add_association`].
-pub struct AssociationBuilder {
-    address: EndpointAddress,
-    channel: MasterChannel,
-    association: Association,
+/// Created by [`MasterBuilder::add_association`] or
+/// [`UdpMasterBuilder::add_association`] after the association has been
+/// registered. Its lifetime binds it to the parent master builder, preventing
+/// it from being registered with a different master or transport.
+#[must_use = "call .into_handle() if runtime access to the association is needed"]
+pub struct AssociationBuilder<'a> {
+    handle: AssociationHandle,
+    association: &'a mut Association,
 }
 
 /// A master task bound to a transport. Call [`run`](Self::run) to execute
@@ -154,43 +157,34 @@ impl MasterBuilder {
         self.enabled = Enabled::Yes;
     }
 
-    /// Create an [`AssociationBuilder`] for configuring an association and its
-    /// polls before registration.
-    pub fn new_association(
-        &self,
+    /// Register an association and return a scoped builder for adding polls
+    /// before the master task starts.
+    pub fn add_association(
+        &mut self,
         address: EndpointAddress,
         config: AssociationConfig,
         read_handler: Box<dyn ReadHandler>,
         assoc_handler: Box<dyn AssociationHandler>,
         assoc_information: Box<dyn AssociationInformation>,
-    ) -> AssociationBuilder {
+    ) -> Result<AssociationBuilder<'_>, AssociationError> {
         let addr = FragmentAddr {
             link: address,
             phys: PhysAddr::None,
         };
-        AssociationBuilder {
-            address,
-            channel: self.channel.clone(),
-            association: Association::new(
+        let handle = AssociationHandle::new(address, self.channel.clone());
+        let association = self
+            .associations
+            .register_and_get(Association::new_deferred(
                 addr,
                 config,
                 read_handler,
                 assoc_handler,
                 assoc_information,
-            ),
-        }
-    }
-
-    /// Register a configured association with the master.
-    ///
-    /// Returns an [`AssociationHandle`] that can be used for post-run operations.
-    /// Async methods on the handle require the task to be running.
-    pub fn add_association(
-        &mut self,
-        builder: AssociationBuilder,
-    ) -> Result<AssociationHandle, AssociationError> {
-        self.associations.register(builder.association)?;
-        Ok(AssociationHandle::new(builder.address, builder.channel))
+            ))?;
+        Ok(AssociationBuilder {
+            handle,
+            association,
+        })
     }
 
     /// Bind to a TCP transport, consuming the builder.
@@ -306,47 +300,38 @@ impl UdpMasterBuilder {
         self.enabled = Enabled::Yes;
     }
 
-    /// Create an [`AssociationBuilder`] for configuring a UDP association and
-    /// its polls before registration.
+    /// Register a UDP association and return a scoped builder for adding polls
+    /// before the master task starts.
     ///
     /// * `address` is the DNP3 link-layer address of the outstation
     /// * `destination` is the IP address and port of the outstation
-    pub fn new_association(
-        &self,
+    pub fn add_association(
+        &mut self,
         address: EndpointAddress,
         destination: SocketAddr,
         config: AssociationConfig,
         read_handler: Box<dyn ReadHandler>,
         assoc_handler: Box<dyn AssociationHandler>,
         assoc_information: Box<dyn AssociationInformation>,
-    ) -> AssociationBuilder {
+    ) -> Result<AssociationBuilder<'_>, AssociationError> {
         let addr = FragmentAddr {
             link: address,
             phys: PhysAddr::Udp(destination),
         };
-        AssociationBuilder {
-            address,
-            channel: self.channel.clone(),
-            association: Association::new(
+        let handle = AssociationHandle::new(address, self.channel.clone());
+        let association = self
+            .associations
+            .register_and_get(Association::new_deferred(
                 addr,
                 config,
                 read_handler,
                 assoc_handler,
                 assoc_information,
-            ),
-        }
-    }
-
-    /// Register a configured association with the master.
-    ///
-    /// Returns an [`AssociationHandle`] that can be used for post-run operations.
-    /// Async methods on the handle require the task to be running.
-    pub fn add_association(
-        &mut self,
-        builder: AssociationBuilder,
-    ) -> Result<AssociationHandle, AssociationError> {
-        self.associations.register(builder.association)?;
-        Ok(AssociationHandle::new(builder.address, builder.channel))
+            ))?;
+        Ok(AssociationBuilder {
+            handle,
+            association,
+        })
     }
 
     /// Bind to a UDP transport, consuming the builder.
@@ -380,17 +365,22 @@ impl UdpMasterBuilder {
     }
 }
 
-impl AssociationBuilder {
+impl AssociationBuilder<'_> {
     /// Add a periodic poll to the association.
     ///
     /// Returns a [`PollHandle`] that can be used for post-run operations.
     /// Async methods on the handle require the task to be running.
     pub fn add_poll(&mut self, request: ReadRequest, period: Duration) -> PollHandle {
         let id = self.association.add_poll(request, period);
-        PollHandle::new(
-            AssociationHandle::new(self.address, self.channel.clone()),
-            id,
-        )
+        PollHandle::new(self.handle.clone(), id)
+    }
+
+    /// Convert this scoped builder into an [`AssociationHandle`].
+    ///
+    /// This releases the mutable borrow of the parent master builder. Async
+    /// methods on the returned handle require the master task to be running.
+    pub fn into_handle(self) -> AssociationHandle {
+        self.handle
     }
 }
 
@@ -399,7 +389,8 @@ impl MasterTask {
     ///
     /// This method consumes the task and runs until the [`MasterChannel`] (and
     /// all associated handles) are dropped.
-    pub async fn run(self) {
+    pub async fn run(mut self) {
+        self.inner.start(Instant::now());
         match self.inner {
             MasterTaskType::Tcp(task) => task.run().await,
             #[cfg(feature = "enable-tls")]
@@ -407,6 +398,19 @@ impl MasterTask {
             #[cfg(feature = "serial")]
             MasterTaskType::Serial(task) => task.run().await,
             MasterTaskType::Udp(task) => task.run().await,
+        }
+    }
+}
+
+impl MasterTaskType {
+    fn start(&mut self, now: Instant) {
+        match self {
+            MasterTaskType::Tcp(task) => task.inner.start(now),
+            #[cfg(feature = "enable-tls")]
+            MasterTaskType::Tls(task) => task.inner.start(now),
+            #[cfg(feature = "serial")]
+            MasterTaskType::Serial(task) => task.inner.start(now),
+            MasterTaskType::Udp(task) => task.inner.start(now),
         }
     }
 }
@@ -477,5 +481,198 @@ impl UdpMasterTask {
             .run()
             .instrument(tracing::info_span!("dnp3-master-udp", "endpoint" = ?local_endpoint))
             .await;
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::app::MaybeAsync;
+    use crate::master::messages::{AssociationMsgType, Message};
+    use crate::master::poll::PollMsg;
+    use std::marker::PhantomData;
+
+    struct ChannelListener<T> {
+        tx: tokio::sync::mpsc::UnboundedSender<T>,
+    }
+
+    impl<T: Send + Sync + 'static> Listener<T> for ChannelListener<T> {
+        fn update(&mut self, value: T) -> MaybeAsync<()> {
+            let _ = self.tx.send(value);
+            MaybeAsync::ready(())
+        }
+    }
+
+    fn channel_listener<T: Send + Sync + 'static>() -> (
+        Box<dyn Listener<T>>,
+        tokio::sync::mpsc::UnboundedReceiver<T>,
+    ) {
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+        (Box::new(ChannelListener { tx }), rx)
+    }
+
+    struct NeverConnect {
+        _not_constructible: PhantomData<()>,
+    }
+
+    impl NeverConnect {
+        fn create() -> Box<dyn ClientConnectionHandler> {
+            Box::new(Self {
+                _not_constructible: PhantomData,
+            })
+        }
+    }
+
+    impl ClientConnectionHandler for NeverConnect {
+        fn endpoint_span_name(&self) -> String {
+            "test".to_string()
+        }
+
+        fn disconnected(&mut self, _: SocketAddr, _: Option<&str>) -> Duration {
+            Duration::from_secs(60)
+        }
+
+        fn next(&mut self) -> Result<crate::tcp::ConnectionInfo, Duration> {
+            Err(Duration::from_secs(60))
+        }
+    }
+
+    struct NullReadHandler;
+    impl ReadHandler for NullReadHandler {}
+
+    struct NullAssociationHandler;
+    impl AssociationHandler for NullAssociationHandler {}
+
+    struct NullAssociationInformation;
+    impl AssociationInformation for NullAssociationInformation {}
+
+    fn endpoint(value: u16) -> EndpointAddress {
+        EndpointAddress::try_new(value).unwrap()
+    }
+
+    fn add_stream_association(
+        builder: &mut MasterBuilder,
+        address: EndpointAddress,
+    ) -> Result<AssociationBuilder<'_>, AssociationError> {
+        builder.add_association(
+            address,
+            AssociationConfig::quiet(),
+            Box::new(NullReadHandler),
+            Box::new(NullAssociationHandler),
+            Box::new(NullAssociationInformation),
+        )
+    }
+
+    #[tokio::test]
+    async fn preconfigured_poll_handle_targets_parent_builder() {
+        let (mut builder, _channel) = MasterBuilder::new(MasterChannelConfig::new(endpoint(1)));
+        let address = endpoint(1024);
+
+        let mut association = add_stream_association(&mut builder, address).unwrap();
+        let mut poll = association.add_poll(
+            ReadRequest::ClassScan(crate::master::Classes::all()),
+            Duration::from_secs(5),
+        );
+        let handle = association.into_handle();
+
+        assert_eq!(handle.address(), address);
+        poll.demand().await.unwrap();
+
+        match builder.rx.receive().await.unwrap() {
+            Message::Association(msg) => {
+                assert_eq!(msg.address, address);
+                assert!(matches!(
+                    msg.details,
+                    AssociationMsgType::Poll(PollMsg::Demand(0))
+                ));
+            }
+            _ => panic!("expected an association message"),
+        }
+    }
+
+    #[test]
+    fn duplicate_address_fails_before_a_scoped_builder_is_returned() {
+        let (mut builder, _channel) = MasterBuilder::new(MasterChannelConfig::new(endpoint(1)));
+        let address = endpoint(1024);
+
+        let association = add_stream_association(&mut builder, address).unwrap();
+        let _handle = association.into_handle();
+
+        assert!(matches!(
+            add_stream_association(&mut builder, address),
+            Err(AssociationError::DuplicateAddress(x)) if x == address
+        ));
+    }
+
+    #[tokio::test]
+    async fn enabled_tcp_task_does_not_report_disabled() {
+        let (mut builder, channel) = MasterBuilder::new(MasterChannelConfig::new(endpoint(1)));
+        builder.enable();
+        let (listener, mut states) = channel_listener();
+        let task = builder.into_tcp(LinkErrorMode::Close, NeverConnect::create(), listener);
+
+        let join = tokio::spawn(task.run());
+        assert_eq!(states.recv().await, Some(ClientState::Connecting));
+
+        drop(channel);
+        join.await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn disabled_tcp_task_reports_disabled() {
+        let (builder, channel) = MasterBuilder::new(MasterChannelConfig::new(endpoint(1)));
+        let (listener, mut states) = channel_listener();
+        let task = builder.into_tcp(LinkErrorMode::Close, NeverConnect::create(), listener);
+
+        let join = tokio::spawn(task.run());
+        assert_eq!(states.recv().await, Some(ClientState::Disabled));
+
+        drop(channel);
+        join.await.unwrap();
+    }
+
+    #[cfg(feature = "serial")]
+    #[tokio::test]
+    async fn enabled_serial_task_does_not_report_disabled() {
+        let (mut builder, channel) = MasterBuilder::new(MasterChannelConfig::new(endpoint(1)));
+        builder.enable();
+        let (listener, mut states) = channel_listener();
+        let task = builder.into_serial(
+            "/path/that/does/not/exist/dnp3-test",
+            crate::serial::SerialSettings::default(),
+            Duration::from_secs(60),
+            listener,
+        );
+
+        let join = tokio::spawn(task.run());
+        assert!(matches!(
+            states.recv().await,
+            Some(crate::serial::PortState::Wait(_))
+        ));
+
+        drop(channel);
+        join.await.unwrap();
+    }
+
+    #[cfg(feature = "serial")]
+    #[tokio::test]
+    async fn disabled_serial_task_reports_disabled() {
+        let (builder, channel) = MasterBuilder::new(MasterChannelConfig::new(endpoint(1)));
+        let (listener, mut states) = channel_listener();
+        let task = builder.into_serial(
+            "/path/that/does/not/exist/dnp3-test",
+            crate::serial::SerialSettings::default(),
+            Duration::from_secs(60),
+            listener,
+        );
+
+        let join = tokio::spawn(task.run());
+        assert_eq!(
+            states.recv().await,
+            Some(crate::serial::PortState::Disabled)
+        );
+
+        drop(channel);
+        join.await.unwrap();
     }
 }

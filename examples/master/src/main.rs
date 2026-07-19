@@ -17,8 +17,9 @@ use dnp3::tcp::*;
 
 use clap::{Parser, Subcommand};
 use dnp3::outstation::FreezeInterval;
+use dnp3::udp::spawn_master_udp;
 use std::net::SocketAddr;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use dnp3_cli_utils::serial::{DataBitsArg, FlowControlArg, ParityArg, StopBitsArg};
 use dnp3_cli_utils::LogLevel;
@@ -46,122 +47,110 @@ struct CliArgs {
 #[derive(Debug, Subcommand)]
 enum TransportCommand {
     /// Use TCP client transport
-    TcpClient(TcpClientArgs),
+    TcpClient {
+        /// IP address and port to connect to
+        #[arg(short, long, default_value = "127.0.0.1:20000")]
+        endpoint: SocketAddr,
+
+        /// Outstation address (DNP3 address of the outstation)
+        #[arg(short, long, default_value = "1024")]
+        outstation_address: EndpointAddress,
+    },
     /// Use UDP transport
-    Udp(UdpArgs),
+    Udp {
+        /// Local IP address and port to bind to
+        #[arg(short, long, default_value = "127.0.0.1:20001")]
+        local_endpoint: SocketAddr,
+
+        /// Remote IP address and port to send to
+        #[arg(short, long, default_value = "127.0.0.1:20000")]
+        remote_endpoint: SocketAddr,
+
+        /// Outstation address (DNP3 address of the outstation)
+        #[arg(short, long, default_value = "1024")]
+        outstation_address: EndpointAddress,
+    },
+
     /// Use serial transport
-    Serial(SerialArgs),
+    Serial {
+        /// Serial port name
+        #[arg(short, long, default_value = "/dev/ttyS0")]
+        port: String,
+
+        /// Baud rate
+        #[arg(short, long, default_value = "9600")]
+        baud_rate: u32,
+
+        /// Data bits
+        #[arg(long, value_enum, default_value_t = DataBitsArg::Eight)]
+        data_bits: DataBitsArg,
+
+        /// Stop bits
+        #[arg(long, value_enum, default_value_t = StopBitsArg::One)]
+        stop_bits: StopBitsArg,
+
+        /// Parity
+        #[arg(long, value_enum, default_value_t = ParityArg::None)]
+        parity: ParityArg,
+
+        /// Flow control
+        #[arg(long, value_enum, default_value_t = FlowControlArg::None)]
+        flow_control: FlowControlArg,
+
+        /// Outstation address (DNP3 address of the outstation)
+        #[arg(short, long, default_value = "1024")]
+        outstation_address: EndpointAddress,
+    },
+
     /// Use TLS with CA chain transport
-    TlsCa(TlsCaArgs),
+    TlsCa {
+        /// IP address and port to connect to
+        #[arg(short, long, default_value = "127.0.0.1:20001")]
+        endpoint: SocketAddr,
+
+        /// Domain name to verify
+        #[arg(long, default_value = "test.com")]
+        domain: String,
+
+        /// Path to CA certificate file
+        #[arg(long, default_value = "./certs/ca_chain/ca_cert.pem")]
+        ca_cert: PathBuf,
+
+        /// Path to entity certificate file
+        #[arg(long, default_value = "./certs/ca_chain/entity1_cert.pem")]
+        entity_cert: PathBuf,
+
+        /// Path to entity private key file
+        #[arg(long, default_value = "./certs/ca_chain/entity1_key.pem")]
+        entity_key: PathBuf,
+
+        /// Outstation address (DNP3 address of the outstation)
+        #[arg(short, long, default_value = "1024")]
+        outstation_address: EndpointAddress,
+    },
+
     /// Use TLS with self-signed certificates
-    TlsSelfSigned(TlsSelfSignedArgs),
-}
+    TlsSelfSigned {
+        /// IP address and port to connect to
+        #[arg(short, long, default_value = "127.0.0.1:20001")]
+        endpoint: SocketAddr,
 
-#[derive(Debug, Parser)]
-struct TcpClientArgs {
-    /// IP address and port to connect to
-    #[arg(short, long, default_value = "127.0.0.1:20000")]
-    endpoint: SocketAddr,
+        /// Path to peer certificate file
+        #[arg(long, default_value = "./certs/self_signed/entity2_cert.pem")]
+        peer_cert: PathBuf,
 
-    /// Outstation address (DNP3 address of the outstation)
-    #[arg(short, long, default_value = "1024")]
-    outstation_address: EndpointAddress,
-}
+        /// Path to entity certificate file
+        #[arg(long, default_value = "./certs/self_signed/entity1_cert.pem")]
+        entity_cert: PathBuf,
 
-#[derive(Debug, Parser)]
-struct UdpArgs {
-    /// Local IP address and port to bind to
-    #[arg(short, long, default_value = "127.0.0.1:20001")]
-    local_endpoint: SocketAddr,
+        /// Path to entity private key file
+        #[arg(long, default_value = "./certs/self_signed/entity1_key.pem")]
+        entity_key: PathBuf,
 
-    /// Remote IP address and port to send to
-    #[arg(short, long, default_value = "127.0.0.1:20000")]
-    remote_endpoint: SocketAddr,
-
-    /// Outstation address (DNP3 address of the outstation)
-    #[arg(short, long, default_value = "1024")]
-    outstation_address: EndpointAddress,
-}
-
-#[derive(Debug, Parser)]
-struct SerialArgs {
-    /// Serial port name
-    #[arg(short, long, default_value = "/dev/ttyS0")]
-    port: String,
-
-    /// Baud rate
-    #[arg(short, long, default_value = "9600")]
-    baud_rate: u32,
-
-    /// Data bits
-    #[arg(long, value_enum, default_value_t = DataBitsArg::Eight)]
-    data_bits: DataBitsArg,
-
-    /// Stop bits
-    #[arg(long, value_enum, default_value_t = StopBitsArg::One)]
-    stop_bits: StopBitsArg,
-
-    /// Parity
-    #[arg(long, value_enum, default_value_t = ParityArg::None)]
-    parity: ParityArg,
-
-    /// Flow control
-    #[arg(long, value_enum, default_value_t = FlowControlArg::None)]
-    flow_control: FlowControlArg,
-
-    /// Outstation address (DNP3 address of the outstation)
-    #[arg(short, long, default_value = "1024")]
-    outstation_address: EndpointAddress,
-}
-
-#[derive(Debug, Parser)]
-struct TlsCaArgs {
-    /// IP address and port to connect to
-    #[arg(short, long, default_value = "127.0.0.1:20001")]
-    endpoint: SocketAddr,
-
-    /// Domain name to verify
-    #[arg(long, default_value = "test.com")]
-    domain: String,
-
-    /// Path to CA certificate file
-    #[arg(long, default_value = "./certs/ca_chain/ca_cert.pem")]
-    ca_cert: PathBuf,
-
-    /// Path to entity certificate file
-    #[arg(long, default_value = "./certs/ca_chain/entity1_cert.pem")]
-    entity_cert: PathBuf,
-
-    /// Path to entity private key file
-    #[arg(long, default_value = "./certs/ca_chain/entity1_key.pem")]
-    entity_key: PathBuf,
-
-    /// Outstation address (DNP3 address of the outstation)
-    #[arg(short, long, default_value = "1024")]
-    outstation_address: EndpointAddress,
-}
-
-#[derive(Debug, Parser)]
-struct TlsSelfSignedArgs {
-    /// IP address and port to connect to
-    #[arg(short, long, default_value = "127.0.0.1:20001")]
-    endpoint: SocketAddr,
-
-    /// Path to peer certificate file
-    #[arg(long, default_value = "./certs/self_signed/entity2_cert.pem")]
-    peer_cert: PathBuf,
-
-    /// Path to entity certificate file
-    #[arg(long, default_value = "./certs/self_signed/entity1_cert.pem")]
-    entity_cert: PathBuf,
-
-    /// Path to entity private key file
-    #[arg(long, default_value = "./certs/self_signed/entity1_key.pem")]
-    entity_key: PathBuf,
-
-    /// Outstation address (DNP3 address of the outstation)
-    #[arg(short, long, default_value = "1024")]
-    outstation_address: EndpointAddress,
+        /// Outstation address (DNP3 address of the outstation)
+        #[arg(short, long, default_value = "1024")]
+        outstation_address: EndpointAddress,
+    },
 }
 
 /// read handler that does nothing
@@ -394,9 +383,27 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .init();
     // ANCHOR_END: logging
 
-    // create the master channel based on the command line argument
-    let (mut handler, task) = setup(&args)?;
-    tokio::spawn(task.run());
+    // spawn the master channel based on the command line argument
+    let (mut channel, mut association) = create_channel_and_association(&args).await?;
+
+    // create an event poll
+    // ANCHOR: add_poll
+    let poll = association
+        .add_poll(
+            ReadRequest::ClassScan(Classes::class123()),
+            Duration::from_secs(5),
+        )
+        .await?;
+    // ANCHOR_END: add_poll
+
+    // enable communications
+    channel.enable().await?;
+
+    let mut handler = CliHandler {
+        poll,
+        channel,
+        association,
+    };
 
     let mut reader = FramedRead::new(tokio::io::stdin(), LinesCodec::new());
 
@@ -600,42 +607,120 @@ impl CliHandler {
     }
 }
 
-fn setup(cli: &CliArgs) -> Result<(CliHandler, MasterTask), Box<dyn std::error::Error>> {
+// create the specified channel based on the command line argument
+async fn create_channel_and_association(
+    cli: &CliArgs,
+) -> Result<(MasterChannel, AssociationHandle), Box<dyn std::error::Error>> {
     match &cli.transport {
-        TransportCommand::TcpClient(args) => args.setup(cli.master_address),
-        TransportCommand::Udp(args) => args.setup(cli.master_address),
-        TransportCommand::Serial(args) => args.setup(cli.master_address),
-        TransportCommand::TlsCa(args) => args.setup(cli.master_address),
-        TransportCommand::TlsSelfSigned(args) => args.setup(cli.master_address),
+        TransportCommand::TcpClient {
+            endpoint,
+            outstation_address,
+        } => {
+            let mut channel = create_tcp_channel(cli.master_address, *endpoint)?;
+            let assoc = add_association(&mut channel, *outstation_address).await?;
+            Ok((channel, assoc))
+        }
+        TransportCommand::Udp {
+            local_endpoint,
+            remote_endpoint,
+            outstation_address,
+        } => {
+            let mut channel = create_udp_channel(cli.master_address, *local_endpoint)?;
+            let assoc =
+                add_udp_association(&mut channel, *remote_endpoint, *outstation_address).await?;
+            Ok((channel, assoc))
+        }
+        TransportCommand::Serial {
+            port,
+            baud_rate,
+            data_bits,
+            stop_bits,
+            parity,
+            flow_control,
+            outstation_address,
+        } => {
+            let mut channel = create_serial_channel(
+                cli.master_address,
+                port,
+                *baud_rate,
+                *data_bits,
+                *stop_bits,
+                *parity,
+                *flow_control,
+            )?;
+            let assoc = add_association(&mut channel, *outstation_address).await?;
+            Ok((channel, assoc))
+        }
+        TransportCommand::TlsCa {
+            endpoint,
+            domain,
+            ca_cert,
+            entity_cert,
+            entity_key,
+            outstation_address,
+        } => {
+            let mut channel = create_tls_channel(
+                cli.master_address,
+                *endpoint,
+                get_tls_authority_config(domain, ca_cert, entity_cert, entity_key)?,
+            )?;
+            let assoc = add_association(&mut channel, *outstation_address).await?;
+            Ok((channel, assoc))
+        }
+        TransportCommand::TlsSelfSigned {
+            endpoint,
+            peer_cert,
+            entity_cert,
+            entity_key,
+            outstation_address,
+        } => {
+            let mut channel = create_tls_channel(
+                cli.master_address,
+                *endpoint,
+                get_tls_self_signed_config(peer_cert, entity_cert, entity_key)?,
+            )?;
+            let assoc = add_association(&mut channel, *outstation_address).await?;
+            Ok((channel, assoc))
+        }
     }
 }
 
-fn create_stream_builder(
-    master_address: EndpointAddress,
+async fn add_association(
+    channel: &mut MasterChannel,
     outstation_address: EndpointAddress,
-) -> Result<(MasterBuilder, CliHandler), Box<dyn std::error::Error>> {
-    let (mut builder, channel) = MasterBuilder::new(get_master_channel_config(master_address)?);
-    builder.enable();
-    let mut assoc = builder.new_association(
-        outstation_address,
-        get_association_config(),
-        ExampleReadHandler::boxed(),
-        Box::new(ExampleAssociationHandler),
-        Box::new(ExampleAssociationInformation),
-    );
-    let poll = assoc.add_poll(
-        ReadRequest::ClassScan(Classes::class123()),
-        Duration::from_secs(5),
-    );
-    let association = builder.add_association(assoc)?;
-    Ok((
-        builder,
-        CliHandler {
-            poll,
-            channel,
-            association,
-        },
-    ))
+) -> Result<AssociationHandle, Box<dyn std::error::Error>> {
+    // ANCHOR: association_create
+    let association = channel
+        .add_association(
+            outstation_address,
+            get_association_config(),
+            ExampleReadHandler::boxed(),
+            Box::new(ExampleAssociationHandler),
+            Box::new(ExampleAssociationInformation),
+        )
+        .await?;
+    // ANCHOR_END: association_create
+    Ok(association)
+}
+
+async fn add_udp_association(
+    channel: &mut MasterChannel,
+    remote_endpoint: SocketAddr,
+    outstation_address: EndpointAddress,
+) -> Result<AssociationHandle, Box<dyn std::error::Error>> {
+    // ANCHOR: association_create_udp
+    let association = channel
+        .add_udp_association(
+            outstation_address,
+            remote_endpoint,
+            get_association_config(),
+            ExampleReadHandler::boxed(),
+            Box::new(ExampleAssociationHandler),
+            Box::new(ExampleAssociationInformation),
+        )
+        .await?;
+    // ANCHOR_END: association_create_udp
+    Ok(association)
 }
 
 // ANCHOR: master_channel_config
@@ -666,136 +751,118 @@ fn get_association_config() -> AssociationConfig {
 }
 // ANCHOR_END: association_config
 
-impl TcpClientArgs {
-    fn setup(
-        &self,
-        master_address: EndpointAddress,
-    ) -> Result<(CliHandler, MasterTask), Box<dyn std::error::Error>> {
-        let (builder, handler) = create_stream_builder(master_address, self.outstation_address)?;
-        let connect = EndpointList::new(self.endpoint.to_string(), &[])
-            .into_connect_handler(ConnectStrategy::default());
-        Ok((
-            handler,
-            builder.into_tcp(LinkErrorMode::Close, connect, NullListener::create()),
-        ))
-    }
+fn get_tls_self_signed_config(
+    peer_cert: &Path,
+    entity_cert: &Path,
+    entity_key: &Path,
+) -> Result<TlsClientConfig, Box<dyn std::error::Error>> {
+    // ANCHOR: tls_self_signed_config
+    let config = TlsClientConfig::self_signed(
+        peer_cert,
+        entity_cert,
+        entity_key,
+        None, // no password
+        MinTlsVersion::V12,
+    )?;
+    // ANCHOR_END: tls_self_signed_config
+    Ok(config)
 }
 
-impl UdpArgs {
-    fn setup(
-        &self,
-        master_address: EndpointAddress,
-    ) -> Result<(CliHandler, MasterTask), Box<dyn std::error::Error>> {
-        let (mut builder, channel) =
-            UdpMasterBuilder::new(get_master_channel_config(master_address)?);
-        builder.enable();
-        let mut assoc = builder.new_association(
-            self.outstation_address,
-            self.remote_endpoint,
-            get_association_config(),
-            ExampleReadHandler::boxed(),
-            Box::new(ExampleAssociationHandler),
-            Box::new(ExampleAssociationInformation),
-        );
-        let poll = assoc.add_poll(
-            ReadRequest::ClassScan(Classes::class123()),
-            Duration::from_secs(5),
-        );
-        let association = builder.add_association(assoc)?;
-        let task = builder.into_udp(
-            self.local_endpoint,
-            LinkReadMode::Datagram,
-            Timeout::from_secs(5)?,
-        );
-        Ok((
-            CliHandler {
-                poll,
-                channel,
-                association,
-            },
-            task,
-        ))
-    }
+fn get_tls_authority_config(
+    domain: &str,
+    ca_cert: &Path,
+    entity_cert: &Path,
+    entity_key: &Path,
+) -> Result<TlsClientConfig, Box<dyn std::error::Error>> {
+    // ANCHOR: tls_ca_chain_config
+    let config = TlsClientConfig::full_pki(
+        Some(domain.to_string()),
+        ca_cert,
+        entity_cert,
+        entity_key,
+        None, // no password
+        MinTlsVersion::V12,
+    )?;
+    // ANCHOR_END: tls_ca_chain_config
+    Ok(config)
 }
 
-impl SerialArgs {
-    fn setup(
-        &self,
-        master_address: EndpointAddress,
-    ) -> Result<(CliHandler, MasterTask), Box<dyn std::error::Error>> {
-        let (builder, handler) = create_stream_builder(master_address, self.outstation_address)?;
-        let settings = SerialSettings {
-            baud_rate: self.baud_rate,
-            data_bits: self.data_bits.into(),
-            stop_bits: self.stop_bits.into(),
-            parity: self.parity.into(),
-            flow_control: self.flow_control.into(),
-        };
-        Ok((
-            handler,
-            builder.into_serial(
-                &self.port,
-                settings,
-                Duration::from_secs(1),
-                NullListener::create(),
-            ),
-        ))
-    }
+fn create_tcp_channel(
+    master_address: EndpointAddress,
+    endpoint: SocketAddr,
+) -> Result<MasterChannel, Box<dyn std::error::Error>> {
+    // ANCHOR: create_master_tcp_channel
+    let channel = spawn_master_tcp_client(
+        LinkErrorMode::Close,
+        get_master_channel_config(master_address)?,
+        EndpointList::new(endpoint.to_string(), &[]),
+        ConnectStrategy::default(),
+        NullListener::create(),
+    );
+    // ANCHOR_END: create_master_tcp_channel
+    Ok(channel)
 }
 
-impl TlsCaArgs {
-    fn setup(
-        &self,
-        master_address: EndpointAddress,
-    ) -> Result<(CliHandler, MasterTask), Box<dyn std::error::Error>> {
-        let (builder, handler) = create_stream_builder(master_address, self.outstation_address)?;
-        let connect = EndpointList::new(self.endpoint.to_string(), &[])
-            .into_connect_handler(ConnectStrategy::default());
-        let tls_config = TlsClientConfig::full_pki(
-            Some(self.domain.to_string()),
-            &self.ca_cert,
-            &self.entity_cert,
-            &self.entity_key,
-            None,
-            MinTlsVersion::V12,
-        )?;
-        Ok((
-            handler,
-            builder.into_tls(
-                LinkErrorMode::Close,
-                connect,
-                NullListener::create(),
-                tls_config,
-            ),
-        ))
-    }
+fn create_udp_channel(
+    master_address: EndpointAddress,
+    local_endpoint: SocketAddr,
+) -> Result<MasterChannel, Box<dyn std::error::Error>> {
+    // ANCHOR: create_master_udp_channel
+    let channel = spawn_master_udp(
+        local_endpoint,
+        LinkReadMode::Datagram,
+        Timeout::from_secs(5)?,
+        get_master_channel_config(master_address)?,
+    );
+    // ANCHOR_END: create_master_udp_channel
+    Ok(channel)
 }
 
-impl TlsSelfSignedArgs {
-    fn setup(
-        &self,
-        master_address: EndpointAddress,
-    ) -> Result<(CliHandler, MasterTask), Box<dyn std::error::Error>> {
-        let (builder, handler) = create_stream_builder(master_address, self.outstation_address)?;
-        let connect = EndpointList::new(self.endpoint.to_string(), &[])
-            .into_connect_handler(ConnectStrategy::default());
-        let tls_config = TlsClientConfig::self_signed(
-            &self.peer_cert,
-            &self.entity_cert,
-            &self.entity_key,
-            None,
-            MinTlsVersion::V12,
-        )?;
-        Ok((
-            handler,
-            builder.into_tls(
-                LinkErrorMode::Close,
-                connect,
-                NullListener::create(),
-                tls_config,
-            ),
-        ))
-    }
+fn create_serial_channel(
+    master_address: EndpointAddress,
+    port: &str,
+    baud_rate: u32,
+    data_bits: DataBitsArg,
+    stop_bits: StopBitsArg,
+    parity: ParityArg,
+    flow_control: FlowControlArg,
+) -> Result<MasterChannel, Box<dyn std::error::Error>> {
+    // ANCHOR: create_master_serial_channel
+    let settings = SerialSettings {
+        baud_rate,
+        data_bits: data_bits.into(),
+        stop_bits: stop_bits.into(),
+        parity: parity.into(),
+        flow_control: flow_control.into(),
+    };
+
+    let channel = spawn_master_serial(
+        get_master_channel_config(master_address)?,
+        port,
+        settings,
+        Duration::from_secs(1),
+        NullListener::create(),
+    );
+    // ANCHOR_END: create_master_serial_channel
+    Ok(channel)
+}
+
+fn create_tls_channel(
+    master_address: EndpointAddress,
+    endpoint: SocketAddr,
+    tls_config: TlsClientConfig,
+) -> Result<MasterChannel, Box<dyn std::error::Error>> {
+    // ANCHOR: create_master_tls_channel
+    let channel = spawn_master_tls_client(
+        LinkErrorMode::Close,
+        get_master_channel_config(master_address)?,
+        EndpointList::new(endpoint.to_string(), &[]),
+        ConnectStrategy::default(),
+        NullListener::create(),
+        tls_config,
+    );
+    // ANCHOR_END: create_master_tls_channel
+    Ok(channel)
 }
 
 fn print_file_info(info: FileInfo) {
