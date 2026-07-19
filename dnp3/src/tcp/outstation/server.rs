@@ -158,16 +158,33 @@ impl Server {
     ///
     /// This may be called outside the Tokio runtime and allows for manual spawning
     pub async fn bind_no_spawn(
-        mut self,
+        self,
     ) -> Result<(ServerHandle, impl std::future::Future<Output = Shutdown>), tokio::io::Error> {
         let listener = tokio::net::TcpListener::bind(self.address).await?;
+        Ok(self.create_task(listener))
+    }
 
+    /// Consume this server and create a task using an already-bound TCP listener.
+    ///
+    /// The returned future does nothing until polled and may be run on any Tokio runtime.
+    #[cfg(feature = "unstable")]
+    pub fn into_task(
+        self,
+        listener: tokio::net::TcpListener,
+    ) -> (ServerHandle, impl std::future::Future<Output = Shutdown>) {
+        self.create_task(listener)
+    }
+
+    fn create_task(
+        mut self,
+        listener: tokio::net::TcpListener,
+    ) -> (ServerHandle, impl std::future::Future<Output = Shutdown>) {
         let addr = listener.local_addr().ok();
+        let local = addr.unwrap_or(self.address);
 
         let (token, shutdown_rx) = crate::util::shutdown::shutdown_token();
 
         let task = async move {
-            let local = self.address;
             self.run(listener, shutdown_rx)
                 .instrument(tracing::info_span!("tcp-server", "listen" = ?local))
                 .await
@@ -178,7 +195,7 @@ impl Server {
             _token: token,
         };
 
-        Ok((handle, task))
+        (handle, task)
     }
 
     /// Consume the `TcpServer` builder object, bind it to pre-specified port, and spawn the server
@@ -265,5 +282,26 @@ impl Server {
                 }
             },
         }
+    }
+}
+
+#[cfg(all(test, feature = "unstable"))]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn into_task_uses_supplied_listener_and_stops_with_handle() {
+        let configured_address = "127.0.0.1:0".parse().unwrap();
+        let listener = tokio::net::TcpListener::bind(configured_address)
+            .await
+            .unwrap();
+        let listener_address = listener.local_addr().unwrap();
+        let server = Server::new_tcp_server(LinkErrorMode::Close, configured_address);
+
+        let (handle, task) = server.into_task(listener);
+
+        assert_eq!(handle.local_addr(), Some(listener_address));
+        drop(handle);
+        task.await;
     }
 }
