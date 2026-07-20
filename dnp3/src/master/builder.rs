@@ -69,6 +69,10 @@ pub struct AssociationBuilder<'a> {
 /// the event loop.
 ///
 /// Created by binding a [`MasterBuilder`] or [`UdpMasterBuilder`] to a transport.
+///
+/// No tracing span is attached automatically. This is by design so that the caller retains full
+/// control over instrumentation and may wrap the [`run`](Self::run) future in whatever span it
+/// chooses before spawning it.
 #[must_use = "a MasterTask does nothing unless you call .run()"]
 pub struct MasterTask {
     inner: MasterTaskType,

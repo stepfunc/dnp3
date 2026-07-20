@@ -100,6 +100,11 @@ impl Server {
     }
 
     /// associate an outstation with the TcpServer, but do not spawn it
+    ///
+    /// The returned future is intentionally uninstrumented: unlike
+    /// [`add_outstation`](Self::add_outstation), it attaches no tracing span. This is by design so
+    /// that the caller retains full control over instrumentation and may wrap the future in
+    /// whatever span (e.g. `dnp3-outstation-tcp`) it chooses before spawning it.
     pub fn add_outstation_no_spawn(
         &mut self,
         config: OutstationConfig,
@@ -221,6 +226,11 @@ impl Server {
     /// tuple.
     ///
     /// This may be called outside the Tokio runtime and allows for manual spawning
+    ///
+    /// The returned future is intentionally uninstrumented: unlike [`bind`](Self::bind), it
+    /// attaches no tracing span. This is by design so that the caller retains full control over
+    /// instrumentation and may wrap the future in whatever span (e.g. `tcp-server`) it chooses
+    /// before spawning it.
     pub async fn bind_no_spawn(
         self,
     ) -> Result<(ServerHandle, impl std::future::Future<Output = Shutdown>), tokio::io::Error> {

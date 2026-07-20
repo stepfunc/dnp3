@@ -1,6 +1,7 @@
 
 ### 1.7.0-RC2 ###
 * :star: Add `Database::discard_unselected_events()` to drop undelivered events of selected classes on demand, e.g. from a disconnect handler. Returns per-class discard counts. Opt-in and lossy by design. See [#427](https://github.com/stepfunc/dnp3/issues/427).
+* :wrench: The no-spawn TCP outstation server APIs (`Server::add_outstation_no_spawn` and `Server::bind_no_spawn`) no longer attach a tracing span to the futures they return. This is intentional so that non-spawning callers retain full control over instrumentation. Rust callers that relied on the previous automatic `dnp3-outstation-tcp` / `tcp-server` spans should now wrap the returned future in their own span before spawning it. The prebuilt bindings (C/C++, .NET, Java) are unaffected. See [#433](https://github.com/stepfunc/dnp3/pull/433).
 * :shield: Update `rustls-webpki` to 0.103.13 to resolve [RUSTSEC-2026-0098](https://rustsec.org/advisories/RUSTSEC-2026-0098) and [RUSTSEC-2026-0099](https://rustsec.org/advisories/RUSTSEC-2026-0099), both concerning incorrect acceptance of X.509 name constraints. Exposure is limited to TLS configurations using `CertificateMode::AuthorityBased`; `SelfSigned` mode bypasses the affected code path.
 * :bell: **This update only affects the prebuilt binary distributions of the bindings (C/C++, .NET, Java).** Rust consumers of the `dnp3` crate pick up the patched `rustls-webpki` automatically on rebuild.
 

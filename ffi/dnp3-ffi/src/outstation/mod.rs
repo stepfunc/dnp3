@@ -155,16 +155,20 @@ pub unsafe fn outstation_server_add_outstation(
         .ok_or(ffi::ParamError::NullParameter)?
         .into();
 
-    let (outstation, task) = server_handle.add_outstation_no_spawn(
-        config,
-        Box::new(application),
-        Box::new(information),
-        Box::new(control_handler),
-        Box::new(listener),
-        filter,
-    )?;
-
-    server.runtime.spawn(task)?;
+    // Drive the spawning variant inside the runtime context (via block_on) so that its
+    // internal tokio::spawn succeeds and the library-defined tracing span is applied. This
+    // avoids re-defining that instrumentation here. add_outstation is synchronous, so the
+    // future completes immediately.
+    let outstation = server.runtime.block_on(async move {
+        server_handle.add_outstation(
+            config,
+            Box::new(application),
+            Box::new(information),
+            Box::new(control_handler),
+            Box::new(listener),
+            filter,
+        )
+    })??;
 
     Ok(Box::into_raw(Box::new(Outstation {
         handle: outstation,
@@ -183,9 +187,10 @@ pub unsafe fn outstation_server_bind(server: *mut OutstationServer) -> Result<()
         OutstationServerState::Running(_) => return Err(ffi::ParamError::ServerAlreadyStarted),
     };
 
-    let (handle, task) = server.runtime.block_on(server_handle.bind_no_spawn())??;
+    // Use the spawning variant inside the runtime context so its internal tokio::spawn and
+    // library-defined tracing span are applied, rather than re-defining instrumentation here.
+    let handle = server.runtime.block_on(server_handle.bind())??;
 
-    server.runtime.spawn(task)?;
     server.state = OutstationServerState::Running(handle);
     Box::leak(server);
     Ok(())
