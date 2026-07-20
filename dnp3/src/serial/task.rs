@@ -1,7 +1,7 @@
 use crate::app::{ExponentialBackOff, Listener, RetryStrategy, Shutdown};
 use crate::serial::{PortState, SerialSettings};
 use crate::util::phys::PhysLayer;
-use crate::util::session::{RunError, Session, StopReason};
+use crate::util::session::{Enabled, RunError, Session, StopReason};
 
 pub(crate) struct SerialTask {
     path: String,
@@ -35,8 +35,10 @@ impl SerialTask {
 
     async fn run_inner(&mut self) -> Result<(), Shutdown> {
         loop {
-            self.listener.update(PortState::Disabled).get().await;
-            self.session.wait_for_enabled().await?;
+            if self.session.enabled() == Enabled::No {
+                self.listener.update(PortState::Disabled).get().await;
+                self.session.wait_for_enabled().await?;
+            }
             if let Err(StopReason::Shutdown) = self.run_enabled().await {
                 return Err(Shutdown);
             }

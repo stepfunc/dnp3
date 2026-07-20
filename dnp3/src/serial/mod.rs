@@ -51,7 +51,7 @@ pub use master::*;
 pub use outstation::*;
 
 mod master;
-mod outstation;
+pub(crate) mod outstation;
 pub(crate) mod task;
 
 /// State of the serial port

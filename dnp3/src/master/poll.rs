@@ -27,13 +27,33 @@ pub(crate) struct Poll {
 
 /// Map of all the polls of an association
 pub(crate) struct PollMap {
+    #[cfg(feature = "unstable")]
+    timer_state: TimerState,
     id: u64,
     polls: BTreeMap<u64, Poll>,
+}
+
+#[cfg(feature = "unstable")]
+#[derive(Copy, Clone, PartialEq)]
+enum TimerState {
+    Deferred,
+    Running,
 }
 
 impl PollMap {
     pub(crate) fn new() -> Self {
         Self {
+            #[cfg(feature = "unstable")]
+            timer_state: TimerState::Running,
+            id: 0,
+            polls: BTreeMap::new(),
+        }
+    }
+
+    #[cfg(feature = "unstable")]
+    pub(crate) fn new_deferred() -> Self {
+        Self {
+            timer_state: TimerState::Deferred,
             id: 0,
             polls: BTreeMap::new(),
         }
@@ -42,8 +62,31 @@ impl PollMap {
     pub(crate) fn add(&mut self, request: ReadRequest, period: Duration) -> u64 {
         let id = self.id;
         self.id += 1;
-        self.polls.insert(id, Poll::new(id, request, period));
+        #[cfg(feature = "unstable")]
+        let poll = match self.timer_state {
+            TimerState::Deferred => Poll::new_deferred(id, request, period),
+            TimerState::Running => Poll::new(id, request, period),
+        };
+        #[cfg(not(feature = "unstable"))]
+        let poll = Poll::new(id, request, period);
+        self.polls.insert(id, poll);
         id
+    }
+
+    /// Start all timers that were deferred during configuration.
+    ///
+    /// Returns `true` only when this call transitions the map to running.
+    #[cfg(feature = "unstable")]
+    pub(crate) fn start(&mut self, now: Instant) -> bool {
+        if self.timer_state == TimerState::Running {
+            return false;
+        }
+
+        self.timer_state = TimerState::Running;
+        for poll in self.polls.values_mut() {
+            poll.start(now);
+        }
+        true
     }
 
     pub(crate) fn remove(&mut self, id: u64) -> bool {
@@ -94,6 +137,21 @@ impl Poll {
             period,
             next: Instant::now().checked_add(period),
         }
+    }
+
+    #[cfg(feature = "unstable")]
+    fn new_deferred(id: u64, request: ReadRequest, period: Duration) -> Self {
+        Self {
+            id,
+            request,
+            period,
+            next: None,
+        }
+    }
+
+    #[cfg(feature = "unstable")]
+    fn start(&mut self, now: Instant) {
+        self.next = now.checked_add(self.period);
     }
 
     pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
@@ -179,5 +237,47 @@ impl PollHandle {
         self.association
             .send_poll_message(PollMsg::RemovePoll(self.id))
             .await
+    }
+}
+
+#[cfg(all(test, feature = "unstable"))]
+mod tests {
+    use super::*;
+    use crate::master::Classes;
+
+    fn request() -> ReadRequest {
+        ReadRequest::ClassScan(Classes::all())
+    }
+
+    #[test]
+    fn deferred_polls_are_scheduled_from_start_time() {
+        let period = Duration::from_secs(5);
+        let start = Instant::now();
+        let mut polls = PollMap::new_deferred();
+        polls.add(request(), period);
+
+        assert!(matches!(polls.next(start), Next::None));
+        assert!(polls.start(start));
+
+        match polls.next(start) {
+            Next::NotBefore(deadline) => assert_eq!(deadline, start + period),
+            _ => panic!("expected a scheduled poll"),
+        }
+    }
+
+    #[test]
+    fn starting_twice_does_not_reset_poll_deadlines() {
+        let period = Duration::from_secs(5);
+        let start = Instant::now();
+        let mut polls = PollMap::new_deferred();
+        polls.add(request(), period);
+
+        assert!(polls.start(start));
+        assert!(!polls.start(start + Duration::from_secs(1)));
+
+        match polls.next(start) {
+            Next::NotBefore(deadline) => assert_eq!(deadline, start + period),
+            _ => panic!("expected a scheduled poll"),
+        }
     }
 }

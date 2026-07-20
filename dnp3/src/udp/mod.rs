@@ -1,7 +1,7 @@
 pub(crate) mod layer;
 mod master;
 mod outstation;
-mod task;
+pub(crate) mod task;
 
 pub use master::*;
 pub use outstation::*;

@@ -1,7 +1,7 @@
 use crate::app::parse::options::ParseOptions;
 use crate::app::{Listener, MaybeAsync, RetryStrategy};
 use crate::link::reader::LinkModes;
-use crate::outstation::task::OutstationTask;
+use crate::outstation::task::OutstationTask as ProtocolOutstationTask;
 use crate::outstation::{
     ControlHandler, OutstationApplication, OutstationConfig, OutstationHandle,
     OutstationInformation,
@@ -11,6 +11,72 @@ use crate::serial::{PortState, SerialSettings};
 use crate::util::phys::{PhysAddr, PhysLayer};
 use crate::util::session::{Enabled, Session};
 use tracing::Instrument;
+
+/// A fully configured serial outstation that has not yet opened its serial port.
+#[cfg(feature = "unstable")]
+pub struct SerialOutstation {
+    task: ProtocolOutstationTask,
+}
+
+pub(crate) struct OneShotSerialOutstationTask {
+    serial: tokio_serial::SerialStream,
+    task: ProtocolOutstationTask,
+}
+
+#[cfg(feature = "unstable")]
+impl SerialOutstation {
+    /// Create a fully configured serial outstation without opening a serial port.
+    pub fn new(
+        config: OutstationConfig,
+        application: Box<dyn OutstationApplication>,
+        information: Box<dyn OutstationInformation>,
+        control_handler: Box<dyn ControlHandler>,
+    ) -> (Self, OutstationHandle) {
+        let (task, handle) = create_outstation(config, application, information, control_handler);
+        (Self { task }, handle)
+    }
+
+    /// Open and configure the serial port, producing a task that is ready to run.
+    pub fn open(
+        self,
+        path: &str,
+        settings: SerialSettings,
+    ) -> std::io::Result<crate::outstation::OutstationTask> {
+        let serial = crate::serial::open(path, settings)?;
+        Ok(crate::outstation::OutstationTask::serial(
+            OneShotSerialOutstationTask::new(serial, self.task),
+        ))
+    }
+}
+
+impl OneShotSerialOutstationTask {
+    fn new(serial: tokio_serial::SerialStream, task: ProtocolOutstationTask) -> Self {
+        Self { serial, task }
+    }
+
+    pub(crate) async fn run(mut self) {
+        let mut io = PhysLayer::Serial(self.serial);
+        let _ = self.task.run(&mut io).await;
+    }
+}
+
+fn create_outstation(
+    config: OutstationConfig,
+    application: Box<dyn OutstationApplication>,
+    information: Box<dyn OutstationInformation>,
+    control_handler: Box<dyn ControlHandler>,
+) -> (ProtocolOutstationTask, OutstationHandle) {
+    ProtocolOutstationTask::create(
+        Enabled::Yes,
+        LinkModes::serial(),
+        ParseOptions::get_static(),
+        config,
+        PhysAddr::None,
+        application,
+        information,
+        control_handler,
+    )
+}
 
 /// Spawn an outstation task onto the `Tokio` runtime. The task runs until the returned handle is dropped or
 /// a serial port error occurs, e.g. a serial port is removed from the OS. It attempts to open
@@ -30,26 +96,13 @@ pub fn spawn_outstation_serial(
     control_handler: Box<dyn ControlHandler>,
 ) -> std::io::Result<OutstationHandle> {
     let serial = crate::serial::open(path, settings)?;
-    let (mut task, handle) = OutstationTask::create(
-        Enabled::Yes,
-        LinkModes::serial(),
-        ParseOptions::get_static(),
-        config,
-        PhysAddr::None,
-        application,
-        information,
-        control_handler,
-    );
-
+    let (task, handle) = create_outstation(config, application, information, control_handler);
     let log_path = path.to_owned();
-    let future = async move {
-        let mut io = PhysLayer::Serial(serial);
-        let _ = task
-            .run(&mut io)
-            .instrument(tracing::info_span!("dnp3-outstation-serial", "port" = ?log_path))
-            .await;
-    };
-    tokio::spawn(future);
+    tokio::spawn(
+        OneShotSerialOutstationTask::new(serial, task)
+            .run()
+            .instrument(tracing::info_span!("dnp3-outstation-serial", "port" = ?log_path)),
+    );
     Ok(handle)
 }
 
@@ -82,16 +135,7 @@ pub fn spawn_outstation_serial_2(
     control_handler: Box<dyn ControlHandler>,
     listener: Box<dyn Listener<PortState>>,
 ) -> OutstationHandle {
-    let (task, handle) = OutstationTask::create(
-        Enabled::Yes,
-        LinkModes::serial(),
-        ParseOptions::get_static(),
-        config,
-        PhysAddr::None,
-        application,
-        information,
-        control_handler,
-    );
+    let (task, handle) = create_outstation(config, application, information, control_handler);
 
     let mut serial = SerialTask::new(path, settings, Session::outstation(task), retry, listener);
 
@@ -104,6 +148,48 @@ pub fn spawn_outstation_serial_2(
     };
     tokio::spawn(future);
     handle
+}
+
+#[cfg(all(test, feature = "unstable"))]
+mod tests {
+    use super::*;
+    use crate::link::EndpointAddress;
+    use crate::outstation::database::EventBufferConfig;
+
+    struct NullApplication;
+    impl OutstationApplication for NullApplication {}
+
+    struct NullInformation;
+    impl OutstationInformation for NullInformation {}
+
+    fn create() -> (SerialOutstation, OutstationHandle) {
+        let config = OutstationConfig::new(
+            EndpointAddress::try_new(10).unwrap(),
+            EndpointAddress::try_new(1).unwrap(),
+            EventBufferConfig::all_types(0),
+        );
+        SerialOutstation::new(
+            config,
+            Box::new(NullApplication),
+            Box::new(NullInformation),
+            crate::outstation::DefaultControlHandler::create(),
+        )
+    }
+
+    #[test]
+    fn construction_does_not_require_a_runtime() {
+        let (_outstation, _handle) = create();
+    }
+
+    #[test]
+    fn failed_open_does_not_produce_a_task() {
+        let (outstation, _handle) = create();
+        let result = outstation.open(
+            "/path/that/does/not/exist/dnp3-test",
+            SerialSettings::default(),
+        );
+        assert!(result.is_err());
+    }
 }
 
 /// This function was added post 1.0 to provide fault tolerance for outstation serial ports.
