@@ -7,7 +7,7 @@ use crate::outstation::{
     ConnectionState, ControlHandler, OutstationApplication, OutstationConfig, OutstationHandle,
     OutstationInformation,
 };
-use crate::tcp::server_task::{NewSession, ServerTask};
+use crate::tcp::server_task::{NewSession, ServerTask as OutstationServerTask};
 use crate::tcp::{AddressFilter, FilterError, ServerHandle};
 use crate::util::channel::Sender;
 use crate::util::phys::{PhysAddr, PhysLayer};
@@ -31,6 +31,24 @@ pub struct Server {
     address: SocketAddr,
     outstations: Vec<OutstationInfo>,
     connection_handler: ServerConnectionHandler,
+}
+
+struct AcceptTask {
+    server: Server,
+    listener: tokio::net::TcpListener,
+    shutdown_rx: ShutdownListener,
+}
+
+/// A TCP server task that accepts connections and routes them to outstations.
+///
+/// It is the caller's responsibility to run this task on a Tokio runtime. Each outstation must be
+/// run independently using the task returned by [`Server::add_outstation_task`] or the future
+/// returned by [`Server::add_outstation_no_spawn`]. No tracing span is attached automatically, so
+/// the caller may instrument the [`run`](Self::run) future as desired.
+#[cfg(feature = "unstable")]
+#[must_use = "a TcpServerTask does nothing unless you call .run()"]
+pub struct TcpServerTask {
+    inner: AcceptTask,
 }
 
 enum ServerConnectionHandler {
@@ -91,6 +109,58 @@ impl Server {
         listener: Box<dyn Listener<ConnectionState>>,
         filter: AddressFilter,
     ) -> Result<(OutstationHandle, impl std::future::Future<Output = ()>), FilterError> {
+        let (handle, mut adapter) = self.register_outstation(
+            config,
+            application,
+            information,
+            control_handler,
+            listener,
+            filter,
+        )?;
+
+        let future = async move {
+            let _ = adapter.run().await;
+        };
+        Ok((handle, future))
+    }
+
+    /// Associate an outstation with the TCP server and return a concrete task without spawning it.
+    ///
+    /// The caller is responsible for running the returned [`crate::outstation::OutstationTask`]
+    /// independently from the TCP server task.
+    #[cfg(feature = "unstable")]
+    #[allow(clippy::too_many_arguments)]
+    pub fn add_outstation_task(
+        &mut self,
+        config: OutstationConfig,
+        application: Box<dyn OutstationApplication>,
+        information: Box<dyn OutstationInformation>,
+        control_handler: Box<dyn ControlHandler>,
+        listener: Box<dyn Listener<ConnectionState>>,
+        filter: AddressFilter,
+    ) -> Result<(OutstationHandle, crate::outstation::OutstationTask), FilterError> {
+        let (handle, adapter) = self.register_outstation(
+            config,
+            application,
+            information,
+            control_handler,
+            listener,
+            filter,
+        )?;
+
+        Ok((handle, crate::outstation::OutstationTask::tcp(adapter)))
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn register_outstation(
+        &mut self,
+        config: OutstationConfig,
+        application: Box<dyn OutstationApplication>,
+        information: Box<dyn OutstationInformation>,
+        control_handler: Box<dyn ControlHandler>,
+        listener: Box<dyn Listener<ConnectionState>>,
+        filter: AddressFilter,
+    ) -> Result<(OutstationHandle, OutstationServerTask), FilterError> {
         for item in self.outstations.iter() {
             if filter.conflicts_with(&item.filter) {
                 return Err(FilterError::Conflict);
@@ -108,7 +178,7 @@ impl Server {
             control_handler,
         );
 
-        let (mut adapter, tx) = ServerTask::create(task, listener);
+        let (adapter, tx) = OutstationServerTask::create(task, listener);
 
         let outstation = OutstationInfo {
             filter,
@@ -116,11 +186,7 @@ impl Server {
             sender: tx,
         };
         self.outstations.push(outstation);
-
-        let future = async move {
-            let _ = adapter.run().await;
-        };
-        Ok((handle, future))
+        Ok((handle, adapter))
     }
 
     /// associate an outstation with the TcpServer and spawn it
@@ -159,28 +225,29 @@ impl Server {
         self,
     ) -> Result<(ServerHandle, impl std::future::Future<Output = Shutdown>), tokio::io::Error> {
         let listener = tokio::net::TcpListener::bind(self.address).await?;
-        Ok(self.create_task(listener))
+        let (handle, task) = self.create_task(listener);
+        Ok((handle, async move { task.run().await }))
     }
 
     /// Consume this server and create a task using an already-bound TCP listener.
     ///
-    /// The returned future does nothing until polled and may be run on any Tokio runtime.
+    /// The returned task does nothing until [`TcpServerTask::run`] is called and may be run on any
+    /// Tokio runtime.
     #[cfg(feature = "unstable")]
-    pub fn into_task(
-        self,
-        listener: tokio::net::TcpListener,
-    ) -> (ServerHandle, impl std::future::Future<Output = Shutdown>) {
-        self.create_task(listener)
+    pub fn into_task(self, listener: tokio::net::TcpListener) -> (ServerHandle, TcpServerTask) {
+        let (handle, task) = self.create_task(listener);
+        (handle, TcpServerTask { inner: task })
     }
 
-    fn create_task(
-        mut self,
-        listener: tokio::net::TcpListener,
-    ) -> (ServerHandle, impl std::future::Future<Output = Shutdown>) {
+    fn create_task(self, listener: tokio::net::TcpListener) -> (ServerHandle, AcceptTask) {
         let addr = listener.local_addr().ok();
         let (token, shutdown_rx) = crate::util::shutdown::shutdown_token();
 
-        let task = async move { self.run(listener, shutdown_rx).await };
+        let task = AcceptTask {
+            server: self,
+            listener,
+            shutdown_rx,
+        };
 
         let handle = ServerHandle {
             addr,
@@ -279,9 +346,40 @@ impl Server {
     }
 }
 
+impl AcceptTask {
+    async fn run(mut self) -> Shutdown {
+        self.server.run(self.listener, self.shutdown_rx).await
+    }
+}
+
+#[cfg(feature = "unstable")]
+impl TcpServerTask {
+    /// Run until the associated [`ServerHandle`] is dropped or the accept loop terminates.
+    pub async fn run(self) {
+        self.inner.run().await;
+    }
+}
+
 #[cfg(all(test, feature = "unstable"))]
 mod tests {
     use super::*;
+    use crate::app::NullListener;
+    use crate::link::EndpointAddress;
+    use crate::outstation::database::EventBufferConfig;
+
+    struct NullApplication;
+    impl OutstationApplication for NullApplication {}
+
+    struct NullInformation;
+    impl OutstationInformation for NullInformation {}
+
+    fn outstation_config() -> OutstationConfig {
+        OutstationConfig::new(
+            EndpointAddress::try_new(10).unwrap(),
+            EndpointAddress::try_new(1).unwrap(),
+            EventBufferConfig::all_types(0),
+        )
+    }
 
     #[tokio::test]
     async fn into_task_uses_supplied_listener_and_stops_with_handle() {
@@ -296,6 +394,27 @@ mod tests {
 
         assert_eq!(handle.local_addr(), Some(listener_address));
         drop(handle);
-        task.await;
+        tokio::spawn(task.run()).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn add_outstation_task_returns_independently_runnable_task() {
+        let configured_address = "127.0.0.1:0".parse().unwrap();
+        let mut server = Server::new_tcp_server(LinkErrorMode::Close, configured_address);
+
+        let (handle, task) = server
+            .add_outstation_task(
+                outstation_config(),
+                Box::new(NullApplication),
+                Box::new(NullInformation),
+                crate::outstation::DefaultControlHandler::create(),
+                NullListener::create(),
+                AddressFilter::Any,
+            )
+            .unwrap();
+
+        drop(handle);
+        drop(server);
+        tokio::spawn(task.run()).await.unwrap();
     }
 }

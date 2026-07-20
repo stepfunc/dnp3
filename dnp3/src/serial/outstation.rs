@@ -1,7 +1,7 @@
 use crate::app::parse::options::ParseOptions;
 use crate::app::{Listener, MaybeAsync, RetryStrategy};
 use crate::link::reader::LinkModes;
-use crate::outstation::task::OutstationTask;
+use crate::outstation::task::OutstationTask as ProtocolOutstationTask;
 use crate::outstation::{
     ControlHandler, OutstationApplication, OutstationConfig, OutstationHandle,
     OutstationInformation,
@@ -15,19 +15,12 @@ use tracing::Instrument;
 /// A fully configured serial outstation that has not yet opened its serial port.
 #[cfg(feature = "unstable")]
 pub struct SerialOutstation {
-    task: OutstationTask,
+    task: ProtocolOutstationTask,
 }
 
-/// A serial outstation task that owns an open and configured serial port.
-#[cfg(feature = "unstable")]
-#[must_use = "a SerialOutstationTask does nothing unless you call .run()"]
-pub struct SerialOutstationTask {
-    inner: OneShotSerialOutstationTask,
-}
-
-struct OneShotSerialOutstationTask {
+pub(crate) struct OneShotSerialOutstationTask {
     serial: tokio_serial::SerialStream,
-    task: OutstationTask,
+    task: ProtocolOutstationTask,
 }
 
 #[cfg(feature = "unstable")]
@@ -48,28 +41,20 @@ impl SerialOutstation {
         self,
         path: &str,
         settings: SerialSettings,
-    ) -> std::io::Result<SerialOutstationTask> {
+    ) -> std::io::Result<crate::outstation::OutstationTask> {
         let serial = crate::serial::open(path, settings)?;
-        Ok(SerialOutstationTask {
-            inner: OneShotSerialOutstationTask::new(serial, self.task),
-        })
-    }
-}
-
-#[cfg(feature = "unstable")]
-impl SerialOutstationTask {
-    /// Run the outstation until it is shut down or the serial port fails.
-    pub async fn run(self) {
-        self.inner.run().await;
+        Ok(crate::outstation::OutstationTask::serial(
+            OneShotSerialOutstationTask::new(serial, self.task),
+        ))
     }
 }
 
 impl OneShotSerialOutstationTask {
-    fn new(serial: tokio_serial::SerialStream, task: OutstationTask) -> Self {
+    fn new(serial: tokio_serial::SerialStream, task: ProtocolOutstationTask) -> Self {
         Self { serial, task }
     }
 
-    async fn run(mut self) {
+    pub(crate) async fn run(mut self) {
         let mut io = PhysLayer::Serial(self.serial);
         let _ = self.task.run(&mut io).await;
     }
@@ -80,8 +65,8 @@ fn create_outstation(
     application: Box<dyn OutstationApplication>,
     information: Box<dyn OutstationInformation>,
     control_handler: Box<dyn ControlHandler>,
-) -> (OutstationTask, OutstationHandle) {
-    OutstationTask::create(
+) -> (ProtocolOutstationTask, OutstationHandle) {
+    ProtocolOutstationTask::create(
         Enabled::Yes,
         LinkModes::serial(),
         ParseOptions::get_static(),

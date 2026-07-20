@@ -1,4 +1,6 @@
 pub use config::*;
+#[cfg(feature = "unstable")]
+pub use runner::OutstationTask;
 pub use traits::*;
 
 use crate::app::Shutdown;
@@ -15,6 +17,8 @@ mod config;
 pub(crate) mod control;
 /// handling of deferred read requests
 pub(crate) mod deferred;
+#[cfg(feature = "unstable")]
+mod runner;
 /// outstation session
 pub(crate) mod session;
 /// async outstation task
