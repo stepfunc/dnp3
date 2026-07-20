@@ -1,7 +1,11 @@
 
+### 1.7.0-RC3 ###
+* :star: Add unstable, non-spawning master and outstation task APIs behind the semver-exempt `unstable` feature, allowing applications to obtain runnable tasks/futures without the library calling `tokio::spawn` internally. See [#433](https://github.com/stepfunc/dnp3/pull/433).
+* :star: Add `EndpointList::into_connect_handler()` and `EndpointList::into_connect_handler_with_options()` to build a `ClientConnectionHandler` from an endpoint list, e.g. for use with `spawn_master_tcp_client_3`. See [#433](https://github.com/stepfunc/dnp3/pull/433).
+* :wrench: The no-spawn TCP outstation server APIs (`Server::add_outstation_no_spawn` and `Server::bind_no_spawn`) no longer attach a tracing span to the futures they return. This is intentional so that non-spawning callers retain full control over instrumentation. Rust callers that relied on the previous automatic `dnp3-outstation-tcp` / `tcp-server` spans should now wrap the returned future in their own span before spawning it. The prebuilt bindings (C/C++, .NET, Java) are unaffected. See [#433](https://github.com/stepfunc/dnp3/pull/433).
+
 ### 1.7.0-RC2 ###
 * :star: Add `Database::discard_unselected_events()` to drop undelivered events of selected classes on demand, e.g. from a disconnect handler. Returns per-class discard counts. Opt-in and lossy by design. See [#427](https://github.com/stepfunc/dnp3/issues/427).
-* :wrench: The no-spawn TCP outstation server APIs (`Server::add_outstation_no_spawn` and `Server::bind_no_spawn`) no longer attach a tracing span to the futures they return. This is intentional so that non-spawning callers retain full control over instrumentation. Rust callers that relied on the previous automatic `dnp3-outstation-tcp` / `tcp-server` spans should now wrap the returned future in their own span before spawning it. The prebuilt bindings (C/C++, .NET, Java) are unaffected. See [#433](https://github.com/stepfunc/dnp3/pull/433).
 * :shield: Update `rustls-webpki` to 0.103.13 to resolve [RUSTSEC-2026-0098](https://rustsec.org/advisories/RUSTSEC-2026-0098) and [RUSTSEC-2026-0099](https://rustsec.org/advisories/RUSTSEC-2026-0099), both concerning incorrect acceptance of X.509 name constraints. Exposure is limited to TLS configurations using `CertificateMode::AuthorityBased`; `SelfSigned` mode bypasses the affected code path.
 * :bell: **This update only affects the prebuilt binary distributions of the bindings (C/C++, .NET, Java).** Rust consumers of the `dnp3` crate pick up the patched `rustls-webpki` automatically on rebuild.
 
