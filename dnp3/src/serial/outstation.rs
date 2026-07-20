@@ -44,7 +44,7 @@ impl SerialOutstation {
     }
 
     /// Open and configure the serial port, producing a task that is ready to run.
-    pub async fn open(
+    pub fn open(
         self,
         path: &str,
         settings: SerialSettings,
@@ -196,15 +196,13 @@ mod tests {
         let (_outstation, _handle) = create();
     }
 
-    #[tokio::test]
-    async fn failed_open_does_not_produce_a_task() {
+    #[test]
+    fn failed_open_does_not_produce_a_task() {
         let (outstation, _handle) = create();
-        let result = outstation
-            .open(
-                "/path/that/does/not/exist/dnp3-test",
-                SerialSettings::default(),
-            )
-            .await;
+        let result = outstation.open(
+            "/path/that/does/not/exist/dnp3-test",
+            SerialSettings::default(),
+        );
         assert!(result.is_err());
     }
 }
