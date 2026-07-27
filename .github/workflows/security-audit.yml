@@ -2,11 +2,13 @@ name: Security Audit
 
 on:
   schedule:
-    # Run daily at 2 AM UTC
+    # Run daily at 2 AM UTC. This is the trigger doing the real work: findings
+    # change when RustSec publishes an advisory, not when we push code.
     - cron: '0 2 * * *'
   # Allow manual trigger for testing
   workflow_dispatch:
-  # Also run on push to main to catch issues early
+  # Run on push to main so a newly introduced dependency is audited against the
+  # advisory database as of the merge, not as of whenever the PR last ran.
   push:
     branches:
       - main
@@ -15,13 +17,14 @@ on:
       - '**/Cargo.lock'
       - '.github/workflows/security-audit.yml'
       - '.cargo/audit.toml'
-  # Run on PRs to test before merging
+  # Run on PRs to test before merging. The job binstalls cargo-audit and reads
+  # Cargo.lock, so it's cheap enough to run unfiltered - and an unfiltered
+  # trigger is a prerequisite for ever making this a required status check,
+  # since a path-filtered workflow reports no status at all.
   pull_request:
-    paths:
-      - '**/Cargo.toml'
-      - '**/Cargo.lock'
-      - '.github/workflows/security-audit.yml'
-      - '.cargo/audit.toml'
+
+permissions:
+  contents: read
 
 jobs:
   audit:
@@ -31,39 +34,76 @@ jobs:
         uses: actions/checkout@v6
 
       - name: Install cargo-binstall
-        uses: cargo-bins/cargo-binstall@main
+        uses: cargo-bins/cargo-binstall@e00d2c94cc0067b77737821097a62d91c0301baa # v1.21.1
 
       - name: Install cargo-audit binary (fast)
         run: cargo binstall cargo-audit@0.22.1 --no-confirm
 
+      # Run cargo-audit exactly once. The exit status alone can't distinguish
+      # "vulnerabilities found" from "the tool or advisory DB fetch failed", so
+      # the verdict comes from parsing the JSON report instead. Unparseable
+      # output means the run itself failed and is reported as such.
       - name: Run security audit
         id: audit
         run: |
-          if cargo audit --json > audit.json 2>&1; then
-            echo "audit_failed=false" >> $GITHUB_OUTPUT
-          else
-            echo "audit_failed=true" >> $GITHUB_OUTPUT
+          set +e
+          cargo audit --json > audit.json 2> audit.err
+          status=$?
+          set -e
+
+          # Diagnostics and warnings go to stderr even in JSON mode
+          cat audit.err
+
+          if ! jq -e . audit.json > /dev/null 2>&1; then
+            echo "::error::cargo audit failed to produce a report (exit ${status}); this is a tool or network failure, not a vulnerability finding"
+            exit 1
           fi
-          
-          # Always show the human-readable output
-          cargo audit || true
-          
+
+          # Warnings (unmaintained, yanked, unsound) don't fail the build, but
+          # cargo-audit prints nothing at all in JSON mode, so surface them here.
+          jq -r '.warnings | to_entries[] | .key as $kind | .value[]
+                 | "::warning::\($kind): \(.advisory.id) \(.package.name) \(.package.version)"' audit.json
+
+          count=$(jq -r '.vulnerabilities.count // 0' audit.json)
+          echo "count=${count}" >> $GITHUB_OUTPUT
+
+          if [ "${count}" -gt 0 ]; then
+            echo "audit_failed=true" >> $GITHUB_OUTPUT
+            jq -r '.vulnerabilities.list[]
+                   | "\(.advisory.id) \(.package.name) \(.package.version): \(.advisory.title)"' audit.json
+          else
+            echo "audit_failed=false" >> $GITHUB_OUTPUT
+            echo "No vulnerable dependencies found."
+          fi
+
+      - name: Upload audit report
+        if: always() && hashFiles('audit.json') != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: audit-report
+          path: |
+            audit.json
+            audit.err
+
       # Create a job summary that's visible in the Actions tab
       - name: Create job summary
         if: steps.audit.outputs.audit_failed == 'true'
         run: |
           echo "## 🚨 Security Vulnerabilities Detected" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
-          echo "The security audit has detected vulnerabilities in the dependencies." >> $GITHUB_STEP_SUMMARY
+          echo "\`cargo audit\` found ${{ steps.audit.outputs.count }} vulnerable dependencies." >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo '| Advisory | Package | Version | Title |' >> $GITHUB_STEP_SUMMARY
+          echo '| --- | --- | --- | --- |' >> $GITHUB_STEP_SUMMARY
+          jq -r '.vulnerabilities.list[]
+                 | "| [\(.advisory.id)](https://rustsec.org/advisories/\(.advisory.id)) | \(.package.name) | \(.package.version) | \(.advisory.title) |"' \
+            audit.json >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Required Actions:" >> $GITHUB_STEP_SUMMARY
-          echo "1. Review the audit output above for details" >> $GITHUB_STEP_SUMMARY
-          echo "2. Run \`cargo audit\` locally to see the full report" >> $GITHUB_STEP_SUMMARY
-          echo "3. Update affected dependencies using \`cargo update\`" >> $GITHUB_STEP_SUMMARY
-          echo "4. Review if these vulnerabilities affect your production deployments" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Workflow run:** [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
-          
+          echo "1. Run \`cargo audit\` locally to see the full report" >> $GITHUB_STEP_SUMMARY
+          echo "2. Update affected dependencies using \`cargo update\`" >> $GITHUB_STEP_SUMMARY
+          echo "3. Review if these vulnerabilities affect your production deployments" >> $GITHUB_STEP_SUMMARY
+
       # Fail the workflow if vulnerabilities were found
       - name: Check audit results
         if: steps.audit.outputs.audit_failed == 'true'
