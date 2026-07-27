@@ -74,7 +74,7 @@ Configure TLS using `TlsClientConfig` or `TlsServerConfig`. Both contain these f
 - `password`:
   * Password used to decrypt the private key file. If the key is not encrypted, this **must** be an empty string (`""`) and not `null` or omitted. This applies to all language bindings (Rust, C, C++, Java, C#). See the next section for more details.
 - `min_tls_version`:
-  * Minimum TLS version to support. The default (`Tls1_2`) allows TLS 1.2 and 1.3 to be negotiated. Setting this to `Tls1_3` forces the usage of TLSv1.3: a peer that does not support TLS 1.3 will fail to complete the handshake.
+  * Minimum TLS version to support. `V12` allows TLS 1.2 and 1.3 to be negotiated, and is the default in the bindings. Setting this to `V13` forces the usage of TLSv1.3: a peer that does not support TLS 1.3 will fail to complete the handshake.
 - `certificate_mode`:
   * Mode used to verify the peer certificate.
 
