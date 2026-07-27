@@ -1,6 +1,6 @@
 
 ### 1.7.0-RC4 ###
-* :shield: Fix inverted `MinTlsVersion` mapping. `MinTlsVersion::V13` previously enabled both TLS 1.2 and 1.3, so it did not exclude TLS 1.2 as documented, and `MinTlsVersion::V12` enabled TLS 1.2 only, disabling TLS 1.3. Both arms now match their documented meaning: `V12` allows TLS 1.2 and 1.3, `V13` allows only TLS 1.3. Affects 1.6.0 through 1.7.0-RC3. See [#437](https://github.com/stepfunc/dnp3/issues/437).
+* :lock: Fix inverted `MinTlsVersion` mapping. `MinTlsVersion::V13` previously enabled both TLS 1.2 and 1.3, so it did not exclude TLS 1.2 as documented, and `MinTlsVersion::V12` enabled TLS 1.2 only, disabling TLS 1.3. Both arms now match their documented meaning: `V12` allows TLS 1.2 and 1.3, `V13` allows only TLS 1.3. Affects 1.6.0 through 1.7.0-RC3. See [#437](https://github.com/stepfunc/dnp3/issues/437).
 * :bell: **Behavior change for existing TLS configurations.** Users who set `V13` were silently permitting TLS 1.2 and will now reject peers that do not support TLS 1.3. Users on the default `V12` (including all bindings users who never overrode it) will now negotiate TLS 1.3 where the peer supports it, rather than being pinned to TLS 1.2.
 
 ### 1.7.0-RC3 ###
