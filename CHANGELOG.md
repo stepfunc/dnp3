@@ -1,4 +1,8 @@
 
+### 1.7.0-RC4 ###
+* :lock: Fix inverted `MinTlsVersion` mapping. `MinTlsVersion::V13` previously enabled both TLS 1.2 and 1.3, so it did not exclude TLS 1.2 as documented, and `MinTlsVersion::V12` enabled TLS 1.2 only, disabling TLS 1.3. Both arms now match their documented meaning: `V12` allows TLS 1.2 and 1.3, `V13` allows only TLS 1.3. Affects 1.6.0 through 1.7.0-RC3. See [#437](https://github.com/stepfunc/dnp3/issues/437).
+* :bell: **Behavior change for existing TLS configurations.** Users who set `V13` were silently permitting TLS 1.2 and will now reject peers that do not support TLS 1.3. Users on the default `V12` (including all bindings users who never overrode it) will now negotiate TLS 1.3 where the peer supports it, rather than being pinned to TLS 1.2.
+
 ### 1.7.0-RC3 ###
 * :star: Add unstable, non-spawning master and outstation task APIs behind the semver-exempt `unstable` feature, allowing applications to obtain runnable tasks/futures without the library calling `tokio::spawn` internally. See [#433](https://github.com/stepfunc/dnp3/pull/433).
 * :star: Add `EndpointList::into_connect_handler()` and `EndpointList::into_connect_handler_with_options()` to build a `ClientConnectionHandler` from an endpoint list, e.g. for use with `spawn_master_tcp_client_3`. See [#433](https://github.com/stepfunc/dnp3/pull/433).
