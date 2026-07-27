@@ -736,7 +736,10 @@ fn define_min_tls_version(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
     let handle = lib
         .define_enum("min_tls_version")?
         .push("v12", "Allow TLS 1.2 and 1.3")?
-        .push("v13", "Only allow TLS 1.3")?
+        .push(
+            "v13",
+            "Only allow TLS 1.3. A peer that does not support TLS 1.3 will fail to complete the handshake.",
+        )?
         .doc("Minimum TLS version to allow")?
         .build()?;
 
