@@ -1,6 +1,6 @@
 [package]
 name = "dnp3-bindings"
-version = "1.7.0-RC4"
+version = "1.7.0"
 
 # inherit from workspace
 rust-version.workspace = true
