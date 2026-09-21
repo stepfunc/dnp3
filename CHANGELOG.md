@@ -1,36 +1,26 @@
 
-### 1.7.0-RC4 ###
-* :shield: Fix inverted `MinTlsVersion` mapping. `MinTlsVersion::V13` previously enabled both TLS 1.2 and 1.3, so it did not exclude TLS 1.2 as documented, and `MinTlsVersion::V12` enabled TLS 1.2 only, disabling TLS 1.3. Both arms now match their documented meaning: `V12` allows TLS 1.2 and 1.3, `V13` allows only TLS 1.3. Affects 1.6.0 through 1.7.0-RC3. See [#437](https://github.com/stepfunc/dnp3/issues/437).
-* :bell: **Behavior change for existing TLS configurations.** Users who set `V13` were silently permitting TLS 1.2 and will now reject peers that do not support TLS 1.3. Users on the default `V12` (including all bindings users who never overrode it) will now negotiate TLS 1.3 where the peer supports it, rather than being pinned to TLS 1.2.
-
-### 1.7.0-RC3 ###
-* :star: Add unstable, non-spawning master and outstation task APIs behind the semver-exempt `unstable` feature, allowing applications to obtain runnable tasks/futures without the library calling `tokio::spawn` internally. See [#433](https://github.com/stepfunc/dnp3/pull/433).
-* :star: Add `EndpointList::into_connect_handler()` and `EndpointList::into_connect_handler_with_options()` to build a `ClientConnectionHandler` from an endpoint list, e.g. for use with `spawn_master_tcp_client_3`. See [#433](https://github.com/stepfunc/dnp3/pull/433).
-* :wrench: The no-spawn TCP outstation server APIs (`Server::add_outstation_no_spawn` and `Server::bind_no_spawn`) no longer attach a tracing span to the futures they return. This is intentional so that non-spawning callers retain full control over instrumentation. Rust callers that relied on the previous automatic `dnp3-outstation-tcp` / `tcp-server` spans should now wrap the returned future in their own span before spawning it. The prebuilt bindings (C/C++, .NET, Java) are unaffected. See [#433](https://github.com/stepfunc/dnp3/pull/433).
-
-### 1.7.0-RC2 ###
-* :star: Add `Database::discard_unselected_events()` to drop undelivered events of selected classes on demand, e.g. from a disconnect handler. Returns per-class discard counts. Opt-in and lossy by design. See [#427](https://github.com/stepfunc/dnp3/issues/427).
-* :shield: Update `rustls-webpki` to 0.103.13 to resolve [RUSTSEC-2026-0098](https://rustsec.org/advisories/RUSTSEC-2026-0098) and [RUSTSEC-2026-0099](https://rustsec.org/advisories/RUSTSEC-2026-0099), both concerning incorrect acceptance of X.509 name constraints. Exposure is limited to TLS configurations using `CertificateMode::AuthorityBased`; `SelfSigned` mode bypasses the affected code path.
-* :bell: **This update only affects the prebuilt binary distributions of the bindings (C/C++, .NET, Java).** Rust consumers of the `dnp3` crate pick up the patched `rustls-webpki` automatically on rebuild.
-
-### 1.7.0-RC1 ###
-* :star: Add outstation ConnectionManager with fine-grained connection control for TCP and TLS clients. See [#381](https://github.com/stepfunc/dnp3/pull/381), [#406](https://github.com/stepfunc/dnp3/pull/406).
-  * New Rust API: `spawn_outstation_tcp_client_2()` and `spawn_outstation_tls_client_2()` functions with `ClientConnectionHandler` trait
-  * New FFI API: `outstation_create_tcp_client_with_handler()` and `outstation_create_tls_client_with_handler()` functions
-  * Provides dynamic endpoint selection, custom retry logic, connection lifecycle notifications, and DNS resolution handling
-  * Per-connection master address override via `ConnectionInfo::set_master_address()` for failover scenarios
-* :star: Add DirectWriteAbsTime time sync procedure for non-conformant outstations. See [#403](https://github.com/stepfunc/dnp3/pull/403).
-  * Writes Group 50 Var 1 directly without delay measurement for outstations that don't properly implement IEEE-1815 time sync
+### 1.7.0 ###
+* :star: Add outstation `ConnectionManager` for fine-grained control of TCP and TLS client connections, including dynamic endpoint selection, custom retry logic, and per-connection master address override. See [#381](https://github.com/stepfunc/dnp3/pull/381), [#406](https://github.com/stepfunc/dnp3/pull/406).
+* :star: Add `DirectWriteAbsTime` time sync procedure for outstations that don't properly implement IEEE-1815 time sync. See [#403](https://github.com/stepfunc/dnp3/pull/403).
 * :star: Add optional support for parsing and transmission of zero-length octet strings via global setting. See [#379](https://github.com/stepfunc/dnp3/pull/379).
 * :star: Add optional support for AWS libcrypto (aws-lc-rs) as TLS backend. See [#378](https://github.com/stepfunc/dnp3/pull/378).
 * :star: Make OctetString constructor public in Java bindings. See [#402](https://github.com/stepfunc/dnp3/pull/402).
 * :star: Make HeaderInfo constructor public for mockability in tests. See [#404](https://github.com/stepfunc/dnp3/pull/404).
-* :shield: Add security policy and automated supply chain scanning. See [#394](https://github.com/stepfunc/dnp3/pull/394).
+* :star: Add `Database::discard_unselected_events()` to drop undelivered events of selected classes on demand. Opt-in and lossy by design. See [#427](https://github.com/stepfunc/dnp3/issues/427).
+* :star: Add non-spawning master and outstation task APIs behind the semver-exempt `unstable` feature, for applications that don't want the library calling `tokio::spawn` internally. See [#433](https://github.com/stepfunc/dnp3/pull/433).
+* :star: Add `EndpointList::into_connect_handler()` and `into_connect_handler_with_options()` to build a `ClientConnectionHandler` from an endpoint list. See [#433](https://github.com/stepfunc/dnp3/pull/433).
+* :shield: Fix inverted `MinTlsVersion` mapping, which affects 1.6.0 through 1.7.0-RC3. See [#437](https://github.com/stepfunc/dnp3/issues/437).
+* :bell: **Behavior change for existing TLS configurations.** Users who set `V13` were silently permitting TLS 1.2 and will now reject peers that do not support TLS 1.3. Users on the default `V12` (including all bindings users who never overrode it) will now negotiate TLS 1.3 where the peer supports it, rather than being pinned to TLS 1.2.
+* :shield: Update `rustls` to 0.23.45 to resolve [RUSTSEC-2026-0285](https://rustsec.org/advisories/RUSTSEC-2026-0285), in which TLS 1.3 handshake messages were accepted across encryption level boundaries. See [#447](https://github.com/stepfunc/dnp3/pull/447).
+* :shield: Update `rustls-webpki` to 0.103.13 to resolve [RUSTSEC-2026-0098](https://rustsec.org/advisories/RUSTSEC-2026-0098) and [RUSTSEC-2026-0099](https://rustsec.org/advisories/RUSTSEC-2026-0099), both concerning incorrect acceptance of X.509 name constraints. Exposure is limited to `CertificateMode::AuthorityBased`.
+* :bell: **These two dependency updates only affect the prebuilt binary distributions of the bindings (C/C++, .NET, Java).** Rust consumers of the `dnp3` crate pick up the patched dependencies automatically on rebuild.
+* :shield: Add security policy and automated supply chain scanning. See [#394](https://github.com/stepfunc/dnp3/pull/394), [#440](https://github.com/stepfunc/dnp3/pull/440).
 * :wrench: Add quality gate to prevent releases when tests fail. See [#393](https://github.com/stepfunc/dnp3/pull/393).
 * :wrench: Automate cargo publish to crates.io in CI release process. See [#407](https://github.com/stepfunc/dnp3/pull/407).
 * :wrench: Better CLI examples with improved organization and documentation. See [#375](https://github.com/stepfunc/dnp3/pull/375).
 * :wrench: Refactor release workflow into separate idempotent jobs for improved reliability.
-* :book: Update TLS documentation to clarify empty string behavior for certificate passwords and improve grammar. See [#389](https://github.com/stepfunc/dnp3/pull/389).
+* :bell: **Rust-only change.** The no-spawn TCP outstation server APIs (`Server::add_outstation_no_spawn` and `Server::bind_no_spawn`) no longer attach a tracing span to the futures they return, so non-spawning callers retain full control over instrumentation. Callers that relied on the automatic `dnp3-outstation-tcp` / `tcp-server` spans should wrap the returned future in their own span. See [#433](https://github.com/stepfunc/dnp3/pull/433).
+* :book: Update TLS documentation to clarify empty string behavior for certificate passwords. See [#389](https://github.com/stepfunc/dnp3/pull/389).
 
 ### 1.6.0 ###
 * :star: Add master station support for writing files to the outstation. See [#338](https://github.com/stepfunc/dnp3/pull/338).
