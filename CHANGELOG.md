@@ -23,8 +23,6 @@
 * :book: Update TLS documentation to clarify empty string behavior for certificate passwords. See [#389](https://github.com/stepfunc/dnp3/pull/389).
 * :bug: Reset the outstation event buffer on session teardown. Events left mid-delivery when a link died were previously stranded and never re-reported on reconnect, and stale selected events could leak into a later response. See [#423](https://github.com/stepfunc/dnp3/issues/423).
 * :bug: Avoid an index overflow when iterating ranged octet string data whose final index is `u16::MAX`. This only ever tripped the debug-build overflow check after the last item had been yielded; release builds wrapped and produced correct output. See [#422](https://github.com/stepfunc/dnp3/pull/422).
-* :bug: Hold `OutstationTask` directly in the TCP server task rather than the generic `Session` wrapper. See [#424](https://github.com/stepfunc/dnp3/issues/424).
-
 ### 1.6.0 ###
 * :star: Add master station support for writing files to the outstation. See [#338](https://github.com/stepfunc/dnp3/pull/338).
 * :star: Add master station support for command events (groups 13 and 43). See [#332](https://github.com/stepfunc/dnp3/pull/332).
