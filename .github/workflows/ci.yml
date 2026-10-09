@@ -127,9 +127,11 @@ jobs:
       - name: Create FFI modules DIR
         run: mkdir ffi-modules\${{ matrix.target }}
       - name: Build FFI
-        run: cargo build -p dnp3-ffi --release --target ${{ matrix.target }} --no-default-features --features serial,tls-aws-lc
+        shell: bash
+        run: bash .github/scripts/build-evidence.sh evidence/ffi/${{ matrix.target }} cargo -p dnp3-ffi --target ${{ matrix.target }} --no-default-features --features serial,tls-aws-lc
       - name: Build JNI
-        run: cargo build -p dnp3-ffi-java --release --target ${{ matrix.target }} --no-default-features --features serial,tls-aws-lc
+        shell: bash
+        run: bash .github/scripts/build-evidence.sh evidence/java/${{ matrix.target }} cargo -p dnp3-ffi-java --target ${{ matrix.target }} --no-default-features --features serial,tls-aws-lc
       - name: Copy the FFI and JNI libs
         shell: pwsh
         run: |
@@ -141,6 +143,11 @@ jobs:
         with:
           name: ffi-modules-${{ matrix.target }}
           path: ffi-modules
+      - name: Upload build evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: evidence-${{ matrix.target }}
+          path: evidence
       - name: Test C Bindings
         if: ${{ matrix.test }}
         run: cargo run --bin dnp3-bindings -- --c -r ${{ matrix.target }} -a ./target/${{ matrix.target }}/release
@@ -169,9 +176,9 @@ jobs:
       - name: Create FFI modules dir
         run: mkdir -p ffi-modules/${{ matrix.target }}
       - name: Build FFI
-        run: cargo build -p dnp3-ffi --release --no-default-features --features serial,tls-aws-lc
+        run: bash .github/scripts/build-evidence.sh evidence/ffi/${{ matrix.target }} cargo -p dnp3-ffi --no-default-features --features serial,tls-aws-lc
       - name: Build JNI
-        run: cargo build -p dnp3-ffi-java --release --no-default-features --features serial,tls-aws-lc
+        run: bash .github/scripts/build-evidence.sh evidence/java/${{ matrix.target }} cargo -p dnp3-ffi-java --no-default-features --features serial,tls-aws-lc
       - name: Copy the FFI and JNI libs
         run: |
           cp ./target/release/libdnp3_ffi.dylib ./ffi-modules/${{ matrix.target }}
@@ -181,6 +188,11 @@ jobs:
         with:
           name: ffi-modules-${{ matrix.target }}
           path: ffi-modules
+      - name: Upload build evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: evidence-${{ matrix.target }}
+          path: evidence
       - name: Test .NET bindings
         run: cargo run --bin dnp3-bindings -- --dotnet
       - name: Test Java bindings
@@ -227,9 +239,9 @@ jobs:
       - name: Create FFI modules dir
         run: mkdir -p ffi-modules/${{ matrix.cases.target }}
       - name: Build FFI
-        run: cross build -p dnp3-ffi --release --target ${{ matrix.cases.target }} --no-default-features --features serial,${{ matrix.cases.features }}
+        run: bash .github/scripts/build-evidence.sh evidence/ffi/${{ matrix.cases.target }} cross -p dnp3-ffi --target ${{ matrix.cases.target }} --no-default-features --features serial,${{ matrix.cases.features }}
       - name: Build JNI
-        run: cross build -p dnp3-ffi-java --release --target ${{ matrix.cases.target }} --no-default-features --features serial,${{ matrix.cases.features }}
+        run: bash .github/scripts/build-evidence.sh evidence/java/${{ matrix.cases.target }} cross -p dnp3-ffi-java --target ${{ matrix.cases.target }} --no-default-features --features serial,${{ matrix.cases.features }}
       - name: Copy the FFI and JNI libs
         run: |
           cp ./target/${{ matrix.cases.target }}/release/libdnp3_ffi.so ./ffi-modules/${{ matrix.cases.target }}
@@ -239,6 +251,11 @@ jobs:
         with:
           name: ffi-modules-${{ matrix.cases.target }}
           path: ffi-modules
+      - name: Upload build evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: evidence-${{ matrix.cases.target }}
+          path: evidence
   guide:
     runs-on: ubuntu-latest
     steps:
@@ -265,10 +282,8 @@ jobs:
     steps:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
-      - name: Install Cargo CycloneDx
-        run: cargo install cargo-cyclonedx
-      - name: Install custom allow-list tool
-        run: cargo install --git https://github.com/stepfunc/bom-tools.git
+      - name: Install bom-tools
+        run: cargo install --locked --git https://github.com/stepfunc/bom-tools.git
       - name: Checkout
         uses: actions/checkout@v6
       - name: Download compiled FFI
@@ -277,18 +292,26 @@ jobs:
           path: ffi-modules
           pattern: ffi-modules-*
           merge-multiple: true
-      - name: Create SBOMs
+      - name: Download build evidence
+        uses: actions/download-artifact@v8
+        with:
+          path: evidence
+          pattern: evidence-*
+          merge-multiple: true
+      - name: Create third-party license reports and SBOMs
         run: |
-          for dir in ffi-modules/*; do
-            target=`basename "${dir}"`
-            cargo cyclonedx -f json --target $target
-            mv ./ffi/dnp3-ffi/dnp3-ffi.cdx.json ffi-modules/$target
-            mv ./ffi/dnp3-ffi-java/dnp3-ffi-java.cdx.json ffi-modules/$target
-          done
-      - name: Create FFI third-party-licenses.txt
-        run: allow-list gen-licenses-dir -l ffi-modules -b dnp3-ffi.cdx.json -c allowed.json > third-party-licenses.txt
-      - name: Create FFI third-party-licenses-java.txt
-        run: allow-list gen-licenses-dir -l ffi-modules -b dnp3-ffi-java.cdx.json -c allowed.json > third-party-licenses-java.txt
+          cargo metadata --format-version 1 --all-features --locked > metadata.json
+          COMMON="-m metadata.json -c allowed.json"
+          bom-tools licenses -e evidence/ffi --root-package dnp3-ffi $COMMON > third-party-licenses.txt
+          bom-tools licenses -e evidence/java --root-package dnp3-ffi-java $COMMON > third-party-licenses-java.txt
+          mkdir sboms
+          bom-tools sbom -e evidence/ffi --root-package dnp3-ffi $COMMON --lockfile Cargo.lock > sboms/dnp3-ffi.cdx.json
+          bom-tools sbom -e evidence/java --root-package dnp3-ffi-java $COMMON --lockfile Cargo.lock > sboms/dnp3-ffi-java.cdx.json
+      - name: Upload SBOMs
+        uses: actions/upload-artifact@v7
+        with:
+          name: sboms
+          path: sboms
       - name: Package C/C++ bindings
         run: cargo run --bin dnp3-bindings -- --c --package ./ffi-modules --options ./packaging.json -f third-party-licenses.txt
       - name: Package .NET bindings
@@ -548,5 +571,6 @@ jobs:
             release/*.zip
             artifacts/dotnet-bindings/dnp3*
             artifacts/java-bindings-jar/*.jar
+            artifacts/sboms/*.cdx.json
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
