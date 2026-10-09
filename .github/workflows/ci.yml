@@ -176,13 +176,13 @@ jobs:
       - name: Create FFI modules dir
         run: mkdir -p ffi-modules/${{ matrix.target }}
       - name: Build FFI
-        run: bash .github/scripts/build-evidence.sh evidence/ffi/${{ matrix.target }} cargo -p dnp3-ffi --no-default-features --features serial,tls-aws-lc
+        run: bash .github/scripts/build-evidence.sh evidence/ffi/${{ matrix.target }} cargo -p dnp3-ffi --target ${{ matrix.target }} --no-default-features --features serial,tls-aws-lc
       - name: Build JNI
-        run: bash .github/scripts/build-evidence.sh evidence/java/${{ matrix.target }} cargo -p dnp3-ffi-java --no-default-features --features serial,tls-aws-lc
+        run: bash .github/scripts/build-evidence.sh evidence/java/${{ matrix.target }} cargo -p dnp3-ffi-java --target ${{ matrix.target }} --no-default-features --features serial,tls-aws-lc
       - name: Copy the FFI and JNI libs
         run: |
-          cp ./target/release/libdnp3_ffi.dylib ./ffi-modules/${{ matrix.target }}
-          cp ./target/release/libdnp3_ffi_java.dylib ./ffi-modules/${{ matrix.target }}
+          cp ./target/${{ matrix.target }}/release/libdnp3_ffi.dylib ./ffi-modules/${{ matrix.target }}
+          cp ./target/${{ matrix.target }}/release/libdnp3_ffi_java.dylib ./ffi-modules/${{ matrix.target }}
       - name: Upload compiled FFI modules
         uses: actions/upload-artifact@v7
         with:
@@ -194,9 +194,9 @@ jobs:
           name: evidence-${{ matrix.target }}
           path: evidence
       - name: Test .NET bindings
-        run: cargo run --bin dnp3-bindings -- --dotnet
+        run: cargo run --bin dnp3-bindings -- --dotnet -r ${{ matrix.target }} -a ./target/${{ matrix.target }}/release
       - name: Test Java bindings
-        run: cargo run --bin dnp3-bindings -- --java
+        run: cargo run --bin dnp3-bindings -- --java -r ${{ matrix.target }} -a ./target/${{ matrix.target }}/release
   # Cross-compilation for Linux to produce portable C and JNI libraries
   bindings-linux:
     env:

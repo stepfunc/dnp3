@@ -9,6 +9,12 @@ set -euo pipefail
 out="$1"
 build="$2"
 shift 2
+# `cargo tree` only separates host and target features when given `--target`, so the build and
+# the trees must always name the target explicitly, even for a native build
+case " $* " in
+  *" --target "*) ;;
+  *) echo "build-evidence.sh: --target is required" >&2; exit 1 ;;
+esac
 mkdir -p "$out"
 tree_format=(--prefix depth --color never --format '{p}|{f}')
 
