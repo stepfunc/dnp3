@@ -313,11 +313,11 @@ jobs:
           name: sboms
           path: sboms
       - name: Package C/C++ bindings
-        run: cargo run --bin dnp3-bindings -- --c --package ./ffi-modules --options ./packaging.json -f third-party-licenses.txt
+        run: cargo run --bin dnp3-bindings -- --c --package ./ffi-modules --options ./packaging.json -f third-party-licenses.txt -f sboms/dnp3-ffi.cdx.json
       - name: Package .NET bindings
-        run: cargo run --bin dnp3-bindings -- --dotnet --package ./ffi-modules --options ./packaging.json -f third-party-licenses.txt
+        run: cargo run --bin dnp3-bindings -- --dotnet --package ./ffi-modules --options ./packaging.json -f third-party-licenses.txt -f sboms/dnp3-ffi.cdx.json
       - name: Package Java bindings
-        run: cargo run --bin dnp3-bindings -- --java --package ./ffi-modules --options ./packaging.json -f third-party-licenses-java.txt
+        run: cargo run --bin dnp3-bindings -- --java --package ./ffi-modules --options ./packaging.json -f third-party-licenses-java.txt -f sboms/dnp3-ffi-java.cdx.json
       - name: Upload C/C++ bindings
         uses: actions/upload-artifact@v7
         with:
