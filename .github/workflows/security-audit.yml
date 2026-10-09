@@ -110,3 +110,48 @@ jobs:
         run: |
           echo "::error::Security vulnerabilities detected in dependencies"
           exit 1
+
+  # cargo-audit only reads the RustSec database. OSV also includes GitHub security advisories
+  # that crate maintainers publish on their repositories, which do not always reach RustSec
+  # (e.g. GHSA-6g2r-675j-hx59 in xxhash-rust).
+  osv-scanner:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      # Same approach as the audit job: run once, take the verdict from the JSON report, and
+      # report a run that produced no valid report as a tool failure, not a finding.
+      - name: Run OSV-Scanner on Cargo.lock
+        run: |
+          set +e
+          docker run --rm -v "$PWD:/src" \
+            ghcr.io/google/osv-scanner:v2.6.0@sha256:afd838850ac1a0fcc15ff4a041dc9ba11123c3f0d2666217a5f0fcf9222b55fa \
+            scan source --format json -L /src/Cargo.lock > osv.json 2> osv.err
+          status=$?
+          set -e
+          cat osv.err
+
+          # exit 0: nothing found, 1: vulnerabilities found, anything else: the run failed
+          if [ "${status}" -gt 1 ] || ! jq -e . osv.json > /dev/null 2>&1; then
+            echo "::error::osv-scanner failed to produce a report (exit ${status}); this is a tool or network failure, not a vulnerability finding"
+            exit 1
+          fi
+
+          findings=$(jq -r '.results[]?.packages[]?
+                            | "\(.package.name) \(.package.version): \([.vulnerabilities[]?.id] | join(", "))"' osv.json)
+          if [ -n "${findings}" ]; then
+            echo "${findings}"
+            echo "::error::OSV-Scanner found vulnerable dependencies"
+            exit 1
+          fi
+          echo "No vulnerable dependencies found."
+
+      - name: Upload OSV report
+        if: always() && hashFiles('osv.json') != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: osv-report
+          path: |
+            osv.json
+            osv.err
