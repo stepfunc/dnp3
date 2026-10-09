@@ -283,7 +283,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Install bom-tools
-        run: cargo install --locked --git https://github.com/stepfunc/bom-tools.git
+        run: cargo install --locked --git https://github.com/stepfunc/bom-tools.git --tag 0.3.0
       - name: Checkout
         uses: actions/checkout@v6
       - name: Download compiled FFI
