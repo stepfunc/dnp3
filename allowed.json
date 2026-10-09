@@ -45,7 +45,6 @@
     "miniz_oxide",
     "nom",
     "object",
-    "oo-bindgen",
     "once_cell_polyfill",
     "os_str_bytes",
     "paste",
@@ -72,35 +71,21 @@
     "version_check",
     "walkdir",
     "which",
-    "winapi-util"
+    "winapi-util",
+    "jobserver",
+    "pkg-config"
   ],
   "vendor": {
-    "dnp3": {
-      "url": "https://github.com/stepfunc/dnp3"
-    },
-    "dnp3-ffi": {
-      "url": "https://github.com/stepfunc/dnp3"
-    },
-    "dnp3-ffi-java": {
-      "url": "https://github.com/stepfunc/dnp3"
-    },
-    "rx509": {
-      "url": "https://github.com/stepfunc/rasn"
-    },
-    "scursor": {
-      "url": "https://github.com/stepfunc/scursor"
-    },
     "sfio-promise": {
       "url": "https://github.com/stepfunc/promise"
     },
-    "sfio-rustls-config": {
-      "url": "https://github.com/stepfunc/rustls-config"
-    },
     "sfio-tokio-ffi": {
-      "url": "https://github.com/stepfunc/tokio-ffi"
+      "url": "https://github.com/stepfunc/tokio-ffi",
+      "embedded": true
     },
     "sfio-tracing-ffi": {
-      "url": "https://github.com/stepfunc/tracing-ffi"
+      "url": "https://github.com/stepfunc/tracing-ffi",
+      "embedded": true
     }
   },
   "third_party": {
@@ -1285,25 +1270,16 @@
       "id": "ring",
       "source": "crates.io",
       "licenses": [
-        {
-          "MIT": {
-            "copyright": {
-              "Lines": [
-                "Copyright (c) 2015-2016 the fiat-crypto authors (see https://github.com/mit-plv/fiat-crypto/blob/master/AUTHORS)"
-              ]
-            }
-          }
-        },
+        "Apache2",
         {
           "ISC": {
             "copyright": {
               "Lines": [
-                "Copyright 2015-2016 Brian Smith"
+                "Copyright 2015-2025 Brian Smith."
               ]
             }
           }
-        },
-        "OpenSSL"
+        }
       ]
     },
     "rustls": {
@@ -1987,6 +1963,121 @@
           }
         }
       ]
+    },
+    "rx509": {
+      "id": "rx509",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright Step Function I/O LLC"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "sfio-rustls-config": {
+      "id": "sfio-rustls-config",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright Step Function I/O LLC"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "scursor": {
+      "id": "scursor",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright 2022 Step Function I/O LLC"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "oo-bindgen": {
+      "id": "oo-bindgen",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright Step Function I/O LLC"
+              ]
+            }
+          }
+        }
+      ],
+      "embedded": true
+    },
+    "aws-lc-rs": {
+      "id": "aws-lc-rs",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "ISC": {
+            "copyright": {
+              "Lines": [
+                "Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved."
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "aws-lc-sys": {
+      "id": "aws-lc-sys",
+      "source": "crates.io",
+      "licenses": [
+        {
+          "ISC": {
+            "copyright": {
+              "Lines": [
+                "Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.",
+                "Copyright (c) 2014-2024 Google Inc."
+              ]
+            }
+          }
+        },
+        "Apache2",
+        {
+          "MIT": {
+            "copyright": {
+              "Lines": [
+                "Copyright (c) 2015-2020 the fiat-crypto authors."
+              ]
+            }
+          }
+        },
+        {
+          "BSD3": {
+            "copyright": {
+              "Lines": [
+                "Copyright (C) 2017 - 2025, Stephan Mueller <smueller@chronox.de>."
+              ]
+            }
+          }
+        }
+      ]
     }
+  },
+  "commercial_license": {
+    "name": "Step Function I/O License Agreement",
+    "url": "https://github.com/stepfunc/dnp3/blob/main/LICENSE.txt"
   }
 }
