@@ -1,8 +1,9 @@
 package io.stepfunc.conformance.dnp3
 
-import com.automatak.dnp4s.dnp3.app._
-import com.automatak.dnp4s.dnp3.{IntegrationPlugin, PluginReporter}
-import com.automatak.dnp4s.protocol.parsing.UInt8
+import io.stepfunc.dnp4s.dnp3.app._
+import io.stepfunc.dnp4s.dnp3.app.objects.AttributeValue
+import io.stepfunc.dnp4s.dnp3.{IntegrationPlugin, PluginReporter}
+import io.stepfunc.dnp4s.protocol.parsing.UInt8
 import io.stepfunc.dnp3.{AddressFilter, AnalogInput, AnalogOutputStatus, BinaryInput, BinaryOutputStatus, Counter, DoubleBit, DoubleBitBinaryInput, EventBufferConfig, FrozenCounter, LinkErrorMode, Outstation, Runtime, RuntimeConfig, OutstationServer}
 import org.joou.UInteger
 import org.joou.Unsigned.{uint, ushort}
@@ -644,10 +645,10 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
     if (expectedValue.idx != receivedValue.idx) throw new Exception("Unknown double-bit binary point event reported")
 
     // Check value
-    if ((expectedValue.value.value == DoubleBit.DETERMINED_OFF && receivedValue.point.value != com.automatak.dnp4s.dnp3.app.DoubleBit.DeterminedOff) ||
-      (expectedValue.value.value == DoubleBit.DETERMINED_ON && receivedValue.point.value != com.automatak.dnp4s.dnp3.app.DoubleBit.DeterminedOn) ||
-      (expectedValue.value.value == DoubleBit.INDETERMINATE && receivedValue.point.value != com.automatak.dnp4s.dnp3.app.DoubleBit.Indeterminate) ||
-      (expectedValue.value.value == DoubleBit.INTERMEDIATE && receivedValue.point.value != com.automatak.dnp4s.dnp3.app.DoubleBit.Intermediate)) {
+    if ((expectedValue.value.value == DoubleBit.DETERMINED_OFF && receivedValue.point.value != io.stepfunc.dnp4s.dnp3.app.DoubleBit.DeterminedOff) ||
+      (expectedValue.value.value == DoubleBit.DETERMINED_ON && receivedValue.point.value != io.stepfunc.dnp4s.dnp3.app.DoubleBit.DeterminedOn) ||
+      (expectedValue.value.value == DoubleBit.INDETERMINATE && receivedValue.point.value != io.stepfunc.dnp4s.dnp3.app.DoubleBit.Indeterminate) ||
+      (expectedValue.value.value == DoubleBit.INTERMEDIATE && receivedValue.point.value != io.stepfunc.dnp4s.dnp3.app.DoubleBit.Intermediate)) {
       throw new Exception(f"Double-bit binary ${receivedValue.idx} did not report proper value")
     }
 
@@ -788,6 +789,17 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
     verifyAllClassEvents(reporter, EventClass.All, points)
   }
 
+  override def verifyDeviceAttributes(reporter: PluginReporter, attributes: Seq[(Int, AttributeValue)]): Unit = {
+    attributes.foreach { case (variation, value) =>
+      trackingDatabase.getAttribute(variation) match {
+        case Some(expected) if expected == value =>
+        case Some(expected) => throw new Exception(s"g0v$variation is ${value.description}, expected ${expected.description}")
+        case None => throw new Exception(s"g0v$variation is not defined in the outstation")
+      }
+    }
+    reporter.log(s"Verified ${attributes.size} device attribute(s)")
+  }
+
   private def eventBufferConfig : EventBufferConfig = {
     val count = ushort(200)
     new EventBufferConfig(
@@ -841,6 +853,7 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
 
     // Create the database
     this.trackingDatabase = new TrackingDatabase(app, this.outstation, config.testDatabaseConfig)
+    app.onWriteStringAttribute = trackingDatabase.writeStringAttribute
 
     // Start the server
     this.server.bind()

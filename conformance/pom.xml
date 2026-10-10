@@ -63,7 +63,7 @@
             <scope>compile</scope>
         </dependency>
         <dependency>
-            <groupId>com.automatak.dnp4s</groupId>
+            <groupId>io.stepfunc.dnp4s</groupId>
             <artifactId>conformance</artifactId>
             <version>${dnp4s.version}</version>
         </dependency>
