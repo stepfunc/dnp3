@@ -84,6 +84,15 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
     }
   }
 
+  override def generateExactClassEvents(reporter: PluginReporter, eventClass: EventClass, numEvents: Int): Unit = {
+    eventClass match {
+      case EventClass.Class1 => generateExactBinaryInputChangeEvents(reporter, numEvents)
+      case EventClass.Class2 => generateExactCounterChangeEvents(reporter, numEvents)
+      case EventClass.Class3 => generateExactAnalogInputChangeEvents(reporter, numEvents)
+      case _ => throw new Exception(s"Cannot generate an exact number of $eventClass events")
+    }
+  }
+
   override def generateBinaryInputPattern(reporter: PluginReporter): Unit = {
     generateBinaryInputChangeEvents(reporter)
   }
@@ -196,16 +205,25 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
     cyclePower(reporter)
   }
 
+  override def reinstallPoints(reporter: PluginReporter): Unit = {
+    config = config.copy(
+      testDatabaseConfig = config.testDatabaseConfig.copy(disableBinaryInputs = false, disableDoubleBitBinaryInputs = false, disableCounters = false),
+      commandHandlerConfig = CommandHandlerConfig(disableBinaryOutput = false, disableAnalogOutput = false)
+    )
+    reporter.log("All points were reinstalled")
+    cyclePower(reporter)
+  }
+
   override def setGlobalRemoteSupervisoryControl(reporter: PluginReporter): Unit = {
     config = config.copy(testDatabaseConfig = config.testDatabaseConfig.copy(isGlobalLocalControl = true))
+    trackingDatabase.setLocalControl(0 to 19)
     reporter.log("Global remote supervisory control was enabled")
-    cyclePower(reporter)
   }
 
   override def setIndividualRemoteSupervisoryControl(reporter: PluginReporter, index: Int): Unit = {
     config = config.copy(testDatabaseConfig = config.testDatabaseConfig.copy(isSingleLocalControl = true))
+    trackingDatabase.setLocalControl(Seq(0))
     reporter.log("Remote supervisory control was enabled")
-    cyclePower(reporter)
   }
 
   override def enableUnsolicitedResponse(reporter: PluginReporter, enabled: Boolean): Unit = {
@@ -794,7 +812,7 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
     this.server = OutstationServer.createTcpServer(runtime, LinkErrorMode.DISCARD, s"${config.tcpConfig.address}:${config.tcpConfig.port}")
 
     // Create config
-    val app = new CustomOutstationApplication(config.testDatabaseConfig.isGlobalLocalControl || config.testDatabaseConfig.isSingleLocalControl)
+    val app = new CustomOutstationApplication
     val information = new CustomOutstationInformation
     this.controlHandler = new QueuedControlHandler(config.commandHandlerConfig.disableBinaryOutput, config.commandHandlerConfig.disableAnalogOutput)
     val listener = new CustomConnectionStateListener

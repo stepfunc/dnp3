@@ -358,7 +358,7 @@ jobs:
         with:
           repository: stepfunc/dnp4s
           ssh-key: ${{ secrets.DNP4S_SSH_KEY }}
-          ref: scala-2.13
+          ref: main
           path: dnp4s
       - name: Build dnp4s
         working-directory: dnp4s

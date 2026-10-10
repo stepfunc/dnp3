@@ -6,7 +6,8 @@ import org.joou.{ULong, UShort}
 
 import java.time.{Duration, Instant}
 
-class CustomOutstationApplication(val isLocalControl: Boolean) extends OutstationApplication {
+class CustomOutstationApplication extends OutstationApplication {
+  @volatile var isLocalControl = false
   private val refreshRate: Duration = Duration.ofSeconds(10)
   private var lastTimestamp = Instant.MIN
   private var lastUpdate = Instant.MIN
