@@ -50,18 +50,6 @@ class TrackingDatabase(val app: CustomOutstationApplication, val outstation: Out
   private val events: ArrayBuffer[Event] = ArrayBuffer()
   private var recordedCounterValues: mutable.SortedMap[Int, Counter] = mutable.SortedMap()
 
-  if(testDatabaseConfig.isGlobalLocalControl) {
-    this.binaryOutputs.foreach(originalPoint => {
-      this.binaryOutputs(originalPoint._1) = new BinaryOutputStatus(originalPoint._2.index, originalPoint._2.value, new Flags(ubyte(0x11)), originalPoint._2.time)
-    })
-  }
-
-  if(testDatabaseConfig.isSingleLocalControl) {
-    val originalPoint = this.binaryOutputs(0)
-    val newPoint = new BinaryOutputStatus(originalPoint.index, originalPoint.value, new Flags(ubyte(0x11)), originalPoint.time)
-    this.binaryOutputs(0) = newPoint
-  }
-
   // Initialize the outstation database
   outstation.transaction(db => {
     val updateOptions = UpdateOptions.noEvent()
@@ -125,6 +113,22 @@ class TrackingDatabase(val app: CustomOutstationApplication, val outstation: Out
       db.updateAnalogOutputStatus(e, updateOptions)
     })
   })
+
+  if(testDatabaseConfig.isGlobalLocalControl) setLocalControl(binaryOutputs.keys)
+  if(testDatabaseConfig.isSingleLocalControl) setLocalControl(Seq(0))
+
+  // Places binary outputs in the local state, like flipping a switch on the device
+  def setLocalControl(indices: Iterable[Int]): Unit = {
+    app.isLocalControl = true
+    outstation.transaction(db => {
+      indices.foreach(idx => {
+        val point = binaryOutputs(idx)
+        val newPoint = new BinaryOutputStatus(point.index, point.value, new Flags(ubyte(0x11)), point.time)
+        binaryOutputs(idx) = newPoint
+        db.updateBinaryOutputStatus(newPoint, UpdateOptions.noEvent())
+      })
+    })
+  }
 
   def generateBinaryInputEvent(idx: Int, eventBatch: Int): TypedEvent[BinaryInput] = {
     val value = !binaryPoints(idx).value
