@@ -2,12 +2,14 @@ package io.stepfunc.conformance.dnp3
 
 import io.stepfunc.dnp3._
 import org.joou.Unsigned.{ulong, ushort, uint}
-import org.joou.{ULong, UShort}
+import org.joou.{UByte, ULong, UShort}
 
 import java.time.{Duration, Instant}
 
 class CustomOutstationApplication extends OutstationApplication {
   @volatile var isLocalControl = false
+  // called when the master writes a writable string attribute
+  @volatile var onWriteStringAttribute: (Int, String) => Unit = (_, _) => ()
   private val refreshRate: Duration = Duration.ofSeconds(10)
   private var lastTimestamp = Instant.MIN
   private var lastUpdate = Instant.MIN
@@ -25,6 +27,11 @@ class CustomOutstationApplication extends OutstationApplication {
     iin.localControl = isLocalControl
     iin.needTime = needsTime
     iin
+  }
+
+  override def writeStringAttr(set: UByte, variation: UByte, attrType: StringAttr, value: String): Boolean = {
+    onWriteStringAttribute(variation.intValue, value)
+    true
   }
 
   override def coldRestart: RestartDelay = RestartDelay.milliseconds(ushort(5000))

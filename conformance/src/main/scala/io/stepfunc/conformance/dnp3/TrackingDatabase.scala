@@ -1,9 +1,12 @@
 package io.stepfunc.conformance.dnp3
 
 import com.automatak.dnp4s.dnp3.app.EventClass
+import com.automatak.dnp4s.dnp3.app.objects.AttributeValue
 import io.stepfunc.dnp3._
+import org.joou.UByte
 import org.joou.Unsigned.{ubyte, uint, ushort}
 
+import java.util.concurrent.ConcurrentHashMap
 import scala.collection.mutable
 import scala.collection.mutable.ArrayBuffer
 
@@ -50,9 +53,30 @@ class TrackingDatabase(val app: CustomOutstationApplication, val outstation: Out
   private val events: ArrayBuffer[Event] = ArrayBuffer()
   private var recordedCounterValues: mutable.SortedMap[Int, Counter] = mutable.SortedMap()
 
+  // standard set device attributes as the master should read them, updated when it writes the writable ones
+  private val attributes = new ConcurrentHashMap[Int, AttributeValue]()
+
   // Initialize the outstation database
   outstation.transaction(db => {
     val updateOptions = UpdateOptions.noEvent()
+
+    def checkDefined(variation: UByte, error: AttrDefError): Unit =
+      if (error != AttrDefError.OK) throw new Exception(s"Unable to define attribute g0v$variation: $error")
+
+    // the writable attributes are user-assigned names
+    List(
+      (AttributeVariations.DEVICE_MANUFACTURERS_NAME, false, "Step Function I/O"),
+      (AttributeVariations.PRODUCT_NAME_AND_MODEL, false, "dnp3 conformance outstation"),
+      (AttributeVariations.USER_ASSIGNED_LOCATION, true, "Bend, OR"),
+      (AttributeVariations.USER_ASSIGNED_DEVICE_NAME, true, "DUT")
+    ).foreach { case (variation, writable, value) =>
+      checkDefined(variation, db.defineStringAttr(ubyte(0), writable, variation, value))
+      attributes.put(variation.intValue, AttributeValue.VisibleString(value))
+    }
+    checkDefined(
+      AttributeVariations.MAX_RX_FRAGMENT_SIZE,
+      db.defineUintAttr(ubyte(0), false, AttributeVariations.MAX_RX_FRAGMENT_SIZE, uint(2048)))
+    attributes.put(AttributeVariations.MAX_RX_FRAGMENT_SIZE.intValue, AttributeValue.UnsignedInt(2048))
 
     if(!testDatabaseConfig.disableBinaryInputs) {
       val binaryConfig = new BinaryInputConfig()
@@ -129,6 +153,11 @@ class TrackingDatabase(val app: CustomOutstationApplication, val outstation: Out
       })
     })
   }
+
+  def getAttribute(variation: Int): Option[AttributeValue] = Option(attributes.get(variation))
+
+  def writeStringAttribute(variation: Int, value: String): Unit =
+    attributes.put(variation, AttributeValue.VisibleString(value))
 
   def generateBinaryInputEvent(idx: Int, eventBatch: Int): TypedEvent[BinaryInput] = {
     val value = !binaryPoints(idx).value
