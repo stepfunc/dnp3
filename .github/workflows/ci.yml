@@ -364,9 +364,30 @@ jobs:
       - name: Build dnp4s
         working-directory: dnp4s
         run: sudo mvn --batch-mode install
+      - name: Capture packets during the conformance tests
+        working-directory: conformance
+        # capturing needs root, which the tests run as; local runs leave it off
+        run: echo "tcp.capture.adapter = /127.0.0.1" >> device.ini
       - name: Run the conformance tests
         working-directory: conformance
         run: sudo mvn --batch-mode scala:run
+      - name: Check the packet captures
+        working-directory: conformance/results
+        # every procedure whose log shows a transmitted frame ("--P->") must have captured packets;
+        # a pcap of only its 24-octet header captured none
+        run: |
+          sent=0
+          empty=0
+          for dir in */; do
+            grep -qE -- '--P-(>|&gt;)' "$dir/log.html" 2>/dev/null || continue
+            sent=$((sent + 1))
+            if [ ! -f "$dir/dump.pcap" ] || [ "$(stat -c %s "$dir/dump.pcap")" -le 24 ]; then
+              echo "No packets captured for ${dir%/}"
+              empty=$((empty + 1))
+            fi
+          done
+          echo "$sent procedures sent frames; $empty captured no packets"
+          [ "$sent" -gt 0 ] && [ "$empty" -eq 0 ]
       - name: Upload conformance test results
         if: always()
         uses: actions/upload-artifact@v7
