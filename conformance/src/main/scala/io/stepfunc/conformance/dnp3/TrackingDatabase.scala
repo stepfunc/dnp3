@@ -1,7 +1,7 @@
 package io.stepfunc.conformance.dnp3
 
-import com.automatak.dnp4s.dnp3.app.EventClass
-import com.automatak.dnp4s.dnp3.app.objects.AttributeValue
+import io.stepfunc.dnp4s.dnp3.app.EventClass
+import io.stepfunc.dnp4s.dnp3.app.objects.AttributeValue
 import io.stepfunc.dnp3._
 import org.joou.UByte
 import org.joou.Unsigned.{ubyte, uint, ushort}
