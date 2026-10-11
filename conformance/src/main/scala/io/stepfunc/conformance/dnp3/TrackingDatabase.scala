@@ -154,6 +154,19 @@ class TrackingDatabase(val app: CustomOutstationApplication, val outstation: Out
     })
   }
 
+  // Puts every binary output back under remote control
+  def clearLocalControl(): Unit = {
+    app.isLocalControl = false
+    outstation.transaction(db => {
+      binaryOutputs.keys.toList.foreach(idx => {
+        val point = binaryOutputs(idx)
+        val newPoint = new BinaryOutputStatus(point.index, point.value, new Flags(ubyte(0x01)), point.time)
+        binaryOutputs(idx) = newPoint
+        db.updateBinaryOutputStatus(newPoint, UpdateOptions.noEvent())
+      })
+    })
+  }
+
   def getAttribute(variation: Int): Option[AttributeValue] = Option(attributes.get(variation))
 
   def writeStringAttribute(variation: Int, value: String): Unit =

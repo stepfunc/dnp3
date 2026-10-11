@@ -2,7 +2,8 @@ package io.stepfunc.conformance.dnp3
 
 import io.stepfunc.dnp4s.dnp3.app._
 import io.stepfunc.dnp4s.dnp3.app.objects.AttributeValue
-import io.stepfunc.dnp4s.dnp3.{IntegrationPlugin, PluginReporter}
+import io.stepfunc.dnp4s.conformance.api.DeferredCheck
+import io.stepfunc.dnp4s.dnp3.{ActionResult, ActionTiming, CheckReporter, IntegrationPlugin, PluginReporter}
 import io.stepfunc.dnp4s.protocol.parsing.UInt8
 import io.stepfunc.dnp3.{AddressFilter, AnalogInput, AnalogOutputStatus, BinaryInput, BinaryOutputStatus, Counter, DoubleBit, DoubleBitBinaryInput, EventBufferConfig, FrozenCounter, LinkErrorMode, Outstation, Runtime, RuntimeConfig, OutstationServer}
 import org.joou.UInteger
@@ -21,7 +22,6 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
   private var config = StackConfig.Default
   private var eventBatch = 0
 
-  override val delayUnsolicitedValidations = false
 
   override def startProcedure(reporter: PluginReporter): Unit = {
     config = StackConfig.Default
@@ -50,24 +50,28 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
     cyclePower(reporter)
   }
 
-  override def checkBinaryOutputOperate(reporter: PluginReporter, index: Int): Unit = {
+  override def checkBinaryOutputOperate(reporter: CheckReporter, index: Int): Option[DeferredCheck] = {
     controlHandler.checkCrob(index)
     reporter.log(f"Binary output $index did operate")
+    None
   }
 
-  override def checkBinaryOutputNotOperate(reporter: PluginReporter): Unit = {
+  override def checkBinaryOutputNotOperate(reporter: CheckReporter): Option[DeferredCheck] = {
     controlHandler.checkNoCrob()
     reporter.log(f"Binary output did NOT operate")
+    None
   }
 
-  override def checkAnalogOutputOperate(reporter: PluginReporter, index: Int): Unit = {
+  override def checkAnalogOutputOperate(reporter: CheckReporter, index: Int): Option[DeferredCheck] = {
     controlHandler.checkAnalog(index)
     reporter.log(f"Analog output $index did operate")
+    None
   }
 
-  override def checkAnalogOutputNotOperate(reporter: PluginReporter): Unit = {
+  override def checkAnalogOutputNotOperate(reporter: CheckReporter): Option[DeferredCheck] = {
     controlHandler.checkNoAnalog()
     reporter.log(f"Analog output did NOT operate")
+    None
   }
 
   override def generateClassEvents(reporter: PluginReporter, eventClass: EventClass): Unit = {
@@ -215,6 +219,13 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
     cyclePower(reporter)
   }
 
+  override def enableRemoteSupervisoryControl(reporter: PluginReporter): Unit = {
+    config = config.copy(testDatabaseConfig =
+      config.testDatabaseConfig.copy(isGlobalLocalControl = false, isSingleLocalControl = false))
+    trackingDatabase.clearLocalControl()
+    reporter.log("Every binary output is under remote control")
+  }
+
   override def setGlobalRemoteSupervisoryControl(reporter: PluginReporter): Unit = {
     config = config.copy(testDatabaseConfig = config.testDatabaseConfig.copy(isGlobalLocalControl = true))
     trackingDatabase.setLocalControl(0 to 19)
@@ -255,8 +266,9 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
     cyclePower(reporter)
   }
 
-  override def generateUnsolicitedEvents(reporter: PluginReporter): Unit = {
+  override def generateUnsolicitedEvents(reporter: PluginReporter, timing: ActionTiming): ActionResult = {
     generateExactBinaryInputChangeEvents(reporter, 1)
+    ActionResult.Performed
   }
 
   override def setMaxFragmentSize(reporter: PluginReporter, maxFragmentSize: Int): Unit = {
@@ -281,7 +293,7 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
     })
   }
 
-  override def verifyAllPointsCurrentStatus(reporter: PluginReporter, isClass0: Boolean, points: Seq[GenIndexedPoint[MeasurementPoint]]): Unit = {
+  override def verifyAllPointsCurrentStatus(reporter: CheckReporter, isClass0: Boolean, points: Seq[GenIndexedPoint[MeasurementPoint]]): Option[DeferredCheck] = {
     val expectedPoints = this.trackingDatabase.getAllPoints(isClass0).to(mutable.Set)
     val numExpectedPoints = expectedPoints.size
 
@@ -337,9 +349,10 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
     if(expectedPoints.nonEmpty) throw new Exception("DUT did not report all the points")
 
     reporter.log(f"Verified $numExpectedPoints point(s)")
+    None
   }
 
-  override def verifyLatestClassEvents(reporter: PluginReporter, eventClass: EventClass, points: Seq[GenIndexedPoint[MeasurementPoint]]): Unit = {
+  override def verifyLatestClassEvents(reporter: CheckReporter, eventClass: EventClass, points: Seq[GenIndexedPoint[MeasurementPoint]]): Option[DeferredCheck] = {
     trackingDatabase.resetHandledEvents()
 
     def getTypedEvent[T <: MeasurementPoint](event: GenIndexedPoint[MeasurementPoint])(implicit tag: ClassTag[T]): GenIndexedPoint[T] = {
@@ -365,9 +378,10 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
     if (trackingDatabase.popEvent(BatchSpecifier.Specific(this.eventBatch), eventClass).isDefined) throw new Exception("Missing event")
 
     reporter.log(f"Verified ${points.size} $eventClass event(s)")
+    None
   }
 
-  override def verifyFirstClassEvent(reporter: PluginReporter, eventClass: EventClass, point: GenIndexedPoint[MeasurementPoint]): Unit = {
+  override def verifyFirstClassEvent(reporter: CheckReporter, eventClass: EventClass, point: GenIndexedPoint[MeasurementPoint]): Option[DeferredCheck] = {
     def getTypedEvent[T <: MeasurementPoint](event: GenIndexedPoint[MeasurementPoint])(implicit tag: ClassTag[T]): GenIndexedPoint[T] = {
       event.point match {
         case _: T => event.asInstanceOf[GenIndexedPoint[T]]
@@ -387,9 +401,10 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
     }
 
     reporter.log(f"Verified first $eventClass event")
+    None
   }
 
-  override def verifyRestClassEvents(reporter: PluginReporter, eventClass: EventClass, points: Seq[GenIndexedPoint[MeasurementPoint]]): Unit = {
+  override def verifyRestClassEvents(reporter: CheckReporter, eventClass: EventClass, points: Seq[GenIndexedPoint[MeasurementPoint]]): Option[DeferredCheck] = {
     def getTypedEvent[T <: MeasurementPoint](event: GenIndexedPoint[MeasurementPoint])(implicit tag: ClassTag[T]): GenIndexedPoint[T] = {
       event.point match {
         case _: T => event.asInstanceOf[GenIndexedPoint[T]]
@@ -413,9 +428,10 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
     if (trackingDatabase.popEvent(BatchSpecifier.Specific(this.eventBatch), eventClass).isDefined) throw new Exception("Missing event")
 
     reporter.log(f"Verified ${points.size} $eventClass event(s)")
+    None
   }
 
-  override def verifyAllClassEvents(reporter: PluginReporter, eventClass: EventClass, points: Seq[GenIndexedPoint[MeasurementPoint]]): Unit = {
+  override def verifyAllClassEvents(reporter: CheckReporter, eventClass: EventClass, points: Seq[GenIndexedPoint[MeasurementPoint]]): Option[DeferredCheck] = {
     trackingDatabase.resetHandledEvents()
 
     def getTypedEvent[T <: MeasurementPoint](event: GenIndexedPoint[MeasurementPoint])(implicit tag: ClassTag[T]): GenIndexedPoint[T] = {
@@ -441,94 +457,116 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
     if (trackingDatabase.popEvent(BatchSpecifier.All, eventClass).isDefined) throw new Exception("Missing event")
 
     reporter.log(f"Verified ${points.size} $eventClass event(s)")
+    None
   }
 
-  override def verifyAllBinaryInputsCurrentStatus(reporter: PluginReporter, points: Seq[GenIndexedPoint[BinaryPoint]]): Unit = {
+  override def verifyAllBinaryInputsCurrentStatus(reporter: CheckReporter, points: Seq[GenIndexedPoint[BinaryPoint]]): Option[DeferredCheck] = {
     verifyAllCurrentStatus(reporter, points, "binary input", trackingDatabase.getAllBinaryInputs, checkBinaryInput)
+    None
   }
 
-  override def verifyLatestBinaryInputChangeEvents(reporter: PluginReporter, points: Seq[GenIndexedPoint[BinaryPoint]]): Unit = {
+  override def verifyLatestBinaryInputChangeEvents(reporter: CheckReporter, points: Seq[GenIndexedPoint[BinaryPoint]]): Option[DeferredCheck] = {
     verifyLatestEvents(reporter, points, "binary input", trackingDatabase.popBinaryEvent, checkBinaryInput)
+    None
   }
 
-  override def verifyFirstBinaryInputChangeEvent(reporter: PluginReporter, point: GenIndexedPoint[BinaryPoint]): Unit = {
+  override def verifyFirstBinaryInputChangeEvent(reporter: CheckReporter, point: GenIndexedPoint[BinaryPoint]): Option[DeferredCheck] = {
     verifyFirstEvent(reporter, point, "binary input", trackingDatabase.popBinaryEvent, checkBinaryInput)
+    None
   }
 
-  override def verifyRestBinaryInputChangeEvents(reporter: PluginReporter, points: Seq[GenIndexedPoint[BinaryPoint]]): Unit = {
+  override def verifyRestBinaryInputChangeEvents(reporter: CheckReporter, points: Seq[GenIndexedPoint[BinaryPoint]]): Option[DeferredCheck] = {
     verifyRestEvents(reporter, points, "binary input", trackingDatabase.popBinaryEvent, checkBinaryInput)
+    None
   }
 
-  override def verifyAllBinaryInputChangeEvents(reporter: PluginReporter, points: Seq[GenIndexedPoint[BinaryPoint]]): Unit = {
+  override def verifyAllBinaryInputChangeEvents(reporter: CheckReporter, points: Seq[GenIndexedPoint[BinaryPoint]]): Option[DeferredCheck] = {
     verifyAllEvents(reporter, points, "binary input", trackingDatabase.popBinaryEvent, checkBinaryInput)
+    None
   }
 
-  override def verifyAllDoubleBitBinaryInputsCurrentStatus(reporter: PluginReporter, points: Seq[GenIndexedPoint[DoubleBitPoint]]): Unit = {
+  override def verifyAllDoubleBitBinaryInputsCurrentStatus(reporter: CheckReporter, points: Seq[GenIndexedPoint[DoubleBitPoint]]): Option[DeferredCheck] = {
     verifyAllCurrentStatus(reporter, points, "double-bit binary input", trackingDatabase.getAllDoubleBitBinaryInputs, checkDoubleBitBinaryInput)
+    None
   }
 
-  override def verifyLatestDoubleBitBinaryInputChangeEvents(reporter: PluginReporter, points: Seq[GenIndexedPoint[DoubleBitPoint]]): Unit = {
+  override def verifyLatestDoubleBitBinaryInputChangeEvents(reporter: CheckReporter, points: Seq[GenIndexedPoint[DoubleBitPoint]]): Option[DeferredCheck] = {
     verifyLatestEvents(reporter, points, "double-bit binary input", trackingDatabase.popDoubleBitBinaryEvent, checkDoubleBitBinaryInput)
+    None
   }
 
-  override def verifyFirstDoubleBitBinaryInputChangeEvent(reporter: PluginReporter, point: GenIndexedPoint[DoubleBitPoint]): Unit = {
+  override def verifyFirstDoubleBitBinaryInputChangeEvent(reporter: CheckReporter, point: GenIndexedPoint[DoubleBitPoint]): Option[DeferredCheck] = {
     verifyFirstEvent(reporter, point, "double-bit binary input", trackingDatabase.popDoubleBitBinaryEvent, checkDoubleBitBinaryInput)
+    None
   }
 
-  override def verifyRestDoubleBitBinaryInputChangeEvents(reporter: PluginReporter, points: Seq[GenIndexedPoint[DoubleBitPoint]]): Unit = {
+  override def verifyRestDoubleBitBinaryInputChangeEvents(reporter: CheckReporter, points: Seq[GenIndexedPoint[DoubleBitPoint]]): Option[DeferredCheck] = {
     verifyRestEvents(reporter, points, "double-bit binary input", trackingDatabase.popDoubleBitBinaryEvent, checkDoubleBitBinaryInput)
+    None
   }
 
-  override def verifyAllDoubleBitBinaryInputChangeEvents(reporter: PluginReporter, points: Seq[GenIndexedPoint[DoubleBitPoint]]): Unit = {
+  override def verifyAllDoubleBitBinaryInputChangeEvents(reporter: CheckReporter, points: Seq[GenIndexedPoint[DoubleBitPoint]]): Option[DeferredCheck] = {
     verifyAllEvents(reporter, points, "double-bit binary input", trackingDatabase.popDoubleBitBinaryEvent, checkDoubleBitBinaryInput)
+    None
   }
 
-  override def verifyAllCountersCurrentStatus(reporter: PluginReporter, points: Seq[GenIndexedPoint[CounterPoint]]): Unit = {
+  override def verifyAllCountersCurrentStatus(reporter: CheckReporter, points: Seq[GenIndexedPoint[CounterPoint]]): Option[DeferredCheck] = {
     verifyAllCurrentStatus(reporter, points, "counter", trackingDatabase.getAllCounters, checkCounter)
+    None
   }
 
-  override def verifyAllCountersMatchPreviousValues(reporter: PluginReporter, points: Seq[GenIndexedPoint[CounterPoint]]): Unit = {
+  override def verifyAllCountersMatchPreviousValues(reporter: CheckReporter, points: Seq[GenIndexedPoint[CounterPoint]]): Option[DeferredCheck] = {
     verifyAllCurrentStatus(reporter, points, "counter", trackingDatabase.getRecordedCounters, checkCounter)
+    None
   }
 
-  override def verifyLatestCounterChangeEvents(reporter: PluginReporter, points: Seq[GenIndexedPoint[CounterPoint]]): Unit = {
+  override def verifyLatestCounterChangeEvents(reporter: CheckReporter, points: Seq[GenIndexedPoint[CounterPoint]]): Option[DeferredCheck] = {
     verifyLatestEvents(reporter, points, "counter", trackingDatabase.popCounterEvent, checkCounter)
+    None
   }
 
-  override def verifyFirstCounterChangeEvent(reporter: PluginReporter, point: GenIndexedPoint[CounterPoint]): Unit = {
+  override def verifyFirstCounterChangeEvent(reporter: CheckReporter, point: GenIndexedPoint[CounterPoint]): Option[DeferredCheck] = {
     verifyFirstEvent(reporter, point, "counter", trackingDatabase.popCounterEvent, checkCounter)
+    None
   }
 
-  override def verifyRestCounterChangeEvents(reporter: PluginReporter, points: Seq[GenIndexedPoint[CounterPoint]]): Unit = {
+  override def verifyRestCounterChangeEvents(reporter: CheckReporter, points: Seq[GenIndexedPoint[CounterPoint]]): Option[DeferredCheck] = {
     verifyRestEvents(reporter, points, "counter", trackingDatabase.popCounterEvent, checkCounter)
+    None
   }
 
-  override def verifyAllCounterChangeEvents(reporter: PluginReporter, points: Seq[GenIndexedPoint[CounterPoint]]): Unit = {
+  override def verifyAllCounterChangeEvents(reporter: CheckReporter, points: Seq[GenIndexedPoint[CounterPoint]]): Option[DeferredCheck] = {
     verifyAllEvents(reporter, points, "counter", trackingDatabase.popCounterEvent, checkCounter)
+    None
   }
 
-  override def verifyAllAnalogInputCurrentStatus(reporter: PluginReporter, points: Seq[GenIndexedPoint[AnalogPoint]]): Unit = {
+  override def verifyAllAnalogInputCurrentStatus(reporter: CheckReporter, points: Seq[GenIndexedPoint[AnalogPoint]]): Option[DeferredCheck] = {
     verifyAllCurrentStatus(reporter, points, "analog input", trackingDatabase.getAllAnalogInputs, checkAnalogInput)
+    None
   }
 
-  override def verifyLatestAnalogInputChangeEvents(reporter: PluginReporter, points: Seq[GenIndexedPoint[AnalogPoint]]): Unit = {
+  override def verifyLatestAnalogInputChangeEvents(reporter: CheckReporter, points: Seq[GenIndexedPoint[AnalogPoint]]): Option[DeferredCheck] = {
     verifyLatestEvents(reporter, points, "analog input", trackingDatabase.popAnalogInputEvent, checkAnalogInput)
+    None
   }
 
-  override def verifyAllAnalogInputChangeEvents(reporter: PluginReporter, points: Seq[GenIndexedPoint[AnalogPoint]]): Unit = {
+  override def verifyAllAnalogInputChangeEvents(reporter: CheckReporter, points: Seq[GenIndexedPoint[AnalogPoint]]): Option[DeferredCheck] = {
     verifyAllEvents(reporter, points, "analog input", trackingDatabase.popAnalogInputEvent, checkAnalogInput)
+    None
   }
 
-  override def verifyPolledDataDoNotRepeatUnsolicitedData(reporter: PluginReporter, unsolicitedResponsePoints: Seq[GenIndexedPoint[MeasurementPoint]], polledResponsePoints: Seq[GenIndexedPoint[MeasurementPoint]]): Unit = {
+  override def verifyPolledDataDoNotRepeatUnsolicitedData(reporter: CheckReporter, unsolicitedResponsePoints: Seq[GenIndexedPoint[MeasurementPoint]], polledResponsePoints: Seq[GenIndexedPoint[MeasurementPoint]]): Option[DeferredCheck] = {
     verifyLatestClassEvents(reporter, EventClass.All, unsolicitedResponsePoints)
     if (polledResponsePoints.nonEmpty) throw new Exception("Expected no events in polled response")
+    None
   }
 
-  override def verifyUnsolicitedHasSameEventsAsPolled(reporter: PluginReporter, previousResponsePoints: Seq[GenIndexedPoint[MeasurementPoint]], currentResponsePoints: Seq[GenIndexedPoint[MeasurementPoint]]): Unit = {
+  override def verifyUnsolicitedHasSameEventsAsPolled(reporter: CheckReporter, previousResponsePoints: Seq[GenIndexedPoint[MeasurementPoint]], currentResponsePoints: Seq[GenIndexedPoint[MeasurementPoint]]): Option[DeferredCheck] = {
     if (!previousResponsePoints.equals(currentResponsePoints)) {
       throw new Exception("Received points are different")
     }
     reporter.log("Verified that received points are the same as the previously received points")
+    None
   }
 
   override def generateNotEnoughUnsolicitedEvents(reporter: PluginReporter): Unit = {
@@ -773,23 +811,26 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
     }
   }
 
-  override def checkAnalogOutputTolerance(reporter: PluginReporter, expectedValue: Double, actualValue: Double): Unit = {
+  override def checkAnalogOutputTolerance(reporter: CheckReporter, expectedValue: Double, actualValue: Double): Option[DeferredCheck] = {
     val delta = Math.abs(expectedValue - actualValue)
     reporter.log(f"Delta: $delta")
     if(delta > 0.001) throw new Exception("Analog Output Status tolerance not respected")
     reporter.log("Delta is within acceptable range (+/- 0.001)")
+    None
   }
 
-  override def verifyDelayMeasurementAccuracy(reporter: PluginReporter, delayMs: Long): Unit = {
+  override def verifyDelayMeasurementAccuracy(reporter: CheckReporter, delayMs: Long): Option[DeferredCheck] = {
     if (delayMs != 0) throw new Exception("Delay measurement was expected to be 0 ms")
     reporter.log("Delay measurement is within acceptable range (+/- 0)")
+    None
   }
 
-  override def verifyTimestamp(reporter: PluginReporter, points: Seq[GenIndexedPoint[MeasurementPoint]]): Unit = {
+  override def verifyTimestamp(reporter: CheckReporter, points: Seq[GenIndexedPoint[MeasurementPoint]]): Option[DeferredCheck] = {
     verifyAllClassEvents(reporter, EventClass.All, points)
+    None
   }
 
-  override def verifyDeviceAttributes(reporter: PluginReporter, attributes: Seq[(Int, AttributeValue)]): Unit = {
+  override def verifyDeviceAttributes(reporter: CheckReporter, attributes: Seq[(Int, AttributeValue)]): Option[DeferredCheck] = {
     attributes.foreach { case (variation, value) =>
       trackingDatabase.getAttribute(variation) match {
         case Some(expected) if expected == value =>
@@ -798,6 +839,7 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
       }
     }
     reporter.log(s"Verified ${attributes.size} device attribute(s)")
+    None
   }
 
   private def eventBufferConfig : EventBufferConfig = {
