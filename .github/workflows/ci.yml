@@ -549,11 +549,10 @@ jobs:
             # Upload bundle to Central Portal
             echo "Uploading bundle to Central Portal..."
             RESPONSE=$(curl -X POST \
-              https://central.sonatype.com/api/v1/publisher/upload \
+              "https://central.sonatype.com/api/v1/publisher/upload?publishingType=AUTOMATIC" \
               -H "Authorization: Bearer $AUTH_TOKEN" \
               -H "Content-Type: multipart/form-data" \
               -F "bundle=@bundle.zip;type=application/octet-stream" \
-              -F "publishingType=AUTOMATIC" \
               -w "\nHTTP_STATUS:%{http_code}" \
               -s)
             
