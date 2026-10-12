@@ -172,6 +172,7 @@ class CommandTaskCallback : public dnp3::CommandTaskCallback {
 };
 // ANCHOR_END: assoc_control_callback
 
+// ANCHOR: assoc_control_no_ack_callback
 class NoAckCommandTaskCallback : public dnp3::CommandTaskCallback {
     void on_complete(dnp3::Nothing result) override {
         std::cout << "no-ack command sent (not confirmed by the outstation)" << std::endl;
@@ -180,6 +181,7 @@ class NoAckCommandTaskCallback : public dnp3::CommandTaskCallback {
         std::cout << "command failed: "<< dnp3::to_string(error) << std::endl;
     }
 };
+// ANCHOR_END: assoc_control_no_ack_callback
 
 class ReadTaskCallback : public dnp3::ReadTaskCallback {
     virtual void on_complete(dnp3::Nothing result) override

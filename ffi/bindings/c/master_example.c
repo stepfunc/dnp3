@@ -200,10 +200,12 @@ void on_command_error(dnp3_command_error_t result, void *arg)
 }
 // ANCHOR_END: assoc_control_callback
 
+// ANCHOR: assoc_control_no_ack_callback
 void on_no_ack_command_sent(dnp3_nothing_t nothing, void* arg)
 {
     printf("no-ack command sent (not confirmed by the outstation)\n");
 }
+// ANCHOR_END: assoc_control_no_ack_callback
 
 // time sync callbacks
 void on_time_sync_success(dnp3_nothing_t nothing, void* arg) { printf("time sync success! \n"); }
