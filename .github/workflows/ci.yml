@@ -433,6 +433,11 @@ jobs:
         with:
           path: artifacts
           pattern: doc-*
+      - name: Download conformance test results
+        uses: actions/download-artifact@v8
+        with:
+          name: conformance-results
+          path: artifacts/conformance-results
       - name: Checkout stepfunc/docs
         uses: actions/checkout@v6
         with:
@@ -451,6 +456,7 @@ jobs:
           mkdir -p ./dnp3/${{github.ref_name}}
           cp -a ../artifacts/doc-api/* ./dnp3/${{github.ref_name}}
           cp -a ../artifacts/doc-guide/* ./dnp3/${{github.ref_name}}
+          cp -a ../artifacts/conformance-results ./dnp3/${{github.ref_name}}/conformance
           # Remove versions superseded under the docs repo's retention policy
           ./scripts/prune.sh
           # Check if there are actual changes to commit
