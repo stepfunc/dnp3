@@ -1,4 +1,6 @@
 
+### 1.7.1 ###
+* :bug: Flush TLS writes so the last frame isn't left buffered when the socket is under backpressure. Affects masters and outstations. See [#461](https://github.com/stepfunc/dnp3/issues/461).
 ### 1.7.0 ###
 * :star: Add outstation `ConnectionManager` for fine-grained control of TCP and TLS client connections, including dynamic endpoint selection, custom retry logic, and per-connection master address override. See [#381](https://github.com/stepfunc/dnp3/pull/381), [#406](https://github.com/stepfunc/dnp3/pull/406).
 * :star: Add `DirectWriteAbsTime` time sync procedure for outstations that don't properly implement IEEE-1815 time sync. See [#403](https://github.com/stepfunc/dnp3/pull/403).
