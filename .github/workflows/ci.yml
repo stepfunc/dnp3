@@ -47,6 +47,27 @@ jobs:
           toolchain: stable
       - name: Build the workspace with the features
         run: cargo build --release -p dnp3 -p dnp3-ffi -p dnp3-ffi-java ${{ matrix.feature-args }}
+  # Check the workspace with the minimum supported Rust version declared in Cargo.toml
+  msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+      - name: Read the minimum supported Rust version
+        id: msrv
+        # a two-part rust-version means the .0 release, so check exactly that toolchain
+        run: |
+          version=$(sed -n 's/^rust-version = "\(.*\)"/\1/p' Cargo.toml)
+          if [[ "$version" =~ ^[0-9]+\.[0-9]+$ ]]; then version="$version.0"; fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Install Rust ${{ steps.msrv.outputs.version }}
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: ${{ steps.msrv.outputs.version }}
+      - name: Check the workspace
+        run: cargo check --locked --workspace --all-targets
+      - name: Check the AWS-LC TLS backend
+        run: cargo check --locked -p dnp3 --no-default-features --features tls-aws-lc,serial,serialization,unstable
   # Run the unit tests on Windows and Linux
   test:
     strategy:
@@ -396,7 +417,7 @@ jobs:
           path: conformance/results
   # Quality gate to ensure all tests pass before releases
   quality-gate:
-    needs: [linting, test, features, conformance]
+    needs: [linting, msrv, test, features, conformance]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:

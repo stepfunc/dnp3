@@ -22,4 +22,4 @@
 - **Naming**: Follow Rust naming conventions (snake_case for functions/variables, CamelCase for types)
 - **Imports**: Organize imports by standard lib, external crates, then internal modules
 - **Features**: Support compile-time features (tls, serial, serialization)
-- **Minimum Rust Version**: 1.75+
+- **Minimum Rust Version**: 1.85+ (the workspace `rust-version`, checked by the `msrv` CI job)
