@@ -25,6 +25,8 @@ enum OutstationServerState {
     Configuring(dnp3::tcp::Server),
     #[allow(dead_code)]
     Running(ServerHandle),
+    /// Binding consumed the server and failed, so it can't be used again
+    BindFailed,
 }
 
 pub struct OutstationServer {
@@ -147,6 +149,7 @@ pub unsafe fn outstation_server_add_outstation(
     let server_handle = match &mut server.state {
         OutstationServerState::Configuring(server) => server,
         OutstationServerState::Running(_) => return Err(ffi::ParamError::ServerAlreadyStarted),
+        OutstationServerState::BindFailed => return Err(ffi::ParamError::ServerBindError),
     };
 
     let config = convert_outstation_config(config)?;
@@ -177,22 +180,24 @@ pub unsafe fn outstation_server_add_outstation(
 }
 
 pub unsafe fn outstation_server_bind(server: *mut OutstationServer) -> Result<(), ffi::ParamError> {
-    if server.is_null() {
-        return Err(ffi::ParamError::NullParameter);
-    }
-    // TODO - this pattern doesn't look correct
-    let mut server = Box::from_raw(server);
-    let server_handle = match server.state {
-        OutstationServerState::Configuring(server) => server,
-        OutstationServerState::Running(_) => return Err(ffi::ParamError::ServerAlreadyStarted),
-    };
+    let server = server.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+
+    // binding consumes the server, so it stays `BindFailed` unless binding succeeds
+    let server_handle =
+        match std::mem::replace(&mut server.state, OutstationServerState::BindFailed) {
+            OutstationServerState::Configuring(server) => server,
+            OutstationServerState::Running(handle) => {
+                server.state = OutstationServerState::Running(handle);
+                return Err(ffi::ParamError::ServerAlreadyStarted);
+            }
+            OutstationServerState::BindFailed => return Err(ffi::ParamError::ServerBindError),
+        };
 
     // Use the spawning variant inside the runtime context so its internal tokio::spawn and
     // library-defined tracing span are applied, rather than re-defining instrumentation here.
     let handle = server.runtime.block_on(server_handle.bind())??;
 
     server.state = OutstationServerState::Running(handle);
-    Box::leak(server);
     Ok(())
 }
 
