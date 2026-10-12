@@ -283,17 +283,8 @@ void run_outstation(dnp3::Outstation &outstation)
     }
 }
 
-void run_server(dnp3::OutstationServer &server)
+void init_database(dnp3::Outstation &outstation)
 {
-    // ANCHOR: tcp_server_add_outstation
-    auto filter = AddressFilter::any();
-    auto outstation = server.add_outstation(
-        get_outstation_config(), std::make_unique<MyOutstationApplication>(), std::make_unique<MyOutstationInformation>(),
-        std::make_unique<MyControlHandler>(),
-        connection_state_listener([](ConnectionState state) { std::cout << "ConnectionState: " << to_string(state) << std::endl; }), filter);
-    // ANCHOR_END: tcp_server_add_outstation
-
-    // setup the initial state of the outstation
     // ANCHOR: database_init_transaction
     auto setup = database_transaction([](Database &db) {
         // add 10 points of each type
@@ -320,6 +311,20 @@ void run_server(dnp3::OutstationServer &server)
     });
     outstation.transaction(setup);
     // ANCHOR_END: database_init_transaction
+}
+
+void run_server(dnp3::OutstationServer &server)
+{
+    // ANCHOR: tcp_server_add_outstation
+    auto filter = AddressFilter::any();
+    auto outstation = server.add_outstation(
+        get_outstation_config(), std::make_unique<MyOutstationApplication>(), std::make_unique<MyOutstationInformation>(),
+        std::make_unique<MyControlHandler>(),
+        connection_state_listener([](ConnectionState state) { std::cout << "ConnectionState: " << to_string(state) << std::endl; }), filter);
+    // ANCHOR_END: tcp_server_add_outstation
+
+    // setup the initial state of the outstation before the server starts accepting connections
+    init_database(outstation);
 
     // ANCHOR: tcp_server_bind
     server.bind();
@@ -354,6 +359,7 @@ void run_tcp_client(dnp3::Runtime &runtime)
         client_state_listener([](ClientState state) { std::cout << "ClientState: " << to_string(state) << std::endl; })
     );
 
+    init_database(outstation);
     // Enable the outstation to start connecting
     outstation.enable();
     run_outstation(outstation);
@@ -459,6 +465,7 @@ void run_tcp_client_with_connection_manager(dnp3::Runtime &runtime)
     );
 
     std::cout << "Outstation started with ConnectionManager - will try multiple endpoints with exponential backoff" << std::endl;
+    init_database(outstation);
     // Enable the outstation to start connecting
     outstation.enable();
     run_outstation(outstation);
@@ -480,6 +487,7 @@ void run_serial(dnp3::Runtime &runtime)
     );
     // ANCHOR_END: create_serial_server
 
+    init_database(outstation);
     run_outstation(outstation);
 }
 
@@ -502,6 +510,7 @@ void run_udp(dnp3::Runtime &runtime)
 
     // ANCHOR_END: create_udp
 
+    init_database(outstation);
     run_outstation(outstation);
 }
 

@@ -276,6 +276,9 @@ class ExampleOutstation
         );
         // ANCHOR_END: tcp_server_add_outstation
 
+        // Setup initial points before the server starts accepting connections
+        InitializeDatabase(outstation);
+
         // ANCHOR: tcp_server_bind
         server.Bind();
         // ANCHOR_END: tcp_server_bind
@@ -315,7 +318,7 @@ class ExampleOutstation
         );
         // ANCHOR_END: create_serial_server
 
-
+        InitializeDatabase(outstation);
         RunOutstation(outstation);
     }
 
@@ -337,6 +340,7 @@ class ExampleOutstation
         );
         // ANCHOR_END: create_udp
 
+        InitializeDatabase(outstation);
         RunOutstation(outstation);
     }
 
@@ -469,7 +473,7 @@ class ExampleOutstation
         return config;
     }
 
-    private static void RunOutstation(Outstation outstation)
+    private static void InitializeDatabase(Outstation outstation)
     {
         // Setup initial points
         // ANCHOR: database_init
@@ -497,7 +501,10 @@ class ExampleOutstation
             db.DefineStringAttr(0, true, AttributeVariations.UserAssignedLocation, "Bend, OR");
         });
         // ANCHOR_END: database_init
+    }
 
+    private static void RunOutstation(Outstation outstation)
+    {
         var binaryValue = false;
         var doubleBitBinaryValue = DoubleBit.DeterminedOff;
         var binaryOutputStatusValue = false;
