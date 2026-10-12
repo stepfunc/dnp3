@@ -80,6 +80,8 @@ class TrackingDatabase(val app: CustomOutstationApplication, val outstation: Out
 
     if(!testDatabaseConfig.disableBinaryInputs) {
       val binaryConfig = new BinaryInputConfig()
+      // with time, so the event generateTimeEvent makes carries its time (8.7.2.2)
+      binaryConfig.eventVariation = EventBinaryInputVariation.GROUP2_VAR2
 
       this.binaryPoints.values.foreach(e => {
         db.addBinaryInput(e.index, io.stepfunc.dnp3.EventClass.CLASS1, binaryConfig)
