@@ -636,6 +636,36 @@ pub(crate) unsafe fn master_channel_operate(
     Ok(())
 }
 
+pub(crate) unsafe fn master_channel_operate_no_ack(
+    channel: *mut crate::MasterChannel,
+    association: ffi::AssociationId,
+    commands: *mut crate::CommandSet,
+    callback: ffi::CommandTaskCallback,
+) -> Result<(), ffi::ParamError> {
+    let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let address = EndpointAddress::try_new(association.address)?;
+    let headers = commands
+        .as_ref()
+        .ok_or(ffi::ParamError::NullParameter)?
+        .clone()
+        .build();
+
+    let promise = sfio_promise::wrap(callback);
+
+    let mut handle = AssociationHandle::create(address, channel.handle.clone());
+
+    let task = async move {
+        let res = handle
+            .operate_no_ack(headers)
+            .await
+            .map_err(CommandError::from);
+        promise.complete(res);
+    };
+
+    channel.runtime.spawn(task)?;
+    Ok(())
+}
+
 impl From<CommandError> for ffi::CommandError {
     fn from(value: CommandError) -> Self {
         match value {
