@@ -245,8 +245,9 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
   }
 
   override def setUnsolicitedResponseTimeout(reporter: PluginReporter, timeoutMs: Int): Unit = {
-    config = config.copy(unsolicitedResponseConfig = config.unsolicitedResponseConfig.copy(unsolConfirmTimeoutMs = timeoutMs))
-    reporter.log(f"Unsolicited response timeout was set to $timeoutMs ms")
+    // the outstation has one confirm timeout, for solicited and unsolicited responses
+    config = config.copy(outstationConfig = config.outstationConfig.copy(confirmTimeoutMs = timeoutMs))
+    reporter.log(f"Confirm timeout, for solicited and unsolicited responses, was set to $timeoutMs ms")
     cyclePower(reporter)
   }
 
@@ -876,7 +877,7 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
     // Outstation config
     dnp3Config.features.selfAddress = config.linkConfig.selfAddressSupport
     dnp3Config.keepAliveTimeout = Duration.ofDays(30)
-    dnp3Config.confirmTimeout = Duration.ofMillis(config.outstationConfig.responseTimeoutMs)
+    dnp3Config.confirmTimeout = Duration.ofMillis(config.outstationConfig.confirmTimeoutMs)
     dnp3Config.selectTimeout = Duration.ofMillis(config.outstationConfig.selectTimeoutMs)
     dnp3Config.solicitedBufferSize = ushort(config.outstationConfig.fragmentSize)
     dnp3Config.unsolicitedBufferSize = ushort(config.outstationConfig.fragmentSize)
@@ -887,7 +888,7 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
     // Unsolicited responses config
     dnp3Config.features.unsolicited = config.unsolicitedResponseConfig.allowUnsolicited
     dnp3Config.features.broadcast = true
-    dnp3Config.unsolicitedRetryDelay = Duration.ofMillis(config.outstationConfig.responseTimeoutMs)
+    dnp3Config.unsolicitedRetryDelay = Duration.ofMillis(config.unsolicitedResponseConfig.retryDelayMs)
     dnp3Config.maxUnsolicitedRetries = config.unsolicitedResponseConfig.maxNumRetries.map(x => uint(x)).getOrElse(UInteger.MAX)
 
     // Create the outstation
