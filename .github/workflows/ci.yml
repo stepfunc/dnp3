@@ -451,6 +451,8 @@ jobs:
           mkdir -p ./dnp3/${{github.ref_name}}
           cp -a ../artifacts/doc-api/* ./dnp3/${{github.ref_name}}
           cp -a ../artifacts/doc-guide/* ./dnp3/${{github.ref_name}}
+          # Remove versions superseded under the docs repo's retention policy
+          ./scripts/prune.sh
           # Check if there are actual changes to commit
           git add -A
           if git diff --staged --quiet; then
