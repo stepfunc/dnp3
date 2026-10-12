@@ -2,6 +2,7 @@ use std::io::ErrorKind;
 
 use scursor::WriteCursor;
 use sfio_tokio_mock_io::Event;
+use tokio::sync::oneshot::error::TryRecvError;
 use tokio::time::Instant;
 
 use crate::app::control::{Group12Var1, OpType};
@@ -204,7 +205,7 @@ async fn queued_tasks_run_back_to_back_after_operate_no_ack_and_ignore_its_seque
         .process_response(empty_response(Sequence::new(1)))
         .await;
     tokio::task::yield_now().await;
-    assert!(read.try_recv().is_err());
+    assert_eq!(read.try_recv(), Err(TryRecvError::Empty));
 
     harness
         .process_response(empty_response(Sequence::new(2)))
@@ -246,14 +247,13 @@ async fn unsolicited_response_is_processed_after_a_queued_batch_drains() {
     }
     barrier(&mut harness).await;
 
-    harness
-        .process_response(command_response(Sequence::new(0)))
-        .await;
-    assert_eq!(blocker.await.unwrap(), Ok(()));
+    // the unsolicited response is already waiting when the batch starts
+    harness.io.read(&command_response(Sequence::new(0)));
     harness
         .io
         .read(&unsol_with_data(Sequence::new(0), 42, false));
 
+    assert_eq!(harness.io.next_event().await, Event::Read);
     for seq in 1..=3 {
         harness
             .expect_write(command_request(NO_ACK, Sequence::new(seq)))
@@ -262,6 +262,7 @@ async fn unsolicited_response_is_processed_after_a_queued_batch_drains() {
     for mut rx in batch {
         assert_eq!(rx.try_recv(), Ok(Ok(())));
     }
+    assert_eq!(blocker.await.unwrap(), Ok(()));
 
     assert_eq!(harness.io.next_event().await, Event::Read);
     harness.expect_write(unsol_confirm(Sequence::new(0))).await;
