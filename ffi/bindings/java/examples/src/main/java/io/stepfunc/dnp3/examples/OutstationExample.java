@@ -313,6 +313,7 @@ public class OutstationExample {
     );
     // ANCHOR_END: create_udp
 
+    outstation.transaction((db) -> initializeDatabase(db));
     runOutstation(outstation);
   }
 
@@ -331,6 +332,7 @@ public class OutstationExample {
     );
     // ANCHOR_END: create_serial_server
 
+    outstation.transaction((db) -> initializeDatabase(db));
     runOutstation(outstation);
   }
 
@@ -411,6 +413,11 @@ public class OutstationExample {
                     AddressFilter.any());
     // ANCHOR_END: tcp_server_add_outstation
 
+    // Setup initial points before the server starts accepting connections
+    // ANCHOR: database_init
+    outstation.transaction((db) -> initializeDatabase(db));
+    // ANCHOR_END: database_init
+
     // ANCHOR: tcp_server_bind
     server.bind();
     // ANCHOR_END: tcp_server_bind
@@ -419,11 +426,6 @@ public class OutstationExample {
   }
 
   private static void runOutstation(Outstation outstation) {
-
-    // Setup initial points
-    // ANCHOR: database_init
-    outstation.transaction((db) -> initializeDatabase(db));
-    // ANCHOR_END: database_init
 
     boolean binaryValue = false;
     DoubleBit doubleBitBinaryValue = DoubleBit.DETERMINED_OFF;

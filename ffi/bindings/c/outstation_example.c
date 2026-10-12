@@ -650,6 +650,7 @@ int run_serial(dnp3_runtime_t* runtime)
         return -1;
     }
 
+    init_database(outstation);
     return run_outstation(outstation);
 }
 
