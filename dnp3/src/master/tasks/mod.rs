@@ -10,6 +10,7 @@ use crate::master::promise::Promise;
 use crate::master::request::{Classes, EventClasses};
 use crate::master::tasks::auto::AutoTask;
 use crate::master::tasks::command::CommandTask;
+use crate::master::tasks::command_no_ack::CommandNoAckTask;
 use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::restart::RestartTask;
 use crate::master::tasks::time::TimeSyncTask;
@@ -27,6 +28,7 @@ use crate::transport::FragmentAddr;
 
 pub(crate) mod auto;
 pub(crate) mod command;
+pub(crate) mod command_no_ack;
 pub(crate) mod deadbands;
 pub(crate) mod empty_response;
 
@@ -150,6 +152,8 @@ pub(crate) enum NonReadTask {
     Auto(AutoTask),
     /// commands initiated from the user API
     Command(CommandTask),
+    /// commands initiated from the user API that the outstation never responds to
+    CommandNoAck(CommandNoAckTask),
     /// time synchronization
     TimeSync(TimeSyncTask),
     /// restart operation
@@ -197,6 +201,7 @@ impl RequestWriter for NonReadTask {
         match self {
             NonReadTask::Auto(t) => t.write(writer)?,
             NonReadTask::Command(t) => t.write(writer)?,
+            NonReadTask::CommandNoAck(t) => t.write(writer)?,
             NonReadTask::TimeSync(t) => t.write(writer)?,
             NonReadTask::Restart(_) => {}
             NonReadTask::DeadBands(t) => t.write(writer)?,
@@ -298,6 +303,7 @@ impl NonReadTask {
     pub(crate) fn start(self, association: &mut Association) -> Option<NonReadTask> {
         match self {
             Self::Command(_) => Some(self),
+            Self::CommandNoAck(_) => Some(self),
             Self::Auto(_) => Some(self),
             Self::TimeSync(task) => task.start(association).map(|task| task.wrap()),
             Self::Restart(_) => Some(self),
@@ -315,6 +321,7 @@ impl NonReadTask {
     pub(crate) fn function(&self) -> FunctionCode {
         match self {
             Self::Command(task) => task.function(),
+            Self::CommandNoAck(task) => task.function(),
             Self::Auto(task) => task.function(),
             Self::TimeSync(task) => task.function(),
             Self::Restart(task) => task.function(),
@@ -332,6 +339,7 @@ impl NonReadTask {
     pub(crate) fn on_task_error(self, association: Option<&mut Association>, err: TaskError) {
         match self {
             Self::Command(task) => task.on_task_error(err),
+            Self::CommandNoAck(task) => task.on_task_error(err),
             Self::TimeSync(task) => task.on_task_error(association, err),
             Self::Auto(task) => task.on_task_error(association, err),
             Self::Restart(task) => task.on_task_error(err),
@@ -353,6 +361,12 @@ impl NonReadTask {
     ) -> Result<Option<NonReadTask>, TaskError> {
         match self {
             Self::Command(task) => task.handle(response),
+            Self::CommandNoAck(task) => {
+                // the scheduler completes these tasks once the request is sent
+                tracing::error!("received a response for a DIRECT_OPERATE_NO_ACK task");
+                task.complete();
+                Ok(None)
+            }
             Self::Auto(task) => task.handle(association, response),
             Self::TimeSync(task) => task.handle(association, response),
             Self::Restart(task) => task.handle(response),
@@ -369,7 +383,7 @@ impl NonReadTask {
 
     pub(crate) fn as_task_type(&self) -> TaskType {
         match self {
-            Self::Command(_) => TaskType::Command,
+            Self::Command(_) | Self::CommandNoAck(_) => TaskType::Command,
             Self::Auto(x) => match x {
                 AutoTask::ClearRestartBit => TaskType::ClearRestartBit,
                 AutoTask::EnableUnsolicited(_) => TaskType::EnableUnsolicited,
@@ -385,6 +399,20 @@ impl NonReadTask {
             Self::OpenFile(_) => TaskType::FileOpen,
             Self::CloseFile(_) => TaskType::FileClose,
             Self::WriteFileBlock(_) => TaskType::FileWriteBlock,
+        }
+    }
+
+    /// Called after the request has been written to the transport
+    ///
+    /// Tasks whose function code elicits no response complete here and return `None`.
+    /// All other tasks are returned unchanged to await a response.
+    pub(crate) fn on_request_sent(self) -> Option<NonReadTask> {
+        match self {
+            Self::CommandNoAck(task) => {
+                task.complete();
+                None
+            }
+            other => Some(other),
         }
     }
 }

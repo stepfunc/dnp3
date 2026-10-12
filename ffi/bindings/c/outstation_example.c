@@ -168,6 +168,7 @@ dnp3_command_status_t select_g12v1(dnp3_group12_var1_t control, uint16_t index, 
 
 dnp3_command_status_t operate_g12v1(dnp3_group12_var1_t control, uint16_t index, dnp3_operate_type_t op_type, dnp3_database_handle_t *database, void *context)
 {
+    printf("operate %s on binary output %u via %s\n", dnp3_op_type_to_string(control.code.op_type), index, dnp3_operate_type_to_string(op_type));
     if (index < 10 && (control.code.op_type == DNP3_OP_TYPE_LATCH_ON || control.code.op_type == DNP3_OP_TYPE_LATCH_OFF))
     {
         bool status = (control.code.op_type == DNP3_OP_TYPE_LATCH_ON);

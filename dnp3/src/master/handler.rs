@@ -12,6 +12,7 @@ use crate::master::poll::{PollHandle, PollMsg};
 use crate::master::promise::Promise;
 use crate::master::request::{CommandHeaders, CommandMode, ReadRequest, TimeSyncProcedure};
 use crate::master::tasks::command::CommandTask;
+use crate::master::tasks::command_no_ack::CommandNoAckTask;
 use crate::master::tasks::deadbands::WriteDeadBandsTask;
 use crate::master::tasks::empty_response::EmptyResponseTask;
 use crate::master::tasks::file::authenticate::AuthFileTask;
@@ -334,6 +335,19 @@ impl AssociationHandle {
         rx.await?
     }
 
+    /// Perform an asynchronous `DIRECT_OPERATE_NO_ACK` (function code 0x06) request
+    ///
+    /// The outstation never responds to this function code, even on error. The returned future
+    /// completes successfully once the request has been written to the transport. Success does
+    /// NOT mean that the outstation received, accepted, or executed the command, and gives no
+    /// guarantee about the order or rate at which the outstation can process commands.
+    pub async fn operate_no_ack(&mut self, headers: CommandHeaders) -> Result<(), TaskError> {
+        let (promise, rx) = Promise::one_shot();
+        self.send_task(CommandNoAckTask::new(headers, promise))
+            .await?;
+        rx.await?
+    }
+
     /// Perform a WARM_RESTART operation
     ///
     /// Returns the delay from the outstation's response as a [Duration](Duration)
@@ -508,7 +522,7 @@ impl AssociationHandle {
         reply.await?
     }
 
-    async fn send_task<T: Into<Task>>(&mut self, task: T) -> Result<(), Shutdown> {
+    pub(crate) async fn send_task<T: Into<Task>>(&mut self, task: T) -> Result<(), Shutdown> {
         self.master
             .send_association_message(self.address, AssociationMsgType::QueueTask(task.into()))
             .await
@@ -534,6 +548,9 @@ pub enum TaskType {
     /// Automatic event scan caused by `RESTART` IIN bit detection
     AutoEventScan,
     /// Command request
+    ///
+    /// For `DIRECT_OPERATE_NO_ACK` (function code 0x06), success only means that the request
+    /// was written to the transport, since the outstation never responds.
     Command,
     /// Clear `RESTART` IIN bit
     ClearRestartBit,

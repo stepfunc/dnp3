@@ -172,6 +172,17 @@ class CommandTaskCallback : public dnp3::CommandTaskCallback {
 };
 // ANCHOR_END: assoc_control_callback
 
+// ANCHOR: assoc_control_no_ack_callback
+class NoAckCommandTaskCallback : public dnp3::CommandTaskCallback {
+    void on_complete(dnp3::Nothing result) override {
+        std::cout << "no-ack command sent (not confirmed by the outstation)" << std::endl;
+    }
+    void on_failure(dnp3::CommandError error) override {
+        std::cout << "command failed: "<< dnp3::to_string(error) << std::endl;
+    }
+};
+// ANCHOR_END: assoc_control_no_ack_callback
+
 class ReadTaskCallback : public dnp3::ReadTaskCallback {
     virtual void on_complete(dnp3::Nothing result) override
     {
@@ -414,6 +425,13 @@ void run_command(const std::string &cmd, dnp3::MasterChannel &channel, dnp3::Ass
         commands.add_g12_v1_u8(3, dnp3::Group12Var1(dnp3::ControlCode(dnp3::TripCloseCode::nul, false, dnp3::OpType::latch_on), 0, 1000, 1000));
         channel.operate(assoc, dnp3::CommandMode::direct_operate, commands, std::make_unique<CommandTaskCallback>());
         // ANCHOR_END: assoc_control
+    }
+    else if (cmd == "cna") {
+        // ANCHOR: assoc_control_no_ack
+        dnp3::CommandSet commands;
+        commands.add_g12_v1_u8(3, dnp3::Group12Var1(dnp3::ControlCode(dnp3::TripCloseCode::nul, false, dnp3::OpType::latch_on), 0, 1000, 1000));
+        channel.operate_no_ack(assoc, commands, std::make_unique<NoAckCommandTaskCallback>());
+        // ANCHOR_END: assoc_control_no_ack
     }
     else {
         std::cout << "unknown command: " << cmd << std::endl;

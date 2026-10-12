@@ -604,6 +604,16 @@ class MainClass
                     // ANCHOR_END: assoc_control
                     break;
                 }
+            case "cna":
+                {
+                    // ANCHOR: assoc_control_no_ack
+                    var commands = new CommandSet();
+                    commands.AddG12V1U8(3, Group12Var1.FromCode(ControlCode.FromOpType(OpType.LatchOn)));
+                    await channel.OperateNoAck(association, commands);
+                    // ANCHOR_END: assoc_control_no_ack
+                    Console.WriteLine("no-ack command sent (not confirmed by the outstation)");
+                    break;
+                }
             case "evt":
                 {
                     channel.DemandPoll(poll);

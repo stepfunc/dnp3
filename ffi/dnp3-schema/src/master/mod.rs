@@ -467,7 +467,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
     let command_cb = define_command_callback(lib, shared.nothing.clone())?;
 
     let operate_async = lib
-        .define_future_method("operate", master_channel_class.clone(), command_cb)?
+        .define_future_method("operate", master_channel_class.clone(), command_cb.clone())?
         .param(
             "association",
             association_id.clone(),
@@ -477,6 +477,21 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         .param("command", command.declaration(), "Command to send")?
         .fails_with(shared.error_type.clone())?
         .doc("Asynchronously perform a command operation on the association")?
+        .build()?;
+
+    let operate_no_ack_async = lib
+        .define_future_method("operate_no_ack", master_channel_class.clone(), command_cb)?
+        .param(
+            "association",
+            association_id.clone(),
+            "Id of the association",
+        )?
+        .param("command", command.declaration(), "Command to send")?
+        .fails_with(shared.error_type.clone())?
+        .doc(
+            doc("Asynchronously perform a DIRECT_OPERATE_NO_ACK (0x06) command operation on the association")
+                .details("The outstation never responds to this function code, even on error. The operation completes successfully once the request has been written to the transport. Success does not mean that the outstation received, accepted, or executed the command.")
+        )?
         .build()?;
 
     let time_sync_mode = define_time_sync_mode(lib)?;
@@ -750,6 +765,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         .async_method(read_async)?
         .async_method(read_with_handler_async)?
         .async_method(operate_async)?
+        .async_method(operate_no_ack_async)?
         .async_method(perform_time_sync_async)?
         .async_method(cold_restart_async)?
         .async_method(warm_restart_async)?

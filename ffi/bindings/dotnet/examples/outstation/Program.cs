@@ -170,6 +170,7 @@ class ExampleOutstation
 
         public CommandStatus OperateG12v1(Group12Var1 control, ushort index, OperateType opType, DatabaseHandle database)
         {
+            Console.WriteLine($"operate {control.Code.OpType} on binary output {index} via {opType}");
             if (index < 10 && (control.Code.OpType == OpType.LatchOn || control.Code.OpType == OpType.LatchOff))
             {
                 var status = (control.Code.OpType == OpType.LatchOn);

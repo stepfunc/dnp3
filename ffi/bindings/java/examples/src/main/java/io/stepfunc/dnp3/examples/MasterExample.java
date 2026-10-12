@@ -522,6 +522,17 @@ public class MasterExample {
         // ANCHOR_END: assoc_control
         break;
       }
+      case "cna":
+      {
+        // ANCHOR: assoc_control_no_ack
+        CommandSet commands = new CommandSet();
+        Group12Var1 control = Group12Var1.fromCode(ControlCode.fromOpType(OpType.LATCH_ON));
+        commands.addG12V1U16(ushort(3), control);
+        channel.operateNoAck(association, commands).toCompletableFuture().get();
+        // ANCHOR_END: assoc_control_no_ack
+        System.out.println("no-ack command sent (not confirmed by the outstation)");
+        break;
+      }
       case "evt":
         channel.demandPoll(poll);
         break;

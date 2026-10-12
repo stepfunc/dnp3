@@ -405,6 +405,11 @@ impl MasterSession {
             }
         };
 
+        let task = match task.on_request_sent() {
+            Some(task) => task,
+            None => return Ok(NextStep::Complete(seq)),
+        };
+
         let timeout = self.associations.get_timeout(dest.link)?;
         let deadline = timeout.deadline_from_now();
 
