@@ -2,7 +2,7 @@ package io.stepfunc.conformance.dnp3
 
 import io.stepfunc.dnp4s.dnp3.app._
 import io.stepfunc.dnp4s.dnp3.app.objects.AttributeValue
-import io.stepfunc.dnp4s.dnp3.{ActionResult, ActionTiming, CheckReporter, DeferredCheck, IntegrationPlugin, PluginReporter}
+import io.stepfunc.dnp4s.dnp3.{ActionResult, ActionTiming, CheckReporter, DeferredCheck, EventExpectation, InputKind, IntegrationPlugin, PluginReporter}
 import io.stepfunc.dnp4s.protocol.parsing.UInt8
 import io.stepfunc.dnp3.{AddressFilter, AnalogInput, AnalogOutputStatus, BinaryInput, BinaryOutputStatus, Counter, DoubleBit, DoubleBitBinaryInput, EventBufferConfig, FrozenCounter, LinkErrorMode, Outstation, Runtime, RuntimeConfig, OutstationServer}
 import org.joou.UInteger
@@ -75,102 +75,55 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
 
   override def generateClassEvents(reporter: PluginReporter, eventClass: EventClass): Unit = {
     eventClass match {
-      case EventClass.Class1 => generateBinaryInputChangeEvents(reporter)
-      case EventClass.Class2 => generateCounterInputData(reporter)
-      case EventClass.Class3 => generateAnalogInputChangeEvents(reporter)
+      case EventClass.Class1 => generateInputChanges(reporter, InputKind.BinaryInput)
+      case EventClass.Class2 => generateInputChanges(reporter, InputKind.Counter)
+      case EventClass.Class3 => generateInputChanges(reporter, InputKind.AnalogInput)
       case _ => {
-        generateBinaryInputChangeEvents(reporter)
+        generateInputChanges(reporter, InputKind.BinaryInput)
         this.eventBatch = this.eventBatch - 1
-        generateCounterInputData(reporter)
+        generateInputChanges(reporter, InputKind.Counter)
         this.eventBatch = this.eventBatch - 1
-        generateAnalogInputChangeEvents(reporter)
+        generateInputChanges(reporter, InputKind.AnalogInput)
       }
     }
   }
 
   override def generateExactClassEvents(reporter: PluginReporter, eventClass: EventClass, numEvents: Int): Unit = {
     eventClass match {
-      case EventClass.Class1 => generateExactBinaryInputChangeEvents(reporter, numEvents)
-      case EventClass.Class2 => generateExactCounterChangeEvents(reporter, numEvents)
-      case EventClass.Class3 => generateExactAnalogInputChangeEvents(reporter, numEvents)
+      case EventClass.Class1 => generateExactInputEvents(reporter, InputKind.BinaryInput, numEvents)
+      case EventClass.Class2 => generateExactInputEvents(reporter, InputKind.Counter, numEvents)
+      case EventClass.Class3 => generateExactInputEvents(reporter, InputKind.AnalogInput, numEvents)
       case _ => throw new Exception(s"Cannot generate an exact number of $eventClass events")
     }
   }
 
+  override def generateInputChanges(reporter: PluginReporter, kind: InputKind[?]): Unit = {
+    this.eventBatch = this.eventBatch + 1
+    0 to 9 foreach(idx => generateInputEvent(reporter, kind, idx))
+  }
+
+  override def generateExactInputEvents(reporter: PluginReporter, kind: InputKind[?], numEvents: Int): Unit = {
+    this.eventBatch = this.eventBatch + 1
+    1 to numEvents foreach(_ => generateInputEvent(reporter, kind, 0))
+  }
+
+  private def generateInputEvent(reporter: PluginReporter, kind: InputKind[?], idx: Int): Unit = kind match {
+    case InputKind.BinaryInput => printBinaryInput(reporter, trackingDatabase.generateBinaryInputEvent(idx, this.eventBatch))
+    case InputKind.DoubleBitInput => printDoubleBitBinaryInput(reporter, trackingDatabase.generateDoubleBitBinaryInputEvent(idx, this.eventBatch))
+    case InputKind.Counter => printCounter(reporter, trackingDatabase.generateCounterEvent(idx, this.eventBatch))
+    case InputKind.AnalogInput => printAnalogInput(reporter, trackingDatabase.generateAnalogInputEvent(idx, this.eventBatch))
+  }
+
   override def generateBinaryInputPattern(reporter: PluginReporter): Unit = {
-    generateBinaryInputChangeEvents(reporter)
-  }
-
-  override def generateBinaryInputChangeEvents(reporter: PluginReporter): Unit = {
-    this.eventBatch = this.eventBatch + 1
-    0 to 9 foreach(idx => {
-      val event = trackingDatabase.generateBinaryInputEvent(idx, this.eventBatch)
-      printBinaryInput(reporter, event)
-    })
-  }
-
-  override def generateExactBinaryInputChangeEvents(reporter: PluginReporter, numEvents: Int): Unit = {
-    this.eventBatch = this.eventBatch + 1
-    1 to numEvents foreach(_ => {
-      val event = trackingDatabase.generateBinaryInputEvent(0, this.eventBatch)
-      printBinaryInput(reporter, event)
-    })
+    generateInputChanges(reporter, InputKind.BinaryInput)
   }
 
   override def generateDoubleBitBinaryInputPattern(reporter: PluginReporter): Unit = {
-    generateDoubleBitBinaryInputChangeEvents(reporter)
-  }
-
-  override def generateDoubleBitBinaryInputChangeEvents(reporter: PluginReporter): Unit = {
-    this.eventBatch = this.eventBatch + 1
-    0 to 9 foreach(idx => {
-      val event = trackingDatabase.generateDoubleBitBinaryInputEvent(idx, this.eventBatch)
-      printDoubleBitBinaryInput(reporter, event)
-    })
-  }
-
-  override def generateExactDoubleBitBinaryInputChangeEvents(reporter: PluginReporter, numEvents: Int): Unit = {
-    this.eventBatch = this.eventBatch + 1
-    1 to numEvents foreach(_ => {
-      val event = trackingDatabase.generateDoubleBitBinaryInputEvent(0, this.eventBatch)
-      printDoubleBitBinaryInput(reporter, event)
-    })
-  }
-
-  override def generateCounterInputData(reporter: PluginReporter): Unit = {
-    this.eventBatch = this.eventBatch + 1
-    0 to 9 foreach(idx => {
-      val event = trackingDatabase.generateCounterEvent(idx, this.eventBatch)
-      printCounter(reporter, event)
-    })
-  }
-
-  override def generateExactCounterChangeEvents(reporter: PluginReporter, numEvents: Int): Unit = {
-    this.eventBatch = this.eventBatch + 1
-    1 to numEvents foreach(_ => {
-      val event = trackingDatabase.generateCounterEvent(0, this.eventBatch)
-      printCounter(reporter, event)
-    })
+    generateInputChanges(reporter, InputKind.DoubleBitInput)
   }
 
   override def generateAnalogInputPattern(reporter: PluginReporter): Unit = {
-    this.generateAnalogInputChangeEvents(reporter)
-  }
-
-  override def generateAnalogInputChangeEvents(reporter: PluginReporter): Unit = {
-    this.eventBatch = this.eventBatch + 1
-    0 to 9 foreach(idx => {
-      val event = trackingDatabase.generateAnalogInputEvent(idx, this.eventBatch)
-      printAnalogInput(reporter, event)
-    })
-  }
-
-  override def generateExactAnalogInputChangeEvents(reporter: PluginReporter, numEvents: Int): Unit = {
-    this.eventBatch = this.eventBatch + 1
-    1 to numEvents foreach(_ => {
-      val event = trackingDatabase.generateAnalogInputEvent(0, this.eventBatch)
-      printAnalogInput(reporter, event)
-    })
+    generateInputChanges(reporter, InputKind.AnalogInput)
   }
 
   override def generateTimeEvent(reporter: PluginReporter): Unit = {
@@ -267,7 +220,7 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
   }
 
   override def generateUnsolicitedEvents(reporter: PluginReporter, timing: ActionTiming): ActionResult = {
-    generateExactBinaryInputChangeEvents(reporter, 1)
+    generateExactInputEvents(reporter, InputKind.BinaryInput, 1)
     ActionResult.Performed
   }
 
@@ -278,10 +231,10 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
   }
 
   override def generateMultiFragmentResponse(reporter: PluginReporter): Unit = {
-    generateExactBinaryInputChangeEvents(reporter, 200)
-    generateExactDoubleBitBinaryInputChangeEvents(reporter, 200)
-    generateExactCounterChangeEvents(reporter, 200)
-    generateExactAnalogInputChangeEvents(reporter, 200)
+    generateExactInputEvents(reporter, InputKind.BinaryInput, 200)
+    generateExactInputEvents(reporter, InputKind.DoubleBitInput, 200)
+    generateExactInputEvents(reporter, InputKind.Counter, 200)
+    generateExactInputEvents(reporter, InputKind.AnalogInput, 200)
   }
 
   override def recordCurrentCounterValues(reporter: PluginReporter): Unit = {
@@ -293,7 +246,7 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
     })
   }
 
-  override def verifyAllPointsCurrentStatus(reporter: CheckReporter, isClass0: Boolean, points: Seq[GenIndexedPoint[MeasurementPoint]]): Option[DeferredCheck] = {
+  override def verifyAllStaticCurrentValues(reporter: CheckReporter, isClass0: Boolean, points: Seq[GenIndexedPoint[MeasurementPoint]]): Option[DeferredCheck] = {
     val expectedPoints = this.trackingDatabase.getAllPoints(isClass0).to(mutable.Set)
     val numExpectedPoints = expectedPoints.size
 
@@ -352,7 +305,13 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
     None
   }
 
-  override def verifyLatestClassEvents(reporter: CheckReporter, eventClass: EventClass, points: Seq[GenIndexedPoint[MeasurementPoint]]): Option[DeferredCheck] = {
+  override def verifyClassEvents(reporter: CheckReporter, eventClass: EventClass, expectation: EventExpectation, points: Seq[GenIndexedPoint[MeasurementPoint]]): Option[DeferredCheck] = expectation match {
+    case EventExpectation.LatestBatch => verifyLatestClassEvents(reporter, eventClass, points)
+    case EventExpectation.RemainingLatestBatch => verifyRestClassEvents(reporter, eventClass, points)
+    case EventExpectation.AllGeneratedBatches => verifyAllClassEvents(reporter, eventClass, points)
+  }
+
+  private def verifyLatestClassEvents(reporter: CheckReporter, eventClass: EventClass, points: Seq[GenIndexedPoint[MeasurementPoint]]): Option[DeferredCheck] = {
     trackingDatabase.resetHandledEvents()
 
     def getTypedEvent[T <: MeasurementPoint](event: GenIndexedPoint[MeasurementPoint])(implicit tag: ClassTag[T]): GenIndexedPoint[T] = {
@@ -404,7 +363,7 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
     None
   }
 
-  override def verifyRestClassEvents(reporter: CheckReporter, eventClass: EventClass, points: Seq[GenIndexedPoint[MeasurementPoint]]): Option[DeferredCheck] = {
+  private def verifyRestClassEvents(reporter: CheckReporter, eventClass: EventClass, points: Seq[GenIndexedPoint[MeasurementPoint]]): Option[DeferredCheck] = {
     def getTypedEvent[T <: MeasurementPoint](event: GenIndexedPoint[MeasurementPoint])(implicit tag: ClassTag[T]): GenIndexedPoint[T] = {
       event.point match {
         case _: T => event.asInstanceOf[GenIndexedPoint[T]]
@@ -431,7 +390,7 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
     None
   }
 
-  override def verifyAllClassEvents(reporter: CheckReporter, eventClass: EventClass, points: Seq[GenIndexedPoint[MeasurementPoint]]): Option[DeferredCheck] = {
+  private def verifyAllClassEvents(reporter: CheckReporter, eventClass: EventClass, points: Seq[GenIndexedPoint[MeasurementPoint]]): Option[DeferredCheck] = {
     trackingDatabase.resetHandledEvents()
 
     def getTypedEvent[T <: MeasurementPoint](event: GenIndexedPoint[MeasurementPoint])(implicit tag: ClassTag[T]): GenIndexedPoint[T] = {
@@ -460,93 +419,49 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
     None
   }
 
-  override def verifyAllBinaryInputsCurrentStatus(reporter: CheckReporter, points: Seq[GenIndexedPoint[BinaryPoint]]): Option[DeferredCheck] = {
-    verifyAllCurrentStatus(reporter, points, "binary input", trackingDatabase.getAllBinaryInputs, checkBinaryInput)
+  override def verifyInputCurrentValues[P <: MeasurementPoint](reporter: CheckReporter, kind: InputKind[P], points: Seq[GenIndexedPoint[P]]): Option[DeferredCheck] = {
+    kind match {
+      case InputKind.BinaryInput => verifyAllCurrentStatus(reporter, points, "binary input", trackingDatabase.getAllBinaryInputs, checkBinaryInput)
+      case InputKind.DoubleBitInput => verifyAllCurrentStatus(reporter, points, "double-bit binary input", trackingDatabase.getAllDoubleBitBinaryInputs, checkDoubleBitBinaryInput)
+      case InputKind.Counter => verifyAllCurrentStatus(reporter, points, "counter", trackingDatabase.getAllCounters, checkCounter)
+      case InputKind.AnalogInput => verifyAllCurrentStatus(reporter, points, "analog input", trackingDatabase.getAllAnalogInputs, checkAnalogInput)
+    }
     None
   }
 
-  override def verifyLatestBinaryInputChangeEvents(reporter: CheckReporter, points: Seq[GenIndexedPoint[BinaryPoint]]): Option[DeferredCheck] = {
-    verifyLatestEvents(reporter, points, "binary input", trackingDatabase.popBinaryEvent, checkBinaryInput)
-    None
-  }
-
-  override def verifyFirstBinaryInputChangeEvent(reporter: CheckReporter, point: GenIndexedPoint[BinaryPoint]): Option[DeferredCheck] = {
-    verifyFirstEvent(reporter, point, "binary input", trackingDatabase.popBinaryEvent, checkBinaryInput)
-    None
-  }
-
-  override def verifyRestBinaryInputChangeEvents(reporter: CheckReporter, points: Seq[GenIndexedPoint[BinaryPoint]]): Option[DeferredCheck] = {
-    verifyRestEvents(reporter, points, "binary input", trackingDatabase.popBinaryEvent, checkBinaryInput)
-    None
-  }
-
-  override def verifyAllBinaryInputChangeEvents(reporter: CheckReporter, points: Seq[GenIndexedPoint[BinaryPoint]]): Option[DeferredCheck] = {
-    verifyAllEvents(reporter, points, "binary input", trackingDatabase.popBinaryEvent, checkBinaryInput)
-    None
-  }
-
-  override def verifyAllDoubleBitBinaryInputsCurrentStatus(reporter: CheckReporter, points: Seq[GenIndexedPoint[DoubleBitPoint]]): Option[DeferredCheck] = {
-    verifyAllCurrentStatus(reporter, points, "double-bit binary input", trackingDatabase.getAllDoubleBitBinaryInputs, checkDoubleBitBinaryInput)
-    None
-  }
-
-  override def verifyLatestDoubleBitBinaryInputChangeEvents(reporter: CheckReporter, points: Seq[GenIndexedPoint[DoubleBitPoint]]): Option[DeferredCheck] = {
-    verifyLatestEvents(reporter, points, "double-bit binary input", trackingDatabase.popDoubleBitBinaryEvent, checkDoubleBitBinaryInput)
-    None
-  }
-
-  override def verifyFirstDoubleBitBinaryInputChangeEvent(reporter: CheckReporter, point: GenIndexedPoint[DoubleBitPoint]): Option[DeferredCheck] = {
-    verifyFirstEvent(reporter, point, "double-bit binary input", trackingDatabase.popDoubleBitBinaryEvent, checkDoubleBitBinaryInput)
-    None
-  }
-
-  override def verifyRestDoubleBitBinaryInputChangeEvents(reporter: CheckReporter, points: Seq[GenIndexedPoint[DoubleBitPoint]]): Option[DeferredCheck] = {
-    verifyRestEvents(reporter, points, "double-bit binary input", trackingDatabase.popDoubleBitBinaryEvent, checkDoubleBitBinaryInput)
-    None
-  }
-
-  override def verifyAllDoubleBitBinaryInputChangeEvents(reporter: CheckReporter, points: Seq[GenIndexedPoint[DoubleBitPoint]]): Option[DeferredCheck] = {
-    verifyAllEvents(reporter, points, "double-bit binary input", trackingDatabase.popDoubleBitBinaryEvent, checkDoubleBitBinaryInput)
-    None
-  }
-
-  override def verifyAllCountersCurrentStatus(reporter: CheckReporter, points: Seq[GenIndexedPoint[CounterPoint]]): Option[DeferredCheck] = {
-    verifyAllCurrentStatus(reporter, points, "counter", trackingDatabase.getAllCounters, checkCounter)
-    None
-  }
-
-  override def verifyAllCountersMatchPreviousValues(reporter: CheckReporter, points: Seq[GenIndexedPoint[CounterPoint]]): Option[DeferredCheck] = {
+  override def verifyRecordedCounterValues(reporter: CheckReporter, points: Seq[GenIndexedPoint[CounterPoint]]): Option[DeferredCheck] = {
     verifyAllCurrentStatus(reporter, points, "counter", trackingDatabase.getRecordedCounters, checkCounter)
     None
   }
 
-  override def verifyLatestCounterChangeEvents(reporter: CheckReporter, points: Seq[GenIndexedPoint[CounterPoint]]): Option[DeferredCheck] = {
-    verifyLatestEvents(reporter, points, "counter", trackingDatabase.popCounterEvent, checkCounter)
+  override def verifyInputEvents[P <: MeasurementPoint](reporter: CheckReporter, kind: InputKind[P], expectation: EventExpectation, points: Seq[GenIndexedPoint[P]]): Option[DeferredCheck] = {
+    kind match {
+      case InputKind.BinaryInput => verifyEvents(reporter, expectation, points, "binary input", trackingDatabase.popBinaryEvent, checkBinaryInput)
+      case InputKind.DoubleBitInput => verifyEvents(reporter, expectation, points, "double-bit binary input", trackingDatabase.popDoubleBitBinaryEvent, checkDoubleBitBinaryInput)
+      case InputKind.Counter => verifyEvents(reporter, expectation, points, "counter", trackingDatabase.popCounterEvent, checkCounter)
+      case InputKind.AnalogInput => verifyEvents(reporter, expectation, points, "analog input", trackingDatabase.popAnalogInputEvent, checkAnalogInput)
+    }
     None
   }
 
-  override def verifyFirstCounterChangeEvent(reporter: CheckReporter, point: GenIndexedPoint[CounterPoint]): Option[DeferredCheck] = {
-    verifyFirstEvent(reporter, point, "counter", trackingDatabase.popCounterEvent, checkCounter)
+  override def verifyFirstInputEvent[P <: MeasurementPoint](reporter: CheckReporter, kind: InputKind[P], point: GenIndexedPoint[P]): Option[DeferredCheck] = {
+    kind match {
+      case InputKind.BinaryInput => verifyFirstEvent(reporter, point, "binary input", trackingDatabase.popBinaryEvent, checkBinaryInput)
+      case InputKind.DoubleBitInput => verifyFirstEvent(reporter, point, "double-bit binary input", trackingDatabase.popDoubleBitBinaryEvent, checkDoubleBitBinaryInput)
+      case InputKind.Counter => verifyFirstEvent(reporter, point, "counter", trackingDatabase.popCounterEvent, checkCounter)
+      case InputKind.AnalogInput => verifyFirstEvent(reporter, point, "analog input", trackingDatabase.popAnalogInputEvent, checkAnalogInput)
+    }
     None
   }
 
-  override def verifyRestCounterChangeEvents(reporter: CheckReporter, points: Seq[GenIndexedPoint[CounterPoint]]): Option[DeferredCheck] = {
-    verifyRestEvents(reporter, points, "counter", trackingDatabase.popCounterEvent, checkCounter)
-    None
+  private def verifyEvents[ReceivedT <: MeasurementPoint, ExpectedT](reporter: PluginReporter, expectation: EventExpectation, points: Seq[GenIndexedPoint[ReceivedT]], name: String, popMethod: BatchSpecifier => Option[TypedEvent[ExpectedT]], checkMethod: (TypedEvent[ExpectedT], GenIndexedPoint[ReceivedT]) => Unit): Unit = expectation match {
+    case EventExpectation.LatestBatch => verifyLatestEvents(reporter, points, name, popMethod, checkMethod)
+    case EventExpectation.RemainingLatestBatch => verifyRestEvents(reporter, points, name, popMethod, checkMethod)
+    case EventExpectation.AllGeneratedBatches => verifyAllEvents(reporter, points, name, popMethod, checkMethod)
   }
 
   override def verifyAllCounterChangeEvents(reporter: CheckReporter, points: Seq[GenIndexedPoint[CounterPoint]]): Option[DeferredCheck] = {
     verifyAllEvents(reporter, points, "counter", trackingDatabase.popCounterEvent, checkCounter)
-    None
-  }
-
-  override def verifyAllAnalogInputCurrentStatus(reporter: CheckReporter, points: Seq[GenIndexedPoint[AnalogPoint]]): Option[DeferredCheck] = {
-    verifyAllCurrentStatus(reporter, points, "analog input", trackingDatabase.getAllAnalogInputs, checkAnalogInput)
-    None
-  }
-
-  override def verifyLatestAnalogInputChangeEvents(reporter: CheckReporter, points: Seq[GenIndexedPoint[AnalogPoint]]): Option[DeferredCheck] = {
-    verifyLatestEvents(reporter, points, "analog input", trackingDatabase.popAnalogInputEvent, checkAnalogInput)
     None
   }
 
@@ -561,7 +476,7 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
     None
   }
 
-  override def verifyUnsolicitedHasSameEventsAsPolled(reporter: CheckReporter, previousResponsePoints: Seq[GenIndexedPoint[MeasurementPoint]], currentResponsePoints: Seq[GenIndexedPoint[MeasurementPoint]]): Option[DeferredCheck] = {
+  override def verifyResponseRetainsEvents(reporter: CheckReporter, previousResponsePoints: Seq[GenIndexedPoint[MeasurementPoint]], currentResponsePoints: Seq[GenIndexedPoint[MeasurementPoint]]): Option[DeferredCheck] = {
     if (!previousResponsePoints.equals(currentResponsePoints)) {
       throw new Exception("Received points are different")
     }
