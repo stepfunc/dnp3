@@ -439,6 +439,7 @@ async fn run_udp(
         Box::new(ExampleControlHandler),
     );
 
+    initialize_database(&outstation);
     run_outstation(outstation).await
 }
 
@@ -458,6 +459,7 @@ async fn run_tcp_client(
         NullListener::create(),
     );
 
+    initialize_database(&outstation);
     run_outstation(outstation).await
 }
 
@@ -495,6 +497,7 @@ async fn run_serial(
     );
     // ANCHOR_END: create_serial_server
 
+    initialize_database(&outstation);
     run_outstation(outstation).await
 }
 
@@ -522,7 +525,19 @@ async fn run_server(mut server: Server, cli: &CliArgs) -> Result<(), Box<dyn std
     )?;
     // ANCHOR_END: tcp_server_spawn_outstation
 
-    // set up the outstation's database before we spawn it
+    // set up the outstation's database before the server starts accepting connections
+    initialize_database(&outstation);
+
+    // ANCHOR: server_bind
+    // dropping the ServerHandle shuts down the server and outstation(s)
+    let _server_handle = server.bind().await?;
+    // ANCHOR_END: server_bind
+
+    run_outstation(outstation).await
+}
+
+/// Add the example's points and attributes to the database
+fn initialize_database(outstation: &OutstationHandle) {
     // ANCHOR: database_init
     outstation.transaction(|db| {
         // initialize 10 points of each type
@@ -577,13 +592,6 @@ async fn run_server(mut server: Server, cli: &CliArgs) -> Result<(), Box<dyn std
         );
     });
     // ANCHOR_END: database_init
-
-    // ANCHOR: server_bind
-    // dropping the ServerHandle shuts down the server and outstation(s)
-    let _server_handle = server.bind().await?;
-    // ANCHOR_END: server_bind
-
-    run_outstation(outstation).await
 }
 
 // run the same logic regardless of the transport type
