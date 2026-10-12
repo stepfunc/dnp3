@@ -154,7 +154,7 @@ mod tls_tests {
     use std::path::PathBuf;
     use std::pin::{pin, Pin};
     use std::sync::Arc;
-    use std::task::{Context, Poll, Wake, Waker};
+    use std::task::{Context, Poll, Waker};
     use std::time::Duration;
 
     use tokio::io::{AsyncReadExt, AsyncWriteExt, DuplexStream};
@@ -167,15 +167,8 @@ mod tls_tests {
     const DUPLEX_CAPACITY: usize = 64;
     const FRAME: [u8; 292] = [0xAB; 292];
 
-    struct NoopWaker;
-
-    impl Wake for NoopWaker {
-        fn wake(self: Arc<Self>) {}
-    }
-
     fn poll_once<F: Future>(future: Pin<&mut F>) -> Poll<F::Output> {
-        let waker = Waker::from(Arc::new(NoopWaker));
-        future.poll(&mut Context::from_waker(&waker))
+        future.poll(&mut Context::from_waker(Waker::noop()))
     }
 
     async fn with_timeout<F: Future>(future: F) -> F::Output {
