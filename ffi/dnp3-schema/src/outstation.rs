@@ -183,7 +183,8 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared_def: &SharedDefinitions) -
 
     let bind = lib.define_method("bind", outstation_server.clone())?
         .fails_with(shared_def.error_type.clone())?
-        .doc("Bind the server to the port and starts listening. Also starts all the outstations associated to it.")?
+        .doc(doc("Bind the server to the port and starts listening. Also starts all the outstations associated to it.")
+            .details("If binding fails, the server can't be used again: further calls to this method or {class:outstation_server.add_outstation()} fail with {enum:param_error.server_bind_error}. Destroy the server and create a new one to retry."))?
         .build()?;
 
     let destructor = lib
