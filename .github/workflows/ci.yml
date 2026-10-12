@@ -359,7 +359,7 @@ jobs:
           repository: stepfunc/dnp4s
           ssh-key: ${{ secrets.DNP4S_SSH_KEY }}
           # a fixed dnp4s commit until dnp4s publishes releases
-          ref: 2c8a3b332c6f6e10ec23e6e35a2aa18fa4770978
+          ref: fa02443b1448bc81d06a7a214be668424b210b9c
           path: dnp4s
       - name: Build dnp4s
         working-directory: dnp4s

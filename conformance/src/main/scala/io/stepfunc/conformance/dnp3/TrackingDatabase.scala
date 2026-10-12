@@ -139,7 +139,7 @@ class TrackingDatabase(val app: CustomOutstationApplication, val outstation: Out
   })
 
   if(testDatabaseConfig.isGlobalLocalControl) setLocalControl(binaryOutputs.keys)
-  if(testDatabaseConfig.isSingleLocalControl) setLocalControl(Seq(0))
+  testDatabaseConfig.localControlIndex.foreach(idx => setLocalControl(Seq(idx)))
 
   // Places binary outputs in the local state, like flipping a switch on the device
   def setLocalControl(indices: Iterable[Int]): Unit = {
