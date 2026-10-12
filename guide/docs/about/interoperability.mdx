@@ -38,8 +38,11 @@ The library will be level 4 compliant when we add AO/BO command events (groups 1
 
 The DNP3 User Group publishes official conformance test procedures for outstations. These procedures validate all level 2 functionality. Procedures for level 3 conformance testing are currently under development by the user group.
 
-We created an internal implementation of these test procedures that we automatically run against the outstation implementation. We use these procedures to augment our own unit and integration tests to meet the conformance standards. You can find the HTML conformance test reports on our
-[Github Actions](https://github.com/stepfunc/dnp3/actions) CI.
+We created an internal implementation of these test procedures that we automatically run against the outstation implementation. We use these procedures to augment our own unit and integration tests to meet the conformance standards.
+
+import sitedata from '../../sitedata.json'
+
+<>The <a href={`https://docs.stepfunc.io/dnp3/${sitedata.version}/conformance/report.html`}>conformance test report</a> for version {sitedata.version} is published alongside this guide.</>
 
 :::note
 The DNP User Group only certifies outstation devices as conforming to the specification, not libraries. Contact Step Function I/O if you would like to engage us to conduct conformance testing for your outstation product.
