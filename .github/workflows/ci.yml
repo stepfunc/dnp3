@@ -374,17 +374,6 @@ jobs:
       - name: Install Java bindings
         shell: bash
         run: (cd ffi/bindings/java/dnp3 && sudo mvn install)
-      - name: Checkout dnp4s
-        uses: actions/checkout@v6
-        with:
-          repository: stepfunc/dnp4s
-          ssh-key: ${{ secrets.DNP4S_SSH_KEY }}
-          # a fixed dnp4s commit until dnp4s publishes releases
-          ref: be35ada4cfa99968cd07b292b9c88c4a36c32111
-          path: dnp4s
-      - name: Build dnp4s
-        working-directory: dnp4s
-        run: sudo mvn --batch-mode install
       - name: Capture packets during the conformance tests
         working-directory: conformance
         # capturing needs root, which the tests run as; local runs leave it off
