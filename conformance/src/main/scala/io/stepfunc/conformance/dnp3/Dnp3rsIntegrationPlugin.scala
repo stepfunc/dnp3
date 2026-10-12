@@ -309,6 +309,39 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
     case EventExpectation.LatestBatch => verifyLatestClassEvents(reporter, eventClass, points)
     case EventExpectation.RemainingLatestBatch => verifyRestClassEvents(reporter, eventClass, points)
     case EventExpectation.AllGeneratedBatches => verifyAllClassEvents(reporter, eventClass, points)
+    case EventExpectation.ReturnedEventsOnly => verifyReturnedClassEvents(reporter, points)
+    case EventExpectation.CurrentValuesWithOptionalEarlier => throw new Exception(s"Unsupported check of $eventClass events: $expectation")
+  }
+
+  // each returned event matches an event generated for its point; there may be none
+  private def verifyReturnedClassEvents(reporter: CheckReporter, points: Seq[GenIndexedPoint[MeasurementPoint]]): Option[DeferredCheck] = {
+    val generated = trackingDatabase.getAllEvents(BatchSpecifier.All)
+    points.foreach(received => {
+      if (!generated.exists(expected => scala.util.Try(checkClassEvent(expected, received)).isSuccess)) {
+        throw new Exception(s"Event at index ${received.idx} matches no event generated")
+      }
+    })
+    reporter.log(f"Verified ${points.size} returned event(s)")
+    None
+  }
+
+  // checks a received event against an expected one of whatever type
+  private def checkClassEvent(expectedEvent: Event, receivedEvent: GenIndexedPoint[MeasurementPoint]): Unit = {
+    def getTypedEvent[T <: MeasurementPoint](event: GenIndexedPoint[MeasurementPoint])(implicit tag: ClassTag[T]): GenIndexedPoint[T] = {
+      event.point match {
+        case _: T => event.asInstanceOf[GenIndexedPoint[T]]
+        case _ => throw new Exception("Received unexpected event type")
+      }
+    }
+    expectedEvent match {
+      case TypedEvent(_: BinaryInput) => checkBinaryInput(expectedEvent.asInstanceOf[TypedEvent[BinaryInput]], getTypedEvent(receivedEvent))
+      case TypedEvent(_: DoubleBitBinaryInput) => checkDoubleBitBinaryInput(expectedEvent.asInstanceOf[TypedEvent[DoubleBitBinaryInput]], getTypedEvent(receivedEvent))
+      case TypedEvent(_: Counter) => checkCounter(expectedEvent.asInstanceOf[TypedEvent[Counter]], getTypedEvent(receivedEvent))
+      case TypedEvent(_: FrozenCounter) => checkFrozenCounter(expectedEvent.asInstanceOf[TypedEvent[FrozenCounter]], getTypedEvent(receivedEvent))
+      case TypedEvent(_: AnalogInput) => checkAnalogInput(expectedEvent.asInstanceOf[TypedEvent[AnalogInput]], getTypedEvent(receivedEvent))
+      case TypedEvent(_: BinaryOutputStatus) => checkBinaryOutput(expectedEvent.asInstanceOf[TypedEvent[BinaryOutputStatus]], getTypedEvent(receivedEvent))
+      case TypedEvent(_: AnalogOutputStatus) => checkAnalogOutput(expectedEvent.asInstanceOf[TypedEvent[AnalogOutputStatus]], getTypedEvent(receivedEvent))
+    }
   }
 
   private def verifyLatestClassEvents(reporter: CheckReporter, eventClass: EventClass, points: Seq[GenIndexedPoint[MeasurementPoint]]): Option[DeferredCheck] = {
@@ -438,10 +471,32 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
     kind match {
       case InputKind.BinaryInput => verifyEvents(reporter, expectation, points, "binary input", trackingDatabase.popBinaryEvent, checkBinaryInput)
       case InputKind.DoubleBitInput => verifyEvents(reporter, expectation, points, "double-bit binary input", trackingDatabase.popDoubleBitBinaryEvent, checkDoubleBitBinaryInput)
+      case InputKind.Counter if expectation == EventExpectation.CurrentValuesWithOptionalEarlier =>
+        verifyCurrentValues(reporter, points, "counter", trackingDatabase.getAllCounterEvents(BatchSpecifier.All), checkCounter)
+      case InputKind.AnalogInput if expectation == EventExpectation.CurrentValuesWithOptionalEarlier =>
+        verifyCurrentValues(reporter, points, "analog input", trackingDatabase.getAllAnalogInputEvents(BatchSpecifier.All), checkAnalogInput)
       case InputKind.Counter => verifyEvents(reporter, expectation, points, "counter", trackingDatabase.popCounterEvent, checkCounter)
       case InputKind.AnalogInput => verifyEvents(reporter, expectation, points, "analog input", trackingDatabase.popAnalogInputEvent, checkAnalogInput)
     }
     None
+  }
+
+  // for each point changed in the latest batch, its last event reports the current value; events before it report
+  // values the point had earlier
+  private def verifyCurrentValues[ReceivedT <: MeasurementPoint, ExpectedT](reporter: PluginReporter, points: Seq[GenIndexedPoint[ReceivedT]], name: String, history: Seq[TypedEvent[ExpectedT]], checkMethod: (TypedEvent[ExpectedT], GenIndexedPoint[ReceivedT]) => Unit): Unit = {
+    val current = history.filter(_.batch == this.eventBatch).groupBy(_.idx).view.mapValues(_.last).toMap
+    val received = points.groupBy(_.idx)
+    if (received.keySet != current.keySet) {
+      throw new Exception(s"Expected $name events for points ${current.keys.toList.sorted.mkString(", ")}, received ${received.keys.toList.sorted.mkString(", ")}")
+    }
+    current.foreach { case (idx, expected) =>
+      checkMethod(expected, received(idx).last)
+      val earlier = history.filter(e => e.idx == idx && (e ne expected))
+      received(idx).init.foreach(point => {
+        if (!earlier.exists(e => scala.util.Try(checkMethod(e, point)).isSuccess)) throw new Exception(s"$name $idx reported a value it never had")
+      })
+    }
+    reporter.log(f"Verified the current value of ${current.size} $name(s)")
   }
 
   override def verifyFirstInputEvent[P <: MeasurementPoint](reporter: CheckReporter, kind: InputKind[P], point: GenIndexedPoint[P]): Option[DeferredCheck] = {
@@ -458,16 +513,7 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
     case EventExpectation.LatestBatch => verifyLatestEvents(reporter, points, name, popMethod, checkMethod)
     case EventExpectation.RemainingLatestBatch => verifyRestEvents(reporter, points, name, popMethod, checkMethod)
     case EventExpectation.AllGeneratedBatches => verifyAllEvents(reporter, points, name, popMethod, checkMethod)
-  }
-
-  override def verifyAllCounterChangeEvents(reporter: CheckReporter, points: Seq[GenIndexedPoint[CounterPoint]]): Option[DeferredCheck] = {
-    verifyAllEvents(reporter, points, "counter", trackingDatabase.popCounterEvent, checkCounter)
-    None
-  }
-
-  override def verifyAllAnalogInputChangeEvents(reporter: CheckReporter, points: Seq[GenIndexedPoint[AnalogPoint]]): Option[DeferredCheck] = {
-    verifyAllEvents(reporter, points, "analog input", trackingDatabase.popAnalogInputEvent, checkAnalogInput)
-    None
+    case _ => throw new Exception(s"Unsupported check of $name events: $expectation")
   }
 
   override def verifyPolledDataDoNotRepeatUnsolicitedData(reporter: CheckReporter, unsolicitedResponsePoints: Seq[GenIndexedPoint[MeasurementPoint]], polledResponsePoints: Seq[GenIndexedPoint[MeasurementPoint]]): Option[DeferredCheck] = {
