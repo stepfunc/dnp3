@@ -2,8 +2,7 @@ package io.stepfunc.conformance.dnp3
 
 import io.stepfunc.dnp4s.dnp3.app._
 import io.stepfunc.dnp4s.dnp3.app.objects.AttributeValue
-import io.stepfunc.dnp4s.conformance.api.DeferredCheck
-import io.stepfunc.dnp4s.dnp3.{ActionResult, ActionTiming, CheckReporter, IntegrationPlugin, PluginReporter}
+import io.stepfunc.dnp4s.dnp3.{ActionResult, ActionTiming, CheckReporter, DeferredCheck, IntegrationPlugin, PluginReporter}
 import io.stepfunc.dnp4s.protocol.parsing.UInt8
 import io.stepfunc.dnp3.{AddressFilter, AnalogInput, AnalogOutputStatus, BinaryInput, BinaryOutputStatus, Counter, DoubleBit, DoubleBitBinaryInput, EventBufferConfig, FrozenCounter, LinkErrorMode, Outstation, Runtime, RuntimeConfig, OutstationServer}
 import org.joou.UInteger
