@@ -22,7 +22,7 @@ tracing-subscriber = "0.3"
 tokio = "1"
 
 [workspace.package]
-rust-version = "1.75"
+rust-version = "1.85"
 edition = "2021"
 license-file = "LICENSE.txt"
 homepage = "https://stepfunc.io/products/libraries/dnp3/"

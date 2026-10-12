@@ -63,11 +63,6 @@ The release's dependency responsibilities are therefore narrow:
   the final release. Late-cycle dependency churn undermines the stabilization
   the RC process exists to provide. Subsequent RCs and the final release take
   **security patches only** (targeted `cargo update -p <crate>`).
-- **Respect deliberate pins:** some dependencies are exact-pinned for documented
-  reasons (e.g. `tokio-serial = "=5.4.5"`, pinned because upstream historically
-  shipped without changelogs, git tags, or GitHub releases, so bumps must be
-  reviewed by hand). Update these intentionally, in their own commit with a note
-  — never via a blanket `cargo update`.
 
 ## CHANGELOG conventions
 

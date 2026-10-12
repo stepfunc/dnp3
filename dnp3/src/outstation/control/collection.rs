@@ -682,7 +682,7 @@ where
     let mut writer = PrefixWriter::new();
     let mut ret = CommandStatus::Success;
     for item in seq.iter() {
-        let status = if max_controls_per_request.map_or(true, |max| *num_controls < max) {
+        let status = if max_controls_per_request.is_none_or(|max| *num_controls < max) {
             item.value
                 .select(transaction, item.index.widen_to_u16(), database)
         } else {
@@ -711,7 +711,7 @@ where
     let mut writer = PrefixWriter::new();
     let mut ret = CommandStatus::Success;
     for item in seq.iter() {
-        let status = if max_controls_per_request.map_or(true, |max| *num_controls < max) {
+        let status = if max_controls_per_request.is_none_or(|max| *num_controls < max) {
             item.value.operate(
                 transaction,
                 item.index.widen_to_u16(),
@@ -739,7 +739,7 @@ fn operate_header_no_ack<I, V>(
     V: FixedSizeVariation + ControlType,
 {
     for item in seq.iter() {
-        if max_controls_per_request.map_or(true, |max| *num_controls < max) {
+        if max_controls_per_request.is_none_or(|max| *num_controls < max) {
             item.value.operate(
                 transaction,
                 item.index.widen_to_u16(),
