@@ -12,7 +12,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <scala.version>3.9.0</scala.version>
         <dnp3.version>1.8.0-M1</dnp3.version>
-        <dnp4s.version>0.1.0-SNAPSHOT</dnp4s.version>
+        <dnp3c.version>0.1.0</dnp3c.version>
         <scala-maven-plugin.version>4.10.0</scala-maven-plugin.version>
     </properties>
 
@@ -63,9 +63,9 @@
             <scope>compile</scope>
         </dependency>
         <dependency>
-            <groupId>io.stepfunc.dnp4s</groupId>
-            <artifactId>conformance</artifactId>
-            <version>${dnp4s.version}</version>
+            <groupId>io.stepfunc</groupId>
+            <artifactId>dnp3c</artifactId>
+            <version>${dnp3c.version}</version>
         </dependency>
         <dependency>
             <groupId>io.stepfunc</groupId>
