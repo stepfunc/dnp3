@@ -490,7 +490,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         .fails_with(shared.error_type.clone())?
         .doc(
             doc("Asynchronously perform a DIRECT_OPERATE_NO_ACK (0x06) command operation on the association")
-                .details("The outstation never responds to this function code, even on error. The callback completes successfully once the request has been written to the transport. Success does not mean that the outstation received, accepted, or executed the command.")
+                .details("The outstation never responds to this function code, even on error. The operation completes successfully once the request has been written to the transport. Success does not mean that the outstation received, accepted, or executed the command.")
         )?
         .build()?;
 
