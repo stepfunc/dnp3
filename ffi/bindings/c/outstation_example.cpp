@@ -91,6 +91,7 @@ class MyControlHandler : public ControlHandler {
 
     CommandStatus operate_g12v1(const Group12Var1 &control, uint16_t index, OperateType op_type, DatabaseHandle &database) override
     {
+        std::cout << "operate " << to_string(control.code.op_type) << " on binary output " << index << " via " << to_string(op_type) << std::endl;
         if (index < 10 && (control.code.op_type == OpType::latch_on || control.code.op_type == OpType::latch_off))
         {
             auto status = (control.code.op_type == OpType::latch_on);

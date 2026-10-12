@@ -468,6 +468,17 @@ impl CliHandler {
                     .await?;
                 // ANCHOR_END: assoc_control
             }
+            "cna" => {
+                // ANCHOR: assoc_control_no_ack
+                self.association
+                    .operate_no_ack(CommandBuilder::single_header_u16(
+                        Group12Var1::from_op_type(OpType::LatchOn),
+                        3u16,
+                    ))
+                    .await?;
+                // ANCHOR_END: assoc_control_no_ack
+                tracing::info!("no-ack command sent (not confirmed by the outstation)");
+            }
             "evt" => self.poll.demand().await?,
             "lts" => {
                 self.association

@@ -267,9 +267,13 @@ impl ControlSupport<Group12Var1> for ExampleControlHandler {
         &mut self,
         control: Group12Var1,
         index: u16,
-        _op_type: OperateType,
+        op_type: OperateType,
         database: &mut DatabaseHandle,
     ) -> CommandStatus {
+        tracing::info!(
+            "operate {:?} on binary output {index} via {op_type:?}",
+            control.code.op_type
+        );
         if index < 10
             && (control.code.op_type == OpType::LatchOn || control.code.op_type == OpType::LatchOff)
         {

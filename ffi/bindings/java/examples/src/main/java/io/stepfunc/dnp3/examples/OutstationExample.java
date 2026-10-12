@@ -127,6 +127,7 @@ class TestControlHandler implements ControlHandler {
 
   @Override
   public CommandStatus operateG12v1(Group12Var1 control, UShort index, OperateType opType, DatabaseHandle database) {
+    System.out.println("operate " + control.code.opType + " on binary output " + index + " via " + opType);
     if (index.compareTo(ushort(10)) < 0 && (control.code.opType == OpType.LATCH_ON || control.code.opType == OpType.LATCH_OFF)) {
       boolean status = control.code.opType == OpType.LATCH_ON;
       database.transaction(db -> db.updateBinaryOutputStatus(new BinaryOutputStatus(index, status, new Flags(Flag.ONLINE), OutstationExample.now()), UpdateOptions.detectEvent()));

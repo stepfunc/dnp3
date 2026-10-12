@@ -200,6 +200,11 @@ void on_command_error(dnp3_command_error_t result, void *arg)
 }
 // ANCHOR_END: assoc_control_callback
 
+void on_no_ack_command_sent(dnp3_nothing_t nothing, void* arg)
+{
+    printf("no-ack command sent (not confirmed by the outstation)\n");
+}
+
 // time sync callbacks
 void on_time_sync_success(dnp3_nothing_t nothing, void* arg) { printf("time sync success! \n"); }
 void on_time_sync_error(dnp3_time_sync_error_t error, void *arg) { printf("Time sync error: %s\n", dnp3_time_sync_error_to_string(error)); }
@@ -408,6 +413,24 @@ int run_channel(dnp3_master_channel_t *channel)
 
             dnp3_command_set_destroy(commands);
             // ANCHOR_END: assoc_control
+        }
+        else if (strcmp(cbuf, "cna\n") == 0) {
+            // ANCHOR: assoc_control_no_ack
+            dnp3_command_set_t *commands = dnp3_command_set_create();
+            dnp3_group12_var1_t g12v1 = dnp3_group12_var1_init(dnp3_control_code_init(DNP3_TRIP_CLOSE_CODE_NUL, false, DNP3_OP_TYPE_LATCH_ON), 1, 1000, 1000);
+            dnp3_command_set_add_g12_v1_u16(commands, 3, g12v1);
+
+            dnp3_command_task_callback_t cb = {
+                .on_complete = &on_no_ack_command_sent,
+                .on_failure = &on_command_error,
+                .on_destroy = NULL,
+                .ctx = NULL,
+            };
+
+            dnp3_master_channel_operate_no_ack(channel, association_id, commands, cb);
+
+            dnp3_command_set_destroy(commands);
+            // ANCHOR_END: assoc_control_no_ack
         }
         else if (strcmp(cbuf, "evt\n") == 0) {
             dnp3_master_channel_demand_poll(channel, poll_id);
