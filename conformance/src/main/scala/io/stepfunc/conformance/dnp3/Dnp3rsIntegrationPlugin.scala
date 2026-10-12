@@ -173,7 +173,7 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
 
   override def enableRemoteSupervisoryControl(reporter: PluginReporter): Unit = {
     config = config.copy(testDatabaseConfig =
-      config.testDatabaseConfig.copy(isGlobalLocalControl = false, isSingleLocalControl = false))
+      config.testDatabaseConfig.copy(isGlobalLocalControl = false, localControlIndex = None))
     trackingDatabase.clearLocalControl()
     reporter.log("Every binary output is under remote control")
   }
@@ -185,9 +185,9 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
   }
 
   override def setIndividualRemoteSupervisoryControl(reporter: PluginReporter, index: Int): Unit = {
-    config = config.copy(testDatabaseConfig = config.testDatabaseConfig.copy(isSingleLocalControl = true))
-    trackingDatabase.setLocalControl(Seq(0))
-    reporter.log("Remote supervisory control was enabled")
+    config = config.copy(testDatabaseConfig = config.testDatabaseConfig.copy(localControlIndex = Some(index)))
+    trackingDatabase.setLocalControl(Seq(index))
+    reporter.log(s"Binary output $index is under local control")
   }
 
   override def enableUnsolicitedResponse(reporter: PluginReporter, enabled: Boolean): Unit = {
@@ -327,44 +327,28 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
 
   // checks a received event against an expected one of whatever type
   private def checkClassEvent(expectedEvent: Event, receivedEvent: GenIndexedPoint[MeasurementPoint]): Unit = {
-    def getTypedEvent[T <: MeasurementPoint](event: GenIndexedPoint[MeasurementPoint])(implicit tag: ClassTag[T]): GenIndexedPoint[T] = {
-      event.point match {
-        case _: T => event.asInstanceOf[GenIndexedPoint[T]]
-        case _ => throw new Exception("Received unexpected event type")
-      }
+    if (generatedKind(expectedEvent) != receivedKind(receivedEvent)) throw new Exception("Received unexpected event type")
+    def typed[T <: MeasurementPoint](implicit tag: ClassTag[T]): GenIndexedPoint[T] = receivedEvent.point match {
+      case _: T => receivedEvent.asInstanceOf[GenIndexedPoint[T]]
+      case _ => throw new Exception("Received unexpected event type")
     }
     expectedEvent match {
-      case TypedEvent(_: BinaryInput) => checkBinaryInput(expectedEvent.asInstanceOf[TypedEvent[BinaryInput]], getTypedEvent(receivedEvent))
-      case TypedEvent(_: DoubleBitBinaryInput) => checkDoubleBitBinaryInput(expectedEvent.asInstanceOf[TypedEvent[DoubleBitBinaryInput]], getTypedEvent(receivedEvent))
-      case TypedEvent(_: Counter) => checkCounter(expectedEvent.asInstanceOf[TypedEvent[Counter]], getTypedEvent(receivedEvent))
-      case TypedEvent(_: FrozenCounter) => checkFrozenCounter(expectedEvent.asInstanceOf[TypedEvent[FrozenCounter]], getTypedEvent(receivedEvent))
-      case TypedEvent(_: AnalogInput) => checkAnalogInput(expectedEvent.asInstanceOf[TypedEvent[AnalogInput]], getTypedEvent(receivedEvent))
-      case TypedEvent(_: BinaryOutputStatus) => checkBinaryOutput(expectedEvent.asInstanceOf[TypedEvent[BinaryOutputStatus]], getTypedEvent(receivedEvent))
-      case TypedEvent(_: AnalogOutputStatus) => checkAnalogOutput(expectedEvent.asInstanceOf[TypedEvent[AnalogOutputStatus]], getTypedEvent(receivedEvent))
+      case TypedEvent(_: BinaryInput) => checkBinaryInput(expectedEvent.asInstanceOf[TypedEvent[BinaryInput]], typed[BinaryPoint])
+      case TypedEvent(_: DoubleBitBinaryInput) => checkDoubleBitBinaryInput(expectedEvent.asInstanceOf[TypedEvent[DoubleBitBinaryInput]], typed[DoubleBitPoint])
+      case TypedEvent(_: Counter) => checkCounter(expectedEvent.asInstanceOf[TypedEvent[Counter]], typed[CounterPoint])
+      case TypedEvent(_: FrozenCounter) => checkFrozenCounter(expectedEvent.asInstanceOf[TypedEvent[FrozenCounter]], typed[CounterPoint])
+      case TypedEvent(_: AnalogInput) => checkAnalogInput(expectedEvent.asInstanceOf[TypedEvent[AnalogInput]], typed[AnalogPoint])
+      case TypedEvent(_: BinaryOutputStatus) => checkBinaryOutput(expectedEvent.asInstanceOf[TypedEvent[BinaryOutputStatus]], typed[BinaryOutputStatusPoint])
+      case TypedEvent(_: AnalogOutputStatus) => checkAnalogOutput(expectedEvent.asInstanceOf[TypedEvent[AnalogOutputStatus]], typed[AnalogOutputStatusPoint])
     }
   }
 
   private def verifyLatestClassEvents(reporter: CheckReporter, eventClass: EventClass, points: Seq[GenIndexedPoint[MeasurementPoint]]): Option[DeferredCheck] = {
     trackingDatabase.resetHandledEvents()
 
-    def getTypedEvent[T <: MeasurementPoint](event: GenIndexedPoint[MeasurementPoint])(implicit tag: ClassTag[T]): GenIndexedPoint[T] = {
-      event.point match {
-        case _: T => event.asInstanceOf[GenIndexedPoint[T]]
-        case _ => throw new Exception("Received unexpected event type")
-      }
-    }
-
     points.foreach(receivedEvent => {
       val expectedEvent = trackingDatabase.popEvent(BatchSpecifier.Specific(this.eventBatch), eventClass).getOrElse(throw new Exception("Unexpected event"))
-      expectedEvent match {
-        case TypedEvent(_: BinaryInput) => checkBinaryInput(expectedEvent.asInstanceOf[TypedEvent[BinaryInput]], getTypedEvent(receivedEvent))
-        case TypedEvent(_: DoubleBitBinaryInput) => checkDoubleBitBinaryInput(expectedEvent.asInstanceOf[TypedEvent[DoubleBitBinaryInput]], getTypedEvent(receivedEvent))
-        case TypedEvent(_: Counter) => checkCounter(expectedEvent.asInstanceOf[TypedEvent[Counter]], getTypedEvent(receivedEvent))
-        case TypedEvent(_: FrozenCounter) => checkFrozenCounter(expectedEvent.asInstanceOf[TypedEvent[FrozenCounter]], getTypedEvent(receivedEvent))
-        case TypedEvent(_: AnalogInput) => checkAnalogInput(expectedEvent.asInstanceOf[TypedEvent[AnalogInput]], getTypedEvent(receivedEvent))
-        case TypedEvent(_: BinaryOutputStatus) => checkBinaryOutput(expectedEvent.asInstanceOf[TypedEvent[BinaryOutputStatus]], getTypedEvent(receivedEvent))
-        case TypedEvent(_: AnalogOutputStatus) => checkAnalogOutput(expectedEvent.asInstanceOf[TypedEvent[AnalogOutputStatus]], getTypedEvent(receivedEvent))
-      }
+      checkClassEvent(expectedEvent, receivedEvent)
     })
 
     if (trackingDatabase.popEvent(BatchSpecifier.Specific(this.eventBatch), eventClass).isDefined) throw new Exception("Missing event")
@@ -374,47 +358,19 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
   }
 
   override def verifyFirstClassEvent(reporter: CheckReporter, eventClass: EventClass, point: GenIndexedPoint[MeasurementPoint]): Option[DeferredCheck] = {
-    def getTypedEvent[T <: MeasurementPoint](event: GenIndexedPoint[MeasurementPoint])(implicit tag: ClassTag[T]): GenIndexedPoint[T] = {
-      event.point match {
-        case _: T => event.asInstanceOf[GenIndexedPoint[T]]
-        case _ => throw new Exception("Received unexpected event type")
-      }
-    }
 
     val expectedEvent = trackingDatabase.popEvent(BatchSpecifier.Specific(this.eventBatch), eventClass).getOrElse(throw new Exception("Unexpected event"))
-    expectedEvent match {
-      case TypedEvent(_: BinaryInput) => checkBinaryInput(expectedEvent.asInstanceOf[TypedEvent[BinaryInput]], getTypedEvent(point))
-      case TypedEvent(_: DoubleBitBinaryInput) => checkDoubleBitBinaryInput(expectedEvent.asInstanceOf[TypedEvent[DoubleBitBinaryInput]], getTypedEvent(point))
-      case TypedEvent(_: Counter) => checkCounter(expectedEvent.asInstanceOf[TypedEvent[Counter]], getTypedEvent(point))
-      case TypedEvent(_: FrozenCounter) => checkFrozenCounter(expectedEvent.asInstanceOf[TypedEvent[FrozenCounter]], getTypedEvent(point))
-      case TypedEvent(_: AnalogInput) => checkAnalogInput(expectedEvent.asInstanceOf[TypedEvent[AnalogInput]], getTypedEvent(point))
-      case TypedEvent(_: BinaryOutputStatus) => checkBinaryOutput(expectedEvent.asInstanceOf[TypedEvent[BinaryOutputStatus]], getTypedEvent(point))
-      case TypedEvent(_: AnalogOutputStatus) => checkAnalogOutput(expectedEvent.asInstanceOf[TypedEvent[AnalogOutputStatus]], getTypedEvent(point))
-    }
+    checkClassEvent(expectedEvent, point)
 
     reporter.log(f"Verified first $eventClass event")
     None
   }
 
   private def verifyRestClassEvents(reporter: CheckReporter, eventClass: EventClass, points: Seq[GenIndexedPoint[MeasurementPoint]]): Option[DeferredCheck] = {
-    def getTypedEvent[T <: MeasurementPoint](event: GenIndexedPoint[MeasurementPoint])(implicit tag: ClassTag[T]): GenIndexedPoint[T] = {
-      event.point match {
-        case _: T => event.asInstanceOf[GenIndexedPoint[T]]
-        case _ => throw new Exception("Received unexpected event type")
-      }
-    }
 
     points.foreach(receivedEvent => {
       val expectedEvent = trackingDatabase.popEvent(BatchSpecifier.Specific(this.eventBatch), eventClass).getOrElse(throw new Exception("Unexpected event"))
-      expectedEvent match {
-        case TypedEvent(_: BinaryInput) => checkBinaryInput(expectedEvent.asInstanceOf[TypedEvent[BinaryInput]], getTypedEvent(receivedEvent))
-        case TypedEvent(_: DoubleBitBinaryInput) => checkDoubleBitBinaryInput(expectedEvent.asInstanceOf[TypedEvent[DoubleBitBinaryInput]], getTypedEvent(receivedEvent))
-        case TypedEvent(_: Counter) => checkCounter(expectedEvent.asInstanceOf[TypedEvent[Counter]], getTypedEvent(receivedEvent))
-        case TypedEvent(_: FrozenCounter) => checkFrozenCounter(expectedEvent.asInstanceOf[TypedEvent[FrozenCounter]], getTypedEvent(receivedEvent))
-        case TypedEvent(_: AnalogInput) => checkAnalogInput(expectedEvent.asInstanceOf[TypedEvent[AnalogInput]], getTypedEvent(receivedEvent))
-        case TypedEvent(_: BinaryOutputStatus) => checkBinaryOutput(expectedEvent.asInstanceOf[TypedEvent[BinaryOutputStatus]], getTypedEvent(receivedEvent))
-        case TypedEvent(_: AnalogOutputStatus) => checkAnalogOutput(expectedEvent.asInstanceOf[TypedEvent[AnalogOutputStatus]], getTypedEvent(receivedEvent))
-      }
+      checkClassEvent(expectedEvent, receivedEvent)
     })
 
     if (trackingDatabase.popEvent(BatchSpecifier.Specific(this.eventBatch), eventClass).isDefined) throw new Exception("Missing event")
@@ -426,24 +382,9 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
   private def verifyAllClassEvents(reporter: CheckReporter, eventClass: EventClass, points: Seq[GenIndexedPoint[MeasurementPoint]]): Option[DeferredCheck] = {
     trackingDatabase.resetHandledEvents()
 
-    def getTypedEvent[T <: MeasurementPoint](event: GenIndexedPoint[MeasurementPoint])(implicit tag: ClassTag[T]): GenIndexedPoint[T] = {
-      event.point match {
-        case _: T => event.asInstanceOf[GenIndexedPoint[T]]
-        case _ => throw new Exception("Received unexpected event type")
-      }
-    }
-
     points.foreach(receivedEvent => {
       val expectedEvent = trackingDatabase.popEvent(BatchSpecifier.All, eventClass).getOrElse(throw new Exception("Unexpected event"))
-      expectedEvent match {
-        case TypedEvent(_: BinaryInput) => checkBinaryInput(expectedEvent.asInstanceOf[TypedEvent[BinaryInput]], getTypedEvent(receivedEvent))
-        case TypedEvent(_: DoubleBitBinaryInput) => checkDoubleBitBinaryInput(expectedEvent.asInstanceOf[TypedEvent[DoubleBitBinaryInput]], getTypedEvent(receivedEvent))
-        case TypedEvent(_: Counter) => checkCounter(expectedEvent.asInstanceOf[TypedEvent[Counter]], getTypedEvent(receivedEvent))
-        case TypedEvent(_: FrozenCounter) => checkFrozenCounter(expectedEvent.asInstanceOf[TypedEvent[FrozenCounter]], getTypedEvent(receivedEvent))
-        case TypedEvent(_: AnalogInput) => checkAnalogInput(expectedEvent.asInstanceOf[TypedEvent[AnalogInput]], getTypedEvent(receivedEvent))
-        case TypedEvent(_: BinaryOutputStatus) => checkBinaryOutput(expectedEvent.asInstanceOf[TypedEvent[BinaryOutputStatus]], getTypedEvent(receivedEvent))
-        case TypedEvent(_: AnalogOutputStatus) => checkAnalogOutput(expectedEvent.asInstanceOf[TypedEvent[AnalogOutputStatus]], getTypedEvent(receivedEvent))
-      }
+      checkClassEvent(expectedEvent, receivedEvent)
     })
 
     if (trackingDatabase.popEvent(BatchSpecifier.All, eventClass).isDefined) throw new Exception("Missing event")
@@ -518,16 +459,51 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
 
   override def verifyPolledDataDoNotRepeatUnsolicitedData(reporter: CheckReporter, unsolicitedResponsePoints: Seq[GenIndexedPoint[MeasurementPoint]], polledResponsePoints: Seq[GenIndexedPoint[MeasurementPoint]]): Option[DeferredCheck] = {
     verifyLatestClassEvents(reporter, EventClass.All, unsolicitedResponsePoints)
-    if (polledResponsePoints.nonEmpty) throw new Exception("Expected no events in polled response")
+    // the polled response may carry newer events, but none the unsolicited response already reported
+    polledResponsePoints.find(polled => unsolicitedResponsePoints.exists(sameEvent(_, polled))).foreach(repeated =>
+      throw new Exception(s"The polled response repeats the event at index ${repeated.idx}"))
     None
   }
 
   override def verifyResponseRetainsEvents(reporter: CheckReporter, previousResponsePoints: Seq[GenIndexedPoint[MeasurementPoint]], currentResponsePoints: Seq[GenIndexedPoint[MeasurementPoint]]): Option[DeferredCheck] = {
-    if (!previousResponsePoints.equals(currentResponsePoints)) {
-      throw new Exception("Received points are different")
-    }
-    reporter.log("Verified that received points are the same as the previously received points")
+    // every event is one that was generated, and each earlier event is still there or replaced by its point's current
+    // value (8.11.2.5.3 step 5: "the data may be updated to reflect current values")
+    val generated = trackingDatabase.getAllEvents(BatchSpecifier.All)
+    def matches(expected: Event, received: GenIndexedPoint[MeasurementPoint]) =
+      scala.util.Try(checkClassEvent(expected, received)).isSuccess
+    currentResponsePoints.foreach(current =>
+      if (!generated.exists(matches(_, current))) throw new Exception(s"The event at index ${current.idx} matches no event generated"))
+    previousResponsePoints.foreach(previous => {
+      val currentValue = generated.filter(e => e.idx == previous.idx && generatedKind(e) == receivedKind(previous)).lastOption
+      val retained = currentResponsePoints.exists(sameEvent(previous, _)) ||
+        currentResponsePoints.exists(current => receivedKind(current) == receivedKind(previous) && currentValue.exists(matches(_, current)))
+      if (!retained) throw new Exception(s"The response no longer reports the event at index ${previous.idx}, or its current value")
+    })
+    reporter.log(s"Verified that the response retains the ${previousResponsePoints.size} earlier event(s)")
     None
+  }
+
+  // a point's kind: its class, and for counters whether it's frozen
+  private def receivedKind(point: GenIndexedPoint[MeasurementPoint]): (Class[?], Boolean) = point.point match {
+    case counter: CounterPoint => (classOf[CounterPoint], counter.isFrozen)
+    case other => (other.getClass, false)
+  }
+
+  // the kind of the points a generated event is reported as
+  private def generatedKind(event: Event): (Class[?], Boolean) = event match {
+    case TypedEvent(_: BinaryInput) => (classOf[BinaryPoint], false)
+    case TypedEvent(_: DoubleBitBinaryInput) => (classOf[DoubleBitPoint], false)
+    case TypedEvent(_: Counter) => (classOf[CounterPoint], false)
+    case TypedEvent(_: FrozenCounter) => (classOf[CounterPoint], true)
+    case TypedEvent(_: AnalogInput) => (classOf[AnalogPoint], false)
+    case TypedEvent(_: BinaryOutputStatus) => (classOf[BinaryOutputStatusPoint], false)
+    case TypedEvent(_: AnalogOutputStatus) => (classOf[AnalogOutputStatusPoint], false)
+  }
+
+  // the same event, however its time was encoded (absolute, or relative to a CTO)
+  private def sameEvent(a: GenIndexedPoint[MeasurementPoint], b: GenIndexedPoint[MeasurementPoint]): Boolean = {
+    def resolved(p: MeasurementPoint) = p.copy_with_timestamp(p.timestamp.map(_.copy(isRelative = false)))
+    a.idx == b.idx && resolved(a.point) == resolved(b.point)
   }
 
   override def generateNotEnoughUnsolicitedEvents(reporter: PluginReporter): Unit = {

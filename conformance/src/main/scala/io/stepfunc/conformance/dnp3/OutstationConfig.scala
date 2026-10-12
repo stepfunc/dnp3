@@ -10,7 +10,7 @@ case class OutstationConfig(confirmTimeoutMs: Int, selectTimeoutMs: Int, fragmen
 // retryDelayMs: the wait after a failed unsolicited response series before starting another
 case class UnsolicitedResponseConfig(allowUnsolicited: Boolean, retryDelayMs: Int, maxNumRetries: Option[Int])
 
-case class TestDatabaseConfig(disableBinaryInputs: Boolean, disableDoubleBitBinaryInputs: Boolean, disableCounters: Boolean, isGlobalLocalControl: Boolean, isSingleLocalControl: Boolean)
+case class TestDatabaseConfig(disableBinaryInputs: Boolean, disableDoubleBitBinaryInputs: Boolean, disableCounters: Boolean, isGlobalLocalControl: Boolean, localControlIndex: Option[Int])
 
 case class CommandHandlerConfig(disableBinaryOutput: Boolean, disableAnalogOutput: Boolean)
 
@@ -22,7 +22,7 @@ object StackConfig {
     LinkConfig(1024, 1, 1000, false),
     OutstationConfig(2000, 2000, 2048, 4),
     UnsolicitedResponseConfig(allowUnsolicited = false, 2000, None),
-    TestDatabaseConfig(disableBinaryInputs = false, disableDoubleBitBinaryInputs = false, disableCounters = false, isGlobalLocalControl = false, isSingleLocalControl = false),
+    TestDatabaseConfig(disableBinaryInputs = false, disableDoubleBitBinaryInputs = false, disableCounters = false, isGlobalLocalControl = false, localControlIndex = None),
     CommandHandlerConfig(disableBinaryOutput = false, disableAnalogOutput = false)
   )
 }
