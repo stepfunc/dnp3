@@ -1,6 +1,7 @@
 
 ### 1.8.0 ###
 * :star: Add master support for `DIRECT_OPERATE_NO_ACK` (function code 0x06) in Rust and all bindings. See [#466](https://github.com/stepfunc/dnp3/pull/466).
+* :bug: Fix a double free in the bindings when an outstation server fails to bind, for example because the port is already in use. See [#469](https://github.com/stepfunc/dnp3/pull/469).
 * :bug: Flush TLS writes so the last frame isn't left buffered when the socket is under backpressure. Affects masters and outstations. See [#462](https://github.com/stepfunc/dnp3/pull/462).
 ### 1.7.0 ###
 * :star: Add outstation `ConnectionManager` for fine-grained control of TCP and TLS client connections, including dynamic endpoint selection, custom retry logic, and per-connection master address override. See [#381](https://github.com/stepfunc/dnp3/pull/381), [#406](https://github.com/stepfunc/dnp3/pull/406).
