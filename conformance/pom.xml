@@ -12,7 +12,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <scala.version>3.9.0</scala.version>
         <dnp3.version>1.8.0-M1</dnp3.version>
-        <dnp3c.version>0.1.0</dnp3c.version>
+        <dnp3c.version>0.1.0-SNAPSHOT</dnp3c.version>
         <scala-maven-plugin.version>4.10.0</scala-maven-plugin.version>
     </properties>
 
@@ -43,6 +43,8 @@
                             <id>conformance</id>
                             <mainClass>io.stepfunc.conformance.dnp3.Main</mainClass>
                             <args>
+                                <arg>-rev</arg>
+                                <arg>3.1r1</arg>
                                 <arg>-config</arg>
                                 <arg>device.ini</arg>
                                 <arg>-run</arg>

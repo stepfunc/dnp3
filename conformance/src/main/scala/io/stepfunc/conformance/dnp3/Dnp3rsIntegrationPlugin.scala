@@ -2,7 +2,7 @@ package io.stepfunc.conformance.dnp3
 
 import io.stepfunc.dnp3c.dnp3.app._
 import io.stepfunc.dnp3c.dnp3.app.objects.AttributeValue
-import io.stepfunc.dnp3c.dnp3.{ActionResult, ActionTiming, CheckReporter, DeferredCheck, EventExpectation, InputKind, IntegrationPlugin, PluginReporter}
+import io.stepfunc.dnp3c.dnp3.{AbnormalFlag, ActionResult, ActionTiming, CheckReporter, DeferredCheck, EventExpectation, InputKind, IntegrationPlugin, PluginReporter, PointKind}
 import io.stepfunc.dnp3c.protocol.parsing.UInt8
 import io.stepfunc.dnp3.{AddressFilter, AnalogInput, AnalogOutputStatus, BinaryInput, BinaryOutputStatus, Counter, DoubleBit, DoubleBitBinaryInput, EventBufferConfig, FrozenCounter, LinkErrorMode, Outstation, Runtime, RuntimeConfig, OutstationServer}
 import org.joou.UInteger
@@ -20,10 +20,13 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
   private var controlHandler: QueuedControlHandler = _
   private var config = StackConfig.Default
   private var eventBatch = 0
+  private var app: CustomOutstationApplication = _
+  private var coldRestartSupported = true
 
 
   override def startProcedure(reporter: PluginReporter): Unit = {
     config = StackConfig.Default
+    coldRestartSupported = true
     startOutstation()
   }
 
@@ -162,9 +165,72 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
     cyclePower(reporter)
   }
 
+  // Actions 3.1r1 uses
+
+  override def setColdRestartSupport(reporter: PluginReporter, enabled: Boolean): Unit = {
+    coldRestartSupported = enabled
+    app.coldRestartSupported = enabled
+    reporter.log(s"Cold restart support is set to $enabled")
+  }
+
+  override def setAnalogInput(reporter: PluginReporter, index: Int, value: Double): Unit = {
+    this.eventBatch = this.eventBatch + 1
+    printAnalogInput(reporter, trackingDatabase.setAnalogInputValue(index, value, this.eventBatch))
+  }
+
+  override def generateExactFrozenCounterEvents(reporter: PluginReporter, numEvents: Int): Unit = {
+    this.eventBatch = this.eventBatch + 1
+    1 to numEvents foreach { _ =>
+      val event = trackingDatabase.generateFrozenCounterEvent(0, this.eventBatch)
+      reporter.log(s"Updated frozen counter ${event.idx}: value=${event.value.value}")
+    }
+  }
+
+  // the analog input values go up by 100 an event from 0, so they stay below 32768
+  override def generateExactSmallAnalogInputEvents(reporter: PluginReporter, numEvents: Int): Unit =
+    generateExactInputEvents(reporter, InputKind.AnalogInput, numEvents)
+
+  override def uninstallFrozenCounters(reporter: PluginReporter): Unit = {
+    config = config.copy(testDatabaseConfig = config.testDatabaseConfig.copy(disableFrozenCounters = true))
+    reporter.log("All frozen counter points were uninstalled")
+    cyclePower(reporter)
+  }
+
+  override def uninstallAnalogInputs(reporter: PluginReporter): Unit = {
+    config = config.copy(testDatabaseConfig = config.testDatabaseConfig.copy(disableAnalogInputs = true))
+    reporter.log("All analog input points were uninstalled")
+    cyclePower(reporter)
+  }
+
+  // the change of one binary input, the kind 3.1r1's 8.26 uses
+  override def generateEventOn(reporter: PluginReporter, kind: PointKind, index: Int): Unit = kind match {
+    case PointKind.BinaryInput =>
+      this.eventBatch = this.eventBatch + 1
+      printBinaryInput(reporter, trackingDatabase.generateBinaryInputEvent(index, this.eventBatch))
+    case _ => throw new Exception(s"Events on one ${kind.name} aren't supported")
+  }
+
+  override def setFlagsNormal(reporter: PluginReporter, kind: PointKind): Unit = {
+    trackingDatabase.setFlags(kind, None, 0x01)
+    reporter.log(s"Every ${kind.name} point's flags are normal")
+  }
+
+  // COMM_LOST set on the first point, with ONLINE
+  override def setFlagAbnormal(reporter: PluginReporter, kind: PointKind, indices: Seq[Int]): AbnormalFlag = {
+    val index = indices.headOption.getOrElse(throw new Exception(s"No ${kind.name} point to set a flag of"))
+    trackingDatabase.setFlags(kind, Some(Seq(index)), 0x05)
+    reporter.log(s"${kind.name} $index has COMM_LOST set")
+    AbnormalFlag(index, Some(0x05))
+  }
+
+  override def verifyFrozenCounterEvents(reporter: CheckReporter, points: Seq[GenIndexedPoint[CounterPoint]]): Option[DeferredCheck] = {
+    verifyLatestEvents(reporter, points, "frozen counter", trackingDatabase.popFrozenCounterEvent, checkFrozenCounter)
+    None
+  }
+
   override def reinstallPoints(reporter: PluginReporter): Unit = {
     config = config.copy(
-      testDatabaseConfig = config.testDatabaseConfig.copy(disableBinaryInputs = false, disableDoubleBitBinaryInputs = false, disableCounters = false),
+      testDatabaseConfig = config.testDatabaseConfig.copy(disableBinaryInputs = false, disableDoubleBitBinaryInputs = false, disableCounters = false, disableFrozenCounters = false, disableAnalogInputs = false),
       commandHandlerConfig = CommandHandlerConfig(disableBinaryOutput = false, disableAnalogOutput = false)
     )
     reporter.log("All points were reinstalled")
@@ -804,6 +870,8 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
 
     // Create config
     val app = new CustomOutstationApplication
+    app.coldRestartSupported = coldRestartSupported
+    this.app = app
     val information = new CustomOutstationInformation
     this.controlHandler = new QueuedControlHandler(config.commandHandlerConfig.disableBinaryOutput, config.commandHandlerConfig.disableAnalogOutput)
     val listener = new CustomConnectionStateListener
@@ -831,7 +899,7 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
     this.outstation = server.addOutstation(dnp3Config, app, information, controlHandler, listener, AddressFilter.any())
 
     // Create the database
-    this.trackingDatabase = new TrackingDatabase(app, this.outstation, config.testDatabaseConfig)
+    this.trackingDatabase = new TrackingDatabase(app, this.outstation, config.testDatabaseConfig, this.controlHandler)
     app.onWriteStringAttribute = trackingDatabase.writeStringAttribute
 
     // Start the server

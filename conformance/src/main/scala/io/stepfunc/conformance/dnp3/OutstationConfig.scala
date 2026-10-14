@@ -10,7 +10,7 @@ case class OutstationConfig(confirmTimeoutMs: Int, selectTimeoutMs: Int, fragmen
 // retryDelayMs: the wait after a failed unsolicited response series before starting another
 case class UnsolicitedResponseConfig(allowUnsolicited: Boolean, retryDelayMs: Int, maxNumRetries: Option[Int])
 
-case class TestDatabaseConfig(disableBinaryInputs: Boolean, disableDoubleBitBinaryInputs: Boolean, disableCounters: Boolean, isGlobalLocalControl: Boolean, localControlIndex: Option[Int])
+case class TestDatabaseConfig(disableBinaryInputs: Boolean, disableDoubleBitBinaryInputs: Boolean, disableCounters: Boolean, isGlobalLocalControl: Boolean, localControlIndex: Option[Int], disableFrozenCounters: Boolean = false, disableAnalogInputs: Boolean = false)
 
 case class CommandHandlerConfig(disableBinaryOutput: Boolean, disableAnalogOutput: Boolean)
 

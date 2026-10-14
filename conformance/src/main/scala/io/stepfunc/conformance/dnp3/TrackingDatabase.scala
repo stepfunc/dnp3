@@ -1,5 +1,6 @@
 package io.stepfunc.conformance.dnp3
 
+import io.stepfunc.dnp3c.dnp3.PointKind
 import io.stepfunc.dnp3c.dnp3.app.EventClass
 import io.stepfunc.dnp3c.dnp3.app.objects.AttributeValue
 import io.stepfunc.dnp3._
@@ -40,12 +41,14 @@ class TypedEvent[T](val idx: Int, val batch: Int, val eventClass: EventClass, va
   }
 }
 
-class TrackingDatabase(val app: CustomOutstationApplication, val outstation: Outstation, testDatabaseConfig: TestDatabaseConfig) {
+class TrackingDatabase(val app: CustomOutstationApplication, val outstation: Outstation, testDatabaseConfig: TestDatabaseConfig, controlHandler: QueuedControlHandler) {
   // Create all the tracking points
   private val binaryPoints = mutable.SortedMap((for (i <- 0 to 9) yield i -> new BinaryInput(ushort(i), false, new Flags(ubyte(0x01)), Timestamp.invalidTimestamp())): _*)
   private val doubleBitPoints = mutable.SortedMap((for (i <- 0 to 9) yield i -> new DoubleBitBinaryInput(ushort(i), DoubleBit.DETERMINED_OFF, new Flags(ubyte(0x41)), Timestamp.invalidTimestamp())): _*)
   private val counters = mutable.SortedMap((for (i <- 0 to 9) yield i -> new Counter(ushort(i), uint(0), new Flags(ubyte(0x01)), Timestamp.invalidTimestamp())): _*)
   private val analogInputs = mutable.SortedMap((for (i <- 0 to 9) yield i -> new AnalogInput(ushort(i), 0.0, new Flags(ubyte(0x01)), Timestamp.invalidTimestamp())): _*)
+  // the frozen counters as the database starts them, changed only by generateFrozenCounterEvent and setFlags
+  private val frozenCounters = mutable.SortedMap((for (i <- 0 to 9) yield i -> new FrozenCounter(ushort(i), uint(0), new Flags(ubyte(0x01)), Timestamp.invalidTimestamp())): _*)
 
   private val binaryOutputs = mutable.SortedMap((for (i <- 0 to 19) yield i -> new BinaryOutputStatus(ushort(i), false, new Flags(ubyte(0x01)), Timestamp.invalidTimestamp())): _*)
   private val analogOutputs = mutable.SortedMap((for (i <- 0 to 19) yield i -> new AnalogOutputStatus(ushort(i), 0.0, new Flags(ubyte(0x01)), Timestamp.invalidTimestamp())): _*)
@@ -109,13 +112,15 @@ class TrackingDatabase(val app: CustomOutstationApplication, val outstation: Out
         db.addCounter(e.index, io.stepfunc.dnp3.EventClass.CLASS2, counterConfig)
         db.updateCounter(e, updateOptions)
 
-        val frozenCounter = new FrozenCounter(e.index, e.value, e.flags, e.time)
-        db.addFrozenCounter(e.index, io.stepfunc.dnp3.EventClass.CLASS1, frozenCounterConfig)
-        db.updateFrozenCounter(frozenCounter, updateOptions)
+        if (!testDatabaseConfig.disableFrozenCounters) {
+          val frozenCounter = new FrozenCounter(e.index, e.value, e.flags, e.time)
+          db.addFrozenCounter(e.index, io.stepfunc.dnp3.EventClass.CLASS1, frozenCounterConfig)
+          db.updateFrozenCounter(frozenCounter, updateOptions)
+        }
       })
     }
 
-    this.analogInputs.values.foreach(e => {
+    if (!testDatabaseConfig.disableAnalogInputs) this.analogInputs.values.foreach(e => {
       val aiConfig = new AnalogInputConfig()
       aiConfig.staticVariation = StaticAnalogInputVariation.GROUP30_VAR2
 
@@ -146,10 +151,13 @@ class TrackingDatabase(val app: CustomOutstationApplication, val outstation: Out
   // Places binary outputs in the local state, like flipping a switch on the device
   def setLocalControl(indices: Iterable[Int]): Unit = {
     app.isLocalControl = true
+    controlHandler.localOutputs = controlHandler.localOutputs ++ indices
     outstation.transaction(db => {
       indices.foreach(idx => {
         val point = binaryOutputs(idx)
-        val newPoint = new BinaryOutputStatus(point.index, point.value, new Flags(ubyte(0x11)), point.time)
+        // ONLINE cleared, the state and every other flag kept: LOCAL_FORCED means a value forced locally, not local mode
+        // (IEEE 1815-2012 Table 11-5; 3.1r1's 8.6.4 step 1.9)
+        val newPoint = new BinaryOutputStatus(point.index, point.value, new Flags(ubyte(point.flags.value.intValue() & ~0x01)), point.time)
         binaryOutputs(idx) = newPoint
         db.updateBinaryOutputStatus(newPoint, UpdateOptions.noEvent())
       })
@@ -159,10 +167,11 @@ class TrackingDatabase(val app: CustomOutstationApplication, val outstation: Out
   // Puts every binary output back under remote control
   def clearLocalControl(): Unit = {
     app.isLocalControl = false
+    controlHandler.localOutputs = Set.empty
     outstation.transaction(db => {
       binaryOutputs.keys.toList.foreach(idx => {
         val point = binaryOutputs(idx)
-        val newPoint = new BinaryOutputStatus(point.index, point.value, new Flags(ubyte(0x01)), point.time)
+        val newPoint = new BinaryOutputStatus(point.index, point.value, new Flags(ubyte(point.flags.value.intValue() | 0x01)), point.time)
         binaryOutputs(idx) = newPoint
         db.updateBinaryOutputStatus(newPoint, UpdateOptions.noEvent())
       })
@@ -240,6 +249,103 @@ class TrackingDatabase(val app: CustomOutstationApplication, val outstation: Out
     newEvent
   }
 
+  // a frozen counter event: the frozen value goes up by one (3.1r1's 8.25)
+  def generateFrozenCounterEvent(idx: Int, eventBatch: Int): TypedEvent[FrozenCounter] = {
+    val value = frozenCounters(idx).value.longValue() + 1
+    val newPoint = new FrozenCounter(ushort(idx), uint(value), new Flags(ubyte(0x01)), app.now())
+
+    this.frozenCounters(idx) = newPoint
+    val newEvent = new TypedEvent[FrozenCounter](idx, eventBatch, EventClass.Class1, newPoint)
+    this.events.append(newEvent)
+
+    outstation.transaction(db => {
+      db.updateFrozenCounter(newPoint, UpdateOptions.detectEvent())
+    })
+
+    newEvent
+  }
+
+  // an analog input set to a value, with the event that makes (3.1r1's 8.19.2.4)
+  def setAnalogInputValue(idx: Int, value: Double, eventBatch: Int): TypedEvent[AnalogInput] = {
+    val newPoint = new AnalogInput(ushort(idx), value, new Flags(ubyte(0x01)), app.now())
+
+    this.analogInputs(idx) = newPoint
+    val newEvent = new TypedEvent[AnalogInput](idx, eventBatch, EventClass.Class3, newPoint)
+    this.events.append(newEvent)
+
+    outstation.transaction(db => {
+      db.updateAnalogInput(newPoint, UpdateOptions.detectEvent())
+    })
+
+    newEvent
+  }
+
+  // Sets the flag bits of the points of a kind, all of them or those given, keeping each point's state and value, without
+  // events (3.1r1's 8.24 and 8.25). The state bits of binary points are kept in their flags octet.
+  def setFlags(kind: PointKind, indices: Option[Seq[Int]], bits: Int): Unit = {
+    def state(on: Boolean): Int = if (on) 0x80 else 0x00
+    def doubleBitState(value: DoubleBit): Int = value match {
+      case DoubleBit.INTERMEDIATE => 0x00
+      case DoubleBit.DETERMINED_OFF => 0x40
+      case DoubleBit.DETERMINED_ON => 0x80
+      case _ => 0xC0
+    }
+    def flags(b: Int): Flags = new Flags(ubyte(b))
+    def which[T](points: mutable.SortedMap[Int, T]): Seq[Int] = indices.getOrElse(points.keys.toSeq)
+    outstation.transaction(db => {
+      kind match {
+        case PointKind.BinaryInput => which(binaryPoints).foreach { i =>
+          val p = binaryPoints(i)
+          binaryPoints(i) = new BinaryInput(p.index, p.value, flags(bits | state(p.value)), p.time)
+          db.updateBinaryInput(binaryPoints(i), UpdateOptions.noEvent())
+        }
+        case PointKind.DoubleBitInput => which(doubleBitPoints).foreach { i =>
+          val p = doubleBitPoints(i)
+          doubleBitPoints(i) = new DoubleBitBinaryInput(p.index, p.value, flags(bits | doubleBitState(p.value)), p.time)
+          db.updateDoubleBitBinaryInput(doubleBitPoints(i), UpdateOptions.noEvent())
+        }
+        case PointKind.BinaryOutputStatus => which(binaryOutputs).foreach { i =>
+          val p = binaryOutputs(i)
+          binaryOutputs(i) = new BinaryOutputStatus(p.index, p.value, flags(bits | state(p.value)), p.time)
+          db.updateBinaryOutputStatus(binaryOutputs(i), UpdateOptions.noEvent())
+        }
+        case PointKind.Counter => which(counters).foreach { i =>
+          val p = counters(i)
+          counters(i) = new Counter(p.index, p.value, flags(bits), p.time)
+          db.updateCounter(counters(i), UpdateOptions.noEvent())
+        }
+        case PointKind.FrozenCounter => which(frozenCounters).foreach { i =>
+          val p = frozenCounters(i)
+          frozenCounters(i) = new FrozenCounter(p.index, p.value, flags(bits), p.time)
+          db.updateFrozenCounter(frozenCounters(i), UpdateOptions.noEvent())
+        }
+        case PointKind.AnalogInput => which(analogInputs).foreach { i =>
+          val p = analogInputs(i)
+          analogInputs(i) = new AnalogInput(p.index, p.value, flags(bits), p.time)
+          db.updateAnalogInput(analogInputs(i), UpdateOptions.noEvent())
+        }
+        case PointKind.AnalogOutputStatus => which(analogOutputs).foreach { i =>
+          val p = analogOutputs(i)
+          analogOutputs(i) = new AnalogOutputStatus(p.index, p.value, flags(bits), p.time)
+          db.updateAnalogOutputStatus(analogOutputs(i), UpdateOptions.noEvent())
+        }
+      }
+    })
+  }
+
+  def getAllFrozenCounterEvents(batch: BatchSpecifier): Seq[TypedEvent[FrozenCounter]] = {
+    getAllEvents(batch).flatMap {
+      case event @ TypedEvent(_: FrozenCounter) => Some(event.asInstanceOf[TypedEvent[FrozenCounter]])
+      case _ => None
+    }
+  }
+
+  def popFrozenCounterEvent(batch: BatchSpecifier): Option[TypedEvent[FrozenCounter]] = {
+    val head = getAllFrozenCounterEvents(batch).find(e => !e.isHandled)
+    head.foreach(_.handle())
+    head
+  }
+
   def resetHandledEvents(): Unit = {
     this.events.foreach(e => e.reset())
   }
@@ -249,7 +355,7 @@ class TrackingDatabase(val app: CustomOutstationApplication, val outstation: Out
       getAllBinaryInputs.map(e => e.asInstanceOf[Event]).toList :::
       (if (!isClass0) getAllDoubleBitBinaryInputs.map(_.asInstanceOf[Event]).toList else Nil) :::
       getAllCounters.map(_.asInstanceOf[Event]).toList :::
-      getAllCounters.map(e => new TypedEvent[FrozenCounter](e.idx, e.batch, EventClass.All, new FrozenCounter(e.value.index, uint(0), e.value.flags, e.value.time)).asInstanceOf[Event]).toList :::
+      this.frozenCounters.map(e => new TypedEvent[FrozenCounter](e._1, 0, EventClass.All, e._2).asInstanceOf[Event]).toList :::
       getAllAnalogInputs.map(_.asInstanceOf[Event]).toList :::
       this.binaryOutputs.map(e => new TypedEvent[BinaryOutputStatus](e._1, 0, EventClass.All, e._2).asInstanceOf[Event]).toList :::
       this.analogOutputs.map(e => new TypedEvent[AnalogOutputStatus](e._1, 0, EventClass.All, e._2).asInstanceOf[Event]).toList
