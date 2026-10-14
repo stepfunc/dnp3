@@ -380,7 +380,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           repository: stepfunc/dnp3c
-          ref: 001b20726aeaf394a02ff5732a0fd6db266a0c3a
+          ref: 1a5422372475dd9c2ddee4a610230c6ed9751e35
           path: dnp3c
       - name: Install dnp3c
         working-directory: dnp3c
