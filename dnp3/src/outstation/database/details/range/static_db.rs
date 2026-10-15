@@ -1125,4 +1125,278 @@ mod tests {
             ]
         )
     }
+
+    fn frozen_counter_config(var: StaticFrozenCounterVariation) -> PointConfig<FrozenCounter> {
+        PointConfig {
+            class: Some(EventClass::Class1),
+            s_var: var,
+            e_var: EventFrozenCounterVariation::Group23Var1,
+            detector: Deadband::new(0),
+        }
+    }
+
+    fn write_class_zero(db: &mut StaticDatabase) -> Vec<u8> {
+        db.select_class_zero();
+
+        let mut buffer = [0u8; 64];
+        let mut cursor = WriteCursor::new(buffer.as_mut());
+
+        db.write(&mut cursor).unwrap();
+
+        cursor.written().to_vec()
+    }
+
+    #[test]
+    fn promotes_counter_variations_without_flags_if_flags_other_than_just_online() {
+        let mut db = StaticDatabase::default();
+
+        assert!(db.add(0, counter_config(StaticCounterVariation::Group20Var5)));
+        assert!(db.add(1, counter_config(StaticCounterVariation::Group20Var6)));
+        assert!(db.add(2, counter_config(StaticCounterVariation::Group20Var5)));
+
+        let online = Counter::new(0, Flags::ONLINE, Time::unsynchronized(0));
+        db.update(&online, 2, UpdateOptions::no_event());
+
+        assert_eq!(
+            write_class_zero(&mut db),
+            [
+                // g20v1 - s/s == 0, restart, value == 0
+                20, 1, 0x01, 0, 0, 0, 0, 0x02, 0, 0, 0, 0,
+                // g20v2 - s/s == 1, restart, value == 0
+                20, 2, 0x01, 1, 0, 1, 0, 0x02, 0, 0, // g20v5 - s/s == 2, value == 0
+                20, 5, 0x01, 2, 0, 2, 0, 0, 0, 0, 0,
+            ]
+        )
+    }
+
+    #[test]
+    fn promotes_frozen_counter_variations_without_flags_if_flags_other_than_just_online() {
+        let mut db = StaticDatabase::default();
+
+        assert!(db.add(
+            0,
+            frozen_counter_config(StaticFrozenCounterVariation::Group21Var9)
+        ));
+        assert!(db.add(
+            1,
+            frozen_counter_config(StaticFrozenCounterVariation::Group21Var10)
+        ));
+        assert!(db.add(
+            2,
+            frozen_counter_config(StaticFrozenCounterVariation::Group21Var9)
+        ));
+
+        let online = FrozenCounter::new(0, Flags::ONLINE, Time::unsynchronized(0));
+        db.update(&online, 2, UpdateOptions::no_event());
+
+        assert_eq!(
+            write_class_zero(&mut db),
+            [
+                // g21v1 - s/s == 0, restart, value == 0
+                21, 1, 0x01, 0, 0, 0, 0, 0x02, 0, 0, 0, 0,
+                // g21v2 - s/s == 1, restart, value == 0
+                21, 2, 0x01, 1, 0, 1, 0, 0x02, 0, 0, // g21v9 - s/s == 2, value == 0
+                21, 9, 0x01, 2, 0, 2, 0, 0, 0, 0, 0,
+            ]
+        )
+    }
+
+    #[test]
+    fn promotes_analog_variations_without_flags_if_flags_other_than_just_online() {
+        let mut db = StaticDatabase::default();
+
+        assert!(db.add(0, analog_config(StaticAnalogInputVariation::Group30Var3)));
+        assert!(db.add(1, analog_config(StaticAnalogInputVariation::Group30Var4)));
+        assert!(db.add(2, analog_config(StaticAnalogInputVariation::Group30Var3)));
+
+        // fits in 32 bits, but not in 16 bits
+        let online = AnalogInput::new(40000.0, Flags::ONLINE, Time::unsynchronized(0));
+        db.update(&online, 0, UpdateOptions::no_event());
+        db.update(&online, 1, UpdateOptions::no_event());
+
+        assert_eq!(
+            write_class_zero(&mut db),
+            [
+                // g30v3 - s/s == 0, value == 40000
+                30, 3, 0x01, 0, 0, 0, 0, 0x40, 0x9C, 0, 0,
+                // g30v2 - s/s == 1, online and over range, value == i16::MAX
+                30, 2, 0x01, 1, 0, 1, 0, 0x21, 0xFF, 0x7F,
+                // g30v1 - s/s == 2, restart, value == 0
+                30, 1, 0x01, 2, 0, 2, 0, 0x02, 0, 0, 0, 0,
+            ]
+        )
+    }
+
+    #[test]
+    fn promotes_counter_variations_without_flags_unless_flags_are_exactly_online() {
+        let mut db = StaticDatabase::default();
+
+        assert!(db.add(0, counter_config(StaticCounterVariation::Group20Var5)));
+        assert!(db.add(1, counter_config(StaticCounterVariation::Group20Var5)));
+        assert!(db.add(2, counter_config(StaticCounterVariation::Group20Var6)));
+
+        let forced = Counter::new(
+            0,
+            Flags::ONLINE | Flags::LOCAL_FORCED,
+            Time::unsynchronized(0),
+        );
+        let no_flags = Counter::new(0, Flags::new(0), Time::unsynchronized(0));
+        let online = Counter::new(0, Flags::ONLINE, Time::unsynchronized(0));
+        db.update(&forced, 0, UpdateOptions::no_event());
+        db.update(&no_flags, 1, UpdateOptions::no_event());
+        db.update(&online, 2, UpdateOptions::no_event());
+
+        assert_eq!(
+            write_class_zero(&mut db),
+            [
+                // g20v1 - s/s == 0 to 1, online and local forced, then no flags, values == 0
+                20, 1, 0x01, 0, 0, 1, 0, 0x11, 0, 0, 0, 0, 0x00, 0, 0, 0, 0,
+                // g20v6 - s/s == 2, value == 0
+                20, 6, 0x01, 2, 0, 2, 0, 0, 0,
+            ]
+        )
+    }
+
+    #[test]
+    fn promotes_frozen_counter_variations_without_flags_unless_flags_are_exactly_online() {
+        let mut db = StaticDatabase::default();
+
+        assert!(db.add(
+            0,
+            frozen_counter_config(StaticFrozenCounterVariation::Group21Var9)
+        ));
+        assert!(db.add(
+            1,
+            frozen_counter_config(StaticFrozenCounterVariation::Group21Var10)
+        ));
+        assert!(db.add(
+            2,
+            frozen_counter_config(StaticFrozenCounterVariation::Group21Var10)
+        ));
+
+        let forced = FrozenCounter::new(
+            0,
+            Flags::ONLINE | Flags::LOCAL_FORCED,
+            Time::unsynchronized(0),
+        );
+        let no_flags = FrozenCounter::new(0, Flags::new(0), Time::unsynchronized(0));
+        let online = FrozenCounter::new(0, Flags::ONLINE, Time::unsynchronized(0));
+        db.update(&forced, 0, UpdateOptions::no_event());
+        db.update(&no_flags, 1, UpdateOptions::no_event());
+        db.update(&online, 2, UpdateOptions::no_event());
+
+        assert_eq!(
+            write_class_zero(&mut db),
+            [
+                // g21v1 - s/s == 0, online and local forced, value == 0
+                21, 1, 0x01, 0, 0, 0, 0, 0x11, 0, 0, 0, 0,
+                // g21v2 - s/s == 1, no flags, value == 0
+                21, 2, 0x01, 1, 0, 1, 0, 0x00, 0, 0, // g21v10 - s/s == 2, value == 0
+                21, 10, 0x01, 2, 0, 2, 0, 0, 0,
+            ]
+        )
+    }
+
+    #[test]
+    fn promotes_analog_variations_without_flags_on_the_flags_the_variation_with_flags_reports() {
+        let mut db = StaticDatabase::default();
+
+        assert!(db.add(0, analog_config(StaticAnalogInputVariation::Group30Var3)));
+        assert!(db.add(1, analog_config(StaticAnalogInputVariation::Group30Var3)));
+        assert!(db.add(2, analog_config(StaticAnalogInputVariation::Group30Var4)));
+        assert!(db.add(3, analog_config(StaticAnalogInputVariation::Group30Var4)));
+
+        let values = [3e9, -3e9, -40000.0, 100.0];
+        for (index, value) in values.into_iter().enumerate() {
+            let online = AnalogInput::new(value, Flags::ONLINE, Time::unsynchronized(0));
+            db.update(&online, index as u16, UpdateOptions::no_event());
+        }
+
+        assert_eq!(
+            write_class_zero(&mut db),
+            [
+                // g30v1 - s/s == 0 to 1, online and over range, values == i32::MAX and i32::MIN
+                30, 1, 0x01, 0, 0, 1, 0, 0x21, 0xFF, 0xFF, 0xFF, 0x7F, 0x21, 0x00, 0x00, 0x00,
+                0x80, // g30v2 - s/s == 2, online and over range, value == i16::MIN
+                30, 2, 0x01, 2, 0, 2, 0, 0x21, 0x00, 0x80,
+                // g30v4 - s/s == 3, value == 100
+                30, 4, 0x01, 3, 0, 3, 0, 0x64, 0x00,
+            ]
+        )
+    }
+
+    #[test]
+    fn promotes_explicitly_requested_variation_without_flags_across_fragments() {
+        let mut db = StaticDatabase::default();
+
+        for index in 0..3 {
+            assert!(db.add(index, counter_config(StaticCounterVariation::Group20Var1)));
+        }
+
+        // only the middle point has flags other than ONLINE
+        db.update(
+            &Counter::new(1, Flags::ONLINE, Time::unsynchronized(0)),
+            0,
+            UpdateOptions::no_event(),
+        );
+        db.update(
+            &Counter::new(2, Flags::RESTART, Time::unsynchronized(0)),
+            1,
+            UpdateOptions::no_event(),
+        );
+        db.update(
+            &Counter::new(3, Flags::ONLINE, Time::unsynchronized(0)),
+            2,
+            UpdateOptions::no_event(),
+        );
+
+        assert_eq!(
+            db.select(StaticReadHeader::Counter(
+                Some(StaticCounterVariation::Group20Var5),
+                None
+            )),
+            Iin2::default()
+        );
+
+        let mut buffer = [0u8; 12]; // can only fit one header at a time
+
+        {
+            let mut cursor = WriteCursor::new(buffer.as_mut());
+            db.write(&mut cursor).unwrap_err(); // incomplete !
+
+            assert_eq!(
+                cursor.written(),
+                [
+                    // g20v5 - s/s == 0, value == 1
+                    20, 5, 0x01, 0, 0, 0, 0, 1, 0, 0, 0,
+                ]
+            )
+        }
+
+        {
+            let mut cursor = WriteCursor::new(buffer.as_mut());
+            db.write(&mut cursor).unwrap_err(); // incomplete !
+
+            assert_eq!(
+                cursor.written(),
+                [
+                    // g20v1 - s/s == 1, restart, value == 2
+                    20, 1, 0x01, 1, 0, 1, 0, 0x02, 2, 0, 0, 0,
+                ]
+            )
+        }
+
+        {
+            let mut cursor = WriteCursor::new(buffer.as_mut());
+            db.write(&mut cursor).unwrap(); // complete !
+
+            assert_eq!(
+                cursor.written(),
+                [
+                    // g20v5 - s/s == 2, value == 3
+                    20, 5, 0x01, 2, 0, 2, 0, 3, 0, 0, 0,
+                ]
+            )
+        }
+    }
 }

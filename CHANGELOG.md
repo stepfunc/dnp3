@@ -1,4 +1,6 @@
 
+### 1.8.0-M2 ###
+* :bug: Report outstation static points whose flags aren't just ONLINE in a variation with flags, when a variation without flags is requested (counters, frozen counters, analog inputs). See [#484](https://github.com/stepfunc/dnp3/pull/484).
 ### 1.8.0-M1 ###
 * :bell: **The minimum supported Rust version is now 1.85**, which the updated dependencies require. CI now checks it.
 * :star: Add master support for `DIRECT_OPERATE_NO_ACK` (function code 0x06) in Rust and all bindings. See [#466](https://github.com/stepfunc/dnp3/pull/466).
