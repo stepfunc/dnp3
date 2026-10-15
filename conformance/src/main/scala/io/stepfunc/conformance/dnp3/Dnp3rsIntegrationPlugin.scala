@@ -135,8 +135,8 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
       case PointKind.Counter => config.copy(testDatabaseConfig = database.copy(disableCounters = true))
       case PointKind.FrozenCounter => config.copy(testDatabaseConfig = database.copy(disableFrozenCounters = true))
       case PointKind.AnalogInput => config.copy(testDatabaseConfig = database.copy(disableAnalogInputs = true))
-      case PointKind.BinaryOutputStatus => config.copy(commandHandlerConfig = commands.copy(disableBinaryOutput = true))
-      case PointKind.AnalogOutputStatus => config.copy(commandHandlerConfig = commands.copy(disableAnalogOutput = true))
+      case PointKind.BinaryOutputStatus => config.copy(testDatabaseConfig = database.copy(disableBinaryOutputStatus = true), commandHandlerConfig = commands.copy(disableBinaryOutput = true))
+      case PointKind.AnalogOutputStatus => config.copy(testDatabaseConfig = database.copy(disableAnalogOutputStatus = true), commandHandlerConfig = commands.copy(disableAnalogOutput = true))
     }
     reporter.log(s"All ${kind.name} points were uninstalled")
     cyclePower(reporter)
@@ -195,7 +195,7 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
 
   override def reinstallPoints(reporter: PluginReporter): Unit = {
     config = config.copy(
-      testDatabaseConfig = config.testDatabaseConfig.copy(disableBinaryInputs = false, disableDoubleBitBinaryInputs = false, disableCounters = false, disableFrozenCounters = false, disableAnalogInputs = false),
+      testDatabaseConfig = config.testDatabaseConfig.copy(disableBinaryInputs = false, disableDoubleBitBinaryInputs = false, disableCounters = false, disableFrozenCounters = false, disableAnalogInputs = false, disableBinaryOutputStatus = false, disableAnalogOutputStatus = false),
       commandHandlerConfig = CommandHandlerConfig(disableBinaryOutput = false, disableAnalogOutput = false)
     )
     reporter.log("All points were reinstalled")

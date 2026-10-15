@@ -128,7 +128,7 @@ class TrackingDatabase(val app: CustomOutstationApplication, val outstation: Out
       db.updateAnalogInput(e, updateOptions)
     })
 
-    this.binaryOutputs.values.foreach(e => {
+    if (!testDatabaseConfig.disableBinaryOutputStatus) this.binaryOutputs.values.foreach(e => {
       val boConfig = new BinaryOutputStatusConfig()
       boConfig.staticVariation = StaticBinaryOutputStatusVariation.GROUP10_VAR2
 
@@ -136,7 +136,7 @@ class TrackingDatabase(val app: CustomOutstationApplication, val outstation: Out
       db.updateBinaryOutputStatus(e, updateOptions)
     })
 
-    this.analogOutputs.values.foreach(e => {
+    if (!testDatabaseConfig.disableAnalogOutputStatus) this.analogOutputs.values.foreach(e => {
       val aoConfig = new AnalogOutputStatusConfig()
       aoConfig.staticVariation = StaticAnalogOutputStatusVariation.GROUP40_VAR2
 
