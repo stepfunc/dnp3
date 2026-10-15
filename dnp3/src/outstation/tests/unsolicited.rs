@@ -240,6 +240,31 @@ async fn defers_read_during_unsol_confirm_wait_timeout() {
 }
 
 #[tokio::test]
+async fn deferred_read_of_type_without_points_sets_object_unknown() {
+    let mut harness = new_harness(get_default_unsolicited_config());
+    confirm_null_unsolicited(&mut harness).await;
+    enable_unsolicited(&mut harness).await;
+
+    generate_binary_event(&mut harness.handle.database);
+    harness.expect_response(UNSOL_G2V1_SEQ1).await;
+    harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
+    // send a read of g3v0, which has no points, that will be deferred
+    harness
+        .send_and_process(&[0xC0, 0x01, 0x03, 0x00, 0x06])
+        .await;
+    harness.check_no_events();
+
+    // expire the unsolicited response
+    tokio::time::pause();
+    harness
+        .wait_for_events(&[Event::UnsolicitedConfirmTimeout(1, false)])
+        .await;
+    // the class 1 event is still pending, and IIN2.1 (OBJECT_UNKNOWN)
+    harness.expect_response(&[0xC0, 0x81, 0x82, 0x02]).await;
+    harness.check_no_events();
+}
+
+#[tokio::test]
 async fn handles_non_read_during_unsolicited_confirm_wait() {
     let mut harness = new_harness(get_default_unsolicited_config());
     confirm_null_unsolicited(&mut harness).await;

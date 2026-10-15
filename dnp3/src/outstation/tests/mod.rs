@@ -12,6 +12,8 @@ mod iin;
 mod octet_strings;
 /// reading g34
 mod read_dead_band;
+/// error IIN for reads of points that aren't installed
+mod read_errors;
 /// state machine for READ requests
 mod read_states;
 /// clear restart IIN + cold/warm restart
