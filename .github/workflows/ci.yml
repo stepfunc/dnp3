@@ -359,9 +359,17 @@ jobs:
         with:
           name: java-bindings-pom
           path: ffi/bindings/java/dnp3/pom.xml
-  # Run the conformance tests
-  conformance:
+  # Run the conformance tests, for each revision of the test procedures at the subset level it tests
+  conformance-run:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - revision: "2.7"
+            level: 2
+          - revision: "3.1r1"
+            level: 3
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -390,12 +398,16 @@ jobs:
         working-directory: conformance
         # capturing needs root, which the tests run as; local runs leave it off
         run: echo "tcp.capture.adapter = /127.0.0.1" >> device.ini
+      - name: Select the subset level
+        working-directory: conformance
+        # device.ini is for 3.1r1 at level 3; a later value overrides it
+        run: echo "outstation.subset.level = ${{ matrix.level }}" >> device.ini
       - name: Run the conformance tests
         working-directory: conformance
-        run: sudo mvn --batch-mode scala:run
+        run: sudo mvn --batch-mode scala:run -Dconformance.revision=${{ matrix.revision }}
       - name: Check the packet captures
         # dnp3c keeps each revision's results, for each subset level, in a folder of its own
-        working-directory: conformance/results/3.1r1/L3
+        working-directory: conformance/results/${{ matrix.revision }}/L${{ matrix.level }}
         # every procedure whose log shows a transmitted frame ("--P->") must have captured packets;
         # a pcap of only its 24-octet header captured none
         run: |
@@ -415,8 +427,18 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: conformance-results
+          name: conformance-results-${{ matrix.revision }}
           path: conformance/results
+  # The check branch protection requires: passes only if every revision's run passed
+  conformance:
+    needs: [conformance-run]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the conformance runs
+        run: |
+          echo "conformance runs: ${{ needs.conformance-run.result }}"
+          [ "${{ needs.conformance-run.result }}" = "success" ]
   # Quality gate to ensure all tests pass before releases
   quality-gate:
     needs: [linting, msrv, test, features, conformance]
@@ -459,8 +481,23 @@ jobs:
       - name: Download conformance test results
         uses: actions/download-artifact@v8
         with:
-          name: conformance-results
+          # each revision's artifact holds <revision>/L<level>/, so they merge without colliding
+          pattern: conformance-results-*
+          merge-multiple: true
           path: artifacts/conformance-results
+      - name: Index the conformance test reports
+        working-directory: artifacts/conformance-results
+        run: |
+          {
+            echo '<!DOCTYPE html>'
+            echo '<html><head><meta charset="utf-8"><title>dnp3 conformance test reports</title></head><body>'
+            echo '<h1>dnp3 conformance test reports</h1><ul>'
+            for report in */L*/report.html; do
+              echo "<li><a href=\"$report\">Revision ${report%%/*}, subset level $(echo "$report" | cut -d/ -f2 | tr -d L)</a></li>"
+            done
+            echo '</ul></body></html>'
+          } > index.html
+          cat index.html
       - name: Checkout stepfunc/docs
         uses: actions/checkout@v6
         with:
@@ -613,8 +650,12 @@ jobs:
           mkdir release
           cd artifacts/c-bindings
           zip -r ../../release/dnp3-${{github.ref_name}}.zip .
-          cd ../conformance-results
-          zip -r ../../release/conformance-results.zip .
+          # each revision's results are in an artifact of its own, holding <revision>/L<level>/
+          cd ../..
+          mkdir conformance-results
+          cp -a artifacts/conformance-results-*/. conformance-results/
+          cd conformance-results
+          zip -r ../release/conformance-results.zip .
       - name: Create GitHub release
         uses: softprops/action-gh-release@v2
         with:

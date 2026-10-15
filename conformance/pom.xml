@@ -14,6 +14,9 @@
         <dnp3.version>1.8.0-M1</dnp3.version>
         <dnp3c.version>0.1.0-SNAPSHOT</dnp3c.version>
         <scala-maven-plugin.version>4.10.0</scala-maven-plugin.version>
+        <!-- the revision of the test procedures scala:run runs, e.g. -Dconformance.revision=2.7, which also needs
+             outstation.subset.level = 2 in device.ini -->
+        <conformance.revision>3.1r1</conformance.revision>
     </properties>
 
     <build>
@@ -44,7 +47,7 @@
                             <mainClass>io.stepfunc.conformance.dnp3.Main</mainClass>
                             <args>
                                 <arg>-rev</arg>
-                                <arg>3.1r1</arg>
+                                <arg>${conformance.revision}</arg>
                                 <arg>-config</arg>
                                 <arg>device.ini</arg>
                                 <arg>-run</arg>
