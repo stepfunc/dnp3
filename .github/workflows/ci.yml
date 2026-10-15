@@ -361,6 +361,7 @@ jobs:
           path: ffi/bindings/java/dnp3/pom.xml
   # Run the conformance tests, for each revision of the test procedures at the subset level it tests
   conformance-run:
+    name: conformance (${{ matrix.revision }}, level ${{ matrix.level }})
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
