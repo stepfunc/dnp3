@@ -4,14 +4,14 @@ use crate::outstation::database::details::event::buffer::{EventBuffer, InsertErr
 use crate::outstation::database::details::range::static_db::{
     PointConfig, StaticDatabase, Updatable, UpdatableFlags,
 };
-use crate::outstation::database::read::ReadHeader;
+use crate::outstation::database::read::{EventReadHeader, ReadHeader};
 use crate::outstation::database::{
     ClassZeroConfig, EventBufferConfig, ResponseInfo, UpdateFlagsType, UpdateInfo, UpdateOptions,
 };
 
 use crate::app::measurement::{
     AnalogInput, AnalogOutputStatus, BinaryInput, BinaryOutputStatus, Counter,
-    DoubleBitBinaryInput, Flags, FrozenCounter, Time,
+    DoubleBitBinaryInput, Flags, FrozenCounter, OctetString, Time,
 };
 use crate::outstation::database::details::attrs::map::SetMap;
 use crate::outstation::{BufferState, ClassCount, OutstationApplication};
@@ -71,10 +71,46 @@ impl Database {
             ReadHeader::Static(header) => self.static_db.select(header),
             ReadHeader::Event(header) => {
                 self.event_buffer.select_by_header(header);
-                Iin2::default()
+                self.event_type_iin(header)
             }
             ReadHeader::Attr(header) => self.attrs.select(header),
         }
+    }
+
+    /// IIN2.1 for a read of an event type with no points (TB2016-001)
+    ///
+    /// Events buffered for points that have since been removed are still reported,
+    /// without an error. This is independent of how many events the header selected,
+    /// because an earlier header in the same request may have selected them already.
+    fn event_type_iin(&self, header: EventReadHeader) -> Iin2 {
+        let missing = match header {
+            EventReadHeader::Class1(_)
+            | EventReadHeader::Class2(_)
+            | EventReadHeader::Class3(_) => false,
+            EventReadHeader::Binary(_, _) => self.is_missing::<BinaryInput>(),
+            EventReadHeader::DoubleBitBinary(_, _) => self.is_missing::<DoubleBitBinaryInput>(),
+            EventReadHeader::BinaryOutputStatus(_, _) => self.is_missing::<BinaryOutputStatus>(),
+            EventReadHeader::Counter(_, _) => self.is_missing::<Counter>(),
+            EventReadHeader::FrozenCounter(_, _) => self.is_missing::<FrozenCounter>(),
+            EventReadHeader::Analog(_, _) => self.is_missing::<AnalogInput>(),
+            EventReadHeader::AnalogOutputStatus(_, _) => self.is_missing::<AnalogOutputStatus>(),
+            EventReadHeader::OctetString(_) => self.is_missing::<OctetString>(),
+            // we know what it is, but don't support it
+            EventReadHeader::FrozenAnalog(_, _) => true,
+        };
+
+        if missing {
+            Iin2::OBJECT_UNKNOWN
+        } else {
+            Iin2::default()
+        }
+    }
+
+    fn is_missing<T>(&self) -> bool
+    where
+        T: Updatable,
+    {
+        !self.static_db.has_points::<T>() && !self.event_buffer.has_events::<T>()
     }
 
     pub(crate) fn discard_unselected_events(&mut self, classes: EventClasses) -> ClassCount {

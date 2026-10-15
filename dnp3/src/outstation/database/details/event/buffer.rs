@@ -536,6 +536,14 @@ impl EventBuffer {
         }
     }
 
+    /// true if the buffer holds at least one event of the type, whatever its state
+    pub(crate) fn has_events<T>(&self) -> bool
+    where
+        T: Insertable,
+    {
+        T::get_type_count(&self.total.types) > 0
+    }
+
     pub(crate) fn select_by_class(&mut self, classes: EventClasses, limit: Option<usize>) -> usize {
         self.select(limit, |e| {
             if classes.matches(e.class) {

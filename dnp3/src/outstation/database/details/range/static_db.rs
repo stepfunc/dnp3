@@ -60,6 +60,11 @@ impl IndexRange {
 
         self.start.try_into().ok().map(AttrSet::new)
     }
+
+    /// number of indices in the range, or 0 if start > stop
+    fn len(&self) -> usize {
+        (usize::from(self.stop) + 1).saturating_sub(usize::from(self.start))
+    }
 }
 
 impl RangeBounds<u16> for IndexRange {
@@ -231,11 +236,33 @@ where
         self.inner.get_mut(&index)
     }
 
+    /// IIN2 bits for a read of a specific range of this type, or the error to
+    /// respond with if nothing in the range can be selected (TB2016-001):
+    ///
+    /// * IIN2.1 if there are no points of this type
+    /// * IIN2.2 if some or all of the points in the range aren't installed
+    fn check_range(&self, range: IndexRange) -> Result<Iin2, Iin2> {
+        if self.inner.is_empty() {
+            return Err(Iin2::OBJECT_UNKNOWN);
+        }
+
+        // BTreeMap::range panics if start > stop
+        if range.len() == 0 {
+            return Err(Iin2::PARAMETER_ERROR);
+        }
+
+        match self.inner.range(range).count() {
+            0 => Err(Iin2::PARAMETER_ERROR),
+            installed if installed < range.len() => Ok(Iin2::PARAMETER_ERROR),
+            _ => Ok(Iin2::default()),
+        }
+    }
+
     fn select_range_with_variation(
         &mut self,
         range: IndexRange,
         variation: Option<T::StaticVariation>,
-    ) -> Option<VariationRange> {
+    ) -> VariationRange {
         for (_index, point) in self
             .inner
             .range_mut((Bound::Included(&range.start), Bound::Included(&range.stop)))
@@ -245,7 +272,7 @@ where
             // this allows the outstation to send consistent snapshot of the values when a multi-fragment response is required
             point.selected = point.current.clone();
         }
-        Some(T::wrap(range, variation))
+        T::wrap(range, variation)
     }
 
     fn select_all(&mut self) -> Option<VariationRange> {
@@ -259,7 +286,7 @@ where
         let range = self.full_range()?;
 
         // as far at the processing goes, we treat this just like a range scan over all the values
-        self.select_range_with_variation(range, variation)
+        Some(self.select_range_with_variation(range, variation))
     }
 }
 
@@ -325,6 +352,11 @@ impl StaticDatabase {
     #[cfg(test)]
     pub(crate) fn selection_capacity(&self) -> usize {
         self.selected.queue.capacity()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn selection_count(&self) -> usize {
+        self.selected.queue.len()
     }
 
     pub(crate) fn reset(&mut self) {
@@ -536,27 +568,26 @@ impl StaticDatabase {
             }
             StaticReadHeader::OctetString(range) => self.select_by_type::<OctetString>(None, range),
             StaticReadHeader::FrozenAnalog(_, _) => {
-                // we don't support this, but we know what it is
-                Iin2::default()
+                // we know what it is, but don't support it
+                Iin2::OBJECT_UNKNOWN
             }
             StaticReadHeader::AnalogInputDeadBand(var, range) => {
-                match range {
-                    None => {
-                        if let Some(range) = self.analog.full_range() {
-                            self.push_selection(VariationRange::new(
-                                range,
-                                SpecificVariation::AnalogDeadBand(var),
-                            ))
-                        } else {
-                            // we don't have any of those
-                            Iin2::default()
-                        }
-                    }
-                    Some(range) => self.push_selection(VariationRange::new(
-                        range,
-                        SpecificVariation::AnalogDeadBand(var),
-                    )),
-                }
+                let (range, iin2) = match range {
+                    None => match self.analog.full_range() {
+                        Some(range) => (range, Iin2::default()),
+                        // no analog inputs
+                        None => return Iin2::OBJECT_UNKNOWN,
+                    },
+                    Some(range) => match self.analog.check_range(range) {
+                        Ok(iin2) => (range, iin2),
+                        Err(iin2) => return iin2,
+                    },
+                };
+
+                iin2 | self.push_selection(VariationRange::new(
+                    range,
+                    SpecificVariation::AnalogDeadBand(var),
+                ))
             }
         }
     }
@@ -569,15 +600,29 @@ impl StaticDatabase {
     where
         T: Updatable,
     {
-        let selected = match range {
-            Some(range) => T::get_mut_map(self).select_range_with_variation(range, variation),
-            None => T::get_mut_map(self).select_all_with_variation(variation),
+        let map = T::get_mut_map(self);
+
+        let (selected, iin2) = match range {
+            Some(range) => match map.check_range(range) {
+                Ok(iin2) => (map.select_range_with_variation(range, variation), iin2),
+                Err(iin2) => return iin2,
+            },
+            None => match map.select_all_with_variation(variation) {
+                Some(selected) => (selected, Iin2::default()),
+                // no points of this type
+                None => return Iin2::OBJECT_UNKNOWN,
+            },
         };
 
-        match selected {
-            None => Iin2::default(),
-            Some(range) => self.push_selection(range),
-        }
+        iin2 | self.push_selection(selected)
+    }
+
+    /// true if at least one point of the type is installed
+    pub(crate) fn has_points<T>(&self) -> bool
+    where
+        T: Updatable,
+    {
+        !self.get_map::<T>().inner.is_empty()
     }
 
     fn push_selection(&mut self, range: VariationRange) -> Iin2 {
@@ -1398,5 +1443,162 @@ mod tests {
                 ]
             )
         }
+    }
+
+    fn write_selection(db: &mut StaticDatabase) -> Vec<u8> {
+        let mut buffer = [0u8; 64];
+        let mut cursor = WriteCursor::new(buffer.as_mut());
+
+        db.write(&mut cursor).unwrap();
+
+        cursor.written().to_vec()
+    }
+
+    #[test]
+    fn check_range_reports_installed_points() {
+        let mut db = StaticDatabase::default();
+
+        // no points of the type
+        assert_eq!(
+            db.binary.check_range(IndexRange::new(0, 0)),
+            Err(Iin2::OBJECT_UNKNOWN)
+        );
+
+        for index in [0, 1, 2, 4] {
+            assert!(db.add(index, binary_config(StaticBinaryInputVariation::Group1Var2)));
+        }
+
+        // every index installed
+        assert_eq!(
+            db.binary.check_range(IndexRange::new(0, 2)),
+            Ok(Iin2::default())
+        );
+        // missing index in the middle
+        assert_eq!(
+            db.binary.check_range(IndexRange::new(2, 4)),
+            Ok(Iin2::PARAMETER_ERROR)
+        );
+        // past the last point
+        assert_eq!(
+            db.binary.check_range(IndexRange::new(4, 5)),
+            Ok(Iin2::PARAMETER_ERROR)
+        );
+        // no installed index
+        assert_eq!(
+            db.binary.check_range(IndexRange::new(5, 10)),
+            Err(Iin2::PARAMETER_ERROR)
+        );
+        // start > stop
+        assert_eq!(
+            db.binary.check_range(IndexRange::new(2, 1)),
+            Err(Iin2::PARAMETER_ERROR)
+        );
+    }
+
+    #[test]
+    fn check_range_counts_the_full_range_of_indices() {
+        let mut db = StaticDatabase::default();
+
+        for index in 0..=u16::MAX {
+            assert!(db.add(index, binary_config(StaticBinaryInputVariation::Group1Var2)));
+        }
+
+        let full = IndexRange::new(0, u16::MAX);
+        assert_eq!(full.len(), 65536);
+        assert_eq!(db.binary.check_range(full), Ok(Iin2::default()));
+
+        assert!(db.remove::<BinaryInput>(1000));
+        assert_eq!(db.binary.check_range(full), Ok(Iin2::PARAMETER_ERROR));
+    }
+
+    #[test]
+    fn select_sets_object_unknown_for_types_without_points() {
+        let mut db = StaticDatabase::default();
+
+        assert_eq!(
+            db.select(StaticReadHeader::Binary(None, None)),
+            Iin2::OBJECT_UNKNOWN
+        );
+        assert_eq!(
+            db.select(StaticReadHeader::Counter(None, Some(IndexRange::new(0, 0)))),
+            Iin2::OBJECT_UNKNOWN
+        );
+        assert_eq!(
+            db.select(StaticReadHeader::AnalogInputDeadBand(None, None)),
+            Iin2::OBJECT_UNKNOWN
+        );
+        assert_eq!(
+            db.select(StaticReadHeader::AnalogInputDeadBand(
+                None,
+                Some(IndexRange::new(0, 0))
+            )),
+            Iin2::OBJECT_UNKNOWN
+        );
+        assert_eq!(
+            db.select(StaticReadHeader::FrozenAnalog(None, None)),
+            Iin2::OBJECT_UNKNOWN
+        );
+
+        // nothing selected
+        assert_eq!(db.selection_count(), 0);
+    }
+
+    #[test]
+    fn select_of_range_without_installed_points_selects_nothing() {
+        let mut db = StaticDatabase::default();
+
+        assert!(db.add(0, counter_config(StaticCounterVariation::Group20Var1)));
+
+        assert_eq!(
+            db.select(StaticReadHeader::Counter(None, Some(IndexRange::new(1, 2)))),
+            Iin2::PARAMETER_ERROR
+        );
+        assert_eq!(db.selection_count(), 0);
+    }
+
+    #[test]
+    fn select_reports_parameter_error_when_out_of_selections() {
+        let mut db = StaticDatabase::default();
+
+        assert!(db.add(0, counter_config(StaticCounterVariation::Group20Var1)));
+
+        // every index installed, so only running out of selections sets IIN2.2
+        let header = StaticReadHeader::Counter(None, Some(IndexRange::new(0, 0)));
+        for _ in 0..db.selection_capacity() {
+            assert_eq!(db.select(header), Iin2::default());
+        }
+        assert_eq!(db.select(header), Iin2::PARAMETER_ERROR);
+    }
+
+    #[test]
+    fn select_of_partial_range_selects_installed_points() {
+        let mut db = StaticDatabase::default();
+
+        assert!(db.add(0, counter_config(StaticCounterVariation::Group20Var1)));
+
+        assert_eq!(
+            db.select(StaticReadHeader::Counter(None, Some(IndexRange::new(0, 1)))),
+            Iin2::PARAMETER_ERROR
+        );
+        assert_eq!(
+            write_selection(&mut db),
+            [
+                // g20v1 - s/s == 0, restart, value == 0
+                20, 1, 0x01, 0, 0, 0, 0, 0x02, 0, 0, 0, 0,
+            ]
+        );
+    }
+
+    #[test]
+    fn select_of_all_points_with_sparse_indices_has_no_error() {
+        let mut db = StaticDatabase::default();
+
+        assert!(db.add(0, counter_config(StaticCounterVariation::Group20Var1)));
+        assert!(db.add(2, counter_config(StaticCounterVariation::Group20Var1)));
+
+        assert_eq!(
+            db.select(StaticReadHeader::Counter(None, None)),
+            Iin2::default()
+        );
     }
 }
