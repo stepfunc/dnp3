@@ -140,6 +140,18 @@ impl StaticVariation<BinaryOutputStatus> for StaticBinaryOutputStatusVariation {
 }
 
 impl StaticVariation<Counter> for StaticCounterVariation {
+    fn promote(&self, value: &Counter) -> Self {
+        if value.flags == Flags::ONLINE {
+            return *self;
+        }
+
+        match self {
+            Self::Group20Var5 => Self::Group20Var1,
+            Self::Group20Var6 => Self::Group20Var2,
+            _ => *self,
+        }
+    }
+
     fn get_write_info(&self, _value: &Counter) -> WriteInfo<Counter> {
         match self {
             StaticCounterVariation::Group20Var1 => fixed_type::<Counter, Group20Var1>(),
@@ -212,6 +224,18 @@ impl ToVariation<Group34Var3> for f64 {
 }
 
 impl StaticVariation<FrozenCounter> for StaticFrozenCounterVariation {
+    fn promote(&self, value: &FrozenCounter) -> Self {
+        if value.flags == Flags::ONLINE {
+            return *self;
+        }
+
+        match self {
+            Self::Group21Var9 => Self::Group21Var1,
+            Self::Group21Var10 => Self::Group21Var2,
+            _ => *self,
+        }
+    }
+
     fn get_write_info(&self, _value: &FrozenCounter) -> WriteInfo<FrozenCounter> {
         match self {
             StaticFrozenCounterVariation::Group21Var1 => fixed_type::<FrozenCounter, Group21Var1>(),
@@ -227,6 +251,16 @@ impl StaticVariation<FrozenCounter> for StaticFrozenCounterVariation {
 }
 
 impl StaticVariation<AnalogInput> for StaticAnalogInputVariation {
+    // the flags checked are those the variation with flags would report,
+    // which include OVER_RANGE if the value doesn't fit
+    fn promote(&self, value: &AnalogInput) -> Self {
+        match self {
+            Self::Group30Var3 if value.to_i32().0 != Flags::ONLINE => Self::Group30Var1,
+            Self::Group30Var4 if value.to_i16().0 != Flags::ONLINE => Self::Group30Var2,
+            _ => *self,
+        }
+    }
+
     fn get_write_info(&self, _value: &AnalogInput) -> WriteInfo<AnalogInput> {
         match self {
             StaticAnalogInputVariation::Group30Var1 => fixed_type::<AnalogInput, Group30Var1>(),
