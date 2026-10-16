@@ -10,6 +10,8 @@ class QueuedControlHandler(val binaryOutputsDisabled: Boolean, val analogOutputs
   val waitTime = 1000
 
   private val binaryOutputCommands = new ConcurrentLinkedDeque[Integer]()
+  // the binary outputs in local mode, which a command gets LOCAL (7) from (TB2017-001's 8.6.4.2 and 8.6.4.3, 3.1r1's 8.6.4)
+  @volatile var localOutputs: Set[Int] = Set.empty
   private val analogOutputCommands = new ConcurrentLinkedDeque[Integer]()
 
   override def beginFragment(): Unit = {}
@@ -112,6 +114,7 @@ class QueuedControlHandler(val binaryOutputsDisabled: Boolean, val analogOutputs
 
   private def checkBinaryOutputCommand(crob: Group12Var1, index: UShort, operate: Boolean) : CommandStatus = {
     if (binaryOutputsDisabled) return CommandStatus.NOT_SUPPORTED
+    if (localOutputs.contains(index.intValue())) return CommandStatus.LOCAL
 
     val result = index.intValue() match {
       case 0 =>
@@ -240,7 +243,8 @@ class QueuedControlHandler(val binaryOutputsDisabled: Boolean, val analogOutputs
       case 0 =>
         if(value == 10.0) CommandStatus.SUCCESS else CommandStatus.FORMAT_ERROR
       case 1 => if(value == 20.0) CommandStatus.SUCCESS else CommandStatus.FORMAT_ERROR
-      case i if i.intValue() >= 10 && i.intValue() <= 19 => if(value == 10.0) CommandStatus.SUCCESS else CommandStatus.FORMAT_ERROR
+      // or a value only 32 bits hold, as 3.1r1's 8.4.1.2.13 commands
+      case i if i.intValue() >= 10 && i.intValue() <= 19 => if(value == 10.0 || value == 70000.0) CommandStatus.SUCCESS else CommandStatus.FORMAT_ERROR
       case _ => CommandStatus.NOT_SUPPORTED
     }
 

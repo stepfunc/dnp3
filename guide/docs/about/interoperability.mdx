@@ -36,13 +36,16 @@ The library will be level 4 compliant when we add AO/BO command events (groups 1
 
 ## Conformance Testing
 
-The DNP3 User Group publishes official conformance test procedures for outstations. These procedures validate all level 2 functionality. Procedures for level 3 conformance testing are currently under development by the user group.
+The DNP3 User Group publishes the conformance test procedures for outstations, the DNP3 IED Certification Procedure. CI runs two revisions of it against the outstation, using [dnp3c](https://github.com/stepfunc/dnp3c), our implementation of the procedures:
 
-We created an internal implementation of these test procedures that we automatically run against the outstation implementation. We use these procedures to augment our own unit and integration tests to meet the conformance standards.
+* Revision 3.1 rev 1 (2022), which covers subset levels 1 to 3. We run it at level 3.
+* Revision 2.7 (2016), which covers subset level 2.
+
+Some procedures are disabled in this configuration, such as the network tests in section 9 and the output event tests in section 10. Each report gives the reason for every procedure it skips. We use these procedures to augment our own unit and integration tests.
 
 import sitedata from '../../sitedata.json'
 
-<>The <a href={`https://docs.stepfunc.io/dnp3/${sitedata.version}/conformance/report.html`}>conformance test report</a> for version {sitedata.version} is published alongside this guide.</>
+<>The conformance test reports for version {sitedata.version} are published alongside this guide: <a href={`https://docs.stepfunc.io/dnp3/${sitedata.version}/conformance/3.1r1/L3/report.html`}>revision 3.1 rev 1, level 3</a> and <a href={`https://docs.stepfunc.io/dnp3/${sitedata.version}/conformance/2.7/L2/report.html`}>revision 2.7, level 2</a>.</>
 
 :::note
 The DNP User Group only certifies outstation devices as conforming to the specification, not libraries. Contact Step Function I/O if you would like to engage us to conduct conformance testing for your outstation product.

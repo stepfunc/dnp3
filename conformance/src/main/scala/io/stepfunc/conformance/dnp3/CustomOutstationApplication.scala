@@ -34,7 +34,11 @@ class CustomOutstationApplication extends OutstationApplication {
     true
   }
 
-  override def coldRestart: RestartDelay = RestartDelay.milliseconds(ushort(5000))
+  // whether the outstation supports cold restart (3.1r1's 8.8.2)
+  @volatile var coldRestartSupported = true
+
+  override def coldRestart: RestartDelay =
+    if (coldRestartSupported) RestartDelay.milliseconds(ushort(5000)) else RestartDelay.notSupported()
 
   override def warmRestart: RestartDelay = RestartDelay.notSupported()
 
