@@ -23,16 +23,27 @@ changed, refresh `allowed.json` so the packaging license check passes, and
 verify any dependency/security claims in the changelog against the actual
 `Cargo.lock` versions.
 
-Open the PR and merge it to `main`.
+Open the PR with the `conformance` label (`gh pr create --label conformance`).
+The conformance tests don't run on unlabeled PRs, and a failure on the tag
+blocks every publisher, so merge the PR to `main` only once both conformance
+jobs are green on its latest revision, after its final update with `main`.
 
 ## 2. Tag on `main` and push
 
-CI only publishes from tags, and by convention tags live on `main`:
+CI only publishes from tags, and by convention tags live on `main`. Tag the
+commit the `prepare` PR's merge produced, by its SHA, since `main` may have
+moved since:
 
 ```bash
 git checkout main && git pull
-git tag X.Y.Z && git push origin X.Y.Z
+SHA=$(gh pr view <prepare PR number> --json mergeCommit --jq .mergeCommit.oid)
+git tag X.Y.Z "$SHA" && git push origin X.Y.Z
 ```
+
+To tag a later commit instead, run the conformance tests on it first
+(`gh workflow run conformance.yml --ref main`), wait for the run to pass, and
+tag the SHA it tested (its `headSha` in `gh run list --workflow conformance.yml
+--json headSha,conclusion`).
 
 crates.io publishing is **irreversible** — a version can never be re-published.
 Confirm the version before pushing. (`-RCn` publishes as a pre-release, which

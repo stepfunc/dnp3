@@ -4,6 +4,9 @@ on:
     tags:
       - "*"
   pull_request:
+# Jobs that write with GITHUB_TOKEN ask for it themselves
+permissions:
+  contents: read
 jobs:
   # Check formatting and run clippy lints
   linting:
@@ -359,75 +362,20 @@ jobs:
         with:
           name: java-bindings-pom
           path: ffi/bindings/java/dnp3/pom.xml
-  # Run the conformance tests, for each revision of the test procedures at the subset level it tests
-  conformance-run:
-    name: conformance (${{ matrix.revision }}, level ${{ matrix.level }})
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - revision: "2.7"
-            level: 2
-          - revision: "3.1r1"
-            level: 3
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-      - name: Build JNI
-        run: cargo build --release -p dnp3-ffi-java
-      - name: Build Java bindings
-        run: cargo run --release --bin dnp3-bindings -- --java
-      - name: Install Java bindings
-        shell: bash
-        run: (cd ffi/bindings/java/dnp3 && sudo mvn install)
-      - name: Capture packets during the conformance tests
-        working-directory: conformance
-        # capturing needs root, which the tests run as; local runs leave it off
-        run: echo "tcp.capture.adapter = /127.0.0.1" >> device.ini
-      - name: Select the subset level
-        working-directory: conformance
-        # device.ini is for 3.1r1 at level 3; a later value overrides it
-        run: echo "outstation.subset.level = ${{ matrix.level }}" >> device.ini
-      - name: Run the conformance tests
-        working-directory: conformance
-        run: sudo mvn --batch-mode scala:run -Dconformance.revision=${{ matrix.revision }}
-      - name: Check the packet captures
-        # dnp3c keeps each revision's results, for each subset level, in a folder of its own
-        working-directory: conformance/results/${{ matrix.revision }}/L${{ matrix.level }}
-        # every procedure whose log shows a transmitted frame ("--P->") must have captured packets;
-        # a pcap of only its 24-octet header captured none
-        run: |
-          sent=0
-          empty=0
-          for dir in */; do
-            grep -qE -- '--P-(>|&gt;)' "$dir/log.html" 2>/dev/null || continue
-            sent=$((sent + 1))
-            if [ ! -f "$dir/dump.pcap" ] || [ "$(stat -c %s "$dir/dump.pcap")" -le 24 ]; then
-              echo "No packets captured for ${dir%/}"
-              empty=$((empty + 1))
-            fi
-          done
-          echo "$sent procedures sent frames; $empty captured no packets"
-          [ "$sent" -gt 0 ] && [ "$empty" -eq 0 ]
-      - name: Upload conformance test results
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: conformance-results-${{ matrix.revision }}
-          path: conformance/results
-  # The check branch protection requires: passes only if every revision's run passed
+  # Run the conformance tests for releases; PRs labeled `conformance` run them through conformance.yml itself
   conformance:
-    needs: [conformance-run]
+    if: startsWith(github.ref, 'refs/tags/')
+    uses: ./.github/workflows/conformance.yml
+  # The check branch protection requires: passes only if every job a PR runs passed
+  ci-ok:
+    needs: [linting, msrv, test, features, packaging]
     if: always()
     runs-on: ubuntu-latest
     steps:
-      - name: Check the conformance runs
+      - name: Check the CI jobs
         run: |
-          echo "conformance runs: ${{ needs.conformance-run.result }}"
-          [ "${{ needs.conformance-run.result }}" = "success" ]
+          echo '${{ toJSON(needs) }}'
+          [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}" = "false" ]
   # Quality gate to ensure all tests pass before releases
   quality-gate:
     needs: [linting, msrv, test, features, conformance]
@@ -629,6 +577,9 @@ jobs:
     needs: [release-docs, release-maven, release-nuget, release-crates-io]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
+    # creates the draft release and uploads its assets
+    permissions:
+      contents: write
     steps:
       - name: Download all release artifacts
         uses: actions/download-artifact@v8
