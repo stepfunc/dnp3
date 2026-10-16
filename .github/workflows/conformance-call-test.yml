@@ -1,0 +1,35 @@
+# TEMPORARY: checks that ci.yml's call into conformance.yml hands the release jobs their artifacts. Remove before merging.
+name: Conformance call test
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+jobs:
+  conformance:
+    uses: ./.github/workflows/conformance.yml
+  check-artifacts:
+    needs: [conformance]
+    # the called jobs skip unless the PR is labeled
+    if: >-
+      contains(github.event.pull_request.labels.*.name, 'conformance') &&
+      (github.event.action != 'labeled' || github.event.label.name == 'conformance')
+    runs-on: ubuntu-latest
+    steps:
+      # as release-docs downloads them
+      - name: Download merged
+        uses: actions/download-artifact@v8
+        with:
+          pattern: conformance-results-*
+          merge-multiple: true
+          path: merged
+      # as create-github-release downloads them
+      - name: Download unmerged
+        uses: actions/download-artifact@v8
+        with:
+          path: artifacts
+      - name: Check the reports
+        run: |
+          find merged artifacts -name report.html
+          test -f merged/2.7/L2/report.html
+          test -f merged/3.1r1/L3/report.html
+          test -f artifacts/conformance-results-2.7/2.7/L2/report.html
+          test -f artifacts/conformance-results-3.1r1/3.1r1/L3/report.html
