@@ -23,11 +23,16 @@ changed, refresh `allowed.json` so the packaging license check passes, and
 verify any dependency/security claims in the changelog against the actual
 `Cargo.lock` versions.
 
-Open the PR and merge it to `main`.
+Open the PR with the `conformance` label (`gh pr create --label conformance`).
+The conformance tests don't run on unlabeled PRs, and a failure on the tag
+blocks every publisher, so merge the PR to `main` only once both conformance
+jobs are green on its latest revision, after its final update with `main`.
 
 ## 2. Tag on `main` and push
 
-CI only publishes from tags, and by convention tags live on `main`:
+CI only publishes from tags, and by convention tags live on `main`. Tag the
+commit the `prepare` PR's merge produced. If you tag a later commit, run the
+conformance tests on it first (`gh workflow run conformance.yml --ref main`).
 
 ```bash
 git checkout main && git pull
