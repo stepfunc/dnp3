@@ -383,18 +383,6 @@ jobs:
       - name: Install Java bindings
         shell: bash
         run: (cd ffi/bindings/java/dnp3 && sudo mvn install)
-      # dnp3c with revision 3.1r1 isn't on Maven Central yet: build the version conformance/pom.xml names from source,
-      # at a pinned commit, into the repository the tests run with (root's, as they run as root)
-      - name: Checkout dnp3c
-        uses: actions/checkout@v6
-        with:
-          repository: stepfunc/dnp3c
-          ref: 2dcc1602a2004f90872b08a5004a1505cf4e32e4
-          path: dnp3c
-      - name: Install dnp3c
-        working-directory: dnp3c
-        # building dnp3c needs a full JDK 21
-        run: sudo JAVA_HOME="$JAVA_HOME_21_X64" mvn --batch-mode install -DskipTests
       - name: Capture packets during the conformance tests
         working-directory: conformance
         # capturing needs root, which the tests run as; local runs leave it off

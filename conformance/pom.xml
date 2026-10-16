@@ -12,7 +12,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <scala.version>3.9.0</scala.version>
         <dnp3.version>1.8.0-M1</dnp3.version>
-        <dnp3c.version>0.1.0-SNAPSHOT</dnp3c.version>
+        <dnp3c.version>0.2.0</dnp3c.version>
         <scala-maven-plugin.version>4.10.0</scala-maven-plugin.version>
         <!-- the revision of the test procedures scala:run runs, e.g. -Dconformance.revision=2.7, which also needs
              outstation.subset.level = 2 in device.ini -->
