@@ -13,7 +13,7 @@ use scursor::{ReadCursor, WriteCursor};
 const fn num_link_frames(fragment_size: usize) -> usize {
     let full_link_frames = fragment_size / link::constant::MAX_APP_BYTES_PER_FRAME;
 
-    if fragment_size % link::constant::MAX_APP_BYTES_PER_FRAME == 0 {
+    if fragment_size.is_multiple_of(link::constant::MAX_APP_BYTES_PER_FRAME) {
         full_link_frames
     } else {
         full_link_frames + 1

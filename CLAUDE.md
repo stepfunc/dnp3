@@ -27,7 +27,7 @@
 - **Naming**: Follow Rust naming conventions (snake_case for functions/variables, CamelCase for types)
 - **Imports**: Organize imports by standard lib, external crates, then internal modules
 - **Features**: Support compile-time features (tls, serial, serialization)
-- **Minimum Rust Version**: 1.85+ (the workspace `rust-version`, checked by the `msrv` CI job)
+- **Minimum Rust Version**: 1.87+ (the workspace `rust-version`, checked by the `msrv` CI job)
 
 ## Reference Documents
 - The private repository `stepfunc/dnp3-reference`, checked out next to this one at `../dnp3-reference`, holds the DNP3 source documents: IEEE 1815-2012 and related standards, the DNP Users Group technical bulletins, and the IED certification test procedures. Some documents (1815-2012 and the 2.7 and 3.1r1 test procedures) have searchable Markdown extractions; the bulletins are PDFs with an index of what each one changes. It also records our interpretation decisions

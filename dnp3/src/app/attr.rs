@@ -1613,8 +1613,8 @@ impl<'a> AttrValue<'a> {
 
     fn parse_signed_int(cursor: &mut ReadCursor<'a>, len: u8) -> Result<i32, AttrParseError> {
         match len {
-            1 => Ok(cursor.read_u8()? as i32),
-            2 => Ok(cursor.read_i16_le()? as i32),
+            1 => Ok(cursor.read_u8()?.cast_signed().into()),
+            2 => Ok(cursor.read_i16_le()?.into()),
             4 => Ok(cursor.read_i32_le()?),
             _ => Err(AttrParseError::BadIntegerLength(len)),
         }
@@ -1635,7 +1635,7 @@ impl<'a> AttrValue<'a> {
         cursor: &mut ReadCursor<'a>,
         len: u16,
     ) -> Result<VariationList<'a>, AttrParseError> {
-        if len % 2 != 0 {
+        if !len.is_multiple_of(2) {
             return Err(AttrParseError::BadAttrListLength(len));
         }
 
@@ -1695,6 +1695,77 @@ mod test {
             AttrValue::parse(&mut cursor),
             Err(AttrParseError::BadIntegerLength(3))
         );
+    }
+
+    fn parse_signed(bytes: &[u8]) -> i32 {
+        let mut cursor = ReadCursor::new(bytes);
+        let value = match AttrValue::parse(&mut cursor).unwrap() {
+            AttrValue::SignedInt(x) => x,
+            other => panic!("unexpected value: {other:?}"),
+        };
+        assert!(cursor.is_empty());
+        value
+    }
+
+    #[test]
+    fn parses_one_byte_signed_int() {
+        assert_eq!(parse_signed(&[SIGNED_INT, 0x01, 0xFF]), -1);
+        assert_eq!(parse_signed(&[SIGNED_INT, 0x01, 0x80]), -128);
+        assert_eq!(parse_signed(&[SIGNED_INT, 0x01, 0x7F]), 127);
+    }
+
+    #[test]
+    fn parses_two_byte_signed_int() {
+        assert_eq!(parse_signed(&[SIGNED_INT, 0x02, 0xFF, 0xFF]), -1);
+        assert_eq!(parse_signed(&[SIGNED_INT, 0x02, 0x00, 0x80]), -32768);
+    }
+
+    #[test]
+    fn parses_four_byte_signed_int() {
+        assert_eq!(
+            parse_signed(&[SIGNED_INT, 0x04, 0xFF, 0xFF, 0xFF, 0xFF]),
+            -1
+        );
+        assert_eq!(
+            parse_signed(&[SIGNED_INT, 0x04, 0x00, 0x00, 0x00, 0x80]),
+            i32::MIN
+        );
+    }
+
+    #[test]
+    fn rejects_three_byte_signed_int() {
+        let mut cursor = ReadCursor::new(&[SIGNED_INT, 0x03, 42, 00, 00]);
+        assert_eq!(
+            AttrValue::parse(&mut cursor),
+            Err(AttrParseError::BadIntegerLength(3))
+        );
+    }
+
+    #[test]
+    fn signed_int_round_trips_at_every_encoding_size() {
+        for value in [
+            -129,
+            -128,
+            -1,
+            0,
+            1,
+            126,
+            127,
+            128,
+            -32769,
+            -32768,
+            32766,
+            32767,
+            32768,
+            i32::MIN,
+            i32::MAX,
+        ] {
+            let mut buffer = [0u8; 8];
+            let mut cursor = WriteCursor::new(&mut buffer);
+            assert!(OwnedAttrValue::SignedInt(value).write(&mut cursor).is_ok());
+            let written = cursor.written().to_vec();
+            assert_eq!(parse_signed(&written), value, "round trip of {value}");
+        }
     }
 
     #[test]
