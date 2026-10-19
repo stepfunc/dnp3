@@ -1,5 +1,7 @@
 
 ### 1.8.0-M2 ###
+* :bell: **The minimum supported Rust version is now 1.87.** See [#500](https://github.com/stepfunc/dnp3/pull/500).
+* :bug: Fix the master reading 1-byte signed integer device attributes as unsigned, for example -1 as 255. See [#500](https://github.com/stepfunc/dnp3/pull/500).
 * :bug: Report outstation static points whose flags aren't just ONLINE in a variation with flags, when a variation without flags is requested (counters, frozen counters, analog inputs). See [#484](https://github.com/stepfunc/dnp3/pull/484).
 * :bell: Outstations now set IIN2.1 for a read of a point type with no points, and IIN2.2 for a range read that isn't fully installed, consistent with TB2016-001. Masters that explicitly poll types or ranges the outstation doesn't have will now see these errors, and dnp3's master fails such a read ([#486](https://github.com/stepfunc/dnp3/issues/486)). See [#487](https://github.com/stepfunc/dnp3/pull/487).
 ### 1.8.0-M1 ###
