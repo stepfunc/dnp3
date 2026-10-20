@@ -33,6 +33,8 @@ pub struct LinkIdConfig {
     decode_level: PhysDecodeLevel,
 }
 
+const DEFAULT_MAX_LINK_ID_TASKS: NonZeroUsize = NonZeroUsize::new(16).unwrap();
+
 impl LinkIdConfig {
     /// Initialize with default values:
     ///
@@ -41,8 +43,8 @@ impl LinkIdConfig {
     /// * decode_level = Nothing
     pub fn new() -> Self {
         Self {
-            max_tasks: NonZeroUsize::new(16).unwrap(),
-            timeout: Timeout::from_secs(5).unwrap(),
+            max_tasks: DEFAULT_MAX_LINK_ID_TASKS,
+            timeout: Timeout(Duration::from_secs(5)),
             decode_level: PhysDecodeLevel::Nothing,
         }
     }
