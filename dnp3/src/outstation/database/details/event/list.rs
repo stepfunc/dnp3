@@ -98,6 +98,8 @@ impl State {
 }
 
 pub(crate) struct VecList<T> {
+    // the maximum number of entries, which `storage.capacity()` may exceed
+    capacity: usize,
     version: u64,
     storage: Vec<Entry<T>>,
     free_stack: VecDeque<usize>,
@@ -130,6 +132,7 @@ impl<T> VecList<T> {
 
     pub(crate) fn new(capacity: usize) -> Self {
         Self {
+            capacity,
             version: 0,
             storage: Vec::with_capacity(capacity),
             free_stack: VecDeque::with_capacity(capacity),
@@ -142,7 +145,7 @@ impl<T> VecList<T> {
     }
 
     pub(crate) fn is_full(&self) -> bool {
-        self.len() == self.storage.capacity()
+        self.len() == self.capacity
     }
 
     pub(crate) fn add(&mut self, item: T) -> Option<Index> {
@@ -361,6 +364,159 @@ mod tests {
         let mut list = VecList::new(3);
         let index = list.add("hello").unwrap();
         assert!(!list.remove_at(Index::new(index.version + 1, index.value)));
+    }
+
+    mod model {
+        use super::*;
+
+        use proptest::prelude::*;
+
+        #[derive(Debug, Clone)]
+        enum Op {
+            Add(u8),
+            // remove the live entry at this position, modulo the number of live entries
+            RemoveLive(usize),
+            // remove an entry that was already removed, modulo the number of removed entries
+            RemoveStale(usize),
+            // remove an index past the end of storage: this offset past it, or usize::MAX for None
+            RemoveOutOfRange(Option<usize>),
+            RemoveFirst(u8),
+            RemoveAll(u8),
+        }
+
+        // a small range of values, so that predicates match more than one entry
+        fn value() -> impl Strategy<Value = u8> {
+            0u8..4
+        }
+
+        fn op() -> impl Strategy<Value = Op> {
+            prop_oneof![
+                3 => value().prop_map(Op::Add),
+                2 => any::<usize>().prop_map(Op::RemoveLive),
+                1 => any::<usize>().prop_map(Op::RemoveStale),
+                1 => prop::option::of(0usize..4).prop_map(Op::RemoveOutOfRange),
+                1 => value().prop_map(Op::RemoveFirst),
+                1 => value().prop_map(Op::RemoveAll),
+            ]
+        }
+
+        // the list must behave like a bounded queue of (index, value) pairs in insertion order
+        struct Model {
+            capacity: usize,
+            live: VecDeque<(Index, u8)>,
+            removed: Vec<Index>,
+        }
+
+        impl Model {
+            fn apply(&mut self, list: &mut VecList<u8>, op: Op) {
+                match op {
+                    Op::Add(value) => {
+                        let result = list.add(value);
+                        if self.live.len() == self.capacity {
+                            assert_eq!(result, None);
+                        } else {
+                            let index = result.expect("add failed below capacity");
+                            assert!(self.live.iter().all(|(live, _)| *live != index));
+                            self.live.push_back((index, value));
+                        }
+                    }
+                    Op::RemoveLive(position) => {
+                        if self.live.is_empty() {
+                            return;
+                        }
+                        let (index, _) = self
+                            .live
+                            .remove(position % self.live.len())
+                            .expect("position is in range");
+                        assert!(list.remove_at(index));
+                        self.removed.push(index);
+                    }
+                    Op::RemoveStale(position) => {
+                        if self.removed.is_empty() {
+                            return;
+                        }
+                        let index = self.removed[position % self.removed.len()];
+                        assert!(!list.remove_at(index));
+                    }
+                    Op::RemoveOutOfRange(offset) => {
+                        let value = match offset {
+                            Some(offset) => list.storage.len() + offset,
+                            None => usize::MAX,
+                        };
+                        assert!(!list.remove_at(Index::new(list.version, value)));
+                    }
+                    Op::RemoveFirst(value) => {
+                        let result = list.remove_first(|x| *x == value).copied();
+                        match self.live.iter().position(|(_, x)| *x == value) {
+                            Some(position) => {
+                                let (index, _) =
+                                    self.live.remove(position).expect("position is in range");
+                                assert_eq!(result, Some(value));
+                                self.removed.push(index);
+                            }
+                            None => assert_eq!(result, None),
+                        }
+                    }
+                    Op::RemoveAll(value) => {
+                        let count = list.remove_all(|x| *x == value);
+                        let before = self.live.len();
+                        let removed = &mut self.removed;
+                        self.live.retain(|(index, x)| {
+                            let keep = *x != value;
+                            if !keep {
+                                removed.push(*index);
+                            }
+                            keep
+                        });
+                        assert_eq!(count, before - self.live.len());
+                    }
+                }
+            }
+
+            fn check(&self, list: &VecList<u8>) {
+                assert_eq!(list.len(), self.live.len());
+                assert_eq!(list.is_full(), self.live.len() == self.capacity);
+                // bounded, so that a cycle in the links fails here instead of hanging
+                let entries: Vec<(Index, u8)> = list
+                    .iter()
+                    .take(self.live.len() + 1)
+                    .map(|(i, x)| (i, *x))
+                    .collect();
+                assert_eq!(entries, self.live.iter().copied().collect::<Vec<_>>());
+                // the stored ends and size, which iteration alone doesn't fully check
+                let expected = match (self.live.front(), self.live.back()) {
+                    (Some((head, _)), Some((tail, _))) => {
+                        Some((head.value, tail.value, self.live.len()))
+                    }
+                    _ => None,
+                };
+                assert_eq!(list.state.map(|s| (s.head, s.tail, s.size)), expected);
+            }
+        }
+
+        proptest! {
+            #[test]
+            fn behaves_like_a_bounded_queue(
+                capacity in 0usize..8,
+                near_version_wraparound in any::<bool>(),
+                ops in prop::collection::vec(op(), 0..64),
+            ) {
+                let mut list = VecList::new(capacity);
+                if near_version_wraparound {
+                    list.version = u64::MAX - 4;
+                }
+                let mut model = Model {
+                    capacity,
+                    live: VecDeque::new(),
+                    removed: Vec::new(),
+                };
+                model.check(&list);
+                for op in ops {
+                    model.apply(&mut list, op);
+                    model.check(&list);
+                }
+            }
+        }
     }
 
     #[test]
