@@ -488,12 +488,6 @@ impl Iin {
             || self.iin2.get_object_unknown()
             || self.iin2.get_parameter_error()
     }
-
-    pub(crate) fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-        cursor.write_u8(self.iin1.value)?;
-        cursor.write_u8(self.iin2.value)?;
-        Ok(())
-    }
 }
 
 /// Application-layer header for requests
@@ -575,10 +569,21 @@ impl ResponseHeader {
         }
     }
 
-    pub(crate) fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-        self.control.write(cursor)?;
-        self.function.function().write(cursor)?;
-        self.iin.write(cursor)?;
-        Ok(())
+    /// a solicited response in a single fragment that doesn't ask for confirmation
+    pub(crate) fn solicited(seq: Sequence, iin: Iin) -> Self {
+        Self::new(
+            ControlField::single_response(seq),
+            ResponseFunction::Response,
+            iin,
+        )
+    }
+
+    pub(crate) fn to_bytes(self) -> [u8; Self::LENGTH] {
+        [
+            self.control.to_u8(),
+            self.function.function().as_u8(),
+            self.iin.iin1.value,
+            self.iin.iin2.value,
+        ]
     }
 }

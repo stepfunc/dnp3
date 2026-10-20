@@ -16,6 +16,8 @@ mod read_dead_band;
 mod read_errors;
 /// state machine for READ requests
 mod read_states;
+/// responses to repeated requests
+mod repeats;
 /// clear restart IIN + cold/warm restart
 mod restart;
 /// time synchronization

@@ -17,6 +17,8 @@ mod config;
 pub(crate) mod control;
 /// handling of deferred read requests
 pub(crate) mod deferred;
+/// outstation response storage
+pub(crate) mod response;
 #[cfg(feature = "unstable")]
 mod runner;
 /// outstation session
