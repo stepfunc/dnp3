@@ -87,14 +87,6 @@ impl State {
     fn single(index: usize) -> State {
         State::new(index, index, 1)
     }
-
-    fn from(size: usize, head: Option<usize>, tail: Option<usize>) -> Option<State> {
-        if size == 0 {
-            None
-        } else {
-            Some(State::new(head.unwrap(), tail.unwrap(), size))
-        }
-    }
 }
 
 pub(crate) struct VecList<T> {
@@ -291,18 +283,6 @@ impl<T> VecList<T> {
         // return this index to the free list
         self.free_stack.push_back(index.value);
 
-        let new_head = if index.value == current.head {
-            metadata.next // new head
-        } else {
-            Some(current.head) // same head
-        };
-
-        let new_tail = if index.value == current.tail {
-            metadata.prev // new tail
-        } else {
-            Some(current.tail) // same tail
-        };
-
         if let Some(prev) = metadata.prev {
             self.storage[prev].metadata.next = metadata.next;
         }
@@ -311,7 +291,17 @@ impl<T> VecList<T> {
             self.storage[next].metadata.prev = metadata.prev;
         }
 
-        self.state = State::from(current.size - 1, new_head, new_tail);
+        // the removed entry's neighbors determine the new ends
+        self.state = match (metadata.prev, metadata.next) {
+            // it was the only entry
+            (None, None) => None,
+            // it was the tail
+            (Some(prev), None) => Some(State::new(current.head, prev, current.size - 1)),
+            // it was the head
+            (None, Some(next)) => Some(State::new(next, current.tail, current.size - 1)),
+            // it was in the middle
+            (Some(_), Some(_)) => Some(State::new(current.head, current.tail, current.size - 1)),
+        };
         true
     }
 }
