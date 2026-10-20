@@ -55,6 +55,15 @@ enum ControlType {
     DirectOperateNoAck,
 }
 
+impl ControlType {
+    fn expects_response(self) -> bool {
+        match self {
+            ControlType::Select | ControlType::Operate | ControlType::DirectOperate => true,
+            ControlType::DirectOperateNoAck => false,
+        }
+    }
+}
+
 #[derive(Copy, Clone)]
 struct Response {
     header: ResponseHeader,
@@ -73,6 +82,10 @@ impl Response {
             iin,
         );
         Self::new(header, 0)
+    }
+
+    fn parameter_error(seq: Sequence) -> Self {
+        Self::empty_solicited(seq, Iin::default() | Iin2::PARAMETER_ERROR)
     }
 
     fn seq(&self) -> Sequence {
@@ -1516,7 +1529,7 @@ impl OutstationSession {
         controls: ControlCollection<'_>,
     ) -> Response {
         // Handle each operate and write the response
-        let (result, len) = {
+        let result = {
             let mut cursor = self.sol_tx_buffer.write_cursor();
             let _ = cursor.skip(ResponseHeader::LENGTH);
 
@@ -1536,13 +1549,38 @@ impl OutstationSession {
             )
             .await;
 
-            (result, cursor.written().len())
+            result.map(|status| (status, cursor.written().len()))
         };
 
-        // Calculate IIN and return it
+        Self::control_response(seq, result)
+    }
+
+    /// Echo the controls into a scratch response, without executing them, to check that the
+    /// real response fits. The echo is the same size whatever the status.
+    fn control_response_fits(&mut self, controls: &ControlCollection) -> bool {
+        let mut cursor = self.sol_tx_buffer.write_cursor();
+        cursor.skip(ResponseHeader::LENGTH).is_ok()
+            && controls
+                .respond_with_status(&mut cursor, CommandStatus::Success)
+                .is_ok()
+    }
+
+    /// `result` is the overall status and the length written, or the error writing the echo
+    fn control_response(
+        seq: Sequence,
+        result: Result<(CommandStatus, usize), scursor::WriteError>,
+    ) -> Response {
+        let (status, len) = match result {
+            Ok(x) => x,
+            Err(_) => {
+                tracing::warn!("control response doesn't fit in the response buffer");
+                return Response::parameter_error(seq);
+            }
+        };
+
         let mut iin = Iin::default();
 
-        if let Ok(CommandStatus::NotSupported) = result {
+        if status == CommandStatus::NotSupported {
             iin |= Iin2::PARAMETER_ERROR;
         }
 
@@ -1619,25 +1657,23 @@ impl OutstationSession {
         let controls = match ControlCollection::from(object_headers) {
             Err(err) => {
                 tracing::warn!(
-                    "ignoring select request containing non-control object header {} - {}",
+                    "ignoring control request containing non-control object header {} - {}",
                     err.variation,
                     err.qualifier
                 );
-
-                let err = Some(Response::empty_solicited(
-                    seq,
-                    Iin::default() | Iin2::PARAMETER_ERROR,
-                ));
-
-                return match ct {
-                    ControlType::Select => err,
-                    ControlType::Operate => err,
-                    ControlType::DirectOperate => err,
-                    ControlType::DirectOperateNoAck => None,
-                };
+                return ct
+                    .expects_response()
+                    .then(|| Response::parameter_error(seq));
             }
             Ok(controls) => controls,
         };
+
+        if ct.expects_response() && !self.control_response_fits(&controls) {
+            tracing::warn!(
+                "ignoring control request whose response doesn't fit in the response buffer"
+            );
+            return Some(Response::parameter_error(seq));
+        }
 
         match ct {
             ControlType::Select => {
@@ -1664,7 +1700,7 @@ impl OutstationSession {
         controls: ControlCollection<'_>,
     ) -> Response {
         // Handle each select and write the response
-        let (result, len) = {
+        let result = {
             let mut cursor = self.sol_tx_buffer.write_cursor();
             let _ = cursor.skip(ResponseHeader::LENGTH);
 
@@ -1678,11 +1714,11 @@ impl OutstationSession {
             )
             .await;
 
-            (result, cursor.written().len())
+            result.map(|status| (status, cursor.written().len()))
         };
 
         // Record the select state
-        if let Ok(CommandStatus::Success) = result {
+        if let Ok((CommandStatus::Success, _)) = result {
             self.state.select = Some(SelectState::new(
                 seq,
                 frame_id,
@@ -1691,19 +1727,7 @@ impl OutstationSession {
             ))
         }
 
-        // Calculate IIN and return response
-        let mut iin = Iin::default();
-
-        if let Ok(CommandStatus::NotSupported) = result {
-            iin |= Iin2::PARAMETER_ERROR;
-        }
-
-        let header = ResponseHeader::new(
-            ControlField::single_response(seq),
-            ResponseFunction::Response,
-            iin,
-        );
-        Response::new(header, len)
+        Self::control_response(seq, result)
     }
 
     async fn handle_operate(
@@ -1714,67 +1738,46 @@ impl OutstationSession {
         controls: ControlCollection<'_>,
     ) -> Response {
         // Handle each operate and write the response
-        let (status, len) = {
+        let result = {
             let mut cursor = self.sol_tx_buffer.write_cursor();
             let _ = cursor.skip(ResponseHeader::LENGTH);
 
             // determine if we have a matching SELECT
-            let status = match self.state.select {
-                Some(s) => {
-                    match s.match_operate(
-                        self.config.select_timeout,
-                        seq,
-                        frame_id,
-                        controls.hash(),
-                    ) {
-                        Err(status) => {
-                            controls.respond_with_status(&mut cursor, status).unwrap();
-                            status
-                        }
-                        Ok(()) => {
-                            let max_controls_per_request = self.config.max_controls_per_request;
-                            ControlTransaction::execute(
-                                self.control_handler.borrow_mut(),
-                                database,
-                                |tx, db| {
-                                    controls
-                                        .operate_with_response(
-                                            &mut cursor,
-                                            OperateType::SelectBeforeOperate,
-                                            tx,
-                                            db,
-                                            max_controls_per_request,
-                                        )
-                                        .unwrap()
-                                },
+            let matched = self
+                .state
+                .select
+                .ok_or(CommandStatus::NoSelect)
+                .and_then(|s| {
+                    s.match_operate(self.config.select_timeout, seq, frame_id, controls.hash())
+                });
+
+            let result = match matched {
+                Err(status) => controls
+                    .respond_with_status(&mut cursor, status)
+                    .map(|_| status),
+                Ok(()) => {
+                    let max_controls_per_request = self.config.max_controls_per_request;
+                    ControlTransaction::execute(
+                        self.control_handler.borrow_mut(),
+                        database,
+                        |tx, db| {
+                            controls.operate_with_response(
+                                &mut cursor,
+                                OperateType::SelectBeforeOperate,
+                                tx,
+                                db,
+                                max_controls_per_request,
                             )
-                            .await
-                        }
-                    }
-                }
-                None => {
-                    let status = CommandStatus::NoSelect;
-                    controls.respond_with_status(&mut cursor, status).unwrap();
-                    status
+                        },
+                    )
+                    .await
                 }
             };
 
-            (status, cursor.written().len())
+            result.map(|status| (status, cursor.written().len()))
         };
 
-        // Calculate IIN and return it
-        let mut iin = Iin::default();
-
-        if status == CommandStatus::NotSupported {
-            iin |= Iin2::PARAMETER_ERROR;
-        }
-
-        let header = ResponseHeader::new(
-            ControlField::single_response(seq),
-            ResponseFunction::Response,
-            iin,
-        );
-        Response::new(header, len)
+        Self::control_response(seq, result)
     }
 
     fn handle_freeze(

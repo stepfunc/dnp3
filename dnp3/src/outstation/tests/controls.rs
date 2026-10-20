@@ -1,7 +1,7 @@
 use tokio::time::Duration;
 
 use crate::app::variations::Group41Var2;
-use crate::app::FunctionCode;
+use crate::app::{BufferSize, FunctionCode};
 use crate::link::header::BroadcastConfirmMode;
 use crate::outstation::config::Feature;
 use crate::outstation::tests::harness::*;
@@ -253,4 +253,208 @@ async fn accept_two_identical_selects_before_operate() {
         Event::Operate(G41V2_INDEX_7, OperateType::SelectBeforeOperate),
         Event::EndControls,
     ]);
+}
+
+// an echo of this many g41v2 controls (8 + 4 * 61 bytes) exactly fills the response buffer
+const MAX_CONTROLS_IN_RESPONSE: u8 = 61;
+const RESPONSE_BUFFER_SIZE: usize = 252;
+
+fn config_with_small_response_buffer() -> crate::outstation::OutstationConfig {
+    let mut config = get_default_config();
+    config.solicited_buffer_size = BufferSize::new(RESPONSE_BUFFER_SIZE).unwrap();
+    config
+}
+
+// g41v2 with a 1-byte count and index, value 513 at indices 0 to count - 1, status SUCCESS
+fn g41v2_request(seq: u8, function: FunctionCode, count: u8) -> Vec<u8> {
+    let mut request = vec![0xC0 | seq, function.as_u8(), 41, 2, 0x17, count];
+    for index in 0..count {
+        request.extend_from_slice(&[index, 0x01, 0x02, 0x00]);
+    }
+    request
+}
+
+// response with restart IIN that echoes g41v2_request with every status set to `status`
+fn g41v2_response(seq: u8, count: u8, status: u8) -> Vec<u8> {
+    let mut response = vec![0xC0 | seq, 0x81, 0x80, 0x00, 41, 2, 0x17, count];
+    for index in 0..count {
+        response.extend_from_slice(&[index, 0x01, 0x02, status]);
+    }
+    response
+}
+
+// response with restart IIN and IIN2.2 PARAMETER_ERROR, and no objects
+fn parameter_error_response(seq: u8) -> [u8; 4] {
+    [0xC0 | seq, 0x81, 0x80, 0x04]
+}
+
+fn g41v2_select_events(count: u8) -> Vec<Event> {
+    let mut events = vec![Event::BeginControls];
+    for index in 0..count {
+        events.push(Event::Select(Control::G41V2(
+            Group41Var2::new(513),
+            index.into(),
+        )));
+    }
+    events.push(Event::EndControls);
+    events
+}
+
+fn g41v2_operate_events(count: u8, operate_type: OperateType) -> Vec<Event> {
+    let mut events = vec![Event::BeginControls];
+    for index in 0..count {
+        events.push(Event::Operate(
+            Control::G41V2(Group41Var2::new(513), index.into()),
+            operate_type,
+        ));
+    }
+    events.push(Event::EndControls);
+    events
+}
+
+#[tokio::test]
+async fn direct_operate_whose_response_fits_exactly_operates() {
+    let mut harness = new_harness(config_with_small_response_buffer());
+
+    harness
+        .test_request_response(
+            &g41v2_request(0, FunctionCode::DirectOperate, MAX_CONTROLS_IN_RESPONSE),
+            &g41v2_response(0, MAX_CONTROLS_IN_RESPONSE, 0),
+        )
+        .await;
+
+    harness.check_events(&g41v2_operate_events(
+        MAX_CONTROLS_IN_RESPONSE,
+        OperateType::DirectOperate,
+    ));
+}
+
+#[tokio::test]
+async fn select_and_operate_whose_responses_fit_exactly_operate() {
+    let mut harness = new_harness(config_with_small_response_buffer());
+
+    harness
+        .test_request_response(
+            &g41v2_request(0, FunctionCode::Select, MAX_CONTROLS_IN_RESPONSE),
+            &g41v2_response(0, MAX_CONTROLS_IN_RESPONSE, 0),
+        )
+        .await;
+    harness.check_events(&g41v2_select_events(MAX_CONTROLS_IN_RESPONSE));
+
+    harness
+        .test_request_response(
+            &g41v2_request(1, FunctionCode::Operate, MAX_CONTROLS_IN_RESPONSE),
+            &g41v2_response(1, MAX_CONTROLS_IN_RESPONSE, 0),
+        )
+        .await;
+    harness.check_events(&g41v2_operate_events(
+        MAX_CONTROLS_IN_RESPONSE,
+        OperateType::SelectBeforeOperate,
+    ));
+}
+
+#[tokio::test]
+async fn direct_operate_whose_headers_fit_alone_but_not_together_is_rejected_without_operating() {
+    let mut harness = new_harness(config_with_small_response_buffer());
+
+    // g41v2 with a 1-byte count and index, then g41v2 with a 2-byte count and index, 30
+    // controls each: either header's echo fits on its own, but not both
+    let mut request = vec![0xC0, FunctionCode::DirectOperate.as_u8(), 41, 2, 0x17, 30];
+    for index in 0..30u8 {
+        request.extend_from_slice(&[index, 0x01, 0x02, 0x00]);
+    }
+    request.extend_from_slice(&[41, 2, 0x28, 30, 0x00]);
+    for index in 30..60u8 {
+        request.extend_from_slice(&[index, 0x00, 0x01, 0x02, 0x00]);
+    }
+
+    harness
+        .test_request_response(&request, &parameter_error_response(0))
+        .await;
+
+    harness.check_events(&[]);
+}
+
+#[tokio::test]
+async fn direct_operate_whose_response_does_not_fit_is_rejected_without_operating() {
+    let mut harness = new_harness(config_with_small_response_buffer());
+
+    harness
+        .test_request_response(
+            &g41v2_request(0, FunctionCode::DirectOperate, MAX_CONTROLS_IN_RESPONSE + 1),
+            &parameter_error_response(0),
+        )
+        .await;
+
+    harness.check_events(&[]);
+}
+
+#[tokio::test]
+async fn select_whose_response_does_not_fit_is_rejected_without_selecting() {
+    let mut harness = new_harness(config_with_small_response_buffer());
+
+    harness
+        .test_request_response(
+            &g41v2_request(0, FunctionCode::Select, MAX_CONTROLS_IN_RESPONSE + 1),
+            &parameter_error_response(0),
+        )
+        .await;
+
+    harness.check_events(&[]);
+}
+
+#[tokio::test]
+async fn operate_without_select_whose_response_does_not_fit_is_rejected() {
+    let mut harness = new_harness(config_with_small_response_buffer());
+
+    harness
+        .test_request_response(
+            &g41v2_request(0, FunctionCode::Operate, MAX_CONTROLS_IN_RESPONSE + 1),
+            &parameter_error_response(0),
+        )
+        .await;
+
+    harness.check_events(&[]);
+}
+
+#[tokio::test]
+async fn operate_after_a_different_select_whose_response_does_not_fit_is_rejected() {
+    let mut harness = new_harness(config_with_small_response_buffer());
+
+    harness
+        .test_request_response(SELECT_SEQ0_G41V2, RESPONSE_SEQ0_G41V2_SUCCESS)
+        .await;
+    harness.check_events(&[
+        Event::BeginControls,
+        Event::Select(G41V2_INDEX_7),
+        Event::EndControls,
+    ]);
+
+    harness
+        .test_request_response(
+            &g41v2_request(1, FunctionCode::Operate, MAX_CONTROLS_IN_RESPONSE + 1),
+            &parameter_error_response(1),
+        )
+        .await;
+
+    harness.check_events(&[]);
+}
+
+#[tokio::test]
+async fn direct_operate_no_ack_operates_without_a_response_even_if_it_would_not_fit() {
+    let mut harness = new_harness(config_with_small_response_buffer());
+
+    harness
+        .send_and_process(&g41v2_request(
+            0,
+            FunctionCode::DirectOperateNoResponse,
+            MAX_CONTROLS_IN_RESPONSE + 1,
+        ))
+        .await;
+
+    harness.check_events(&g41v2_operate_events(
+        MAX_CONTROLS_IN_RESPONSE + 1,
+        OperateType::DirectOperateNoAck,
+    ));
+    harness.expect_no_response();
 }
