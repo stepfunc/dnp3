@@ -449,16 +449,24 @@ pub struct DatabaseHandle {
 
 impl DatabaseHandle {
     /// Acquire a mutex on the underlying database and apply a set of changes as a transaction
-    pub fn transaction<F, R>(&self, mut func: F) -> R
+    pub fn transaction<F, R>(&self, func: F) -> R
     where
         F: FnMut(&mut Database) -> R,
     {
-        let ret = {
-            let mut db = self.inner.lock().unwrap();
-            func(&mut db)
-        };
+        let ret = self.with_database(func);
         self.notify.notify_one();
         ret
+    }
+
+    /// Run `func` with the database locked, without notifying the outstation task of a change
+    ///
+    /// This is the only place the lock is taken
+    #[expect(
+        clippy::expect_used,
+        reason = "the mutex is only poisoned by an earlier panic while it was held"
+    )]
+    fn with_database<R>(&self, func: impl FnOnce(&mut Database) -> R) -> R {
+        func(&mut self.inner.lock().expect("database mutex poisoned"))
     }
 
     pub(crate) async fn wait_for_change(&self) {
@@ -482,39 +490,34 @@ impl DatabaseHandle {
 
     pub(crate) async fn clear_written_events(&mut self, app: &mut dyn OutstationApplication) {
         app.begin_confirm();
-        let state = self.inner.lock().unwrap().inner.clear_written_events(app);
+        let state = self.with_database(|db| db.inner.clear_written_events(app));
         app.end_confirm(state).get().await;
     }
 
     pub(crate) fn get_events_info(&self) -> EventsInfo {
-        let guard = self.inner.lock().unwrap();
-
-        EventsInfo {
-            unwritten_classes: guard.inner.unwritten_classes(),
-            is_overflown: guard.inner.is_overflown(),
-        }
+        self.with_database(|db| EventsInfo {
+            unwritten_classes: db.inner.unwritten_classes(),
+            is_overflown: db.inner.is_overflown(),
+        })
     }
 
     pub(crate) fn select(&mut self, headers: &HeaderCollection) -> Iin2 {
-        let mut iin2 = Iin2::default();
-        let mut guard = self.inner.lock().unwrap();
-        for header in headers.iter() {
-            match ReadHeader::get(&header) {
-                None => {
-                    iin2 |= Iin2::NO_FUNC_CODE_SUPPORT;
+        self.with_database(|db| {
+            let mut iin2 = Iin2::default();
+            for header in headers.iter() {
+                match ReadHeader::get(&header) {
+                    None => {
+                        iin2 |= Iin2::NO_FUNC_CODE_SUPPORT;
+                    }
+                    Some(x) => iin2 |= db.inner.select_by_header(x),
                 }
-                Some(x) => iin2 |= guard.inner.select_by_header(x),
             }
-        }
-        iin2
+            iin2
+        })
     }
 
     pub(crate) fn write_response_headers(&mut self, cursor: &mut WriteCursor) -> ResponseInfo {
-        self.inner
-            .lock()
-            .unwrap()
-            .inner
-            .write_response_headers(cursor)
+        self.with_database(|db| db.inner.write_response_headers(cursor))
     }
 
     pub(crate) fn write_unsolicited(
@@ -522,17 +525,18 @@ impl DatabaseHandle {
         classes: EventClasses,
         cursor: &mut WriteCursor,
     ) -> usize {
-        let mut guard = self.inner.lock().unwrap();
-        guard.inner.reset();
-        let count = guard.inner.select_event_classes(classes);
-        if count == 0 {
-            return 0;
-        }
-        guard.inner.write_events_only(cursor)
+        self.with_database(|db| {
+            db.inner.reset();
+            let count = db.inner.select_event_classes(classes);
+            if count == 0 {
+                return 0;
+            }
+            db.inner.write_events_only(cursor)
+        })
     }
 
     pub(crate) fn reset(&mut self) {
-        self.inner.lock().unwrap().inner.reset()
+        self.with_database(|db| db.inner.reset())
     }
 }
 
