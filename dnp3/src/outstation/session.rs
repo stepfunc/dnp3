@@ -1470,17 +1470,33 @@ impl OutstationSession {
             time: self.application.get_processing_delay_ms(),
         };
 
-        let mut cursor = self.sol_tx_buffer.write_cursor();
-        let _ = cursor.skip(ResponseHeader::LENGTH);
-        let mut writer = HeaderWriter::new(&mut cursor);
-        writer.write_count_of_one(g52v2).unwrap();
+        self.single_object_response(seq, g52v2)
+    }
 
-        let header = ResponseHeader::new(
-            ControlField::response(seq, true, true, false),
-            ResponseFunction::Response,
-            Iin::default(),
-        );
-        Response::new(header, cursor.written().len())
+    /// Respond with a single object, or with IIN2.2 if it can't be written
+    fn single_object_response<V>(&mut self, seq: Sequence, item: V) -> Response
+    where
+        V: FixedSizeVariation,
+    {
+        let mut cursor = self.sol_tx_buffer.write_cursor();
+        let result = cursor
+            .skip(ResponseHeader::LENGTH)
+            .and_then(|_| HeaderWriter::new(&mut cursor).write_count_of_one(item));
+
+        match result {
+            Ok(()) => {
+                let header = ResponseHeader::new(
+                    ControlField::response(seq, true, true, false),
+                    ResponseFunction::Response,
+                    Iin::default(),
+                );
+                Response::new(header, cursor.written().len())
+            }
+            Err(err) => {
+                tracing::error!("unable to write {item} to the response buffer: {err:?}");
+                Response::parameter_error(seq)
+            }
+        }
     }
 
     fn handle_record_current_time(&mut self, seq: Sequence) -> Response {
@@ -1497,29 +1513,14 @@ impl OutstationSession {
         };
 
         // respond with the delay
-        let mut cursor = self.sol_tx_buffer.write_cursor();
-        let _ = cursor.skip(ResponseHeader::LENGTH);
-        let mut writer = HeaderWriter::new(&mut cursor);
         match delay {
             RestartDelay::Seconds(value) => {
-                writer
-                    .write_count_of_one(Group52Var1 { time: value })
-                    .unwrap();
+                self.single_object_response(seq, Group52Var1 { time: value })
             }
             RestartDelay::Milliseconds(value) => {
-                writer
-                    .write_count_of_one(Group52Var2 { time: value })
-                    .unwrap();
+                self.single_object_response(seq, Group52Var2 { time: value })
             }
         }
-
-        let header = ResponseHeader::new(
-            ControlField::response(seq, true, true, false),
-            ResponseFunction::Response,
-            Iin::default(),
-        );
-
-        Response::new(header, cursor.written().len())
     }
 
     async fn handle_direct_operate(
