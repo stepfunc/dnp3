@@ -19,9 +19,8 @@ use crate::master::poll::{PollHandle, PollMap, PollMsg};
 use crate::master::request::ReadRequest;
 use crate::master::request::{Classes, EventClasses, TimeSyncProcedure};
 use crate::master::tasks::auto::AutoTask;
-use crate::master::tasks::time::TimeSyncTask;
-use crate::master::tasks::NonReadTask::TimeSync;
-use crate::master::tasks::{AppTask, AssociationTask, ReadTask, Task};
+use crate::master::tasks::time::PendingTimeSync;
+use crate::master::tasks::{AppTask, AssociationTask, QueuedTask, ReadTask, Task};
 use crate::master::{AssociationInformation, ReadHandler, ReadType, TaskType};
 use crate::util::Smallest;
 
@@ -161,8 +160,8 @@ impl AutoTaskState {
         !self.is_idle()
     }
 
-    /// Create a `Next<Task>`
-    fn create_next_task(&self, builder: impl FnOnce() -> Task) -> Next<Task> {
+    /// Create a `Next<QueuedTask>`
+    fn create_next_task(&self, builder: impl FnOnce() -> QueuedTask) -> Next<QueuedTask> {
         match self {
             Self::Idle => Next::None,
             Self::Pending => Next::Now(builder()),
@@ -240,16 +239,18 @@ impl TaskStates {
         self.enabled_unsolicited.demand();
     }
 
-    fn next(&self, config: &AssociationConfig, association: &Association) -> Next<Task> {
+    fn next(&self, config: &AssociationConfig, association: &Association) -> Next<QueuedTask> {
         if self.clear_restart_iin.is_pending() {
             return self
                 .clear_restart_iin
-                .create_next_task(|| AutoTask::ClearRestartBit.wrap());
+                .create_next_task(|| AutoTask::ClearRestartBit.wrap().into());
         }
 
         if config.disable_unsol_classes.any() && self.disable_unsolicited.is_pending() {
             return self.disable_unsolicited.create_next_task(|| {
-                AutoTask::DisableUnsolicited(config.disable_unsol_classes).wrap()
+                AutoTask::DisableUnsolicited(config.disable_unsol_classes)
+                    .wrap()
+                    .into()
             });
         }
 
@@ -258,20 +259,23 @@ impl TaskStates {
                 Task::App(AppTask::Read(ReadTask::StartupIntegrity(
                     config.startup_integrity_classes,
                 )))
+                .into()
             });
         }
 
         if self.time_sync.is_pending() {
             if let Some(procedure) = config.auto_time_sync {
-                return self.time_sync.create_next_task(|| {
-                    TimeSync(TimeSyncTask::get_procedure(procedure, None)).wrap()
-                });
+                return self
+                    .time_sync
+                    .create_next_task(|| PendingTimeSync::new(procedure, None).into());
             }
         }
 
         if config.enable_unsol_classes.any() && self.enabled_unsolicited.is_pending() {
             return self.enabled_unsolicited.create_next_task(|| {
-                AutoTask::EnableUnsolicited(config.enable_unsol_classes).wrap()
+                AutoTask::EnableUnsolicited(config.enable_unsol_classes)
+                    .wrap()
+                    .into()
             });
         }
 
@@ -279,7 +283,7 @@ impl TaskStates {
         if events_to_scan.any() {
             return self
                 .event_scan
-                .create_next_task(|| ReadTask::EventScan(events_to_scan).wrap());
+                .create_next_task(|| ReadTask::EventScan(events_to_scan).wrap().into());
         }
 
         Next::None
@@ -309,7 +313,7 @@ pub(crate) struct Association {
     response_timeout: Timeout,
     seq: Sequence,
     last_unsol_frag: Option<LastUnsolFragment>,
-    request_queue: VecDeque<Task>,
+    request_queue: VecDeque<QueuedTask>,
     max_request_queue_size: usize,
     auto_tasks: TaskStates,
     read_handler: Box<dyn ReadHandler>,
@@ -705,25 +709,25 @@ impl Association {
 
     fn next_task(&mut self, now: Instant) -> Next<Task> {
         loop {
-            let next_task = self.get_next_task(now);
-
-            if let Next::Now(task) = next_task {
-                // Check if execution can still happen
-                if let Some(task) = task.start(self) {
-                    return Next::Now(task);
+            match self.get_next_task(now) {
+                Next::Now(task) => {
+                    // Check if execution can still happen
+                    if let Some(task) = task.start(self) {
+                        return Next::Now(task);
+                    }
                 }
-            } else {
-                return next_task;
+                Next::NotBefore(time) => return Next::NotBefore(time),
+                Next::None => return Next::None,
             }
         }
     }
 
-    fn next_link_status_task(&self, now: Instant) -> Next<Task> {
+    fn next_link_status_task(&self, now: Instant) -> Next<QueuedTask> {
         match self.next_link_status_deadline {
             None => Next::None,
             Some(next) => {
                 if now >= next {
-                    Next::Now(Task::LinkStatus(Promise::null()))
+                    Next::Now(Task::LinkStatus(Promise::null()).into())
                 } else {
                     Next::NotBefore(next)
                 }
@@ -731,7 +735,7 @@ impl Association {
         }
     }
 
-    fn get_next_task(&self, now: Instant) -> Next<Task> {
+    fn get_next_task(&self, now: Instant) -> Next<QueuedTask> {
         // Check for automatic tasks
         let next_auto_task = self.auto_tasks.next(&self.config, self);
 
@@ -743,7 +747,7 @@ impl Association {
         match self.polls.next(now) {
             Next::Now(poll) => {
                 // always prioritize polls over link status requests
-                Next::Now(Task::App(AppTask::Read(ReadTask::PeriodicPoll(poll))))
+                Next::Now(Task::App(AppTask::Read(ReadTask::PeriodicPoll(poll))).into())
             }
             Next::NotBefore(next_poll) => {
                 match self.next_link_status_task(now) {

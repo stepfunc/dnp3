@@ -5,7 +5,7 @@ use crate::master::error::PollError;
 use crate::master::error::{AssociationError, TaskError};
 use crate::master::poll::PollMsg;
 use crate::master::promise::Promise;
-use crate::master::tasks::Task;
+use crate::master::tasks::QueuedTask;
 use crate::master::{AssociationConfig, AssociationHandler, AssociationInformation, ReadHandler};
 use crate::transport::FragmentAddr;
 use crate::util::session::Enabled;
@@ -45,7 +45,7 @@ pub(crate) struct AssociationMsg {
 
 pub(crate) enum AssociationMsgType {
     /// Queue an I/O task for execution later
-    QueueTask(Task),
+    QueueTask(QueuedTask),
     /// Modify polls
     Poll(PollMsg),
 }

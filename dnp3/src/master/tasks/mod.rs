@@ -13,7 +13,7 @@ use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::command_no_ack::CommandNoAckTask;
 use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::restart::RestartTask;
-use crate::master::tasks::time::TimeSyncTask;
+use crate::master::tasks::time::{PendingTimeSync, TimeSyncTask};
 use crate::master::{ReadType, TaskType};
 
 use crate::master::tasks::deadbands::WriteDeadBandsTask;
@@ -67,6 +67,45 @@ pub(crate) enum Task {
     LinkStatus(Promise<Result<(), TaskError>>),
 }
 
+/// A task waiting for the scheduler to start it
+pub(crate) enum QueuedTask {
+    /// Ready to send as is
+    Ready(Task),
+    /// Captures the time its first request is based on when it starts
+    TimeSync(PendingTimeSync),
+}
+
+impl From<Task> for QueuedTask {
+    fn from(task: Task) -> Self {
+        Self::Ready(task)
+    }
+}
+
+impl From<PendingTimeSync> for QueuedTask {
+    fn from(task: PendingTimeSync) -> Self {
+        Self::TimeSync(task)
+    }
+}
+
+impl QueuedTask {
+    pub(crate) fn on_task_error(self, association: Option<&mut Association>, err: TaskError) {
+        match self {
+            Self::Ready(task) => task.on_task_error(association, err),
+            Self::TimeSync(task) => task.on_task_error(association, err),
+        }
+    }
+
+    /// Perform any operation needed before sending and check that the task should still be sent
+    ///
+    /// Returning `None` means starting failed and the failure has already been reported.
+    pub(crate) fn start(self, association: &mut Association) -> Option<Task> {
+        match self {
+            Self::Ready(task) => Some(task),
+            Self::TimeSync(task) => task.start(association).map(Task::from),
+        }
+    }
+}
+
 #[derive(Copy, Clone, PartialEq, Debug)]
 pub(crate) enum TaskId {
     LinkStatus,
@@ -109,18 +148,6 @@ impl Task {
             Self::App(task) => task.on_task_error(association, err),
             Self::LinkStatus(promise) => promise.complete(Err(err)),
         }
-    }
-
-    /// Perform operation before sending and check if the request should still be sent
-    ///
-    /// Returning Some means the task should proceed, returning None means
-    /// the task was cancelled, forget about it.
-    pub(crate) fn start(self, association: &mut Association) -> Option<Task> {
-        if let Task::App(AppTask::NonRead(task)) = self {
-            return task.start(association).map(|task| task.wrap());
-        }
-
-        Some(self)
     }
 
     pub(crate) fn get_id(&self) -> TaskId {
@@ -296,28 +323,6 @@ impl ReadTask {
 }
 
 impl NonReadTask {
-    pub(crate) fn wrap(self) -> Task {
-        Task::App(AppTask::NonRead(self))
-    }
-
-    pub(crate) fn start(self, association: &mut Association) -> Option<NonReadTask> {
-        match self {
-            Self::Command(_) => Some(self),
-            Self::CommandNoAck(_) => Some(self),
-            Self::Auto(_) => Some(self),
-            Self::TimeSync(task) => task.start(association).map(|task| task.wrap()),
-            Self::Restart(_) => Some(self),
-            Self::DeadBands(_) => Some(self),
-            Self::EmptyResponseTask(_) => Some(self),
-            Self::FileRead(_) => Some(self),
-            Self::GetFileInfo(_) => Some(self),
-            Self::OpenFile(_) => Some(self),
-            Self::CloseFile(_) => Some(self),
-            Self::WriteFileBlock(_) => Some(self),
-            Self::AuthFile(_) => Some(self),
-        }
-    }
-
     pub(crate) fn function(&self) -> FunctionCode {
         match self {
             Self::Command(task) => task.function(),

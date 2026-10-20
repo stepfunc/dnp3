@@ -14,16 +14,66 @@ use crate::master::tasks::{AppTask, NonReadTask, Task};
 
 use tokio::time::Instant;
 
+type TimeSyncPromise = Option<Promise<Result<(), TimeSyncError>>>;
+
+/// A time synchronization that hasn't started. Starting it captures the time the first
+/// request is based on.
+pub(crate) struct PendingTimeSync {
+    procedure: TimeSyncProcedure,
+    promise: TimeSyncPromise,
+}
+
+impl PendingTimeSync {
+    pub(crate) fn new(procedure: TimeSyncProcedure, promise: TimeSyncPromise) -> Self {
+        Self { procedure, promise }
+    }
+
+    /// Start the time synchronization, or report an error and return `None` if the system
+    /// time isn't available
+    pub(crate) fn start(self, association: &mut Association) -> Option<TimeSyncTask> {
+        let state = match self.procedure {
+            TimeSyncProcedure::NonLan => {
+                let request_tx = Instant::now();
+                association
+                    .get_system_time()
+                    .map(|_| State::MeasureDelay(request_tx))
+            }
+            TimeSyncProcedure::Lan => association.get_system_time().map(State::RecordCurrentTime),
+            TimeSyncProcedure::DirectWriteAbsTime => {
+                association.get_system_time().map(State::WriteAbsoluteTime)
+            }
+        };
+
+        match state {
+            Some(state) => Some(TimeSyncTask::new(state, self.promise)),
+            None => {
+                complete(
+                    self.promise,
+                    association,
+                    Err(TimeSyncError::SystemTimeNotAvailable),
+                );
+                None
+            }
+        }
+    }
+
+    pub(crate) fn on_task_error(self, association: Option<&mut Association>, err: TaskError) {
+        on_task_error(self.promise, association, err)
+    }
+}
+
 enum State {
-    MeasureDelay(Option<Instant>),
-    WriteAbsoluteTime(Option<Timestamp>),
-    RecordCurrentTime(Option<Timestamp>),
+    /// time the delay measurement request is sent
+    MeasureDelay(Instant),
+    WriteAbsoluteTime(Timestamp),
+    /// time the record current time request is sent
+    RecordCurrentTime(Timestamp),
     WriteLastRecordedTime(Timestamp),
 }
 
 pub(crate) struct TimeSyncTask {
     state: State,
-    promise: Option<Promise<Result<(), TimeSyncError>>>,
+    promise: TimeSyncPromise,
 }
 
 impl From<TimeSyncTask> for Task {
@@ -32,18 +82,33 @@ impl From<TimeSyncTask> for Task {
     }
 }
 
-impl TimeSyncProcedure {
-    fn get_start_state(&self) -> State {
-        match self {
-            TimeSyncProcedure::Lan => State::RecordCurrentTime(None),
-            TimeSyncProcedure::NonLan => State::MeasureDelay(None),
-            TimeSyncProcedure::DirectWriteAbsTime => State::WriteAbsoluteTime(None),
+fn complete(
+    promise: TimeSyncPromise,
+    association: &mut Association,
+    result: Result<(), TimeSyncError>,
+) {
+    match promise {
+        None => match result {
+            Ok(()) => association.on_time_sync_success(),
+            Err(err) => association.on_time_sync_failure(err),
+        },
+        Some(x) => x.complete(result),
+    }
+}
+
+fn on_task_error(promise: TimeSyncPromise, association: Option<&mut Association>, err: TaskError) {
+    match promise {
+        None => {
+            if let Some(association) = association {
+                association.on_time_sync_failure(err.into());
+            }
         }
+        Some(x) => x.complete(Err(err.into())),
     }
 }
 
 impl TimeSyncTask {
-    fn new(state: State, promise: Option<Promise<Result<(), TimeSyncError>>>) -> Self {
+    fn new(state: State, promise: TimeSyncPromise) -> Self {
         Self { state, promise }
     }
 
@@ -51,57 +116,8 @@ impl TimeSyncTask {
         TimeSyncTask::new(state, self.promise)
     }
 
-    pub(crate) fn get_procedure(
-        procedure: TimeSyncProcedure,
-        promise: Option<Promise<Result<(), TimeSyncError>>>,
-    ) -> Self {
-        Self::new(procedure.get_start_state(), promise)
-    }
-
     pub(crate) fn wrap(self) -> NonReadTask {
         NonReadTask::TimeSync(self)
-    }
-
-    pub(crate) fn start(mut self, association: &mut Association) -> Option<Self> {
-        match &mut self.state {
-            State::MeasureDelay(time) => {
-                time.replace(Instant::now());
-
-                match association.get_system_time() {
-                    Some(_) => Some(self),
-                    None => {
-                        self.report_error(association, TimeSyncError::SystemTimeNotAvailable);
-                        None
-                    }
-                }
-            }
-            State::WriteAbsoluteTime(time) => {
-                if time.is_none() {
-                    *time = association.get_system_time();
-                    match time {
-                        Some(_) => Some(self),
-                        None => {
-                            self.report_error(association, TimeSyncError::SystemTimeNotAvailable);
-                            None
-                        }
-                    }
-                } else {
-                    Some(self)
-                }
-            }
-            State::RecordCurrentTime(time) => {
-                *time = association.get_system_time();
-
-                match time {
-                    Some(_) => Some(self),
-                    None => {
-                        self.report_error(association, TimeSyncError::SystemTimeNotAvailable);
-                        None
-                    }
-                }
-            }
-            State::WriteLastRecordedTime(_) => Some(self),
-        }
     }
 
     pub(crate) fn function(&self) -> FunctionCode {
@@ -116,23 +132,14 @@ impl TimeSyncTask {
     pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         match self.state {
             State::MeasureDelay(_) => Ok(()),
-            State::WriteAbsoluteTime(x) => writer.write_count_of_one(Group50Var1 {
-                time: x.expect("WriteAbsoluteTime timestamp must be set by start()"),
-            }),
+            State::WriteAbsoluteTime(time) => writer.write_count_of_one(Group50Var1 { time }),
             State::RecordCurrentTime(_) => Ok(()),
             State::WriteLastRecordedTime(x) => writer.write_count_of_one(Group50Var3 { time: x }),
         }
     }
 
     pub(crate) fn on_task_error(self, association: Option<&mut Association>, err: TaskError) {
-        match self.promise {
-            None => {
-                if let Some(association) = association {
-                    association.on_time_sync_failure(err.into());
-                }
-            }
-            Some(x) => x.complete(Err(err.into())),
-        }
+        on_task_error(self.promise, association, err)
     }
 
     pub(crate) fn handle(
@@ -155,10 +162,9 @@ impl TimeSyncTask {
     fn handle_delay_measure(
         self,
         association: &mut Association,
-        request_tx: Option<Instant>,
+        request_tx: Instant,
         response: Response,
     ) -> Result<Option<NonReadTask>, TaskError> {
-        let request_tx = request_tx.unwrap_or_else(Instant::now);
         let now = Instant::now();
 
         let interval = match now.checked_duration_since(request_tx) {
@@ -226,7 +232,7 @@ impl TimeSyncTask {
         };
 
         Ok(Some(
-            self.change_state(State::WriteAbsoluteTime(Some(timestamp)))
+            self.change_state(State::WriteAbsoluteTime(timestamp))
                 .wrap(),
         ))
     }
@@ -255,7 +261,7 @@ impl TimeSyncTask {
     fn handle_record_current_time(
         self,
         association: &mut Association,
-        recorded_time: Option<Timestamp>,
+        recorded_time: Timestamp,
         response: Response,
     ) -> Result<Option<NonReadTask>, TaskError> {
         if !response.raw_objects.is_empty() {
@@ -266,7 +272,6 @@ impl TimeSyncTask {
             return Err(TaskError::UnexpectedResponseHeaders);
         }
 
-        let recorded_time = recorded_time.expect("Recorded time should be set by the start method");
         Ok(Some(
             self.change_state(State::WriteLastRecordedTime(recorded_time))
                 .wrap(),
@@ -307,17 +312,11 @@ impl TimeSyncTask {
     }
 
     fn report_success(self, association: &mut Association) {
-        match self.promise {
-            None => association.on_time_sync_success(),
-            Some(x) => x.complete(Ok(())),
-        }
+        complete(self.promise, association, Ok(()))
     }
 
     fn report_error(self, association: &mut Association, error: TimeSyncError) {
-        match self.promise {
-            None => association.on_time_sync_failure(error),
-            Some(x) => x.complete(Err(error)),
-        }
+        complete(self.promise, association, Err(error))
     }
 }
 
@@ -393,7 +392,7 @@ mod tests {
         procedure: TimeSyncProcedure,
         handler: fn(Timestamp) -> Box<dyn AssociationHandler>,
     ) -> (
-        NonReadTask,
+        PendingTimeSync,
         Timestamp,
         Association,
         tokio::sync::oneshot::Receiver<Result<(), TimeSyncError>>,
@@ -412,7 +411,7 @@ mod tests {
             Box::new(NullAssociationInformation),
         );
         let (promise, rx) = Promise::one_shot();
-        let task = NonReadTask::TimeSync(TimeSyncTask::get_procedure(procedure, Some(promise)));
+        let task = PendingTimeSync::new(procedure, Some(promise));
 
         (task, system_time, association, rx)
     }
@@ -447,7 +446,7 @@ mod tests {
         const PROPAGATION_DELAY_MS: u16 = (TOTAL_DELAY_MS - OUTSTATION_DELAY_MS) / 2;
 
         fn non_lan_time_sync_setup() -> (
-            NonReadTask,
+            PendingTimeSync,
             Timestamp,
             Association,
             tokio::sync::oneshot::Receiver<Result<(), TimeSyncError>>,
@@ -458,7 +457,7 @@ mod tests {
         }
 
         fn non_lan_time_sync_single_time_setup() -> (
-            NonReadTask,
+            PendingTimeSync,
             Timestamp,
             Association,
             tokio::sync::oneshot::Receiver<Result<(), TimeSyncError>>,
@@ -477,7 +476,7 @@ mod tests {
                 .await
                 .unwrap()
                 .unwrap();
-            let task = check_write_request(task, &mut association, system_time);
+            let task = check_write_request(task, system_time);
             send_write_response(task, &mut association).await;
             assert!(rx.try_recv().unwrap().is_ok());
         }
@@ -520,7 +519,7 @@ mod tests {
             .unwrap()
             .unwrap();
 
-            let task = check_write_request(task, &mut association, system_time);
+            let task = check_write_request(task, system_time);
             send_write_response(task, &mut association).await;
             assert!(rx.try_recv().unwrap().is_ok());
         }
@@ -577,7 +576,7 @@ mod tests {
                 .await
                 .unwrap()
                 .unwrap();
-            let task = check_write_request(task, &mut association, system_time);
+            let task = check_write_request(task, system_time);
             {
                 let mut buffer = [0; 20];
                 let mut cursor = WriteCursor::new(&mut buffer);
@@ -613,7 +612,7 @@ mod tests {
                 .await
                 .unwrap()
                 .unwrap();
-            let task = check_write_request(task, &mut association, system_time);
+            let task = check_write_request(task, system_time);
             {
                 let mut buffer = [0; 20];
                 let mut cursor = WriteCursor::new(&mut buffer);
@@ -644,7 +643,7 @@ mod tests {
                 .await
                 .unwrap()
                 .unwrap();
-            let task = check_write_request(task, &mut association, system_time);
+            let task = check_write_request(task, system_time);
             task.on_task_error(Some(&mut association), TaskError::ResponseTimeout);
             assert_eq!(
                 rx.try_recv().unwrap(),
@@ -681,12 +680,12 @@ mod tests {
         }
 
         fn check_measure_delay_request(
-            task: NonReadTask,
+            task: PendingTimeSync,
             association: &mut Association,
         ) -> NonReadTask {
             let mut buffer = [0; 20];
             let mut cursor = WriteCursor::new(&mut buffer);
-            let task = task.start(association).unwrap();
+            let task = task.start(association).unwrap().wrap();
             let mut writer = start_request(
                 ControlField::request(Sequence::default()),
                 task.function(),
@@ -725,14 +724,9 @@ mod tests {
             task.handle_response(association, response).await
         }
 
-        fn check_write_request(
-            task: NonReadTask,
-            association: &mut Association,
-            system_time: Timestamp,
-        ) -> NonReadTask {
+        fn check_write_request(task: NonReadTask, system_time: Timestamp) -> NonReadTask {
             let mut buffer = [0; 20];
             let mut cursor = WriteCursor::new(&mut buffer);
-            let task = task.start(association).unwrap();
             let mut writer = start_request(
                 ControlField::request(Sequence::default()),
                 task.function(),
@@ -775,7 +769,7 @@ mod tests {
                 .await
                 .unwrap()
                 .unwrap();
-            let task = check_write_request(task, &mut association, system_time);
+            let task = check_write_request(task, system_time);
             send_write_response(task, &mut association).await;
             assert!(rx.try_recv().unwrap().is_ok());
         }
@@ -819,7 +813,7 @@ mod tests {
                 .await
                 .unwrap()
                 .unwrap();
-            let task = check_write_request(task, &mut association, system_time);
+            let task = check_write_request(task, system_time);
             {
                 let mut buffer = [0; 20];
                 let mut cursor = WriteCursor::new(&mut buffer);
@@ -854,7 +848,7 @@ mod tests {
                 .await
                 .unwrap()
                 .unwrap();
-            let task = check_write_request(task, &mut association, system_time);
+            let task = check_write_request(task, system_time);
             {
                 let mut buffer = [0; 20];
                 let mut cursor = WriteCursor::new(&mut buffer);
@@ -885,7 +879,7 @@ mod tests {
                 .await
                 .unwrap()
                 .unwrap();
-            let task = check_write_request(task, &mut association, system_time);
+            let task = check_write_request(task, system_time);
             task.on_task_error(Some(&mut association), TaskError::ResponseTimeout);
             assert_eq!(
                 rx.try_recv().unwrap(),
@@ -906,7 +900,7 @@ mod tests {
         }
 
         fn lan_time_sync_setup() -> (
-            NonReadTask,
+            PendingTimeSync,
             Timestamp,
             Association,
             tokio::sync::oneshot::Receiver<Result<(), TimeSyncError>>,
@@ -917,12 +911,12 @@ mod tests {
         }
 
         fn check_record_current_time_request(
-            task: NonReadTask,
+            task: PendingTimeSync,
             association: &mut Association,
         ) -> NonReadTask {
             let mut buffer = [0; 20];
             let mut cursor = WriteCursor::new(&mut buffer);
-            let task = task.start(association).unwrap();
+            let task = task.start(association).unwrap().wrap();
             let mut writer = start_request(
                 ControlField::request(Sequence::default()),
                 task.function(),
@@ -956,14 +950,9 @@ mod tests {
             task.handle_response(association, response).await
         }
 
-        fn check_write_request(
-            task: NonReadTask,
-            association: &mut Association,
-            system_time: Timestamp,
-        ) -> NonReadTask {
+        fn check_write_request(task: NonReadTask, system_time: Timestamp) -> NonReadTask {
             let mut buffer = [0; 20];
             let mut cursor = WriteCursor::new(&mut buffer);
-            let task = task.start(association).unwrap();
             let mut writer = start_request(
                 ControlField::request(Sequence::default()),
                 task.function(),
@@ -1031,7 +1020,7 @@ mod tests {
         }
 
         fn direct_write_setup() -> (
-            NonReadTask,
+            PendingTimeSync,
             Timestamp,
             Association,
             tokio::sync::oneshot::Receiver<Result<(), TimeSyncError>>,

@@ -809,6 +809,16 @@ pub struct OctetString {
     len: u8,
 }
 
+impl Default for OctetString {
+    /// A single zero byte
+    fn default() -> Self {
+        Self {
+            value: [0; Self::MAX_SIZE],
+            len: 1,
+        }
+    }
+}
+
 #[allow(clippy::len_without_is_empty)]
 impl OctetString {
     const MAX_SIZE: usize = 255;
