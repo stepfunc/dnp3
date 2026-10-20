@@ -24,8 +24,8 @@ use crate::master::tasks::file::read::{FileReadTask, FileReaderType};
 use crate::master::tasks::file::write_block::{WriteBlockRequest, WriteBlockTask};
 use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::restart::{RestartTask, RestartType};
-use crate::master::tasks::time::TimeSyncTask;
-use crate::master::tasks::Task;
+use crate::master::tasks::time::PendingTimeSync;
+use crate::master::tasks::{QueuedTask, Task};
 use crate::master::{
     AuthKey, BlockNumber, DeadBandHeader, DirReadConfig, FileCredentials, FileError, FileHandle,
     FileInfo, FileMode, FileReadConfig, FileReader, Headers, OpenFile, ReadHandler, WriteError,
@@ -375,8 +375,8 @@ impl AssociationHandle {
         procedure: TimeSyncProcedure,
     ) -> Result<(), TimeSyncError> {
         let (promise, rx) = Promise::one_shot();
-        let task = TimeSyncTask::get_procedure(procedure, Some(promise));
-        self.send_task(task).await?;
+        self.queue_task(PendingTimeSync::new(procedure, Some(promise)).into())
+            .await?;
         rx.await?
     }
 
@@ -523,8 +523,12 @@ impl AssociationHandle {
     }
 
     pub(crate) async fn send_task<T: Into<Task>>(&mut self, task: T) -> Result<(), Shutdown> {
+        self.queue_task(QueuedTask::Ready(task.into())).await
+    }
+
+    async fn queue_task(&mut self, task: QueuedTask) -> Result<(), Shutdown> {
         self.master
-            .send_association_message(self.address, AssociationMsgType::QueueTask(task.into()))
+            .send_association_message(self.address, AssociationMsgType::QueueTask(task))
             .await
     }
 
