@@ -19,6 +19,13 @@
 - Label a PR `conformance` (`gh pr create --label conformance` or `gh pr edit <N> --add-label conformance`) when it changes what the outstation sends or accepts: the outstation, the application, transport, or link layers, or the Java FFI the tests drive. Don't label master-only, docs, CI, or other-binding changes
 - On PRs the result is advisory, not a required check, so look at it before merging
 
+## Dependency Security Advisories
+- The `audit` (cargo-audit) and `osv-scanner` CI jobs fail when an advisory is published against a locked dependency, including on unrelated PRs. Check whether `main` is affected, then fix it in its own PR against `main` (usually `cargo update -p <crate>`) and rebase open PRs once it merges
+- The PR description must say whether dnp3, as configured, is exposed and why, citing the code that decides it. This analysis is what determines whether released versions need a patch or an announcement
+- To assess exposure, check what the released lockfiles (`git show <tag>:Cargo.lock`) pinned and how dnp3 uses the affected code. For TLS: `sfio-rustls-config` builds the trust store from `RootCertStore::empty()` plus only the configured CA file (no system or `webpki-roots` certificates), `CertificateMode::AuthorityBased` uses the webpki verifiers against that store, and `CertificateMode::SelfSigned` rejects any intermediates and compares the peer certificate byte for byte without building a chain
+- Add a `:shield:` changelog entry naming the advisory and the exposure. Rust users pick up a fixed dependency on their next `cargo update`, so a lockfile update only changes the prebuilt bindings (C/C++, .NET, Java); say so
+- If released versions are exposed in a realistic configuration, raise a patch release with the maintainer; otherwise the fix ships in the next release
+
 ## Code Style Guidelines
 - **No unsafe code**: Unsafe code is forbidden (`unsafe_code = "forbid"`)
 - **Documentation**: All public items must be documented (`missing_docs = "deny"`)

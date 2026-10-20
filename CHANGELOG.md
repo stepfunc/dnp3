@@ -1,5 +1,6 @@
 
 ### 1.8.0-M2 ###
+* :shield: Update `rustls-webpki` to 0.103.16 to resolve [RUSTSEC-2026-0382](https://rustsec.org/advisories/RUSTSEC-2026-0382), in which certificate paths through distrusted emSign intermediates could be accepted. dnp3 trusts only the CA file it is configured with, so this requires `CertificateMode::AuthorityBased` with a public emSign root in that file; `CertificateMode::SelfSigned` is not affected. The update only matters for the prebuilt binary distributions of the bindings (C/C++, .NET, Java). See [#505](https://github.com/stepfunc/dnp3/pull/505).
 * :bell: **The minimum supported Rust version is now 1.87.** See [#500](https://github.com/stepfunc/dnp3/pull/500).
 * :bug: Fix the master reading 1-byte signed integer device attributes as unsigned, for example -1 as 255. See [#500](https://github.com/stepfunc/dnp3/pull/500).
 * :bug: Report outstation static points whose flags aren't just ONLINE in a variation with flags, when a variation without flags is requested (counters, frozen counters, analog inputs). See [#484](https://github.com/stepfunc/dnp3/pull/484).
