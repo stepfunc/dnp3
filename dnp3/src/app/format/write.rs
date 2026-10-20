@@ -34,7 +34,7 @@ pub(crate) fn start_response<'a, 'b>(
     cursor: &'b mut WriteCursor<'a>,
 ) -> Result<HeaderWriter<'a, 'b>, scursor::WriteError> {
     let header = ResponseHeader::new(control, function, iin);
-    header.write(cursor)?;
+    cursor.write_bytes(&header.to_bytes())?;
     Ok(HeaderWriter { cursor })
 }
 
