@@ -5,7 +5,6 @@ use crate::link::reader::LinkModes;
 use crate::link::LinkErrorMode;
 use crate::master::task::MasterTask;
 use crate::master::{MasterChannel, MasterChannelConfig, MasterChannelType};
-use crate::util::channel::{Receiver, Sender};
 use crate::util::phys::PhysLayer;
 use crate::util::session::{Enabled, Session};
 use std::future::Future;
@@ -19,6 +18,7 @@ use std::net::SocketAddr;
 use std::num::NonZeroUsize;
 use std::time::Duration;
 use tokio::net::{TcpListener, TcpStream};
+use tokio::task::JoinSet;
 use tracing::Instrument;
 
 /// Configuration that controls how the server performs remote link identification
@@ -93,20 +93,16 @@ pub async fn spawn_master_tcp_server<C: ConnectionHandler>(
 
     let assigned_addr = listener.local_addr().ok();
 
-    let (tx, rx) = crate::util::channel::request_channel();
-
     let (token, shutdown_listener) = crate::util::shutdown::shutdown_token();
 
     let accept_task = AcceptTask {
         conn_id: 0,
-        pending_link_id_tasks: 0,
         link_id_config,
         parse_options: ParseOptions::get_static(),
         listener,
         shutdown_listener,
         handler,
-        id_task_results: rx,
-        id_task_sender: tx,
+        link_id_tasks: JoinSet::new(),
     };
 
     let task = async move {
@@ -192,14 +188,12 @@ type LinkIdResult = std::io::Result<(PhysLayer, SocketAddr, LinkIdentity)>;
 
 struct AcceptTask<C: ConnectionHandler> {
     conn_id: u64,
-    pending_link_id_tasks: usize,
     link_id_config: LinkIdConfig,
     parse_options: ParseOptions,
     listener: TcpListener,
     shutdown_listener: ShutdownListener,
     handler: C,
-    id_task_results: Receiver<LinkIdResult>,
-    id_task_sender: Sender<LinkIdResult>,
+    link_id_tasks: JoinSet<LinkIdResult>,
 }
 
 enum TaskEvent {
@@ -229,15 +223,12 @@ impl<C: ConnectionHandler> AcceptTask<C> {
                 crate::tcp::configure_server(&stream);
                 self.handle_accept(stream, addr).await;
             }
-            TaskEvent::LinkId(res) => {
-                self.pending_link_id_tasks -= 1;
-                match res {
-                    Ok((phys, addr, id)) => self.handle_link_identity(phys, addr, id).await,
-                    Err(err) => {
-                        tracing::warn!("unable to identify remote link: {err}");
-                    }
+            TaskEvent::LinkId(res) => match res {
+                Ok((phys, addr, id)) => self.handle_link_identity(phys, addr, id).await,
+                Err(err) => {
+                    tracing::warn!("unable to identify remote link: {err}");
                 }
-            }
+            },
         }
     }
 
@@ -248,7 +239,7 @@ impl<C: ConnectionHandler> AcceptTask<C> {
     }
 
     async fn next_event(&mut self) -> std::io::Result<Result<TaskEvent, Shutdown>> {
-        let can_accept = self.pending_link_id_tasks < self.link_id_config.max_tasks.get();
+        let can_accept = self.link_id_tasks.len() < self.link_id_config.max_tasks.get();
 
         let accept_connection = async {
             if can_accept {
@@ -263,10 +254,10 @@ impl<C: ConnectionHandler> AcceptTask<C> {
                 let (stream, addr) = res?;
                Ok(Ok(TaskEvent::Accept(stream, addr)))
             }
-            res = self.id_task_results.receive() => {
-                // unwrap is fine b/c both the sending and receiving sides of the channel are owned by this struct
-                let id = res.expect("bad channel logic");
-                Ok(Ok(TaskEvent::LinkId(id)))
+            Some(res) = self.link_id_tasks.join_next(), if !self.link_id_tasks.is_empty() => {
+                // a task that panicked or was cancelled is a failure to identify the link
+                let res = res.unwrap_or_else(|err| Err(std::io::Error::other(err)));
+                Ok(Ok(TaskEvent::LinkId(res)))
             }
             _ = self.shutdown_listener.listen() => {
                 Ok(Err(Shutdown))
@@ -323,14 +314,12 @@ impl<C: ConnectionHandler> AcceptTask<C> {
             }
             Ok(AcceptAction::GetLinkIdentity) => {
                 // spawn a task to identify the remote link layer
-                tokio::spawn(identify_link(
+                self.link_id_tasks.spawn(identify_link(
                     phys,
                     self.link_id_config.decode_level,
                     addr,
                     self.link_id_config.timeout.into(),
-                    self.id_task_sender.clone(),
                 ));
-                self.pending_link_id_tasks += 1;
             }
         }
     }
@@ -414,11 +403,9 @@ async fn identify_link(
     link_id_decode_level: PhysDecodeLevel,
     addr: SocketAddr,
     timeout: Duration,
-    mut reply_to: Sender<LinkIdResult>,
-) {
+) -> LinkIdResult {
     let result = identify_or_timeout(&mut phys, link_id_decode_level, timeout).await;
-    let reply = result.map(|x| (phys, addr, x));
-    let _ = reply_to.send(reply).await;
+    result.map(|x| (phys, addr, x))
 }
 
 async fn identify_or_timeout(
