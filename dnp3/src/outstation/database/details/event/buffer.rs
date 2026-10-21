@@ -406,7 +406,6 @@ pub(crate) trait Insertable: Sized {
     fn get_max(config: &EventBufferConfig) -> u16;
     fn get_type_count(counter: &TypeCounter) -> usize;
     fn is_type(record: &EventRecord) -> bool;
-    fn decrement_type(counter: &mut TypeCounter);
     fn increment_type(counter: &mut TypeCounter);
     fn create_event(&self, default_variation: Self::EventVariation) -> Event;
     // set the selected variation if the record is of this type
@@ -471,8 +470,11 @@ impl EventBuffer {
 
         let ret = if T::get_type_count(&self.total.types) == max as usize {
             if let Some(record) = self.events.remove_first(T::is_type) {
-                T::decrement_type(&mut self.total.types);
-                self.total.classes.decrement(record.class);
+                self.total.decrement(record);
+                // a written event awaiting confirmation is counted as written too
+                if record.state.get() == EventState::Written {
+                    self.written.decrement(record);
+                }
                 self.is_overflown = true;
                 Err(InsertError::Overflow {
                     created: id,
@@ -746,10 +748,6 @@ impl Insertable for measurement::BinaryInput {
         std::matches!(record.event, Event::Binary(_, _))
     }
 
-    fn decrement_type(counter: &mut TypeCounter) {
-        counter.num_binary.decrement();
-    }
-
     fn increment_type(counter: &mut TypeCounter) {
         counter.num_binary.increment();
     }
@@ -781,10 +779,6 @@ impl Insertable for measurement::DoubleBitBinaryInput {
 
     fn is_type(record: &EventRecord) -> bool {
         std::matches!(record.event, Event::DoubleBitBinary(_, _))
-    }
-
-    fn decrement_type(counter: &mut TypeCounter) {
-        counter.num_double_binary.decrement();
     }
 
     fn increment_type(counter: &mut TypeCounter) {
@@ -820,10 +814,6 @@ impl Insertable for measurement::BinaryOutputStatus {
         std::matches!(record.event, Event::BinaryOutputStatus(_, _))
     }
 
-    fn decrement_type(counter: &mut TypeCounter) {
-        counter.num_binary_output_status.decrement();
-    }
-
     fn increment_type(counter: &mut TypeCounter) {
         counter.num_binary_output_status.increment();
     }
@@ -855,10 +845,6 @@ impl Insertable for measurement::Counter {
 
     fn is_type(record: &EventRecord) -> bool {
         std::matches!(record.event, Event::Counter(_, _))
-    }
-
-    fn decrement_type(counter: &mut TypeCounter) {
-        counter.num_counter.decrement();
     }
 
     fn increment_type(counter: &mut TypeCounter) {
@@ -894,10 +880,6 @@ impl Insertable for measurement::FrozenCounter {
         std::matches!(record.event, Event::FrozenCounter(_, _))
     }
 
-    fn decrement_type(counter: &mut TypeCounter) {
-        counter.num_frozen_counter.decrement();
-    }
-
     fn increment_type(counter: &mut TypeCounter) {
         counter.num_frozen_counter.increment();
     }
@@ -929,10 +911,6 @@ impl Insertable for measurement::AnalogInput {
 
     fn is_type(record: &EventRecord) -> bool {
         std::matches!(record.event, Event::Analog(_, _))
-    }
-
-    fn decrement_type(counter: &mut TypeCounter) {
-        counter.num_analog.decrement();
     }
 
     fn increment_type(counter: &mut TypeCounter) {
@@ -968,10 +946,6 @@ impl Insertable for measurement::AnalogOutputStatus {
         std::matches!(record.event, Event::AnalogOutputStatus(_, _))
     }
 
-    fn decrement_type(counter: &mut TypeCounter) {
-        counter.num_analog_output_status.decrement();
-    }
-
     fn increment_type(counter: &mut TypeCounter) {
         counter.num_analog_output_status.increment();
     }
@@ -1003,10 +977,6 @@ impl Insertable for measurement::OctetString {
 
     fn is_type(record: &EventRecord) -> bool {
         std::matches!(record.event, Event::OctetString(_, _))
-    }
-
-    fn decrement_type(counter: &mut TypeCounter) {
-        counter.num_octet_string.decrement();
     }
 
     fn increment_type(counter: &mut TypeCounter) {
@@ -1160,6 +1130,77 @@ mod tests {
             ),
             Err(expected)
         )
+    }
+
+    fn insert_binary(buffer: &mut EventBuffer, class: EventClass) -> Result<u64, InsertError> {
+        buffer.insert(
+            1,
+            class,
+            &BinaryInput::new(true, Flags::ONLINE, Time::synchronized(0)),
+            EventBinaryInputVariation::Group2Var1,
+        )
+    }
+
+    fn write_class_1(buffer: &mut EventBuffer) {
+        assert_eq!(1, buffer.select_by_class(EventClass::Class1.into(), None));
+        let mut backing = [0u8; 64];
+        let mut cursor = WriteCursor::new(backing.as_mut());
+        assert_eq!(buffer.write_events(&mut cursor), Ok(1));
+    }
+
+    #[test]
+    fn evicting_a_written_event_of_another_class_keeps_the_counts_consistent() {
+        let mut buffer = EventBuffer::new(EventBufferConfig::all_types(1));
+        let mut mock = MockApplication::default();
+
+        insert_binary(&mut buffer, EventClass::Class1).unwrap();
+        write_class_1(&mut buffer);
+        assert_eq!(buffer.unwritten_classes(), EventClasses::none());
+
+        // the written event is discarded for the new one before it's confirmed
+        assert_matches!(
+            insert_binary(&mut buffer, EventClass::Class2),
+            Err(InsertError::Overflow { .. })
+        );
+        assert_eq!(buffer.unwritten_classes(), EventClass::Class2.into());
+
+        // the confirm clears nothing, and the new event remains
+        assert_eq!(buffer.clear_written(&mut mock), 0);
+        assert_eq!(buffer.unwritten_classes(), EventClass::Class2.into());
+        assert_eq!(1, buffer.select_by_class(EventClass::Class2.into(), None));
+    }
+
+    #[test]
+    fn evicting_a_selected_event_reports_the_new_one() {
+        let mut buffer = EventBuffer::new(EventBufferConfig::all_types(1));
+
+        insert_binary(&mut buffer, EventClass::Class1).unwrap();
+        assert_eq!(1, buffer.select_by_class(EventClass::Class1.into(), None));
+
+        assert_matches!(
+            insert_binary(&mut buffer, EventClass::Class2),
+            Err(InsertError::Overflow { .. })
+        );
+        assert_eq!(buffer.unwritten_classes(), EventClass::Class2.into());
+    }
+
+    #[test]
+    fn evicting_a_written_event_of_the_same_class_reports_the_new_one() {
+        let mut buffer = EventBuffer::new(EventBufferConfig::all_types(1));
+        let mut mock = MockApplication::default();
+
+        insert_binary(&mut buffer, EventClass::Class1).unwrap();
+        write_class_1(&mut buffer);
+
+        assert_matches!(
+            insert_binary(&mut buffer, EventClass::Class1),
+            Err(InsertError::Overflow { .. })
+        );
+        assert_eq!(buffer.unwritten_classes(), EventClass::Class1.into());
+
+        assert_eq!(buffer.clear_written(&mut mock), 0);
+        assert_eq!(buffer.unwritten_classes(), EventClass::Class1.into());
+        assert_eq!(1, buffer.select_by_class(EventClass::Class1.into(), None));
     }
 
     #[test]
