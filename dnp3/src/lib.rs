@@ -66,3 +66,6 @@ pub mod udp;
 
 pub(crate) mod transport;
 pub(crate) mod util;
+
+#[cfg(all(test, dnp3_no_panic))]
+mod no_panic_check;

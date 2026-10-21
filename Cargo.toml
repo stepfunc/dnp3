@@ -31,6 +31,7 @@ keywords = ["dnp3", "ics", "scada", "security"]
 categories = ["network-programming"]
 
 [workspace.lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(dnp3_no_panic)'] }
 unsafe_code = "forbid"
 non_ascii_idents = "deny"
 unreachable_pub = "deny"

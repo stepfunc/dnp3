@@ -145,27 +145,23 @@ pub trait ReadHandler: Send + Sync {
     fn handle_abs_time(&mut self, info: HeaderInfo, time: Timestamp) {}
 }
 
-pub(crate) fn handle_attribute(
+/// Returns false for an attribute whose type doesn't match the one its variation defines
+pub(crate) fn handle_attribute<H: ReadHandler + ?Sized>(
     var: Variation,
     qualifier: QualifierCode,
     attr: &Option<Attribute>,
-    handler: &mut dyn ReadHandler,
-) {
+    handler: &mut H,
+) -> bool {
     if let Some(attr) = attr {
         match AnyAttribute::try_from(attr) {
             Ok(attr) => {
                 handler
                     .handle_device_attribute(HeaderInfo::new(var, qualifier, false, false), attr);
             }
-            Err(err) => {
-                tracing::warn!(
-                    "Expected attribute type {:?} but received {:?}",
-                    err.expected,
-                    err.actual
-                );
-            }
+            Err(_) => return false,
         }
     }
+    true
 }
 
 /// Information about the object header and specific variation

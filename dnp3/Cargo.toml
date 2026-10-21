@@ -37,6 +37,10 @@ tokio-serial = { version = "5.5.0", default-features = false, optional = true }
 # serde support
 serde =  { version = "^1.0", features = ["derive"], default-features = false, optional = true }
 
+# only for the no-panic check, which sets --cfg dnp3_no_panic
+[target.'cfg(dnp3_no_panic)'.dev-dependencies]
+no-panic = "0.1"
+
 [dev-dependencies]
 assert_matches = "1.2"
 serde_json = "1.0.96"

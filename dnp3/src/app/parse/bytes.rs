@@ -144,6 +144,7 @@ where
 impl<'a> Iterator for RangedBytesIterator<'a> {
     type Item = (&'a [u8], u16);
 
+    #[cfg_attr(all(test, dnp3_no_panic), no_panic::no_panic)]
     fn next(&mut self) -> Option<Self::Item> {
         let remaining = self.remaining.checked_sub(1)?;
         let bytes = self.cursor.read_bytes(self.size).ok()?;
@@ -164,6 +165,7 @@ where
 {
     type Item = (&'a [u8], T);
 
+    #[cfg_attr(all(test, dnp3_no_panic), no_panic::no_panic)]
     fn next(&mut self) -> Option<Self::Item> {
         let remaining = self.remaining.checked_sub(1)?;
 

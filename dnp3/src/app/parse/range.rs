@@ -97,6 +97,7 @@ where
 {
     type Item = (T, u16);
 
+    #[cfg_attr(all(test, dnp3_no_panic), no_panic::no_panic)]
     fn next(&mut self) -> Option<Self::Item> {
         match T::read(&mut self.cursor) {
             Ok(x) => {

@@ -304,14 +304,13 @@ impl<'a> RangedVariation<'a> {
         }
     }
     
-    pub(crate) fn extract_measurements_to(&self, var: Variation, qualifier: QualifierCode, handler: &mut dyn ReadHandler) -> bool {
+    pub(crate) fn extract_measurements_to<H: ReadHandler + ?Sized>(&self, var: Variation, qualifier: QualifierCode, handler: &mut H) -> bool {
         match self {
             RangedVariation::Group0Var254 => {
                 false // extraction not supported
             }
             RangedVariation::Group0(_, attr) => {
-                crate::master::handle_attribute(var, qualifier, attr, handler);
-                true
+                crate::master::handle_attribute(var, qualifier, attr, handler)
             }
             RangedVariation::Group1Var0 => {
                 false // extraction not supported

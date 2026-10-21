@@ -13,6 +13,7 @@
 - Format code: `cargo fmt`
 - Check lints: `cargo clippy`
 - Run with logging: `RUST_LOG=debug cargo run --example outstation`
+- No-panic check: `RUSTFLAGS="--cfg dnp3_no_panic" CARGO_PROFILE_RELEASE_LTO=thin CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 cargo test -p dnp3 --lib --release --no-run` (use a separate `CARGO_TARGET_DIR`). A link error names a function marked `no_panic` that the optimizer couldn't prove panic-free; see `dnp3/src/no_panic_check.rs`
 
 ## Conformance Tests
 - `.github/workflows/conformance.yml` runs the DNP3 IED certification procedures against the outstation with dnp3c (about 12 minutes). It runs on release tags (gating publishing), weekly on `main`, on demand (`gh workflow run conformance.yml --ref <branch>`), and on PRs labeled `conformance`
