@@ -200,7 +200,7 @@ impl TestHarness {
     pub(crate) async fn pop_write(&mut self) -> Vec<u8> {
         match self.io.next_event().await {
             sfio_tokio_mock_io::Event::Write(data) => data,
-            _ => unreachable!(),
+            x => panic!("expected a write, but got: {x:?}"),
         }
     }
 

@@ -1,16 +1,13 @@
 #![doc = include_str!("../README.md")]
 #![cfg_attr(test, allow(dead_code))]
-// deny explicit panic constructs outside unit tests; exemptions use #[expect] with a reason
-#![cfg_attr(
-    not(test),
-    deny(
-        clippy::unwrap_used,
-        clippy::expect_used,
-        clippy::panic,
-        clippy::unreachable,
-        clippy::todo,
-        clippy::unimplemented
-    )
+// deny explicit panic constructs; clippy.toml allows unwrap, expect and panic in test code
+#![deny(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::unreachable,
+    clippy::todo,
+    clippy::unimplemented
 )]
 
 #[cfg(test)]

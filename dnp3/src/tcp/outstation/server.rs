@@ -370,7 +370,8 @@ impl TcpServerTask {
     }
 }
 
-#[cfg(all(test, feature = "unstable"))]
+#[cfg(test)]
+#[cfg(feature = "unstable")]
 mod tests {
     use super::*;
     use crate::app::NullListener;

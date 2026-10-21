@@ -198,7 +198,7 @@ mod test {
             _info: HeaderInfo,
             _x: &mut dyn Iterator<Item = (DoubleBitBinaryInput, u16)>,
         ) {
-            unimplemented!()
+            panic!("not used by these tests")
         }
 
         fn handle_binary_output_status(
@@ -206,7 +206,7 @@ mod test {
             _info: HeaderInfo,
             _x: &mut dyn Iterator<Item = (BinaryOutputStatus, u16)>,
         ) {
-            unimplemented!()
+            panic!("not used by these tests")
         }
 
         fn handle_counter(
@@ -214,7 +214,7 @@ mod test {
             _info: HeaderInfo,
             _x: &mut dyn Iterator<Item = (Counter, u16)>,
         ) {
-            unimplemented!()
+            panic!("not used by these tests")
         }
 
         fn handle_frozen_counter(
@@ -222,7 +222,7 @@ mod test {
             _info: HeaderInfo,
             _x: &mut dyn Iterator<Item = (FrozenCounter, u16)>,
         ) {
-            unimplemented!()
+            panic!("not used by these tests")
         }
 
         fn handle_analog_input(
@@ -230,7 +230,7 @@ mod test {
             _info: HeaderInfo,
             _x: &mut dyn Iterator<Item = (AnalogInput, u16)>,
         ) {
-            unimplemented!()
+            panic!("not used by these tests")
         }
 
         fn handle_frozen_analog_input(
@@ -254,7 +254,7 @@ mod test {
             _info: HeaderInfo,
             _x: &mut dyn Iterator<Item = (AnalogOutputStatus, u16)>,
         ) {
-            unimplemented!()
+            panic!("not used by these tests")
         }
 
         fn handle_binary_output_command_event(
@@ -286,7 +286,7 @@ mod test {
             _info: HeaderInfo,
             _x: &mut dyn Iterator<Item = (&[u8], u16)>,
         ) {
-            unimplemented!()
+            panic!("not used by these tests")
         }
 
         fn handle_device_attribute(&mut self, _info: HeaderInfo, attr: AnyAttribute) {

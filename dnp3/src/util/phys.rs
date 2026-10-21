@@ -145,7 +145,8 @@ impl std::fmt::Display for PhysDisplay<'_> {
     }
 }
 
-#[cfg(all(test, feature = "enable-tls"))]
+#[cfg(test)]
+#[cfg(feature = "enable-tls")]
 mod tls_tests {
     use super::write_all_and_flush;
 

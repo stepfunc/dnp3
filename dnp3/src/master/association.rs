@@ -899,7 +899,8 @@ impl AssociationMap {
     }
 }
 
-#[cfg(all(test, feature = "unstable"))]
+#[cfg(test)]
+#[cfg(feature = "unstable")]
 mod timer_tests {
     use super::*;
     use crate::master::{AssociationHandler, AssociationInformation, ReadHandler};
