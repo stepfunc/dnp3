@@ -32,6 +32,7 @@
 - **Documentation**: All public items must be documented (`missing_docs = "deny"`)
 - **API Design**: Avoid unreachable public items (`unreachable_pub = "deny"`)
 - **Error Handling**: Use proper error types and propagation (no panics in library code)
+- **Panic exceptions**: `unwrap`, `expect`, indexing and unchecked arithmetic are allowed in library code only where input can't reach them: the invariant that protects them is local and trivially true (e.g. a `u8` index into a 256-entry table), or they can only fire after another panic already happened (e.g. a poisoned mutex). Each gets a narrow `#[expect(lint, reason = "...")]`
 - **Naming**: Follow Rust naming conventions (snake_case for functions/variables, CamelCase for types)
 - **Imports**: Organize imports by standard lib, external crates, then internal modules
 - **Features**: Support compile-time features (tls, serial, serialization)

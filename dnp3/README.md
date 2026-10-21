@@ -18,6 +18,11 @@ Rust implementation of DNP3 (IEEE 1815) with idiomatic bindings for C, C++, .NET
   - Official support for: Windows x64 and Linux x64, AArch64, ARMv7 and ARMv6
   - Unofficial support: MacOS, PowerPC, MIPS, FreeBSD, and others
 
+# Security
+
+Written in safe Rust, with sources of panics restricted by lints, and the parsing of data received from the network
+proven panic-free at link time. See the [security page](https://docs.stepfunc.io/dnp3/1.8.0-M1/guide/docs/security) of the guide for what is enforced and proven.
+
 # Cargo Features
 
 Default features can be disabled at compile time:

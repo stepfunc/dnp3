@@ -4,6 +4,7 @@ module.exports = {
         'about/guide',
         'about/dnp3',
         'about/interop',
+        'about/security',
         'about/versioning',
         'about/license',
         'about/dependencies',

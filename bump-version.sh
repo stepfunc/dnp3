@@ -31,6 +31,8 @@ FILES=(
   ffi/bindings/dotnet/examples/outstation/Outstation.csproj
   ffi/bindings/c/CMakeLists.txt
   guide/sitedata.json
+  dnp3/README.md
+  SECURITY.md
 )
 
 OLD="$(sed -n 's/^version = "\(.*\)"/\1/p' dnp3/Cargo.toml | head -n1)"
