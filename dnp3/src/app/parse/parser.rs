@@ -1094,7 +1094,7 @@ mod test {
             HeaderDetails::OneByteCount(1, CountVariation::Group50Var2(seq)) => {
                 seq.single().unwrap()
             }
-            _ => unreachable!(),
+            _ => panic!("unexpected header details"),
         };
 
         assert!(headers.next().is_none());
@@ -1223,7 +1223,7 @@ mod test {
                 assert_eq!(first, (empty, 7));
                 assert_eq!(iter.next(), None);
             }
-            _ => unreachable!(),
+            _ => panic!("unexpected header details"),
         }
     }
 
@@ -1246,7 +1246,7 @@ mod test {
                 0x07,
                 RangedVariation::Group0(0xCA, Some(set)),
             ) => set,
-            _ => unreachable!(),
+            _ => panic!("unexpected header details"),
         };
 
         assert_eq!(
@@ -1301,7 +1301,7 @@ mod test {
         assert_eq!(header.variation, Variation::Group70Var5);
         let obj = match header.details {
             HeaderDetails::TwoByteFreeFormat(1, FreeFormatVariation::Group70Var5(obj)) => obj,
-            _ => unreachable!(),
+            _ => panic!("unexpected header details"),
         };
         assert_eq!(
             obj,

@@ -1047,13 +1047,13 @@ mod tests {
 
     impl OutstationApplication for MockApplication {
         fn begin_confirm(&mut self) {
-            unreachable!()
+            panic!("unexpected begin_confirm")
         }
         fn event_cleared(&mut self, id: u64) {
             self.events.push_back(Event::Clear(id));
         }
         fn end_confirm(&mut self, _state: BufferState) -> MaybeAsync<()> {
-            unreachable!()
+            panic!("unexpected end_confirm")
         }
     }
 

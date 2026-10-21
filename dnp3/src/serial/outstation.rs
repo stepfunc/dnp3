@@ -150,7 +150,32 @@ pub fn spawn_outstation_serial_2(
     handle
 }
 
-#[cfg(all(test, feature = "unstable"))]
+/// This function was added post 1.0 to provide fault tolerance for outstation serial ports.
+///
+/// This function is implemented by calling [`spawn_outstation_serial_2`] with a post listener that does nothing.
+pub fn spawn_outstation_serial_fault_tolerant(
+    path: &str,
+    settings: SerialSettings,
+    config: OutstationConfig,
+    retry: RetryStrategy,
+    application: Box<dyn OutstationApplication>,
+    information: Box<dyn OutstationInformation>,
+    control_handler: Box<dyn ControlHandler>,
+) -> OutstationHandle {
+    spawn_outstation_serial_2(
+        path,
+        settings,
+        config,
+        retry,
+        application,
+        information,
+        control_handler,
+        Box::new(NullListener),
+    )
+}
+
+#[cfg(test)]
+#[cfg(feature = "unstable")]
 mod tests {
     use super::*;
     use crate::link::EndpointAddress;
@@ -190,28 +215,4 @@ mod tests {
         );
         assert!(result.is_err());
     }
-}
-
-/// This function was added post 1.0 to provide fault tolerance for outstation serial ports.
-///
-/// This function is implemented by calling [`spawn_outstation_serial_2`] with a post listener that does nothing.
-pub fn spawn_outstation_serial_fault_tolerant(
-    path: &str,
-    settings: SerialSettings,
-    config: OutstationConfig,
-    retry: RetryStrategy,
-    application: Box<dyn OutstationApplication>,
-    information: Box<dyn OutstationInformation>,
-    control_handler: Box<dyn ControlHandler>,
-) -> OutstationHandle {
-    spawn_outstation_serial_2(
-        path,
-        settings,
-        config,
-        retry,
-        application,
-        information,
-        control_handler,
-        Box::new(NullListener),
-    )
 }

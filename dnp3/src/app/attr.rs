@@ -1773,7 +1773,7 @@ mod test {
         let mut cursor = ReadCursor::new(&[ATTR_LIST, 0x06, 20, 00, 21, 1, 22, 2]);
         let parsed_list: Vec<AttrItem> = match AttrValue::parse(&mut cursor).unwrap() {
             AttrValue::AttrList(x) => x.iter().collect(),
-            _ => unreachable!(),
+            _ => panic!("expected an attribute list"),
         };
         assert_eq!(
             &parsed_list,

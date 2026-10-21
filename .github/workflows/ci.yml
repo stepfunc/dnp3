@@ -28,6 +28,10 @@ jobs:
         run: cargo fmt --all -- --check
       - name: Clippy
         run: cargo clippy -- -D warnings
+      - name: Clippy the core crate with all features (ring)
+        run: cargo clippy -p dnp3 --features ffi,serialization,unstable -- -D warnings
+      - name: Clippy the core crate with all features (AWS-LC)
+        run: cargo clippy -p dnp3 --no-default-features --features ffi,serial,tls-aws-lc,serialization,unstable -- -D warnings
   # Build the workspace with the feature permutations not built by default
   features:
     strategy:
@@ -48,8 +52,11 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
+          components: clippy
       - name: Build the workspace with the features
         run: cargo build --release -p dnp3 -p dnp3-ffi -p dnp3-ffi-java ${{ matrix.feature-args }}
+      - name: Clippy the core crate with the features
+        run: cargo clippy -p dnp3 ${{ matrix.feature-args }} -- -D warnings
   # Check the workspace with the minimum supported Rust version declared in Cargo.toml
   msrv:
     runs-on: ubuntu-latest
