@@ -295,7 +295,7 @@ async fn operate_no_ack_fails_if_the_request_does_not_fit() {
 
     // more CROBs than fit in the minimum transmit buffer
     let mut builder = CommandBuilder::new();
-    for index in 0..(BufferSize::<249, 2048>::min().value() as u16) {
+    for index in 0..u16::try_from(BufferSize::<249, 2048>::min().value()).unwrap() {
         builder.add_u16(Group12Var1::from_op_type(OpType::LatchOn), index);
     }
 

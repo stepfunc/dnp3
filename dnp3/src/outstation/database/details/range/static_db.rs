@@ -1390,7 +1390,11 @@ mod tests {
         let values = [3e9, -3e9, -40000.0, 100.0];
         for (index, value) in values.into_iter().enumerate() {
             let online = AnalogInput::new(value, Flags::ONLINE, Time::unsynchronized(0));
-            db.update(&online, index as u16, UpdateOptions::no_event());
+            db.update(
+                &online,
+                index.try_into().unwrap(),
+                UpdateOptions::no_event(),
+            );
         }
 
         assert_eq!(
