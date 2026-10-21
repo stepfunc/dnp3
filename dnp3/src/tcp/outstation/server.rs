@@ -66,11 +66,6 @@ impl std::fmt::Debug for TcpServerTask {
     }
 }
 
-/// How long a TLS handshake may take. The server accepts one connection at a time, so without
-/// a limit, a peer that stalls its handshake would stop the server accepting any others
-#[cfg(feature = "enable-tls")]
-const TLS_HANDSHAKE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
-
 enum ServerConnectionHandler {
     Tcp,
     #[cfg(feature = "enable-tls")]
@@ -83,12 +78,15 @@ impl ServerConnectionHandler {
             Self::Tcp => Ok(PhysLayer::Tcp(socket)),
             #[cfg(feature = "enable-tls")]
             Self::Tls(config) => {
-                tokio::time::timeout(TLS_HANDSHAKE_TIMEOUT, config.handle_connection(socket))
+                // the server accepts one connection at a time, so a handshake that stalls would stop
+                // it accepting any others
+                let timeout = crate::tcp::tls::TLS_HANDSHAKE_TIMEOUT;
+                tokio::time::timeout(timeout, config.handle_connection(socket))
                     .await
                     .unwrap_or_else(|_| {
                         Err(format!(
                             "TLS handshake didn't complete within {} seconds",
-                            TLS_HANDSHAKE_TIMEOUT.as_secs()
+                            timeout.as_secs()
                         ))
                     })
             }
