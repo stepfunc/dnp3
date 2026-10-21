@@ -101,10 +101,10 @@ impl ReadHeader {
     fn get_impl(header: &HeaderDetails) -> Option<ReadHeader> {
         match header {
             HeaderDetails::AllObjects(x) => Self::from_all_objects(x),
-            HeaderDetails::OneByteCount(count, x) => Self::from_count(x, *count as usize),
-            HeaderDetails::TwoByteCount(count, x) => Self::from_count(x, *count as usize),
+            HeaderDetails::OneByteCount(count, x) => Self::from_count(x, (*count).into()),
+            HeaderDetails::TwoByteCount(count, x) => Self::from_count(x, (*count).into()),
             HeaderDetails::OneByteStartStop(start, stop, x) => {
-                Self::from_range(x, IndexRange::new(*start as u16, *stop as u16))
+                Self::from_range(x, IndexRange::new((*start).into(), (*stop).into()))
             }
             HeaderDetails::TwoByteStartStop(start, stop, x) => {
                 Self::from_range(x, IndexRange::new(*start, *stop))

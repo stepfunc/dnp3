@@ -117,7 +117,7 @@ struct SelectionQueue {
 impl SelectionQueue {
     fn new(max_selections: u16) -> Self {
         Self {
-            queue: VecDeque::with_capacity(max_selections as usize),
+            queue: VecDeque::with_capacity(max_selections.into()),
             capacity_exceeded: 0,
         }
     }
@@ -1390,7 +1390,11 @@ mod tests {
         let values = [3e9, -3e9, -40000.0, 100.0];
         for (index, value) in values.into_iter().enumerate() {
             let online = AnalogInput::new(value, Flags::ONLINE, Time::unsynchronized(0));
-            db.update(&online, index as u16, UpdateOptions::no_event());
+            db.update(
+                &online,
+                index.try_into().unwrap(),
+                UpdateOptions::no_event(),
+            );
         }
 
         assert_eq!(

@@ -1,12 +1,14 @@
 #![doc = include_str!("../README.md")]
 #![cfg_attr(test, allow(dead_code))]
-// deny explicit panic constructs, indexing and unchecked arithmetic; clippy.toml allows unwrap,
-// expect, panic and indexing in test code, and test modules that need arithmetic say so
+// deny explicit panic constructs, indexing, unchecked arithmetic and as conversions; clippy.toml
+// allows unwrap, expect, panic and indexing in test code, and test modules that need arithmetic
+// say so
 #![deny(
     clippy::unwrap_used,
     clippy::expect_used,
     clippy::indexing_slicing,
     clippy::arithmetic_side_effects,
+    clippy::as_conversions,
     clippy::panic,
     clippy::unreachable,
     clippy::todo,

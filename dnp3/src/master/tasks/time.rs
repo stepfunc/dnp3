@@ -475,7 +475,7 @@ mod tests {
         async fn success() {
             let (task, system_time, mut association, mut rx) = non_lan_time_sync_setup();
             let task = check_measure_delay_request(task, &mut association);
-            tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS as u64)).await;
+            tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS.into())).await;
             let task = send_measure_delay_response(task, &mut association)
                 .await
                 .unwrap()
@@ -490,7 +490,7 @@ mod tests {
             let (task, system_time, mut association, mut rx) = non_lan_time_sync_setup();
 
             let task = check_measure_delay_request(task, &mut association);
-            tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS as u64)).await;
+            tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS.into())).await;
 
             let task = {
                 let mut buffer = [0; 20];
@@ -546,7 +546,7 @@ mod tests {
         async fn empty_measure_delay_response() {
             let (task, _system_time, mut association, mut rx) = non_lan_time_sync_setup();
             let task = check_measure_delay_request(task, &mut association);
-            tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS as u64)).await;
+            tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS.into())).await;
             {
                 let mut buffer = [0; 20];
                 let mut cursor = WriteCursor::new(&mut buffer);
@@ -575,7 +575,7 @@ mod tests {
         async fn non_empty_write_response() {
             let (task, system_time, mut association, mut rx) = non_lan_time_sync_setup();
             let task = check_measure_delay_request(task, &mut association);
-            tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS as u64)).await;
+            tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS.into())).await;
             let task = send_measure_delay_response(task, &mut association)
                 .await
                 .unwrap()
@@ -611,7 +611,7 @@ mod tests {
             let (task, system_time, mut association, mut rx) = non_lan_time_sync_setup();
 
             let task = check_measure_delay_request(task, &mut association);
-            tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS as u64)).await;
+            tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS.into())).await;
             let task = send_measure_delay_response(task, &mut association)
                 .await
                 .unwrap()
@@ -642,7 +642,7 @@ mod tests {
         async fn error_response() {
             let (task, system_time, mut association, mut rx) = non_lan_time_sync_setup();
             let task = check_measure_delay_request(task, &mut association);
-            tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS as u64)).await;
+            tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS.into())).await;
             let task = send_measure_delay_response(task, &mut association)
                 .await
                 .unwrap()
@@ -673,7 +673,7 @@ mod tests {
             let (task, _system_time, mut association, mut rx) =
                 non_lan_time_sync_single_time_setup();
             let task = check_measure_delay_request(task, &mut association);
-            tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS as u64)).await;
+            tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS.into())).await;
             assert!(send_measure_delay_response(task, &mut association)
                 .await
                 .is_err());
@@ -747,7 +747,7 @@ mod tests {
                     assert_eq!(
                         seq.single().unwrap().time,
                         system_time
-                            .checked_add(Duration::from_millis(PROPAGATION_DELAY_MS as u64))
+                            .checked_add(Duration::from_millis(PROPAGATION_DELAY_MS.into()))
                             .unwrap()
                     );
                 }
@@ -768,7 +768,7 @@ mod tests {
         async fn success() {
             let (task, system_time, mut association, mut rx) = lan_time_sync_setup();
             let task = check_record_current_time_request(task, &mut association);
-            tokio::time::advance(Duration::from_millis(DELAY_MS as u64)).await;
+            tokio::time::advance(Duration::from_millis(DELAY_MS.into())).await;
             let task = send_record_current_time_response(task, &mut association)
                 .await
                 .unwrap()
@@ -782,7 +782,7 @@ mod tests {
         async fn non_empty_record_current_time_response() {
             let (task, _system_time, mut association, mut rx) = lan_time_sync_setup();
             let task = check_record_current_time_request(task, &mut association);
-            tokio::time::advance(Duration::from_millis(DELAY_MS as u64)).await;
+            tokio::time::advance(Duration::from_millis(DELAY_MS.into())).await;
             {
                 let mut buffer = [0; 20];
                 let mut cursor = WriteCursor::new(&mut buffer);
@@ -812,7 +812,7 @@ mod tests {
         async fn non_empty_write_response() {
             let (task, system_time, mut association, mut rx) = lan_time_sync_setup();
             let task = check_record_current_time_request(task, &mut association);
-            tokio::time::advance(Duration::from_millis(DELAY_MS as u64)).await;
+            tokio::time::advance(Duration::from_millis(DELAY_MS.into())).await;
             let task = send_record_current_time_response(task, &mut association)
                 .await
                 .unwrap()
@@ -847,7 +847,7 @@ mod tests {
         async fn iin_bit_not_reset() {
             let (task, system_time, mut association, mut rx) = lan_time_sync_setup();
             let task = check_record_current_time_request(task, &mut association);
-            tokio::time::advance(Duration::from_millis(DELAY_MS as u64)).await;
+            tokio::time::advance(Duration::from_millis(DELAY_MS.into())).await;
             let task = send_record_current_time_response(task, &mut association)
                 .await
                 .unwrap()
@@ -878,7 +878,7 @@ mod tests {
         async fn error_response() {
             let (task, system_time, mut association, mut rx) = lan_time_sync_setup();
             let task = check_record_current_time_request(task, &mut association);
-            tokio::time::advance(Duration::from_millis(DELAY_MS as u64)).await;
+            tokio::time::advance(Duration::from_millis(DELAY_MS.into())).await;
             let task = send_record_current_time_response(task, &mut association)
                 .await
                 .unwrap()

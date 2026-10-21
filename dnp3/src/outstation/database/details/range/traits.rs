@@ -3,6 +3,7 @@ use crate::app::parse::traits::{FixedSize, FixedSizeVariation};
 use crate::app::variations::*;
 use crate::outstation::database::config::*;
 use crate::util::bit::bits::{BIT_6, BIT_7};
+use crate::util::float::{f64_to_f32, f64_to_u16, f64_to_u32};
 
 use scursor::{WriteCursor, WriteError};
 
@@ -174,35 +175,17 @@ impl AnalogInputDeadBandVariation {
 
 impl ToVariation<Group34Var1> for f64 {
     fn to_variation(&self) -> Group34Var1 {
-        let num = self.round() as i64;
-        let value = {
-            if num > u16::MAX as i64 {
-                u16::MAX
-            } else if num < u16::MIN as i64 {
-                u16::MIN
-            } else {
-                num as u16
-            }
-        };
-
-        Group34Var1 { value }
+        Group34Var1 {
+            value: f64_to_u16(self.round()),
+        }
     }
 }
 
 impl ToVariation<Group34Var2> for f64 {
     fn to_variation(&self) -> Group34Var2 {
-        let num = self.round() as i64;
-        let value = {
-            if num > u32::MAX as i64 {
-                u32::MAX
-            } else if num < u32::MIN as i64 {
-                u32::MIN
-            } else {
-                num as u32
-            }
-        };
-
-        Group34Var2 { value }
+        Group34Var2 {
+            value: f64_to_u32(self.round()),
+        }
     }
 }
 
@@ -210,12 +193,12 @@ impl ToVariation<Group34Var3> for f64 {
     fn to_variation(&self) -> Group34Var3 {
         let num = *self;
         let value = {
-            if num > f32::MAX as f64 {
+            if num > f32::MAX.into() {
                 f32::MAX
-            } else if num < f32::MIN as f64 {
+            } else if num < f32::MIN.into() {
                 f32::MIN
             } else {
-                num as f32
+                f64_to_f32(num)
             }
         };
 
@@ -295,5 +278,47 @@ impl StaticVariation<AnalogOutputStatus> for StaticAnalogOutputStatusVariation {
 impl StaticVariation<OctetString> for StaticOctetStringVariation {
     fn get_write_info(&self, value: &OctetString) -> WriteInfo<OctetString> {
         octet_string(value)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn g34v1(value: f64) -> u16 {
+        ToVariation::<Group34Var1>::to_variation(&value).value
+    }
+
+    fn g34v2(value: f64) -> u32 {
+        ToVariation::<Group34Var2>::to_variation(&value).value
+    }
+
+    fn g34v3(value: f64) -> f32 {
+        ToVariation::<Group34Var3>::to_variation(&value).value
+    }
+
+    #[test]
+    fn integer_deadbands_round_and_saturate() {
+        assert_eq!(g34v1(0.5), 1);
+        assert_eq!(g34v1(-0.4), 0);
+        assert_eq!(g34v1(65534.6), u16::MAX);
+        assert_eq!(g34v1(65535.5), u16::MAX);
+        assert_eq!(g34v1(f64::INFINITY), u16::MAX);
+        assert_eq!(g34v1(f64::NEG_INFINITY), 0);
+        assert_eq!(g34v1(f64::NAN), 0);
+
+        assert_eq!(g34v2(2.5), 3);
+        assert_eq!(g34v2(4_294_967_295.5), u32::MAX);
+        assert_eq!(g34v2(f64::INFINITY), u32::MAX);
+        assert_eq!(g34v2(f64::NEG_INFINITY), 0);
+        assert_eq!(g34v2(f64::NAN), 0);
+    }
+
+    #[test]
+    fn float_deadband_clamps_to_the_f32_range() {
+        assert_eq!(g34v3(1.5), 1.5);
+        assert_eq!(g34v3(f64::MAX), f32::MAX);
+        assert_eq!(g34v3(f64::MIN), f32::MIN);
+        assert!(g34v3(f64::NAN).is_nan());
     }
 }

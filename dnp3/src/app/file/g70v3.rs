@@ -71,7 +71,7 @@ impl<'a> Group70Var3<'a> {
         let mode = FileMode::new(cursor.read_u16_le()?);
         let max_block_size = cursor.read_u16_le()?;
         let request_id = cursor.read_u16_le()?;
-        let file_name_bytes = cursor.read_bytes(file_name_length as usize)?;
+        let file_name_bytes = cursor.read_bytes(file_name_length.into())?;
         let file_name = std::str::from_utf8(file_name_bytes)?;
 
         Ok(Self {

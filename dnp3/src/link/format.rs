@@ -50,8 +50,7 @@ pub(crate) fn format_header_fixed_size(
     buffer: &mut [u8; constant::LINK_HEADER_LENGTH],
 ) {
     fn to_le(x: u16) -> (u8, u8) {
-        let low = (x & 0xFF) as u8;
-        let high = ((x >> 8) & 0xFF) as u8;
+        let [low, high] = x.to_le_bytes();
         (low, high)
     }
 

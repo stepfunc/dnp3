@@ -21,7 +21,7 @@ async fn write_g34_var1() {
 
     harness.check_events(&[
         Event::BeginWriteDeadBands,
-        Event::WriteDeadBand(3, 0xFECA as f64),
+        Event::WriteDeadBand(3, f64::from(0xFECAu16)),
         Event::EndWriteDeadBands,
     ]);
 }

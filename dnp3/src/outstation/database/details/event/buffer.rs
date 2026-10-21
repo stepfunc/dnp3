@@ -468,7 +468,7 @@ impl EventBuffer {
         let id = self.next;
         self.next = self.next.wrapping_add(1);
 
-        let ret = if T::get_type_count(&self.total.types) == max as usize {
+        let ret = if T::get_type_count(&self.total.types) == usize::from(max) {
             if let Some(record) = self.events.remove_first(T::is_type) {
                 self.total.decrement(record);
                 // a written event awaiting confirmation is counted as written too
@@ -702,7 +702,7 @@ impl EventBuffer {
             return false;
         }
 
-        T::get_type_count(&self.total.types) >= max as usize
+        T::get_type_count(&self.total.types) >= usize::from(max)
     }
 
     fn select<F>(&mut self, limit: Option<usize>, selector: F) -> usize

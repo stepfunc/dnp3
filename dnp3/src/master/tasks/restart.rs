@@ -80,11 +80,11 @@ impl RestartTask {
 
         let result: Result<Duration, TaskError> = match count {
             CountVariation::Group52Var1(val) => match val.single() {
-                Some(val) => Ok(Duration::from_secs(val.time as u64)),
+                Some(val) => Ok(Duration::from_secs(val.time.into())),
                 None => Err(TaskError::UnexpectedResponseHeaders),
             },
             CountVariation::Group52Var2(val) => match val.single() {
-                Some(val) => Ok(Duration::from_millis(val.time as u64)),
+                Some(val) => Ok(Duration::from_millis(val.time.into())),
                 None => Err(TaskError::UnexpectedResponseHeaders),
             },
             _ => Err(TaskError::UnexpectedResponseHeaders),

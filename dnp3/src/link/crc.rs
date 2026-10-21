@@ -39,7 +39,8 @@ pub(crate) fn calc_crc_with_0564(slice: &[u8]) -> u16 {
 )]
 pub(crate) fn crc_increment(mut acc: u16, slice: &[u8]) -> u16 {
     for byte in slice {
-        let index = ((acc as u8) ^ *byte) as usize;
+        let [low, _] = acc.to_le_bytes();
+        let index = usize::from(low ^ *byte);
         acc = CRC_TABLE[index] ^ (acc >> 8)
     }
     acc

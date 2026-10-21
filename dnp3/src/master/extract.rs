@@ -465,7 +465,7 @@ mod test {
 
         let expected: (FrozenAnalogInput, u16) = (
             FrozenAnalogInput {
-                value: i32::from_le_bytes([0xDE, 0xAD, 0xCA, 0xFE]) as f64,
+                value: i32::from_le_bytes([0xDE, 0xAD, 0xCA, 0xFE]).into(),
                 flags: Flags::ONLINE,
                 time: Some(Time::Synchronized(Timestamp::new(0x060504030201))),
             },
@@ -507,7 +507,7 @@ mod test {
 
         let expected: (FrozenAnalogInput, u16) = (
             FrozenAnalogInput {
-                value: i16::from_le_bytes([0xCA, 0xFE]) as f64,
+                value: i16::from_le_bytes([0xCA, 0xFE]).into(),
                 flags: Flags::ONLINE,
                 time: None,
             },
@@ -624,7 +624,7 @@ mod test {
             &[Header::AnalogCommandEvent(vec![(
                 AnalogOutputCommandEvent {
                     status: CommandStatus::TooManyOps,
-                    commanded_value: AnalogCommandValue::I16(0xCAFEu16 as i16),
+                    commanded_value: AnalogCommandValue::I16(0xCAFEu16.cast_signed()),
                     time: None,
                 },
                 7

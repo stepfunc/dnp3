@@ -909,7 +909,7 @@ impl FloatType {
     /// Extract the value, widening f32 to f64
     pub fn value(self) -> f64 {
         match self {
-            FloatType::F32(x) => x as f64,
+            FloatType::F32(x) => x.into(),
             FloatType::F64(x) => x,
         }
     }
@@ -1060,10 +1060,10 @@ enum UInt {
 
 impl UInt {
     fn new(value: u32) -> Self {
-        if value <= u8::MAX as u32 {
-            Self::U8(value as u8)
-        } else if value <= u16::MAX as u32 {
-            Self::U16(value as u16)
+        if let Ok(x) = u8::try_from(value) {
+            Self::U8(x)
+        } else if let Ok(x) = u16::try_from(value) {
+            Self::U16(x)
         } else {
             Self::U32(value)
         }
@@ -1088,20 +1088,17 @@ impl UInt {
 
 #[derive(Copy, Clone)]
 enum Int {
-    I8(u8),
+    I8(i8),
     I16(i16),
     I32(i32),
 }
 
 impl Int {
-    const I8_RANGE: core::ops::Range<i32> = i8::MIN as i32..i8::MAX as i32;
-    const I16_RANGE: core::ops::Range<i32> = i16::MIN as i32..i16::MAX as i32;
-
     fn new(value: i32) -> Self {
-        if Self::I8_RANGE.contains(&value) {
-            Self::I8(value as u8)
-        } else if Self::I16_RANGE.contains(&value) {
-            Self::I16(value as i16)
+        if let Ok(x) = i8::try_from(value) {
+            Self::I8(x)
+        } else if let Ok(x) = i16::try_from(value) {
+            Self::I16(x)
         } else {
             Self::I32(value)
         }
@@ -1117,7 +1114,7 @@ impl Int {
 
     fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         match self {
-            Self::I8(x) => cursor.write_u8(x),
+            Self::I8(x) => cursor.write_u8(x.cast_unsigned()),
             Self::I16(x) => cursor.write_i16_le(x),
             Self::I32(x) => cursor.write_i32_le(x),
         }
@@ -1431,7 +1428,7 @@ impl<'a> Attribute<'a> {
     {
         if count != 1 {
             return Err(ObjectParseError::BadAttribute(AttrParseError::CountNotOne(
-                count as usize,
+                count.into(),
             )));
         }
         let index = I::read(cursor)?.widen_to_u16();
@@ -1560,15 +1557,15 @@ impl<'a> AttrValue<'a> {
             AttrDataType::FloatingPoint => {
                 Self::FloatingPoint(Self::parse_floating_point(cursor, len)?)
             }
-            AttrDataType::OctetString => Self::OctetString(cursor.read_bytes(len as usize)?),
-            AttrDataType::BitString => Self::BitString(cursor.read_bytes(len as usize)?),
+            AttrDataType::OctetString => Self::OctetString(cursor.read_bytes(len.into())?),
+            AttrDataType::BitString => Self::BitString(cursor.read_bytes(len.into())?),
             AttrDataType::Dnp3Time => {
                 if len != 6 {
                     return Err(AttrParseError::BadTimeLength(len));
                 }
                 Self::Dnp3Time(Timestamp::new(cursor.read_u48_le()?))
             }
-            AttrDataType::AttrList => Self::AttrList(Self::parse_attr_list(cursor, len as u16)?),
+            AttrDataType::AttrList => Self::AttrList(Self::parse_attr_list(cursor, len.into())?),
             AttrDataType::ExtAttrList => {
                 // with extended attribute lists, the len is really len + 256
                 let len = u16::from(len) | 0x100;
@@ -1597,15 +1594,15 @@ impl<'a> AttrValue<'a> {
         cursor: &mut ReadCursor<'a>,
         len: u8,
     ) -> Result<&'a str, AttrParseError> {
-        let data = cursor.read_bytes(len as usize)?;
+        let data = cursor.read_bytes(len.into())?;
         let value = std::str::from_utf8(data)?;
         Ok(value)
     }
 
     fn parse_unsigned_int(cursor: &mut ReadCursor<'a>, len: u8) -> Result<u32, AttrParseError> {
         match len {
-            1 => Ok(cursor.read_u8()? as u32),
-            2 => Ok(cursor.read_u16_le()? as u32),
+            1 => Ok(cursor.read_u8()?.into()),
+            2 => Ok(cursor.read_u16_le()?.into()),
             4 => Ok(cursor.read_u32_le()?),
             _ => Err(AttrParseError::BadIntegerLength(len)),
         }
@@ -1639,7 +1636,7 @@ impl<'a> AttrValue<'a> {
             return Err(AttrParseError::BadAttrListLength(len));
         }
 
-        let data = cursor.read_bytes(len as usize)?;
+        let data = cursor.read_bytes(len.into())?;
 
         Ok(VariationList { data })
     }
@@ -1765,6 +1762,26 @@ mod test {
             assert!(OwnedAttrValue::SignedInt(value).write(&mut cursor).is_ok());
             let written = cursor.written().to_vec();
             assert_eq!(parse_signed(&written), value, "round trip of {value}");
+        }
+    }
+
+    #[test]
+    fn signed_int_uses_the_smallest_encoding() {
+        for (value, size) in [
+            (-128, 1),
+            (127, 1),
+            (-129, 2),
+            (128, 2),
+            (-32768, 2),
+            (32767, 2),
+            (-32769, 4),
+            (32768, 4),
+        ] {
+            let mut buffer = [0u8; 8];
+            let mut cursor = WriteCursor::new(&mut buffer);
+            assert!(OwnedAttrValue::SignedInt(value).write(&mut cursor).is_ok());
+            // the data type and the length precede the value
+            assert_eq!(cursor.written().len(), 2 + size, "encoding of {value}");
         }
     }
 

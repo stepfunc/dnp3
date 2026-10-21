@@ -1,4 +1,5 @@
 use crate::app::control::CommandStatus;
+use crate::util::float::{f64_to_f32, f64_to_i16, f64_to_i32};
 use std::time::Duration;
 
 use crate::app::types::Timestamp;
@@ -117,10 +118,10 @@ impl Time {
     pub(crate) fn checked_add(self, x: u16) -> Option<Self> {
         match self {
             Time::Synchronized(ts) => ts
-                .checked_add(Duration::from_millis(x as u64))
+                .checked_add(Duration::from_millis(x.into()))
                 .map(Time::Synchronized),
             Time::Unsynchronized(ts) => ts
-                .checked_add(Duration::from_millis(x as u64))
+                .checked_add(Duration::from_millis(x.into()))
                 .map(Time::Unsynchronized),
         }
     }
@@ -745,7 +746,7 @@ pub(crate) trait AnalogConversions {
             return (self.get_flags().with_bits_set(Self::OVER_RANGE), i16::MAX);
         }
 
-        (self.get_flags(), self.get_value() as i16)
+        (self.get_flags(), f64_to_i16(self.get_value()))
     }
 
     fn to_i32(&self) -> (Flags, i32) {
@@ -757,7 +758,7 @@ pub(crate) trait AnalogConversions {
             return (self.get_flags().with_bits_set(Self::OVER_RANGE), i32::MAX);
         }
 
-        (self.get_flags(), self.get_value() as i32)
+        (self.get_flags(), f64_to_i32(self.get_value()))
     }
 
     fn to_f32(&self) -> (Flags, f32) {
@@ -769,7 +770,7 @@ pub(crate) trait AnalogConversions {
             return (self.get_flags().with_bits_set(Self::OVER_RANGE), f32::MAX);
         }
 
-        (self.get_flags(), self.get_value() as f32)
+        (self.get_flags(), f64_to_f32(self.get_value()))
     }
 }
 
@@ -829,15 +830,12 @@ impl OctetString {
     /// octet strings may be constructed and transmitted, although the standard
     /// explicitly disallows them and they are not parsed by this library by default.
     pub fn new(value: &[u8]) -> Result<Self, OctetStringLengthError> {
-        let len = value.len();
-
-        if len > Self::MAX_SIZE {
-            return Err(OctetStringLengthError::MoreThan255Octets);
-        }
+        let len =
+            u8::try_from(value.len()).map_err(|_| OctetStringLengthError::MoreThan255Octets)?;
 
         let mut result = Self {
             value: [0u8; Self::MAX_SIZE],
-            len: len as u8,
+            len,
         };
         for (dest, src) in result.value.iter_mut().zip(value) {
             *dest = *src;
@@ -873,9 +871,22 @@ pub enum OctetStringLengthError {
     MoreThan255Octets,
 }
 
+/// The low 16 bits of a counter, which is how a 32-bit counter rolls over in a 16-bit variation
+pub(crate) fn low_16_bits(value: u32) -> u16 {
+    let [low, high, _, _] = value.to_le_bytes();
+    u16::from_le_bytes([low, high])
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_16_bit_counter_keeps_the_low_16_bits() {
+        assert_eq!(low_16_bits(0x0000_FFFF), 0xFFFF);
+        assert_eq!(low_16_bits(0x0001_0000), 0);
+        assert_eq!(low_16_bits(0x1234_5678), 0x5678);
+    }
 
     #[test]
     fn octet_string_methods() {
