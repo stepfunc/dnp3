@@ -11,6 +11,7 @@ use crate::outstation::tests::harness::{
     MockOutstationApplication, MockOutstationInformation,
 };
 use crate::outstation::OutstationHandle;
+use crate::transport::mock::MockTransport;
 use crate::util::phys::{PhysAddr, PhysLayer};
 use crate::util::session::{Enabled, RunError};
 use std::sync::{Arc, Mutex};
@@ -40,7 +41,9 @@ pub(crate) fn get_default_unsolicited_config() -> OutstationConfig {
 /// rather than a runtime panic.
 pub(crate) type OutstationHarness = Harness<Connected>;
 
-type Session = JoinHandle<(OutstationTask, RunError)>;
+type MockOutstationTask = OutstationTask<MockTransport>;
+
+type Session = JoinHandle<(MockOutstationTask, RunError)>;
 
 pub(crate) struct Harness<S> {
     pub(crate) handle: OutstationHandle,
@@ -57,15 +60,18 @@ pub(crate) struct Connected {
 
 /// disconnected state: the task (and its `DatabaseHandle`) parked between connections
 pub(crate) struct Disconnected {
-    task: OutstationTask,
+    task: MockOutstationTask,
 }
 
-async fn run_session(mut task: OutstationTask, mut io: PhysLayer) -> (OutstationTask, RunError) {
+async fn run_session(
+    mut task: MockOutstationTask,
+    mut io: PhysLayer,
+) -> (MockOutstationTask, RunError) {
     let err = task.run(&mut io).await;
     (task, err)
 }
 
-fn spawn_session(task: OutstationTask) -> Connected {
+fn spawn_session(task: MockOutstationTask) -> Connected {
     let (io, io_handle) = sfio_tokio_mock_io::mock();
     let phys = PhysLayer::Mock(io);
     Connected {
@@ -205,7 +211,7 @@ fn new_harness_impl(
 
     let (data, application) = MockOutstationApplication::create(sender.clone());
 
-    let (mut task, handle) = OutstationTask::create(
+    let (mut task, handle) = MockOutstationTask::with_transport(
         Enabled::Yes,
         LinkModes::test(),
         ParseOptions::get_static(),
@@ -218,14 +224,12 @@ fn new_harness_impl(
 
     let master_address = master_address.unwrap_or(config.master_address);
 
-    task.get_reader()
-        .get_inner()
-        .set_rx_frame_info(FrameInfo::new(
-            master_address,
-            broadcast,
-            FrameType::Data,
-            PhysAddr::None,
-        ));
+    task.set_rx_frame_info(FrameInfo::new(
+        master_address,
+        broadcast,
+        FrameType::Data,
+        PhysAddr::None,
+    ));
 
     Harness {
         handle,

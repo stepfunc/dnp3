@@ -8,12 +8,13 @@ use crate::decode::AppDecodeLevel;
 use crate::link::header::{FrameInfo, FrameType};
 use crate::link::reader::LinkModes;
 use crate::link::EndpointAddress;
-use crate::master::association::AssociationConfig;
+use crate::master::association::{AssociationConfig, AssociationMap};
 use crate::master::task::MasterTask;
 use crate::master::{AssociationHandle, MasterChannel, ReadHandler};
 use crate::master::{
     AssociationHandler, AssociationInformation, HeaderInfo, MasterChannelConfig, MasterChannelType,
 };
+use crate::transport::mock::MockTransport;
 use crate::util::phys::{PhysAddr, PhysLayer};
 use crate::util::session::{Enabled, RunError};
 
@@ -41,8 +42,9 @@ pub(crate) async fn create_association(mut config: AssociationConfig) -> TestHar
 
     // Create the master session
     let (tx, rx) = crate::util::channel::request_channel();
-    let mut task = MasterTask::new(
+    let mut task = MasterTask::<MockTransport>::with_transport(
         Enabled::Yes,
+        AssociationMap::new(),
         LinkModes::serial(),
         ParseOptions::default(),
         task_config,

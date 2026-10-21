@@ -11,7 +11,9 @@ use crate::master::error::TaskError;
 use crate::master::messages::{MasterMsg, Message};
 use crate::master::tasks::{AppTask, AssociationTask, NonReadTask, ReadTask, RequestWriter, Task};
 use crate::master::{Association, MasterChannelConfig};
-use crate::transport::{FragmentAddr, TransportReader, TransportResponse, TransportWriter};
+use crate::transport::{
+    FragmentAddr, RealTransport, Transport, TransportReader, TransportResponse, TransportWriter,
+};
 use crate::util::buffer::Buffer;
 use crate::util::channel::Receiver;
 use crate::util::phys::PhysLayer;
@@ -22,10 +24,10 @@ use crate::util::session::{Enabled, RunError, StopReason};
 use tokio::time::Instant;
 
 /// combines the session with transport stuff
-pub(crate) struct MasterTask {
+pub(crate) struct MasterTask<T: Transport = RealTransport> {
     session: MasterSession,
-    reader: TransportReader,
-    writer: TransportWriter,
+    reader: TransportReader<T>,
+    writer: TransportWriter<T>,
 }
 
 impl MasterTask {
@@ -54,6 +56,37 @@ impl MasterTask {
         config: MasterChannelConfig,
         messages: Receiver<Message>,
     ) -> Self {
+        Self::with_transport(
+            enabled,
+            associations,
+            link_modes,
+            parse_options,
+            config,
+            messages,
+        )
+    }
+
+    pub(crate) fn seed_link(&mut self, seed_data: &[u8]) -> Result<(), scursor::WriteError> {
+        self.reader.seed_link(seed_data)
+    }
+}
+
+#[cfg(test)]
+impl MasterTask<crate::transport::mock::MockTransport> {
+    pub(crate) fn set_rx_frame_info(&mut self, info: crate::link::header::FrameInfo) {
+        self.reader.set_rx_frame_info(info);
+    }
+}
+
+impl<T: Transport> MasterTask<T> {
+    pub(crate) fn with_transport(
+        enabled: Enabled,
+        associations: AssociationMap,
+        link_modes: LinkModes,
+        parse_options: ParseOptions,
+        config: MasterChannelConfig,
+        messages: Receiver<Message>,
+    ) -> Self {
         let session = MasterSession::new(
             enabled,
             config.decode_level,
@@ -72,15 +105,6 @@ impl MasterTask {
             reader,
             writer,
         }
-    }
-
-    pub(crate) fn seed_link(&mut self, seed_data: &[u8]) -> Result<(), scursor::WriteError> {
-        self.reader.seed_link(seed_data)
-    }
-
-    #[cfg(test)]
-    pub(crate) fn set_rx_frame_info(&mut self, info: crate::link::header::FrameInfo) {
-        self.reader.get_inner().set_rx_frame_info(info);
     }
 
     pub(crate) fn enabled(&self) -> Enabled {
@@ -141,11 +165,11 @@ impl MasterSession {
     }
 
     /// Run the master until an error or shutdown occurs.
-    async fn run(
+    async fn run<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
-        writer: &mut TransportWriter,
-        reader: &mut TransportReader,
+        writer: &mut TransportWriter<T>,
+        reader: &mut TransportReader<T>,
     ) -> RunError {
         loop {
             let result = match self.get_next_task() {
@@ -175,11 +199,11 @@ impl MasterSession {
     /// Wait until a message is received or a response is received.
     ///
     /// Returns an error only if shutdown or link layer error occurred.
-    async fn idle_forever(
+    async fn idle_forever<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
-        writer: &mut TransportWriter,
-        reader: &mut TransportReader,
+        writer: &mut TransportWriter<T>,
+        reader: &mut TransportReader<T>,
     ) -> Result<(), RunError> {
         loop {
             let decode_level = self.decode_level;
@@ -207,12 +231,12 @@ impl MasterSession {
     /// Wait until a message is received, a response is received, or we reach the defined time.
     ///
     /// Returns an error only if shutdown or link layer error occured.
-    async fn idle_until(
+    async fn idle_until<T: Transport>(
         &mut self,
         instant: Instant,
         io: &mut PhysLayer,
-        writer: &mut TransportWriter,
-        reader: &mut TransportReader,
+        writer: &mut TransportWriter<T>,
+        reader: &mut TransportReader<T>,
     ) -> Result<(), RunError> {
         loop {
             let decode_level = self.decode_level;
@@ -308,12 +332,12 @@ impl MasterSession {
     /// Run a specific task.
     ///
     /// Returns an error only if shutdown or link layer error occurred.
-    async fn run_task(
+    async fn run_task<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
         task: AssociationTask,
-        writer: &mut TransportWriter,
-        reader: &mut TransportReader,
+        writer: &mut TransportWriter<T>,
+        reader: &mut TransportReader<T>,
     ) -> Result<(), RunError> {
         let result = match task.details {
             Task::App(t) => {
@@ -366,13 +390,13 @@ impl MasterSession {
         }
     }
 
-    async fn run_non_read_task(
+    async fn run_non_read_task<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
         dest: FragmentAddr,
         task: NonReadTask,
-        writer: &mut TransportWriter,
-        reader: &mut TransportReader,
+        writer: &mut TransportWriter<T>,
+        reader: &mut TransportReader<T>,
     ) -> Result<Sequence, TaskError> {
         let mut next = NextStep::Continue(task);
 
@@ -389,13 +413,13 @@ impl MasterSession {
         }
     }
 
-    async fn run_single_non_read_task(
+    async fn run_single_non_read_task<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
         dest: FragmentAddr,
         task: NonReadTask,
-        writer: &mut TransportWriter,
-        reader: &mut TransportReader,
+        writer: &mut TransportWriter<T>,
+        reader: &mut TransportReader<T>,
     ) -> Result<NextStep, TaskError> {
         let seq = match self.send_request(io, dest, &task, writer).await {
             Ok(seq) => seq,
@@ -483,12 +507,12 @@ impl MasterSession {
         }
     }
 
-    async fn validate_non_read_response<'a>(
+    async fn validate_non_read_response<'a, T: Transport>(
         &mut self,
         destination: FragmentAddr,
         seq: Sequence,
         io: &mut PhysLayer,
-        writer: &mut TransportWriter,
+        writer: &mut TransportWriter<T>,
         source: FragmentAddr,
         response: Response<'a>,
     ) -> Result<Option<Response<'a>>, TaskError> {
@@ -526,13 +550,13 @@ impl MasterSession {
         Ok(Some(response))
     }
 
-    async fn run_read_task(
+    async fn run_read_task<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
         dest: FragmentAddr,
         mut task: ReadTask,
-        writer: &mut TransportWriter,
-        reader: &mut TransportReader,
+        writer: &mut TransportWriter<T>,
+        reader: &mut TransportReader<T>,
     ) -> Result<Sequence, TaskError> {
         let result = self
             .execute_read_task(io, dest, &mut task, writer, reader)
@@ -554,13 +578,13 @@ impl MasterSession {
         result
     }
 
-    async fn execute_read_task(
+    async fn execute_read_task<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
         dest: FragmentAddr,
         task: &mut ReadTask,
-        writer: &mut TransportWriter,
-        reader: &mut TransportReader,
+        writer: &mut TransportWriter<T>,
+        reader: &mut TransportReader<T>,
     ) -> Result<Sequence, TaskError> {
         let mut seq = self.send_request(io, dest, task, writer).await?;
         let mut is_first = true;
@@ -609,14 +633,14 @@ impl MasterSession {
     }
 
     #[allow(clippy::too_many_arguments)] // TODO
-    async fn process_read_response(
+    async fn process_read_response<T: Transport>(
         &mut self,
         destination: FragmentAddr,
         is_first: bool,
         seq: Sequence,
         task: &mut ReadTask,
         io: &mut PhysLayer,
-        writer: &mut TransportWriter,
+        writer: &mut TransportWriter<T>,
         source: FragmentAddr,
         response: Response<'_>,
     ) -> Result<ReadResponseAction, TaskError> {
@@ -685,10 +709,10 @@ impl MasterSession {
 
 // Unsolicited processing
 impl MasterSession {
-    async fn handle_fragment_while_idle(
+    async fn handle_fragment_while_idle<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
-        writer: &mut TransportWriter,
+        writer: &mut TransportWriter<T>,
         source: FragmentAddr,
         response: Response<'_>,
     ) -> Result<(), RunError> {
@@ -705,12 +729,12 @@ impl MasterSession {
         Ok(())
     }
 
-    async fn handle_unsolicited(
+    async fn handle_unsolicited<T: Transport>(
         &mut self,
         source: FragmentAddr,
         response: &Response<'_>,
         io: &mut PhysLayer,
-        writer: &mut TransportWriter,
+        writer: &mut TransportWriter<T>,
     ) -> Result<(), LinkError> {
         let association = match self.associations.get_mut(source.link).ok() {
             Some(x) => x,
@@ -739,12 +763,12 @@ impl MasterSession {
 
 // Sending methods
 impl MasterSession {
-    async fn confirm_solicited(
+    async fn confirm_solicited<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
         dest: FragmentAddr,
         seq: Sequence,
-        writer: &mut TransportWriter,
+        writer: &mut TransportWriter<T>,
     ) -> Result<(), LinkError> {
         let mut cursor = self.tx_buffer.write_cursor();
         write::confirm_solicited(seq, &mut cursor)?;
@@ -754,12 +778,12 @@ impl MasterSession {
         Ok(())
     }
 
-    async fn confirm_unsolicited(
+    async fn confirm_unsolicited<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
         dest: FragmentAddr,
         seq: Sequence,
-        writer: &mut TransportWriter,
+        writer: &mut TransportWriter<T>,
     ) -> Result<(), LinkError> {
         let mut cursor = self.tx_buffer.write_cursor();
         write::confirm_unsolicited(seq, &mut cursor)?;
@@ -770,12 +794,12 @@ impl MasterSession {
         Ok(())
     }
 
-    async fn send_request<U>(
+    async fn send_request<T: Transport, U>(
         &mut self,
         io: &mut PhysLayer,
         addr: FragmentAddr,
         request: &U,
-        writer: &mut TransportWriter,
+        writer: &mut TransportWriter<T>,
     ) -> Result<Sequence, TaskError>
     where
         U: RequestWriter,
@@ -796,12 +820,12 @@ impl MasterSession {
 
 // Link status stuff
 impl MasterSession {
-    async fn run_link_status_task(
+    async fn run_link_status_task<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
         destination: FragmentAddr,
-        writer: &mut TransportWriter,
-        reader: &mut TransportReader,
+        writer: &mut TransportWriter<T>,
+        reader: &mut TransportReader<T>,
     ) -> Result<(), TaskError> {
         // Send link status request
         tracing::info!("sending link status request (for {})", destination.link);

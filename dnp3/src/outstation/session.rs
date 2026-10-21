@@ -29,7 +29,7 @@ use crate::outstation::response::{Prepared, ResponseSlot};
 use crate::outstation::task::{ConfigurationChange, OutstationMessage};
 use crate::outstation::traits::*;
 use crate::transport::{
-    FragmentAddr, FragmentInfo, RequestGuard, TransportReader, TransportRequest,
+    FragmentAddr, FragmentInfo, RequestGuard, Transport, TransportReader, TransportRequest,
     TransportRequestError, TransportWriter,
 };
 use crate::util::channel::Receiver;
@@ -343,11 +343,11 @@ impl OutstationSession {
         self.handle_next_message().await
     }
 
-    pub(crate) async fn run(
+    pub(crate) async fn run<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
-        reader: &mut TransportReader,
-        writer: &mut TransportWriter,
+        reader: &mut TransportReader<T>,
+        writer: &mut TransportWriter<T>,
         database: &mut DatabaseHandle,
     ) -> RunError {
         loop {
@@ -366,10 +366,10 @@ impl OutstationSession {
         self.unsol.clear();
     }
 
-    async fn write_unsolicited(
+    async fn write_unsolicited<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
-        writer: &mut TransportWriter,
+        writer: &mut TransportWriter<T>,
         mut response: Prepared,
         database: &DatabaseHandle,
     ) -> Result<ResponseHeader, LinkError> {
@@ -387,10 +387,10 @@ impl OutstationSession {
         Ok(response.header())
     }
 
-    async fn repeat_unsolicited(
+    async fn repeat_unsolicited<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
-        writer: &mut TransportWriter,
+        writer: &mut TransportWriter<T>,
     ) -> Result<(), LinkError> {
         if let Some(response) = self.unsol.ready() {
             writer
@@ -400,10 +400,10 @@ impl OutstationSession {
         Ok(())
     }
 
-    async fn write_solicited(
+    async fn write_solicited<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
-        writer: &mut TransportWriter,
+        writer: &mut TransportWriter<T>,
         respond_to: FragmentAddr,
         mut response: Prepared,
         database: &DatabaseHandle,
@@ -423,10 +423,10 @@ impl OutstationSession {
     }
 
     /// Send a response with no objects that doesn't replace the response to the last valid request
-    async fn write_transient_solicited(
+    async fn write_transient_solicited<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
-        writer: &mut TransportWriter,
+        writer: &mut TransportWriter<T>,
         respond_to: FragmentAddr,
         mut header: ResponseHeader,
         database: &DatabaseHandle,
@@ -447,11 +447,11 @@ impl OutstationSession {
         }
     }
 
-    async fn repeat_solicited(
+    async fn repeat_solicited<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
         respond_to: FragmentAddr,
-        writer: &mut TransportWriter,
+        writer: &mut TransportWriter<T>,
     ) -> Result<(), LinkError> {
         if let Some(response) = self.sol.ready() {
             writer
@@ -461,11 +461,11 @@ impl OutstationSession {
         Ok(())
     }
 
-    async fn run_idle_state(
+    async fn run_idle_state<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
-        reader: &mut TransportReader,
-        writer: &mut TransportWriter,
+        reader: &mut TransportReader<T>,
+        writer: &mut TransportWriter<T>,
         database: &mut DatabaseHandle,
     ) -> Result<(), RunError> {
         // handle a request fragment if present
@@ -502,11 +502,11 @@ impl OutstationSession {
         Ok(())
     }
 
-    async fn check_unsolicited(
+    async fn check_unsolicited<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
-        reader: &mut TransportReader,
-        writer: &mut TransportWriter,
+        reader: &mut TransportReader<T>,
+        writer: &mut TransportWriter<T>,
         database: &mut DatabaseHandle,
     ) -> Result<NextIdleAction, RunError> {
         if self.config.unsolicited.is_disabled() {
@@ -563,10 +563,10 @@ impl OutstationSession {
         }
     }
 
-    async fn check_link_status(
+    async fn check_link_status<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
-        writer: &mut TransportWriter,
+        writer: &mut TransportWriter<T>,
     ) -> Result<(), RunError> {
         if let Some(next) = self.next_link_status {
             // Wait until we need to send the link status
@@ -584,11 +584,11 @@ impl OutstationSession {
         Ok(())
     }
 
-    async fn perform_null_unsolicited(
+    async fn perform_null_unsolicited<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
-        reader: &mut TransportReader,
-        writer: &mut TransportWriter,
+        reader: &mut TransportReader<T>,
+        writer: &mut TransportWriter<T>,
         database: &mut DatabaseHandle,
     ) -> Result<UnsolicitedResult, RunError> {
         let header = ResponseHeader::new(
@@ -607,11 +607,11 @@ impl OutstationSession {
         .await
     }
 
-    async fn maybe_perform_unsolicited(
+    async fn maybe_perform_unsolicited<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
-        reader: &mut TransportReader,
-        writer: &mut TransportWriter,
+        reader: &mut TransportReader<T>,
+        writer: &mut TransportWriter<T>,
         database: &mut DatabaseHandle,
     ) -> Result<Option<UnsolicitedResult>, RunError> {
         if !self.state.enabled_unsolicited_classes.any() {
@@ -649,14 +649,14 @@ impl OutstationSession {
         Some(Prepared::Stored(header))
     }
 
-    async fn perform_unsolicited_response_series(
+    async fn perform_unsolicited_response_series<T: Transport>(
         &mut self,
         database: &mut DatabaseHandle,
         response: Prepared,
         is_null: bool,
         io: &mut PhysLayer,
-        reader: &mut TransportReader,
-        writer: &mut TransportWriter,
+        reader: &mut TransportReader<T>,
+        writer: &mut TransportWriter<T>,
     ) -> Result<UnsolicitedResult, RunError> {
         let seq = self
             .write_unsolicited(io, writer, response, database)
@@ -710,13 +710,13 @@ impl OutstationSession {
         }
     }
 
-    async fn wait_for_unsolicited_confirm(
+    async fn wait_for_unsolicited_confirm<T: Transport>(
         &mut self,
         uns_ecsn: Sequence,
         deadline: tokio::time::Instant,
         io: &mut PhysLayer,
-        reader: &mut TransportReader,
-        writer: &mut TransportWriter,
+        reader: &mut TransportReader<T>,
+        writer: &mut TransportWriter<T>,
         database: &mut DatabaseHandle,
     ) -> Result<UnsolicitedWaitResult, RunError> {
         if let TimeoutStatus::Yes = self.read_until(io, reader, deadline).await? {
@@ -835,10 +835,10 @@ impl OutstationSession {
         }
     }
 
-    async fn read_until(
+    async fn read_until<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
-        reader: &mut TransportReader,
+        reader: &mut TransportReader<T>,
         deadline: tokio::time::Instant,
     ) -> Result<TimeoutStatus, RunError> {
         let decode_level = self.config.decode_level;
@@ -904,11 +904,11 @@ impl OutstationSession {
         }
     }
 
-    async fn handle_deferred_read(
+    async fn handle_deferred_read<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
-        reader: &mut TransportReader,
-        writer: &mut TransportWriter,
+        reader: &mut TransportReader<T>,
+        writer: &mut TransportWriter<T>,
         database: &mut DatabaseHandle,
     ) -> Result<(), RunError> {
         if let Some(x) = self.state.deferred_read.select(database) {
@@ -939,11 +939,11 @@ impl OutstationSession {
         Ok(())
     }
 
-    async fn handle_one_request_from_idle(
+    async fn handle_one_request_from_idle<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
-        reader: &mut TransportReader,
-        writer: &mut TransportWriter,
+        reader: &mut TransportReader<T>,
+        writer: &mut TransportWriter<T>,
         database: &mut DatabaseHandle,
     ) -> Result<(), RunError> {
         let mut guard = reader.pop_request(self.required_master_address());
@@ -1059,11 +1059,11 @@ impl OutstationSession {
         }
     }
 
-    async fn write_error_response(
+    async fn write_error_response<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
         respond_to: FragmentAddr,
-        writer: &mut TransportWriter,
+        writer: &mut TransportWriter<T>,
         err: TransportRequestError,
         database: &DatabaseHandle,
     ) -> Result<(), RunError> {
@@ -1950,11 +1950,11 @@ impl OutstationSession {
         tokio::time::Instant::now() + self.config.unsolicited_retry_delay
     }
 
-    async fn sol_confirm_wait(
+    async fn sol_confirm_wait<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
-        reader: &mut TransportReader,
-        writer: &mut TransportWriter,
+        reader: &mut TransportReader<T>,
+        writer: &mut TransportWriter<T>,
         database: &mut DatabaseHandle,
         mut series: ResponseSeries,
     ) -> Result<(), RunError> {
@@ -2003,11 +2003,11 @@ impl OutstationSession {
         }
     }
 
-    async fn wait_for_sol_confirm(
+    async fn wait_for_sol_confirm<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
-        reader: &mut TransportReader,
-        writer: &mut TransportWriter,
+        reader: &mut TransportReader<T>,
+        writer: &mut TransportWriter<T>,
         ecsn: Sequence,
     ) -> Result<Confirm, RunError> {
         let mut deadline = self.new_confirm_deadline();
@@ -2046,7 +2046,11 @@ impl OutstationSession {
         }
     }
 
-    fn expect_sol_confirm(&mut self, ecsn: Sequence, request: &mut RequestGuard) -> ConfirmAction {
+    fn expect_sol_confirm<T: Transport>(
+        &mut self,
+        ecsn: Sequence,
+        request: &mut RequestGuard<'_, T>,
+    ) -> ConfirmAction {
         let (info, request) = match request.get() {
             Some(TransportRequest::Request(info, request)) => {
                 self.on_link_activity();
