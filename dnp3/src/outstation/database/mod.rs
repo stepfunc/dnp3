@@ -530,7 +530,7 @@ impl DatabaseHandle {
             for header in headers.iter() {
                 match ReadHeader::get(&header) {
                     None => {
-                        iin2 |= Iin2::NO_FUNC_CODE_SUPPORT;
+                        iin2 |= ReadHeader::unsupported(header.variation);
                     }
                     Some(x) => iin2 |= db.inner.select_by_header(x),
                 }

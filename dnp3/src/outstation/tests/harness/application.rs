@@ -14,6 +14,8 @@ pub(crate) struct MockOutstationApplication {
 pub(crate) struct ApplicationData {
     pub(crate) processing_delay: u16,
     pub(crate) restart_delay: Option<RestartDelay>,
+    /// when false, time writes, freezes and dead-band writes are declined
+    pub(crate) supported: bool,
 }
 
 impl ApplicationData {
@@ -21,6 +23,7 @@ impl ApplicationData {
         Self {
             processing_delay: 0,
             restart_delay: None,
+            supported: true,
         }
     }
 }
@@ -44,6 +47,9 @@ impl OutstationApplication for MockOutstationApplication {
     }
 
     fn write_absolute_time(&mut self, time: Timestamp) -> Result<(), RequestError> {
+        if !self.data().supported {
+            return Err(RequestError::NotSupported);
+        }
         self.events.send(Event::WriteAbsoluteTime(time));
         Ok(())
     }
@@ -66,12 +72,15 @@ impl OutstationApplication for MockOutstationApplication {
         freeze_type: FreezeType,
         _db: &mut DatabaseHandle,
     ) -> Result<(), RequestError> {
+        if !self.data().supported {
+            return Err(RequestError::NotSupported);
+        }
         self.events.send(Event::Freeze(indices, freeze_type));
         Ok(())
     }
 
     fn support_write_analog_dead_bands(&mut self) -> bool {
-        true
+        self.data().supported
     }
 
     fn begin_write_analog_dead_bands(&mut self) {

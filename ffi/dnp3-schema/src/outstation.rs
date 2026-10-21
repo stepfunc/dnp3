@@ -1127,7 +1127,7 @@ fn define_outstation_application(
     let write_time_result = lib.define_enum("write_time_result")?
         .push("ok", "The write time operation succeeded.")?
         .push("parameter_error", "The request parameters are nonsensical.")?
-        .push("not_supported", "Writing time is not supported by this outstation (translated to NO_FUNC_CODE_SUPPORT).")?
+        .push("not_supported", "Writing time is not supported by this outstation (translated to IIN2.1 OBJECT_UNKNOWN).")?
         .doc("Write time result used by {interface:outstation_application.write_absolute_time()}")?
         .build()?;
 
@@ -1143,7 +1143,7 @@ fn define_outstation_application(
         .push("parameter_error", "The request parameters are nonsensical.")?
         .push(
             "not_supported",
-            "The demanded freeze operation is not supported by this device.",
+            "The demanded freeze operation is not supported by this device (translated to IIN2.1 OBJECT_UNKNOWN).",
         )?
         .doc("Result of a freeze operation")?
         .build()?;
@@ -1215,7 +1215,7 @@ fn define_outstation_application(
         .end_callback()?
         .begin_callback("support_write_analog_dead_bands",
                         doc("Controls outstation support for writing group 34, analog input dead-bands")
-                            .details("Returning false, indicates that the writes to group34 should not be processed and requests to do so should be rejected with IIN2.NO_FUNC_CODE_SUPPORT")
+                            .details("Returning false, indicates that the writes to group34 should not be processed and requests to do so should be rejected with IIN2.1 OBJECT_UNKNOWN")
                             .details("Returning true will allow the request to process the actual values with a sequence of calls:")
                             .details("1) A single call to {interface:outstation_application.begin_write_analog_dead_bands()}")
                             .details("2) Zero or more calls to {interface:outstation_application.write_analog_dead_band()}")

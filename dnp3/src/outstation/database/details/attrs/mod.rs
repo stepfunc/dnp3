@@ -233,13 +233,10 @@ impl AttrHandler {
                 match var {
                     254 => self.selection.push(Selected::all(set)),
                     255 => self.selection.push(Selected::single(set, 255)),
-                    _ => {
-                        if self.map.exists(set, var) {
-                            self.selection.push(Selected::single(set, var))
-                        } else {
-                            Iin2::NO_FUNC_CODE_SUPPORT
-                        }
-                    }
+                    _ => match self.map.get(set, var) {
+                        Ok(_) => self.selection.push(Selected::single(set, var)),
+                        Err(err) => err.into(),
+                    },
                 }
             }
         }

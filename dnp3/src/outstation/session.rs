@@ -1252,7 +1252,7 @@ impl OutstationSession {
 
         for header in object_headers.iter() {
             empty = false;
-            iin2 = self.handle_single_write_header(header, database).await;
+            iin2 |= self.handle_single_write_header(header, database).await;
         }
 
         if empty {
@@ -1287,7 +1287,7 @@ impl OutstationSession {
         // first validate that attribute can be written
         if let Err(err) = db.transaction(|db| db.inner.get_attr_map().can_write(attr)) {
             tracing::warn!("Unable to WRITE attribute: {err}");
-            return Iin2::NO_FUNC_CODE_SUPPORT;
+            return err.into();
         }
 
         // next, ask the application to validate and persist the value
@@ -1299,7 +1299,7 @@ impl OutstationSession {
         // this can't fail today: nothing removes an attribute or changes its type once defined
         if let Err(err) = db.transaction(|db| db.inner.get_attr_map().write(attr)) {
             tracing::error!("Unable to store the WRITE of an attribute: {err}");
-            return Iin2::NO_FUNC_CODE_SUPPORT;
+            return Iin2::PARAMETER_ERROR;
         }
         Iin2::default()
     }
@@ -1326,7 +1326,7 @@ impl OutstationSession {
         V: FixedSizeVariation + Into<f64>,
     {
         if !self.application.support_write_analog_dead_bands() {
-            return Iin2::NO_FUNC_CODE_SUPPORT;
+            return Iin2::OBJECT_UNKNOWN;
         }
 
         self.application.begin_write_analog_dead_bands();
@@ -1366,10 +1366,19 @@ impl OutstationSession {
             HeaderDetails::OneByteStartStop(_, _, RangedVariation::Group80Var1(bits)) => {
                 self.handle_write_iin(bits)
             }
+            HeaderDetails::TwoByteStartStop(_, _, RangedVariation::Group80Var1(bits)) => {
+                self.handle_write_iin(bits)
+            }
             HeaderDetails::OneByteCount(_, CountVariation::Group50Var1(seq)) => {
                 self.handle_write_abs_time(seq)
             }
+            HeaderDetails::TwoByteCount(_, CountVariation::Group50Var1(seq)) => {
+                self.handle_write_abs_time(seq)
+            }
             HeaderDetails::OneByteCount(_, CountVariation::Group50Var3(seq)) => {
+                self.handle_write_at_last_recorded_time(seq)
+            }
+            HeaderDetails::TwoByteCount(_, CountVariation::Group50Var3(seq)) => {
                 self.handle_write_at_last_recorded_time(seq)
             }
             // analog deadbands
@@ -1397,8 +1406,26 @@ impl OutstationSession {
                     header.details.qualifier(),
                     header.variation
                 );
-                Iin2::NO_FUNC_CODE_SUPPORT
+                if Self::is_writable(header.variation) {
+                    Iin2::PARAMETER_ERROR
+                } else {
+                    Iin2::OBJECT_UNKNOWN
+                }
             }
+        }
+    }
+
+    /// variations that WRITE supports with some qualifier
+    fn is_writable(variation: Variation) -> bool {
+        match variation {
+            Variation::Group0(var) => var != 255,
+            Variation::Group34Var1
+            | Variation::Group34Var2
+            | Variation::Group34Var3
+            | Variation::Group50Var1
+            | Variation::Group50Var3
+            | Variation::Group80Var1 => true,
+            _ => false,
         }
     }
 
@@ -1434,8 +1461,7 @@ impl OutstationSession {
 
         self.state.last_recorded_time = None;
         match self.application.write_absolute_time(timestamp) {
-            Err(RequestError::NotSupported) => Iin2::NO_FUNC_CODE_SUPPORT,
-            Err(RequestError::ParameterError) => Iin2::PARAMETER_ERROR,
+            Err(err) => err.into(),
             Ok(()) => Iin2::default(),
         }
     }
@@ -1579,7 +1605,12 @@ impl OutstationSession {
                 }
                 _ => {
                     tracing::warn!("received {} unsolicited request for unsupported qualifier ({}) and variation ({})", to_string(enable), header.details.qualifier(), header.variation);
-                    iin2 |= Iin2::NO_FUNC_CODE_SUPPORT;
+                    iin2 |= match header.variation {
+                        Variation::Group60Var2
+                        | Variation::Group60Var3
+                        | Variation::Group60Var4 => Iin2::PARAMETER_ERROR,
+                        _ => Iin2::OBJECT_UNKNOWN,
+                    };
                 }
             }
         }
@@ -1730,7 +1761,7 @@ impl OutstationSession {
         let mut iin = Iin::default();
 
         for header in object_headers.iter() {
-            iin |= self.handle_freeze_header(database, freeze_type, header.details);
+            iin |= self.handle_freeze_header(database, freeze_type, header);
         }
 
         Prepared::empty_solicited(seq, iin)
@@ -1785,7 +1816,7 @@ impl OutstationSession {
                             iin |= self.handle_freeze_header(
                                 database,
                                 FreezeType::FreezeAtTime(x),
-                                header.details,
+                                header,
                             );
                         }
                     }
@@ -1800,9 +1831,9 @@ impl OutstationSession {
         &mut self,
         database: &mut DatabaseHandle,
         freeze_type: FreezeType,
-        details: HeaderDetails,
+        header: ObjectHeader,
     ) -> Iin2 {
-        match details {
+        match header.details {
             HeaderDetails::AllObjects(AllObjectsVariation::Group20Var0) => self
                 .application
                 .freeze_counter(FreezeIndices::All, freeze_type, database)
@@ -1819,7 +1850,10 @@ impl OutstationSession {
                 .application
                 .freeze_counter(FreezeIndices::Range(start, stop), freeze_type, database)
                 .map_or_else(|err| err.into(), |_| Iin2::default()),
-            _ => Iin2::NO_FUNC_CODE_SUPPORT,
+            _ => match header.variation {
+                Variation::Group20Var0 => Iin2::PARAMETER_ERROR,
+                _ => Iin2::OBJECT_UNKNOWN,
+            },
         }
     }
 
@@ -2163,7 +2197,7 @@ impl From<ObjectParseError> for Iin2 {
     fn from(err: ObjectParseError) -> Self {
         match err {
             ObjectParseError::InsufficientBytes => Iin2::PARAMETER_ERROR,
-            ObjectParseError::InvalidQualifierForVariation(_, _) => Iin2::NO_FUNC_CODE_SUPPORT,
+            ObjectParseError::InvalidQualifierForVariation(_, _) => Iin2::PARAMETER_ERROR,
             ObjectParseError::InvalidRange(_, _) => Iin2::PARAMETER_ERROR,
             ObjectParseError::UnknownGroupVariation(_, _) => Iin2::OBJECT_UNKNOWN,
             ObjectParseError::UnsupportedQualifierCode(_) => Iin2::PARAMETER_ERROR,
