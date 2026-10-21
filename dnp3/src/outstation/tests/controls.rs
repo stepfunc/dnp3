@@ -371,7 +371,7 @@ async fn control_request_with_a_non_control_object_gets_object_unknown() {
         .test_request_response(&request, &[0xC0, 0x81, 0x80, 0x02])
         .await;
 
-    harness.check_events(&[]);
+    harness.check_no_events();
 }
 
 #[tokio::test]
@@ -393,7 +393,7 @@ async fn direct_operate_whose_headers_fit_alone_but_not_together_is_rejected_wit
         .test_request_response(&request, &parameter_error_response(0))
         .await;
 
-    harness.check_events(&[]);
+    harness.check_no_events();
 }
 
 #[tokio::test]
@@ -407,7 +407,7 @@ async fn direct_operate_whose_response_does_not_fit_is_rejected_without_operatin
         )
         .await;
 
-    harness.check_events(&[]);
+    harness.check_no_events();
 }
 
 #[tokio::test]
@@ -421,7 +421,7 @@ async fn select_whose_response_does_not_fit_is_rejected_without_selecting() {
         )
         .await;
 
-    harness.check_events(&[]);
+    harness.check_no_events();
 }
 
 #[tokio::test]
@@ -435,7 +435,7 @@ async fn operate_without_select_whose_response_does_not_fit_is_rejected() {
         )
         .await;
 
-    harness.check_events(&[]);
+    harness.check_no_events();
 }
 
 #[tokio::test]
@@ -458,7 +458,7 @@ async fn operate_after_a_different_select_whose_response_does_not_fit_is_rejecte
         )
         .await;
 
-    harness.check_events(&[]);
+    harness.check_no_events();
 }
 
 #[tokio::test]
