@@ -11,11 +11,17 @@ use crate::app::attr::{AnyAttribute, AttrValue, Attribute, KnownAttribute};
 use crate::app::measurement::*;
 use crate::app::parse::options::ParseOptions;
 use crate::app::parse::parser::{HeaderCollection, ParsedFragment};
-use crate::link::header::{BroadcastConfirmMode, FrameInfo, FrameType};
+use crate::app::EndpointType;
+use crate::link::header::{
+    AnyAddress, BroadcastConfirmMode, ControlField, FrameInfo, FrameType, Header as LinkHeader,
+};
+use crate::link::layer::Layer;
 use crate::link::parser::{FramePayload, Parser};
+use crate::link::reader::LinkModes;
 use crate::link::{EndpointAddress, LinkErrorMode};
 use crate::master::extract::{extract_header, Extracted};
 use crate::master::{HeaderInfo, ReadHandler};
+use crate::outstation::Feature;
 use crate::transport::real::assembler::{Assembler, AssemblyState};
 use crate::transport::real::header::Header;
 use crate::util::phys::PhysAddr;
@@ -181,6 +187,66 @@ fn assemble(assembler: &mut Assembler, info: FrameInfo, segment: &[u8]) -> usize
     0
 }
 
+/// no physical address, or a UDP address, chosen by bits 2 to 7
+fn phys_addr(flags: u8) -> PhysAddr {
+    if flags & 0x04 == 0 {
+        PhysAddr::None
+    } else {
+        PhysAddr::Udp(std::net::SocketAddr::from((
+            [127, 0, 0, 1],
+            u16::from(flags >> 3),
+        )))
+    }
+}
+
+/// the link layer's processing of one frame header, and the reply it formats
+#[no_panic::no_panic]
+fn process_link_header(layer: &mut Layer, header: LinkHeader, addr: PhysAddr) -> usize {
+    let (info, reply) = layer.process_header(header, addr, |_| {});
+    std::hint::black_box(info);
+    match reply {
+        Some(reply) => {
+            let header = layer.get_header(reply);
+            layer.format_reply(header).len()
+        }
+        None => 0,
+    }
+}
+
+/// a link layer configured from the input, given frame headers from the input
+fn link_headers(data: &[u8]) {
+    let [config, local_0, local_1, headers @ ..] = data else {
+        return;
+    };
+    let mut data = headers;
+    let endpoint_type = if config & 0x01 == 0 {
+        EndpointType::Master
+    } else {
+        EndpointType::Outstation
+    };
+    let self_address = if config & 0x02 == 0 {
+        Feature::Disabled
+    } else {
+        Feature::Enabled
+    };
+    let mut layer = Layer::new(
+        LinkModes::serial(),
+        2048,
+        endpoint_type,
+        self_address,
+        EndpointAddress::raw(u16::from_le_bytes([*local_0, *local_1])),
+    );
+    while let [control, dest_0, dest_1, source_0, source_1, flags, rest @ ..] = data {
+        let header = LinkHeader::new(
+            ControlField::from(*control),
+            AnyAddress::from(u16::from_le_bytes([*dest_0, *dest_1])),
+            AnyAddress::from(u16::from_le_bytes([*source_0, *source_1])),
+        );
+        std::hint::black_box(process_link_header(&mut layer, header, phys_addr(*flags)));
+        data = rest;
+    }
+}
+
 /// segments cut from the input, each with a source, broadcast mode and physical address from
 /// the input
 fn segments(mut data: &[u8]) {
@@ -193,19 +259,11 @@ fn segments(mut data: &[u8]) {
             2 => Some(BroadcastConfirmMode::NotRequired),
             _ => None,
         };
-        let phys = if flags & 0x04 == 0 {
-            PhysAddr::None
-        } else {
-            PhysAddr::Udp(std::net::SocketAddr::from((
-                [127, 0, 0, 1],
-                u16::from(flags >> 3),
-            )))
-        };
         let info = FrameInfo::new(
             EndpointAddress::raw(u16::from(*source)),
             broadcast,
             FrameType::Data,
-            phys,
+            phys_addr(*flags),
         );
         std::hint::black_box(assemble(&mut assembler, info, segment));
         data = next;
@@ -217,6 +275,7 @@ fn parsers_with_unknown_input() {
     let data = std::hint::black_box(input());
 
     segments(&data);
+    link_headers(&data);
 
     let mut parser = Parser::new(LinkErrorMode::Discard);
     let mut payload = FramePayload::new();
