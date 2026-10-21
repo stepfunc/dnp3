@@ -522,7 +522,7 @@ fn define_outstation(
         )?
         .returns(
             outstation.clone(),
-            "Outstation instance or {null} if the port cannot be opened",
+            "Outstation instance or {null} if an error occurred",
         )?
         .fails_with(shared.error_type.clone())?
         .doc(
@@ -570,7 +570,7 @@ fn define_outstation(
         )?
         .returns(
             outstation.clone(),
-            "Outstation instance or {null} if the port cannot be opened",
+            "Outstation instance or {null} if an error occurred",
         )?
         .fails_with(shared.error_type.clone())?
         .doc(
@@ -610,17 +610,18 @@ fn define_outstation(
         )?
         .returns(
             outstation.clone(),
-            "Outstation instance or {null} if the port cannot be opened",
+            "Outstation instance or {null} if an error occurred",
         )?
         .fails_with(shared.error_type.clone())?
         .doc(
-            doc("Create an outstation instance running on a serial port which is tolerant to the serial port being added and removed")
+            doc("Create an outstation instance that communicates over UDP")
+                .details("The socket is bound in the background, and binding is retried after a failure, so this method does not fail if the socket cannot be bound.")
         )?
         .build_static("create_udp")?;
 
     let destructor = lib.define_destructor(
         outstation.clone(),
-        doc("Free resources of the outstation.").warning("This does not shutdown the outstation. Only {class:outstation_server.[destructor]} will properly shutdown the outstation.")
+        doc("Free resources of the outstation.").warning("An outstation created with a TCP client, TLS client, serial, or UDP method stops when it is destroyed. An outstation added to an {class:outstation_server} keeps running until the server is shut down with {class:outstation_server.[destructor]}.")
     )?;
 
     let execute_transaction = lib
@@ -928,7 +929,7 @@ fn define_outstation_config(
             doc("Delay of inactivity before sending a REQUEST_LINK_STATUS to the master")
                 .details("A value of zero means no automatic keep-alive will be sent."),
         )?
-        .add(&max_read_request_headers, Primitive::U16, doc("Maximum number of headers that will be processed in a READ request.").details("Internally, this controls the size of a pre-allocated buffer used to process requests. A minimum value of `DEFAULT_READ_REQUEST_HEADERS` is always enforced. Requesting more than this number will result in the PARAMETER_ERROR IIN bit being set in the response."))?
+        .add(&max_read_request_headers, Primitive::U16, doc("Maximum number of headers that will be processed in a READ request.").details("Internally, this controls the size of a pre-allocated buffer used to process requests. A minimum value of 64 is always enforced. Requesting more than this number will result in the PARAMETER_ERROR IIN bit being set in the response."))?
         .add(&max_controls_per_request, Primitive::U16, doc("Maximum number of controls in a single request."))?
         .add(&class_zero, class_zero_config, "Controls responses to Class 0 reads")?
         .end_fields()?
@@ -1227,7 +1228,7 @@ fn define_outstation_application(
             .returns_nothing_by_default()?
             .end_callback()?
         .begin_callback("write_analog_dead_band",
-                        doc("Called when the outstation begins processing a header to write analog dead-bands")
+                        doc("Called when the outstation writes the dead-band of an analog input")
                             .details("Called for each analog dead-band in the write request where an analog input is defined at the specified index.")
                             .details("The dead-band is automatically updated in the database. This callback allows application code to persist the modified value to non-volatile memory if desired")
             )?

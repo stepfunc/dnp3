@@ -49,7 +49,7 @@ If you must implement this functionality to pass conformance tests or due to cus
 
 ## Freeze Requests
 
-`OutstationApplication` contains two methods related to freezing counters:
+`OutstationApplication` contains methods related to freezing counters:
 
 * `freezeCountersAll`: Called for freeze operations using the All Points (0x06) qualifier.
 * `freezeCountersRange`: Called for freeze operations using 8-bit (0x00) or 16-bit (0x01) range qualifiers.
@@ -59,17 +59,20 @@ Use the provided `DatabaseHandle` to copy counters to frozen counters. `FreezeTy
 * `IMMEDIATE_FREEZE`: Copy the current value of a counter to the associated frozen counter point.
 * `FREEZE_AND_CLEAR`: Copy the current value of a counter to the associated frozen counter point and clear the current value to 0.
 
+Requests to freeze at a particular time and interval are also passed to the application. In Rust, this is the `FreezeType::FreezeAtTime` variant. The bindings
+have separate `freezeCountersAllAtTime` and `freezeCountersRangeAtTime` methods.
+
 ## Writing Device Attributes
 
 When defining an attribute, you may specify that it is writable. When the outstation receives a WRITE request containing
 an attribute it follows this procedure:
 
-1. If the attribute has not been defined the outstation returns `IIN2.NO_FUNC_CODE_SUPPORT`.
-2. If the attribute is defined, but the value is not of the correct type the outstation returns `IIN.PARAMETER_ERROR`.
+1. If the attribute set is not defined, or the value is not of the correct type, the outstation returns `IIN2.PARAMETER_ERROR`.
+2. If the set is defined but the attribute is not, the attribute is read-only, or the variation is reserved, the outstation returns `IIN2.OBJECT_UNKNOWN`.
 3. The outstation then calls the appropriate handler to ask user code to validate and persist the new value. Rust has a single callback method
 whereas the bindings have a callback method for each type of attribute. These callbacks may return false to reject the WRITE. For example,
 certain attributes may have allowed ranges or discrete values. If the callback method returns `false` the outstation will
-respond with `IIN.PARAMETER_ERROR`.
+respond with `IIN2.PARAMETER_ERROR`.
 4. Finally, if the handler returned `true` then the outstation will modify the in-memory value and return an empty response
 without error indications.
 

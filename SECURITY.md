@@ -48,17 +48,18 @@ We take supply chain security seriously and have implemented the following measu
 
 ### Automated Vulnerability Scanning
 
-- **Nightly audits**: Dependencies are automatically scanned daily at 2 AM UTC using `cargo audit`
+- **Nightly audits**: Dependencies are automatically scanned daily at 2 AM UTC using `cargo audit` and `osv-scanner`, which also
+  covers advisories published on GitHub that don't reach the RustSec database
 - **Pull request checks**: All PRs are checked for vulnerabilities before merging
-- **Immediate notifications**: Maintainers receive automated alerts when vulnerabilities are detected
-- **GitHub Security tab integration**: Vulnerability information is surfaced in the repository's Security tab
+- **Notifications**: A failed scheduled scan notifies maintainers through GitHub Actions
+- **Reports**: Each scan's report is kept as a workflow artifact, and a failed `cargo audit` lists the advisories in the job summary
 
 ### Dependency Management
 
 - **Minimal dependencies**: We strive to minimize external dependencies where practical
 - **Regular updates**: Dependencies are regularly reviewed and updated to address known vulnerabilities
 - **Lock file commits**: `Cargo.lock` is committed to ensure reproducible builds
-- **Audit before release**: All releases undergo security audit as part of the CI/CD pipeline
+- **Audit before release**: A release is only tagged once the security scans pass on its release PR
 
 ### For Users
 

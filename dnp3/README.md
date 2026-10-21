@@ -8,7 +8,7 @@ Rust implementation of DNP3 (IEEE 1815) with idiomatic bindings for C, C++, .NET
 
 - Subset Level 3 master and outstation components in a single library
 - Written in safe Rust with idiomatic bindings for C, C++, .NET Core, and Java.
-- Supports TCP, TLS, and serial communication channels
+- Supports TCP, TLS, UDP, and serial communication channels
 - TLS is implemented using [rustls](https://github.com/rustls/rustls) not OpenSSL.
 - Automatic mapping between DNP3 and higher-level measurement types
 - Built-in logging and protocol decoding
@@ -27,11 +27,13 @@ proven panic-free at link time. See the [security page](https://docs.stepfunc.io
 
 Default features can be disabled at compile time:
 * `tls` - Build the library with support for mutually authenticated TLS using [ring](https://crates.io/crates/ring) for cryptography.
-* `tls-aws-lc` - Same as the `tls` feature but uses [aws-lc-rs](https://crates.io/crates/aws-lc-rs) for cryptography.
 * `serial` - Build the library with support for serial ports
 
 Optional features that may be enabled at compile time:
-* `serialize` - Add [serde](https://docs.rs/crate/serde/latest) de(serialization) support for public configuration types.
+* `tls-aws-lc` - Same as the `tls` feature but uses [aws-lc-rs](https://crates.io/crates/aws-lc-rs) for cryptography.
+* `serialization` - Add [serde](https://docs.rs/crate/serde/latest) de(serialization) support for public configuration types.
+
+The minimum supported Rust version is 1.88.
 
 # License
 

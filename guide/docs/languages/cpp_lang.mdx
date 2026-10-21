@@ -100,7 +100,7 @@ The class destructor will call the underlying C destructor automatically.
 
 ### Interfaces
 
-Interfaces are abstract classes containing only pure virtual functions where every callback must be implemented. The destructor is virtual to allow proper cleanup.
+Interfaces are abstract classes containing virtual functions. Callbacks without a default implementation are pure virtual and must be implemented, while many others have a default implementation that does nothing or returns a default value. The destructor is virtual to allow proper cleanup.
 
 Owned interfaces that are invoked asynchronously by the library are passed into the API as a `std::unique_ptr<T>`. Use `std::make_unique` to create these smart pointers.
 

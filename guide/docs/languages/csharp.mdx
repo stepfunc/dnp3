@@ -12,15 +12,16 @@ The bindings are .NET Standard 2.0 compatible and include platform-specific shar
 
 Shared libraries for the following platforms are included in the Nuget package:
 
-- Windows x64 (Windows 7+)
-- Windows x86 (Windows 7+)
-- Linux x64 (GLIBC and MUSL variants)
-- Linux AArch64 (GLIBC and MUSL variants)
-- Linux ARMv6hf (GLIBC and MUSL variants)
-- MacOS x64 (MacOS 10.7+, Lion+)
+- Windows x64 (Windows 10+)
+- Windows x86 (Windows 10+)
+- Linux x64 (GLIBC and MUSL variants, kernel 3.2+, glibc 2.17+)
+- Linux AArch64 (GLIBC and MUSL variants, kernel 4.1+, glibc 2.17+)
+- Linux ARMv6hf (GLIBC and MUSL variants, kernel 3.2+, glibc 2.17+)
+- MacOS x64 (MacOS 10.12+)
+- MacOS AArch64 (MacOS 11.0+)
 
 :::warning
-MacOS x64 libraries are included in the package but are not officially supported. They are useful for developers using MacOS, but
+MacOS libraries are included in the package but are not officially supported. They are useful for developers using MacOS, but
 are not supported in production.
 :::
 
@@ -61,9 +62,9 @@ Each field has a `With<FieldName>` method that sets the field and returns the st
 
 Abstract classes are mapped to C# classes. They have a private pointer to the underlying native resource. There are two types of generated classes in C#:
 * Generated classes that only have a private finalizer: These are automatically garbage collected, while native resources are deallocated in the class's finalize method. These
-types of classes are typically builder objects such as `Commands`, `Request`, and `AddressFilter`.
-* Generated classes that also provide a public `Shutdown` method: These represent long-lived resources such as `Runtime`, `Master`, or `TCPServer`. They map to an asynchronous
-Rust task executing on the Tokio runtime. The `Shutdown` method lets you precisely control when the resource/task will stop.
+types of classes are typically builder objects such as `CommandSet`, `Request`, and `AddressFilter`.
+* Generated classes that also provide a public `Shutdown` method: These represent long-lived resources such as `Runtime`, `MasterChannel`, or `OutstationServer`. They map to an asynchronous
+Rust task executing on the Tokio runtime. The `Shutdown` method lets you precisely control when the resource/task will stop. `MasterServer` implements `IDisposable` and provides `Dispose` instead.
 
 ### Asynchronous Methods
 

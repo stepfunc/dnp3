@@ -72,8 +72,12 @@ The DNP3 standard requires that the master perform these actions during initiali
 sequenceDiagram
     Master->>Outstation: Disable Unsolicited Reporting;
     Outstation->>Master: Response;
-    Master->>Outstation: READ Class 3,2,1,0; 
+    Master->>Outstation: READ Class 1,2,3,0;
     Note over Master,Outstation: multiple responses/ACK possible here;
+    opt outstation requests time and automatic time sync is enabled
+        Master->>Outstation: Time synchronization;
+        Outstation->>Master: Response;
+    end
     Master->>Outstation: Enable Unsolicited Reporting;
     Outstation->>Master: Response;
 ```

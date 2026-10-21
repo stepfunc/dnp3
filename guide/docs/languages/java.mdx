@@ -13,14 +13,15 @@ correct native library will automatically load during static initialization. The
 
 Shared libraries for the following platforms are included in the release JAR:
 
-- Windows x64 (Windows 7+)
-- Windows x86 (Windows 7+)
-- Linux x64 (kernel 2.6.32+, glibc 2.11+)
-- Linux AArch64 (kernel 4.2, glibc 2.17+)
-- MacOS x64 (MacOS 10.7+, Lion+)
+- Windows x64 (Windows 10+)
+- Linux x64 (kernel 3.2+, glibc 2.17+)
+- Linux AArch64 (kernel 4.1+, glibc 2.17+)
+- Linux ARMv6hf (kernel 3.2+, glibc 2.17+)
+- MacOS x64 (MacOS 10.12+)
+- MacOS AArch64 (MacOS 11.0+)
 
 :::warning
-MacOS x64 libraries are included in the package but are not officially supported. They are useful for developers using MacOS, but
+MacOS libraries are included in the package but are not officially supported. They are useful for developers using MacOS, but
 are not supported in production.
 :::
 
@@ -91,8 +92,8 @@ Each field has a `with<FieldName>` method that sets the field and returns the st
 ### Classes
 
 Abstract classes are also mapped to Java classes. They have a private pointer to the underlying native resource. There are two types of generated classes in Java: 
-* Generated classes that only have a `finalize` method: These are automatically garbage collected, while native resources are deallocated in the class's finalize method. These types of classes are typically builder objects such as `Commands`, `Request`, and `AddressFilter`. 
-* Generated classes that also provide a public `Shutdown` method to proactively release native resources: These represent long-lived resources such as `Runtime`, `Master`, or `TCPServer`. They map to an asynchronous Rust task executing on the Tokio runtime. The `Shutdown` method lets you precisely control when the resource/task will stop.
+* Generated classes that only have a `finalize` method: These are automatically garbage collected, while native resources are deallocated in the class's finalize method. These types of classes are typically builder objects such as `CommandSet`, `Request`, and `AddressFilter`. 
+* Generated classes that also provide a public `shutdown()` method to proactively release native resources: These represent long-lived resources such as `Runtime`, `MasterChannel`, or `OutstationServer`. They map to an asynchronous Rust task executing on the Tokio runtime. The `shutdown()` method lets you precisely control when the resource/task will stop. `MasterServer` implements `AutoCloseable` and provides `close()` instead.
 
 
 ### Asynchronous Methods
