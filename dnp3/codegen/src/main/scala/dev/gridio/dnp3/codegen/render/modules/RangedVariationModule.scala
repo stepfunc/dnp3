@@ -159,8 +159,7 @@ object RangedVariationModule extends Module {
       v match {
         case AllAttributesRequest => notSupported
         case SpecificAttribute => bracket(s"RangedVariation::${v.parent.name}(_, attr) =>") {
-          "crate::master::handle_attribute(var, qualifier, attr, handler);".eol ++
-          "true".eol
+          "crate::master::handle_attribute(var, qualifier, attr, handler)".eol
         }
         case _ : AnyVariation => notSupported
         case Group80Var1 => {
@@ -202,7 +201,7 @@ object RangedVariationModule extends Module {
             variations.flatMap(getFmtMatcher).iterator
           }
         } ++ space ++
-        bracket("pub(crate) fn extract_measurements_to(&self, var: Variation, qualifier: QualifierCode, handler: &mut dyn ReadHandler) -> bool") {
+        bracket("pub(crate) fn extract_measurements_to<H: ReadHandler + ?Sized>(&self, var: Variation, qualifier: QualifierCode, handler: &mut H) -> bool") {
           bracket("match self") {
             variations.flatMap(getExtractMatcher).iterator
           }

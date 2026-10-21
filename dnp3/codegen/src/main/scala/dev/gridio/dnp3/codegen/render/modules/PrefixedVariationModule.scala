@@ -112,8 +112,7 @@ object PrefixedVariationModule extends Module {
         case SpecificAttribute => {
           bracket(s"PrefixedVariation::${v.parent.name}(attr) =>") {
             "let info = self.get_header_info();".eol ++
-            "crate::master::handle_attribute(info.variation, info.qualifier, &Some(*attr), handler);".eol ++
-            "true".eol
+            "crate::master::handle_attribute(info.variation, info.qualifier, &Some(*attr), handler)".eol
           }
         }
         case _ if v.parent.groupType == GroupType.AnalogInputDeadband => {
@@ -167,7 +166,7 @@ object PrefixedVariationModule extends Module {
             variations.flatMap(fmtMatcher).iterator
           }
         } ++ space ++
-      bracket("pub(crate) fn extract_measurements_to(&self, cto: Option<Time>, handler: &mut dyn ReadHandler) -> bool") {
+      bracket("pub(crate) fn extract_measurements_to<H: ReadHandler + ?Sized>(&self, cto: Option<Time>, handler: &mut H) -> bool") {
         bracket("match self") {
           variations.flatMap(extractMatcher).iterator
         }

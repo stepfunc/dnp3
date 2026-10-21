@@ -60,6 +60,7 @@ impl<'a> ParsedFragment<'a> {
         }
     }
 
+    #[cfg_attr(all(test, dnp3_no_panic), no_panic::no_panic)]
     pub(crate) fn to_request(self) -> Result<Request<'a>, RequestValidationError> {
         if self.iin.is_some() {
             return Err(RequestValidationError::UnexpectedFunction(self.function));
@@ -80,6 +81,7 @@ impl<'a> ParsedFragment<'a> {
         })
     }
 
+    #[cfg_attr(all(test, dnp3_no_panic), no_panic::no_panic)]
     pub(crate) fn to_response(self) -> Result<Response<'a>, ResponseValidationError> {
         let (function, iin) = match (self.function, self.iin) {
             (FunctionCode::Response, Some(x)) => (ResponseFunction::Response, x),
@@ -108,7 +110,8 @@ impl<'a> ParsedFragment<'a> {
         })
     }
 
-    fn parse_no_logging(
+    #[cfg_attr(all(test, dnp3_no_panic), no_panic::no_panic)]
+    pub(crate) fn parse_no_logging(
         options: ParseOptions,
         fragment: &'a [u8],
     ) -> Result<Self, HeaderParseError> {
@@ -441,6 +444,7 @@ pub(crate) struct HeaderIterator<'a> {
 impl<'a> Iterator for HeaderIterator<'a> {
     type Item = ObjectHeader<'a>;
 
+    #[cfg_attr(all(test, dnp3_no_panic), no_panic::no_panic)]
     fn next(&mut self) -> Option<Self::Item> {
         match self.parser.next() {
             None => None,

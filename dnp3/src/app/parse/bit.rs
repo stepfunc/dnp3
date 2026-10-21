@@ -90,6 +90,7 @@ pub(crate) struct DoubleBitIterator<'a> {
 impl Iterator for BitIterator<'_> {
     type Item = (bool, u16);
 
+    #[cfg_attr(all(test, dnp3_no_panic), no_panic::no_panic)]
     fn next(&mut self) -> Option<Self::Item> {
         if self.pos >= self.count {
             return None;
@@ -119,6 +120,7 @@ impl Iterator for BitIterator<'_> {
 impl Iterator for DoubleBitIterator<'_> {
     type Item = (DoubleBit, u16);
 
+    #[cfg_attr(all(test, dnp3_no_panic), no_panic::no_panic)]
     fn next(&mut self) -> Option<Self::Item> {
         if self.pos >= self.count {
             return None;

@@ -279,12 +279,11 @@ impl<'a, I> PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Dis
         }
     }
     
-    pub(crate) fn extract_measurements_to(&self, cto: Option<Time>, handler: &mut dyn ReadHandler) -> bool {
+    pub(crate) fn extract_measurements_to<H: ReadHandler + ?Sized>(&self, cto: Option<Time>, handler: &mut H) -> bool {
         match self {
             PrefixedVariation::Group0(attr) => {
                 let info = self.get_header_info();
-                crate::master::handle_attribute(info.variation, info.qualifier, &Some(*attr), handler);
-                true
+                crate::master::handle_attribute(info.variation, info.qualifier, &Some(*attr), handler)
             }
             PrefixedVariation::Group2Var1(seq) => {
                 handler.handle_binary_input(

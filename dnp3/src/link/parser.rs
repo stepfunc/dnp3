@@ -91,6 +91,7 @@ impl Parser {
         self.state = ParseState::FindSync1;
     }
 
+    #[cfg_attr(all(test, dnp3_no_panic), no_panic::no_panic)]
     pub(crate) fn parse(
         &mut self,
         cursor: &mut ReadCursor,

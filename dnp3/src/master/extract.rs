@@ -26,18 +26,51 @@ pub(crate) fn extract_measurements_inner(
     objects: HeaderCollection<'_>,
     handler: &mut dyn ReadHandler,
 ) {
-    fn extract_cto_g51v1(prev: Option<Time>, item: Option<Group51Var1>) -> Option<Time> {
-        item.map_or(prev, |x| Some(Time::Synchronized(x.time)))
+    let mut cto = None;
+    for header in objects.iter() {
+        match extract_header(&header, cto, handler) {
+            Extracted::Handled => {}
+            Extracted::Cto(x) => cto = x,
+            Extracted::Ignored => {
+                tracing::warn!(
+                    "ignored header variation: {} qualifier: {:?}",
+                    &header.variation,
+                    &header.details.qualifier()
+                );
+            }
+        }
+    }
+}
+
+/// What [`extract_header`] did with a header
+pub(crate) enum Extracted {
+    /// the header's values were passed to the handler
+    Handled,
+    /// the header is a common time of occurrence for the headers that follow
+    Cto(Option<Time>),
+    /// the header isn't one that the master extracts
+    Ignored,
+}
+
+/// Pass the values of one header to the handler, given the common time of occurrence
+/// of the headers before it
+pub(crate) fn extract_header<H: ReadHandler + ?Sized>(
+    header: &ObjectHeader,
+    cto: Option<Time>,
+    handler: &mut H,
+) -> Extracted {
+    fn extract_cto_g51v1(prev: Option<Time>, item: Option<Group51Var1>) -> Extracted {
+        Extracted::Cto(item.map_or(prev, |x| Some(Time::Synchronized(x.time))))
     }
 
-    fn extract_cto_g51v2(prev: Option<Time>, item: Option<Group51Var2>) -> Option<Time> {
-        item.map_or(prev, |x| Some(Time::Unsynchronized(x.time)))
+    fn extract_cto_g51v2(prev: Option<Time>, item: Option<Group51Var2>) -> Extracted {
+        Extracted::Cto(item.map_or(prev, |x| Some(Time::Unsynchronized(x.time))))
     }
 
-    fn extract_g50v1(
+    fn extract_g50v1<H: ReadHandler + ?Sized>(
         seq: &CountSequence<Group50Var1>,
         header: &ObjectHeader,
-        handler: &mut dyn ReadHandler,
+        handler: &mut H,
     ) -> bool {
         if let Some(item) = seq.single() {
             handler.handle_abs_time(
@@ -50,66 +83,47 @@ pub(crate) fn extract_measurements_inner(
         }
     }
 
-    fn handle(
-        cto: Option<Time>,
-        header: ObjectHeader,
-        handler: &mut dyn ReadHandler,
-    ) -> Option<Time> {
-        let handled = match &header.details {
-            // these are common-time-of-occurrence headers
-            HeaderDetails::OneByteCount(1, CountVariation::Group51Var1(seq)) => {
-                return extract_cto_g51v1(cto, seq.single())
-            }
-            HeaderDetails::OneByteCount(1, CountVariation::Group51Var2(seq)) => {
-                return extract_cto_g51v2(cto, seq.single())
-            }
-            HeaderDetails::TwoByteCount(1, CountVariation::Group51Var1(seq)) => {
-                return extract_cto_g51v1(cto, seq.single())
-            }
-            HeaderDetails::TwoByteCount(1, CountVariation::Group51Var2(seq)) => {
-                return extract_cto_g51v2(cto, seq.single())
-            }
-            // handle g50v1 - absolute time (only count == 1 is valid)
-            HeaderDetails::OneByteCount(1, CountVariation::Group50Var1(seq)) => {
-                extract_g50v1(seq, &header, handler)
-            }
-            HeaderDetails::TwoByteCount(1, CountVariation::Group50Var1(seq)) => {
-                extract_g50v1(seq, &header, handler)
-            }
-            // everything else
-            HeaderDetails::OneByteStartStop(_, _, var) => {
-                var.extract_measurements_to(header.variation, header.details.qualifier(), handler)
-            }
-            HeaderDetails::TwoByteStartStop(_, _, var) => {
-                var.extract_measurements_to(header.variation, header.details.qualifier(), handler)
-            }
-            HeaderDetails::OneByteCountAndPrefix(_, var) => {
-                var.extract_measurements_to(cto, handler)
-            }
-            HeaderDetails::TwoByteCountAndPrefix(_, var) => {
-                var.extract_measurements_to(cto, handler)
-            }
-            HeaderDetails::AllObjects(_)
-            | HeaderDetails::OneByteCount(..)
-            | HeaderDetails::TwoByteCount(..)
-            | HeaderDetails::TwoByteFreeFormat(..) => false,
-        };
-
-        if !handled {
-            tracing::warn!(
-                "ignored header variation: {} qualifier: {:?}",
-                &header.variation,
-                &header.details.qualifier()
-            );
+    let handled = match &header.details {
+        // these are common-time-of-occurrence headers
+        HeaderDetails::OneByteCount(1, CountVariation::Group51Var1(seq)) => {
+            return extract_cto_g51v1(cto, seq.single())
         }
+        HeaderDetails::OneByteCount(1, CountVariation::Group51Var2(seq)) => {
+            return extract_cto_g51v2(cto, seq.single())
+        }
+        HeaderDetails::TwoByteCount(1, CountVariation::Group51Var1(seq)) => {
+            return extract_cto_g51v1(cto, seq.single())
+        }
+        HeaderDetails::TwoByteCount(1, CountVariation::Group51Var2(seq)) => {
+            return extract_cto_g51v2(cto, seq.single())
+        }
+        // handle g50v1 - absolute time (only count == 1 is valid)
+        HeaderDetails::OneByteCount(1, CountVariation::Group50Var1(seq)) => {
+            extract_g50v1(seq, header, handler)
+        }
+        HeaderDetails::TwoByteCount(1, CountVariation::Group50Var1(seq)) => {
+            extract_g50v1(seq, header, handler)
+        }
+        // everything else
+        HeaderDetails::OneByteStartStop(_, _, var) => {
+            var.extract_measurements_to(header.variation, header.details.qualifier(), handler)
+        }
+        HeaderDetails::TwoByteStartStop(_, _, var) => {
+            var.extract_measurements_to(header.variation, header.details.qualifier(), handler)
+        }
+        HeaderDetails::OneByteCountAndPrefix(_, var) => var.extract_measurements_to(cto, handler),
+        HeaderDetails::TwoByteCountAndPrefix(_, var) => var.extract_measurements_to(cto, handler),
+        HeaderDetails::AllObjects(_)
+        | HeaderDetails::OneByteCount(..)
+        | HeaderDetails::TwoByteCount(..)
+        | HeaderDetails::TwoByteFreeFormat(..) => false,
+    };
 
-        // if we didn't return early b/c the header is a CTO, then we just return the previous value
-        cto
+    if handled {
+        Extracted::Handled
+    } else {
+        Extracted::Ignored
     }
-
-    objects
-        .iter()
-        .fold(None, |cto, header| handle(cto, header, handler));
 }
 
 #[cfg(test)]
