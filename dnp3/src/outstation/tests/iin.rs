@@ -97,3 +97,113 @@ async fn buffer_overflow() {
         .test_request_response(READ_CLASS_123, EMPTY_RESPONSE)
         .await;
 }
+
+const EMPTY_RESPONSE_OBJECT_UNKNOWN: &[u8] = &[0xC0, 0x81, 0x80, 0x02];
+const EMPTY_RESPONSE_PARAM_ERROR: &[u8] = &[0xC0, 0x81, 0x80, 0x04];
+const WRITE_ABSOLUTE_TIME: &[u8] = &[
+    0xC0, 0x02, 50, 1, 0x07, 1, 0xC0, 0x24, 0x0E, 0xDA, 0x77, 0x01,
+];
+
+#[tokio::test]
+async fn read_of_object_that_cannot_be_read_sets_object_unknown() {
+    let mut harness = new_harness(get_default_config());
+
+    harness
+        .test_request_response(&[0xC0, 0x01, 13, 1, 0x06], EMPTY_RESPONSE_OBJECT_UNKNOWN)
+        .await;
+}
+
+#[tokio::test]
+async fn read_with_qualifier_not_supported_for_the_object_sets_parameter_error() {
+    let mut harness = new_harness(get_default_config());
+
+    harness
+        .test_request_response(
+            &[0xC0, 0x01, 2, 1, 0x17, 1, 0, 0x01],
+            EMPTY_RESPONSE_PARAM_ERROR,
+        )
+        .await;
+}
+
+#[tokio::test]
+async fn write_of_object_that_cannot_be_written_sets_object_unknown() {
+    let mut harness = new_harness(get_default_config());
+
+    harness
+        .test_request_response(
+            &[0xC0, 0x02, 1, 2, 0x00, 0, 0, 0x01],
+            EMPTY_RESPONSE_OBJECT_UNKNOWN,
+        )
+        .await;
+}
+
+#[tokio::test]
+async fn write_with_qualifier_not_supported_for_the_object_sets_parameter_error() {
+    let mut harness = new_harness(get_default_config());
+
+    harness
+        .test_request_response(&[0xC0, 0x02, 0, 240, 0x06], EMPTY_RESPONSE_PARAM_ERROR)
+        .await;
+}
+
+#[tokio::test]
+async fn write_accepts_two_byte_qualifiers() {
+    let mut harness = new_harness(get_default_config());
+
+    // clear the restart IIN with a 2-byte start/stop
+    harness
+        .test_request_response(
+            &[0xC0, 0x02, 80, 1, 0x01, 7, 0, 7, 0, 0x00],
+            &[0xC0, 0x81, 0x00, 0x00],
+        )
+        .await;
+
+    // write the time with a 2-byte count
+    harness
+        .test_request_response(
+            &[
+                0xC1, 0x02, 50, 1, 0x08, 1, 0, 0xC0, 0x24, 0x0E, 0xDA, 0x77, 0x01,
+            ],
+            &[0xC1, 0x81, 0x00, 0x00],
+        )
+        .await;
+
+    harness.check_events(&[
+        Event::ClearRestartIIN,
+        Event::WriteAbsoluteTime(Timestamp::new(1614271096000)),
+    ]);
+}
+
+#[tokio::test]
+async fn write_keeps_the_error_of_an_earlier_header() {
+    let mut harness = new_harness(get_default_config());
+
+    // an unsupported g1v2 header followed by clearing the restart IIN
+    harness
+        .test_request_response(
+            &[0xC0, 0x02, 1, 2, 0x00, 0, 0, 0x01, 80, 1, 0x00, 7, 7, 0x00],
+            &[0xC0, 0x81, 0x00, 0x02],
+        )
+        .await;
+}
+
+#[tokio::test]
+async fn requests_the_application_declines_set_object_unknown() {
+    let mut harness = new_harness(get_default_config());
+    harness.application_data.lock().unwrap().supported = false;
+
+    harness
+        .test_request_response(WRITE_ABSOLUTE_TIME, EMPTY_RESPONSE_OBJECT_UNKNOWN)
+        .await;
+    harness
+        .test_request_response(
+            &[0xC0, 0x02, 34, 1, 0x17, 1, 0, 0xCA, 0xFE],
+            EMPTY_RESPONSE_OBJECT_UNKNOWN,
+        )
+        .await;
+    harness
+        .test_request_response(&[0xC0, 0x07, 20, 0, 0x06], EMPTY_RESPONSE_OBJECT_UNKNOWN)
+        .await;
+
+    harness.check_no_events();
+}

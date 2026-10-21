@@ -31,9 +31,9 @@ pub enum RestartDelay {
 /// Enum describing the result of an operation
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum RequestError {
-    /// outstation supports this operation, but the parameter(s) are nonsensical.
+    /// outstation supports this operation, but the parameter(s) are nonsensical (IIN2.2 PARAMETER_ERROR)
     ParameterError,
-    /// outstation does not support this operation
+    /// outstation does not support this operation for the requested object (IIN2.1 OBJECT_UNKNOWN)
     NotSupported,
 }
 
@@ -169,7 +169,7 @@ pub trait OutstationApplication: Sync + Send + 'static {
     /// Controls outstation support for writing group 34, analog input dead-bands
     ///
     /// Returning false, indicates that the writes to group34 should not be processed and requests to
-    /// do so should be rejected with IIN2.NO_FUNC_CODE_SUPPORT
+    /// do so should be rejected with IIN2.1 OBJECT_UNKNOWN
     ///
     /// Returning true will allow the request to process the actual values with a sequence of calls:
     ///
@@ -208,8 +208,8 @@ pub trait OutstationApplication: Sync + Send + 'static {
     ///
     /// This callback is only invoked for attributes that have been defined as write-able in the
     /// database. The library automatically validates that the attribute has the same type as the
-    /// defined type. Writes to undefined or readonly attributes are rejected with IIN2::PARAM_ERROR
-    /// within the library.
+    /// defined type. Writes to undefined or read-only attributes are rejected with IIN2.1 OBJECT_UNKNOWN,
+    /// and writes to an undefined set or with the wrong type with IIN2.2 PARAMETER_ERROR, within the library.
     ///
     /// This method may validate the value and reject the write by returning false. If the method
     /// returns true, then the in memory copy of the attribute will be modified.

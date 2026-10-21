@@ -2,6 +2,7 @@ use crate::app::gen::all::AllObjectsVariation;
 use crate::app::gen::count::CountVariation;
 use crate::app::gen::ranged::RangedVariation;
 use crate::app::parse::parser::{HeaderDetails, ObjectHeader};
+use crate::app::{Iin2, Variation};
 use crate::outstation::database::config::*;
 use crate::outstation::database::details::range::static_db::IndexRange;
 
@@ -96,6 +97,19 @@ impl ReadHeader {
             );
         }
         res
+    }
+
+    /// The error for a header that [`Self::get`] rejects: a variation that READ supports with
+    /// another qualifier has an unsupported qualifier, and any other is an unsupported object
+    pub(crate) fn unsupported(variation: Variation) -> Iin2 {
+        let readable = AllObjectsVariation::get(variation)
+            .and_then(|x| Self::from_all_objects(&x))
+            .is_some();
+        if readable {
+            Iin2::PARAMETER_ERROR
+        } else {
+            Iin2::OBJECT_UNKNOWN
+        }
     }
 
     fn get_impl(header: &HeaderDetails) -> Option<ReadHeader> {

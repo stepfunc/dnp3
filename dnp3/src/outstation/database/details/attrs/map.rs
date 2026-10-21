@@ -1,6 +1,7 @@
 use crate::app::attr::{
     AnyAttribute, AttrDataType, AttrItem, AttrProp, AttrSet, Attribute, OwnedAttribute, TypeError,
 };
+use crate::app::Iin2;
 use crate::outstation::database::AttrDefError;
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
@@ -101,6 +102,18 @@ impl From<TypeError> for AttrError {
     }
 }
 
+impl From<AttrError> for Iin2 {
+    fn from(value: AttrError) -> Self {
+        match value {
+            // the set is the index of the object
+            AttrError::SetNotDefined(_) | AttrError::BadType(_) => Iin2::PARAMETER_ERROR,
+            AttrError::AttrNotDefined(_, _)
+            | AttrError::ReservedVariation(_)
+            | AttrError::NotWritable(_, _) => Iin2::OBJECT_UNKNOWN,
+        }
+    }
+}
+
 impl SetMap {
     /// Define an attribute in map
     ///
@@ -180,10 +193,6 @@ impl SetMap {
                 }
             }
         }
-    }
-
-    pub(crate) fn exists(&self, set: AttrSet, var: u8) -> bool {
-        self.get(set, var).is_ok()
     }
 
     /// Retrieve an attribute in the map

@@ -417,7 +417,7 @@ impl From<RequestError> for Iin2 {
     fn from(from: RequestError) -> Self {
         match from {
             RequestError::ParameterError => Iin2::PARAMETER_ERROR,
-            RequestError::NotSupported => Iin2::NO_FUNC_CODE_SUPPORT,
+            RequestError::NotSupported => Iin2::OBJECT_UNKNOWN,
         }
     }
 }
