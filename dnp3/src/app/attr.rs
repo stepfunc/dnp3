@@ -909,7 +909,7 @@ impl FloatType {
     /// Extract the value, widening f32 to f64
     pub fn value(self) -> f64 {
         match self {
-            FloatType::F32(x) => x as f64,
+            FloatType::F32(x) => x.into(),
             FloatType::F64(x) => x,
         }
     }
@@ -1060,10 +1060,10 @@ enum UInt {
 
 impl UInt {
     fn new(value: u32) -> Self {
-        if value <= u8::MAX as u32 {
-            Self::U8(value as u8)
-        } else if value <= u16::MAX as u32 {
-            Self::U16(value as u16)
+        if let Ok(x) = u8::try_from(value) {
+            Self::U8(x)
+        } else if let Ok(x) = u16::try_from(value) {
+            Self::U16(x)
         } else {
             Self::U32(value)
         }
@@ -1431,7 +1431,7 @@ impl<'a> Attribute<'a> {
     {
         if count != 1 {
             return Err(ObjectParseError::BadAttribute(AttrParseError::CountNotOne(
-                count as usize,
+                count.into(),
             )));
         }
         let index = I::read(cursor)?.widen_to_u16();
@@ -1560,15 +1560,15 @@ impl<'a> AttrValue<'a> {
             AttrDataType::FloatingPoint => {
                 Self::FloatingPoint(Self::parse_floating_point(cursor, len)?)
             }
-            AttrDataType::OctetString => Self::OctetString(cursor.read_bytes(len as usize)?),
-            AttrDataType::BitString => Self::BitString(cursor.read_bytes(len as usize)?),
+            AttrDataType::OctetString => Self::OctetString(cursor.read_bytes(len.into())?),
+            AttrDataType::BitString => Self::BitString(cursor.read_bytes(len.into())?),
             AttrDataType::Dnp3Time => {
                 if len != 6 {
                     return Err(AttrParseError::BadTimeLength(len));
                 }
                 Self::Dnp3Time(Timestamp::new(cursor.read_u48_le()?))
             }
-            AttrDataType::AttrList => Self::AttrList(Self::parse_attr_list(cursor, len as u16)?),
+            AttrDataType::AttrList => Self::AttrList(Self::parse_attr_list(cursor, len.into())?),
             AttrDataType::ExtAttrList => {
                 // with extended attribute lists, the len is really len + 256
                 let len = u16::from(len) | 0x100;
@@ -1597,15 +1597,15 @@ impl<'a> AttrValue<'a> {
         cursor: &mut ReadCursor<'a>,
         len: u8,
     ) -> Result<&'a str, AttrParseError> {
-        let data = cursor.read_bytes(len as usize)?;
+        let data = cursor.read_bytes(len.into())?;
         let value = std::str::from_utf8(data)?;
         Ok(value)
     }
 
     fn parse_unsigned_int(cursor: &mut ReadCursor<'a>, len: u8) -> Result<u32, AttrParseError> {
         match len {
-            1 => Ok(cursor.read_u8()? as u32),
-            2 => Ok(cursor.read_u16_le()? as u32),
+            1 => Ok(cursor.read_u8()?.into()),
+            2 => Ok(cursor.read_u16_le()?.into()),
             4 => Ok(cursor.read_u32_le()?),
             _ => Err(AttrParseError::BadIntegerLength(len)),
         }
@@ -1639,7 +1639,7 @@ impl<'a> AttrValue<'a> {
             return Err(AttrParseError::BadAttrListLength(len));
         }
 
-        let data = cursor.read_bytes(len as usize)?;
+        let data = cursor.read_bytes(len.into())?;
 
         Ok(VariationList { data })
     }

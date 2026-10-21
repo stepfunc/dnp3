@@ -74,8 +74,8 @@ impl<'a> Group70Var2<'a> {
         let password_length: u16 = cursor.read_u16_le()?;
         let auth_key = cursor.read_u32_le()?;
 
-        let user_name_bytes = cursor.read_bytes(user_name_length as usize)?;
-        let password_bytes = cursor.read_bytes(password_length as usize)?;
+        let user_name_bytes = cursor.read_bytes(user_name_length.into())?;
+        let password_bytes = cursor.read_bytes(password_length.into())?;
 
         let user_name = std::str::from_utf8(user_name_bytes)?;
         let password = std::str::from_utf8(password_bytes)?;

@@ -37,7 +37,7 @@ impl DeferredRead {
     pub(crate) fn new(header_capacity: u16) -> Self {
         Self {
             info: None,
-            vec: Vec::with_capacity(header_capacity as usize),
+            vec: Vec::with_capacity(header_capacity.into()),
         }
     }
 

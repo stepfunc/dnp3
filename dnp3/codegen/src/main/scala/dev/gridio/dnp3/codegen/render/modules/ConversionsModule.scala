@@ -167,7 +167,7 @@ object ConversionsModule extends Module {
           val field = fs.fields.find(f => f.attr.contains(FieldAttribute.Value)).get
           field.typ match {
             case UInt32Field => ""
-            case _ => " as u32"
+            case _ => ".into()"
           }
         }
         bracket(name) {
@@ -181,7 +181,7 @@ object ConversionsModule extends Module {
         def fieldGetter(field: FixedSizeField): String = {
           field.typ match {
             case TimestampField => "self.time.into()"
-            case UInt16Field if field.isValue => "self.value as u16"
+            case UInt16Field if field.isValue => "low_16_bits(self.value)"
             case UInt32Field if field.isValue => "self.value"
             case UInt8Field if field.isFlags => "self.flags.value"
             case _ => throw new Exception(s"Unhandled field type in counter conversion: ${field.typ}")
@@ -242,7 +242,7 @@ object ConversionsModule extends Module {
           val field = fs.fields.find(f => f.attr.contains(FieldAttribute.Value)).get
           field.typ match {
             case Float64Field => ""
-            case _ => " as f64"
+            case _ => ".into()"
           }
         }
         bracket(name) {

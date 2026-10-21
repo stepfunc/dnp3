@@ -1797,7 +1797,7 @@ impl OutstationSession {
             HeaderDetails::OneByteStartStop(start, stop, RangedVariation::Group20Var0) => self
                 .application
                 .freeze_counter(
-                    FreezeIndices::Range(start as u16, stop as u16),
+                    FreezeIndices::Range(start.into(), stop.into()),
                     freeze_type,
                     database,
                 )
@@ -2165,18 +2165,18 @@ impl From<ObjectParseError> for Iin2 {
 
 impl From<Group34Var1> for f64 {
     fn from(x: Group34Var1) -> Self {
-        x.value as f64
+        x.value.into()
     }
 }
 
 impl From<Group34Var2> for f64 {
     fn from(x: Group34Var2) -> Self {
-        x.value as f64
+        x.value.into()
     }
 }
 
 impl From<Group34Var3> for f64 {
     fn from(x: Group34Var3) -> Self {
-        x.value as f64
+        x.value.into()
     }
 }

@@ -204,7 +204,7 @@ impl EventWriter {
                 }
             }
 
-            let (group, var) = variation.get_group_var(event);
+            let (group, var) = variation.get_group_var(event)?;
             let count_pos = Self::write_event_header(cursor, group, var)?;
             variation.write(cursor, event, index, time).map(|_| ())?;
             Ok(count_pos)

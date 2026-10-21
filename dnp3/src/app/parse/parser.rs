@@ -521,7 +521,7 @@ impl<'a> ObjectParser<'a> {
 
     fn parse_count_u8(&mut self, v: Variation) -> Result<ObjectHeader<'a>, ObjectParseError> {
         let count = self.cursor.read_u8()?;
-        let data = CountVariation::parse(v, QualifierCode::Count8, count as u16, &mut self.cursor)?;
+        let data = CountVariation::parse(v, QualifierCode::Count8, count.into(), &mut self.cursor)?;
         Ok(ObjectHeader::new(
             v,
             HeaderDetails::OneByteCount(count, data),
@@ -540,7 +540,7 @@ impl<'a> ObjectParser<'a> {
     fn parse_start_stop_u8(&mut self, v: Variation) -> Result<ObjectHeader<'a>, ObjectParseError> {
         let start = self.cursor.read_u8()?;
         let stop = self.cursor.read_u8()?;
-        let range = Range::from(start as u16, stop as u16)?;
+        let range = Range::from(start.into(), stop.into())?;
         let data = RangedVariation::parse(
             self.options,
             self.function,
@@ -611,7 +611,7 @@ impl<'a> ObjectParser<'a> {
         // read the length of free-format data
         let length = self.cursor.read_u16_le()?;
         // the bytes inside the header
-        let bytes = self.cursor.read_bytes(length as usize)?;
+        let bytes = self.cursor.read_bytes(length.into())?;
 
         // create a sub-cursor over only these bytes
         let mut cursor = ReadCursor::new(bytes);

@@ -3,6 +3,7 @@ pub(crate) mod buffer;
 pub(crate) mod channel;
 pub(crate) mod deadline;
 pub(crate) mod decode;
+pub(crate) mod float;
 pub(crate) mod future;
 pub(crate) mod phys;
 pub(crate) mod session;

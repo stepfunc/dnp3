@@ -113,7 +113,7 @@ impl<'a, 'b> HeaderWriter<'a, 'b> {
         V::VARIATION.write(self.cursor)?;
         I::COUNT_AND_PREFIX_QUALIFIER.write(self.cursor)?;
         let pos_of_count = self.cursor.position();
-        self.cursor.skip(I::SIZE as usize)?;
+        self.cursor.skip(I::SIZE.into())?;
 
         let mut count = I::zero();
         for (v, i) in iter {

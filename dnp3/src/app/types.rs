@@ -55,7 +55,8 @@ impl Timestamp {
 
     /// Attempt to create a `DateTime<Utc>` from a Timestamp
     pub fn to_datetime_utc(self) -> Option<DateTime<Utc>> {
-        Utc.timestamp_millis_opt(self.value as i64).single()
+        Utc.timestamp_millis_opt(self.value.try_into().ok()?)
+            .single()
     }
 
     /// Retrieve the raw u64 value

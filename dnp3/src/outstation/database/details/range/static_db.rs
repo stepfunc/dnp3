@@ -117,7 +117,7 @@ struct SelectionQueue {
 impl SelectionQueue {
     fn new(max_selections: u16) -> Self {
         Self {
-            queue: VecDeque::with_capacity(max_selections as usize),
+            queue: VecDeque::with_capacity(max_selections.into()),
             capacity_exceeded: 0,
         }
     }

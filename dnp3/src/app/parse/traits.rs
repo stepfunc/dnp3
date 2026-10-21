@@ -63,7 +63,7 @@ impl Index for u8 {
         self.checked_add(1)
     }
     fn widen_to_u16(self) -> u16 {
-        self as u16
+        self.into()
     }
 
     const COUNT_AND_PREFIX_QUALIFIER: QualifierCode = QualifierCode::CountAndPrefix8;

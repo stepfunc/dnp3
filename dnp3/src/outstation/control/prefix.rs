@@ -56,7 +56,7 @@ where
                 V::VARIATION.write(cursor)?;
                 I::COUNT_AND_PREFIX_QUALIFIER.write(cursor)?;
                 let count_pos = cursor.position();
-                cursor.skip(I::SIZE as usize)?;
+                cursor.skip(I::SIZE.into())?;
                 State {
                     count: I::one(),
                     count_pos,

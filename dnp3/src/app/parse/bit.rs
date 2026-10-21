@@ -96,7 +96,7 @@ impl Iterator for BitIterator<'_> {
         }
 
         let byte = self.pos / 8;
-        let bit = (self.pos % 8) as u8; // [0,7]
+        let bit = self.pos % 8;
 
         match self.bytes.get(byte) {
             Some(value) => {
