@@ -207,3 +207,48 @@ async fn requests_the_application_declines_set_object_unknown() {
 
     harness.check_no_events();
 }
+
+#[tokio::test]
+async fn fragments_that_are_not_valid_requests_get_no_response() {
+    let mut harness = new_harness(get_default_config());
+
+    for request in [
+        &[0x40, 0x01, 60, 1, 0x06][..], // FIR = 0
+        &[0x80, 0x01, 60, 1, 0x06][..], // FIN = 0
+        &[0xD0, 0x01, 60, 1, 0x06][..], // UNS = 1 on a READ
+        &[0xC0, 0x81, 0x00, 0x00][..],  // a response function code
+    ] {
+        harness.send_and_process(request).await;
+        harness.expect_no_response();
+    }
+
+    // a valid request is still answered
+    harness
+        .test_request_response(&[0xC0, 0x01, 60, 1, 0x06], EMPTY_RESPONSE)
+        .await;
+}
+
+#[tokio::test]
+async fn fragment_that_is_not_a_valid_request_does_not_end_a_confirm_wait() {
+    let mut harness = new_harness(get_default_config());
+    harness.handle.database.transaction(|database| {
+        database.add(0, Some(EventClass::Class1), BinaryInputConfig::default());
+        database.update(
+            0,
+            &BinaryInput::new(true, Flags::ONLINE, Time::Synchronized(Timestamp::new(0))),
+            UpdateOptions::default(),
+        );
+    });
+
+    harness.send_and_process(READ_CLASS_1).await;
+    harness.expect_write().await;
+    harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
+
+    // FIR = 0
+    harness.send_and_process(&[0x40, 0x01, 60, 2, 0x06]).await;
+    harness.expect_no_response();
+    harness.check_no_events();
+
+    harness.send_and_process(CONFIRM_SEQ_0).await;
+    harness.check_events(&[Event::SolicitedConfirmReceived(0)]);
+}

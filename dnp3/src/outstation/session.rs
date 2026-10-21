@@ -738,9 +738,11 @@ impl OutstationSession {
                 return Ok(UnsolicitedWaitResult::ReadNext);
             }
             Some(TransportRequest::Error(from, err)) => {
-                self.state.deferred_read.clear();
-                self.write_error_response(io, from, writer, err, database)
-                    .await?;
+                if let Some(seq) = Self::error_response_seq(err) {
+                    self.state.deferred_read.clear();
+                    self.write_error_response(io, from, writer, seq, database)
+                        .await?;
+                }
                 return Ok(UnsolicitedWaitResult::ReadNext);
             }
         };
@@ -992,8 +994,10 @@ impl OutstationSession {
             }
             Some(TransportRequest::Error(from, err)) => {
                 self.on_link_activity();
-                self.write_error_response(io, from, writer, err, database)
-                    .await?;
+                if let Some(seq) = Self::error_response_seq(err) {
+                    self.write_error_response(io, from, writer, seq, database)
+                        .await?;
+                }
             }
             None => (),
         }
@@ -1062,34 +1066,38 @@ impl OutstationSession {
         }
     }
 
+    /// The sequence number to answer a request that couldn't be accepted with, if it gets an answer
+    fn error_response_seq(err: TransportRequestError) -> Option<Sequence> {
+        match err {
+            TransportRequestError::HeaderParseError(err) => match err {
+                HeaderParseError::UnknownFunction(seq, _) => Some(seq),
+                HeaderParseError::InsufficientBytes => None,
+            },
+            TransportRequestError::RequestValidationError(_, err) => {
+                // IEEE 1815-2012 clause 6 discards a fragment that isn't a valid request
+                tracing::warn!("ignoring invalid request: {err}");
+                None
+            }
+        }
+    }
+
     async fn write_error_response<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
         respond_to: FragmentAddr,
         writer: &mut TransportWriter<T>,
-        err: TransportRequestError,
+        seq: Sequence,
         database: &DatabaseHandle,
-    ) -> Result<(), RunError> {
-        let seq = match err {
-            TransportRequestError::HeaderParseError(err) => match err {
-                HeaderParseError::UnknownFunction(seq, _) => Some(seq),
-                HeaderParseError::InsufficientBytes => None,
-            },
-            TransportRequestError::RequestValidationError(seq, _) => Some(seq),
-        };
-
-        if let Some(seq) = seq {
-            let iin = Iin::default() | Iin2::NO_FUNC_CODE_SUPPORT;
-            self.write_transient_solicited(
-                io,
-                writer,
-                respond_to,
-                ResponseHeader::solicited(seq, iin),
-                database,
-            )
-            .await?;
-        }
-        Ok(())
+    ) -> Result<(), LinkError> {
+        let iin = Iin::default() | Iin2::NO_FUNC_CODE_SUPPORT;
+        self.write_transient_solicited(
+            io,
+            writer,
+            respond_to,
+            ResponseHeader::solicited(seq, iin),
+            database,
+        )
+        .await
     }
 
     fn format_first_read_response(
@@ -2110,9 +2118,12 @@ impl OutstationSession {
                 self.on_link_activity();
                 return ConfirmAction::ContinueWait;
             }
-            Some(TransportRequest::Error(_, _)) => {
+            Some(TransportRequest::Error(_, err)) => {
                 self.on_link_activity();
-                return ConfirmAction::NewRequest;
+                return match Self::error_response_seq(err) {
+                    Some(_) => ConfirmAction::NewRequest,
+                    None => ConfirmAction::ContinueWait,
+                };
             }
             None => return ConfirmAction::ContinueWait,
         };
