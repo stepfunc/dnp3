@@ -139,7 +139,7 @@ pub(crate) fn define(
             "The set (point) to which the attribute belongs",
         )?
         .doc(doc(
-            "Add a one-byte start/stop header for use with a READ request",
+            "Add a header that reads a specific device attribute (group 0) for use with a READ request",
         ))?
         .build()?;
 
@@ -153,7 +153,7 @@ pub(crate) fn define(
         )?
         .param("value", StringType, "Value of the attribute")?
         .doc(doc(
-            "Add a one-byte start/stop header containing for use with a WRITE request",
+            "Add a header that writes a visible string device attribute (group 0) for use with a WRITE request",
         ))?
         .build()?;
 
@@ -167,7 +167,7 @@ pub(crate) fn define(
         )?
         .param("value", Primitive::U32, "Value of the attribute")?
         .doc(doc(
-            "Add a one-byte start/stop header containing for use with a WRITE request",
+            "Add a header that writes an unsigned integer device attribute (group 0) for use with a WRITE request",
         ))?
         .build()?;
 
