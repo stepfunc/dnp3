@@ -6,6 +6,7 @@
 * :shield: File AUTHENTICATE passwords and auth keys are no longer printed by object value decode logging or by the `Debug` output of `FileCredentials` and `AuthKey`. See [#520](https://github.com/stepfunc/dnp3/pull/520).
 * :bell: **The minimum supported Rust version is now 1.88.** See [#502](https://github.com/stepfunc/dnp3/pull/502).
 * :star: Every public type in the Rust crate implements `Debug`. See [#519](https://github.com/stepfunc/dnp3/pull/519).
+* :star: Export `LinkError`, `FrameError` and `LogicError` from `dnp3::link`. `TaskError::Link` contained a `LinkError` that Rust users couldn't name. See [#539](https://github.com/stepfunc/dnp3/pull/539).
 * :bug: Fix an outstation resending the first fragment's header and length when a READ is repeated while it waits for confirmation of a later fragment. It now resends the fragment awaiting confirmation. See [#504](https://github.com/stepfunc/dnp3/pull/504).
 * :bug: Encode signed integer device attributes of 127 and 32,767 in one and two bytes, the smallest sizes that hold them, instead of the next size up. See [#517](https://github.com/stepfunc/dnp3/pull/517).
 * :bug: Fix a panic when a retry delay or keep-alive timeout is too long to schedule, such as a retry strategy with a maximum delay of `Duration::MAX`. Such deadlines are now clamped to 30 years. See [#514](https://github.com/stepfunc/dnp3/pull/514).
