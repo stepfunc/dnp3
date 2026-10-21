@@ -15,6 +15,7 @@ impl Buffer {
         WriteCursor::new(self.inner.as_mut())
     }
 
+    #[cfg(test)]
     pub(crate) fn get(&self, length: usize) -> Option<&[u8]> {
         self.inner.get(0..length)
     }
