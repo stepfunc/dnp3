@@ -178,7 +178,7 @@ mod test {
 
     #[test]
     fn deserialization_allows_defaults() {
-        assert!(serde_json::from_str::<super::OutstationConfig>("{}").is_err());
+        serde_json::from_str::<super::OutstationConfig>("{}").unwrap_err();
 
         let data = r#"{
             "outstation_address": 64,

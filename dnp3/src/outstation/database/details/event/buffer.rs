@@ -1340,14 +1340,14 @@ mod tests {
             )
             .unwrap();
 
-        assert!(buffer
+        buffer
             .insert(
                 1,
                 EventClass::Class1,
                 &binary,
                 EventBinaryInputVariation::Group2Var1,
             )
-            .is_err());
+            .unwrap_err();
 
         assert!(buffer.is_overflown());
         assert_eq!(

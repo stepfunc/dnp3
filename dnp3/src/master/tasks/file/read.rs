@@ -299,7 +299,7 @@ impl FileReadTask {
     }
 
     fn handle_close_response(header: ObjectHeader) -> Option<FileReadTask> {
-        let _ = process_close_response(header);
+        log_close_response(header);
         None
     }
 }

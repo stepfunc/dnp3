@@ -41,7 +41,7 @@ pub fn spawn_master_udp(
         retry_delay,
     };
     let future = async move {
-        let _ = task
+        let _: Result<(), crate::app::Shutdown> = task
             .run()
             .instrument(tracing::info_span!("dnp3-master-udp", "endpoint" = ?local_endpoint))
             .await;

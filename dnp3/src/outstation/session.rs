@@ -293,7 +293,10 @@ impl NextIdleAction {
 }
 
 impl OutstationSession {
-    #[allow(clippy::too_many_arguments)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "a session takes each part of its configuration separately"
+    )]
     pub(crate) fn new(
         initial_state: Enabled,
         messages: Receiver<OutstationMessage>,
@@ -1293,8 +1296,11 @@ impl OutstationSession {
             return Iin2::PARAMETER_ERROR;
         }
 
-        // this should never fail b/c we already validated the attribute is writable
-        let _ = db.transaction(|db| db.inner.get_attr_map().write(attr));
+        // this can't fail today: nothing removes an attribute or changes its type once defined
+        if let Err(err) = db.transaction(|db| db.inner.get_attr_map().write(attr)) {
+            tracing::error!("Unable to store the WRITE of an attribute: {err}");
+            return Iin2::NO_FUNC_CODE_SUPPORT;
+        }
         Iin2::default()
     }
 

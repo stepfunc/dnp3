@@ -106,7 +106,7 @@ impl Parser {
             match res {
                 Ok(x) => return Ok(x),
                 Err(_) => {
-                    let _ = cursor.read_u8(); // advance one byte
+                    let _: Result<u8, scursor::ReadError> = cursor.read_u8(); // advance one byte
                     self.reset();
                     // goto next iteration
                 }

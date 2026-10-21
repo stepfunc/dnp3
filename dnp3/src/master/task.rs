@@ -632,7 +632,10 @@ impl MasterSession {
         }
     }
 
-    #[allow(clippy::too_many_arguments)] // TODO
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "processing a read response needs the request, the response and the session state"
+    )]
     async fn process_read_response<T: Transport>(
         &mut self,
         destination: FragmentAddr,

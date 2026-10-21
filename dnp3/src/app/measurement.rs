@@ -803,7 +803,10 @@ impl AnalogOutputStatus {
 ///
 /// The default value is `[0x00]`, corresponding to an empty
 /// C-style string.
-#[allow(missing_copy_implementations)]
+#[expect(
+    missing_copy_implementations,
+    reason = "an octet string holds 255 bytes, too many to copy implicitly"
+)]
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct OctetString {
     value: [u8; Self::MAX_SIZE],
@@ -820,7 +823,6 @@ impl Default for OctetString {
     }
 }
 
-#[allow(clippy::len_without_is_empty)]
 impl OctetString {
     const MAX_SIZE: usize = 255;
 
@@ -851,6 +853,12 @@ impl OctetString {
     /// Returns the length of the octet string
     pub fn len(&self) -> u8 {
         self.len
+    }
+
+    /// True if the octet string is empty, which the standard prohibits but which may be
+    /// constructed
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
     }
 
     /// Allocates a new slice with the exact size of the string
@@ -898,7 +906,7 @@ mod tests {
 
     #[test]
     fn allows_creating_zero_length_octet_string() {
-        assert!(OctetString::new(&[]).is_ok());
+        OctetString::new(&[]).unwrap();
     }
 
     #[test]

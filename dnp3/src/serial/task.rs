@@ -29,7 +29,7 @@ impl SerialTask {
     }
 
     pub(crate) async fn run(&mut self) {
-        let _ = self.run_inner().await;
+        let _: Result<(), crate::app::Shutdown> = self.run_inner().await;
         self.listener.update(PortState::Shutdown).get().await;
     }
 

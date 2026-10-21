@@ -132,20 +132,32 @@ pub trait ClientConnectionHandler: Send {
     fn next(&mut self) -> Result<ConnectionInfo, Duration>;
 
     /// Notification that a connection attempt is being made
-    #[allow(unused)]
+    #[expect(
+        unused_variables,
+        reason = "the default implementation ignores the notification"
+    )]
     fn connecting(&mut self, addr: SocketAddr, hostname: Option<&str>) {}
 
     /// Notification that connection operation failed
-    #[allow(unused)]
+    #[expect(
+        unused_variables,
+        reason = "the default implementation ignores the notification"
+    )]
     fn connect_failed(&mut self, addr: SocketAddr, hostname: Option<&str>) {}
 
     /// Notification that a connection attempt succeeded
-    #[allow(unused)]
+    #[expect(
+        unused_variables,
+        reason = "the default implementation ignores the notification"
+    )]
     fn connected(&mut self, addr: SocketAddr, hostname: Option<&str>) {}
 
     /// Notification that DNS resolution failed. The task will sleep for the specified
     /// duration before attempting another connection.
-    #[allow(unused)]
+    #[expect(
+        unused_variables,
+        reason = "the default implementation ignores the notification"
+    )]
     fn resolution_failed(&mut self, host_name: &str) {}
 }
 

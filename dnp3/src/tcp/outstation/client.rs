@@ -18,7 +18,10 @@ use crate::util::session::{Enabled, Session};
 ///
 /// **Note**: This function may only be called from within the runtime itself, and panics otherwise.
 /// Use Runtime::enter() if required.
-#[allow(clippy::too_many_arguments)]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the public spawn function takes each part of its configuration separately"
+)]
 pub fn spawn_outstation_tcp_client(
     link_error_mode: LinkErrorMode,
     endpoints: EndpointList,
@@ -50,7 +53,6 @@ pub fn spawn_outstation_tcp_client(
 ///
 /// **Note**: This function may only be called from within the runtime itself, and panics otherwise.
 /// Use Runtime::enter() if required.
-#[allow(clippy::too_many_arguments)]
 pub fn spawn_outstation_tcp_client_2(
     link_error_mode: LinkErrorMode,
     config: OutstationConfig,

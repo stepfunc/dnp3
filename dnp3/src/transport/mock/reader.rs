@@ -26,6 +26,10 @@ impl MockReader {
         self.info = Some(info)
     }
 
+    #[expect(
+        clippy::unwrap_in_result,
+        reason = "a test that never sets the frame info should fail loudly"
+    )]
     fn get(&self, count: usize) -> Option<Fragment<'_>> {
         if count == 0 {
             return None;

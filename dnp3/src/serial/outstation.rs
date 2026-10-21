@@ -56,7 +56,7 @@ impl OneShotSerialOutstationTask {
 
     pub(crate) async fn run(mut self) {
         let mut io = PhysLayer::Serial(self.serial);
-        let _ = self.task.run(&mut io).await;
+        let _: crate::util::session::RunError = self.task.run(&mut io).await;
     }
 }
 
@@ -124,7 +124,10 @@ impl Listener<PortState> for NullListener {
 ///
 /// **Note**: This function may only be called from within the runtime itself, and panics otherwise.
 /// Use Runtime::enter() if required.
-#[allow(clippy::too_many_arguments)]
+#[expect(
+    clippy::too_many_arguments,
+    reason = "the public spawn function takes each part of its configuration separately"
+)]
 pub fn spawn_outstation_serial_2(
     path: &str,
     settings: SerialSettings,

@@ -363,6 +363,10 @@ mod tests {
     }
 
     impl SingleTimestampTestHandler {
+        fn time(&self) -> std::sync::MutexGuard<'_, Option<Timestamp>> {
+            self.time.lock().unwrap()
+        }
+
         fn new(time: Timestamp) -> Self {
             Self {
                 time: Arc::new(Mutex::new(Some(time))),
@@ -388,7 +392,7 @@ mod tests {
 
     impl AssociationHandler for SingleTimestampTestHandler {
         fn get_current_time(&self) -> Option<Timestamp> {
-            self.time.lock().unwrap().take()
+            self.time().take()
         }
     }
 
@@ -432,7 +436,7 @@ mod tests {
         .unwrap();
         let response = writer.to_parsed().to_response().unwrap();
 
-        assert!(task.handle_response(association, response).await.is_ok());
+        task.handle_response(association, response).await.unwrap();
     }
 
     mod non_lan {
@@ -482,7 +486,7 @@ mod tests {
                 .unwrap();
             let task = check_write_request(task, system_time);
             send_write_response(task, &mut association).await;
-            assert!(rx.try_recv().unwrap().is_ok());
+            rx.try_recv().unwrap().unwrap();
         }
 
         #[tokio::test(start_paused = true)]
@@ -525,7 +529,7 @@ mod tests {
 
             let task = check_write_request(task, system_time);
             send_write_response(task, &mut association).await;
-            assert!(rx.try_recv().unwrap().is_ok());
+            rx.try_recv().unwrap().unwrap();
         }
 
         #[tokio::test(start_paused = true)]
@@ -775,7 +779,7 @@ mod tests {
                 .unwrap();
             let task = check_write_request(task, system_time);
             send_write_response(task, &mut association).await;
-            assert!(rx.try_recv().unwrap().is_ok());
+            rx.try_recv().unwrap().unwrap();
         }
 
         #[tokio::test(start_paused = true)]
