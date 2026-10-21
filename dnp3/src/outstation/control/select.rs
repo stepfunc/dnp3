@@ -6,9 +6,8 @@ use crate::app::{Sequence, Timeout};
 pub(crate) struct SelectState {
     /// sequence number of the SELECT
     seq: Sequence,
-    /// frame count of the select, makes it easier to ensure that OPERATE directly follows SELECT
-    /// without requests in between
-    frame_id: u32,
+    /// hash of the SELECT request, which recognizes its retry
+    request_hash: u64,
     /// time at which the SELECT occurred
     time: tokio::time::Instant,
     /// the hash of the object headers
@@ -18,27 +17,30 @@ pub(crate) struct SelectState {
 impl SelectState {
     pub(crate) fn new(
         seq: Sequence,
-        frame_id: u32,
+        request_hash: u64,
         time: tokio::time::Instant,
         object_hash: u64,
     ) -> Self {
         Self {
             seq,
-            frame_id,
+            request_hash,
             time,
             object_hash,
         }
     }
 
-    pub(crate) fn update_frame_id(&mut self, new_frame_id: u32) {
-        self.frame_id = new_frame_id;
+    pub(crate) fn seq(&self) -> Sequence {
+        self.seq
+    }
+
+    pub(crate) fn request_hash(&self) -> u64 {
+        self.request_hash
     }
 
     pub(crate) fn match_operate(
         &self,
         timeout: Timeout,
         seq: Sequence,
-        frame_id: u32,
         object_hash: u64,
     ) -> Result<(), CommandStatus> {
         let elapsed = tokio::time::Instant::now().checked_duration_since(self.time);
@@ -46,12 +48,6 @@ impl SelectState {
         // check the sequence number
         if self.seq.next() != seq.value() {
             tracing::warn!("received OPERATE with non-consecutive sequence number");
-            return Err(CommandStatus::NoSelect);
-        }
-
-        // check the frame_id to ensure there was no requests in between the SELECT and OPERATE
-        if self.frame_id.wrapping_add(1) != frame_id {
-            tracing::warn!("received OPERATE without prior SELECT");
             return Err(CommandStatus::NoSelect);
         }
 

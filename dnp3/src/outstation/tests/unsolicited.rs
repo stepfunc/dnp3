@@ -5,6 +5,7 @@ use crate::app::parse::parser::{HeaderDetails, ParsedFragment};
 use crate::app::{BufferSize, Timestamp};
 use crate::outstation::config::OutstationConfig;
 use crate::outstation::database::*;
+use crate::outstation::traits::OperateType;
 use crate::outstation::{BufferState, ClassCount, TypeCount};
 
 use super::harness::*;
@@ -261,6 +262,125 @@ async fn deferred_read_of_type_without_points_sets_object_unknown() {
         .await;
     // the class 1 event is still pending, and IIN2.1 (OBJECT_UNKNOWN)
     harness.expect_response(&[0xC0, 0x81, 0x82, 0x02]).await;
+    harness.check_no_events();
+}
+
+// SELECT and OPERATE for g41v2 index 7, value 513
+const SELECT_SEQ1_G41V2: &[u8] = &[0xC1, 0x03, 41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, 0x00];
+const OPERATE_SEQ2_G41V2: &[u8] = &[0xC2, 0x04, 41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, 0x00];
+const G41V2_INDEX_7: Control = Control::G41V2(crate::app::variations::Group41Var2::new(513), 7);
+
+async fn select_seq1(harness: &mut OutstationHarness) {
+    harness
+        .test_request_response(
+            SELECT_SEQ1_G41V2,
+            &[
+                0xC1, 0x81, 0x80, 0x00, 41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, 0x00,
+            ],
+        )
+        .await;
+    harness.check_events(&[
+        Event::BeginControls,
+        Event::Select(G41V2_INDEX_7),
+        Event::EndControls,
+    ]);
+}
+
+/// the status of the single g41v2 object in a control response
+async fn control_status(harness: &mut OutstationHarness) -> Option<u8> {
+    harness.expect_write().await.last().copied()
+}
+
+/// IEEE 1815-2012 4.4.4 Table 4-9: the master's CONFIRM of an unsolicited response isn't a
+/// request, so it doesn't end the selection (#501)
+#[tokio::test]
+async fn unsolicited_confirm_between_select_and_operate_keeps_the_selection() {
+    let mut harness = new_harness(get_default_unsolicited_config());
+    confirm_null_unsolicited(&mut harness).await;
+    enable_unsolicited(&mut harness).await;
+
+    select_seq1(&mut harness).await;
+    generate_binary_event(&mut harness.handle.database);
+    harness.expect_response(UNSOL_G2V1_SEQ1).await;
+    harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
+    harness.send_and_process(UNS_CONFIRM_SEQ_1).await;
+    harness.check_events(&[
+        Event::UnsolicitedConfirmReceived(1),
+        Event::BeginConfirm,
+        Event::Cleared(0),
+        Event::EndConfirm(BufferState {
+            classes: ClassCount {
+                num_class_1: 0,
+                num_class_2: 0,
+                num_class_3: 0,
+            },
+            types: TypeCount {
+                num_binary_input: 0,
+                num_double_bit_binary_input: 0,
+                num_binary_output_status: 0,
+                num_counter: 0,
+                num_frozen_counter: 0,
+                num_analog: 0,
+                num_analog_output_status: 0,
+                num_octet_string: 0,
+            },
+        }),
+    ]);
+
+    harness.send_and_process(OPERATE_SEQ2_G41V2).await;
+    assert_eq!(control_status(&mut harness).await, Some(0));
+    harness.check_events(&[
+        Event::BeginControls,
+        Event::Operate(G41V2_INDEX_7, OperateType::SelectBeforeOperate),
+        Event::EndControls,
+    ]);
+}
+
+#[tokio::test]
+async fn operate_during_unsolicited_confirm_wait_uses_the_selection() {
+    let mut harness = new_harness(get_default_unsolicited_config());
+    confirm_null_unsolicited(&mut harness).await;
+    enable_unsolicited(&mut harness).await;
+
+    select_seq1(&mut harness).await;
+    generate_binary_event(&mut harness.handle.database);
+    harness.expect_response(UNSOL_G2V1_SEQ1).await;
+    harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
+
+    harness.send_and_process(OPERATE_SEQ2_G41V2).await;
+    assert_eq!(control_status(&mut harness).await, Some(0));
+    harness.check_events(&[
+        Event::BeginControls,
+        Event::Operate(G41V2_INDEX_7, OperateType::SelectBeforeOperate),
+        Event::EndControls,
+    ]);
+}
+
+/// a deferred READ ends the selection, and a retry of the SELECT after it repeats the SELECT's
+/// response without selecting again
+#[tokio::test]
+async fn select_retry_after_a_deferred_read_does_not_restore_the_selection() {
+    let mut harness = new_harness(get_default_unsolicited_config());
+    confirm_null_unsolicited(&mut harness).await;
+    enable_unsolicited(&mut harness).await;
+
+    select_seq1(&mut harness).await;
+    generate_binary_event(&mut harness.handle.database);
+    harness.expect_response(UNSOL_G2V1_SEQ1).await;
+    harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
+
+    // a READ that is deferred
+    harness.send_and_process(&[0xC5, 0x01, 60, 1, 0x06]).await;
+    harness.check_no_events();
+
+    // the retry of the SELECT repeats its response
+    harness.send_and_process(SELECT_SEQ1_G41V2).await;
+    assert_eq!(control_status(&mut harness).await, Some(0));
+    harness.check_no_events();
+
+    // NO_SELECT
+    harness.send_and_process(OPERATE_SEQ2_G41V2).await;
+    assert_eq!(control_status(&mut harness).await, Some(2));
     harness.check_no_events();
 }
 

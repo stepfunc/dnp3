@@ -14,22 +14,13 @@ pub(crate) struct FragmentAddr {
 
 #[derive(Debug, Copy, Clone)]
 pub(crate) struct FragmentInfo {
-    pub(crate) id: u32,
     pub(crate) addr: FragmentAddr,
     pub(crate) broadcast: Option<BroadcastConfirmMode>,
 }
 
 impl FragmentInfo {
-    pub(crate) fn new(
-        id: u32,
-        addr: FragmentAddr,
-        broadcast: Option<BroadcastConfirmMode>,
-    ) -> Self {
-        FragmentInfo {
-            id,
-            addr,
-            broadcast,
-        }
+    pub(crate) fn new(addr: FragmentAddr, broadcast: Option<BroadcastConfirmMode>) -> Self {
+        FragmentInfo { addr, broadcast }
     }
 }
 

@@ -12,7 +12,6 @@ use crate::transport::{Fragment, FragmentAddr, FragmentInfo};
 /// - broadcast segments are accepted only as a single FIR/FIN segment, and others are ignored
 pub(crate) struct Assembler {
     state: State,
-    frame_id: u32,
     buffer: Box<[u8]>,
     /// length of the series or fragment in `buffer`; meaningful while `Running` or `Complete`.
     /// Only `extend` grows it, to an end that `buffer` was just checked to contain.
@@ -104,7 +103,6 @@ impl Assembler {
     pub(crate) fn new(max_fragment_size: usize) -> Self {
         Self {
             state: State::Idle,
-            frame_id: 0,
             buffer: vec![0; max_fragment_size].into_boxed_slice(),
             len: 0,
         }
@@ -263,9 +261,7 @@ impl Assembler {
                 link: info.source,
                 phys: info.phys_addr,
             };
-            let id = self.frame_id;
-            self.frame_id = self.frame_id.wrapping_add(1);
-            self.state = State::Complete(FragmentInfo::new(id, addr, info.broadcast));
+            self.state = State::Complete(FragmentInfo::new(addr, info.broadcast));
         }
     }
 
@@ -349,20 +345,14 @@ mod tests {
             self.segment(info(), true, true, seq, data)
         }
 
-        fn pop(&mut self) -> Option<(u32, Vec<u8>)> {
-            self.assembler
-                .pop()
-                .map(|fragment| (fragment.info.id, fragment.data.to_vec()))
-        }
-
-        fn pop_data(&mut self) -> Option<Vec<u8>> {
-            self.pop().map(|(_, data)| data)
+        fn pop(&mut self) -> Option<Vec<u8>> {
+            self.assembler.pop().map(|fragment| fragment.data.to_vec())
         }
 
         /// a fresh single-segment fragment still assembles
         fn assert_recovers(&mut self, seq: u8) {
             assert!(self.single(seq, &[0xEE]));
-            assert_eq!(self.pop_data(), Some(vec![0xEE]));
+            assert_eq!(self.pop(), Some(vec![0xEE]));
         }
     }
 
@@ -387,7 +377,7 @@ mod tests {
     fn row_3_single_segment_is_passed_up() {
         let mut h = Harness::new();
         assert!(h.single(0, &[1, 2, 3]));
-        assert_eq!(h.pop_data(), Some(vec![1, 2, 3]));
+        assert_eq!(h.pop(), Some(vec![1, 2, 3]));
         assert_eq!(h.pop(), None);
     }
 
@@ -395,7 +385,7 @@ mod tests {
     fn row_3_single_segment_of_exactly_the_maximum_size_is_passed_up() {
         let mut h = Harness::new();
         assert!(h.single(0, &[7; MAX]));
-        assert_eq!(h.pop_data(), Some(vec![7; MAX]));
+        assert_eq!(h.pop(), Some(vec![7; MAX]));
     }
 
     #[test]
@@ -411,7 +401,7 @@ mod tests {
         let mut h = Harness::new();
         assert!(!h.first(0, &[]));
         assert!(h.last(1, &[1, 2]));
-        assert_eq!(h.pop_data(), Some(vec![1, 2]));
+        assert_eq!(h.pop(), Some(vec![1, 2]));
     }
 
     #[test]
@@ -420,7 +410,7 @@ mod tests {
         assert!(!h.first(0, &[1]));
         assert_eq!(h.pop(), None);
         assert!(h.last(1, &[2]));
-        assert_eq!(h.pop_data(), Some(vec![1, 2]));
+        assert_eq!(h.pop(), Some(vec![1, 2]));
     }
 
     #[test]
@@ -441,7 +431,7 @@ mod tests {
         assert!(!h.middle(1, &[2, 3]));
         assert!(!h.middle(1, &[2, 3]));
         assert!(h.last(2, &[4]));
-        assert_eq!(h.pop_data(), Some(vec![1, 2, 3, 4]));
+        assert_eq!(h.pop(), Some(vec![1, 2, 3, 4]));
     }
 
     #[test]
@@ -451,7 +441,7 @@ mod tests {
         assert!(!h.middle(1, &[]));
         assert!(!h.middle(1, &[]));
         assert!(h.last(2, &[2]));
-        assert_eq!(h.pop_data(), Some(vec![1, 2]));
+        assert_eq!(h.pop(), Some(vec![1, 2]));
     }
 
     #[test]
@@ -491,7 +481,7 @@ mod tests {
         assert!(!h.first(0, &[1]));
         assert!(!h.middle(1, &[]));
         assert!(h.last(2, &[2]));
-        assert_eq!(h.pop_data(), Some(vec![1, 2]));
+        assert_eq!(h.pop(), Some(vec![1, 2]));
     }
 
     #[test]
@@ -501,7 +491,7 @@ mod tests {
         assert!(!h.middle(11, &[4]));
         assert!(!h.middle(12, &[5, 6]));
         assert!(h.last(13, &[7]));
-        assert_eq!(h.pop_data(), Some(vec![1, 2, 3, 4, 5, 6, 7]));
+        assert_eq!(h.pop(), Some(vec![1, 2, 3, 4, 5, 6, 7]));
     }
 
     #[test]
@@ -510,7 +500,7 @@ mod tests {
         assert!(!h.first(0, &[1; MAX - 2]));
         assert!(!h.middle(1, &[2; 2]));
         assert!(h.last(2, &[]));
-        assert_eq!(h.pop_data().map(|x| x.len()), Some(MAX));
+        assert_eq!(h.pop().map(|x| x.len()), Some(MAX));
     }
 
     #[test]
@@ -537,7 +527,7 @@ mod tests {
         let mut h = Harness::new();
         assert!(!h.first(0, &[1, 2]));
         assert!(h.last(1, &[]));
-        assert_eq!(h.pop_data(), Some(vec![1, 2]));
+        assert_eq!(h.pop(), Some(vec![1, 2]));
     }
 
     #[test]
@@ -545,7 +535,7 @@ mod tests {
         let mut h = Harness::new();
         assert!(!h.first(0, &[1; MAX - 1]));
         assert!(h.last(1, &[2]));
-        assert_eq!(h.pop_data().map(|x| x.len()), Some(MAX));
+        assert_eq!(h.pop().map(|x| x.len()), Some(MAX));
     }
 
     #[test]
@@ -575,7 +565,7 @@ mod tests {
         assert!(!h.first(62, &[1]));
         assert!(!h.middle(63, &[2]));
         assert!(h.last(0, &[3]));
-        assert_eq!(h.pop_data(), Some(vec![1, 2, 3]));
+        assert_eq!(h.pop(), Some(vec![1, 2, 3]));
     }
 
     #[test]
@@ -585,7 +575,7 @@ mod tests {
         assert!(!h.middle(1, &[2]));
         assert!(!h.first(5, &[]));
         assert!(h.last(6, &[3]));
-        assert_eq!(h.pop_data(), Some(vec![3]));
+        assert_eq!(h.pop(), Some(vec![3]));
     }
 
     #[test]
@@ -595,7 +585,7 @@ mod tests {
         assert!(!h.middle(1, &[2]));
         assert!(!h.first(9, &[3]));
         assert!(h.last(10, &[4]));
-        assert_eq!(h.pop_data(), Some(vec![3, 4]));
+        assert_eq!(h.pop(), Some(vec![3, 4]));
     }
 
     #[test]
@@ -605,7 +595,7 @@ mod tests {
         assert!(!h.middle(1, &[2]));
         assert!(!h.first(0, &[1]));
         assert!(h.last(1, &[3]));
-        assert_eq!(h.pop_data(), Some(vec![1, 3]));
+        assert_eq!(h.pop(), Some(vec![1, 3]));
     }
 
     #[test]
@@ -636,7 +626,7 @@ mod tests {
         let mut h = Harness::new();
         assert!(!h.first(0, &[1]));
         assert!(h.single(4, &[2]));
-        assert_eq!(h.pop_data(), Some(vec![2]));
+        assert_eq!(h.pop(), Some(vec![2]));
     }
 
     #[test]
@@ -654,7 +644,7 @@ mod tests {
         let mut h = Harness::new();
         assert!(!h.first(0, &[1]));
         assert!(h.last(1, &[2]));
-        assert_eq!(h.pop_data(), Some(vec![1, 2]));
+        assert_eq!(h.pop(), Some(vec![1, 2]));
         assert!(!h.last(1, &[2]));
         assert_eq!(h.pop(), None);
     }
@@ -663,9 +653,9 @@ mod tests {
     fn repeated_single_segment_is_passed_up_again() {
         let mut h = Harness::new();
         assert!(h.single(0, &[1]));
-        assert_eq!(h.pop_data(), Some(vec![1]));
+        assert_eq!(h.pop(), Some(vec![1]));
         assert!(h.single(0, &[1]));
-        assert_eq!(h.pop_data(), Some(vec![1]));
+        assert_eq!(h.pop(), Some(vec![1]));
     }
 
     #[test]
@@ -746,7 +736,7 @@ mod tests {
         assert!(!h.first(0, &[1]));
         assert!(!h.segment(broadcast(), false, true, 1, &[9]));
         assert!(h.last(1, &[2]));
-        assert_eq!(h.pop_data(), Some(vec![1, 2]));
+        assert_eq!(h.pop(), Some(vec![1, 2]));
     }
 
     #[test]
@@ -754,7 +744,7 @@ mod tests {
         let mut h = Harness::new();
         assert!(!h.first(0, &[1]));
         assert!(h.segment(broadcast(), true, true, 5, &[9]));
-        assert_eq!(h.pop_data(), Some(vec![9]));
+        assert_eq!(h.pop(), Some(vec![9]));
         assert!(!h.last(1, &[2]));
     }
 
@@ -764,7 +754,7 @@ mod tests {
         assert!(h.single(0, &[1]));
         assert_eq!(h.assembler.peek().map(|f| f.data.to_vec()), Some(vec![1]));
         assert_eq!(h.assembler.peek().map(|f| f.data.to_vec()), Some(vec![1]));
-        assert_eq!(h.pop_data(), Some(vec![1]));
+        assert_eq!(h.pop(), Some(vec![1]));
         assert!(h.assembler.peek().is_none());
         assert_eq!(h.pop(), None);
     }
@@ -785,28 +775,5 @@ mod tests {
         assert!(h.single(0, &[1]));
         h.assembler.reset();
         assert_eq!(h.pop(), None);
-    }
-
-    #[test]
-    fn fragment_ids_count_only_completed_fragments() {
-        let mut h = Harness::new();
-        assert!(h.single(0, &[1]));
-        assert_eq!(h.pop().map(|(id, _)| id), Some(0));
-        // discarded and empty segments don't use an id
-        assert!(!h.middle(1, &[2]));
-        assert!(!h.single(2, &[7; MAX + 1]));
-        assert!(!h.single(3, &[]));
-        assert!(h.single(4, &[1]));
-        assert_eq!(h.pop().map(|(id, _)| id), Some(1));
-    }
-
-    #[test]
-    fn fragment_ids_wrap() {
-        let mut h = Harness::new();
-        h.assembler.frame_id = u32::MAX;
-        assert!(h.single(0, &[1]));
-        assert_eq!(h.pop().map(|(id, _)| id), Some(u32::MAX));
-        assert!(h.single(1, &[1]));
-        assert_eq!(h.pop().map(|(id, _)| id), Some(0));
     }
 }
