@@ -17,7 +17,7 @@ use crate::link::header::{
 };
 use crate::link::layer::Layer;
 use crate::link::parser::{FramePayload, Parser};
-use crate::link::reader::LinkModes;
+use crate::link::reader::{LinkModes, Reader, Step};
 use crate::link::{EndpointAddress, LinkErrorMode};
 use crate::master::extract::{extract_header, Extracted};
 use crate::master::{HeaderInfo, ReadHandler};
@@ -230,7 +230,7 @@ fn link_headers(data: &[u8]) {
         Feature::Enabled
     };
     let mut layer = Layer::new(
-        LinkModes::serial(),
+        LinkModes::stream(LinkErrorMode::Discard),
         2048,
         endpoint_type,
         self_address,
@@ -244,6 +244,60 @@ fn link_headers(data: &[u8]) {
         );
         std::hint::black_box(process_link_header(&mut layer, header, phys_addr(*flags)));
         data = rest;
+    }
+}
+
+/// one simulated read of `chunk` into the frame reader, returning the bytes it took
+#[no_panic::no_panic]
+fn link_receive(reader: &mut Reader, chunk: &[u8]) -> usize {
+    let Ok(space) = reader.write_space() else {
+        return 0;
+    };
+    let mut count: usize = 0;
+    for (dest, src) in space.iter_mut().zip(chunk) {
+        *dest = *src;
+        count = count.saturating_add(1);
+    }
+    match reader.wrote(count) {
+        Ok(()) => count,
+        Err(_) => 0,
+    }
+}
+
+/// the frame reader's processing of the data it holds, returning the frames it found
+#[no_panic::no_panic]
+fn link_frames(reader: &mut Reader, payload: &mut FramePayload) -> usize {
+    let mut frames: usize = 0;
+    while let Ok(Step::Frame(header)) = reader.step(payload) {
+        std::hint::black_box((header, payload.get().len()));
+        frames = frames.saturating_add(1);
+    }
+    frames
+}
+
+/// a frame reader configured from the input, given reads of input-sized chunks
+fn link_reader(data: &[u8]) {
+    let [config, size, chunks @ ..] = data else {
+        return;
+    };
+    let error_mode = if config & 0x01 == 0 {
+        LinkErrorMode::Discard
+    } else {
+        LinkErrorMode::Close
+    };
+    let modes = if config & 0x02 == 0 {
+        LinkModes::stream(error_mode)
+    } else {
+        LinkModes::datagram(error_mode)
+    };
+    let mut reader = Reader::new(modes, usize::from(*size).saturating_mul(16));
+    let mut payload = FramePayload::new();
+    let mut data = chunks;
+    while let [length, rest @ ..] = data {
+        let (chunk, next) = rest.split_at(usize::from(*length).min(rest.len()));
+        std::hint::black_box(link_receive(&mut reader, chunk));
+        std::hint::black_box(link_frames(&mut reader, &mut payload));
+        data = next;
     }
 }
 
@@ -276,6 +330,7 @@ fn parsers_with_unknown_input() {
 
     segments(&data);
     link_headers(&data);
+    link_reader(&data);
 
     let mut parser = Parser::new(LinkErrorMode::Discard);
     let mut payload = FramePayload::new();
