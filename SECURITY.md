@@ -37,6 +37,11 @@ To stay up to date:
   [GitHub Security Advisories RSS feed](https://github.blog/changelog/2022-10-25-syndicate-github-security-advisories-with-rss/)
 - Use tools like `cargo audit` or your organization's OSS scanners
 
+## How the Library Is Hardened
+
+The [security page](https://docs.stepfunc.io/dnp3/1.8.0-M1/guide/docs/security) of the guide describes the engineering measures: memory safety, the lints that restrict
+sources of panics, the link-time proof that the parsers can't panic, protocol validation and the TLS trust model.
+
 ## Supply Chain Security
 
 We take supply chain security seriously and have implemented the following measures:
