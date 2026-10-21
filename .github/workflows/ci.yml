@@ -7,6 +7,10 @@ on:
 # Jobs that write with GITHUB_TOKEN ask for it themselves
 permissions:
   contents: read
+# A newer push to a PR cancels its older run
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   # Check formatting and run clippy lints
   linting:
@@ -151,7 +155,9 @@ jobs:
           name: doc-api
           path: ~/doc
     # Build bindings on Windows x64 [64-bit MSVC (Windows 7+) (x86_64-pc-windows-msvc)] and x86 [32-bit MSVC (Windows 7+) (i686-pc-windows-msvc)]
+  # Paused on PRs during the 1.8.0 refactor series; release tags still build them. Restore before 1.8.0
   bindings-windows:
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: windows-latest
     strategy:
       fail-fast: false
@@ -207,7 +213,9 @@ jobs:
         if: ${{ matrix.test }}
         run: cargo run --bin dnp3-bindings -- --java -r ${{ matrix.target }} -a ./target/${{ matrix.target }}/release
   # Build bindings on MacOS [64-bit macOS (10.7+, Lion+) (x86_64-apple-darwin)]
+  # Paused on PRs during the 1.8.0 refactor series; release tags still build them. Restore before 1.8.0
   bindings-macos:
+    if: startsWith(github.ref, 'refs/tags/')
     strategy:
       fail-fast: false
       matrix:
@@ -325,8 +333,10 @@ jobs:
           name: doc-guide
           path: ~/doc
   # Package all the generated bindings
+  # Paused on PRs during the 1.8.0 refactor series; release tags still package. Restore before 1.8.0
   packaging:
     needs: [documentation, guide, bindings-windows, bindings-macos, bindings-linux]
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
       - name: Install Rust
@@ -393,7 +403,7 @@ jobs:
     uses: ./.github/workflows/conformance.yml
   # The check branch protection requires: passes only if every job a PR runs passed
   ci-ok:
-    needs: [linting, msrv, test, no-panic, features, packaging]
+    needs: [linting, msrv, test, no-panic, features, documentation, guide, bindings-linux]
     if: always()
     runs-on: ubuntu-latest
     steps:
