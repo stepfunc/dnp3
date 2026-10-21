@@ -1,6 +1,7 @@
 use crate::app::Shutdown;
 use crate::link::error::LinkError;
 use crate::link::EndpointAddress;
+use crate::util::deadline::deadline;
 use crate::util::phys::PhysLayer;
 use std::time::Duration;
 
@@ -144,9 +145,7 @@ impl Session {
     }
 
     pub(crate) async fn wait_for_retry(&mut self, duration: Duration) -> Result<(), StopReason> {
-        use std::ops::Add;
-
-        let deadline = tokio::time::Instant::now().add(duration);
+        let deadline = deadline(tokio::time::Instant::now(), duration);
 
         loop {
             tokio::select! {
@@ -161,5 +160,30 @@ impl Session {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::app::parse::options::ParseOptions;
+    use crate::link::reader::LinkModes;
+    use crate::master::task::MasterTask;
+    use crate::master::{MasterChannel, MasterChannelConfig, MasterChannelType};
+
+    #[tokio::test]
+    async fn retry_wait_accepts_a_delay_too_long_to_represent() {
+        let (tx, rx) = crate::util::channel::request_channel();
+        let mut session = Session::master(MasterTask::new(
+            Enabled::Yes,
+            LinkModes::test(),
+            ParseOptions::default(),
+            MasterChannelConfig::new(EndpointAddress::raw(1)),
+            rx,
+        ));
+        let mut channel = MasterChannel::new(tx, MasterChannelType::Stream);
+
+        let (result, _) = tokio::join!(session.wait_for_retry(Duration::MAX), channel.disable());
+        assert!(matches!(result, Err(StopReason::Disable)));
     }
 }

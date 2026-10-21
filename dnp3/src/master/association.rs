@@ -29,6 +29,8 @@ use crate::transport::FragmentAddr;
 use crate::util::session::RunError;
 use tokio::time::Instant;
 
+use crate::util::deadline::deadline;
+
 /// Configuration for a master association
 #[derive(Debug, Copy, Clone)]
 #[cfg_attr(
@@ -196,12 +198,12 @@ impl AutoTaskState {
         *self = match self {
             Self::Failed(backoff, _) => {
                 let delay = backoff.on_failure();
-                Self::Failed(backoff.clone(), Instant::now() + delay)
+                Self::Failed(backoff.clone(), deadline(Instant::now(), delay))
             }
             _ => {
                 let mut backoff = ExponentialBackOff::new(config.auto_tasks_retry_strategy);
                 let delay = backoff.on_failure();
-                Self::Failed(backoff, Instant::now() + delay)
+                Self::Failed(backoff, deadline(Instant::now(), delay))
             }
         }
     }
@@ -349,7 +351,7 @@ impl Association {
             assoc_info,
             config,
             polls: PollMap::new(),
-            next_link_status_deadline: config.keep_alive_timeout.map(|delay| now + delay),
+            next_link_status_deadline: config.keep_alive_timeout.map(|delay| deadline(now, delay)),
             startup_integrity_done: false,
             events_available: EventClasses::none(),
         }
@@ -385,8 +387,10 @@ impl Association {
     #[cfg(feature = "unstable")]
     pub(crate) fn start(&mut self, now: Instant) {
         if self.polls.start(now) {
-            self.next_link_status_deadline =
-                self.config.keep_alive_timeout.map(|delay| now + delay);
+            self.next_link_status_deadline = self
+                .config
+                .keep_alive_timeout
+                .map(|delay| deadline(now, delay));
         }
     }
 
@@ -568,7 +572,7 @@ impl Association {
         self.next_link_status_deadline = self
             .config
             .keep_alive_timeout
-            .map(|timeout| Instant::now() + timeout)
+            .map(|timeout| deadline(Instant::now(), timeout))
     }
 
     pub(crate) async fn handle_unsolicited_response(&mut self, response: &Response<'_>) -> bool {
@@ -896,6 +900,33 @@ impl AssociationMap {
 
         // No task found
         Next::None
+    }
+}
+
+#[cfg(test)]
+mod retry_tests {
+    use super::*;
+
+    #[test]
+    fn retry_delays_too_long_to_represent_are_scheduled_far_in_the_future() {
+        let config = AssociationConfig {
+            auto_tasks_retry_strategy: RetryStrategy::new(Duration::MAX, Duration::MAX),
+            ..AssociationConfig::default()
+        };
+
+        let mut state = AutoTaskState::Pending;
+        // the first failure, then a retry whose delay would double past the maximum
+        for _ in 0..2 {
+            state.failure(&config);
+            assert!(matches!(
+                state.create_next_task(unreachable_task),
+                Next::NotBefore(x) if x > Instant::now()
+            ));
+        }
+    }
+
+    fn unreachable_task() -> QueuedTask {
+        panic!("the task isn't due")
     }
 }
 

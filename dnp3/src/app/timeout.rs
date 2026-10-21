@@ -87,9 +87,7 @@ impl Timeout {
     }
 
     pub(crate) fn deadline_from_now(self) -> tokio::time::Instant {
-        // if this panics due to overflow we have bigger problems than the panic
-        // it means the tim value being returned by now() is WAAAY too big
-        tokio::time::Instant::now() + self.0
+        crate::util::deadline::deadline(tokio::time::Instant::now(), self.0)
     }
 }
 
