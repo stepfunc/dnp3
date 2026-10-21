@@ -6,6 +6,10 @@ pub use outstation::*;
 
 use tokio_rustls::rustls::pki_types;
 
+/// How long a TLS handshake may take, on either side of the connection, so that a peer that stalls
+/// its handshake can't hold up whatever is waiting for it
+pub(crate) const TLS_HANDSHAKE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+
 /// Determines how the certificate(s) presented by the peer are validated
 ///
 /// This validation always occurs **after** the handshake signature has been

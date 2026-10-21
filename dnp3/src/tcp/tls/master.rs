@@ -219,14 +219,50 @@ impl TlsClientConfig {
         endpoint: &SocketAddr,
     ) -> Option<PhysLayer> {
         let connector = tokio_rustls::TlsConnector::from(self.config.clone());
-        match connector.connect(self.server_name.clone(), socket).await {
-            Err(err) => {
+        // a server that stalls the handshake would otherwise stop the client retrying or moving on to
+        // its other endpoints
+        let handshake = connector.connect(self.server_name.clone(), socket);
+        match tokio::time::timeout(super::TLS_HANDSHAKE_TIMEOUT, handshake).await {
+            Err(_) => {
+                tracing::warn!(
+                    "TLS handshake with {endpoint} didn't complete within {} seconds",
+                    super::TLS_HANDSHAKE_TIMEOUT.as_secs()
+                );
+                None
+            }
+            Ok(Err(err)) => {
                 tracing::warn!("failed to establish TLS session with {endpoint}: {err}");
                 None
             }
-            Ok(stream) => Some(PhysLayer::Tls(Box::new(tokio_rustls::TlsStream::from(
+            Ok(Ok(stream)) => Some(PhysLayer::Tls(Box::new(tokio_rustls::TlsStream::from(
                 stream,
             )))),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test(start_paused = true)]
+    async fn tls_handshake_with_a_server_that_never_answers_times_out() {
+        let certs = Path::new(env!("CARGO_MANIFEST_DIR")).join("../certs/self_signed");
+        let mut config = TlsClientConfig::self_signed(
+            &certs.join("entity2_cert.pem"),
+            &certs.join("entity1_cert.pem"),
+            &certs.join("entity1_key.pem"),
+            None,
+            MinTlsVersion::V12,
+        )
+        .unwrap();
+
+        // a server that accepts the connection and never answers the ClientHello
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let endpoint = listener.local_addr().unwrap();
+        let socket = TcpStream::connect(endpoint).await.unwrap();
+        let _server = listener.accept().await.unwrap();
+
+        assert!(config.handle_connection(socket, &endpoint).await.is_none());
     }
 }
