@@ -66,6 +66,11 @@ impl std::fmt::Debug for TcpServerTask {
     }
 }
 
+/// How long a TLS handshake may take. The server accepts one connection at a time, so without
+/// a limit, a peer that stalls its handshake would stop the server accepting any others
+#[cfg(feature = "enable-tls")]
+const TLS_HANDSHAKE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
+
 enum ServerConnectionHandler {
     Tcp,
     #[cfg(feature = "enable-tls")]
@@ -77,7 +82,16 @@ impl ServerConnectionHandler {
         match self {
             Self::Tcp => Ok(PhysLayer::Tcp(socket)),
             #[cfg(feature = "enable-tls")]
-            Self::Tls(config) => config.handle_connection(socket).await,
+            Self::Tls(config) => {
+                tokio::time::timeout(TLS_HANDSHAKE_TIMEOUT, config.handle_connection(socket))
+                    .await
+                    .unwrap_or_else(|_| {
+                        Err(format!(
+                            "TLS handshake didn't complete within {} seconds",
+                            TLS_HANDSHAKE_TIMEOUT.as_secs()
+                        ))
+                    })
+            }
         }
     }
 }
@@ -442,5 +456,30 @@ mod tests {
         drop(handle);
         drop(server);
         tokio::spawn(task.run()).await.unwrap();
+    }
+
+    #[cfg(feature = "enable-tls")]
+    #[tokio::test(start_paused = true)]
+    async fn tls_handshake_that_never_starts_times_out() {
+        let certs = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../certs/self_signed");
+        let config = crate::tcp::tls::TlsServerConfig::self_signed(
+            &certs.join("entity1_cert.pem"),
+            &certs.join("entity2_cert.pem"),
+            &certs.join("entity2_key.pem"),
+            None,
+            crate::tcp::tls::MinTlsVersion::V12,
+        )
+        .unwrap();
+        let mut handler = ServerConnectionHandler::Tls(config);
+
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        // a peer that connects and never sends its ClientHello
+        let _peer = tokio::net::TcpStream::connect(listener.local_addr().unwrap())
+            .await
+            .unwrap();
+        let (socket, _) = listener.accept().await.unwrap();
+
+        let err = handler.handle(socket).await.unwrap_err();
+        assert!(err.contains("didn't complete"), "{err}");
     }
 }
