@@ -1,28 +1,13 @@
-use crate::app::EndpointType;
 use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
-use crate::link::EndpointAddress;
-use crate::transport::FragmentAddr;
+use crate::transport::{FragmentAddr, TransportWrite};
 use crate::util::phys::PhysLayer;
 
-pub(crate) struct MockWriter {
-    num_writes: usize,
-}
+pub(crate) struct MockWriter;
 
-// same signature as the real transport writer
-impl MockWriter {
-    pub(crate) fn new(_: EndpointType, _: EndpointAddress) -> Self {
-        Self { num_writes: 0 }
-    }
-
-    pub(crate) fn reset(&mut self) {}
-
-    pub(crate) fn num_writes(&self) -> usize {
-        self.num_writes
-    }
-
+impl TransportWrite for MockWriter {
     // just write the fragment directly to the I/O
-    pub(crate) async fn write(
+    async fn write(
         &mut self,
         io: &mut PhysLayer,
         level: DecodeLevel,
@@ -30,11 +15,10 @@ impl MockWriter {
         fragment: &[u8],
     ) -> Result<(), LinkError> {
         io.write(fragment, destination.phys, level.physical).await?;
-        self.num_writes += 1;
         Ok(())
     }
 
-    pub(crate) async fn write_link_status_request(
+    async fn write_link_status_request(
         &mut self,
         _: &mut PhysLayer,
         _: FragmentAddr,
@@ -42,4 +26,6 @@ impl MockWriter {
     ) -> Result<(), LinkError> {
         Ok(())
     }
+
+    fn reset(&mut self) {}
 }

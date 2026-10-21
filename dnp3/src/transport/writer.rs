@@ -1,28 +1,17 @@
 use crate::app::parse::options::ParseOptions;
 use crate::app::parse::parser::{FragmentDisplay, ParsedFragment};
-use crate::app::EndpointType;
 use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
-use crate::link::EndpointAddress;
-use crate::transport::FragmentAddr;
+use crate::transport::{FragmentAddr, Transport, TransportWrite};
 use crate::util::phys::PhysLayer;
 
-/// This type definition is used so that we can mock the transport writer during testing.
-/// If Rust eventually allows `async fn` in traits, this could be removed
-#[cfg(not(test))]
-pub(crate) type InnerTransportWriter = crate::transport::real::writer::Writer;
-#[cfg(test)]
-pub(crate) type InnerTransportWriter = crate::transport::mock::writer::MockWriter;
-
-pub(crate) struct TransportWriter {
-    inner: InnerTransportWriter,
+pub(crate) struct TransportWriter<T: Transport> {
+    inner: T::Writer,
 }
 
-impl TransportWriter {
-    pub(crate) fn new(endpoint_type: EndpointType, local_address: EndpointAddress) -> Self {
-        Self {
-            inner: InnerTransportWriter::new(endpoint_type, local_address),
-        }
+impl<T: Transport> TransportWriter<T> {
+    pub(crate) fn new(inner: T::Writer) -> Self {
+        Self { inner }
     }
 
     pub(crate) fn reset(&mut self) {

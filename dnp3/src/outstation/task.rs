@@ -7,7 +7,7 @@ use crate::outstation::database::DatabaseHandle;
 use crate::outstation::session::OutstationSession;
 use crate::outstation::traits::{ControlHandler, OutstationApplication, OutstationInformation};
 use crate::outstation::OutstationHandle;
-use crate::transport::{FragmentAddr, TransportReader, TransportWriter};
+use crate::transport::{FragmentAddr, RealTransport, Transport, TransportReader, TransportWriter};
 use crate::util::phys::{PhysAddr, PhysLayer};
 use crate::util::session::{Enabled, RunError, StopReason};
 
@@ -28,19 +28,19 @@ pub(crate) enum OutstationMessage {
     Configuration(ConfigurationChange),
 }
 
-pub(crate) struct OutstationTask {
+pub(crate) struct OutstationTask<T: Transport = RealTransport> {
     session: OutstationSession,
-    reader: TransportReader,
-    writer: TransportWriter,
+    reader: TransportReader<T>,
+    writer: TransportWriter<T>,
     database: DatabaseHandle,
 }
 
 /// RAII guard that re-arms per-connection state on session teardown.
-struct SessionTeardown<'a> {
-    task: &'a mut OutstationTask,
+struct SessionTeardown<'a, T: Transport> {
+    task: &'a mut OutstationTask<T>,
 }
 
-impl Drop for SessionTeardown<'_> {
+impl<T: Transport> Drop for SessionTeardown<'_, T> {
     fn drop(&mut self) {
         // re-arm, don't clear: unconfirmed events return to Unselected for re-delivery
         self.task.database.reset();
@@ -51,9 +51,43 @@ impl Drop for SessionTeardown<'_> {
 }
 
 impl OutstationTask {
-    /// create an `OutstationTask` and return it along with a `DatabaseHandle` for updating it
+    /// create an `OutstationTask` and return it along with an `OutstationHandle` for controlling it
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn create(
+        initial_state: Enabled,
+        link_modes: LinkModes,
+        parse_options: ParseOptions,
+        config: OutstationConfig,
+        phys_addr: PhysAddr,
+        application: Box<dyn OutstationApplication>,
+        information: Box<dyn OutstationInformation>,
+        control_handler: Box<dyn ControlHandler>,
+    ) -> (Self, OutstationHandle) {
+        Self::with_transport(
+            initial_state,
+            link_modes,
+            parse_options,
+            config,
+            phys_addr,
+            application,
+            information,
+            control_handler,
+        )
+    }
+}
+
+#[cfg(test)]
+impl OutstationTask<crate::transport::mock::MockTransport> {
+    pub(crate) fn set_rx_frame_info(&mut self, info: crate::link::header::FrameInfo) {
+        self.reader.set_rx_frame_info(info);
+    }
+}
+
+impl<T: Transport> OutstationTask<T> {
+    /// create an `OutstationTask` over a transport and return it along with an `OutstationHandle`
+    /// for controlling it
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn with_transport(
         initial_state: Enabled,
         link_modes: LinkModes,
         parse_options: ParseOptions,
@@ -127,10 +161,5 @@ impl OutstationTask {
     /// process received outstation messages while idle without a session
     pub(crate) async fn process_next_message(&mut self) -> Result<(), StopReason> {
         self.session.process_next_message().await
-    }
-
-    #[cfg(test)]
-    pub(crate) fn get_reader(&mut self) -> &mut TransportReader {
-        &mut self.reader
     }
 }

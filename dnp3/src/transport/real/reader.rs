@@ -9,7 +9,7 @@ use crate::outstation::Feature;
 use crate::transport::real::assembler::{Assembler, AssemblyState};
 use crate::transport::real::display::SegmentDisplay;
 use crate::transport::real::header::Header;
-use crate::transport::{LinkLayerMessage, LinkLayerMessageType, TransportData};
+use crate::transport::{LinkLayerMessage, LinkLayerMessageType, TransportData, TransportRead};
 use crate::util::phys::PhysLayer;
 
 pub(crate) struct Reader {
@@ -56,13 +56,19 @@ impl Reader {
         }
     }
 
-    pub(crate) fn reset(&mut self) {
+    pub(crate) fn seed_link(&mut self, seed_data: &[u8]) -> Result<(), scursor::WriteError> {
+        self.link.seed(seed_data)
+    }
+}
+
+impl TransportRead for Reader {
+    fn reset(&mut self) {
         self.assembler.reset();
         self.link.reset();
         self.pending_link_layer_message = None;
     }
 
-    pub(crate) fn pop(&mut self) -> Option<TransportData<'_>> {
+    fn pop(&mut self) -> Option<TransportData<'_>> {
         if let Some(msg) = self.pending_link_layer_message.take() {
             return Some(TransportData::LinkLayerMessage(msg));
         }
@@ -70,7 +76,7 @@ impl Reader {
         self.assembler.pop().map(TransportData::Fragment)
     }
 
-    pub(crate) fn peek(&self) -> Option<TransportData<'_>> {
+    fn peek(&self) -> Option<TransportData<'_>> {
         if let Some(msg) = self.pending_link_layer_message {
             return Some(TransportData::LinkLayerMessage(msg));
         }
@@ -78,15 +84,7 @@ impl Reader {
         self.assembler.peek().map(TransportData::Fragment)
     }
 
-    pub(crate) fn seed_link(&mut self, seed_data: &[u8]) -> Result<(), scursor::WriteError> {
-        self.link.seed(seed_data)
-    }
-
-    pub(crate) async fn read(
-        &mut self,
-        io: &mut PhysLayer,
-        level: DecodeLevel,
-    ) -> Result<(), LinkError> {
+    async fn read(&mut self, io: &mut PhysLayer, level: DecodeLevel) -> Result<(), LinkError> {
         if self.assembler.peek().is_some() {
             return Ok(());
         }

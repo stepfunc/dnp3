@@ -8,7 +8,7 @@ use crate::transport::real::header::Header;
 use crate::transport::real::sequence::Sequence;
 use crate::util::phys::PhysLayer;
 
-use crate::transport::FragmentAddr;
+use crate::transport::{FragmentAddr, TransportWrite};
 use scursor::WriteCursor;
 
 pub(crate) struct Writer {
@@ -27,12 +27,14 @@ impl Writer {
             buffer: [0; crate::link::constant::MAX_LINK_FRAME_LENGTH],
         }
     }
+}
 
-    pub(crate) fn reset(&mut self) {
+impl TransportWrite for Writer {
+    fn reset(&mut self) {
         self.seq.reset();
     }
 
-    pub(crate) async fn write(
+    async fn write(
         &mut self,
         io: &mut PhysLayer,
         level: DecodeLevel,
@@ -76,7 +78,7 @@ impl Writer {
         Ok(())
     }
 
-    pub(crate) async fn write_link_status_request(
+    async fn write_link_status_request(
         &mut self,
         io: &mut PhysLayer,
         destination: FragmentAddr,

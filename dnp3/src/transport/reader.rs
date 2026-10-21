@@ -3,34 +3,25 @@ use crate::app::parse::parser::ParsedFragment;
 use crate::app::HeaderParseError;
 use crate::decode::{AppDecodeLevel, DecodeLevel};
 use crate::link::error::LinkError;
-use crate::link::reader::LinkModes;
 use crate::link::EndpointAddress;
-use crate::outstation::Feature;
 use crate::transport::{
-    FragmentAddr, FragmentInfo, LinkLayerMessage, TransportData, TransportRequest,
-    TransportResponse,
+    FragmentAddr, FragmentInfo, LinkLayerMessage, RealTransport, Transport, TransportData,
+    TransportRead, TransportRequest, TransportResponse,
 };
 use crate::util::phys::PhysLayer;
 
-#[cfg(not(test))]
-/// This type definition is used so that we can mock the transport reader during testing.
-/// If Rust eventually allows `async fn` in traits, this can be removed
-pub(crate) type InnerReaderType = crate::transport::real::reader::Reader;
-#[cfg(test)]
-pub(crate) type InnerReaderType = crate::transport::mock::reader::MockReader;
-
-pub(crate) struct TransportReader {
+pub(crate) struct TransportReader<T: Transport> {
     parse_options: ParseOptions,
-    inner: InnerReaderType,
+    inner: T::Reader,
 }
 
-pub(crate) struct RequestGuard<'a> {
+pub(crate) struct RequestGuard<'a, T: Transport> {
     canceled: bool,
-    reader: &'a mut TransportReader,
+    reader: &'a mut TransportReader<T>,
 }
 
-impl<'a> RequestGuard<'a> {
-    fn new(reader: &'a mut TransportReader) -> Self {
+impl<'a, T: Transport> RequestGuard<'a, T> {
+    fn new(reader: &'a mut TransportReader<T>) -> Self {
         RequestGuard {
             canceled: false,
             reader,
@@ -46,7 +37,7 @@ impl<'a> RequestGuard<'a> {
     }
 }
 
-impl Drop for RequestGuard<'_> {
+impl<T: Transport> Drop for RequestGuard<'_, T> {
     fn drop(&mut self) {
         if !self.canceled {
             self.reader.pop()
@@ -54,39 +45,25 @@ impl Drop for RequestGuard<'_> {
     }
 }
 
-impl TransportReader {
-    pub(crate) fn master(
-        link_modes: LinkModes,
-        parse_options: ParseOptions,
-        address: EndpointAddress,
-        rx_buffer_size: usize,
-    ) -> Self {
-        Self {
-            parse_options,
-            inner: InnerReaderType::master(link_modes, address, rx_buffer_size),
-        }
-    }
-
-    pub(crate) fn outstation(
-        link_modes: LinkModes,
-        parse_options: ParseOptions,
-        address: EndpointAddress,
-        self_address: Feature,
-        rx_buffer_size: usize,
-    ) -> Self {
-        Self {
-            parse_options,
-            inner: InnerReaderType::outstation(link_modes, address, self_address, rx_buffer_size),
-        }
-    }
-
-    #[cfg(test)]
-    pub(crate) fn get_inner(&mut self) -> &mut InnerReaderType {
-        &mut self.inner
-    }
-
+impl TransportReader<RealTransport> {
     pub(crate) fn seed_link(&mut self, seed_data: &[u8]) -> Result<(), scursor::WriteError> {
         self.inner.seed_link(seed_data)
+    }
+}
+
+#[cfg(test)]
+impl TransportReader<crate::transport::mock::MockTransport> {
+    pub(crate) fn set_rx_frame_info(&mut self, info: crate::link::header::FrameInfo) {
+        self.inner.set_rx_frame_info(info)
+    }
+}
+
+impl<T: Transport> TransportReader<T> {
+    pub(crate) fn new(parse_options: ParseOptions, inner: T::Reader) -> Self {
+        Self {
+            parse_options,
+            inner,
+        }
     }
 
     pub(crate) async fn read(
@@ -140,7 +117,7 @@ impl TransportReader {
     pub(crate) fn pop_request(
         &mut self,
         master_address: Option<EndpointAddress>,
-    ) -> RequestGuard<'_> {
+    ) -> RequestGuard<'_, T> {
         if let Some(TransportRequest::Request(info, _)) = self.peek_request() {
             if let Some(required_master_addr) = master_address {
                 if info.addr.link != required_master_addr {
