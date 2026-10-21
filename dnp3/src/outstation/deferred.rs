@@ -71,10 +71,11 @@ impl DeferredRead {
                         self.vec.capacity(),
                         h.variation,
                         h.details.qualifier()
-                    )
+                    );
+                    iin2 |= Iin2::PARAMETER_ERROR;
                 }
             } else {
-                iin2 = Iin2::PARAMETER_ERROR;
+                iin2 |= ReadHeader::unsupported(h.variation);
             }
         }
 
