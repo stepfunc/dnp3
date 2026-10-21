@@ -30,7 +30,7 @@ Initialize points before the outstation exposes measurement data. This is typica
 
 * An optional event class assignment for the point
 * Default static and event variations for the type
-* Type-specific dead-bands that default to zero (Binary points have no deadband)
+* Dead-bands for analog and counter types that default to zero (other types have no deadband)
 
 :::caution
 The default static and event variations for each point type may not do what you expect them to do. For example,
@@ -51,6 +51,7 @@ Update the value after adding the point if you don't want a connecting master to
 
 :::tip
 The examples show contiguous point ranges, but discontiguous ranges work efficiently too. The library uses a [BTreeMap](https://doc.rust-lang.org/std/collections/struct.BTreeMap.html) internally regardless of how you define indices.
+A READ of a range that spans missing indices returns the points that exist and sets IIN2.2 (TB2016-001).
 :::
 
 <Tabs
@@ -132,7 +133,7 @@ Use the UpdateOptions to ignore event creation during startup initialization if 
 Some applications may wish to use the `Database` as a cache of the most recent value. Each type has a getter method to retrieve the most recently assigned value.
 
 :::note
-Since the point may not be defined, the getters can fail. If you try to retrieve a point that doesn't exist using Java and C#, an exception will be thrown.
+Since the point may not be defined, the getters can fail. If you try to retrieve a point that doesn't exist using C++, Java, or C#, an exception will be thrown.
 :::
 
 ## Removing Points

@@ -16,7 +16,7 @@ Create a `MasterChannel` using generic configuration combined with transport-spe
 
 ## Association
 
-The DNP3 standard defines an association as "a representation of a logical connection between a master and an outstation". In this library, you add an association to a `MasterChannel` to enable communication with a particular outstation address. Adding an association to a channel will return an `AssociationId`, which can then be used in conjunction with the channel to perform actions on that outstation.
+An association is the master's view of its logical connection to one outstation (IEEE 1815-2012 Annex B). In this library, you add an association to a `MasterChannel` to enable communication with a particular outstation address. Adding an association to a channel will return an `AssociationId`, which can then be used in conjunction with the channel to perform actions on that outstation.
 
 ```mermaid
 graph TD

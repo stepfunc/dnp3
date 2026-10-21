@@ -383,7 +383,7 @@ class MainClass
             LinkReadMode.Datagram,
             TimeSpan.FromSeconds(5)
         );
-        // ANCHOR_END: create_serial_channel
+        // ANCHOR_END: create_udp_channel
 
         try
         {

@@ -1,7 +1,7 @@
 # Release Process
 
 Publishing is handled by `.github/workflows/ci.yml`: **pushing a tag `X.Y.Z`
-(or `X.Y.Z-RCn`) to a commit on `main` publishes that version** to crates.io,
+(or a milestone `X.Y.Z-Mn` or release candidate `X.Y.Z-RCn`) to a commit on `main` publishes that version** to crates.io,
 Maven Central, NuGet, and the docs site, and opens a draft GitHub release. This
 file covers only the human steps around that trigger.
 
@@ -46,7 +46,7 @@ tag the SHA it tested (its `headSha` in `gh run list --workflow conformance.yml
 --json headSha,conclusion`).
 
 crates.io publishing is **irreversible** — a version can never be re-published.
-Confirm the version before pushing. (`-RCn` publishes as a pre-release, which
+Confirm the version before pushing. (`-Mn` and `-RCn` publish as pre-releases, which
 cargo won't select by default.)
 
 ## 3. After CI completes
@@ -57,15 +57,16 @@ idempotent, so re-running the tag's workflow safely retries any that failed.
 ## Dependencies
 
 Dependency security is handled **continuously**, not at release time:
-`.github/workflows/security-audit.yml` runs `cargo audit` daily and on every
-PR/`main` push that touches `Cargo.toml`/`Cargo.lock`, and fails on advisories.
+`.github/workflows/security-audit.yml` runs `cargo audit` and `osv-scanner` daily,
+on every PR, and on every `main` push that touches `Cargo.toml`/`Cargo.lock`, and
+fails on advisories.
 Security patches land as their own PRs as advisories appear — they are not
 batched onto releases.
 
 The release's dependency responsibilities are therefore narrow:
 
 - **Gate, don't churn:** the security audit must be green on the `prepare` PR
-  (it runs automatically because the PR touches `Cargo.lock`). Don't tag if it's
+  (it runs on every PR). Don't tag if it's
   red. The prebuilt bindings (C/.NET/Java) freeze whatever is in `Cargo.lock` at
   tag time, so a clean audit at the tag is what protects binding consumers —
   pure-Rust crate consumers re-resolve on their own.
@@ -77,10 +78,11 @@ The release's dependency responsibilities are therefore narrow:
 
 ## CHANGELOG conventions
 
-- Each release candidate gets its own `### X.Y.Z-RCn ###` section while the
-  pre-release cycle is ongoing, so adopters can see the delta between RCs.
-- **When cutting the final `X.Y.Z`, collapse all `X.Y.Z-RCn` sections into a
-  single `### X.Y.Z ###` section** — merge and de-duplicate the bullets and drop
-  the per-RC headers. The final release gets one coherent entry.
+- Each milestone or release candidate gets its own `### X.Y.Z-Mn ###` or
+  `### X.Y.Z-RCn ###` section while the pre-release cycle is ongoing, so adopters
+  can see the delta between pre-releases.
+- **When cutting the final `X.Y.Z`, collapse all `X.Y.Z-Mn` and `X.Y.Z-RCn` sections
+  into a single `### X.Y.Z ###` section**: merge and de-duplicate the bullets and
+  drop the per-pre-release headers. The final release gets one coherent entry.
 - Bullet prefixes in use: `:star:` feature, `:shield:` security, `:wrench:`
   tooling/CI, `:book:` docs. Reference the PR/issue number.

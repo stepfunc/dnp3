@@ -88,7 +88,7 @@ pub struct MasterChannelConfig {
 }
 
 impl MasterChannelConfig {
-    /// Create a configuration with default buffer sizes, no decoding, and a default timeout of 5 seconds
+    /// Create a configuration with default buffer sizes and no decoding
     pub fn new(master_address: EndpointAddress) -> Self {
         Self {
             master_address,
@@ -549,7 +549,7 @@ pub enum TaskType {
     PeriodicPoll,
     /// Startup integrity scan
     StartupIntegrity,
-    /// Automatic event scan caused by `RESTART` IIN bit detection
+    /// Automatic event scan caused by the event class IIN bits (IIN1.1 - IIN1.3) indicating that events are available
     AutoEventScan,
     /// Command request
     ///

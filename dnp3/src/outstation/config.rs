@@ -28,7 +28,9 @@ pub struct Features {
     pub self_address: Feature,
     /// if enabled, the outstation processes valid broadcast messages (default == Enabled)
     pub broadcast: Feature,
-    /// if enabled, the outstation will send process enable/disable unsolicited and produce unsolicited responses (default == Enabled)
+    /// if enabled, the outstation processes ENABLE/DISABLE UNSOLICITED requests and produces unsolicited responses (default == Enabled)
+    ///
+    /// if disabled, the outstation responds to ENABLE/DISABLE UNSOLICITED requests with IIN2.0 (NO_FUNC_CODE_SUPPORT)
     pub unsolicited: Feature,
     /// if enabled, the outstation will process every request as if it came from the configured master address
     ///
@@ -76,7 +78,7 @@ pub struct OutstationConfig {
     /// confirm timeout for solicited and unsolicited responses
     #[cfg_attr(feature = "serialization", serde(default))]
     pub confirm_timeout: Timeout,
-    /// timeout after which a matching OPERATE will fail with SELECT_TIMEOUT
+    /// timeout after which a matching OPERATE will fail with [`CommandStatus::Timeout`](crate::app::control::CommandStatus::Timeout)
     #[cfg_attr(feature = "serialization", serde(default))]
     pub select_timeout: Timeout,
     /// optional features that can be enabled
@@ -91,7 +93,7 @@ pub struct OutstationConfig {
         serde(default = "OutstationConfig::default_unsolicited_retry_delay")
     )]
     pub unsolicited_retry_delay: std::time::Duration,
-    /// time without any link activity before the outstation will send REQUEST_LINK_STATES
+    /// time without any link activity before the outstation will send REQUEST_LINK_STATUS
     ///
     /// A value of `None` will disable this feature
     #[cfg_attr(

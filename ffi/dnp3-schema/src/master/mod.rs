@@ -1040,7 +1040,7 @@ fn define_association_information(
         .push("startup_integrity", "Startup integrity scan")?
         .push(
             "auto_event_scan",
-            "Automatic event scan caused by RESTART IIN bit detection",
+            "Automatic event scan caused by the event class IIN bits (IIN1.1 - IIN1.3) indicating that events are available",
         )?
         .push("command", "Command request")?
         .push("clear_restart_bit", "Clear RESTART IIN bit")?

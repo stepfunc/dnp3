@@ -103,7 +103,7 @@ values={[
 ```
 
 :::note
-The terminology differs here between Rust and the bindings. The Rust API's 'add_outstation' method doesn't spawn it onto the runtime.
+The Rust `add_outstation` method spawns the outstation onto the Tokio runtime, so it must be called from within the runtime. Use `add_outstation_no_spawn` if you want to spawn the returned future yourself.
 :::
 
 </TabItem>
@@ -184,7 +184,7 @@ values={[
 ```
 
 :::note
-The terminology differs here between Rust and the bindings.
+The Rust `bind` method spawns the server onto the Tokio runtime, so it must be called from within the runtime. Use `bind_no_spawn` if you want to spawn the returned future yourself.
 :::
 
 </TabItem>

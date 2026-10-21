@@ -73,12 +73,14 @@ values={[
 ## Read a File
 
 File data may be asynchronously read from the outstation using a callback interface. Reading a file consists of multiple
-DNP3 requests. Obtaining an authentication key from the outstation and is optional depending on outstation requirements.
+DNP3 requests. Obtaining an authentication key from the outstation is optional, depending on outstation requirements.
 
 ```mermaid
 sequenceDiagram
     Master-->>Outstation: authenticate_file (optional);
     Outstation-->>Master: response w/ key;
+    Master->>Outstation: open file;
+    Outstation->>Master: response w/ file handle;
     Master->>Outstation: read file block (1 of N);
     Outstation->>Master: response (1 of N);
     Master->>Outstation: close file;

@@ -10,8 +10,7 @@ import TabItem from '@theme/TabItem';
 
 Use the `MasterChannel::createSerialChannel` method to create a channel bound to a serial port. It requires the same serial port configuration parameters as the outstation serial port API.
 
-Unlike the outstation API, the master API opens the serial port lazily after `MasterChannel.enable()` is called. It will try to reopen the port
-if the initial attempt fails.
+The master opens the serial port after `MasterChannel.enable()` is called. If the port can't be opened, or fails later, the master reopens it after a fixed retry delay.
 
 :::note
 The `LinkErrorMode` is internally set to `Discard` for serial communication channels.

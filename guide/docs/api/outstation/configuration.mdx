@@ -18,7 +18,7 @@ The following static configuration is required to create an outstation.
 
 ### OutstationConfig
 
-`OutstationConfig` contains parameters that modify outstation behavior. See the generated API documentation for field definitions. All fields have defaults except the master and outstation link addresses. Defaults aren't optimized for every use case—you may need to adjust timeouts for higher latency links.
+`OutstationConfig` contains parameters that modify outstation behavior. See the generated API documentation for field definitions. All fields have defaults except the master and outstation link addresses and the `EventBufferConfig`. Defaults aren't optimized for every use case, so you may need to adjust timeouts for higher latency links.
 
 <Tabs
 groupId="language"
@@ -70,7 +70,7 @@ values={[
 ### EventBufferConfig
 
 
-`EventBufferConfig` controls the number of events buffered for each type. Space is pre-allocated during initialization. When a buffer fills, the oldest event is discarded and the outstation asserts IIN 2.3 (Event Buffer Overflow).
+`EventBufferConfig` controls the number of events buffered for each type. Space is pre-allocated during initialization. When a buffer fills, the oldest event of that type is discarded, even one already sent and awaiting confirmation, and the outstation asserts IIN 2.3 (Event Buffer Overflow).
 
 There's a tradeoff between preserving events and memory/CPU usage. Consider these factors when sizing buffers:
 

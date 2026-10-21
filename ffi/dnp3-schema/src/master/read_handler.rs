@@ -534,7 +534,7 @@ fn declare_iin_struct(lib: &mut LibraryBuilder) -> BackTraced<CallbackArgStructH
         .doc("Second IIN byte")?
         .add("no_func_code_support", Primitive::Bool, "Outstation does not support this function code")?
         .add("object_unknown", Primitive::Bool, "Outstation does not support requested operation for objects in the request")?
-        .add("parameter_error", Primitive::Bool, "Outstation does not support requested operation for objects in the request")?
+        .add("parameter_error", Primitive::Bool, "A parameter in the request was invalid, e.g. malformed object data or an unsupported qualifier or range")?
         .add("event_buffer_overflow", Primitive::Bool, "An event buffer overflow condition exists in the outstation, and at least one unconfirmed event was lost")?
         .add("already_executing", Primitive::Bool, "The operation requested is already executing (optional support)")?
         .add("config_corrupt", Primitive::Bool, "The outstation detected corrupt configuration (optional support)")?

@@ -13,7 +13,7 @@ pub trait ReadHandler: Send + Sync {
     /// `read_type` provides information about what triggered the call, e.g. response vs unsolicited
     /// `header` provides the full response header
     ///
-    /// Note: The operation may or may not be async depending
+    /// Note: The operation may or may not be async depending on the implementation
     fn begin_fragment(&mut self, read_type: ReadType, header: ResponseHeader) -> MaybeAsync<()> {
         MaybeAsync::ready(())
     }
@@ -23,7 +23,7 @@ pub trait ReadHandler: Send + Sync {
     /// `read_type` provides information about what triggered the call, e.g. response vs unsolicited
     /// `header` provides the full response header
     ///
-    /// Note: The operation may or may not be async depending. A typical use case for using async
+    /// Note: The operation may or may not be async depending on the implementation. A typical use case for using async
     /// here would be to publish a message to an async MPSC.
     fn end_fragment(&mut self, read_type: ReadType, header: ResponseHeader) -> MaybeAsync<()> {
         MaybeAsync::ready(())

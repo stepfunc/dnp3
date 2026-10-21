@@ -93,12 +93,12 @@ Logs include contextual metadata so you can:
 * Understand what state the software was in when the event occurred
 
 ```
-INFO DNP3-Master-TCP{endpoint="127.0.0.1:20000"}: connected to 127.0.0.1:20000
-INFO DNP3-Master-TCP{endpoint="127.0.0.1:20000"}:Task{type=Function(DisableUnsolicited) dest=1024}: APP TX - ctrl: [fir: true fin: true con: false uns: false seq: 0] func: DisableUnsolicited ... (len = 9)
-INFO DNP3-Master-TCP{endpoint="127.0.0.1:20000"}:Task{type=Function(DisableUnsolicited) dest=1024}: APP RX - ctrl: [fir: true fin: true con: true uns: true seq: 0] func: UnsolicitedResponse iin1: [DEVICE_RESTART] iin2: [] ... (len = 0)
-WARN DNP3-Master-TCP{endpoint="127.0.0.1:20000"}:Task{type=Function(DisableUnsolicited) dest=1024}: device restart detected (address == 1024)
-INFO DNP3-Master-TCP{endpoint="127.0.0.1:20000"}:Task{type=Function(DisableUnsolicited) dest=1024}: APP TX - ctrl: [fir: true fin: true con: false uns: true seq: 0] func: Confirm ... (len = 0)
-INFO DNP3-Master-TCP{endpoint="127.0.0.1:20000"}:Task{type=Function(DisableUnsolicited) dest=1024}: APP RX - ctrl: [fir: true fin: true con: false uns: false seq: 0] func: Response iin1: [DEVICE_RESTART] iin2: [] ... (len = 0)
+INFO dnp3-master-tcp-client{endpoint="127.0.0.1:20000"}: connected to 127.0.0.1:20000
+INFO dnp3-master-tcp-client{endpoint="127.0.0.1:20000"}:task{type=Function(DisableUnsolicited) dest=1024}: APP TX - ctrl: [fir: true fin: true con: false uns: false seq: 0] func: DisableUnsolicited ... (len = 9)
+INFO dnp3-master-tcp-client{endpoint="127.0.0.1:20000"}:task{type=Function(DisableUnsolicited) dest=1024}: APP RX - ctrl: [fir: true fin: true con: true uns: true seq: 0] func: UnsolicitedResponse iin1: [DEVICE_RESTART] iin2: [] ... (len = 0)
+WARN dnp3-master-tcp-client{endpoint="127.0.0.1:20000"}:task{type=Function(DisableUnsolicited) dest=1024}: device restart detected (address == 1024)
+INFO dnp3-master-tcp-client{endpoint="127.0.0.1:20000"}:task{type=Function(DisableUnsolicited) dest=1024}: APP TX - ctrl: [fir: true fin: true con: false uns: true seq: 0] func: Confirm ... (len = 0)
+INFO dnp3-master-tcp-client{endpoint="127.0.0.1:20000"}:task{type=Function(DisableUnsolicited) dest=1024}: APP RX - ctrl: [fir: true fin: true con: false uns: false seq: 0] func: Response iin1: [DEVICE_RESTART] iin2: [] ... (len = 0)
 ```
 
 ## Protocol Decoding
@@ -120,6 +120,11 @@ index: 7 false
 
 :::note
 Protocol decoding is always output at the *Info* log level. If left enabled, it can be too verbose in a production system. When you're debugging a communication issue, try adjusting the application-layer decoding first to gain visibility into the messages exchanged.
+:::
+
+:::caution
+Application-layer object value decoding redacts the passwords and authentication keys used in file transfer. The transport, link,
+and physical layers can log raw bytes, which include these secrets.
 :::
 
 

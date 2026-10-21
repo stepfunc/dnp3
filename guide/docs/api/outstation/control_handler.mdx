@@ -8,10 +8,12 @@ slug: /api/outstation/controls
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-The `ControlHandler` interface receives control requests. Each request begins with `beginFragment` and ends with `endFragment`, useful for handling operations atomically or in batches. 
+The `ControlHandler` interface receives control requests. When a request results in at least one `select` or `operate` callback, the callbacks are preceded by `beginFragment` and followed by `endFragment`, useful
+for handling operations atomically or in batches. These two methods are not called if no control callback runs.
 
-Each `select` or `operate` callback returns a `CommandStatus` enum. The outstation response to a control message echoes the request data and this
-status code is returned for every control in the message. The library actually builds the response message while making these callbacks.
+Each `select` or `operate` callback returns a `CommandStatus` enum. The outstation response to a control message echoes the request data along with
+the status returned for each control. The library actually builds the response message while making these callbacks. If an `OPERATE` doesn't match a
+prior `SELECT`, no callbacks are made and the same failure status is returned for every control in the message.
 
 ## Handling SELECT
 
@@ -26,7 +28,7 @@ sequenceDiagram
     Outstation->>Master: response;
 ```
 
-DNP3 masters can also use a "select-before-operate" strategy. The rules for processing these two-pass control messages are complex, but the library handles them automatically.
+DNP3 masters can also use a "select-before-operate" strategy. The library handles these two-pass control messages automatically, following IEEE 1815-2012 4.4.4 and Table 4-9.
 
 ## Handling OPERATE
 

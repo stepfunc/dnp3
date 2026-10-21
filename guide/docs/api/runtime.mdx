@@ -8,7 +8,7 @@ slug: /api/runtime
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-Rust's asynchronous programming model is a form of [cooperative multitasking](https://docs.rs/tokio/1.0.2/tokio/task/index.html). Once a task gets to a point where it would typically block, such as reading from a socket, execution is instead released back to an executor so that another task may run. This lets a pool of worker threads inside the executor efficiently execute thousands of asynchronous tasks concurrently without the overhead of per-task call stacks or thread context-switching.
+Rust's asynchronous programming model is a form of [cooperative multitasking](https://docs.rs/tokio/latest/tokio/task/index.html). Once a task gets to a point where it would typically block, such as reading from a socket, execution is instead released back to an executor so that another task may run. This lets a pool of worker threads inside the executor efficiently execute thousands of asynchronous tasks concurrently without the overhead of per-task call stacks or thread context-switching.
 
 Rust supports asynchronous programming using 'async' functions and 'async/await' syntax. The Rust compiler transforms synchronous-looking code into state machines that are just as efficient as what can be written by hand. Although Rust has this capability built into the compiler, it doesn't include a default runtime to execute the asynchronous programs. Instead, you are free to pick the runtime as an external library.
 
@@ -21,7 +21,7 @@ Tokio is a modern evolution of libraries like [libuv (C)](https://libuv.org/) an
 Create a `Runtime` before any communication can take place. It's a shared resource for multiple sessions, typically created just after initializing logging and shut down last when exiting.
 
 :::note
-Rust users can share the runtime with other libraries that also use Tokio. The bindings don't currently support sharing a runtime, but this will be possible in a future release.
+Rust users can share the runtime with other libraries that also use Tokio. The bindings don't support sharing a runtime.
 :::
 
 ## Examples
@@ -90,6 +90,11 @@ For example, when you receive a log message via a callback, a synchronous call t
 
 Avoid blocking in callbacks whenever possible. Defer blocking calls to dedicated worker threads, such as a separate thread that writes log messages to file.
 
+:::note
+Binding methods that wait for the runtime to complete an operation, such as enabling or disabling a channel, adding an association or a poll, or changing an
+outstation's decode level, can't be called from within a callback. They fail with the `RUNTIME_CANNOT_BLOCK_WITHIN_ASYNC` parameter error.
+:::
+
 
 
 :::tip
@@ -108,7 +113,7 @@ that permanently blocks, `shutdown` will cause a deadlock.
 
 If you cannot ensure a clean shutdown, use `Runtime.set_shutdown_timeout(..)` to set an upper time limit. Call this method immediately after creating the Runtime.
 
-**Shutting down the runtime using a timeout can leak memory as worker threads will be aborted if the timeout occurs. Only
+**Shutting down the runtime using a timeout can leak memory as worker threads that haven't stopped when the timeout occurs are left running. Only
 use this method if you are exiting the process anyway.**
 :::
 

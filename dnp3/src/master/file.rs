@@ -46,10 +46,8 @@ pub struct FileReadConfig {
     pub max_block_size: u16,
     /// Maximum file size accepted by the master
     ///
-    /// This applies to both:
-    ///
-    /// 1) The size returned by the outstation in the OPEN operation
-    /// 2) The total number of bytes actually returned in subsequent READ operations
+    /// This limit applies to the total number of bytes actually returned in READ operations.
+    /// The file size reported by the outstation in the OPEN response is not checked against it.
     pub max_file_size: usize,
 }
 

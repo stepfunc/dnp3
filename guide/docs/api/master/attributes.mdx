@@ -67,8 +67,8 @@ values={[
 ## Writing Attributes
 
 Attributes can be written one at a time or in batches by constructing a request header and sending it to the outstation. The Rust
-API uses a single method to add an attribute to the header, whereas the bindings use a separate method for each type of
-attribute.
+API uses a single method to add any type of attribute to the request. The bindings can only write visible string and unsigned integer
+attributes, using a separate method for each type.
 
 The example below demonstrates how to write g0v245 (User-assigned location) to the outstation which is a visible string.
 

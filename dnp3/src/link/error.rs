@@ -14,9 +14,10 @@ pub enum LogicError {
     BadSize,
 }
 
-/// Errors that can occur when parsing a link-layer frame. On session-oriented transports,
-/// such as TCP/TLS, these errors percolate up to the main master/outstation task and kill
-/// the communication session. On serial, they are just discarded.
+/// Errors that can occur when parsing a link-layer frame. What happens next depends on the
+/// `LinkErrorMode`: with `Close`, these errors percolate up to the main master/outstation task
+/// and close the communication session; with `Discard`, the bad data is discarded. Serial and
+/// UDP always discard.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum FrameError {
     UnexpectedStart1(u8),
