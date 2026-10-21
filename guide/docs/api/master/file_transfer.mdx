@@ -150,9 +150,10 @@ values={[
 </TabItem>
 </Tabs>
 
-:::tip
-There is no need to manually close a file. The master will always attempt to close a file, even if the file operation
-is aborted by the user.
+:::note
+The master closes the file when a read completes, or when your `FileReader` aborts the transfer in `opened`. If the
+transfer stops for any other reason, such as an abort in `block_received`, a timeout or an error, the file is left for the
+outstation to clean up.
 :::
 
 ## Read a Directory
