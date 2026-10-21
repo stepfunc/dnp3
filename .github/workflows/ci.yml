@@ -426,14 +426,32 @@ jobs:
         uses: actions/checkout@v6
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+      - name: Check the tag matches the crate version
+        run: |
+          VERSION=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "dnp3") | .version')
+          if [ "$VERSION" != "${{github.ref_name}}" ]; then
+            echo "❌ tag ${{github.ref_name}} doesn't match the crate version $VERSION"
+            exit 1
+          fi
       - name: Check whether this version is already published
         id: published
         run: |
           VERSION=${{github.ref_name}}
-          if curl -f -s "https://crates.io/api/v1/crates/dnp3/$VERSION" > /dev/null 2>&1; then
-            echo "✅ dnp3 $VERSION already published to crates.io - skipping"
-            echo "skip=true" >> "$GITHUB_OUTPUT"
-          fi
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" --retry 5 --retry-all-errors \
+            -A "stepfunc/dnp3 release workflow" "https://crates.io/api/v1/crates/dnp3/$VERSION")
+          case "$STATUS" in
+            200)
+              echo "✅ dnp3 $VERSION already published to crates.io - skipping"
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              ;;
+            404)
+              echo "Publishing dnp3 $VERSION to crates.io..."
+              ;;
+            *)
+              echo "❌ crates.io returned HTTP $STATUS"
+              exit 1
+              ;;
+          esac
       - name: Authenticate with crates.io
         if: steps.published.outputs.skip != 'true'
         id: auth
