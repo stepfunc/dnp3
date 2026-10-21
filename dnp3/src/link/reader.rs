@@ -77,6 +77,8 @@ pub(crate) struct Reader {
     read_mode: LinkReadMode,
     parser: Parser,
     buffer: ReadBuffer,
+    /// where the data in `buffer` came from, for datagrams that contain more than one frame
+    addr: PhysAddr,
 }
 
 struct ReadBuffer {
@@ -137,6 +139,7 @@ impl Reader {
             read_mode: link_modes.read_mode,
             parser: Parser::new(link_modes.error_mode),
             buffer: ReadBuffer::new(buffer_size),
+            addr: PhysAddr::None,
         }
     }
 
@@ -150,6 +153,7 @@ impl Reader {
     pub(crate) fn reset(&mut self) {
         self.buffer.reset();
         self.parser.reset();
+        self.addr = PhysAddr::None;
     }
 
     /**
@@ -162,15 +166,13 @@ impl Reader {
         payload: &mut FramePayload,
         level: DecodeLevel,
     ) -> Result<(Header, PhysAddr), LinkError> {
-        let mut addr = PhysAddr::None;
-
         loop {
             // how much data is currently in the buffer?
             let length = self.buffer.num_bytes_unread();
 
             if length == 0 {
                 self.buffer.reset();
-                addr = self.read_more_data(io, level).await?;
+                self.addr = self.read_more_data(io, level).await?;
             } else {
                 match self.parse_buffer(payload, level)? {
                     None => {
@@ -181,9 +183,9 @@ impl Reader {
                             self.buffer.reset();
                             self.parser.reset();
                         }
-                        addr = self.read_more_data(io, level).await?;
+                        self.addr = self.read_more_data(io, level).await?;
                     }
-                    Some(header) => return Ok((header, addr)),
+                    Some(header) => return Ok((header, self.addr)),
                 }
             }
         }
@@ -231,5 +233,86 @@ impl Reader {
             // parser can't make progress without more bytes
             None => Ok(None),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::link::test_data::{ACK, RESET_LINK};
+    use crate::udp::layer::UdpLayer;
+
+    async fn bound() -> (PhysLayer, std::net::SocketAddr) {
+        let socket = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        let local = socket.local_addr().unwrap();
+        (PhysLayer::Udp(UdpLayer::bound(socket)), local)
+    }
+
+    async fn sender() -> (tokio::net::UdpSocket, PhysAddr) {
+        let socket = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        let addr = PhysAddr::Udp(socket.local_addr().unwrap());
+        (socket, addr)
+    }
+
+    async fn read(reader: &mut Reader, io: &mut PhysLayer) -> (Header, PhysAddr) {
+        let mut payload = FramePayload::new();
+        reader
+            .read_frame(io, &mut payload, DecodeLevel::nothing())
+            .await
+            .unwrap()
+    }
+
+    fn datagram_reader() -> Reader {
+        Reader::new(LinkModes::datagram(LinkErrorMode::Discard), 2048)
+    }
+
+    #[tokio::test]
+    async fn later_datagram_from_another_sender_has_its_address() {
+        let (mut io, local) = bound().await;
+        let (first, first_addr) = sender().await;
+        let (second, second_addr) = sender().await;
+        first.send_to(RESET_LINK.bytes, local).await.unwrap();
+        second.send_to(ACK.bytes, local).await.unwrap();
+
+        let mut reader = datagram_reader();
+        assert_eq!(
+            read(&mut reader, &mut io).await,
+            (RESET_LINK.header, first_addr)
+        );
+        assert_eq!(read(&mut reader, &mut io).await, (ACK.header, second_addr));
+    }
+
+    #[tokio::test]
+    async fn partial_frame_is_not_joined_with_the_next_datagram() {
+        let (mut io, local) = bound().await;
+        let (first, first_addr) = sender().await;
+        let (second, second_addr) = sender().await;
+        let partial = ACK.bytes.get(..4).unwrap();
+        first
+            .send_to(&[RESET_LINK.bytes, partial].concat(), local)
+            .await
+            .unwrap();
+        second.send_to(ACK.bytes, local).await.unwrap();
+
+        let mut reader = datagram_reader();
+        assert_eq!(
+            read(&mut reader, &mut io).await,
+            (RESET_LINK.header, first_addr)
+        );
+        assert_eq!(read(&mut reader, &mut io).await, (ACK.header, second_addr));
+    }
+
+    #[tokio::test]
+    async fn frames_from_one_datagram_keep_the_sender_address() {
+        let (mut io, local) = bound().await;
+        let (sender, addr) = sender().await;
+        sender
+            .send_to(&[RESET_LINK.bytes, ACK.bytes].concat(), local)
+            .await
+            .unwrap();
+
+        let mut reader = datagram_reader();
+        assert_eq!(read(&mut reader, &mut io).await, (RESET_LINK.header, addr));
+        assert_eq!(read(&mut reader, &mut io).await, (ACK.header, addr));
     }
 }

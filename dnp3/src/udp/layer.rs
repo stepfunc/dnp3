@@ -49,9 +49,13 @@ impl UdpFactory {
 impl UdpLayer {
     async fn bind(local: SocketAddr) -> std::io::Result<Self> {
         let socket = tokio::net::UdpSocket::bind(local).await?;
-        Ok(UdpLayer {
+        Ok(Self::bound(socket))
+    }
+
+    pub(crate) fn bound(socket: tokio::net::UdpSocket) -> Self {
+        UdpLayer {
             inner: UdpType::Bound(socket),
-        })
+        }
     }
 
     async fn connect(local: SocketAddr, remote: SocketAddr) -> std::io::Result<Self> {
