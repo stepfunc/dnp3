@@ -91,8 +91,8 @@ For example, when you receive a log message via a callback, a synchronous call t
 Avoid blocking in callbacks whenever possible. Defer blocking calls to dedicated worker threads, such as a separate thread that writes log messages to file.
 
 :::note
-Binding methods that wait for the runtime to complete an operation, such as enabling or disabling a channel, adding an association or a poll, or changing the
-decode level, can't be called from within a callback. They fail with the `RUNTIME_CANNOT_BLOCK_WITHIN_ASYNC` parameter error.
+Binding methods that wait for the runtime to complete an operation, such as enabling or disabling a channel, adding an association or a poll, or changing an
+outstation's decode level, can't be called from within a callback. They fail with the `RUNTIME_CANNOT_BLOCK_WITHIN_ASYNC` parameter error.
 :::
 
 

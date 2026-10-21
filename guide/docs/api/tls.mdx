@@ -39,8 +39,10 @@ Configure TLS using `TlsClientConfig` or `TlsServerConfig`. In Rust, these are c
 structs. Both contain these parameters:
 
 - `name` (`dns_name` in the bindings):
-  * In `AuthorityBased` mode, both client and server verify the peer's certificate is valid for this name. See the next section for name validation details.
-  * In `AuthorityBased` mode, the client will advertise this name through a Server Name Indication (SNI) extension in the `Client Hello`, unless the name is an IP address.
+  * In `AuthorityBased` mode with a name configured, both client and server verify the peer's certificate is valid for this name. See the next section for name
+    validation details. Name checking can be turned off, in which case the name isn't checked.
+  * In `AuthorityBased` mode with a name configured, the client advertises it through a Server Name Indication (SNI) extension in the `Client Hello`, unless the
+    name is an IP address. No SNI is sent when name checking is turned off.
   * In `SelfSigned` mode, no name is checked or sent as SNI.
 - `peer_cert_path`:
   * Path to the unencrypted PEM file containing the trusted root certificate(s) or the peer self-signed certificate.
