@@ -85,7 +85,7 @@ impl TransportRead for Reader {
     }
 
     async fn read(&mut self, io: &mut PhysLayer, level: DecodeLevel) -> Result<(), LinkError> {
-        if self.assembler.peek().is_some() {
+        if self.peek().is_some() {
             return Ok(());
         }
 
@@ -128,5 +128,212 @@ impl TransportRead for Reader {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use scursor::WriteCursor;
+
+    use super::*;
+    use crate::link::constant::MAX_LINK_FRAME_LENGTH;
+    use crate::link::format::{format_data_frame, format_header_only, Payload};
+
+    const OUTSTATION: EndpointAddress = EndpointAddress::raw(1024);
+    const MASTER: EndpointAddress = EndpointAddress::raw(1);
+
+    fn segment(fir: bool, fin: bool, seq: u8, data: &[u8]) -> Vec<u8> {
+        let header = crate::link::header::Header::unconfirmed_user_data(
+            true,
+            OUTSTATION.wrap(),
+            MASTER.wrap(),
+        );
+        let transport = Header::new(
+            fin,
+            fir,
+            crate::transport::real::sequence::Sequence::new(seq),
+        );
+        let mut buffer = [0; MAX_LINK_FRAME_LENGTH];
+        let mut cursor = WriteCursor::new(&mut buffer);
+        format_data_frame(header, Payload::new(transport.to_u8(), data), &mut cursor)
+            .unwrap()
+            .frame
+            .to_vec()
+    }
+
+    fn header_only(header: crate::link::header::Header) -> Vec<u8> {
+        let mut buffer = [0; MAX_LINK_FRAME_LENGTH];
+        let mut cursor = WriteCursor::new(&mut buffer);
+        format_header_only(header, &mut cursor)
+            .unwrap()
+            .frame
+            .to_vec()
+    }
+
+    fn link_status_request() -> Vec<u8> {
+        header_only(crate::link::header::Header::request_link_status(
+            true, OUTSTATION, MASTER,
+        ))
+    }
+
+    struct Harness {
+        reader: Reader,
+        io: PhysLayer,
+        handle: sfio_tokio_mock_io::Handle,
+    }
+
+    impl Harness {
+        fn new() -> Self {
+            let (io, handle) = sfio_tokio_mock_io::mock();
+            Self {
+                reader: Reader::outstation(LinkModes::test(), OUTSTATION, Feature::Disabled, 2048),
+                io: PhysLayer::Mock(io),
+                handle,
+            }
+        }
+
+        fn queue(&mut self, frames: &[Vec<u8>]) {
+            self.handle.read(&frames.concat());
+        }
+
+        /// true if `read` completed instead of waiting for more data
+        async fn read(&mut self) -> bool {
+            tokio::time::timeout(
+                Duration::from_secs(1),
+                self.reader.read(&mut self.io, DecodeLevel::nothing()),
+            )
+            .await
+            .map(|res| res.unwrap())
+            .is_ok()
+        }
+
+        fn pop(&mut self) -> Option<Item> {
+            self.reader.pop().map(Item::from)
+        }
+
+        fn peek(&self) -> Option<Item> {
+            self.reader.peek().map(Item::from)
+        }
+    }
+
+    #[derive(Debug, PartialEq)]
+    enum Item {
+        Fragment(Vec<u8>),
+        LinkStatusRequest,
+        LinkStatusResponse,
+    }
+
+    impl From<TransportData<'_>> for Item {
+        fn from(data: TransportData<'_>) -> Self {
+            match data {
+                TransportData::Fragment(fragment) => Item::Fragment(fragment.data.to_vec()),
+                TransportData::LinkLayerMessage(msg) => match msg.message {
+                    LinkLayerMessageType::LinkStatusRequest => Item::LinkStatusRequest,
+                    LinkLayerMessageType::LinkStatusResponse => Item::LinkStatusResponse,
+                },
+            }
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn returns_a_fragment_assembled_from_several_segments() {
+        let mut h = Harness::new();
+        h.queue(&[
+            segment(true, false, 0, &[1, 2]),
+            segment(false, true, 1, &[3]),
+        ]);
+        assert!(h.read().await);
+        assert_eq!(h.pop(), Some(Item::Fragment(vec![1, 2, 3])));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn read_returns_at_once_while_a_fragment_is_pending() {
+        let mut h = Harness::new();
+        h.queue(&[segment(true, true, 0, &[1]), segment(true, true, 1, &[2])]);
+        assert!(h.read().await);
+        assert!(h.read().await);
+        assert_eq!(h.pop(), Some(Item::Fragment(vec![1])));
+        assert!(h.read().await);
+        assert_eq!(h.pop(), Some(Item::Fragment(vec![2])));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn read_returns_at_once_while_a_link_layer_message_is_pending() {
+        let mut h = Harness::new();
+        h.queue(&[link_status_request()]);
+        assert!(h.read().await);
+        assert_eq!(h.peek(), Some(Item::LinkStatusRequest));
+        // nothing more to read, so a read that doesn't return at once times out
+        assert!(h.read().await);
+        assert_eq!(h.pop(), Some(Item::LinkStatusRequest));
+        assert_eq!(h.pop(), None);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn pending_link_layer_message_is_not_overwritten_by_the_next() {
+        let mut h = Harness::new();
+        // DIR set, secondary function 11: link status
+        let link_status = header_only(crate::link::header::Header::new(
+            crate::link::header::ControlField::from(0x8B),
+            OUTSTATION.wrap(),
+            MASTER.wrap(),
+        ));
+        h.queue(&[link_status_request(), link_status]);
+        assert!(h.read().await);
+        assert!(h.read().await);
+        assert_eq!(h.pop(), Some(Item::LinkStatusRequest));
+        assert!(h.read().await);
+        assert_eq!(h.pop(), Some(Item::LinkStatusResponse));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn link_layer_message_during_assembly_leaves_the_series() {
+        let mut h = Harness::new();
+        h.queue(&[
+            segment(true, false, 0, &[1]),
+            link_status_request(),
+            segment(false, true, 1, &[2]),
+        ]);
+        assert!(h.read().await);
+        assert_eq!(h.pop(), Some(Item::LinkStatusRequest));
+        assert!(h.read().await);
+        assert_eq!(h.pop(), Some(Item::Fragment(vec![1, 2])));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn segment_with_only_a_transport_header_is_not_passed_up() {
+        let mut h = Harness::new();
+        h.queue(&[segment(true, true, 0, &[]), segment(true, true, 1, &[1])]);
+        assert!(h.read().await);
+        assert_eq!(h.pop(), Some(Item::Fragment(vec![1])));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn data_frame_without_a_transport_header_is_ignored() {
+        let mut h = Harness::new();
+        h.queue(&[
+            header_only(crate::link::header::Header::unconfirmed_user_data(
+                true,
+                OUTSTATION.wrap(),
+                MASTER.wrap(),
+            )),
+            segment(true, true, 0, &[1]),
+        ]);
+        assert!(h.read().await);
+        assert_eq!(h.pop(), Some(Item::Fragment(vec![1])));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn reset_discards_pending_input() {
+        let mut h = Harness::new();
+        h.queue(&[segment(true, false, 0, &[1]), link_status_request()]);
+        assert!(h.read().await);
+        h.reader.reset();
+        assert_eq!(h.pop(), None);
+        h.queue(&[segment(false, true, 1, &[2]), segment(true, true, 2, &[3])]);
+        assert!(h.read().await);
+        assert_eq!(h.pop(), Some(Item::Fragment(vec![3])));
     }
 }
