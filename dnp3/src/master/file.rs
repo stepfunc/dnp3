@@ -5,12 +5,20 @@ use crate::master::TaskError;
 use std::fmt::Debug;
 
 /// Credentials for obtaining a file authorization token from the outstation
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct FileCredentials {
     /// User name
     pub user_name: String,
     /// Password
     pub password: String,
+}
+
+impl Debug for FileCredentials {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("FileCredentials")
+            .field("user_name", &self.user_name)
+            .finish_non_exhaustive()
+    }
 }
 
 /// Information about a file or directory returned from the outstation
@@ -276,8 +284,14 @@ pub trait FileReader: Send + Sync + 'static {
 }
 
 /// Authentication key used when opening a file
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone)]
 pub struct AuthKey(u32);
+
+impl Debug for AuthKey {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("AuthKey").finish_non_exhaustive()
+    }
+}
 
 impl From<AuthKey> for u32 {
     fn from(value: AuthKey) -> Self {

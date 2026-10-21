@@ -138,6 +138,15 @@ fn byte_length(s: &str) -> Result<u16, crate::app::format::Overflow> {
     crate::app::format::to_u16(s.len())
 }
 
+/// a key of zero means no key, so only a nonzero key is a secret
+fn format_auth_key(f: &mut std::fmt::Formatter, key: u32) -> std::fmt::Result {
+    if key == 0 {
+        write!(f, "\nauth key: none")
+    } else {
+        write!(f, "\nauth key: <redacted>")
+    }
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) enum ReadError {
     /// No more data

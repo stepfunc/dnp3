@@ -18,9 +18,8 @@ impl<'a> Group70Var2<'a> {
 
     pub(crate) fn format(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         write!(f, "\nuser name: {}", self.user_name)?;
-        write!(f, "\npassword: {}", self.password)?;
-        write!(f, "\nauth key: {}", self.auth_key)?;
-        Ok(())
+        write!(f, "\npassword: <redacted>")?;
+        format_auth_key(f, self.auth_key)
     }
 
     pub(crate) fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {

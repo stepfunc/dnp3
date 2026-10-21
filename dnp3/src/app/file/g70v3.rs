@@ -32,7 +32,7 @@ impl<'a> Group70Var3<'a> {
             self.time_of_creation.raw_value()
         )?;
         write!(f, "\npermissions: {}", self.permissions)?;
-        write!(f, "\nauth key: {}", self.auth_key)?;
+        format_auth_key(f, self.auth_key)?;
         write!(f, "\nfile size: {}", self.file_size)?;
         write!(f, "\noperational mode: {:?}", self.mode)?;
         write!(f, "\nmax block size: {}", self.max_block_size)?;
