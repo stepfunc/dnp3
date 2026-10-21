@@ -18,6 +18,13 @@ pub struct SerialOutstation {
     task: ProtocolOutstationTask,
 }
 
+#[cfg(feature = "unstable")]
+impl std::fmt::Debug for SerialOutstation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SerialOutstation").finish_non_exhaustive()
+    }
+}
+
 pub(crate) struct OneShotSerialOutstationTask {
     serial: tokio_serial::SerialStream,
     task: ProtocolOutstationTask,
@@ -216,6 +223,6 @@ mod tests {
             "/path/that/does/not/exist/dnp3-test",
             SerialSettings::default(),
         );
-        assert!(result.is_err());
+        result.unwrap_err();
     }
 }

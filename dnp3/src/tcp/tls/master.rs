@@ -27,6 +27,15 @@ pub struct TlsClientConfig {
     config: Arc<rustls::ClientConfig>,
 }
 
+impl std::fmt::Debug for TlsClientConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // the rustls configuration holds key material, so only the server name is shown
+        f.debug_struct("TlsClientConfig")
+            .field("server_name", &self.server_name)
+            .finish_non_exhaustive()
+    }
+}
+
 /// Spawn a task onto the `Tokio` runtime. The task runs until the returned handle, and any
 /// `AssociationHandle` created from it is dropped.
 ///

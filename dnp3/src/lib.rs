@@ -35,7 +35,8 @@
     clippy::let_underscore_future,
     let_underscore_drop,
     clippy::allow_attributes,
-    clippy::allow_attributes_without_reason
+    clippy::allow_attributes_without_reason,
+    missing_debug_implementations
 )]
 
 #[cfg(test)]

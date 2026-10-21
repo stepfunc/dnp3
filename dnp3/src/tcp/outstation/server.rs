@@ -33,6 +33,14 @@ pub struct Server {
     connection_handler: ServerConnectionHandler,
 }
 
+impl std::fmt::Debug for Server {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Server")
+            .field("address", &self.address)
+            .finish_non_exhaustive()
+    }
+}
+
 struct AcceptTask {
     server: Server,
     listener: tokio::net::TcpListener,
@@ -49,6 +57,13 @@ struct AcceptTask {
 #[must_use = "a TcpServerTask does nothing unless you call .run()"]
 pub struct TcpServerTask {
     inner: AcceptTask,
+}
+
+#[cfg(feature = "unstable")]
+impl std::fmt::Debug for TcpServerTask {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("TcpServerTask").finish_non_exhaustive()
+    }
 }
 
 enum ServerConnectionHandler {

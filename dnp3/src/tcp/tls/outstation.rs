@@ -115,6 +115,13 @@ pub struct TlsServerConfig {
     config: Arc<rustls::ServerConfig>,
 }
 
+impl std::fmt::Debug for TlsServerConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // the rustls configuration holds key material, so nothing is shown
+        f.debug_struct("TlsServerConfig").finish_non_exhaustive()
+    }
+}
+
 impl TlsServerConfig {
     /// Legacy method of creating a TLS server configuration
     #[deprecated(
