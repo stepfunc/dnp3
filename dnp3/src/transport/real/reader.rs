@@ -56,7 +56,7 @@ impl Reader {
         }
     }
 
-    pub(crate) fn seed_link(&mut self, seed_data: &[u8]) -> Result<(), scursor::WriteError> {
+    pub(crate) fn seed_link(&mut self, seed_data: &[u8]) -> Result<(), LinkError> {
         self.link.seed(seed_data)
     }
 }

@@ -56,7 +56,7 @@ impl Layer {
         }
     }
 
-    pub(crate) fn seed(&mut self, seed_data: &[u8]) -> Result<(), scursor::WriteError> {
+    pub(crate) fn seed(&mut self, seed_data: &[u8]) -> Result<(), LinkError> {
         self.reader.seed(seed_data)
     }
 

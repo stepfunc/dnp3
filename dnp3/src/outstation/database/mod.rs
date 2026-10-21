@@ -183,14 +183,19 @@ impl EventBufferConfig {
     }
 
     fn max_events(&self) -> usize {
-        self.max_binary as usize
-            + self.max_double_binary as usize
-            + self.max_binary_output_status as usize
-            + self.max_counter as usize
-            + self.max_frozen_counter as usize
-            + self.max_analog as usize
-            + self.max_analog_output_status as usize
-            + self.max_octet_string as usize
+        [
+            self.max_binary,
+            self.max_double_binary,
+            self.max_binary_output_status,
+            self.max_counter,
+            self.max_frozen_counter,
+            self.max_analog,
+            self.max_analog_output_status,
+            self.max_octet_string,
+        ]
+        .into_iter()
+        .map(usize::from)
+        .sum()
     }
 }
 

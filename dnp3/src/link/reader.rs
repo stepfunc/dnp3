@@ -1,6 +1,6 @@
 use crate::decode::DecodeLevel;
 use crate::link::display::LinkDisplay;
-use crate::link::error::LinkError;
+use crate::link::error::{LinkError, LogicError};
 use crate::link::header::Header;
 use crate::link::parser::{FramePayload, Parser};
 use crate::link::{LinkErrorMode, LinkReadMode};
@@ -9,29 +9,16 @@ use crate::util::phys::{PhysAddr, PhysLayer};
 use crate::link;
 use scursor::{ReadCursor, WriteCursor};
 
-/// How many link frames might be required to transport this much application data?
-const fn num_link_frames(fragment_size: usize) -> usize {
-    let full_link_frames = fragment_size / link::constant::MAX_APP_BYTES_PER_FRAME;
-
-    if fragment_size.is_multiple_of(link::constant::MAX_APP_BYTES_PER_FRAME) {
-        full_link_frames
-    } else {
-        full_link_frames + 1
-    }
-}
-
 /// Given a fragment size, how should we size our read buffer
 const fn read_buffer_size(fragment_size: usize) -> usize {
-    let num_frames = num_link_frames(fragment_size);
-
-    let size = if num_frames == 0 {
-        link::constant::MAX_LINK_FRAME_LENGTH
-    } else {
-        num_frames * link::constant::MAX_LINK_FRAME_LENGTH
-    };
+    // the link frames needed to carry a fragment of this size, and at least one
+    let num_frames = fragment_size.div_ceil(link::constant::MAX_APP_BYTES_PER_FRAME);
+    let num_frames = if num_frames == 0 { 1 } else { num_frames };
 
     // we add 1 to this number for transports like UDP to detect under-sized reads
-    size + 1
+    num_frames
+        .saturating_mul(link::constant::MAX_LINK_FRAME_LENGTH)
+        .saturating_add(1)
 }
 
 /// Combines the error and read modes
@@ -81,6 +68,7 @@ pub(crate) struct Reader {
     addr: PhysAddr,
 }
 
+/// Bytes read from the physical layer: `begin..end` is unread, and `begin <= end <= buffer.len()`
 struct ReadBuffer {
     begin: usize,
     end: usize,
@@ -95,26 +83,43 @@ impl ReadBuffer {
             buffer: vec![0; buffer_size].into_boxed_slice(),
         }
     }
-    fn shift_unread_bytes(&mut self) {
+    /// move the unread bytes to the start of the buffer
+    fn shift_unread_bytes(&mut self) -> Result<(), LogicError> {
+        if self.begin > self.end || self.end > self.buffer.len() {
+            return Err(LogicError::BadSize);
+        }
         self.buffer.copy_within(self.begin..self.end, 0);
-        self.end -= self.begin;
+        self.end = self.num_bytes_unread();
         self.begin = 0;
+        Ok(())
     }
 
-    fn writable(&mut self) -> &mut [u8] {
-        self.buffer.get_mut(self.end..).unwrap_or_default()
+    fn writable(&mut self) -> Result<&mut [u8], LogicError> {
+        self.buffer.get_mut(self.end..).ok_or(LogicError::BadSize)
     }
 
-    fn readable(&mut self) -> &[u8] {
-        self.buffer.get(self.begin..self.end).unwrap_or_default()
+    fn readable(&self) -> Result<&[u8], LogicError> {
+        self.buffer
+            .get(self.begin..self.end)
+            .ok_or(LogicError::BadSize)
     }
 
-    fn advance_write(&mut self, count: usize) {
-        self.end += count;
+    fn advance_write(&mut self, count: usize) -> Result<(), LogicError> {
+        self.end = self
+            .end
+            .checked_add(count)
+            .filter(|end| *end <= self.buffer.len())
+            .ok_or(LogicError::BadSize)?;
+        Ok(())
     }
 
-    fn advance_read(&mut self, count: usize) {
-        self.begin += count;
+    fn advance_read(&mut self, count: usize) -> Result<(), LogicError> {
+        self.begin = self
+            .begin
+            .checked_add(count)
+            .filter(|begin| *begin <= self.end)
+            .ok_or(LogicError::BadSize)?;
+        Ok(())
     }
 
     fn is_full(&self) -> bool {
@@ -127,7 +132,7 @@ impl ReadBuffer {
     }
 
     fn num_bytes_unread(&self) -> usize {
-        self.end - self.begin
+        self.end.saturating_sub(self.begin)
     }
 }
 
@@ -143,10 +148,10 @@ impl Reader {
         }
     }
 
-    pub(crate) fn seed(&mut self, seed_data: &[u8]) -> Result<(), scursor::WriteError> {
-        let mut cursor = WriteCursor::new(self.buffer.writable());
+    pub(crate) fn seed(&mut self, seed_data: &[u8]) -> Result<(), LinkError> {
+        let mut cursor = WriteCursor::new(self.buffer.writable()?);
         cursor.write_bytes(seed_data)?;
-        self.buffer.advance_write(seed_data.len());
+        self.buffer.advance_write(seed_data.len())?;
         Ok(())
     }
 
@@ -198,13 +203,13 @@ impl Reader {
     ) -> Result<PhysAddr, LinkError> {
         // if we've consumed all the data, we need to shift contents
         if self.buffer.is_full() {
-            self.buffer.shift_unread_bytes();
+            self.buffer.shift_unread_bytes()?;
         }
 
         // now we can read more data
-        let (count, addr) = io.read(self.buffer.writable(), level.physical).await?;
+        let (count, addr) = io.read(self.buffer.writable()?, level.physical).await?;
 
-        self.buffer.advance_write(count);
+        self.buffer.advance_write(count)?;
         Ok(addr)
     }
 
@@ -215,10 +220,10 @@ impl Reader {
         level: DecodeLevel,
     ) -> Result<Option<Header>, LinkError> {
         // the readable portion of the buffer
-        let mut cursor = ReadCursor::new(self.buffer.readable());
+        let mut cursor = ReadCursor::new(self.buffer.readable()?);
         let result = self.parser.parse(&mut cursor, payload)?;
         let consumed = cursor.position();
-        self.buffer.advance_read(consumed);
+        self.buffer.advance_read(consumed)?;
         match result {
             // complete frame
             Some(header) => {
@@ -239,6 +244,21 @@ impl Reader {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn read_buffer_rejects_advances_past_its_bounds() {
+        let mut buffer = ReadBuffer::new(4);
+
+        assert_eq!(buffer.advance_write(5), Err(LogicError::BadSize));
+        assert_eq!((buffer.begin, buffer.end), (0, 0));
+
+        buffer.advance_write(3).unwrap();
+        assert_eq!(buffer.advance_read(4), Err(LogicError::BadSize));
+        assert_eq!((buffer.begin, buffer.end), (0, 3));
+
+        buffer.advance_read(3).unwrap();
+        assert_eq!(buffer.num_bytes_unread(), 0);
+    }
     use crate::link::test_data::{ACK, RESET_LINK};
     use crate::udp::layer::UdpLayer;
 

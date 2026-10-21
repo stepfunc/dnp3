@@ -102,12 +102,8 @@ impl Iterator for BitIterator<'_> {
             Some(value) => {
                 let value = (*value & (1 << bit)) != 0;
                 let index = self.index;
-                self.pos += 1;
-                if self.pos < self.count {
-                    // protect from overflow
-                    self.index += 1;
-                }
-
+                self.pos = self.pos.saturating_add(1);
+                self.index = self.index.saturating_add(1);
                 Some((value, index))
             }
             None => None,
@@ -115,7 +111,7 @@ impl Iterator for BitIterator<'_> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let count = self.count - self.pos;
+        let count = self.count.saturating_sub(self.pos);
         (count, Some(count))
     }
 }
@@ -129,18 +125,20 @@ impl Iterator for DoubleBitIterator<'_> {
         }
 
         let byte = self.pos / 4;
-        let shift = 2 * (self.pos % 4) as u8; // [0,2,4,6]
+        let shift = match self.pos % 4 {
+            0 => 0,
+            1 => 2,
+            2 => 4,
+            _ => 6,
+        };
 
         match self.bytes.get(byte) {
             Some(x) => {
                 let bits = *x >> shift;
                 let value = DoubleBit::from(bits.bit_1(), bits.bit_0());
                 let index = self.index;
-                self.pos += 1;
-                if self.pos < self.count {
-                    // protect from overflow
-                    self.index += 1;
-                }
+                self.pos = self.pos.saturating_add(1);
+                self.index = self.index.saturating_add(1);
                 Some((value, index))
             }
             None => None,
@@ -148,7 +146,7 @@ impl Iterator for DoubleBitIterator<'_> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        let count = self.count - self.pos;
+        let count = self.count.saturating_sub(self.pos);
         (count, Some(count))
     }
 }

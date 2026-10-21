@@ -74,13 +74,9 @@ impl Timestamp {
     }
 
     pub(crate) fn checked_add(self, x: Duration) -> Option<Timestamp> {
-        // safe from overflow since self.value cannot possibly be larger than MAX
-        let max_add = Self::MAX_VALUE - self.value;
-        let millis = x.as_millis();
-        if millis > max_add as u128 {
-            return None;
-        }
-        Some(Timestamp::new(self.value + millis as u64))
+        let millis: u64 = x.as_millis().try_into().ok()?;
+        let value = self.value.checked_add(millis)?;
+        (value <= Self::MAX_VALUE).then_some(Timestamp::new(value))
     }
 }
 

@@ -66,7 +66,7 @@ impl MasterTask {
         )
     }
 
-    pub(crate) fn seed_link(&mut self, seed_data: &[u8]) -> Result<(), scursor::WriteError> {
+    pub(crate) fn seed_link(&mut self, seed_data: &[u8]) -> Result<(), LinkError> {
         self.reader.seed_link(seed_data)
     }
 }

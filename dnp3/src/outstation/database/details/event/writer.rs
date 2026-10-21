@@ -29,11 +29,12 @@ impl HeaderState {
         }
     }
 
-    fn increment(self) -> Self {
-        Self {
-            count: self.count + 1,
+    /// the state after one more event, or `None` if the count is full
+    fn increment(self) -> Option<Self> {
+        Some(Self {
+            count: self.count.checked_add(1)?,
             ..self
-        }
+        })
     }
 }
 
@@ -115,12 +116,10 @@ impl EventWriter {
                         if current_variation != variation {
                             self.start_new_header(cursor, event, index, variation)
                         } else {
-                            // if we ever wrote this number of events, let's avoid overflow
-                            // this will never happen based on packet/buffer sizes but this
-                            // futures proofs things
-                            if state.count == u16::MAX {
+                            // a header whose count is full needs a new header
+                            let Some(new_state) = state.increment() else {
                                 return self.start_new_header(cursor, event, index, variation);
-                            }
+                            };
 
                             let result: Continue = cursor.transaction(|c| {
                                 current_variation.write(c, event, index, state.cto)
@@ -128,7 +127,6 @@ impl EventWriter {
 
                             match result {
                                 Continue::Ok => {
-                                    let new_state = state.increment();
                                     // write the new count at the count position
                                     cursor.at_pos(state.count_position, |cur| {
                                         cur.write_u16_le(new_state.count)
@@ -574,6 +572,56 @@ mod tests {
                 ]
             );
         }
+    }
+
+    fn write_binary_at(writer: &mut EventWriter, cursor: &mut WriteCursor, time: u64) {
+        let value = BinaryInput::new(true, Flags::ONLINE, Time::synchronized(time));
+        writer
+            .write(cursor, &value, 6, EventBinaryInputVariation::Group2Var3)
+            .unwrap();
+    }
+
+    #[test]
+    fn keeps_the_cto_header_for_the_largest_difference_it_can_encode() {
+        let mut buffer = [0u8; 64];
+        let mut cursor = WriteCursor::new(&mut buffer);
+        let mut writer = EventWriter::new();
+
+        write_binary_at(&mut writer, &mut cursor, 0);
+        write_binary_at(&mut writer, &mut cursor, 65535);
+
+        assert_eq!(
+            cursor.written(),
+            &[
+                // synchronized CTO header
+                51, 1, 0x07, 0x01, 0, 0, 0, 0, 0, 0,
+                // g2v3 (count of 2) with relative timestamps of zero and 65535
+                2, 3, 0x28, 0x02, 0x00, 6, 0, 0x81, 0, 0, 6, 0, 0x81, 0xFF, 0xFF,
+            ]
+        );
+    }
+
+    #[test]
+    fn switches_cto_headers_for_a_time_before_the_cto() {
+        let mut buffer = [0u8; 64];
+        let mut cursor = WriteCursor::new(&mut buffer);
+        let mut writer = EventWriter::new();
+
+        write_binary_at(&mut writer, &mut cursor, 1);
+        write_binary_at(&mut writer, &mut cursor, 0);
+
+        assert_eq!(
+            cursor.written(),
+            &[
+                // synchronized CTO header at 1
+                51, 1, 0x07, 0x01, 1, 0, 0, 0, 0, 0,
+                // g2v3 (count of 1) with relative timestamp of zero
+                2, 3, 0x28, 0x01, 0x00, 6, 0, 0x81, 0, 0, // synchronized CTO header at 0
+                51, 1, 0x07, 0x01, 0, 0, 0, 0, 0, 0,
+                // g2v3 (count of 1) with relative timestamp of zero
+                2, 3, 0x28, 0x01, 0x00, 6, 0, 0x81, 0, 0,
+            ]
+        );
     }
 
     #[test]

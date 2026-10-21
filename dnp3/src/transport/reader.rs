@@ -46,7 +46,7 @@ impl<T: Transport> Drop for RequestGuard<'_, T> {
 }
 
 impl TransportReader<RealTransport> {
-    pub(crate) fn seed_link(&mut self, seed_data: &[u8]) -> Result<(), scursor::WriteError> {
+    pub(crate) fn seed_link(&mut self, seed_data: &[u8]) -> Result<(), LinkError> {
         self.inner.seed_link(seed_data)
     }
 }

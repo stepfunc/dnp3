@@ -234,7 +234,7 @@ impl<C: ConnectionHandler> AcceptTask<C> {
 
     fn next_conn_id(&mut self) -> u64 {
         let ret = self.conn_id;
-        self.conn_id += 1;
+        self.conn_id = self.conn_id.wrapping_add(1);
         ret
     }
 
@@ -435,7 +435,7 @@ async fn read_link_identity(
                 .get_mut(count..)
                 .ok_or_else(|| std::io::Error::other("link header overrun"))?;
             let (num, _) = layer.read(remaining, decode_level).await?;
-            count += num;
+            count = count.saturating_add(num);
             if count == link::constant::LINK_HEADER_LENGTH {
                 return Ok(header);
             }

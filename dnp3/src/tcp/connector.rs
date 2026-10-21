@@ -196,7 +196,7 @@ impl ClientConnectionHandler for SimpleConnectHandler {
                 Err(self.backoff.on_failure())
             }
             Some(x) => {
-                self.next += 1;
+                self.next = self.next.saturating_add(1);
                 let mut info = ConnectionInfo::new(x.clone());
                 if let Some(x) = self.options.timeout {
                     info.set_timeout(x);

@@ -20,9 +20,9 @@ where
         count: u16,
         cursor: &mut ReadCursor<'a>,
     ) -> Result<CountSequence<'a, T>, ReadError> {
-        // this cannot overflow b/c SIZE is [0, 255] and count is [0, 65535]
-        let num_bytes = T::SIZE as usize * count as usize;
-        Ok(Self::new(count as usize, cursor.read_bytes(num_bytes)?))
+        let count = usize::from(count);
+        let num_bytes = usize::from(T::SIZE).checked_mul(count).ok_or(ReadError)?;
+        Ok(Self::new(count, cursor.read_bytes(num_bytes)?))
     }
 
     pub(crate) fn single(&self) -> Option<T> {

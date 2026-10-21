@@ -21,11 +21,7 @@ impl Sequence {
     }
 
     fn calc_next(value: u8) -> u8 {
-        if value == Self::MAX_VALUE {
-            0
-        } else {
-            value + 1
-        }
+        value.wrapping_add(1) & Self::MAX_VALUE
     }
 
     pub(crate) fn next(self) -> u8 {

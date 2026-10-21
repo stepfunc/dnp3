@@ -63,7 +63,9 @@ impl IndexRange {
 
     /// number of indices in the range, or 0 if start > stop
     fn len(&self) -> usize {
-        (usize::from(self.stop) + 1).saturating_sub(usize::from(self.start))
+        usize::from(self.stop)
+            .saturating_add(1)
+            .saturating_sub(usize::from(self.start))
     }
 }
 
@@ -139,7 +141,7 @@ impl SelectionQueue {
 
     fn push_back(&mut self, range: VariationRange) -> bool {
         if self.queue.len() == self.queue.capacity() {
-            self.capacity_exceeded += 1;
+            self.capacity_exceeded = self.capacity_exceeded.saturating_add(1);
             return false;
         }
         self.queue.push_back(range);
@@ -681,27 +683,42 @@ impl StaticDatabase {
 }
 
 pub(crate) struct FlagsDetector;
-pub(crate) struct Deadband<N>
-where
-    N: std::ops::Sub<N, Output = N> + PartialOrd<N>,
-{
+pub(crate) struct Deadband<N> {
     deadband: N,
+}
+
+/// how far apart two values are
+pub(crate) trait Distance: PartialOrd {
+    fn distance(self, other: Self) -> Self;
+}
+
+impl Distance for u32 {
+    fn distance(self, other: Self) -> Self {
+        self.abs_diff(other)
+    }
+}
+
+impl Distance for f64 {
+    fn distance(self, other: Self) -> Self {
+        if self > other {
+            self - other
+        } else {
+            other - self
+        }
+    }
 }
 
 pub(crate) struct OctetStringDetector;
 
-impl<N> Deadband<N>
-where
-    N: std::ops::Sub<N, Output = N> + PartialOrd<N>,
-{
+impl<N> Deadband<N> {
     pub(crate) fn new(value: N) -> Self {
         Self { deadband: value }
     }
+}
 
+impl<N: Distance> Deadband<N> {
     fn exceeded(&self, lhs: N, rhs: N) -> bool {
-        let diff = if lhs > rhs { lhs - rhs } else { rhs - lhs };
-
-        diff > self.deadband
+        lhs.distance(rhs) > self.deadband
     }
 }
 
@@ -754,7 +771,7 @@ impl HasValue<f64> for AnalogOutputStatus {
 impl<T, N> EventDetector<T> for Deadband<N>
 where
     T: Updatable + HasValue<N> + WireFlags,
-    N: std::ops::Sub<N, Output = N> + PartialOrd<N>,
+    N: Distance,
 {
     fn is_event(&self, new: &T, old: &T) -> bool {
         if new.get_wire_flags() != old.get_wire_flags() {
@@ -1036,6 +1053,31 @@ impl Default for AnalogOutputStatus {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn integer_deadband_measures_the_change_in_either_direction() {
+        let deadband = Deadband::new(5u32);
+        assert!(!deadband.exceeded(10, 15));
+        assert!(!deadband.exceeded(15, 10));
+        assert!(deadband.exceeded(10, 16));
+        assert!(deadband.exceeded(16, 10));
+        assert!(deadband.exceeded(0, u32::MAX));
+        assert!(deadband.exceeded(u32::MAX, 0));
+    }
+
+    #[test]
+    fn float_deadband_keeps_ieee_semantics() {
+        let deadband = Deadband::new(1.0f64);
+        assert!(!deadband.exceeded(2.0, 2.5));
+        assert!(deadband.exceeded(-1.0, 1.0));
+        assert!(deadband.exceeded(f64::MAX, f64::MIN));
+        // NaN differences never exceed the deadband
+        assert!(!deadband.exceeded(f64::NAN, 1.0));
+        assert!(!deadband.exceeded(1.0, f64::NAN));
+        // equal infinities differ by NaN
+        assert!(!deadband.exceeded(f64::INFINITY, f64::INFINITY));
+        assert!(deadband.exceeded(f64::INFINITY, 1.0));
+    }
 
     fn binary_config(var: StaticBinaryInputVariation) -> PointConfig<BinaryInput> {
         PointConfig {

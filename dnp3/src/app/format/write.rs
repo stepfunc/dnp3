@@ -117,9 +117,9 @@ impl<'a, 'b> HeaderWriter<'a, 'b> {
 
         let mut count = I::zero();
         for (v, i) in iter {
+            count = count.next().ok_or(scursor::WriteError::NumericOverflow)?;
             i.write(self.cursor)?;
             v.write(self.cursor)?;
-            count.increment();
         }
 
         self.cursor.at_pos(pos_of_count, |cur| count.write(cur))
@@ -158,7 +158,12 @@ impl<'a, 'b> HeaderWriter<'a, 'b> {
         self.cursor.skip(2)?; // come back and write this after
         let object_start = self.cursor.position();
         value.write(self.cursor)?;
-        let length = crate::app::format::to_u16(self.cursor.position() - object_start)?;
+        let length = self
+            .cursor
+            .position()
+            .checked_sub(object_start)
+            .ok_or(crate::app::format::WriteError::Overflow)?;
+        let length = crate::app::format::to_u16(length)?;
         self.cursor
             .at_pos(length_pos, |cur| cur.write_u16_le(length))?;
         Ok(())
@@ -217,6 +222,25 @@ mod test {
         writer.write_all_objects_header(Variation::Group60Var4)?;
         writer.write_all_objects_header(Variation::Group60Var1)?;
         Ok(())
+    }
+
+    #[test]
+    fn prefixed_items_fail_when_the_count_overflows_the_index_type() {
+        let items: Vec<(crate::app::variations::Group41Var2, u8)> = (0..=u8::MAX)
+            .map(|i| (crate::app::variations::Group41Var2::new(513), i))
+            .collect();
+        let mut buffer = [0u8; 2048];
+
+        let mut cursor = WriteCursor::new(&mut buffer);
+        let mut writer = HeaderWriter::new(&mut cursor);
+        assert!(writer.write_prefixed_items(items.iter().take(255)).is_ok());
+
+        let mut cursor = WriteCursor::new(&mut buffer);
+        let mut writer = HeaderWriter::new(&mut cursor);
+        assert_eq!(
+            writer.write_prefixed_items(items.iter()),
+            Err(scursor::WriteError::NumericOverflow)
+        );
     }
 
     #[test]

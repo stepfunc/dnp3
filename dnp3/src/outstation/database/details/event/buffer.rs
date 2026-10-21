@@ -77,7 +77,7 @@ impl Count {
 
     fn subtract(&self, other: &Count) -> Self {
         Self {
-            value: self.value - other.value,
+            value: self.value.saturating_sub(other.value),
         }
     }
 
@@ -90,11 +90,11 @@ impl Count {
     }
 
     fn increment(&mut self) {
-        self.value += 1;
+        self.value = self.value.saturating_add(1);
     }
 
     fn decrement(&mut self) {
-        self.value -= 1;
+        self.value = self.value.saturating_sub(1);
     }
 }
 
@@ -466,7 +466,7 @@ impl EventBuffer {
         }
 
         let id = self.next;
-        self.next += 1;
+        self.next = self.next.wrapping_add(1);
 
         let ret = if T::get_type_count(&self.total.types) == max as usize {
             if let Some(record) = self.events.remove_first(T::is_type) {
@@ -597,7 +597,7 @@ impl EventBuffer {
     }
 
     pub(crate) fn write_events(&mut self, cursor: &mut WriteCursor) -> Result<usize, usize> {
-        let mut count = 0;
+        let mut count: usize = 0;
         let mut writer = EventWriter::new();
         let mut counters = self.written;
         let mut complete = true;
@@ -613,7 +613,7 @@ impl EventBuffer {
 
             counters.increment(record);
             record.state.set(EventState::Written);
-            count += 1;
+            count = count.saturating_add(1);
         }
         self.written = counters;
 
@@ -650,9 +650,9 @@ impl EventBuffer {
             if event.state.get() == EventState::Unselected && classes.matches(event.class) {
                 total.decrement(event);
                 match event.class {
-                    EventClass::Class1 => count.num_class_1 += 1,
-                    EventClass::Class2 => count.num_class_2 += 1,
-                    EventClass::Class3 => count.num_class_3 += 1,
+                    EventClass::Class1 => count.num_class_1 = count.num_class_1.saturating_add(1),
+                    EventClass::Class2 => count.num_class_2 = count.num_class_2.saturating_add(1),
+                    EventClass::Class3 => count.num_class_3 = count.num_class_3.saturating_add(1),
                 }
                 true
             } else {
@@ -709,7 +709,7 @@ impl EventBuffer {
     where
         F: Fn(&EventRecord) -> bool,
     {
-        let mut count = 0;
+        let mut count: usize = 0;
 
         for (_, evt) in self
             .events
@@ -718,7 +718,7 @@ impl EventBuffer {
             .take(limit.unwrap_or(usize::MAX))
         {
             evt.state.set(EventState::Selected);
-            count += 1;
+            count = count.saturating_add(1);
         }
 
         count
