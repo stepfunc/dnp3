@@ -33,6 +33,7 @@ use crate::transport::{
     TransportRequestError, TransportWriter,
 };
 use crate::util::channel::Receiver;
+use crate::util::deadline::deadline;
 use crate::util::phys::PhysLayer;
 
 use crate::app::gen::prefixed::PrefixedVariation;
@@ -306,7 +307,7 @@ impl OutstationSession {
     ) -> Self {
         let next_link_status = config
             .keep_alive_timeout
-            .map(|delay| tokio::time::Instant::now() + delay);
+            .map(|delay| deadline(tokio::time::Instant::now(), delay));
 
         Self {
             enabled: initial_state,
@@ -1947,7 +1948,10 @@ impl OutstationSession {
     }
 
     fn new_unsolicited_retry_deadline(&self) -> tokio::time::Instant {
-        tokio::time::Instant::now() + self.config.unsolicited_retry_delay
+        deadline(
+            tokio::time::Instant::now(),
+            self.config.unsolicited_retry_delay,
+        )
     }
 
     async fn sol_confirm_wait<T: Transport>(
@@ -2139,7 +2143,7 @@ impl OutstationSession {
         self.next_link_status = self
             .config
             .keep_alive_timeout
-            .map(|timeout| tokio::time::Instant::now() + timeout);
+            .map(|timeout| deadline(tokio::time::Instant::now(), timeout));
     }
 }
 
