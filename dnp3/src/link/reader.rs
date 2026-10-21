@@ -172,73 +172,84 @@ impl Reader {
         level: DecodeLevel,
     ) -> Result<(Header, PhysAddr), LinkError> {
         loop {
-            // how much data is currently in the buffer?
-            let length = self.buffer.num_bytes_unread();
-
-            if length == 0 {
-                self.buffer.reset();
-                self.addr = self.read_more_data(io, level).await?;
-            } else {
-                match self.parse_buffer(payload, level)? {
-                    None => {
-                        if self.read_mode == LinkReadMode::Datagram {
-                            // We didn't read a frame this iteration even though there was data in the buffer.
-                            // This means that our datagram didn't contain a complete frame
-                            tracing::warn!("Partial datagram of length {length} did not contain a full link-layer frame. Resetting link-layer parser.");
-                            self.buffer.reset();
-                            self.parser.reset();
-                        }
-                        self.addr = self.read_more_data(io, level).await?;
+            match self.step(payload)? {
+                Step::Frame(header) => {
+                    if level.link.enabled() {
+                        tracing::info!(
+                            "LINK RX - {}",
+                            LinkDisplay::new(header, payload.get(), level.link)
+                        );
                     }
-                    Some(header) => return Ok((header, self.addr)),
+                    return Ok((header, self.addr));
+                }
+                Step::NeedData => {}
+                Step::PartialDatagram(length) => {
+                    tracing::warn!("Partial datagram of length {length} did not contain a full link-layer frame. Resetting link-layer parser.");
                 }
             }
+            let (count, addr) = io.read(self.write_space()?, level.physical).await?;
+            self.wrote(count)?;
+            self.addr = addr;
         }
     }
 
-    pub(crate) async fn read_more_data(
-        &mut self,
-        io: &mut PhysLayer,
-        level: DecodeLevel,
-    ) -> Result<PhysAddr, LinkError> {
-        // if we've consumed all the data, we need to shift contents
-        if self.buffer.is_full() {
-            self.buffer.shift_unread_bytes()?;
+    /// Parse the data in the buffer, and report what happened
+    #[cfg_attr(all(test, dnp3_no_panic), no_panic::no_panic)]
+    pub(crate) fn step(&mut self, payload: &mut FramePayload) -> Result<Step, LinkError> {
+        // how much data is currently in the buffer?
+        let length = self.buffer.num_bytes_unread();
+
+        if length == 0 {
+            self.buffer.reset();
+            return Ok(Step::NeedData);
         }
 
-        // now we can read more data
-        let (count, addr) = io.read(self.buffer.writable()?, level.physical).await?;
-
-        self.buffer.advance_write(count)?;
-        Ok(addr)
-    }
-
-    /// Parse data currently available in the buffer
-    pub(crate) fn parse_buffer(
-        &mut self,
-        payload: &mut FramePayload,
-        level: DecodeLevel,
-    ) -> Result<Option<Header>, LinkError> {
         // the readable portion of the buffer
         let mut cursor = ReadCursor::new(self.buffer.readable()?);
         let result = self.parser.parse(&mut cursor, payload)?;
         let consumed = cursor.position();
         self.buffer.advance_read(consumed)?;
         match result {
-            // complete frame
-            Some(header) => {
-                if level.link.enabled() {
-                    tracing::info!(
-                        "LINK RX - {}",
-                        LinkDisplay::new(header, payload.get(), level.link)
-                    );
+            Some(header) => Ok(Step::Frame(header)),
+            // the parser can't make progress without more bytes
+            None => {
+                if self.read_mode == LinkReadMode::Datagram {
+                    // the datagram didn't contain a complete frame
+                    self.buffer.reset();
+                    self.parser.reset();
+                    Ok(Step::PartialDatagram(length))
+                } else {
+                    Ok(Step::NeedData)
                 }
-                Ok(Some(header))
             }
-            // parser can't make progress without more bytes
-            None => Ok(None),
         }
     }
+
+    /// The space to read more data into, after moving the unread bytes to the start of the
+    /// buffer if it's full
+    #[cfg_attr(all(test, dnp3_no_panic), no_panic::no_panic)]
+    pub(crate) fn write_space(&mut self) -> Result<&mut [u8], LogicError> {
+        if self.buffer.is_full() {
+            self.buffer.shift_unread_bytes()?;
+        }
+        self.buffer.writable()
+    }
+
+    /// Record that `count` bytes were read into [`Self::write_space`]
+    #[cfg_attr(all(test, dnp3_no_panic), no_panic::no_panic)]
+    pub(crate) fn wrote(&mut self, count: usize) -> Result<(), LogicError> {
+        self.buffer.advance_write(count)
+    }
+}
+
+/// What [`Reader::step`] did with the data in the buffer
+pub(crate) enum Step {
+    /// a complete frame
+    Frame(Header),
+    /// more data is needed to make progress
+    NeedData,
+    /// a datagram of this length held no complete frame, so it was discarded
+    PartialDatagram(usize),
 }
 
 #[cfg(test)]
