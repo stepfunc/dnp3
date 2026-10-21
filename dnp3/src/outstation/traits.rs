@@ -113,7 +113,10 @@ pub trait OutstationApplication: Sync + Send + 'static {
     /// Handle a write of the absolute time.
     ///
     /// This is used during time synchronization procedures.
-    #[allow(unused_variables)]
+    #[expect(
+        unused_variables,
+        reason = "the default implementation ignores its arguments"
+    )]
     fn write_absolute_time(&mut self, time: Timestamp) -> Result<(), RequestError> {
         Err(RequestError::NotSupported)
     }
@@ -150,7 +153,10 @@ pub trait OutstationApplication: Sync + Send + 'static {
     }
 
     /// Perform a counter freeze operation
-    #[allow(unused_variables)]
+    #[expect(
+        unused_variables,
+        reason = "the default implementation ignores its arguments"
+    )]
     fn freeze_counter(
         &mut self,
         indices: FreezeIndices,
@@ -182,7 +188,10 @@ pub trait OutstationApplication: Sync + Send + 'static {
     ///
     /// The dead-band is automatically updated in the database. This callback allows application code
     /// to persist the modified value to non-volatile memory if desired
-    #[allow(unused_variables)]
+    #[expect(
+        unused_variables,
+        reason = "the default implementation ignores its arguments"
+    )]
     fn write_analog_dead_band(&mut self, index: u16, dead_band: f64) {}
 
     /// Called when the outstation completes processing a header to write analog dead-bands
@@ -204,7 +213,10 @@ pub trait OutstationApplication: Sync + Send + 'static {
     ///
     /// This method may validate the value and reject the write by returning false. If the method
     /// returns true, then the in memory copy of the attribute will be modified.
-    #[allow(unused_variables)]
+    #[expect(
+        unused_variables,
+        reason = "the default implementation ignores its arguments"
+    )]
     fn write_device_attr(&mut self, attr: Attribute) -> MaybeAsync<bool> {
         MaybeAsync::ready(true)
     }
@@ -214,13 +226,19 @@ pub trait OutstationApplication: Sync + Send + 'static {
     fn begin_confirm(&mut self) {}
 
     /// Called when an event is cleared from the buffer due to master confirmation
-    #[allow(unused_variables)]
+    #[expect(
+        unused_variables,
+        reason = "the default implementation ignores its arguments"
+    )]
     fn event_cleared(&mut self, id: u64) {}
 
     /// Called when all relevant events have been cleared due to confirmation
     ///
     /// * state - number of events remaining in the buffer for Class 1, 2, and 3
-    #[allow(unused_variables)]
+    #[expect(
+        unused_variables,
+        reason = "the default implementation ignores its arguments"
+    )]
     fn end_confirm(&mut self, state: BufferState) -> MaybeAsync<()> {
         MaybeAsync::ready(())
     }

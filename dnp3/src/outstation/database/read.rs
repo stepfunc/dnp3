@@ -20,7 +20,7 @@ pub(crate) enum StaticReadHeader {
     Counter(Option<StaticCounterVariation>, Option<IndexRange>),
     FrozenCounter(Option<StaticFrozenCounterVariation>, Option<IndexRange>),
     Analog(Option<StaticAnalogInputVariation>, Option<IndexRange>),
-    #[allow(dead_code)] // TODO - this can be removed if we support these request
+    #[expect(dead_code, reason = "frozen analog reads are not supported yet")]
     FrozenAnalog(Option<StaticFrozenAnalogInputVariation>, Option<IndexRange>),
     AnalogOutputStatus(
         Option<StaticAnalogOutputStatusVariation>,
@@ -43,7 +43,7 @@ pub(crate) enum EventReadHeader {
     Counter(Option<EventCounterVariation>, Option<usize>),
     FrozenCounter(Option<EventFrozenCounterVariation>, Option<usize>),
     Analog(Option<EventAnalogInputVariation>, Option<usize>),
-    #[allow(dead_code)] // TODO - this can be removed if we support these request
+    #[expect(dead_code, reason = "frozen analog reads are not supported yet")]
     FrozenAnalog(Option<EventFrozenAnalogInputVariation>, Option<usize>),
     AnalogOutputStatus(Option<EventAnalogOutputStatusVariation>, Option<usize>),
     OctetString(Option<usize>),

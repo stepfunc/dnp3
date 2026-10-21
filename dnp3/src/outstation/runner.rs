@@ -34,7 +34,7 @@ impl OutstationTask {
             #[cfg(feature = "serial")]
             OutstationTaskType::Serial(task) => task.run().await,
             OutstationTaskType::Tcp(mut task) => {
-                let _ = task.run().await;
+                let _: Result<(), crate::app::Shutdown> = task.run().await;
             }
         }
     }

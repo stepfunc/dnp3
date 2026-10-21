@@ -1,5 +1,8 @@
 #![doc = include_str!("../README.md")]
-#![cfg_attr(test, allow(dead_code))]
+#![cfg_attr(
+    test,
+    expect(dead_code, reason = "some crate items are only used outside of tests")
+)]
 // deny explicit panic constructs, indexing, unchecked arithmetic and as conversions; clippy.toml
 // allows unwrap, expect, panic and indexing in test code, and test modules that need arithmetic
 // say so
@@ -12,7 +15,27 @@
     clippy::panic,
     clippy::unreachable,
     clippy::todo,
-    clippy::unimplemented
+    clippy::unimplemented,
+    clippy::panic_in_result_fn,
+    clippy::unwrap_in_result,
+    clippy::string_slice,
+    clippy::exit,
+    clippy::mem_forget,
+    clippy::print_stdout,
+    clippy::print_stderr,
+    clippy::dbg_macro,
+    clippy::infinite_loop,
+    clippy::large_futures,
+    clippy::large_stack_arrays,
+    clippy::iter_over_hash_type,
+    clippy::float_cmp,
+    clippy::lossy_float_literal,
+    clippy::assertions_on_result_states,
+    clippy::let_underscore_untyped,
+    clippy::let_underscore_future,
+    let_underscore_drop,
+    clippy::allow_attributes,
+    clippy::allow_attributes_without_reason
 )]
 
 #[cfg(test)]

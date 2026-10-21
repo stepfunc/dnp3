@@ -82,7 +82,7 @@ mod test {
     #[test]
     #[cfg(feature = "serialization")]
     fn deserialization_enforces_min_size() {
-        assert!(serde_json::from_str::<super::BufferSize>("248").is_err());
+        serde_json::from_str::<super::BufferSize>("248").unwrap_err();
         assert_eq!(
             249,
             serde_json::from_str::<super::BufferSize>("249").unwrap().0

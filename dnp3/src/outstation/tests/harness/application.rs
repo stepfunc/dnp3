@@ -26,6 +26,10 @@ impl ApplicationData {
 }
 
 impl MockOutstationApplication {
+    fn data(&self) -> std::sync::MutexGuard<'_, ApplicationData> {
+        self.data.lock().unwrap()
+    }
+
     pub(crate) fn create(
         events: EventSender,
     ) -> (Arc<Mutex<ApplicationData>>, Box<dyn OutstationApplication>) {
@@ -45,13 +49,13 @@ impl OutstationApplication for MockOutstationApplication {
     }
 
     fn cold_restart(&mut self) -> Option<RestartDelay> {
-        let delay = self.data.lock().unwrap().restart_delay;
+        let delay = self.data().restart_delay;
         self.events.send(Event::ColdRestart(delay));
         delay
     }
 
     fn warm_restart(&mut self) -> Option<RestartDelay> {
-        let delay = self.data.lock().unwrap().restart_delay;
+        let delay = self.data().restart_delay;
         self.events.send(Event::WarmRestart(delay));
         delay
     }

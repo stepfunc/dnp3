@@ -233,7 +233,7 @@ mod test {
 
         let mut cursor = WriteCursor::new(&mut buffer);
         let mut writer = HeaderWriter::new(&mut cursor);
-        assert!(writer.write_prefixed_items(items.iter().take(255)).is_ok());
+        writer.write_prefixed_items(items.iter().take(255)).unwrap();
 
         let mut cursor = WriteCursor::new(&mut buffer);
         let mut writer = HeaderWriter::new(&mut cursor);

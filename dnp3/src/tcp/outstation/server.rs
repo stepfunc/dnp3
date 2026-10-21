@@ -124,7 +124,7 @@ impl Server {
         )?;
 
         let future = async move {
-            let _ = adapter.run().await;
+            let _: Result<(), crate::app::Shutdown> = adapter.run().await;
         };
         Ok((handle, future))
     }
@@ -134,7 +134,6 @@ impl Server {
     /// The caller is responsible for running the returned [`crate::outstation::OutstationTask`]
     /// independently from the TCP server task.
     #[cfg(feature = "unstable")]
-    #[allow(clippy::too_many_arguments)]
     pub fn add_outstation_task(
         &mut self,
         config: OutstationConfig,
@@ -156,7 +155,6 @@ impl Server {
         Ok((handle, crate::outstation::OutstationTask::tcp(adapter)))
     }
 
-    #[allow(clippy::too_many_arguments)]
     fn register_outstation(
         &mut self,
         config: OutstationConfig,
@@ -301,7 +299,7 @@ impl Server {
 
         for x in self.outstations.iter_mut() {
             // best effort to shut down outstations before exiting
-            let _ = x.handle.shutdown().await;
+            let _: Result<(), crate::app::Shutdown> = x.handle.shutdown().await;
         }
 
         tracing::info!("shutdown");
@@ -349,7 +347,9 @@ impl Server {
                     tracing::warn!("error from {}: {}", addr, err);
                 }
                 Ok(phys) => {
-                    let _ = x.sender.send(NewSession::new(id, phys)).await;
+                    if x.sender.send(NewSession::new(id, phys)).await.is_err() {
+                        tracing::warn!("outstation is shut down, closing connection from {}", addr);
+                    }
                 }
             },
         }

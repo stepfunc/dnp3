@@ -73,7 +73,10 @@ pub struct ClassZeroConfig {
 
 impl ClassZeroConfig {
     /// construct a `ClassZeroConfig` from its fields
-    #[allow(clippy::too_many_arguments)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "one inclusion flag per static measurement type"
+    )]
     pub fn new(
         binary: bool,
         double_bit_binary: bool,
@@ -159,7 +162,10 @@ impl EventBufferConfig {
     }
 
     /// create a configuration specifying the max for each type individually
-    #[allow(clippy::too_many_arguments)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "the event buffer configuration has a limit per event type"
+    )]
     pub fn new(
         max_binary: u16,
         max_double_binary: u16,

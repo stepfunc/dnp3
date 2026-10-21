@@ -316,9 +316,10 @@ mod tests {
 
     #[test]
     fn float_deadband_clamps_to_the_f32_range() {
-        assert_eq!(g34v3(1.5), 1.5);
-        assert_eq!(g34v3(f64::MAX), f32::MAX);
-        assert_eq!(g34v3(f64::MIN), f32::MIN);
+        // these values are exact, so compare their bits
+        assert_eq!(g34v3(1.5).to_bits(), 1.5f32.to_bits());
+        assert_eq!(g34v3(f64::MAX).to_bits(), f32::MAX.to_bits());
+        assert_eq!(g34v3(f64::MIN).to_bits(), f32::MIN.to_bits());
         assert!(g34v3(f64::NAN).is_nan());
     }
 }

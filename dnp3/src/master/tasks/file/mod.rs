@@ -83,25 +83,20 @@ fn handle_open_response(header: ObjectHeader) -> Result<(u32, FileHandle), FileE
     Ok((obj.file_size, FileHandle::new(obj.file_handle)))
 }
 
-fn process_close_response(header: ObjectHeader) -> Result<(), FileError> {
-    let obj = match header.details {
-        HeaderDetails::TwoByteFreeFormat(1, FreeFormatVariation::Group70Var4(obj)) => obj,
-        _ => {
-            tracing::warn!(
-                "File CLOSE response contains unexpected variation: {}",
-                header.variation
-            );
-            return Err(FileError::BadResponse);
+/// The file was already read, so a CLOSE that fails only gets logged
+fn log_close_response(header: ObjectHeader) {
+    match header.details {
+        HeaderDetails::TwoByteFreeFormat(1, FreeFormatVariation::Group70Var4(obj)) => {
+            if obj.status_code != FileStatus::Success {
+                tracing::warn!(
+                    "Unable to close file (status code == {:?})",
+                    obj.status_code
+                );
+            }
         }
-    };
-
-    if obj.status_code != FileStatus::Success {
-        tracing::warn!(
-            "Unable to close file (status code == {:?})",
-            obj.status_code
-        );
-        return Err(FileError::BadStatus(obj.status_code));
+        _ => tracing::warn!(
+            "File CLOSE response contains unexpected variation: {}",
+            header.variation
+        ),
     }
-
-    Ok(())
 }

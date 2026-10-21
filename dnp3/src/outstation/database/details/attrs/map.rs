@@ -114,7 +114,7 @@ impl SetMap {
         let variation = Variation::create(attr.variation)?;
 
         // ensure that we're using the right types for default attributes
-        let _ = AnyAttribute::try_from(&attr.view())?;
+        let _: AnyAttribute = AnyAttribute::try_from(&attr.view())?;
 
         // constraints that apply to certain items in the default set
         if attr.set == AttrSet::Default && prop.is_writable() && !variation.can_be_written() {

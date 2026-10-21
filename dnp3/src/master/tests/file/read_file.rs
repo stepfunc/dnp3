@@ -31,9 +31,12 @@ struct EventHandle {
 }
 
 impl EventHandle {
+    fn state(&self) -> std::sync::MutexGuard<'_, State> {
+        self.state.lock().unwrap()
+    }
+
     fn pop(&self) -> Option<Event> {
-        let mut state = self.state.lock().unwrap();
-        state.events.pop_front()
+        self.state().events.pop_front()
     }
 }
 

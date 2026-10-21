@@ -42,7 +42,7 @@ mod tests {
 
     #[test]
     fn f32_conversion_rounds_and_saturates() {
-        assert_eq!(f64_to_f32(0.5), 0.5);
-        assert_eq!(f64_to_f32(f64::MAX), f32::INFINITY);
+        assert_eq!(f64_to_f32(0.5).to_bits(), 0.5f32.to_bits());
+        assert_eq!(f64_to_f32(f64::MAX).to_bits(), f32::INFINITY.to_bits());
     }
 }

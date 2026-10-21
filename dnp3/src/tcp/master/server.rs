@@ -107,7 +107,7 @@ pub async fn spawn_master_tcp_server<C: ConnectionHandler>(
 
     let task = async move {
         tracing::info!("accepting connections");
-        let _ = accept_task.run().await;
+        let _: Result<(), crate::app::Shutdown> = accept_task.run().await;
         tracing::info!("shutdown");
     }
     .instrument(tracing::info_span!("master-tcp-server", addr = ?local_addr));
@@ -324,7 +324,10 @@ impl<C: ConnectionHandler> AcceptTask<C> {
         }
     }
 
-    #[allow(clippy::too_many_arguments)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "a session takes each part of its configuration separately"
+    )]
     async fn spawn_session(
         &mut self,
         phys: PhysLayer,
@@ -356,7 +359,7 @@ impl<C: ConnectionHandler> AcceptTask<C> {
         };
 
         let future = async move {
-            let _ = task.run().await;
+            let _: Result<(), crate::app::Shutdown> = task.run().await;
         }
         .instrument(tracing::info_span!("master-session", remote = ?addr, conn = conn_id));
 

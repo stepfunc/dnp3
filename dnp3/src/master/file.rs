@@ -408,7 +408,7 @@ mod tests {
         let mut block = BlockNumber(0x7FFF_FFFE);
         block.set_last();
 
-        assert!(block.increment().is_ok());
+        block.increment().unwrap();
         assert_eq!(block.bottom_bits(), BlockNumber::MAX_VALUE);
         assert!(block.is_last());
 

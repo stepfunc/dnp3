@@ -467,7 +467,7 @@ impl UdpMasterTask {
             factory: UdpFactory::bound(local_endpoint),
             retry_delay: self.retry_delay,
         };
-        let _ = task.run().await;
+        let _: Result<(), crate::app::Shutdown> = task.run().await;
     }
 }
 
@@ -485,7 +485,8 @@ mod tests {
 
     impl<T: Send + Sync + 'static> Listener<T> for ChannelListener<T> {
         fn update(&mut self, value: T) -> MaybeAsync<()> {
-            let _ = self.tx.send(value);
+            // the test may already have stopped listening
+            drop(self.tx.send(value));
             MaybeAsync::ready(())
         }
     }

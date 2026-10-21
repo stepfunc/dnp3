@@ -52,7 +52,10 @@ impl<T: Transport> Drop for SessionTeardown<'_, T> {
 
 impl OutstationTask {
     /// create an `OutstationTask` and return it along with an `OutstationHandle` for controlling it
-    #[allow(clippy::too_many_arguments)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "a task takes each part of its configuration separately"
+    )]
     pub(crate) fn create(
         initial_state: Enabled,
         link_modes: LinkModes,
@@ -86,7 +89,10 @@ impl OutstationTask<crate::transport::mock::MockTransport> {
 impl<T: Transport> OutstationTask<T> {
     /// create an `OutstationTask` over a transport and return it along with an `OutstationHandle`
     /// for controlling it
-    #[allow(clippy::too_many_arguments)]
+    #[expect(
+        clippy::too_many_arguments,
+        reason = "a task takes each part of its configuration separately"
+    )]
     pub(crate) fn with_transport(
         initial_state: Enabled,
         link_modes: LinkModes,

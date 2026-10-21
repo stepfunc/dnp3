@@ -3,7 +3,10 @@ use crate::util::BadWrite;
 /// these errors should never occur, but they are preferable to using
 /// functions that could panic. If they ever were to happen, they indicate
 /// a bug in the library itself
-#[allow(clippy::enum_variant_names)]
+#[expect(
+    clippy::enum_variant_names,
+    reason = "each variant names what went wrong in a bad operation"
+)]
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
 pub enum LogicError {
     BadRead,

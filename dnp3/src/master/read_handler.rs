@@ -3,7 +3,10 @@ use crate::app::measurement::*;
 use crate::app::{MaybeAsync, QualifierCode, ResponseHeader, Timestamp, Variation};
 
 /// Trait used to process measurement data received from an outstation
-#[allow(unused_variables)]
+#[expect(
+    unused_variables,
+    reason = "the default implementations ignore their arguments"
+)]
 pub trait ReadHandler: Send + Sync {
     /// Called as the first action before any of the type-specific handle methods are invoked
     ///
