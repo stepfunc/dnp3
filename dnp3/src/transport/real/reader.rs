@@ -6,7 +6,7 @@ use crate::link::parser::FramePayload;
 use crate::link::reader::LinkModes;
 use crate::link::EndpointAddress;
 use crate::outstation::Feature;
-use crate::transport::real::assembler::{Assembler, AssemblyState};
+use crate::transport::real::assembler::{Assembler, AssemblyState, Discard};
 use crate::transport::real::display::SegmentDisplay;
 use crate::transport::real::header::Header;
 use crate::transport::{LinkLayerMessage, LinkLayerMessageType, TransportData, TransportRead};
@@ -105,8 +105,8 @@ impl TransportRead for Reader {
                             );
                         }
 
-                        if let AssemblyState::Complete = self.assembler.assemble(info, header, data)
-                        {
+                        let state = self.assembler.assemble(info, header, data, Discard::log);
+                        if let AssemblyState::Complete = state {
                             return Ok(());
                         }
                     }

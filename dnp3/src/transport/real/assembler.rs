@@ -1,4 +1,5 @@
 use crate::link::header::FrameInfo;
+use crate::link::EndpointAddress;
 use crate::transport::real::header::Header;
 use crate::transport::{Fragment, FragmentAddr, FragmentInfo};
 
@@ -38,6 +39,67 @@ pub(crate) enum AssemblyState {
 
 struct Overflow;
 
+/// Why the assembler discarded a segment or the series in progress
+#[derive(Copy, Clone, Debug)]
+pub(crate) enum Discard {
+    /// a FIR segment started a new series, dropping the bytes of the one in progress
+    NewSeries { len: usize, source: EndpointAddress },
+    /// a broadcast segment that isn't both FIR and FIN
+    BroadcastSeries { fir: bool, fin: bool },
+    /// a segment that isn't FIR, with no series in progress
+    NoSeries { source: EndpointAddress },
+    /// a segment from a different source or physical address than the series in progress
+    ConflictingAddress {
+        previous: FrameInfo,
+        received: FrameInfo,
+    },
+    /// a repeat of the previous segment, which is ignored
+    Repeat { seq: u8 },
+    /// a segment with the previous segment's sequence number but different contents
+    DifferentRepeat { seq: u8 },
+    /// a segment with an unexpected sequence number
+    UnexpectedSeq { expected: u8, received: u8 },
+    /// a segment that doesn't fit in the fragment buffer
+    Overflow { len: usize },
+}
+
+impl Discard {
+    /// log the reason, which the reader passes to [`Assembler::assemble`]
+    pub(crate) fn log(self) {
+        tracing::warn!("transport: {self}");
+    }
+}
+
+impl std::fmt::Display for Discard {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NewSeries { len, source } => {
+                write!(f, "received FIR - dropping {len} assembled bytes from {source}")
+            }
+            Self::BroadcastSeries { fir, fin } => write!(
+                f,
+                "ignoring broadcast frame with transport header fir: {fir} and fin: {fin}"
+            ),
+            Self::NoSeries { source } => {
+                write!(f, "ignoring non-FIR segment from {source} with no previous FIR")
+            }
+            Self::ConflictingAddress { previous, received } => write!(
+                f,
+                "conflicting addresses, previous segment with {previous:?}, but received {received:?}"
+            ),
+            Self::Repeat { seq } => write!(f, "ignoring repeated segment with seq: {seq}"),
+            Self::DifferentRepeat { seq } => write!(
+                f,
+                "segment with repeated seq: {seq} differs from the previous segment"
+            ),
+            Self::UnexpectedSeq { expected, received } => {
+                write!(f, "expected seq: {expected} but received seq: {received}")
+            }
+            Self::Overflow { len } => write!(f, "buffer overflow with {len} bytes to write"),
+        }
+    }
+}
+
 impl Assembler {
     pub(crate) fn new(max_fragment_size: usize) -> Self {
         Self {
@@ -76,33 +138,34 @@ impl Assembler {
         }
     }
 
-    pub(crate) fn assemble(
+    /// Add a segment, passing the reason to `discard` whenever a segment or the series in
+    /// progress is discarded
+    pub(crate) fn assemble<F: FnMut(Discard)>(
         &mut self,
         info: FrameInfo,
         header: Header,
         data: &[u8],
+        mut discard: F,
     ) -> AssemblyState {
         // FIR always clears the previous assembly
         if header.fir {
             if let State::Running { info, .. } = self.state {
-                tracing::warn!(
-                    "transport: received FIR - dropping {} assembled bytes from {}",
-                    self.len,
-                    info.source
-                );
+                discard(Discard::NewSeries {
+                    len: self.len,
+                    source: info.source,
+                });
             }
             self.abandon();
         }
 
         if info.broadcast.is_some() {
             if header.fir && header.fin {
-                self.append(info, header, data);
+                self.append(info, header, data, &mut discard);
             } else {
-                tracing::warn!(
-                    "ignoring broadcast frame with transport header fir: {} and fin: {}",
-                    header.fir,
-                    header.fin
-                );
+                discard(Discard::BroadcastSeries {
+                    fir: header.fir,
+                    fin: header.fin,
+                });
             }
             return self.assembly_state();
         }
@@ -110,12 +173,11 @@ impl Assembler {
         match self.state {
             State::Idle | State::Complete(_) => {
                 if header.fir {
-                    self.append(info, header, data);
+                    self.append(info, header, data, &mut discard);
                 } else {
-                    tracing::warn!(
-                        "transport: ignoring non-FIR segment from {} with no previous FIR",
-                        info.source
-                    );
+                    discard(Discard::NoSeries {
+                        source: info.source,
+                    });
                 }
             }
             State::Running {
@@ -124,30 +186,33 @@ impl Assembler {
                 last_len,
             } => {
                 if info != previous {
-                    tracing::warn!("transport: conflicting addresses, previous segment with {:?}, but received {:?}", previous, info);
+                    discard(Discard::ConflictingAddress {
+                        previous,
+                        received: info,
+                    });
                     self.abandon();
                 } else if header.seq.value() == last.seq.value() {
                     let repeat = header.to_u8() == last.to_u8()
                         && data.len() == last_len
                         && self.fragment().ends_with(data);
                     if repeat {
-                        tracing::warn!(
-                            "transport: ignoring repeated segment with seq: {}",
-                            header.seq.value()
-                        );
+                        discard(Discard::Repeat {
+                            seq: header.seq.value(),
+                        });
                     } else {
-                        tracing::warn!("transport: segment with repeated seq: {} differs from the previous segment", header.seq.value());
+                        discard(Discard::DifferentRepeat {
+                            seq: header.seq.value(),
+                        });
                         self.abandon();
                     }
                 } else if header.seq.value() != last.seq.next() {
-                    tracing::warn!(
-                        "transport: expected seq: {} but received seq: {}",
-                        last.seq.next(),
-                        header.seq.value()
-                    );
+                    discard(Discard::UnexpectedSeq {
+                        expected: last.seq.next(),
+                        received: header.seq.value(),
+                    });
                     self.abandon();
                 } else {
-                    self.append(info, header, data);
+                    self.append(info, header, data, &mut discard);
                 }
             }
         }
@@ -171,12 +236,15 @@ impl Assembler {
         self.len = 0;
     }
 
-    fn append(&mut self, info: FrameInfo, header: Header, data: &[u8]) {
+    fn append<F: FnMut(Discard)>(
+        &mut self,
+        info: FrameInfo,
+        header: Header,
+        data: &[u8],
+        discard: &mut F,
+    ) {
         if self.extend(data).is_err() {
-            tracing::warn!(
-                "transport buffer overflow with {} bytes to write",
-                data.len()
-            );
+            discard(Discard::Overflow { len: data.len() });
             self.abandon();
             return;
         }
@@ -260,7 +328,7 @@ mod tests {
         fn segment(&mut self, info: FrameInfo, fir: bool, fin: bool, seq: u8, data: &[u8]) -> bool {
             let header = Header::new(fin, fir, Sequence::new(seq));
             matches!(
-                self.assembler.assemble(info, header, data),
+                self.assembler.assemble(info, header, data, |_| {}),
                 AssemblyState::Complete
             )
         }

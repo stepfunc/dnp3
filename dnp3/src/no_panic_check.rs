@@ -1,4 +1,4 @@
-//! Links the parsers into the test binary with input the compiler can't know, so that the
+//! Links the parsers and the transport assembler into the test binary with input the compiler can't know, so that the
 //! functions marked `no_panic` here and in the parsers are checked for every input. The link
 //! fails if the optimizer can't remove every path to a panic from one of them.
 //!
@@ -11,10 +11,14 @@ use crate::app::attr::{AnyAttribute, AttrValue, Attribute, KnownAttribute};
 use crate::app::measurement::*;
 use crate::app::parse::options::ParseOptions;
 use crate::app::parse::parser::{HeaderCollection, ParsedFragment};
+use crate::link::header::{BroadcastConfirmMode, FrameInfo, FrameType};
 use crate::link::parser::{FramePayload, Parser};
-use crate::link::LinkErrorMode;
+use crate::link::{EndpointAddress, LinkErrorMode};
 use crate::master::extract::{extract_header, Extracted};
 use crate::master::{HeaderInfo, ReadHandler};
+use crate::transport::real::assembler::{Assembler, AssemblyState};
+use crate::transport::real::header::Header;
+use crate::util::phys::PhysAddr;
 
 fn input() -> Vec<u8> {
     match std::env::var_os("DNP3_NO_PANIC_INPUT") {
@@ -162,9 +166,57 @@ fn extract(objects: HeaderCollection) {
     }
 }
 
+/// one segment given to the transport assembler, returning the length of a completed fragment
+#[no_panic::no_panic]
+fn assemble(assembler: &mut Assembler, info: FrameInfo, segment: &[u8]) -> usize {
+    if let [transport, data @ ..] = segment {
+        let header = Header::from_u8(*transport);
+        if let AssemblyState::Complete = assembler.assemble(info, header, data, |_| {}) {
+            let peeked = assembler.peek().map_or(0, |fragment| fragment.data.len());
+            return assembler
+                .pop()
+                .map_or(peeked, |fragment| fragment.data.len());
+        }
+    }
+    0
+}
+
+/// segments cut from the input, each with a source, broadcast mode and physical address from
+/// the input
+fn segments(mut data: &[u8]) {
+    let mut assembler = Assembler::new(std::hint::black_box(2048));
+    while let [length, source, flags, rest @ ..] = data {
+        let (segment, next) = rest.split_at(usize::from(*length).min(rest.len()));
+        let broadcast = match flags % 4 {
+            0 => Some(BroadcastConfirmMode::Optional),
+            1 => Some(BroadcastConfirmMode::Mandatory),
+            2 => Some(BroadcastConfirmMode::NotRequired),
+            _ => None,
+        };
+        let phys = if flags & 0x04 == 0 {
+            PhysAddr::None
+        } else {
+            PhysAddr::Udp(std::net::SocketAddr::from((
+                [127, 0, 0, 1],
+                u16::from(flags >> 3),
+            )))
+        };
+        let info = FrameInfo::new(
+            EndpointAddress::raw(u16::from(*source)),
+            broadcast,
+            FrameType::Data,
+            phys,
+        );
+        std::hint::black_box(assemble(&mut assembler, info, segment));
+        data = next;
+    }
+}
+
 #[test]
 fn parsers_with_unknown_input() {
     let data = std::hint::black_box(input());
+
+    segments(&data);
 
     let mut parser = Parser::new(LinkErrorMode::Discard);
     let mut payload = FramePayload::new();
