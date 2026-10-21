@@ -6,6 +6,14 @@ pub struct ServerHandle {
     pub(crate) _token: crate::util::shutdown::ShutdownToken,
 }
 
+impl std::fmt::Debug for ServerHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ServerHandle")
+            .field("addr", &self.addr)
+            .finish_non_exhaustive()
+    }
+}
+
 impl ServerHandle {
     /// Returns the local address to which this server is bound.
     ///

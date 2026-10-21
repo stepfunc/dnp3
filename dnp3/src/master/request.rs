@@ -722,6 +722,14 @@ pub struct CommandHeaders {
     headers: Vec<CommandHeader>,
 }
 
+impl std::fmt::Debug for CommandHeaders {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CommandHeaders")
+            .field("num_headers", &self.headers.len())
+            .finish()
+    }
+}
+
 impl CommandHeaders {
     pub(crate) fn single(header: CommandHeader) -> Self {
         Self {
@@ -760,6 +768,14 @@ impl CommandHeaders {
 pub struct CommandBuilder {
     headers: Vec<CommandHeader>,
     partial: Option<CommandHeader>,
+}
+
+impl std::fmt::Debug for CommandBuilder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("CommandBuilder")
+            .field("num_headers", &self.headers.len())
+            .finish_non_exhaustive()
+    }
 }
 
 /// Trait that provides builder support for a particular command type

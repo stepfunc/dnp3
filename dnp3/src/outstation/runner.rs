@@ -8,6 +8,12 @@ pub struct OutstationTask {
     inner: OutstationTaskType,
 }
 
+impl std::fmt::Debug for OutstationTask {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OutstationTask").finish_non_exhaustive()
+    }
+}
+
 enum OutstationTaskType {
     #[cfg(feature = "serial")]
     Serial(crate::serial::outstation::OneShotSerialOutstationTask),

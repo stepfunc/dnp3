@@ -38,6 +38,14 @@ pub struct MasterBuilder {
     associations: AssociationMap,
 }
 
+impl std::fmt::Debug for MasterBuilder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MasterBuilder")
+            .field("config", &self.config)
+            .finish_non_exhaustive()
+    }
+}
+
 /// Builder for configuring a UDP master task before binding it to a transport.
 ///
 /// Created via [`UdpMasterBuilder::new`]. The returned [`MasterChannel`] can be
@@ -50,6 +58,14 @@ pub struct UdpMasterBuilder {
     config: MasterChannelConfig,
     enabled: Enabled,
     associations: AssociationMap,
+}
+
+impl std::fmt::Debug for UdpMasterBuilder {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("UdpMasterBuilder")
+            .field("config", &self.config)
+            .finish_non_exhaustive()
+    }
 }
 
 /// Builder for configuring an association and its polls before the master task
@@ -65,6 +81,12 @@ pub struct AssociationBuilder<'a> {
     association: &'a mut Association,
 }
 
+impl std::fmt::Debug for AssociationBuilder<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AssociationBuilder").finish_non_exhaustive()
+    }
+}
+
 /// A master task bound to a transport. Call [`run`](Self::run) to execute
 /// the event loop.
 ///
@@ -76,6 +98,12 @@ pub struct AssociationBuilder<'a> {
 #[must_use = "a MasterTask does nothing unless you call .run()"]
 pub struct MasterTask {
     inner: MasterTaskType,
+}
+
+impl std::fmt::Debug for MasterTask {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MasterTask").finish_non_exhaustive()
+    }
 }
 
 enum MasterTaskType {

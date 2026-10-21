@@ -37,6 +37,12 @@ pub struct OutstationHandle {
     sender: Sender<OutstationMessage>,
 }
 
+impl std::fmt::Debug for OutstationHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OutstationHandle").finish_non_exhaustive()
+    }
+}
+
 impl OutstationHandle {
     /// Get a handle to the associated database
     pub fn get_database_handle(&self) -> DatabaseHandle {

@@ -440,7 +440,7 @@ pub trait ControlHandler:
 
 /// Struct with a default implementation of [ControlHandler](crate::outstation::ControlHandler)
 /// that returns that same `CommandStatus` for every operation.
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct DefaultControlHandler {
     status: CommandStatus,
 }

@@ -405,6 +405,12 @@ pub struct Database {
     pub(crate) inner: details::database::Database,
 }
 
+impl std::fmt::Debug for Database {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Database").finish_non_exhaustive()
+    }
+}
+
 impl Database {
     /// Create a database by specified how it will buffer events
     pub(crate) fn new(
@@ -456,6 +462,12 @@ impl Database {
 pub struct DatabaseHandle {
     inner: Arc<Mutex<Database>>,
     notify: Arc<tokio::sync::Notify>,
+}
+
+impl std::fmt::Debug for DatabaseHandle {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("DatabaseHandle").finish_non_exhaustive()
+    }
 }
 
 impl DatabaseHandle {

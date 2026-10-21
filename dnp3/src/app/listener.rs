@@ -7,7 +7,7 @@ pub trait Listener<T>: Send + Sync {
 }
 
 /// Listener that does nothing
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub struct NullListener;
 
 impl NullListener {
