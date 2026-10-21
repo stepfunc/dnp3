@@ -7,7 +7,6 @@ use crate::util::phys::{PhysAddr, PhysLayer};
 
 pub(crate) struct MockReader {
     count: usize,
-    frame_id: u32,
     info: Option<FrameInfo>,
     buffer: Buffer,
 }
@@ -16,7 +15,6 @@ impl MockReader {
     pub(super) fn new(buffer_size: usize) -> Self {
         Self {
             count: 0,
-            frame_id: 0,
             info: None,
             buffer: Buffer::new(buffer_size),
         }
@@ -42,7 +40,7 @@ impl MockReader {
             phys: PhysAddr::None,
         };
         let fragment = Fragment {
-            info: FragmentInfo::new(self.frame_id, addr, info.broadcast),
+            info: FragmentInfo::new(addr, info.broadcast),
             data: self.buffer.get(count).unwrap(),
         };
         Some(fragment)
@@ -76,7 +74,6 @@ impl TransportRead for MockReader {
             )
             .await?;
         self.count = count;
-        self.frame_id = self.frame_id.wrapping_add(1);
         Ok(())
     }
 }

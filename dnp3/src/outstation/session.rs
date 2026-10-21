@@ -182,6 +182,35 @@ enum UnsolicitedState {
     Ready(Option<tokio::time::Instant>),
 }
 
+/// What a request does to the selection, following IEEE 1815-2012 4.4.4 Rule 4 and Table 4-9.
+/// Ending a selection early can only make an OPERATE fail, while keeping one too long could
+/// execute a control, so every request ends it except the few cases that keep it
+enum SelectionAction {
+    /// a CONFIRM, which isn't a request, or a retry of the SELECT
+    Keep,
+    /// a SELECT with the selection's sequence number but different contents
+    Discard,
+    /// any other request, which ends the selection, giving it to an OPERATE to check
+    Take(Option<SelectState>),
+}
+
+/// What processing a non-read request needs to know about the selection
+#[derive(Copy, Clone)]
+struct SelectContext {
+    /// the selection that this request ended
+    previous: Option<SelectState>,
+    /// the request's hash, which a SELECT records to recognize its retry
+    request_hash: u64,
+}
+
+impl SelectContext {
+    /// for requests that can't be a SELECT or OPERATE
+    const NONE: Self = Self {
+        previous: None,
+        request_hash: 0,
+    };
+}
+
 /// state that mutates while the session runs
 struct SessionState {
     restart_iin_asserted: bool,
@@ -741,6 +770,8 @@ impl OutstationSession {
             }
             Some(TransportRequest::Error(from, err)) => {
                 if let Some(seq) = Self::error_response_seq(err) {
+                    // a request with an unknown function code ends the selection
+                    self.state.select = None;
                     self.state.deferred_read.clear();
                     self.write_error_response(io, from, writer, seq, database)
                         .await?;
@@ -749,7 +780,18 @@ impl OutstationSession {
             }
         };
 
-        match self.classify(info, request) {
+        let fragment = self.classify(info, request);
+        let selection = match self.selection_for(
+            &fragment,
+            request.header.function,
+            request.header.control.seq,
+        ) {
+            SelectionAction::Discard => return Ok(UnsolicitedWaitResult::ReadNext),
+            SelectionAction::Keep => None,
+            SelectionAction::Take(selection) => selection,
+        };
+
+        match fragment {
             FragmentType::UnsolicitedConfirm(seq) => {
                 if seq == uns_ecsn {
                     self.state.last_broadcast_type = None;
@@ -775,8 +817,7 @@ impl OutstationSession {
             }
             FragmentType::Broadcast(mode) => {
                 self.state.deferred_read.clear();
-                self.process_broadcast(info.id, database, mode, request)
-                    .await;
+                self.process_broadcast(database, mode, request).await;
                 Ok(UnsolicitedWaitResult::ReadNext)
             }
             FragmentType::MalformedRequest(_, err) => {
@@ -796,12 +837,16 @@ impl OutstationSession {
             }
             FragmentType::NewNonRead(hash, objects) => {
                 self.state.deferred_read.clear();
+                let select = SelectContext {
+                    previous: selection,
+                    request_hash: hash,
+                };
                 let response = self
                     .handle_non_read(
                         database,
                         request.header.function,
                         request.header.control.seq,
-                        info.id,
+                        select,
                         objects,
                     )
                     .await;
@@ -997,6 +1042,8 @@ impl OutstationSession {
             Some(TransportRequest::Error(from, err)) => {
                 self.on_link_activity();
                 if let Some(seq) = Self::error_response_seq(err) {
+                    // a request with an unknown function code ends the selection
+                    self.state.select = None;
                     self.write_error_response(io, from, writer, seq, database)
                         .await?;
                 }
@@ -1013,11 +1060,17 @@ impl OutstationSession {
         request: Request<'_>,
         database: &mut DatabaseHandle,
     ) -> Option<(LastValidRequest, Option<Prepared>)> {
+        let seq = request.header.control.seq;
+        let fragment = self.classify(info, request);
+        let selection = match self.selection_for(&fragment, request.header.function, seq) {
+            SelectionAction::Discard => return None,
+            SelectionAction::Keep => None,
+            SelectionAction::Take(selection) => selection,
+        };
+
         self.info.process_request_from_idle(request.header);
 
-        let seq = request.header.control.seq;
-
-        match self.classify(info, request) {
+        match fragment {
             FragmentType::MalformedRequest(hash, err) => {
                 let response = Prepared::empty_solicited(seq, Iin::default() | Iin2::from(err));
                 Some((LastValidRequest::new(seq, hash, None), Some(response)))
@@ -1031,24 +1084,22 @@ impl OutstationSession {
                 Some((LastValidRequest::new(seq, hash, series), Some(response)))
             }
             FragmentType::NewNonRead(hash, objects) => {
+                let select = SelectContext {
+                    previous: selection,
+                    request_hash: hash,
+                };
                 let response = self
-                    .handle_non_read(database, request.header.function, seq, info.id, objects)
+                    .handle_non_read(database, request.header.function, seq, select, objects)
                     .await;
                 Some((LastValidRequest::new(seq, hash, None), response))
             }
             FragmentType::RepeatNonRead(hash) => {
-                // If we have a pending select, update the sequence number
-                if let Some(select) = &mut self.state.select {
-                    select.update_frame_id(info.id);
-                }
-
                 // per the spec, we just echo the last response
                 let response = self.sol.header().map(Prepared::Stored);
                 Some((LastValidRequest::new(seq, hash, None), response))
             }
             FragmentType::Broadcast(mode) => {
-                self.process_broadcast(info.id, database, mode, request)
-                    .await;
+                self.process_broadcast(database, mode, request).await;
                 None
             }
             FragmentType::SolicitedConfirm(seq) => {
@@ -1143,7 +1194,7 @@ impl OutstationSession {
         database: &mut DatabaseHandle,
         function: FunctionCode,
         seq: Sequence,
-        frame_id: u32,
+        select: SelectContext,
         object_headers: HeaderCollection<'_>,
     ) -> Option<Prepared> {
         let mut result = match function {
@@ -1161,25 +1212,19 @@ impl OutstationSession {
             }
             // controls
             FunctionCode::Select => {
-                self.handle_controls(ControlType::Select, database, seq, frame_id, object_headers)
+                self.handle_controls(ControlType::Select, database, seq, select, object_headers)
                     .await
             }
             FunctionCode::Operate => {
-                self.handle_controls(
-                    ControlType::Operate,
-                    database,
-                    seq,
-                    frame_id,
-                    object_headers,
-                )
-                .await
+                self.handle_controls(ControlType::Operate, database, seq, select, object_headers)
+                    .await
             }
             FunctionCode::DirectOperate => {
                 self.handle_controls(
                     ControlType::DirectOperate,
                     database,
                     seq,
-                    frame_id,
+                    select,
                     object_headers,
                 )
                 .await
@@ -1189,7 +1234,7 @@ impl OutstationSession {
                     ControlType::DirectOperateNoAck,
                     database,
                     seq,
-                    frame_id,
+                    select,
                     object_headers,
                 )
                 .await
@@ -1645,7 +1690,7 @@ impl OutstationSession {
         ct: ControlType,
         database: &mut DatabaseHandle,
         seq: Sequence,
-        frame_id: u32,
+        select: SelectContext,
         object_headers: HeaderCollection<'_>,
     ) -> Option<Prepared> {
         let controls = match ControlCollection::from(object_headers) {
@@ -1670,12 +1715,14 @@ impl OutstationSession {
         }
 
         match ct {
-            ControlType::Select => {
-                Some(self.handle_select(database, seq, frame_id, controls).await)
-            }
-            ControlType::Operate => {
-                Some(self.handle_operate(database, seq, frame_id, controls).await)
-            }
+            ControlType::Select => Some(
+                self.handle_select(database, seq, select.request_hash, controls)
+                    .await,
+            ),
+            ControlType::Operate => Some(
+                self.handle_operate(database, seq, select.previous, controls)
+                    .await,
+            ),
             ControlType::DirectOperate => {
                 Some(self.handle_direct_operate(database, seq, controls).await)
             }
@@ -1690,7 +1737,7 @@ impl OutstationSession {
         &mut self,
         database: &mut DatabaseHandle,
         seq: Sequence,
-        frame_id: u32,
+        request_hash: u64,
         controls: ControlCollection<'_>,
     ) -> Prepared {
         // Handle each select and write the response
@@ -1707,7 +1754,7 @@ impl OutstationSession {
         if let Ok(CommandStatus::Success) = result {
             self.state.select = Some(SelectState::new(
                 seq,
-                frame_id,
+                request_hash,
                 tokio::time::Instant::now(),
                 controls.hash(),
             ))
@@ -1720,17 +1767,13 @@ impl OutstationSession {
         &mut self,
         database: &mut DatabaseHandle,
         seq: Sequence,
-        frame_id: u32,
+        selection: Option<SelectState>,
         controls: ControlCollection<'_>,
     ) -> Prepared {
-        // determine if we have a matching SELECT
-        let matched = self
-            .state
-            .select
+        // the OPERATE has already ended the selection, so it is used at most once
+        let matched = selection
             .ok_or(CommandStatus::NoSelect)
-            .and_then(|s| {
-                s.match_operate(self.config.select_timeout, seq, frame_id, controls.hash())
-            });
+            .and_then(|s| s.match_operate(self.config.select_timeout, seq, controls.hash()));
 
         // Handle each operate and write the response
         let result = match matched {
@@ -1909,22 +1952,18 @@ impl OutstationSession {
 
     async fn process_broadcast(
         &mut self,
-        frame_id: u32,
         database: &mut DatabaseHandle,
         mode: BroadcastConfirmMode,
         request: Request<'_>,
     ) {
         self.state.last_broadcast_type = Some(mode);
-        let action = self
-            .process_broadcast_get_action(frame_id, database, request)
-            .await;
+        let action = self.process_broadcast_get_action(database, request).await;
         self.info
             .broadcast_received(request.header.function, action)
     }
 
     async fn process_broadcast_get_action(
         &mut self,
-        frame_id: u32,
         database: &mut DatabaseHandle,
         request: Request<'_>,
     ) -> BroadcastAction {
@@ -1959,7 +1998,7 @@ impl OutstationSession {
                     ControlType::DirectOperateNoAck,
                     database,
                     seq,
-                    frame_id,
+                    SelectContext::NONE,
                     objects,
                 )
                 .await;
@@ -2130,10 +2169,23 @@ impl OutstationSession {
             None => return ConfirmAction::ContinueWait,
         };
 
-        match self.classify(info, request) {
+        let fragment = self.classify(info, request);
+        if self.is_discarded_select(
+            &fragment,
+            request.header.function,
+            request.header.control.seq,
+        ) {
+            return ConfirmAction::ContinueWait;
+        }
+
+        match fragment {
             FragmentType::MalformedRequest(_, _) => ConfirmAction::NewRequest,
             FragmentType::NewRead(_, _) => ConfirmAction::NewRequest,
-            FragmentType::RepeatRead(_, _) => ConfirmAction::EchoLastResponse(info.addr),
+            FragmentType::RepeatRead(_, _) => {
+                // a request ends the selection; the READ that started this wait already did
+                self.state.select = None;
+                ConfirmAction::EchoLastResponse(info.addr)
+            }
             FragmentType::NewNonRead(_, _) => ConfirmAction::NewRequest,
             // this should never happen, but if it does, new request is probably best course of action
             FragmentType::RepeatNonRead(_) => ConfirmAction::NewRequest,
@@ -2196,6 +2248,52 @@ impl OutstationSession {
         } else {
             FragmentType::NewNonRead(this_hash, object_headers)
         }
+    }
+
+    /// Table 4-9: a SELECT with the selection's sequence number but different contents is discarded
+    fn is_discarded_select(
+        &self,
+        fragment: &FragmentType,
+        function: FunctionCode,
+        seq: Sequence,
+    ) -> bool {
+        let discarded = matches!(fragment, FragmentType::NewNonRead(_, _))
+            && function == FunctionCode::Select
+            && self.state.select.is_some_and(|select| select.seq() == seq);
+        if discarded {
+            tracing::warn!("discarding SELECT that repeats the selection's sequence number with different contents");
+        }
+        discarded
+    }
+
+    /// Decide what a request does to the selection, ending it unless it's kept
+    fn selection_for(
+        &mut self,
+        fragment: &FragmentType,
+        function: FunctionCode,
+        seq: Sequence,
+    ) -> SelectionAction {
+        if self.is_discarded_select(fragment, function, seq) {
+            return SelectionAction::Discard;
+        }
+        match fragment {
+            FragmentType::SolicitedConfirm(_) | FragmentType::UnsolicitedConfirm(_) => {
+                return SelectionAction::Keep
+            }
+            FragmentType::RepeatNonRead(hash) => {
+                if let Some(select) = self.state.select {
+                    if select.request_hash() == *hash {
+                        return SelectionAction::Keep;
+                    }
+                }
+            }
+            FragmentType::MalformedRequest(_, _)
+            | FragmentType::NewRead(_, _)
+            | FragmentType::RepeatRead(_, _)
+            | FragmentType::NewNonRead(_, _)
+            | FragmentType::Broadcast(_) => {}
+        }
+        SelectionAction::Take(self.state.select.take())
     }
 
     fn on_link_activity(&mut self) {
