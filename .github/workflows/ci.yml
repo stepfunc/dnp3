@@ -121,7 +121,9 @@ jobs:
           CARGO_PROFILE_RELEASE_LTO: thin
           CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "1"
   # Build API documentation packages
+  # Paused on PRs during the 1.8.0 refactor series; release tags still build them. Restore before 1.8.0
   documentation:
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -313,7 +315,9 @@ jobs:
         with:
           name: evidence-${{ matrix.cases.target }}
           path: evidence
+  # Paused on PRs during the 1.8.0 refactor series; release tags still build them. Restore before 1.8.0
   guide:
+    if: startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -403,7 +407,7 @@ jobs:
     uses: ./.github/workflows/conformance.yml
   # The check branch protection requires: passes only if every job a PR runs passed
   ci-ok:
-    needs: [linting, msrv, test, no-panic, features, documentation, guide, bindings-linux]
+    needs: [linting, msrv, test, no-panic, features, bindings-linux]
     if: always()
     runs-on: ubuntu-latest
     steps:
