@@ -108,7 +108,7 @@ impl<'a, T> Iterator for ListIterator<'a, T> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let idx = self.current?;
-        let entry = &self.list.storage[idx];
+        let entry = self.list.storage.get(idx)?;
         self.current = entry.metadata.next;
         Some((entry.metadata.create_index(idx), &entry.data))
     }
@@ -145,44 +145,37 @@ impl<T> VecList<T> {
             return None;
         }
 
-        // do we have an entry already?
-        let index: Index = match self.state {
-            Some(current) => {
-                if let Some(idx) = self.free_stack.pop_front() {
-                    self.storage[idx] = Entry::last(self.version, item, Some(current.tail));
+        let entry = match self.state {
+            Some(current) => Entry::last(self.version, item, Some(current.tail)),
+            None => Entry::first(self.version, item),
+        };
 
-                    // update the previous tail
-                    self.storage[current.tail].metadata.next = Some(idx);
-
-                    self.state = Some(current.append(idx));
-                    Index::new(self.version, idx)
-                } else {
-                    let idx = self.storage.len();
-                    self.storage
-                        .push(Entry::last(self.version, item, Some(current.tail)));
-
-                    // update the previous tail
-                    self.storage[current.tail].metadata.next = Some(idx);
-
-                    // set the new tail
-                    self.state = Some(current.append(idx));
-                    Index::new(self.version, idx)
-                }
+        // reuse a free slot, or add one
+        let idx = match self.free_stack.front() {
+            Some(&idx) => {
+                *self.storage.get_mut(idx)? = entry;
+                self.free_stack.pop_front();
+                idx
             }
             None => {
-                if let Some(idx) = self.free_stack.pop_front() {
-                    self.storage[idx] = Entry::first(self.version, item);
-                    self.state = Some(State::single(idx));
-                    Index::new(self.version, idx)
-                } else {
-                    let idx = self.storage.len();
-                    self.storage.push(Entry::first(self.version, item));
-                    self.state = Some(State::single(idx));
-                    Index::new(self.version, idx)
-                }
+                let idx = self.storage.len();
+                self.storage.push(entry);
+                idx
             }
         };
 
+        self.state = Some(match self.state {
+            Some(current) => {
+                // link the previous tail to the new one
+                if let Some(tail) = self.storage.get_mut(current.tail) {
+                    tail.metadata.next = Some(idx);
+                }
+                current.append(idx)
+            }
+            None => State::single(idx),
+        });
+
+        let index = Index::new(self.version, idx);
         self.version = self.version.wrapping_add(1);
         Some(index)
     }
@@ -212,7 +205,9 @@ impl<T> VecList<T> {
 
         loop {
             let (next, entry_to_remove) = {
-                let entry = &self.storage[current];
+                let Some(entry) = self.storage.get(current) else {
+                    return count;
+                };
                 let entry_to_delete = match predicate(&entry.data) {
                     true => Some(entry.create_index(current)),
                     false => None,
@@ -249,7 +244,7 @@ impl<T> VecList<T> {
         let mut current = start;
 
         loop {
-            let entry = &self.storage[current];
+            let entry = self.storage.get(current)?;
             if predicate(&entry.data) {
                 return Some(entry.create_index(current));
             }
@@ -283,12 +278,12 @@ impl<T> VecList<T> {
         // return this index to the free list
         self.free_stack.push_back(index.value);
 
-        if let Some(prev) = metadata.prev {
-            self.storage[prev].metadata.next = metadata.next;
+        if let Some(prev) = metadata.prev.and_then(|i| self.storage.get_mut(i)) {
+            prev.metadata.next = metadata.next;
         }
 
-        if let Some(next) = metadata.next {
-            self.storage[next].metadata.prev = metadata.prev;
+        if let Some(next) = metadata.next.and_then(|i| self.storage.get_mut(i)) {
+            next.metadata.prev = metadata.prev;
         }
 
         // the removed entry's neighbors determine the new ends

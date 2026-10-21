@@ -431,7 +431,9 @@ async fn read_link_identity(
         let mut header = [0; link::constant::LINK_HEADER_LENGTH];
         let mut count = 0;
         loop {
-            let remaining = &mut header[count..link::constant::LINK_HEADER_LENGTH];
+            let remaining = header
+                .get_mut(count..)
+                .ok_or_else(|| std::io::Error::other("link header overrun"))?;
             let (num, _) = layer.read(remaining, decode_level).await?;
             count += num;
             if count == link::constant::LINK_HEADER_LENGTH {

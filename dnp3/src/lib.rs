@@ -1,9 +1,11 @@
 #![doc = include_str!("../README.md")]
 #![cfg_attr(test, allow(dead_code))]
-// deny explicit panic constructs; clippy.toml allows unwrap, expect and panic in test code
+// deny explicit panic constructs and indexing; clippy.toml allows unwrap, expect, panic and
+// indexing in test code
 #![deny(
     clippy::unwrap_used,
     clippy::expect_used,
+    clippy::indexing_slicing,
     clippy::panic,
     clippy::unreachable,
     clippy::todo,
