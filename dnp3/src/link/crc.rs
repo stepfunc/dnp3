@@ -33,6 +33,10 @@ pub(crate) fn calc_crc_with_0564(slice: &[u8]) -> u16 {
     !crc_increment(CRC_OF_0564, slice)
 }
 
+#[expect(
+    clippy::indexing_slicing,
+    reason = "a u8 index is always within the 256-entry table"
+)]
 pub(crate) fn crc_increment(mut acc: u16, slice: &[u8]) -> u16 {
     for byte in slice {
         let index = ((acc as u8) ^ *byte) as usize;

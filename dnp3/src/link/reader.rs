@@ -102,11 +102,11 @@ impl ReadBuffer {
     }
 
     fn writable(&mut self) -> &mut [u8] {
-        self.buffer[self.end..].as_mut()
+        self.buffer.get_mut(self.end..).unwrap_or_default()
     }
 
     fn readable(&mut self) -> &[u8] {
-        self.buffer[self.begin..self.end].as_ref()
+        self.buffer.get(self.begin..self.end).unwrap_or_default()
     }
 
     fn advance_write(&mut self, count: usize) {

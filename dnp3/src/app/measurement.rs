@@ -839,13 +839,15 @@ impl OctetString {
             value: [0u8; Self::MAX_SIZE],
             len: len as u8,
         };
-        result.value[..len].copy_from_slice(value);
+        for (dest, src) in result.value.iter_mut().zip(value) {
+            *dest = *src;
+        }
         Ok(result)
     }
 
     /// Returns the value of the octet string
     pub fn value(&self) -> &[u8] {
-        &self.value[..self.len() as usize]
+        self.value.get(..usize::from(self.len)).unwrap_or_default()
     }
 
     /// Returns the length of the octet string

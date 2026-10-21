@@ -178,9 +178,10 @@ impl SimpleConnectHandler {
 
 impl ClientConnectionHandler for SimpleConnectHandler {
     fn endpoint_span_name(&self) -> String {
-        match &self.endpoints[0].inner {
-            EndpointInner::Address(x) => x.to_string(),
-            EndpointInner::Hostname(x) => x.to_string(),
+        match self.endpoints.first().map(|x| &x.inner) {
+            Some(EndpointInner::Address(x)) => x.to_string(),
+            Some(EndpointInner::Hostname(x)) => x.to_string(),
+            None => String::new(),
         }
     }
 

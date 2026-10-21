@@ -32,7 +32,7 @@ impl FramePayload {
     }
 
     pub(crate) fn get(&self) -> &[u8] {
-        &self.buffer[0..self.length]
+        self.buffer.get(..self.length).unwrap_or_default()
     }
 
     pub(crate) fn push(&mut self, data: &[u8]) -> Result<(), LogicError> {
