@@ -82,6 +82,10 @@ fn spawn_session(task: MockOutstationTask) -> Connected {
 
 // methods available in any connection state
 impl<S> Harness<S> {
+    pub(crate) async fn next_event(&mut self) -> Event {
+        self.events.next().await
+    }
+
     pub(crate) async fn wait_for_events(&mut self, expected: &[Event]) {
         for event in expected {
             let next = self.events.next().await;

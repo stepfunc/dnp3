@@ -690,7 +690,7 @@ where
         };
         writer.write(cursor, item.value.with_status(status), item.index)?;
         ret = ret.first_error(status);
-        *num_controls += 1;
+        *num_controls = num_controls.saturating_add(1);
     }
     Ok(ret)
 }
@@ -723,7 +723,7 @@ where
         };
         writer.write(cursor, item.value.with_status(status), item.index)?;
         ret = ret.first_error(status);
-        *num_controls += 1;
+        *num_controls = num_controls.saturating_add(1);
     }
     Ok(ret)
 }
@@ -747,6 +747,6 @@ fn operate_header_no_ack<I, V>(
                 database,
             );
         }
-        *num_controls += 1;
+        *num_controls = num_controls.saturating_add(1);
     }
 }

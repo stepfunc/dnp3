@@ -458,3 +458,87 @@ async fn direct_operate_no_ack_operates_without_a_response_even_if_it_would_not_
     ));
     harness.expect_no_response();
 }
+
+// 65,535 g41v2 controls (2-byte count and index), then 11 more (1-byte count and index): more
+// controls than a u16 counts
+fn request_with_65546_controls(seq: u8, function: FunctionCode) -> Vec<u8> {
+    let mut request = vec![0xC0 | seq, function.as_u8(), 41, 2, 0x28];
+    request.extend_from_slice(&u16::MAX.to_le_bytes());
+    for index in 0..u16::MAX {
+        request.extend_from_slice(&index.to_le_bytes());
+        request.extend_from_slice(&[0x01, 0x02, 0x00]);
+    }
+    request.extend_from_slice(&[41, 2, 0x17, 11]);
+    for index in 0..11u8 {
+        request.extend_from_slice(&[index, 0x01, 0x02, 0x00]);
+    }
+    request
+}
+
+async fn count_operates(max_controls_per_request: Option<u16>) -> usize {
+    let mut config = get_default_config();
+    config.rx_buffer_size = BufferSize::new(400_000).unwrap();
+    config.max_controls_per_request = max_controls_per_request;
+    let mut harness = new_harness(config);
+
+    harness
+        .send_and_process(&request_with_65546_controls(
+            0,
+            FunctionCode::DirectOperateNoResponse,
+        ))
+        .await;
+
+    assert_eq!(harness.next_event().await, Event::BeginControls);
+    let mut count = 0;
+    loop {
+        match harness.next_event().await {
+            Event::Operate(_, OperateType::DirectOperateNoAck) => count += 1,
+            Event::EndControls => break,
+            x => panic!("unexpected event: {x:?}"),
+        }
+    }
+    harness.expect_no_response();
+    count
+}
+
+#[tokio::test]
+async fn control_limit_holds_past_65535_controls_in_a_request() {
+    assert_eq!(count_operates(Some(10)).await, 10);
+}
+
+#[tokio::test]
+async fn control_limit_of_u16_max_holds_past_65535_controls_in_a_request() {
+    assert_eq!(count_operates(Some(u16::MAX)).await, usize::from(u16::MAX));
+}
+
+#[tokio::test]
+async fn all_controls_operate_without_a_limit() {
+    assert_eq!(count_operates(None).await, 65546);
+}
+
+#[tokio::test]
+async fn control_limit_holds_past_65535_controls_in_a_select_or_direct_operate() {
+    for function in [FunctionCode::Select, FunctionCode::DirectOperate] {
+        let mut config = get_default_config();
+        config.rx_buffer_size = BufferSize::new(400_000).unwrap();
+        config.solicited_buffer_size = BufferSize::new(400_000).unwrap();
+        config.max_controls_per_request = Some(10);
+        let mut harness = new_harness(config);
+
+        harness
+            .send_and_process(&request_with_65546_controls(0, function))
+            .await;
+        harness.expect_write().await;
+
+        assert_eq!(harness.next_event().await, Event::BeginControls);
+        let mut count = 0;
+        loop {
+            match harness.next_event().await {
+                Event::Select(_) | Event::Operate(_, OperateType::DirectOperate) => count += 1,
+                Event::EndControls => break,
+                x => panic!("unexpected event: {x:?}"),
+            }
+        }
+        assert_eq!(count, 10, "{function:?}");
+    }
+}
