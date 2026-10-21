@@ -65,10 +65,7 @@ impl GetFileInfoTask {
         let result = inner(response);
         let ret = match &result {
             Ok(_) => Ok(None),
-            Err(err) => match err {
-                FileError::TaskError(x) => Err(*x),
-                _ => Err(TaskError::UnexpectedResponseHeaders),
-            },
+            Err(err) => Err(TaskError::from(*err)),
         };
         self.promise.complete(result);
         ret

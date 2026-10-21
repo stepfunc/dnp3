@@ -417,7 +417,18 @@ impl NonReadTask {
                 task.complete();
                 None
             }
-            other => Some(other),
+            other @ (Self::Auto(_)
+            | Self::Command(_)
+            | Self::TimeSync(_)
+            | Self::Restart(_)
+            | Self::DeadBands(_)
+            | Self::EmptyResponseTask(_)
+            | Self::FileRead(_)
+            | Self::AuthFile(_)
+            | Self::OpenFile(_)
+            | Self::CloseFile(_)
+            | Self::WriteFileBlock(_)
+            | Self::GetFileInfo(_)) => Some(other),
         }
     }
 }

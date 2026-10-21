@@ -114,7 +114,9 @@ impl TryFrom<u16> for EndpointAddress {
     fn try_from(value: u16) -> Result<Self, Self::Error> {
         match AnyAddress::from(value) {
             AnyAddress::Endpoint(x) => Ok(x),
-            _ => Err(SpecialAddressError { address: value }),
+            AnyAddress::Reserved(_) | AnyAddress::Broadcast(_) | AnyAddress::SelfAddress => {
+                Err(SpecialAddressError { address: value })
+            }
         }
     }
 }

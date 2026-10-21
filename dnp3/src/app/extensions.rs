@@ -196,30 +196,36 @@ impl std::fmt::Display for QualifierCode {
 #[derive(Copy, Clone)]
 pub(crate) struct FunctionInfo {
     pub(crate) objects_allowed: bool,
+    /// responses carry IIN bits after the function code
+    pub(crate) has_iin: bool,
 }
 
 impl FunctionInfo {
     pub(crate) const fn request_with_objects() -> Self {
         Self {
             objects_allowed: true,
+            has_iin: false,
         }
     }
 
     pub(crate) const fn request_by_function_only() -> Self {
         Self {
             objects_allowed: false,
+            has_iin: false,
         }
     }
 
     pub(crate) const fn response() -> Self {
         Self {
             objects_allowed: true,
+            has_iin: true,
         }
     }
 
     pub(crate) const fn confirm() -> Self {
         Self {
             objects_allowed: false,
+            has_iin: false,
         }
     }
 }

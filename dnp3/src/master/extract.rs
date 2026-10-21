@@ -89,7 +89,10 @@ pub(crate) fn extract_measurements_inner(
             HeaderDetails::TwoByteCountAndPrefix(_, var) => {
                 var.extract_measurements_to(cto, handler)
             }
-            _ => false,
+            HeaderDetails::AllObjects(_)
+            | HeaderDetails::OneByteCount(..)
+            | HeaderDetails::TwoByteCount(..)
+            | HeaderDetails::TwoByteFreeFormat(..) => false,
         };
 
         if !handled {

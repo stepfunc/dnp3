@@ -58,7 +58,7 @@ impl Assembler {
                 info,
                 data: self.fragment(),
             }),
-            _ => None,
+            State::Idle | State::Running { .. } => None,
         }
     }
 
@@ -72,7 +72,7 @@ impl Assembler {
                     data: self.fragment(),
                 })
             }
-            _ => None,
+            State::Idle | State::Running { .. } => None,
         }
     }
 
@@ -158,7 +158,7 @@ impl Assembler {
     fn assembly_state(&self) -> AssemblyState {
         match self.state {
             State::Complete(_) => AssemblyState::Complete,
-            _ => AssemblyState::ReadMore,
+            State::Idle | State::Running { .. } => AssemblyState::ReadMore,
         }
     }
 

@@ -177,7 +177,13 @@ impl From<FileError> for TaskError {
     fn from(err: FileError) -> Self {
         match err {
             FileError::TaskError(err) => err,
-            _ => TaskError::UnexpectedResponseHeaders,
+            FileError::BadResponse
+            | FileError::BadStatus(_)
+            | FileError::WrongHandle
+            | FileError::NoPermission
+            | FileError::BadBlockNum
+            | FileError::AbortByUser
+            | FileError::MaxLengthExceeded => TaskError::UnexpectedResponseHeaders,
         }
     }
 }

@@ -1,7 +1,6 @@
 use crate::app::format::write::HeaderWriter;
 use crate::app::format::WriteError;
-use crate::app::parse::free_format::FreeFormatVariation;
-use crate::app::parse::parser::{HeaderDetails, Response};
+use crate::app::parse::parser::Response;
 use crate::app::{FunctionCode, Group70Var2};
 use crate::master::promise::Promise;
 use crate::master::tasks::{AppTask, NonReadTask, Task};
@@ -38,25 +37,7 @@ impl AuthFileTask {
 
     pub(crate) fn handle(self, response: Response<'_>) -> Result<Option<NonReadTask>, TaskError> {
         fn process(response: Response<'_>) -> Result<AuthKey, FileError> {
-            let header = response.objects?.get_only_header()?;
-
-            let obj = match header.details {
-                HeaderDetails::TwoByteFreeFormat(_, FreeFormatVariation::Group70Var2(obj)) => obj,
-                _ => {
-                    tracing::warn!(
-                        "File AUTHENTICATE response contains unexpected variation: {}",
-                        header.variation
-                    );
-                    return Err(FileError::BadResponse);
-                }
-            };
-
-            if obj.auth_key == 0 {
-                tracing::warn!("Outstation returned auth key == 0: no permission to access file");
-                return Err(FileError::NoPermission);
-            }
-
-            Ok(AuthKey::new(obj.auth_key))
+            super::handle_auth_response(response.objects?.get_only_header()?)
         }
 
         let result = process(response);
