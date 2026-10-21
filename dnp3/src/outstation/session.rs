@@ -1693,6 +1693,8 @@ impl OutstationSession {
         select: SelectContext,
         object_headers: HeaderCollection<'_>,
     ) -> Option<Prepared> {
+        // a control object with an unsupported qualifier fails to parse, so this is an object
+        // that the control functions don't support
         let controls = match ControlCollection::from(object_headers) {
             Err(err) => {
                 tracing::warn!(
@@ -1700,9 +1702,9 @@ impl OutstationSession {
                     err.variation,
                     err.qualifier
                 );
-                return ct
-                    .expects_response()
-                    .then(|| Prepared::parameter_error(seq));
+                return ct.expects_response().then(|| {
+                    Prepared::empty_solicited(seq, Iin::default() | Iin2::OBJECT_UNKNOWN)
+                });
             }
             Ok(controls) => controls,
         };

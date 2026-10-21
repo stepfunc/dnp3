@@ -10,6 +10,8 @@ pub(crate) mod layer;
 pub(crate) mod parser;
 pub(crate) mod reader;
 
+pub use error::{FrameError, LinkError, LogicError};
+
 pub(crate) mod constant {
     pub(crate) const START1: u8 = 0x05;
     pub(crate) const START2: u8 = 0x64;

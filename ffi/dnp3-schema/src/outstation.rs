@@ -1452,7 +1452,12 @@ fn define_control_handler(
         .details(select_details_2);
 
     let control_handler = lib
-        .define_interface("control_handler", "Callbacks for handling controls")?
+        .define_interface(
+            "control_handler",
+            doc("Callbacks for handling controls").details(
+                "Return {enum:command_status.not_supported} for an index that doesn't exist. When it's the first control in the request that fails, the response also sets IIN2.2 (parameter error), which TB2016-001 requires for an index that isn't installed.",
+            ),
+        )?
         //------
         .begin_callback("begin_fragment", "Notifies the start of a command fragment")?
         .end_callback()?

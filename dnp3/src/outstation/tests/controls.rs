@@ -359,6 +359,22 @@ async fn select_and_operate_whose_responses_fit_exactly_operate() {
 }
 
 #[tokio::test]
+async fn control_request_with_a_non_control_object_gets_object_unknown() {
+    let mut harness = new_harness(get_default_config());
+
+    // g41v2 at index 7, then g2v1 at index 0 with flags ONLINE
+    let mut request = DIRECT_OPERATE_SEQ0_G41V2.to_vec();
+    request.extend_from_slice(&[2, 1, 0x17, 0x01, 0x00, 0x01]);
+
+    // restart IIN and IIN2.1 OBJECT_UNKNOWN, and no objects
+    harness
+        .test_request_response(&request, &[0xC0, 0x81, 0x80, 0x02])
+        .await;
+
+    harness.check_no_events();
+}
+
+#[tokio::test]
 async fn direct_operate_whose_headers_fit_alone_but_not_together_is_rejected_without_operating() {
     let mut harness = new_harness(config_with_small_response_buffer());
 
@@ -377,7 +393,7 @@ async fn direct_operate_whose_headers_fit_alone_but_not_together_is_rejected_wit
         .test_request_response(&request, &parameter_error_response(0))
         .await;
 
-    harness.check_events(&[]);
+    harness.check_no_events();
 }
 
 #[tokio::test]
@@ -391,7 +407,7 @@ async fn direct_operate_whose_response_does_not_fit_is_rejected_without_operatin
         )
         .await;
 
-    harness.check_events(&[]);
+    harness.check_no_events();
 }
 
 #[tokio::test]
@@ -405,7 +421,7 @@ async fn select_whose_response_does_not_fit_is_rejected_without_selecting() {
         )
         .await;
 
-    harness.check_events(&[]);
+    harness.check_no_events();
 }
 
 #[tokio::test]
@@ -419,7 +435,7 @@ async fn operate_without_select_whose_response_does_not_fit_is_rejected() {
         )
         .await;
 
-    harness.check_events(&[]);
+    harness.check_no_events();
 }
 
 #[tokio::test]
@@ -442,7 +458,7 @@ async fn operate_after_a_different_select_whose_response_does_not_fit_is_rejecte
         )
         .await;
 
-    harness.check_events(&[]);
+    harness.check_no_events();
 }
 
 #[tokio::test]

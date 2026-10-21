@@ -15,6 +15,9 @@ Each `select` or `operate` callback returns a `CommandStatus` enum. The outstati
 the status returned for each control. The library actually builds the response message while making these callbacks. If an `OPERATE` doesn't match a
 prior `SELECT`, no callbacks are made and the same failure status is returned for every control in the message.
 
+Return `NOT_SUPPORTED` for an index that doesn't exist. When it's the first control in the request that fails, the response also sets IIN2.2 (parameter error),
+which TB2016-001 requires for an index that isn't installed.
+
 ## Handling SELECT
 
 The `select*` methods of `ControlHandler` are called when a properly formatted `SELECT` message is received from the master.  Selecting a control
