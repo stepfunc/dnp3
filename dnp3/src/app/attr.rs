@@ -1088,20 +1088,17 @@ impl UInt {
 
 #[derive(Copy, Clone)]
 enum Int {
-    I8(u8),
+    I8(i8),
     I16(i16),
     I32(i32),
 }
 
 impl Int {
-    const I8_RANGE: core::ops::Range<i32> = i8::MIN as i32..i8::MAX as i32;
-    const I16_RANGE: core::ops::Range<i32> = i16::MIN as i32..i16::MAX as i32;
-
     fn new(value: i32) -> Self {
-        if Self::I8_RANGE.contains(&value) {
-            Self::I8(value as u8)
-        } else if Self::I16_RANGE.contains(&value) {
-            Self::I16(value as i16)
+        if let Ok(x) = i8::try_from(value) {
+            Self::I8(x)
+        } else if let Ok(x) = i16::try_from(value) {
+            Self::I16(x)
         } else {
             Self::I32(value)
         }
@@ -1117,7 +1114,7 @@ impl Int {
 
     fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         match self {
-            Self::I8(x) => cursor.write_u8(x),
+            Self::I8(x) => cursor.write_u8(x.cast_unsigned()),
             Self::I16(x) => cursor.write_i16_le(x),
             Self::I32(x) => cursor.write_i32_le(x),
         }
@@ -1765,6 +1762,26 @@ mod test {
             assert!(OwnedAttrValue::SignedInt(value).write(&mut cursor).is_ok());
             let written = cursor.written().to_vec();
             assert_eq!(parse_signed(&written), value, "round trip of {value}");
+        }
+    }
+
+    #[test]
+    fn signed_int_uses_the_smallest_encoding() {
+        for (value, size) in [
+            (-128, 1),
+            (127, 1),
+            (-129, 2),
+            (128, 2),
+            (-32768, 2),
+            (32767, 2),
+            (-32769, 4),
+            (32768, 4),
+        ] {
+            let mut buffer = [0u8; 8];
+            let mut cursor = WriteCursor::new(&mut buffer);
+            assert!(OwnedAttrValue::SignedInt(value).write(&mut cursor).is_ok());
+            // the data type and the length precede the value
+            assert_eq!(cursor.written().len(), 2 + size, "encoding of {value}");
         }
     }
 
