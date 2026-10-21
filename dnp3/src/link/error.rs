@@ -1,42 +1,52 @@
 use crate::util::BadWrite;
 
-/// these errors should never occur, but they are preferable to using
-/// functions that could panic. If they ever were to happen, they indicate
-/// a bug in the library itself
-#[expect(
-    clippy::enum_variant_names,
-    reason = "each variant names what went wrong in a bad operation"
-)]
+/// Errors that should never occur, but are preferable to functions that could panic. If one ever
+/// happens, it indicates a bug in the library itself
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub enum LogicError {
+    /// A read was out of bounds
     BadRead,
+    /// A write was out of bounds
     BadWrite,
+    /// A size was out of bounds
     BadSize,
 }
 
 /// Errors that can occur when parsing a link-layer frame. What happens next depends on the
-/// `LinkErrorMode`: with `Close`, these errors percolate up to the main master/outstation task
-/// and close the communication session; with `Discard`, the bad data is discarded. Serial and
-/// UDP always discard.
+/// [`LinkErrorMode`](crate::link::LinkErrorMode): with `Close`, these errors percolate up to the
+/// main master/outstation task and close the communication session; with `Discard`, the bad data
+/// is discarded. Serial and UDP always discard.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub enum FrameError {
+    /// The first start byte wasn't 0x05
     UnexpectedStart1(u8),
+    /// The second start byte wasn't 0x64
     UnexpectedStart2(u8),
+    /// The length field was less than the minimum of 5
     BadLength(u8),
+    /// The CRC of the frame header didn't match
     BadHeaderCrc,
+    /// The CRC of a block of the frame payload didn't match
     BadBodyCrc,
 }
 
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-pub enum ParseError {
+pub(crate) enum ParseError {
     BadFrame(FrameError),
     BadLogic(LogicError),
 }
 
+/// Errors that end a communication session at the link layer
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[non_exhaustive]
 pub enum LinkError {
+    /// An I/O error on the underlying channel, including the channel closing
     Stdio(std::io::ErrorKind),
+    /// A malformed link-layer frame with [`LinkErrorMode::Close`](crate::link::LinkErrorMode::Close)
     BadFrame(FrameError),
+    /// A bug in the library
     BadLogic(LogicError),
 }
 
@@ -63,7 +73,7 @@ impl std::fmt::Display for FrameError {
             FrameError::BadLength(x) => write!(f, "bad frame length: {x}"),
             FrameError::BadHeaderCrc => f.write_str("bad CRC value in frame header"),
             FrameError::UnexpectedStart1(x) => write!(f, "bad frame start1: {x} != 0x05"),
-            FrameError::UnexpectedStart2(x) => write!(f, "bad frame start1: {x} != 0x64"),
+            FrameError::UnexpectedStart2(x) => write!(f, "bad frame start2: {x} != 0x64"),
         }
     }
 }
