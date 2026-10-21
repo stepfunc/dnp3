@@ -60,7 +60,9 @@ impl TransportRead for MockReader {
         Some(TransportData::Fragment(self.get(count)?))
     }
 
-    fn reset(&mut self) {}
+    fn reset(&mut self) {
+        self.count = 0;
+    }
 
     async fn read(&mut self, io: &mut PhysLayer, level: DecodeLevel) -> Result<(), LinkError> {
         if self.count > 0 {
