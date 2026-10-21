@@ -9,15 +9,18 @@ use crate::master::{HeaderInfo, ReadHandler};
 
 /// Extract measurements from a HeaderCollection, sinking them into
 /// something that implements `MeasurementHandler`
+///
+/// Returns true if the values of any header were passed to the handler
 pub(crate) async fn extract_measurements(
     read_type: ReadType,
     header: ResponseHeader,
     objects: HeaderCollection<'_>,
     handler: &mut dyn ReadHandler,
-) {
+) -> bool {
     handler.begin_fragment(read_type, header).get().await;
-    extract_measurements_inner(objects, handler);
+    let delivered = extract_measurements_inner(objects, handler);
     handler.end_fragment(read_type, header).get().await;
+    delivered
 }
 
 /// Extract measurements from a HeaderCollection, sinking them into
@@ -25,11 +28,12 @@ pub(crate) async fn extract_measurements(
 pub(crate) fn extract_measurements_inner(
     objects: HeaderCollection<'_>,
     handler: &mut dyn ReadHandler,
-) {
+) -> bool {
+    let mut delivered = false;
     let mut cto = None;
     for header in objects.iter() {
         match extract_header(&header, cto, handler) {
-            Extracted::Handled => {}
+            Extracted::Handled => delivered |= has_objects(&header.details),
             Extracted::Cto(x) => cto = x,
             Extracted::Ignored => {
                 tracing::warn!(
@@ -38,6 +42,22 @@ pub(crate) fn extract_measurements_inner(
                     &header.details.qualifier()
                 );
             }
+        }
+    }
+    delivered
+}
+
+/// True if the header carries at least one object
+fn has_objects(details: &HeaderDetails) -> bool {
+    match details {
+        HeaderDetails::AllObjects(_) => false,
+        // a range covers at least one index
+        HeaderDetails::OneByteStartStop(..) | HeaderDetails::TwoByteStartStop(..) => true,
+        HeaderDetails::OneByteCount(count, _)
+        | HeaderDetails::OneByteCountAndPrefix(count, _)
+        | HeaderDetails::TwoByteFreeFormat(count, _) => *count > 0,
+        HeaderDetails::TwoByteCount(count, _) | HeaderDetails::TwoByteCountAndPrefix(count, _) => {
+            *count > 0
         }
     }
 }

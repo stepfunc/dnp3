@@ -2,7 +2,7 @@ use tracing::Instrument;
 
 use crate::app::format::write;
 use crate::app::parse::parser::Response;
-use crate::app::{BufferSize, ControlField, Sequence};
+use crate::app::{BufferSize, ControlField, Iin, Iin1, Iin2, Sequence};
 use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
 use crate::link::EndpointAddress;
@@ -139,6 +139,40 @@ struct MasterSession {
     associations: AssociationMap,
     messages: Receiver<Message>,
     tx_buffer: Buffer,
+}
+
+/// What the fragments of a read reported and delivered, which decides its outcome when it completes
+#[derive(Default)]
+struct ReadOutcome {
+    /// the IIN2.0, IIN2.1 and IIN2.2 bits of every fragment
+    errors: Iin2,
+    /// the IIN1 bits of the last fragment
+    iin1: Iin1,
+    /// true if any fragment delivered measurements to the handler
+    delivered: bool,
+}
+
+impl ReadOutcome {
+    fn add(&mut self, iin: Iin, delivered: bool) {
+        self.errors |= iin.bad_request_errors();
+        self.iin1 = iin.iin1;
+        self.delivered |= delivered;
+    }
+
+    /// A read with errors still succeeds if it delivered data, or if it's an automatic task
+    fn result(&self, task: &ReadTask) -> Result<(), TaskError> {
+        if self.errors == Iin2::default() {
+            return Ok(());
+        }
+        if self.delivered || !task.fails_without_data() {
+            tracing::warn!(
+                "read completed, but the outstation reported: {}",
+                self.errors
+            );
+            return Ok(());
+        }
+        Err(TaskError::RejectedByIin2(Iin::new(self.iin1, self.errors)))
+    }
 }
 
 enum ReadResponseAction {
@@ -601,6 +635,7 @@ impl MasterSession {
     ) -> Result<Sequence, TaskError> {
         let mut seq = self.send_request(io, dest, task, writer).await?;
         let mut is_first = true;
+        let mut outcome = ReadOutcome::default();
 
         // read responses until we get a FIN or an error occurs
         loop {
@@ -618,12 +653,12 @@ impl MasterSession {
                         match reader.pop_response() {
                             Some(TransportResponse::Response(addr, response)) => {
                                 self.notify_link_activity(addr.link);
-                                let action = self.process_read_response(dest, is_first, seq, task, io, writer, addr, response).await?;
+                                let action = self.process_read_response(dest, is_first, seq, task, &mut outcome, io, writer, addr, response).await?;
                                 match action {
                                     // continue reading responses on the inner loop
                                     ReadResponseAction::Ignore => continue,
                                     // read task complete
-                                    ReadResponseAction::Complete => return Ok(seq),
+                                    ReadResponseAction::Complete => return outcome.result(task).map(|()| seq),
                                     // break to the outer loop and read another response
                                     ReadResponseAction::ReadNext => {
                                         is_first = false;
@@ -655,6 +690,7 @@ impl MasterSession {
         is_first: bool,
         seq: Sequence,
         task: &mut ReadTask,
+        outcome: &mut ReadOutcome,
         io: &mut PhysLayer,
         writer: &mut TransportWriter<T>,
         source: FragmentAddr,
@@ -698,14 +734,13 @@ impl MasterSession {
             return Err(TaskError::NonFinWithoutCon);
         }
 
-        if response.header.iin.has_bad_request_error() {
-            return Err(TaskError::RejectedByIin2(response.header.iin));
-        }
-
+        // a response with IIN2 errors is still processed, and the errors decide the outcome at the end
         let association = self.associations.get_mut(destination.link)?;
         association.process_iin(response.header.iin);
-        task.process_response(association, response.header, response.objects?)
+        let delivered = task
+            .process_response(association, response.header, response.objects?)
             .await;
+        outcome.add(response.header.iin, delivered);
 
         if response.header.control.con {
             self.confirm_solicited(io, destination, seq, writer).await?;

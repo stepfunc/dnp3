@@ -82,7 +82,7 @@ async fn master_startup_procedure() {
 }
 
 #[tokio::test]
-async fn master_calls_task_fail_when_auto_tasks_returns_iin2_errors() {
+async fn startup_continues_when_auto_tasks_return_iin2_errors() {
     let config = AssociationConfig::default();
     let mut seq = Sequence::default();
     let mut harness = create_association(config).await;
@@ -123,6 +123,7 @@ async fn master_calls_task_fail_when_auto_tasks_returns_iin2_errors() {
 
     let iin = Iin::new(Iin1::default(), Iin2::PARAMETER_ERROR);
 
+    // a read with IIN2 errors and no data still completes the integrity scan, so startup continues
     harness
         .expect_write_and_respond(
             integrity_poll_request(seq),
@@ -133,22 +134,17 @@ async fn master_calls_task_fail_when_auto_tasks_returns_iin2_errors() {
     assert_eq!(
         harness.assoc_events.pop().as_slice(),
         &[
-            AssocInfoEvent::TaskFailure(TaskType::StartupIntegrity, TaskError::RejectedByIin2(iin),) // the master will NOT start another task right away if the integrity poll fails
+            AssocInfoEvent::TaskSuccess(
+                TaskType::StartupIntegrity,
+                FunctionCode::Read,
+                Sequence::new(1)
+            ),
+            AssocInfoEvent::TaskStart(
+                TaskType::EnableUnsolicited,
+                FunctionCode::EnableUnsolicited,
+                Sequence::new(2)
+            ),
         ]
-    );
-
-    // auto advance time
-    tokio::time::pause();
-
-    harness.expect_write(integrity_poll_request(seq)).await;
-
-    assert_eq!(
-        harness.assoc_events.pop().as_slice(),
-        &[AssocInfoEvent::TaskStart(
-            TaskType::StartupIntegrity,
-            FunctionCode::Read,
-            Sequence::new(2)
-        )]
     );
 }
 
