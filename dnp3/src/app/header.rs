@@ -483,6 +483,11 @@ impl Iin {
         })
     }
 
+    /// The IIN2.0, IIN2.1 and IIN2.2 bits, which report a problem with the request
+    pub(crate) fn bad_request_errors(self) -> Iin2 {
+        Iin2::new(self.iin2.value & (BIT_0.value | BIT_1.value | BIT_2.value))
+    }
+
     pub(crate) fn has_bad_request_error(self) -> bool {
         self.iin2.get_no_func_code_support()
             || self.iin2.get_object_unknown()

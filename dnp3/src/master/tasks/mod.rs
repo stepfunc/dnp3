@@ -255,12 +255,13 @@ impl ReadTask {
         Task::App(AppTask::Read(self))
     }
 
+    /// Pass the response's measurements to the handler, returning true if any were delivered
     pub(crate) async fn process_response(
         &mut self,
         association: &mut Association,
         header: ResponseHeader,
         objects: HeaderCollection<'_>,
-    ) {
+    ) -> bool {
         match self {
             ReadTask::StartupIntegrity(_) => {
                 association.handle_integrity_response(header, objects).await
@@ -278,6 +279,16 @@ impl ReadTask {
                 }
                 None => association.handle_read_response(header, objects).await,
             },
+        }
+    }
+
+    /// True if the read fails when the outstation reports an error and delivers no data. The
+    /// automatic tasks complete regardless, because retrying can't change the outstation's answer,
+    /// and their retry backoff would hold up polling
+    pub(crate) fn fails_without_data(&self) -> bool {
+        match self {
+            Self::SingleRead(_) | Self::PeriodicPoll(_) => true,
+            Self::StartupIntegrity(_) | Self::EventScan(_) => false,
         }
     }
 
