@@ -164,8 +164,10 @@ impl From<OutstationConfig> for SessionConfig {
 impl From<OutstationConfig> for SessionParameters {
     fn from(x: OutstationConfig) -> Self {
         SessionParameters {
+            // the same minimum the database enforces for READs that aren't deferred
             max_read_headers_per_request: x
                 .max_read_request_headers
+                .map(|x| x.max(OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS))
                 .unwrap_or(OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS),
             sol_tx_buffer_size: x.solicited_buffer_size,
             unsol_tx_buffer_size: x.unsolicited_buffer_size,

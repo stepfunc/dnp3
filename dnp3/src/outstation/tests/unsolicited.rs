@@ -265,6 +265,57 @@ async fn deferred_read_of_type_without_points_sets_object_unknown() {
 }
 
 #[tokio::test]
+async fn deferred_read_of_object_that_cannot_be_read_sets_object_unknown() {
+    let mut harness = new_harness(get_default_unsolicited_config());
+    confirm_null_unsolicited(&mut harness).await;
+    enable_unsolicited(&mut harness).await;
+
+    generate_binary_event(&mut harness.handle.database);
+    harness.expect_response(UNSOL_G2V1_SEQ1).await;
+    harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
+    // send a read of g13v1, which can't be read, that will be deferred
+    harness.send_and_process(&[0xC0, 0x01, 13, 1, 0x06]).await;
+    harness.check_no_events();
+
+    // expire the unsolicited response
+    tokio::time::pause();
+    harness
+        .wait_for_events(&[Event::UnsolicitedConfirmTimeout(1, false)])
+        .await;
+    // the class 1 event is still pending, and IIN2.1 (OBJECT_UNKNOWN)
+    harness.expect_response(&[0xC0, 0x81, 0x82, 0x02]).await;
+    harness.check_no_events();
+}
+
+#[tokio::test]
+async fn deferred_read_with_more_headers_than_the_limit_sets_parameter_error() {
+    let mut harness = new_harness(get_default_unsolicited_config());
+    confirm_null_unsolicited(&mut harness).await;
+    enable_unsolicited(&mut harness).await;
+
+    generate_binary_event(&mut harness.handle.database);
+    harness.expect_response(UNSOL_G2V1_SEQ1).await;
+    harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
+    // a read of class 0 in one more header than the default limit, which will be deferred
+    let mut request = vec![0xC0, 0x01];
+    for _ in 0..=OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS {
+        request.extend_from_slice(&[60, 1, 0x06]);
+    }
+    harness.send_and_process(&request).await;
+    harness.check_no_events();
+
+    // expire the unsolicited response
+    tokio::time::pause();
+    harness
+        .wait_for_events(&[Event::UnsolicitedConfirmTimeout(1, false)])
+        .await;
+    // the class 1 event is still pending, and IIN2.2 (PARAMETER_ERROR), ahead of the binary point
+    let response = harness.expect_write().await;
+    assert_eq!(response.get(..4), Some([0xC0, 0x81, 0x82, 0x04].as_slice()));
+    harness.check_no_events();
+}
+
+#[tokio::test]
 async fn handles_non_read_during_unsolicited_confirm_wait() {
     let mut harness = new_harness(get_default_unsolicited_config());
     confirm_null_unsolicited(&mut harness).await;
