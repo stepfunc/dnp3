@@ -118,7 +118,12 @@ fn format_frame<'a>(
             if payload.app_data.len() > constant::MAX_APP_BYTES_PER_FRAME {
                 return Err(BadWrite);
             }
-            payload.app_data.len() as u8 + constant::MIN_HEADER_LENGTH_VALUE + 1
+            // the header fields, the transport header, and the data
+            u8::try_from(payload.app_data.len())
+                .ok()
+                .and_then(|len| len.checked_add(constant::MIN_HEADER_LENGTH_VALUE))
+                .and_then(|len| len.checked_add(1))
+                .ok_or(BadWrite)?
         }
         None => constant::MIN_HEADER_LENGTH_VALUE,
     };

@@ -89,14 +89,13 @@ impl RetryCounter {
     fn decrement(&mut self) -> bool {
         match self.retries {
             None => true,
-            Some(x) => {
-                if x == 0 {
-                    false
-                } else {
-                    self.retries = Some(x - 1);
+            Some(x) => match x.checked_sub(1) {
+                Some(remaining) => {
+                    self.retries = Some(remaining);
                     true
                 }
-            }
+                None => false,
+            },
         }
     }
 }

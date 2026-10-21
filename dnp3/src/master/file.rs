@@ -354,13 +354,13 @@ impl BlockNumber {
     /// is returned as an error.
     pub fn increment(&mut self) -> Result<(), FailedBlockIncrement> {
         let top_bit = self.0 & Self::TOP_BIT;
-        let bottom_bits = self.bottom_bits();
-        if bottom_bits < Self::MAX_VALUE {
-            self.0 = (self.bottom_bits() + 1) | top_bit;
-            Ok(())
-        } else {
-            Err(FailedBlockIncrement)
-        }
+        let next = self
+            .bottom_bits()
+            .checked_add(1)
+            .filter(|x| *x <= Self::MAX_VALUE)
+            .ok_or(FailedBlockIncrement)?;
+        self.0 = next | top_bit;
+        Ok(())
     }
 
     /// Constructor used only in FFI mode
@@ -397,4 +397,24 @@ pub struct OpenFile {
     /// The master must respect this parameter when writing data to a file or
     /// the transfer may not succeed
     pub max_block_size: u16,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn block_number_increments_to_the_maximum_and_keeps_the_last_flag() {
+        let mut block = BlockNumber(0x7FFF_FFFE);
+        block.set_last();
+
+        assert!(block.increment().is_ok());
+        assert_eq!(block.bottom_bits(), BlockNumber::MAX_VALUE);
+        assert!(block.is_last());
+
+        // past the maximum it fails and keeps its value
+        assert!(block.increment().is_err());
+        assert_eq!(block.bottom_bits(), BlockNumber::MAX_VALUE);
+        assert!(block.is_last());
+    }
 }

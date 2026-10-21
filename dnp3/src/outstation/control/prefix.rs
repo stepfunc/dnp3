@@ -63,7 +63,7 @@ where
                 }
             }
             Some(s) => State {
-                count: s.count.next(),
+                count: s.count.next().ok_or(WriteError::NumericOverflow)?,
                 count_pos: s.count_pos,
             },
         };

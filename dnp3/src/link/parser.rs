@@ -36,10 +36,16 @@ impl FramePayload {
     }
 
     pub(crate) fn push(&mut self, data: &[u8]) -> Result<(), LogicError> {
+        let end = self
+            .length
+            .checked_add(data.len())
+            .ok_or(LogicError::BadSize)?;
         let mut buff = self.buffer.as_mut();
-        let dest = buff.np_get_mut(self.length..self.length + data.len())?;
-        dest.copy_from_slice(data);
-        self.length += data.len();
+        let dest = buff.np_get_mut(self.length..end)?;
+        for (dest, src) in dest.iter_mut().zip(data) {
+            *dest = *src;
+        }
+        self.length = end;
         Ok(())
     }
 }
@@ -136,15 +142,15 @@ impl Parser {
         }
     }
 
+    /// the data and CRC bytes that follow the header, for a frame with this much data
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "a u8 of data needs at most 255 data bytes plus 32 CRC bytes"
+    )]
     fn calc_trailer_length(data_length: u8) -> usize {
-        let div16: usize = data_length as usize / constant::MAX_BLOCK_SIZE;
-        let mod16: usize = data_length as usize % constant::MAX_BLOCK_SIZE;
-
-        if mod16 == 0 {
-            div16 * constant::MAX_BLOCK_SIZE_WITH_CRC
-        } else {
-            (div16 * constant::MAX_BLOCK_SIZE_WITH_CRC) + mod16 + constant::CRC_LENGTH
-        }
+        let data_length = usize::from(data_length);
+        let blocks = data_length.div_ceil(constant::MAX_BLOCK_SIZE);
+        data_length + blocks * constant::CRC_LENGTH
     }
 
     fn parse_sync1(&mut self, cursor: &mut ReadCursor) -> Result<(), ParseError> {
@@ -194,16 +200,17 @@ impl Parser {
             AnyAddress::from(cursor.read_u16_le()?),
         );
 
-        if len < 5 {
+        // the length counts the control and address fields, then the data
+        let Some(data_length) = len.checked_sub(5) else {
             return Err(FrameError::BadLength(len).into());
-        }
+        };
 
         let expected_crc = super::crc::calc_crc_with_0564(crc_bytes);
         if crc_value != expected_crc {
             return Err(FrameError::BadHeaderCrc.into());
         }
 
-        let trailer_length = Self::calc_trailer_length(len - 5); // ok b/c len >= 5 above
+        let trailer_length = Self::calc_trailer_length(data_length);
 
         self.state = ParseState::ReadBody(header, trailer_length);
         Ok(())
@@ -223,13 +230,11 @@ impl Parser {
 
         let body = cursor.read_bytes(trailer_length)?;
 
-        for block in body.chunks(18) {
-            if block.len() < 3 {
-                // can't be a valid block
+        for block in body.chunks(constant::MAX_BLOCK_SIZE_WITH_CRC) {
+            // a block holds at least one byte of data before its CRC
+            let Some(data_len) = block.len().checked_sub(2).filter(|n| *n > 0) else {
                 return Err(LogicError::BadSize.into());
-            }
-
-            let data_len = block.len() - 2;
+            };
 
             let (data, crc) = block.np_split_at(data_len)?;
             let crc_value = ReadCursor::new(crc).read_u16_le()?;

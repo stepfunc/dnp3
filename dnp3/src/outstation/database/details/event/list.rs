@@ -76,12 +76,12 @@ impl State {
         State { head, tail, size }
     }
 
-    fn append(&self, new_tail: usize) -> State {
-        Self {
+    fn append(&self, new_tail: usize) -> Option<State> {
+        Some(Self {
             head: self.head,
             tail: new_tail,
-            size: self.size + 1,
-        }
+            size: self.size.checked_add(1)?,
+        })
     }
 
     fn single(index: usize) -> State {
@@ -145,35 +145,31 @@ impl<T> VecList<T> {
             return None;
         }
 
-        let entry = match self.state {
-            Some(current) => Entry::last(self.version, item, Some(current.tail)),
-            None => Entry::first(self.version, item),
+        // reuse a free slot, or add one
+        let reused = self.free_stack.front().copied();
+        let idx = reused.unwrap_or(self.storage.len());
+
+        let (entry, state) = match self.state {
+            Some(current) => (
+                Entry::last(self.version, item, Some(current.tail)),
+                current.append(idx)?,
+            ),
+            None => (Entry::first(self.version, item), State::single(idx)),
         };
 
-        // reuse a free slot, or add one
-        let idx = match self.free_stack.front() {
-            Some(&idx) => {
+        match reused {
+            Some(idx) => {
                 *self.storage.get_mut(idx)? = entry;
                 self.free_stack.pop_front();
-                idx
             }
-            None => {
-                let idx = self.storage.len();
-                self.storage.push(entry);
-                idx
-            }
-        };
+            None => self.storage.push(entry),
+        }
 
-        self.state = Some(match self.state {
-            Some(current) => {
-                // link the previous tail to the new one
-                if let Some(tail) = self.storage.get_mut(current.tail) {
-                    tail.metadata.next = Some(idx);
-                }
-                current.append(idx)
-            }
-            None => State::single(idx),
-        });
+        // link the previous tail to the new one
+        if let Some(tail) = self.state.and_then(|x| self.storage.get_mut(x.tail)) {
+            tail.metadata.next = Some(idx);
+        }
+        self.state = Some(state);
 
         let index = Index::new(self.version, idx);
         self.version = self.version.wrapping_add(1);
@@ -197,7 +193,7 @@ impl<T> VecList<T> {
     where
         F: FnMut(&T) -> bool,
     {
-        let mut count = 0;
+        let mut count: usize = 0;
         let mut current = match self.state {
             None => return count,
             Some(x) => x.head,
@@ -216,8 +212,9 @@ impl<T> VecList<T> {
             };
 
             if let Some(index) = entry_to_remove {
-                self.remove_at(index);
-                count += 1;
+                if self.remove_at(index) {
+                    count = count.saturating_add(1);
+                }
             }
 
             match next {
@@ -254,26 +251,34 @@ impl<T> VecList<T> {
     }
 
     pub(crate) fn remove_at(&mut self, index: Index) -> bool {
-        let current = match self.state {
-            None => return false,
-            Some(x) => x,
+        let Some(current) = self.state else {
+            return false;
         };
 
-        let metadata = match self.storage.get_mut(index.value) {
-            None => return false,
-            Some(x) => {
-                if x.is_free {
-                    // already free
-                    return false;
-                }
-                if x.metadata.version != index.version {
-                    // bad version
-                    return false;
-                }
-                x.is_free = true;
-                x.metadata
-            }
+        // the entry must be in use, with the same version
+        let metadata = match self.storage.get(index.value) {
+            Some(x) if !x.is_free && x.metadata.version == index.version => x.metadata,
+            _ => return false,
         };
+
+        // the removed entry's neighbors determine the new ends
+        let Some(size) = current.size.checked_sub(1) else {
+            return false;
+        };
+        let state = match (metadata.prev, metadata.next) {
+            // it was the only entry
+            (None, None) => None,
+            // it was the tail
+            (Some(prev), None) => Some(State::new(current.head, prev, size)),
+            // it was the head
+            (None, Some(next)) => Some(State::new(next, current.tail, size)),
+            // it was in the middle
+            (Some(_), Some(_)) => Some(State::new(current.head, current.tail, size)),
+        };
+
+        if let Some(entry) = self.storage.get_mut(index.value) {
+            entry.is_free = true;
+        }
 
         // return this index to the free list
         self.free_stack.push_back(index.value);
@@ -286,17 +291,7 @@ impl<T> VecList<T> {
             next.metadata.prev = metadata.prev;
         }
 
-        // the removed entry's neighbors determine the new ends
-        self.state = match (metadata.prev, metadata.next) {
-            // it was the only entry
-            (None, None) => None,
-            // it was the tail
-            (Some(prev), None) => Some(State::new(current.head, prev, current.size - 1)),
-            // it was the head
-            (None, Some(next)) => Some(State::new(next, current.tail, current.size - 1)),
-            // it was in the middle
-            (Some(_), Some(_)) => Some(State::new(current.head, current.tail, current.size - 1)),
-        };
+        self.state = state;
         true
     }
 }
@@ -351,6 +346,10 @@ mod tests {
         assert!(!list.remove_at(Index::new(index.version + 1, index.value)));
     }
 
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "the model picks entries and counts them"
+    )]
     mod model {
         use super::*;
 

@@ -79,10 +79,15 @@ impl<'a> RangedBytesSequence<'a> {
             return Err(ObjectParseError::ZeroLengthOctetData);
         }
 
+        let size = usize::from(variation);
+        let num_bytes = size
+            .checked_mul(count)
+            .ok_or(ObjectParseError::InsufficientBytes)?;
+
         Ok(RangedBytesSequence {
-            bytes: cursor.read_bytes(variation as usize * count)?,
+            bytes: cursor.read_bytes(num_bytes)?,
             index,
-            size: variation as usize,
+            size,
             count,
         })
     }
@@ -111,12 +116,17 @@ where
             return Err(ObjectParseError::ZeroLengthOctetData);
         }
 
-        let size = (variation as usize + T::SIZE as usize) * count as usize;
+        let size = usize::from(variation);
+        let count = usize::from(count);
+        let num_bytes = size
+            .checked_add(T::SIZE.into())
+            .and_then(|n| n.checked_mul(count))
+            .ok_or(ObjectParseError::InsufficientBytes)?;
 
         Ok(PrefixedBytesSequence {
-            bytes: cursor.read_bytes(size)?,
-            size: variation as usize,
-            count: count as usize,
+            bytes: cursor.read_bytes(num_bytes)?,
+            size,
+            count,
             phantom: std::marker::PhantomData {},
         })
     }
@@ -135,13 +145,11 @@ impl<'a> Iterator for RangedBytesIterator<'a> {
     type Item = (&'a [u8], u16);
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.remaining == 0 {
-            return None;
-        }
+        let remaining = self.remaining.checked_sub(1)?;
         let bytes = self.cursor.read_bytes(self.size).ok()?;
         let index = self.index;
         self.index = self.index.saturating_add(1);
-        self.remaining -= 1;
+        self.remaining = remaining;
         Some((bytes, index))
     }
 
@@ -157,9 +165,7 @@ where
     type Item = (&'a [u8], T);
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.remaining == 0 {
-            return None;
-        }
+        let remaining = self.remaining.checked_sub(1)?;
 
         let index = match T::read(&mut self.cursor) {
             Ok(x) => x,
@@ -170,7 +176,7 @@ where
             _ => return None,
         };
 
-        self.remaining -= 1;
+        self.remaining = remaining;
 
         Some((bytes, index))
     }

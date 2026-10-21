@@ -57,20 +57,17 @@ where
         return Ok(Continue::NewHeader);
     }
 
-    // the timestamp is < the CTO
-    if cto.timestamp().raw_value() > time.timestamp().raw_value() {
+    // the timestamp is before the CTO, or too far after it to encode
+    let Some(difference) = time
+        .timestamp()
+        .raw_value()
+        .checked_sub(cto.timestamp().raw_value())
+        .and_then(|x| u16::try_from(x).ok())
+    else {
         return Ok(Continue::NewHeader);
-    }
+    };
 
-    // this can't underflow b/c of check above
-    let difference: u64 = time.timestamp().raw_value() - cto.timestamp().raw_value();
-
-    // too big of a difference to encode
-    if difference > u16::MAX.into() {
-        return Ok(Continue::NewHeader);
-    }
-
-    let variation = event.to_cto_variation(difference as u16); // difference in range [0, u16::max]
+    let variation = event.to_cto_variation(difference);
 
     write_prefixed(cursor, &variation, index).map(|_| Continue::Ok)
 }

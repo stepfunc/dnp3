@@ -1,3 +1,8 @@
+#![expect(
+    clippy::arithmetic_side_effects,
+    reason = "tests compute the expected number of values in a range"
+)]
+
 use crate::app::measurement::*;
 use crate::app::BufferSize;
 use crate::outstation::database::*;

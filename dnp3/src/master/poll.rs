@@ -61,7 +61,7 @@ impl PollMap {
 
     pub(crate) fn add(&mut self, request: ReadRequest, period: Duration) -> u64 {
         let id = self.id;
-        self.id += 1;
+        self.id = self.id.wrapping_add(1);
         #[cfg(feature = "unstable")]
         let poll = match self.timer_state {
             TimerState::Deferred => Poll::new_deferred(id, request, period),

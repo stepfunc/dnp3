@@ -17,16 +17,10 @@ where
 
 pub(crate) trait Index: Copy + Clone + FixedSize + PartialEq + Display {
     fn zero() -> Self;
-    fn next(self) -> Self;
+    fn one() -> Self;
+    /// the next index, or `None` past the type's maximum
+    fn next(self) -> Option<Self>;
     fn widen_to_u16(self) -> u16;
-
-    fn one() -> Self {
-        Self::zero().next()
-    }
-
-    fn increment(&mut self) {
-        *self = self.next()
-    }
 
     const COUNT_AND_PREFIX_QUALIFIER: QualifierCode;
     const RANGE_QUALIFIER: QualifierCode;
@@ -62,8 +56,11 @@ impl Index for u8 {
     fn zero() -> Self {
         0
     }
-    fn next(self) -> Self {
-        self + 1
+    fn one() -> Self {
+        1
+    }
+    fn next(self) -> Option<Self> {
+        self.checked_add(1)
     }
     fn widen_to_u16(self) -> u16 {
         self as u16
@@ -78,8 +75,11 @@ impl Index for u16 {
     fn zero() -> Self {
         0
     }
-    fn next(self) -> Self {
-        self + 1
+    fn one() -> Self {
+        1
+    }
+    fn next(self) -> Option<Self> {
+        self.checked_add(1)
     }
     fn widen_to_u16(self) -> u16 {
         self

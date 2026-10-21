@@ -1,3 +1,8 @@
+#![expect(
+    clippy::arithmetic_side_effects,
+    reason = "tests count the controls each request operates"
+)]
+
 use tokio::time::Duration;
 
 use crate::app::variations::Group41Var2;

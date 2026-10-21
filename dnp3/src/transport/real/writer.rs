@@ -43,11 +43,7 @@ impl TransportWrite for Writer {
     ) -> Result<(), LinkError> {
         let chunks = fragment.chunks(crate::link::constant::MAX_APP_BYTES_PER_FRAME);
 
-        let last = if chunks.len() == 0 {
-            0
-        } else {
-            chunks.len() - 1
-        };
+        let last = chunks.len().saturating_sub(1);
 
         for (count, chunk) in chunks.enumerate() {
             let mut cursor = WriteCursor::new(&mut self.buffer);

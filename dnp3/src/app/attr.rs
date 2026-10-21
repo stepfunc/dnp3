@@ -1571,7 +1571,7 @@ impl<'a> AttrValue<'a> {
             AttrDataType::AttrList => Self::AttrList(Self::parse_attr_list(cursor, len as u16)?),
             AttrDataType::ExtAttrList => {
                 // with extended attribute lists, the len is really len + 256
-                let len = len as u16 + 256;
+                let len = u16::from(len) | 0x100;
                 Self::AttrList(Self::parse_attr_list(cursor, len)?)
             }
         };

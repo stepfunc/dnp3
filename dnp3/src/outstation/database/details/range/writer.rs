@@ -59,7 +59,7 @@ where
     fn next(&self, value: T) -> Option<Self> {
         if self.bit_pos < 8 {
             Some(Self {
-                bit_pos: self.bit_pos + T::NUM_BITS,
+                bit_pos: self.bit_pos.checked_add(T::NUM_BITS)?,
                 acc: self.acc | (value.to_mask() << self.bit_pos),
                 byte_pos: self.byte_pos,
                 _phantom: self._phantom,
@@ -263,11 +263,7 @@ impl<T> WriteType<T> {
 }
 
 fn is_consecutive(last: u16, next: u16) -> bool {
-    if next > last {
-        next == last + 1
-    } else {
-        false
-    }
+    last.checked_add(1) == Some(next)
 }
 
 fn write_header(

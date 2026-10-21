@@ -17,14 +17,12 @@ pub(crate) struct Range {
 impl Range {
     /// construct a range in a way that ensures only a valid range can be obtained
     pub(crate) fn from(start: u16, stop: u16) -> Result<Self, InvalidRange> {
-        if stop < start {
-            return Err(InvalidRange { start, stop });
-        }
+        let count = usize::from(stop)
+            .checked_sub(start.into())
+            .and_then(|n| n.checked_add(1))
+            .ok_or(InvalidRange { start, stop })?;
 
-        Ok(Self {
-            start,
-            count: stop as usize - start as usize + 1,
-        })
+        Ok(Self { start, count })
     }
 
     pub(crate) fn empty() -> Self {
@@ -58,8 +56,9 @@ where
         range: Range,
         cursor: &mut ReadCursor<'a>,
     ) -> Result<RangedSequence<'a, T>, ReadError> {
-        // this cannot overflow b/c SIZE is [0, 255] and count is [0, 65536]
-        let num_bytes = T::SIZE as usize * range.count;
+        let num_bytes = usize::from(T::SIZE)
+            .checked_mul(range.count)
+            .ok_or(ReadError)?;
         Ok(Self::new(range, cursor.read_bytes(num_bytes)?))
     }
 
