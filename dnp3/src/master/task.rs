@@ -385,7 +385,20 @@ impl MasterSession {
                 TaskError::Shutdown => Err(RunError::Stop(StopReason::Shutdown)),
                 TaskError::Disabled => Err(RunError::Stop(StopReason::Disable)),
                 TaskError::Link(err) => Err(RunError::Link(err)),
-                _ => Ok(()),
+                TaskError::TooManyRequests
+                | TaskError::Transport
+                | TaskError::RejectedByIin2(_)
+                | TaskError::MalformedResponse(_)
+                | TaskError::UnexpectedResponseHeaders
+                | TaskError::NonFinWithoutCon
+                | TaskError::NeverReceivedFir
+                | TaskError::UnexpectedFir
+                | TaskError::MultiFragmentResponse
+                | TaskError::ResponseTimeout
+                | TaskError::WriteError
+                | TaskError::BadEncoding(_)
+                | TaskError::NoSuchAssociation(_)
+                | TaskError::NoConnection => Ok(()),
             },
         }
     }

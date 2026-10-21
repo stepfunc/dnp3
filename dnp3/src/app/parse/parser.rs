@@ -120,10 +120,10 @@ impl<'a> ParsedFragment<'a> {
             None => return Err(HeaderParseError::UnknownFunction(control.seq, raw_func)),
             Some(x) => x,
         };
-        let iin = match function {
-            FunctionCode::Response => Some(Iin::parse(&mut cursor)?),
-            FunctionCode::UnsolicitedResponse => Some(Iin::parse(&mut cursor)?),
-            _ => None,
+        let iin = if function.get_function_info().has_iin {
+            Some(Iin::parse(&mut cursor)?)
+        } else {
+            None
         };
 
         let objects = cursor.read_all();
@@ -656,9 +656,10 @@ impl<'a> RangedVariation<'a> {
         range: Range,
         cursor: &mut ReadCursor<'a>,
     ) -> Result<RangedVariation<'a>, ObjectParseError> {
-        match function {
-            FunctionCode::Read => Self::parse_read(v, qualifier),
-            _ => Self::parse_non_read(v, qualifier, range, options, cursor),
+        if function == FunctionCode::Read {
+            Self::parse_read(v, qualifier)
+        } else {
+            Self::parse_non_read(v, qualifier, range, options, cursor)
         }
     }
 }

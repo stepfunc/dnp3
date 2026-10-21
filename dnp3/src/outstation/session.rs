@@ -1764,7 +1764,14 @@ impl OutstationSession {
                         }
                     }
                 }
-                _ => {
+                HeaderDetails::AllObjects(_)
+                | HeaderDetails::OneByteStartStop(..)
+                | HeaderDetails::TwoByteStartStop(..)
+                | HeaderDetails::OneByteCount(..)
+                | HeaderDetails::TwoByteCount(..)
+                | HeaderDetails::OneByteCountAndPrefix(..)
+                | HeaderDetails::TwoByteCountAndPrefix(..)
+                | HeaderDetails::TwoByteFreeFormat(..) => {
                     // other variations require that there be a preceding g50v2
                     match timing {
                         None => {

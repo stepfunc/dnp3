@@ -124,7 +124,7 @@ impl Layer {
         // validate the source address
         let source: EndpointAddress = match header.source {
             AnyAddress::Endpoint(x) => x,
-            _ => {
+            AnyAddress::Reserved(_) | AnyAddress::Broadcast(_) | AnyAddress::SelfAddress => {
                 tracing::warn!(
                     "ignoring frame from unknown source address: {}",
                     header.source
@@ -259,7 +259,11 @@ impl Layer {
                 )),
                 None,
             ),
-            function => {
+            function @ (Function::PriTestLinkStates
+            | Function::SecAck
+            | Function::SecNack
+            | Function::SecNotSupported
+            | Function::Unknown(_)) => {
                 tracing::warn!("ignoring frame with function code: {:?}", function);
                 (None, None)
             }

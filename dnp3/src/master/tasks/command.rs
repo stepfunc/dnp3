@@ -103,7 +103,7 @@ impl CommandTask {
 
         match self.state {
             State::Select => Ok(Some(self.change_state(State::Operate).wrap())),
-            _ => {
+            State::Operate | State::DirectOperate => {
                 // Complete w/ success
                 self.promise.complete(Ok(()));
                 Ok(None)

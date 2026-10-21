@@ -200,7 +200,7 @@ impl AutoTaskState {
                 let delay = backoff.on_failure();
                 Self::Failed(backoff.clone(), deadline(Instant::now(), delay))
             }
-            _ => {
+            Self::Idle | Self::Pending => {
                 let mut backoff = ExponentialBackOff::new(config.auto_tasks_retry_strategy);
                 let delay = backoff.on_failure();
                 Self::Failed(backoff, deadline(Instant::now(), delay))
