@@ -299,6 +299,10 @@ pub enum OperateType {
 }
 
 /// select, operate, direct operate, or direct operate no-ack a control point
+///
+/// Return [`CommandStatus::NotSupported`] for an index that doesn't exist. When it's the first
+/// control in the request that fails, the response also sets IIN2.2 (parameter error), which
+/// TB2016-001 requires for an index that isn't installed.
 pub trait ControlSupport<T> {
     /// Select a control point but do not operate. Implementors can think of
     /// this function asking "is this control supported"?
