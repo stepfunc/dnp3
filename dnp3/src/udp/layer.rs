@@ -116,8 +116,8 @@ impl UdpLayer {
             match self.inner.read(buffer).await {
                 Ok(x) => break x,
                 Err(err) => {
-                    if err.kind() == ErrorKind::ConnectionReset {
-                        tracing::warn!("Trapped ICMP UDP reset: {}", err);
+                    if is_icmp_error(&err) {
+                        tracing::warn!("Trapped ICMP error on UDP read: {}", err);
                     } else {
                         return Err(err);
                     }
@@ -136,10 +136,85 @@ impl UdpLayer {
         data: &[u8],
         addr: PhysAddr,
     ) -> Result<(), std::io::Error> {
-        let count = self.inner.write(data, addr).await?;
+        let count = match self.inner.write(data, addr).await {
+            Ok(count) => count,
+            // the error reports an earlier datagram, so this one wasn't sent yet
+            Err(err) if is_icmp_error(&err) => {
+                tracing::warn!("Trapped ICMP error on UDP write: {}", err);
+                self.inner.write(data, addr).await?
+            }
+            Err(err) => return Err(err),
+        };
         if count < data.len() {
             tracing::error!("UDP under-write");
         }
         Ok(())
+    }
+}
+
+/// An ICMP error, such as port unreachable, reports that an earlier datagram wasn't delivered.
+/// Windows reports it as a reset, and Linux reports it as a refusal on a connected socket.
+fn is_icmp_error(err: &std::io::Error) -> bool {
+    matches!(
+        err.kind(),
+        ErrorKind::ConnectionReset | ErrorKind::ConnectionRefused
+    )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Duration;
+
+    const LOCAL: &str = "127.0.0.1:0";
+
+    /// Connect a layer to a port that is closed once the layer has its own port, so they can't
+    /// be the same, and check with a plain socket that sending to it raises an ICMP error
+    async fn connected_to_closed_port() -> (UdpLayer, SocketAddr) {
+        let remote = tokio::net::UdpSocket::bind(LOCAL).await.unwrap();
+        let address = remote.local_addr().unwrap();
+        let layer = UdpLayer::connect(LOCAL.parse().unwrap(), address)
+            .await
+            .unwrap();
+        drop(remote);
+
+        let probe = tokio::net::UdpSocket::bind(LOCAL).await.unwrap();
+        probe.connect(address).await.unwrap();
+        probe.send(&[0]).await.unwrap();
+        let mut buffer = [0; 16];
+        let err = tokio::time::timeout(Duration::from_secs(1), probe.recv(&mut buffer))
+            .await
+            .unwrap()
+            .unwrap_err();
+        assert!(is_icmp_error(&err), "unexpected error: {err}");
+
+        (layer, address)
+    }
+
+    #[tokio::test]
+    async fn read_ignores_a_refused_datagram() {
+        let (mut layer, _) = connected_to_closed_port().await;
+        layer.write_all(&[1], PhysAddr::None).await.unwrap();
+
+        let mut buffer = [0; 16];
+        let result =
+            tokio::time::timeout(Duration::from_millis(200), layer.read(&mut buffer)).await;
+        assert!(result.is_err(), "read should wait for data, got {result:?}");
+    }
+
+    #[tokio::test]
+    async fn write_after_a_refused_datagram_is_sent() {
+        let (mut layer, address) = connected_to_closed_port().await;
+        layer.write_all(&[1], PhysAddr::None).await.unwrap();
+        // the probe above saw its error by now, so this one has arrived too
+        let remote = tokio::net::UdpSocket::bind(address).await.unwrap();
+        layer.write_all(&[2], PhysAddr::None).await.unwrap();
+
+        let mut buffer = [0; 16];
+        let count = tokio::time::timeout(Duration::from_secs(1), remote.recv(&mut buffer))
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(buffer.get(..count), Some([2].as_slice()));
     }
 }

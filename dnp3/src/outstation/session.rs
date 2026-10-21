@@ -1021,10 +1021,10 @@ impl OutstationSession {
                 Some((LastValidRequest::new(seq, hash, None), Some(response)))
             }
             FragmentType::NewRead(hash, objects) | FragmentType::RepeatRead(hash, objects) => {
-                // for a repeated READ, this deviates a bit from the spec, the specification says to
-                // also reply to duplicate READ requests from idle, but this
-                // is plainly wrong since it can't possibly handle a multi-fragmented
-                // response correctly. Answering a repeat READ with a fresh response is harmless
+                // IEEE 1815-2012 Table 6-1 (Idle, row 8) says to resend the previous response to a
+                // repeated READ. We deliberately answer it as a new READ instead: the fresh response
+                // carries current values, and events that were never confirmed are still buffered,
+                // so they are reported again
                 let (response, series) = self.format_first_read_response(database, seq, objects);
                 Some((LastValidRequest::new(seq, hash, series), Some(response)))
             }
