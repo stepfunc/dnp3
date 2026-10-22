@@ -11,7 +11,7 @@ use crate::app::parse::options::ParseOptions;
 use crate::app::{BufferSize, ControlField, FunctionCode, Iin, ResponseFunction, Sequence};
 use crate::decode::AppDecodeLevel;
 use crate::link::reader::LinkModes;
-use crate::link::EndpointAddress;
+use crate::link::{EndpointAddress, LinkErrorMode};
 use crate::master::association::{Association, AssociationConfig, AssociationMap};
 use crate::master::promise::Promise;
 use crate::master::task::MasterTask;
@@ -351,7 +351,7 @@ async fn operate_no_ack_fails_without_a_connection() {
     let mut task = MasterTask::with_associations(
         Enabled::Yes,
         associations,
-        LinkModes::serial(),
+        LinkModes::stream(LinkErrorMode::Discard),
         ParseOptions::default(),
         MasterChannelConfig {
             master_address: EndpointAddress::try_new(1).unwrap(),
