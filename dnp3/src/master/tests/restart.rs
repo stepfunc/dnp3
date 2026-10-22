@@ -5,6 +5,7 @@ use crate::master::association::AssociationConfig;
 use crate::master::TaskError;
 
 use super::harness::create_association;
+use crate::util::test_support::watchdog;
 
 #[derive(Copy, Clone, Debug)]
 enum Restart {
@@ -69,30 +70,33 @@ const CASES: [Case; 5] = [
 
 #[tokio::test]
 async fn restart_returns_the_time_delay_of_the_response() {
-    for case in CASES {
-        let mut harness = create_association(AssociationConfig::quiet()).await;
-        let mut association = harness.association.clone();
-        let restart = tokio::spawn(async move {
-            match case.restart {
-                Restart::Cold => association.cold_restart().await,
-                Restart::Warm => association.warm_restart().await,
-            }
-        });
+    watchdog(async {
+        for case in CASES {
+            let mut harness = create_association(AssociationConfig::quiet()).await;
+            let mut association = harness.association.clone();
+            let restart = tokio::spawn(async move {
+                match case.restart {
+                    Restart::Cold => association.cold_restart().await,
+                    Restart::Warm => association.warm_restart().await,
+                }
+            });
 
-        let seq = Sequence::default();
-        harness
-            .expect_write_and_respond(
-                vec![0xC0, case.restart.function()],
-                response(seq, case.objects),
-            )
-            .await;
+            let seq = Sequence::default();
+            harness
+                .expect_write_and_respond(
+                    vec![0xC0, case.restart.function()],
+                    response(seq, case.objects),
+                )
+                .await;
 
-        assert_eq!(
-            restart.await.unwrap(),
-            case.expected,
-            "{:?} {:?}",
-            case.restart,
-            case.objects
-        );
-    }
+            assert_eq!(
+                restart.await.unwrap(),
+                case.expected,
+                "{:?} {:?}",
+                case.restart,
+                case.objects
+            );
+        }
+    })
+    .await;
 }

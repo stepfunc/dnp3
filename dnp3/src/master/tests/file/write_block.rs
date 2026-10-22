@@ -2,64 +2,74 @@ use crate::app::{FileStatus, FunctionCode, Group70Var4, Group70Var6, Sequence};
 use crate::master::association::AssociationConfig;
 use crate::master::tests::harness::{create_association, AssocInfoEvent, TestHarness};
 use crate::master::{BlockNumber, FileError, FileHandle, TaskError, TaskType};
+use crate::util::test_support::watchdog;
 
 const HANDLE: u32 = 0xDEADCAFE;
 
 #[tokio::test]
 async fn write_block_request_bytes_and_success() {
-    let mut harness = create_association(AssociationConfig::quiet()).await;
-    let task = spawn_write_task(&harness);
-    harness
-        .expect_write(vec![
-            0xC0, 0x02, 70, 5, 0x5B, 0x01, 0x0B, 0x00, // header, length = 11
-            0xFE, 0xCA, 0xAD, 0xDE, // file handle
-            0x02, 0x00, 0x00, 0x80, // block number 2, last
-            0x01, 0x02, 0x03, // data
-        ])
-        .await;
-    harness
-        .process_response(block_status_response(2, FileStatus::Success))
-        .await;
+    watchdog(async {
+        let mut harness = create_association(AssociationConfig::quiet()).await;
+        let task = spawn_write_task(&harness);
+        harness
+            .expect_write(vec![
+                0xC0, 0x02, 70, 5, 0x5B, 0x01, 0x0B, 0x00, // header, length = 11
+                0xFE, 0xCA, 0xAD, 0xDE, // file handle
+                0x02, 0x00, 0x00, 0x80, // block number 2, last
+                0x01, 0x02, 0x03, // data
+            ])
+            .await;
+        harness
+            .process_response(block_status_response(2, FileStatus::Success))
+            .await;
 
-    assert_eq!(task.await.unwrap(), Ok(()));
-    assert_eq!(
-        harness.assoc_events.pop().as_slice(),
-        &[
-            AssocInfoEvent::TaskStart(
-                TaskType::FileWriteBlock,
-                FunctionCode::Write,
-                Sequence::new(0)
-            ),
-            AssocInfoEvent::TaskSuccess(
-                TaskType::FileWriteBlock,
-                FunctionCode::Write,
-                Sequence::new(0)
-            ),
-        ]
-    );
+        assert_eq!(task.await.unwrap(), Ok(()));
+        assert_eq!(
+            harness.assoc_events.pop().as_slice(),
+            &[
+                AssocInfoEvent::TaskStart(
+                    TaskType::FileWriteBlock,
+                    FunctionCode::Write,
+                    Sequence::new(0)
+                ),
+                AssocInfoEvent::TaskSuccess(
+                    TaskType::FileWriteBlock,
+                    FunctionCode::Write,
+                    Sequence::new(0)
+                ),
+            ]
+        );
+    })
+    .await;
 }
 
 #[tokio::test]
 async fn fails_on_bad_status() {
-    let result = write_with_response(block_status_response(2, FileStatus::BlockSeq)).await;
-    assert_eq!(result, Err(FileError::BadStatus(FileStatus::BlockSeq)));
+    watchdog(async {
+        let result = write_with_response(block_status_response(2, FileStatus::BlockSeq)).await;
+        assert_eq!(result, Err(FileError::BadStatus(FileStatus::BlockSeq)));
+    })
+    .await;
 }
 
 #[tokio::test]
 async fn fails_on_unexpected_variation() {
-    let result = write_with_response(super::response(
-        0,
-        &Group70Var4 {
-            file_handle: HANDLE,
-            file_size: 0,
-            max_block_size: 0,
-            request_id: 0,
-            status_code: FileStatus::Success,
-            text: "",
-        },
-    ))
+    watchdog(async {
+        let result = write_with_response(super::response(
+            0,
+            &Group70Var4 {
+                file_handle: HANDLE,
+                file_size: 0,
+                max_block_size: 0,
+                request_id: 0,
+                status_code: FileStatus::Success,
+                text: "",
+            },
+        ))
+        .await;
+        assert_eq!(result, Err(FileError::BadResponse));
+    })
     .await;
-    assert_eq!(result, Err(FileError::BadResponse));
 }
 
 /// Run the block write against a response that fails it, and check that the task fails

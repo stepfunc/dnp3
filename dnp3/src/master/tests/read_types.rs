@@ -12,6 +12,7 @@ use crate::master::{Classes, ReadRequest, ReadType};
 
 use super::harness::create_association;
 use super::harness::requests::*;
+use crate::util::test_support::watchdog;
 
 const CLASS_1_EVENTS: Iin = Iin::new(Iin1::new(0x02), Iin2::new(0x00));
 
@@ -42,167 +43,185 @@ fn fragment_with_data(read_type: ReadType) -> Vec<ReadEvent> {
 
 #[tokio::test]
 async fn startup_integrity_poll_reports_startup_integrity() {
-    let mut seq = Sequence::default();
-    let mut harness = create_association(AssociationConfig::default()).await;
+    watchdog(async {
+        let mut seq = Sequence::default();
+        let mut harness = create_association(AssociationConfig::default()).await;
 
-    harness
-        .expect_write_and_respond(disable_unsol_request(seq), empty_response(seq.increment()))
-        .await;
-    harness
-        .expect_write_and_respond(
-            integrity_poll_request(seq),
-            response_with_data(seq.increment()),
-        )
-        .await;
-    harness
-        .expect_write_and_respond(enable_unsol_request(seq), empty_response(seq.increment()))
-        .await;
+        harness
+            .expect_write_and_respond(disable_unsol_request(seq), empty_response(seq.increment()))
+            .await;
+        harness
+            .expect_write_and_respond(
+                integrity_poll_request(seq),
+                response_with_data(seq.increment()),
+            )
+            .await;
+        harness
+            .expect_write_and_respond(enable_unsol_request(seq), empty_response(seq.increment()))
+            .await;
 
-    assert_eq!(
-        harness.read_events.pop(),
-        fragment_with_data(ReadType::StartupIntegrity)
-    );
+        assert_eq!(
+            harness.read_events.pop(),
+            fragment_with_data(ReadType::StartupIntegrity)
+        );
+    })
+    .await;
 }
 
 #[tokio::test]
 async fn event_scan_reports_periodic_poll() {
-    let config = AssociationConfig {
-        event_scan_on_events_available: EventClasses::all(),
-        ..Default::default()
-    };
-    let mut seq = Sequence::default();
-    let mut harness = create_association(config).await;
-    startup_procedure(&mut harness, &mut seq).await;
-    harness.read_events.pop();
+    watchdog(async {
+        let config = AssociationConfig {
+            event_scan_on_events_available: EventClasses::all(),
+            ..Default::default()
+        };
+        let mut seq = Sequence::default();
+        let mut harness = create_association(config).await;
+        startup_procedure(&mut harness, &mut seq).await;
+        harness.read_events.pop();
 
-    harness
-        .read_and_expect_write(
-            unsol_null_custom_iin(seq, CLASS_1_EVENTS),
-            unsol_confirm(seq),
-        )
-        .await;
-    assert_eq!(
-        harness.read_events.pop(),
-        vec![
-            ReadEvent::BeginFragment(ReadType::Unsolicited),
-            ReadEvent::EndFragment(ReadType::Unsolicited),
-        ]
-    );
+        harness
+            .read_and_expect_write(
+                unsol_null_custom_iin(seq, CLASS_1_EVENTS),
+                unsol_confirm(seq),
+            )
+            .await;
+        assert_eq!(
+            harness.read_events.pop(),
+            vec![
+                ReadEvent::BeginFragment(ReadType::Unsolicited),
+                ReadEvent::EndFragment(ReadType::Unsolicited),
+            ]
+        );
 
-    let class1 = Classes::new(false, EventClasses::new(true, false, false));
-    harness
-        .expect_write_and_respond(
-            class_scan_request(class1, seq),
-            response_with_data(seq.increment()),
-        )
-        .await;
+        let class1 = Classes::new(false, EventClasses::new(true, false, false));
+        harness
+            .expect_write_and_respond(
+                class_scan_request(class1, seq),
+                response_with_data(seq.increment()),
+            )
+            .await;
 
-    assert_eq!(
-        harness.read_events.pop(),
-        fragment_with_data(ReadType::PeriodicPoll)
-    );
+        assert_eq!(
+            harness.read_events.pop(),
+            fragment_with_data(ReadType::PeriodicPoll)
+        );
+    })
+    .await;
 }
 
 #[tokio::test]
 async fn periodic_poll_reports_periodic_poll() {
-    let mut seq = Sequence::default();
-    let mut harness = create_association(AssociationConfig::default()).await;
-    startup_procedure(&mut harness, &mut seq).await;
-    harness.read_events.pop();
+    watchdog(async {
+        let mut seq = Sequence::default();
+        let mut harness = create_association(AssociationConfig::default()).await;
+        startup_procedure(&mut harness, &mut seq).await;
+        harness.read_events.pop();
 
-    tokio::time::pause();
-    let mut association = harness.association.clone();
-    let _poll = association
-        .add_poll(
-            ReadRequest::ClassScan(Classes::class0()),
-            std::time::Duration::from_secs(1),
-        )
-        .await
-        .unwrap();
+        tokio::time::pause();
+        let mut association = harness.association.clone();
+        let _poll = association
+            .add_poll(
+                ReadRequest::ClassScan(Classes::class0()),
+                std::time::Duration::from_secs(1),
+            )
+            .await
+            .unwrap();
 
-    harness
-        .expect_write_and_respond(
-            class_scan_request(Classes::class0(), seq),
-            response_with_data(seq.increment()),
-        )
-        .await;
+        harness
+            .expect_write_and_respond(
+                class_scan_request(Classes::class0(), seq),
+                response_with_data(seq.increment()),
+            )
+            .await;
 
-    assert_eq!(
-        harness.read_events.pop(),
-        fragment_with_data(ReadType::PeriodicPoll)
-    );
+        assert_eq!(
+            harness.read_events.pop(),
+            fragment_with_data(ReadType::PeriodicPoll)
+        );
+    })
+    .await;
 }
 
 #[tokio::test]
 async fn single_read_reports_single_poll() {
-    let mut seq = Sequence::default();
-    let mut harness = create_association(AssociationConfig::default()).await;
-    startup_procedure(&mut harness, &mut seq).await;
-    harness.read_events.pop();
+    watchdog(async {
+        let mut seq = Sequence::default();
+        let mut harness = create_association(AssociationConfig::default()).await;
+        startup_procedure(&mut harness, &mut seq).await;
+        harness.read_events.pop();
 
-    let mut association = harness.association.clone();
-    let read = tokio::spawn(async move {
-        association
-            .read(ReadRequest::ClassScan(Classes::class0()))
-            .await
-    });
-    harness
-        .expect_write_and_respond(
-            class_scan_request(Classes::class0(), seq),
-            response_with_data(seq.increment()),
-        )
-        .await;
+        let mut association = harness.association.clone();
+        let read = tokio::spawn(async move {
+            association
+                .read(ReadRequest::ClassScan(Classes::class0()))
+                .await
+        });
+        harness
+            .expect_write_and_respond(
+                class_scan_request(Classes::class0(), seq),
+                response_with_data(seq.increment()),
+            )
+            .await;
 
-    assert_eq!(read.await.unwrap(), Ok(()));
-    assert_eq!(
-        harness.read_events.pop(),
-        fragment_with_data(ReadType::SinglePoll)
-    );
+        assert_eq!(read.await.unwrap(), Ok(()));
+        assert_eq!(
+            harness.read_events.pop(),
+            fragment_with_data(ReadType::SinglePoll)
+        );
+    })
+    .await;
 }
 
 #[tokio::test]
 async fn single_read_with_custom_handler_reports_single_poll_to_that_handler_only() {
-    let mut seq = Sequence::default();
-    let mut harness = create_association(AssociationConfig::default()).await;
-    startup_procedure(&mut harness, &mut seq).await;
-    harness.read_events.pop();
+    watchdog(async {
+        let mut seq = Sequence::default();
+        let mut harness = create_association(AssociationConfig::default()).await;
+        startup_procedure(&mut harness, &mut seq).await;
+        harness.read_events.pop();
 
-    let handler = CountHandler::new();
-    let mut custom_events = handler.events();
-    let mut association = harness.association.clone();
-    let read = tokio::spawn(async move {
-        association
-            .read_with_handler(ReadRequest::ClassScan(Classes::class0()), Box::new(handler))
-            .await
-    });
-    harness
-        .expect_write_and_respond(
-            class_scan_request(Classes::class0(), seq),
-            response_with_data(seq.increment()),
-        )
-        .await;
+        let handler = CountHandler::new();
+        let mut custom_events = handler.events();
+        let mut association = harness.association.clone();
+        let read = tokio::spawn(async move {
+            association
+                .read_with_handler(ReadRequest::ClassScan(Classes::class0()), Box::new(handler))
+                .await
+        });
+        harness
+            .expect_write_and_respond(
+                class_scan_request(Classes::class0(), seq),
+                response_with_data(seq.increment()),
+            )
+            .await;
 
-    assert_eq!(read.await.unwrap(), Ok(()));
-    assert_eq!(
-        custom_events.pop(),
-        fragment_with_data(ReadType::SinglePoll)
-    );
-    assert_eq!(harness.read_events.pop(), Vec::new());
+        assert_eq!(read.await.unwrap(), Ok(()));
+        assert_eq!(
+            custom_events.pop(),
+            fragment_with_data(ReadType::SinglePoll)
+        );
+        assert_eq!(harness.read_events.pop(), Vec::new());
+    })
+    .await;
 }
 
 #[tokio::test]
 async fn unsolicited_response_reports_unsolicited() {
-    let mut seq = Sequence::default();
-    let mut harness = create_association(AssociationConfig::default()).await;
-    startup_procedure(&mut harness, &mut seq).await;
-    harness.read_events.pop();
+    watchdog(async {
+        let mut seq = Sequence::default();
+        let mut harness = create_association(AssociationConfig::default()).await;
+        startup_procedure(&mut harness, &mut seq).await;
+        harness.read_events.pop();
 
-    harness
-        .read_and_expect_write(unsol_with_data(seq, 7, false), unsol_confirm(seq))
-        .await;
+        harness
+            .read_and_expect_write(unsol_with_data(seq, 7, false), unsol_confirm(seq))
+            .await;
 
-    assert_eq!(
-        harness.read_events.pop(),
-        fragment_with_data(ReadType::Unsolicited)
-    );
+        assert_eq!(
+            harness.read_events.pop(),
+            fragment_with_data(ReadType::Unsolicited)
+        );
+    })
+    .await;
 }

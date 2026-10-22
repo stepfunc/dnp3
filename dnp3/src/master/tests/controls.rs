@@ -102,196 +102,214 @@ async fn barrier(harness: &mut TestHarness) {
 
 #[tokio::test]
 async fn operate_no_ack_sends_function_code_6_and_completes_without_response() {
-    let mut harness = quiet_association().await;
-    let start = Instant::now();
+    watchdog(async {
+        let mut harness = quiet_association().await;
+        let start = Instant::now();
 
-    let request = command_request(NO_ACK, Sequence::new(0));
-    assert_eq!(&request[..2], &[0xC0, 0x06]);
+        let request = command_request(NO_ACK, Sequence::new(0));
+        assert_eq!(&request[..2], &[0xC0, 0x06]);
 
-    let result = harness.association.operate_no_ack(crob()).await;
-    assert_eq!(result, Ok(()));
-    harness.expect_write(request).await;
-    assert_eq!(Instant::now(), start);
+        let result = harness.association.operate_no_ack(crob()).await;
+        assert_eq!(result, Ok(()));
+        harness.expect_write(request).await;
+        assert_eq!(Instant::now(), start);
 
-    assert_eq!(
-        harness.assoc_events.pop(),
-        vec![
-            AssocInfoEvent::TaskStart(TaskType::Command, NO_ACK, Sequence::new(0)),
-            AssocInfoEvent::TaskSuccess(TaskType::Command, NO_ACK, Sequence::new(0)),
-        ]
-    );
+        assert_eq!(
+            harness.assoc_events.pop(),
+            vec![
+                AssocInfoEvent::TaskStart(TaskType::Command, NO_ACK, Sequence::new(0)),
+                AssocInfoEvent::TaskSuccess(TaskType::Command, NO_ACK, Sequence::new(0)),
+            ]
+        );
+    })
+    .await;
 }
 
 #[tokio::test]
 async fn operate_no_ack_does_not_delay_the_next_task() {
-    let mut harness = quiet_association().await;
-    let start = Instant::now();
+    watchdog(async {
+        let mut harness = quiet_association().await;
+        let start = Instant::now();
 
-    // followed by a read
-    harness.association.operate_no_ack(crob()).await.unwrap();
-    harness
-        .expect_write(command_request(NO_ACK, Sequence::new(0)))
-        .await;
-    let mut association = harness.association.clone();
-    let read = tokio::spawn(async move {
-        association
-            .read(ReadRequest::class_scan(Classes::class0()))
-            .await
-    });
-    harness
-        .expect_write_and_respond(
-            class_scan_request(Sequence::new(1)),
-            empty_response(Sequence::new(1)),
-        )
-        .await;
-    assert_eq!(read.await.unwrap(), Ok(()));
+        // followed by a read
+        harness.association.operate_no_ack(crob()).await.unwrap();
+        harness
+            .expect_write(command_request(NO_ACK, Sequence::new(0)))
+            .await;
+        let mut association = harness.association.clone();
+        let read = tokio::spawn(async move {
+            association
+                .read(ReadRequest::class_scan(Classes::class0()))
+                .await
+        });
+        harness
+            .expect_write_and_respond(
+                class_scan_request(Sequence::new(1)),
+                empty_response(Sequence::new(1)),
+            )
+            .await;
+        assert_eq!(read.await.unwrap(), Ok(()));
 
-    // followed by a command that does expect a response
-    harness.association.operate_no_ack(crob()).await.unwrap();
-    harness
-        .expect_write(command_request(NO_ACK, Sequence::new(2)))
-        .await;
-    let mut association = harness.association.clone();
-    let operate = tokio::spawn(async move {
-        association
-            .operate(CommandMode::DirectOperate, crob())
-            .await
-    });
-    harness
-        .expect_write_and_respond(
-            command_request(FunctionCode::DirectOperate, Sequence::new(3)),
-            command_response(Sequence::new(3)),
-        )
-        .await;
-    assert_eq!(operate.await.unwrap(), Ok(()));
+        // followed by a command that does expect a response
+        harness.association.operate_no_ack(crob()).await.unwrap();
+        harness
+            .expect_write(command_request(NO_ACK, Sequence::new(2)))
+            .await;
+        let mut association = harness.association.clone();
+        let operate = tokio::spawn(async move {
+            association
+                .operate(CommandMode::DirectOperate, crob())
+                .await
+        });
+        harness
+            .expect_write_and_respond(
+                command_request(FunctionCode::DirectOperate, Sequence::new(3)),
+                command_response(Sequence::new(3)),
+            )
+            .await;
+        assert_eq!(operate.await.unwrap(), Ok(()));
 
-    assert_eq!(Instant::now(), start);
+        assert_eq!(Instant::now(), start);
+    })
+    .await;
 }
 
 #[tokio::test]
 async fn queued_tasks_run_back_to_back_after_operate_no_ack_and_ignore_its_sequence() {
-    let mut harness = quiet_association().await;
-    let blocker = start_blocker(&mut harness, Sequence::new(0)).await;
+    watchdog(async {
+        let mut harness = quiet_association().await;
+        let blocker = start_blocker(&mut harness, Sequence::new(0)).await;
 
-    let mut no_ack = queue_no_ack(&mut harness).await;
-    let (promise, mut read) = Promise::one_shot();
-    harness
-        .association
-        .send_task(SingleReadTask::new(
-            ReadRequest::class_scan(Classes::class0()),
-            promise,
-        ))
-        .await
-        .unwrap();
-    barrier(&mut harness).await;
+        let mut no_ack = queue_no_ack(&mut harness).await;
+        let (promise, mut read) = Promise::one_shot();
+        harness
+            .association
+            .send_task(SingleReadTask::new(
+                ReadRequest::class_scan(Classes::class0()),
+                promise,
+            ))
+            .await
+            .unwrap();
+        barrier(&mut harness).await;
 
-    let start = Instant::now();
-    harness
-        .process_response(command_response(Sequence::new(0)))
-        .await;
-    assert_eq!(blocker.await.unwrap(), Ok(()));
+        let start = Instant::now();
+        harness
+            .process_response(command_response(Sequence::new(0)))
+            .await;
+        assert_eq!(blocker.await.unwrap(), Ok(()));
 
-    harness
-        .expect_write(command_request(NO_ACK, Sequence::new(1)))
-        .await;
-    harness
-        .expect_write(class_scan_request(Sequence::new(2)))
-        .await;
-    assert_eq!(no_ack.try_recv(), Ok(Ok(())));
-    assert_eq!(Instant::now(), start);
+        harness
+            .expect_write(command_request(NO_ACK, Sequence::new(1)))
+            .await;
+        harness
+            .expect_write(class_scan_request(Sequence::new(2)))
+            .await;
+        assert_eq!(no_ack.try_recv(), Ok(Ok(())));
+        assert_eq!(Instant::now(), start);
 
-    // a response carrying the DIRECT_OPERATE_NO_ACK's sequence doesn't complete the read
-    harness
-        .process_response(empty_response(Sequence::new(1)))
-        .await;
-    tokio::task::yield_now().await;
-    assert_eq!(read.try_recv(), Err(TryRecvError::Empty));
+        // a response carrying the DIRECT_OPERATE_NO_ACK's sequence doesn't complete the read
+        harness
+            .process_response(empty_response(Sequence::new(1)))
+            .await;
+        tokio::task::yield_now().await;
+        assert_eq!(read.try_recv(), Err(TryRecvError::Empty));
 
-    harness
-        .process_response(empty_response(Sequence::new(2)))
-        .await;
-    assert_eq!(read.await.unwrap(), Ok(()));
+        harness
+            .process_response(empty_response(Sequence::new(2)))
+            .await;
+        assert_eq!(read.await.unwrap(), Ok(()));
+    })
+    .await;
 }
 
 #[tokio::test]
 async fn requests_beyond_the_queue_limit_fail_with_too_many_requests() {
-    tokio::time::pause();
-    let config = AssociationConfig {
-        max_queued_user_requests: 1,
-        ..AssociationConfig::quiet()
-    };
-    let mut harness = create_association(config).await;
-    let blocker = start_blocker(&mut harness, Sequence::new(0)).await;
+    watchdog(async {
+        tokio::time::pause();
+        let config = AssociationConfig {
+            max_queued_user_requests: 1,
+            ..AssociationConfig::quiet()
+        };
+        let mut harness = create_association(config).await;
+        let blocker = start_blocker(&mut harness, Sequence::new(0)).await;
 
-    let mut queued = queue_no_ack(&mut harness).await;
-    let rejected = queue_no_ack(&mut harness).await;
-    assert_eq!(rejected.await.unwrap(), Err(TaskError::TooManyRequests));
-    assert_eq!(queued.try_recv(), Err(TryRecvError::Empty));
+        let mut queued = queue_no_ack(&mut harness).await;
+        let rejected = queue_no_ack(&mut harness).await;
+        assert_eq!(rejected.await.unwrap(), Err(TaskError::TooManyRequests));
+        assert_eq!(queued.try_recv(), Err(TryRecvError::Empty));
 
-    harness
-        .process_response(command_response(Sequence::new(0)))
-        .await;
-    assert_eq!(blocker.await.unwrap(), Ok(()));
-    harness
-        .expect_write(command_request(NO_ACK, Sequence::new(1)))
-        .await;
-    assert_eq!(queued.await.unwrap(), Ok(()));
+        harness
+            .process_response(command_response(Sequence::new(0)))
+            .await;
+        assert_eq!(blocker.await.unwrap(), Ok(()));
+        harness
+            .expect_write(command_request(NO_ACK, Sequence::new(1)))
+            .await;
+        assert_eq!(queued.await.unwrap(), Ok(()));
+    })
+    .await;
 }
 
 #[tokio::test]
 async fn response_to_operate_no_ack_while_idle_is_ignored() {
-    let mut harness = quiet_association().await;
+    watchdog(async {
+        let mut harness = quiet_association().await;
 
-    harness.association.operate_no_ack(crob()).await.unwrap();
-    harness
-        .expect_write(command_request(NO_ACK, Sequence::new(0)))
-        .await;
-    harness.assoc_events.pop();
+        harness.association.operate_no_ack(crob()).await.unwrap();
+        harness
+            .expect_write(command_request(NO_ACK, Sequence::new(0)))
+            .await;
+        harness.assoc_events.pop();
 
-    harness
-        .process_response(empty_response(Sequence::new(0)))
-        .await;
-    barrier(&mut harness).await;
-    harness.assert_no_events();
-    assert_eq!(harness.assoc_events.pop(), Vec::new());
+        harness
+            .process_response(empty_response(Sequence::new(0)))
+            .await;
+        barrier(&mut harness).await;
+        harness.assert_no_events();
+        assert_eq!(harness.assoc_events.pop(), Vec::new());
 
-    harness.association.operate_no_ack(crob()).await.unwrap();
-    harness
-        .expect_write(command_request(NO_ACK, Sequence::new(1)))
-        .await;
+        harness.association.operate_no_ack(crob()).await.unwrap();
+        harness
+            .expect_write(command_request(NO_ACK, Sequence::new(1)))
+            .await;
+    })
+    .await;
 }
 
 #[tokio::test]
 async fn unsolicited_response_is_processed_after_a_queued_batch_drains() {
-    let mut harness = quiet_association().await;
-    let blocker = start_blocker(&mut harness, Sequence::new(0)).await;
+    watchdog(async {
+        let mut harness = quiet_association().await;
+        let blocker = start_blocker(&mut harness, Sequence::new(0)).await;
 
-    let mut batch = Vec::new();
-    for _ in 0..3 {
-        batch.push(queue_no_ack(&mut harness).await);
-    }
-    barrier(&mut harness).await;
+        let mut batch = Vec::new();
+        for _ in 0..3 {
+            batch.push(queue_no_ack(&mut harness).await);
+        }
+        barrier(&mut harness).await;
 
-    // the unsolicited response is already waiting when the batch starts
-    harness.io.read(&command_response(Sequence::new(0)));
-    harness
-        .io
-        .read(&unsol_with_data(Sequence::new(0), 42, false));
-
-    assert_eq!(harness.io.next_event().await, Event::Read);
-    for seq in 1..=3 {
+        // the unsolicited response is already waiting when the batch starts
+        harness.io.read(&command_response(Sequence::new(0)));
         harness
-            .expect_write(command_request(NO_ACK, Sequence::new(seq)))
-            .await;
-    }
-    for mut rx in batch {
-        assert_eq!(rx.try_recv(), Ok(Ok(())));
-    }
-    assert_eq!(blocker.await.unwrap(), Ok(()));
+            .io
+            .read(&unsol_with_data(Sequence::new(0), 42, false));
 
-    assert_eq!(harness.io.next_event().await, Event::Read);
-    harness.expect_write(unsol_confirm(Sequence::new(0))).await;
-    assert_eq!(harness.num_requests(), 1);
+        assert_eq!(harness.io.next_event().await, Event::Read);
+        for seq in 1..=3 {
+            harness
+                .expect_write(command_request(NO_ACK, Sequence::new(seq)))
+                .await;
+        }
+        for mut rx in batch {
+            assert_eq!(rx.try_recv(), Ok(Ok(())));
+        }
+        assert_eq!(blocker.await.unwrap(), Ok(()));
+
+        assert_eq!(harness.io.next_event().await, Event::Read);
+        harness.expect_write(unsol_confirm(Sequence::new(0))).await;
+        assert_eq!(harness.num_requests(), 1);
+    })
+    .await;
 }
 
 #[tokio::test]
@@ -319,38 +337,44 @@ async fn operate_no_ack_fails_if_the_write_fails() {
 
 #[tokio::test]
 async fn operate_no_ack_fails_if_the_request_does_not_fit() {
-    let mut harness = quiet_association().await;
+    watchdog(async {
+        let mut harness = quiet_association().await;
 
-    // more CROBs than fit in the minimum transmit buffer
-    let mut builder = CommandBuilder::new();
-    for index in 0..u16::try_from(BufferSize::<249, 2048>::min().value()).unwrap() {
-        builder.add_u16(Group12Var1::from_op_type(OpType::LatchOn), index);
-    }
+        // more CROBs than fit in the minimum transmit buffer
+        let mut builder = CommandBuilder::new();
+        for index in 0..u16::try_from(BufferSize::<249, 2048>::min().value()).unwrap() {
+            builder.add_u16(Group12Var1::from_op_type(OpType::LatchOn), index);
+        }
 
-    let result = harness.association.operate_no_ack(builder.build()).await;
-    assert_eq!(result, Err(TaskError::WriteError));
-    harness.assert_no_events();
-    assert_eq!(
-        harness.assoc_events.pop(),
-        vec![
-            AssocInfoEvent::TaskStart(TaskType::Command, NO_ACK, Sequence::new(0)),
-            AssocInfoEvent::TaskFailure(TaskType::Command, TaskError::WriteError),
-        ]
-    );
+        let result = harness.association.operate_no_ack(builder.build()).await;
+        assert_eq!(result, Err(TaskError::WriteError));
+        harness.assert_no_events();
+        assert_eq!(
+            harness.assoc_events.pop(),
+            vec![
+                AssocInfoEvent::TaskStart(TaskType::Command, NO_ACK, Sequence::new(0)),
+                AssocInfoEvent::TaskFailure(TaskType::Command, TaskError::WriteError),
+            ]
+        );
+    })
+    .await;
 }
 
 #[tokio::test]
 async fn queued_operate_no_ack_fails_when_the_channel_is_disabled() {
-    let mut harness = quiet_association().await;
-    let blocker = start_blocker(&mut harness, Sequence::new(0)).await;
+    watchdog(async {
+        let mut harness = quiet_association().await;
+        let blocker = start_blocker(&mut harness, Sequence::new(0)).await;
 
-    let no_ack = queue_no_ack(&mut harness).await;
-    barrier(&mut harness).await;
-    harness.master.disable().await.unwrap();
+        let no_ack = queue_no_ack(&mut harness).await;
+        barrier(&mut harness).await;
+        harness.master.disable().await.unwrap();
 
-    assert_eq!(no_ack.await.unwrap(), Err(TaskError::Disabled));
-    assert!(blocker.await.unwrap().is_err());
-    harness.assert_no_events();
+        assert_eq!(no_ack.await.unwrap(), Err(TaskError::Disabled));
+        assert!(blocker.await.unwrap().is_err());
+        harness.assert_no_events();
+    })
+    .await;
 }
 
 struct NullHandler;
@@ -360,41 +384,44 @@ impl AssociationInformation for NullHandler {}
 
 #[tokio::test]
 async fn operate_no_ack_fails_without_a_connection() {
-    let address = EndpointAddress::try_new(1024).unwrap();
-    let mut associations = AssociationMap::new();
-    associations
-        .register(Association::new(
-            FragmentAddr {
-                link: address,
-                phys: PhysAddr::None,
+    watchdog(async {
+        let address = EndpointAddress::try_new(1024).unwrap();
+        let mut associations = AssociationMap::new();
+        associations
+            .register(Association::new(
+                FragmentAddr {
+                    link: address,
+                    phys: PhysAddr::None,
+                },
+                AssociationConfig::quiet(),
+                Box::new(NullHandler),
+                Box::new(NullHandler),
+                Box::new(NullHandler),
+            ))
+            .unwrap();
+
+        let (tx, rx) = crate::util::channel::request_channel();
+        let mut task = MasterTask::with_associations(
+            Enabled::Yes,
+            associations,
+            LinkModes::stream(LinkErrorMode::Discard),
+            MasterChannelConfig {
+                master_address: EndpointAddress::try_new(1).unwrap(),
+                decode_level: AppDecodeLevel::Nothing.into(),
+                tx_buffer_size: BufferSize::min(),
+                rx_buffer_size: BufferSize::min(),
             },
-            AssociationConfig::quiet(),
-            Box::new(NullHandler),
-            Box::new(NullHandler),
-            Box::new(NullHandler),
-        ))
-        .unwrap();
+            rx,
+        );
+        let mut association =
+            AssociationHandle::new(address, MasterChannel::new(tx, MasterChannelType::Stream));
 
-    let (tx, rx) = crate::util::channel::request_channel();
-    let mut task = MasterTask::with_associations(
-        Enabled::Yes,
-        associations,
-        LinkModes::stream(LinkErrorMode::Discard),
-        MasterChannelConfig {
-            master_address: EndpointAddress::try_new(1).unwrap(),
-            decode_level: AppDecodeLevel::Nothing.into(),
-            tx_buffer_size: BufferSize::min(),
-            rx_buffer_size: BufferSize::min(),
-        },
-        rx,
-    );
-    let mut association =
-        AssociationHandle::new(address, MasterChannel::new(tx, MasterChannelType::Stream));
+        let operate = tokio::spawn(async move { association.operate_no_ack(crob()).await });
+        task.process_next_message().await.unwrap();
 
-    let operate = tokio::spawn(async move { association.operate_no_ack(crob()).await });
-    task.process_next_message().await.unwrap();
-
-    assert_eq!(operate.await.unwrap(), Err(TaskError::NoConnection));
+        assert_eq!(operate.await.unwrap(), Err(TaskError::NoConnection));
+    })
+    .await;
 }
 
 /// Codes whose fields encode to a byte that parses back to a different `ControlCode`
@@ -461,27 +488,30 @@ fn requests_containing(bad: ControlCode) -> [CommandHeaders; 7] {
 
 #[tokio::test]
 async fn non_canonical_control_codes_are_rejected_before_anything_is_sent() {
-    let mut harness = quiet_association().await;
+    watchdog(async {
+        let mut harness = quiet_association().await;
 
-    for code in non_canonical_codes() {
-        let expected = TaskError::BadEncoding(BadEncoding::ControlCode(code));
+        for code in non_canonical_codes() {
+            let expected = TaskError::BadEncoding(BadEncoding::ControlCode(code));
 
-        for mode in [CommandMode::DirectOperate, CommandMode::SelectBeforeOperate] {
+            for mode in [CommandMode::DirectOperate, CommandMode::SelectBeforeOperate] {
+                for headers in requests_containing(code) {
+                    assert_eq!(
+                        harness.association.operate(mode, headers).await,
+                        Err(CommandError::Task(expected))
+                    );
+                    harness.assert_no_events();
+                }
+            }
+
             for headers in requests_containing(code) {
                 assert_eq!(
-                    harness.association.operate(mode, headers).await,
-                    Err(CommandError::Task(expected))
+                    harness.association.operate_no_ack(headers).await,
+                    Err(expected)
                 );
                 harness.assert_no_events();
             }
         }
-
-        for headers in requests_containing(code) {
-            assert_eq!(
-                harness.association.operate_no_ack(headers).await,
-                Err(expected)
-            );
-            harness.assert_no_events();
-        }
-    }
+    })
+    .await;
 }
