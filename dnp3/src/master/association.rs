@@ -14,7 +14,7 @@ use crate::master::error::{AssociationError, TaskError, TimeSyncError};
 use crate::master::extract::{extract_measurements, Delivered, ProcessableResponse};
 use crate::master::handler::AssociationHandler;
 use crate::master::messages::AssociationMsgType;
-use crate::master::poll::{PollHandle, PollMap, PollMsg};
+use crate::master::poll::{Poll, PollHandle, PollMap, PollMsg};
 #[cfg(feature = "unstable")]
 use crate::master::request::ReadRequest;
 use crate::master::request::{Classes, EventClasses, TimeSyncProcedure};
@@ -506,8 +506,8 @@ impl Association {
         self.assoc_handler.get_current_time()
     }
 
-    pub(crate) fn complete_poll(&mut self, id: u64) {
-        self.polls.complete(id)
+    pub(crate) fn complete_poll(&mut self, run: &Poll) {
+        self.polls.complete(run)
     }
 
     pub(crate) fn seq(&self) -> Sequence {

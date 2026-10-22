@@ -493,7 +493,7 @@ impl ReadTask {
     ) {
         match self {
             ReadTask::StartupIntegrity(_) => association.on_integrity_scan_complete(),
-            ReadTask::PeriodicPoll(poll) => association.complete_poll(poll.id),
+            ReadTask::PeriodicPoll(poll) => association.complete_poll(&poll),
             ReadTask::EventScan(_) => {
                 association.on_event_scan_complete(events_without_request_errors)
             }
@@ -553,7 +553,7 @@ impl ReadTask {
             }
             ReadTask::PeriodicPoll(poll) => {
                 if let Some(association) = association {
-                    association.complete_poll(poll.id);
+                    association.complete_poll(&poll);
                 }
             }
             ReadTask::EventScan(_) => {

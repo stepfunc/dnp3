@@ -12,8 +12,10 @@
 //!   and a due poll goes before a due keep-alive.
 //! - A poll first runs one period after it's added, and then one period after each run
 //!   completes, so a slow response delays the next run by as much. A failed run, whether it timed
-//!   out or was rejected, is rescheduled the same way and isn't retried sooner.
-//! - Demanding a poll runs it at once, and its next run is one period after that run completes. A
+//!   out or was rejected, is rescheduled the same way and isn't retried sooner, unless the poll was
+//!   demanded while it ran.
+//! - Demanding a poll runs it at once, and its next run is one period after that run completes.
+//!   Demanding a poll while it runs makes it run again as soon as that run completes or fails. A
 //!   removed poll never runs again.
 //! - Within an association, when the master picks a poll it takes the first one added that is
 //!   already due, whichever came due first. If no poll is due, it waits for the earliest deadline.
@@ -426,7 +428,7 @@ async fn demanding_a_poll_runs_it_at_once_and_restarts_its_period() {
 }
 
 #[tokio::test(start_paused = true)]
-async fn demanding_a_poll_while_it_runs_is_absorbed_by_that_run() {
+async fn demanding_a_poll_while_it_runs_runs_it_again_when_that_run_completes() {
     watchdog(async {
         let mut harness = Harness::new();
         let mut a = harness.add(A, quiet(5)).await;
@@ -439,7 +441,32 @@ async fn demanding_a_poll_while_it_runs_is_absorbed_by_that_run() {
         tokio::time::advance(secs(2)).await;
         harness.respond().await;
 
-        assert_eq!(harness.next().await, (secs(22), read(A, class(1))));
+        expect_answered(
+            &mut harness,
+            &[(secs(12), read(A, class(1))), (secs(22), read(A, class(1)))],
+        )
+        .await;
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn demanding_a_poll_whose_run_then_times_out_runs_it_again_when_that_run_fails() {
+    watchdog(async {
+        let mut harness = Harness::new();
+        let mut a = harness.add(A, quiet(5)).await;
+        let mut poll = add_poll(&mut a, class(1), secs(10)).await;
+
+        // the poll is demanded while it waits for a response that never comes
+        assert_eq!(harness.next().await, (secs(10), read(A, class(1))));
+        poll.demand().await.unwrap();
+        harness.settle().await;
+
+        expect_answered(
+            &mut harness,
+            &[(secs(15), read(A, class(1))), (secs(25), read(A, class(1)))],
+        )
+        .await;
     })
     .await;
 }

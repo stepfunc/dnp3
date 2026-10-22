@@ -365,6 +365,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
             doc("Demand the immediate execution of a poll previously created with {class:master_channel.add_poll()}.")
                 .details("This method returns immediately. The result will be sent to the registered {interface:read_handler}.")
                 .details("This method resets the internal timer of the poll.")
+                .details("If the poll is running, it runs again as soon as that run completes.")
         )?
         .build()?;
 
