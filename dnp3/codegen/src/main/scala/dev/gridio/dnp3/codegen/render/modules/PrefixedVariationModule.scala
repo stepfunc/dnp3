@@ -11,7 +11,7 @@ object PrefixedVariationModule extends Module {
       "use crate::app::variations::*;".eol ++
       "use crate::app::parse::count::CountSequence;".eol ++
       "use crate::app::parse::parser::*;".eol ++
-      "use crate::app::parse::traits::{FixedSize, Index};".eol ++
+      "use crate::app::parse::traits::Index;".eol ++
       "use crate::app::parse::prefix::Prefix;".eol ++
       "use crate::app::parse::bytes::*;".eol ++
       "use crate::app::parse::options::ParseOptions;".eol ++
@@ -41,7 +41,7 @@ object PrefixedVariationModule extends Module {
     }
 
     "#[derive(Debug)]".eol ++
-      bracket("pub(crate) enum PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Display") {
+      bracket("pub(crate) enum PrefixedVariation<'a, I> where I : Index") {
         variations.iterator.flatMap(v =>  commented(v.fullDesc).eol ++ definition(v))
       }
 
@@ -155,7 +155,7 @@ object PrefixedVariationModule extends Module {
       }
     }
 
-    bracket("impl<'a, I> PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Display") {
+    bracket("impl<'a, I> PrefixedVariation<'a, I> where I : Index") {
       bracket("pub(crate) fn parse(v: Variation, count: u16, options: ParseOptions, cursor: &mut ReadCursor<'a>) -> Result<PrefixedVariation<'a, I>, ObjectParseError>") {
         bracket("match v") {
           variations.flatMap(parseMatcher) ++ "_ => Err(ObjectParseError::InvalidQualifierForVariation(v, I::COUNT_AND_PREFIX_QUALIFIER)),".eol

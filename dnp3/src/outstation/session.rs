@@ -2064,7 +2064,7 @@ impl OutstationSession {
             match header.details {
                 HeaderDetails::Count(_, _, CountVariation::Group50Var2(seq)) => {
                     match seq.single() {
-                        None => iin.iin2.set(Iin2::PARAMETER_ERROR),
+                        None => iin.iin2 |= Iin2::PARAMETER_ERROR,
                         Some(x) => {
                             timing = Some(x.into());
                         }
@@ -2084,7 +2084,7 @@ impl OutstationSession {
                                 "freeze-at-time on {} w/o preceding g50v2",
                                 header.variation()
                             );
-                            iin.iin2.set(Iin2::PARAMETER_ERROR);
+                            iin.iin2 |= Iin2::PARAMETER_ERROR;
                         }
                         Some(x) => {
                             iin |= self.handle_freeze_header(

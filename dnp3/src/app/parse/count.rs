@@ -5,7 +5,7 @@ use scursor::{ReadCursor, ReadError};
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct CountSequence<'a, T>
 where
-    T: FixedSize + Copy + Clone,
+    T: FixedSize,
 {
     count: usize,
     data: &'a [u8],
@@ -14,7 +14,7 @@ where
 
 impl<'a, T> CountSequence<'a, T>
 where
-    T: FixedSize + Copy + Clone,
+    T: FixedSize,
 {
     pub(crate) fn parse(
         count: u16,

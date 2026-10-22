@@ -185,7 +185,7 @@ impl<'a> RangedVariation<'a> {
             Variation::Group102Var0 => Ok(RangedVariation::Group102Var0),
             Variation::Group102Var1 => Ok(RangedVariation::Group102Var1(RangedSequence::parse(range, cursor)?)),
             Variation::Group110(x) => {
-                Ok(RangedVariation::Group110VarX(x, RangedBytesSequence::parse(options, x, range.get_start(), range.get_count(), cursor)?))
+                Ok(RangedVariation::Group110VarX(x, RangedBytesSequence::parse(options, x, range, cursor)?))
             },
             _ => Err(ObjectParseError::InvalidQualifierForVariation(v, qualifier)),
         }

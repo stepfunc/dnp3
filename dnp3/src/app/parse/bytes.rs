@@ -1,3 +1,4 @@
+use crate::app::parse::range::Range;
 use crate::app::parse::traits::FixedSize;
 use crate::app::parse_error::ObjectParseError;
 
@@ -33,9 +34,8 @@ impl std::fmt::Display for Bytes<'_> {
 #[derive(Debug, PartialEq)]
 pub(crate) struct RangedBytesSequence<'a> {
     bytes: &'a [u8],
-    index: u16,
+    range: Range,
     size: usize,
-    count: usize,
 }
 
 #[derive(Debug)]
@@ -71,8 +71,7 @@ impl<'a> RangedBytesSequence<'a> {
     pub(crate) fn parse(
         options: ParseOptions,
         variation: u8,
-        index: u16,
-        count: usize,
+        range: Range,
         cursor: &mut ReadCursor<'a>,
     ) -> Result<Self, ObjectParseError> {
         if variation == 0 && !options.parse_zero_length_strings {
@@ -81,23 +80,22 @@ impl<'a> RangedBytesSequence<'a> {
 
         let size = usize::from(variation);
         let num_bytes = size
-            .checked_mul(count)
+            .checked_mul(range.get_count())
             .ok_or(ObjectParseError::InsufficientBytes)?;
 
         Ok(RangedBytesSequence {
             bytes: cursor.read_bytes(num_bytes)?,
-            index,
+            range,
             size,
-            count,
         })
     }
 
     pub(crate) fn iter(&self) -> RangedBytesIterator<'a> {
         RangedBytesIterator {
             cursor: ReadCursor::new(self.bytes),
-            index: self.index,
+            index: self.range.get_start(),
             size: self.size,
-            remaining: self.count,
+            remaining: self.range.get_count(),
         }
     }
 }

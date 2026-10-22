@@ -45,7 +45,7 @@ impl LinkIdConfig {
     pub fn new() -> Self {
         Self {
             max_tasks: DEFAULT_MAX_LINK_ID_TASKS,
-            timeout: Timeout(Duration::from_secs(5)),
+            timeout: Timeout::default(),
             decode_level: PhysDecodeLevel::Nothing,
         }
     }

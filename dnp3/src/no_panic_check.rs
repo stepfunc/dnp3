@@ -346,7 +346,7 @@ fn parsers_with_unknown_input() {
     let options = ParseOptions {
         parse_zero_length_strings: data.first().is_some_and(|x| x & 0x01 != 0),
     };
-    if let Ok(fragment) = ParsedFragment::parse_no_logging(options, &data) {
+    if let Ok(fragment) = ParsedFragment::parse(options, &data) {
         std::hint::black_box(fragment.to_request().is_ok());
         std::hint::black_box(fragment.to_response().is_ok());
         if let Ok(objects) = fragment.objects {

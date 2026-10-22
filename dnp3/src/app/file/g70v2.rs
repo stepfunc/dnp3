@@ -1,5 +1,7 @@
 use super::*;
+use crate::app::format::free_format::FreeFormat;
 use crate::app::format::WriteError;
+use crate::app::Variation;
 use scursor::{ReadCursor, WriteCursor};
 
 /// Group 70 Variation 3 - authentication
@@ -20,27 +22,6 @@ impl<'a> Group70Var2<'a> {
         write!(f, "\nuser name: {}", self.user_name)?;
         write!(f, "\npassword: <redacted>")?;
         format_auth_key(f, self.auth_key)
-    }
-
-    pub(crate) fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-        cursor.write_u16_le(Self::USER_NAME_OFFSET)?;
-        let user_name_size = byte_length(self.user_name)?;
-        cursor.write_u16_le(user_name_size)?;
-
-        let password_offset = match Self::USER_NAME_OFFSET.checked_add(user_name_size) {
-            None => return Err(WriteError::Overflow),
-            Some(x) => x,
-        };
-
-        cursor.write_u16_le(password_offset)?;
-        let password_size = byte_length(self.password)?;
-
-        cursor.write_u16_le(password_size)?;
-        cursor.write_u32_le(self.auth_key)?;
-        cursor.write_bytes(self.user_name.as_bytes())?;
-        cursor.write_bytes(self.password.as_bytes())?;
-
-        Ok(())
     }
 
     pub(crate) fn read(cursor: &mut ReadCursor<'a>) -> Result<Self, ReadError> {
@@ -87,9 +68,35 @@ impl<'a> Group70Var2<'a> {
     }
 }
 
+impl FreeFormat for Group70Var2<'_> {
+    const VARIATION: Variation = Variation::Group70Var2;
+
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u16_le(Self::USER_NAME_OFFSET)?;
+        let user_name_size = byte_length(self.user_name)?;
+        cursor.write_u16_le(user_name_size)?;
+
+        let password_offset = match Self::USER_NAME_OFFSET.checked_add(user_name_size) {
+            None => return Err(WriteError::Overflow),
+            Some(x) => x,
+        };
+
+        cursor.write_u16_le(password_offset)?;
+        let password_size = byte_length(self.password)?;
+
+        cursor.write_u16_le(password_size)?;
+        cursor.write_u32_le(self.auth_key)?;
+        cursor.write_bytes(self.user_name.as_bytes())?;
+        cursor.write_bytes(self.password.as_bytes())?;
+
+        Ok(())
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::Group70Var2;
+    use crate::app::format::free_format::FreeFormat;
     use scursor::{ReadCursor, WriteCursor};
 
     const OBJECT: Group70Var2 = Group70Var2 {

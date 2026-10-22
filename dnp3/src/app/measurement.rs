@@ -541,15 +541,12 @@ impl Flags {
     }
 }
 
-struct FlagFormatter {
+/// Writes the names of the set flags, separated by commas
+struct FlagList {
     prev: bool,
 }
 
-impl FlagFormatter {
-    fn new() -> Self {
-        Self { prev: false }
-    }
-
+impl FlagList {
     fn push(
         &mut self,
         is_set: bool,
@@ -563,37 +560,6 @@ impl FlagFormatter {
             self.prev = true;
             f.write_str(text)?;
         }
-        Ok(())
-    }
-
-    fn begin(flags: Flags, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        write!(f, "0x{:02X} [", flags.value)
-    }
-
-    fn end(f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        f.write_str("]")
-    }
-
-    fn format_binary_flags_0_to_4(
-        &mut self,
-        flags: Flags,
-        f: &mut std::fmt::Formatter,
-    ) -> std::fmt::Result {
-        self.push(flags.is_set(Flags::ONLINE), "ONLINE", f)?;
-        self.push(flags.is_set(Flags::RESTART), "RESTART", f)?;
-        self.push(flags.is_set(Flags::COMM_LOST), "COMM_LOST", f)?;
-        self.push(flags.is_set(Flags::REMOTE_FORCED), "REMOTE_FORCED", f)?;
-        self.push(flags.is_set(Flags::LOCAL_FORCED), "LOCAL_FORCED", f)?;
-        Ok(())
-    }
-
-    fn format_binary_flags_0_to_5(
-        &mut self,
-        flags: Flags,
-        f: &mut std::fmt::Formatter,
-    ) -> std::fmt::Result {
-        self.format_binary_flags_0_to_4(flags, f)?;
-        self.push(flags.is_set(Flags::CHATTER_FILTER), "CHATTER_FILTER", f)?;
         Ok(())
     }
 
@@ -614,132 +580,85 @@ impl FlagFormatter {
     }
 }
 
-pub(crate) struct BinaryFlagFormatter {
-    flags: Flags,
+/// What bits 5 to 7 of the flags mean, which depends on the measurement type
+#[derive(Copy, Clone)]
+enum HighFlags {
+    /// the names of bits 5, 6 and 7
+    Named([&'static str; 3]),
+    /// bit 5 is CHATTER_FILTER and bits 6 and 7 are the double-bit state
+    ChatterFilterAndState,
 }
 
-impl BinaryFlagFormatter {
-    pub(crate) fn new(value: u8) -> Self {
+/// Displays a flags byte and the names of the bits it sets
+pub(crate) struct FlagFormatter {
+    flags: Flags,
+    high: HighFlags,
+}
+
+impl FlagFormatter {
+    fn named(value: u8, names: [&'static str; 3]) -> Self {
         Self {
             flags: Flags::new(value),
+            high: HighFlags::Named(names),
         }
     }
-}
 
-impl std::fmt::Display for BinaryFlagFormatter {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let mut formatter = FlagFormatter::new();
-        FlagFormatter::begin(self.flags, f)?;
-        formatter.format_binary_flags_0_to_5(self.flags, f)?;
-        formatter.push(self.flags.value.bit_6(), "RESERVED(6)", f)?;
-        formatter.push(self.flags.value.bit_7(), "STATE", f)?;
-        FlagFormatter::end(f)
+    pub(crate) fn binary(value: u8) -> Self {
+        Self::named(value, ["CHATTER_FILTER", "RESERVED(6)", "STATE"])
     }
-}
 
-pub(crate) struct DoubleBitBinaryFlagFormatter {
-    flags: Flags,
-}
-
-impl DoubleBitBinaryFlagFormatter {
-    pub(crate) fn new(value: u8) -> Self {
+    pub(crate) fn double_bit_binary(value: u8) -> Self {
         Self {
             flags: Flags::new(value),
+            high: HighFlags::ChatterFilterAndState,
         }
     }
-}
 
-impl std::fmt::Display for DoubleBitBinaryFlagFormatter {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let mut formatter = FlagFormatter::new();
-        FlagFormatter::begin(self.flags, f)?;
-        formatter.format_binary_flags_0_to_5(self.flags, f)?;
-        formatter.push_debug_item("state", self.flags.double_bit_state(), f)?;
-        FlagFormatter::end(f)
+    pub(crate) fn binary_output_status(value: u8) -> Self {
+        Self::named(value, ["RESERVED(5)", "RESERVED(6)", "STATE"])
+    }
+
+    pub(crate) fn counter(value: u8) -> Self {
+        Self::named(value, ["ROLLOVER", "DISCONTINUITY", "RESERVED(7)"])
+    }
+
+    pub(crate) fn analog(value: u8) -> Self {
+        Self::named(value, ["OVER_RANGE", "REFERENCE_ERR", "RESERVED(7)"])
     }
 }
 
-pub(crate) struct BinaryOutputStatusFlagFormatter {
-    flags: Flags,
-}
-
-impl BinaryOutputStatusFlagFormatter {
-    pub(crate) fn new(value: u8) -> Self {
-        Self {
-            flags: Flags::new(value),
+impl std::fmt::Display for FlagFormatter {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        let flags = self.flags;
+        write!(f, "0x{:02X} [", flags.value)?;
+        let mut list = FlagList { prev: false };
+        list.push(flags.is_set(Flags::ONLINE), "ONLINE", f)?;
+        list.push(flags.is_set(Flags::RESTART), "RESTART", f)?;
+        list.push(flags.is_set(Flags::COMM_LOST), "COMM_LOST", f)?;
+        list.push(flags.is_set(Flags::REMOTE_FORCED), "REMOTE_FORCED", f)?;
+        list.push(flags.is_set(Flags::LOCAL_FORCED), "LOCAL_FORCED", f)?;
+        match self.high {
+            HighFlags::Named([bit_5, bit_6, bit_7]) => {
+                list.push(flags.value.bit_5(), bit_5, f)?;
+                list.push(flags.value.bit_6(), bit_6, f)?;
+                list.push(flags.value.bit_7(), bit_7, f)?;
+            }
+            HighFlags::ChatterFilterAndState => {
+                list.push(flags.is_set(Flags::CHATTER_FILTER), "CHATTER_FILTER", f)?;
+                list.push_debug_item("state", flags.double_bit_state(), f)?;
+            }
         }
-    }
-}
-
-impl std::fmt::Display for BinaryOutputStatusFlagFormatter {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let mut formatter = FlagFormatter::new();
-        FlagFormatter::begin(self.flags, f)?;
-        formatter.format_binary_flags_0_to_4(self.flags, f)?;
-        formatter.push(self.flags.value.bit_5(), "RESERVED(5)", f)?;
-        formatter.push(self.flags.value.bit_6(), "RESERVED(6)", f)?;
-        formatter.push(self.flags.value.bit_7(), "STATE", f)?;
-        FlagFormatter::end(f)
-    }
-}
-
-pub(crate) struct CounterFlagFormatter {
-    flags: Flags,
-}
-
-impl CounterFlagFormatter {
-    pub(crate) fn new(value: u8) -> Self {
-        Self {
-            flags: Flags::new(value),
-        }
-    }
-}
-
-impl std::fmt::Display for CounterFlagFormatter {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let mut formatter = FlagFormatter::new();
-        FlagFormatter::begin(self.flags, f)?;
-        formatter.format_binary_flags_0_to_4(self.flags, f)?;
-        formatter.push(self.flags.value.bit_5(), "ROLLOVER", f)?;
-        formatter.push(self.flags.value.bit_6(), "DISCONTINUITY", f)?;
-        formatter.push(self.flags.value.bit_7(), "RESERVED(7)", f)?;
-        FlagFormatter::end(f)
-    }
-}
-
-pub(crate) struct AnalogFlagFormatter {
-    flags: Flags,
-}
-
-impl AnalogFlagFormatter {
-    pub(crate) fn new(value: u8) -> Self {
-        Self {
-            flags: Flags::new(value),
-        }
-    }
-}
-
-impl std::fmt::Display for AnalogFlagFormatter {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        let mut formatter = FlagFormatter::new();
-        FlagFormatter::begin(self.flags, f)?;
-        formatter.format_binary_flags_0_to_4(self.flags, f)?;
-        formatter.push(self.flags.value.bit_5(), "OVER_RANGE", f)?;
-        formatter.push(self.flags.value.bit_6(), "REFERENCE_ERR", f)?;
-        formatter.push(self.flags.value.bit_7(), "RESERVED(7)", f)?;
-        FlagFormatter::end(f)
+        f.write_str("]")
     }
 }
 
 pub(crate) trait AnalogConversions {
-    const OVER_RANGE: BitMask = bits::BIT_5;
-
     fn get_value(&self) -> f64;
     fn get_flags(&self) -> Flags;
 
     /// the flags with OVER_RANGE set, for a value the variation can't represent
     fn over_range<N>(&self, value: N) -> (Flags, N) {
-        (self.get_flags().with_bits_set(Self::OVER_RANGE), value)
+        (self.get_flags() | Flags::OVER_RANGE, value)
     }
 
     /// NaN is 0 and out of range values clamp, both with OVER_RANGE
@@ -1093,9 +1012,9 @@ mod tests {
 
     #[test]
     fn formats_binary_flags() {
-        assert_eq!(format!("{}", BinaryFlagFormatter::new(0)), "0x00 []");
+        assert_eq!(format!("{}", FlagFormatter::binary(0)), "0x00 []");
         assert_eq!(
-            format!("{}", BinaryFlagFormatter::new(0b1100_0001)),
+            format!("{}", FlagFormatter::binary(0b1100_0001)),
             "0xC1 [ONLINE, RESERVED(6), STATE]"
         );
     }
@@ -1103,11 +1022,11 @@ mod tests {
     #[test]
     fn formats_double_flags() {
         assert_eq!(
-            format!("{}", DoubleBitBinaryFlagFormatter::new(0)),
+            format!("{}", FlagFormatter::double_bit_binary(0)),
             "0x00 [state = Intermediate]"
         );
         assert_eq!(
-            format!("{}", DoubleBitBinaryFlagFormatter::new(0b1100_0001)),
+            format!("{}", FlagFormatter::double_bit_binary(0b1100_0001)),
             "0xC1 [ONLINE, state = Indeterminate]"
         );
     }

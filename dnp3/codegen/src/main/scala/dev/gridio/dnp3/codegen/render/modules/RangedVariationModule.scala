@@ -70,7 +70,7 @@ object RangedVariationModule extends Module {
 
       case v : SizedByVariation => {
         bracketComma(s"Variation::${v.parent.name}(x) =>") {
-          s"Ok(RangedVariation::${v.parent.name}VarX(x, RangedBytesSequence::parse(options, x, range.get_start(), range.get_count(), cursor)?))".eol
+          s"Ok(RangedVariation::${v.parent.name}VarX(x, RangedBytesSequence::parse(options, x, range, cursor)?))".eol
         }
       }
       case SpecificAttribute => {

@@ -1,5 +1,7 @@
 use super::*;
+use crate::app::format::free_format::FreeFormat;
 use crate::app::format::WriteError;
+use crate::app::Variation;
 use scursor::{ReadCursor, WriteCursor};
 
 /// Group 70 Variation 4 - file command status
@@ -26,16 +28,6 @@ impl<'a> Group70Var4<'a> {
         Ok(())
     }
 
-    pub(crate) fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-        cursor.write_u32_le(self.file_handle)?;
-        cursor.write_u32_le(self.file_size)?;
-        cursor.write_u16_le(self.max_block_size)?;
-        cursor.write_u16_le(self.request_id)?;
-        cursor.write_u8(self.status_code.to_u8())?;
-        cursor.write_bytes(self.text.as_bytes())?;
-        Ok(())
-    }
-
     pub(crate) fn read(cursor: &mut ReadCursor<'a>) -> Result<Self, ReadError> {
         let file_handle = cursor.read_u32_le()?;
         let file_size = cursor.read_u32_le()?;
@@ -52,6 +44,20 @@ impl<'a> Group70Var4<'a> {
             status_code,
             text,
         })
+    }
+}
+
+impl FreeFormat for Group70Var4<'_> {
+    const VARIATION: Variation = Variation::Group70Var4;
+
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u32_le(self.file_handle)?;
+        cursor.write_u32_le(self.file_size)?;
+        cursor.write_u16_le(self.max_block_size)?;
+        cursor.write_u16_le(self.request_id)?;
+        cursor.write_u8(self.status_code.to_u8())?;
+        cursor.write_bytes(self.text.as_bytes())?;
+        Ok(())
     }
 }
 
