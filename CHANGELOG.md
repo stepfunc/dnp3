@@ -8,6 +8,7 @@
 * :bell: **The minimum supported Rust version is now 1.88.** See [#502](https://github.com/stepfunc/dnp3/pull/502).
 * :bell: Deprecate `WriteError::IinError`, `TimeSyncError::IinError`, `TimeSyncError::SystemTimeNotUnix`, `CommandResponseError::Request` and `ObjectParseError::UnsupportedQualifierCode`, which are never returned. They will be removed in 2.0. See [#556](https://github.com/stepfunc/dnp3/pull/556).
 * :star: Every public type in the Rust crate implements `Debug`. See [#519](https://github.com/stepfunc/dnp3/pull/519).
+* :bell: Defining a visible string, octet string or bit string device attribute longer than 255 bytes now fails with the new `AttrDefError::BadValue` (`bad_value` in the bindings). Such attributes were accepted but could never be encoded, so READs left them out. See [#567](https://github.com/stepfunc/dnp3/pull/567).
 * :star: Export `LinkError`, `FrameError` and `LogicError` from `dnp3::link`. `TaskError::Link` contained a `LinkError` that Rust users couldn't name. See [#539](https://github.com/stepfunc/dnp3/pull/539).
 * :bug: Fix an outstation resending the first fragment's header and length when a READ is repeated while it waits for confirmation of a later fragment. It now resends the fragment awaiting confirmation. See [#504](https://github.com/stepfunc/dnp3/pull/504).
 * :bug: Fix a file reader that aborts in `opened` being told the read failed with `Shutdown`, or with the CLOSE's error, instead of `AbortByUser`. See [#547](https://github.com/stepfunc/dnp3/pull/547).

@@ -1112,6 +1112,10 @@ pub(crate) fn define_database(
             "not_writable",
             "This attribute cannot be configured as writable",
         )?
+        .push(
+            "bad_value",
+            "The value cannot be encoded, e.g. a string longer than 255 bytes",
+        )?
         .build()?;
 
     let define_string_attr = lib
