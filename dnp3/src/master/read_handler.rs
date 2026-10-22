@@ -149,19 +149,16 @@ pub trait ReadHandler: Send + Sync {
 pub(crate) fn handle_attribute<H: ReadHandler + ?Sized>(
     var: Variation,
     qualifier: QualifierCode,
-    attr: &Option<Attribute>,
+    attr: &Attribute,
     handler: &mut H,
 ) -> bool {
-    if let Some(attr) = attr {
-        match AnyAttribute::try_from(attr) {
-            Ok(attr) => {
-                handler
-                    .handle_device_attribute(HeaderInfo::new(var, qualifier, false, false), attr);
-            }
-            Err(_) => return false,
+    match AnyAttribute::try_from(attr) {
+        Ok(attr) => {
+            handler.handle_device_attribute(HeaderInfo::new(var, qualifier, false, false), attr);
+            true
         }
+        Err(_) => false,
     }
-    true
 }
 
 /// Information about the object header and specific variation

@@ -25,44 +25,23 @@ object CountVariationModule extends Module {
     def definition(v : Variation): Iterator[String] = {
       v match {
         case v : FixedSize if v.parent.groupType == GroupType.Time => s"${v.name}(CountSequence<'a, ${v.name}>),".eol
-        case _ : SizedByVariation => {
-            s"${v.parent.name}Var0,".eol ++
-            s"${v.parent.name}VarX(u8),".eol
-        }
+        case _ : SizedByVariation => s"${v.parent.name}Var0,".eol
         case _ => s"${v.name},".eol
       }
     }
 
     "#[derive(Debug, PartialEq)]".eol ++
       bracket("pub(crate) enum CountVariation<'a>") {
-        variations.iterator.flatMap(v =>  commented(v.fullDesc).eol ++ definition(v))
+        nonReadVariations.flatMap(v =>  commented(v.fullDesc).eol ++ definition(v))
       }
 
   }
 
   private def enumImpl(implicit indent: Indentation) : Iterator[String] = {
 
-    def isTime(v : Variation) : Boolean = v.parent.groupType == GroupType.Time
-
-    // a READ request carries no object data: time objects are empty, and each event variation names
-    // the events to read
-    def readMatcher(v : Variation) : Iterator[String] = {
-      v match {
-        case v : FixedSize if isTime(v) => s"Variation::${v.name} => Ok(CountVariation::${v.name}(CountSequence::empty())),".eol
-        case _ : SizedByVariation => {
-            s"Variation::${v.parent.name}(0) => Ok(CountVariation::${v.parent.name}Var0),".eol ++
-            s"Variation::${v.parent.name}(x) => Ok(CountVariation::${v.parent.name}VarX(x)),".eol
-        }
-        case _ => s"Variation::${v.name} => Ok(CountVariation::${v.name}),".eol
-      }
-    }
-
-    // outside a READ, a count of a variation with a known object size would have to be followed by
-    // the objects, which only the time objects may carry
     def nonReadMatcher(v : Variation) : Iterator[String] = {
       v match {
         case v : FixedSize if isTime(v) => s"Variation::${v.name} => Ok(CountVariation::${v.name}(CountSequence::parse(count, cursor)?)),".eol
-        case _ : FixedSize => Iterator.empty
         case _ : SizedByVariation => s"Variation::${v.parent.name}(0) => Ok(CountVariation::${v.parent.name}Var0),".eol
         case _ => s"Variation::${v.name} => Ok(CountVariation::${v.name}),".eol
       }
@@ -70,35 +49,39 @@ object CountVariationModule extends Module {
 
     def fmtMatcher(v : Variation) : Iterator[String] = {
       v match {
-        case v : FixedSize if v.parent.groupType == GroupType.Time => s"CountVariation::${v.name}(seq) => format_count_of_items(f, seq.iter()),".eol
-        case _ : SizedByVariation => {
-            s"CountVariation::${v.parent.name}Var0 => Ok(()),".eol ++
-            s"CountVariation::${v.parent.name}VarX(_) => Ok(()),".eol
-        }
+        case v : FixedSize if isTime(v) => s"CountVariation::${v.name}(seq) => format_count_of_items(f, seq.iter()),".eol
+        case _ : SizedByVariation => s"CountVariation::${v.parent.name}Var0 => Ok(()),".eol
         case _ => s"CountVariation::${v.name} => Ok(()),".eol
       }
     }
 
     bracket("impl<'a> CountVariation<'a>") {
-      bracket("pub(crate) fn parse_read(v: Variation, qualifier: QualifierCode) -> Result<CountVariation<'a>, ObjectParseError>") {
-        bracket("match v") {
-          variations.flatMap(readMatcher) ++ "_ => Err(ObjectParseError::InvalidQualifierForVariation(v, qualifier)),".eol
-        }
-      } ++ space ++
       bracket("pub(crate) fn parse_non_read(v: Variation, qualifier: QualifierCode, count: u16, cursor: &mut ReadCursor<'a>) -> Result<CountVariation<'a>, ObjectParseError>") {
         bracket("match v") {
-          variations.flatMap(nonReadMatcher) ++ "_ => Err(ObjectParseError::InvalidQualifierForVariation(v, qualifier)),".eol
+          nonReadVariations.flatMap(nonReadMatcher) ++ "_ => Err(ObjectParseError::InvalidQualifierForVariation(v, qualifier)),".eol
         }
       } ++ space ++
       bracket("pub(crate) fn format_objects(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result") {
         bracket("match self") {
-          variations.flatMap(fmtMatcher)
+          nonReadVariations.flatMap(fmtMatcher)
         }
       }
     }
 
   }
 
+  private def isTime(v : Variation) : Boolean = v.parent.groupType == GroupType.Time
+
+  // outside a READ, a count of a variation with a known object size would have to be followed by
+  // the objects, which only the time objects may carry
+  private def nonReadVariations : Iterator[Variation] = {
+    variations.filter {
+      case v : FixedSize => isTime(v)
+      case _ => true
+    }
+  }
+
+  // the variations a count header can name, including those that only a READ can
   def variations : Iterator[Variation] = {
     ObjectGroup.allVariations.iterator.flatMap { v =>
       v match {

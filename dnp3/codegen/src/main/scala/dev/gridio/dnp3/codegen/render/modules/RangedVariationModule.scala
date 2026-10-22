@@ -36,12 +36,11 @@ object RangedVariationModule extends Module {
         case _ : AnyVariation => nameOnly
         case _ : FixedSize => s"${v.name}(RangedSequence<'a, ${v.name}>),".eol
         case _ : SizedByVariation if v.parent.groupType.isStatic =>  {
-          s"${v.parent.name}Var0,".eol ++
-            s"${v.parent.name}VarX(u8, RangedBytesSequence<'a>),".eol
+          s"${v.parent.name}VarX(u8, RangedBytesSequence<'a>),".eol
         }
         case SpecificAttribute => {
-          "/// variation and optional attribute".eol ++
-          s"${v.parent.name}(u8, Option<crate::app::attr::Attribute<'a>>),".eol
+          "/// variation and attribute".eol ++
+          s"${v.parent.name}(u8, crate::app::attr::Attribute<'a>),".eol
         }
         case AllAttributesRequest => nameOnly
       }
@@ -58,16 +57,9 @@ object RangedVariationModule extends Module {
 
     def getNonReadVarDefinition(v: Variation) : String = v match {
       case AllAttributesRequest => ""
-      case SpecificAttribute => "(var, Some(crate::app::attr::Attribute::parse_from_range(var, range, cursor)?))"
+      case SpecificAttribute => "(var, crate::app::attr::Attribute::parse_from_range(var, range, cursor)?)"
       case _ : AnyVariation => ""
       case _ : FixedSize => "(RangedSequence::parse(range, cursor)?)"
-    }
-
-    def getReadVarDefinition(v: Variation) : String = v match {
-      case AllAttributesRequest => ""
-      case SpecificAttribute => "(var, None)"
-      case _ : AnyVariation => ""
-      case _ : FixedSize => "(RangedSequence::empty())"
     }
 
     def getNonReadMatcher(v: Variation): Iterator[String] = v match {
@@ -90,33 +82,15 @@ object RangedVariationModule extends Module {
       case _ => s"Variation::${v.name} => Ok(RangedVariation::${v.name}${getNonReadVarDefinition(v)}),".eol
     }
 
-    def getReadMatcher(v: Variation): Iterator[String] = v match {
-      case _ : SingleBitField =>  {
-        s"Variation::${v.name} => Ok(RangedVariation::${v.name}(BitSequence::empty())),".eol
-      }
-
-      case _ : DoubleBitField =>  {
-        s"Variation::${v.name} => Ok(RangedVariation::${v.name}(DoubleBitSequence::empty())),".eol
-      }
-      case _ : SizedByVariation => {
-        s"Variation::${v.parent.name}(0) => Ok(RangedVariation::${v.parent.name}Var0),".eol
-      }
-      case SpecificAttribute => {
-        s"Variation::${v.parent.name}(var) => Ok(RangedVariation::${v.parent.name}${getReadVarDefinition(v)}),".eol
-      }
-      case _ => s"Variation::${v.name} => Ok(RangedVariation::${v.name}${getReadVarDefinition(v)}),".eol
-    }
-
     def getFmtMatcher(v: Variation): Iterator[String] = {
       def nothing = s"RangedVariation::${v.name} => Ok(()),".eol
 
       v match {
         case AllAttributesRequest => nothing
-        case SpecificAttribute => s"RangedVariation::${v.parent.name}(_, x) => format_optional_attribute(f, x),".eol
+        case SpecificAttribute => s"RangedVariation::${v.parent.name}(_, x) => x.format(f),".eol
         case _ : AnyVariation => nothing
         case _ : SizedByVariation => {
-          s"RangedVariation::${v.parent.name}Var0 => Ok(()),".eol ++
-            s"RangedVariation::${v.parent.name}VarX(_, seq) => format_indexed_items(f, seq.iter().map(|(x, i)| (Bytes::new(x), i))),".eol
+          s"RangedVariation::${v.parent.name}VarX(_, seq) => format_indexed_items(f, seq.iter().map(|(x, i)| (Bytes::new(x), i))),".eol
         }
 
         case _ => s"RangedVariation::${v.name}(seq) => format_indexed_items(f, seq.iter()),".eol
@@ -172,9 +146,6 @@ object RangedVariationModule extends Module {
         case _ : DoubleBitField => simpleExtract(v)
         case _ : FixedSize => simpleExtract(v)
         case Group110AnyVar => {
-          bracket(s"RangedVariation::${v.parent.name}Var0 =>") {
-            "false".eol
-          } ++
           bracket(s"RangedVariation::${v.parent.name}VarX(_,seq) =>") {
             parenSemi("handler.handle_octet_string") {
               s"HeaderInfo::new(var, qualifier, ${isEvent}, ${v.hasFlags}),".eol ++
@@ -191,11 +162,6 @@ object RangedVariationModule extends Module {
           variations.flatMap(getNonReadMatcher).iterator ++ "_ => Err(ObjectParseError::InvalidQualifierForVariation(v, qualifier)),".eol
         }
       } ++ space ++
-        bracket("pub(crate) fn parse_read(v: Variation, qualifier: QualifierCode) -> Result<RangedVariation<'a>, ObjectParseError>") {
-          bracket("match v") {
-            variations.flatMap(getReadMatcher).iterator ++ "_ => Err(ObjectParseError::InvalidQualifierForVariation(v, qualifier)),".eol
-          }
-        } ++ space ++
         bracket("pub(crate) fn format_objects(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result") {
           bracket("match self") {
             variations.flatMap(getFmtMatcher).iterator

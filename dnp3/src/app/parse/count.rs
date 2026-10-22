@@ -25,10 +25,6 @@ where
         Ok(Self::new(count, cursor.read_bytes(num_bytes)?))
     }
 
-    pub(crate) fn empty() -> Self {
-        Self::new(0, &[])
-    }
-
     pub(crate) fn single(&self) -> Option<T> {
         if self.count != 1 {
             return None;

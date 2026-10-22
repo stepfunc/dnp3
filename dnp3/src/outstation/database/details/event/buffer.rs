@@ -4,7 +4,6 @@ use std::ops::BitOr;
 use crate::app::measurement::{self};
 use crate::master::EventClasses;
 use crate::outstation::database::config::*;
-use crate::outstation::database::read::EventReadHeader;
 use crate::outstation::database::{EventBufferConfig, EventClass};
 
 use crate::util::BadWrite;
@@ -522,48 +521,6 @@ impl EventBuffer {
         }
     }
 
-    pub(crate) fn select_by_header(&mut self, header: EventReadHeader) -> usize {
-        match header {
-            EventReadHeader::Class1(limit) => {
-                self.select_by_class(EventClass::Class1.into(), limit)
-            }
-            EventReadHeader::Class2(limit) => {
-                self.select_by_class(EventClass::Class2.into(), limit)
-            }
-            EventReadHeader::Class3(limit) => {
-                self.select_by_class(EventClass::Class3.into(), limit)
-            }
-            EventReadHeader::Binary(v, limit) => {
-                self.select_by_type::<measurement::BinaryInput>(v, limit)
-            }
-            EventReadHeader::DoubleBitBinary(v, limit) => {
-                self.select_by_type::<measurement::DoubleBitBinaryInput>(v, limit)
-            }
-            EventReadHeader::BinaryOutputStatus(v, limit) => {
-                self.select_by_type::<measurement::BinaryOutputStatus>(v, limit)
-            }
-            EventReadHeader::Counter(v, limit) => {
-                self.select_by_type::<measurement::Counter>(v, limit)
-            }
-            EventReadHeader::FrozenCounter(v, limit) => {
-                self.select_by_type::<measurement::FrozenCounter>(v, limit)
-            }
-            EventReadHeader::Analog(v, limit) => {
-                self.select_by_type::<measurement::AnalogInput>(v, limit)
-            }
-            EventReadHeader::AnalogOutputStatus(v, limit) => {
-                self.select_by_type::<measurement::AnalogOutputStatus>(v, limit)
-            }
-            EventReadHeader::OctetString(limit) => {
-                self.select_by_type::<measurement::OctetString>(None, limit)
-            }
-            EventReadHeader::FrozenAnalog(_, _) => {
-                // not currently supported
-                0
-            }
-        }
-    }
-
     /// true if the buffer holds at least one event of the type, whatever its state
     pub(crate) fn has_events<T>(&self) -> bool
     where
@@ -583,7 +540,7 @@ impl EventBuffer {
         })
     }
 
-    fn select_by_type<T>(
+    pub(crate) fn select_by_type<T>(
         &mut self,
         specific_variation: Option<T::EventVariation>,
         limit: Option<usize>,

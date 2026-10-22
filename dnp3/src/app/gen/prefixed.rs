@@ -283,7 +283,7 @@ impl<'a, I> PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Dis
         match self {
             PrefixedVariation::Group0(attr) => {
                 let info = self.get_header_info();
-                crate::master::handle_attribute(info.variation, info.qualifier, &Some(*attr), handler)
+                crate::master::handle_attribute(info.variation, info.qualifier, attr, handler)
             }
             PrefixedVariation::Group2Var1(seq) => {
                 handler.handle_binary_input(

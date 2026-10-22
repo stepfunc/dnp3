@@ -13,6 +13,7 @@ The code generator creates the following Rust source files:
 - `../src/app/gen/all.rs` - All objects variations
 - `../src/app/gen/count.rs` - Count-based variations
 - `../src/app/gen/prefixed.rs` - Prefixed variations (with size prefix)
+- `../src/app/gen/read.rs` - The variations a READ request can carry with each qualifier
 - `../src/app/gen/conversion.rs` - Type conversion implementations
 
 ## Requirements

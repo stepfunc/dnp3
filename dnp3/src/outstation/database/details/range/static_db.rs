@@ -10,7 +10,7 @@ use crate::outstation::database::details::family::Family;
 use crate::outstation::database::details::range::traits::StaticVariation;
 use crate::outstation::database::details::range::writer::RangeWriter;
 use crate::outstation::database::details::WriteProgress;
-use crate::outstation::database::read::StaticReadHeader;
+use crate::outstation::database::read::StaticTarget;
 use crate::outstation::database::{ClassZeroConfig, EventClass, EventMode, UpdateOptions};
 
 use crate::app::attr::AttrSet;
@@ -483,36 +483,29 @@ impl StaticDatabase {
         Ok(())
     }
 
-    pub(crate) fn select(&mut self, variation: StaticReadHeader) -> Iin2 {
-        match variation {
-            StaticReadHeader::Class0 => self.select_class_zero(),
-            StaticReadHeader::Binary(variation, range) => {
-                self.select_by_type::<BinaryInput>(variation, range)
-            }
-            StaticReadHeader::DoubleBitBinary(variation, range) => {
+    pub(crate) fn select(&mut self, target: StaticTarget, range: Option<IndexRange>) -> Iin2 {
+        match target {
+            StaticTarget::Binary(variation) => self.select_by_type::<BinaryInput>(variation, range),
+            StaticTarget::DoubleBitBinary(variation) => {
                 self.select_by_type::<DoubleBitBinaryInput>(variation, range)
             }
-            StaticReadHeader::BinaryOutputStatus(variation, range) => {
+            StaticTarget::BinaryOutputStatus(variation) => {
                 self.select_by_type::<BinaryOutputStatus>(variation, range)
             }
-            StaticReadHeader::Counter(variation, range) => {
-                self.select_by_type::<Counter>(variation, range)
-            }
-            StaticReadHeader::FrozenCounter(variation, range) => {
+            StaticTarget::Counter(variation) => self.select_by_type::<Counter>(variation, range),
+            StaticTarget::FrozenCounter(variation) => {
                 self.select_by_type::<FrozenCounter>(variation, range)
             }
-            StaticReadHeader::Analog(variation, range) => {
-                self.select_by_type::<AnalogInput>(variation, range)
-            }
-            StaticReadHeader::AnalogOutputStatus(variation, range) => {
+            StaticTarget::Analog(variation) => self.select_by_type::<AnalogInput>(variation, range),
+            StaticTarget::AnalogOutputStatus(variation) => {
                 self.select_by_type::<AnalogOutputStatus>(variation, range)
             }
-            StaticReadHeader::OctetString(range) => self.select_by_type::<OctetString>(None, range),
-            StaticReadHeader::FrozenAnalog(_, _) => {
+            StaticTarget::OctetString => self.select_by_type::<OctetString>(None, range),
+            StaticTarget::FrozenAnalog(_) => {
                 // we know what it is, but don't support it
                 Iin2::OBJECT_UNKNOWN
             }
-            StaticReadHeader::AnalogInputDeadBand(var, range) => {
+            StaticTarget::AnalogInputDeadBand(var) => {
                 let (range, iin2) = match range {
                     None => match self.analog.full_range() {
                         Some(range) => (range, Iin2::default()),
@@ -601,7 +594,7 @@ impl StaticDatabase {
         }
     }
 
-    fn select_class_zero(&mut self) -> Iin2 {
+    pub(crate) fn select_class_zero(&mut self) -> Iin2 {
         self.select_class_zero_type::<BinaryInput>()
             | self.select_class_zero_type::<DoubleBitBinaryInput>()
             | self.select_class_zero_type::<BinaryOutputStatus>()
@@ -1117,10 +1110,10 @@ mod tests {
         );
 
         assert_eq!(
-            db.select(StaticReadHeader::Counter(
-                Some(StaticCounterVariation::Group20Var5),
+            db.select(
+                StaticTarget::Counter(Some(StaticCounterVariation::Group20Var5)),
                 None
-            )),
+            ),
             Iin2::default()
         );
 
@@ -1237,26 +1230,26 @@ mod tests {
         let mut db = StaticDatabase::default();
 
         assert_eq!(
-            db.select(StaticReadHeader::Binary(None, None)),
+            db.select(StaticTarget::Binary(None), None),
             Iin2::OBJECT_UNKNOWN
         );
         assert_eq!(
-            db.select(StaticReadHeader::Counter(None, Some(IndexRange::new(0, 0)))),
+            db.select(StaticTarget::Counter(None), Some(IndexRange::new(0, 0))),
             Iin2::OBJECT_UNKNOWN
         );
         assert_eq!(
-            db.select(StaticReadHeader::AnalogInputDeadBand(None, None)),
+            db.select(StaticTarget::AnalogInputDeadBand(None), None),
             Iin2::OBJECT_UNKNOWN
         );
         assert_eq!(
-            db.select(StaticReadHeader::AnalogInputDeadBand(
-                None,
+            db.select(
+                StaticTarget::AnalogInputDeadBand(None),
                 Some(IndexRange::new(0, 0))
-            )),
+            ),
             Iin2::OBJECT_UNKNOWN
         );
         assert_eq!(
-            db.select(StaticReadHeader::FrozenAnalog(None, None)),
+            db.select(StaticTarget::FrozenAnalog(None), None),
             Iin2::OBJECT_UNKNOWN
         );
 
@@ -1271,7 +1264,7 @@ mod tests {
         assert!(db.add(0, counter_config(StaticCounterVariation::Group20Var1)));
 
         assert_eq!(
-            db.select(StaticReadHeader::Counter(None, Some(IndexRange::new(1, 2)))),
+            db.select(StaticTarget::Counter(None), Some(IndexRange::new(1, 2))),
             Iin2::PARAMETER_ERROR
         );
         assert_eq!(db.selection_count(), 0);
@@ -1284,11 +1277,17 @@ mod tests {
         assert!(db.add(0, counter_config(StaticCounterVariation::Group20Var1)));
 
         // every index installed, so only running out of selections sets IIN2.2
-        let header = StaticReadHeader::Counter(None, Some(IndexRange::new(0, 0)));
+        let range = Some(IndexRange::new(0, 0));
         for _ in 0..db.selection_capacity() {
-            assert_eq!(db.select(header), Iin2::default());
+            assert_eq!(
+                db.select(StaticTarget::Counter(None), range),
+                Iin2::default()
+            );
         }
-        assert_eq!(db.select(header), Iin2::PARAMETER_ERROR);
+        assert_eq!(
+            db.select(StaticTarget::Counter(None), range),
+            Iin2::PARAMETER_ERROR
+        );
     }
 
     #[test]
@@ -1298,7 +1297,7 @@ mod tests {
         assert!(db.add(0, counter_config(StaticCounterVariation::Group20Var1)));
 
         assert_eq!(
-            db.select(StaticReadHeader::Counter(None, Some(IndexRange::new(0, 1)))),
+            db.select(StaticTarget::Counter(None), Some(IndexRange::new(0, 1))),
             Iin2::PARAMETER_ERROR
         );
         assert_eq!(
@@ -1318,14 +1317,17 @@ mod tests {
         assert!(db.add(2, counter_config(StaticCounterVariation::Group20Var1)));
 
         assert_eq!(
-            db.select(StaticReadHeader::Counter(None, None)),
+            db.select(StaticTarget::Counter(None), None),
             Iin2::default()
         );
     }
 
     fn selections_until_parameter_error(db: &mut StaticDatabase) -> usize {
-        let header = StaticReadHeader::Counter(None, Some(IndexRange::new(0, 0)));
-        std::iter::from_fn(|| (db.select(header) == Iin2::default()).then_some(())).count()
+        let range = Some(IndexRange::new(0, 0));
+        std::iter::from_fn(|| {
+            (db.select(StaticTarget::Counter(None), range) == Iin2::default()).then_some(())
+        })
+        .count()
     }
 
     fn db_with_one_counter() -> StaticDatabase {

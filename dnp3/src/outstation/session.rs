@@ -1492,7 +1492,7 @@ impl OutstationSession {
         db: &DatabaseHandle,
     ) -> Iin2 {
         match header.details {
-            HeaderDetails::Range(_, _, RangedVariation::Group0(_, Some(attr))) => {
+            HeaderDetails::Range(_, _, RangedVariation::Group0(_, attr)) => {
                 self.handle_write_attr(attr, db).await
             }
             HeaderDetails::Range(_, _, RangedVariation::Group80Var1(bits)) => {
@@ -1912,7 +1912,8 @@ impl OutstationSession {
                 | HeaderDetails::Count(..)
                 | HeaderDetails::CountAndPrefix8(..)
                 | HeaderDetails::CountAndPrefix16(..)
-                | HeaderDetails::FreeFormat(_) => {
+                | HeaderDetails::FreeFormat(_)
+                | HeaderDetails::Read(_) => {
                     // other variations require that there be a preceding g50v2
                     match timing {
                         None => {
