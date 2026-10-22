@@ -450,6 +450,13 @@ impl Association {
         }
     }
 
+    /// Fail the queued requests of an association that is being removed
+    fn fail_queued_requests(&mut self, err: TaskError) {
+        while let Some(task) = self.request_queue.pop_front() {
+            task.on_task_error(None, err);
+        }
+    }
+
     fn reset(&mut self, err: RunError) {
         // Fail any pending requests
         while let Some(task) = self.request_queue.pop_front() {
@@ -793,7 +800,9 @@ impl AssociationMap {
     }
 
     pub(crate) fn remove(&mut self, address: EndpointAddress) {
-        self.map.remove(&address);
+        if let Some(mut association) = self.map.remove(&address) {
+            association.fail_queued_requests(TaskError::NoSuchAssociation(address));
+        }
         self.priority.retain(|x| *x != address);
     }
 
