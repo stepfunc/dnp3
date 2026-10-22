@@ -46,7 +46,8 @@ pub(crate) enum Ignored {
     UnconfirmedWithFcv,
     ResetWithFcv,
     ConfirmedWithoutFcv,
-    /// confirmed user data before its source reset the link
+    /// confirmed user data from a source that does not own the secondary state, because the link
+    /// was never reset or another source reset it since
     NotReset,
     /// confirmed user data that repeats the previous frame's FCB
     RepeatedFcb,
@@ -87,7 +88,7 @@ impl std::fmt::Display for Ignored {
                 f.write_str("ignoring confirmed user data with FCV bit NOT set")
             }
             Self::NotReset => f.write_str(
-                "ignoring confirmed user data from a source that has not reset the link",
+                "ignoring confirmed user data from a source that does not own the link secondary state",
             ),
             Self::RepeatedFcb => f.write_str("ignoring confirmed user data with non-matching fcb"),
             Self::LinkStatusWithFcv => f.write_str("ignoring request link status with FCV bit set"),
@@ -589,22 +590,22 @@ mod test {
         assert_eq!(processed.info, Some(data_from(a, None)));
         assert_eq!(processed.reply, ack(a));
 
-        // the other peer never reset the link, whatever FCB it sends
+        // the other peer never reset the link, whatever FCB it sends, and each of its frames
+        // leaves the owner's next expected FCB unchanged
         for fcb in [false, true] {
             let processed = process(&mut layer, confirmed(b, fcb));
             assert_eq!(processed.info, None);
             assert_eq!(processed.reply, None);
             assert!(matches!(processed.ignored[..], [Ignored::NotReset]));
+
+            let processed = process(&mut layer, confirmed(a, fcb));
+            assert_eq!(processed.info, Some(data_from(a, None)));
+            assert_eq!(processed.reply, ack(a));
+            assert!(processed.ignored.is_empty());
         }
 
-        // the owner's next frame is still expected with FCB = 0
-        let processed = process(&mut layer, confirmed(a, false));
-        assert_eq!(processed.info, Some(data_from(a, None)));
-        assert_eq!(processed.reply, ack(a));
-        assert!(processed.ignored.is_empty());
-
         // the owner's duplicate is acked without being delivered again
-        let processed = process(&mut layer, confirmed(a, false));
+        let processed = process(&mut layer, confirmed(a, true));
         assert_eq!(processed.info, None);
         assert_eq!(processed.reply, ack(a));
         assert!(matches!(processed.ignored[..], [Ignored::RepeatedFcb]));
