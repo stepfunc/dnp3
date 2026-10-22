@@ -74,6 +74,7 @@ module.exports = {
                         'api/master/assoc_other',
                     ]
                 },
+                'api/master/scheduling',
             ]
         }
     ],
