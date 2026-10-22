@@ -5,12 +5,10 @@ pub(crate) use writer::*;
 use std::future::Future;
 
 use crate::app::parse::options::ParseOptions;
-use crate::app::BufferSize;
 use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
 use crate::link::reader::LinkModes;
-use crate::link::EndpointAddress;
-use crate::outstation::Feature;
+use crate::link::{EndpointAddress, LinkRole};
 use crate::util::phys::PhysLayer;
 
 #[cfg(test)]
@@ -28,16 +26,10 @@ pub(crate) trait Transport: Send + 'static {
     type Reader: TransportRead;
     type Writer: TransportWrite;
 
-    fn master(
+    fn new(
         link_modes: LinkModes,
+        role: LinkRole,
         address: EndpointAddress,
-        rx_buffer_size: usize,
-    ) -> (Self::Reader, Self::Writer);
-
-    fn outstation(
-        link_modes: LinkModes,
-        address: EndpointAddress,
-        self_address: Feature,
         rx_buffer_size: usize,
     ) -> (Self::Reader, Self::Writer);
 }
@@ -82,27 +74,14 @@ pub(crate) trait TransportWrite: Send {
     fn reset(&mut self);
 }
 
-pub(crate) fn create_master_transport_layer<T: Transport>(
+pub(crate) fn create_transport_layer<T: Transport>(
     link_modes: LinkModes,
     parse_options: ParseOptions,
+    role: LinkRole,
     address: EndpointAddress,
-    rx_buffer_size: BufferSize<2048, 2048>,
+    rx_buffer_size: usize,
 ) -> (TransportReader<T>, TransportWriter<T>) {
-    let (reader, writer) = T::master(link_modes, address, rx_buffer_size.value());
-    (
-        TransportReader::new(parse_options, reader),
-        TransportWriter::new(writer),
-    )
-}
-
-pub(crate) fn create_outstation_transport_layer<T: Transport>(
-    link_modes: LinkModes,
-    parse_options: ParseOptions,
-    address: EndpointAddress,
-    self_address: Feature,
-    rx_buffer_size: BufferSize,
-) -> (TransportReader<T>, TransportWriter<T>) {
-    let (reader, writer) = T::outstation(link_modes, address, self_address, rx_buffer_size.value());
+    let (reader, writer) = T::new(link_modes, role, address, rx_buffer_size);
     (
         TransportReader::new(parse_options, reader),
         TransportWriter::new(writer),

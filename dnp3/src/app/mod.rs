@@ -19,19 +19,6 @@ pub mod control {
     pub use super::variations::{Group12Var1, Group41Var1, Group41Var2, Group41Var3, Group41Var4};
 }
 
-/// internal enum used all over the place to specify master or outstation
-#[derive(Debug, Copy, Clone, PartialEq)]
-pub(crate) enum EndpointType {
-    Master,
-    Outstation,
-}
-
-impl EndpointType {
-    pub(crate) fn dir_bit(&self) -> bool {
-        *self == EndpointType::Master
-    }
-}
-
 /// Types association with Device Attributes (Group 0)
 pub mod attr;
 mod control_types;

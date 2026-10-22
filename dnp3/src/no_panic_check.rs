@@ -11,14 +11,13 @@ use crate::app::attr::{AnyAttribute, AttrValue, Attribute, KnownAttribute};
 use crate::app::measurement::*;
 use crate::app::parse::options::ParseOptions;
 use crate::app::parse::parser::{HeaderCollection, ParsedFragment};
-use crate::app::EndpointType;
 use crate::link::header::{
     AnyAddress, BroadcastConfirmMode, ControlField, FrameInfo, FrameType, Header as LinkHeader,
 };
 use crate::link::layer::Layer;
 use crate::link::parser::{FramePayload, Parser};
 use crate::link::reader::{LinkModes, Reader, Step};
-use crate::link::{EndpointAddress, LinkErrorMode};
+use crate::link::{EndpointAddress, LinkErrorMode, LinkRole};
 use crate::master::extract::{extract_header, Extracted};
 use crate::master::{HeaderInfo, ReadHandler};
 use crate::outstation::Feature;
@@ -219,21 +218,21 @@ fn link_headers(data: &[u8]) {
         return;
     };
     let mut data = headers;
-    let endpoint_type = if config & 0x01 == 0 {
-        EndpointType::Master
+    let role = if config & 0x01 == 0 {
+        LinkRole::Master
+    } else if config & 0x02 == 0 {
+        LinkRole::Outstation {
+            self_address: Feature::Disabled,
+        }
     } else {
-        EndpointType::Outstation
-    };
-    let self_address = if config & 0x02 == 0 {
-        Feature::Disabled
-    } else {
-        Feature::Enabled
+        LinkRole::Outstation {
+            self_address: Feature::Enabled,
+        }
     };
     let mut layer = Layer::new(
         LinkModes::stream(LinkErrorMode::Discard),
         2048,
-        endpoint_type,
-        self_address,
+        role,
         EndpointAddress::raw(u16::from_le_bytes([*local_0, *local_1])),
     );
     while let [control, dest_0, dest_1, source_0, source_1, flags, rest @ ..] = data {
