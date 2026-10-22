@@ -51,14 +51,11 @@ pub(crate) fn extract_measurements_inner(
 fn has_objects(details: &HeaderDetails) -> bool {
     match details {
         HeaderDetails::AllObjects(_) => false,
-        // a range covers at least one index
-        HeaderDetails::OneByteStartStop(..) | HeaderDetails::TwoByteStartStop(..) => true,
-        HeaderDetails::OneByteCount(count, _)
-        | HeaderDetails::OneByteCountAndPrefix(count, _)
-        | HeaderDetails::TwoByteFreeFormat(count, _) => *count > 0,
-        HeaderDetails::TwoByteCount(count, _) | HeaderDetails::TwoByteCountAndPrefix(count, _) => {
-            *count > 0
-        }
+        // a range covers at least one index, and a free-format header holds one object
+        HeaderDetails::Range(..) | HeaderDetails::FreeFormat(_) => true,
+        HeaderDetails::Count(_, count, _) => *count > 0,
+        HeaderDetails::CountAndPrefix8(count, _) => *count > 0,
+        HeaderDetails::CountAndPrefix16(count, _) => *count > 0,
     }
 }
 
@@ -122,12 +119,10 @@ fn has_relative_time(header: &ObjectHeader) -> bool {
 /// If the header is a common time of occurrence, the one for the headers that follow it
 fn next_cto(details: &HeaderDetails, prev: Option<Time>) -> Option<Option<Time>> {
     let time = match details {
-        HeaderDetails::OneByteCount(1, CountVariation::Group51Var1(seq))
-        | HeaderDetails::TwoByteCount(1, CountVariation::Group51Var1(seq)) => {
+        HeaderDetails::Count(_, 1, CountVariation::Group51Var1(seq)) => {
             seq.single().map(|x| Time::Synchronized(x.time))
         }
-        HeaderDetails::OneByteCount(1, CountVariation::Group51Var2(seq))
-        | HeaderDetails::TwoByteCount(1, CountVariation::Group51Var2(seq)) => {
+        HeaderDetails::Count(_, 1, CountVariation::Group51Var2(seq)) => {
             seq.single().map(|x| Time::Unsynchronized(x.time))
         }
         _ => return None,
@@ -174,25 +169,18 @@ pub(crate) fn extract_header<H: ReadHandler + ?Sized>(
 
     let handled = match &header.details {
         // handle g50v1 - absolute time (only count == 1 is valid)
-        HeaderDetails::OneByteCount(1, CountVariation::Group50Var1(seq)) => {
-            extract_g50v1(seq, header, handler)
-        }
-        HeaderDetails::TwoByteCount(1, CountVariation::Group50Var1(seq)) => {
+        HeaderDetails::Count(_, 1, CountVariation::Group50Var1(seq)) => {
             extract_g50v1(seq, header, handler)
         }
         // everything else
-        HeaderDetails::OneByteStartStop(_, _, var) => {
+        HeaderDetails::Range(_, _, var) => {
             var.extract_measurements_to(header.variation, header.details.qualifier(), handler)
         }
-        HeaderDetails::TwoByteStartStop(_, _, var) => {
-            var.extract_measurements_to(header.variation, header.details.qualifier(), handler)
+        HeaderDetails::CountAndPrefix8(_, var) => var.extract_measurements_to(cto, handler),
+        HeaderDetails::CountAndPrefix16(_, var) => var.extract_measurements_to(cto, handler),
+        HeaderDetails::AllObjects(_) | HeaderDetails::Count(..) | HeaderDetails::FreeFormat(_) => {
+            false
         }
-        HeaderDetails::OneByteCountAndPrefix(_, var) => var.extract_measurements_to(cto, handler),
-        HeaderDetails::TwoByteCountAndPrefix(_, var) => var.extract_measurements_to(cto, handler),
-        HeaderDetails::AllObjects(_)
-        | HeaderDetails::OneByteCount(..)
-        | HeaderDetails::TwoByteCount(..)
-        | HeaderDetails::TwoByteFreeFormat(..) => false,
     };
 
     if handled {

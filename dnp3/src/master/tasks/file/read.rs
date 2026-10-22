@@ -233,7 +233,7 @@ impl FileReadTask {
             header: ObjectHeader<'_>,
         ) -> Result<Option<ReadState>, FileError> {
             let obj = match header.details {
-                HeaderDetails::TwoByteFreeFormat(_, FreeFormatVariation::Group70Var5(obj)) => obj,
+                HeaderDetails::FreeFormat(FreeFormatVariation::Group70Var5(obj)) => obj,
                 _ => {
                     tracing::warn!(
                         "File READ response contains unexpected variation: {}",

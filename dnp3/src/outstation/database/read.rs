@@ -115,17 +115,13 @@ impl ReadHeader {
     fn get_impl(header: &HeaderDetails) -> Option<ReadHeader> {
         match header {
             HeaderDetails::AllObjects(x) => Self::from_all_objects(x),
-            HeaderDetails::OneByteCount(count, x) => Self::from_count(x, (*count).into()),
-            HeaderDetails::TwoByteCount(count, x) => Self::from_count(x, (*count).into()),
-            HeaderDetails::OneByteStartStop(start, stop, x) => {
-                Self::from_range(x, IndexRange::new((*start).into(), (*stop).into()))
+            HeaderDetails::Count(_, count, x) => Self::from_count(x, (*count).into()),
+            HeaderDetails::Range(_, range, x) => {
+                Self::from_range(x, IndexRange::new(range.get_start(), range.get_stop()))
             }
-            HeaderDetails::TwoByteStartStop(start, stop, x) => {
-                Self::from_range(x, IndexRange::new(*start, *stop))
-            }
-            HeaderDetails::OneByteCountAndPrefix(_, _) => None,
-            HeaderDetails::TwoByteCountAndPrefix(_, _) => None,
-            HeaderDetails::TwoByteFreeFormat(_, _) => None,
+            HeaderDetails::CountAndPrefix8(_, _)
+            | HeaderDetails::CountAndPrefix16(_, _)
+            | HeaderDetails::FreeFormat(_) => None,
         }
     }
 

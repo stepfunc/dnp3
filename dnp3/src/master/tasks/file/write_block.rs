@@ -48,7 +48,7 @@ impl WriteBlockTask {
             let header = response.objects?.get_only_header()?;
 
             let obj = match header.details {
-                HeaderDetails::TwoByteFreeFormat(_, FreeFormatVariation::Group70Var6(obj)) => obj,
+                HeaderDetails::FreeFormat(FreeFormatVariation::Group70Var6(obj)) => obj,
                 _ => {
                     tracing::warn!(
                         "File WRITE response contains unexpected variation: {}",
