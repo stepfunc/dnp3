@@ -34,6 +34,7 @@ object Main {
     (AllObjectsVariationModule,  implPath.resolve("all.rs")),
     (CountVariationModule, implPath.resolve("count.rs")),
     (PrefixedVariationModule, implPath.resolve("prefixed.rs")),
+    (ReadQualifierModule, implPath.resolve("read.rs")),
     (ConversionsModule, implPath.resolve("conversion.rs"))
   )
 

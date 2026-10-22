@@ -27,8 +27,8 @@ pub(crate) enum RangedVariation<'a> {
     /// Device Attributes - Non-Specific All Attributes Request
     Group0Var254,
     /// Device Attributes - Specific Attribute
-    /// variation and optional attribute
-    Group0(u8, Option<crate::app::attr::Attribute<'a>>),
+    /// variation and attribute
+    Group0(u8, crate::app::attr::Attribute<'a>),
     /// Binary Input - Any Variation
     Group1Var0,
     /// Binary Input - Packed Format
@@ -126,7 +126,6 @@ pub(crate) enum RangedVariation<'a> {
     /// Unsigned Integer - 8-bit
     Group102Var1(RangedSequence<'a, Group102Var1>),
     /// Octet String - Sized by variation
-    Group110Var0,
     Group110VarX(u8, RangedBytesSequence<'a>),
 }
 
@@ -134,7 +133,7 @@ impl<'a> RangedVariation<'a> {
     pub(crate) fn parse_non_read(v: Variation, qualifier: QualifierCode, range: Range, options: ParseOptions, cursor: &mut ReadCursor<'a>) -> Result<RangedVariation<'a>, ObjectParseError> {
         match v {
             Variation::Group0Var254 => Ok(RangedVariation::Group0Var254),
-            Variation::Group0(var) => Ok(RangedVariation::Group0(var, Some(crate::app::attr::Attribute::parse_from_range(var, range, cursor)?))),
+            Variation::Group0(var) => Ok(RangedVariation::Group0(var, crate::app::attr::Attribute::parse_from_range(var, range, cursor)?)),
             Variation::Group1Var0 => Ok(RangedVariation::Group1Var0),
             Variation::Group1Var1 => Ok(RangedVariation::Group1Var1(BitSequence::parse(range, cursor)?)),
             Variation::Group1Var2 => Ok(RangedVariation::Group1Var2(RangedSequence::parse(range, cursor)?)),
@@ -190,67 +189,10 @@ impl<'a> RangedVariation<'a> {
         }
     }
     
-    pub(crate) fn parse_read(v: Variation, qualifier: QualifierCode) -> Result<RangedVariation<'a>, ObjectParseError> {
-        match v {
-            Variation::Group0Var254 => Ok(RangedVariation::Group0Var254),
-            Variation::Group0(var) => Ok(RangedVariation::Group0(var, None)),
-            Variation::Group1Var0 => Ok(RangedVariation::Group1Var0),
-            Variation::Group1Var1 => Ok(RangedVariation::Group1Var1(BitSequence::empty())),
-            Variation::Group1Var2 => Ok(RangedVariation::Group1Var2(RangedSequence::empty())),
-            Variation::Group3Var0 => Ok(RangedVariation::Group3Var0),
-            Variation::Group3Var1 => Ok(RangedVariation::Group3Var1(DoubleBitSequence::empty())),
-            Variation::Group3Var2 => Ok(RangedVariation::Group3Var2(RangedSequence::empty())),
-            Variation::Group10Var0 => Ok(RangedVariation::Group10Var0),
-            Variation::Group10Var1 => Ok(RangedVariation::Group10Var1(BitSequence::empty())),
-            Variation::Group10Var2 => Ok(RangedVariation::Group10Var2(RangedSequence::empty())),
-            Variation::Group20Var0 => Ok(RangedVariation::Group20Var0),
-            Variation::Group20Var1 => Ok(RangedVariation::Group20Var1(RangedSequence::empty())),
-            Variation::Group20Var2 => Ok(RangedVariation::Group20Var2(RangedSequence::empty())),
-            Variation::Group20Var5 => Ok(RangedVariation::Group20Var5(RangedSequence::empty())),
-            Variation::Group20Var6 => Ok(RangedVariation::Group20Var6(RangedSequence::empty())),
-            Variation::Group21Var0 => Ok(RangedVariation::Group21Var0),
-            Variation::Group21Var1 => Ok(RangedVariation::Group21Var1(RangedSequence::empty())),
-            Variation::Group21Var2 => Ok(RangedVariation::Group21Var2(RangedSequence::empty())),
-            Variation::Group21Var5 => Ok(RangedVariation::Group21Var5(RangedSequence::empty())),
-            Variation::Group21Var6 => Ok(RangedVariation::Group21Var6(RangedSequence::empty())),
-            Variation::Group21Var9 => Ok(RangedVariation::Group21Var9(RangedSequence::empty())),
-            Variation::Group21Var10 => Ok(RangedVariation::Group21Var10(RangedSequence::empty())),
-            Variation::Group30Var0 => Ok(RangedVariation::Group30Var0),
-            Variation::Group30Var1 => Ok(RangedVariation::Group30Var1(RangedSequence::empty())),
-            Variation::Group30Var2 => Ok(RangedVariation::Group30Var2(RangedSequence::empty())),
-            Variation::Group30Var3 => Ok(RangedVariation::Group30Var3(RangedSequence::empty())),
-            Variation::Group30Var4 => Ok(RangedVariation::Group30Var4(RangedSequence::empty())),
-            Variation::Group30Var5 => Ok(RangedVariation::Group30Var5(RangedSequence::empty())),
-            Variation::Group30Var6 => Ok(RangedVariation::Group30Var6(RangedSequence::empty())),
-            Variation::Group31Var0 => Ok(RangedVariation::Group31Var0),
-            Variation::Group31Var1 => Ok(RangedVariation::Group31Var1(RangedSequence::empty())),
-            Variation::Group31Var2 => Ok(RangedVariation::Group31Var2(RangedSequence::empty())),
-            Variation::Group31Var3 => Ok(RangedVariation::Group31Var3(RangedSequence::empty())),
-            Variation::Group31Var4 => Ok(RangedVariation::Group31Var4(RangedSequence::empty())),
-            Variation::Group31Var5 => Ok(RangedVariation::Group31Var5(RangedSequence::empty())),
-            Variation::Group31Var6 => Ok(RangedVariation::Group31Var6(RangedSequence::empty())),
-            Variation::Group31Var7 => Ok(RangedVariation::Group31Var7(RangedSequence::empty())),
-            Variation::Group31Var8 => Ok(RangedVariation::Group31Var8(RangedSequence::empty())),
-            Variation::Group34Var1 => Ok(RangedVariation::Group34Var1(RangedSequence::empty())),
-            Variation::Group34Var2 => Ok(RangedVariation::Group34Var2(RangedSequence::empty())),
-            Variation::Group34Var3 => Ok(RangedVariation::Group34Var3(RangedSequence::empty())),
-            Variation::Group40Var0 => Ok(RangedVariation::Group40Var0),
-            Variation::Group40Var1 => Ok(RangedVariation::Group40Var1(RangedSequence::empty())),
-            Variation::Group40Var2 => Ok(RangedVariation::Group40Var2(RangedSequence::empty())),
-            Variation::Group40Var3 => Ok(RangedVariation::Group40Var3(RangedSequence::empty())),
-            Variation::Group40Var4 => Ok(RangedVariation::Group40Var4(RangedSequence::empty())),
-            Variation::Group80Var1 => Ok(RangedVariation::Group80Var1(BitSequence::empty())),
-            Variation::Group102Var0 => Ok(RangedVariation::Group102Var0),
-            Variation::Group102Var1 => Ok(RangedVariation::Group102Var1(RangedSequence::empty())),
-            Variation::Group110(0) => Ok(RangedVariation::Group110Var0),
-            _ => Err(ObjectParseError::InvalidQualifierForVariation(v, qualifier)),
-        }
-    }
-    
     pub(crate) fn format_objects(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             RangedVariation::Group0Var254 => Ok(()),
-            RangedVariation::Group0(_, x) => format_optional_attribute(f, x),
+            RangedVariation::Group0(_, x) => x.format(f),
             RangedVariation::Group1Var0 => Ok(()),
             RangedVariation::Group1Var1(seq) => format_indexed_items(f, seq.iter()),
             RangedVariation::Group1Var2(seq) => format_indexed_items(f, seq.iter()),
@@ -299,7 +241,6 @@ impl<'a> RangedVariation<'a> {
             RangedVariation::Group80Var1(seq) => format_indexed_items(f, seq.iter()),
             RangedVariation::Group102Var0 => Ok(()),
             RangedVariation::Group102Var1(seq) => format_indexed_items(f, seq.iter()),
-            RangedVariation::Group110Var0 => Ok(()),
             RangedVariation::Group110VarX(_, seq) => format_indexed_items(f, seq.iter().map(|(x, i)| (Bytes::new(x), i))),
         }
     }
@@ -607,9 +548,6 @@ impl<'a> RangedVariation<'a> {
                     &mut seq.iter().map(|(v,i)| (v.into(), i))
                 );
                 true
-            }
-            RangedVariation::Group110Var0 => {
-                false
             }
             RangedVariation::Group110VarX(_,seq) => {
                 handler.handle_octet_string(

@@ -26,14 +26,6 @@ impl Range {
         Ok(Self { start, stop, count })
     }
 
-    pub(crate) fn empty() -> Self {
-        Self {
-            start: 0,
-            stop: 0,
-            count: 0,
-        }
-    }
-
     pub(crate) fn get_start(&self) -> u16 {
         self.start
     }
@@ -70,10 +62,6 @@ where
             .checked_mul(range.count)
             .ok_or(ReadError)?;
         Ok(Self::new(range, cursor.read_bytes(num_bytes)?))
-    }
-
-    pub(crate) fn empty() -> Self {
-        Self::new(Range::empty(), &[])
     }
 
     fn new(range: Range, data: &'a [u8]) -> Self {
@@ -160,13 +148,6 @@ mod tests {
         assert_eq!(iter.next(), None);
         assert_eq!(iter.next(), None);
         assert_eq!(iter.size_hint(), (0, Some(0)));
-    }
-
-    #[test]
-    fn empty_sequence_yields_nothing() {
-        let seq = RangedSequence::<u16>::empty();
-        assert_eq!(seq.iter().size_hint(), (0, Some(0)));
-        assert_eq!(seq.iter().next(), None);
     }
 
     #[test]

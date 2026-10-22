@@ -5,7 +5,6 @@ use crate::app::measurement::*;
 use crate::master::EventClasses;
 use crate::outstation::database::config::*;
 use crate::outstation::database::details::WriteProgress;
-use crate::outstation::database::read::EventReadHeader;
 use crate::outstation::database::{EventBufferConfig, EventClass};
 use crate::outstation::{BufferState, ClassCount, OutstationApplication, TypeCount};
 
@@ -137,38 +136,38 @@ impl Kind {
         }
     }
 
-    /// a READ header for this type, with the default variation or a specific one
-    fn header(self, specific: bool, limit: Option<usize>) -> EventReadHeader {
+    /// select the events of this type, in the default variation or a specific one
+    fn select(self, buffer: &mut EventBuffer, specific: bool, limit: Option<usize>) -> usize {
         match self {
-            Kind::Binary => EventReadHeader::Binary(
+            Kind::Binary => buffer.select_by_type::<BinaryInput>(
                 specific.then_some(EventBinaryInputVariation::Group2Var2),
                 limit,
             ),
-            Kind::DoubleBitBinary => EventReadHeader::DoubleBitBinary(
+            Kind::DoubleBitBinary => buffer.select_by_type::<DoubleBitBinaryInput>(
                 specific.then_some(EventDoubleBitBinaryInputVariation::Group4Var2),
                 limit,
             ),
-            Kind::BinaryOutputStatus => EventReadHeader::BinaryOutputStatus(
+            Kind::BinaryOutputStatus => buffer.select_by_type::<BinaryOutputStatus>(
                 specific.then_some(EventBinaryOutputStatusVariation::Group11Var2),
                 limit,
             ),
-            Kind::Counter => EventReadHeader::Counter(
+            Kind::Counter => buffer.select_by_type::<Counter>(
                 specific.then_some(EventCounterVariation::Group22Var5),
                 limit,
             ),
-            Kind::FrozenCounter => EventReadHeader::FrozenCounter(
+            Kind::FrozenCounter => buffer.select_by_type::<FrozenCounter>(
                 specific.then_some(EventFrozenCounterVariation::Group23Var5),
                 limit,
             ),
-            Kind::Analog => EventReadHeader::Analog(
+            Kind::Analog => buffer.select_by_type::<AnalogInput>(
                 specific.then_some(EventAnalogInputVariation::Group32Var3),
                 limit,
             ),
-            Kind::AnalogOutputStatus => EventReadHeader::AnalogOutputStatus(
+            Kind::AnalogOutputStatus => buffer.select_by_type::<AnalogOutputStatus>(
                 specific.then_some(EventAnalogOutputStatusVariation::Group42Var3),
                 limit,
             ),
-            Kind::OctetString => EventReadHeader::OctetString(limit),
+            Kind::OctetString => buffer.select_by_type::<OctetString>(None, limit),
         }
     }
 
@@ -368,7 +367,7 @@ fn overflow_persists_until_no_type_is_full() {
     assert!(buffer.is_overflown());
 
     // confirming the binary events leaves the counter type full
-    assert_eq!(buffer.select_by_header(Kind::Binary.header(false, None)), 2);
+    assert_eq!(Kind::Binary.select(&mut buffer, false, None), 2);
     assert_eq!(write(&mut buffer, 4096), (2, WriteProgress::Complete));
     assert!(buffer.is_overflown());
     assert_eq!(clear(&mut buffer), [1, 2]);
@@ -588,7 +587,10 @@ fn reset_after_a_partial_write_and_new_events_keeps_insertion_order() {
     buffer.reset();
 
     // the limit takes the oldest events
-    assert_eq!(buffer.select_by_header(EventReadHeader::Class1(Some(2))), 2);
+    assert_eq!(
+        buffer.select_by_class(EventClass::Class1.into(), Some(2)),
+        2
+    );
     assert_eq!(write(&mut buffer, 4096), (2, WriteProgress::Complete));
     assert_eq!(clear(&mut buffer), [0, 1]);
     assert_eq!(drain(&mut buffer), [2]);
@@ -656,15 +658,9 @@ fn type_reads_select_only_their_type_with_limits() {
     binary(&mut buffer, EventClass::Class2).unwrap(); // 2
     binary(&mut buffer, EventClass::Class3).unwrap(); // 3
 
-    assert_eq!(
-        buffer.select_by_header(Kind::Binary.header(true, Some(2))),
-        2
-    );
+    assert_eq!(Kind::Binary.select(&mut buffer, true, Some(2)), 2);
     // the analog event and the third binary event are still unselected
-    assert_eq!(
-        buffer.select_by_header(Kind::Counter.header(false, None)),
-        0
-    );
+    assert_eq!(Kind::Counter.select(&mut buffer, false, None), 0);
     assert_eq!(write(&mut buffer, 4096), (2, WriteProgress::Complete));
     assert_eq!(
         buffer.unwritten_classes(),
@@ -672,8 +668,8 @@ fn type_reads_select_only_their_type_with_limits() {
     );
     assert_eq!(clear(&mut buffer), [0, 2]);
 
-    assert_eq!(buffer.select_by_header(Kind::Binary.header(false, None)), 1);
-    assert_eq!(buffer.select_by_header(Kind::Analog.header(false, None)), 1);
+    assert_eq!(Kind::Binary.select(&mut buffer, false, None), 1);
+    assert_eq!(Kind::Analog.select(&mut buffer, false, None), 1);
     assert_eq!(write(&mut buffer, 4096), (2, WriteProgress::Complete));
     assert_eq!(clear(&mut buffer), [1, 3]);
 }
@@ -947,16 +943,11 @@ impl Model {
                 );
             }
             Op::SelectClass(class, limit) => {
-                let header = match class {
-                    EventClass::Class1 => EventReadHeader::Class1(limit),
-                    EventClass::Class2 => EventReadHeader::Class2(limit),
-                    EventClass::Class3 => EventReadHeader::Class3(limit),
-                };
-                let selected = buffer.select_by_header(header);
+                let selected = buffer.select_by_class(class.into(), limit);
                 assert_eq!(selected, self.select(limit, false, |r| r.class == class));
             }
             Op::SelectType(kind, specific, limit) => {
-                let selected = buffer.select_by_header(kind.header(specific, limit));
+                let selected = kind.select(buffer, specific, limit);
                 assert_eq!(selected, self.select(limit, specific, |r| r.kind == kind));
             }
             Op::Write(size) => {

@@ -27,13 +27,6 @@ pub(crate) struct DoubleBitSequence<'a> {
 }
 
 impl<'a> BitSequence<'a> {
-    pub(crate) fn empty() -> Self {
-        Self {
-            bytes: &[],
-            range: Range::empty(),
-        }
-    }
-
     pub(crate) fn parse(range: Range, cursor: &mut ReadCursor<'a>) -> Result<Self, ReadError> {
         let bytes = cursor.read_bytes(num_bytes_for_bits(range.get_count()))?;
 
@@ -51,13 +44,6 @@ impl<'a> BitSequence<'a> {
 }
 
 impl<'a> DoubleBitSequence<'a> {
-    pub(crate) fn empty() -> Self {
-        Self {
-            bytes: &[],
-            range: Range::empty(),
-        }
-    }
-
     pub(crate) fn parse(range: Range, cursor: &mut ReadCursor<'a>) -> Result<Self, ReadError> {
         let bytes = cursor.read_bytes(num_bytes_for_double_bits(range.get_count()))?;
         Ok(Self { bytes, range })

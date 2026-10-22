@@ -3,7 +3,7 @@ use crate::master::EventClasses;
 use crate::outstation::database::details::event::buffer::{EventBuffer, InsertError};
 use crate::outstation::database::details::family::{Family, UpdatableFlags};
 use crate::outstation::database::details::range::static_db::{PointConfig, StaticDatabase};
-use crate::outstation::database::read::{EventReadHeader, ReadHeader};
+use crate::outstation::database::read::{EventTarget, ReadHeader};
 use crate::outstation::database::{
     ClassZeroConfig, EventBufferConfig, ResponseInfo, UpdateFlagsType, UpdateInfo, UpdateOptions,
 };
@@ -68,49 +68,57 @@ impl Database {
 
     pub(crate) fn select_by_header(&mut self, header: ReadHeader) -> Iin2 {
         match header {
-            ReadHeader::Static(header) => self.static_db.select(header),
-            ReadHeader::Event(header) => {
-                self.event_buffer.select_by_header(header);
-                self.event_type_iin(header)
-            }
+            ReadHeader::Class0 => self.static_db.select_class_zero(),
+            ReadHeader::Static(target, range) => self.static_db.select(target, range),
+            ReadHeader::Event(target, limit) => self.select_events(target, limit),
             ReadHeader::Attr(header) => self.attrs.select(header),
         }
     }
 
-    /// IIN2.1 for a read of an event type with no points (TB2016-001)
+    fn select_events(&mut self, target: EventTarget, limit: Option<usize>) -> Iin2 {
+        match target {
+            EventTarget::Class(class) => {
+                self.event_buffer.select_by_class(class.into(), limit);
+                Iin2::default()
+            }
+            EventTarget::Binary(v) => self.select_events_by_type::<BinaryInput>(v, limit),
+            EventTarget::DoubleBitBinary(v) => {
+                self.select_events_by_type::<DoubleBitBinaryInput>(v, limit)
+            }
+            EventTarget::BinaryOutputStatus(v) => {
+                self.select_events_by_type::<BinaryOutputStatus>(v, limit)
+            }
+            EventTarget::Counter(v) => self.select_events_by_type::<Counter>(v, limit),
+            EventTarget::FrozenCounter(v) => self.select_events_by_type::<FrozenCounter>(v, limit),
+            EventTarget::Analog(v) => self.select_events_by_type::<AnalogInput>(v, limit),
+            EventTarget::AnalogOutputStatus(v) => {
+                self.select_events_by_type::<AnalogOutputStatus>(v, limit)
+            }
+            EventTarget::OctetString => self.select_events_by_type::<OctetString>(None, limit),
+            // we know what it is, but don't support it
+            EventTarget::FrozenAnalog(_) => Iin2::OBJECT_UNKNOWN,
+        }
+    }
+
+    /// Select the events of a type, with IIN2.1 if the type has no points (TB2016-001)
     ///
     /// Events buffered for points that have since been removed are still reported,
     /// without an error. This is independent of how many events the header selected,
     /// because an earlier header in the same request may have selected them already.
-    fn event_type_iin(&self, header: EventReadHeader) -> Iin2 {
-        let missing = match header {
-            EventReadHeader::Class1(_)
-            | EventReadHeader::Class2(_)
-            | EventReadHeader::Class3(_) => false,
-            EventReadHeader::Binary(_, _) => self.is_missing::<BinaryInput>(),
-            EventReadHeader::DoubleBitBinary(_, _) => self.is_missing::<DoubleBitBinaryInput>(),
-            EventReadHeader::BinaryOutputStatus(_, _) => self.is_missing::<BinaryOutputStatus>(),
-            EventReadHeader::Counter(_, _) => self.is_missing::<Counter>(),
-            EventReadHeader::FrozenCounter(_, _) => self.is_missing::<FrozenCounter>(),
-            EventReadHeader::Analog(_, _) => self.is_missing::<AnalogInput>(),
-            EventReadHeader::AnalogOutputStatus(_, _) => self.is_missing::<AnalogOutputStatus>(),
-            EventReadHeader::OctetString(_) => self.is_missing::<OctetString>(),
-            // we know what it is, but don't support it
-            EventReadHeader::FrozenAnalog(_, _) => true,
-        };
-
-        if missing {
+    fn select_events_by_type<T>(
+        &mut self,
+        variation: Option<T::EventVariation>,
+        limit: Option<usize>,
+    ) -> Iin2
+    where
+        T: Family,
+    {
+        self.event_buffer.select_by_type::<T>(variation, limit);
+        if !self.static_db.has_points::<T>() && !self.event_buffer.has_events::<T>() {
             Iin2::OBJECT_UNKNOWN
         } else {
             Iin2::default()
         }
-    }
-
-    fn is_missing<T>(&self) -> bool
-    where
-        T: Family,
-    {
-        !self.static_db.has_points::<T>() && !self.event_buffer.has_events::<T>()
     }
 
     pub(crate) fn discard_unselected_events(&mut self, classes: EventClasses) -> ClassCount {

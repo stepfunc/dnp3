@@ -61,6 +61,7 @@ pub(crate) mod gen {
     pub(crate) mod count;
     pub(crate) mod prefixed;
     pub(crate) mod ranged;
+    pub(crate) mod read;
 }
 
 #[cfg(test)]

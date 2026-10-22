@@ -50,7 +50,7 @@ pub(crate) fn extract_measurements_inner(
 /// True if the header carries at least one object
 fn has_objects(details: &HeaderDetails) -> bool {
     match details {
-        HeaderDetails::AllObjects(_) => false,
+        HeaderDetails::AllObjects(_) | HeaderDetails::Read(_) => false,
         // a range covers at least one index, and a free-format header holds one object
         HeaderDetails::Range(..) | HeaderDetails::FreeFormat(_) => true,
         HeaderDetails::Count(_, count, _) => *count > 0,
@@ -178,9 +178,10 @@ pub(crate) fn extract_header<H: ReadHandler + ?Sized>(
         }
         HeaderDetails::CountAndPrefix8(_, var) => var.extract_measurements_to(cto, handler),
         HeaderDetails::CountAndPrefix16(_, var) => var.extract_measurements_to(cto, handler),
-        HeaderDetails::AllObjects(_) | HeaderDetails::Count(..) | HeaderDetails::FreeFormat(_) => {
-            false
-        }
+        HeaderDetails::AllObjects(_)
+        | HeaderDetails::Count(..)
+        | HeaderDetails::FreeFormat(_)
+        | HeaderDetails::Read(_) => false,
     };
 
     if handled {
