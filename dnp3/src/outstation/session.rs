@@ -316,6 +316,9 @@ struct UnsolicitedWait {
     seq: Sequence,
     /// the confirm of a solicited response sent during the wait, if one asked for it
     solicited: Option<ExpectedConfirm>,
+    /// a DISABLE_UNSOLICITED was processed during the wait, so it ends on timeout without a retry
+    /// (TB2015-002a rule 15, decision 0007)
+    disabled: bool,
 }
 
 /// A solicited response's confirm, expected until the confirm timeout. The timeout is checked
@@ -852,6 +855,7 @@ impl OutstationSession {
         let mut wait = UnsolicitedWait {
             seq,
             solicited: None,
+            disabled: false,
         };
 
         loop {
@@ -867,8 +871,9 @@ impl OutstationSession {
                 UnsolicitedWaitResult::Timeout => {
                     let mut retry = retry_count.decrement();
 
-                    // If a deferred read is pending, we want to exit
-                    if self.state.deferred_read.is_set() {
+                    // If a deferred read is pending, or a DISABLE_UNSOLICITED was processed, we
+                    // want to exit
+                    if self.state.deferred_read.is_set() || wait.disabled {
                         retry = false;
                     }
 
@@ -920,8 +925,7 @@ impl OutstationSession {
         };
 
         let selection = self.take_selection(&received.fragment);
-        let disable = matches!(received.fragment, FragmentType::NewNonRead(..))
-            && received.request.header.function == FunctionCode::DisableUnsolicited;
+        let disable = self.processes_disable_unsolicited(&received);
 
         // Table 6-1 rows 24-29: a request ends the wait for a solicited confirm, and an answer that
         // asks for one starts it again
@@ -933,12 +937,27 @@ impl OutstationSession {
             deadline: self.new_confirm_deadline(),
         });
 
-        if disable {
-            // DISABLE_UNSOLICITED ends the unsolicited response series
-            return Ok(UnsolicitedWaitResult::Complete(ConfirmOutcome::Unconfirmed));
-        }
+        wait.disabled |= disable;
 
         Ok(UnsolicitedWaitResult::ReadNext)
+    }
+
+    /// Whether the request is a DISABLE_UNSOLICITED that will be processed, either directly or as a
+    /// broadcast, whatever classes it names
+    fn processes_disable_unsolicited(&self, received: &Received) -> bool {
+        if received.request.header.function != FunctionCode::DisableUnsolicited {
+            return false;
+        }
+        match received.fragment {
+            FragmentType::NewNonRead(..) => true,
+            FragmentType::Broadcast(_) => {
+                !self.config.broadcast.is_disabled() && received.request.objects.is_ok()
+            }
+            FragmentType::MalformedRequest(..)
+            | FragmentType::NewRead(..)
+            | FragmentType::RepeatRead(..)
+            | FragmentType::RepeatNonRead(..) => false,
+        }
     }
 
     fn confirm_in_unsolicited_wait(
