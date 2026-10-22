@@ -74,3 +74,30 @@ pub(crate) mod gen {
     pub(crate) mod prefixed;
     pub(crate) mod ranged;
 }
+
+#[cfg(test)]
+mod test {
+    use super::Variation;
+
+    #[test]
+    fn variation_lookup_round_trips_through_group_and_var() {
+        let mut count = 0;
+        for group in 0..=255 {
+            for var in 0..=255 {
+                if let Some(x) = Variation::lookup(group, var) {
+                    assert_eq!(x.to_group_and_var(), (group, var), "{x:?}");
+                    count += 1;
+                }
+            }
+        }
+        assert!(count > 0);
+    }
+
+    #[test]
+    fn group0_var254_has_two_representations() {
+        // lookup only produces Group0Var254, but Group0(254) encodes the same
+        assert_eq!(Variation::lookup(0, 254), Some(Variation::Group0Var254));
+        assert_eq!(Variation::Group0Var254.to_group_and_var(), (0, 254));
+        assert_eq!(Variation::Group0(254).to_group_and_var(), (0, 254));
+    }
+}

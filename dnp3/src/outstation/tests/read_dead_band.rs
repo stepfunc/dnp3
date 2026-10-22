@@ -174,6 +174,48 @@ async fn read_g34_v3() {
 }
 
 #[tokio::test]
+async fn read_infinite_deadband_saturates_every_variation() {
+    let mut harness = new_harness(get_default_config());
+
+    harness
+        .handle
+        .database
+        .transaction(|db| db.add(7, Some(EventClass::Class1), config(f64::INFINITY)));
+
+    // g34v1 saturates at u16::MAX
+    harness
+        .test_request_response(
+            &[0xC0, 0x01, 0x22, 0x01, 0x06],
+            &[
+                0xC0, 0x81, 0x80, 0x00, 0x22, 0x01, 0x01, 0x07, 0x00, 0x07, 0x00, 0xFF, 0xFF,
+            ],
+        )
+        .await;
+
+    // g34v2 saturates at u32::MAX
+    harness
+        .test_request_response(
+            &[0xC1, 0x01, 0x22, 0x02, 0x06],
+            &[
+                0xC1, 0x81, 0x80, 0x00, 0x22, 0x02, 0x01, 0x07, 0x00, 0x07, 0x00, 0xFF, 0xFF, 0xFF,
+                0xFF,
+            ],
+        )
+        .await;
+
+    // g34v3 clamps to f32::MAX
+    harness
+        .test_request_response(
+            &[0xC2, 0x01, 0x22, 0x03, 0x06],
+            &[
+                0xC2, 0x81, 0x80, 0x00, 0x22, 0x03, 0x01, 0x07, 0x00, 0x07, 0x00, 0xFF, 0xFF, 0x7F,
+                0x7F,
+            ],
+        )
+        .await;
+}
+
+#[tokio::test]
 async fn read_g34_v0() {
     let mut harness = new_harness(get_default_config());
 

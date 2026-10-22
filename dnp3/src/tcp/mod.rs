@@ -20,6 +20,9 @@ mod server_handle;
 
 pub(crate) mod client;
 
+#[cfg(test)]
+mod spawn_tests;
+
 /// state of TCP client connection
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ClientState {

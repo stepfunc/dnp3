@@ -4,7 +4,6 @@ use crate::link::crc::{calc_crc, calc_crc_with_0564};
 use crate::link::display::LinkDisplay;
 use crate::link::error::LogicError;
 use crate::link::header::Header;
-use crate::util::slice_ext::SliceExtNoPanic;
 
 use scursor::WriteCursor;
 
@@ -44,29 +43,24 @@ impl FrameData<'_> {
     }
 }
 
-// this can all be statically verified not to panic since the buffer is a constant length
-pub(crate) fn format_header_fixed_size(
-    header: Header,
-    buffer: &mut [u8; constant::LINK_HEADER_LENGTH],
-) {
-    fn to_le(x: u16) -> (u8, u8) {
-        let [low, high] = x.to_le_bytes();
-        (low, high)
-    }
-
-    buffer[0] = constant::START1;
-    buffer[1] = constant::START2;
-    buffer[2] = 5;
-    buffer[3] = header.control.to_u8();
-    let (d1, d2) = to_le(header.destination.value());
-    buffer[4] = d1;
-    buffer[5] = d2;
-    let (s1, s2) = to_le(header.source.value());
-    buffer[6] = s1;
-    buffer[7] = s2;
-    let (c1, c2) = to_le(calc_crc(&buffer[0..8]));
-    buffer[8] = c1;
-    buffer[9] = c2;
+/// The 10 bytes of a link header announcing `length` (the header fields plus any user data)
+pub(crate) fn header_bytes(header: Header, length: u8) -> [u8; constant::LINK_HEADER_LENGTH] {
+    let ctrl = header.control.to_u8();
+    let [d0, d1] = header.destination.value().to_le_bytes();
+    let [s0, s1] = header.source.value().to_le_bytes();
+    let [c0, c1] = calc_crc_with_0564(&[length, ctrl, d0, d1, s0, s1]).to_le_bytes();
+    [
+        constant::START1,
+        constant::START2,
+        length,
+        ctrl,
+        d0,
+        d1,
+        s0,
+        s1,
+        c0,
+        c1,
+    ]
 }
 
 pub(crate) fn format_header_only<'a>(
@@ -94,7 +88,8 @@ fn format_frame<'a>(
         // the first block contains the transport header
         let (first, remainder) = payload
             .app_data
-            .np_split_at_no_error(constant::MAX_BLOCK_SIZE - 1);
+            .split_at_checked(constant::MAX_BLOCK_SIZE - 1)
+            .unwrap_or((payload.app_data, &[]));
 
         // write the first block
         let begin_first_block = cursor.position();
@@ -129,16 +124,7 @@ fn format_frame<'a>(
 
     let start = cursor.position();
 
-    cursor.write_u8(constant::START1)?;
-    cursor.write_u8(constant::START2)?;
-
-    let header_start = cursor.position();
-
-    cursor.write_u8(length)?;
-    cursor.write_u8(header.control.to_u8())?;
-    cursor.write_u16_le(header.destination.value())?;
-    cursor.write_u16_le(header.source.value())?;
-    cursor.write_u16_le(calc_crc_with_0564(cursor.written_since(header_start)?))?;
+    cursor.write_bytes(&header_bytes(header, length))?;
 
     let end_header = cursor.position();
 
@@ -163,12 +149,119 @@ fn format_frame<'a>(
 mod test {
     use super::super::test_data::*;
     use super::*;
+    use crate::link::header::AnyAddress;
+    use crate::link::EndpointAddress;
 
     #[test]
     fn formats_ack() {
-        let mut buffer = [0; constant::LINK_HEADER_LENGTH];
-        format_header_fixed_size(ACK.header, &mut buffer);
-        assert_eq!(buffer, ACK.bytes);
+        assert_eq!(
+            header_bytes(ACK.header, constant::MIN_HEADER_LENGTH_VALUE),
+            ACK.bytes
+        );
+    }
+
+    const ADDR_A: EndpointAddress = EndpointAddress::raw(0x1234);
+    const ADDR_B: EndpointAddress = EndpointAddress::raw(0xABCD);
+
+    fn header_only(header: Header) -> Vec<u8> {
+        let mut buffer = [0; constant::MAX_LINK_FRAME_LENGTH];
+        let mut cursor = WriteCursor::new(&mut buffer);
+        let data = format_header_only(header, &mut cursor).unwrap();
+        assert!(data.payload_only.is_empty());
+        data.frame.to_vec()
+    }
+
+    fn data_frame(header: Header, app_data: &[u8]) -> Vec<u8> {
+        let mut buffer = [0; constant::MAX_LINK_FRAME_LENGTH];
+        let mut cursor = WriteCursor::new(&mut buffer);
+        format_data_frame(header, Payload::new(0xC0, app_data), &mut cursor)
+            .unwrap()
+            .frame
+            .to_vec()
+    }
+
+    #[test]
+    fn formats_link_status_request_from_master() {
+        assert_eq!(
+            header_only(Header::request_link_status(true, ADDR_A, ADDR_B)),
+            [0x05, 0x64, 0x05, 0xC9, 0x34, 0x12, 0xCD, 0xAB, 0xE8, 0xB8]
+        );
+    }
+
+    #[test]
+    fn formats_link_status_request_from_outstation() {
+        assert_eq!(
+            header_only(Header::request_link_status(false, ADDR_B, ADDR_A)),
+            [0x05, 0x64, 0x05, 0x49, 0xCD, 0xAB, 0x34, 0x12, 0x24, 0x5B]
+        );
+    }
+
+    #[test]
+    fn formats_header_only_ack_like_fixed_size() {
+        assert_eq!(header_only(ACK.header), ACK.bytes);
+    }
+
+    #[test]
+    fn formats_header_of_empty_data_frame() {
+        let frame = data_frame(
+            Header::unconfirmed_user_data(true, ADDR_A.wrap(), ADDR_B.wrap()),
+            &[],
+        );
+        assert_eq!(
+            frame,
+            [0x05, 0x64, 0x06, 0xC4, 0x34, 0x12, 0xCD, 0xAB, 0xEF, 0xD1, 0xC0, 0x1D, 0x0A]
+        );
+    }
+
+    #[test]
+    fn formats_header_of_full_data_frame() {
+        let frame = data_frame(
+            Header::unconfirmed_user_data(true, ADDR_A.wrap(), ADDR_B.wrap()),
+            &[0xAA; constant::MAX_APP_BYTES_PER_FRAME],
+        );
+        assert_eq!(frame.len(), constant::MAX_LINK_FRAME_LENGTH);
+        assert_eq!(
+            frame.get(..constant::LINK_HEADER_LENGTH).unwrap(),
+            [0x05, 0x64, 0xFF, 0xC4, 0x34, 0x12, 0xCD, 0xAB, 0x69, 0xC8]
+        );
+    }
+
+    #[test]
+    fn formats_header_of_broadcast_data_frame() {
+        let frame = data_frame(
+            Header::unconfirmed_user_data(true, AnyAddress::from(0xFFFF), ADDR_B.wrap()),
+            &[0x01],
+        );
+        assert_eq!(
+            frame.get(..constant::LINK_HEADER_LENGTH).unwrap(),
+            [0x05, 0x64, 0x07, 0xC4, 0xFF, 0xFF, 0xCD, 0xAB, 0x0F, 0x1A]
+        );
+    }
+
+    #[test]
+    fn formats_header_of_outstation_data_frame() {
+        let frame = data_frame(
+            Header::unconfirmed_user_data(false, ADDR_B.wrap(), ADDR_A.wrap()),
+            &[0x01],
+        );
+        assert_eq!(
+            frame.get(..constant::LINK_HEADER_LENGTH).unwrap(),
+            [0x05, 0x64, 0x07, 0x44, 0xCD, 0xAB, 0x34, 0x12, 0xC4, 0x87]
+        );
+    }
+
+    #[test]
+    fn formats_data_frame_with_multiple_blocks() {
+        let mut buffer = [0; constant::MAX_LINK_FRAME_LENGTH];
+        let mut cursor = WriteCursor::new(&mut buffer);
+        let (transport, app_data) = MULTI_BLOCK_USER_DATA.payload.split_first().unwrap();
+        let data = format_data_frame(
+            MULTI_BLOCK_USER_DATA.header,
+            Payload::new(*transport, app_data),
+            &mut cursor,
+        )
+        .unwrap();
+        assert_eq!(data.frame, MULTI_BLOCK_USER_DATA.bytes);
     }
 
     #[test]

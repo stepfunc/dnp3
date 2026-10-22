@@ -11,20 +11,18 @@ use crate::outstation::{
     ControlHandler, OutstationApplication, OutstationConfig, OutstationHandle,
     OutstationInformation,
 };
-use crate::tcp::client::ClientTask;
 use crate::tcp::tls::{CertificateMode, MinTlsVersion, TlsClientConfig, TlsError};
 use crate::tcp::{
     ClientConnectionHandler, ClientState, ConnectOptions, EndpointList, PostConnectionHandler,
     SimpleConnectHandler,
 };
 use crate::util::phys::{PhysAddr, PhysLayer};
-use crate::util::session::{Enabled, Session};
+use crate::util::session::Enabled;
 use tokio::net::TcpStream;
 use tokio_rustls::rustls::pki_types::ServerName;
 
 use crate::app::parse::options::ParseOptions;
 use crate::link::reader::LinkModes;
-use tracing::Instrument;
 
 /// Spawn a TLS client task onto the `Tokio` runtime. The task runs until the returned handle is dropped.
 ///
@@ -81,7 +79,6 @@ pub fn spawn_outstation_tls_client_2(
     listener: Box<dyn Listener<ClientState>>,
     tls_config: TlsClientConfig,
 ) -> OutstationHandle {
-    let name = connect_handler.endpoint_span_name();
     let (task, handle) = OutstationTask::create(
         Enabled::No,
         LinkModes::stream(link_error_mode),
@@ -92,21 +89,13 @@ pub fn spawn_outstation_tls_client_2(
         information,
         control_handler,
     );
-    let session = Session::outstation(task);
-    let mut client = ClientTask::new(
-        session,
+    crate::tcp::spawn_outstation_client(
+        task,
         connect_handler,
         PostConnectionHandler::Tls(tls_config),
         listener,
+        |name| tracing::info_span!("dnp3-outstation-tls-client", "endpoint" = ?name),
     );
-
-    let future = async move {
-        client
-            .run()
-            .instrument(tracing::info_span!("dnp3-outstation-tls-client", "endpoint" = ?name))
-            .await;
-    };
-    tokio::spawn(future);
     handle
 }
 
@@ -227,9 +216,16 @@ impl TlsServerConfig {
         socket: TcpStream,
     ) -> Result<PhysLayer, String> {
         let connector = tokio_rustls::TlsAcceptor::from(self.config.clone());
-        match connector.accept(socket).await {
-            Err(err) => Err(format!("failed to establish TLS session: {err}")),
-            Ok(stream) => Ok(PhysLayer::Tls(Box::new(tokio_rustls::TlsStream::from(
+        // the server accepts one connection at a time, so a handshake that stalls would stop it
+        // accepting any others
+        let handshake = connector.accept(socket);
+        match tokio::time::timeout(super::TLS_HANDSHAKE_TIMEOUT, handshake).await {
+            Err(_) => Err(format!(
+                "TLS handshake didn't complete within {} seconds",
+                super::TLS_HANDSHAKE_TIMEOUT.as_secs()
+            )),
+            Ok(Err(err)) => Err(format!("failed to establish TLS session: {err}")),
+            Ok(Ok(stream)) => Ok(PhysLayer::Tls(Box::new(tokio_rustls::TlsStream::from(
                 stream,
             )))),
         }

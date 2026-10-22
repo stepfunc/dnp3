@@ -623,9 +623,15 @@ fn define_retry_strategy(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStru
             DurationType::Milliseconds,
             "Maximum delay between two retries",
         )?
-        .doc(doc("Retry strategy configuration.").details(
-            "The strategy uses an exponential back-off with a minimum and maximum value.",
-        ))?
+        .doc(
+            doc("Retry strategy configuration.")
+                .details(
+                    "The strategy uses an exponential back-off with a minimum and maximum value.",
+                )
+                .details(
+                    "If the minimum delay is greater than the maximum delay, the two are swapped. Both delays are raised to at least 1 millisecond.",
+                ),
+        )?
         .end_fields()?
         .begin_initializer("init", InitializerType::Normal, "Initialize to defaults")?
         .default(&min_delay, Duration::from_secs(1))?

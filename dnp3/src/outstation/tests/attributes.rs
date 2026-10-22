@@ -1,5 +1,6 @@
 use crate::app::attr::*;
 use crate::app::BufferSize;
+use crate::outstation::database::AttrDefError;
 use crate::outstation::tests::harness::*;
 
 // read g0v254 (all attributes) with qualifier 0x06
@@ -52,35 +53,114 @@ async fn attribute_that_does_not_fit_is_moved_whole_to_the_next_fragment() {
 }
 
 #[tokio::test]
-async fn attribute_that_cannot_be_encoded_is_skipped_without_a_partial_header() {
+async fn attribute_values_longer_than_255_bytes_cannot_be_defined() {
+    let harness = new_harness(get_default_config());
+
+    let results = harness.handle.database.transaction(|db| {
+        [
+            db.define_attr(
+                AttrProp::default(),
+                StringAttr::DeviceSerialNumber.with_value("L".repeat(256)),
+            ),
+            db.define_attr(
+                AttrProp::default(),
+                OwnedAttribute::new(
+                    AttrSet::new(1),
+                    1,
+                    OwnedAttrValue::OctetString(vec![0xAA; 256]),
+                ),
+            ),
+            db.define_attr(
+                AttrProp::default(),
+                OwnedAttribute::new(
+                    AttrSet::new(1),
+                    2,
+                    OwnedAttrValue::BitString(vec![0xBB; 256]),
+                ),
+            ),
+        ]
+    });
+
+    assert_eq!(
+        results,
+        [Err(AttrDefError::BadValue(BadAttribute::BadLength(256))); 3]
+    );
+}
+
+#[tokio::test]
+async fn attribute_values_of_255_bytes_are_defined_and_read_back() {
     let mut harness = new_harness(get_default_config());
 
-    // a visible string longer than 255 bytes cannot be encoded
-    let too_long = "L".repeat(256);
+    let serial = "S".repeat(255);
 
     harness.handle.database.transaction(|db| {
         db.define_attr(
             AttrProp::default(),
-            StringAttr::DeviceSerialNumber.with_value("serial"),
+            StringAttr::DeviceSerialNumber.with_value(serial.as_str()),
         )
         .unwrap();
         db.define_attr(
             AttrProp::default(),
-            StringAttr::DeviceSubsetAndConformance.with_value(too_long.as_str()),
+            OwnedAttribute::new(
+                AttrSet::new(1),
+                1,
+                OwnedAttrValue::OctetString(vec![0xAA; 255]),
+            ),
         )
         .unwrap();
         db.define_attr(
             AttrProp::default(),
-            StringAttr::ProductNameAndModel.with_value("product"),
+            OwnedAttribute::new(
+                AttrSet::new(1),
+                2,
+                OwnedAttrValue::BitString(vec![0xBB; 255]),
+            ),
         )
         .unwrap();
     });
 
     let mut response = vec![0xC0, 0x81, 0x80, 0x00];
-    response.extend(encode_string(var::DEVICE_SERIAL_NUMBER, "serial"));
-    response.extend(encode_string(var::PRODUCT_NAME_AND_MODEL, "product"));
+    response.extend(encode_string(var::DEVICE_SERIAL_NUMBER, &serial));
+    // g0v1, set 1, octet string, 255 bytes
+    response.extend([0x00, 0x01, 0x00, 0x01, 0x01, 0x05, 0xFF]);
+    response.extend([0xAA; 255]);
+    // g0v2, set 1, bit string, 255 bytes
+    response.extend([0x00, 0x02, 0x00, 0x01, 0x01, 0x06, 0xFF]);
+    response.extend([0xBB; 255]);
 
     harness
         .test_request_response(READ_ALL_ATTRIBUTES, &response)
         .await;
+}
+
+#[tokio::test]
+async fn attribute_defined_in_private_set_zero_is_read_from_the_default_set() {
+    let mut harness = new_harness(get_default_config());
+
+    harness.handle.database.transaction(|db| {
+        db.define_attr(
+            AttrProp::default(),
+            OwnedAttribute::new(
+                AttrSet::Private(0),
+                var::DEVICE_SERIAL_NUMBER,
+                OwnedAttrValue::VisibleString("serial".to_string()),
+            ),
+        )
+        .unwrap();
+    });
+
+    // read g0v248 (device serial number) in set 0
+    let request = &[
+        0xC0,
+        0x01,
+        0x00,
+        var::DEVICE_SERIAL_NUMBER,
+        0x00,
+        0x00,
+        0x00,
+    ];
+    let mut response = vec![0xC0, 0x81, 0x80, 0x00];
+    response.extend(encode_string(var::DEVICE_SERIAL_NUMBER, "serial"));
+
+    harness.test_request_response(request, &response).await;
 }
