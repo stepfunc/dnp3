@@ -122,3 +122,23 @@ pub(crate) fn format_bitfield(
 
     f.write_str("]")
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::app::{Iin1, Iin2};
+
+    #[test]
+    fn bitfield_lists_the_names_of_the_set_bits_from_bit_0() {
+        assert_eq!(Iin1::new(0).to_string(), "iin1: []");
+        assert_eq!(Iin1::new(0b0100_0000).to_string(), "iin1: [DEVICE_TROUBLE]");
+        assert_eq!(
+            Iin1::new(0b1000_0101).to_string(),
+            "iin1: [BROADCAST, CLASS_2_EVENTS, DEVICE_RESTART]"
+        );
+        assert_eq!(
+            Iin2::new(0xFF).to_string(),
+            "iin2: [NO_FUNC_CODE_SUPPORT, OBJECT_UNKNOWN, PARAMETER_ERROR, EVENT_BUFFER_OVERFLOW, \
+             ALREADY_EXECUTING, CONFIG_CORRUPT, RESERVED_2, RESERVED_1]"
+        );
+    }
+}
