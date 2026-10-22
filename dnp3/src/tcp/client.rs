@@ -1,9 +1,10 @@
-use crate::app::{Listener, Shutdown};
+use crate::app::Listener;
+use crate::link::error::LinkError;
 use crate::tcp::{
     ClientConnectionHandler, ClientState, ConnectionInfo, EndpointInner, PostConnectionHandler,
 };
 use crate::util::phys::PhysLayer;
-use crate::util::session::{Enabled, RunError, Session, StopReason};
+use crate::util::session::{run_connection, Connection, Session};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
@@ -32,45 +33,8 @@ impl ClientTask {
     }
 
     pub(crate) async fn run(&mut self) {
-        let _: Result<(), crate::app::Shutdown> = self.run_impl().await;
+        run_connection(self).await;
         self.listener.update(ClientState::Shutdown).get().await;
-    }
-
-    async fn run_impl(&mut self) -> Result<(), Shutdown> {
-        loop {
-            if self.session.enabled() == Enabled::No {
-                self.listener.update(ClientState::Disabled).get().await;
-                self.session.wait_for_enabled().await?;
-            }
-            if let Err(StopReason::Shutdown) = self.run_connection().await {
-                return Err(Shutdown);
-            }
-        }
-    }
-
-    async fn run_connection(&mut self) -> Result<(), StopReason> {
-        loop {
-            self.run_one_connection().await?;
-        }
-    }
-
-    async fn run_one_connection(&mut self) -> Result<(), StopReason> {
-        self.listener.update(ClientState::Connecting).get().await;
-
-        match self.connect().await {
-            Ok((phys, addr, hostname)) => {
-                self.listener.update(ClientState::Connected).get().await;
-                self.run_phys(phys, addr, hostname).await
-            }
-            Err(delay) => {
-                tracing::info!("waiting {} ms to retry connection", delay.as_millis());
-                self.listener
-                    .update(ClientState::WaitAfterFailedConnect(delay))
-                    .get()
-                    .await;
-                self.session.wait_for_retry(delay).await
-            }
-        }
     }
 
     async fn connect(&mut self) -> Result<(PhysLayer, SocketAddr, Option<Arc<String>>), Duration> {
@@ -205,33 +169,52 @@ impl ClientTask {
 
         Some(phys)
     }
+}
 
-    async fn run_phys(
-        &mut self,
-        mut phys: PhysLayer,
-        addr: SocketAddr,
-        hostname: Option<Arc<String>>,
-    ) -> Result<(), StopReason> {
-        match self.session.run(&mut phys).await {
-            RunError::Stop(s) => Err(s),
-            RunError::Link(err) => {
-                tracing::warn!("connection to {addr} failed: {err}");
-                let hostname = hostname.as_ref().map(|x| x.as_str());
-                let reconnect_delay = self.connect_handler.disconnected(addr, hostname);
+impl Connection for ClientTask {
+    type Peer = (SocketAddr, Option<Arc<String>>);
 
+    fn session(&mut self) -> &mut Session {
+        &mut self.session
+    }
+
+    async fn disabled(&mut self) {
+        self.listener.update(ClientState::Disabled).get().await;
+    }
+
+    async fn open(&mut self) -> Result<(PhysLayer, Self::Peer), Duration> {
+        self.listener.update(ClientState::Connecting).get().await;
+
+        match self.connect().await {
+            Ok((phys, addr, hostname)) => {
+                self.listener.update(ClientState::Connected).get().await;
+                Ok((phys, (addr, hostname)))
+            }
+            Err(delay) => {
+                tracing::info!("waiting {} ms to retry connection", delay.as_millis());
                 self.listener
-                    .update(ClientState::WaitAfterDisconnect(reconnect_delay))
+                    .update(ClientState::WaitAfterFailedConnect(delay))
                     .get()
                     .await;
-
-                if !reconnect_delay.is_zero() {
-                    tracing::warn!("waiting {reconnect_delay:?} to reconnect");
-                    self.session.wait_for_retry(reconnect_delay).await?;
-                }
-
-                Ok(())
+                Err(delay)
             }
         }
+    }
+
+    async fn failed(&mut self, (addr, hostname): Self::Peer, err: LinkError) -> Duration {
+        tracing::warn!("connection to {addr} failed: {err}");
+        let hostname = hostname.as_ref().map(|x| x.as_str());
+        let reconnect_delay = self.connect_handler.disconnected(addr, hostname);
+
+        self.listener
+            .update(ClientState::WaitAfterDisconnect(reconnect_delay))
+            .get()
+            .await;
+
+        if !reconnect_delay.is_zero() {
+            tracing::warn!("waiting {reconnect_delay:?} to reconnect");
+        }
+        reconnect_delay
     }
 }
 
