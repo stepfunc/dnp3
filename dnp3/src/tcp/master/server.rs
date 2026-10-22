@@ -1,4 +1,4 @@
-use crate::app::{ReadError, Shutdown, Timeout};
+use crate::app::{Shutdown, Timeout};
 use crate::decode::PhysDecodeLevel;
 use crate::link;
 use crate::link::reader::LinkModes;
@@ -13,7 +13,7 @@ use crate::app::parse::options::ParseOptions;
 use crate::tcp::ServerHandle;
 use crate::util::future::forever;
 use crate::util::shutdown::ShutdownListener;
-use scursor::ReadCursor;
+use std::io::ErrorKind;
 use std::net::SocketAddr;
 use std::num::NonZeroUsize;
 use std::time::Duration;
@@ -421,23 +421,14 @@ async fn read_link_identity(
         }
     }
 
-    fn read_addr(header: &HeaderBytes) -> Result<(u16, u16), ReadError> {
-        let mut cursor = ReadCursor::new(header);
-        // just skip over the 0x0564 | LENGTH | CTRL
-        cursor.read_bytes(4)?;
-        let destination = cursor.read_u16_le()?;
-        let source = cursor.read_u16_le()?;
-        Ok((destination, source))
-    }
-
     let header_bytes = read_header(layer, decode_level).await?;
 
-    let (destination, source) =
-        read_addr(&header_bytes).map_err(|_| std::io::Error::other("Bad read logic"))?;
+    let (header, _) = link::parser::parse_header_bytes(header_bytes)
+        .map_err(|err| std::io::Error::new(ErrorKind::InvalidData, err.to_string()))?;
 
     Ok(LinkIdentity {
-        source,
-        destination,
+        source: header.source.value(),
+        destination: header.destination.value(),
         header_bytes,
     })
 }
@@ -579,6 +570,25 @@ mod tests {
                 .unwrap();
             assert_eq!(buffer, expected);
         }
+
+        /// the server closes the connection without reporting a link identity
+        async fn expect_closed_without_identity(&mut self) {
+            let mut buffer = [0; 1];
+            let closed = async {
+                tokio::select! {
+                    Some(event) = self.events.recv() => panic!("unexpected event: {event:?}"),
+                    res = self.stream.read(&mut buffer) => res.unwrap(),
+                }
+            };
+            let count = tokio::time::timeout(Duration::from_secs(5), closed)
+                .await
+                .unwrap();
+            assert_eq!(count, 0);
+            assert_eq!(
+                self.events.try_recv(),
+                Err(mpsc::error::TryRecvError::Empty)
+            );
+        }
     }
 
     #[tokio::test]
@@ -609,5 +619,39 @@ mod tests {
         fixture.enable_channel().await;
         // the session answers the header that was read to identify it
         fixture.expect_bytes(&LINK_STATUS_RESPONSE).await;
+    }
+
+    async fn rejects_identification(header: [u8; 10]) {
+        let mut fixture = Fixture::new(true).await;
+        fixture.expect_event(Event::Accept).await;
+        fixture.stream.write_all(&header).await.unwrap();
+        fixture.expect_closed_without_identity().await;
+    }
+
+    #[tokio::test]
+    async fn header_with_bad_start1_is_not_identified() {
+        let mut header = LINK_STATUS_REQUEST;
+        header[0] = 0x06;
+        rejects_identification(header).await;
+    }
+
+    #[tokio::test]
+    async fn header_with_bad_start2_is_not_identified() {
+        let mut header = LINK_STATUS_REQUEST;
+        header[1] = 0x65;
+        rejects_identification(header).await;
+    }
+
+    #[tokio::test]
+    async fn header_with_bad_crc_is_not_identified() {
+        let mut header = LINK_STATUS_REQUEST;
+        header[9] ^= 0xFF;
+        rejects_identification(header).await;
+    }
+
+    #[tokio::test]
+    async fn header_with_bad_length_is_not_identified() {
+        // length 4 with a matching CRC
+        rejects_identification([0x05, 0x64, 0x04, 0xC0, 0x01, 0x00, 0x00, 0x04, 0x0E, 0x94]).await;
     }
 }
