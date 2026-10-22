@@ -4,6 +4,8 @@ pub(crate) mod harness;
 mod addressing;
 /// device attributes (group 0)
 mod attributes;
+/// every control object and index width, handler statuses and the control limit
+mod control_objects;
 /// control functionality
 mod controls;
 /// freeze counters tests

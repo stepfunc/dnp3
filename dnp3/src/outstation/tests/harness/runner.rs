@@ -1,3 +1,4 @@
+use crate::app::control::CommandStatus;
 use crate::app::parse::options::ParseOptions;
 use crate::decode::AppDecodeLevel;
 use crate::link::header::{BroadcastConfirmMode, FrameInfo, FrameType};
@@ -7,7 +8,7 @@ use crate::outstation::config::{Feature, OutstationConfig};
 use crate::outstation::database::EventBufferConfig;
 use crate::outstation::task::OutstationTask;
 use crate::outstation::tests::harness::{
-    event_handlers, ApplicationData, Event, EventReceiver, MockControlHandler,
+    event_handlers, ApplicationData, ControlStatuses, Event, EventReceiver, MockControlHandler,
     MockOutstationApplication, MockOutstationInformation,
 };
 use crate::outstation::OutstationHandle;
@@ -51,6 +52,7 @@ pub(crate) struct Harness<S> {
     state: S,
     events: EventReceiver,
     pub(crate) application_data: Arc<Mutex<ApplicationData>>,
+    control_statuses: ControlStatuses,
     frame_info: RxFrameInfo,
 }
 
@@ -116,6 +118,11 @@ impl<S> Harness<S> {
         }
     }
 
+    /// Make the control handler return `status` for every control at `index`
+    pub(crate) fn set_control_status(&self, index: u16, status: CommandStatus) {
+        self.control_statuses.lock().unwrap().insert(index, status);
+    }
+
     /// Change the broadcast address of the requests sent from now on
     pub(crate) fn set_broadcast(&mut self, broadcast: Option<BroadcastConfirmMode>) {
         let mut info = self.frame_info.get().unwrap();
@@ -166,6 +173,7 @@ impl Harness<Connected> {
             state: Connected { mut io, session },
             events,
             application_data,
+            control_statuses,
             frame_info,
         } = self;
 
@@ -181,6 +189,7 @@ impl Harness<Connected> {
             state: Disconnected { task },
             events,
             application_data,
+            control_statuses,
             frame_info,
         }
     }
@@ -195,6 +204,7 @@ impl Harness<Disconnected> {
             state: spawn_session(self.state.task),
             events: self.events,
             application_data: self.application_data,
+            control_statuses: self.control_statuses,
             frame_info: self.frame_info,
         }
     }
@@ -226,6 +236,7 @@ fn new_harness_impl(
     let (sender, receiver) = event_handlers();
 
     let (data, application) = MockOutstationApplication::create(sender.clone());
+    let control_statuses = ControlStatuses::default();
 
     let (mut task, handle) = MockOutstationTask::with_transport(
         Enabled::Yes,
@@ -235,7 +246,7 @@ fn new_harness_impl(
         PhysAddr::None,
         application,
         MockOutstationInformation::create(sender.clone()),
-        MockControlHandler::create(sender.clone()),
+        MockControlHandler::create(sender.clone(), control_statuses.clone()),
     );
 
     let master_address = master_address.unwrap_or(config.master_address);
@@ -254,6 +265,7 @@ fn new_harness_impl(
         state: spawn_session(task),
         events: receiver,
         application_data: data,
+        control_statuses,
         frame_info,
     }
 }
