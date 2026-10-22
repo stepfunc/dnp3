@@ -186,3 +186,44 @@ async fn freeze_at_time_no_ack() {
 
     harness.expect_no_response();
 }
+
+#[tokio::test]
+async fn immediate_freeze_two_byte_range_of_counters() {
+    let mut harness = new_harness(get_default_config());
+
+    harness
+        .test_request_response(
+            &[0xC0, 0x07, 20, 0, 0x01, 0x00, 0x01, 0x10, 0x01],
+            EMPTY_RESPONSE,
+        )
+        .await;
+
+    harness.check_events(&[Event::Freeze(
+        FreezeIndices::Range(256, 272),
+        FreezeType::ImmediateFreeze,
+    )]);
+}
+
+#[tokio::test]
+async fn freeze_at_time_with_two_byte_count() {
+    let mut harness = new_harness(get_default_config());
+
+    // g50v2 with a 2-byte count, then g20v0 with a 1-byte start/stop
+    harness
+        .test_request_response(
+            &[
+                0xC0, 0x0B, 0x32, 0x02, 0x08, 0x01, 0x00, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0xAA,
+                0xBB, 0xCC, 0xDD, 20, 0, 0x00, 3, 4,
+            ],
+            EMPTY_RESPONSE,
+        )
+        .await;
+
+    harness.check_events(&[Event::Freeze(
+        FreezeIndices::Range(3, 4),
+        FreezeType::FreezeAtTime(FreezeInterval::PeriodicallyFreeze(
+            Timestamp::new(0xFF),
+            0xDDCCBBAA,
+        )),
+    )]);
+}

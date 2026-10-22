@@ -1478,4 +1478,156 @@ mod test {
         );
         assert_matches!(headers.next(), None);
     }
+
+    /// one response header with each qualifier, the 1-byte and 2-byte forms of each family next
+    /// to each other
+    const RESPONSE_WITH_EVERY_QUALIFIER: &[u8] = &[
+        // g1v0, all objects
+        0x01, 0x00, 0x06, //
+        // g1v2, 1-byte start/stop [7, 8]
+        0x01, 0x02, 0x00, 0x07, 0x08, 0x81, 0x01, //
+        // g1v2, 2-byte start/stop [256, 257]
+        0x01, 0x02, 0x01, 0x00, 0x01, 0x01, 0x01, 0x01, 0x81, //
+        // g50v1, 1-byte count of 1
+        0x32, 0x01, 0x07, 0x01, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, //
+        // g50v1, 2-byte count of 1
+        0x32, 0x01, 0x08, 0x01, 0x00, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16, //
+        // g2v1, 1-byte count of 1 and 1-byte prefix, index 5
+        0x02, 0x01, 0x17, 0x01, 0x05, 0x81, //
+        // g2v1, 2-byte count of 1 and 2-byte prefix, index 261
+        0x02, 0x01, 0x28, 0x01, 0x00, 0x05, 0x01, 0x01, //
+        // g70v5, free-format, count of 1, 12 bytes
+        70, 5, 0x5B, 0x01, 12, 0x00, 0x01, 0x02, 0x03, 0x04, 0xAA, 0xBB, 0xCC, 0xDD, b'd', b'a',
+        b't', b'a',
+    ];
+
+    /// the variation, qualifier and whether `count()` is available for each header
+    fn qualifier_transcript(
+        function: FunctionCode,
+        input: &[u8],
+    ) -> Vec<(Variation, QualifierCode, bool)> {
+        ObjectParser::parse(ParseOptions::default(), function, input)
+            .unwrap()
+            .iter()
+            .map(|x| {
+                (
+                    x.variation,
+                    x.details.qualifier(),
+                    x.details.count().is_some(),
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn response_headers_keep_their_qualifier_at_both_widths() {
+        assert_eq!(
+            qualifier_transcript(FunctionCode::Response, RESPONSE_WITH_EVERY_QUALIFIER),
+            vec![
+                (Variation::Group1Var0, QualifierCode::AllObjects, false),
+                (Variation::Group1Var2, QualifierCode::Range8, false),
+                (Variation::Group1Var2, QualifierCode::Range16, false),
+                (Variation::Group50Var1, QualifierCode::Count8, true),
+                (Variation::Group50Var1, QualifierCode::Count16, true),
+                (Variation::Group2Var1, QualifierCode::CountAndPrefix8, false),
+                (
+                    Variation::Group2Var1,
+                    QualifierCode::CountAndPrefix16,
+                    false
+                ),
+                (Variation::Group70Var5, QualifierCode::FreeFormat16, false),
+            ]
+        );
+    }
+
+    #[test]
+    fn read_headers_keep_their_qualifier_at_both_widths() {
+        let input = [
+            0x01, 0x00, 0x06, // g1v0, all objects
+            0x01, 0x02, 0x00, 0x07, 0x08, // g1v2, 1-byte start/stop
+            0x01, 0x02, 0x01, 0x00, 0x01, 0x01, 0x01, // g1v2, 2-byte start/stop
+            0x02, 0x00, 0x07, 0x03, // g2v0, 1-byte count
+            0x02, 0x00, 0x08, 0x03, 0x01, // g2v0, 2-byte count
+        ];
+        assert_eq!(
+            qualifier_transcript(FunctionCode::Read, &input),
+            vec![
+                (Variation::Group1Var0, QualifierCode::AllObjects, false),
+                (Variation::Group1Var2, QualifierCode::Range8, false),
+                (Variation::Group1Var2, QualifierCode::Range16, false),
+                (Variation::Group2Var0, QualifierCode::Count8, true),
+                (Variation::Group2Var0, QualifierCode::Count16, true),
+            ]
+        );
+    }
+
+    #[test]
+    fn control_headers_keep_their_qualifier_at_both_widths() {
+        let input = [
+            // g12v1, 1-byte count and prefix, index 3
+            0x0C, 0x01, 0x17, 0x01, 0x03, 0x01, 0x01, 0x64, 0x00, 0x00, 0x00, 0xC8, 0x00, 0x00,
+            0x00, 0x00, //
+            // g12v1, 2-byte count and prefix, index 259
+            0x0C, 0x01, 0x28, 0x01, 0x00, 0x03, 0x01, 0x01, 0x01, 0x64, 0x00, 0x00, 0x00, 0xC8,
+            0x00, 0x00, 0x00, 0x00,
+        ];
+        assert_eq!(
+            qualifier_transcript(FunctionCode::Operate, &input),
+            vec![
+                (
+                    Variation::Group12Var1,
+                    QualifierCode::CountAndPrefix8,
+                    false
+                ),
+                (
+                    Variation::Group12Var1,
+                    QualifierCode::CountAndPrefix16,
+                    false
+                ),
+            ]
+        );
+    }
+
+    #[test]
+    fn free_format_count_other_than_one_is_rejected() {
+        for count in [0, 2] {
+            test_parse_error(
+                &[70, 5, 0x5B, count, 0x00, 0x00],
+                FunctionCode::Response,
+                ObjectParseError::UnsupportedFreeFormatCount(count),
+            );
+        }
+    }
+
+    #[test]
+    fn object_header_log_format_for_every_qualifier() {
+        let mut fragment = vec![0xC0, 0x81, 0x00, 0x00];
+        fragment.extend_from_slice(RESPONSE_WITH_EVERY_QUALIFIER);
+        let fragment = ParsedFragment::parse(ParseOptions::default(), &fragment).unwrap();
+        let text = fragment.display(AppDecodeLevel::ObjectValues).to_string();
+        let expected = [
+            "ctrl: [fir: true fin: true con: false uns: false seq: 0] func: Response iin1: [] iin2: [] ... (len = 72)",
+            "g1v0 : Binary Input - Any Variation - all objects",
+            "g1v2 : Binary Input - With Flags - 1-byte start/stop - [7, 8]",
+            "index: 7 flags: 0x81 [ONLINE, STATE]",
+            "index: 8 flags: 0x01 [ONLINE]",
+            "g1v2 : Binary Input - With Flags - 2-byte start/stop - [256, 257]",
+            "index: 256 flags: 0x01 [ONLINE]",
+            "index: 257 flags: 0x81 [ONLINE, STATE]",
+            "g50v1 : Time and Date - Absolute Time - 1-byte count of objects - [1]",
+            "time: 2179-09-26T07:18:29.121Z",
+            "g50v1 : Time and Date - Absolute Time - 2-byte count of objects - [1]",
+            "time: 2739-05-26T01:15:18.417Z",
+            "g2v1 : Binary Input Event - Without Time - 1-byte count of objects - [1]",
+            "index: 5 flags: 0x81 [ONLINE, STATE]",
+            "g2v1 : Binary Input Event - Without Time - 2-byte count of objects - [1]",
+            "index: 261 flags: 0x01 [ONLINE]",
+            "g70v5 : File-control - file transport - 2-byte free format - [1]",
+            "file handle: 67305985",
+            "block number: 3721182122",
+            "file data length: 4",
+        ]
+        .join("\n");
+        assert_eq!(text, expected);
+    }
 }

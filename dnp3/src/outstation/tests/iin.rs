@@ -406,3 +406,43 @@ async fn fragment_that_is_not_a_valid_request_does_not_end_a_confirm_wait() {
     harness.send_and_process(CONFIRM_SEQ_0).await;
     harness.check_events(&[Event::SolicitedConfirmReceived(0)]);
 }
+
+#[tokio::test]
+async fn read_with_two_byte_count_and_prefix_sets_parameter_error() {
+    let mut harness = new_harness(get_default_config());
+
+    harness
+        .test_request_response(
+            &[0xC0, 0x01, 2, 1, 0x28, 1, 0, 0, 0, 0x01],
+            EMPTY_RESPONSE_PARAM_ERROR,
+        )
+        .await;
+}
+
+#[tokio::test]
+async fn read_with_free_format_qualifier_sets_object_unknown() {
+    let mut harness = new_harness(get_default_config());
+
+    // g70v5, free-format, 8 bytes: file handle and block number with no data
+    harness
+        .test_request_response(
+            &[0xC0, 0x01, 70, 5, 0x5B, 1, 8, 0, 1, 2, 3, 4, 5, 6, 7, 8],
+            EMPTY_RESPONSE_OBJECT_UNKNOWN,
+        )
+        .await;
+}
+
+#[tokio::test]
+async fn write_of_g34_with_a_two_byte_range_sets_parameter_error() {
+    let mut harness = new_harness(get_default_config());
+
+    // g34v1 is writable, but not with a 2-byte start/stop
+    harness
+        .test_request_response(
+            &[
+                0xC0, 0x02, 0x22, 0x01, 0x01, 0x03, 0x00, 0x03, 0x00, 0xCA, 0xFE,
+            ],
+            EMPTY_RESPONSE_PARAM_ERROR,
+        )
+        .await;
+}

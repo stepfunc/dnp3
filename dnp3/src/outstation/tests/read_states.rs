@@ -286,3 +286,39 @@ async fn discards_unselected_events_on_demand_after_link_drop() {
         .await;
     harness.check_no_events();
 }
+
+fn create_binary_and_two_events(database: &mut Database) {
+    database.add(0, Some(EventClass::Class1), BinaryInputConfig::default());
+    for value in [true, false] {
+        database.update(
+            0,
+            &BinaryInput::new(value, Flags::ONLINE, Time::Synchronized(Timestamp::new(0))),
+            UpdateOptions::default(),
+        );
+    }
+}
+
+#[tokio::test]
+async fn can_read_count_of_events_at_both_widths() {
+    // g2v0 with a count of 1, as a 1-byte and a 2-byte count
+    for request in [
+        [0xC0, 0x01, 0x02, 0x00, 0x07, 0x01].as_slice(),
+        [0xC0, 0x01, 0x02, 0x00, 0x08, 0x01, 0x00].as_slice(),
+    ] {
+        let mut harness = new_harness(get_default_config());
+        harness
+            .handle
+            .database
+            .transaction(create_binary_and_two_events);
+
+        // only the first event, with class 1 events still pending
+        harness
+            .test_request_response(
+                request,
+                &[
+                    0xE0, 0x81, 0x82, 0x00, 0x02, 0x01, 0x28, 0x01, 0x00, 0x00, 0x00, 0x81,
+                ],
+            )
+            .await;
+    }
+}

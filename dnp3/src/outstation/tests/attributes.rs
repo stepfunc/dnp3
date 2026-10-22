@@ -301,3 +301,66 @@ async fn attribute_defined_in_private_set_zero_is_read_from_the_default_set() {
 
     harness.test_request_response(request, &response).await;
 }
+
+#[tokio::test]
+async fn writes_attribute_with_one_and_two_byte_ranges() {
+    let mut harness = new_harness(get_default_config());
+
+    harness.handle.database.transaction(|db| {
+        db.define_attr(
+            AttrProp::writable(),
+            StringAttr::UserAssignedLocation.with_value("old"),
+        )
+        .unwrap();
+    });
+
+    // read g0v245 in the default set with a 1-byte start/stop
+    const READ_LOCATION: [u8; 6] = [0x01, 0x00, var::USER_ASSIGNED_LOCATION, 0x00, 0x00, 0x00];
+
+    // write g0v245 in the default set, 1-byte start/stop then 2-byte start/stop
+    let writes: [&[u8]; 2] = [
+        &[
+            0xC0,
+            0x02,
+            0x00,
+            var::USER_ASSIGNED_LOCATION,
+            0x00,
+            0x00,
+            0x00,
+            0x01,
+            3,
+            b'o',
+            b'n',
+            b'e',
+        ],
+        &[
+            0xC2,
+            0x02,
+            0x00,
+            var::USER_ASSIGNED_LOCATION,
+            0x01,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x01,
+            3,
+            b't',
+            b'w',
+            b'o',
+        ],
+    ];
+
+    for (seq, (write, value)) in writes.into_iter().zip(["one", "two"]).enumerate() {
+        let seq: u8 = (2 * seq).try_into().unwrap();
+        harness
+            .test_request_response(write, &[0xC0 | seq, 0x81, 0x80, 0x00])
+            .await;
+
+        let mut read = vec![0xC0 | (seq + 1)];
+        read.extend(READ_LOCATION);
+        let mut response = vec![0xC0 | (seq + 1), 0x81, 0x80, 0x00];
+        response.extend(encode_string(var::USER_ASSIGNED_LOCATION, value));
+        harness.test_request_response(&read, &response).await;
+    }
+}

@@ -58,3 +58,22 @@ async fn lan_procedure() {
 
     harness.check_events(&[Event::WriteAbsoluteTime(Timestamp::new(0xCAFE))]);
 }
+
+#[tokio::test(start_paused = true)]
+async fn lan_procedure_with_two_byte_count() {
+    let mut harness = new_harness(get_default_config());
+
+    harness
+        .test_request_response(RECORD_CURRENT_TIME, EMPTY_RESPONSE_SEQ0)
+        .await;
+    harness
+        .test_request_response(
+            &[
+                0xC1, 0x02, 50, 3, 0x08, 1, 0, 0xFE, 0xCA, 0x00, 0x00, 0x00, 0x00,
+            ],
+            EMPTY_RESPONSE_SEQ1,
+        )
+        .await;
+
+    harness.check_events(&[Event::WriteAbsoluteTime(Timestamp::new(0xCAFE))]);
+}

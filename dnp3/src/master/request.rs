@@ -1166,3 +1166,62 @@ impl CommandHeader {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::app::control::OpType;
+    use crate::app::parse::options::ParseOptions;
+    use crate::app::FunctionCode;
+    use scursor::WriteCursor;
+
+    fn check(
+        sent: &CommandHeader,
+        echo: &CommandHeader,
+        expected: Result<(), CommandResponseError>,
+    ) {
+        let mut buffer = [0u8; 64];
+        let mut cursor = WriteCursor::new(&mut buffer);
+        echo.write(&mut HeaderWriter::new(&mut cursor)).unwrap();
+        let headers = HeaderCollection::parse(
+            ParseOptions::default(),
+            FunctionCode::Response,
+            cursor.written(),
+        )
+        .unwrap();
+        assert_eq!(
+            CommandHeaders::single(sent.clone()).compare(headers),
+            expected
+        );
+    }
+
+    /// each command with 1-byte and then 2-byte addressing
+    fn commands() -> [(CommandHeader, CommandHeader); 5] {
+        fn both<C: Command>(command: C) -> (CommandHeader, CommandHeader) {
+            (command.to_header_u8(3), command.to_header_u16(259))
+        }
+        [
+            both(Group12Var1::from_op_type(OpType::LatchOn)),
+            both(Group41Var1::new(-7)),
+            both(Group41Var2::new(-7)),
+            both(Group41Var3::new(2.5)),
+            both(Group41Var4::new(2.5)),
+        ]
+    }
+
+    #[test]
+    fn echo_with_the_same_width_matches() {
+        for (one, two) in commands() {
+            check(&one, &one, Ok(()));
+            check(&two, &two, Ok(()));
+        }
+    }
+
+    #[test]
+    fn echo_with_the_other_width_is_a_header_type_mismatch() {
+        for (one, two) in commands() {
+            check(&one, &two, Err(CommandResponseError::HeaderTypeMismatch));
+            check(&two, &one, Err(CommandResponseError::HeaderTypeMismatch));
+        }
+    }
+}

@@ -750,3 +750,114 @@ fn operate_header_no_ack<I, V>(
         *num_controls = num_controls.saturating_add(1);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::app::parse::options::ParseOptions;
+    use crate::app::FunctionCode;
+
+    const G12V1: [u8; 11] = [0x01, 0x01, 0x64, 0, 0, 0, 0xC8, 0, 0, 0, 0x00];
+    const G41V1: [u8; 5] = [0x01, 0x02, 0x03, 0x04, 0x00];
+    const G41V2: [u8; 3] = [0x01, 0x02, 0x00];
+    const G41V3: [u8; 5] = [0x00, 0x00, 0x20, 0x40, 0x00];
+    const G41V4: [u8; 9] = [0, 0, 0, 0, 0, 0, 0x04, 0x40, 0x00];
+
+    /// the control header for each control object, with a 1-byte count and prefix for index 3
+    /// and then a 2-byte count and prefix for index 259
+    fn control_headers() -> Vec<u8> {
+        let objects: [(u8, u8, &[u8]); 5] = [
+            (12, 1, &G12V1),
+            (41, 1, &G41V1),
+            (41, 2, &G41V2),
+            (41, 3, &G41V3),
+            (41, 4, &G41V4),
+        ];
+        let mut input = Vec::new();
+        for (group, var, data) in objects {
+            input.extend([group, var, 0x17, 0x01, 0x03]);
+            input.extend_from_slice(data);
+        }
+        for (group, var, data) in objects {
+            input.extend([group, var, 0x28, 0x01, 0x00, 0x03, 0x01]);
+            input.extend_from_slice(data);
+        }
+        input
+    }
+
+    #[test]
+    fn maps_every_control_object_at_both_widths() {
+        let input = control_headers();
+        let headers =
+            HeaderCollection::parse(ParseOptions::default(), FunctionCode::Operate, &input)
+                .unwrap();
+        let mut headers = headers.iter().map(|x| x.to_control_header().unwrap());
+
+        let g41v1 = Group41Var1 {
+            value: 0x04030201,
+            status: CommandStatus::Success,
+        };
+        let g41v2 = Group41Var2 {
+            value: 0x0201,
+            status: CommandStatus::Success,
+        };
+        let g41v3 = Group41Var3 {
+            value: 2.5,
+            status: CommandStatus::Success,
+        };
+        let g41v4 = Group41Var4 {
+            value: 2.5,
+            status: CommandStatus::Success,
+        };
+
+        let index = |x: Option<Prefix<u8, Group12Var1>>| x.map(|x| x.index);
+        assert_matches!(headers.next(), Some(ControlHeader::OneByteGroup12Var1(seq)) => assert_eq!(index(seq.single()), Some(3)));
+        assert_matches!(headers.next(), Some(ControlHeader::OneByteGroup41Var1(seq)) => assert_eq!(seq.single(), Some(Prefix { index: 3, value: g41v1 })));
+        assert_matches!(headers.next(), Some(ControlHeader::OneByteGroup41Var2(seq)) => assert_eq!(seq.single(), Some(Prefix { index: 3, value: g41v2 })));
+        assert_matches!(headers.next(), Some(ControlHeader::OneByteGroup41Var3(seq)) => assert_eq!(seq.single(), Some(Prefix { index: 3, value: g41v3 })));
+        assert_matches!(headers.next(), Some(ControlHeader::OneByteGroup41Var4(seq)) => assert_eq!(seq.single(), Some(Prefix { index: 3, value: g41v4 })));
+
+        let index = |x: Option<Prefix<u16, Group12Var1>>| x.map(|x| x.index);
+        assert_matches!(headers.next(), Some(ControlHeader::TwoByteGroup12Var1(seq)) => assert_eq!(index(seq.single()), Some(259)));
+        assert_matches!(headers.next(), Some(ControlHeader::TwoByteGroup41Var1(seq)) => assert_eq!(seq.single(), Some(Prefix { index: 259, value: g41v1 })));
+        assert_matches!(headers.next(), Some(ControlHeader::TwoByteGroup41Var2(seq)) => assert_eq!(seq.single(), Some(Prefix { index: 259, value: g41v2 })));
+        assert_matches!(headers.next(), Some(ControlHeader::TwoByteGroup41Var3(seq)) => assert_eq!(seq.single(), Some(Prefix { index: 259, value: g41v3 })));
+        assert_matches!(headers.next(), Some(ControlHeader::TwoByteGroup41Var4(seq)) => assert_eq!(seq.single(), Some(Prefix { index: 259, value: g41v4 })));
+
+        assert!(headers.next().is_none());
+    }
+
+    #[test]
+    fn rejects_other_headers_with_their_qualifier() {
+        let input = [
+            // g1v2, 1-byte and 2-byte start/stop
+            0x01, 0x02, 0x00, 0x03, 0x03, 0x01, //
+            0x01, 0x02, 0x01, 0x03, 0x01, 0x03, 0x01, 0x01, //
+            // g50v1, 1-byte and 2-byte count
+            0x32, 0x01, 0x07, 0x01, 0, 0, 0, 0, 0, 0, //
+            0x32, 0x01, 0x08, 0x01, 0x00, 0, 0, 0, 0, 0, 0, //
+            // g2v1, 1-byte and 2-byte count and prefix
+            0x02, 0x01, 0x17, 0x01, 0x03, 0x01, //
+            0x02, 0x01, 0x28, 0x01, 0x00, 0x03, 0x01, 0x01,
+        ];
+        let headers =
+            HeaderCollection::parse(ParseOptions::default(), FunctionCode::Operate, &input)
+                .unwrap();
+        let errors: Vec<BadControlHeader> = headers
+            .iter()
+            .map(|x| x.to_control_header().unwrap_err())
+            .collect();
+
+        assert_eq!(
+            errors,
+            [
+                BadControlHeader::new(Variation::Group1Var2, QualifierCode::Range8),
+                BadControlHeader::new(Variation::Group1Var2, QualifierCode::Range16),
+                BadControlHeader::new(Variation::Group50Var1, QualifierCode::Count8),
+                BadControlHeader::new(Variation::Group50Var1, QualifierCode::Count16),
+                BadControlHeader::new(Variation::Group2Var1, QualifierCode::CountAndPrefix8),
+                BadControlHeader::new(Variation::Group2Var1, QualifierCode::CountAndPrefix16),
+            ]
+        );
+    }
+}
