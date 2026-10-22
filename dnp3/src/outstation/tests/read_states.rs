@@ -4,22 +4,12 @@ use crate::outstation::database::*;
 use crate::outstation::tests::harness::*;
 
 const EMPTY_READ: &[u8] = &[0xC0, 0x01];
-const READ_CLASS_0: &[u8] = &[0xC0, 0x01, 60, 1, 0x06];
 const READ_CLASS_123: &[u8] = &[0xC0, 0x01, 60, 2, 0x06, 60, 3, 0x06, 60, 4, 0x06];
 const EMPTY_RESPONSE: &[u8] = &[0xC0, 0x81, 0x80, 0x00];
 const EMPTY_RESPONSE_WITH_PENDING_EVENTS: &[u8] = &[0xC0, 0x81, 0x82, 0x00];
 const BINARY_EVENT_RESPONSE: &[u8] = &[
     0xE0, 0x81, 0x80, 0x00, 0x02, 0x01, 0x28, 0x01, 0x00, 0x00, 0x00, 0x81,
 ];
-
-fn create_binary_and_event(database: &mut Database) {
-    database.add(0, Some(EventClass::Class1), BinaryInputConfig::default());
-    database.update(
-        0,
-        &BinaryInput::new(true, Flags::ONLINE, Time::Synchronized(Timestamp::new(0))),
-        UpdateOptions::default(),
-    );
-}
 
 fn create_one_analog_with_value_42(database: &mut Database) {
     database.add(0, Some(EventClass::Class1), AnalogInputConfig::default());
@@ -149,7 +139,7 @@ async fn can_read_two_byte_range_for_default_variation() {
 async fn re_arms_unconfirmed_events_after_link_drop() {
     let mut harness = new_harness(get_default_config());
 
-    harness.handle.database.transaction(create_binary_and_event);
+    harness.handle.database.transaction(add_binary_event);
 
     // read the event, then drop the link before CONFIRM so it stays in the `Written` state
     harness
@@ -184,7 +174,7 @@ async fn re_arms_unconfirmed_events_after_link_drop() {
 async fn discards_unselected_events_on_demand_after_link_drop() {
     let mut harness = new_harness(get_default_config());
 
-    harness.handle.database.transaction(create_binary_and_event);
+    harness.handle.database.transaction(add_binary_event);
 
     // read the event, then drop the link before CONFIRM so it stays in the `Written` state
     harness

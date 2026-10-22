@@ -5,15 +5,6 @@ use crate::outstation::tests::harness::*;
 
 // read g0v254 (all attributes) with qualifier 0x06
 const READ_ALL_ATTRIBUTES: &[u8] = &[0xC0, 0x01, 0x00, 0xFE, 0x06];
-const CONFIRM_SEQ_0: &[u8] = &[0xC0, 0x00];
-
-/// expected encoding of a visible string attribute in the default set
-fn encode_string(variation: u8, value: &str) -> Vec<u8> {
-    let mut bytes = vec![0x00, variation, 0x00, 0x00, 0x00, 0x01];
-    bytes.push(value.len().try_into().unwrap());
-    bytes.extend_from_slice(value.as_bytes());
-    bytes
-}
 
 #[tokio::test]
 async fn attribute_values_longer_than_255_bytes_cannot_be_defined() {
@@ -226,7 +217,7 @@ async fn attribute_list_that_does_not_fit_is_moved_whole_to_the_next_fragment() 
     harness.expect_response(&first).await;
     harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
 
-    harness.send_and_process(CONFIRM_SEQ_0).await;
+    harness.send_and_process(&confirm(0)).await;
     // FIN, seq 1
     let mut second = vec![0x41, 0x81, 0x80, 0x00];
     second.extend(encode_uint_attr_list(2, 60));

@@ -17,6 +17,7 @@ use crate::app::parse::parser::HeaderCollection;
 use crate::app::{FunctionCode, Iin2};
 use crate::outstation::config::OutstationConfig;
 use crate::outstation::database::*;
+use crate::outstation::tests::harness::empty_buffer_state;
 use crate::outstation::{BufferState, ClassCount, OutstationApplication, TypeCount};
 
 /// the index of the point in most tests
@@ -1180,22 +1181,7 @@ fn each_type_has_its_own_event_limit() {
             30, 31, 32, 33, 34, 36, 37, 38, 39, 40, 41, 42, 43
         ]
     );
-    assert_eq!(
-        state,
-        BufferState {
-            classes: ClassCount::default(),
-            types: TypeCount {
-                num_binary_input: 0,
-                num_double_bit_binary_input: 0,
-                num_binary_output_status: 0,
-                num_counter: 0,
-                num_frozen_counter: 0,
-                num_analog: 0,
-                num_analog_output_status: 0,
-                num_octet_string: 0,
-            },
-        }
-    );
+    assert_eq!(state, empty_buffer_state());
 }
 
 #[test]

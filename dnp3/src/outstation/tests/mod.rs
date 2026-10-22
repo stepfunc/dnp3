@@ -40,8 +40,3 @@ mod time;
 mod unsolicited;
 /// writing g34
 mod write_dead_band;
-
-/// test data for use in multiple tests
-mod data {
-    pub(crate) const DELAY_MEASURE: &[u8] = &[0xC0, 23];
-}

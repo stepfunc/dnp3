@@ -2,9 +2,7 @@ use scursor::WriteCursor;
 use tokio::task::JoinHandle;
 use tokio::time::{Duration, Instant};
 
-use crate::app::measurement::{BinaryInput, Flags, Time};
 use crate::app::parse::options::ParseOptions;
-use crate::app::variations::Group41Var2;
 use crate::app::FunctionCode;
 use crate::decode::{
     AppDecodeLevel, DecodeLevel, LinkDecodeLevel, PhysDecodeLevel, TransportDecodeLevel,
@@ -14,10 +12,9 @@ use crate::link::format::{format_data_frame, header_bytes, Payload};
 use crate::link::header::{AnyAddress, BroadcastConfirmMode, ControlField, Header};
 use crate::link::reader::LinkModes;
 use crate::outstation::config::{Feature, OutstationConfig};
-use crate::outstation::database::{Add, BinaryInputConfig, EventClass, Update, UpdateOptions};
 use crate::outstation::task::OutstationTask;
 use crate::outstation::traits::{BroadcastAction, OperateType};
-use crate::outstation::{BufferState, ClassCount, OutstationHandle, TypeCount};
+use crate::outstation::OutstationHandle;
 use crate::transport::RealTransport;
 use crate::util::phys::{PhysAddr, PhysLayer};
 use crate::util::session::{Enabled, RunError};
@@ -31,9 +28,6 @@ const OTHER_MASTER: u16 = 2;
 const OTHER_OUTSTATION: u16 = 11;
 const SELF_ADDRESS: u16 = 0xFFFC;
 
-const READ_CLASS_0_SEQ_0: &[u8] = &[0xC0, 0x01, 60, 1, 0x06];
-const READ_CLASS_0_SEQ_1: &[u8] = &[0xC1, 0x01, 60, 1, 0x06];
-const READ_CLASS_1_SEQ_0: &[u8] = &[0xC0, 0x01, 60, 2, 0x06];
 const EMPTY_RESPONSE_SEQ_0: &[u8] = &[0xC0, 0x81, 0x80, 0x00];
 const EMPTY_RESPONSE_SEQ_1: &[u8] = &[0xC1, 0x81, 0x80, 0x00];
 /// g1v1 with binary input 0, which the confirm-wait tests add
@@ -47,14 +41,10 @@ const UNKNOWN_FUNCTION_SEQ_1: &[u8] = &[0xC1, 0x70];
 /// 0x83 (AUTHENTICATE_RESPONSE) isn't a function code the outstation knows
 const UNKNOWN_FUNCTIONS_SEQ_1: &[&[u8]] = &[UNKNOWN_FUNCTION_SEQ_1, &[0xC1, 0x83, 0x80, 0x00]];
 const NO_FUNCTION_SUPPORT_SEQ_1: &[u8] = &[0xC1, 0x81, 0x80, 0x01];
-const CONFIRM_SEQ_0: &[u8] = &[0xC0, 0x00];
-const UNS_CONFIRM_SEQ_0: &[u8] = &[0xD0, 0x00];
-const NULL_UNSOLICITED_SEQ_0: &[u8] = &[0xF0, 0x82, 0x80, 0x00];
 /// a fragment too short for a request header, which gets no response
 const CONTROL_ONLY_SEQ_1: &[u8] = &[0xC1];
 /// REQUEST_LINK_STATUS from the outstation to the master
 const LINK_STATUS_REQUEST: &[u8] = &[0x05, 0x64, 0x05, 0x49, 0x01, 0x00, 0x0A, 0x00, 0xDB, 0x9B];
-const G41V2_INDEX_7: Control = Control::G41V2(Group41Var2::new(513), 7);
 /// g41v2, index 7, value 513
 const SELECT_SEQ_0: &[u8] = &[0xC0, 0x03, 41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, 0x00];
 const OPERATE_SEQ_1: &[u8] = &[0xC1, 0x04, 41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, 0x00];
@@ -130,17 +120,6 @@ fn request(destination: u16, source: u16, app: &[u8]) -> Vec<u8> {
 /// a request frame from the configured master to the outstation
 fn from_master(app: &[u8]) -> Vec<u8> {
     request(OUTSTATION, MASTER, app)
-}
-
-fn add_binary_event(handle: &mut OutstationHandle) {
-    handle.database.transaction(|db| {
-        db.add(0, Some(EventClass::Class1), BinaryInputConfig::default());
-        db.update(
-            0,
-            &BinaryInput::new(true, Flags::ONLINE, Time::synchronized(0)),
-            UpdateOptions::default(),
-        );
-    });
 }
 
 /// An outstation running over the real link and transport layers
@@ -219,7 +198,7 @@ impl LinkHarness {
     /// a READ from the master is still answered normally, without anything left behind by the
     /// frames before it
     async fn probe(&mut self) {
-        self.send(&from_master(READ_CLASS_0_SEQ_0)).await;
+        self.send(&from_master(&read_class_0(0))).await;
         self.expect_response(MASTER, EMPTY_RESPONSE_SEQ_0).await;
         self.expect_nothing();
     }
@@ -229,7 +208,7 @@ impl LinkHarness {
 async fn request_from_the_master_to_the_outstation_is_answered() {
     for level in decode_levels() {
         let mut harness = LinkHarness::new(get_default_config(), level);
-        harness.send(&from_master(READ_CLASS_0_SEQ_1)).await;
+        harness.send(&from_master(&read_class_0(1))).await;
         harness.expect_response(MASTER, EMPTY_RESPONSE_SEQ_1).await;
         harness.expect_nothing();
         harness.probe().await;
@@ -241,7 +220,7 @@ async fn request_to_another_outstation_is_dropped() {
     for level in decode_levels() {
         let mut harness = LinkHarness::new(get_default_config(), level);
         harness
-            .send_dropped(&request(OTHER_OUTSTATION, MASTER, READ_CLASS_0_SEQ_1))
+            .send_dropped(&request(OTHER_OUTSTATION, MASTER, &read_class_0(1)))
             .await;
         harness.probe().await;
     }
@@ -252,7 +231,7 @@ async fn request_to_the_self_address_is_dropped_unless_enabled() {
     for level in decode_levels() {
         let mut harness = LinkHarness::new(get_default_config(), level);
         harness
-            .send_dropped(&request(SELF_ADDRESS, MASTER, READ_CLASS_0_SEQ_1))
+            .send_dropped(&request(SELF_ADDRESS, MASTER, &read_class_0(1)))
             .await;
         harness.probe().await;
 
@@ -260,7 +239,7 @@ async fn request_to_the_self_address_is_dropped_unless_enabled() {
         config.features.self_address = Feature::Enabled;
         let mut harness = LinkHarness::new(config, level);
         harness
-            .send(&request(SELF_ADDRESS, MASTER, READ_CLASS_0_SEQ_1))
+            .send(&request(SELF_ADDRESS, MASTER, &read_class_0(1)))
             .await;
         harness.expect_response(MASTER, EMPTY_RESPONSE_SEQ_1).await;
         harness.probe().await;
@@ -270,12 +249,12 @@ async fn request_to_the_self_address_is_dropped_unless_enabled() {
 #[tokio::test]
 async fn valid_requests_from_another_master_are_dropped() {
     let requests: &[&[u8]] = &[
-        READ_CLASS_0_SEQ_1,
+        &read_class_0(1),
         // malformed objects
         MALFORMED_READ_SEQ_1,
         // confirms
-        &[0xC1, 0x00],
-        &[0xD1, 0x00],
+        &confirm(1),
+        &unsolicited_confirm(1),
     ];
     for level in decode_levels() {
         let mut harness = LinkHarness::new(get_default_config(), level);
@@ -289,7 +268,7 @@ async fn valid_requests_from_another_master_are_dropped() {
             .send_dropped(&request(
                 BroadcastConfirmMode::NotRequired.address(),
                 OTHER_MASTER,
-                READ_CLASS_0_SEQ_1,
+                &read_class_0(1),
             ))
             .await;
         harness.probe().await;
@@ -303,7 +282,7 @@ async fn requests_from_another_master_are_answered_when_any_master_is_allowed() 
     for level in decode_levels() {
         let mut harness = LinkHarness::new(config, level);
         harness
-            .send(&request(OUTSTATION, OTHER_MASTER, READ_CLASS_0_SEQ_1))
+            .send(&request(OUTSTATION, OTHER_MASTER, &read_class_0(1)))
             .await;
         harness
             .expect_response(OTHER_MASTER, EMPTY_RESPONSE_SEQ_1)
@@ -391,7 +370,7 @@ async fn broadcast_gets_no_response_and_sets_the_broadcast_iin() {
         ] {
             let mut harness = LinkHarness::new(get_default_config(), level);
             harness
-                .send(&request(mode.address(), MASTER, READ_CLASS_0_SEQ_1))
+                .send(&request(mode.address(), MASTER, &read_class_0(1)))
                 .await;
             harness.check_events(&[Event::BroadcastReceived(
                 FunctionCode::Read,
@@ -399,7 +378,7 @@ async fn broadcast_gets_no_response_and_sets_the_broadcast_iin() {
             )]);
             harness.expect_nothing();
 
-            harness.send(&from_master(READ_CLASS_0_SEQ_0)).await;
+            harness.send(&from_master(&read_class_0(0))).await;
             harness
                 .expect_response(MASTER, &[0xC0, 0x81, 0x81, 0x00])
                 .await;
@@ -413,7 +392,7 @@ async fn broadcast_gets_no_response_and_sets_the_broadcast_iin() {
             .send(&request(
                 BroadcastConfirmMode::Mandatory.address(),
                 MASTER,
-                READ_CLASS_0_SEQ_1,
+                &read_class_0(1),
             ))
             .await;
         harness.check_events(&[Event::BroadcastReceived(
@@ -422,19 +401,19 @@ async fn broadcast_gets_no_response_and_sets_the_broadcast_iin() {
         )]);
         harness.expect_nothing();
 
-        harness.send(&from_master(READ_CLASS_0_SEQ_0)).await;
+        harness.send(&from_master(&read_class_0(0))).await;
         harness
             .expect_response(MASTER, &[0xE0, 0x81, 0x81, 0x00])
             .await;
         harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
-        harness.send(&from_master(CONFIRM_SEQ_0)).await;
+        harness.send(&from_master(&confirm(0))).await;
         harness.check_events(&[
             Event::SolicitedConfirmReceived(0),
             Event::BeginConfirm,
-            Event::EndConfirm(empty_buffer()),
+            Event::EndConfirm(empty_buffer_state()),
         ]);
         harness.expect_nothing();
-        harness.send(&from_master(READ_CLASS_0_SEQ_1)).await;
+        harness.send(&from_master(&read_class_0(1))).await;
         harness.expect_response(MASTER, EMPTY_RESPONSE_SEQ_1).await;
         harness.expect_nothing();
     }
@@ -442,8 +421,8 @@ async fn broadcast_gets_no_response_and_sets_the_broadcast_iin() {
 
 /// READ class 1 with one binary event, which waits for a confirm with sequence 0
 async fn enter_sol_confirm_wait(harness: &mut LinkHarness) {
-    add_binary_event(&mut harness.handle);
-    harness.send(&from_master(READ_CLASS_1_SEQ_0)).await;
+    harness.handle.database.transaction(add_binary_event);
+    harness.send(&from_master(&read_class_1(0))).await;
     harness
         .expect_response(
             MASTER,
@@ -456,32 +435,12 @@ async fn enter_sol_confirm_wait(harness: &mut LinkHarness) {
     harness.expect_nothing();
 }
 
-fn empty_buffer() -> BufferState {
-    BufferState {
-        classes: ClassCount {
-            num_class_1: 0,
-            num_class_2: 0,
-            num_class_3: 0,
-        },
-        types: TypeCount {
-            num_binary_input: 0,
-            num_double_bit_binary_input: 0,
-            num_binary_output_status: 0,
-            num_counter: 0,
-            num_frozen_counter: 0,
-            num_analog: 0,
-            num_analog_output_status: 0,
-            num_octet_string: 0,
-        },
-    }
-}
-
 fn confirmed_events() -> [Event; 4] {
     [
         Event::SolicitedConfirmReceived(0),
         Event::BeginConfirm,
         Event::Cleared(0),
-        Event::EndConfirm(empty_buffer()),
+        Event::EndConfirm(empty_buffer_state()),
     ]
 }
 
@@ -492,10 +451,10 @@ async fn solicited_confirm_wait_drops_requests_from_another_master() {
         enter_sol_confirm_wait(&mut harness).await;
 
         harness
-            .send_dropped(&request(OUTSTATION, OTHER_MASTER, CONFIRM_SEQ_0))
+            .send_dropped(&request(OUTSTATION, OTHER_MASTER, &confirm(0)))
             .await;
         harness
-            .send_dropped(&request(OUTSTATION, OTHER_MASTER, READ_CLASS_0_SEQ_1))
+            .send_dropped(&request(OUTSTATION, OTHER_MASTER, &read_class_0(1)))
             .await;
         harness
             .send_dropped(&request(OUTSTATION, OTHER_MASTER, MALFORMED_READ_SEQ_1))
@@ -506,10 +465,10 @@ async fn solicited_confirm_wait_drops_requests_from_another_master() {
                 .await;
         }
 
-        harness.send(&from_master(CONFIRM_SEQ_0)).await;
+        harness.send(&from_master(&confirm(0))).await;
         harness.check_events(&confirmed_events());
         harness.expect_nothing();
-        harness.send(&from_master(READ_CLASS_0_SEQ_0)).await;
+        harness.send(&from_master(&read_class_0(0))).await;
         harness
             .expect_response(MASTER, BINARY_0_CLASS_0_RESPONSE_SEQ_0)
             .await;
@@ -529,10 +488,10 @@ async fn unknown_function_from_another_master_does_not_end_the_solicited_confirm
                 .await;
         }
 
-        harness.send(&from_master(CONFIRM_SEQ_0)).await;
+        harness.send(&from_master(&confirm(0))).await;
         harness.check_events(&confirmed_events());
         harness.expect_nothing();
-        harness.send(&from_master(READ_CLASS_0_SEQ_0)).await;
+        harness.send(&from_master(&read_class_0(0))).await;
         harness
             .expect_response(MASTER, BINARY_0_CLASS_0_RESPONSE_SEQ_0)
             .await;
@@ -554,7 +513,7 @@ async fn unknown_function_from_the_master_ends_the_solicited_confirm_wait() {
         harness.expect_nothing();
 
         // the wait is over
-        harness.send_dropped(&from_master(CONFIRM_SEQ_0)).await;
+        harness.send_dropped(&from_master(&confirm(0))).await;
     }
 }
 
@@ -564,7 +523,7 @@ async fn request_from_the_master_ends_the_solicited_confirm_wait_and_is_answered
         let mut harness = LinkHarness::new(get_default_config(), level);
         enter_sol_confirm_wait(&mut harness).await;
 
-        harness.send(&from_master(READ_CLASS_0_SEQ_1)).await;
+        harness.send(&from_master(&read_class_0(1))).await;
         harness.check_events(&[Event::SolicitedConfirmWaitNewRequest]);
         harness
             .expect_response(
@@ -582,16 +541,14 @@ async fn request_from_the_master_ends_the_solicited_confirm_wait_and_is_answered
 async fn unsolicited_confirm_wait_drops_requests_from_another_master() {
     for level in decode_levels() {
         let mut harness = LinkHarness::new(get_default_unsolicited_config(), level);
-        harness
-            .expect_response(MASTER, NULL_UNSOLICITED_SEQ_0)
-            .await;
+        harness.expect_response(MASTER, &null_unsolicited(0)).await;
         harness.check_events(&[Event::EnterUnsolicitedConfirmWait(0)]);
 
         harness
-            .send_dropped(&request(OUTSTATION, OTHER_MASTER, UNS_CONFIRM_SEQ_0))
+            .send_dropped(&request(OUTSTATION, OTHER_MASTER, &unsolicited_confirm(0)))
             .await;
         harness
-            .send_dropped(&request(OUTSTATION, OTHER_MASTER, READ_CLASS_0_SEQ_1))
+            .send_dropped(&request(OUTSTATION, OTHER_MASTER, &read_class_0(1)))
             .await;
         harness
             .send_dropped(&request(OUTSTATION, OTHER_MASTER, MALFORMED_READ_SEQ_1))
@@ -608,7 +565,7 @@ async fn unsolicited_confirm_wait_drops_requests_from_another_master() {
                 .await;
         }
 
-        harness.send(&from_master(UNS_CONFIRM_SEQ_0)).await;
+        harness.send(&from_master(&unsolicited_confirm(0))).await;
         harness.check_events(&[Event::UnsolicitedConfirmReceived(0)]);
         harness.expect_nothing();
         harness.probe().await;
@@ -709,11 +666,7 @@ async fn header_error_from_another_master_postpones_the_link_status_request_when
 async fn unknown_function_from_another_master_keeps_the_selection(harness: &mut LinkHarness) {
     harness.send(&from_master(SELECT_SEQ_0)).await;
     harness.expect_response(MASTER, SELECT_RESPONSE_SEQ_0).await;
-    harness.check_events(&[
-        Event::BeginControls,
-        Event::Select(G41V2_INDEX_7),
-        Event::EndControls,
-    ]);
+    harness.check_events(&selected());
     harness.expect_nothing();
 
     for app in [UNKNOWN_FUNCTION_SEQ_0, UNKNOWN_FUNCTION_SEQ_1] {
@@ -726,11 +679,7 @@ async fn unknown_function_from_another_master_keeps_the_selection(harness: &mut 
     harness
         .expect_response(MASTER, OPERATE_RESPONSE_SEQ_1)
         .await;
-    harness.check_events(&[
-        Event::BeginControls,
-        Event::Operate(G41V2_INDEX_7, OperateType::SelectBeforeOperate),
-        Event::EndControls,
-    ]);
+    harness.check_events(&operated(OperateType::SelectBeforeOperate));
     harness.expect_nothing();
 }
 
@@ -747,15 +696,13 @@ async fn unknown_function_from_another_master_keeps_the_selection_in_the_unsolic
 {
     for level in decode_levels() {
         let mut harness = LinkHarness::new(get_default_unsolicited_config(), level);
-        harness
-            .expect_response(MASTER, NULL_UNSOLICITED_SEQ_0)
-            .await;
+        harness.expect_response(MASTER, &null_unsolicited(0)).await;
         harness.check_events(&[Event::EnterUnsolicitedConfirmWait(0)]);
         harness.expect_nothing();
 
         unknown_function_from_another_master_keeps_the_selection(&mut harness).await;
 
-        harness.send(&from_master(UNS_CONFIRM_SEQ_0)).await;
+        harness.send(&from_master(&unsolicited_confirm(0))).await;
         harness.check_events(&[Event::UnsolicitedConfirmReceived(0)]);
         harness.expect_nothing();
     }
@@ -848,18 +795,12 @@ async fn link_status_request_from_the_master_in_the_unsolicited_confirm_wait_pos
         with_keep_alive(get_default_unsolicited_config()),
         DecodeLevel::nothing(),
     );
-    harness
-        .expect_response(MASTER, NULL_UNSOLICITED_SEQ_0)
-        .await;
+    harness.expect_response(MASTER, &null_unsolicited(0)).await;
     tokio::time::advance(ACTIVITY_AT).await;
     harness.exchange_link_status().await;
 
     // due at 14 seconds, so after the wait that ends at 15, not the one that ends at 10
-    harness
-        .expect_response(MASTER, &[0xF1, 0x82, 0x80, 0x00])
-        .await;
-    harness
-        .expect_response(MASTER, &[0xF2, 0x82, 0x80, 0x00])
-        .await;
+    harness.expect_response(MASTER, &null_unsolicited(1)).await;
+    harness.expect_response(MASTER, &null_unsolicited(2)).await;
     harness.expect_link_status_request().await;
 }

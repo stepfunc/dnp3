@@ -1,6 +1,5 @@
-use crate::app::measurement::*;
 use crate::app::variations::Group41Var2;
-use crate::app::{BufferSize, FunctionCode, Timestamp};
+use crate::app::{BufferSize, FunctionCode};
 use crate::link::header::BroadcastConfirmMode;
 use crate::outstation::database::*;
 use crate::outstation::tests::harness::*;
@@ -10,10 +9,6 @@ use crate::outstation::traits::{BroadcastAction, OperateType};
 const READ_G30V1_0_TO_149_AND_CLASS_1: &[u8] = &[
     0xC0, 0x01, 0x1E, 0x01, 0x01, 0x00, 0x00, 0x95, 0x00, 0x3C, 0x02, 0x06,
 ];
-const CONFIRM_SEQ_0: &[u8] = &[0xC0, 0x00];
-const CONFIRM_SEQ_1: &[u8] = &[0xC1, 0x00];
-const DELAY_MEASURE_SEQ_0: &[u8] = &[0xC0, 0x17];
-const RECORD_CURRENT_TIME_SEQ_1: &[u8] = &[0xC1, 0x18];
 // restart IIN, no objects
 const EMPTY_RESPONSE_SEQ_1: &[u8] = &[0xC1, 0x81, 0x80, 0x00];
 // direct operate no ack, seq == 1, g41v2 - count == 1, index == 7, value = 513
@@ -24,17 +19,12 @@ const DIRECT_OPERATE_SEQ_0: &[u8] = &[0xC0, 0x05, 41, 2, 0x17, 0x01, 0x07, 0x01,
 const DIRECT_OPERATE_RESPONSE_SEQ_0: &[u8] = &[
     0xC0, 0x81, 0x80, 0x00, 41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, 0x00,
 ];
-const G41V2_INDEX_7: Control = Control::G41V2(Group41Var2::new(513), 7);
 
 async fn direct_operate(harness: &mut OutstationHarness) {
     harness
         .test_request_response(DIRECT_OPERATE_SEQ_0, DIRECT_OPERATE_RESPONSE_SEQ_0)
         .await;
-    harness.check_events(&[
-        Event::BeginControls,
-        Event::Operate(G41V2_INDEX_7, OperateType::DirectOperate),
-        Event::EndControls,
-    ]);
+    harness.check_events(&operated(OperateType::DirectOperate));
 }
 
 #[tokio::test]
@@ -48,12 +38,7 @@ async fn repeated_read_during_a_later_fragment_resends_that_fragment() {
         for index in 0..150 {
             db.add(index, None, AnalogInputConfig::default());
         }
-        db.add(0, Some(EventClass::Class1), BinaryInputConfig::default());
-        db.update(
-            0,
-            &BinaryInput::new(true, Flags::ONLINE, Time::Synchronized(Timestamp::new(0))),
-            UpdateOptions::default(),
-        );
+        add_binary_event(db);
     });
 
     harness
@@ -62,7 +47,7 @@ async fn repeated_read_during_a_later_fragment_resends_that_fragment() {
     let first = harness.expect_write().await;
     harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
 
-    harness.send_and_process(CONFIRM_SEQ_0).await;
+    harness.send_and_process(&confirm(0)).await;
     let second = harness.expect_write().await;
     assert_eq!(&second[0..2], &[0x21, 0x81]); // CON, seq 1
     assert_ne!(first.len(), second.len());
@@ -73,7 +58,7 @@ async fn repeated_read_during_a_later_fragment_resends_that_fragment() {
     harness.expect_response(&second).await;
 
     // still waiting for the confirm of the second fragment
-    harness.send_and_process(CONFIRM_SEQ_1).await;
+    harness.send_and_process(&confirm(1)).await;
     let third = harness.expect_write().await;
     assert_eq!(third[0] & 0x0F, 2);
 }
@@ -82,7 +67,7 @@ async fn repeated_read_during_a_later_fragment_resends_that_fragment() {
 async fn repeated_request_after_an_error_reply_gets_the_original_response() {
     let mut harness = new_harness(get_default_config());
 
-    harness.send_and_process(DELAY_MEASURE_SEQ_0).await;
+    harness.send_and_process(&delay_measure(0)).await;
     let response = harness.expect_write().await;
     assert!(response.len() > 4);
 
@@ -91,7 +76,7 @@ async fn repeated_request_after_an_error_reply_gets_the_original_response() {
         .test_request_response(&[0xC1, 0x70], &[0xC1, 0x81, 0x80, 0x01])
         .await;
 
-    harness.send_and_process(DELAY_MEASURE_SEQ_0).await;
+    harness.send_and_process(&delay_measure(0)).await;
     harness.expect_response(&response).await;
 }
 
@@ -135,7 +120,7 @@ async fn request_after_a_malformed_request_during_unsolicited_confirm_wait_is_pr
     let mut harness = new_harness(get_default_unsolicited_config());
 
     // the null unsolicited response is never confirmed
-    harness.expect_response(&[0xF0, 0x82, 0x80, 0x00]).await;
+    harness.expect_response(&null_unsolicited(0)).await;
     harness.check_events(&[Event::EnterUnsolicitedConfirmWait(0)]);
 
     harness
@@ -166,14 +151,7 @@ async fn repeated_direct_operate_gets_the_original_response_after_the_iin_change
     direct_operate(&mut harness).await;
 
     // a class 1 event sets IIN1.1 in the responses that follow
-    harness.handle.database.transaction(|db| {
-        db.add(0, Some(EventClass::Class1), BinaryInputConfig::default());
-        db.update(
-            0,
-            &BinaryInput::new(true, Flags::ONLINE, Time::Synchronized(Timestamp::new(0))),
-            UpdateOptions::default(),
-        );
-    });
+    harness.handle.database.transaction(add_binary_event);
 
     harness
         .test_request_response(DIRECT_OPERATE_SEQ_0, DIRECT_OPERATE_RESPONSE_SEQ_0)
@@ -182,7 +160,7 @@ async fn repeated_direct_operate_gets_the_original_response_after_the_iin_change
 
     // a new request reports the current IIN
     harness
-        .test_request_response(RECORD_CURRENT_TIME_SEQ_1, &[0xC1, 0x81, 0x82, 0x00])
+        .test_request_response(&record_current_time(1), &[0xC1, 0x81, 0x82, 0x00])
         .await;
 }
 
@@ -219,12 +197,12 @@ async fn repeated_request_after_a_broadcast_leaves_the_broadcast_iin_for_the_nex
         // restart IIN and IIN1.0 BROADCAST, which asks for a confirm if the broadcast required one
         if mode == BroadcastConfirmMode::Mandatory {
             harness
-                .test_request_response(RECORD_CURRENT_TIME_SEQ_1, &[0xE1, 0x81, 0x81, 0x00])
+                .test_request_response(&record_current_time(1), &[0xE1, 0x81, 0x81, 0x00])
                 .await;
             harness.check_events(&[Event::EnterSolicitedConfirmWait(1)]);
         } else {
             harness
-                .test_request_response(RECORD_CURRENT_TIME_SEQ_1, &[0xC1, 0x81, 0x81, 0x00])
+                .test_request_response(&record_current_time(1), &[0xC1, 0x81, 0x81, 0x00])
                 .await;
             harness.check_no_events();
         }
@@ -272,13 +250,13 @@ async fn repeated_request_whose_response_asked_for_a_confirm_waits_for_it_again(
         .await;
     harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
 
-    harness.send_and_process(CONFIRM_SEQ_0).await;
+    harness.send_and_process(&confirm(0)).await;
     harness.check_events(&[Event::SolicitedConfirmReceived(0), Event::BeginConfirm]);
     assert!(matches!(harness.next_event().await, Event::EndConfirm(_)));
 
     // the confirm ended the broadcast's IIN1.0 and its confirm requirement
     harness
-        .test_request_response(RECORD_CURRENT_TIME_SEQ_1, EMPTY_RESPONSE_SEQ_1)
+        .test_request_response(&record_current_time(1), EMPTY_RESPONSE_SEQ_1)
         .await;
     harness.check_no_events();
 }

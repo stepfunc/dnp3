@@ -1,22 +1,16 @@
 //! The solicited and unsolicited responses the outstation keeps to send again: each resend is the
 //! bytes of the response it repeats, whatever was built in either slot since
 
-#![expect(
-    clippy::arithmetic_side_effects,
-    reason = "tests compute expected counts and fragment sizes"
-)]
-
 use std::ops::Range;
 
 use crate::app::control::CommandStatus;
 use crate::app::measurement::*;
-use crate::app::variations::Group41Var2;
 use crate::app::{BufferSize, FunctionCode};
 use crate::outstation::config::OutstationConfig;
 use crate::outstation::database::*;
 use crate::outstation::tests::harness::*;
 use crate::outstation::traits::OperateType;
-use crate::outstation::{BufferState, ClassCount, TypeCount};
+use crate::outstation::BufferState;
 
 const RESTART: u8 = 0x80;
 const CLASS_1: u8 = 0x02;
@@ -31,44 +25,9 @@ const FIN_CON: u8 = 0x60;
 /// fragment
 const EVENTS_IN_MIN_FRAGMENT: u16 = 80;
 
-const G41V2_INDEX_7: Control = Control::G41V2(Group41Var2::new(513), 7);
-
-/// READ class 1
-fn read_class_1(seq: u8) -> [u8; 5] {
-    [0xC0 | seq, 0x01, 0x3C, 0x02, 0x06]
-}
-
-fn record_current_time(seq: u8) -> [u8; 2] {
-    [0xC0 | seq, 0x18]
-}
-
-fn delay_measure(seq: u8) -> [u8; 2] {
-    [0xC0 | seq, 0x17]
-}
-
-fn confirm(seq: u8) -> [u8; 2] {
-    [0xC0 | seq, 0x00]
-}
-
-fn unsolicited_confirm(seq: u8) -> [u8; 2] {
-    [0xD0 | seq, 0x00]
-}
-
-/// ENABLE_UNSOLICITED for classes 1, 2 and 3
-const ENABLE_UNSOLICITED_SEQ_0: &[u8] = &[
-    0xC0, 0x14, 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06,
-];
-
 /// a solicited response
 fn response(control: u8, seq: u8, iin1: u8, iin2: u8, objects: &[u8]) -> Vec<u8> {
     let mut bytes = vec![control | seq, 0x81, iin1, iin2];
-    bytes.extend_from_slice(objects);
-    bytes
-}
-
-/// an unsolicited response with FIR, FIN and CON
-fn unsolicited(seq: u8, iin1: u8, objects: &[u8]) -> Vec<u8> {
-    let mut bytes = vec![0xF0 | seq, 0x82, iin1, 0x00];
     bytes.extend_from_slice(objects);
     bytes
 }
@@ -80,23 +39,7 @@ fn g52v2(delay: u16) -> Vec<u8> {
     bytes
 }
 
-/// g41v2 at index 7 with value 513
-fn control(function: FunctionCode, seq: u8) -> Vec<u8> {
-    vec![
-        0xC0 | seq,
-        function.as_u8(),
-        41,
-        2,
-        0x17,
-        0x01,
-        0x07,
-        0x01,
-        0x02,
-        0x00,
-    ]
-}
-
-/// the echo of [`control`] with `status`
+/// the echo of a g41v2 control at index 7 with `status`
 fn control_echo(status: CommandStatus) -> Vec<u8> {
     vec![41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, status.as_u8()]
 }
@@ -109,26 +52,6 @@ fn select_that_does_not_fit(seq: u8) -> Vec<u8> {
         select.extend_from_slice(&[index, 0x01, 0x02, 0x00]);
     }
     select
-}
-
-fn operated(operate_type: OperateType) -> [Event; 3] {
-    [
-        Event::BeginControls,
-        Event::Operate(G41V2_INDEX_7, operate_type),
-        Event::EndControls,
-    ]
-}
-
-/// g2v1 events for the indices, each with flags ONLINE and state true
-fn g2v1_events(indices: Range<u16>) -> Vec<u8> {
-    let count = indices.end - indices.start;
-    let mut bytes = vec![0x02, 0x01, 0x28];
-    bytes.extend(count.to_le_bytes());
-    for index in indices {
-        bytes.extend(index.to_le_bytes());
-        bytes.push(0x81);
-    }
-    bytes
 }
 
 /// class 1 binary inputs 0 to `count - 1`, each updated to true with an event
@@ -149,26 +72,6 @@ fn add_binary_events(database: &mut DatabaseHandle, count: u16) {
             );
         }
     });
-}
-
-fn class_1_binaries(count: usize) -> BufferState {
-    BufferState {
-        classes: ClassCount {
-            num_class_1: count,
-            num_class_2: 0,
-            num_class_3: 0,
-        },
-        types: TypeCount {
-            num_binary_input: count,
-            num_double_bit_binary_input: 0,
-            num_binary_output_status: 0,
-            num_counter: 0,
-            num_frozen_counter: 0,
-            num_analog: 0,
-            num_analog_output_status: 0,
-            num_octet_string: 0,
-        },
-    }
 }
 
 fn set_processing_delay(harness: &OutstationHarness, delay: u16) {
@@ -208,16 +111,8 @@ async fn two_fragment_harness() -> (OutstationHarness, Vec<u8>, Vec<u8>) {
 /// responses for every class
 async fn enabled_unsolicited_harness(config: OutstationConfig) -> OutstationHarness {
     let mut harness = new_harness(config);
-    harness.expect_response(&unsolicited(0, RESTART, &[])).await;
-    harness.check_events(&[Event::EnterUnsolicitedConfirmWait(0)]);
-    harness.send_and_process(&unsolicited_confirm(0)).await;
-    harness.check_events(&[Event::UnsolicitedConfirmReceived(0)]);
-    harness
-        .test_request_response(
-            ENABLE_UNSOLICITED_SEQ_0,
-            &response(FIR_FIN, 0, RESTART, 0, &[]),
-        )
-        .await;
+    confirm_null_unsolicited(&mut harness).await;
+    enable_unsolicited(&mut harness).await;
     harness.check_no_events();
     harness
 }
@@ -334,7 +229,7 @@ async fn control_response_is_the_executed_echo_not_the_fit_probe() {
     let mut harness = new_harness(get_default_config());
     harness.set_control_status(7, CommandStatus::NotSupported);
 
-    let direct_operate = control(FunctionCode::DirectOperate, 0);
+    let direct_operate = g41v2_control(FunctionCode::DirectOperate, 0, 7);
     let expected = response(
         FIR_FIN,
         0,
@@ -389,7 +284,7 @@ async fn failed_control_in_the_unsolicited_confirm_wait_repeats_the_executed_ech
     let unsolicited = unsolicited_event(&mut harness, 1).await;
     harness.set_control_status(7, CommandStatus::HardwareError);
 
-    let direct_operate = control(FunctionCode::DirectOperate, 1);
+    let direct_operate = g41v2_control(FunctionCode::DirectOperate, 1, 7);
     let echo = response(
         FIR_FIN,
         1,
@@ -468,7 +363,7 @@ async fn no_ack_request_clears_the_response_and_the_next_request_rebuilds_it() {
         )
         .await;
 
-    let no_ack = control(FunctionCode::DirectOperateNoResponse, 1);
+    let no_ack = g41v2_control(FunctionCode::DirectOperateNoResponse, 1, 7);
     harness.send_and_process(&no_ack).await;
     harness.check_events(&operated(OperateType::DirectOperateNoAck));
     harness.expect_no_response();
@@ -540,7 +435,7 @@ async fn solicited_responses_in_the_unsolicited_confirm_wait_leave_the_unsolicit
         .test_request_response(&delay_measure(1), &delay)
         .await;
 
-    let direct_operate = control(FunctionCode::DirectOperate, 2);
+    let direct_operate = g41v2_control(FunctionCode::DirectOperate, 2, 7);
     let echo = response(
         FIR_FIN,
         2,
