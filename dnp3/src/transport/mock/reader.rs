@@ -1,3 +1,5 @@
+use std::sync::{Arc, Mutex};
+
 use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
 use crate::link::header::FrameInfo;
@@ -5,9 +7,23 @@ use crate::transport::{Fragment, FragmentAddr, FragmentInfo, TransportData, Tran
 use crate::util::buffer::Buffer;
 use crate::util::phys::{PhysAddr, PhysLayer};
 
+/// The frame info the reader gives each fragment, which a test can change while a session runs
+#[derive(Clone, Default)]
+pub(crate) struct RxFrameInfo(Arc<Mutex<Option<FrameInfo>>>);
+
+impl RxFrameInfo {
+    pub(crate) fn set(&self, info: FrameInfo) {
+        *self.0.lock().unwrap() = Some(info);
+    }
+
+    pub(crate) fn get(&self) -> Option<FrameInfo> {
+        *self.0.lock().unwrap()
+    }
+}
+
 pub(crate) struct MockReader {
     count: usize,
-    info: Option<FrameInfo>,
+    info: RxFrameInfo,
     buffer: Buffer,
 }
 
@@ -15,13 +31,17 @@ impl MockReader {
     pub(super) fn new(buffer_size: usize) -> Self {
         Self {
             count: 0,
-            info: None,
+            info: RxFrameInfo::default(),
             buffer: Buffer::new(buffer_size),
         }
     }
 
     pub(crate) fn set_rx_frame_info(&mut self, info: FrameInfo) {
-        self.info = Some(info)
+        self.info.set(info)
+    }
+
+    pub(crate) fn rx_frame_info(&self) -> RxFrameInfo {
+        self.info.clone()
     }
 
     #[expect(
@@ -34,6 +54,7 @@ impl MockReader {
         }
         let info = self
             .info
+            .get()
             .expect("call set_rx_frame_info(..) before running test");
         let addr = FragmentAddr {
             link: info.source,

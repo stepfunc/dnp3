@@ -211,6 +211,16 @@ impl SelectContext {
     };
 }
 
+/// a broadcast whose IIN1.0 hasn't been cleared
+#[derive(Copy, Clone)]
+struct PendingBroadcast {
+    mode: BroadcastConfirmMode,
+    /// a solicited response has carried IIN1.0 for this broadcast
+    solicited_reported: bool,
+    /// an unsolicited response has carried IIN1.0 for this broadcast
+    unsolicited_reported: bool,
+}
+
 /// state that mutates while the session runs
 struct SessionState {
     restart_iin_asserted: bool,
@@ -221,7 +231,7 @@ struct SessionState {
     unsolicited_seq: Sequence,
     deferred_read: DeferredRead,
     last_recorded_time: Option<tokio::time::Instant>,
-    last_broadcast_type: Option<BroadcastConfirmMode>,
+    broadcast: Option<PendingBroadcast>,
 }
 
 impl SessionState {
@@ -235,7 +245,7 @@ impl SessionState {
             unsolicited_seq: Sequence::default(),
             deferred_read: DeferredRead::new(max_read_headers),
             last_recorded_time: None,
-            last_broadcast_type: None,
+            broadcast: None,
         }
     }
 
@@ -417,6 +427,9 @@ impl OutstationSession {
         database: &DatabaseHandle,
     ) -> Result<ResponseHeader, LinkError> {
         response.header_mut().iin |= self.get_response_iin(database);
+        if let Some(broadcast) = &mut self.state.broadcast {
+            broadcast.unsolicited_reported = true;
+        }
 
         writer
             .write(
@@ -485,8 +498,11 @@ impl OutstationSession {
         header.iin |= self.get_response_iin(database);
 
         // Determine if we need to ask for confirmation due to broadcast
-        if let Some(BroadcastConfirmMode::Mandatory) = self.state.last_broadcast_type {
-            header.control.con = true;
+        if let Some(broadcast) = &mut self.state.broadcast {
+            if broadcast.mode == BroadcastConfirmMode::Mandatory {
+                header.control.con = true;
+            }
+            broadcast.solicited_reported = true;
         }
     }
 
@@ -819,7 +835,9 @@ impl OutstationSession {
         match fragment {
             FragmentType::UnsolicitedConfirm(seq) => {
                 if seq == uns_ecsn {
-                    self.state.last_broadcast_type = None;
+                    if self.state.broadcast.is_some_and(|b| b.unsolicited_reported) {
+                        self.state.broadcast = None;
+                    }
                     self.info.unsolicited_confirmed(seq);
                     Ok(UnsolicitedWaitResult::Complete(
                         UnsolicitedResult::Confirmed,
@@ -833,8 +851,8 @@ impl OutstationSession {
                 }
             }
             FragmentType::SolicitedConfirm(_) => {
-                if let Some(BroadcastConfirmMode::Mandatory) = self.state.last_broadcast_type {
-                    self.state.last_broadcast_type = None
+                if self.state.broadcast.is_some_and(|b| b.solicited_reported) {
+                    self.state.broadcast = None
                 } else {
                     tracing::warn!("ignoring solicited confirm");
                 }
@@ -1963,11 +1981,11 @@ impl OutstationSession {
         }
 
         // Broadcast bit
-        if let Some(mode) = self.state.last_broadcast_type {
+        if let Some(broadcast) = self.state.broadcast {
             iin |= Iin1::BROADCAST;
 
-            if mode != BroadcastConfirmMode::Mandatory {
-                self.state.last_broadcast_type = None;
+            if broadcast.mode != BroadcastConfirmMode::Mandatory {
+                self.state.broadcast = None;
             }
         }
 
@@ -1983,7 +2001,11 @@ impl OutstationSession {
         mode: BroadcastConfirmMode,
         request: Request<'_>,
     ) {
-        self.state.last_broadcast_type = Some(mode);
+        self.state.broadcast = Some(PendingBroadcast {
+            mode,
+            solicited_reported: false,
+            unsolicited_reported: false,
+        });
         let action = self.process_broadcast_get_action(database, request).await;
         self.info
             .broadcast_received(request.header.function, action)
@@ -2092,7 +2114,9 @@ impl OutstationSession {
                 .await?
             {
                 Confirm::Yes(respond_to) => {
-                    self.state.last_broadcast_type = None;
+                    if self.state.broadcast.is_some_and(|b| b.solicited_reported) {
+                        self.state.broadcast = None;
+                    }
 
                     self.end_confirm_wait(database, ConfirmOutcome::Confirmed)
                         .await;
