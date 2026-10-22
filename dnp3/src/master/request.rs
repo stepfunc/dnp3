@@ -13,7 +13,7 @@ use crate::app::CommandObject;
 use crate::app::Timestamp;
 use crate::app::Variation::Group0;
 use crate::master::error::CommandResponseError;
-use crate::master::TaskError;
+use crate::master::{BadEncoding, TaskError};
 use crate::outstation::FreezeInterval;
 
 /// Controls how a command request is issued
@@ -779,7 +779,11 @@ impl CommandHeaders {
         }
     }
 
-    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
+    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
+        for header in self.headers.iter() {
+            header.validate().map_err(TaskError::BadEncoding)?;
+        }
+
         for header in self.headers.iter() {
             header.write(writer)?;
         }
@@ -973,6 +977,13 @@ impl CommandHeader {
         I::header(C::header(vec![(command, index)]))
     }
 
+    fn validate(&self) -> Result<(), BadEncoding> {
+        match self {
+            CommandHeader::U8(items) => items.validate(),
+            CommandHeader::U16(items) => items.validate(),
+        }
+    }
+
     pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         match self {
             CommandHeader::U8(items) => items.write(writer),
@@ -994,6 +1005,21 @@ impl CommandHeader {
 }
 
 impl<I: Index> CommandItems<I> {
+    fn validate(&self) -> Result<(), BadEncoding> {
+        match self {
+            CommandItems::G12V1(items) => {
+                match items.iter().find(|(x, _)| !x.code.is_canonical()) {
+                    Some((x, _)) => Err(BadEncoding::ControlCode(x.code)),
+                    None => Ok(()),
+                }
+            }
+            CommandItems::G41V1(_)
+            | CommandItems::G41V2(_)
+            | CommandItems::G41V3(_)
+            | CommandItems::G41V4(_) => Ok(()),
+        }
+    }
+
     fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         match self {
             CommandItems::G12V1(items) => writer.write_prefixed_items(items.iter()),
@@ -1060,7 +1086,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::control::OpType;
+    use crate::app::control::{ControlCode, OpType};
     use crate::app::parse::options::ParseOptions;
     use crate::app::FunctionCode;
     use scursor::WriteCursor;
@@ -1100,6 +1126,26 @@ mod tests {
             both(Group41Var3::new(2.5)),
             both(Group41Var4::new(2.5)),
         ]
+    }
+
+    #[test]
+    fn later_invalid_header_leaves_the_cursor_untouched() {
+        let code = ControlCode::from_op_type(OpType::Unknown(0x11));
+        let mut builder = CommandBuilder::new();
+        builder.add_u8(Group12Var1::from_op_type(OpType::LatchOn), 1);
+        builder.finish_header();
+        builder.add_u8(Group12Var1::from_code(code), 2);
+        let headers = builder.build();
+
+        let mut buffer = [0u8; 64];
+        let mut cursor = WriteCursor::new(&mut buffer);
+        cursor.write_u8(0xAA).unwrap();
+
+        assert_eq!(
+            headers.write(&mut HeaderWriter::new(&mut cursor)),
+            Err(TaskError::BadEncoding(BadEncoding::ControlCode(code)))
+        );
+        assert_eq!(cursor.written(), &[0xAA]);
     }
 
     #[test]
