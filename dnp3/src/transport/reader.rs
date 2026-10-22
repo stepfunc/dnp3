@@ -5,8 +5,7 @@ use crate::decode::{AppDecodeLevel, DecodeLevel};
 use crate::link::error::LinkError;
 use crate::link::EndpointAddress;
 use crate::transport::{
-    FragmentAddr, FragmentInfo, LinkLayerMessage, RealTransport, Transport, TransportData,
-    TransportRead, TransportRequest, TransportResponse,
+    RealTransport, Transport, TransportData, TransportRead, TransportRequest, TransportResponse,
 };
 use crate::util::phys::PhysLayer;
 
@@ -17,13 +16,21 @@ pub(crate) struct TransportReader<T: Transport> {
 
 pub(crate) struct RequestGuard<'a, T: Transport> {
     canceled: bool,
+    master_address: Option<EndpointAddress>,
+    level: AppDecodeLevel,
     reader: &'a mut TransportReader<T>,
 }
 
 impl<'a, T: Transport> RequestGuard<'a, T> {
-    fn new(reader: &'a mut TransportReader<T>) -> Self {
+    fn new(
+        reader: &'a mut TransportReader<T>,
+        master_address: Option<EndpointAddress>,
+        level: AppDecodeLevel,
+    ) -> Self {
         RequestGuard {
             canceled: false,
+            master_address,
+            level,
             reader,
         }
     }
@@ -32,8 +39,9 @@ impl<'a, T: Transport> RequestGuard<'a, T> {
         self.canceled = true
     }
 
-    pub(crate) fn get(&mut self) -> Option<TransportRequest<'_>> {
-        self.reader.peek_request()
+    /// Parse the available request, or `None` if there is none or it came from another master
+    pub(crate) fn get(&self) -> Option<TransportRequest<'_>> {
+        self.reader.peek_request(self.master_address, self.level)
     }
 }
 
@@ -75,24 +83,7 @@ impl<T: Transport> TransportReader<T> {
         io: &mut PhysLayer,
         decode_level: DecodeLevel,
     ) -> Result<(), LinkError> {
-        self.inner.read(io, decode_level).await?;
-        if decode_level.application.enabled() {
-            self.decode(decode_level.application);
-        }
-        Ok(())
-    }
-
-    fn decode(&self, level: AppDecodeLevel) {
-        if let Some(TransportData::Fragment(fragment)) = self.inner.peek() {
-            match ParsedFragment::parse(self.parse_options, fragment.data) {
-                Ok(fragment) => {
-                    tracing::info!("APP RX - {}", fragment.display(level));
-                }
-                Err(err) => {
-                    tracing::warn!("error parsing fragment header: {}", err);
-                }
-            }
-        }
+        self.inner.read(io, decode_level).await
     }
 
     pub(crate) fn reset(&mut self) {
@@ -103,81 +94,86 @@ impl<T: Transport> TransportReader<T> {
         self.inner.pop();
     }
 
-    pub(crate) fn pop_response(&mut self) -> Option<TransportResponse<'_>> {
-        let data = self.parse(false)?;
-
-        match data {
-            Ok(ParsedTransportData::Fragment(info, fragment)) => match fragment.to_response() {
-                Ok(response) => Some(TransportResponse::Response(info.addr, response)),
-                Err(err) => Some(TransportResponse::Error(err.into())),
-            },
-            Ok(ParsedTransportData::LinkLayerMessage(msg)) => {
-                Some(TransportResponse::LinkLayerMessage(msg))
+    pub(crate) fn pop_response(&mut self, level: AppDecodeLevel) -> Option<TransportResponse<'_>> {
+        let options = self.parse_options;
+        let fragment = match self.inner.pop()? {
+            TransportData::Fragment(fragment) => fragment,
+            TransportData::LinkLayerMessage(msg) => {
+                return Some(TransportResponse::LinkLayerMessage(msg))
             }
-            Err((err, _)) => Some(TransportResponse::Error(err.into())),
-        }
+        };
+
+        let response = match parse(options, level, fragment.data) {
+            Ok(parsed) => match parsed.to_response() {
+                Ok(response) => TransportResponse::Response(fragment.info.addr, response),
+                Err(err) => TransportResponse::Error(err.into()),
+            },
+            Err(err) => TransportResponse::Error(err.into()),
+        };
+        Some(response)
     }
 
+    /// Guard the available request, which is consumed when the guard drops unless retained
     pub(crate) fn pop_request(
         &mut self,
         master_address: Option<EndpointAddress>,
+        level: AppDecodeLevel,
     ) -> RequestGuard<'_, T> {
-        if let Some(TransportRequest::Request(info, _)) = self.peek_request() {
-            if let Some(required_master_addr) = master_address {
-                if info.addr.link != required_master_addr {
-                    tracing::warn!(
-                        "Discarding ASDU from master address: {} (configured address == {})",
-                        info.addr.link.raw_value(),
-                        required_master_addr.raw_value()
-                    );
-                    self.pop();
-                }
-            }
-        }
-        RequestGuard::new(self)
+        RequestGuard::new(self, master_address, level)
     }
 
-    fn peek_request(&mut self) -> Option<TransportRequest<'_>> {
-        let data = self.parse(true)?;
-        match data {
-            Ok(ParsedTransportData::Fragment(info, fragment)) => match fragment.to_request() {
-                Ok(request) => Some(TransportRequest::Request(info, request)),
-                Err(err) => Some(TransportRequest::Error(
-                    info.addr,
-                    err.into(fragment.control.seq),
-                )),
-            },
-            Ok(ParsedTransportData::LinkLayerMessage(_)) => {
-                Some(TransportRequest::LinkLayerMessage)
-            }
-            Err((err, source)) => Some(TransportRequest::Error(source, err.into())),
-        }
-    }
-
-    fn parse(
-        &mut self,
-        peek: bool,
-    ) -> Option<Result<ParsedTransportData<'_>, (HeaderParseError, FragmentAddr)>> {
-        let transport_data = if peek {
-            self.inner.peek()?
-        } else {
-            self.inner.pop()?
+    fn peek_request(
+        &self,
+        master_address: Option<EndpointAddress>,
+        level: AppDecodeLevel,
+    ) -> Option<TransportRequest<'_>> {
+        let fragment = match self.inner.peek()? {
+            TransportData::Fragment(fragment) => fragment,
+            TransportData::LinkLayerMessage(_) => return Some(TransportRequest::LinkLayerMessage),
         };
 
-        match transport_data {
-            TransportData::Fragment(fragment) => Some(
-                ParsedFragment::parse(self.parse_options, fragment.data)
-                    .map(|parsed| ParsedTransportData::Fragment(fragment.info, parsed))
-                    .map_err(|err| (err, fragment.info.addr)),
-            ),
-            TransportData::LinkLayerMessage(msg) => {
-                Some(Ok(ParsedTransportData::LinkLayerMessage(msg)))
+        let parsed = match parse(self.parse_options, level, fragment.data) {
+            Ok(parsed) => parsed,
+            Err(err) => return Some(TransportRequest::Error(fragment.info.addr, err.into())),
+        };
+
+        let request = match parsed.to_request() {
+            Ok(request) => request,
+            Err(err) => {
+                return Some(TransportRequest::Error(
+                    fragment.info.addr,
+                    err.into(parsed.control.seq),
+                ))
+            }
+        };
+
+        if let Some(required_master_addr) = master_address {
+            if fragment.info.addr.link != required_master_addr {
+                tracing::warn!(
+                    "Discarding ASDU from master address: {} (configured address == {})",
+                    fragment.info.addr.link.raw_value(),
+                    required_master_addr.raw_value()
+                );
+                return None;
             }
         }
+
+        Some(TransportRequest::Request(fragment.info, request))
     }
 }
 
-enum ParsedTransportData<'a> {
-    Fragment(FragmentInfo, ParsedFragment<'a>),
-    LinkLayerMessage(LinkLayerMessage),
+/// Parse a received fragment, logging it at `level`
+fn parse(
+    options: ParseOptions,
+    level: AppDecodeLevel,
+    fragment: &[u8],
+) -> Result<ParsedFragment<'_>, HeaderParseError> {
+    let parsed = ParsedFragment::parse(options, fragment);
+    if level.enabled() {
+        match &parsed {
+            Ok(fragment) => tracing::info!("APP RX - {}", fragment.display(level)),
+            Err(err) => tracing::warn!("error parsing fragment header: {}", err),
+        }
+    }
+    parsed
 }
