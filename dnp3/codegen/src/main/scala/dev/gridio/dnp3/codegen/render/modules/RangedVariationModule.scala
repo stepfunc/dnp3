@@ -70,7 +70,7 @@ object RangedVariationModule extends Module {
 
       case v : SizedByVariation => {
         bracketComma(s"Variation::${v.parent.name}(x) =>") {
-          s"Ok(RangedVariation::${v.parent.name}VarX(x, RangedBytesSequence::parse(options, x, range.get_start(), range.get_count(), cursor)?))".eol
+          s"Ok(RangedVariation::${v.parent.name}VarX(x, RangedBytesSequence::parse(options, x, range, cursor)?))".eol
         }
       }
       case SpecificAttribute => {
@@ -193,6 +193,7 @@ object RangedVariationModule extends Module {
         case v : AnyVariation if v.parent.groupType.isStatic => Some(v)
         case v : FixedSize if v.parent.groupType.isStatic => Some(v)
         case v : SizedByVariation if v.parent.groupType.isStatic => Some(v)
+        case v : AnyVariation if v.parent.groupType == GroupType.AnalogInputDeadband => Some(v)
         case v : FixedSize if v.parent.groupType == GroupType.AnalogInputDeadband => Some(v)
         case AllAttributesRequest => Some(v)
         case SpecificAttribute => Some(v)

@@ -10,6 +10,26 @@ use tokio_rustls::rustls::pki_types;
 /// its handshake can't hold up whatever is waiting for it
 pub(crate) const TLS_HANDSHAKE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
 
+/// Why a TLS handshake didn't produce a session
+#[derive(Debug)]
+pub(crate) enum HandshakeError {
+    /// The peer didn't complete the handshake within [`TLS_HANDSHAKE_TIMEOUT`]
+    Timeout,
+    /// The handshake failed
+    Failed(std::io::Error),
+}
+
+/// Run a handshake, giving up if it doesn't complete within [`TLS_HANDSHAKE_TIMEOUT`]
+async fn handshake<S>(
+    handshake: impl std::future::Future<Output = std::io::Result<S>>,
+) -> Result<S, HandshakeError> {
+    match tokio::time::timeout(TLS_HANDSHAKE_TIMEOUT, handshake).await {
+        Err(_) => Err(HandshakeError::Timeout),
+        Ok(Err(err)) => Err(HandshakeError::Failed(err)),
+        Ok(Ok(stream)) => Ok(stream),
+    }
+}
+
 /// Determines how the certificate(s) presented by the peer are validated
 ///
 /// This validation always occurs **after** the handshake signature has been

@@ -2,6 +2,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use tokio::task::JoinHandle;
 
+use crate::app::measurement::AnalogInputDeadBand;
 use crate::app::parse::options::ParseOptions;
 use crate::app::{BufferSize, Timeout};
 use crate::app::{MaybeAsync, ResponseHeader};
@@ -38,7 +39,7 @@ pub(crate) async fn create_association_with_handler(
 
     let (io, io_handle) = sfio_tokio_mock_io::mock();
 
-    let mut io = PhysLayer::Mock(io);
+    let mut io = PhysLayer::mock(io);
 
     let outstation_address = EndpointAddress::try_new(1024).unwrap();
 
@@ -102,11 +103,13 @@ pub(crate) async fn create_association_with_handler(
 }
 
 /// A ReadHandler callback, in the order the handler received it
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum ReadEvent {
     BeginFragment(ReadType),
     BinaryInput,
     AnalogInput,
+    /// one deadband of a header, and its index
+    AnalogInputDeadBand(AnalogInputDeadBand, u16),
     EndFragment(ReadType),
 }
 
@@ -167,6 +170,16 @@ impl ReadHandler for CountHandler {
     ) {
         self.num_requests.fetch_add(1, Ordering::SeqCst);
         self.push(ReadEvent::AnalogInput);
+    }
+
+    fn handle_analog_input_dead_band(
+        &mut self,
+        _info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (AnalogInputDeadBand, u16)>,
+    ) {
+        for (value, index) in iter {
+            self.push(ReadEvent::AnalogInputDeadBand(value, index));
+        }
     }
 }
 

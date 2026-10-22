@@ -26,7 +26,6 @@ pub(crate) struct Layer {
     local_address: EndpointAddress,
     secondary_state: SecondaryState,
     reader: super::reader::Reader,
-    tx_buffer: [u8; super::constant::LINK_HEADER_LENGTH],
 }
 
 pub(crate) struct Reply {
@@ -35,7 +34,7 @@ pub(crate) struct Reply {
 }
 
 /// Why the link layer ignored a frame
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum Ignored {
     UnknownSource(AnyAddress),
     OtherDestination(EndpointAddress),
@@ -115,7 +114,6 @@ impl Layer {
             local_address,
             secondary_state: SecondaryState::NotReset,
             reader: super::reader::Reader::new(link_modes, max_rx_fragment_size),
-            tx_buffer: [0; super::constant::LINK_HEADER_LENGTH],
         }
     }
 
@@ -128,6 +126,12 @@ impl Layer {
         self.reader.reset();
     }
 
+    /// Read until a frame passes data or a link-layer message up, returning its info with its
+    /// data in `payload`
+    ///
+    /// Nothing is awaited between consuming a frame and returning it, and a frame's reply is
+    /// queued in `io`, which writes it before the next frame is read or anything else is written.
+    /// Dropping the future therefore loses neither a frame nor a reply.
     pub(crate) async fn read(
         &mut self,
         io: &mut PhysLayer,
@@ -135,8 +139,18 @@ impl Layer {
         payload: &mut FramePayload,
     ) -> Result<FrameInfo, LinkError> {
         loop {
-            if let Some(address) = self.read_one(io, level, payload).await? {
-                return Ok(address);
+            io.finish_reply().await?;
+            let (header, addr) = self.reader.read_frame(io, payload, level).await?;
+            let (info, reply) = self.process_header(header, addr, Ignored::log);
+            if let Some(reply) = reply {
+                let header = self.get_header(reply);
+                if level.link.enabled() {
+                    tracing::info!("LINK TX - {}", LinkDisplay::new(header, &[], level.link));
+                }
+                io.queue_reply(Self::format_reply(header), addr, level.physical)?;
+            }
+            if let Some(info) = info {
+                return Ok(info);
             }
         }
     }
@@ -149,28 +163,8 @@ impl Layer {
         )
     }
 
-    pub(crate) fn format_reply(&mut self, header: Header) -> &[u8] {
-        self.tx_buffer = header_bytes(header, super::constant::MIN_HEADER_LENGTH_VALUE);
-        &self.tx_buffer
-    }
-
-    async fn read_one(
-        &mut self,
-        io: &mut PhysLayer,
-        level: DecodeLevel,
-        payload: &mut FramePayload,
-    ) -> Result<Option<FrameInfo>, LinkError> {
-        let (header, addr) = self.reader.read_frame(io, payload, level).await?;
-        let (info, reply) = self.process_header(header, addr, Ignored::log);
-        if let Some(reply) = reply {
-            let header = self.get_header(reply);
-            if level.link.enabled() {
-                tracing::info!("LINK TX - {}", LinkDisplay::new(header, &[], level.link));
-            }
-            io.write(self.format_reply(header), addr, level.physical)
-                .await?
-        }
-        Ok(info)
+    pub(crate) fn format_reply(header: Header) -> [u8; super::constant::LINK_HEADER_LENGTH] {
+        header_bytes(header, super::constant::MIN_HEADER_LENGTH_VALUE)
     }
 
     /// Process a frame's header, passing the reason to `ignore` whenever the frame is ignored
@@ -411,7 +405,7 @@ mod test {
         let (info, reply) = layer.process_header(header, PhysAddr::None, |x| ignored.push(x));
         let reply = reply.map(|reply| {
             let header = layer.get_header(reply);
-            layer.format_reply(header).to_vec()
+            Layer::format_reply(header).to_vec()
         });
         Processed {
             info,
@@ -888,5 +882,211 @@ mod test {
                 }
             }
         }
+    }
+
+    /// reset the link and accept confirmed user data with FCB set, so the next FCB the link
+    /// expects is clear
+    fn reset_and_accept_one(
+        layer: &mut Layer,
+        from_master: bool,
+        local: EndpointAddress,
+        source: EndpointAddress,
+    ) {
+        process(
+            layer,
+            header(from_master, Function::PriResetLinkStates, local.wrap()),
+        );
+        let processed = process(layer, confirmed(from_master, true, local.wrap()));
+        assert_eq!(processed.info, Some(data_from(source, None)));
+    }
+
+    /// the next confirmed user data, with FCB clear, is delivered and acked
+    fn assert_next_fcb_is_clear(
+        layer: &mut Layer,
+        from_master: bool,
+        local: EndpointAddress,
+        source: EndpointAddress,
+        ack: [u8; 10],
+    ) {
+        let processed = process(layer, confirmed(from_master, false, local.wrap()));
+        assert_eq!(processed.info, Some(data_from(source, None)));
+        assert_eq!(processed.reply.as_deref(), Some(&ack[..]));
+        assert!(processed.ignored.is_empty());
+    }
+
+    /// each primary function with its FCV bit the wrong way round, and why it's ignored
+    fn wrong_fcv(from_master: bool, destination: AnyAddress) -> [(Header, Ignored); 4] {
+        let with_fcv = |function| {
+            let mut header = header(from_master, function, destination);
+            header.control.fcv = true;
+            header
+        };
+        // the FCB the link expects next, so only the FCV bit can stop it
+        let mut confirmed_without_fcv = confirmed(from_master, false, destination);
+        confirmed_without_fcv.control.fcv = false;
+        [
+            (
+                with_fcv(Function::PriUnconfirmedUserData),
+                Ignored::UnconfirmedWithFcv,
+            ),
+            (
+                with_fcv(Function::PriResetLinkStates),
+                Ignored::ResetWithFcv,
+            ),
+            (confirmed_without_fcv, Ignored::ConfirmedWithoutFcv),
+            (
+                with_fcv(Function::PriRequestLinkStatus),
+                Ignored::LinkStatusWithFcv,
+            ),
+        ]
+    }
+
+    /// frames with the wrong FCV bit are ignored without a reply, and leave the secondary state
+    /// as it was
+    fn frames_with_the_wrong_fcv_bit_are_ignored(
+        mut layer: Layer,
+        from_master: bool,
+        local: EndpointAddress,
+        source: EndpointAddress,
+        ack: [u8; 10],
+    ) {
+        reset_and_accept_one(&mut layer, from_master, local, source);
+        for (header, reason) in wrong_fcv(from_master, local.wrap()) {
+            let processed = process(&mut layer, header);
+            assert_eq!(processed.info, None);
+            assert_eq!(processed.reply, None);
+            assert_eq!(processed.ignored, [reason]);
+        }
+        assert_next_fcb_is_clear(&mut layer, from_master, local, source, ack);
+    }
+
+    #[test]
+    fn outstation_ignores_frames_with_the_wrong_fcv_bit() {
+        frames_with_the_wrong_fcv_bit_are_ignored(
+            outstation(Feature::Disabled),
+            true,
+            OUTSTATION,
+            MASTER,
+            ACK_FROM_OUTSTATION,
+        );
+    }
+
+    #[test]
+    fn master_ignores_frames_with_the_wrong_fcv_bit() {
+        frames_with_the_wrong_fcv_bit_are_ignored(
+            master(),
+            false,
+            MASTER,
+            OUTSTATION,
+            ACK_FROM_MASTER,
+        );
+    }
+
+    /// the lowest and highest reserved addresses
+    const RESERVED: [u16; 2] = [0xFFF0, 0xFFFB];
+
+    /// frames sent to a reserved address are ignored without a reply, and leave the secondary
+    /// state as it was
+    fn frames_to_reserved_addresses_are_ignored(
+        mut layer: Layer,
+        from_master: bool,
+        local: EndpointAddress,
+        source: EndpointAddress,
+        ack: [u8; 10],
+    ) {
+        reset_and_accept_one(&mut layer, from_master, local, source);
+        for address in RESERVED {
+            let mut headers = requests(from_master, AnyAddress::from(address));
+            // the FCB the link expects next, so only the address can stop it
+            headers[2].control.fcb = false;
+            for header in headers {
+                let processed = process(&mut layer, header);
+                assert_eq!(processed.info, None);
+                assert_eq!(processed.reply, None);
+                assert_eq!(processed.ignored, [Ignored::ReservedDestination(address)]);
+            }
+        }
+        assert_next_fcb_is_clear(&mut layer, from_master, local, source, ack);
+    }
+
+    #[test]
+    fn outstation_ignores_frames_to_reserved_addresses() {
+        for self_address in [Feature::Disabled, Feature::Enabled] {
+            frames_to_reserved_addresses_are_ignored(
+                outstation(self_address),
+                true,
+                OUTSTATION,
+                MASTER,
+                ACK_FROM_OUTSTATION,
+            );
+        }
+    }
+
+    #[test]
+    fn master_ignores_frames_to_reserved_addresses() {
+        frames_to_reserved_addresses_are_ignored(
+            master(),
+            false,
+            MASTER,
+            OUTSTATION,
+            ACK_FROM_MASTER,
+        );
+    }
+
+    /// the functions the link layer never acts on: test link states, the secondary functions
+    /// other than link status, and unknown primary and secondary codes
+    const IGNORED_FUNCTIONS: [Function; 6] = [
+        Function::PriTestLinkStates,
+        Function::SecAck,
+        Function::SecNack,
+        Function::SecNotSupported,
+        Function::Unknown(0x41),
+        Function::Unknown(0x0E),
+    ];
+
+    /// frames with a function the link layer doesn't act on are ignored without a reply, whatever
+    /// their FCB and FCV bits, and leave the secondary state as it was
+    fn frames_with_ignored_functions_are_ignored(
+        mut layer: Layer,
+        from_master: bool,
+        local: EndpointAddress,
+        source: EndpointAddress,
+        ack: [u8; 10],
+    ) {
+        reset_and_accept_one(&mut layer, from_master, local, source);
+        for function in IGNORED_FUNCTIONS {
+            for (fcb, fcv) in [(false, false), (false, true), (true, true)] {
+                let mut header = header(from_master, function, local.wrap());
+                header.control.fcb = fcb;
+                header.control.fcv = fcv;
+                let processed = process(&mut layer, header);
+                assert_eq!(processed.info, None);
+                assert_eq!(processed.reply, None);
+                assert_eq!(processed.ignored, [Ignored::Function(function)]);
+            }
+        }
+        assert_next_fcb_is_clear(&mut layer, from_master, local, source, ack);
+    }
+
+    #[test]
+    fn outstation_ignores_frames_with_functions_it_does_not_act_on() {
+        frames_with_ignored_functions_are_ignored(
+            outstation(Feature::Disabled),
+            true,
+            OUTSTATION,
+            MASTER,
+            ACK_FROM_OUTSTATION,
+        );
+    }
+
+    #[test]
+    fn master_ignores_frames_with_functions_it_does_not_act_on() {
+        frames_with_ignored_functions_are_ignored(
+            master(),
+            false,
+            MASTER,
+            OUTSTATION,
+            ACK_FROM_MASTER,
+        );
     }
 }

@@ -188,6 +188,8 @@ pub trait OutstationApplication: Sync + Send + 'static {
     ///
     /// The dead-band is automatically updated in the database. This callback allows application code
     /// to persist the modified value to non-volatile memory if desired
+    ///
+    /// A negative dead-band written by the master is stored, and reported here, as 0
     #[expect(
         unused_variables,
         reason = "the default implementation ignores its arguments"
@@ -303,6 +305,9 @@ pub enum OperateType {
 /// Return [`CommandStatus::NotSupported`] for an index that doesn't exist. When it's the first
 /// control in the request that fails, the response also sets IIN2.2 (parameter error), which
 /// TB2016-001 requires for an index that isn't installed.
+///
+/// The outstation answers a g41v3 or g41v4 control whose value is NaN or infinite with
+/// [`CommandStatus::NotSupported`] itself, without calling this trait.
 pub trait ControlSupport<T> {
     /// Select a control point but do not operate. Implementors can think of
     /// this function asking "is this control supported"?

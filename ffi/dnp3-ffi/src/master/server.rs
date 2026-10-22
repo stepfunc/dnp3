@@ -105,9 +105,7 @@ pub unsafe fn accept_handler_get_link_identity(instance: *mut AcceptHandler) -> 
 impl From<ffi::LinkIdConfig> for LinkIdConfig {
     fn from(value: ffi::LinkIdConfig) -> Self {
         LinkIdConfig::new()
-            .max_tasks(
-                NonZeroUsize::new(value.max_tasks.into()).unwrap_or(NonZeroUsize::new(1).unwrap()),
-            )
+            .max_tasks(NonZeroUsize::new(value.max_tasks.into()).unwrap_or(NonZeroUsize::MIN))
             .timeout(Timeout::saturating(value.timeout()))
             .decode_level(value.decode_level().into())
     }

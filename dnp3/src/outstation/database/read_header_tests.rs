@@ -292,7 +292,7 @@ const ROWS: &[Row] = &[
     row([33, 6], R(OU, &[]), BadQ, R(OU, &[]), R(OU, &[]), R(PE, &[]), BadQ),
     row([33, 7], R(OU, &[]), BadQ, R(OU, &[]), R(OU, &[]), R(PE, &[]), BadQ),
     row([33, 8], R(OU, &[]), BadQ, R(OU, &[]), R(OU, &[]), R(PE, &[]), BadQ),
-    row([34, 0], R(NONE, &[34, 3, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0]), BadQ, BadQ, BadQ, BadQ, BadQ),
+    row([34, 0], R(NONE, &[34, 3, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0]), R(NONE, &[34, 3, 1, 1, 0, 1, 0, 0, 0, 0, 0]), BadQ, BadQ, BadQ, BadQ),
     row([34, 1], R(NONE, &[34, 1, 1, 0, 0, 1, 0, 0, 0, 0, 0]), R(NONE, &[34, 1, 1, 1, 0, 1, 0, 0, 0]), BadQ, BadQ, R(PE, &[]), BadQ),
     row([34, 2], R(NONE, &[34, 2, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0]), R(NONE, &[34, 2, 1, 1, 0, 1, 0, 0, 0, 0, 0]), BadQ, BadQ, R(PE, &[]), BadQ),
     row([34, 3], R(NONE, &[34, 3, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0]), R(NONE, &[34, 3, 1, 1, 0, 1, 0, 0, 0, 0, 0]), BadQ, BadQ, R(PE, &[]), BadQ),
@@ -364,18 +364,15 @@ const DYNAMIC_GROUPS: [u8; 3] = [0, 110, 111];
 
 #[test]
 fn table_covers_every_variation_outside_the_dynamic_groups() {
-    for group in 0..=u8::MAX {
+    for variation in Variation::all() {
+        let (group, var) = variation.to_group_and_var();
         if DYNAMIC_GROUPS.contains(&group) {
             continue;
         }
-        for var in 0..=u8::MAX {
-            if Variation::lookup(group, var).is_some() {
-                assert!(
-                    ROWS.iter().any(|row| row.gv == [group, var]),
-                    "g{group}v{var}"
-                );
-            }
-        }
+        assert!(
+            ROWS.iter().any(|row| row.gv == [group, var]),
+            "g{group}v{var}"
+        );
     }
 }
 
@@ -496,10 +493,10 @@ const EDGES: &[([u8; 2], QualifierCode, &[u8], Expect)] = &[
     ([33, 0], QualifierCode::Range16, &[0, 0, 255, 255], BadQ),
     ([33, 0], QualifierCode::Count8, &[255], R(OU, &[])),
     ([33, 0], QualifierCode::Count16, &[255, 255], R(OU, &[])),
-    ([34, 0], QualifierCode::Range8, &[5, 6], BadQ),
-    ([34, 0], QualifierCode::Range8, &[1, 6], BadQ),
-    ([34, 0], QualifierCode::Range8, &[0, 255], BadQ),
-    ([34, 0], QualifierCode::Range16, &[0, 0, 255, 255], BadQ),
+    ([34, 0], QualifierCode::Range8, &[5, 6], R(PE, &[])),
+    ([34, 0], QualifierCode::Range8, &[1, 6], R(PE, &[34, 3, 1, 1, 0, 1, 0, 0, 0, 0, 0])),
+    ([34, 0], QualifierCode::Range8, &[0, 255], R(PE, &[34, 3, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0])),
+    ([34, 0], QualifierCode::Range16, &[0, 0, 255, 255], R(PE, &[34, 3, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0])),
     ([34, 0], QualifierCode::Count8, &[255], BadQ),
     ([34, 0], QualifierCode::Count16, &[255, 255], BadQ),
     ([34, 1], QualifierCode::Range8, &[5, 6], R(PE, &[])),

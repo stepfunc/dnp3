@@ -11,7 +11,7 @@ use crate::outstation::{
     ControlHandler, OutstationApplication, OutstationConfig, OutstationHandle,
     OutstationInformation,
 };
-use crate::tcp::tls::{CertificateMode, MinTlsVersion, TlsClientConfig, TlsError};
+use crate::tcp::tls::{CertificateMode, HandshakeError, MinTlsVersion, TlsClientConfig, TlsError};
 use crate::tcp::{
     ClientConnectionHandler, ClientState, ConnectOptions, EndpointList, PostConnectionHandler,
     SimpleConnectHandler,
@@ -212,22 +212,48 @@ impl TlsServerConfig {
     }
 
     pub(crate) async fn handle_connection(
-        &mut self,
+        &self,
         socket: TcpStream,
-    ) -> Result<PhysLayer, String> {
+    ) -> Result<PhysLayer, HandshakeError> {
         let connector = tokio_rustls::TlsAcceptor::from(self.config.clone());
         // the server accepts one connection at a time, so a handshake that stalls would stop it
         // accepting any others
-        let handshake = connector.accept(socket);
-        match tokio::time::timeout(super::TLS_HANDSHAKE_TIMEOUT, handshake).await {
-            Err(_) => Err(format!(
-                "TLS handshake didn't complete within {} seconds",
-                super::TLS_HANDSHAKE_TIMEOUT.as_secs()
-            )),
-            Ok(Err(err)) => Err(format!("failed to establish TLS session: {err}")),
-            Ok(Ok(stream)) => Ok(PhysLayer::Tls(Box::new(tokio_rustls::TlsStream::from(
-                stream,
-            )))),
-        }
+        let stream = super::handshake(connector.accept(socket)).await?;
+        Ok(PhysLayer::tls(tokio_rustls::TlsStream::from(stream)))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tcp::tls::TLS_HANDSHAKE_TIMEOUT;
+    use crate::util::test_support::watchdog;
+
+    #[tokio::test(start_paused = true)]
+    async fn tls_handshake_that_never_starts_times_out() {
+        watchdog(async {
+            let certs = Path::new(env!("CARGO_MANIFEST_DIR")).join("../certs/self_signed");
+            let config = TlsServerConfig::self_signed(
+                &certs.join("entity1_cert.pem"),
+                &certs.join("entity2_cert.pem"),
+                &certs.join("entity2_key.pem"),
+                None,
+                MinTlsVersion::V12,
+            )
+            .unwrap();
+
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            // a peer that connects and never sends its ClientHello
+            let _peer = TcpStream::connect(listener.local_addr().unwrap())
+                .await
+                .unwrap();
+            let (socket, _) = listener.accept().await.unwrap();
+
+            let start = tokio::time::Instant::now();
+            let result = config.handle_connection(socket).await;
+            assert!(matches!(result, Err(HandshakeError::Timeout)));
+            assert_eq!(start.elapsed(), TLS_HANDSHAKE_TIMEOUT);
+        })
+        .await;
     }
 }

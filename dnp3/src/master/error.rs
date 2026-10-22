@@ -2,7 +2,7 @@ use std::error::Error;
 
 use crate::app::control::{CommandStatus, ControlCode};
 use crate::app::{Iin, Iin2};
-use crate::app::{ObjectParseError, Shutdown};
+use crate::app::{ObjectParseError, ParseErrorCause, Shutdown};
 use crate::link::error::LinkError;
 use crate::link::EndpointAddress;
 use crate::master::association::NoAssociation;
@@ -66,7 +66,8 @@ pub enum TaskError {
     Transport,
     /// Outstation returned IIN.2 bit(s) indicating failure
     RejectedByIin2(Iin),
-    /// A response to the task's request was malformed
+    /// The objects in a response to the task's request could not be parsed, either because they
+    /// are malformed or because they use an encoding the parser doesn't support
     MalformedResponse(ObjectParseError),
     /// The response contains unexpected or invalid headers or data that don't match the request
     UnexpectedResponseHeaders,
@@ -234,7 +235,13 @@ impl std::fmt::Display for TaskError {
             }
             TaskError::Link(_) => f.write_str("link-layer or I/O error"),
             TaskError::Transport => f.write_str("malformed response"),
-            TaskError::MalformedResponse(err) => write!(f, "malformed response: {err}"),
+            TaskError::MalformedResponse(err) => match err.cause() {
+                ParseErrorCause::Unsupported => write!(f, "unsupported response content: {err}"),
+                ParseErrorCause::Invalid => write!(f, "malformed response: {err}"),
+                ParseErrorCause::UnsupportedOrInvalid => {
+                    write!(f, "unsupported or invalid response content: {err}")
+                }
+            },
             TaskError::UnexpectedResponseHeaders => {
                 f.write_str("response contains headers that don't match the request")
             }
@@ -469,3 +476,35 @@ impl Error for CommandError {}
 impl Error for CommandResponseError {}
 impl Error for TimeSyncError {}
 impl Error for WriteError {}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::app::variations::Variation;
+    use crate::app::QualifierCode;
+
+    #[test]
+    fn task_error_words_parse_failures_by_cause() {
+        let unsupported =
+            TaskError::MalformedResponse(ObjectParseError::UnknownGroupVariation(1, 9));
+        assert_eq!(
+            unsupported.to_string(),
+            "unsupported response content: unknown group/variation: g1v9"
+        );
+
+        let either = TaskError::MalformedResponse(ObjectParseError::InvalidQualifierForVariation(
+            Variation::Group111(5),
+            QualifierCode::Range8,
+        ));
+        assert_eq!(
+            either.to_string(),
+            "unsupported or invalid response content: Group111(5) may not be used with the qualifier: 1-byte start/stop (0x00)"
+        );
+
+        let malformed = TaskError::MalformedResponse(ObjectParseError::InsufficientBytes);
+        assert_eq!(
+            malformed.to_string(),
+            "malformed response: insufficient bytes for object header"
+        );
+    }
+}

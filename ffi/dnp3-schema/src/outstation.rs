@@ -1231,6 +1231,7 @@ fn define_outstation_application(
                         doc("Called when the outstation writes the dead-band of an analog input")
                             .details("Called for each analog dead-band in the write request where an analog input is defined at the specified index.")
                             .details("The dead-band is automatically updated in the database. This callback allows application code to persist the modified value to non-volatile memory if desired")
+                            .details("A negative dead-band written by the master is stored, and reported here, as 0")
             )?
             .param("index", Primitive::U16, "Index of the analog input")?
             .param("dead_band", Primitive::Double, "New dead-band value")?
@@ -1454,9 +1455,13 @@ fn define_control_handler(
     let control_handler = lib
         .define_interface(
             "control_handler",
-            doc("Callbacks for handling controls").details(
-                "Return {enum:command_status.not_supported} for an index that doesn't exist. When it's the first control in the request that fails, the response also sets IIN2.2 (parameter error), which TB2016-001 requires for an index that isn't installed.",
-            ),
+            doc("Callbacks for handling controls")
+                .details(
+                    "Return {enum:command_status.not_supported} for an index that doesn't exist. When it's the first control in the request that fails, the response also sets IIN2.2 (parameter error), which TB2016-001 requires for an index that isn't installed.",
+                )
+                .details(
+                    "The outstation answers a g41v3 or g41v4 control whose value is NaN or infinite with {enum:command_status.not_supported} itself, without calling this interface.",
+                ),
         )?
         //------
         .begin_callback("begin_fragment", "Notifies the start of a command fragment")?

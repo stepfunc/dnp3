@@ -45,7 +45,7 @@ impl LinkIdConfig {
     pub fn new() -> Self {
         Self {
             max_tasks: DEFAULT_MAX_LINK_ID_TASKS,
-            timeout: Timeout(Duration::from_secs(5)),
+            timeout: Timeout::default(),
             decode_level: PhysDecodeLevel::Nothing,
         }
     }
@@ -289,7 +289,7 @@ impl<C: ConnectionHandler, L: Listen> AcceptTask<C, L> {
     }
 
     async fn handle_accept(&mut self, stream: TcpStream, addr: SocketAddr) {
-        let phys = PhysLayer::Tcp(stream);
+        let phys = PhysLayer::tcp(stream);
 
         match self.handler.accept(addr).await {
             Err(Reject) => {
@@ -299,13 +299,7 @@ impl<C: ConnectionHandler, L: Listen> AcceptTask<C, L> {
                 self.spawn_session(phys, addr, x, None).await;
             }
             Ok(AcceptAction::GetLinkIdentity) => {
-                // spawn a task to identify the remote link layer
-                self.link_id_tasks.spawn(identify_link(
-                    phys,
-                    self.link_id_config.decode_level,
-                    addr,
-                    self.link_id_config.timeout.into(),
-                ));
+                spawn_identify_link(&mut self.link_id_tasks, &self.link_id_config, phys, addr);
             }
         }
     }
@@ -317,35 +311,13 @@ impl<C: ConnectionHandler, L: Listen> AcceptTask<C, L> {
         accept: AcceptConfig,
         link_id: Option<LinkIdentity>,
     ) {
-        let (tx, rx) = crate::util::channel::request_channel();
-        let mut task = MasterTask::new(
-            Enabled::No,
-            LinkModes::stream(accept.error_mode),
-            self.parse_options,
-            accept.config,
-            rx,
-        );
-        let seed_data: &[u8] = link_id.as_ref().map_or(&[], |id| &id.header_bytes);
-        if let Err(err) = task.seed_link(seed_data) {
-            tracing::error!("unable to seed link layer: {err:?}");
+        let Some((task, channel)) =
+            SessionTask::create(phys, self.parse_options, accept, link_id.as_ref())
+        else {
             return;
-        }
-
-        let conn_id = self.next_conn_id();
-
-        let task = SessionTask {
-            phys,
-            session: Session::master(task),
         };
 
-        let future = async move {
-            let _: Result<(), crate::app::Shutdown> = task.run().await;
-        }
-        .instrument(tracing::info_span!("master-session", remote = ?addr, conn = conn_id));
-
-        tokio::spawn(future);
-
-        let channel = MasterChannel::new(tx, MasterChannelType::Stream);
+        task.spawn(addr, self.next_conn_id());
 
         match link_id {
             Some(id) => {
@@ -363,7 +335,45 @@ struct SessionTask {
     session: Session,
 }
 
+// Creating and spawning the session outside the generic `AcceptTask` keeps the session future
+// from being compiled again in every crate that instantiates `spawn_master_tcp_server`.
 impl SessionTask {
+    fn create(
+        phys: PhysLayer,
+        parse_options: ParseOptions,
+        accept: AcceptConfig,
+        link_id: Option<&LinkIdentity>,
+    ) -> Option<(Self, MasterChannel)> {
+        let (tx, rx) = crate::util::channel::request_channel();
+        let mut task = MasterTask::new(
+            Enabled::No,
+            LinkModes::stream(accept.error_mode),
+            parse_options,
+            accept.config,
+            rx,
+        );
+        let seed_data: &[u8] = link_id.map_or(&[], |id| &id.header_bytes);
+        if let Err(err) = task.seed_link(seed_data) {
+            tracing::error!("unable to seed link layer: {err:?}");
+            return None;
+        }
+
+        let task = Self {
+            phys,
+            session: Session::master(task),
+        };
+        Some((task, MasterChannel::new(tx, MasterChannelType::Stream)))
+    }
+
+    fn spawn(self, addr: SocketAddr, conn_id: u64) {
+        let future = async move {
+            let _: Result<(), crate::app::Shutdown> = self.run().await;
+        }
+        .instrument(tracing::info_span!("master-session", remote = ?addr, conn = conn_id));
+
+        tokio::spawn(future);
+    }
+
     async fn run(mut self) -> Result<(), Shutdown> {
         self.session.wait_for_enabled().await?;
         let err = self.session.run(&mut self.phys).await;
@@ -379,6 +389,22 @@ struct LinkIdentity {
     source: u16,
     destination: u16,
     header_bytes: HeaderBytes,
+}
+
+/// Spawn a task to identify the remote link layer, outside the generic `AcceptTask` for the same
+/// reason as [`SessionTask`]
+fn spawn_identify_link(
+    tasks: &mut JoinSet<LinkIdResult>,
+    config: &LinkIdConfig,
+    phys: PhysLayer,
+    addr: SocketAddr,
+) {
+    tasks.spawn(identify_link(
+        phys,
+        config.decode_level,
+        addr,
+        config.timeout.into(),
+    ));
 }
 
 async fn identify_link(

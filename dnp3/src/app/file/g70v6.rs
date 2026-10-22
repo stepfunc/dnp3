@@ -1,5 +1,13 @@
 use super::*;
+#[cfg(test)]
+use crate::app::format::free_format::FreeFormat;
+#[cfg(test)]
+use crate::app::format::WriteError;
+#[cfg(test)]
+use crate::app::Variation;
 use scursor::ReadCursor;
+#[cfg(test)]
+use scursor::WriteCursor;
 
 /// Group 70 Variation 6 - file transport status
 ///
@@ -21,19 +29,6 @@ impl<'a> Group70Var6<'a> {
         Ok(())
     }
 
-    // we aren't using this in production yet but will be needed for the outstation
-    #[cfg(test)]
-    pub(crate) fn write(
-        &self,
-        cursor: &mut scursor::WriteCursor,
-    ) -> Result<(), crate::app::format::WriteError> {
-        cursor.write_u32_le(self.file_handle)?;
-        cursor.write_u32_le(self.block_number)?;
-        cursor.write_u8(self.status_code.to_u8())?;
-        cursor.write_bytes(self.text.as_bytes())?;
-        Ok(())
-    }
-
     pub(crate) fn read(cursor: &mut ReadCursor<'a>) -> Result<Self, ReadError> {
         let file_handle = cursor.read_u32_le()?;
         let block_number = cursor.read_u32_le()?;
@@ -46,6 +41,19 @@ impl<'a> Group70Var6<'a> {
             status_code,
             text,
         })
+    }
+}
+
+#[cfg(test)]
+impl FreeFormat for Group70Var6<'_> {
+    const VARIATION: Variation = Variation::Group70Var6;
+
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u32_le(self.file_handle)?;
+        cursor.write_u32_le(self.block_number)?;
+        cursor.write_u8(self.status_code.to_u8())?;
+        cursor.write_bytes(self.text.as_bytes())?;
+        Ok(())
     }
 }
 

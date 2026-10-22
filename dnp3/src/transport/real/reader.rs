@@ -4,7 +4,7 @@ use crate::link::header::FrameType;
 use crate::link::parser::FramePayload;
 use crate::link::reader::LinkModes;
 use crate::link::{EndpointAddress, LinkRole};
-use crate::transport::real::assembler::{Assembler, AssemblyState, Discard};
+use crate::transport::real::assembler::{Assembler, Discard};
 use crate::transport::real::display::SegmentDisplay;
 use crate::transport::real::header::Header;
 use crate::transport::{LinkLayerMessage, LinkLayerMessageType, TransportData, TransportRead};
@@ -59,13 +59,17 @@ impl TransportRead for Reader {
     }
 
     async fn read(&mut self, io: &mut PhysLayer, level: DecodeLevel) -> Result<(), LinkError> {
-        if self.peek().is_some() {
-            return Ok(());
-        }
-
         let mut payload = FramePayload::new();
 
         loop {
+            // the reply to the last frame goes out before what that frame carried is returned
+            io.finish_reply().await?;
+
+            if self.peek().is_some() {
+                return Ok(());
+            }
+
+            // the frame is assembled or stored below with nothing awaited, so it can't be lost
             let info = self.link.read(io, level, &mut payload).await?;
 
             match info.frame_type {
@@ -79,10 +83,7 @@ impl TransportRead for Reader {
                             );
                         }
 
-                        let state = self.assembler.assemble(info, header, data, Discard::log);
-                        if let AssemblyState::Complete = state {
-                            return Ok(());
-                        }
+                        self.assembler.assemble(info, header, data, Discard::log);
                     }
                     [] => tracing::warn!("received link data frame with no payload"),
                 },
@@ -91,14 +92,12 @@ impl TransportRead for Reader {
                         source: info.source,
                         message: LinkLayerMessageType::LinkStatusRequest,
                     });
-                    return Ok(());
                 }
                 FrameType::LinkStatusResponse => {
                     self.pending_link_layer_message = Some(LinkLayerMessage {
                         source: info.source,
                         message: LinkLayerMessageType::LinkStatusResponse,
                     });
-                    return Ok(());
                 }
             }
         }
@@ -124,6 +123,16 @@ mod tests {
             OUTSTATION.wrap(),
             MASTER.wrap(),
         );
+        data_frame(header, fir, fin, seq, data)
+    }
+
+    fn data_frame(
+        header: crate::link::header::Header,
+        fir: bool,
+        fin: bool,
+        seq: u8,
+        data: &[u8],
+    ) -> Vec<u8> {
         let transport = Header::new(
             fin,
             fir,
@@ -170,7 +179,7 @@ mod tests {
                     OUTSTATION,
                     2048,
                 ),
-                io: PhysLayer::Mock(io),
+                io: PhysLayer::mock(io),
                 handle,
             }
         }
@@ -316,5 +325,243 @@ mod tests {
         h.queue(&[segment(false, true, 1, &[2]), segment(true, true, 2, &[3])]);
         assert!(h.read().await);
         assert_eq!(h.pop(), Some(Item::Fragment(vec![3])));
+    }
+
+    /// reads dropped while the link layer's reply is waiting on the peer
+    mod cancel {
+        use std::future::Future;
+        use std::pin::pin;
+        use std::task::{Context, Waker};
+
+        use tokio::io::{AsyncReadExt, AsyncWriteExt, DuplexStream};
+
+        use super::*;
+        use crate::link::header::ControlField;
+        use crate::transport::{FragmentAddr, TransportWrite};
+        use crate::util::phys::PhysAddr;
+
+        const FRAGMENT: [u8; 1] = [0xAA];
+
+        // link control fields, including the DIR, PRM and FCV bits
+        const RESET_LINK_STATES: u8 = 0xC0;
+        const CONFIRMED_USER_DATA: u8 = 0xD3;
+        const ACK: u8 = 0x00;
+        const LINK_STATUS: u8 = 0x0B;
+
+        fn from_master(control: u8) -> crate::link::header::Header {
+            crate::link::header::Header::new(
+                ControlField::from(control),
+                OUTSTATION.wrap(),
+                MASTER.wrap(),
+            )
+        }
+
+        fn reset_link_states() -> Vec<u8> {
+            header_only(from_master(RESET_LINK_STATES))
+        }
+
+        fn confirmed(fcb: bool) -> Vec<u8> {
+            let mut header = from_master(CONFIRMED_USER_DATA);
+            header.control.fcb = fcb;
+            data_frame(header, true, true, 0, &FRAGMENT)
+        }
+
+        fn reply(control: u8) -> Vec<u8> {
+            header_only(crate::link::header::Header::new(
+                ControlField::from(control),
+                MASTER.wrap(),
+                OUTSTATION.wrap(),
+            ))
+        }
+
+        fn ack() -> Vec<u8> {
+            reply(ACK)
+        }
+
+        /// an outstation reader whose writes wait once `capacity` bytes are unread by the peer
+        struct Duplex {
+            reader: Reader,
+            io: PhysLayer,
+            peer: DuplexStream,
+        }
+
+        impl Duplex {
+            fn new(capacity: usize) -> Self {
+                let (io, peer) = tokio::io::duplex(capacity);
+                Self {
+                    reader: Reader::new(
+                        LinkModes::test(),
+                        LinkRole::Outstation {
+                            self_address: crate::outstation::Feature::Disabled,
+                        },
+                        OUTSTATION,
+                        2048,
+                    ),
+                    io: PhysLayer::duplex(io),
+                    peer,
+                }
+            }
+
+            async fn send(&mut self, frame: &[u8]) {
+                self.peer.write_all(frame).await.unwrap();
+            }
+
+            /// poll a read once and drop it, returning true if it was still pending
+            fn read_and_cancel(&mut self) -> bool {
+                let read = pin!(self.reader.read(&mut self.io, DecodeLevel::nothing()));
+                read.poll(&mut Context::from_waker(Waker::noop()))
+                    .is_pending()
+            }
+
+            /// true if `read` completed instead of waiting for more data
+            async fn read(&mut self) -> bool {
+                tokio::time::timeout(
+                    Duration::from_secs(1),
+                    self.reader.read(&mut self.io, DecodeLevel::nothing()),
+                )
+                .await
+                .map(|res| res.unwrap())
+                .is_ok()
+            }
+
+            /// the next `len` bytes the reader wrote
+            async fn received(&mut self, len: usize) -> Vec<u8> {
+                let mut bytes = vec![0; len];
+                self.peer.read_exact(&mut bytes).await.unwrap();
+                bytes
+            }
+
+            fn nothing_more_received(&mut self) -> bool {
+                let mut byte = [0];
+                pin!(self.peer.read(&mut byte))
+                    .poll(&mut Context::from_waker(Waker::noop()))
+                    .is_pending()
+            }
+
+            fn pop(&mut self) -> Option<Item> {
+                self.reader.pop().map(Item::from)
+            }
+
+            /// reset the link with `resets` frames, whose ACKs the peer leaves unread, then
+            /// cancel the read of confirmed user data while its ACK is waiting on the peer
+            async fn cancel_ack(capacity: usize, resets: usize) -> Self {
+                let mut h = Self::new(capacity);
+                for _ in 0..resets {
+                    h.send(&reset_link_states()).await;
+                    assert!(h.read_and_cancel());
+                }
+                h.send(&confirmed(true)).await;
+                assert!(h.read_and_cancel());
+                h
+            }
+        }
+
+        /// the peer's buffer holds `capacity` bytes, which the reader fills with `resets` ACKs and
+        /// what fits of the ACK to the confirmed user data
+        async fn fragment_is_delivered_once_after_cancelling_its_ack(
+            capacity: usize,
+            resets: usize,
+        ) {
+            let mut h = Duplex::cancel_ack(capacity, resets).await;
+            let acks = ack().repeat(resets.saturating_add(1));
+            let (full, rest) = acks.split_at(capacity);
+
+            assert_eq!(h.received(full.len()).await, full);
+            assert!(h.read().await);
+            assert_eq!(h.received(rest.len()).await, rest);
+            assert!(h.nothing_more_received());
+            assert_eq!(h.pop(), Some(Item::Fragment(FRAGMENT.to_vec())));
+            assert_eq!(h.pop(), None);
+        }
+
+        #[tokio::test(start_paused = true)]
+        async fn fragment_is_delivered_once_after_cancelling_an_ack_with_nothing_written() {
+            fragment_is_delivered_once_after_cancelling_its_ack(20, 2).await;
+        }
+
+        #[tokio::test(start_paused = true)]
+        async fn fragment_is_delivered_once_after_cancelling_a_partly_written_ack() {
+            fragment_is_delivered_once_after_cancelling_its_ack(15, 1).await;
+        }
+
+        #[tokio::test(start_paused = true)]
+        async fn repeat_of_a_frame_whose_ack_was_cancelled_is_acked_without_redelivery() {
+            let mut h = Duplex::cancel_ack(15, 1).await;
+            // the master times out waiting for the ACK and repeats the frame
+            h.send(&confirmed(true)).await;
+            let acks = ack().repeat(3);
+            let (full, rest) = acks.split_at(15);
+
+            assert_eq!(h.received(full.len()).await, full);
+            assert!(h.read().await);
+            assert_eq!(h.pop(), Some(Item::Fragment(FRAGMENT.to_vec())));
+            assert!(!h.read().await);
+            assert_eq!(h.received(rest.len()).await, rest);
+            assert!(h.nothing_more_received());
+            assert_eq!(h.pop(), None);
+        }
+
+        #[tokio::test(start_paused = true)]
+        async fn link_status_request_is_delivered_once_after_cancelling_its_reply() {
+            let mut h = Duplex::new(10);
+            h.send(&reset_link_states()).await;
+            assert!(h.read_and_cancel());
+            h.send(&link_status_request()).await;
+            assert!(h.read_and_cancel());
+
+            assert_eq!(h.received(10).await, ack());
+            assert!(h.read().await);
+            assert_eq!(h.received(10).await, reply(LINK_STATUS));
+            assert!(h.nothing_more_received());
+            assert_eq!(h.pop(), Some(Item::LinkStatusRequest));
+            assert_eq!(h.pop(), None);
+        }
+
+        #[tokio::test(start_paused = true)]
+        async fn writer_finishes_a_cancelled_reply_before_writing() {
+            let mut h = Duplex::cancel_ack(15, 1).await;
+            let acks = ack().repeat(2);
+            let (full, rest) = acks.split_at(15);
+            assert_eq!(h.received(full.len()).await, full);
+
+            let mut writer = crate::transport::real::writer::Writer::new(
+                LinkRole::Outstation {
+                    self_address: crate::outstation::Feature::Disabled,
+                },
+                OUTSTATION,
+            );
+            let destination = FragmentAddr {
+                link: MASTER,
+                phys: PhysAddr::None,
+            };
+            let response = data_frame(
+                crate::link::header::Header::unconfirmed_user_data(
+                    false,
+                    MASTER.wrap(),
+                    OUTSTATION.wrap(),
+                ),
+                true,
+                true,
+                0,
+                &FRAGMENT,
+            );
+            let expected = [rest, &response].concat();
+            let mut received = vec![0; expected.len()];
+            let (written, read) = tokio::time::timeout(Duration::from_secs(1), async {
+                tokio::join!(
+                    writer.write(&mut h.io, DecodeLevel::nothing(), destination, &FRAGMENT),
+                    h.peer.read_exact(&mut received)
+                )
+            })
+            .await
+            .unwrap();
+            written.unwrap();
+            read.unwrap();
+
+            assert_eq!(received, expected);
+            assert!(h.nothing_more_received());
+            assert!(h.read().await);
+            assert_eq!(h.pop(), Some(Item::Fragment(FRAGMENT.to_vec())));
+        }
     }
 }

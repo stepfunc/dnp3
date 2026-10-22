@@ -100,12 +100,12 @@ object FixedSizeVariationModule extends Module {
 
     def fieldArgExpression(f: FixedSizeField) : String = {
 
-      def getFlagsType : String = {
-        def binary = "BinaryFlagFormatter"
-        def analog = "AnalogFlagFormatter"
-        def counter = "CounterFlagFormatter"
-        def binaryOutputStatus = "BinaryOutputStatusFlagFormatter"
-        def doubleBitBinary = "DoubleBitBinaryFlagFormatter"
+      def getFlagsFormatter : String = {
+        def binary = "FlagFormatter::binary"
+        def analog = "FlagFormatter::analog"
+        def counter = "FlagFormatter::counter"
+        def binaryOutputStatus = "FlagFormatter::binary_output_status"
+        def doubleBitBinary = "FlagFormatter::double_bit_binary"
 
         gv.parent.groupType match {
           case GroupType.StaticBinary => binary
@@ -132,7 +132,7 @@ object FixedSizeVariationModule extends Module {
 
 
       if(f.isFlags) {
-        s"${getFlagsType}::new(self.flags)"
+        s"${getFlagsFormatter}(self.flags)"
       } else {
         s"self.${f.name}"
       }

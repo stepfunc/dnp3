@@ -10,6 +10,7 @@ import dev.gridio.dnp3.codegen.render.given_Conversion_String_RenderString
 object ReadQualifierModule extends Module {
 
   override def lines(implicit indent: Indentation) : Iterator[String] = {
+      "use crate::app::gen::all::AllObjectsVariation;".eol ++
       "use crate::app::parse::parser::ReadQualifier;".eol ++
       "use crate::app::variations::Variation;".eol ++
       space ++
@@ -24,8 +25,8 @@ object ReadQualifierModule extends Module {
       case _ => s"Variation::${v.name}"
     }
 
-    // a sized-by-variation group can be read all at once or by range only in variation 0, and by
-    // count in any variation
+    // a sized-by-variation group can be read by range only in variation 0, and by count in any
+    // variation
     def accepts(qualifier: String, variations: Iterator[Variation], sizedByVariation: String) : Iterator[String] = {
       val patterns = variations.map(v => pattern(v, sizedByVariation)).toList
       s"${qualifier} => matches!(".eol ++ indent {
@@ -38,7 +39,8 @@ object ReadQualifierModule extends Module {
       "/// true if a READ request can carry the variation with this qualifier".eol ++
       bracket("pub(crate) fn accepts(self, v: Variation) -> bool") {
         bracket("match self") {
-          accepts("ReadQualifier::AllObjects", AllObjectsVariationModule.variations, "0") ++
+          "// a READ can name the same variations with all objects as any other function".eol ++
+          "ReadQualifier::AllObjects => AllObjectsVariation::get(v).is_some(),".eol ++
           accepts("ReadQualifier::Range(_, _)", RangedVariationModule.variations.iterator, "0") ++
           accepts("ReadQualifier::Count(_, _)", CountVariationModule.variations, "_")
         }

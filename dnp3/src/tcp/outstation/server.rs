@@ -74,11 +74,29 @@ enum ServerConnectionHandler {
 }
 
 impl ServerConnectionHandler {
-    async fn handle(&mut self, socket: tokio::net::TcpStream) -> Result<PhysLayer, String> {
+    async fn handle(&self, socket: tokio::net::TcpStream, _addr: SocketAddr) -> Option<PhysLayer> {
         match self {
-            Self::Tcp => Ok(PhysLayer::Tcp(socket)),
+            Self::Tcp => Some(PhysLayer::tcp(socket)),
             #[cfg(feature = "enable-tls")]
-            Self::Tls(config) => config.handle_connection(socket).await,
+            Self::Tls(config) => match config.handle_connection(socket).await {
+                Ok(phys) => Some(phys),
+                Err(crate::tcp::tls::HandshakeError::Timeout) => {
+                    tracing::warn!(
+                        "error from {}: TLS handshake didn't complete within {} seconds",
+                        _addr,
+                        crate::tcp::tls::TLS_HANDSHAKE_TIMEOUT.as_secs()
+                    );
+                    None
+                }
+                Err(crate::tcp::tls::HandshakeError::Failed(err)) => {
+                    tracing::warn!(
+                        "error from {}: failed to establish TLS session: {}",
+                        _addr,
+                        err
+                    );
+                    None
+                }
+            },
         }
     }
 }
@@ -296,11 +314,21 @@ impl Server {
     ///
     /// This must be called from within the Tokio runtime
     pub async fn bind(self) -> Result<ServerHandle, tokio::io::Error> {
+        let listener = tokio::net::TcpListener::bind(self.address).await?;
+        Ok(self.spawn(listener))
+    }
+
+    // Spawning outside the `bind` future keeps the server task from being compiled again in every
+    // crate that awaits `bind`.
+    fn spawn(self, listener: tokio::net::TcpListener) -> ServerHandle {
         let configured_address = self.address;
-        let (handle, future) = self.bind_no_spawn().await?;
+        let (handle, task) = self.create_task(listener);
         let local = handle.local_addr().unwrap_or(configured_address);
-        tokio::spawn(future.instrument(tracing::info_span!("tcp-server", "listen" = ?local)));
-        Ok(handle)
+        tokio::spawn(
+            task.run()
+                .instrument(tracing::info_span!("tcp-server", "listen" = ?local)),
+        );
+        handle
     }
 
     async fn run<L: Listen>(&mut self, listener: L, mut shutdown_rx: ShutdownListener) -> Shutdown {
@@ -347,16 +375,13 @@ impl Server {
             None => {
                 tracing::warn!("no matching outstation for: {}", addr)
             }
-            Some(x) => match self.connection_handler.handle(stream).await {
-                Err(err) => {
-                    tracing::warn!("error from {}: {}", addr, err);
-                }
-                Ok(phys) => {
+            Some(x) => {
+                if let Some(phys) = self.connection_handler.handle(stream, addr).await {
                     if x.sender.send(NewSession::new(id, phys)).await.is_err() {
                         tracing::warn!("outstation is shut down, closing connection from {}", addr);
                     }
                 }
-            },
+            }
         }
     }
 }
@@ -415,6 +440,12 @@ mod tests {
 
     /// a server with one outstation that reports its connection state
     fn server_with_outstation() -> (Server, mpsc::UnboundedReceiver<ConnectionState>) {
+        server_with_filter(AddressFilter::Any)
+    }
+
+    fn server_with_filter(
+        filter: AddressFilter,
+    ) -> (Server, mpsc::UnboundedReceiver<ConnectionState>) {
         let mut server =
             Server::new_tcp_server(LinkErrorMode::Close, "127.0.0.1:0".parse().unwrap());
         let (tx, rx) = mpsc::unbounded_channel();
@@ -425,11 +456,182 @@ mod tests {
                 Box::new(NullInformation),
                 crate::outstation::DefaultControlHandler::create(),
                 Box::new(ConnectionListener(tx)),
-                AddressFilter::Any,
+                filter,
             )
             .unwrap();
         tokio::spawn(future);
         (server, rx)
+    }
+
+    #[cfg(feature = "enable-tls")]
+    mod tls {
+        use super::*;
+        use crate::tcp::tls::{MinTlsVersion, TlsServerConfig};
+        use crate::util::test_support::Timeline;
+        use std::path::PathBuf;
+        use std::sync::Arc;
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        use tokio::net::{TcpListener, TcpStream};
+        use tokio_rustls::rustls::pki_types::{IpAddr, ServerName};
+
+        const fn secs(x: u64) -> Duration {
+            Duration::from_secs(x)
+        }
+
+        fn certs() -> PathBuf {
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../certs/self_signed")
+        }
+
+        /// a TLS server on an OS-assigned port with one outstation that reports its connection state
+        async fn spawn_tls_server() -> (ServerHandle, SocketAddr, Timeline<ConnectionState>) {
+            let certs = certs();
+            let config = TlsServerConfig::self_signed(
+                &certs.join("entity1_cert.pem"),
+                &certs.join("entity2_cert.pem"),
+                &certs.join("entity2_key.pem"),
+                None,
+                MinTlsVersion::V12,
+            )
+            .unwrap();
+            let mut server = Server::new_tls_server(
+                LinkErrorMode::Close,
+                "127.0.0.1:0".parse().unwrap(),
+                config,
+            );
+            let (listener, timeline) = Timeline::new();
+            let (_handle, future) = server
+                .add_outstation_no_spawn(
+                    outstation_config(),
+                    Box::new(NullApplication),
+                    Box::new(NullInformation),
+                    crate::outstation::DefaultControlHandler::create(),
+                    listener,
+                    AddressFilter::Any,
+                )
+                .unwrap();
+            tokio::spawn(future);
+            let socket = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let addr = socket.local_addr().unwrap();
+            let (handle, task) = server.create_task_with(socket, None);
+            tokio::spawn(task.run());
+            (handle, addr, timeline)
+        }
+
+        /// complete a TLS handshake with the server as a master holding the expected certificate
+        async fn connect_tls(addr: SocketAddr) -> tokio_rustls::client::TlsStream<TcpStream> {
+            let certs = certs();
+            let config = sfio_rustls_config::client::self_signed(
+                MinTlsVersion::V12.into(),
+                &certs.join("entity2_cert.pem"),
+                &certs.join("entity1_cert.pem"),
+                &certs.join("entity1_key.pem"),
+                None,
+            )
+            .unwrap();
+            let socket = TcpStream::connect(addr).await.unwrap();
+            tokio_rustls::TlsConnector::from(Arc::new(config))
+                .connect(
+                    ServerName::IpAddress(IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED.into())),
+                    socket,
+                )
+                .await
+                .unwrap()
+        }
+
+        /// wait for the server to close a connection, discarding anything it sends first
+        async fn assert_closed(socket: &mut TcpStream) {
+            let mut buffer = [0; 64];
+            while let Ok(1..) = socket.read(&mut buffer).await {}
+        }
+
+        #[tokio::test(start_paused = true)]
+        async fn tls_server_closes_a_stalled_handshake_after_the_timeout_and_accepts_the_next() {
+            watchdog(async {
+                let (_handle, addr, mut timeline) = spawn_tls_server().await;
+                // a peer that connects and never sends its ClientHello
+                let mut stalled = TcpStream::connect(addr).await.unwrap();
+                assert_closed(&mut stalled).await;
+                assert_eq!(timeline.now(), secs(5));
+                timeline.assert_quiet();
+
+                // a paused clock advances whenever the runtime waits on a socket, so it could expire
+                // the next handshake's timeout before the handshake completes
+                tokio::time::resume();
+                let _session = connect_tls(addr).await;
+                timeline.expect_state(ConnectionState::Connected).await;
+            })
+            .await;
+        }
+
+        #[tokio::test]
+        async fn tls_server_closes_a_failed_handshake_at_once_and_accepts_the_next() {
+            watchdog(async {
+                let (_handle, addr, mut timeline) = spawn_tls_server().await;
+                // a peer that sends a DNP3 frame instead of a ClientHello
+                let mut plain = TcpStream::connect(addr).await.unwrap();
+                plain
+                    .write_all(&crate::util::test_support::MASTER_REQUEST)
+                    .await
+                    .unwrap();
+                assert_closed(&mut plain).await;
+                assert!(timeline.now() < secs(5));
+                timeline.assert_quiet();
+
+                let _session = connect_tls(addr).await;
+                timeline.expect_state(ConnectionState::Connected).await;
+            })
+            .await;
+        }
+    }
+
+    #[tokio::test]
+    async fn ipv4_filters_match_ipv4_peers_on_a_dual_stack_listener() {
+        let filters = [
+            AddressFilter::Exact("127.0.0.1".parse().unwrap()),
+            AddressFilter::AnyOf(["127.0.0.1".parse().unwrap()].into()),
+            AddressFilter::WildcardIpv4("127.0.0.*".parse().unwrap()),
+        ];
+        for filter in filters {
+            watchdog(async {
+                let Ok(listener) = tokio::net::TcpListener::bind("[::]:0").await else {
+                    return;
+                };
+                let port = listener.local_addr().unwrap().port();
+                let Ok(_client) = tokio::net::TcpStream::connect(("127.0.0.1", port)).await else {
+                    // the platform doesn't accept IPv4 on an IPv6 socket
+                    return;
+                };
+                let (server, mut states) = server_with_filter(filter);
+                let (_handle, task) = server.create_task_with(listener, None);
+                tokio::spawn(task.run());
+
+                assert_eq!(states.recv().await, Some(ConnectionState::Connected));
+            })
+            .await;
+        }
+    }
+
+    #[tokio::test]
+    async fn bind_serves_connections_on_the_bound_address() {
+        watchdog(async {
+            let (server, mut states) = server_with_outstation();
+            let handle = server.bind().await.unwrap();
+            let addr = handle.local_addr().unwrap();
+            assert_ne!(addr.port(), 0);
+
+            let _client = tokio::net::TcpStream::connect(addr).await.unwrap();
+            assert_eq!(states.recv().await, Some(ConnectionState::Connected));
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn bind_reports_an_address_in_use() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let server = Server::new_tcp_server(LinkErrorMode::Close, listener.local_addr().unwrap());
+
+        let err = server.bind().await.unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::AddrInUse);
     }
 
     #[tokio::test(start_paused = true)]
@@ -531,30 +733,5 @@ mod tests {
         drop(handle);
         drop(server);
         tokio::spawn(task.run()).await.unwrap();
-    }
-
-    #[cfg(feature = "enable-tls")]
-    #[tokio::test(start_paused = true)]
-    async fn tls_handshake_that_never_starts_times_out() {
-        let certs = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../certs/self_signed");
-        let config = crate::tcp::tls::TlsServerConfig::self_signed(
-            &certs.join("entity1_cert.pem"),
-            &certs.join("entity2_cert.pem"),
-            &certs.join("entity2_key.pem"),
-            None,
-            crate::tcp::tls::MinTlsVersion::V12,
-        )
-        .unwrap();
-        let mut handler = ServerConnectionHandler::Tls(config);
-
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-        // a peer that connects and never sends its ClientHello
-        let _peer = tokio::net::TcpStream::connect(listener.local_addr().unwrap())
-            .await
-            .unwrap();
-        let (socket, _) = listener.accept().await.unwrap();
-
-        let err = handler.handle(socket).await.unwrap_err();
-        assert!(err.contains("didn't complete"), "{err}");
     }
 }

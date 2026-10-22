@@ -226,14 +226,13 @@ impl ToVariation<Group34Var2> for f64 {
 impl ToVariation<Group34Var3> for f64 {
     fn to_variation(&self) -> Group34Var3 {
         let num = *self;
-        let value = {
-            if num > f32::MAX.into() {
-                f32::MAX
-            } else if num < f32::MIN.into() {
-                f32::MIN
-            } else {
-                f64_to_f32(num)
-            }
+        // finite values past the f32 range clamp, and infinity is kept
+        let value = if num.is_finite() && num > f32::MAX.into() {
+            f32::MAX
+        } else if num.is_finite() && num < f32::MIN.into() {
+            f32::MIN
+        } else {
+            f64_to_f32(num)
         };
 
         Group34Var3 { value }
@@ -349,6 +348,7 @@ mod tests {
         assert_eq!(g34v3(1.5).to_bits(), 1.5f32.to_bits());
         assert_eq!(g34v3(f64::MAX).to_bits(), f32::MAX.to_bits());
         assert_eq!(g34v3(f64::MIN).to_bits(), f32::MIN.to_bits());
+        assert_eq!(g34v3(f64::INFINITY).to_bits(), f32::INFINITY.to_bits());
         assert!(g34v3(f64::NAN).is_nan());
     }
 }

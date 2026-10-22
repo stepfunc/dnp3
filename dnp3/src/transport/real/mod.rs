@@ -138,7 +138,7 @@ mod tests {
             Self {
                 reader,
                 writer,
-                io: PhysLayer::Mock(io),
+                io: PhysLayer::mock(io),
                 handle,
             }
         }

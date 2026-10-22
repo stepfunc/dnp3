@@ -321,6 +321,10 @@ impl Executor<'_, '_, '_> {
             return CommandStatus::TooManyOps;
         }
 
+        if !control.has_supported_value() {
+            return CommandStatus::NotSupported;
+        }
+
         match self.mode {
             ControlMode::Select => self.transaction.select(control, index, self.database),
             ControlMode::Operate(op_type) => {

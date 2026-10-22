@@ -212,7 +212,7 @@ fn process_link_header(layer: &mut Layer, header: LinkHeader, addr: PhysAddr) ->
     match reply {
         Some(reply) => {
             let header = layer.get_header(reply);
-            layer.format_reply(header).len()
+            Layer::format_reply(header).len()
         }
         None => 0,
     }
@@ -252,10 +252,16 @@ fn link_headers(data: &[u8]) {
     }
 }
 
-/// one simulated read of `chunk` into the frame reader, returning the bytes it took
+/// one simulated read of `chunk` into the frame reader, from a stream or a datagram socket,
+/// returning the bytes it took
 #[no_panic::no_panic]
-fn link_receive(reader: &mut Reader, chunk: &[u8]) -> usize {
-    let Ok(space) = reader.write_space() else {
+fn link_receive(reader: &mut Reader, datagram_socket: bool, chunk: &[u8]) -> usize {
+    let space = if datagram_socket {
+        reader.datagram_space()
+    } else {
+        reader.write_space()
+    };
+    let Ok(space) = space else {
         return 0;
     };
     let mut count: usize = 0;
@@ -295,12 +301,13 @@ fn link_reader(data: &[u8]) {
     } else {
         LinkModes::datagram(error_mode)
     };
+    let datagram_socket = config & 0x04 != 0;
     let mut reader = Reader::new(modes, usize::from(*size).saturating_mul(16));
     let mut payload = FramePayload::new();
     let mut data = chunks;
     while let [length, rest @ ..] = data {
         let (chunk, next) = rest.split_at(usize::from(*length).min(rest.len()));
-        std::hint::black_box(link_receive(&mut reader, chunk));
+        std::hint::black_box(link_receive(&mut reader, datagram_socket, chunk));
         std::hint::black_box(link_frames(&mut reader, &mut payload));
         data = next;
     }
@@ -346,7 +353,7 @@ fn parsers_with_unknown_input() {
     let options = ParseOptions {
         parse_zero_length_strings: data.first().is_some_and(|x| x & 0x01 != 0),
     };
-    if let Ok(fragment) = ParsedFragment::parse_no_logging(options, &data) {
+    if let Ok(fragment) = ParsedFragment::parse(options, &data) {
         std::hint::black_box(fragment.to_request().is_ok());
         std::hint::black_box(fragment.to_response().is_ok());
         if let Ok(objects) = fragment.objects {

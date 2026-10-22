@@ -77,7 +77,7 @@ async fn run_session(
 
 fn spawn_session(task: MockOutstationTask) -> Connected {
     let (io, io_handle) = sfio_tokio_mock_io::mock();
-    let phys = PhysLayer::Mock(io);
+    let phys = PhysLayer::mock(io);
     Connected {
         io: io_handle,
         session: tokio::spawn(run_session(task, phys)),
@@ -211,27 +211,19 @@ impl Harness<Disconnected> {
 }
 
 pub(crate) fn new_harness(config: OutstationConfig) -> OutstationHarness {
-    new_harness_impl(config, None, None)
-}
-
-pub(crate) fn new_harness_with_master_addr(
-    config: OutstationConfig,
-    master_address: EndpointAddress,
-) -> OutstationHarness {
-    new_harness_impl(config, None, Some(master_address))
+    new_harness_impl(config, None)
 }
 
 pub(crate) fn new_harness_for_broadcast(
     config: OutstationConfig,
     broadcast: BroadcastConfirmMode,
 ) -> OutstationHarness {
-    new_harness_impl(config, Some(broadcast), None)
+    new_harness_impl(config, Some(broadcast))
 }
 
 fn new_harness_impl(
     config: OutstationConfig,
     broadcast: Option<BroadcastConfirmMode>,
-    master_address: Option<EndpointAddress>,
 ) -> OutstationHarness {
     let (sender, receiver) = event_handlers();
 
@@ -249,10 +241,8 @@ fn new_harness_impl(
         MockControlHandler::create(sender.clone(), control_statuses.clone()),
     );
 
-    let master_address = master_address.unwrap_or(config.master_address);
-
     task.set_rx_frame_info(FrameInfo::new(
-        master_address,
+        config.master_address,
         broadcast,
         FrameType::Data,
         PhysAddr::None,

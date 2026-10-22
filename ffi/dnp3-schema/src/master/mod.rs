@@ -661,7 +661,11 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         )?
         .param("file_name", StringType, "Complete path to the remote file")?
         .fails_with(shared.error_type.clone())?
-        .doc("Asynchronously retrieve information on a particular file")?
+        .doc(
+            doc("Asynchronously retrieve information on a particular file").details(
+                "A file name containing a NUL octet that a C string can't hold gives {enum:file_error.bad_response}.",
+            ),
+        )?
         .build()?;
 
     let file_info_iter =
@@ -1188,14 +1192,14 @@ fn define_command_mode(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
     Ok(mode)
 }
 
-const DIRECTORY_RESULT_DETAILS: &str = "The result passed to the callback is the source of truth for the read. Entries that fail to parse after the transfer completes give {enum:file_error.bad_response}, while the {interface:association_information} may still report {enum:task_type.file_read} as a success.";
+const DIRECTORY_RESULT_DETAILS: &str = "The result passed to the callback is the source of truth for the read. Entries that fail to parse after the transfer completes, or a name containing a NUL octet that a C string can't hold, give {enum:file_error.bad_response}, while the {interface:association_information} may still report {enum:task_type.file_read} as a success.";
 
 const TASK_ERRORS: &[(&str, &str)] = &[
     ("too_many_requests", "too many user requests queued"),
     ("iin_error", "outstation returned an IIN.2 error bit"),
     (
         "bad_response",
-        "response was malformed or contained object headers",
+        "response was malformed or contained unexpected object headers",
     ),
     (
         "response_timeout",
@@ -1209,6 +1213,15 @@ const TASK_ERRORS: &[(&str, &str)] = &[
     ("shutdown", "master was shutdown"),
     ("association_removed", "association was removed mid-task"),
     ("bad_encoding", "request data could not be encoded"),
+    // appended rather than placed next to bad_response so that existing values keep their numbers
+    (
+        "unsupported_response",
+        "response contained objects that the library doesn't support, which may be valid DNP3 (e.g. an unknown group and variation)",
+    ),
+    (
+        "unsupported_or_bad_response",
+        "response contained objects that are either malformed or valid but not supported by the library (e.g. a qualifier code that can't be used with a variation)",
+    ),
 ];
 
 pub(crate) trait TaskErrors: Sized {

@@ -5,8 +5,8 @@ use std::str::Utf8Error;
 use std::time::Duration;
 
 use dnp3::app::{
-    BufferSize, ConnectStrategy, Listener, MaybeAsync, PermissionSet, Permissions, RetryStrategy,
-    Timeout, TimeoutRangeError, Timestamp,
+    BufferSize, ConnectStrategy, Listener, MaybeAsync, ParseErrorCause, PermissionSet, Permissions,
+    RetryStrategy, Timeout, TimeoutRangeError, Timestamp,
 };
 use dnp3::link::{EndpointAddress, SpecialAddressError};
 use dnp3::master::*;
@@ -28,17 +28,21 @@ pub struct FileInfoIterator {
 }
 
 impl FileInfoIterator {
-    pub(crate) fn new(inner: std::vec::IntoIter<FileInfo>) -> Self {
-        Self {
-            inner,
+    /// Returns `None` if any name contains a NUL, which a C string can't hold
+    pub(crate) fn new(items: Vec<FileInfo>) -> Option<Self> {
+        if items.iter().any(|x| x.name.contains('\0')) {
+            return None;
+        }
+        Some(Self {
+            inner: items.into_iter(),
             current_name: Default::default(),
             current_info: None,
-        }
+        })
     }
 
     pub(crate) fn next(&mut self) -> Option<&ffi::FileInfo> {
         let next = self.inner.next()?;
-        self.current_name = CString::new(next.name).unwrap();
+        self.current_name = CString::new(next.name).ok()?;
         let file_type: ffi::FileType = next.file_type.into();
         self.current_info = Some(ffi::FileInfo {
             file_name: self.current_name.as_ptr(),
@@ -1382,7 +1386,11 @@ macro_rules! define_task_from_impl {
                     TaskError::TooManyRequests => Self::TooManyRequests,
                     TaskError::Link(_) => Self::NoConnection,
                     TaskError::Transport => Self::NoConnection,
-                    TaskError::MalformedResponse(_) => Self::BadResponse,
+                    TaskError::MalformedResponse(err) => match err.into() {
+                        ParseErrorCause::Unsupported => Self::UnsupportedResponse,
+                        ParseErrorCause::Invalid => Self::BadResponse,
+                        ParseErrorCause::UnsupportedOrInvalid => Self::UnsupportedOrBadResponse,
+                    },
                     TaskError::UnexpectedResponseHeaders => Self::BadResponse,
                     TaskError::NonFinWithoutCon => Self::BadResponse,
                     TaskError::NeverReceivedFir => Self::BadResponse,

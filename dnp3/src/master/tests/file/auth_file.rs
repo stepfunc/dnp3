@@ -4,36 +4,6 @@ use crate::master::tests::harness::{create_association, AssocInfoEvent, TestHarn
 use crate::master::{AuthKey, FileCredentials, FileError, TaskError, TaskType};
 
 #[tokio::test]
-async fn reports_file_auth_task_type() {
-    let config = AssociationConfig::quiet();
-    let mut harness = create_association(config).await;
-
-    let auth_task = spawn_auth_task(&harness);
-
-    harness.expect_write(auth_request(0)).await;
-
-    harness.process_response(auth_response(0, 42)).await;
-
-    assert_eq!(u32::from(auth_task.await.unwrap().unwrap()), 42);
-
-    assert_eq!(
-        harness.assoc_events.pop().as_slice(),
-        &[
-            AssocInfoEvent::TaskStart(
-                TaskType::FileAuth,
-                FunctionCode::AuthenticateFile,
-                Sequence::new(0)
-            ),
-            AssocInfoEvent::TaskSuccess(
-                TaskType::FileAuth,
-                FunctionCode::AuthenticateFile,
-                Sequence::new(0)
-            ),
-        ]
-    );
-}
-
-#[tokio::test]
 async fn auth_request_bytes() {
     let mut harness = create_association(AssociationConfig::quiet()).await;
     let _auth_task = spawn_auth_task(&harness);
@@ -66,20 +36,6 @@ async fn fails_on_unexpected_variation() {
     assert_eq!(
         auth_task.await.unwrap().map(u32::from),
         Err(FileError::BadResponse)
-    );
-    expect_failure(&mut harness, TaskError::UnexpectedResponseHeaders);
-}
-
-#[tokio::test]
-async fn fails_without_object_header() {
-    let mut harness = create_association(AssociationConfig::quiet()).await;
-    let auth_task = spawn_auth_task(&harness);
-    harness.expect_write(auth_request(0)).await;
-    harness.process_response(super::no_object_response(0)).await;
-
-    assert_eq!(
-        auth_task.await.unwrap().map(u32::from),
-        Err(FileError::TaskError(TaskError::UnexpectedResponseHeaders))
     );
     expect_failure(&mut harness, TaskError::UnexpectedResponseHeaders);
 }

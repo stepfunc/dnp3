@@ -12,125 +12,100 @@ fn num_bytes_for_double_bits(count: usize) -> usize {
     count.div_ceil(4)
 }
 
-/// zero-copy type used to iterate over a collection of bits without allocating
-#[derive(Debug, PartialEq, Copy, Clone)]
-pub(crate) struct BitSequence<'a> {
-    bytes: &'a [u8],
-    range: Range,
+/// A value packed several to a byte, least significant bits first
+pub(crate) trait Packed: Sized {
+    /// the number of bytes that hold `count` values
+    fn num_bytes(count: usize) -> usize;
+
+    /// the value at `pos`, or `None` past the end of `bytes`
+    fn get(bytes: &[u8], pos: usize) -> Option<Self>;
 }
 
-/// zero-copy type used to iterate over a collection of double bits without allocating
-#[derive(Debug, PartialEq, Copy, Clone)]
-pub(crate) struct DoubleBitSequence<'a> {
-    bytes: &'a [u8],
-    range: Range,
-}
-
-impl<'a> BitSequence<'a> {
-    pub(crate) fn parse(range: Range, cursor: &mut ReadCursor<'a>) -> Result<Self, ReadError> {
-        let bytes = cursor.read_bytes(num_bytes_for_bits(range.get_count()))?;
-
-        Ok(Self { bytes, range })
+impl Packed for bool {
+    fn num_bytes(count: usize) -> usize {
+        num_bytes_for_bits(count)
     }
 
-    pub(crate) fn iter(&self) -> BitIterator<'a> {
-        BitIterator::<'a> {
-            index: self.range.get_start(),
-            bytes: self.bytes,
-            count: self.range.get_count(),
-            pos: 0,
-        }
+    fn get(bytes: &[u8], pos: usize) -> Option<Self> {
+        let value = bytes.get(pos / 8)?;
+        Some((*value & (1 << (pos % 8))) != 0)
     }
 }
 
-impl<'a> DoubleBitSequence<'a> {
-    pub(crate) fn parse(range: Range, cursor: &mut ReadCursor<'a>) -> Result<Self, ReadError> {
-        let bytes = cursor.read_bytes(num_bytes_for_double_bits(range.get_count()))?;
-        Ok(Self { bytes, range })
+impl Packed for DoubleBit {
+    fn num_bytes(count: usize) -> usize {
+        num_bytes_for_double_bits(count)
     }
 
-    pub(crate) fn iter(&self) -> DoubleBitIterator<'a> {
-        DoubleBitIterator::<'a> {
-            index: self.range.get_start(),
-            bytes: self.bytes,
-            count: self.range.get_count(),
-            pos: 0,
-        }
-    }
-}
-
-pub(crate) struct BitIterator<'a> {
-    index: u16,
-    bytes: &'a [u8],
-    count: usize,
-    pos: usize,
-}
-
-pub(crate) struct DoubleBitIterator<'a> {
-    index: u16,
-    bytes: &'a [u8],
-    count: usize,
-    pos: usize,
-}
-
-impl Iterator for BitIterator<'_> {
-    type Item = (bool, u16);
-
-    #[cfg_attr(all(test, dnp3_no_panic), no_panic::no_panic)]
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.pos >= self.count {
-            return None;
-        }
-
-        let byte = self.pos / 8;
-        let bit = self.pos % 8;
-
-        match self.bytes.get(byte) {
-            Some(value) => {
-                let value = (*value & (1 << bit)) != 0;
-                let index = self.index;
-                self.pos = self.pos.saturating_add(1);
-                self.index = self.index.saturating_add(1);
-                Some((value, index))
-            }
-            None => None,
-        }
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        let count = self.count.saturating_sub(self.pos);
-        (count, Some(count))
-    }
-}
-
-impl Iterator for DoubleBitIterator<'_> {
-    type Item = (DoubleBit, u16);
-
-    #[cfg_attr(all(test, dnp3_no_panic), no_panic::no_panic)]
-    fn next(&mut self) -> Option<Self::Item> {
-        if self.pos >= self.count {
-            return None;
-        }
-
-        let byte = self.pos / 4;
-        let shift = match self.pos % 4 {
+    fn get(bytes: &[u8], pos: usize) -> Option<Self> {
+        let shift = match pos % 4 {
             0 => 0,
             1 => 2,
             2 => 4,
             _ => 6,
         };
+        let bits = *bytes.get(pos / 4)? >> shift;
+        Some(DoubleBit::from(bits.bit_1(), bits.bit_0()))
+    }
+}
 
-        match self.bytes.get(byte) {
-            Some(x) => {
-                let bits = *x >> shift;
-                let value = DoubleBit::from(bits.bit_1(), bits.bit_0());
-                let index = self.index;
-                self.pos = self.pos.saturating_add(1);
-                self.index = self.index.saturating_add(1);
-                Some((value, index))
-            }
-            None => None,
+/// zero-copy type used to iterate over a range of packed values without allocating
+#[derive(Debug, PartialEq, Copy, Clone)]
+pub(crate) struct PackedSequence<'a, P> {
+    bytes: &'a [u8],
+    range: Range,
+    phantom: std::marker::PhantomData<P>,
+}
+
+/// a range of bits
+pub(crate) type BitSequence<'a> = PackedSequence<'a, bool>;
+
+/// a range of double bits
+pub(crate) type DoubleBitSequence<'a> = PackedSequence<'a, DoubleBit>;
+
+impl<'a, P: Packed> PackedSequence<'a, P> {
+    pub(crate) fn parse(range: Range, cursor: &mut ReadCursor<'a>) -> Result<Self, ReadError> {
+        let bytes = cursor.read_bytes(P::num_bytes(range.get_count()))?;
+        Ok(Self {
+            bytes,
+            range,
+            phantom: std::marker::PhantomData,
+        })
+    }
+
+    pub(crate) fn iter(&self) -> PackedIterator<'a, P> {
+        PackedIterator {
+            index: self.range.get_start(),
+            bytes: self.bytes,
+            count: self.range.get_count(),
+            pos: 0,
+            phantom: std::marker::PhantomData,
         }
+    }
+}
+
+pub(crate) struct PackedIterator<'a, P> {
+    index: u16,
+    bytes: &'a [u8],
+    count: usize,
+    pos: usize,
+    phantom: std::marker::PhantomData<P>,
+}
+
+impl<P: Packed> Iterator for PackedIterator<'_, P> {
+    type Item = (P, u16);
+
+    #[cfg_attr(all(test, dnp3_no_panic), no_panic::no_panic)]
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.pos >= self.count {
+            return None;
+        }
+
+        let value = P::get(self.bytes, self.pos)?;
+        let index = self.index;
+        self.pos = self.pos.saturating_add(1);
+        self.index = self.index.saturating_add(1);
+        Some((value, index))
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -175,6 +150,32 @@ mod tests {
         assert_eq!(seq.iter().size_hint(), (2, Some(2)));
         let vec: Vec<(bool, u16)> = seq.iter().collect();
         assert_eq!(vec, vec![(true, 65534), (false, 65535)]);
+    }
+
+    #[test]
+    fn can_parse_bits_across_two_bytes() {
+        let range = Range::from(3, 12).unwrap(); // ten values
+        let data = [0b1010_0110, 0b0000_0010];
+        let mut cursor = ReadCursor::new(&data);
+        let seq = BitSequence::parse(range, &mut cursor).unwrap();
+        assert!(cursor.is_empty());
+        assert_eq!(seq.iter().size_hint(), (10, Some(10)));
+        let vec: Vec<(bool, u16)> = seq.iter().collect();
+        assert_eq!(
+            vec,
+            vec![
+                (false, 3),
+                (true, 4),
+                (true, 5),
+                (false, 6),
+                (false, 7),
+                (true, 8),
+                (false, 9),
+                (true, 10),
+                (false, 11),
+                (true, 12),
+            ]
+        );
     }
 
     #[test]

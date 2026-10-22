@@ -13,7 +13,7 @@
 use crate::app::variations::*;
 use crate::app::parse::count::CountSequence;
 use crate::app::parse::parser::*;
-use crate::app::parse::traits::{FixedSize, Index};
+use crate::app::parse::traits::Index;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::bytes::*;
 use crate::app::parse::options::ParseOptions;
@@ -24,7 +24,7 @@ use crate::app::ObjectParseError;
 use scursor::ReadCursor;
 
 #[derive(Debug)]
-pub(crate) enum PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Display {
+pub(crate) enum PrefixedVariation<'a, I> where I : Index {
     /// Device Attributes - Specific Attribute
     Group0(crate::app::attr::Attribute<'a>),
     /// Binary Input Event - Without Time
@@ -147,7 +147,7 @@ pub(crate) enum PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt:
     Group111VarX(u8, PrefixedBytesSequence<'a, I>),
 }
 
-impl<'a, I> PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Display {
+impl<'a, I> PrefixedVariation<'a, I> where I : Index {
     pub(crate) fn parse(v: Variation, count: u16, options: ParseOptions, cursor: &mut ReadCursor<'a>) -> Result<PrefixedVariation<'a, I>, ObjectParseError> {
         match v {
             Variation::Group0(var) => Ok(PrefixedVariation::Group0(crate::app::attr::Attribute::parse_prefixed::<I>(var, count, cursor)?)),

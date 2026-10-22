@@ -8,7 +8,7 @@ use tokio::task::JoinHandle;
 use tokio::time::Instant;
 
 use crate::app::parse::options::ParseOptions;
-use crate::app::{BufferSize, Sequence, Timeout};
+use crate::app::{BufferSize, FunctionCode, Sequence, Timeout};
 use crate::decode::DecodeLevel;
 use crate::link::constant::MAX_LINK_FRAME_LENGTH;
 use crate::link::format::{format_data_frame, format_header_only, Payload};
@@ -19,11 +19,13 @@ use crate::master::association::AssociationConfig;
 use crate::master::task::MasterTask;
 use crate::master::tests::harness::requests::{empty_response, unsol_null, unsol_with_data};
 use crate::master::tests::harness::{
-    AssocInfoEvent, AssociationInformationEventHandler, CountHandler, ReadEvent,
+    AssocInfoEvent, AssocInfoEventQueue, AssociationInformationEventHandler, CountHandler,
+    ReadEvent,
 };
 use crate::master::{
     AssociationHandle, AssociationHandler, AssociationInformation, Classes, MasterChannel,
     MasterChannelConfig, MasterChannelType, ReadHandler, ReadRequest, ReadType, TaskError,
+    TaskType,
 };
 use crate::util::phys::PhysLayer;
 use crate::util::session::{Enabled, RunError};
@@ -91,8 +93,18 @@ struct Harness {
 
 impl Harness {
     async fn new() -> Self {
+        Self::create(null()).await
+    }
+
+    /// A harness whose association reports its tasks to the returned queue
+    async fn reporting() -> (Self, AssocInfoEventQueue) {
+        let (info, events) = AssociationInformationEventHandler::pair();
+        (Self::create(Box::new(info)).await, events)
+    }
+
+    async fn create(info: Box<dyn AssociationInformation>) -> Self {
         let (io, handle) = sfio_tokio_mock_io::mock();
-        let mut io = PhysLayer::Mock(io);
+        let mut io = PhysLayer::mock(io);
         let (tx, rx) = crate::util::channel::request_channel();
         let mut task = MasterTask::new(
             Enabled::Yes,
@@ -109,7 +121,7 @@ impl Harness {
         let task = tokio::spawn(async move { task.run(&mut io).await });
         let mut master = MasterChannel::new(tx, MasterChannelType::Stream);
         let association = master
-            .add_association(OUTSTATION, config(), null(), null(), null())
+            .add_association(OUTSTATION, config(), null(), null(), info)
             .await
             .unwrap();
         Self {
@@ -177,6 +189,36 @@ impl Kind {
             };
             (result, Instant::now())
         })
+    }
+
+    /// The task type and function code the association is told about, if the task is reported
+    fn reported(self) -> Option<(TaskType, FunctionCode)> {
+        match self {
+            Kind::Read => Some((TaskType::UserRead, FunctionCode::Read)),
+            Kind::NonRead => Some((TaskType::Restart, FunctionCode::ColdRestart)),
+            Kind::LinkStatus => None,
+        }
+    }
+
+    /// What the association is told when the task starts
+    fn start_events(self) -> Vec<AssocInfoEvent> {
+        self.reported()
+            .map(|(task_type, function)| {
+                AssocInfoEvent::TaskStart(task_type, function, Sequence::new(0))
+            })
+            .into_iter()
+            .collect()
+    }
+
+    /// What the association is told when the task ends with `result`
+    fn end_events(self, result: Result<(), TaskError>) -> Vec<AssocInfoEvent> {
+        self.reported()
+            .map(|(task_type, function)| match result {
+                Ok(()) => AssocInfoEvent::TaskSuccess(task_type, function, Sequence::new(0)),
+                Err(err) => AssocInfoEvent::TaskFailure(task_type, err),
+            })
+            .into_iter()
+            .collect()
     }
 
     /// The frame from the outstation that completes the task
@@ -429,17 +471,26 @@ async fn tasks_ignore_malformed_fragments_from_other_outstations() {
     watchdog(async {
         for kind in KINDS {
             for malformed in MALFORMED {
-                let mut harness = Harness::new().await;
+                let (mut harness, mut info) = Harness::reporting().await;
                 let task = kind.spawn(harness.association.clone());
                 harness.pop_write().await;
+                harness.barrier().await;
+                assert_eq!(info.pop(), kind.start_events(), "{kind:?}");
 
                 harness.read(&fragment(OTHER, malformed)).await;
                 harness.barrier().await;
                 assert!(!task.is_finished(), "{kind:?} {malformed:?}");
                 assert_eq!(harness.io.pop_event(), None, "{kind:?} {malformed:?}");
+                assert_eq!(info.pop(), [], "{kind:?} {malformed:?}");
 
                 harness.read(&kind.reply()).await;
                 assert_eq!(task.await.unwrap().0, Ok(()), "{kind:?} {malformed:?}");
+                harness.barrier().await;
+                assert_eq!(
+                    info.pop(),
+                    kind.end_events(Ok(())),
+                    "{kind:?} {malformed:?}"
+                );
             }
         }
     })
@@ -450,7 +501,7 @@ async fn tasks_ignore_malformed_fragments_from_other_outstations() {
 async fn malformed_fragments_from_other_outstations_do_not_extend_the_response_deadline() {
     watchdog(async {
         for kind in KINDS {
-            let mut harness = Harness::new().await;
+            let (mut harness, mut info) = Harness::reporting().await;
             let task = kind.spawn(harness.association.clone());
             harness.pop_write().await;
             let start = Instant::now();
@@ -465,6 +516,10 @@ async fn malformed_fragments_from_other_outstations_do_not_extend_the_response_d
             assert_eq!(result, Err(TaskError::ResponseTimeout), "{kind:?}");
             assert_eq!(completed, start + RESPONSE_TIMEOUT, "{kind:?}");
             assert!(!harness.task.is_finished(), "{kind:?}");
+            harness.barrier().await;
+            let mut events = kind.start_events();
+            events.extend(kind.end_events(result));
+            assert_eq!(info.pop(), events, "{kind:?}");
         }
     })
     .await;

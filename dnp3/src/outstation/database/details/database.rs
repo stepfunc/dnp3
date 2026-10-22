@@ -46,7 +46,7 @@ impl Database {
         self.attrs.reset();
     }
 
-    pub(crate) fn set_analog_deadband(&mut self, index: u16, deadband: f64) -> bool {
+    pub(crate) fn set_analog_deadband(&mut self, index: u16, deadband: f64) -> Option<f64> {
         self.static_db.set_analog_deadband(index, deadband)
     }
 

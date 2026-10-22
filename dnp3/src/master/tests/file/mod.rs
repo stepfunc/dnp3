@@ -1,7 +1,6 @@
 use crate::app::format::free_format::FreeFormat;
 use crate::app::format::write::HeaderWriter;
-use crate::app::format::WriteError;
-use crate::app::{FileStatus, FunctionCode, Group70Var4, Group70Var5, Group70Var6, Variation};
+use crate::app::{FileStatus, FunctionCode, Group70Var4, Group70Var5};
 use scursor::WriteCursor;
 
 mod auth_file;
@@ -10,14 +9,6 @@ mod get_info;
 mod open_file;
 mod read_file;
 mod write_block;
-
-impl FreeFormat for Group70Var6<'_> {
-    const VARIATION: Variation = Variation::Group70Var6;
-
-    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-        self.write(cursor)
-    }
-}
 
 pub(super) fn last_block(block: u32) -> u32 {
     (1 << 31) | block

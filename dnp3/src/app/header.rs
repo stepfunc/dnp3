@@ -54,16 +54,6 @@ impl ControlField {
         }
     }
 
-    pub(crate) fn single_response(seq: Sequence) -> Self {
-        Self {
-            fir: true,
-            fin: true,
-            con: false,
-            uns: false,
-            seq,
-        }
-    }
-
     pub(crate) fn request(seq: Sequence) -> Self {
         Self {
             fir: true,
@@ -259,10 +249,6 @@ impl Iin2 {
     /// Construct IIN2 from its underlying value
     pub const fn new(value: u8) -> Self {
         Self { value }
-    }
-
-    pub(crate) fn set(&mut self, iin2: Self) {
-        self.value |= iin2.value;
     }
 
     /// test IIN.2 to see if the NO_FUNC_CODE_SUPPORT bit is set
@@ -489,9 +475,7 @@ impl Iin {
     }
 
     pub(crate) fn has_bad_request_error(self) -> bool {
-        self.iin2.get_no_func_code_support()
-            || self.iin2.get_object_unknown()
-            || self.iin2.get_parameter_error()
+        self.bad_request_errors().value != 0
     }
 }
 
@@ -578,7 +562,7 @@ impl ResponseHeader {
     /// a solicited response in a single fragment that doesn't ask for confirmation
     pub(crate) fn solicited(seq: Sequence, iin: Iin) -> Self {
         Self::new(
-            ControlField::single_response(seq),
+            ControlField::response(seq, true, true, false),
             ResponseFunction::Response,
             iin,
         )
@@ -591,5 +575,20 @@ impl ResponseHeader {
             self.iin.iin1.value,
             self.iin.iin2.value,
         ]
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn bad_request_errors_are_iin2_bits_0_to_2() {
+        for value in 0..=u8::MAX {
+            let iin = Iin::new(Iin1::default(), Iin2::new(value));
+            let errors = value & 0b0000_0111;
+            assert_eq!(iin.bad_request_errors(), Iin2::new(errors), "{value:#04X}");
+            assert_eq!(iin.has_bad_request_error(), errors != 0, "{value:#04X}");
+        }
     }
 }
