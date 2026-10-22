@@ -498,6 +498,185 @@ async fn class_0_and_attributes_span_fragments_without_a_confirm_for_the_last() 
     harness.check_no_events();
 }
 
+/// a g51 CTO with the 48-bit time
+fn cto(variation: u8, time: u64) -> Vec<u8> {
+    let mut bytes = vec![0x33, variation, 0x07, 0x01];
+    bytes.extend_from_slice(&time.to_le_bytes()[..6]);
+    bytes
+}
+
+/// a variation 3 header of events with relative times, as (index, flags, time after the CTO)
+fn relative_time_events(group: u8, events: &[(u16, u8, u16)]) -> Vec<u8> {
+    let mut bytes = vec![group, 0x03, 0x28];
+    bytes.extend(u16::try_from(events.len()).unwrap().to_le_bytes());
+    for &(index, flags, time) in events {
+        bytes.extend(index.to_le_bytes());
+        bytes.push(flags);
+        bytes.extend(time.to_le_bytes());
+    }
+    bytes
+}
+
+/// a variation 2 header of events with absolute times, as (index, flags, time)
+fn absolute_time_events(group: u8, events: &[(u16, u8, u64)]) -> Vec<u8> {
+    let mut bytes = vec![group, 0x02, 0x28];
+    bytes.extend(u16::try_from(events.len()).unwrap().to_le_bytes());
+    for &(index, flags, time) in events {
+        bytes.extend(index.to_le_bytes());
+        bytes.push(flags);
+        bytes.extend_from_slice(&time.to_le_bytes()[..6]);
+    }
+    bytes
+}
+
+/// a response header, a g51v2 CTO and a g2v3 header leave room for this many 5-byte events in a
+/// minimum fragment
+const RELATIVE_EVENTS_IN_MIN_FRAGMENT: u16 = 46;
+const UNSYNCHRONIZED_START: u64 = 1000;
+
+#[tokio::test]
+async fn unsynchronized_g2v2_events_continue_after_a_new_cto_in_the_next_fragment() {
+    let count = RELATIVE_EVENTS_IN_MIN_FRAGMENT;
+    let mut harness = new_harness(config_with_buffer(<BufferSize>::MIN));
+    harness.handle.database.transaction(|db| {
+        for index in 0..count + 2 {
+            db.add(
+                index,
+                Some(EventClass::Class1),
+                BinaryInputConfig::new(
+                    StaticBinaryInputVariation::Group1Var2,
+                    EventBinaryInputVariation::Group2Var2,
+                ),
+            );
+            db.update(
+                index,
+                &BinaryInput::new(
+                    true,
+                    Flags::ONLINE,
+                    Time::unsynchronized(UNSYNCHRONIZED_START + u64::from(index)),
+                ),
+                UpdateOptions::default(),
+            );
+        }
+    });
+
+    harness.send_and_process(&read(&[CLASS_1])).await;
+    let events: Vec<_> = (0..count).map(|i| (i, BINARY_TRUE, i)).collect();
+    let first = response(
+        FIR_CON,
+        IIN1_RESTART_CLASS_1,
+        &[
+            &cto(2, UNSYNCHRONIZED_START),
+            &relative_time_events(2, &events),
+        ],
+    );
+    assert_eq!(first.len(), <BufferSize>::MIN);
+    expect_first_and_confirm(&mut harness, &first, 0..count.into(), class_1_binaries(2)).await;
+
+    harness
+        .expect_response(&response(
+            FIN_CON_SEQ_1,
+            IIN1_RESTART,
+            &[
+                &cto(2, UNSYNCHRONIZED_START + u64::from(count)),
+                &relative_time_events(2, &[(count, BINARY_TRUE, 0), (count + 1, BINARY_TRUE, 1)]),
+            ],
+        ))
+        .await;
+    let next = u64::from(count);
+    confirm(&mut harness, 1, next..next + 2, class_1_binaries(0)).await;
+    harness.check_no_events();
+}
+
+/// double-bit flags: ONLINE and state determined on
+const DOUBLE_BIT_ON: u8 = 0x81;
+/// synchronized g4v2 events in the first fragment
+const ABSOLUTE_EVENTS_BEFORE_CTO: u16 = 25;
+/// a response header and a g4v2 header with `ABSOLUTE_EVENTS_BEFORE_CTO` events leave 19 bytes,
+/// enough for a g51v2 CTO and a g4v3 header but one byte short of the first g4v3 event as well
+const CTO_EVENT_ONE_BYTE_SHORT: usize = 4 + 5 + 9 * 25 + 10 + 5 + 5 - 1;
+const SYNCHRONIZED_START: u64 = 2000;
+
+fn class_1_double_bits(count: usize) -> BufferState {
+    let mut state = empty_buffer_state();
+    state.classes.num_class_1 = count;
+    state.types.num_double_bit_binary_input = count;
+    state
+}
+
+#[tokio::test]
+async fn unsynchronized_g4v2_event_whose_cto_does_not_fit_starts_the_next_fragment() {
+    let absolute = ABSOLUTE_EVENTS_BEFORE_CTO;
+    let times: Vec<Time> = (0..absolute)
+        .map(|i| Time::synchronized(SYNCHRONIZED_START + u64::from(i)))
+        .chain([
+            Time::unsynchronized(UNSYNCHRONIZED_START),
+            Time::unsynchronized(UNSYNCHRONIZED_START + 1),
+            Time::synchronized(SYNCHRONIZED_START + 100),
+        ])
+        .collect();
+    let mut harness = new_harness(config_with_buffer(CTO_EVENT_ONE_BYTE_SHORT));
+    harness.handle.database.transaction(|db| {
+        for (index, time) in (0..).zip(times.iter().copied()) {
+            db.add(
+                index,
+                Some(EventClass::Class1),
+                DoubleBitBinaryInputConfig::new(
+                    StaticDoubleBitBinaryInputVariation::Group3Var2,
+                    EventDoubleBitBinaryInputVariation::Group4Var2,
+                ),
+            );
+            db.update(
+                index,
+                &DoubleBitBinaryInput::new(DoubleBit::DeterminedOn, Flags::ONLINE, time),
+                UpdateOptions::default(),
+            );
+        }
+    });
+
+    harness.send_and_process(&read(&[CLASS_1])).await;
+    let events: Vec<_> = (0..absolute)
+        .map(|i| (i, DOUBLE_BIT_ON, SYNCHRONIZED_START + u64::from(i)))
+        .collect();
+    let first = response(
+        FIR_CON,
+        IIN1_RESTART_CLASS_1,
+        &[&absolute_time_events(4, &events)],
+    );
+    assert_eq!(first.len(), CTO_EVENT_ONE_BYTE_SHORT - 19);
+    expect_first_and_confirm(
+        &mut harness,
+        &first,
+        0..absolute.into(),
+        class_1_double_bits(3),
+    )
+    .await;
+
+    harness
+        .expect_response(&response(
+            FIN_CON_SEQ_1,
+            IIN1_RESTART,
+            &[
+                &cto(2, UNSYNCHRONIZED_START),
+                &relative_time_events(
+                    4,
+                    &[
+                        (absolute, DOUBLE_BIT_ON, 0),
+                        (absolute + 1, DOUBLE_BIT_ON, 1),
+                    ],
+                ),
+                &absolute_time_events(
+                    4,
+                    &[(absolute + 2, DOUBLE_BIT_ON, SYNCHRONIZED_START + 100)],
+                ),
+            ],
+        ))
+        .await;
+    let next = u64::from(absolute);
+    confirm(&mut harness, 1, next..next + 3, class_1_double_bits(0)).await;
+    harness.check_no_events();
+}
+
 /// confirm the unsolicited response with `seq`, expecting it to clear the events with `cleared`
 /// ids and leave `remaining` class 1 binary events
 async fn confirm_unsolicited(

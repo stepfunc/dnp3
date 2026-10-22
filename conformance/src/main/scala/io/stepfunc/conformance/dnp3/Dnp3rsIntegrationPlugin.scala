@@ -2,7 +2,7 @@ package io.stepfunc.conformance.dnp3
 
 import io.stepfunc.dnp3c.dnp3.app._
 import io.stepfunc.dnp3c.dnp3.app.objects.AttributeValue
-import io.stepfunc.dnp3c.dnp3.{AbnormalFlag, ActionResult, ActionTiming, CheckReporter, DeferredCheck, EventExpectation, InputKind, IntegrationPlugin, OutputKind, PluginReporter, PointKind}
+import io.stepfunc.dnp3c.dnp3.{AbnormalFlag, ActionResult, ActionTiming, CheckReporter, DeferredCheck, EventExpectation, InputKind, IntegrationPlugin, OutputKind, PluginReporter, PointKind, TimeQuality}
 import io.stepfunc.dnp3c.protocol.parsing.UInt8
 import io.stepfunc.dnp3.{AddressFilter, AnalogInput, AnalogOutputStatus, BinaryInput, BinaryOutputStatus, Counter, DoubleBit, DoubleBitBinaryInput, EventBufferConfig, FrozenCounter, LinkErrorMode, Outstation, Runtime, RuntimeConfig, OutstationServer}
 import org.joou.UInteger
@@ -125,6 +125,10 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
     val event = trackingDatabase.generateBinaryInputEvent(0, this.eventBatch)
     printBinaryInput(reporter, event)
   }
+
+  // the quality the application gives the timestamps of events recorded now
+  override def timeQuality(reporter: PluginReporter): Option[TimeQuality] =
+    Some(if (app.isTimeValid) TimeQuality.Synchronized else TimeQuality.Unsynchronized)
 
   override def uninstall(reporter: PluginReporter, kind: PointKind): Unit = {
     val database = config.testDatabaseConfig

@@ -13,6 +13,16 @@ pub(crate) trait EventVariation<T>: Copy {
     fn encode<E>(self, encoder: E) -> E::Output
     where
         E: Encoder<T>;
+
+    /// the variation the event is written in when this one is selected for it
+    ///
+    /// Binary and double-bit events with absolute time must have been recorded while synchronized
+    /// (TB2017-003a 5.1.3.1.2), and events recorded without time are reported without time
+    /// (IED certification procedures 3.1 rev 1, 8.14.1), whether the variation is the default or
+    /// the one requested.
+    fn for_event(self, _event: &T) -> Self {
+        self
+    }
 }
 
 /// Something done with an event, given how its variation is encoded
@@ -48,6 +58,16 @@ impl EventVariation<BinaryInput> for EventBinaryInputVariation {
             Self::Group2Var3 => encoder.cto::<Group2Var3>(),
         }
     }
+
+    fn for_event(self, event: &BinaryInput) -> Self {
+        match (self, event.time) {
+            (Self::Group2Var2 | Self::Group2Var3, None) => Self::Group2Var1,
+            (Self::Group2Var2, Some(Time::Unsynchronized(_))) => Self::Group2Var3,
+            (Self::Group2Var1, _)
+            | (Self::Group2Var2, Some(Time::Synchronized(_)))
+            | (Self::Group2Var3, Some(_)) => self,
+        }
+    }
 }
 
 impl EventVariation<DoubleBitBinaryInput> for EventDoubleBitBinaryInputVariation {
@@ -59,6 +79,16 @@ impl EventVariation<DoubleBitBinaryInput> for EventDoubleBitBinaryInputVariation
             Self::Group4Var1 => encoder.fixed::<Group4Var1>(),
             Self::Group4Var2 => encoder.fixed::<Group4Var2>(),
             Self::Group4Var3 => encoder.cto::<Group4Var3>(),
+        }
+    }
+
+    fn for_event(self, event: &DoubleBitBinaryInput) -> Self {
+        match (self, event.time) {
+            (Self::Group4Var2 | Self::Group4Var3, None) => Self::Group4Var1,
+            (Self::Group4Var2, Some(Time::Unsynchronized(_))) => Self::Group4Var3,
+            (Self::Group4Var1, _)
+            | (Self::Group4Var2, Some(Time::Synchronized(_)))
+            | (Self::Group4Var3, Some(_)) => self,
         }
     }
 }
