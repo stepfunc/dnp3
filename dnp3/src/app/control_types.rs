@@ -101,6 +101,12 @@ pub(crate) trait CommandObject: FixedSizeVariation {
     fn echoes(&self, sent: &Self) -> bool {
         self == sent
     }
+
+    /// false if the outstation answers the object with NOT_SUPPORTED instead of passing it to
+    /// the control handler
+    fn has_supported_value(&self) -> bool {
+        true
+    }
 }
 
 impl CommandObject for Group12Var1 {
@@ -145,6 +151,11 @@ impl CommandObject for Group41Var3 {
     fn echoes(&self, sent: &Self) -> bool {
         self.status == sent.status && self.value.to_bits() == sent.value.to_bits()
     }
+
+    /// NaN and infinity are not supported
+    fn has_supported_value(&self) -> bool {
+        self.value.is_finite()
+    }
 }
 
 impl CommandObject for Group41Var4 {
@@ -158,6 +169,11 @@ impl CommandObject for Group41Var4 {
 
     fn echoes(&self, sent: &Self) -> bool {
         self.status == sent.status && self.value.to_bits() == sent.value.to_bits()
+    }
+
+    /// NaN and infinity are not supported
+    fn has_supported_value(&self) -> bool {
+        self.value.is_finite()
     }
 }
 
