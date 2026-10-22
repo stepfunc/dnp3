@@ -78,6 +78,10 @@ impl MasterTask<crate::transport::mock::MockTransport> {
     pub(crate) fn set_rx_frame_info(&mut self, info: crate::link::header::FrameInfo) {
         self.reader.set_rx_frame_info(info);
     }
+
+    pub(crate) fn rx_frame_info(&self) -> crate::transport::mock::reader::RxFrameInfo {
+        self.reader.rx_frame_info()
+    }
 }
 
 impl<T: Transport> MasterTask<T> {

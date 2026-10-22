@@ -15,6 +15,7 @@ use crate::master::{AssociationHandle, MasterChannel, ReadHandler, ReadType};
 use crate::master::{
     AssociationHandler, AssociationInformation, HeaderInfo, MasterChannelConfig, MasterChannelType,
 };
+use crate::transport::mock::reader::RxFrameInfo;
 use crate::transport::mock::MockTransport;
 use crate::util::phys::{PhysAddr, PhysLayer};
 use crate::util::session::{Enabled, RunError};
@@ -68,6 +69,7 @@ pub(crate) async fn create_association_with_handler(
         PhysAddr::None,
     ));
 
+    let rx_info = task.rx_frame_info();
     let master_task = tokio::spawn(async move { task.run(&mut io).await });
 
     // Create the association
@@ -95,6 +97,7 @@ pub(crate) async fn create_association_with_handler(
         assoc_events,
         read_events,
         io: io_handle,
+        rx_info,
     }
 }
 
@@ -241,9 +244,20 @@ pub(crate) struct TestHarness {
     pub(crate) assoc_events: AssocInfoEventQueue,
     pub(crate) read_events: ReadEventQueue,
     pub(crate) io: sfio_tokio_mock_io::Handle,
+    rx_info: RxFrameInfo,
 }
 
 impl TestHarness {
+    /// Set the link address that the fragments read after this appear to come from
+    pub(crate) fn set_source(&self, source: EndpointAddress) {
+        self.rx_info.set(FrameInfo::new(
+            source,
+            None,
+            FrameType::Data,
+            PhysAddr::None,
+        ));
+    }
+
     pub(crate) async fn expect_write(&mut self, expected: Vec<u8>) {
         assert_eq!(
             self.io.next_event().await,
