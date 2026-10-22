@@ -326,7 +326,7 @@ impl MasterSession {
             _ = sleep_until(deadline) => return Ok(Event::Timeout),
         }
 
-        let event = match reader.pop_response() {
+        let event = match reader.pop_response(decode_level.application) {
             Some(TransportResponse::Response(source, response)) => {
                 self.notify_link_activity(source.link);
                 Event::Fragment(source, response)

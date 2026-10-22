@@ -382,6 +382,16 @@ impl OutstationSession {
         }
     }
 
+    fn pop_request<'a, T: Transport>(
+        &self,
+        reader: &'a mut TransportReader<T>,
+    ) -> RequestGuard<'a, T> {
+        reader.pop_request(
+            self.required_master_address(),
+            self.config.decode_level.application,
+        )
+    }
+
     pub(crate) fn change_master_address(&mut self, address: EndpointAddress) {
         self.destination.link = address;
     }
@@ -797,7 +807,7 @@ impl OutstationSession {
             return Ok(UnsolicitedWaitResult::Timeout);
         }
 
-        let mut guard = reader.pop_request(self.required_master_address());
+        let guard = self.pop_request(reader);
         let (info, request) = match guard.get() {
             None => return Ok(UnsolicitedWaitResult::ReadNext),
             Some(TransportRequest::Request(info, request)) => {
@@ -1034,7 +1044,7 @@ impl OutstationSession {
         writer: &mut TransportWriter<T>,
         database: &mut DatabaseHandle,
     ) -> Result<(), RunError> {
-        let mut guard = reader.pop_request(self.required_master_address());
+        let guard = self.pop_request(reader);
         match guard.get() {
             Some(TransportRequest::Request(info, request)) => {
                 self.on_link_activity();
@@ -2162,7 +2172,7 @@ impl OutstationSession {
                 }
                 // process data
                 TimeoutStatus::No => {
-                    let mut guard = reader.pop_request(self.required_master_address());
+                    let mut guard = self.pop_request(reader);
                     match self.expect_sol_confirm(ecsn, &mut guard) {
                         ConfirmAction::ContinueWait => {
                             // we ignored whatever the request was and logged it elsewhere
