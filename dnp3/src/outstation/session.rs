@@ -27,7 +27,7 @@ use crate::outstation::control::select::SelectState;
 use crate::outstation::database::{DatabaseHandle, EventClass};
 use crate::outstation::deferred::DeferredRead;
 use crate::outstation::response::{Prepared, ResponseSlot, Staged};
-use crate::outstation::target::{self, DeadBands, FreezeTarget, WriteHeader, WriteTarget};
+use crate::outstation::target::{DeadBands, FreezeTarget, Selector, WriteHeader, WriteTarget};
 use crate::outstation::task::{ConfigurationChange, OutstationMessage};
 use crate::outstation::traits::*;
 use crate::transport::{
@@ -42,6 +42,7 @@ use crate::app::parse::bit::BitSequence;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
 use crate::util::session::{Enabled, RunError, StopReason};
+use crate::util::skipped::Skipped;
 
 #[derive(Copy, Clone)]
 enum TimeoutStatus {
@@ -1489,12 +1490,17 @@ impl OutstationSession {
     ) -> ResponseHeader {
         let mut iin2 = Iin2::default();
         let mut empty = true;
+        let mut selector = Selector::new(FunctionCode::Write);
 
         for header in object_headers.iter() {
             empty = false;
-            iin2 |= self.handle_single_write_header(header, database).await;
+            iin2 |= match selector.select::<WriteTarget>(header) {
+                Ok(header) => self.handle_single_write_header(header, database).await,
+                Err(iin2) => iin2,
+            };
         }
 
+        selector.log();
         if empty {
             tracing::warn!("empty WRITE request");
         }
@@ -1637,13 +1643,9 @@ impl OutstationSession {
 
     async fn handle_single_write_header(
         &mut self,
-        header: ObjectHeader<'_>,
+        header: WriteHeader<'_>,
         db: &DatabaseHandle,
     ) -> Iin2 {
-        let header = match target::select::<WriteTarget>(FunctionCode::Write, header) {
-            Ok(header) => header,
-            Err(iin2) => return iin2,
-        };
         match header {
             WriteHeader::Attr(attr) => self.handle_write_attr(attr, db).await,
             WriteHeader::Iin(bits) => self.handle_write_iin(bits),
@@ -1829,16 +1831,18 @@ impl OutstationSession {
         }
 
         let mut iin2 = Iin2::default();
+        let mut selector = Selector::new(function);
 
         let classes = &mut self.state.enabled_unsolicited_classes;
         for header in object_headers.iter() {
-            match target::select::<EventClass>(function, header) {
+            match selector.select::<EventClass>(header) {
                 Ok(EventClass::Class1) => classes.class1 = enable,
                 Ok(EventClass::Class2) => classes.class2 = enable,
                 Ok(EventClass::Class3) => classes.class3 = enable,
                 Err(err) => iin2 |= err,
             }
         }
+        selector.log();
 
         ResponseHeader::solicited(seq, Iin::default() | iin2)
     }
@@ -1986,10 +1990,12 @@ impl OutstationSession {
         freeze_type: FreezeType,
     ) -> ResponseHeader {
         let mut iin = Iin::default();
+        let mut selector = Selector::new(function);
 
         for header in object_headers.iter() {
-            iin |= self.handle_freeze_header(database, function, freeze_type, header);
+            iin |= self.handle_freeze_header(database, &mut selector, freeze_type, header);
         }
+        selector.log();
 
         ResponseHeader::solicited(seq, iin)
     }
@@ -2004,6 +2010,8 @@ impl OutstationSession {
         let mut iin = Iin::default();
 
         let mut timing: Option<FreezeInterval> = None;
+        let mut selector = Selector::new(function);
+        let mut without_timing = Skipped::new();
 
         for header in object_headers.iter() {
             match header {
@@ -2023,16 +2031,13 @@ impl OutstationSession {
                     // other variations require that there be a preceding g50v2
                     match timing {
                         None => {
-                            tracing::warn!(
-                                "freeze-at-time on {} w/o preceding g50v2",
-                                header.variation()
-                            );
+                            without_timing.add(header.variation());
                             iin.iin2 |= Iin2::PARAMETER_ERROR;
                         }
                         Some(x) => {
                             iin |= self.handle_freeze_header(
                                 database,
-                                function,
+                                &mut selector,
                                 FreezeType::FreezeAtTime(x),
                                 header,
                             );
@@ -2042,17 +2047,22 @@ impl OutstationSession {
             }
         }
 
+        selector.log();
+        if let Some((variation, count)) = without_timing.first() {
+            tracing::warn!("freeze-at-time on {variation} w/o preceding g50v2{count}");
+        }
+
         ResponseHeader::solicited(seq, iin)
     }
 
     fn handle_freeze_header(
         &mut self,
         database: &mut DatabaseHandle,
-        function: FunctionCode,
+        selector: &mut Selector,
         freeze_type: FreezeType,
         header: ObjectHeader,
     ) -> Iin2 {
-        match target::select::<FreezeTarget>(function, header) {
+        match selector.select::<FreezeTarget>(header) {
             Ok(indices) => self
                 .application
                 .freeze_counter(indices, freeze_type, database)

@@ -6,9 +6,10 @@ use details::range::static_db::{Deadband, FlagsDetector, OctetStringDetector, Po
 
 use crate::app::measurement::*;
 use crate::app::parse::parser::HeaderCollection;
-use crate::app::Iin2;
+use crate::app::{FunctionCode, Iin2};
 use crate::master::EventClasses;
 use crate::outstation::database::read::ReadHeader;
+use crate::outstation::target::Selector;
 
 use crate::app::attr::{AttrProp, AttrSet, BadAttribute, OwnedAttribute, TypeError};
 use crate::outstation::{ClassCount, OutstationApplication};
@@ -530,15 +531,18 @@ impl DatabaseHandle {
     }
 
     pub(crate) fn select(&mut self, headers: &HeaderCollection) -> Iin2 {
-        self.with_database(|db| {
+        let mut selector = Selector::new(FunctionCode::Read);
+        let iin2 = self.with_database(|db| {
             let mut unsupported = Iin2::default();
             let selected = db.inner.select_read(headers.iter().filter_map(|header| {
-                ReadHeader::parse(header)
+                ReadHeader::parse(header, &mut selector)
                     .map_err(|err| unsupported |= err)
                     .ok()
             }));
             selected | unsupported
-        })
+        });
+        selector.log();
+        iin2
     }
 
     pub(crate) fn write_response_headers(&mut self, cursor: &mut WriteCursor) -> ResponseInfo {

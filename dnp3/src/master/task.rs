@@ -225,7 +225,7 @@ fn fails_task(source: FragmentAddr, destination: FragmentAddr) -> bool {
     if source.link == destination.link {
         return true;
     }
-    tracing::warn!(
+    tracing::debug!(
         "ignoring malformed fragment from {} while expecting response from {}",
         source.link,
         destination.link
@@ -368,7 +368,7 @@ impl MasterSession {
         }
 
         if source.link != destination.link {
-            tracing::warn!(
+            tracing::debug!(
                 "Received response from {} while expecting response from {}",
                 source.link,
                 destination.link

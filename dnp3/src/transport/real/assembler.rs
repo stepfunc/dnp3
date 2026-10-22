@@ -72,7 +72,10 @@ pub(crate) enum Discard {
 impl Discard {
     /// log the reason, which the reader passes to [`Assembler::assemble`]
     pub(crate) fn log(self) {
-        tracing::warn!("transport: {self}");
+        match self {
+            Self::Repeat { .. } | Self::Pending => tracing::debug!("transport: {self}"),
+            _ => tracing::warn!("transport: {self}"),
+        }
     }
 }
 

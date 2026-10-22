@@ -1,10 +1,12 @@
 use crate::app::parse::parser::HeaderCollection;
-use crate::app::Iin2;
 use crate::app::Sequence;
+use crate::app::{FunctionCode, Iin2};
 use crate::outstation::database::read::ReadHeader;
 use crate::outstation::database::DatabaseHandle;
+use crate::outstation::target::Selector;
 use crate::transport::FragmentInfo;
 use crate::util::bounded::{BoundedQueue, Full};
+use crate::util::skipped::Skipped;
 
 #[derive(Copy, Clone)]
 pub(crate) struct DeferredInfo {
@@ -61,21 +63,28 @@ impl DeferredRead {
         self.headers.clear();
 
         let mut iin2 = Iin2::default();
+        let mut selector = Selector::new(FunctionCode::Read);
+        let mut over_capacity = Skipped::new();
 
         for h in headers.iter() {
             let (variation, qualifier) = (h.variation(), h.qualifier());
-            match ReadHeader::parse(h) {
+            match ReadHeader::parse(h, &mut selector) {
                 Ok(r) => {
                     if let Err(Full) = self.headers.try_push(r) {
-                        tracing::warn!(
-                            "insufficient capacity ({}) for READ header: {variation} - {qualifier}",
-                            self.headers.max(),
-                        );
+                        over_capacity.add((variation, qualifier));
                         iin2 |= Iin2::PARAMETER_ERROR;
                     }
                 }
                 Err(err) => iin2 |= err,
             }
+        }
+
+        selector.log();
+        if let Some(((variation, qualifier), count)) = over_capacity.first() {
+            tracing::warn!(
+                "insufficient capacity ({}) for READ header: {variation} - {qualifier}{count}",
+                self.headers.max(),
+            );
         }
 
         self.info = Some(DeferredInfo::new(hash, seq, info, iin2));

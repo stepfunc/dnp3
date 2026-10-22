@@ -6,6 +6,7 @@ use crate::app::variations::*;
 use crate::app::{ObjectParseError, ResponseHeader};
 use crate::master::{HeaderInfo, ReadHandler};
 use crate::master::{ReadType, TaskError};
+use crate::util::skipped::Skipped;
 
 /// Extract measurements from a HeaderCollection, sinking them into
 /// something that implements `MeasurementHandler`
@@ -31,18 +32,16 @@ pub(crate) fn extract_measurements_inner(
 ) -> bool {
     let mut delivered = false;
     let mut cto = None;
+    let mut ignored = Skipped::new();
     for header in objects.iter() {
         match extract_header(&header, cto, handler) {
             Extracted::Handled => delivered |= has_objects(&header),
             Extracted::Cto(x) => cto = x,
-            Extracted::Ignored => {
-                tracing::warn!(
-                    "ignored header variation: {} qualifier: {:?}",
-                    &header.variation(),
-                    &header.qualifier()
-                );
-            }
+            Extracted::Ignored => ignored.add((header.variation(), header.qualifier())),
         }
+    }
+    if let Some(((variation, qualifier), count)) = ignored.first() {
+        tracing::warn!("ignored header variation: {variation} qualifier: {qualifier:?}{count}");
     }
     delivered
 }

@@ -9,15 +9,16 @@ use crate::app::parse::prefix::Prefix;
 use crate::app::parse::range::RangedSequence;
 use crate::app::parse::traits::FixedSizeVariation;
 use crate::app::variations::{Group34Var1, Group34Var2, Group34Var3, Group50Var1, Group50Var3};
-use crate::app::{FunctionCode, Iin2, Variation};
+use crate::app::{FunctionCode, Iin2, QualifierCode, Variation};
 use crate::outstation::database::EventClass;
 use crate::outstation::FreezeIndices;
+use crate::util::skipped::Skipped;
 
 /// What a function does with the objects of a variation, whatever their qualifier
 ///
-/// The targets of a function are the one list of the headers it supports: [`select`] takes the
-/// header it handles from the target, and gives the error for a header it doesn't from whether
-/// the variation has a target.
+/// The targets of a function are the one list of the headers it supports: [`Selector::select`]
+/// takes the header it handles from the target, and gives the error for a header it doesn't from
+/// whether the variation has a target.
 pub(crate) trait Target: Copy {
     /// What a header with a qualifier that the function supports selects
     type Header<'a>;
@@ -30,24 +31,50 @@ pub(crate) trait Target: Copy {
     fn with(self, header: ObjectHeader<'_>) -> Option<Self::Header<'_>>;
 }
 
-/// What a header in a request selects, or the error for one that the function doesn't support: a
-/// variation that the function supports with another qualifier has an unsupported qualifier, and
-/// any other is an unsupported object
-pub(crate) fn select<T: Target>(
+/// Selects the headers of one request, and logs the ones that its function doesn't support once
+/// for the request
+pub(crate) struct Selector {
     function: FunctionCode,
-    header: ObjectHeader<'_>,
-) -> Result<T::Header<'_>, Iin2> {
-    let variation = header.variation();
-    let qualifier = header.qualifier();
-    let target = T::get(variation);
-    target.and_then(|x| x.with(header)).ok_or_else(|| {
-        tracing::warn!("{function:?} doesn't support {variation} with qualifier {qualifier}");
-        if target.is_some() {
-            Iin2::PARAMETER_ERROR
-        } else {
-            Iin2::OBJECT_UNKNOWN
+    unsupported: Skipped<(Variation, QualifierCode)>,
+}
+
+impl Selector {
+    pub(crate) const fn new(function: FunctionCode) -> Self {
+        Self {
+            function,
+            unsupported: Skipped::new(),
         }
-    })
+    }
+
+    /// What a header in the request selects, or the error for one that the function doesn't
+    /// support: a variation that the function supports with another qualifier has an unsupported
+    /// qualifier, and any other is an unsupported object
+    pub(crate) fn select<'a, T: Target>(
+        &mut self,
+        header: ObjectHeader<'a>,
+    ) -> Result<T::Header<'a>, Iin2> {
+        let variation = header.variation();
+        let qualifier = header.qualifier();
+        let target = T::get(variation);
+        target.and_then(|x| x.with(header)).ok_or_else(|| {
+            self.unsupported.add((variation, qualifier));
+            if target.is_some() {
+                Iin2::PARAMETER_ERROR
+            } else {
+                Iin2::OBJECT_UNKNOWN
+            }
+        })
+    }
+
+    /// Log the headers that the function doesn't support, if there were any
+    pub(crate) fn log(&self) {
+        if let Some(((variation, qualifier), count)) = self.unsupported.first() {
+            let function = self.function;
+            tracing::warn!(
+                "{function:?} doesn't support {variation} with qualifier {qualifier}{count}"
+            );
+        }
+    }
 }
 
 /// What a WRITE of a variation writes
