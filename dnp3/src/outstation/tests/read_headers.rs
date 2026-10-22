@@ -94,8 +94,8 @@ async fn read_of_a_variation_the_qualifier_cannot_carry_sets_parameter_error() {
         .transaction(add_binary_inputs_with_events);
 
     let requests: &[&[u8]] = &[
-        // g34v0, 8-bit start/stop, 0 to 1
-        &[0xC0, 0x01, 0x22, 0x00, 0x00, 0x00, 0x01],
+        // g32v0, 8-bit start/stop, 0 to 1
+        &[0xC0, 0x01, 0x20, 0x00, 0x00, 0x00, 0x01],
         // g2v1, 8-bit start/stop, 0 to 1
         &[0xC0, 0x01, 0x02, 0x01, 0x00, 0x00, 0x01],
         // g1v2, 8-bit count of 1

@@ -281,6 +281,14 @@ async fn write_of_object_that_cannot_be_written_sets_object_unknown() {
             EMPTY_RESPONSE_OBJECT_UNKNOWN,
         )
         .await;
+
+    // g34v0, 8-bit start/stop, 0 to 1
+    harness
+        .test_request_response(
+            &[0xC1, 0x02, 0x22, 0x00, 0x00, 0, 1],
+            &[0xC1, 0x81, 0x80, 0x02],
+        )
+        .await;
 }
 
 #[tokio::test]
@@ -480,16 +488,13 @@ async fn read_with_free_format_qualifier_sets_object_unknown() {
 }
 
 #[tokio::test]
-async fn write_of_g34_with_a_two_byte_range_sets_parameter_error() {
+async fn write_of_g34_with_all_objects_sets_parameter_error() {
     let mut harness = new_harness(get_default_config());
 
-    // g34v1 is writable, but not with a 2-byte start/stop
+    // g34v1 is writable, but not with all objects
     harness
-        .test_request_response(
-            &[
-                0xC0, 0x02, 0x22, 0x01, 0x01, 0x03, 0x00, 0x03, 0x00, 0xCA, 0xFE,
-            ],
-            EMPTY_RESPONSE_PARAM_ERROR,
-        )
+        .test_request_response(&[0xC0, 0x02, 0x22, 0x01, 0x06], EMPTY_RESPONSE_PARAM_ERROR)
         .await;
+
+    harness.check_no_events();
 }

@@ -10,6 +10,7 @@ use crate::app::gen::count::CountVariation;
 use crate::app::gen::ranged::RangedVariation;
 use crate::app::parse::count::CountSequence;
 use crate::app::parse::parser::{HeaderCollection, HeaderDetails, ObjectHeader, Request};
+use crate::app::parse::range::RangedSequence;
 use crate::app::variations::{
     Group34Var1, Group34Var2, Group34Var3, Group50Var1, Group50Var3, Group52Var1, Group52Var2,
 };
@@ -1555,7 +1556,7 @@ impl OutstationSession {
         }
     }
 
-    async fn handle_write_analog_deadbands<I, V>(
+    async fn handle_write_prefixed_analog_deadbands<I, V>(
         &mut self,
         items: CountSequence<'_, Prefix<I, V>>,
         db: &DatabaseHandle,
@@ -1564,6 +1565,35 @@ impl OutstationSession {
         I: Index,
         V: FixedSizeVariation + Into<f64>,
     {
+        self.handle_write_analog_deadbands(
+            items
+                .iter()
+                .map(|x| (x.index.widen_to_u16(), x.value.into())),
+            db,
+        )
+        .await
+    }
+
+    async fn handle_write_ranged_analog_deadbands<V>(
+        &mut self,
+        items: RangedSequence<'_, V>,
+        db: &DatabaseHandle,
+    ) -> Iin2
+    where
+        V: FixedSizeVariation + Into<f64>,
+    {
+        self.handle_write_analog_deadbands(
+            items.iter().map(|(value, index)| (index, value.into())),
+            db,
+        )
+        .await
+    }
+
+    async fn handle_write_analog_deadbands(
+        &mut self,
+        mut items: impl Iterator<Item = (u16, f64)>,
+        db: &DatabaseHandle,
+    ) -> Iin2 {
         if !self.application.support_write_analog_dead_bands() {
             return Iin2::OBJECT_UNKNOWN;
         }
@@ -1572,10 +1602,7 @@ impl OutstationSession {
 
         let iin = db.transaction(|db| {
             let mut iin2 = Iin2::default();
-            for (index, deadband) in items
-                .iter()
-                .map(|x| (x.index.widen_to_u16(), x.value.into()))
-            {
+            for (index, deadband) in items.by_ref() {
                 match db.inner.set_analog_deadband(index, deadband) {
                     Some(deadband) => self.application.write_analog_dead_band(index, deadband),
                     None => iin2 |= Iin2::PARAMETER_ERROR,
@@ -1608,23 +1635,32 @@ impl OutstationSession {
                 self.handle_write_at_last_recorded_time(seq)
             }
             // analog deadbands
+            HeaderDetails::Range(_, _, RangedVariation::Group34Var1(seq)) => {
+                self.handle_write_ranged_analog_deadbands(seq, db).await
+            }
+            HeaderDetails::Range(_, _, RangedVariation::Group34Var2(seq)) => {
+                self.handle_write_ranged_analog_deadbands(seq, db).await
+            }
+            HeaderDetails::Range(_, _, RangedVariation::Group34Var3(seq)) => {
+                self.handle_write_ranged_analog_deadbands(seq, db).await
+            }
             HeaderDetails::CountAndPrefix8(_, PrefixedVariation::Group34Var1(seq)) => {
-                self.handle_write_analog_deadbands(seq, db).await
+                self.handle_write_prefixed_analog_deadbands(seq, db).await
             }
             HeaderDetails::CountAndPrefix8(_, PrefixedVariation::Group34Var2(seq)) => {
-                self.handle_write_analog_deadbands(seq, db).await
+                self.handle_write_prefixed_analog_deadbands(seq, db).await
             }
             HeaderDetails::CountAndPrefix8(_, PrefixedVariation::Group34Var3(seq)) => {
-                self.handle_write_analog_deadbands(seq, db).await
+                self.handle_write_prefixed_analog_deadbands(seq, db).await
             }
             HeaderDetails::CountAndPrefix16(_, PrefixedVariation::Group34Var1(seq)) => {
-                self.handle_write_analog_deadbands(seq, db).await
+                self.handle_write_prefixed_analog_deadbands(seq, db).await
             }
             HeaderDetails::CountAndPrefix16(_, PrefixedVariation::Group34Var2(seq)) => {
-                self.handle_write_analog_deadbands(seq, db).await
+                self.handle_write_prefixed_analog_deadbands(seq, db).await
             }
             HeaderDetails::CountAndPrefix16(_, PrefixedVariation::Group34Var3(seq)) => {
-                self.handle_write_analog_deadbands(seq, db).await
+                self.handle_write_prefixed_analog_deadbands(seq, db).await
             }
             _ => {
                 tracing::warn!(

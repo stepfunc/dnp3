@@ -1195,7 +1195,7 @@ const TASK_ERRORS: &[(&str, &str)] = &[
     ("iin_error", "outstation returned an IIN.2 error bit"),
     (
         "bad_response",
-        "response was malformed or contained object headers",
+        "response was malformed or contained unexpected object headers",
     ),
     (
         "response_timeout",
@@ -1209,6 +1209,15 @@ const TASK_ERRORS: &[(&str, &str)] = &[
     ("shutdown", "master was shutdown"),
     ("association_removed", "association was removed mid-task"),
     ("bad_encoding", "request data could not be encoded"),
+    // appended rather than placed next to bad_response so that existing values keep their numbers
+    (
+        "unsupported_response",
+        "response contained objects that the library doesn't support, which may be valid DNP3 (e.g. an unknown group and variation)",
+    ),
+    (
+        "unsupported_or_bad_response",
+        "response contained objects that are either malformed or valid but not supported by the library (e.g. a qualifier code that can't be used with a variation)",
+    ),
 ];
 
 pub(crate) trait TaskErrors: Sized {

@@ -45,6 +45,61 @@ pub enum ObjectParseError {
     BadEncoding,
 }
 
+#[cfg(feature = "ffi")]
+pub use cause::ParseErrorCause;
+#[cfg(not(feature = "ffi"))]
+pub(crate) use cause::ParseErrorCause;
+
+mod cause {
+    /// Whether an [`ObjectParseError`](super::ObjectParseError) means the input is invalid or
+    /// that the parser doesn't support it
+    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+    #[cfg_attr(feature = "ffi", doc(hidden))]
+    #[cfg_attr(
+        not(feature = "ffi"),
+        expect(unreachable_pub, reason = "public only when building the FFI")
+    )]
+    pub enum ParseErrorCause {
+        /// The parser doesn't support what was received, which may be valid
+        Unsupported,
+        /// What was received is encoded incorrectly
+        Invalid,
+        /// Either, depending on the case: e.g. a qualifier the specification disallows for a
+        /// variation, or one it allows that the parser doesn't support
+        UnsupportedOrInvalid,
+    }
+}
+
+impl From<ObjectParseError> for ParseErrorCause {
+    fn from(err: ObjectParseError) -> Self {
+        err.cause()
+    }
+}
+
+impl ObjectParseError {
+    /// Whether the error means the input is invalid or that the parser doesn't support it
+    pub(crate) fn cause(&self) -> ParseErrorCause {
+        match self {
+            ObjectParseError::UnknownGroupVariation(_, _)
+            | ObjectParseError::UnsupportedFreeFormatCount(_) => ParseErrorCause::Unsupported,
+            #[expect(
+                deprecated,
+                reason = "the mapping must cover every variant until removal"
+            )]
+            ObjectParseError::UnsupportedQualifierCode(_) => ParseErrorCause::Unsupported,
+            ObjectParseError::InvalidQualifierForVariation(_, _) => {
+                ParseErrorCause::UnsupportedOrInvalid
+            }
+            ObjectParseError::UnknownQualifier(_)
+            | ObjectParseError::InsufficientBytes
+            | ObjectParseError::InvalidRange(_, _)
+            | ObjectParseError::ZeroLengthOctetData
+            | ObjectParseError::BadAttribute(_)
+            | ObjectParseError::BadEncoding => ParseErrorCause::Invalid,
+        }
+    }
+}
+
 impl From<TrailingBytes> for ObjectParseError {
     fn from(_: TrailingBytes) -> Self {
         Self::BadEncoding
@@ -183,5 +238,48 @@ impl From<ReadError> for HeaderParseError {
 impl From<InvalidRange> for ObjectParseError {
     fn from(r: InvalidRange) -> Self {
         ObjectParseError::InvalidRange(r.start, r.stop)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn classifies_each_error_by_cause() {
+        use ParseErrorCause::*;
+
+        #[expect(
+            deprecated,
+            reason = "the classification covers every variant until removal"
+        )]
+        let cases = [
+            (ObjectParseError::UnknownGroupVariation(111, 5), Unsupported),
+            (
+                ObjectParseError::InvalidQualifierForVariation(
+                    Variation::Group111(5),
+                    QualifierCode::Range8,
+                ),
+                UnsupportedOrInvalid,
+            ),
+            (
+                ObjectParseError::UnsupportedQualifierCode(QualifierCode::Range8),
+                Unsupported,
+            ),
+            (ObjectParseError::UnsupportedFreeFormatCount(2), Unsupported),
+            (ObjectParseError::UnknownQualifier(0xFF), Invalid),
+            (ObjectParseError::InsufficientBytes, Invalid),
+            (ObjectParseError::InvalidRange(2, 1), Invalid),
+            (ObjectParseError::ZeroLengthOctetData, Invalid),
+            (
+                ObjectParseError::BadAttribute(AttrParseError::ReadError),
+                Invalid,
+            ),
+            (ObjectParseError::BadEncoding, Invalid),
+        ];
+
+        for (err, expected) in cases {
+            assert_eq!(err.cause(), expected, "{err:?}");
+        }
     }
 }
