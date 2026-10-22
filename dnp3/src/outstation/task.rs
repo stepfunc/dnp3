@@ -109,7 +109,7 @@ impl<T: Transport> OutstationTask<T> {
     ) -> (Self, OutstationHandle) {
         let (tx, rx) = crate::util::channel::request_channel();
         let handle = DatabaseHandle::new(
-            config.max_read_request_headers,
+            config.read_header_limit(),
             config.class_zero,
             config.event_buffer_config,
         );

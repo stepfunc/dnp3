@@ -57,6 +57,45 @@ impl Default for FramePayload {
     }
 }
 
+/// Parse a complete link header, returning the header and the amount of data it announces
+pub(crate) fn parse_header_bytes(
+    bytes: [u8; constant::LINK_HEADER_LENGTH],
+) -> Result<(Header, u8), FrameError> {
+    let [start1, start2, fields @ ..] = bytes;
+    if start1 != constant::START1 {
+        return Err(FrameError::UnexpectedStart1(start1));
+    }
+    if start2 != constant::START2 {
+        return Err(FrameError::UnexpectedStart2(start2));
+    }
+    parse_header_fields(fields)
+}
+
+/// Parse the header fields that follow the start bytes, returning the header and the amount of
+/// data it announces
+fn parse_header_fields(bytes: [u8; 8]) -> Result<(Header, u8), FrameError> {
+    let [len, control, dest_0, dest_1, src_0, src_1, crc_0, crc_1] = bytes;
+
+    // the length counts the control and address fields, then the data
+    let data_length = len
+        .checked_sub(constant::MIN_HEADER_LENGTH_VALUE)
+        .ok_or(FrameError::BadLength(len))?;
+
+    let expected_crc =
+        super::crc::calc_crc_with_0564(&[len, control, dest_0, dest_1, src_0, src_1]);
+    if u16::from_le_bytes([crc_0, crc_1]) != expected_crc {
+        return Err(FrameError::BadHeaderCrc);
+    }
+
+    let header = Header::new(
+        ControlField::from(control),
+        AnyAddress::from(u16::from_le_bytes([dest_0, dest_1])),
+        AnyAddress::from(u16::from_le_bytes([src_0, src_1])),
+    );
+
+    Ok((header, data_length))
+}
+
 pub(crate) struct Parser {
     mode: LinkErrorMode,
     state: ParseState,
@@ -162,7 +201,7 @@ impl Parser {
 
         let x = cursor.read_u8()?;
 
-        if x != 0x05 {
+        if x != constant::START1 {
             return Err(FrameError::UnexpectedStart1(x).into());
         }
 
@@ -177,7 +216,7 @@ impl Parser {
 
         let x = cursor.read_u8()?;
 
-        if x != 0x64 {
+        if x != constant::START2 {
             return Err(FrameError::UnexpectedStart2(x).into());
         }
 
@@ -186,31 +225,11 @@ impl Parser {
     }
 
     fn parse_header(&mut self, cursor: &mut ReadCursor) -> Result<(), ParseError> {
-        if cursor.remaining() < 8 {
+        let Some(bytes) = cursor.read_bytes(8).ok().and_then(<[u8]>::first_chunk) else {
             return Ok(());
-        }
-
-        let crc_bytes = cursor.read_bytes(6)?;
-        let crc_value = cursor.read_u16_le()?;
-
-        let mut cursor = ReadCursor::new(crc_bytes);
-        let len = cursor.read_u8()?;
-
-        let header = Header::new(
-            ControlField::from(cursor.read_u8()?),
-            AnyAddress::from(cursor.read_u16_le()?),
-            AnyAddress::from(cursor.read_u16_le()?),
-        );
-
-        // the length counts the control and address fields, then the data
-        let Some(data_length) = len.checked_sub(5) else {
-            return Err(FrameError::BadLength(len).into());
         };
 
-        let expected_crc = super::crc::calc_crc_with_0564(crc_bytes);
-        if crc_value != expected_crc {
-            return Err(FrameError::BadHeaderCrc.into());
-        }
+        let (header, data_length) = parse_header_fields(*bytes)?;
 
         let trailer_length = Self::calc_trailer_length(data_length);
 

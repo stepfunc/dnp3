@@ -25,14 +25,14 @@ pub(crate) struct Database {
 
 impl Database {
     pub(crate) fn new(
-        max_read_selection: Option<u16>,
+        max_read_selection: u16,
         class_zero_config: ClassZeroConfig,
         config: EventBufferConfig,
     ) -> Self {
         Self {
             static_db: StaticDatabase::new(max_read_selection, class_zero_config),
             event_buffer: EventBuffer::new(config),
-            attrs: super::attrs::AttrHandler::new(32),
+            attrs: super::attrs::AttrHandler::new(super::attrs::AttrHandler::MAX_SELECTED),
         }
     }
 

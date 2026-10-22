@@ -3,8 +3,8 @@ use crate::app::format::write::HeaderWriter;
 use crate::app::{Iin2, QualifierCode, Variation};
 use crate::outstation::database::details::attrs::map::SetMap;
 use crate::outstation::database::read::AttrHeader;
+use crate::util::bounded::{BoundedQueue, Full};
 use scursor::WriteCursor;
-use std::collections::VecDeque;
 
 pub(crate) mod map;
 
@@ -54,8 +54,7 @@ impl Selected {
 }
 
 struct Selection {
-    max: usize,
-    selected: VecDeque<Selected>,
+    selected: BoundedQueue<Selected>,
 }
 
 fn get_list_encoding(num_items: usize) -> Option<(u8, AttrDataType)> {
@@ -77,15 +76,15 @@ fn get_list_encoding(num_items: usize) -> Option<(u8, AttrDataType)> {
 
 impl Selection {
     fn push(&mut self, s: Selected) -> Iin2 {
-        if self.selected.len() < self.max {
-            self.selected.push_back(s);
-            Iin2::default()
-        } else {
-            tracing::warn!(
-                "READ exceeds max attribute headers ({}) per request",
-                self.max
-            );
-            Iin2::PARAMETER_ERROR
+        match self.selected.try_push(s) {
+            Ok(()) => Iin2::default(),
+            Err(Full) => {
+                tracing::warn!(
+                    "READ exceeds max attribute headers ({}) per request",
+                    self.selected.max()
+                );
+                Iin2::PARAMETER_ERROR
+            }
         }
     }
 
@@ -174,12 +173,14 @@ pub(crate) struct AttrHandler {
 }
 
 impl AttrHandler {
+    /// Attribute selections per READ, which `max_read_request_headers` doesn't change
+    pub(crate) const MAX_SELECTED: usize = 32;
+
     pub(crate) fn new(max_selected: usize) -> Self {
         Self {
             map: SetMap::default(),
             selection: Selection {
-                max: max_selected,
-                selected: VecDeque::with_capacity(max_selected),
+                selected: BoundedQueue::new(max_selected),
             },
         }
     }

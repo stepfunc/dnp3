@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, Bound, VecDeque};
+use std::collections::{BTreeMap, Bound};
 use std::fmt::Formatter;
 use std::ops::RangeBounds;
 
@@ -13,6 +13,7 @@ use crate::outstation::database::read::StaticReadHeader;
 use crate::outstation::database::{ClassZeroConfig, EventClass, EventMode, UpdateOptions};
 
 use crate::app::attr::AttrSet;
+use crate::util::bounded::{BoundedQueue, Full};
 use crate::util::BadWrite;
 use scursor::WriteCursor;
 
@@ -106,51 +107,6 @@ pub(crate) enum SpecificVariation {
 impl SpecificVariation {
     fn with(self, range: IndexRange) -> VariationRange {
         VariationRange::new(range, self)
-    }
-}
-
-struct SelectionQueue {
-    queue: VecDeque<VariationRange>,
-    capacity_exceeded: usize,
-}
-
-impl SelectionQueue {
-    fn new(max_selections: u16) -> Self {
-        Self {
-            queue: VecDeque::with_capacity(max_selections.into()),
-            capacity_exceeded: 0,
-        }
-    }
-
-    fn peek(&self) -> Option<VariationRange> {
-        self.queue.front().copied()
-    }
-
-    fn pop(&mut self) {
-        self.queue.pop_front();
-    }
-
-    fn update_front(&mut self, range: VariationRange) -> bool {
-        if let Some(front) = self.queue.front_mut() {
-            *front = range;
-            true
-        } else {
-            false
-        }
-    }
-
-    fn push_back(&mut self, range: VariationRange) -> bool {
-        if self.queue.len() == self.queue.capacity() {
-            self.capacity_exceeded = self.capacity_exceeded.saturating_add(1);
-            return false;
-        }
-        self.queue.push_back(range);
-        true
-    }
-
-    fn reset(&mut self) {
-        self.capacity_exceeded = 0;
-        self.queue.clear();
     }
 }
 
@@ -294,7 +250,7 @@ where
 
 pub(crate) struct StaticDatabase {
     class_zero: ClassZeroConfig,
-    selected: SelectionQueue,
+    selected: BoundedQueue<VariationRange>,
     // maps for the various types
     binary: PointMap<BinaryInput>,
     double_bit_binary: PointMap<DoubleBitBinaryInput>,
@@ -308,20 +264,18 @@ pub(crate) struct StaticDatabase {
 
 impl Default for StaticDatabase {
     fn default() -> Self {
-        Self::new(None, ClassZeroConfig::default())
+        Self::new(
+            OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS,
+            ClassZeroConfig::default(),
+        )
     }
 }
 
 impl StaticDatabase {
-    pub(crate) fn new(max_read_selection: Option<u16>, class_zero: ClassZeroConfig) -> Self {
-        // don't allow values smaller than the default
-        let max_read_selection = max_read_selection
-            .map(|x| x.max(OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS))
-            .unwrap_or(OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS);
-
+    pub(crate) fn new(max_read_selection: u16, class_zero: ClassZeroConfig) -> Self {
         Self {
             class_zero,
-            selected: SelectionQueue::new(max_read_selection),
+            selected: BoundedQueue::new(max_read_selection.into()),
             binary: PointMap::empty(),
             double_bit_binary: PointMap::empty(),
             binary_output_status: PointMap::empty(),
@@ -349,16 +303,16 @@ impl StaticDatabase {
 
     #[cfg(test)]
     pub(crate) fn selection_capacity(&self) -> usize {
-        self.selected.queue.capacity()
+        self.selected.max()
     }
 
     #[cfg(test)]
     pub(crate) fn selection_count(&self) -> usize {
-        self.selected.queue.len()
+        self.selected.len()
     }
 
     pub(crate) fn reset(&mut self) {
-        self.selected.reset();
+        self.selected.clear();
     }
 
     pub(crate) fn add<T>(&mut self, index: u16, config: PointConfig<T>) -> bool
@@ -432,16 +386,18 @@ impl StaticDatabase {
     }
 
     pub(crate) fn write(&mut self, cursor: &mut WriteCursor) -> Result<(), BadWrite> {
-        while let Some(range) = self.selected.peek() {
+        while let Some(range) = self.selected.front().copied() {
             match self.write_range(cursor, range) {
                 // done with this header
                 Ok(()) => {
-                    self.selected.pop();
+                    self.selected.pop_front();
                 }
                 // ran out of space
                 Err(s) => {
                     // possibly wrote some data though, so update the selection
-                    self.selected.update_front(s);
+                    if let Some(front) = self.selected.front_mut() {
+                        *front = s;
+                    }
                     return Err(BadWrite);
                 }
             };
@@ -624,10 +580,9 @@ impl StaticDatabase {
     }
 
     fn push_selection(&mut self, range: VariationRange) -> Iin2 {
-        if self.selected.push_back(range) {
-            Iin2::default()
-        } else {
-            Iin2::PARAMETER_ERROR
+        match self.selected.try_push(range) {
+            Ok(()) => Iin2::default(),
+            Err(Full) => Iin2::PARAMETER_ERROR,
         }
     }
 
@@ -650,16 +605,9 @@ impl StaticDatabase {
         T: Updatable,
     {
         if T::enabled_class_zero(&self.class_zero) {
-            let full_range = match T::get_mut_map(self).select_all() {
-                None => return Iin2::default(),
-                Some(x) => x,
-            };
-
-            if self.selected.push_back(full_range) {
-                Iin2::default()
-            } else {
-                // out of space for read headers
-                Iin2::PARAMETER_ERROR
+            match T::get_mut_map(self).select_all() {
+                None => Iin2::default(),
+                Some(full_range) => self.push_selection(full_range),
             }
         } else {
             Iin2::default()
@@ -1655,6 +1603,43 @@ mod tests {
         assert_eq!(
             db.select(StaticReadHeader::Counter(None, None)),
             Iin2::default()
+        );
+    }
+
+    fn selections_until_parameter_error(db: &mut StaticDatabase) -> usize {
+        let header = StaticReadHeader::Counter(None, Some(IndexRange::new(0, 0)));
+        std::iter::from_fn(|| (db.select(header) == Iin2::default()).then_some(())).count()
+    }
+
+    fn db_with_one_counter() -> StaticDatabase {
+        let mut db = StaticDatabase::default();
+        assert!(db.add(0, counter_config(StaticCounterVariation::Group20Var1)));
+        db
+    }
+
+    #[test]
+    fn selection_limit_defaults_to_the_default_read_header_limit() {
+        let mut db = db_with_one_counter();
+        assert_eq!(
+            selections_until_parameter_error(&mut db),
+            usize::from(OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS)
+        );
+        // a selection past the limit selects nothing
+        assert_eq!(
+            db.selection_count(),
+            usize::from(OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS)
+        );
+    }
+
+    #[test]
+    fn reset_makes_every_selection_available_again() {
+        let mut db = db_with_one_counter();
+        selections_until_parameter_error(&mut db);
+        db.reset();
+        assert_eq!(db.selection_count(), 0);
+        assert_eq!(
+            selections_until_parameter_error(&mut db),
+            usize::from(OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS)
         );
     }
 }

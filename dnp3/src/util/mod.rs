@@ -1,4 +1,5 @@
 pub(crate) mod bit;
+pub(crate) mod bounded;
 pub(crate) mod buffer;
 pub(crate) mod channel;
 pub(crate) mod deadline;

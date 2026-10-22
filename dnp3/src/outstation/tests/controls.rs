@@ -732,3 +732,161 @@ async fn operate_uses_the_selection_once() {
         .await;
     harness.check_no_events();
 }
+
+#[tokio::test]
+async fn operate_without_a_select_gets_no_select() {
+    let mut harness = new_harness(get_default_config());
+    operate_gets_no_select(&mut harness).await;
+}
+
+#[tokio::test]
+async fn select_replaces_the_previous_selection() {
+    let mut harness = new_harness(get_default_config());
+    select(&mut harness).await;
+    harness
+        .test_request_response(
+            &g41v2_request(5, FunctionCode::Select, 1),
+            &g41v2_response(5, 1, 0),
+        )
+        .await;
+    harness.check_events(&g41v2_select_events(1));
+    // the OPERATE that follows the first SELECT no longer matches
+    operate_gets_no_select(&mut harness).await;
+}
+
+#[tokio::test]
+async fn operate_follows_the_latest_select() {
+    let mut harness = new_harness(get_default_config());
+    select(&mut harness).await;
+    harness
+        .test_request_response(
+            &g41v2_request(5, FunctionCode::Select, 1),
+            &g41v2_response(5, 1, 0),
+        )
+        .await;
+    harness.check_events(&g41v2_select_events(1));
+    harness
+        .test_request_response(
+            &g41v2_request(6, FunctionCode::Operate, 1),
+            &g41v2_response(6, 1, 0),
+        )
+        .await;
+    harness.check_events(&g41v2_operate_events(1, OperateType::SelectBeforeOperate));
+}
+
+#[tokio::test]
+async fn select_after_direct_operates_can_be_operated() {
+    let mut harness = new_harness(get_default_config());
+    harness
+        .test_request_response(
+            &g41v2_request(4, FunctionCode::DirectOperate, 1),
+            &g41v2_response(4, 1, 0),
+        )
+        .await;
+    harness.check_events(&g41v2_operate_events(1, OperateType::DirectOperate));
+    harness
+        .send_and_process(&g41v2_request(5, FunctionCode::DirectOperateNoResponse, 1))
+        .await;
+    harness.expect_no_response();
+    harness.check_events(&g41v2_operate_events(1, OperateType::DirectOperateNoAck));
+    select(&mut harness).await;
+    operate_succeeds(&mut harness).await;
+}
+
+#[tokio::test]
+async fn select_repeated_after_its_operate_selects_again() {
+    let mut harness = new_harness(get_default_config());
+    select(&mut harness).await;
+    operate_succeeds(&mut harness).await;
+    // no longer a retry, since the OPERATE came between them
+    select(&mut harness).await;
+    operate_succeeds(&mut harness).await;
+}
+
+#[tokio::test]
+async fn broadcast_direct_operate_no_ack_ends_the_selection() {
+    let mut harness = new_harness(get_default_config());
+    select(&mut harness).await;
+    harness.set_broadcast(Some(BroadcastConfirmMode::Optional));
+    harness
+        .send_and_process(&g41v2_request(5, FunctionCode::DirectOperateNoResponse, 1))
+        .await;
+    harness.set_broadcast(None);
+    harness.expect_no_response();
+    harness.check_events(&g41v2_operate_events(1, OperateType::DirectOperateNoAck));
+    harness.check_events(&[Event::BroadcastReceived(
+        FunctionCode::DirectOperateNoResponse,
+        BroadcastAction::Processed,
+    )]);
+    // restart IIN and IIN1.0 BROADCAST + echo with status == NO_SELECT
+    harness
+        .test_request_response(
+            OPERATE_SEQ1_G41V2,
+            &[
+                0xC1, 0x81, 0x81, 0x00, 41, 2, 0x17, 0x1, 0x07, 0x01, 0x02, 0x02,
+            ],
+        )
+        .await;
+    harness.check_no_events();
+}
+
+// select, seq == 0, g12v1 count == 1, index == 7, status == SUCCESS. Bytes 8 to 15 (the CROB's
+// count, on time and most of its off time) were solved by inverting xxh64 so that the whole request
+// hashes to 0, which the outstation must treat like any other request hash
+const SELECT_SEQ0_G12V1_HASH_ZERO: &[u8] = &[
+    0xC0, 0x03, 12, 1, 0x17, 0x01, 0x07, 0x01, 0x15, 0x6E, 0x9A, 0xA5, 0x7B, 0xA4, 0xFE, 0xCB,
+    0x00, 0x00,
+];
+const OPERATE_SEQ1_G12V1: &[u8] = &[
+    0xC1, 0x04, 12, 1, 0x17, 0x01, 0x07, 0x01, 0x15, 0x6E, 0x9A, 0xA5, 0x7B, 0xA4, 0xFE, 0xCB,
+    0x00, 0x00,
+];
+
+fn g12v1_index_7() -> Control {
+    Control::G12V1(
+        crate::app::variations::Group12Var1 {
+            code: crate::app::control::ControlCode::from(0x01),
+            count: 0x15,
+            on_time: 0x7BA5_9A6E,
+            off_time: 0x00CB_FEA4,
+            status: crate::app::control::CommandStatus::Success,
+        },
+        7,
+    )
+}
+
+fn g12v1_response(seq: u8) -> Vec<u8> {
+    let mut response = vec![0xC0 | seq, 0x81, 0x80, 0x00];
+    response.extend_from_slice(&SELECT_SEQ0_G12V1_HASH_ZERO[2..]);
+    response
+}
+
+#[tokio::test]
+async fn select_whose_request_hashes_to_zero_can_be_retried_and_operated() {
+    assert_eq!(xxhash_rust::xxh64::xxh64(SELECT_SEQ0_G12V1_HASH_ZERO, 0), 0);
+
+    let mut harness = new_harness(get_default_config());
+    harness
+        .test_request_response(SELECT_SEQ0_G12V1_HASH_ZERO, &g12v1_response(0))
+        .await;
+    harness.check_events(&[
+        Event::BeginControls,
+        Event::Select(g12v1_index_7()),
+        Event::EndControls,
+    ]);
+
+    // the retry repeats the response and keeps the selection
+    harness
+        .test_request_response(SELECT_SEQ0_G12V1_HASH_ZERO, &g12v1_response(0))
+        .await;
+    harness.check_no_events();
+
+    harness
+        .test_request_response(OPERATE_SEQ1_G12V1, &g12v1_response(1))
+        .await;
+    harness.check_events(&[
+        Event::BeginControls,
+        Event::Operate(g12v1_index_7(), OperateType::SelectBeforeOperate),
+        Event::EndControls,
+    ]);
+}

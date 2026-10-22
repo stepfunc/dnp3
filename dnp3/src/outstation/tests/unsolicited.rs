@@ -510,6 +510,32 @@ async fn operate_during_unsolicited_confirm_wait_uses_the_selection() {
     ]);
 }
 
+#[tokio::test]
+async fn select_during_unsolicited_confirm_wait_can_be_retried_and_operated() {
+    let mut harness = new_harness(get_default_unsolicited_config());
+    confirm_null_unsolicited(&mut harness).await;
+    enable_unsolicited(&mut harness).await;
+
+    generate_binary_event(&mut harness.handle.database);
+    harness.expect_response(UNSOL_G2V1_SEQ1).await;
+    harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
+
+    select_seq1(&mut harness).await;
+
+    // the retry of the SELECT repeats its response and keeps the selection
+    harness.send_and_process(SELECT_SEQ1_G41V2).await;
+    assert_eq!(control_status(&mut harness).await, Some(0));
+    harness.check_no_events();
+
+    harness.send_and_process(OPERATE_SEQ2_G41V2).await;
+    assert_eq!(control_status(&mut harness).await, Some(0));
+    harness.check_events(&[
+        Event::BeginControls,
+        Event::Operate(G41V2_INDEX_7, OperateType::SelectBeforeOperate),
+        Event::EndControls,
+    ]);
+}
+
 /// a deferred READ ends the selection, and a retry of the SELECT after it repeats the SELECT's
 /// response without selecting again
 #[tokio::test]

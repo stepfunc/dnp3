@@ -106,7 +106,8 @@ pub struct OutstationConfig {
     /// pre-allocated buffer used to process requests. A minimum
     /// value of [`OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS`] is always enforced.
     /// Requesting more than this number will result in the PARAMETER_ERROR
-    /// IIN bit being set in the response.
+    /// IIN bit being set in the response. Device attributes (group 0) have a
+    /// separate, fixed limit of 32 selections per READ.
     #[cfg_attr(feature = "serialization", serde(default))]
     pub max_read_request_headers: Option<u16>,
     /// Maximum number of controls in a single request
@@ -141,6 +142,14 @@ impl OutstationConfig {
     /// Default unsolicited retry delay between series
     pub const DEFAULT_UNSOLICITED_RETRY_DELAY: std::time::Duration =
         Self::default_unsolicited_retry_delay();
+
+    /// [`OutstationConfig::max_read_request_headers`], raised to the default if it's smaller
+    pub(crate) fn read_header_limit(&self) -> u16 {
+        self.max_read_request_headers
+            .map_or(Self::DEFAULT_MAX_READ_REQUEST_HEADERS, |x| {
+                x.max(Self::DEFAULT_MAX_READ_REQUEST_HEADERS)
+            })
+    }
 
     /// constructs an `OutstationConfig` with default settings, except for the
     /// master and outstation link addresses which really don't have good defaults
