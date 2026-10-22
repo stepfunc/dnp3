@@ -1,7 +1,11 @@
+use std::sync::{Arc, Mutex, MutexGuard};
+
+use scursor::WriteCursor;
+
 use crate::app::format::free_format::FreeFormat;
 use crate::app::format::write::HeaderWriter;
-use crate::app::{FileStatus, FunctionCode, Group70Var4, Group70Var5};
-use scursor::WriteCursor;
+use crate::app::{FileStatus, FunctionCode, Group70Var4, Group70Var5, MaybeAsync};
+use crate::master::{FileAction, FileError, FileReader};
 
 mod auth_file;
 mod close_file;
@@ -9,6 +13,65 @@ mod get_info;
 mod open_file;
 mod read_file;
 mod write_block;
+
+/// What a file reader was told, in order
+#[derive(Clone, Debug, PartialEq)]
+pub(super) enum ReaderEvent {
+    Opened(u32),
+    Block(u32, Vec<u8>),
+    Aborted(FileError),
+    Completed,
+}
+
+#[derive(Default)]
+struct ReaderState {
+    action: FileAction,
+    events: Vec<ReaderEvent>,
+}
+
+/// A file reader that records what it's told, and answers each file and block with an action
+#[derive(Clone, Default)]
+pub(super) struct RecordingReader(Arc<Mutex<ReaderState>>);
+
+impl RecordingReader {
+    /// Take what the reader was told since the last call
+    pub(super) fn pop(&self) -> Vec<ReaderEvent> {
+        std::mem::take(&mut self.lock().events)
+    }
+
+    /// Answer the file and the blocks that follow with `action`
+    pub(super) fn set_action(&self, action: FileAction) {
+        self.lock().action = action;
+    }
+
+    fn lock(&self) -> MutexGuard<'_, ReaderState> {
+        self.0.lock().unwrap()
+    }
+
+    fn record(&self, event: ReaderEvent) -> FileAction {
+        let mut state = self.lock();
+        state.events.push(event);
+        state.action
+    }
+}
+
+impl FileReader for RecordingReader {
+    fn opened(&mut self, size: u32) -> FileAction {
+        self.record(ReaderEvent::Opened(size))
+    }
+
+    fn block_received(&mut self, block_num: u32, data: &[u8]) -> MaybeAsync<FileAction> {
+        MaybeAsync::ready(self.record(ReaderEvent::Block(block_num, data.to_vec())))
+    }
+
+    fn aborted(&mut self, err: FileError) {
+        self.record(ReaderEvent::Aborted(err));
+    }
+
+    fn completed(&mut self) {
+        self.record(ReaderEvent::Completed);
+    }
+}
 
 pub(super) fn last_block(block: u32) -> u32 {
     (1 << 31) | block
