@@ -591,4 +591,70 @@ mod test {
             assert_eq!(iin.has_bad_request_error(), errors != 0, "{value:#04X}");
         }
     }
+
+    type Getter<T> = fn(T) -> bool;
+
+    #[test]
+    fn iin1_getters_and_constants_match_their_bits() {
+        let bits: [(Getter<Iin1>, Iin1, u8); 8] = [
+            (|x| x.get_broadcast(), Iin1::BROADCAST, 0x01),
+            (Iin1::get_class_1_events, Iin1::CLASS_1_EVENTS, 0x02),
+            (Iin1::get_class_2_events, Iin1::CLASS_2_EVENTS, 0x04),
+            (Iin1::get_class_3_events, Iin1::CLASS_3_EVENTS, 0x08),
+            (Iin1::get_need_time, Iin1::NEED_TIME, 0x10),
+            (Iin1::get_local_control, Iin1::LOCAL_CONTROL, 0x20),
+            (Iin1::get_device_trouble, Iin1::DEVICE_TROUBLE, 0x40),
+            (Iin1::get_device_restart, Iin1::RESTART, 0x80),
+        ];
+
+        for (getter, constant, mask) in bits {
+            assert_eq!(constant, Iin1::new(mask));
+            for value in 0..=u8::MAX {
+                assert_eq!(
+                    getter(Iin1::new(value)),
+                    value & mask != 0,
+                    "{value:#04X} {mask:#04X}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn iin2_getters_and_constants_match_their_bits() {
+        let bits: [(Getter<Iin2>, Option<Iin2>, u8); 8] = [
+            (
+                Iin2::get_no_func_code_support,
+                Some(Iin2::NO_FUNC_CODE_SUPPORT),
+                0x01,
+            ),
+            (Iin2::get_object_unknown, Some(Iin2::OBJECT_UNKNOWN), 0x02),
+            (Iin2::get_parameter_error, Some(Iin2::PARAMETER_ERROR), 0x04),
+            (
+                Iin2::get_event_buffer_overflow,
+                Some(Iin2::EVENT_BUFFER_OVERFLOW),
+                0x08,
+            ),
+            (
+                Iin2::get_already_executing,
+                Some(Iin2::ALREADY_EXECUTING),
+                0x10,
+            ),
+            (Iin2::get_config_corrupt, Some(Iin2::CONFIG_CORRUPT), 0x20),
+            (Iin2::get_reserved_2, None, 0x40),
+            (Iin2::get_reserved_1, None, 0x80),
+        ];
+
+        for (getter, constant, mask) in bits {
+            if let Some(constant) = constant {
+                assert_eq!(constant, Iin2::new(mask));
+            }
+            for value in 0..=u8::MAX {
+                assert_eq!(
+                    getter(Iin2::new(value)),
+                    value & mask != 0,
+                    "{value:#04X} {mask:#04X}"
+                );
+            }
+        }
+    }
 }

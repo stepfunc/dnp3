@@ -27,6 +27,8 @@ pub(crate) use control_types::CommandObject;
 mod app_enums;
 mod buffer_size;
 mod control_enums;
+#[cfg(test)]
+mod enum_tests;
 mod extensions;
 
 pub(crate) mod file;
