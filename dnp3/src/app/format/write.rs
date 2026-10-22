@@ -40,11 +40,6 @@ pub(crate) fn start_response<'a, 'b>(
 
 impl<'a, 'b> HeaderWriter<'a, 'b> {
     #[cfg(test)]
-    pub(crate) fn inner(self) -> &'b mut WriteCursor<'a> {
-        self.cursor
-    }
-
-    #[cfg(test)]
     pub(crate) fn write_class1230(&mut self) -> Result<(), scursor::WriteError> {
         self.write_all_objects_header(Variation::Group60Var2)?;
         self.write_all_objects_header(Variation::Group60Var3)?;

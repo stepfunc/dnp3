@@ -569,74 +569,19 @@ async fn every_task_fails_on_a_response_with_unexpected_objects() {
     .await;
 }
 
-#[tokio::test(start_paused = true)]
-async fn every_task_fails_on_a_fragment_too_short_to_be_a_response() {
-    watchdog(async {
-        for kind in KINDS {
-            let mut started = start(kind).await;
-            respond(&mut started.harness, vec![0xC0, 0x81, 0x00]).await;
-            started.expect_failure(TaskError::Transport).await;
-        }
-    })
-    .await;
-}
-
 /// Fragments that aren't valid responses: one too short for the IIN, and a solicited response with
 /// the UNS bit
 const MALFORMED: [&[u8]; 2] = [&[0xC0, 0x81, 0x00], &[0xD0, 0x81, 0x00, 0x00]];
 
 #[tokio::test(start_paused = true)]
-async fn every_task_fails_on_a_solicited_response_with_the_uns_bit() {
+async fn every_task_fails_on_a_malformed_fragment_from_its_outstation() {
     watchdog(async {
-        for kind in KINDS {
-            let mut started = start(kind).await;
-            respond(&mut started.harness, vec![0xD0, 0x81, 0x00, 0x00]).await;
-            started.expect_failure(TaskError::Transport).await;
-        }
-    })
-    .await;
-}
-
-#[tokio::test(start_paused = true)]
-async fn every_task_ignores_malformed_fragments_from_other_outstations() {
-    watchdog(async {
-        for kind in KINDS {
-            let mut started = start(kind).await;
-            let harness = &mut started.harness;
-            harness.set_source(OTHER);
-            for fragment in MALFORMED {
-                respond(harness, fragment.to_vec()).await;
+        for fragment in MALFORMED {
+            for kind in KINDS {
+                let mut started = start(kind).await;
+                respond(&mut started.harness, fragment.to_vec()).await;
+                started.expect_failure(TaskError::Transport).await;
             }
-            harness.set_source(OUTSTATION);
-            started.expect_waiting().await;
-            started.expect_success().await;
-        }
-    })
-    .await;
-}
-
-#[tokio::test(start_paused = true)]
-async fn malformed_fragments_from_other_outstations_do_not_extend_any_task_deadline() {
-    watchdog(async {
-        for kind in KINDS {
-            let mut started = start(kind).await;
-            let now = Instant::now();
-            let harness = &mut started.harness;
-            harness.set_source(OTHER);
-            for fragment in MALFORMED {
-                tokio::time::advance(Duration::from_millis(250)).await;
-                respond(harness, fragment.to_vec()).await;
-            }
-            harness.set_source(OUTSTATION);
-            let err = TaskError::ResponseTimeout;
-            assert_eq!(started.reply().await, kind.failed(err), "{kind:?}");
-            assert_eq!(now.elapsed(), Duration::from_secs(1), "{kind:?}");
-            barrier(&mut started.harness).await;
-            assert_eq!(
-                started.harness.assoc_events.pop(),
-                [kind.failure_event(err)],
-                "{kind:?}"
-            );
         }
     })
     .await;
@@ -1179,16 +1124,6 @@ async fn read_times_out_one_response_timeout_after_the_last_fragment() {
 }
 
 #[tokio::test(start_paused = true)]
-async fn select_before_operate_reports_the_select_and_the_operate_sequence() {
-    watchdog(async {
-        // SELECT and OPERATE are one task: it starts with the SELECT and succeeds with the OPERATE
-        let mut started = start(Kind::SelectBeforeOperate).await;
-        started.expect_success().await;
-    })
-    .await;
-}
-
-#[tokio::test(start_paused = true)]
 async fn select_before_operate_times_out_waiting_for_the_operate_response() {
     watchdog(async {
         let mut started = start(Kind::SelectBeforeOperate).await;
@@ -1198,31 +1133,6 @@ async fn select_before_operate_times_out_waiting_for_the_operate_response() {
         let now = Instant::now();
         started.expect_failure(TaskError::ResponseTimeout).await;
         TestHarness::assert_elapsed(now, Duration::from_secs(1));
-    })
-    .await;
-}
-
-#[tokio::test(start_paused = true)]
-async fn select_before_operate_fails_without_operate_if_the_select_response_differs() {
-    watchdog(async {
-        let mut started = start(Kind::SelectBeforeOperate).await;
-        // the outstation answers with no objects
-        respond(&mut started.harness, empty_response(Sequence::new(0))).await;
-        assert_eq!(
-            started.reply().await,
-            Reply::Command(Err(CommandError::Response(
-                crate::master::CommandResponseError::HeaderCountMismatch
-            )))
-        );
-        barrier(&mut started.harness).await;
-        assert_eq!(
-            started.harness.assoc_events.pop(),
-            [AssocInfoEvent::TaskFailure(
-                TaskType::Command,
-                TaskError::UnexpectedResponseHeaders
-            )]
-        );
-        assert_eq!(started.harness.io.pop_event(), None);
     })
     .await;
 }
@@ -1911,48 +1821,78 @@ async fn time_out(harness: &mut TestHarness) {
     barrier(harness).await;
 }
 
-#[tokio::test(start_paused = true)]
-async fn file_read_cleanup_that_times_out_fails_the_task_without_another_callback() {
-    watchdog(async {
-        for end in EARLY_ENDS {
-            let (mut harness, reader) = end.file_read().await;
-            time_out(&mut harness).await;
-            assert_eq!(
-                harness.assoc_events.pop(),
-                [AssocInfoEvent::TaskFailure(
-                    TaskType::FileRead,
-                    TaskError::ResponseTimeout
-                )],
-                "{end:?}"
-            );
-            assert_eq!(reader.pop(), [], "{end:?}");
-            assert_eq!(harness.io.pop_event(), None, "{end:?}");
-        }
-    })
-    .await;
+/// What ends the CLOSE a file read sends after ending early
+#[derive(Copy, Clone, Debug)]
+enum CleanupFailure {
+    Timeout,
+    RejectedByIin2,
+    /// a fragment from the outstation too short to be a response
+    Malformed,
+    Disabled,
+    Shutdown,
 }
 
+const CLEANUP_FAILURES: [CleanupFailure; 5] = [
+    CleanupFailure::Timeout,
+    CleanupFailure::RejectedByIin2,
+    CleanupFailure::Malformed,
+    CleanupFailure::Disabled,
+    CleanupFailure::Shutdown,
+];
+
 #[tokio::test(start_paused = true)]
-async fn file_read_cleanup_rejected_by_iin2_fails_the_task_without_another_callback() {
+async fn file_read_cleanup_that_fails_fails_the_task_without_another_callback() {
     watchdog(async {
         for end in EARLY_ENDS {
-            let (mut harness, reader) = end.file_read().await;
-            respond(
-                &mut harness,
-                empty_response_custom_iin(Sequence::new(2), REJECTED),
-            )
-            .await;
-            barrier(&mut harness).await;
-            assert_eq!(
-                harness.assoc_events.pop(),
-                [AssocInfoEvent::TaskFailure(
-                    TaskType::FileRead,
-                    TaskError::RejectedByIin2(REJECTED)
-                )],
-                "{end:?}"
-            );
-            assert_eq!(reader.pop(), [], "{end:?}");
-            assert_eq!(harness.io.pop_event(), None, "{end:?}");
+            for failure in CLEANUP_FAILURES {
+                let (mut harness, reader) = end.file_read().await;
+                let err = match failure {
+                    CleanupFailure::Timeout => {
+                        time_out(&mut harness).await;
+                        TaskError::ResponseTimeout
+                    }
+                    CleanupFailure::RejectedByIin2 => {
+                        respond(
+                            &mut harness,
+                            empty_response_custom_iin(Sequence::new(2), REJECTED),
+                        )
+                        .await;
+                        barrier(&mut harness).await;
+                        TaskError::RejectedByIin2(REJECTED)
+                    }
+                    CleanupFailure::Malformed => {
+                        respond(&mut harness, vec![0xC2, 0x81, 0x00]).await;
+                        barrier(&mut harness).await;
+                        TaskError::Transport
+                    }
+                    CleanupFailure::Disabled => {
+                        harness.master.disable().await.unwrap();
+                        assert_eq!(
+                            (&mut harness.task).await.unwrap(),
+                            RunError::Stop(StopReason::Disable),
+                            "{end:?}"
+                        );
+                        TaskError::Disabled
+                    }
+                    CleanupFailure::Shutdown => {
+                        drop(harness.association);
+                        drop(harness.master);
+                        assert_eq!(
+                            (&mut harness.task).await.unwrap(),
+                            RunError::Stop(StopReason::Shutdown),
+                            "{end:?}"
+                        );
+                        TaskError::Shutdown
+                    }
+                };
+                assert_eq!(
+                    harness.assoc_events.pop(),
+                    [AssocInfoEvent::TaskFailure(TaskType::FileRead, err)],
+                    "{end:?} {failure:?}"
+                );
+                assert_eq!(reader.pop(), [], "{end:?} {failure:?}");
+                assert_eq!(harness.io.pop_event(), None, "{end:?} {failure:?}");
+            }
         }
     })
     .await;

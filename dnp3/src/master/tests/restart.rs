@@ -5,13 +5,20 @@ use crate::master::association::AssociationConfig;
 use crate::master::TaskError;
 
 use super::harness::create_association;
-use super::harness::requests::startup_procedure;
 
-const COLD_RESTART: u8 = 0x0D;
-const WARM_RESTART: u8 = 0x0E;
+#[derive(Copy, Clone, Debug)]
+enum Restart {
+    Cold,
+    Warm,
+}
 
-fn restart_request(function: u8, seq: Sequence) -> Vec<u8> {
-    vec![0xC0 | seq.value(), function]
+impl Restart {
+    fn function(self) -> u8 {
+        match self {
+            Restart::Cold => 0x0D,
+            Restart::Warm => 0x0E,
+        }
+    }
 }
 
 fn response(seq: Sequence, objects: &[u8]) -> Vec<u8> {
@@ -20,111 +27,72 @@ fn response(seq: Sequence, objects: &[u8]) -> Vec<u8> {
     data
 }
 
-#[tokio::test]
-async fn cold_restart_returns_the_delay_in_seconds() {
-    let mut seq = Sequence::default();
-    let mut harness = create_association(AssociationConfig::default()).await;
-    startup_procedure(&mut harness, &mut seq).await;
+/// A restart request, the objects of the response to it, and the result
+struct Case {
+    restart: Restart,
+    objects: &'static [u8],
+    expected: Result<Duration, TaskError>,
+}
 
-    let mut association = harness.association.clone();
-    let restart = tokio::spawn(async move { association.cold_restart().await });
-
+const CASES: [Case; 5] = [
     // g52v1 with a count of one: 2 seconds
-    harness
-        .expect_write_and_respond(
-            restart_request(COLD_RESTART, seq),
-            response(seq.increment(), &[52, 1, 0x07, 1, 0x02, 0x00]),
-        )
-        .await;
-
-    assert_eq!(restart.await.unwrap(), Ok(Duration::from_secs(2)));
-}
-
-#[tokio::test]
-async fn warm_restart_returns_the_delay_in_milliseconds() {
-    let mut seq = Sequence::default();
-    let mut harness = create_association(AssociationConfig::default()).await;
-    startup_procedure(&mut harness, &mut seq).await;
-
-    let mut association = harness.association.clone();
-    let restart = tokio::spawn(async move { association.warm_restart().await });
-
+    Case {
+        restart: Restart::Cold,
+        objects: &[52, 1, 0x07, 1, 0x02, 0x00],
+        expected: Ok(Duration::from_secs(2)),
+    },
     // g52v2 with a count of one: 2 milliseconds
-    harness
-        .expect_write_and_respond(
-            restart_request(WARM_RESTART, seq),
-            response(seq.increment(), &[52, 2, 0x07, 1, 0x02, 0x00]),
-        )
-        .await;
-
-    assert_eq!(restart.await.unwrap(), Ok(Duration::from_millis(2)));
-}
-
-#[tokio::test]
-async fn restart_fails_when_the_response_has_no_time_delay() {
-    let mut seq = Sequence::default();
-    let mut harness = create_association(AssociationConfig::default()).await;
-    startup_procedure(&mut harness, &mut seq).await;
-
-    let mut association = harness.association.clone();
-    let restart = tokio::spawn(async move { association.cold_restart().await });
-
-    // g51v1 (CTO) instead of a time delay
-    harness
-        .expect_write_and_respond(
-            restart_request(COLD_RESTART, seq),
-            response(
-                seq.increment(),
-                &[51, 1, 0x07, 1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
-            ),
-        )
-        .await;
-
-    assert_eq!(
-        restart.await.unwrap(),
-        Err(TaskError::UnexpectedResponseHeaders)
-    );
-}
-
-#[tokio::test]
-async fn restart_accepts_a_time_delay_with_a_two_byte_count() {
-    let mut seq = Sequence::default();
-    let mut harness = create_association(AssociationConfig::default()).await;
-    startup_procedure(&mut harness, &mut seq).await;
-
-    let mut association = harness.association.clone();
-    let restart = tokio::spawn(async move { association.cold_restart().await });
-
+    Case {
+        restart: Restart::Warm,
+        objects: &[52, 2, 0x07, 1, 0x02, 0x00],
+        expected: Ok(Duration::from_millis(2)),
+    },
     // g52v1 with a 2-byte count of one: 3 seconds
-    harness
-        .expect_write_and_respond(
-            restart_request(COLD_RESTART, seq),
-            response(seq.increment(), &[52, 1, 0x08, 1, 0, 0x03, 0x00]),
-        )
-        .await;
-
-    assert_eq!(restart.await.unwrap(), Ok(Duration::from_secs(3)));
-}
+    Case {
+        restart: Restart::Cold,
+        objects: &[52, 1, 0x08, 1, 0, 0x03, 0x00],
+        expected: Ok(Duration::from_secs(3)),
+    },
+    // g51v1 (CTO) instead of a time delay
+    Case {
+        restart: Restart::Cold,
+        objects: &[51, 1, 0x07, 1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+        expected: Err(TaskError::UnexpectedResponseHeaders),
+    },
+    // g1v2 with a 1-byte start/stop instead of a counted time delay
+    Case {
+        restart: Restart::Cold,
+        objects: &[1, 2, 0x00, 0, 0, 0x01],
+        expected: Err(TaskError::UnexpectedResponseHeaders),
+    },
+];
 
 #[tokio::test]
-async fn restart_fails_when_the_response_has_no_counted_header() {
-    let mut seq = Sequence::default();
-    let mut harness = create_association(AssociationConfig::default()).await;
-    startup_procedure(&mut harness, &mut seq).await;
+async fn restart_returns_the_time_delay_of_the_response() {
+    for case in CASES {
+        let mut harness = create_association(AssociationConfig::quiet()).await;
+        let mut association = harness.association.clone();
+        let restart = tokio::spawn(async move {
+            match case.restart {
+                Restart::Cold => association.cold_restart().await,
+                Restart::Warm => association.warm_restart().await,
+            }
+        });
 
-    let mut association = harness.association.clone();
-    let restart = tokio::spawn(async move { association.cold_restart().await });
+        let seq = Sequence::default();
+        harness
+            .expect_write_and_respond(
+                vec![0xC0, case.restart.function()],
+                response(seq, case.objects),
+            )
+            .await;
 
-    // g1v2 with a 1-byte start/stop instead of a counted time delay
-    harness
-        .expect_write_and_respond(
-            restart_request(COLD_RESTART, seq),
-            response(seq.increment(), &[1, 2, 0x00, 0, 0, 0x01]),
-        )
-        .await;
-
-    assert_eq!(
-        restart.await.unwrap(),
-        Err(TaskError::UnexpectedResponseHeaders)
-    );
+        assert_eq!(
+            restart.await.unwrap(),
+            case.expected,
+            "{:?} {:?}",
+            case.restart,
+            case.objects
+        );
+    }
 }
