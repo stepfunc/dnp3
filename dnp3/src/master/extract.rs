@@ -236,6 +236,7 @@ mod test {
     #[derive(Default)]
     struct MockHandler {
         received: Vec<Header>,
+        infos: Vec<HeaderInfo>,
     }
 
     impl MockHandler {
@@ -268,9 +269,10 @@ mod test {
 
         fn handle_binary_input(
             &mut self,
-            _info: HeaderInfo,
+            info: HeaderInfo,
             x: &mut dyn Iterator<Item = (BinaryInput, u16)>,
         ) {
+            self.infos.push(info);
             self.received.push(Header::Binary(x.collect()));
         }
 
@@ -394,7 +396,8 @@ mod test {
             }
         }
 
-        fn handle_abs_time(&mut self, _info: HeaderInfo, time: Timestamp) {
+        fn handle_abs_time(&mut self, info: HeaderInfo, time: Timestamp) {
+            self.infos.push(info);
             self.received.push(Header::AbsTime(time));
         }
     }
@@ -860,5 +863,195 @@ mod test {
 
         // Should not receive any time values since count == 0
         assert_eq!(&handler.pop(), &[]);
+    }
+
+    fn extract(input: &[u8]) -> (bool, MockHandler) {
+        let mut handler = MockHandler::new();
+        let objects =
+            HeaderCollection::parse(ParseOptions::default(), FunctionCode::Response, input)
+                .unwrap();
+        let delivered = extract_measurements_inner(objects, &mut handler);
+        (delivered, handler)
+    }
+
+    fn binary(value: bool, time: Option<Time>, index: u16) -> (BinaryInput, u16) {
+        let flags = if value {
+            Flags::new(0x81)
+        } else {
+            Flags::ONLINE
+        };
+        (BinaryInput { value, flags, time }, index)
+    }
+
+    #[test]
+    fn extracts_ranges_at_both_widths() {
+        let (delivered, mut handler) = extract(&[
+            // g1v2, 1-byte start/stop [7, 8]
+            0x01, 0x02, 0x00, 0x07, 0x08, 0x81, 0x01, //
+            // g1v2, 2-byte start/stop [256, 257]
+            0x01, 0x02, 0x01, 0x00, 0x01, 0x01, 0x01, 0x01, 0x81,
+        ]);
+
+        assert!(delivered);
+        assert_eq!(
+            handler.infos,
+            [
+                HeaderInfo::new(Variation::Group1Var2, QualifierCode::Range8, false, true),
+                HeaderInfo::new(Variation::Group1Var2, QualifierCode::Range16, false, true),
+            ]
+        );
+        assert_eq!(
+            handler.pop(),
+            [
+                Header::Binary(vec![binary(true, None, 7), binary(false, None, 8)]),
+                Header::Binary(vec![binary(false, None, 256), binary(true, None, 257)]),
+            ]
+        );
+    }
+
+    #[test]
+    fn extracts_count_and_prefix_at_both_widths() {
+        let (delivered, mut handler) = extract(&[
+            // g2v1, 1-byte count and prefix, index 5
+            0x02, 0x01, 0x17, 0x01, 0x05, 0x81, //
+            // g2v1, 2-byte count and prefix, index 261
+            0x02, 0x01, 0x28, 0x01, 0x00, 0x05, 0x01, 0x01,
+        ]);
+
+        assert!(delivered);
+        assert_eq!(
+            handler.infos,
+            [
+                HeaderInfo::new(
+                    Variation::Group2Var1,
+                    QualifierCode::CountAndPrefix8,
+                    true,
+                    true
+                ),
+                HeaderInfo::new(
+                    Variation::Group2Var1,
+                    QualifierCode::CountAndPrefix16,
+                    true,
+                    true
+                ),
+            ]
+        );
+        assert_eq!(
+            handler.pop(),
+            [
+                Header::Binary(vec![binary(true, None, 5)]),
+                Header::Binary(vec![binary(false, None, 261)]),
+            ]
+        );
+    }
+
+    #[test]
+    fn empty_count_and_prefix_headers_deliver_nothing_at_both_widths() {
+        for input in [
+            [0x02, 0x01, 0x17, 0x00].as_slice(),
+            [0x02, 0x01, 0x28, 0x00, 0x00].as_slice(),
+        ] {
+            let (delivered, mut handler) = extract(input);
+            assert!(!delivered);
+            assert_eq!(handler.pop(), [Header::Binary(vec![])]);
+        }
+    }
+
+    #[test]
+    fn abs_time_is_extracted_at_both_widths() {
+        let (delivered, mut handler) = extract(&[
+            // g50v1, 1-byte count of 1
+            0x32, 0x01, 0x07, 0x01, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, //
+            // g50v1, 2-byte count of 1
+            0x32, 0x01, 0x08, 0x01, 0x00, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16,
+        ]);
+
+        assert!(delivered);
+        assert_eq!(
+            handler.infos,
+            [
+                HeaderInfo::new(Variation::Group50Var1, QualifierCode::Count8, false, false),
+                HeaderInfo::new(Variation::Group50Var1, QualifierCode::Count16, false, false),
+            ]
+        );
+        assert_eq!(
+            handler.pop(),
+            [
+                Header::AbsTime(Timestamp::new(0x060504030201)),
+                Header::AbsTime(Timestamp::new(0x161514131211)),
+            ]
+        );
+    }
+
+    #[test]
+    fn abs_time_with_a_two_byte_count_other_than_one_is_ignored() {
+        for input in [
+            [0x32, 0x01, 0x08, 0x00, 0x00].as_slice(),
+            [
+                0x32, 0x01, 0x08, 0x02, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x11, 0x12, 0x13,
+                0x14, 0x15, 0x16,
+            ]
+            .as_slice(),
+        ] {
+            let (delivered, mut handler) = extract(input);
+            assert!(!delivered);
+            assert_eq!(handler.pop(), []);
+        }
+    }
+
+    // g2v3, 1-byte count and prefix, index 7, relative time 0xFFFF
+    const G2V3_INDEX_7: [u8; 8] = [0x02, 0x03, 0x17, 0x01, 0x07, 0x01, 0xFF, 0xFF];
+
+    #[test]
+    fn cto_with_a_two_byte_count_applies_to_the_next_header() {
+        for (variation, time) in [
+            (1, Time::Synchronized(Timestamp::new(0x1_0001))),
+            (2, Time::Unsynchronized(Timestamp::new(0x1_0001))),
+        ] {
+            // g51 var 1 or 2, 2-byte count of 1, time 2
+            let mut input = vec![
+                0x33, variation, 0x08, 0x01, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00,
+            ];
+            input.extend(G2V3_INDEX_7);
+
+            let (delivered, mut handler) = extract(&input);
+
+            assert!(delivered);
+            assert_eq!(
+                handler.pop(),
+                [Header::Binary(vec![binary(false, Some(time), 7)])]
+            );
+        }
+    }
+
+    #[test]
+    fn cto_with_a_count_other_than_one_is_ignored_at_both_widths() {
+        for cto in [
+            // g51v1, 1-byte count of 0
+            vec![0x33, 0x01, 0x07, 0x00],
+            // g51v1, 2-byte count of 0
+            vec![0x33, 0x01, 0x08, 0x00, 0x00],
+            // g51v1, 1-byte count of 2
+            vec![
+                0x33, 0x01, 0x07, 0x02, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
+                0x00, 0x00,
+            ],
+            // g51v2, 2-byte count of 2
+            vec![
+                0x33, 0x02, 0x08, 0x02, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00,
+                0x00, 0x00, 0x00,
+            ],
+        ] {
+            let mut input = cto;
+            input.extend(G2V3_INDEX_7);
+
+            let (delivered, mut handler) = extract(&input);
+
+            assert!(delivered);
+            assert_eq!(
+                handler.pop(),
+                [Header::Binary(vec![binary(false, None, 7)])]
+            );
+        }
     }
 }

@@ -85,3 +85,46 @@ async fn restart_fails_when_the_response_has_no_time_delay() {
         Err(TaskError::UnexpectedResponseHeaders)
     );
 }
+
+#[tokio::test]
+async fn restart_accepts_a_time_delay_with_a_two_byte_count() {
+    let mut seq = Sequence::default();
+    let mut harness = create_association(AssociationConfig::default()).await;
+    startup_procedure(&mut harness, &mut seq).await;
+
+    let mut association = harness.association.clone();
+    let restart = tokio::spawn(async move { association.cold_restart().await });
+
+    // g52v1 with a 2-byte count of one: 3 seconds
+    harness
+        .expect_write_and_respond(
+            restart_request(COLD_RESTART, seq),
+            response(seq.increment(), &[52, 1, 0x08, 1, 0, 0x03, 0x00]),
+        )
+        .await;
+
+    assert_eq!(restart.await.unwrap(), Ok(Duration::from_secs(3)));
+}
+
+#[tokio::test]
+async fn restart_fails_when_the_response_has_no_counted_header() {
+    let mut seq = Sequence::default();
+    let mut harness = create_association(AssociationConfig::default()).await;
+    startup_procedure(&mut harness, &mut seq).await;
+
+    let mut association = harness.association.clone();
+    let restart = tokio::spawn(async move { association.cold_restart().await });
+
+    // g1v2 with a 1-byte start/stop instead of a counted time delay
+    harness
+        .expect_write_and_respond(
+            restart_request(COLD_RESTART, seq),
+            response(seq.increment(), &[1, 2, 0x00, 0, 0, 0x01]),
+        )
+        .await;
+
+    assert_eq!(
+        restart.await.unwrap(),
+        Err(TaskError::UnexpectedResponseHeaders)
+    );
+}
