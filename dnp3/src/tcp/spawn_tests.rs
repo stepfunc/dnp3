@@ -15,21 +15,12 @@ use crate::outstation::{
 };
 use crate::tcp::{ClientState, ConnectOptions, EndpointList};
 use crate::util::phys::{PhysAddr, PhysLayer};
+use crate::util::test_support::{
+    MASTER_REPLY, MASTER_REQUEST, NULL_UNSOLICITED_HEADER, OUTSTATION_REPLY, OUTSTATION_REQUEST,
+};
 
 const MASTER: u16 = 1;
 const OUTSTATION: u16 = 1024;
-
-/// request link status from outstation 1024 to master 1, and the master's reply
-const OUTSTATION_REQUEST: [u8; 10] = [0x05, 0x64, 0x05, 0x49, 0x01, 0x00, 0x00, 0x04, 0xD2, 0x36];
-const MASTER_REPLY: [u8; 10] = [0x05, 0x64, 0x05, 0x8B, 0x00, 0x04, 0x01, 0x00, 0x2E, 0xF7];
-
-/// request link status from master 1 to outstation 1024, and the outstation's reply
-const MASTER_REQUEST: [u8; 10] = [0x05, 0x64, 0x05, 0xC9, 0x00, 0x04, 0x01, 0x00, 0x98, 0x81];
-const OUTSTATION_REPLY: [u8; 10] = [0x05, 0x64, 0x05, 0x0B, 0x01, 0x00, 0x00, 0x04, 0x64, 0x40];
-
-/// the link header of unconfirmed user data from outstation 1024 to master 1 holding 5 bytes
-const NULL_UNSOLICITED_HEADER: [u8; 10] =
-    [0x05, 0x64, 0x0A, 0x44, 0x01, 0x00, 0x00, 0x04, 0x67, 0x88];
 
 const TIMEOUT: Duration = Duration::from_secs(5);
 
@@ -197,7 +188,7 @@ mod tls {
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../certs/self_signed")
     }
 
-    fn client_config() -> TlsClientConfig {
+    pub(super) fn client_config() -> TlsClientConfig {
         let certs = certs();
         TlsClientConfig::self_signed(
             &certs.join("entity2_cert.pem"),
@@ -209,7 +200,7 @@ mod tls {
         .unwrap()
     }
 
-    fn server_config() -> TlsServerConfig {
+    pub(super) fn server_config() -> TlsServerConfig {
         let certs = certs();
         TlsServerConfig::self_signed(
             &certs.join("entity1_cert.pem"),
@@ -326,5 +317,437 @@ mod tls {
         states
             .expect(ClientState::WaitAfterFailedConnect(Duration::from_secs(1)))
             .await;
+    }
+}
+
+/// The connect, retry, disable and shutdown sequence of a TCP or TLS client
+///
+/// The tests with a paused clock run a master with no associations, so the client's own waits
+/// (and the TLS handshake timeout) are the only timers while a task waits on a socket, and the
+/// clock jumps only to the end of them.
+mod lifecycle {
+    use super::*;
+    use crate::master::MasterChannel;
+    use crate::util::test_support::{watchdog, Timeline};
+    use std::io::Read;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpSocket;
+
+    const fn secs(x: u64) -> Duration {
+        Duration::from_secs(x)
+    }
+
+    /// A socket bound to a local port without listening, so connections to it are refused
+    fn refusing_port() -> (TcpSocket, EndpointList) {
+        let socket = TcpSocket::new_v4().unwrap();
+        socket.bind("127.0.0.1:0".parse().unwrap()).unwrap();
+        let endpoints = EndpointList::new(socket.local_addr().unwrap().to_string(), &[]);
+        (socket, endpoints)
+    }
+
+    fn spawn_master(
+        endpoints: EndpointList,
+        strategy: ConnectStrategy,
+    ) -> (MasterChannel, Timeline<ClientState>) {
+        let (listener, timeline) = Timeline::new();
+        let channel = crate::tcp::spawn_master_tcp_client_2(
+            LinkErrorMode::Close,
+            master_config(),
+            endpoints,
+            strategy,
+            ConnectOptions::default(),
+            listener,
+        );
+        (channel, timeline)
+    }
+
+    /// Accept without a timeout, which would make a paused clock jump
+    async fn accept(listener: &TcpListener) -> tokio::net::TcpStream {
+        listener.accept().await.unwrap().0
+    }
+
+    async fn assert_closed(stream: &mut tokio::net::TcpStream) {
+        let mut buffer = [0; 16];
+        assert_eq!(stream.read(&mut buffer).await.unwrap(), 0);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn failed_connects_retry_with_growing_delays_until_a_session_resets_them() {
+        watchdog(async {
+            let (socket, endpoints) = refusing_port();
+            let (mut channel, mut timeline) =
+                spawn_master(endpoints, ConnectStrategy::new(secs(1), secs(4), secs(3)));
+            timeline.expect(secs(0), ClientState::Disabled).await;
+            channel.enable().await.unwrap();
+            timeline.expect(secs(0), ClientState::Connecting).await;
+            timeline
+                .expect(secs(0), ClientState::WaitAfterFailedConnect(secs(1)))
+                .await;
+            timeline.expect(secs(1), ClientState::Connecting).await;
+            timeline
+                .expect(secs(1), ClientState::WaitAfterFailedConnect(secs(2)))
+                .await;
+            timeline.expect(secs(3), ClientState::Connecting).await;
+            timeline
+                .expect(secs(3), ClientState::WaitAfterFailedConnect(secs(4)))
+                .await;
+            timeline.expect(secs(7), ClientState::Connecting).await;
+            timeline
+                .expect(secs(7), ClientState::WaitAfterFailedConnect(secs(4)))
+                .await;
+
+            let listener = socket.listen(1024).unwrap();
+            timeline.expect(secs(11), ClientState::Connecting).await;
+            let stream = accept(&listener).await;
+            timeline.expect(secs(11), ClientState::Connected).await;
+
+            // refuse connections again, then end the session
+            drop(listener);
+            drop(stream);
+            timeline
+                .expect(secs(11), ClientState::WaitAfterDisconnect(secs(3)))
+                .await;
+            timeline.expect(secs(14), ClientState::Connecting).await;
+            timeline
+                .expect(secs(14), ClientState::WaitAfterFailedConnect(secs(1)))
+                .await;
+            timeline.expect(secs(15), ClientState::Connecting).await;
+            timeline
+                .expect(secs(15), ClientState::WaitAfterFailedConnect(secs(2)))
+                .await;
+            drop(channel);
+            timeline.expect(secs(15), ClientState::Shutdown).await;
+        })
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn link_error_keeps_the_connection_open_until_the_reconnect_delay_elapses() {
+        watchdog(async {
+            let peer = Peer::new().await;
+            let (mut channel, mut timeline) = spawn_master(
+                peer.endpoints(),
+                ConnectStrategy::new(secs(1), secs(10), secs(3)),
+            );
+            timeline.expect(secs(0), ClientState::Disabled).await;
+            channel.enable().await.unwrap();
+            timeline.expect(secs(0), ClientState::Connecting).await;
+            let mut stream = accept(&peer.listener).await;
+            timeline.expect(secs(0), ClientState::Connected).await;
+
+            // not a link frame, which ends the session in LinkErrorMode::Close
+            stream.write_all(&[0; 10]).await.unwrap();
+            timeline
+                .expect(secs(0), ClientState::WaitAfterDisconnect(secs(3)))
+                .await;
+            let mut stream = stream.into_std().unwrap();
+            let mut buffer = [0; 16];
+            assert_eq!(
+                stream.peek(&mut buffer).map_err(|err| err.kind()),
+                Err(std::io::ErrorKind::WouldBlock)
+            );
+
+            timeline.expect(secs(3), ClientState::Connecting).await;
+            // the client closed the old connection before connecting again
+            stream.set_nonblocking(false).unwrap();
+            stream.set_read_timeout(Some(TIMEOUT)).unwrap();
+            assert_eq!(stream.read(&mut buffer).unwrap(), 0);
+            timeline.expect(secs(3), ClientState::Connected).await;
+            drop(channel);
+            timeline.expect(secs(3), ClientState::Shutdown).await;
+        })
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn zero_reconnect_delay_reconnects_at_once() {
+        watchdog(async {
+            let peer = Peer::new().await;
+            let (mut channel, mut timeline) = spawn_master(
+                peer.endpoints(),
+                ConnectStrategy::new(secs(1), secs(10), Duration::ZERO),
+            );
+            timeline.expect(secs(0), ClientState::Disabled).await;
+            channel.enable().await.unwrap();
+            timeline.expect(secs(0), ClientState::Connecting).await;
+            drop(accept(&peer.listener).await);
+            timeline.expect(secs(0), ClientState::Connected).await;
+            timeline
+                .expect(secs(0), ClientState::WaitAfterDisconnect(Duration::ZERO))
+                .await;
+            timeline.expect(secs(0), ClientState::Connecting).await;
+            let _stream = accept(&peer.listener).await;
+            timeline.expect(secs(0), ClientState::Connected).await;
+            drop(channel);
+            timeline.expect(secs(0), ClientState::Shutdown).await;
+        })
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn disable_during_a_connect_retry_wait_stops_at_once_and_keeps_the_back_off() {
+        watchdog(async {
+            let (_socket, endpoints) = refusing_port();
+            let (mut channel, mut timeline) =
+                spawn_master(endpoints, ConnectStrategy::new(secs(5), secs(20), secs(1)));
+            timeline.expect(secs(0), ClientState::Disabled).await;
+            channel.enable().await.unwrap();
+            timeline.expect(secs(0), ClientState::Connecting).await;
+            timeline
+                .expect(secs(0), ClientState::WaitAfterFailedConnect(secs(5)))
+                .await;
+            channel.disable().await.unwrap();
+            timeline.expect(secs(0), ClientState::Disabled).await;
+
+            tokio::time::sleep(secs(30)).await;
+            timeline.assert_quiet();
+            channel.enable().await.unwrap();
+            timeline.expect(secs(30), ClientState::Connecting).await;
+            timeline
+                .expect(secs(30), ClientState::WaitAfterFailedConnect(secs(10)))
+                .await;
+            drop(channel);
+            timeline.expect(secs(30), ClientState::Shutdown).await;
+        })
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn disable_during_a_reconnect_wait_stops_at_once() {
+        watchdog(async {
+            let peer = Peer::new().await;
+            let (mut channel, mut timeline) = spawn_master(
+                peer.endpoints(),
+                ConnectStrategy::new(secs(1), secs(10), secs(5)),
+            );
+            timeline.expect(secs(0), ClientState::Disabled).await;
+            channel.enable().await.unwrap();
+            timeline.expect(secs(0), ClientState::Connecting).await;
+            drop(accept(&peer.listener).await);
+            timeline.expect(secs(0), ClientState::Connected).await;
+            timeline
+                .expect(secs(0), ClientState::WaitAfterDisconnect(secs(5)))
+                .await;
+            channel.disable().await.unwrap();
+            timeline.expect(secs(0), ClientState::Disabled).await;
+
+            tokio::time::sleep(secs(10)).await;
+            timeline.assert_quiet();
+            channel.enable().await.unwrap();
+            timeline.expect(secs(10), ClientState::Connecting).await;
+            let _stream = accept(&peer.listener).await;
+            timeline.expect(secs(10), ClientState::Connected).await;
+            drop(channel);
+            timeline.expect(secs(10), ClientState::Shutdown).await;
+        })
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn shutdown_during_a_connect_retry_wait_stops_at_once() {
+        watchdog(async {
+            let (_socket, endpoints) = refusing_port();
+            let (mut channel, mut timeline) =
+                spawn_master(endpoints, ConnectStrategy::new(secs(5), secs(20), secs(1)));
+            timeline.expect(secs(0), ClientState::Disabled).await;
+            channel.enable().await.unwrap();
+            timeline.expect(secs(0), ClientState::Connecting).await;
+            timeline
+                .expect(secs(0), ClientState::WaitAfterFailedConnect(secs(5)))
+                .await;
+            drop(channel);
+            timeline.expect(secs(0), ClientState::Shutdown).await;
+        })
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn shutdown_during_a_reconnect_wait_stops_at_once() {
+        watchdog(async {
+            let peer = Peer::new().await;
+            let (mut channel, mut timeline) = spawn_master(
+                peer.endpoints(),
+                ConnectStrategy::new(secs(1), secs(10), secs(5)),
+            );
+            timeline.expect(secs(0), ClientState::Disabled).await;
+            channel.enable().await.unwrap();
+            timeline.expect(secs(0), ClientState::Connecting).await;
+            drop(accept(&peer.listener).await);
+            timeline.expect(secs(0), ClientState::Connected).await;
+            timeline
+                .expect(secs(0), ClientState::WaitAfterDisconnect(secs(5)))
+                .await;
+            drop(channel);
+            timeline.expect(secs(0), ClientState::Shutdown).await;
+        })
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn disable_during_a_session_closes_the_connection_until_enabled() {
+        watchdog(async {
+            let peer = Peer::new().await;
+            let (mut channel, mut timeline) = spawn_master(
+                peer.endpoints(),
+                ConnectStrategy::new(secs(1), secs(10), secs(5)),
+            );
+            timeline.expect(secs(0), ClientState::Disabled).await;
+            channel.enable().await.unwrap();
+            timeline.expect(secs(0), ClientState::Connecting).await;
+            let mut stream = accept(&peer.listener).await;
+            timeline.expect(secs(0), ClientState::Connected).await;
+            channel.disable().await.unwrap();
+            timeline.expect(secs(0), ClientState::Disabled).await;
+            assert_closed(&mut stream).await;
+
+            tokio::time::sleep(secs(10)).await;
+            timeline.assert_quiet();
+            channel.enable().await.unwrap();
+            timeline.expect(secs(10), ClientState::Connecting).await;
+            let mut stream = accept(&peer.listener).await;
+            timeline.expect(secs(10), ClientState::Connected).await;
+            drop(channel);
+            timeline.expect(secs(10), ClientState::Shutdown).await;
+            assert_closed(&mut stream).await;
+        })
+        .await;
+    }
+
+    /// Whether or not the connection was already established when the disable arrived, the
+    /// client connects and then closes the session
+    #[tokio::test]
+    async fn disable_while_connecting_takes_effect_once_connected() {
+        let peer = Peer::new().await;
+        let (listener, mut states) = States::new();
+        let mut channel = crate::tcp::spawn_master_tcp_client_2(
+            LinkErrorMode::Close,
+            master_config(),
+            peer.endpoints(),
+            strategy(),
+            ConnectOptions::default(),
+            listener,
+        );
+        states.expect(ClientState::Disabled).await;
+        channel.enable().await.unwrap();
+        states.expect(ClientState::Connecting).await;
+        channel.disable().await.unwrap();
+        states.expect(ClientState::Connected).await;
+        states.expect(ClientState::Disabled).await;
+        let mut stream = peer.accept().await;
+        tokio::time::timeout(TIMEOUT, assert_closed(&mut stream))
+            .await
+            .unwrap();
+    }
+
+    #[cfg(feature = "enable-tls")]
+    mod tls {
+        use super::super::tls::{client_config, server_config};
+        use super::*;
+
+        fn spawn_tls_master(peer: &Peer) -> (MasterChannel, Timeline<ClientState>) {
+            let (listener, timeline) = Timeline::new();
+            let channel = crate::tcp::tls::spawn_master_tls_client_2(
+                LinkErrorMode::Close,
+                master_config(),
+                peer.endpoints(),
+                strategy(),
+                ConnectOptions::default(),
+                listener,
+                client_config(),
+            );
+            (channel, timeline)
+        }
+
+        /// The peer never answers the ClientHello, so the handshake times out after 5 seconds
+        #[tokio::test(start_paused = true)]
+        async fn disable_during_a_tls_handshake_takes_effect_once_it_fails() {
+            watchdog(async {
+                let peer = Peer::new().await;
+                let (mut channel, mut timeline) = spawn_tls_master(&peer);
+                timeline.expect(secs(0), ClientState::Disabled).await;
+                channel.enable().await.unwrap();
+                timeline.expect(secs(0), ClientState::Connecting).await;
+                channel.disable().await.unwrap();
+                timeline
+                    .expect(secs(5), ClientState::WaitAfterFailedConnect(secs(1)))
+                    .await;
+                timeline.expect(secs(5), ClientState::Disabled).await;
+            })
+            .await;
+        }
+
+        /// The peer never answers the ClientHello, so the handshake times out after 5 seconds
+        #[tokio::test(start_paused = true)]
+        async fn shutdown_during_a_tls_handshake_takes_effect_once_it_fails() {
+            watchdog(async {
+                let peer = Peer::new().await;
+                let (mut channel, mut timeline) = spawn_tls_master(&peer);
+                timeline.expect(secs(0), ClientState::Disabled).await;
+                channel.enable().await.unwrap();
+                timeline.expect(secs(0), ClientState::Connecting).await;
+                drop(channel);
+                timeline
+                    .expect(secs(5), ClientState::WaitAfterFailedConnect(secs(1)))
+                    .await;
+                timeline.expect(secs(5), ClientState::Shutdown).await;
+            })
+            .await;
+        }
+
+        async fn assert_tls_closed(phys: &mut PhysLayer) {
+            let mut buffer = [0; 16];
+            let result =
+                tokio::time::timeout(TIMEOUT, phys.read(&mut buffer, PhysDecodeLevel::Nothing))
+                    .await
+                    .unwrap();
+            assert_eq!(
+                result.map(|(count, _)| count).map_err(|err| err.kind()),
+                Err(std::io::ErrorKind::UnexpectedEof)
+            );
+        }
+
+        /// Spawn a TLS master, enable it, and accept its TCP connection without answering the
+        /// ClientHello yet
+        async fn connecting_tls_master(
+            peer: &Peer,
+        ) -> (MasterChannel, States, tokio::net::TcpStream) {
+            let (listener, mut states) = States::new();
+            let mut channel = crate::tcp::tls::spawn_master_tls_client_2(
+                LinkErrorMode::Close,
+                master_config(),
+                peer.endpoints(),
+                strategy(),
+                ConnectOptions::default(),
+                listener,
+                client_config(),
+            );
+            states.expect(ClientState::Disabled).await;
+            channel.enable().await.unwrap();
+            states.expect(ClientState::Connecting).await;
+            let stream = peer.accept().await;
+            (channel, states, stream)
+        }
+
+        #[tokio::test]
+        async fn disable_during_a_tls_handshake_that_completes_closes_the_session() {
+            let peer = Peer::new().await;
+            let (mut channel, mut states, stream) = connecting_tls_master(&peer).await;
+            channel.disable().await.unwrap();
+            let mut phys = server_config().handle_connection(stream).await.unwrap();
+            states.expect(ClientState::Connected).await;
+            states.expect(ClientState::Disabled).await;
+            assert_tls_closed(&mut phys).await;
+        }
+
+        #[tokio::test]
+        async fn shutdown_during_a_tls_handshake_that_completes_closes_the_session() {
+            let peer = Peer::new().await;
+            let (channel, mut states, stream) = connecting_tls_master(&peer).await;
+            drop(channel);
+            let mut phys = server_config().handle_connection(stream).await.unwrap();
+            states.expect(ClientState::Connected).await;
+            states.expect(ClientState::Shutdown).await;
+            assert_tls_closed(&mut phys).await;
+        }
     }
 }

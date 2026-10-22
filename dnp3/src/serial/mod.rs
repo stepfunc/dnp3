@@ -54,6 +54,9 @@ mod master;
 pub(crate) mod outstation;
 pub(crate) mod task;
 
+#[cfg(test)]
+mod lifecycle_tests;
+
 /// State of the serial port
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum PortState {
