@@ -426,6 +426,25 @@ async fn demanding_a_poll_runs_it_at_once_and_restarts_its_period() {
 }
 
 #[tokio::test(start_paused = true)]
+async fn demanding_a_poll_while_it_runs_is_absorbed_by_that_run() {
+    watchdog(async {
+        let mut harness = Harness::new();
+        let mut a = harness.add(A, quiet(5)).await;
+        let mut poll = add_poll(&mut a, class(1), secs(10)).await;
+
+        // the poll is demanded while it waits for its response, which comes 2 seconds later
+        assert_eq!(harness.next().await, (secs(10), read(A, class(1))));
+        poll.demand().await.unwrap();
+        harness.settle().await;
+        tokio::time::advance(secs(2)).await;
+        harness.respond().await;
+
+        assert_eq!(harness.next().await, (secs(22), read(A, class(1))));
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
 async fn a_removed_poll_never_runs_again() {
     watchdog(async {
         let mut harness = Harness::new();

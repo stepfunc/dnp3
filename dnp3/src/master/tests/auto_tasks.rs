@@ -3,10 +3,11 @@ use std::time::Duration;
 use tokio::time::Instant;
 
 use crate::app::Sequence;
-use crate::app::{Iin, Iin1, Iin2};
+use crate::app::{FunctionCode, Iin, Iin1, Iin2};
 use crate::master::association::AssociationConfig;
 use crate::master::request::EventClasses;
-use crate::master::{Classes, TaskError, TimeSyncProcedure};
+use crate::master::tests::harness::AssocInfoEvent;
+use crate::master::{Classes, TaskError, TaskType, TimeSyncProcedure};
 
 use super::harness::requests::*;
 use super::harness::{create_association, TestHarness};
@@ -449,6 +450,126 @@ async fn clear_restart_rejected_without_restart_iin_is_not_repeated() {
             .await;
 
         assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+    })
+    .await;
+}
+
+const DEVICE_RESTART: Iin = Iin::new(Iin1::new(0x80), Iin2::new(0x00));
+
+#[tokio::test(start_paused = true)]
+async fn event_scan_whose_response_still_reports_events_is_not_repeated() {
+    watchdog(async {
+        let config = AssociationConfig {
+            event_scan_on_events_available: EventClasses::all(),
+            ..AssociationConfig::quiet()
+        };
+        let mut seq = Sequence::default();
+        let mut harness = create_association(config).await;
+
+        harness
+            .read_and_expect_write(
+                unsol_null_custom_iin(Sequence::default(), CLASS_1_EVENTS),
+                unsol_confirm(Sequence::default()),
+            )
+            .await;
+
+        // the response to the scan reports that more class 1 events are available
+        let class1 = Classes::new(false, EventClasses::new(true, false, false));
+        expect_write_soon(&mut harness, class_scan_request(class1, seq)).await;
+        harness
+            .process_response(empty_response_custom_iin(seq.increment(), CLASS_1_EVENTS))
+            .await;
+
+        // the scan isn't repeated
+        assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn restart_iin_in_the_integrity_scan_response_does_not_repeat_the_scan() {
+    watchdog(async {
+        let config = AssociationConfig {
+            startup_integrity_classes: Classes::all(),
+            enable_unsol_classes: EventClasses::all(),
+            ..AssociationConfig::quiet()
+        };
+        let mut seq = Sequence::default();
+        let mut harness = create_association(config).await;
+
+        // the outstation reports a restart in its response to the startup integrity scan
+        expect_write_soon(&mut harness, integrity_poll_request(seq)).await;
+        harness
+            .process_response(empty_response_custom_iin(seq.increment(), DEVICE_RESTART))
+            .await;
+
+        // the restart is cleared, and the integrity scan isn't repeated
+        expect_write_soon(&mut harness, clear_restart_iin(seq)).await;
+        harness
+            .process_response(empty_response(seq.increment()))
+            .await;
+        expect_write_soon(&mut harness, enable_unsol_request(seq)).await;
+        harness
+            .process_response(empty_response(seq.increment()))
+            .await;
+
+        assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn clear_restart_answered_with_restart_iin_reports_success_and_retries_after_the_backoff() {
+    watchdog(async {
+        let mut seq = Sequence::default();
+        let mut harness = create_association(AssociationConfig::quiet()).await;
+
+        harness
+            .read_and_expect_write(
+                unsol_null(Sequence::default(), true),
+                unsol_confirm(Sequence::default()),
+            )
+            .await;
+
+        // the outstation accepts the clear restart, but still reports the restart
+        expect_write_soon(&mut harness, clear_restart_iin(seq)).await;
+        harness
+            .process_response(empty_response_custom_iin(seq.increment(), DEVICE_RESTART))
+            .await;
+
+        let failed = Instant::now();
+        harness
+            .expect_write_and_respond(clear_restart_iin(seq), empty_response(seq.increment()))
+            .await;
+        TestHarness::assert_elapsed(failed, Duration::from_secs(1));
+        assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+
+        assert_eq!(
+            harness.assoc_events.pop(),
+            vec![
+                AssocInfoEvent::Unsolicited(false, Sequence::new(0)),
+                AssocInfoEvent::TaskStart(
+                    TaskType::ClearRestartBit,
+                    FunctionCode::Write,
+                    Sequence::new(0)
+                ),
+                AssocInfoEvent::TaskSuccess(
+                    TaskType::ClearRestartBit,
+                    FunctionCode::Write,
+                    Sequence::new(0)
+                ),
+                AssocInfoEvent::TaskStart(
+                    TaskType::ClearRestartBit,
+                    FunctionCode::Write,
+                    Sequence::new(1)
+                ),
+                AssocInfoEvent::TaskSuccess(
+                    TaskType::ClearRestartBit,
+                    FunctionCode::Write,
+                    Sequence::new(1)
+                ),
+            ]
+        );
     })
     .await;
 }
