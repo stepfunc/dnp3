@@ -28,10 +28,6 @@ impl OneShotRequest for AuthFileRequest {
         super::parse_auth_response(response.objects?.get_only_header()?)
     }
 
-    fn task_error(err: FileError) -> TaskError {
-        err.into()
-    }
-
     fn wrap(task: OneShot<Self>) -> NonReadTask {
         NonReadTask::AuthFile(task)
     }

@@ -25,17 +25,6 @@ pub(crate) fn expect_empty(response: Response<'_>) -> Result<(), WriteError> {
     }
 }
 
-pub(crate) fn write_error(err: WriteError) -> TaskError {
-    match err {
-        WriteError::Task(err) => err,
-        #[expect(
-            deprecated,
-            reason = "the match must cover every variant until removal"
-        )]
-        WriteError::IinError(_) => TaskError::UnexpectedResponseHeaders,
-    }
-}
-
 impl OneShotRequest for EmptyResponseRequest {
     type Output = ();
     type Error = WriteError;
@@ -54,10 +43,6 @@ impl OneShotRequest for EmptyResponseRequest {
 
     fn parse(&self, response: Response<'_>) -> Result<(), WriteError> {
         expect_empty(response)
-    }
-
-    fn task_error(err: WriteError) -> TaskError {
-        write_error(err)
     }
 
     fn wrap(task: OneShot<Self>) -> NonReadTask {

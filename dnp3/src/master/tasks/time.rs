@@ -269,28 +269,6 @@ impl ResponseTask for TimeSyncTask {
         }
     }
 
-    fn from_task_error(err: TaskError) -> TimeSyncError {
-        err.into()
-    }
-
-    fn task_error(err: TimeSyncError) -> TaskError {
-        match err {
-            TimeSyncError::Task(err) => err,
-            TimeSyncError::ClockRollback
-            | TimeSyncError::BadOutstationTimeDelay(_)
-            | TimeSyncError::Overflow
-            | TimeSyncError::StillNeedsTime
-            | TimeSyncError::SystemTimeNotAvailable => TaskError::UnexpectedResponseHeaders,
-            #[expect(
-                deprecated,
-                reason = "the match must cover every variant until removal"
-            )]
-            TimeSyncError::SystemTimeNotUnix | TimeSyncError::IinError(_) => {
-                TaskError::UnexpectedResponseHeaders
-            }
-        }
-    }
-
     fn complete(self, association: Option<&mut Association>, result: Result<(), TimeSyncError>) {
         self.requester.complete(association, result)
     }

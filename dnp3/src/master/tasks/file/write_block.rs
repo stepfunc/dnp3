@@ -58,10 +58,6 @@ impl OneShotRequest for WriteBlockRequest {
         Ok(())
     }
 
-    fn task_error(err: FileError) -> TaskError {
-        err.into()
-    }
-
     fn wrap(task: OneShot<Self>) -> NonReadTask {
         NonReadTask::WriteFileBlock(task)
     }

@@ -1,7 +1,7 @@
 use crate::app::format::write::HeaderWriter;
 use crate::app::parse::parser::Response;
 use crate::app::FunctionCode;
-use crate::master::tasks::empty_response::{expect_empty, write_error};
+use crate::master::tasks::empty_response::expect_empty;
 use crate::master::tasks::{NonReadTask, OneShot, OneShotRequest};
 use crate::master::{DeadBandHeader, DeadBandHeaderVariants, TaskError, TaskType, WriteError};
 
@@ -50,10 +50,6 @@ impl OneShotRequest for DeadBandsRequest {
 
     fn parse(&self, response: Response<'_>) -> Result<(), WriteError> {
         expect_empty(response)
-    }
-
-    fn task_error(err: WriteError) -> TaskError {
-        write_error(err)
     }
 
     fn wrap(task: OneShot<Self>) -> NonReadTask {

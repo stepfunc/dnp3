@@ -80,14 +80,6 @@ impl ResponseTask for AutoTask {
         Ok(Step::Done(response.header.iin))
     }
 
-    fn from_task_error(err: TaskError) -> TaskError {
-        err
-    }
-
-    fn task_error(err: TaskError) -> TaskError {
-        err
-    }
-
     fn complete(self, association: Option<&mut Association>, result: Result<Iin, TaskError>) {
         let association = match association {
             None => return,

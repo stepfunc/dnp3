@@ -61,10 +61,6 @@ impl OneShotRequest for RestartType {
         }
     }
 
-    fn task_error(err: TaskError) -> TaskError {
-        err
-    }
-
     fn wrap(task: OneShot<Self>) -> NonReadTask {
         NonReadTask::Restart(task)
     }

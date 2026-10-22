@@ -28,10 +28,6 @@ impl OneShotRequest for CloseFileRequest {
         super::check_close_response(self.handle, response.objects?.get_only_header()?)
     }
 
-    fn task_error(err: FileError) -> TaskError {
-        err.into()
-    }
-
     fn wrap(task: OneShot<Self>) -> NonReadTask {
         NonReadTask::CloseFile(task)
     }

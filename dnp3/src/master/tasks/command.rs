@@ -87,17 +87,6 @@ impl ResponseTask for CommandTask {
         }
     }
 
-    fn from_task_error(err: TaskError) -> CommandError {
-        err.into()
-    }
-
-    fn task_error(err: CommandError) -> TaskError {
-        match err {
-            CommandError::Task(err) => err,
-            CommandError::Response(_) => TaskError::UnexpectedResponseHeaders,
-        }
-    }
-
     fn complete(self, _association: Option<&mut Association>, result: Result<(), CommandError>) {
         self.promise.complete(result)
     }
