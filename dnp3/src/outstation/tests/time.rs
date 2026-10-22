@@ -8,7 +8,6 @@ const WRITE_ABSOLUTE_TIME: &[u8] = &[
     0xC1, 0x02, 50, 1, 0x07, 1, 0xC0, 0x24, 0x0E, 0xDA, 0x77, 0x01,
 ];
 
-const RECORD_CURRENT_TIME: &[u8] = &[0xC0, 0x18];
 const WRITE_LAST_RECORDED_TIME: &[u8] = &[
     0xC1, 0x02, 50, 3, 0x07, 1, 0xFE, 0xCA, 0x00, 0x00, 0x00, 0x00,
 ];
@@ -23,7 +22,7 @@ async fn responds_to_delay_measure() {
     harness.application_data.lock().unwrap().processing_delay = 0xCAFE;
 
     harness
-        .test_request_response(super::data::DELAY_MEASURE, RESPONSE_TIME_DELAY_FINE_CAFE)
+        .test_request_response(&delay_measure(0), RESPONSE_TIME_DELAY_FINE_CAFE)
         .await;
 }
 
@@ -34,7 +33,7 @@ async fn non_lan_procedure() {
     harness.application_data.lock().unwrap().processing_delay = 0xCAFE;
 
     harness
-        .test_request_response(super::data::DELAY_MEASURE, RESPONSE_TIME_DELAY_FINE_CAFE)
+        .test_request_response(&delay_measure(0), RESPONSE_TIME_DELAY_FINE_CAFE)
         .await;
     harness
         .test_request_response(WRITE_ABSOLUTE_TIME, EMPTY_RESPONSE_SEQ1)
@@ -50,7 +49,7 @@ async fn lan_procedure() {
     harness.application_data.lock().unwrap().processing_delay = 0xCAFE;
 
     harness
-        .test_request_response(RECORD_CURRENT_TIME, EMPTY_RESPONSE_SEQ0)
+        .test_request_response(&record_current_time(0), EMPTY_RESPONSE_SEQ0)
         .await;
     harness
         .test_request_response(WRITE_LAST_RECORDED_TIME, EMPTY_RESPONSE_SEQ1)
@@ -64,7 +63,7 @@ async fn lan_procedure_with_two_byte_count() {
     let mut harness = new_harness(get_default_config());
 
     harness
-        .test_request_response(RECORD_CURRENT_TIME, EMPTY_RESPONSE_SEQ0)
+        .test_request_response(&record_current_time(0), EMPTY_RESPONSE_SEQ0)
         .await;
     harness
         .test_request_response(

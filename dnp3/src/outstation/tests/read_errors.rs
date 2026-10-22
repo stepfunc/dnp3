@@ -8,8 +8,6 @@ use crate::app::BufferSize;
 use crate::outstation::database::*;
 use crate::outstation::tests::harness::*;
 
-const CONFIRM_SEQ_0: &[u8] = &[0xC0, 0x00];
-
 const READ_G1V0_ALL: &[u8] = &[0xC0, 0x01, 0x01, 0x00, 0x06];
 const READ_G2V0_ALL: &[u8] = &[0xC0, 0x01, 0x02, 0x00, 0x06];
 const READ_G2V0_ALL_SEQ_1: &[u8] = &[0xC1, 0x01, 0x02, 0x00, 0x06];
@@ -39,12 +37,7 @@ fn add_binary_inputs(database: &mut Database, indices: &[u16]) {
 
 // a binary input event whose point is then removed
 fn create_event_and_remove_point(database: &mut Database) {
-    database.add(0, Some(EventClass::Class1), BinaryInputConfig::default());
-    database.update(
-        0,
-        &BinaryInput::new(true, Flags::ONLINE, Time::synchronized(0)),
-        UpdateOptions::default(),
-    );
+    add_binary_event(database);
     assert!(Remove::<BinaryInput>::remove(database, 0));
 }
 
@@ -219,7 +212,7 @@ async fn parameter_error_is_only_in_the_first_fragment_of_a_partial_range_read()
     assert_eq!(&first[0..4], &[0xA0, 0x81, 0x80, 0x04]); // FIR, CON, IIN2.2
     harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
 
-    harness.send_and_process(CONFIRM_SEQ_0).await;
+    harness.send_and_process(&confirm(0)).await;
     harness.check_events(&[Event::SolicitedConfirmReceived(0)]);
 
     let last = harness.expect_write().await;
@@ -310,7 +303,7 @@ async fn events_of_a_removed_point_are_reported_until_confirmed() {
         .test_request_response(READ_G2V0_ALL, BINARY_EVENT_RESPONSE)
         .await;
     harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
-    harness.send_and_process(CONFIRM_SEQ_0).await;
+    harness.send_and_process(&confirm(0)).await;
     harness.check_events(&[Event::SolicitedConfirmReceived(0)]);
 
     // no points and no events left
@@ -395,14 +388,7 @@ async fn read_of_time_with_a_count_sets_object_unknown() {
 async fn headers_after_a_read_of_time_with_a_count_are_processed() {
     let mut harness = new_harness(get_default_config());
 
-    harness.handle.database.transaction(|db| {
-        db.add(0, Some(EventClass::Class1), BinaryInputConfig::default());
-        db.update(
-            0,
-            &BinaryInput::new(true, Flags::ONLINE, Time::synchronized(0)),
-            UpdateOptions::default(),
-        );
-    });
+    harness.handle.database.transaction(add_binary_event);
 
     // g50v1 count 1, then class 1 and class 2
     harness
