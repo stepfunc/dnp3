@@ -157,7 +157,6 @@ impl Reader {
 
     pub(crate) fn reset(&mut self) {
         self.buffer.reset();
-        self.parser.reset();
         self.addr = PhysAddr::None;
     }
 
@@ -216,7 +215,6 @@ impl Reader {
                 if self.read_mode == LinkReadMode::Datagram {
                     // the datagram didn't contain a complete frame
                     self.buffer.reset();
-                    self.parser.reset();
                     Ok(Step::PartialDatagram(length))
                 } else {
                     Ok(Step::NeedData)

@@ -5,14 +5,6 @@ use crate::link::LinkErrorMode;
 
 use scursor::{ReadCursor, ReadError};
 
-#[derive(Copy, Clone)]
-enum ParseState {
-    FindSync1,
-    FindSync2,
-    ReadHeader,
-    ReadBody(Header, usize), // the header + calculated trailer length
-}
-
 pub(crate) struct FramePayload {
     length: usize,
     buffer: [u8; constant::MAX_FRAME_PAYLOAD_LENGTH],
@@ -98,7 +90,14 @@ fn parse_header_fields(bytes: [u8; 8]) -> Result<(Header, u8), FrameError> {
 
 pub(crate) struct Parser {
     mode: LinkErrorMode,
-    state: ParseState,
+}
+
+/// Why no frame could be read from the start of the unread bytes
+enum NoFrame {
+    /// the bytes are the start of a frame that needs more of them
+    NeedData,
+    /// the bytes don't start a valid frame
+    Bad(ParseError),
 }
 
 impl From<ReadError> for ParseError {
@@ -119,18 +118,22 @@ impl From<LogicError> for ParseError {
     }
 }
 
+impl<T: Into<ParseError>> From<T> for NoFrame {
+    fn from(err: T) -> Self {
+        NoFrame::Bad(err.into())
+    }
+}
+
 impl Parser {
     pub(crate) fn new(mode: LinkErrorMode) -> Parser {
-        Parser {
-            mode,
-            state: ParseState::FindSync1,
-        }
+        Parser { mode }
     }
 
-    pub(crate) fn reset(&mut self) {
-        self.state = ParseState::FindSync1;
-    }
-
+    /// Read the next frame, copying its data into `payload`
+    ///
+    /// The parser keeps nothing between calls: the bytes of an incomplete frame are left unread,
+    /// to be parsed again from the frame's first byte once more of them arrive. In
+    /// [`LinkErrorMode::Discard`], parsing restarts one byte past where an invalid frame began.
     #[cfg_attr(all(test, dnp3_no_panic), no_panic::no_panic)]
     pub(crate) fn parse(
         &mut self,
@@ -138,49 +141,55 @@ impl Parser {
         payload: &mut FramePayload,
     ) -> Result<Option<Header>, ParseError> {
         loop {
-            if self.mode == LinkErrorMode::Close {
-                return self.parse_impl(cursor, payload);
-            }
-
-            let res = cursor.transaction(|cur| self.parse_impl(cur, payload));
-
-            match res {
-                Ok(x) => return Ok(x),
-                Err(_) => {
-                    let _: Result<u8, scursor::ReadError> = cursor.read_u8(); // advance one byte
-                    self.reset();
-                    // goto next iteration
+            let mut frame = *cursor;
+            match Self::read_frame(&mut frame, payload) {
+                Ok(header) => {
+                    *cursor = frame;
+                    return Ok(Some(header));
                 }
+                Err(NoFrame::NeedData) => return Ok(None),
+                Err(NoFrame::Bad(err)) => match self.mode {
+                    LinkErrorMode::Close => {
+                        *cursor = frame;
+                        return Err(err);
+                    }
+                    LinkErrorMode::Discard => {
+                        // skip the byte the invalid frame began on
+                        if cursor.read_u8().is_err() {
+                            return Ok(None);
+                        }
+                    }
+                },
             }
         }
     }
 
-    fn parse_impl(
-        &mut self,
-        cursor: &mut ReadCursor,
-        payload: &mut FramePayload,
-    ) -> Result<Option<Header>, ParseError> {
-        loop {
-            let start = cursor.remaining();
-
-            match self.state {
-                ParseState::FindSync1 => self.parse_sync1(cursor)?,
-                ParseState::FindSync2 => self.parse_sync2(cursor)?,
-                ParseState::ReadHeader => self.parse_header(cursor)?,
-                ParseState::ReadBody(header, length) => {
-                    if let Some(()) = self.parse_body(length, cursor, payload)? {
-                        return Ok(Some(header));
-                    }
-                }
-            }
-
-            let end = cursor.remaining();
-
-            if start == end {
-                // no progress
-                return Ok(None);
-            }
+    /// Read a whole frame from the cursor, copying its data into `payload`
+    #[cfg_attr(all(test, dnp3_no_panic), no_panic::no_panic)]
+    fn read_frame(cursor: &mut ReadCursor, payload: &mut FramePayload) -> Result<Header, NoFrame> {
+        let start1 = cursor.read_u8().map_err(|_| NoFrame::NeedData)?;
+        if start1 != constant::START1 {
+            return Err(FrameError::UnexpectedStart1(start1).into());
         }
+
+        let start2 = cursor.read_u8().map_err(|_| NoFrame::NeedData)?;
+        if start2 != constant::START2 {
+            return Err(FrameError::UnexpectedStart2(start2).into());
+        }
+
+        let fields = cursor
+            .read_bytes(8)
+            .ok()
+            .and_then(<[u8]>::first_chunk)
+            .ok_or(NoFrame::NeedData)?;
+        let (header, data_length) = parse_header_fields(*fields)?;
+
+        let trailer = cursor
+            .read_bytes(Self::calc_trailer_length(data_length))
+            .map_err(|_| NoFrame::NeedData)?;
+        Self::read_body(trailer, payload)?;
+
+        Ok(header)
     }
 
     /// the data and CRC bytes that follow the header, for a frame with this much data
@@ -194,64 +203,11 @@ impl Parser {
         data_length + blocks * constant::CRC_LENGTH
     }
 
-    fn parse_sync1(&mut self, cursor: &mut ReadCursor) -> Result<(), ParseError> {
-        if cursor.is_empty() {
-            return Ok(());
-        }
-
-        let x = cursor.read_u8()?;
-
-        if x != constant::START1 {
-            return Err(FrameError::UnexpectedStart1(x).into());
-        }
-
-        self.state = ParseState::FindSync2;
-        Ok(())
-    }
-
-    fn parse_sync2(&mut self, cursor: &mut ReadCursor) -> Result<(), ParseError> {
-        if cursor.is_empty() {
-            return Ok(());
-        }
-
-        let x = cursor.read_u8()?;
-
-        if x != constant::START2 {
-            return Err(FrameError::UnexpectedStart2(x).into());
-        }
-
-        self.state = ParseState::ReadHeader;
-        Ok(())
-    }
-
-    fn parse_header(&mut self, cursor: &mut ReadCursor) -> Result<(), ParseError> {
-        let Some(bytes) = cursor.read_bytes(8).ok().and_then(<[u8]>::first_chunk) else {
-            return Ok(());
-        };
-
-        let (header, data_length) = parse_header_fields(*bytes)?;
-
-        let trailer_length = Self::calc_trailer_length(data_length);
-
-        self.state = ParseState::ReadBody(header, trailer_length);
-        Ok(())
-    }
-
-    fn parse_body(
-        &mut self,
-        trailer_length: usize,
-        cursor: &mut ReadCursor,
-        payload: &mut FramePayload,
-    ) -> Result<Option<()>, ParseError> {
-        if cursor.remaining() < trailer_length {
-            return Ok(None);
-        }
-
+    /// Check the CRC of each block of the trailer, copying the data into `payload`
+    fn read_body(trailer: &[u8], payload: &mut FramePayload) -> Result<(), ParseError> {
         payload.clear();
 
-        let body = cursor.read_bytes(trailer_length)?;
-
-        for block in body.chunks(constant::MAX_BLOCK_SIZE_WITH_CRC) {
+        for block in trailer.chunks(constant::MAX_BLOCK_SIZE_WITH_CRC) {
             // a block holds at least one byte of data before its CRC
             let Some(data_len) = block.len().checked_sub(2).filter(|n| *n > 0) else {
                 return Err(LogicError::BadSize.into());
@@ -267,12 +223,10 @@ impl Parser {
                 return Err(FrameError::BadBodyCrc.into());
             }
 
-            // copy the data and advance the position
             payload.push(data)?;
         }
 
-        self.state = ParseState::FindSync1;
-        Ok(Some(()))
+        Ok(())
     }
 }
 
