@@ -240,10 +240,9 @@ async fn rejected_clear_restart_retries_after_the_backoff() {
     .await;
 }
 
-#[tokio::test]
-async fn rejected_enable_unsolicited_with_restart_iin_is_not_repeated() {
+#[tokio::test(start_paused = true)]
+async fn rejected_enable_unsolicited_with_restart_iin_is_repeated_after_the_restart_is_cleared() {
     watchdog(async {
-        tokio::time::pause();
         let config = AssociationConfig {
             enable_unsol_classes: EventClasses::all(),
             ..AssociationConfig::quiet()
@@ -265,9 +264,13 @@ async fn rejected_enable_unsolicited_with_restart_iin_is_not_repeated() {
             .process_response(empty_response(seq.increment()))
             .await;
 
-        // the rejected ENABLE_UNSOLICITED isn't sent again
-        let next = tokio::time::timeout(Duration::from_secs(5), harness.io.next_event()).await;
-        assert_eq!(next.ok(), None);
+        // the restart starts the sequence over, so ENABLE_UNSOLICITED is sent again
+        expect_write_soon(&mut harness, enable_unsol_request(seq)).await;
+        harness
+            .process_response(empty_response(seq.increment()))
+            .await;
+
+        assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
     })
     .await;
 }
@@ -512,6 +515,19 @@ async fn event_scan_whose_response_still_reports_events_runs_again_at_once() {
     .await;
 }
 
+/// Expect the request with the next sequence, and answer it with an empty response carrying `iin`
+async fn answer(
+    harness: &mut TestHarness,
+    seq: &mut Sequence,
+    request: fn(Sequence) -> Vec<u8>,
+    iin: Iin,
+) {
+    expect_write_soon(harness, request(*seq)).await;
+    harness
+        .process_response(empty_response_custom_iin(seq.increment(), iin))
+        .await;
+}
+
 #[tokio::test(start_paused = true)]
 async fn event_scan_whose_response_reports_events_but_returns_none_is_not_repeated() {
     watchdog(async {
@@ -608,7 +624,7 @@ async fn event_scan_with_iin2_bits_other_than_request_errors_runs_again_at_once(
 }
 
 #[tokio::test(start_paused = true)]
-async fn restart_iin_in_the_integrity_scan_response_does_not_repeat_the_scan() {
+async fn restart_iin_in_integrity_or_enable_unsolicited_response_starts_the_sequence_over() {
     watchdog(async {
         let config = AssociationConfig {
             startup_integrity_classes: Classes::all(),
@@ -617,22 +633,23 @@ async fn restart_iin_in_the_integrity_scan_response_does_not_repeat_the_scan() {
         };
         let mut seq = Sequence::default();
         let mut harness = create_association(config).await;
+        let none = Iin::default();
 
         // the outstation reports a restart in its response to the startup integrity scan
-        expect_write_soon(&mut harness, integrity_poll_request(seq)).await;
-        harness
-            .process_response(empty_response_custom_iin(seq.increment(), DEVICE_RESTART))
-            .await;
-
-        // the restart is cleared, and the integrity scan isn't repeated
-        expect_write_soon(&mut harness, clear_restart_iin(seq)).await;
-        harness
-            .process_response(empty_response(seq.increment()))
-            .await;
-        expect_write_soon(&mut harness, enable_unsol_request(seq)).await;
-        harness
-            .process_response(empty_response(seq.increment()))
-            .await;
+        answer(
+            &mut harness,
+            &mut seq,
+            integrity_poll_request,
+            DEVICE_RESTART,
+        )
+        .await;
+        answer(&mut harness, &mut seq, clear_restart_iin, none).await;
+        // and again in its response to ENABLE_UNSOLICITED
+        answer(&mut harness, &mut seq, integrity_poll_request, none).await;
+        answer(&mut harness, &mut seq, enable_unsol_request, DEVICE_RESTART).await;
+        answer(&mut harness, &mut seq, clear_restart_iin, none).await;
+        answer(&mut harness, &mut seq, integrity_poll_request, none).await;
+        answer(&mut harness, &mut seq, enable_unsol_request, none).await;
 
         assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
     })

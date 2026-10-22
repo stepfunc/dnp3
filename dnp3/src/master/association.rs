@@ -257,6 +257,24 @@ impl TaskStates {
         self.enabled_unsolicited.demand();
     }
 
+    /// True if the outstation reported a restart that isn't cleared yet.
+    ///
+    /// The integrity scan and `ENABLE_UNSOLICITED` only start once the restart is cleared, so if
+    /// this is true when one of them completes, the outstation restarted while it ran, and the
+    /// post-restart sequence starts over.
+    fn restarted(&self) -> bool {
+        self.clear_restart_iin.is_pending()
+    }
+
+    fn on_success(&mut self, task: &AutoTask) {
+        match task {
+            AutoTask::EnableUnsolicited(_) if self.restarted() => self.enabled_unsolicited.again(),
+            AutoTask::ClearRestartBit
+            | AutoTask::EnableUnsolicited(_)
+            | AutoTask::DisableUnsolicited(_) => self.state_mut(task).done(),
+        }
+    }
+
     fn next(
         &self,
         now: Instant,
@@ -544,8 +562,12 @@ impl Association {
     }
 
     pub(crate) fn on_integrity_scan_complete(&mut self) {
-        self.auto_tasks.integrity_scan.done();
-        self.startup_integrity_done = true;
+        if self.auto_tasks.restarted() {
+            self.auto_tasks.integrity_scan.again();
+        } else {
+            self.auto_tasks.integrity_scan.done();
+            self.startup_integrity_done = true;
+        }
     }
 
     pub(crate) fn on_integrity_scan_failure(&mut self) {
@@ -574,7 +596,7 @@ impl Association {
     }
 
     pub(crate) fn on_auto_task_success(&mut self, task: &AutoTask) {
-        self.auto_tasks.state_mut(task).done();
+        self.auto_tasks.on_success(task);
     }
 
     pub(crate) fn on_auto_task_failure(&mut self, task: &AutoTask) {
