@@ -1,10 +1,8 @@
 use crate::app::format::write::HeaderWriter;
 use crate::app::format::WriteError;
-use crate::app::parse::free_format::FreeFormatVariation;
-use crate::app::parse::parser::{HeaderDetails, Response};
-use crate::app::{FileStatus, FunctionCode, Group70Var4};
+use crate::app::parse::parser::Response;
+use crate::app::FunctionCode;
 use crate::master::promise::Promise;
-use crate::master::tasks::file::REQUEST_ID;
 use crate::master::tasks::{AppTask, NonReadTask, Task};
 use crate::master::{FileError, FileHandle, TaskError};
 
@@ -25,16 +23,7 @@ impl CloseFileTask {
     }
 
     pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
-        let obj = Group70Var4 {
-            file_handle: self.handle.into(),
-            file_size: 0,
-            max_block_size: 0,
-            request_id: REQUEST_ID,
-            status_code: FileStatus::Success,
-            text: "",
-        };
-
-        writer.write_free_format(&obj)
+        super::write_close(self.handle, writer)
     }
 
     pub(crate) fn on_task_error(self, err: TaskError) {
@@ -43,32 +32,13 @@ impl CloseFileTask {
 
     pub(crate) fn handle(self, response: Response<'_>) -> Result<Option<NonReadTask>, TaskError> {
         fn process(expected_handle: FileHandle, response: Response<'_>) -> Result<(), FileError> {
-            let header = response.objects?.get_only_header()?;
-
-            let obj = match header.details {
-                HeaderDetails::TwoByteFreeFormat(_, FreeFormatVariation::Group70Var4(obj)) => obj,
-                _ => {
-                    tracing::warn!(
-                        "File CLOSE response contains unexpected variation: {}",
-                        header.variation
-                    );
-                    return Err(FileError::BadResponse);
-                }
-            };
+            let obj = super::parse_close_response(response.objects?.get_only_header()?)?;
 
             if obj.file_handle != u32::from(expected_handle) {
                 return Err(FileError::WrongHandle);
             }
 
-            if obj.status_code != FileStatus::Success {
-                tracing::warn!(
-                    "Unable to close file (status code == {:?})",
-                    obj.status_code
-                );
-                return Err(FileError::BadStatus(obj.status_code));
-            }
-
-            Ok(())
+            super::check_close_status(obj.status_code)
         }
 
         let result = process(self.handle, response);

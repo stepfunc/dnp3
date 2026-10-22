@@ -1,7 +1,7 @@
 use super::*;
 use crate::app::file::*;
 use crate::app::parse::parser::Response;
-use crate::app::{FunctionCode, Timestamp};
+use crate::app::FunctionCode;
 use crate::master::file::BlockNumber;
 use crate::master::tasks::{AppTask, NonReadTask, Task};
 use crate::master::{FileAction, FileMode, FileReadConfig, FileReader, TaskError};
@@ -151,7 +151,15 @@ impl FileReadTask {
     pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
         match &self.state {
             State::GetAuth(auth) => write_auth(auth, writer),
-            State::Open(auth) => write_open(&self.settings, *auth, writer),
+            State::Open(auth) => write_open(
+                &self.settings.name.0,
+                *auth,
+                Permissions::default(),
+                0,
+                FileMode::Read,
+                self.settings.config.max_block_size,
+                writer,
+            ),
             State::Read(rs) => write_read(*rs, writer),
             State::Close(handle) => write_close(*handle, writer),
         }
@@ -184,7 +192,7 @@ impl FileReadTask {
     }
 
     fn handle_auth_response(mut settings: Settings, header: ObjectHeader) -> Option<FileReadTask> {
-        match handle_auth_response(header) {
+        match parse_auth_response(header) {
             Ok(key) => Some(FileReadTask::new(settings, State::Open(key))),
             Err(err) => {
                 settings.reader.aborted(err);
@@ -194,16 +202,16 @@ impl FileReadTask {
     }
 
     fn handle_open_response(mut settings: Settings, header: ObjectHeader) -> Option<FileReadTask> {
-        match handle_open_response(header) {
-            Ok((file_size, handle)) => {
-                if settings.reader.opened(file_size).is_abort() {
+        match parse_open_response(header) {
+            Ok(file) => {
+                if settings.reader.opened(file.file_size).is_abort() {
                     tracing::warn!("File transfer aborted by user");
                     settings.reader.aborted(FileError::AbortByUser);
-                    Some(FileReadTask::new(settings, State::Close(handle)))
+                    Some(FileReadTask::new(settings, State::Close(file.file_handle)))
                 } else {
                     Some(FileReadTask::new(
                         settings,
-                        State::Read(ReadState::new(handle)),
+                        State::Read(ReadState::new(file.file_handle)),
                     ))
                 }
             }
@@ -299,28 +307,12 @@ impl FileReadTask {
         }
     }
 
+    /// The file was already read, so a CLOSE that fails only gets logged
     fn handle_close_response(header: ObjectHeader) -> Option<FileReadTask> {
-        log_close_response(header);
+        let _: Result<(), FileError> =
+            parse_close_response(header).and_then(|obj| check_close_status(obj.status_code));
         None
     }
-}
-
-fn write_open(
-    settings: &Settings,
-    key: AuthKey,
-    writer: &mut HeaderWriter,
-) -> Result<(), WriteError> {
-    let obj = Group70Var3 {
-        time_of_creation: Timestamp::zero(),
-        permissions: Permissions::default(),
-        auth_key: key.into(),
-        file_size: 0,
-        mode: FileMode::Read,
-        max_block_size: settings.config.max_block_size,
-        request_id: REQUEST_ID,
-        file_name: &settings.name.0,
-    };
-    writer.write_free_format(&obj)
 }
 
 fn write_read(rs: ReadState, writer: &mut HeaderWriter) -> Result<(), WriteError> {
