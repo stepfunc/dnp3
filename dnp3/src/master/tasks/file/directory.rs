@@ -39,14 +39,14 @@ impl FileReader for DirectoryReader {
             let mut items = Vec::new();
             while !cursor.is_empty() {
                 match Group70Var7::read(&mut cursor) {
-                    Ok(x) => items.push(x),
+                    Ok(x) => items.push(x.into()),
                     Err(err) => {
                         tracing::warn!("Error reading directory information: {err}");
                         return Err(FileError::BadResponse);
                     }
                 }
             }
-            Ok(items.into_iter().map(|x| x.into()).collect())
+            Ok(items)
         }
 
         // parse the accumulated data
