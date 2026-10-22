@@ -6,8 +6,10 @@ use scursor::WriteCursor;
 
 mod auth_file;
 mod close_file;
+mod get_info;
 mod open_file;
 mod read_file;
+mod write_block;
 
 impl FreeFormat for Group70Var6<'_> {
     const VARIATION: Variation = Variation::Group70Var6;
@@ -59,6 +61,10 @@ pub(super) fn file_transport_response(
             file_data,
         },
     )
+}
+
+pub(super) fn no_object_response(seq: u8) -> Vec<u8> {
+    [fir_and_fin(seq), 0x81, 0x00, 0x00].to_vec()
 }
 
 pub(crate) fn response<T: FreeFormat>(seq: u8, variation: &T) -> Vec<u8> {
