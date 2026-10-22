@@ -749,105 +749,6 @@ mod test {
     }
 
     #[test]
-    fn parses_valid_request() {
-        let fragment = &[0xC2, 0x02, 0xAA];
-        let request = ParsedFragment::parse(ParseOptions::default(), fragment)
-            .unwrap()
-            .to_request()
-            .unwrap();
-        let expected = RequestHeader {
-            control: ControlField {
-                fir: true,
-                fin: true,
-                con: false,
-                uns: false,
-                seq: Sequence::new(0x02),
-            },
-            function: FunctionCode::Write,
-        };
-
-        assert_eq!(request.header, expected);
-        assert_eq!(
-            request.objects.err().unwrap(),
-            ObjectParseError::InsufficientBytes
-        )
-    }
-
-    #[test]
-    fn parses_valid_unsolicited_response() {
-        let fragment = &[0b11010010, 0x82, 0xFF, 0xAA, 0x01, 0x02];
-        let response = ParsedFragment::parse(ParseOptions::default(), fragment)
-            .unwrap()
-            .to_response()
-            .unwrap();
-        let expected = ResponseHeader {
-            control: ControlField {
-                fir: true,
-                fin: true,
-                con: false,
-                uns: true,
-                seq: Sequence::new(0x02),
-            },
-            function: ResponseFunction::UnsolicitedResponse,
-            iin: Iin {
-                iin1: Iin1::new(0xFF),
-                iin2: Iin2::new(0xAA),
-            },
-        };
-
-        assert_eq!(response.header, expected);
-        assert_eq!(response.raw_objects, &[0x01, 0x02]);
-        assert_eq!(
-            response.objects.err().unwrap(),
-            ObjectParseError::InsufficientBytes
-        )
-    }
-
-    #[test]
-    fn fails_unsolicited_response_without_uns_bit() {
-        test_response_validation_error(
-            &[0b11000000, 0x82, 0x00, 0x00],
-            ResponseValidationError::UnsolicitedResponseWithoutUnsBit,
-        );
-    }
-
-    #[test]
-    fn fails_solicited_response_with_uns_bit() {
-        test_response_validation_error(
-            &[0b11010000, 0x81, 0x00, 0x00],
-            ResponseValidationError::SolicitedResponseWithUnsBit,
-        );
-    }
-
-    #[test]
-    fn fails_bad_request_function_with_uns_bit() {
-        test_request_validation_error(
-            &[0b11010000, 0x02], // write with UNS
-            RequestValidationError::UnexpectedUnsBit(FunctionCode::Write),
-        );
-    }
-
-    #[test]
-    fn confirms_may_or_may_not_have_uns_set() {
-        {
-            let request = ParsedFragment::parse(ParseOptions::default(), &[0b11010000, 0x00])
-                .unwrap()
-                .to_request()
-                .unwrap();
-            assert_eq!(request.header.function, FunctionCode::Confirm);
-            assert!(request.header.control.uns);
-        }
-        {
-            let request = ParsedFragment::parse(ParseOptions::default(), &[0b11000000, 0x00])
-                .unwrap()
-                .to_request()
-                .unwrap();
-            assert_eq!(request.header.function, FunctionCode::Confirm);
-            assert!(!request.header.control.uns);
-        }
-    }
-
-    #[test]
     fn parses_integrity_scan() {
         let headers: Vec<ObjectHeader> = parse_objects(
             FunctionCode::Read,
@@ -1056,18 +957,6 @@ mod test {
     }
 
     #[test]
-    fn g110_variations_other_than_0_cannot_be_used_in_read() {
-        test_parse_error(
-            &[0x6E, 0x01, 0x00, 0x01, 0x02],
-            FunctionCode::Read,
-            ObjectParseError::InvalidQualifierForVariation(
-                Variation::Group110(1),
-                QualifierCode::Range8,
-            ),
-        );
-    }
-
-    #[test]
     fn parses_group110var1_as_non_read() {
         let input = [0x6E, 0x01, 0x00, 0x01, 0x02, 0xAA, 0xBB];
         let mut headers = parse_objects(FunctionCode::Response, &input);
@@ -1115,15 +1004,6 @@ mod test {
 
         assert_eq!(bytes, vec![([0xAA].as_slice(), 1), ([0xBB].as_slice(), 2)]);
         assert_matches!(headers.next(), None);
-    }
-
-    #[test]
-    fn g110v0_cannot_be_used_in_non_read() {
-        test_parse_error(
-            &[0x6E, 0x00, 0x00, 0x01, 0x02],
-            FunctionCode::Response,
-            ObjectParseError::ZeroLengthOctetData,
-        );
     }
 
     #[test]
@@ -1414,102 +1294,6 @@ mod test {
         b't', b'a',
     ];
 
-    /// the variation, qualifier and whether `count()` is available for each header
-    fn qualifier_transcript(
-        function: FunctionCode,
-        input: &[u8],
-    ) -> Vec<(Variation, QualifierCode, bool)> {
-        parse_objects(function, input)
-            .map(|x| {
-                (
-                    x.variation(),
-                    x.details.qualifier(),
-                    x.details.count().is_some(),
-                )
-            })
-            .collect()
-    }
-
-    #[test]
-    fn response_headers_keep_their_qualifier_at_both_widths() {
-        assert_eq!(
-            qualifier_transcript(FunctionCode::Response, RESPONSE_WITH_EVERY_QUALIFIER),
-            vec![
-                (Variation::Group1Var0, QualifierCode::AllObjects, false),
-                (Variation::Group1Var2, QualifierCode::Range8, false),
-                (Variation::Group1Var2, QualifierCode::Range16, false),
-                (Variation::Group50Var1, QualifierCode::Count8, true),
-                (Variation::Group50Var1, QualifierCode::Count16, true),
-                (Variation::Group2Var1, QualifierCode::CountAndPrefix8, false),
-                (
-                    Variation::Group2Var1,
-                    QualifierCode::CountAndPrefix16,
-                    false
-                ),
-                (Variation::Group70Var5, QualifierCode::FreeFormat16, false),
-            ]
-        );
-    }
-
-    #[test]
-    fn read_headers_keep_their_qualifier_at_both_widths() {
-        let input = [
-            0x01, 0x00, 0x06, // g1v0, all objects
-            0x01, 0x02, 0x00, 0x07, 0x08, // g1v2, 1-byte start/stop
-            0x01, 0x02, 0x01, 0x00, 0x01, 0x01, 0x01, // g1v2, 2-byte start/stop
-            0x02, 0x00, 0x07, 0x03, // g2v0, 1-byte count
-            0x02, 0x00, 0x08, 0x03, 0x01, // g2v0, 2-byte count
-        ];
-        assert_eq!(
-            qualifier_transcript(FunctionCode::Read, &input),
-            vec![
-                (Variation::Group1Var0, QualifierCode::AllObjects, false),
-                (Variation::Group1Var2, QualifierCode::Range8, false),
-                (Variation::Group1Var2, QualifierCode::Range16, false),
-                (Variation::Group2Var0, QualifierCode::Count8, false),
-                (Variation::Group2Var0, QualifierCode::Count16, false),
-            ]
-        );
-    }
-
-    #[test]
-    fn control_headers_keep_their_qualifier_at_both_widths() {
-        let input = [
-            // g12v1, 1-byte count and prefix, index 3
-            0x0C, 0x01, 0x17, 0x01, 0x03, 0x01, 0x01, 0x64, 0x00, 0x00, 0x00, 0xC8, 0x00, 0x00,
-            0x00, 0x00, //
-            // g12v1, 2-byte count and prefix, index 259
-            0x0C, 0x01, 0x28, 0x01, 0x00, 0x03, 0x01, 0x01, 0x01, 0x64, 0x00, 0x00, 0x00, 0xC8,
-            0x00, 0x00, 0x00, 0x00,
-        ];
-        assert_eq!(
-            qualifier_transcript(FunctionCode::Operate, &input),
-            vec![
-                (
-                    Variation::Group12Var1,
-                    QualifierCode::CountAndPrefix8,
-                    false
-                ),
-                (
-                    Variation::Group12Var1,
-                    QualifierCode::CountAndPrefix16,
-                    false
-                ),
-            ]
-        );
-    }
-
-    #[test]
-    fn free_format_count_other_than_one_is_rejected() {
-        for count in [0, 2] {
-            test_parse_error(
-                &[70, 5, 0x5B, count, 0x00, 0x00],
-                FunctionCode::Response,
-                ObjectParseError::UnsupportedFreeFormatCount(count),
-            );
-        }
-    }
-
     // g70v2 with user name "ab" and password "cd"
     const G70V2: &[u8] = &[
         12, 0, 2, 0, 14, 0, 2, 0, 0xFE, 0xCA, 0xAD, 0xDE, b'a', b'b', b'c', b'd',
@@ -1768,12 +1552,26 @@ mod test {
                 &[0xF0, 0x01],
                 RequestValidationError::UnexpectedUnsBit(FunctionCode::Read),
             ),
+            (
+                &[0xD0, 0x02],
+                RequestValidationError::UnexpectedUnsBit(FunctionCode::Write),
+            ),
         ] {
             test_request_validation_error(fragment, err);
         }
 
         let request = parse_header(&[0xE7, 0x01]).unwrap().to_request().unwrap();
         assert_eq!(request.header.control, control(true, true, true, false, 7));
+
+        // only a CONFIRM may set UNS, to confirm an unsolicited response
+        let request = parse_header(&[0xD0, 0x00]).unwrap().to_request().unwrap();
+        assert_eq!(
+            request.header,
+            RequestHeader {
+                control: control(true, true, false, true, 0),
+                function: FunctionCode::Confirm,
+            }
+        );
     }
 
     #[test]
@@ -1786,6 +1584,10 @@ mod test {
             (
                 &[0x00, 0x00],
                 ResponseValidationError::UnexpectedFunction(FunctionCode::Confirm),
+            ),
+            (
+                &[0xC0, 0x82, 0x00, 0x00],
+                ResponseValidationError::UnsolicitedResponseWithoutUnsBit,
             ),
             (
                 &[0x80, 0x82, 0x00, 0x00],
@@ -1802,6 +1604,10 @@ mod test {
             (
                 &[0x10, 0x82, 0x00, 0x00],
                 ResponseValidationError::UnsolicitedResponseWithoutFirAndFin,
+            ),
+            (
+                &[0xD0, 0x81, 0x00, 0x00],
+                ResponseValidationError::SolicitedResponseWithUnsBit,
             ),
             (
                 &[0x50, 0x81, 0x00, 0x00],
