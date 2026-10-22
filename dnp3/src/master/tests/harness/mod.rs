@@ -4,13 +4,14 @@ use tokio::task::JoinHandle;
 
 use crate::app::parse::options::ParseOptions;
 use crate::app::{BufferSize, Timeout};
+use crate::app::{MaybeAsync, ResponseHeader};
 use crate::decode::AppDecodeLevel;
 use crate::link::header::{FrameInfo, FrameType};
 use crate::link::reader::LinkModes;
 use crate::link::EndpointAddress;
 use crate::master::association::{AssociationConfig, AssociationMap};
 use crate::master::task::MasterTask;
-use crate::master::{AssociationHandle, MasterChannel, ReadHandler};
+use crate::master::{AssociationHandle, MasterChannel, ReadHandler, ReadType};
 use crate::master::{
     AssociationHandler, AssociationInformation, HeaderInfo, MasterChannelConfig, MasterChannelType,
 };
@@ -66,6 +67,7 @@ pub(crate) async fn create_association(mut config: AssociationConfig) -> TestHar
     let handler = CountHandler::new();
     let (info, assoc_events) = AssociationInformationEventHandler::pair();
     let num_requests = handler.num_requests.clone();
+    let read_events = handler.events();
 
     let association = master
         .add_association(
@@ -84,29 +86,68 @@ pub(crate) async fn create_association(mut config: AssociationConfig) -> TestHar
         association,
         num_requests,
         assoc_events,
+        read_events,
         io: io_handle,
     }
 }
 
-struct CountHandler {
+/// A ReadHandler callback, in the order the handler received it
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) enum ReadEvent {
+    BeginFragment(ReadType),
+    AnalogInput,
+    EndFragment(ReadType),
+}
+
+pub(crate) struct ReadEventQueue(Arc<Mutex<Vec<ReadEvent>>>);
+
+impl ReadEventQueue {
+    pub(crate) fn pop(&mut self) -> Vec<ReadEvent> {
+        let mut guard = self.0.lock().unwrap();
+        guard.drain(..).collect()
+    }
+}
+
+pub(crate) struct CountHandler {
     num_requests: Arc<AtomicU64>,
+    events: Arc<Mutex<Vec<ReadEvent>>>,
 }
 
 impl CountHandler {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             num_requests: Arc::new(AtomicU64::new(0)),
+            events: Default::default(),
         }
+    }
+
+    pub(crate) fn events(&self) -> ReadEventQueue {
+        ReadEventQueue(self.events.clone())
+    }
+
+    fn push(&mut self, event: ReadEvent) {
+        self.events.lock().unwrap().push(event);
     }
 }
 
 impl ReadHandler for CountHandler {
+    fn begin_fragment(&mut self, read_type: ReadType, _header: ResponseHeader) -> MaybeAsync<()> {
+        self.push(ReadEvent::BeginFragment(read_type));
+        MaybeAsync::ready(())
+    }
+
+    fn end_fragment(&mut self, read_type: ReadType, _header: ResponseHeader) -> MaybeAsync<()> {
+        self.push(ReadEvent::EndFragment(read_type));
+        MaybeAsync::ready(())
+    }
+
     fn handle_analog_input(
         &mut self,
         _info: HeaderInfo,
         _iter: &mut dyn Iterator<Item = (crate::app::measurement::AnalogInput, u16)>,
     ) {
         self.num_requests.fetch_add(1, Ordering::SeqCst);
+        self.push(ReadEvent::AnalogInput);
     }
 }
 
@@ -182,6 +223,7 @@ pub(crate) struct TestHarness {
     pub(crate) association: AssociationHandle,
     pub(crate) num_requests: Arc<AtomicU64>,
     pub(crate) assoc_events: AssocInfoEventQueue,
+    pub(crate) read_events: ReadEventQueue,
     pub(crate) io: sfio_tokio_mock_io::Handle,
 }
 
