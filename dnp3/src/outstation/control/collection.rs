@@ -21,10 +21,10 @@ impl<'a> ControlTransaction<'a> {
     pub(crate) async fn execute<F, R>(
         handler: &'a mut dyn ControlHandler,
         database: &mut DatabaseHandle,
-        mut func: F,
+        func: F,
     ) -> R
     where
-        F: FnMut(&mut Self, &mut DatabaseHandle) -> R,
+        F: FnOnce(&mut Self, &mut DatabaseHandle) -> R,
     {
         let mut tx = ControlTransaction {
             started: false,

@@ -4,10 +4,10 @@ use crate::link::reader::LinkModes;
 use crate::link::EndpointAddress;
 use crate::outstation::config::*;
 use crate::outstation::database::DatabaseHandle;
-use crate::outstation::session::OutstationSession;
+use crate::outstation::session::{OutstationSession, Responder};
 use crate::outstation::traits::{ControlHandler, OutstationApplication, OutstationInformation};
 use crate::outstation::OutstationHandle;
-use crate::transport::{FragmentAddr, RealTransport, Transport, TransportReader, TransportWriter};
+use crate::transport::{FragmentAddr, RealTransport, Transport, TransportReader};
 use crate::util::phys::{PhysAddr, PhysLayer};
 use crate::util::session::{Enabled, RunError, StopReason};
 
@@ -31,7 +31,7 @@ pub(crate) enum OutstationMessage {
 pub(crate) struct OutstationTask<T: Transport = RealTransport> {
     session: OutstationSession,
     reader: TransportReader<T>,
-    writer: TransportWriter<T>,
+    responder: Responder<T>,
     database: DatabaseHandle,
 }
 
@@ -45,7 +45,7 @@ impl<T: Transport> Drop for SessionTeardown<'_, T> {
         // re-arm, don't clear: unconfirmed events return to Unselected for re-delivery
         self.task.database.reset();
         self.task.reader.reset();
-        self.task.writer.reset();
+        self.task.responder.reset();
         self.task.session.reset_session_state();
     }
 }
@@ -132,13 +132,13 @@ impl<T: Transport> OutstationTask<T> {
                 rx,
                 destination,
                 config.into(),
-                config.into(),
+                config.read_header_limit(),
                 application,
                 information,
                 control_handler,
             ),
             reader,
-            writer,
+            responder: Responder::new(writer, &config),
             database: handle.clone(),
         };
         (
@@ -166,7 +166,12 @@ impl<T: Transport> OutstationTask<T> {
         let guard = SessionTeardown { task: self };
         let task = &mut *guard.task; // reborrow so Drop can reset after the run future releases its borrows
         task.session
-            .run(io, &mut task.reader, &mut task.writer, &mut task.database)
+            .run(
+                io,
+                &mut task.reader,
+                &mut task.responder,
+                &mut task.database,
+            )
             .await
     }
 

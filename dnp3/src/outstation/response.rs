@@ -9,6 +9,11 @@ use crate::app::*;
 /// response, header and objects, so a resend is always the bytes of the response it repeats. No
 /// caller supplies a length. The slot records the length itself, from the cursor it wrote with.
 ///
+/// A response is prepared in the slot that sends it: [`ResponseSlot::build`] and
+/// [`ResponseSlot::empty`] borrow the slot until the [`Prepared`] response is published or
+/// dropped. So a header can only be published with the objects of the slot it was prepared in,
+/// and nothing else writes to that slot in between.
+///
 /// The master doesn't need this. It sends each request or confirm from the cursor that just wrote
 /// it, and never resends one. A retried task formats a new request.
 pub(crate) struct ResponseSlot {
@@ -19,35 +24,44 @@ pub(crate) struct ResponseSlot {
     header: Option<ResponseHeader>,
 }
 
-/// A response a handler has prepared, ready to publish
-#[derive(Copy, Clone)]
-pub(crate) enum Prepared {
-    /// a response with no objects
-    Empty(ResponseHeader),
-    /// a response with the objects already in the slot, from the last successful
-    /// [`ResponseSlot::build`] or the response published before, and nothing has built since
-    Stored(ResponseHeader),
+/// The objects a build left in its slot, waiting for their header: all of them, or none if the
+/// build failed
+pub(crate) struct Staged<'a> {
+    slot: &'a mut ResponseSlot,
 }
 
-impl Prepared {
-    pub(crate) fn empty_solicited(seq: Sequence, iin: Iin) -> Self {
-        Self::Empty(ResponseHeader::solicited(seq, iin))
-    }
-
-    pub(crate) fn parameter_error(seq: Sequence) -> Self {
-        Self::empty_solicited(seq, Iin::default() | Iin2::PARAMETER_ERROR)
-    }
-
-    pub(crate) fn header(self) -> ResponseHeader {
-        match self {
-            Self::Empty(header) | Self::Stored(header) => header,
+impl<'a> Staged<'a> {
+    pub(crate) fn with_header(self, header: ResponseHeader) -> Prepared<'a> {
+        Prepared {
+            slot: self.slot,
+            header,
         }
+    }
+}
+
+/// A response prepared in a slot, ready to publish there
+pub(crate) struct Prepared<'a> {
+    slot: &'a mut ResponseSlot,
+    header: ResponseHeader,
+}
+
+impl<'a> Prepared<'a> {
+    pub(crate) fn header(&self) -> ResponseHeader {
+        self.header
     }
 
     pub(crate) fn header_mut(&mut self) -> &mut ResponseHeader {
-        match self {
-            Self::Empty(header) | Self::Stored(header) => header,
+        &mut self.header
+    }
+
+    /// Publish the response in its slot and return the bytes to send
+    pub(crate) fn publish(self) -> &'a [u8] {
+        let Self { slot, header } = self;
+        for (dest, src) in slot.bytes.iter_mut().zip(header.to_bytes()) {
+            *dest = src;
         }
+        slot.header = Some(header);
+        slot.view()
     }
 }
 
@@ -60,14 +74,22 @@ impl ResponseSlot {
         }
     }
 
-    /// Write objects after the header. This doesn't publish them, and the response published
-    /// before is gone.
+    /// Write objects after the header, for a response to prepare from the result. The response
+    /// published before is gone.
     pub(crate) fn build<R>(
         &mut self,
         write: impl FnOnce(&mut WriteCursor) -> Result<R, WriteError>,
-    ) -> Result<R, WriteError> {
+    ) -> (Result<R, WriteError>, Staged<'_>) {
         self.header = None;
         self.len = ResponseHeader::LENGTH;
+        let result = self.write_objects(write);
+        (result, Staged { slot: self })
+    }
+
+    fn write_objects<R>(
+        &mut self,
+        write: impl FnOnce(&mut WriteCursor) -> Result<R, WriteError>,
+    ) -> Result<R, WriteError> {
         let mut cursor = WriteCursor::new(&mut self.bytes);
         cursor.skip(ResponseHeader::LENGTH)?;
         let result = write(&mut cursor)?;
@@ -75,20 +97,11 @@ impl ResponseSlot {
         Ok(result)
     }
 
-    /// Publish a response and return the bytes to send
-    pub(crate) fn publish(&mut self, response: Prepared) -> &[u8] {
-        let header = match response {
-            Prepared::Empty(header) => {
-                self.len = ResponseHeader::LENGTH;
-                header
-            }
-            Prepared::Stored(header) => header,
-        };
-        for (dest, src) in self.bytes.iter_mut().zip(header.to_bytes()) {
-            *dest = src;
-        }
-        self.header = Some(header);
-        self.view()
+    /// Prepare a response with no objects. The response published before is gone.
+    pub(crate) fn empty(&mut self, header: ResponseHeader) -> Prepared<'_> {
+        self.header = None;
+        self.len = ResponseHeader::LENGTH;
+        Prepared { slot: self, header }
     }
 
     /// The published response, to send again exactly as it was
@@ -125,17 +138,18 @@ mod tests {
     #[test]
     fn builds_are_not_published() {
         let mut slot = ResponseSlot::new(BufferSize::min());
-        slot.publish(Prepared::Empty(header(1)));
+        slot.empty(header(1)).publish();
 
-        slot.build(|cursor| cursor.write_u8(0xAA)).unwrap();
+        let (result, _) = slot.build(|cursor| cursor.write_u8(0xAA));
+        result.unwrap();
         assert!(slot.ready().is_none());
 
-        slot.publish(Prepared::Empty(header(2)));
-        slot.build(|cursor| {
+        slot.empty(header(2)).publish();
+        let (result, _) = slot.build(|cursor| {
             cursor.write_u8(0xAA)?;
             cursor.write_bytes(&[0; 300])
-        })
-        .unwrap_err();
+        });
+        result.unwrap_err();
         assert!(slot.ready().is_none());
         assert!(slot.header().is_none());
     }
@@ -143,30 +157,56 @@ mod tests {
     #[test]
     fn publishes_the_header_and_objects() {
         let mut slot = ResponseSlot::new(BufferSize::min());
-        slot.build(|cursor| cursor.write_bytes(&[0xAA, 0xBB]))
-            .unwrap();
+        let (result, staged) = slot.build(|cursor| cursor.write_bytes(&[0xAA, 0xBB]));
+        result.unwrap();
 
         let expected = [0xC1, 0x81, 0x00, 0x00, 0xAA, 0xBB];
-        assert_eq!(slot.publish(Prepared::Stored(header(1))), expected);
+        assert_eq!(staged.with_header(header(1)).publish(), expected);
+        assert_eq!(slot.ready(), Some(expected.as_slice()));
+    }
+
+    #[test]
+    fn failed_build_leaves_no_objects() {
+        let mut slot = ResponseSlot::new(BufferSize::min());
+        let (result, staged) = slot.build(|cursor| {
+            cursor.write_u8(0xAA)?;
+            cursor.write_bytes(&[0; 300])
+        });
+        result.unwrap_err();
+
+        let expected = [0xC1, 0x81, 0x00, 0x00];
+        assert_eq!(staged.with_header(header(1)).publish(), expected);
         assert_eq!(slot.ready(), Some(expected.as_slice()));
     }
 
     #[test]
     fn empty_response_drops_the_previous_objects() {
         let mut slot = ResponseSlot::new(BufferSize::min());
-        slot.build(|cursor| cursor.write_bytes(&[0xAA, 0xBB]))
-            .unwrap();
-        slot.publish(Prepared::Stored(header(1)));
+        let (result, staged) = slot.build(|cursor| cursor.write_bytes(&[0xAA, 0xBB]));
+        result.unwrap();
+        staged.with_header(header(1)).publish();
 
         let expected = [0xC2, 0x81, 0x00, 0x00];
-        assert_eq!(slot.publish(Prepared::Empty(header(2))), expected);
+        assert_eq!(slot.empty(header(2)).publish(), expected);
         assert_eq!(slot.ready(), Some(expected.as_slice()));
+    }
+
+    #[test]
+    fn dropped_empty_response_leaves_nothing_published() {
+        let mut slot = ResponseSlot::new(BufferSize::min());
+        slot.empty(header(1)).publish();
+
+        {
+            let _unpublished = slot.empty(header(2));
+        }
+        assert!(slot.ready().is_none());
+        assert!(slot.header().is_none());
     }
 
     #[test]
     fn clear_unpublishes() {
         let mut slot = ResponseSlot::new(BufferSize::min());
-        slot.publish(Prepared::Empty(header(1)));
+        slot.empty(header(1)).publish();
         slot.clear();
         assert!(slot.ready().is_none());
         assert!(slot.header().is_none());
