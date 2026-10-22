@@ -26,7 +26,6 @@ pub(crate) struct Layer {
     local_address: EndpointAddress,
     secondary_state: SecondaryState,
     reader: super::reader::Reader,
-    tx_buffer: [u8; super::constant::LINK_HEADER_LENGTH],
 }
 
 pub(crate) struct Reply {
@@ -115,7 +114,6 @@ impl Layer {
             local_address,
             secondary_state: SecondaryState::NotReset,
             reader: super::reader::Reader::new(link_modes, max_rx_fragment_size),
-            tx_buffer: [0; super::constant::LINK_HEADER_LENGTH],
         }
     }
 
@@ -128,6 +126,12 @@ impl Layer {
         self.reader.reset();
     }
 
+    /// Read until a frame passes data or a link-layer message up, returning its info with its
+    /// data in `payload`
+    ///
+    /// Nothing is awaited between consuming a frame and returning it, and a frame's reply is
+    /// queued in `io`, which writes it before the next frame is read or anything else is written.
+    /// Dropping the future therefore loses neither a frame nor a reply.
     pub(crate) async fn read(
         &mut self,
         io: &mut PhysLayer,
@@ -135,8 +139,18 @@ impl Layer {
         payload: &mut FramePayload,
     ) -> Result<FrameInfo, LinkError> {
         loop {
-            if let Some(address) = self.read_one(io, level, payload).await? {
-                return Ok(address);
+            io.finish_reply().await?;
+            let (header, addr) = self.reader.read_frame(io, payload, level).await?;
+            let (info, reply) = self.process_header(header, addr, Ignored::log);
+            if let Some(reply) = reply {
+                let header = self.get_header(reply);
+                if level.link.enabled() {
+                    tracing::info!("LINK TX - {}", LinkDisplay::new(header, &[], level.link));
+                }
+                io.queue_reply(Self::format_reply(header), addr, level.physical)?;
+            }
+            if let Some(info) = info {
+                return Ok(info);
             }
         }
     }
@@ -149,28 +163,8 @@ impl Layer {
         )
     }
 
-    pub(crate) fn format_reply(&mut self, header: Header) -> &[u8] {
-        self.tx_buffer = header_bytes(header, super::constant::MIN_HEADER_LENGTH_VALUE);
-        &self.tx_buffer
-    }
-
-    async fn read_one(
-        &mut self,
-        io: &mut PhysLayer,
-        level: DecodeLevel,
-        payload: &mut FramePayload,
-    ) -> Result<Option<FrameInfo>, LinkError> {
-        let (header, addr) = self.reader.read_frame(io, payload, level).await?;
-        let (info, reply) = self.process_header(header, addr, Ignored::log);
-        if let Some(reply) = reply {
-            let header = self.get_header(reply);
-            if level.link.enabled() {
-                tracing::info!("LINK TX - {}", LinkDisplay::new(header, &[], level.link));
-            }
-            io.write(self.format_reply(header), addr, level.physical)
-                .await?
-        }
-        Ok(info)
+    pub(crate) fn format_reply(header: Header) -> [u8; super::constant::LINK_HEADER_LENGTH] {
+        header_bytes(header, super::constant::MIN_HEADER_LENGTH_VALUE)
     }
 
     /// Process a frame's header, passing the reason to `ignore` whenever the frame is ignored
@@ -411,7 +405,7 @@ mod test {
         let (info, reply) = layer.process_header(header, PhysAddr::None, |x| ignored.push(x));
         let reply = reply.map(|reply| {
             let header = layer.get_header(reply);
-            layer.format_reply(header).to_vec()
+            Layer::format_reply(header).to_vec()
         });
         Processed {
             info,

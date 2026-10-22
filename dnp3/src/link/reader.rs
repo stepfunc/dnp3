@@ -276,7 +276,7 @@ mod tests {
     async fn bound() -> (PhysLayer, std::net::SocketAddr) {
         let socket = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
         let local = socket.local_addr().unwrap();
-        (PhysLayer::Udp(UdpLayer::bound(socket)), local)
+        (PhysLayer::udp(UdpLayer::bound(socket)), local)
     }
 
     async fn sender() -> (tokio::net::UdpSocket, PhysAddr) {

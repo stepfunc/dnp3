@@ -92,7 +92,7 @@ struct Harness {
 impl Harness {
     async fn new() -> Self {
         let (io, handle) = sfio_tokio_mock_io::mock();
-        let mut io = PhysLayer::Mock(io);
+        let mut io = PhysLayer::mock(io);
         let (tx, rx) = crate::util::channel::request_channel();
         let mut task = MasterTask::new(
             Enabled::Yes,

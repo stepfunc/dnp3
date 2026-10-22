@@ -77,7 +77,7 @@ async fn run_session(
 
 fn spawn_session(task: MockOutstationTask) -> Connected {
     let (io, io_handle) = sfio_tokio_mock_io::mock();
-    let phys = PhysLayer::Mock(io);
+    let phys = PhysLayer::mock(io);
     Connected {
         io: io_handle,
         session: tokio::spawn(run_session(task, phys)),
