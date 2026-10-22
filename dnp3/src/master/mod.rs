@@ -19,6 +19,8 @@ mod request;
 
 pub(crate) mod convert;
 pub(crate) mod extract;
+#[cfg(test)]
+mod header_info_tests;
 pub(crate) mod messages;
 pub(crate) mod poll;
 pub(crate) mod promise;
