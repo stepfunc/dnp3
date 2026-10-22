@@ -91,6 +91,11 @@ pub(crate) trait CommandObject: FixedSizeVariation {
 
     /// a copy of the object with a new status
     fn with_status(self, status: CommandStatus) -> Self;
+
+    /// true if this response object is an exact echo of the `sent` object
+    fn echoes(&self, sent: &Self) -> bool {
+        self == sent
+    }
 }
 
 impl CommandObject for Group12Var1 {
@@ -131,6 +136,10 @@ impl CommandObject for Group41Var3 {
     fn with_status(self, status: CommandStatus) -> Self {
         Self { status, ..self }
     }
+
+    fn echoes(&self, sent: &Self) -> bool {
+        self.status == sent.status && self.value.to_bits() == sent.value.to_bits()
+    }
 }
 
 impl CommandObject for Group41Var4 {
@@ -140,6 +149,10 @@ impl CommandObject for Group41Var4 {
 
     fn with_status(self, status: CommandStatus) -> Self {
         Self { status, ..self }
+    }
+
+    fn echoes(&self, sent: &Self) -> bool {
+        self.status == sent.status && self.value.to_bits() == sent.value.to_bits()
     }
 }
 

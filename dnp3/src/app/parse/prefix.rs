@@ -12,16 +12,6 @@ where
     pub(crate) value: V,
 }
 
-impl<I, V> Prefix<I, V>
-where
-    I: Index,
-    V: FixedSizeVariation,
-{
-    pub(crate) fn equals(&self, other: &(V, I)) -> bool {
-        self.index == other.1 && self.value == other.0
-    }
-}
-
 impl<I, V> FixedSize for Prefix<I, V>
 where
     I: Index,
