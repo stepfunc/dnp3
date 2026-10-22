@@ -13,22 +13,24 @@ use crate::transport::{Fragment, FragmentAddr, FragmentInfo};
 pub(crate) struct Assembler {
     state: State,
     buffer: Box<[u8]>,
-    /// length of the series or fragment in `buffer`; meaningful while `Running` or `Complete`.
-    /// Only `extend` grows it, to an end that `buffer` was just checked to contain.
-    len: usize,
 }
 
 #[derive(Copy, Clone)]
 enum State {
     Idle,
-    /// a series is in progress, and `last` and `last_len` describe its most recent segment
+    /// a series of `len` bytes is in progress, and `last` and `last_len` describe its most recent
+    /// segment
     Running {
         info: FrameInfo,
         last: Header,
         last_len: usize,
+        len: usize,
     },
-    /// the buffer holds a fragment waiting to be taken
-    Complete(FragmentInfo),
+    /// the first `len` bytes of the buffer hold a fragment waiting to be taken
+    Complete {
+        info: FragmentInfo,
+        len: usize,
+    },
 }
 
 pub(crate) enum AssemblyState {
@@ -104,36 +106,32 @@ impl Assembler {
         Self {
             state: State::Idle,
             buffer: vec![0; max_fragment_size].into_boxed_slice(),
-            len: 0,
         }
     }
 
     pub(crate) fn reset(&mut self) {
-        self.abandon();
+        self.state = State::Idle;
     }
 
     pub(crate) fn peek(&self) -> Option<Fragment<'_>> {
-        match self.state {
-            State::Complete(info) => Some(Fragment {
-                info,
-                data: self.fragment(),
-            }),
-            State::Idle | State::Running { .. } => None,
-        }
+        let State::Complete { info, len } = self.state else {
+            return None;
+        };
+        Some(Fragment {
+            info,
+            data: self.fragment(len),
+        })
     }
 
     pub(crate) fn pop(&mut self) -> Option<Fragment<'_>> {
-        match self.state {
-            State::Complete(info) => {
-                // `len` is kept so the returned fragment still covers the data; the next FIR resets it
-                self.state = State::Idle;
-                Some(Fragment {
-                    info,
-                    data: self.fragment(),
-                })
-            }
-            State::Idle | State::Running { .. } => None,
-        }
+        let State::Complete { info, len } = self.state else {
+            return None;
+        };
+        self.state = State::Idle;
+        Some(Fragment {
+            info,
+            data: self.fragment(len),
+        })
     }
 
     /// Add a segment, passing the reason to `discard` whenever a segment or the series in
@@ -147,18 +145,18 @@ impl Assembler {
     ) -> AssemblyState {
         // FIR always clears the previous assembly
         if header.fir {
-            if let State::Running { info, .. } = self.state {
+            if let State::Running { info, len, .. } = self.state {
                 discard(Discard::NewSeries {
-                    len: self.len,
+                    len,
                     source: info.source,
                 });
             }
-            self.abandon();
+            self.state = State::Idle;
         }
 
         if info.broadcast.is_some() {
             if header.fir && header.fin {
-                self.append(info, header, data, &mut discard);
+                self.append(0, info, header, data, &mut discard);
             } else {
                 discard(Discard::BroadcastSeries {
                     fir: header.fir,
@@ -169,9 +167,9 @@ impl Assembler {
         }
 
         match self.state {
-            State::Idle | State::Complete(_) => {
+            State::Idle | State::Complete { .. } => {
                 if header.fir {
-                    self.append(info, header, data, &mut discard);
+                    self.append(0, info, header, data, &mut discard);
                 } else {
                     discard(Discard::NoSeries {
                         source: info.source,
@@ -182,17 +180,18 @@ impl Assembler {
                 info: previous,
                 last,
                 last_len,
+                len,
             } => {
                 if info != previous {
                     discard(Discard::ConflictingAddress {
                         previous,
                         received: info,
                     });
-                    self.abandon();
+                    self.state = State::Idle;
                 } else if header.seq.value() == last.seq.value() {
                     let repeat = header.to_u8() == last.to_u8()
                         && data.len() == last_len
-                        && self.fragment().ends_with(data);
+                        && self.fragment(len).ends_with(data);
                     if repeat {
                         discard(Discard::Repeat {
                             seq: header.seq.value(),
@@ -201,16 +200,16 @@ impl Assembler {
                         discard(Discard::DifferentRepeat {
                             seq: header.seq.value(),
                         });
-                        self.abandon();
+                        self.state = State::Idle;
                     }
                 } else if header.seq.value() != last.seq.next() {
                     discard(Discard::UnexpectedSeq {
                         expected: last.seq.next(),
                         received: header.seq.value(),
                     });
-                    self.abandon();
+                    self.state = State::Idle;
                 } else {
-                    self.append(info, header, data, &mut discard);
+                    self.append(len, info, header, data, &mut discard);
                 }
             }
         }
@@ -220,59 +219,61 @@ impl Assembler {
 
     fn assembly_state(&self) -> AssemblyState {
         match self.state {
-            State::Complete(_) => AssemblyState::Complete,
+            State::Complete { .. } => AssemblyState::Complete,
             State::Idle | State::Running { .. } => AssemblyState::ReadMore,
         }
     }
 
-    fn fragment(&self) -> &[u8] {
-        self.buffer.get(..self.len).unwrap_or_default()
+    /// the first `len` bytes of the buffer
+    fn fragment(&self, len: usize) -> &[u8] {
+        self.buffer.get(..len).unwrap_or_default()
     }
 
-    fn abandon(&mut self) {
-        self.state = State::Idle;
-        self.len = 0;
-    }
-
+    /// Append a segment to the `start` bytes already assembled
     fn append<F: FnMut(Discard)>(
         &mut self,
+        start: usize,
         info: FrameInfo,
         header: Header,
         data: &[u8],
         discard: &mut F,
     ) {
-        if self.extend(data).is_err() {
+        let Ok(len) = self.extend(start, data) else {
             discard(Discard::Overflow { len: data.len() });
-            self.abandon();
+            self.state = State::Idle;
             return;
-        }
+        };
 
-        if !header.fin {
-            self.state = State::Running {
+        self.state = if !header.fin {
+            State::Running {
                 info,
                 last: header,
                 last_len: data.len(),
-            };
-        } else if self.len == 0 {
+                len,
+            }
+        } else if len == 0 {
             // an empty fragment isn't passed to the application layer
-            self.state = State::Idle;
+            State::Idle
         } else {
             let addr = FragmentAddr {
                 link: info.source,
                 phys: info.phys_addr,
             };
-            self.state = State::Complete(FragmentInfo::new(addr, info.broadcast));
-        }
+            State::Complete {
+                info: FragmentInfo::new(addr, info.broadcast),
+                len,
+            }
+        };
     }
 
-    fn extend(&mut self, data: &[u8]) -> Result<(), Overflow> {
-        let end = self.len.checked_add(data.len()).ok_or(Overflow)?;
-        let dest = self.buffer.get_mut(self.len..end).ok_or(Overflow)?;
+    /// Copy `data` into the buffer after the first `start` bytes, returning the new length
+    fn extend(&mut self, start: usize, data: &[u8]) -> Result<usize, Overflow> {
+        let end = start.checked_add(data.len()).ok_or(Overflow)?;
+        let dest = self.buffer.get_mut(start..end).ok_or(Overflow)?;
         for (dest, src) in dest.iter_mut().zip(data) {
             *dest = *src;
         }
-        self.len = end;
-        Ok(())
+        Ok(end)
     }
 }
 
