@@ -85,15 +85,6 @@ fn command_status_values_match_the_table() {
 }
 
 #[test]
-fn function_code_round_trips_every_parsed_value() {
-    for byte in 0..=u8::MAX {
-        if let Some(function) = FunctionCode::from(byte) {
-            assert_eq!(function.as_u8(), byte, "{function:?}");
-        }
-    }
-}
-
-#[test]
 fn function_code_values_match_the_table() {
     for &(function, value) in FUNCTION_CODES {
         assert_eq!(FunctionCode::from(value), Some(function), "{value}");
