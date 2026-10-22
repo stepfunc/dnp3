@@ -32,6 +32,8 @@ mod repeats;
 mod request_filtering;
 /// how a request is answered in idle and in each confirm wait
 mod request_intake;
+/// the bytes of the solicited and unsolicited responses sent again
+mod response_slots;
 /// clear restart IIN + cold/warm restart
 mod restart;
 /// time synchronization
