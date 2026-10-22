@@ -277,7 +277,7 @@ impl TaskStates {
             if let Some(procedure) = config.auto_time_sync {
                 return self
                     .time_sync
-                    .create_next_task(|| PendingTimeSync::new(procedure, None).into());
+                    .create_next_task(|| PendingTimeSync::auto(procedure).into());
             }
         }
 

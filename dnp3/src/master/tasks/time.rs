@@ -14,18 +14,62 @@ use crate::master::tasks::{AppTask, NonReadTask, Task};
 
 use tokio::time::Instant;
 
-type TimeSyncPromise = Option<Promise<Result<(), TimeSyncError>>>;
+/// Who receives the outcome of a time synchronization
+enum Requester {
+    /// Requested through the API
+    User(Promise<Result<(), TimeSyncError>>),
+    /// Started automatically, reported to the association
+    Auto,
+}
+
+impl Requester {
+    fn complete(self, association: &mut Association, result: Result<(), TimeSyncError>) {
+        match self {
+            Self::User(promise) => promise.complete(result),
+            Self::Auto => match result {
+                Ok(()) => association.on_time_sync_success(),
+                Err(err) => association.on_time_sync_failure(err),
+            },
+        }
+    }
+
+    fn on_task_error(self, association: Option<&mut Association>, err: TaskError) {
+        match self {
+            Self::User(promise) => promise.complete(Err(err.into())),
+            Self::Auto => {
+                if let Some(association) = association {
+                    association.on_time_sync_failure(err.into());
+                }
+            }
+        }
+    }
+}
 
 /// A time synchronization that hasn't started. Starting it captures the time the first
 /// request is based on.
 pub(crate) struct PendingTimeSync {
     procedure: TimeSyncProcedure,
-    promise: TimeSyncPromise,
+    requester: Requester,
 }
 
 impl PendingTimeSync {
-    pub(crate) fn new(procedure: TimeSyncProcedure, promise: TimeSyncPromise) -> Self {
-        Self { procedure, promise }
+    /// A time synchronization requested through the API
+    pub(crate) fn user(
+        procedure: TimeSyncProcedure,
+        promise: Promise<Result<(), TimeSyncError>>,
+    ) -> Self {
+        Self {
+            procedure,
+            requester: Requester::User(promise),
+        }
+    }
+
+    /// A time synchronization started because the outstation needs the time
+    pub(crate) fn auto(procedure: TimeSyncProcedure) -> Self {
+        Self {
+            procedure,
+            requester: Requester::Auto,
+        }
     }
 
     /// Start the time synchronization, or report an error and return `None` if the system
@@ -45,20 +89,17 @@ impl PendingTimeSync {
         };
 
         match state {
-            Some(state) => Some(TimeSyncTask::new(state, self.promise)),
+            Some(state) => Some(TimeSyncTask::new(state, self.requester)),
             None => {
-                complete(
-                    self.promise,
-                    association,
-                    Err(TimeSyncError::SystemTimeNotAvailable),
-                );
+                self.requester
+                    .complete(association, Err(TimeSyncError::SystemTimeNotAvailable));
                 None
             }
         }
     }
 
     pub(crate) fn on_task_error(self, association: Option<&mut Association>, err: TaskError) {
-        on_task_error(self.promise, association, err)
+        self.requester.on_task_error(association, err)
     }
 }
 
@@ -73,7 +114,7 @@ enum State {
 
 pub(crate) struct TimeSyncTask {
     state: State,
-    promise: TimeSyncPromise,
+    requester: Requester,
 }
 
 impl From<TimeSyncTask> for Task {
@@ -82,38 +123,31 @@ impl From<TimeSyncTask> for Task {
     }
 }
 
-fn complete(
-    promise: TimeSyncPromise,
-    association: &mut Association,
-    result: Result<(), TimeSyncError>,
-) {
-    match promise {
-        None => match result {
-            Ok(()) => association.on_time_sync_success(),
-            Err(err) => association.on_time_sync_failure(err),
-        },
-        Some(x) => x.complete(result),
+/// Check that a response has no object headers
+fn check_no_objects(response: &Response) -> Result<(), TimeSyncError> {
+    if response.raw_objects.is_empty() {
+        Ok(())
+    } else {
+        Err(TimeSyncError::Task(TaskError::UnexpectedResponseHeaders))
     }
 }
 
-fn on_task_error(promise: TimeSyncPromise, association: Option<&mut Association>, err: TaskError) {
-    match promise {
-        None => {
-            if let Some(association) = association {
-                association.on_time_sync_failure(err.into());
-            }
-        }
-        Some(x) => x.complete(Err(err.into())),
+/// Check the response to the WRITE that sets the outstation's time
+fn check_write_response(response: &Response) -> Result<(), TimeSyncError> {
+    check_no_objects(response)?;
+    if response.header.iin.iin1.get_need_time() {
+        return Err(TimeSyncError::StillNeedsTime);
     }
+    Ok(())
 }
 
 impl TimeSyncTask {
-    fn new(state: State, promise: TimeSyncPromise) -> Self {
-        Self { state, promise }
+    fn new(state: State, requester: Requester) -> Self {
+        Self { state, requester }
     }
 
     fn change_state(self, state: State) -> Self {
-        TimeSyncTask::new(state, self.promise)
+        TimeSyncTask::new(state, self.requester)
     }
 
     pub(crate) fn wrap(self) -> NonReadTask {
@@ -139,7 +173,7 @@ impl TimeSyncTask {
     }
 
     pub(crate) fn on_task_error(self, association: Option<&mut Association>, err: TaskError) {
-        on_task_error(self.promise, association, err)
+        self.requester.on_task_error(association, err)
     }
 
     pub(crate) fn handle(
@@ -149,12 +183,11 @@ impl TimeSyncTask {
     ) -> Result<Option<NonReadTask>, TaskError> {
         match self.state {
             State::MeasureDelay(time) => self.handle_delay_measure(association, time, response),
-            State::WriteAbsoluteTime(_) => self.handle_write_absolute_time(association, response),
             State::RecordCurrentTime(time) => {
                 self.handle_record_current_time(association, time, response)
             }
-            State::WriteLastRecordedTime(_) => {
-                self.handle_write_last_recorded_time(association, response)
+            State::WriteAbsoluteTime(_) | State::WriteLastRecordedTime(_) => {
+                self.handle_write(association, response)
             }
         }
     }
@@ -241,23 +274,17 @@ impl TimeSyncTask {
         ))
     }
 
-    fn handle_write_absolute_time(
+    fn handle_write(
         self,
         association: &mut Association,
         response: Response,
     ) -> Result<Option<NonReadTask>, TaskError> {
-        if !response.raw_objects.is_empty() {
-            let err = TaskError::UnexpectedResponseHeaders;
-            self.report_error(association, TimeSyncError::Task(err));
-            return Err(err);
-        }
-
-        if response.header.iin.iin1.get_need_time() {
-            self.report_error(association, TimeSyncError::StillNeedsTime);
+        if let Err(err) = check_write_response(&response) {
+            self.report_error(association, err);
             return Err(TaskError::UnexpectedResponseHeaders);
         }
 
-        self.report_success(association);
+        self.requester.complete(association, Ok(()));
 
         Ok(None)
     }
@@ -268,11 +295,8 @@ impl TimeSyncTask {
         recorded_time: Timestamp,
         response: Response,
     ) -> Result<Option<NonReadTask>, TaskError> {
-        if !response.raw_objects.is_empty() {
-            self.report_error(
-                association,
-                TimeSyncError::Task(TaskError::UnexpectedResponseHeaders),
-            );
+        if let Err(err) = check_no_objects(&response) {
+            self.report_error(association, err);
             return Err(TaskError::UnexpectedResponseHeaders);
         }
 
@@ -280,29 +304,6 @@ impl TimeSyncTask {
             self.change_state(State::WriteLastRecordedTime(recorded_time))
                 .wrap(),
         ))
-    }
-
-    fn handle_write_last_recorded_time(
-        self,
-        association: &mut Association,
-        response: Response,
-    ) -> Result<Option<NonReadTask>, TaskError> {
-        if !response.raw_objects.is_empty() {
-            self.report_error(
-                association,
-                TimeSyncError::Task(TaskError::UnexpectedResponseHeaders),
-            );
-            return Err(TaskError::UnexpectedResponseHeaders);
-        }
-
-        if response.header.iin.iin1.get_need_time() {
-            self.report_error(association, TimeSyncError::StillNeedsTime);
-            return Err(TaskError::UnexpectedResponseHeaders);
-        }
-
-        self.report_success(association);
-
-        Ok(None)
     }
 
     fn get_timestamp(
@@ -315,12 +316,8 @@ impl TimeSyncTask {
         }
     }
 
-    fn report_success(self, association: &mut Association) {
-        complete(self.promise, association, Ok(()))
-    }
-
     fn report_error(self, association: &mut Association, error: TimeSyncError) {
-        complete(self.promise, association, Err(error))
+        self.requester.complete(association, Err(error))
     }
 }
 
@@ -419,7 +416,7 @@ mod tests {
             Box::new(NullAssociationInformation),
         );
         let (promise, rx) = Promise::one_shot();
-        let task = PendingTimeSync::new(procedure, Some(promise));
+        let task = PendingTimeSync::user(procedure, promise);
 
         (task, system_time, association, rx)
     }
