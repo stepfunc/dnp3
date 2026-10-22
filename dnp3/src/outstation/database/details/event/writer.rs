@@ -725,33 +725,103 @@ mod tests {
         );
     }
 
+    fn write_binary(
+        writer: &mut EventWriter,
+        cursor: &mut WriteCursor,
+        index: u16,
+        time: Option<Time>,
+        variation: EventBinaryInputVariation,
+    ) {
+        let value = BinaryInput {
+            value: true,
+            flags: Flags::ONLINE,
+            time,
+        };
+        writer.write(cursor, &value, index, variation).unwrap();
+    }
+
     #[test]
-    fn writes_events_without_time_selected_as_g2v2_after_an_unsynchronized_cto_at_zero() {
+    fn writes_events_without_time_selected_as_g2v2_in_g2v1() {
         let mut buffer = [0u8; 64];
         let mut cursor = WriteCursor::new(&mut buffer);
         let mut writer = EventWriter::new();
 
-        let value = BinaryInput {
-            value: true,
-            flags: Flags::ONLINE,
-            time: None,
-        };
-        writer
-            .write(
+        for (index, time) in [
+            (1, Some(Time::synchronized(1))),
+            (2, None),
+            (3, Some(Time::unsynchronized(2))),
+        ] {
+            write_binary(
+                &mut writer,
                 &mut cursor,
-                &value,
-                6,
+                index,
+                time,
                 EventBinaryInputVariation::Group2Var2,
-            )
-            .unwrap();
+            );
+        }
 
         assert_eq!(
             cursor.written(),
             &[
-                // unsynchronized CTO at 0, g2v3 (count of 1), index 6 at +0
-                51, 2, 0x07, 0x01, 0, 0, 0, 0, 0, 0, 2, 3, 0x28, 0x01, 0x00, 6, 0, 0x81, 0, 0,
+                // g2v2 (count of 1), index 1 at 1
+                2, 2, 0x28, 0x01, 0x00, 1, 0, 0x81, 1, 0, 0, 0, 0, 0,
+                // g2v1 (count of 1), index 2
+                2, 1, 0x28, 0x01, 0x00, 2, 0, 0x81,
+                // unsynchronized CTO at 2, g2v3 (count of 1), index 3 at +0
+                51, 2, 0x07, 0x01, 2, 0, 0, 0, 0, 0, 2, 3, 0x28, 0x01, 0x00, 3, 0, 0x81, 0, 0,
             ]
         );
+    }
+
+    #[test]
+    fn writes_events_without_time_selected_as_g2v3_in_g2v1() {
+        let mut buffer = [0u8; 64];
+        let mut cursor = WriteCursor::new(&mut buffer);
+        let mut writer = EventWriter::new();
+
+        for (index, time) in [(1, None), (2, Some(Time::synchronized(5))), (3, None)] {
+            write_binary(
+                &mut writer,
+                &mut cursor,
+                index,
+                time,
+                EventBinaryInputVariation::Group2Var3,
+            );
+        }
+
+        assert_eq!(
+            cursor.written(),
+            &[
+                // g2v1 (count of 1), index 1
+                2, 1, 0x28, 0x01, 0x00, 1, 0, 0x81,
+                // synchronized CTO at 5, g2v3 (count of 1), index 2 at +0
+                51, 1, 0x07, 0x01, 5, 0, 0, 0, 0, 0, 2, 3, 0x28, 0x01, 0x00, 2, 0, 0x81, 0, 0,
+                // g2v1 (count of 1), index 3
+                2, 1, 0x28, 0x01, 0x00, 3, 0, 0x81,
+            ]
+        );
+    }
+
+    #[test]
+    fn writes_double_bit_events_without_time_selected_with_time_in_g4v1() {
+        for variation in [
+            EventDoubleBitBinaryInputVariation::Group4Var2,
+            EventDoubleBitBinaryInputVariation::Group4Var3,
+        ] {
+            let mut buffer = [0u8; 64];
+            let mut cursor = WriteCursor::new(&mut buffer);
+            let mut writer = EventWriter::new();
+
+            let value = DoubleBitBinaryInput {
+                value: DoubleBit::DeterminedOn,
+                flags: Flags::ONLINE,
+                time: None,
+            };
+            writer.write(&mut cursor, &value, 6, variation).unwrap();
+
+            // g4v1 (count of 1), index 6
+            assert_eq!(cursor.written(), &[4, 1, 0x28, 0x01, 0x00, 6, 0, 0x81]);
+        }
     }
 
     #[test]

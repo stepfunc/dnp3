@@ -10,9 +10,12 @@ pub enum EventBinaryInputVariation {
     /// Binary Input Event - with Absolute time
     ///
     /// Events recorded with unsynchronized time are reported as `Group2Var3` after an
-    /// unsynchronized common time of occurrence (g51v2)
+    /// unsynchronized common time of occurrence (g51v2), and events recorded without time as
+    /// `Group2Var1`
     Group2Var2,
     /// Binary Input Event - with Relative time
+    ///
+    /// Events recorded without time are reported as `Group2Var1`
     Group2Var3,
 }
 
@@ -41,9 +44,12 @@ pub enum EventDoubleBitBinaryInputVariation {
     /// Double-bit Binary Input Event - with Absolute time
     ///
     /// Events recorded with unsynchronized time are reported as `Group4Var3` after an
-    /// unsynchronized common time of occurrence (g51v2)
+    /// unsynchronized common time of occurrence (g51v2), and events recorded without time as
+    /// `Group4Var1`
     Group4Var2,
     /// Double-bit Binary Input Event - with Relative time
+    ///
+    /// Events recorded without time are reported as `Group4Var1`
     Group4Var3,
 }
 

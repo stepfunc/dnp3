@@ -1168,12 +1168,12 @@ fn cto_changes_with_synchronization() {
 }
 
 #[test]
-fn event_without_time_uses_an_unsynchronized_cto_of_zero() {
+fn event_without_time_is_reported_without_time_ahead_of_the_cto() {
     assert_eq!(
         binary_cto_events(&[None, unsync(0), unsync(1)]),
         ok(&[
-            51, 2, 7, 1, 0, 0, 0, 0, 0, 0, 2, 3, 40, 3, 0, 3, 0, 129, 0, 0, 3, 0, 1, 0, 0, 3, 0,
-            129, 1, 0
+            2, 1, 40, 1, 0, 3, 0, 129, 51, 2, 7, 1, 0, 0, 0, 0, 0, 0, 2, 3, 40, 2, 0, 3, 0, 1, 0,
+            0, 3, 0, 129, 1, 0
         ])
     );
 }

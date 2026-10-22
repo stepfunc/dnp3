@@ -17,15 +17,12 @@ pub(crate) trait EventVariation<T>: Copy {
     /// the variation the event is written in when this one is selected for it
     ///
     /// Binary and double-bit events with absolute time must have been recorded while synchronized
-    /// (TB2017-003a 5.1.3.1.2), whether the variation is the default or the one requested.
+    /// (TB2017-003a 5.1.3.1.2), and events recorded without time are reported without time
+    /// (IED certification procedures 3.1 rev 1, 8.14.1), whether the variation is the default or
+    /// the one requested.
     fn for_event(self, _event: &T) -> Self {
         self
     }
-}
-
-/// whether an event's time was recorded while the outstation was synchronized
-fn is_synchronized(time: Option<Time>) -> bool {
-    Time::from(time).is_synchronized()
 }
 
 /// Something done with an event, given how its variation is encoded
@@ -63,9 +60,12 @@ impl EventVariation<BinaryInput> for EventBinaryInputVariation {
     }
 
     fn for_event(self, event: &BinaryInput) -> Self {
-        match self {
-            Self::Group2Var2 if !is_synchronized(event.time) => Self::Group2Var3,
-            Self::Group2Var1 | Self::Group2Var2 | Self::Group2Var3 => self,
+        match (self, event.time) {
+            (Self::Group2Var2 | Self::Group2Var3, None) => Self::Group2Var1,
+            (Self::Group2Var2, Some(Time::Unsynchronized(_))) => Self::Group2Var3,
+            (Self::Group2Var1, _)
+            | (Self::Group2Var2, Some(Time::Synchronized(_)))
+            | (Self::Group2Var3, Some(_)) => self,
         }
     }
 }
@@ -83,9 +83,12 @@ impl EventVariation<DoubleBitBinaryInput> for EventDoubleBitBinaryInputVariation
     }
 
     fn for_event(self, event: &DoubleBitBinaryInput) -> Self {
-        match self {
-            Self::Group4Var2 if !is_synchronized(event.time) => Self::Group4Var3,
-            Self::Group4Var1 | Self::Group4Var2 | Self::Group4Var3 => self,
+        match (self, event.time) {
+            (Self::Group4Var2 | Self::Group4Var3, None) => Self::Group4Var1,
+            (Self::Group4Var2, Some(Time::Unsynchronized(_))) => Self::Group4Var3,
+            (Self::Group4Var1, _)
+            | (Self::Group4Var2, Some(Time::Synchronized(_)))
+            | (Self::Group4Var3, Some(_)) => self,
         }
     }
 }
