@@ -1,5 +1,5 @@
 use crate::app::parse::options::ParseOptions;
-use crate::app::{Listener, MaybeAsync, RetryStrategy};
+use crate::app::{Listener, NullListener, RetryStrategy};
 use crate::link::reader::LinkModes;
 use crate::outstation::task::OutstationTask as ProtocolOutstationTask;
 use crate::outstation::{
@@ -113,14 +113,6 @@ pub fn spawn_outstation_serial(
     Ok(handle)
 }
 
-struct NullListener;
-
-impl Listener<PortState> for NullListener {
-    fn update(&mut self, _: PortState) -> MaybeAsync<()> {
-        MaybeAsync::ready(())
-    }
-}
-
 /// Spawns an outstation task onto the `Tokio` runtime. The task runs until the returned handle is dropped.
 /// It is tolerant to the serial port being unavailable at startup or being removed from the OS. It
 /// uses the provided `RetryStrategy` to determine when to retry the port if the port cannot be
@@ -180,7 +172,7 @@ pub fn spawn_outstation_serial_fault_tolerant(
         application,
         information,
         control_handler,
-        Box::new(NullListener),
+        NullListener::create(),
     )
 }
 

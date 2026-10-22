@@ -272,16 +272,7 @@ impl<C: ConnectionHandler> AcceptTask<C> {
             .await
         {
             Ok(x) => {
-                self.spawn_session(
-                    phys,
-                    addr,
-                    x.config,
-                    self.parse_options,
-                    x.error_mode,
-                    id.header_bytes.as_slice(),
-                    Some(id),
-                )
-                .await;
+                self.spawn_session(phys, addr, x, Some(id)).await;
             }
             Err(Reject) => {
                 tracing::warn!(
@@ -301,16 +292,7 @@ impl<C: ConnectionHandler> AcceptTask<C> {
                 tracing::info!("rejected connection from {addr}");
             }
             Ok(AcceptAction::Accept(x)) => {
-                self.spawn_session(
-                    phys,
-                    addr,
-                    x.config,
-                    self.parse_options,
-                    x.error_mode,
-                    &[],
-                    None,
-                )
-                .await;
+                self.spawn_session(phys, addr, x, None).await;
             }
             Ok(AcceptAction::GetLinkIdentity) => {
                 // spawn a task to identify the remote link layer
@@ -324,28 +306,22 @@ impl<C: ConnectionHandler> AcceptTask<C> {
         }
     }
 
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "a session takes each part of its configuration separately"
-    )]
     async fn spawn_session(
         &mut self,
         phys: PhysLayer,
         addr: SocketAddr,
-        config: MasterChannelConfig,
-        parse_options: ParseOptions,
-        error_mode: LinkErrorMode,
-        seed_data: &[u8],
+        accept: AcceptConfig,
         link_id: Option<LinkIdentity>,
     ) {
         let (tx, rx) = crate::util::channel::request_channel();
         let mut task = MasterTask::new(
             Enabled::No,
-            LinkModes::stream(error_mode),
-            parse_options,
-            config,
+            LinkModes::stream(accept.error_mode),
+            self.parse_options,
+            accept.config,
             rx,
         );
+        let seed_data: &[u8] = link_id.as_ref().map_or(&[], |id| &id.header_bytes);
         if let Err(err) = task.seed_link(seed_data) {
             tracing::error!("unable to seed link layer: {err:?}");
             return;
