@@ -188,6 +188,34 @@ async fn write_keeps_the_error_of_an_earlier_header() {
 }
 
 #[tokio::test]
+async fn write_of_counted_event_objects_is_malformed() {
+    let mut harness = new_harness(get_default_config());
+
+    // g32v2 with a count of 2 and its 6 bytes of object data, which also read as a g80v1 header
+    // that clears the restart IIN
+    harness
+        .test_request_response(
+            &[0xC0, 0x02, 32, 2, 0x07, 2, 80, 1, 0x00, 7, 7, 0x00],
+            EMPTY_RESPONSE_PARAM_ERROR,
+        )
+        .await;
+    harness.check_no_events();
+}
+
+#[tokio::test]
+async fn write_of_counted_event_objects_without_data_is_malformed() {
+    let mut harness = new_harness(get_default_config());
+
+    // g32v1 with a 1-byte and a 2-byte count of 1, and no object data
+    harness
+        .test_request_response(&[0xC0, 0x02, 32, 1, 0x07, 1], EMPTY_RESPONSE_PARAM_ERROR)
+        .await;
+    harness
+        .test_request_response(&[0xC1, 0x02, 32, 1, 0x08, 1, 0], &[0xC1, 0x81, 0x80, 0x04])
+        .await;
+}
+
+#[tokio::test]
 async fn requests_the_application_declines_set_object_unknown() {
     let mut harness = new_harness(get_default_config());
     harness.application_data.lock().unwrap().supported = false;

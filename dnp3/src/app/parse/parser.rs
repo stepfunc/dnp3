@@ -525,7 +525,13 @@ impl<'a> ObjectParser<'a> {
 
     fn parse_count_u8(&mut self, v: Variation) -> Result<ObjectHeader<'a>, ObjectParseError> {
         let count = self.cursor.read_u8()?;
-        let data = CountVariation::parse(v, QualifierCode::Count8, count.into(), &mut self.cursor)?;
+        let data = CountVariation::parse(
+            self.function,
+            QualifierCode::Count8,
+            v,
+            count.into(),
+            &mut self.cursor,
+        )?;
         Ok(ObjectHeader::new(
             v,
             HeaderDetails::OneByteCount(count, data),
@@ -534,7 +540,13 @@ impl<'a> ObjectParser<'a> {
 
     fn parse_count_u16(&mut self, v: Variation) -> Result<ObjectHeader<'a>, ObjectParseError> {
         let count = self.cursor.read_u16_le()?;
-        let data = CountVariation::parse(v, QualifierCode::Count16, count, &mut self.cursor)?;
+        let data = CountVariation::parse(
+            self.function,
+            QualifierCode::Count16,
+            v,
+            count,
+            &mut self.cursor,
+        )?;
         Ok(ObjectHeader::new(
             v,
             HeaderDetails::TwoByteCount(count, data),
@@ -664,6 +676,22 @@ impl<'a> RangedVariation<'a> {
             Self::parse_read(v, qualifier)
         } else {
             Self::parse_non_read(v, qualifier, range, options, cursor)
+        }
+    }
+}
+
+impl<'a> CountVariation<'a> {
+    pub(crate) fn parse(
+        function: FunctionCode,
+        qualifier: QualifierCode,
+        v: Variation,
+        count: u16,
+        cursor: &mut ReadCursor<'a>,
+    ) -> Result<CountVariation<'a>, ObjectParseError> {
+        if function == FunctionCode::Read {
+            Self::parse_read(v, qualifier)
+        } else {
+            Self::parse_non_read(v, qualifier, count, cursor)
         }
     }
 }
@@ -1316,5 +1344,138 @@ mod test {
                 file_data: b"data",
             }
         );
+    }
+
+    #[test]
+    fn count_of_time_in_read_carries_no_data() {
+        let mut headers = ObjectParser::parse(
+            ParseOptions::default(),
+            FunctionCode::Read,
+            &[0x32, 0x01, 0x07, 0x01],
+        )
+        .unwrap()
+        .iter();
+        assert_matches!(
+            headers.next().unwrap().details,
+            HeaderDetails::OneByteCount(1, CountVariation::Group50Var1(seq)) => assert_eq!(seq.iter().count(), 0)
+        );
+        assert_matches!(headers.next(), None);
+
+        let mut headers = ObjectParser::parse(
+            ParseOptions::default(),
+            FunctionCode::Read,
+            &[0x32, 0x01, 0x08, 0x01, 0x00],
+        )
+        .unwrap()
+        .iter();
+        assert_matches!(
+            headers.next().unwrap().details,
+            HeaderDetails::TwoByteCount(1, CountVariation::Group50Var1(seq)) => assert_eq!(seq.iter().count(), 0)
+        );
+        assert_matches!(headers.next(), None);
+    }
+
+    #[test]
+    fn headers_after_count_of_time_in_read_are_parsed() {
+        let input = [0x32, 0x01, 0x07, 0x01, 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06];
+        let mut headers = ObjectParser::parse(ParseOptions::default(), FunctionCode::Read, &input)
+            .unwrap()
+            .iter();
+        assert_matches!(
+            headers.next().unwrap().details,
+            HeaderDetails::OneByteCount(1, CountVariation::Group50Var1(seq)) => assert_eq!(seq.iter().count(), 0)
+        );
+        assert_matches!(
+            headers.next().unwrap().details,
+            HeaderDetails::AllObjects(AllObjectsVariation::Group60Var2)
+        );
+        assert_matches!(
+            headers.next().unwrap().details,
+            HeaderDetails::AllObjects(AllObjectsVariation::Group60Var3)
+        );
+        assert_matches!(headers.next(), None);
+    }
+
+    #[test]
+    fn count_of_sized_events_is_rejected_outside_read() {
+        // g2v1, count 6, followed by bytes that would parse as g1v2 index 0
+        let input = [0x02, 0x01, 0x07, 0x06, 0x01, 0x02, 0x00, 0x00, 0x00, 0x01];
+        for function in [FunctionCode::Response, FunctionCode::UnsolicitedResponse] {
+            test_parse_error(
+                &input,
+                function,
+                ObjectParseError::InvalidQualifierForVariation(
+                    Variation::Group2Var1,
+                    QualifierCode::Count8,
+                ),
+            );
+        }
+
+        // g32v1, two-byte count of 1, with its object data, in a WRITE
+        test_parse_error(
+            &[0x20, 0x01, 0x08, 0x01, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05],
+            FunctionCode::Write,
+            ObjectParseError::InvalidQualifierForVariation(
+                Variation::Group32Var1,
+                QualifierCode::Count16,
+            ),
+        );
+
+        // g111v1, count 1, with one octet
+        test_parse_error(
+            &[0x6F, 0x01, 0x07, 0x01, 0xAA],
+            FunctionCode::Response,
+            ObjectParseError::InvalidQualifierForVariation(
+                Variation::Group111(1),
+                QualifierCode::Count8,
+            ),
+        );
+    }
+
+    #[test]
+    fn count_of_sized_events_in_read_carries_no_data() {
+        let input = [
+            0x02, 0x01, 0x07, 0x05, 0x20, 0x02, 0x08, 0x0A, 0x00, 0x6F, 0x01, 0x07, 0x01,
+        ];
+        let mut headers = ObjectParser::parse(ParseOptions::default(), FunctionCode::Read, &input)
+            .unwrap()
+            .iter();
+        assert_matches!(
+            headers.next().unwrap().details,
+            HeaderDetails::OneByteCount(5, CountVariation::Group2Var1)
+        );
+        assert_matches!(
+            headers.next().unwrap().details,
+            HeaderDetails::TwoByteCount(10, CountVariation::Group32Var2)
+        );
+        assert_matches!(
+            headers.next().unwrap().details,
+            HeaderDetails::OneByteCount(1, CountVariation::Group111VarX(1))
+        );
+        assert_matches!(headers.next(), None);
+    }
+
+    #[test]
+    fn count_of_any_variation_class_and_g111v0_is_accepted_outside_read() {
+        let input = [
+            0x02, 0x00, 0x07, 0x01, 0x3C, 0x02, 0x08, 0x01, 0x00, 0x6F, 0x00, 0x07, 0x01,
+        ];
+        let mut headers =
+            ObjectParser::parse(ParseOptions::default(), FunctionCode::Response, &input)
+                .unwrap()
+                .iter();
+        assert_matches!(
+            headers.next().unwrap().details,
+            HeaderDetails::OneByteCount(1, CountVariation::Group2Var0)
+        );
+        assert_matches!(
+            headers.next().unwrap().details,
+            HeaderDetails::TwoByteCount(1, CountVariation::Group60Var2)
+        );
+        assert_matches!(
+            headers.next().unwrap().details,
+            HeaderDetails::OneByteCount(1, CountVariation::Group111Var0)
+        );
+        assert_matches!(headers.next(), None);
     }
 }

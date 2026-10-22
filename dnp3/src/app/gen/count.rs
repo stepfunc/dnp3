@@ -164,7 +164,7 @@ pub(crate) enum CountVariation<'a> {
 }
 
 impl<'a> CountVariation<'a> {
-    pub(crate) fn parse(v: Variation, qualifier: QualifierCode, count: u16, cursor: &mut ReadCursor<'a>) -> Result<CountVariation<'a>, ObjectParseError> {
+    pub(crate) fn parse_read(v: Variation, qualifier: QualifierCode) -> Result<CountVariation<'a>, ObjectParseError> {
         match v {
             Variation::Group2Var0 => Ok(CountVariation::Group2Var0),
             Variation::Group2Var1 => Ok(CountVariation::Group2Var1),
@@ -224,6 +224,33 @@ impl<'a> CountVariation<'a> {
             Variation::Group43Var6 => Ok(CountVariation::Group43Var6),
             Variation::Group43Var7 => Ok(CountVariation::Group43Var7),
             Variation::Group43Var8 => Ok(CountVariation::Group43Var8),
+            Variation::Group50Var1 => Ok(CountVariation::Group50Var1(CountSequence::empty())),
+            Variation::Group50Var2 => Ok(CountVariation::Group50Var2(CountSequence::empty())),
+            Variation::Group50Var3 => Ok(CountVariation::Group50Var3(CountSequence::empty())),
+            Variation::Group50Var4 => Ok(CountVariation::Group50Var4(CountSequence::empty())),
+            Variation::Group51Var1 => Ok(CountVariation::Group51Var1(CountSequence::empty())),
+            Variation::Group51Var2 => Ok(CountVariation::Group51Var2(CountSequence::empty())),
+            Variation::Group52Var1 => Ok(CountVariation::Group52Var1(CountSequence::empty())),
+            Variation::Group52Var2 => Ok(CountVariation::Group52Var2(CountSequence::empty())),
+            Variation::Group60Var2 => Ok(CountVariation::Group60Var2),
+            Variation::Group60Var3 => Ok(CountVariation::Group60Var3),
+            Variation::Group60Var4 => Ok(CountVariation::Group60Var4),
+            Variation::Group111(0) => Ok(CountVariation::Group111Var0),
+            Variation::Group111(x) => Ok(CountVariation::Group111VarX(x)),
+            _ => Err(ObjectParseError::InvalidQualifierForVariation(v, qualifier)),
+        }
+    }
+    
+    pub(crate) fn parse_non_read(v: Variation, qualifier: QualifierCode, count: u16, cursor: &mut ReadCursor<'a>) -> Result<CountVariation<'a>, ObjectParseError> {
+        match v {
+            Variation::Group2Var0 => Ok(CountVariation::Group2Var0),
+            Variation::Group4Var0 => Ok(CountVariation::Group4Var0),
+            Variation::Group11Var0 => Ok(CountVariation::Group11Var0),
+            Variation::Group22Var0 => Ok(CountVariation::Group22Var0),
+            Variation::Group23Var0 => Ok(CountVariation::Group23Var0),
+            Variation::Group32Var0 => Ok(CountVariation::Group32Var0),
+            Variation::Group33Var0 => Ok(CountVariation::Group33Var0),
+            Variation::Group42Var0 => Ok(CountVariation::Group42Var0),
             Variation::Group50Var1 => Ok(CountVariation::Group50Var1(CountSequence::parse(count, cursor)?)),
             Variation::Group50Var2 => Ok(CountVariation::Group50Var2(CountSequence::parse(count, cursor)?)),
             Variation::Group50Var3 => Ok(CountVariation::Group50Var3(CountSequence::parse(count, cursor)?)),
@@ -236,7 +263,6 @@ impl<'a> CountVariation<'a> {
             Variation::Group60Var3 => Ok(CountVariation::Group60Var3),
             Variation::Group60Var4 => Ok(CountVariation::Group60Var4),
             Variation::Group111(0) => Ok(CountVariation::Group111Var0),
-            Variation::Group111(x) => Ok(CountVariation::Group111VarX(x)),
             _ => Err(ObjectParseError::InvalidQualifierForVariation(v, qualifier)),
         }
     }
