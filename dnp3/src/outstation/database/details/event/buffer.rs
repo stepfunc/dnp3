@@ -12,6 +12,7 @@ use crate::util::BadWrite;
 use super::writer::EventWriter;
 
 use crate::outstation::database::details::event::traits::OctetStringLength;
+use crate::outstation::database::details::WriteProgress;
 use crate::outstation::{BufferState, ClassCount, OutstationApplication, TypeCount};
 use records::{EventRecord, EventState, Events};
 use scursor::WriteCursor;
@@ -146,6 +147,7 @@ mod records {
     use super::super::writer::EventWriter;
     use super::{class_count_mut, decrement, increment, Event, EventType};
     use crate::master::EventClasses;
+    use crate::outstation::database::details::WriteProgress;
     use crate::outstation::database::EventClass;
     use crate::outstation::{BufferState, ClassCount, TypeCount};
 
@@ -290,12 +292,13 @@ mod records {
             count
         }
 
-        /// write the selected records in order until the cursor is full, marking them written
-        pub(super) fn write(&mut self, cursor: &mut WriteCursor) -> Result<usize, usize> {
+        /// write the selected records in order until the cursor is full, marking them written,
+        /// and return how many were written
+        pub(super) fn write(&mut self, cursor: &mut WriteCursor) -> (usize, WriteProgress) {
             let written = &mut self.written;
             let mut writer = EventWriter::new();
             let mut count: usize = 0;
-            let mut complete = true;
+            let mut progress = WriteProgress::Complete;
             self.list.for_each_mut(|record| {
                 if record.state != EventState::Selected {
                     return ControlFlow::Continue(());
@@ -305,19 +308,15 @@ mod records {
                     .write(record.index, cursor, &mut writer)
                     .is_err()
                 {
-                    complete = false;
-                    return ControlFlow::Break(()); // out of space
+                    progress = WriteProgress::Partial;
+                    return ControlFlow::Break(());
                 }
                 Self::set_state(written, record, EventState::Written);
                 count = count.saturating_add(1);
                 ControlFlow::Continue(())
             });
 
-            if complete {
-                Ok(count)
-            } else {
-                Err(count)
-            }
+            (count, progress)
         }
 
         /// return every record to the unselected state
@@ -632,7 +631,8 @@ impl EventBuffer {
         })
     }
 
-    pub(crate) fn write_events(&mut self, cursor: &mut WriteCursor) -> Result<usize, usize> {
+    /// write the selected events until the cursor is full, returning how many were written
+    pub(crate) fn write_events(&mut self, cursor: &mut WriteCursor) -> (usize, WriteProgress) {
         self.events.write(cursor)
     }
 
@@ -980,7 +980,10 @@ mod tests {
         assert_eq!(1, buffer.select_by_class(EventClass::Class1.into(), None));
         let mut backing = [0u8; 64];
         let mut cursor = WriteCursor::new(backing.as_mut());
-        assert_eq!(buffer.write_events(&mut cursor), Ok(1));
+        assert_eq!(
+            buffer.write_events(&mut cursor),
+            (1, WriteProgress::Complete)
+        );
     }
 
     #[test]
@@ -1056,7 +1059,10 @@ mod tests {
 
         {
             let mut cursor = WriteCursor::new(backing.as_mut());
-            assert_eq!(buffer.write_events(&mut cursor), Err(1)); // not enough space to write both events
+            assert_eq!(
+                buffer.write_events(&mut cursor),
+                (1, WriteProgress::Partial)
+            ); // not enough space to write both events
             let remaining_classes = EventClasses::all();
             assert_eq!(buffer.unwritten_classes(), remaining_classes);
             assert_eq!(buffer.clear_written(&mut mock), 1);
@@ -1065,7 +1071,10 @@ mod tests {
 
         {
             let mut cursor = WriteCursor::new(backing.as_mut());
-            assert_eq!(buffer.write_events(&mut cursor), Err(1));
+            assert_eq!(
+                buffer.write_events(&mut cursor),
+                (1, WriteProgress::Partial)
+            );
             let remaining_classes = EventClass::Class1 | EventClass::Class2; //  we just wrote the only class 3 event
             assert_eq!(buffer.unwritten_classes(), remaining_classes);
             assert_eq!(buffer.clear_written(&mut mock), 1);
@@ -1112,7 +1121,10 @@ mod tests {
         // leaving one Written and one still Selected
         let mut backing = [0u8; 10];
         let mut cursor = WriteCursor::new(backing.as_mut());
-        assert_eq!(buffer.write_events(&mut cursor), Err(1));
+        assert_eq!(
+            buffer.write_events(&mut cursor),
+            (1, WriteProgress::Partial)
+        );
 
         // only the three unselected events (ids 1, 2, 3) are discarded
         assert_eq!(
@@ -1133,7 +1145,10 @@ mod tests {
         let mut cursor = WriteCursor::new(backing.as_mut());
         buffer.reset();
         assert_eq!(1, buffer.select_by_class(EventClasses::all(), None));
-        assert_eq!(1, buffer.write_events(&mut cursor).unwrap());
+        assert_eq!(
+            buffer.write_events(&mut cursor),
+            (1, WriteProgress::Complete)
+        );
         assert_eq!(1, buffer.clear_written(&mut mock));
         assert_eq!(mock.events.pop_front(), Some(Event::Clear(4)));
         assert_eq!(mock.events.pop_front(), None);
@@ -1213,7 +1228,10 @@ mod tests {
         let mut backing = [0u8; 64];
         let mut cursor = WriteCursor::new(backing.as_mut());
 
-        assert_eq!(2, buffer.write_events(&mut cursor).unwrap());
+        assert_eq!(
+            buffer.write_events(&mut cursor),
+            (2, WriteProgress::Complete)
+        );
 
         assert_eq!(
             cursor.written(),

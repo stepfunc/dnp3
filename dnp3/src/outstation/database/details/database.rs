@@ -14,6 +14,7 @@ use crate::app::measurement::{
     DoubleBitBinaryInput, Flags, FrozenCounter, OctetString, Time,
 };
 use crate::outstation::database::details::attrs::map::SetMap;
+use crate::outstation::database::details::WriteProgress;
 use crate::outstation::{BufferState, ClassCount, OutstationApplication};
 use scursor::WriteCursor;
 
@@ -216,41 +217,23 @@ impl Database {
         }
     }
 
+    /// write events, then static data, then attributes, each only once the part before it is
+    /// complete
     pub(crate) fn write_response_headers(&mut self, cursor: &mut WriteCursor) -> ResponseInfo {
-        // first we write events
-        let result = self.event_buffer.write_events(cursor);
-        let has_events = match result {
-            Ok(count) => count > 0,
-            Err(count) => count > 0,
-        };
-
-        // next write static data
-        let complete = if result.is_err() {
-            // unable to write all the events in this response, so we can't write any static data
-            false
-        } else {
-            // write all events to we can try to write all static data
-            self.static_db.write(cursor).is_ok()
-        };
-
-        // next write device attributes
-        let complete = if complete {
-            self.attrs.write(cursor)
-        } else {
-            false
-        };
+        let (num_events, progress) = self.event_buffer.write_events(cursor);
+        let progress = progress
+            .then(|| self.static_db.write(cursor))
+            .then(|| self.attrs.write(cursor));
 
         ResponseInfo {
-            has_events,
-            complete,
+            has_events: num_events > 0,
+            complete: progress == WriteProgress::Complete,
         }
     }
 
     pub(crate) fn write_events_only(&mut self, cursor: &mut WriteCursor) -> usize {
         // doesn't matter if we wrote all of them or not
-        match self.event_buffer.write_events(cursor) {
-            Ok(x) => x,
-            Err(x) => x,
-        }
+        let (num_events, _) = self.event_buffer.write_events(cursor);
+        num_events
     }
 }
