@@ -1,4 +1,5 @@
 use crate::app::measurement::{BinaryInput, Flags, Time};
+use crate::app::parse::header_identity_tests::DATALESS_COUNT_VARIATIONS;
 use crate::app::Timestamp;
 use crate::outstation::database::{Add, BinaryInputConfig, EventClass, Update, UpdateOptions};
 use crate::outstation::{BufferState, ClassCount, TypeCount};
@@ -358,6 +359,33 @@ async fn write_of_counted_event_objects_without_data_is_malformed() {
     harness
         .test_request_response(&[0xC1, 0x02, 32, 1, 0x08, 1, 0], &[0xC1, 0x81, 0x80, 0x04])
         .await;
+}
+
+#[tokio::test]
+async fn non_read_with_a_count_of_objects_that_carry_no_data_is_malformed() {
+    let mut harness = new_harness(get_default_config());
+
+    let mut seq: u8 = 0;
+    for function in [0x02, 0x05] {
+        for variation in DATALESS_COUNT_VARIATIONS {
+            let (group, var) = variation.to_group_and_var();
+            let counts: [&[u8]; 2] = [&[0x07, 1], &[0x08, 1, 0]];
+            for count in counts {
+                // followed by a g80v1 header that would clear the restart IIN
+                let request = [
+                    &[0xC0 | seq, function, group, var],
+                    count,
+                    &[80, 1, 0x00, 7, 7, 0x00],
+                ]
+                .concat();
+                harness
+                    .test_request_response(&request, &[0xC0 | seq, 0x81, 0x80, 0x04])
+                    .await;
+                seq = seq.wrapping_add(1) & 0x0F;
+            }
+        }
+    }
+    harness.check_no_events();
 }
 
 #[tokio::test]

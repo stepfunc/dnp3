@@ -197,19 +197,23 @@ const RANGE: &[(u8, &[u8])] = &[
 ];
 
 /// The same for a count header of either width
-const COUNT: &[(u8, &[u8])] = &[
-    (2, &[0]),
-    (4, &[0]),
-    (11, &[0]),
-    (22, &[0]),
-    (23, &[0]),
-    (32, &[0]),
-    (33, &[0]),
-    (42, &[0]),
-    (50, &[1, 2, 3, 4]),
-    (51, &[1, 2]),
-    (52, &[1, 2]),
-    (60, &[2, 3, 4]),
+const COUNT: &[(u8, &[u8])] = &[(50, &[1, 2, 3, 4]), (51, &[1, 2]), (52, &[1, 2])];
+
+/// The variations that a READ counts but that have no objects to follow a count outside a READ:
+/// the "any variation" of each event group, the event classes and octet string events
+pub(crate) const DATALESS_COUNT_VARIATIONS: [Variation; 12] = [
+    Variation::Group2Var0,
+    Variation::Group4Var0,
+    Variation::Group11Var0,
+    Variation::Group22Var0,
+    Variation::Group23Var0,
+    Variation::Group32Var0,
+    Variation::Group33Var0,
+    Variation::Group42Var0,
+    Variation::Group60Var2,
+    Variation::Group60Var3,
+    Variation::Group60Var4,
+    Variation::Group111(0),
 ];
 
 /// The same for a count and prefix header of either width
@@ -258,7 +262,6 @@ fn expected(
             return Err(E::ZeroLengthOctetData)
         }
         (Q::Range8 | Q::Range16, 110) => true,
-        (Q::Count8 | Q::Count16, 111) => var == 0,
         (Q::CountAndPrefix8 | Q::CountAndPrefix16, 0) => var != 254,
         (Q::CountAndPrefix8 | Q::CountAndPrefix16, 111) if var == 0 && !zero_length => {
             return Err(E::ZeroLengthOctetData)

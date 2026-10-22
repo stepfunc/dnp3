@@ -22,17 +22,9 @@ object CountVariationModule extends Module {
 
   private def enumDefinition(implicit indent: Indentation) : Iterator[String] = {
 
-    def definition(v : Variation): Iterator[String] = {
-      v match {
-        case v : FixedSize if v.parent.groupType == GroupType.Time => s"${v.name}(CountSequence<'a, ${v.name}>),".eol
-        case _ : SizedByVariation => s"${v.parent.name}Var0,".eol
-        case _ => s"${v.name},".eol
-      }
-    }
-
     "#[derive(Debug, PartialEq)]".eol ++
       bracket("pub(crate) enum CountVariation<'a>") {
-        nonReadVariations.flatMap(v =>  commented(v.fullDesc).eol ++ definition(v))
+        nonReadVariations.flatMap(v =>  commented(v.fullDesc).eol ++ s"${v.name}(CountSequence<'a, ${v.name}>),".eol)
       }
 
   }
@@ -40,27 +32,15 @@ object CountVariationModule extends Module {
   private def enumImpl(implicit indent: Indentation) : Iterator[String] = {
 
     def nonReadMatcher(v : Variation) : Iterator[String] = {
-      v match {
-        case v : FixedSize if isTime(v) => s"Variation::${v.name} => Ok(CountVariation::${v.name}(CountSequence::parse(count, cursor)?)),".eol
-        case _ : SizedByVariation => s"Variation::${v.parent.name}(0) => Ok(CountVariation::${v.parent.name}Var0),".eol
-        case _ => s"Variation::${v.name} => Ok(CountVariation::${v.name}),".eol
-      }
+      s"Variation::${v.name} => Ok(CountVariation::${v.name}(CountSequence::parse(count, cursor)?)),".eol
     }
 
     def variationMatcher(v : Variation) : Iterator[String] = {
-      v match {
-        case v : FixedSize if isTime(v) => s"CountVariation::${v.name}(_) => Variation::${v.name},".eol
-        case _ : SizedByVariation => s"CountVariation::${v.parent.name}Var0 => Variation::${v.parent.name}(0),".eol
-        case _ => s"CountVariation::${v.name} => Variation::${v.name},".eol
-      }
+      s"CountVariation::${v.name}(_) => Variation::${v.name},".eol
     }
 
     def fmtMatcher(v : Variation) : Iterator[String] = {
-      v match {
-        case v : FixedSize if isTime(v) => s"CountVariation::${v.name}(seq) => format_count_of_items(f, seq.iter()),".eol
-        case _ : SizedByVariation => s"CountVariation::${v.parent.name}Var0 => Ok(()),".eol
-        case _ => s"CountVariation::${v.name} => Ok(()),".eol
-      }
+      s"CountVariation::${v.name}(seq) => format_count_of_items(f, seq.iter()),".eol
     }
 
     bracket("impl<'a> CountVariation<'a>") {
@@ -85,12 +65,11 @@ object CountVariationModule extends Module {
 
   private def isTime(v : Variation) : Boolean = v.parent.groupType == GroupType.Time
 
-  // outside a READ, a count of a variation with a known object size would have to be followed by
-  // the objects, which only the time objects may carry
+  // outside a READ, a count header must be followed by its objects, which only the time objects may
+  // carry: the "any variation", class and sized-by-variation objects that a READ counts have none
   private def nonReadVariations : Iterator[Variation] = {
-    variations.filter {
-      case v : FixedSize => isTime(v)
-      case _ => true
+    variations.collect {
+      case v : FixedSize if isTime(v) => v
     }
   }
 
