@@ -19,7 +19,7 @@ use crate::link::layer::Layer;
 use crate::link::parser::{FramePayload, Parser};
 use crate::link::reader::{LinkModes, Reader, Step};
 use crate::link::{EndpointAddress, LinkErrorMode};
-use crate::master::extract::{extract_header, Extracted};
+use crate::master::extract::{extract_header, validate_response, Extracted};
 use crate::master::{HeaderInfo, ReadHandler};
 use crate::outstation::Feature;
 use crate::transport::real::assembler::{Assembler, AssemblyState};
@@ -170,6 +170,12 @@ fn extract(objects: HeaderCollection) {
             cto = x;
         }
     }
+}
+
+/// the master's check that it can process a response
+#[no_panic::no_panic]
+fn validate(objects: HeaderCollection) -> bool {
+    validate_response(Ok(objects)).is_ok()
 }
 
 /// one segment given to the transport assembler, returning the length of a completed fragment
@@ -345,6 +351,7 @@ fn parsers_with_unknown_input() {
         std::hint::black_box(fragment.to_request().is_ok());
         std::hint::black_box(fragment.to_response().is_ok());
         if let Ok(objects) = fragment.objects {
+            std::hint::black_box(validate(objects));
             extract(objects);
         }
     }

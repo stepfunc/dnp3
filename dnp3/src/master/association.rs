@@ -11,7 +11,7 @@ use crate::app::{Iin, ResponseHeader};
 use crate::app::{Sequence, Timeout};
 use crate::link::EndpointAddress;
 use crate::master::error::{AssociationError, TaskError, TimeSyncError};
-use crate::master::extract::extract_measurements;
+use crate::master::extract::{extract_measurements, validate_response};
 use crate::master::handler::AssociationHandler;
 use crate::master::messages::AssociationMsgType;
 use crate::master::poll::{PollHandle, PollMap, PollMsg};
@@ -587,26 +587,34 @@ impl Association {
         // master timeout and here we go, we're now in the same situation as a video call with a 3 seconds
         // lag, each waiting for the other to talk, but end up talking at the same time.
         if self.is_integrity_complete() || response.raw_objects.is_empty() {
-            // Update last fragment received
             let new_frag = LastUnsolFragment::new(response);
-            let last_frag = self.last_unsol_frag.replace(new_frag);
 
             // Ignore repeat
-            if last_frag == Some(new_frag) {
+            if self.last_unsol_frag == Some(new_frag) {
                 tracing::warn!("ignoring duplicate unsolicited response");
                 self.notify_unsolicited_response(true, new_frag.header.control.seq);
                 return true; // still want to send confirmation if requested
             }
 
-            if let Ok(objects) = response.objects {
-                extract_measurements(
-                    ReadType::Unsolicited,
-                    response.header,
-                    objects,
-                    self.read_handler.as_mut(),
-                )
-                .await;
-            }
+            // An invalid response isn't confirmed or remembered, so the outstation's retry isn't
+            // taken for a duplicate
+            let objects = match validate_response(response.objects) {
+                Ok(objects) => objects,
+                Err(err) => {
+                    tracing::warn!("discarding unsolicited response: {err}");
+                    return false;
+                }
+            };
+
+            self.last_unsol_frag = Some(new_frag);
+
+            extract_measurements(
+                ReadType::Unsolicited,
+                response.header,
+                objects,
+                self.read_handler.as_mut(),
+            )
+            .await;
 
             self.notify_unsolicited_response(false, new_frag.header.control.seq);
 

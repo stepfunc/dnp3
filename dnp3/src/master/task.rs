@@ -8,6 +8,7 @@ use crate::link::error::LinkError;
 use crate::link::EndpointAddress;
 use crate::master::association::{AssociationMap, Next};
 use crate::master::error::TaskError;
+use crate::master::extract::validate_response;
 use crate::master::messages::{MasterMsg, Message};
 use crate::master::tasks::{AppTask, AssociationTask, NonReadTask, ReadTask, RequestWriter, Task};
 use crate::master::{Association, MasterChannelConfig};
@@ -738,8 +739,11 @@ impl MasterSession {
         // a response with IIN2 errors is still processed, and the errors decide the outcome at the end
         let association = self.associations.get_mut(destination.link)?;
         association.process_iin(response.header.iin);
+        let objects = validate_response(response.objects).inspect_err(|err| {
+            tracing::warn!("discarding response: {err}");
+        })?;
         let delivered = task
-            .process_response(association, response.header, response.objects?)
+            .process_response(association, response.header, objects)
             .await;
         outcome.add(response.header.iin, delivered);
 

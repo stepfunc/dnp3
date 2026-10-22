@@ -3,9 +3,9 @@ use crate::app::measurement::*;
 use crate::app::parse::count::CountSequence;
 use crate::app::parse::parser::{HeaderCollection, HeaderDetails, ObjectHeader};
 use crate::app::variations::*;
-use crate::app::ResponseHeader;
-use crate::master::ReadType;
+use crate::app::{ObjectParseError, ResponseHeader};
 use crate::master::{HeaderInfo, ReadHandler};
+use crate::master::{ReadType, TaskError};
 
 /// Extract measurements from a HeaderCollection, sinking them into
 /// something that implements `MeasurementHandler`
@@ -62,6 +62,79 @@ fn has_objects(details: &HeaderDetails) -> bool {
     }
 }
 
+/// Why the master discards a response without processing or confirming it
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) enum InvalidResponse {
+    /// the objects failed to parse
+    Malformed(ObjectParseError),
+    /// an object with relative time has no common time of occurrence before it in the fragment
+    RelativeTimeWithoutCto(Variation),
+}
+
+impl std::fmt::Display for InvalidResponse {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Malformed(err) => write!(f, "malformed objects: {err}"),
+            Self::RelativeTimeWithoutCto(variation) => {
+                write!(
+                    f,
+                    "{variation} without a preceding common time of occurrence"
+                )
+            }
+        }
+    }
+}
+
+impl From<InvalidResponse> for TaskError {
+    fn from(err: InvalidResponse) -> Self {
+        match err {
+            InvalidResponse::Malformed(err) => TaskError::MalformedResponse(err),
+            InvalidResponse::RelativeTimeWithoutCto(_) => TaskError::UnexpectedResponseHeaders,
+        }
+    }
+}
+
+/// Check that the master can process a response's objects: they parse, and every object with
+/// relative time follows a common time of occurrence in the same fragment
+pub(crate) fn validate_response(
+    objects: Result<HeaderCollection<'_>, ObjectParseError>,
+) -> Result<HeaderCollection<'_>, InvalidResponse> {
+    let objects = objects.map_err(InvalidResponse::Malformed)?;
+    let mut cto = None;
+    for header in objects.iter() {
+        if let Some(next) = next_cto(&header.details, cto) {
+            cto = next;
+        } else if cto.is_none() && has_relative_time(&header) {
+            return Err(InvalidResponse::RelativeTimeWithoutCto(header.variation));
+        }
+    }
+    Ok(objects)
+}
+
+/// True if the header carries objects whose time is relative to a common time of occurrence
+fn has_relative_time(header: &ObjectHeader) -> bool {
+    matches!(
+        header.variation,
+        Variation::Group2Var3 | Variation::Group4Var3
+    ) && has_objects(&header.details)
+}
+
+/// If the header is a common time of occurrence, the one for the headers that follow it
+fn next_cto(details: &HeaderDetails, prev: Option<Time>) -> Option<Option<Time>> {
+    let time = match details {
+        HeaderDetails::OneByteCount(1, CountVariation::Group51Var1(seq))
+        | HeaderDetails::TwoByteCount(1, CountVariation::Group51Var1(seq)) => {
+            seq.single().map(|x| Time::Synchronized(x.time))
+        }
+        HeaderDetails::OneByteCount(1, CountVariation::Group51Var2(seq))
+        | HeaderDetails::TwoByteCount(1, CountVariation::Group51Var2(seq)) => {
+            seq.single().map(|x| Time::Unsynchronized(x.time))
+        }
+        _ => return None,
+    };
+    Some(time.or(prev))
+}
+
 /// What [`extract_header`] did with a header
 pub(crate) enum Extracted {
     /// the header's values were passed to the handler
@@ -79,14 +152,6 @@ pub(crate) fn extract_header<H: ReadHandler + ?Sized>(
     cto: Option<Time>,
     handler: &mut H,
 ) -> Extracted {
-    fn extract_cto_g51v1(prev: Option<Time>, item: Option<Group51Var1>) -> Extracted {
-        Extracted::Cto(item.map_or(prev, |x| Some(Time::Synchronized(x.time))))
-    }
-
-    fn extract_cto_g51v2(prev: Option<Time>, item: Option<Group51Var2>) -> Extracted {
-        Extracted::Cto(item.map_or(prev, |x| Some(Time::Unsynchronized(x.time))))
-    }
-
     fn extract_g50v1<H: ReadHandler + ?Sized>(
         seq: &CountSequence<Group50Var1>,
         header: &ObjectHeader,
@@ -103,20 +168,11 @@ pub(crate) fn extract_header<H: ReadHandler + ?Sized>(
         }
     }
 
+    if let Some(cto) = next_cto(&header.details, cto) {
+        return Extracted::Cto(cto);
+    }
+
     let handled = match &header.details {
-        // these are common-time-of-occurrence headers
-        HeaderDetails::OneByteCount(1, CountVariation::Group51Var1(seq)) => {
-            return extract_cto_g51v1(cto, seq.single())
-        }
-        HeaderDetails::OneByteCount(1, CountVariation::Group51Var2(seq)) => {
-            return extract_cto_g51v2(cto, seq.single())
-        }
-        HeaderDetails::TwoByteCount(1, CountVariation::Group51Var1(seq)) => {
-            return extract_cto_g51v1(cto, seq.single())
-        }
-        HeaderDetails::TwoByteCount(1, CountVariation::Group51Var2(seq)) => {
-            return extract_cto_g51v2(cto, seq.single())
-        }
         // handle g50v1 - absolute time (only count == 1 is valid)
         HeaderDetails::OneByteCount(1, CountVariation::Group50Var1(seq)) => {
             extract_g50v1(seq, header, handler)
@@ -355,28 +411,73 @@ mod test {
         }
     }
 
-    #[test]
-    fn g2v3_without_cto_yields_invalid_time() {
-        let mut handler = MockHandler::new();
-        let objects = HeaderCollection::parse(
+    fn validate(objects: &[u8]) -> Result<(), InvalidResponse> {
+        validate_response(HeaderCollection::parse(
             ParseOptions::default(),
             FunctionCode::Response,
-            &[0x02, 0x03, 0x17, 0x01, 0x07, 0x01, 0xFF, 0xFF],
-        )
-        .unwrap();
+            objects,
+        ))
+        .map(|_| ())
+    }
 
-        let expected: (BinaryInput, u16) = (
-            BinaryInput {
-                value: false,
-                flags: Flags::ONLINE,
-                time: None,
-            },
-            0x07,
+    #[test]
+    fn relative_time_without_cto_is_invalid() {
+        // g2v3 count: 1 index: 7 flags: 0x01 time: 0xFFFF
+        assert_eq!(
+            validate(&[0x02, 0x03, 0x17, 0x01, 0x07, 0x01, 0xFF, 0xFF]),
+            Err(InvalidResponse::RelativeTimeWithoutCto(
+                Variation::Group2Var3
+            ))
         );
+        // g4v3 count: 1 index: 7 flags: 0x01 time: 0xFFFF
+        assert_eq!(
+            validate(&[0x04, 0x03, 0x17, 0x01, 0x07, 0x01, 0xFF, 0xFF]),
+            Err(InvalidResponse::RelativeTimeWithoutCto(
+                Variation::Group4Var3
+            ))
+        );
+    }
 
-        extract_measurements_inner(objects, &mut handler);
+    #[test]
+    fn relative_time_before_cto_is_invalid() {
+        assert_eq!(
+            validate(&[
+                0x02, 0x03, 0x17, 0x01, 0x07, 0x01, 0xFF, 0xFF, 0x33, 0x01, 0x07, 0x01, 0x02, 0x00,
+                0x00, 0x00, 0x00, 0x00,
+            ]),
+            Err(InvalidResponse::RelativeTimeWithoutCto(
+                Variation::Group2Var3
+            ))
+        );
+    }
 
-        assert_eq!(handler.pop(), &[Header::Binary(vec![expected])]);
+    #[test]
+    fn relative_time_after_cto_is_valid() {
+        // g51v2 time: 2, then g4v3 and g2v3
+        assert_eq!(
+            validate(&[
+                0x33, 0x02, 0x07, 0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x03, 0x17, 0x01,
+                0x07, 0x01, 0xFF, 0xFF, 0x02, 0x03, 0x17, 0x01, 0x07, 0x01, 0xFF, 0xFF,
+            ]),
+            Ok(())
+        );
+    }
+
+    #[test]
+    fn relative_time_header_without_objects_is_valid() {
+        // g2v3 count: 0
+        assert_eq!(validate(&[0x02, 0x03, 0x17, 0x00]), Ok(()));
+    }
+
+    #[test]
+    fn malformed_objects_are_invalid() {
+        // g32v2 count: 1 index: 0, missing its flags and value
+        assert_eq!(
+            validate(&[0x20, 0x02, 0x17, 0x01, 0x00]),
+            Err(InvalidResponse::Malformed(
+                ObjectParseError::InsufficientBytes
+            ))
+        );
     }
 
     #[test]

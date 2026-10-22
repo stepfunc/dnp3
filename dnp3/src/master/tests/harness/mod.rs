@@ -95,6 +95,7 @@ pub(crate) async fn create_association(mut config: AssociationConfig) -> TestHar
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) enum ReadEvent {
     BeginFragment(ReadType),
+    BinaryInput,
     AnalogInput,
     EndFragment(ReadType),
 }
@@ -139,6 +140,14 @@ impl ReadHandler for CountHandler {
     fn end_fragment(&mut self, read_type: ReadType, _header: ResponseHeader) -> MaybeAsync<()> {
         self.push(ReadEvent::EndFragment(read_type));
         MaybeAsync::ready(())
+    }
+
+    fn handle_binary_input(
+        &mut self,
+        _info: HeaderInfo,
+        _iter: &mut dyn Iterator<Item = (crate::app::measurement::BinaryInput, u16)>,
+    ) {
+        self.push(ReadEvent::BinaryInput);
     }
 
     fn handle_analog_input(

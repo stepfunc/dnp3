@@ -8,5 +8,6 @@ mod read_types;
 mod restart;
 mod shared_link;
 mod startup;
+mod unsolicited;
 
 mod file;
