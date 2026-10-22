@@ -5,7 +5,7 @@ use sfio_tokio_mock_io::Event;
 use tokio::sync::oneshot::error::TryRecvError;
 use tokio::time::Instant;
 
-use crate::app::control::{ControlCode, Group12Var1, OpType, TripCloseCode};
+use crate::app::control::{ControlCode, Group12Var1, Group41Var1, OpType, TripCloseCode};
 use crate::app::format::write::{start_request, start_response};
 use crate::app::parse::options::ParseOptions;
 use crate::app::{BufferSize, ControlField, FunctionCode, Iin, ResponseFunction, Sequence};
@@ -407,26 +407,79 @@ fn non_canonical_codes() -> [ControlCode; 3] {
     ]
 }
 
+/// Requests that carry `bad` alone, after a valid command in the same header, or in a later
+/// header, with both index widths
+fn requests_containing(bad: ControlCode) -> [CommandHeaders; 7] {
+    let good = Group12Var1::from_op_type(OpType::LatchOn);
+    let bad = Group12Var1::from_code(bad);
+
+    let same_header_u8 = {
+        let mut builder = CommandBuilder::new();
+        builder.add_u8(good, 1);
+        builder.add_u8(bad, 2);
+        builder.build()
+    };
+    let same_header_u16 = {
+        let mut builder = CommandBuilder::new();
+        builder.add_u16(good, 1);
+        builder.add_u16(bad, 2);
+        builder.build()
+    };
+    let later_header_u8 = {
+        let mut builder = CommandBuilder::new();
+        builder.add_u8(good, 1);
+        builder.finish_header();
+        builder.add_u8(bad, 2);
+        builder.build()
+    };
+    let later_header_u16 = {
+        let mut builder = CommandBuilder::new();
+        builder.add_u16(good, 1);
+        builder.finish_header();
+        builder.add_u16(bad, 2);
+        builder.build()
+    };
+    let after_analog_header = {
+        let mut builder = CommandBuilder::new();
+        builder.add_u16(Group41Var1::new(7), 1);
+        builder.add_u8(bad, 2);
+        builder.build()
+    };
+
+    [
+        CommandBuilder::single_header_u8(bad, 3),
+        CommandBuilder::single_header_u16(bad, 3),
+        same_header_u8,
+        same_header_u16,
+        later_header_u8,
+        later_header_u16,
+        after_analog_header,
+    ]
+}
+
 #[tokio::test]
 async fn non_canonical_control_codes_are_rejected_before_anything_is_sent() {
     let mut harness = quiet_association().await;
 
     for code in non_canonical_codes() {
-        let headers = || CommandBuilder::single_header_u16(Group12Var1::from_code(code), 3);
         let expected = TaskError::BadEncoding(BadEncoding::ControlCode(code));
 
         for mode in [CommandMode::DirectOperate, CommandMode::SelectBeforeOperate] {
+            for headers in requests_containing(code) {
+                assert_eq!(
+                    harness.association.operate(mode, headers).await,
+                    Err(CommandError::Task(expected))
+                );
+                harness.assert_no_events();
+            }
+        }
+
+        for headers in requests_containing(code) {
             assert_eq!(
-                harness.association.operate(mode, headers()).await,
-                Err(CommandError::Task(expected))
+                harness.association.operate_no_ack(headers).await,
+                Err(expected)
             );
             harness.assert_no_events();
         }
-
-        assert_eq!(
-            harness.association.operate_no_ack(headers()).await,
-            Err(expected)
-        );
-        harness.assert_no_events();
     }
 }

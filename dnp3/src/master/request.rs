@@ -1086,7 +1086,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::control::OpType;
+    use crate::app::control::{ControlCode, OpType};
     use crate::app::parse::options::ParseOptions;
     use crate::app::FunctionCode;
     use scursor::WriteCursor;
@@ -1126,6 +1126,26 @@ mod tests {
             both(Group41Var3::new(2.5)),
             both(Group41Var4::new(2.5)),
         ]
+    }
+
+    #[test]
+    fn later_invalid_header_leaves_the_cursor_untouched() {
+        let code = ControlCode::from_op_type(OpType::Unknown(0x11));
+        let mut builder = CommandBuilder::new();
+        builder.add_u8(Group12Var1::from_op_type(OpType::LatchOn), 1);
+        builder.finish_header();
+        builder.add_u8(Group12Var1::from_code(code), 2);
+        let headers = builder.build();
+
+        let mut buffer = [0u8; 64];
+        let mut cursor = WriteCursor::new(&mut buffer);
+        cursor.write_u8(0xAA).unwrap();
+
+        assert_eq!(
+            headers.write(&mut HeaderWriter::new(&mut cursor)),
+            Err(TaskError::BadEncoding(BadEncoding::ControlCode(code)))
+        );
+        assert_eq!(cursor.written(), &[0xAA]);
     }
 
     #[test]
