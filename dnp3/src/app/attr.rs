@@ -1142,11 +1142,29 @@ impl OwnedAttrValue {
         Ok(())
     }
 
-    fn write_bytes(cursor: &mut WriteCursor, code: u8, bytes: &[u8]) -> Result<(), AttrWriteError> {
-        let len: u8 = bytes
+    /// Check that the value can be encoded
+    pub(crate) fn check_encodable(&self) -> Result<(), BadAttribute> {
+        let bytes = match self {
+            OwnedAttrValue::VisibleString(s) => s.as_bytes(),
+            OwnedAttrValue::OctetString(x) | OwnedAttrValue::BitString(x) => x.as_slice(),
+            OwnedAttrValue::UnsignedInt(_)
+            | OwnedAttrValue::SignedInt(_)
+            | OwnedAttrValue::FloatingPoint(_)
+            | OwnedAttrValue::Dnp3Time(_) => return Ok(()),
+        };
+        Self::bytes_len(bytes)?;
+        Ok(())
+    }
+
+    fn bytes_len(bytes: &[u8]) -> Result<u8, BadAttribute> {
+        bytes
             .len()
             .try_into()
-            .map_err(|_| BadAttribute::BadLength(bytes.len()))?;
+            .map_err(|_| BadAttribute::BadLength(bytes.len()))
+    }
+
+    fn write_bytes(cursor: &mut WriteCursor, code: u8, bytes: &[u8]) -> Result<(), AttrWriteError> {
+        let len = Self::bytes_len(bytes)?;
         Self::write_header(cursor, code, len)?;
         cursor.write_bytes(bytes)?;
         Ok(())

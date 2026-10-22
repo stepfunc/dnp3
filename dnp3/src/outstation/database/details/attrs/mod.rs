@@ -245,3 +245,47 @@ impl AttrHandler {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::app::attr::{var, AttrProp, StringAttr};
+
+    fn encode_string(variation: u8, value: &str) -> Vec<u8> {
+        let mut bytes = vec![0x00, variation, 0x00, 0x00, 0x00, 0x01];
+        bytes.push(value.len().try_into().unwrap());
+        bytes.extend_from_slice(value.as_bytes());
+        bytes
+    }
+
+    #[test]
+    fn attribute_that_cannot_be_encoded_is_skipped_without_a_partial_header() {
+        let mut handler = AttrHandler::new(1);
+        let map = handler.get_attr_map();
+        map.define(
+            AttrProp::default(),
+            StringAttr::DeviceSerialNumber.with_value("serial"),
+        )
+        .unwrap();
+        map.define_unchecked(
+            AttrProp::default(),
+            StringAttr::DeviceSubsetAndConformance.with_value("L".repeat(256)),
+        )
+        .unwrap();
+        map.define(
+            AttrProp::default(),
+            StringAttr::ProductNameAndModel.with_value("product"),
+        )
+        .unwrap();
+
+        assert_eq!(handler.select(AttrHeader::All(254)), Iin2::default());
+
+        let mut buffer = [0; 64];
+        let mut cursor = WriteCursor::new(&mut buffer);
+        assert!(handler.write(&mut cursor));
+
+        let mut expected = encode_string(var::DEVICE_SERIAL_NUMBER, "serial");
+        expected.extend(encode_string(var::PRODUCT_NAME_AND_MODEL, "product"));
+        assert_eq!(cursor.written(), expected.as_slice());
+    }
+}

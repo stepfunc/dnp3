@@ -129,11 +129,35 @@ impl SetMap {
         // ensure that we're using the right types for default attributes
         let _: AnyAttribute = AnyAttribute::try_from(&attr.view())?;
 
+        // reject values that can never be encoded in a response
+        attr.value.check_encodable()?;
+
         // constraints that apply to certain items in the default set
         if attr.set == AttrSet::Default && prop.is_writable() && !variation.can_be_written() {
             return Err(AttrDefError::NotWritable(attr.set, attr.variation));
         }
 
+        self.insert(variation, prop, attr)
+    }
+
+    /// Define an attribute without validating its value, to test how values that can't be
+    /// encoded are handled
+    #[cfg(test)]
+    pub(super) fn define_unchecked(
+        &mut self,
+        prop: AttrProp,
+        attr: OwnedAttribute,
+    ) -> Result<(), AttrDefError> {
+        let variation = Variation::create(attr.variation)?;
+        self.insert(variation, prop, attr)
+    }
+
+    fn insert(
+        &mut self,
+        variation: Variation,
+        prop: AttrProp,
+        attr: OwnedAttribute,
+    ) -> Result<(), AttrDefError> {
         // lookup or create the set
         match self.sets.entry(attr.set) {
             Entry::Occupied(mut e) => match e.get_mut().entry(variation) {

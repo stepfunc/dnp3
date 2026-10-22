@@ -9,7 +9,7 @@ use crate::app::Iin2;
 use crate::master::EventClasses;
 use crate::outstation::database::read::ReadHeader;
 
-use crate::app::attr::{AttrProp, AttrSet, OwnedAttribute, TypeError};
+use crate::app::attr::{AttrProp, AttrSet, BadAttribute, OwnedAttribute, TypeError};
 use crate::outstation::{ClassCount, OutstationApplication};
 use scursor::WriteCursor;
 
@@ -371,6 +371,8 @@ pub enum AttrDefError {
     ReservedVariation(u8),
     /// The attribute is not writable
     NotWritable(AttrSet, u8),
+    /// The attribute value cannot be encoded, e.g. a string longer than 255 bytes
+    BadValue(BadAttribute),
 }
 
 impl std::fmt::Display for AttrDefError {
@@ -389,6 +391,7 @@ impl std::fmt::Display for AttrDefError {
                 "Attribute with set = {set:?} and var = {var} cannot be written"
             ),
             Self::AlreadyDefined => write!(f, "The requested attribute is already defined"),
+            Self::BadValue(x) => write!(f, "{x}"),
         }
     }
 }
@@ -396,6 +399,12 @@ impl std::fmt::Display for AttrDefError {
 impl From<TypeError> for AttrDefError {
     fn from(value: TypeError) -> Self {
         Self::BadType(value)
+    }
+}
+
+impl From<BadAttribute> for AttrDefError {
+    fn from(value: BadAttribute) -> Self {
+        Self::BadValue(value)
     }
 }
 
