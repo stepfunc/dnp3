@@ -1785,6 +1785,29 @@ mod test {
     }
 
     #[test]
+    fn integers_support_only_lengths_one_two_and_four() {
+        // user decision D5: other lengths are rejected, even with enough payload bytes
+        let payload = [0u8; 255];
+        for data_type in [UNSIGNED_INT, SIGNED_INT] {
+            for len in 0..=u8::MAX {
+                let mut input = vec![data_type, len];
+                input.extend_from_slice(&payload[..usize::from(len)]);
+                let mut cursor = ReadCursor::new(&input);
+                let result = AttrValue::parse(&mut cursor);
+                match (data_type, len) {
+                    (UNSIGNED_INT, 1 | 2 | 4) => assert_eq!(result, Ok(AttrValue::UnsignedInt(0))),
+                    (SIGNED_INT, 1 | 2 | 4) => assert_eq!(result, Ok(AttrValue::SignedInt(0))),
+                    _ => assert_eq!(
+                        result,
+                        Err(AttrParseError::BadIntegerLength(len)),
+                        "type {data_type} length {len}"
+                    ),
+                }
+            }
+        }
+    }
+
+    #[test]
     fn signed_int_round_trips_at_every_encoding_size() {
         for value in [
             -129,
