@@ -11,7 +11,7 @@ use tokio::time::Instant;
 use crate::app::control::{Group12Var1, OpType};
 use crate::app::{
     FileStatus, FileType, FunctionCode, Group70Var2, Group70Var6, Group70Var7, Iin, Iin1, Iin2,
-    MaybeAsync, Permissions, ResponseHeader, Sequence, Timestamp, Variation,
+    MaybeAsync, Permissions, ResponseHeader, Sequence, Shutdown, Timestamp, Variation,
 };
 use crate::link::EndpointAddress;
 use crate::master::association::AssociationConfig;
@@ -1518,6 +1518,35 @@ async fn file_read_aborts_the_reader_once_when_the_master_shuts_down() {
                 TaskType::FileRead,
                 TaskError::Shutdown
             )]
+        );
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn file_read_requested_after_the_master_stops_aborts_the_reader_once() {
+    watchdog(async {
+        let mut harness = create_association(AssociationConfig::quiet()).await;
+        harness.task.abort();
+        assert!((&mut harness.task).await.unwrap_err().is_cancelled());
+
+        // the request is dropped unsent, with the reader
+        let reader = RecordingReader::default();
+        let result = harness
+            .association
+            .read_file(
+                "f.txt",
+                FileReadConfig::default(),
+                Box::new(reader.clone()),
+                None,
+            )
+            .await;
+        assert!(matches!(result, Err(Shutdown)));
+        assert_eq!(
+            reader.pop(),
+            [ReaderEvent::Aborted(FileError::TaskError(
+                TaskError::Shutdown
+            ))]
         );
     })
     .await;

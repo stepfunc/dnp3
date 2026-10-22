@@ -69,3 +69,85 @@ impl<'a> From<Group70Var7<'a>> for FileInfo {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use scursor::WriteCursor;
+
+    use super::*;
+    use crate::app::format::free_format::FreeFormat;
+    use crate::app::{FileType, PermissionSet, Permissions, Timestamp};
+
+    const ENTRIES: [Group70Var7<'static>; 2] = [
+        Group70Var7 {
+            file_type: FileType::Directory,
+            file_size: 3,
+            time_of_creation: Timestamp::new(1),
+            permissions: Permissions {
+                world: PermissionSet::all(),
+                group: PermissionSet::all(),
+                owner: PermissionSet::all(),
+            },
+            request_id: 7,
+            file_name: "sub",
+        },
+        Group70Var7 {
+            file_type: FileType::File,
+            file_size: 1234,
+            time_of_creation: Timestamp::new(0x0102_0304_0506),
+            permissions: Permissions {
+                world: PermissionSet::all(),
+                group: PermissionSet::all(),
+                owner: PermissionSet::all(),
+            },
+            request_id: 0,
+            file_name: "f.txt",
+        },
+    ];
+
+    fn fields(info: &FileInfo) -> (&str, FileType, u32, Timestamp, Permissions) {
+        (
+            info.name.as_str(),
+            info.file_type,
+            info.size,
+            info.time_created,
+            info.permissions,
+        )
+    }
+
+    #[tokio::test]
+    async fn completes_with_every_entry_of_every_block() {
+        let mut buffer = [0; 128];
+        let mut cursor = WriteCursor::new(&mut buffer);
+        for entry in &ENTRIES {
+            entry.write(&mut cursor).unwrap();
+        }
+        // the second block starts inside the second entry
+        let (first, second) = cursor.written().split_at(30);
+
+        let (promise, mut rx) = Promise::one_shot();
+        let mut reader = DirectoryReader::new(promise);
+        assert_eq!(reader.opened(0), FileAction::Continue);
+        for (block, data) in [first, second].into_iter().enumerate() {
+            let block = u32::try_from(block).unwrap();
+            let action = reader.block_received(block, data).get().await;
+            assert_eq!(action, FileAction::Continue);
+        }
+        reader.completed();
+
+        let entries = rx.try_recv().unwrap().unwrap();
+        assert_eq!(
+            entries.iter().map(fields).collect::<Vec<_>>(),
+            ENTRIES
+                .iter()
+                .map(|x| (
+                    x.file_name,
+                    x.file_type,
+                    x.file_size,
+                    x.time_of_creation,
+                    x.permissions
+                ))
+                .collect::<Vec<_>>()
+        );
+    }
+}
