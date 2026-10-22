@@ -700,9 +700,17 @@ mod lifecycle {
                 tokio::time::timeout(TIMEOUT, phys.read(&mut buffer, PhysDecodeLevel::Nothing))
                     .await
                     .unwrap();
-            assert_eq!(
-                result.map(|(count, _)| count).map_err(|err| err.kind()),
-                Err(std::io::ErrorKind::UnexpectedEof)
+            // the OS reports the peer closing the connection differently: Windows as an aborted
+            // connection, others as the end of the stream
+            let kind = result.map(|(count, _)| count).map_err(|err| err.kind());
+            assert!(
+                matches!(
+                    kind,
+                    Err(std::io::ErrorKind::UnexpectedEof
+                        | std::io::ErrorKind::ConnectionAborted
+                        | std::io::ErrorKind::ConnectionReset)
+                ),
+                "{kind:?}"
             );
         }
 
