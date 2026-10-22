@@ -26,7 +26,7 @@ use crate::outstation::control::collection::{
 use crate::outstation::control::select::SelectState;
 use crate::outstation::database::DatabaseHandle;
 use crate::outstation::deferred::DeferredRead;
-use crate::outstation::response::{Prepared, ResponseSlot};
+use crate::outstation::response::{Prepared, ResponseSlot, Staged};
 use crate::outstation::task::{ConfigurationChange, OutstationMessage};
 use crate::outstation::traits::*;
 use crate::transport::{
@@ -61,18 +61,6 @@ enum ControlRequest {
         selection: Option<SelectState>,
     },
     DirectOperate,
-    DirectOperateNoAck,
-}
-
-impl ControlRequest {
-    fn expects_response(self) -> bool {
-        match self {
-            ControlRequest::Select { .. }
-            | ControlRequest::Operate { .. }
-            | ControlRequest::DirectOperate => true,
-            ControlRequest::DirectOperateNoAck => false,
-        }
-    }
 }
 
 #[derive(Copy, Clone, PartialEq)]
@@ -122,6 +110,11 @@ impl LastValidRequest {
     }
 }
 
+/// The header of a solicited response that reports IIN2.2
+fn parameter_error(seq: Sequence) -> ResponseHeader {
+    ResponseHeader::solicited(seq, Iin::default() | Iin2::PARAMETER_ERROR)
+}
+
 pub(crate) struct SessionConfig {
     decode_level: DecodeLevel,
     confirm_timeout: Timeout,
@@ -133,11 +126,6 @@ pub(crate) struct SessionConfig {
     unsolicited_retry_delay: std::time::Duration,
     keep_alive_timeout: Option<std::time::Duration>,
     max_controls_per_request: Option<u16>,
-}
-pub(crate) struct SessionParameters {
-    max_read_headers_per_request: u16,
-    sol_tx_buffer_size: BufferSize<249, 2048>,
-    unsol_tx_buffer_size: BufferSize<249, 2048>,
 }
 impl From<OutstationConfig> for SessionConfig {
     fn from(config: OutstationConfig) -> Self {
@@ -152,16 +140,6 @@ impl From<OutstationConfig> for SessionConfig {
             unsolicited_retry_delay: config.unsolicited_retry_delay,
             keep_alive_timeout: config.keep_alive_timeout,
             max_controls_per_request: config.max_controls_per_request,
-        }
-    }
-}
-
-impl From<OutstationConfig> for SessionParameters {
-    fn from(x: OutstationConfig) -> Self {
-        SessionParameters {
-            max_read_headers_per_request: x.read_header_limit(),
-            sol_tx_buffer_size: x.solicited_buffer_size,
-            unsol_tx_buffer_size: x.unsolicited_buffer_size,
         }
     }
 }
@@ -275,12 +253,36 @@ impl SessionState {
     }
 }
 
-pub(crate) struct OutstationSession {
-    enabled: Enabled,
-    messages: Receiver<OutstationMessage>,
+/// What the session answers the master with: the transport writer, and a slot for each kind of
+/// response, which keeps the response published last to send again. The slots live outside the
+/// session, so a response prepared in one can be held while the session runs its handlers.
+pub(crate) struct Responder<T: Transport> {
+    writer: TransportWriter<T>,
     /// the response to the last valid request, if it had one
     sol: ResponseSlot,
     unsol: ResponseSlot,
+}
+
+impl<T: Transport> Responder<T> {
+    pub(crate) fn new(writer: TransportWriter<T>, config: &OutstationConfig) -> Self {
+        Self {
+            writer,
+            sol: ResponseSlot::new(config.solicited_buffer_size),
+            unsol: ResponseSlot::new(config.unsolicited_buffer_size),
+        }
+    }
+
+    /// reset the writer and drop both responses between communication sessions
+    pub(crate) fn reset(&mut self) {
+        self.writer.reset();
+        self.sol.clear();
+        self.unsol.clear();
+    }
+}
+
+pub(crate) struct OutstationSession {
+    enabled: Enabled,
+    messages: Receiver<OutstationMessage>,
     config: SessionConfig,
     destination: FragmentAddr,
     state: SessionState,
@@ -427,7 +429,7 @@ impl OutstationSession {
         messages: Receiver<OutstationMessage>,
         destination: FragmentAddr,
         config: SessionConfig,
-        param: SessionParameters,
+        max_read_headers_per_request: u16,
         application: Box<dyn OutstationApplication>,
         information: Box<dyn OutstationInformation>,
         control_handler: Box<dyn ControlHandler>,
@@ -440,9 +442,7 @@ impl OutstationSession {
             enabled: initial_state,
             messages,
             config,
-            sol: ResponseSlot::new(param.sol_tx_buffer_size),
-            unsol: ResponseSlot::new(param.unsol_tx_buffer_size),
-            state: SessionState::new(param.max_read_headers_per_request),
+            state: SessionState::new(max_read_headers_per_request),
             application,
             info: information,
             control_handler,
@@ -485,11 +485,11 @@ impl OutstationSession {
         &mut self,
         io: &mut PhysLayer,
         reader: &mut TransportReader<T>,
-        writer: &mut TransportWriter<T>,
+        out: &mut Responder<T>,
         database: &mut DatabaseHandle,
     ) -> RunError {
         loop {
-            if let Err(err) = self.run_idle_state(io, reader, writer, database).await {
+            if let Err(err) = self.run_idle_state(io, reader, out, database).await {
                 // teardown (including self.state.reset()) is handled by SessionTeardown
                 // in OutstationTask::run, so it also covers a cancelled run future
                 return err;
@@ -500,15 +500,13 @@ impl OutstationSession {
     /// reset the per-connection session state between communication sessions
     pub(crate) fn reset_session_state(&mut self) {
         self.state.reset();
-        self.sol.clear();
-        self.unsol.clear();
     }
 
     async fn write_unsolicited<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
         writer: &mut TransportWriter<T>,
-        mut response: Prepared,
+        mut response: Prepared<'_>,
         database: &DatabaseHandle,
     ) -> Result<ResponseHeader, LinkError> {
         response.header_mut().iin |= self.get_response_iin(database);
@@ -516,25 +514,26 @@ impl OutstationSession {
             .broadcast
             .report(response.header_mut(), ResponseKind::Unsolicited);
 
+        let header = response.header();
         writer
             .write(
                 io,
                 self.config.decode_level,
                 self.destination,
-                self.unsol.publish(response),
+                response.publish(),
             )
             .await?;
 
-        Ok(response.header())
+        Ok(header)
     }
 
     async fn repeat_unsolicited<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
-        writer: &mut TransportWriter<T>,
+        out: &mut Responder<T>,
     ) -> Result<(), LinkError> {
-        if let Some(response) = self.unsol.ready() {
-            writer
+        if let Some(response) = out.unsol.ready() {
+            out.writer
                 .write(io, self.config.decode_level, self.destination, response)
                 .await?;
         }
@@ -546,21 +545,17 @@ impl OutstationSession {
         io: &mut PhysLayer,
         writer: &mut TransportWriter<T>,
         respond_to: FragmentAddr,
-        mut response: Prepared,
+        mut response: Prepared<'_>,
         database: &DatabaseHandle,
     ) -> Result<ResponseHeader, LinkError> {
         self.finish_solicited_header(response.header_mut(), database);
 
+        let header = response.header();
         writer
-            .write(
-                io,
-                self.config.decode_level,
-                respond_to,
-                self.sol.publish(response),
-            )
+            .write(io, self.config.decode_level, respond_to, response.publish())
             .await?;
 
-        Ok(response.header())
+        Ok(header)
     }
 
     /// Send a response with no objects that doesn't replace the response to the last valid request
@@ -593,39 +588,38 @@ impl OutstationSession {
             .then(|| ResponseSeries::new(header.control.seq, header.control.fin))
     }
 
-    /// Answer a request that becomes the last valid request, publishing its response if it has
-    /// one. Returns the confirm that the response waits for.
+    /// Answer a request that becomes the last valid request, publishing its response. Returns the
+    /// confirm that the response waits for.
     async fn respond<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
         writer: &mut TransportWriter<T>,
         respond_to: FragmentAddr,
         request: LastValidRequest,
-        response: Option<Prepared>,
+        response: Prepared<'_>,
         database: &DatabaseHandle,
     ) -> Result<Option<ResponseSeries>, LinkError> {
-        let confirm = match response {
-            Some(response) => Self::awaited_confirm(
-                self.write_solicited(io, writer, respond_to, response, database)
-                    .await?,
-            ),
-            None => {
-                self.sol.clear();
-                None
-            }
-        };
+        let header = self
+            .write_solicited(io, writer, respond_to, response, database)
+            .await?;
         self.state.last_valid_request = Some(request);
-        Ok(confirm)
+        Ok(Self::awaited_confirm(header))
+    }
+
+    /// Accept a request without a response as the last valid request, so its repeat gets none
+    fn respond_with_nothing(&mut self, sol: &mut ResponseSlot, request: LastValidRequest) {
+        sol.clear();
+        self.state.last_valid_request = Some(request);
     }
 
     async fn repeat_solicited<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
         respond_to: FragmentAddr,
-        writer: &mut TransportWriter<T>,
+        out: &mut Responder<T>,
     ) -> Result<(), LinkError> {
-        if let Some(response) = self.sol.ready() {
-            writer
+        if let Some(response) = out.sol.ready() {
+            out.writer
                 .write(io, self.config.decode_level, respond_to, response)
                 .await?;
         }
@@ -636,22 +630,21 @@ impl OutstationSession {
         &mut self,
         io: &mut PhysLayer,
         reader: &mut TransportReader<T>,
-        writer: &mut TransportWriter<T>,
+        out: &mut Responder<T>,
         database: &mut DatabaseHandle,
     ) -> Result<(), RunError> {
         // handle a request fragment if present
-        self.handle_one_request_from_idle(io, reader, writer, database)
+        self.handle_one_request_from_idle(io, reader, out, database)
             .await?;
 
         // check to see if we should perform unsolicited
-        let next_action = self.check_unsolicited(io, reader, writer, database).await?;
+        let next_action = self.check_unsolicited(io, reader, out, database).await?;
 
         // handle a deferred read request if it was produced during unsolicited
-        self.handle_deferred_read(io, reader, writer, database)
-            .await?;
+        self.handle_deferred_read(io, reader, out, database).await?;
 
         // check to see if we should perform a link status check
-        self.check_link_status(io, writer).await?;
+        self.check_link_status(io, &mut out.writer).await?;
 
         let next_action = next_action.select_earliest(self.next_link_status);
 
@@ -677,7 +670,7 @@ impl OutstationSession {
         &mut self,
         io: &mut PhysLayer,
         reader: &mut TransportReader<T>,
-        writer: &mut TransportWriter<T>,
+        out: &mut Responder<T>,
         database: &mut DatabaseHandle,
     ) -> Result<NextIdleAction, RunError> {
         if self.config.unsolicited.is_disabled() {
@@ -688,7 +681,7 @@ impl OutstationSession {
             UnsolicitedState::NullRequired => {
                 // perform NULL unsolicited
                 match self
-                    .perform_null_unsolicited(io, reader, writer, database)
+                    .perform_null_unsolicited(io, reader, out, database)
                     .await?
                 {
                     UnsolicitedResult::Timeout | UnsolicitedResult::ReturnToIdle => {
@@ -712,7 +705,7 @@ impl OutstationSession {
 
                 // perform regular unsolicited
                 match self
-                    .maybe_perform_unsolicited(io, reader, writer, database)
+                    .maybe_perform_unsolicited(io, reader, out, database)
                     .await?
                 {
                     None => {
@@ -775,7 +768,7 @@ impl OutstationSession {
         &mut self,
         io: &mut PhysLayer,
         reader: &mut TransportReader<T>,
-        writer: &mut TransportWriter<T>,
+        out: &mut Responder<T>,
         database: &mut DatabaseHandle,
     ) -> Result<UnsolicitedResult, RunError> {
         let header = ResponseHeader::new(
@@ -783,47 +776,49 @@ impl OutstationSession {
             ResponseFunction::UnsolicitedResponse,
             Iin::default(),
         );
-        self.perform_unsolicited_response_series(
-            database,
-            Prepared::Empty(header),
-            true,
-            io,
-            reader,
-            writer,
-        )
-        .await
+        let seq = self
+            .write_unsolicited(io, &mut out.writer, out.unsol.empty(header), database)
+            .await?
+            .control
+            .seq;
+        self.unsolicited_confirm_wait(database, seq, true, io, reader, out)
+            .await
     }
 
     async fn maybe_perform_unsolicited<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
         reader: &mut TransportReader<T>,
-        writer: &mut TransportWriter<T>,
+        out: &mut Responder<T>,
         database: &mut DatabaseHandle,
     ) -> Result<Option<UnsolicitedResult>, RunError> {
         if !self.state.enabled_unsolicited_classes.any() {
             return Ok(None);
         }
 
-        match self.write_unsolicited_data(database) {
-            None => Ok(None),
-            Some(res) => {
-                let result = self
-                    .perform_unsolicited_response_series(database, res, false, io, reader, writer)
-                    .await?;
-                Ok(Some(result))
-            }
-        }
+        let Some(response) = self.write_unsolicited_data(&mut out.unsol, database) else {
+            return Ok(None);
+        };
+        let seq = self
+            .write_unsolicited(io, &mut out.writer, response, database)
+            .await?
+            .control
+            .seq;
+        let result = self
+            .unsolicited_confirm_wait(database, seq, false, io, reader, out)
+            .await?;
+        Ok(Some(result))
     }
 
-    fn write_unsolicited_data(&mut self, database: &mut DatabaseHandle) -> Option<Prepared> {
+    fn write_unsolicited_data<'a>(
+        &mut self,
+        unsol: &'a mut ResponseSlot,
+        database: &mut DatabaseHandle,
+    ) -> Option<Prepared<'a>> {
         let classes = self.state.enabled_unsolicited_classes;
-        let count = self
-            .unsol
-            .build(|cursor| Ok(database.write_unsolicited(classes, cursor)))
-            .unwrap_or_default();
+        let (count, staged) = unsol.build(|cursor| Ok(database.write_unsolicited(classes, cursor)));
 
-        if count == 0 {
+        if count.unwrap_or_default() == 0 {
             return None;
         }
 
@@ -833,24 +828,20 @@ impl OutstationSession {
             ResponseFunction::UnsolicitedResponse,
             Iin::default(),
         );
-        Some(Prepared::Stored(header))
+        Some(staged.with_header(header))
     }
 
-    async fn perform_unsolicited_response_series<T: Transport>(
+    /// Wait for the confirm of the unsolicited response just sent with `seq`, sending it again
+    /// when the wait times out
+    async fn unsolicited_confirm_wait<T: Transport>(
         &mut self,
         database: &mut DatabaseHandle,
-        response: Prepared,
+        seq: Sequence,
         is_null: bool,
         io: &mut PhysLayer,
         reader: &mut TransportReader<T>,
-        writer: &mut TransportWriter<T>,
+        out: &mut Responder<T>,
     ) -> Result<UnsolicitedResult, RunError> {
-        let seq = self
-            .write_unsolicited(io, writer, response, database)
-            .await?
-            .control
-            .seq;
-
         // enter unsolicited confirm wait state
         self.info.enter_unsolicited_confirm_wait(seq);
 
@@ -874,7 +865,7 @@ impl OutstationSession {
 
         loop {
             match self
-                .wait_for_unsolicited_confirm(&mut wait, deadline, io, reader, writer, database)
+                .wait_for_unsolicited_confirm(&mut wait, deadline, io, reader, out, database)
                 .instrument(tracing::info_span!("UnsolConfirmWait", "seq" = seq.value()))
                 .await?
             {
@@ -897,7 +888,7 @@ impl OutstationSession {
                     }
 
                     // perform a retry
-                    self.repeat_unsolicited(io, writer).await?;
+                    self.repeat_unsolicited(io, out).await?;
 
                     // update the deadline
                     deadline = self.new_confirm_deadline();
@@ -912,7 +903,7 @@ impl OutstationSession {
         deadline: tokio::time::Instant,
         io: &mut PhysLayer,
         reader: &mut TransportReader<T>,
-        writer: &mut TransportWriter<T>,
+        out: &mut Responder<T>,
         database: &mut DatabaseHandle,
     ) -> Result<UnsolicitedWaitResult, RunError> {
         if let TimeoutStatus::Yes = self.read_until(io, reader, deadline).await? {
@@ -927,7 +918,7 @@ impl OutstationSession {
                 // solicited confirm wait. Its IIN2.0 answer isn't the response to a valid request,
                 // so the outstation doesn't wait for that answer's confirm
                 wait.solicited = None;
-                self.answer_unknown_function(io, writer, from, seq, database)
+                self.answer_unknown_function(io, &mut out.writer, from, seq, database)
                     .await?;
                 return Ok(UnsolicitedWaitResult::ReadNext);
             }
@@ -944,7 +935,7 @@ impl OutstationSession {
         // Table 6-1 rows 24-29: a request ends the wait for a solicited confirm, and an answer that
         // asks for one starts it again
         let confirm = self
-            .accept(io, writer, database, received, selection, Reads::Defer)
+            .accept(io, out, database, received, selection, Reads::Defer)
             .await?;
         wait.solicited = confirm.map(|series| ExpectedConfirm {
             ecsn: series.ecsn,
@@ -1067,26 +1058,26 @@ impl OutstationSession {
         &mut self,
         io: &mut PhysLayer,
         reader: &mut TransportReader<T>,
-        writer: &mut TransportWriter<T>,
+        out: &mut Responder<T>,
         database: &mut DatabaseHandle,
     ) -> Result<(), RunError> {
         if let Some(x) = self.state.deferred_read.select(database) {
             tracing::info!("handling deferred READ request");
-            let response = self.format_read_response(database, true, x.seq, x.iin2);
+            let response = Self::format_read_response(&mut out.sol, database, true, x.seq, x.iin2);
             let confirm = self
                 .respond(
                     io,
-                    writer,
+                    &mut out.writer,
                     x.info.addr,
                     LastValidRequest::new(x.seq, x.hash),
-                    Some(response),
+                    response,
                     database,
                 )
                 .await?;
 
             if let Some(series) = confirm {
                 // enter the solicited confirm wait state
-                self.sol_confirm_wait(io, reader, writer, database, series)
+                self.sol_confirm_wait(io, reader, out, database, series)
                     .instrument(tracing::info_span!(
                         "SolConfirmWait",
                         "ecsn" = series.ecsn.value()
@@ -1103,14 +1094,14 @@ impl OutstationSession {
         &mut self,
         io: &mut PhysLayer,
         reader: &mut TransportReader<T>,
-        writer: &mut TransportWriter<T>,
+        out: &mut Responder<T>,
         database: &mut DatabaseHandle,
     ) -> Result<(), RunError> {
         let guard = self.pop_request(reader);
         let confirm = match self.receive(&guard) {
             Intake::Nothing => None,
             Intake::UnknownFunction(from, seq) => {
-                self.answer_unknown_function(io, writer, from, seq, database)
+                self.answer_unknown_function(io, &mut out.writer, from, seq, database)
                     .await?;
                 None
             }
@@ -1130,7 +1121,7 @@ impl OutstationSession {
             Intake::Request(received) => {
                 let selection = self.take_selection(&received.fragment);
                 self.info.process_request_from_idle(received.request.header);
-                self.accept(io, writer, database, received, selection, Reads::Answer)
+                self.accept(io, out, database, received, selection, Reads::Answer)
                     .await?
             }
         };
@@ -1138,7 +1129,7 @@ impl OutstationSession {
 
         if let Some(series) = confirm {
             // enter the solicited confirm wait state
-            self.sol_confirm_wait(io, reader, writer, database, series)
+            self.sol_confirm_wait(io, reader, out, database, series)
                 .instrument(tracing::info_span!(
                     "SolConfirmWait",
                     "ecsn" = series.ecsn.value()
@@ -1198,7 +1189,7 @@ impl OutstationSession {
     async fn accept<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
-        writer: &mut TransportWriter<T>,
+        out: &mut Responder<T>,
         database: &mut DatabaseHandle,
         received: Received<'_>,
         selection: Option<SelectState>,
@@ -1223,13 +1214,14 @@ impl OutstationSession {
                         // response to a repeated READ. We deliberately answer it as a new READ
                         // instead: the fresh response carries current values, and events that were
                         // never confirmed are still buffered, so they are reported again
-                        let response = self.format_first_read_response(database, seq, objects);
+                        let response =
+                            Self::format_first_read_response(&mut out.sol, database, seq, objects);
                         self.respond(
                             io,
-                            writer,
+                            &mut out.writer,
                             info.addr,
                             LastValidRequest::new(seq, hash),
-                            Some(response),
+                            response,
                             database,
                         )
                         .await
@@ -1243,43 +1235,45 @@ impl OutstationSession {
             FragmentType::MalformedRequest(hash, err) => {
                 // IEEE 1815-2012 clause 6.1: a request whose objects don't parse is still the last
                 // request, answered with IIN2
-                let response = Prepared::empty_solicited(seq, Iin::default() | Iin2::from(err));
+                let header = ResponseHeader::solicited(seq, Iin::default() | Iin2::from(err));
                 self.respond(
                     io,
-                    writer,
+                    &mut out.writer,
                     info.addr,
                     LastValidRequest::new(seq, hash),
-                    Some(response),
+                    out.sol.empty(header),
                     database,
                 )
                 .await
             }
             FragmentType::NewNonRead(hash, objects) => {
+                let last = LastValidRequest::new(seq, hash);
                 let response = self
                     .handle_non_read(
+                        &mut out.sol,
                         database,
                         request.header.function,
-                        seq,
-                        hash,
+                        last,
                         selection,
                         objects,
                     )
                     .await;
-                self.respond(
-                    io,
-                    writer,
-                    info.addr,
-                    LastValidRequest::new(seq, hash),
-                    response,
-                    database,
-                )
-                .await
+                match response {
+                    Some(response) => {
+                        self.respond(io, &mut out.writer, info.addr, last, response, database)
+                            .await
+                    }
+                    None => {
+                        self.respond_with_nothing(&mut out.sol, last);
+                        Ok(None)
+                    }
+                }
             }
             FragmentType::RepeatNonRead(_) => {
                 // IEEE 1815-2012 Table 6-1: send the same response, byte for byte, which waits for
                 // its confirm again if it asked for one
-                self.repeat_solicited(io, info.addr, writer).await?;
-                Ok(self.sol.header().and_then(Self::awaited_confirm))
+                self.repeat_solicited(io, info.addr, out).await?;
+                Ok(out.sol.header().and_then(Self::awaited_confirm))
             }
             FragmentType::Broadcast(mode) => {
                 self.process_broadcast(database, mode, request).await;
@@ -1327,130 +1321,142 @@ impl OutstationSession {
         }
     }
 
-    fn format_first_read_response(
-        &mut self,
+    fn format_first_read_response<'a>(
+        sol: &'a mut ResponseSlot,
         database: &mut DatabaseHandle,
         seq: Sequence,
         object_headers: HeaderCollection,
-    ) -> Prepared {
+    ) -> Prepared<'a> {
         let iin2 = database.select(&object_headers);
-        self.format_read_response(database, true, seq, iin2)
+        Self::format_read_response(sol, database, true, seq, iin2)
     }
 
-    fn format_read_response(
-        &mut self,
+    fn format_read_response<'a>(
+        sol: &'a mut ResponseSlot,
         database: &mut DatabaseHandle,
         fir: bool,
         seq: Sequence,
         iin2: Iin2,
-    ) -> Prepared {
-        let info = match self
-            .sol
-            .build(|cursor| Ok(database.write_response_headers(cursor)))
-        {
-            Ok(info) => info,
+    ) -> Prepared<'a> {
+        let (result, staged) = sol.build(|cursor| Ok(database.write_response_headers(cursor)));
+        let header = match result {
+            Ok(info) => ResponseHeader::new(
+                ControlField::response(seq, fir, info.complete, info.need_confirm()),
+                ResponseFunction::Response,
+                Iin::default() | iin2,
+            ),
             Err(err) => {
                 tracing::error!("unable to write a READ response: {err:?}");
-                return Prepared::parameter_error(seq);
+                parameter_error(seq)
             }
         };
-
-        let header = ResponseHeader::new(
-            ControlField::response(seq, fir, info.complete, info.need_confirm()),
-            ResponseFunction::Response,
-            Iin::default() | iin2,
-        );
-        Prepared::Stored(header)
+        staged.with_header(header)
     }
 
-    async fn handle_non_read(
+    async fn handle_non_read<'a>(
         &mut self,
+        sol: &'a mut ResponseSlot,
         database: &mut DatabaseHandle,
         function: FunctionCode,
-        seq: Sequence,
-        request_hash: u64,
+        request: LastValidRequest,
         selection: Option<SelectState>,
         object_headers: HeaderCollection<'_>,
-    ) -> Option<Prepared> {
+    ) -> Option<Prepared<'a>> {
+        let LastValidRequest { seq, request_hash } = request;
         let mut result = match function {
-            FunctionCode::Write => Some(self.handle_write(seq, object_headers, database).await),
+            FunctionCode::Write => {
+                let header = self.handle_write(seq, object_headers, database).await;
+                Some(sol.empty(header))
+            }
             // these function don't process objects
-            FunctionCode::DelayMeasure => Some(self.handle_delay_measure(seq)),
-            FunctionCode::RecordCurrentTime => Some(self.handle_record_current_time(seq)),
+            FunctionCode::DelayMeasure => Some(self.handle_delay_measure(sol, seq)),
+            FunctionCode::RecordCurrentTime => {
+                Some(sol.empty(self.handle_record_current_time(seq)))
+            }
             FunctionCode::ColdRestart => {
                 let delay = self.application.cold_restart();
-                Some(self.handle_restart(seq, delay))
+                Some(Self::handle_restart(sol, seq, delay))
             }
             FunctionCode::WarmRestart => {
                 let delay = self.application.warm_restart();
-                Some(self.handle_restart(seq, delay))
+                Some(Self::handle_restart(sol, seq, delay))
             }
             // controls
-            FunctionCode::Select => {
+            FunctionCode::Select => Some(
                 self.handle_controls(
+                    sol,
                     ControlRequest::Select { request_hash },
                     database,
                     seq,
                     object_headers,
                 )
-                .await
-            }
-            FunctionCode::Operate => {
+                .await,
+            ),
+            FunctionCode::Operate => Some(
                 self.handle_controls(
+                    sol,
                     ControlRequest::Operate { selection },
                     database,
                     seq,
                     object_headers,
                 )
-                .await
-            }
-            FunctionCode::DirectOperate => {
-                self.handle_controls(ControlRequest::DirectOperate, database, seq, object_headers)
-                    .await
-            }
-            FunctionCode::DirectOperateNoResponse => {
+                .await,
+            ),
+            FunctionCode::DirectOperate => Some(
                 self.handle_controls(
-                    ControlRequest::DirectOperateNoAck,
+                    sol,
+                    ControlRequest::DirectOperate,
                     database,
                     seq,
                     object_headers,
                 )
-                .await
+                .await,
+            ),
+            FunctionCode::DirectOperateNoResponse => {
+                self.handle_direct_operate_no_ack(database, object_headers)
+                    .await;
+                None
             }
-            FunctionCode::ImmediateFreeze => {
-                Some(self.handle_freeze(database, seq, object_headers, FreezeType::ImmediateFreeze))
-            }
+            FunctionCode::ImmediateFreeze => Some(sol.empty(self.handle_freeze(
+                database,
+                seq,
+                object_headers,
+                FreezeType::ImmediateFreeze,
+            ))),
             FunctionCode::ImmediateFreezeNoResponse => {
                 self.handle_freeze(database, seq, object_headers, FreezeType::ImmediateFreeze);
                 None
             }
-            FunctionCode::FreezeClear => {
-                Some(self.handle_freeze(database, seq, object_headers, FreezeType::FreezeAndClear))
-            }
+            FunctionCode::FreezeClear => Some(sol.empty(self.handle_freeze(
+                database,
+                seq,
+                object_headers,
+                FreezeType::FreezeAndClear,
+            ))),
             FunctionCode::FreezeClearNoResponse => {
                 self.handle_freeze(database, seq, object_headers, FreezeType::FreezeAndClear);
                 None
             }
             FunctionCode::FreezeAtTime => {
-                Some(self.handle_freeze_at_time(database, seq, object_headers))
+                Some(sol.empty(self.handle_freeze_at_time(database, seq, object_headers)))
             }
             FunctionCode::FreezeAtTimeNoResponse => {
                 self.handle_freeze_at_time(database, seq, object_headers);
                 None
             }
-            FunctionCode::EnableUnsolicited => {
-                Some(self.handle_enable_or_disable_unsolicited(true, seq, object_headers))
-            }
-            FunctionCode::DisableUnsolicited => {
-                Some(self.handle_enable_or_disable_unsolicited(false, seq, object_headers))
-            }
+            FunctionCode::EnableUnsolicited => Some(
+                sol.empty(self.handle_enable_or_disable_unsolicited(true, seq, object_headers)),
+            ),
+            FunctionCode::DisableUnsolicited => Some(
+                sol.empty(self.handle_enable_or_disable_unsolicited(false, seq, object_headers)),
+            ),
 
             _ => {
                 tracing::warn!("unsupported function code: {:?}", function);
-                Some(Prepared::empty_solicited(
+                Some(sol.empty(ResponseHeader::solicited(
                     seq,
                     Iin::default() | Iin2::NO_FUNC_CODE_SUPPORT,
-                ))
+                )))
             }
         };
 
@@ -1479,7 +1485,7 @@ impl OutstationSession {
         seq: Sequence,
         object_headers: HeaderCollection<'_>,
         database: &DatabaseHandle,
-    ) -> Prepared {
+    ) -> ResponseHeader {
         let mut iin2 = Iin2::default();
         let mut empty = true;
 
@@ -1492,7 +1498,7 @@ impl OutstationSession {
             tracing::warn!("empty WRITE request");
         }
 
-        Prepared::empty_solicited(seq, Iin::default() | iin2)
+        ResponseHeader::solicited(seq, Iin::default() | iin2)
     }
 
     fn handle_write_iin(&mut self, bits: BitSequence) -> Iin2 {
@@ -1687,40 +1693,51 @@ impl OutstationSession {
         }
     }
 
-    fn handle_delay_measure(&mut self, seq: Sequence) -> Prepared {
+    fn handle_delay_measure<'a>(
+        &mut self,
+        sol: &'a mut ResponseSlot,
+        seq: Sequence,
+    ) -> Prepared<'a> {
         let g52v2 = Group52Var2 {
             time: self.application.get_processing_delay_ms(),
         };
 
-        self.single_object_response(seq, g52v2)
+        Self::single_object_response(sol, seq, g52v2)
     }
 
     /// Respond with a single object, or with IIN2.2 if it can't be written
-    fn single_object_response<V>(&mut self, seq: Sequence, item: V) -> Prepared
+    fn single_object_response<V>(sol: &mut ResponseSlot, seq: Sequence, item: V) -> Prepared<'_>
     where
         V: FixedSizeVariation,
     {
-        match self
-            .sol
-            .build(|cursor| HeaderWriter::new(cursor).write_count_of_one(item))
-        {
-            Ok(()) => Prepared::Stored(ResponseHeader::solicited(seq, Iin::default())),
+        let (result, staged) =
+            sol.build(|cursor| HeaderWriter::new(cursor).write_count_of_one(item));
+        let header = match result {
+            Ok(()) => ResponseHeader::solicited(seq, Iin::default()),
             Err(err) => {
                 tracing::error!("unable to write {item} to the response buffer: {err:?}");
-                Prepared::parameter_error(seq)
+                parameter_error(seq)
             }
-        }
+        };
+        staged.with_header(header)
     }
 
-    fn handle_record_current_time(&mut self, seq: Sequence) -> Prepared {
+    fn handle_record_current_time(&mut self, seq: Sequence) -> ResponseHeader {
         self.state.last_recorded_time = Some(tokio::time::Instant::now());
-        Prepared::empty_solicited(seq, Iin::default())
+        ResponseHeader::solicited(seq, Iin::default())
     }
 
-    fn handle_restart(&mut self, seq: Sequence, delay: Option<RestartDelay>) -> Prepared {
+    fn handle_restart(
+        sol: &mut ResponseSlot,
+        seq: Sequence,
+        delay: Option<RestartDelay>,
+    ) -> Prepared<'_> {
         let delay = match delay {
             None => {
-                return Prepared::empty_solicited(seq, Iin::default() | Iin2::NO_FUNC_CODE_SUPPORT);
+                return sol.empty(ResponseHeader::solicited(
+                    seq,
+                    Iin::default() | Iin2::NO_FUNC_CODE_SUPPORT,
+                ));
             }
             Some(x) => x,
         };
@@ -1728,60 +1745,48 @@ impl OutstationSession {
         // respond with the delay
         match delay {
             RestartDelay::Seconds(value) => {
-                self.single_object_response(seq, Group52Var1 { time: value })
+                Self::single_object_response(sol, seq, Group52Var1 { time: value })
             }
             RestartDelay::Milliseconds(value) => {
-                self.single_object_response(seq, Group52Var2 { time: value })
+                Self::single_object_response(sol, seq, Group52Var2 { time: value })
             }
         }
     }
 
-    async fn handle_direct_operate(
-        &mut self,
-        database: &mut DatabaseHandle,
-        seq: Sequence,
-        controls: ControlCollection<'_>,
-    ) -> Prepared {
-        let result = self
-            .execute_controls(
-                database,
-                ControlMode::Operate(OperateType::DirectOperate),
-                &controls,
-            )
-            .await;
-
-        Self::control_response(seq, result)
-    }
-
     /// Execute the controls and build the response that echoes them, returning their overall
     /// status
-    async fn execute_controls(
+    async fn execute_controls<'a>(
         &mut self,
+        sol: &'a mut ResponseSlot,
         database: &mut DatabaseHandle,
         mode: ControlMode,
         controls: &ControlCollection<'_>,
-    ) -> Result<CommandStatus, scursor::WriteError> {
+    ) -> (Result<CommandStatus, scursor::WriteError>, Staged<'a>) {
         let max_controls_per_request = self.config.max_controls_per_request;
-        ControlTransaction::execute(self.control_handler.borrow_mut(), database, |tx, db| {
-            self.sol.build(|cursor| {
-                controls.execute_with_response(
-                    cursor,
-                    mode,
-                    tx,
-                    db,
-                    ControlLimit::new(max_controls_per_request),
-                )
-            })
-        })
+        ControlTransaction::execute(
+            self.control_handler.borrow_mut(),
+            database,
+            move |tx, db| {
+                sol.build(|cursor| {
+                    controls.execute_with_response(
+                        cursor,
+                        mode,
+                        tx,
+                        db,
+                        ControlLimit::new(max_controls_per_request),
+                    )
+                })
+            },
+        )
         .await
     }
 
     /// Echo the controls into an unpublished response, without executing them, to check that the
     /// real response fits. The echo is the same size whatever the status.
-    fn control_response_fits(&mut self, controls: &ControlCollection) -> bool {
-        self.sol
-            .build(|cursor| controls.respond_with_status(cursor, CommandStatus::Success))
-            .is_ok()
+    fn control_response_fits(sol: &mut ResponseSlot, controls: &ControlCollection) -> bool {
+        let (result, _) =
+            sol.build(|cursor| controls.respond_with_status(cursor, CommandStatus::Success));
+        result.is_ok()
     }
 
     /// `result` is the overall status of the controls built into the response, or the error
@@ -1789,22 +1794,22 @@ impl OutstationSession {
     fn control_response(
         seq: Sequence,
         result: Result<CommandStatus, scursor::WriteError>,
-    ) -> Prepared {
-        let status = match result {
-            Ok(x) => x,
+        staged: Staged<'_>,
+    ) -> Prepared<'_> {
+        let header = match result {
+            Ok(status) => {
+                let mut iin = Iin::default();
+                if status == CommandStatus::NotSupported {
+                    iin |= Iin2::PARAMETER_ERROR;
+                }
+                ResponseHeader::solicited(seq, iin)
+            }
             Err(_) => {
                 tracing::warn!("control response doesn't fit in the response buffer");
-                return Prepared::parameter_error(seq);
+                parameter_error(seq)
             }
         };
-
-        let mut iin = Iin::default();
-
-        if status == CommandStatus::NotSupported {
-            iin |= Iin2::PARAMETER_ERROR;
-        }
-
-        Prepared::Stored(ResponseHeader::solicited(seq, iin))
+        staged.with_header(header)
     }
 
     fn handle_enable_or_disable_unsolicited(
@@ -1812,7 +1817,7 @@ impl OutstationSession {
         enable: bool,
         seq: Sequence,
         object_headers: HeaderCollection,
-    ) -> Prepared {
+    ) -> ResponseHeader {
         fn to_string(enable: bool) -> &'static str {
             if enable {
                 "ENABLE"
@@ -1823,7 +1828,7 @@ impl OutstationSession {
 
         if self.config.unsolicited.is_disabled() {
             tracing::warn!("received {} unsolicited request, but unsolicited support is disabled by configuration", to_string(enable));
-            return Prepared::empty_solicited(seq, Iin::default() | Iin2::NO_FUNC_CODE_SUPPORT);
+            return ResponseHeader::solicited(seq, Iin::default() | Iin2::NO_FUNC_CODE_SUPPORT);
         }
 
         let mut iin2 = Iin2::default();
@@ -1857,14 +1862,34 @@ impl OutstationSession {
             }
         }
 
-        Prepared::empty_solicited(seq, Iin::default() | iin2)
+        ResponseHeader::solicited(seq, Iin::default() | iin2)
+    }
+
+    /// The controls in a request, or `None` if it has an object that the control functions don't
+    /// support. A control object with an unsupported qualifier fails to parse, so it's one of
+    /// those.
+    fn controls(object_headers: HeaderCollection<'_>) -> Option<ControlCollection<'_>> {
+        match ControlCollection::from(object_headers) {
+            Ok(controls) => Some(controls),
+            Err(err) => {
+                tracing::warn!(
+                    "ignoring control request containing non-control object header {} - {}",
+                    err.variation,
+                    err.qualifier
+                );
+                None
+            }
+        }
     }
 
     async fn handle_direct_operate_no_ack(
         &mut self,
         database: &mut DatabaseHandle,
-        controls: ControlCollection<'_>,
+        object_headers: HeaderCollection<'_>,
     ) {
+        let Some(controls) = Self::controls(object_headers) else {
+            return;
+        };
         let max_controls_per_request = self.config.max_controls_per_request;
         ControlTransaction::execute(self.control_handler.borrow_mut(), database, |tx, db| {
             controls.operate_no_ack(tx, db, ControlLimit::new(max_controls_per_request))
@@ -1872,64 +1897,61 @@ impl OutstationSession {
         .await;
     }
 
-    async fn handle_controls(
+    async fn handle_controls<'a>(
         &mut self,
+        sol: &'a mut ResponseSlot,
         request: ControlRequest,
         database: &mut DatabaseHandle,
         seq: Sequence,
         object_headers: HeaderCollection<'_>,
-    ) -> Option<Prepared> {
-        // a control object with an unsupported qualifier fails to parse, so this is an object
-        // that the control functions don't support
-        let controls = match ControlCollection::from(object_headers) {
-            Err(err) => {
-                tracing::warn!(
-                    "ignoring control request containing non-control object header {} - {}",
-                    err.variation,
-                    err.qualifier
-                );
-                return request.expects_response().then(|| {
-                    Prepared::empty_solicited(seq, Iin::default() | Iin2::OBJECT_UNKNOWN)
-                });
-            }
-            Ok(controls) => controls,
+    ) -> Prepared<'a> {
+        let Some(controls) = Self::controls(object_headers) else {
+            return sol.empty(ResponseHeader::solicited(
+                seq,
+                Iin::default() | Iin2::OBJECT_UNKNOWN,
+            ));
         };
 
-        if request.expects_response() && !self.control_response_fits(&controls) {
+        if !Self::control_response_fits(sol, &controls) {
             tracing::warn!(
                 "ignoring control request whose response doesn't fit in the response buffer"
             );
-            return Some(Prepared::parameter_error(seq));
+            return sol.empty(parameter_error(seq));
         }
 
         match request {
-            ControlRequest::Select { request_hash } => Some(
-                self.handle_select(database, seq, request_hash, controls)
-                    .await,
-            ),
-            ControlRequest::Operate { selection } => Some(
-                self.handle_operate(database, seq, selection, controls)
-                    .await,
-            ),
-            ControlRequest::DirectOperate => {
-                Some(self.handle_direct_operate(database, seq, controls).await)
+            ControlRequest::Select { request_hash } => {
+                self.handle_select(sol, database, seq, request_hash, controls)
+                    .await
             }
-            ControlRequest::DirectOperateNoAck => {
-                self.handle_direct_operate_no_ack(database, controls).await;
-                None
+            ControlRequest::Operate { selection } => {
+                self.handle_operate(sol, database, seq, selection, controls)
+                    .await
+            }
+            ControlRequest::DirectOperate => {
+                let (result, staged) = self
+                    .execute_controls(
+                        sol,
+                        database,
+                        ControlMode::Operate(OperateType::DirectOperate),
+                        &controls,
+                    )
+                    .await;
+                Self::control_response(seq, result, staged)
             }
         }
     }
 
-    async fn handle_select(
+    async fn handle_select<'a>(
         &mut self,
+        sol: &'a mut ResponseSlot,
         database: &mut DatabaseHandle,
         seq: Sequence,
         request_hash: u64,
         controls: ControlCollection<'_>,
-    ) -> Prepared {
-        let result = self
-            .execute_controls(database, ControlMode::Select, &controls)
+    ) -> Prepared<'a> {
+        let (result, staged) = self
+            .execute_controls(sol, database, ControlMode::Select, &controls)
             .await;
 
         // Record the select state
@@ -1942,28 +1964,30 @@ impl OutstationSession {
             ))
         }
 
-        Self::control_response(seq, result)
+        Self::control_response(seq, result, staged)
     }
 
-    async fn handle_operate(
+    async fn handle_operate<'a>(
         &mut self,
+        sol: &'a mut ResponseSlot,
         database: &mut DatabaseHandle,
         seq: Sequence,
         selection: Option<SelectState>,
         controls: ControlCollection<'_>,
-    ) -> Prepared {
+    ) -> Prepared<'a> {
         // the OPERATE has already ended the selection, so it is used at most once
         let matched = selection
             .ok_or(CommandStatus::NoSelect)
             .and_then(|s| s.match_operate(self.config.select_timeout, seq, controls.hash()));
 
         // Handle each operate and write the response
-        let result = match matched {
-            Err(status) => self
-                .sol
-                .build(|cursor| controls.respond_with_status(cursor, status).map(|_| status)),
+        let (result, staged) = match matched {
+            Err(status) => {
+                sol.build(|cursor| controls.respond_with_status(cursor, status).map(|_| status))
+            }
             Ok(()) => {
                 self.execute_controls(
+                    sol,
                     database,
                     ControlMode::Operate(OperateType::SelectBeforeOperate),
                     &controls,
@@ -1972,7 +1996,7 @@ impl OutstationSession {
             }
         };
 
-        Self::control_response(seq, result)
+        Self::control_response(seq, result, staged)
     }
 
     fn handle_freeze(
@@ -1981,14 +2005,14 @@ impl OutstationSession {
         seq: Sequence,
         object_headers: HeaderCollection,
         freeze_type: FreezeType,
-    ) -> Prepared {
+    ) -> ResponseHeader {
         let mut iin = Iin::default();
 
         for header in object_headers.iter() {
             iin |= self.handle_freeze_header(database, freeze_type, header);
         }
 
-        Prepared::empty_solicited(seq, iin)
+        ResponseHeader::solicited(seq, iin)
     }
 
     fn handle_freeze_at_time(
@@ -1996,7 +2020,7 @@ impl OutstationSession {
         database: &mut DatabaseHandle,
         seq: Sequence,
         object_headers: HeaderCollection,
-    ) -> Prepared {
+    ) -> ResponseHeader {
         let mut iin = Iin::default();
 
         let mut timing: Option<FreezeInterval> = None;
@@ -2039,7 +2063,7 @@ impl OutstationSession {
             }
         }
 
-        Prepared::empty_solicited(seq, iin)
+        ResponseHeader::solicited(seq, iin)
     }
 
     fn handle_freeze_header(
@@ -2144,8 +2168,7 @@ impl OutstationSession {
                 BroadcastAction::Processed
             }
             FunctionCode::DirectOperateNoResponse => {
-                self.handle_controls(ControlRequest::DirectOperateNoAck, database, seq, objects)
-                    .await;
+                self.handle_direct_operate_no_ack(database, objects).await;
                 BroadcastAction::Processed
             }
             FunctionCode::ImmediateFreezeNoResponse => {
@@ -2197,7 +2220,7 @@ impl OutstationSession {
         &mut self,
         io: &mut PhysLayer,
         reader: &mut TransportReader<T>,
-        writer: &mut TransportWriter<T>,
+        out: &mut Responder<T>,
         database: &mut DatabaseHandle,
         mut series: ResponseSeries,
     ) -> Result<(), RunError> {
@@ -2205,7 +2228,7 @@ impl OutstationSession {
 
         loop {
             match self
-                .wait_for_sol_confirm(io, reader, writer, series.ecsn)
+                .wait_for_sol_confirm(io, reader, out, series.ecsn)
                 .await?
             {
                 Confirm::Yes(respond_to) => {
@@ -2220,10 +2243,15 @@ impl OutstationSession {
                     }
                     // format the next response in the series
                     series.ecsn.increment();
-                    let response =
-                        self.format_read_response(database, false, series.ecsn, Iin2::default());
+                    let response = Self::format_read_response(
+                        &mut out.sol,
+                        database,
+                        false,
+                        series.ecsn,
+                        Iin2::default(),
+                    );
                     let header = self
-                        .write_solicited(io, writer, respond_to, response, database)
+                        .write_solicited(io, &mut out.writer, respond_to, response, database)
                         .await?;
                     match Self::awaited_confirm(header) {
                         None => return Ok(()),
@@ -2252,7 +2280,7 @@ impl OutstationSession {
         &mut self,
         io: &mut PhysLayer,
         reader: &mut TransportReader<T>,
-        writer: &mut TransportWriter<T>,
+        out: &mut Responder<T>,
         ecsn: Sequence,
     ) -> Result<Confirm, RunError> {
         let mut deadline = self.new_confirm_deadline();
@@ -2281,7 +2309,7 @@ impl OutstationSession {
                             return Ok(Confirm::NewRequest);
                         }
                         ConfirmAction::EchoLastResponse(respond_to) => {
-                            self.repeat_solicited(io, respond_to, writer).await?;
+                            self.repeat_solicited(io, respond_to, out).await?;
                             // per the spec, we restart the confirm timer
                             deadline = self.new_confirm_deadline();
                         }
