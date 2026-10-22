@@ -732,14 +732,12 @@ impl std::fmt::Display for AnalogFlagFormatter {
 }
 
 pub(crate) trait AnalogConversions {
-    const OVER_RANGE: BitMask = bits::BIT_5;
-
     fn get_value(&self) -> f64;
     fn get_flags(&self) -> Flags;
 
     /// the flags with OVER_RANGE set, for a value the variation can't represent
     fn over_range<N>(&self, value: N) -> (Flags, N) {
-        (self.get_flags().with_bits_set(Self::OVER_RANGE), value)
+        (self.get_flags() | Flags::OVER_RANGE, value)
     }
 
     /// NaN is 0 and out of range values clamp, both with OVER_RANGE

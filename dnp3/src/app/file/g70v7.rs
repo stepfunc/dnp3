@@ -1,6 +1,9 @@
 use super::*;
+use crate::app::format::free_format::FreeFormat;
 use crate::app::format::WriteError;
 use crate::app::Timestamp;
+use crate::app::Variation;
+use scursor::WriteCursor;
 
 /// Group 70 Variation 7 - file descriptor
 ///
@@ -33,18 +36,6 @@ impl<'a> Group70Var7<'a> {
         Ok(())
     }
 
-    pub(crate) fn write(&self, cursor: &mut scursor::WriteCursor) -> Result<(), WriteError> {
-        cursor.write_u16_le(Self::FILE_NAME_OFFSET)?;
-        cursor.write_u16_le(byte_length(self.file_name)?)?;
-        cursor.write_u16_le(self.file_type.to_u16())?;
-        cursor.write_u32_le(self.file_size)?;
-        self.time_of_creation.write(cursor)?;
-        self.permissions.write(cursor)?;
-        cursor.write_u16_le(self.request_id)?;
-        cursor.write_bytes(self.file_name.as_bytes())?;
-        Ok(())
-    }
-
     pub(crate) fn read(cursor: &mut scursor::ReadCursor<'a>) -> Result<Self, ReadError> {
         let file_name_offset = cursor.read_u16_le()?;
         if file_name_offset != Self::FILE_NAME_OFFSET {
@@ -70,6 +61,22 @@ impl<'a> Group70Var7<'a> {
             request_id,
             file_name,
         })
+    }
+}
+
+impl FreeFormat for Group70Var7<'_> {
+    const VARIATION: Variation = Variation::Group70Var7;
+
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u16_le(Self::FILE_NAME_OFFSET)?;
+        cursor.write_u16_le(byte_length(self.file_name)?)?;
+        cursor.write_u16_le(self.file_type.to_u16())?;
+        cursor.write_u32_le(self.file_size)?;
+        self.time_of_creation.write(cursor)?;
+        self.permissions.write(cursor)?;
+        cursor.write_u16_le(self.request_id)?;
+        cursor.write_bytes(self.file_name.as_bytes())?;
+        Ok(())
     }
 }
 

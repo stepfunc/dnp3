@@ -5,17 +5,14 @@ use crate::app::QualifierCode;
 
 use scursor::*;
 
-pub(crate) trait FixedSize: Copy + Clone
-where
-    Self: Sized,
-{
+pub(crate) trait FixedSize: Copy {
     const SIZE: u8;
 
     fn read(cursor: &mut ReadCursor) -> Result<Self, ReadError>;
     fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError>;
 }
 
-pub(crate) trait Index: Copy + Clone + FixedSize + PartialEq + Display {
+pub(crate) trait Index: FixedSize + PartialEq + Display {
     fn zero() -> Self;
     fn one() -> Self;
     /// the next index, or `None` past the type's maximum

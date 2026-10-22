@@ -1,7 +1,9 @@
 use super::permissions::*;
 use super::*;
+use crate::app::format::free_format::FreeFormat;
 use crate::app::format::WriteError;
 use crate::app::Timestamp;
+use crate::app::Variation;
 use crate::master::FileMode;
 use scursor::{ReadCursor, WriteCursor};
 
@@ -40,20 +42,6 @@ impl<'a> Group70Var3<'a> {
         Ok(())
     }
 
-    pub(crate) fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-        cursor.write_u16_le(Self::FILE_NAME_OFFSET)?;
-        cursor.write_u16_le(byte_length(self.file_name)?)?;
-        self.time_of_creation.write(cursor)?;
-        self.permissions.write(cursor)?;
-        cursor.write_u32_le(self.auth_key)?;
-        cursor.write_u32_le(self.file_size)?;
-        cursor.write_u16_le(self.mode.to_u16())?;
-        cursor.write_u16_le(self.max_block_size)?;
-        cursor.write_u16_le(self.request_id)?;
-        cursor.write_bytes(self.file_name.as_bytes())?;
-        Ok(())
-    }
-
     pub(crate) fn read(cursor: &mut ReadCursor<'a>) -> Result<Self, ReadError> {
         let file_name_offset = cursor.read_u16_le()?;
         if file_name_offset != Self::FILE_NAME_OFFSET {
@@ -84,6 +72,24 @@ impl<'a> Group70Var3<'a> {
             request_id,
             file_name,
         })
+    }
+}
+
+impl FreeFormat for Group70Var3<'_> {
+    const VARIATION: Variation = Variation::Group70Var3;
+
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u16_le(Self::FILE_NAME_OFFSET)?;
+        cursor.write_u16_le(byte_length(self.file_name)?)?;
+        self.time_of_creation.write(cursor)?;
+        self.permissions.write(cursor)?;
+        cursor.write_u32_le(self.auth_key)?;
+        cursor.write_u32_le(self.file_size)?;
+        cursor.write_u16_le(self.mode.to_u16())?;
+        cursor.write_u16_le(self.max_block_size)?;
+        cursor.write_u16_le(self.request_id)?;
+        cursor.write_bytes(self.file_name.as_bytes())?;
+        Ok(())
     }
 }
 

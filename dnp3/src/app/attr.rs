@@ -1,5 +1,5 @@
 use crate::app::parse::range::Range;
-use crate::app::parse::traits::{FixedSize, Index};
+use crate::app::parse::traits::Index;
 use crate::app::{ObjectParseError, Timestamp};
 use crate::master::{BadEncoding, TaskError};
 use scursor::{ReadCursor, ReadError, WriteCursor, WriteError};
@@ -989,15 +989,7 @@ pub enum OwnedAttrValue {
 
 impl OwnedAttrValue {
     pub(crate) fn data_type(&self) -> AttrDataType {
-        match self {
-            OwnedAttrValue::VisibleString(_) => AttrDataType::VisibleString,
-            OwnedAttrValue::UnsignedInt(_) => AttrDataType::UnsignedInt,
-            OwnedAttrValue::SignedInt(_) => AttrDataType::SignedInt,
-            OwnedAttrValue::FloatingPoint(_) => AttrDataType::FloatingPoint,
-            OwnedAttrValue::OctetString(_) => AttrDataType::OctetString,
-            OwnedAttrValue::Dnp3Time(_) => AttrDataType::Dnp3Time,
-            OwnedAttrValue::BitString(_) => AttrDataType::BitString,
-        }
+        self.view().data_type()
     }
 
     pub(crate) fn view(&self) -> AttrValue<'_> {
@@ -1247,28 +1239,34 @@ impl<'a> AttrValue<'a> {
     pub(crate) fn expect_octet_string(&self) -> Result<&'a [u8], TypeError> {
         match self {
             AttrValue::OctetString(x) => Ok(x),
-            _ => Err(TypeError::new(AttrDataType::OctetString, self.get_type())),
+            _ => Err(TypeError::new(AttrDataType::OctetString, self.data_type())),
         }
     }
 
     pub(crate) fn expect_time(&self) -> Result<Timestamp, TypeError> {
         match self {
             AttrValue::Dnp3Time(t) => Ok(*t),
-            _ => Err(TypeError::new(AttrDataType::Dnp3Time, self.get_type())),
+            _ => Err(TypeError::new(AttrDataType::Dnp3Time, self.data_type())),
         }
     }
 
     pub(crate) fn expect_float(&self) -> Result<FloatType, TypeError> {
         match self {
             AttrValue::FloatingPoint(x) => Ok(*x),
-            _ => Err(TypeError::new(AttrDataType::FloatingPoint, self.get_type())),
+            _ => Err(TypeError::new(
+                AttrDataType::FloatingPoint,
+                self.data_type(),
+            )),
         }
     }
 
     pub(crate) fn expect_vstr(&self) -> Result<&'a str, TypeError> {
         match self {
             AttrValue::VisibleString(x) => Ok(x),
-            _ => Err(TypeError::new(AttrDataType::VisibleString, self.get_type())),
+            _ => Err(TypeError::new(
+                AttrDataType::VisibleString,
+                self.data_type(),
+            )),
         }
     }
 
@@ -1279,21 +1277,21 @@ impl<'a> AttrValue<'a> {
     pub(crate) fn expect_uint(&self) -> Result<u32, TypeError> {
         match self {
             AttrValue::UnsignedInt(x) => Ok(*x),
-            _ => Err(TypeError::new(AttrDataType::UnsignedInt, self.get_type())),
+            _ => Err(TypeError::new(AttrDataType::UnsignedInt, self.data_type())),
         }
     }
 
     pub(crate) fn expect_int(&self) -> Result<i32, TypeError> {
         match self {
             AttrValue::SignedInt(x) => Ok(*x),
-            _ => Err(TypeError::new(AttrDataType::SignedInt, self.get_type())),
+            _ => Err(TypeError::new(AttrDataType::SignedInt, self.data_type())),
         }
     }
 
     pub(crate) fn expect_attr_list(&self) -> Result<VariationList<'a>, TypeError> {
         match self {
             AttrValue::AttrList(x) => Ok(*x),
-            _ => Err(TypeError::new(AttrDataType::AttrList, self.get_type())),
+            _ => Err(TypeError::new(AttrDataType::AttrList, self.data_type())),
         }
     }
 }
@@ -1442,7 +1440,7 @@ impl<'a> Attribute<'a> {
         cursor: &mut ReadCursor<'a>,
     ) -> Result<Self, ObjectParseError>
     where
-        I: FixedSize + Index + Display,
+        I: Index,
     {
         if count != 1 {
             return Err(ObjectParseError::BadAttribute(AttrParseError::CountNotOne(
@@ -1592,20 +1590,6 @@ impl<'a> AttrValue<'a> {
         };
 
         Ok(attr)
-    }
-
-    /// underlying type
-    pub(crate) fn get_type(&self) -> AttrDataType {
-        match self {
-            AttrValue::VisibleString(_) => AttrDataType::VisibleString,
-            AttrValue::UnsignedInt(_) => AttrDataType::UnsignedInt,
-            AttrValue::SignedInt(_) => AttrDataType::SignedInt,
-            AttrValue::FloatingPoint(_) => AttrDataType::FloatingPoint,
-            AttrValue::OctetString(_) => AttrDataType::OctetString,
-            AttrValue::BitString(_) => AttrDataType::BitString,
-            AttrValue::AttrList(_) => AttrDataType::AttrList,
-            AttrValue::Dnp3Time(_) => AttrDataType::Dnp3Time,
-        }
     }
 
     fn parse_visible_string(

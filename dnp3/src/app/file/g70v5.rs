@@ -1,5 +1,7 @@
 use super::*;
+use crate::app::format::free_format::FreeFormat;
 use crate::app::format::WriteError;
+use crate::app::Variation;
 use scursor::{ReadCursor, WriteCursor};
 
 /// Group 70 Variation 5 - file transport
@@ -20,13 +22,6 @@ impl<'a> Group70Var5<'a> {
         Ok(())
     }
 
-    pub(crate) fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
-        cursor.write_u32_le(self.file_handle)?;
-        cursor.write_u32_le(self.block_number)?;
-        cursor.write_bytes(self.file_data)?;
-        Ok(())
-    }
-
     pub(crate) fn read(cursor: &mut ReadCursor<'a>) -> Result<Self, ReadError> {
         let file_handle = cursor.read_u32_le()?;
         let block_number = cursor.read_u32_le()?;
@@ -37,6 +32,17 @@ impl<'a> Group70Var5<'a> {
             block_number,
             file_data,
         })
+    }
+}
+
+impl FreeFormat for Group70Var5<'_> {
+    const VARIATION: Variation = Variation::Group70Var5;
+
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_u32_le(self.file_handle)?;
+        cursor.write_u32_le(self.block_number)?;
+        cursor.write_bytes(self.file_data)?;
+        Ok(())
     }
 }
 
