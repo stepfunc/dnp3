@@ -1031,3 +1031,40 @@ async fn direct_operate_passes_the_largest_finite_analog_values_to_the_handler()
         Event::EndControls,
     ]);
 }
+
+const TOO_MANY_OPS: u8 = 8;
+
+#[tokio::test]
+async fn control_limit_applies_before_the_analog_value_check() {
+    // the limit, the statuses of g41v2, g41v3 and g41v4, and the IIN2 of the response
+    let cases = [
+        // the non-finite g41v3 is within the limit, the g41v4 isn't
+        (2, [0, NOT_SUPPORTED, TOO_MANY_OPS], 0x04),
+        // both are past the limit, so the first failure is TOO_MANY_OPS, without IIN2.2
+        (1, [0, TOO_MANY_OPS, TOO_MANY_OPS], 0x00),
+    ];
+
+    for (limit, statuses, iin2) in cases {
+        for values in NON_FINITE {
+            for function in [FunctionCode::Select, FunctionCode::DirectOperate] {
+                let mut config = get_default_config();
+                config.max_controls_per_request = Some(limit);
+                let mut harness = new_harness(config);
+
+                harness
+                    .test_request_response(
+                        &analog_control_request(0, function, values),
+                        &analog_control_response(0, iin2, values, statuses),
+                    )
+                    .await;
+
+                let control = match function {
+                    FunctionCode::Select => Event::Select(G41V2_INDEX_7),
+                    _ => Event::Operate(G41V2_INDEX_7, OperateType::DirectOperate),
+                };
+                harness.check_events(&[Event::BeginControls, control, Event::EndControls]);
+                harness.check_no_events();
+            }
+        }
+    }
+}
