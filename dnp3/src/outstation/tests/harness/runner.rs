@@ -11,6 +11,7 @@ use crate::outstation::tests::harness::{
     MockOutstationApplication, MockOutstationInformation,
 };
 use crate::outstation::OutstationHandle;
+use crate::transport::mock::reader::RxFrameInfo;
 use crate::transport::mock::MockTransport;
 use crate::util::phys::{PhysAddr, PhysLayer};
 use crate::util::session::{Enabled, RunError};
@@ -50,6 +51,7 @@ pub(crate) struct Harness<S> {
     state: S,
     events: EventReceiver,
     pub(crate) application_data: Arc<Mutex<ApplicationData>>,
+    frame_info: RxFrameInfo,
 }
 
 /// connected state: a live mock IO handle and the running session
@@ -113,6 +115,13 @@ impl<S> Harness<S> {
             panic!("expected no events, but next event is: {x:?}")
         }
     }
+
+    /// Change the broadcast address of the requests sent from now on
+    pub(crate) fn set_broadcast(&mut self, broadcast: Option<BroadcastConfirmMode>) {
+        let mut info = self.frame_info.get().unwrap();
+        info.broadcast = broadcast;
+        self.frame_info.set(info);
+    }
 }
 
 // methods that require a live connection
@@ -157,6 +166,7 @@ impl Harness<Connected> {
             state: Connected { mut io, session },
             events,
             application_data,
+            frame_info,
         } = self;
 
         io.read_error(std::io::ErrorKind::ConnectionReset);
@@ -171,6 +181,7 @@ impl Harness<Connected> {
             state: Disconnected { task },
             events,
             application_data,
+            frame_info,
         }
     }
 }
@@ -184,6 +195,7 @@ impl Harness<Disconnected> {
             state: spawn_session(self.state.task),
             events: self.events,
             application_data: self.application_data,
+            frame_info: self.frame_info,
         }
     }
 }
@@ -235,10 +247,13 @@ fn new_harness_impl(
         PhysAddr::None,
     ));
 
+    let frame_info = task.rx_frame_info();
+
     Harness {
         handle,
         state: spawn_session(task),
         events: receiver,
         application_data: data,
+        frame_info,
     }
 }
