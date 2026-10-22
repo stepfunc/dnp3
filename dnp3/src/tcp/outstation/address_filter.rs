@@ -50,7 +50,7 @@ impl WildcardIPv4 {
             }
         }
 
-        match addr {
+        match addr.to_canonical() {
             std::net::IpAddr::V4(x) => {
                 let [b3, b2, b1, b0] = x.octets();
                 bm(b3, self.b3) && bm(b2, self.b2) && bm(b1, self.b1) && bm(b0, self.b0)
@@ -77,6 +77,9 @@ impl WildcardIPv4 {
 
 /// Address filter used to control which master address(es) may connect to an outstation.
 ///
+/// An IPv4 address and its IPv4-mapped IPv6 form (`::ffff:a.b.c.d`) are the same address, so IPv4
+/// filters match IPv4 masters on a server bound to an IPv6 address such as `[::]`.
+///
 /// Note: User code not exhaustively match against this enum as new variants may be added in the future.
 #[non_exhaustive]
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -93,10 +96,16 @@ pub enum AddressFilter {
 
 impl AddressFilter {
     pub(crate) fn matches(&self, addr: std::net::IpAddr) -> bool {
+        let addr = addr.to_canonical();
         match self {
             AddressFilter::Any => true,
-            AddressFilter::Exact(x) => *x == addr,
-            AddressFilter::AnyOf(set) => set.contains(&addr),
+            AddressFilter::Exact(x) => x.to_canonical() == addr,
+            AddressFilter::AnyOf(set) => match addr {
+                std::net::IpAddr::V4(v4) => {
+                    set.contains(&addr) || set.contains(&std::net::IpAddr::V6(v4.to_ipv6_mapped()))
+                }
+                std::net::IpAddr::V6(_) => set.contains(&addr),
+            },
             AddressFilter::WildcardIpv4(wc) => wc.matches(addr),
         }
     }
@@ -210,5 +219,69 @@ mod test {
         // disjoint
         assert!(!wc1.conflicts_with(&ip2));
         assert!(!wc2.conflicts_with(&ip1));
+    }
+
+    fn ip(s: &str) -> IpAddr {
+        s.parse().unwrap()
+    }
+
+    fn any_of(addrs: &[&str]) -> AddressFilter {
+        AddressFilter::AnyOf(addrs.iter().map(|x| ip(x)).collect())
+    }
+
+    /// filters written with the IPv4 form of 192.168.0.1 and with its IPv4-mapped IPv6 form
+    fn filters_for_192_168_0_1() -> [AddressFilter; 5] {
+        [
+            AddressFilter::Exact(ip("192.168.0.1")),
+            AddressFilter::Exact(ip("::ffff:192.168.0.1")),
+            any_of(&["10.0.0.1", "192.168.0.1"]),
+            any_of(&["10.0.0.1", "::ffff:192.168.0.1"]),
+            AddressFilter::WildcardIpv4("192.168.0.*".parse().unwrap()),
+        ]
+    }
+
+    #[test]
+    fn native_and_mapped_ipv4_peers_match_either_form() {
+        for filter in filters_for_192_168_0_1() {
+            for peer in ["192.168.0.1", "::ffff:192.168.0.1"] {
+                assert!(filter.matches(ip(peer)), "{filter:?} {peer}");
+            }
+            for peer in ["192.168.1.1", "::ffff:192.168.1.1", "::192.168.0.1", "::1"] {
+                assert!(!filter.matches(ip(peer)), "{filter:?} {peer}");
+            }
+        }
+    }
+
+    #[test]
+    fn native_ipv6_matching_is_unchanged() {
+        let filter = any_of(&["2001:db8::1", "192.168.0.1"]);
+        assert!(filter.matches(ip("2001:db8::1")));
+        assert!(!filter.matches(ip("2001:db8::2")));
+        assert!(AddressFilter::Exact(ip("2001:db8::1")).matches(ip("2001:db8::1")));
+        assert!(!AddressFilter::Exact(ip("2001:db8::1")).matches(ip("2001:db8::2")));
+    }
+
+    #[test]
+    fn native_and_mapped_forms_of_an_address_conflict() {
+        for lhs in filters_for_192_168_0_1() {
+            for rhs in filters_for_192_168_0_1() {
+                assert!(lhs.conflicts_with(&rhs), "{lhs:?} {rhs:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn mapped_forms_of_different_addresses_do_not_conflict() {
+        let others = [
+            AddressFilter::Exact(ip("::ffff:192.168.1.1")),
+            any_of(&["::ffff:192.168.1.1", "2001:db8::1"]),
+            AddressFilter::Exact(ip("::192.168.0.1")),
+        ];
+        for lhs in filters_for_192_168_0_1() {
+            for rhs in others.iter() {
+                assert!(!lhs.conflicts_with(rhs), "{lhs:?} {rhs:?}");
+                assert!(!rhs.conflicts_with(&lhs), "{rhs:?} {lhs:?}");
+            }
+        }
     }
 }
