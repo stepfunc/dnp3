@@ -790,3 +790,36 @@ async fn buffer_overflow_issue() {
         )
         .await;
 }
+
+#[tokio::test]
+async fn malformed_request_during_unsolicited_confirm_wait_leaves_the_unsolicited_response() {
+    let mut harness = new_harness(get_default_unsolicited_config());
+    confirm_null_unsolicited(&mut harness).await;
+    enable_unsolicited(&mut harness).await;
+
+    generate_binary_event(&mut harness.handle.database);
+    harness.expect_response(UNSOL_G2V1_SEQ1).await;
+    harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
+
+    // read, seq == 1, g1v2 with a 1-byte start/stop qualifier but no start or stop, answered with
+    // restart IIN and IIN2.2 PARAMETER_ERROR
+    harness
+        .test_request_response(&[0xC1, 0x01, 0x01, 0x02, 0x00], &[0xC1, 0x81, 0x80, 0x04])
+        .await;
+    harness.check_no_events();
+
+    // the unsolicited response is retried unchanged
+    tokio::time::pause();
+    harness.expect_response(UNSOL_G2V1_SEQ1).await;
+    harness.check_events(&[Event::UnsolicitedConfirmTimeout(1, true)]);
+    tokio::time::resume();
+
+    // and its confirm is still accepted
+    harness.send_and_process(UNS_CONFIRM_SEQ_1).await;
+    harness.check_events(&[
+        Event::UnsolicitedConfirmReceived(1),
+        Event::BeginConfirm,
+        Event::Cleared(0),
+        Event::EndConfirm(empty_buffer_state()),
+    ]);
+}

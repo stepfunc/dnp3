@@ -845,19 +845,16 @@ impl OutstationSession {
                 self.process_broadcast(database, mode, request).await;
                 Ok(UnsolicitedWaitResult::ReadNext)
             }
-            FragmentType::MalformedRequest(_, err) => {
+            FragmentType::MalformedRequest(hash, err) => {
                 self.state.deferred_read.clear();
 
+                // IEEE 1815-2012 clause 6.1: a request whose objects don't parse is still the last
+                // request, answered with IIN2, as from idle
                 let seq = request.header.control.seq;
-                let iin = Iin::default() | Iin2::from(err);
-                self.write_transient_solicited(
-                    io,
-                    writer,
-                    info.addr,
-                    ResponseHeader::solicited(seq, iin),
-                    database,
-                )
-                .await?;
+                let response = Prepared::empty_solicited(seq, Iin::default() | Iin2::from(err));
+                self.write_solicited(io, writer, info.addr, response, database)
+                    .await?;
+                self.state.last_valid_request = Some(LastValidRequest::new(seq, hash, None));
                 Ok(UnsolicitedWaitResult::ReadNext)
             }
             FragmentType::NewNonRead(hash, objects) => {
