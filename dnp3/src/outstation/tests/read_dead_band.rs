@@ -174,7 +174,7 @@ async fn read_g34_v3() {
 }
 
 #[tokio::test]
-async fn read_infinite_deadband_saturates_every_variation() {
+async fn read_infinite_deadband_is_infinity_in_g34v3_and_saturates_the_integers() {
     let mut harness = new_harness(get_default_config());
 
     harness
@@ -203,12 +203,12 @@ async fn read_infinite_deadband_saturates_every_variation() {
         )
         .await;
 
-    // g34v3 clamps to f32::MAX
+    // g34v3 is infinity
     harness
         .test_request_response(
             &[0xC2, 0x01, 0x22, 0x03, 0x06],
             &[
-                0xC2, 0x81, 0x80, 0x00, 0x22, 0x03, 0x01, 0x07, 0x00, 0x07, 0x00, 0xFF, 0xFF, 0x7F,
+                0xC2, 0x81, 0x80, 0x00, 0x22, 0x03, 0x01, 0x07, 0x00, 0x07, 0x00, 0x00, 0x00, 0x80,
                 0x7F,
             ],
         )

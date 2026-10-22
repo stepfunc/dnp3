@@ -274,18 +274,16 @@ impl StaticDatabase {
         }
     }
 
-    pub(crate) fn set_analog_deadband(&mut self, index: u16, deadband: f64) -> bool {
-        let Some(deadband) = Deadband::analog(deadband) else {
-            return false;
-        };
-
-        match self.analog.get_mut(index) {
-            None => false,
-            Some(x) => {
-                x.config.detector = deadband;
-                true
-            }
-        }
+    /// Set the deadband a master wrote, returning the value stored, or None if the deadband is NaN
+    /// or there's no analog input at the index
+    ///
+    /// A negative deadband is stored as 0 (IEEE 1815-2012 A.18)
+    pub(crate) fn set_analog_deadband(&mut self, index: u16, deadband: f64) -> Option<f64> {
+        let deadband = if deadband < 0.0 { 0.0 } else { deadband };
+        let detector = Deadband::analog(deadband)?;
+        let point = self.analog.get_mut(index)?;
+        point.config.detector = detector;
+        Some(deadband)
     }
 
     #[cfg(test)]
@@ -760,16 +758,29 @@ mod tests {
     }
 
     #[test]
-    fn written_analog_deadband_must_be_zero_or_positive() {
+    fn written_analog_deadband_treats_negative_values_as_zero() {
         let mut db = StaticDatabase::default();
         assert!(db.add(0, analog_config(StaticAnalogInputVariation::Group30Var1)));
 
-        for deadband in [0.0, -0.0, 1.5, 1e-310, f64::INFINITY] {
-            assert!(db.set_analog_deadband(0, deadband), "{deadband}");
+        let cases = [
+            (0.0, Some(0.0)),
+            (1.5, Some(1.5)),
+            (1e-310, Some(1e-310)),
+            (f64::INFINITY, Some(f64::INFINITY)),
+            (-1.0, Some(0.0)),
+            (f64::NEG_INFINITY, Some(0.0)),
+            (f64::NAN, None),
+        ];
+        for (deadband, stored) in cases {
+            assert_eq!(db.set_analog_deadband(0, deadband), stored, "{deadband}");
         }
-        for deadband in [f64::NAN, -1.0, f64::NEG_INFINITY] {
-            assert!(!db.set_analog_deadband(0, deadband), "{deadband}");
-        }
+        // -0.0 is stored as written
+        assert_eq!(
+            db.set_analog_deadband(0, -0.0).map(f64::to_bits),
+            Some((-0.0f64).to_bits())
+        );
+        // no analog input at the index
+        assert_eq!(db.set_analog_deadband(1, 1.0), None);
     }
 
     fn binary_config(var: StaticBinaryInputVariation) -> PointConfig<BinaryInput> {

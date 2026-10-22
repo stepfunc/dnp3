@@ -1603,10 +1603,9 @@ impl OutstationSession {
         let iin = db.transaction(|db| {
             let mut iin2 = Iin2::default();
             for (index, deadband) in items.by_ref() {
-                if db.inner.set_analog_deadband(index, deadband) {
-                    self.application.write_analog_dead_band(index, deadband);
-                } else {
-                    iin2 |= Iin2::PARAMETER_ERROR
+                match db.inner.set_analog_deadband(index, deadband) {
+                    Some(deadband) => self.application.write_analog_dead_band(index, deadband),
+                    None => iin2 |= Iin2::PARAMETER_ERROR,
                 }
             }
             iin2

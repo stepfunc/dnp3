@@ -1231,6 +1231,7 @@ fn define_outstation_application(
                         doc("Called when the outstation writes the dead-band of an analog input")
                             .details("Called for each analog dead-band in the write request where an analog input is defined at the specified index.")
                             .details("The dead-band is automatically updated in the database. This callback allows application code to persist the modified value to non-volatile memory if desired")
+                            .details("A negative dead-band written by the master is stored, and reported here, as 0")
             )?
             .param("index", Primitive::U16, "Index of the analog input")?
             .param("dead_band", Primitive::Double, "New dead-band value")?

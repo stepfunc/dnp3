@@ -27,17 +27,36 @@ async fn write_g34_var1() {
 }
 
 fn harness_with_analog_input() -> OutstationHarness {
+    harness_with_deadband(0.0)
+}
+
+fn harness_with_deadband(deadband: f64) -> OutstationHarness {
     let harness = new_harness(get_default_config());
+    let config = AnalogInputConfig {
+        deadband,
+        ..Default::default()
+    };
     harness
         .handle
         .database
-        .transaction(|db| db.add(3, Some(EventClass::Class1), AnalogInputConfig::default()));
+        .transaction(|db| db.add(3, Some(EventClass::Class1), config));
     harness
 }
 
 fn write_g34_var3(value: f32) -> [u8; 11] {
     let [a, b, c, d] = value.to_le_bytes();
     [0xC0, 0x02, 0x22, 0x03, 0x17, 0x01, 0x03, a, b, c, d]
+}
+
+/// READ g34 `var` for index 3 with sequence number 1, and expect `value`
+async fn read_g34(harness: &mut OutstationHarness, var: u8, value: &[u8]) {
+    let request = [0xC1, 0x01, 0x22, var, 0x06];
+    let header = [
+        0xC1, 0x81, 0x80, 0x00, 0x22, var, 0x01, 0x03, 0x00, 0x03, 0x00,
+    ];
+    harness
+        .test_request_response(&request, &[&header[..], value].concat())
+        .await;
 }
 
 #[tokio::test]
@@ -53,20 +72,63 @@ async fn write_g34_var3_accepts_infinity() {
         Event::WriteDeadBand(3, f64::INFINITY),
         Event::EndWriteDeadBands,
     ]);
+
+    // infinity in g34v3, the maximum in the integer variations
+    read_g34(&mut harness, 3, &f32::INFINITY.to_le_bytes()).await;
+    read_g34(&mut harness, 1, &[0xFF, 0xFF]).await;
+    read_g34(&mut harness, 2, &[0xFF, 0xFF, 0xFF, 0xFF]).await;
 }
 
 #[tokio::test]
-async fn write_g34_var3_rejects_nan_and_negative_values() {
+async fn write_g34_var3_accepts_a_positive_subnormal_value() {
     let mut harness = harness_with_analog_input();
+    let subnormal = f32::from_bits(1);
 
-    for value in [f32::NAN, -1.0, f32::NEG_INFINITY] {
-        // IIN2.2 (PARAMETER_ERROR)
+    harness
+        .test_request_response(&write_g34_var3(subnormal), EMPTY_RESPONSE)
+        .await;
+
+    harness.check_events(&[
+        Event::BeginWriteDeadBands,
+        Event::WriteDeadBand(3, f64::from(subnormal)),
+        Event::EndWriteDeadBands,
+    ]);
+
+    read_g34(&mut harness, 3, &[0x01, 0x00, 0x00, 0x00]).await;
+}
+
+#[tokio::test]
+async fn write_g34_var3_stores_negative_values_as_zero() {
+    for value in [-1.0, f32::NEG_INFINITY] {
+        let mut harness = harness_with_deadband(2.5);
+
         harness
-            .test_request_response(&write_g34_var3(value), &[0xC0, 0x81, 0x80, 0x04])
+            .test_request_response(&write_g34_var3(value), EMPTY_RESPONSE)
             .await;
 
-        harness.check_events(&[Event::BeginWriteDeadBands, Event::EndWriteDeadBands]);
+        harness.check_events(&[
+            Event::BeginWriteDeadBands,
+            Event::WriteDeadBand(3, 0.0),
+            Event::EndWriteDeadBands,
+        ]);
+
+        read_g34(&mut harness, 3, &[0x00, 0x00, 0x00, 0x00]).await;
     }
+}
+
+#[tokio::test]
+async fn write_g34_var3_rejects_nan() {
+    let mut harness = harness_with_deadband(2.5);
+
+    // IIN2.2 (PARAMETER_ERROR)
+    harness
+        .test_request_response(&write_g34_var3(f32::NAN), &[0xC0, 0x81, 0x80, 0x04])
+        .await;
+
+    harness.check_events(&[Event::BeginWriteDeadBands, Event::EndWriteDeadBands]);
+
+    // the deadband is unchanged
+    read_g34(&mut harness, 3, &2.5f32.to_le_bytes()).await;
 }
 
 #[tokio::test]
@@ -265,6 +327,59 @@ async fn ranged_write_of_g34_applies_the_valid_deadbands_around_rejected_ones() 
                     0xC1, 0x81, 0x80, 0x00, 0x22, 0x03, 0x01, 0x03, 0x00, 0x03, 0x00, 0x00, 0x00,
                     0xC0, 0x3F, 0x22, 0x03, 0x01, 0x05, 0x00, 0x06, 0x00, 0x00, 0x00, 0x10, 0x41,
                     0x00, 0x00, 0x20, 0x40,
+                ],
+            )
+            .await;
+    }
+}
+
+#[tokio::test]
+async fn ranged_write_of_g34_stores_negative_deadbands_as_zero_and_rejects_nan() {
+    // g34v3 for indices 3 to 6: -1.0, NaN, the smallest positive subnormal, then -infinity
+    let objects: &[u8] = &[
+        0x00, 0x00, 0x80, 0xBF, 0x00, 0x00, 0xC0, 0x7F, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x80,
+        0xFF,
+    ];
+    let ranges: [&[u8]; 2] = [&[0x00, 0x03, 0x06], &[0x01, 0x03, 0x00, 0x06, 0x00]];
+    let subnormal = f64::from(f32::from_bits(1));
+
+    for range in ranges {
+        let mut harness = new_harness(get_default_config());
+        let config = AnalogInputConfig {
+            deadband: 9.0,
+            ..Default::default()
+        };
+        harness.handle.database.transaction(|db| {
+            for index in 3..=6 {
+                db.add(index, Some(EventClass::Class1), config);
+            }
+        });
+
+        let mut request = vec![0xC0, 0x02, 0x22, 0x03];
+        request.extend_from_slice(range);
+        request.extend_from_slice(objects);
+        // IIN2.2 (PARAMETER_ERROR) for the NaN
+        harness
+            .test_request_response(&request, &[0xC0, 0x81, 0x80, 0x04])
+            .await;
+
+        harness.check_events(&[
+            Event::BeginWriteDeadBands,
+            Event::WriteDeadBand(3, 0.0),
+            Event::WriteDeadBand(5, subnormal),
+            Event::WriteDeadBand(6, 0.0),
+            Event::EndWriteDeadBands,
+        ]);
+        harness.check_no_events();
+
+        // 0, the unchanged 9.0, the subnormal, and 0
+        harness
+            .test_request_response(
+                &[0xC1, 0x01, 0x22, 0x03, 0x06],
+                &[
+                    0xC1, 0x81, 0x80, 0x00, 0x22, 0x03, 0x01, 0x03, 0x00, 0x06, 0x00, 0x00, 0x00,
+                    0x00, 0x00, 0x00, 0x00, 0x10, 0x41, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                    0x00,
                 ],
             )
             .await;
