@@ -37,10 +37,16 @@ impl Retry {
             | ErrorKind::ConnectionReset
             | ErrorKind::ConnectionRefused
             | ErrorKind::Interrupted => Self::Immediately,
-            _ if is_pending_network_error(err) => Self::Immediately,
+            _ if is_windows_interrupt(err) || is_pending_network_error(err) => Self::Immediately,
             _ => Self::AfterDelay,
         }
     }
+}
+
+/// Rust leaves WSAEINTR uncategorized, so `ErrorKind::Interrupted` doesn't cover it
+fn is_windows_interrupt(err: &std::io::Error) -> bool {
+    const WSAEINTR: i32 = 10004;
+    cfg!(windows) && err.raw_os_error() == Some(WSAEINTR)
 }
 
 /// Linux returns network errors already pending on the new socket from `accept()`, and
@@ -311,12 +317,14 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn windows_errors_are_classified() {
+        const WSAEINTR: i32 = 10004;
         const WSAECONNABORTED: i32 = 10053;
         const WSAECONNRESET: i32 = 10054;
+        const WSAECONNREFUSED: i32 = 10061;
         const WSAEMFILE: i32 = 10024;
         const WSAENETDOWN: i32 = 10050;
         const WSAENOBUFS: i32 = 10055;
-        for code in [WSAECONNABORTED, WSAECONNRESET] {
+        for code in [WSAEINTR, WSAECONNABORTED, WSAECONNRESET, WSAECONNREFUSED] {
             assert_eq!(retry(Fault::Os(code)), Retry::Immediately, "{code}");
         }
         for code in [WSAEMFILE, WSAENETDOWN, WSAENOBUFS] {
