@@ -20,12 +20,27 @@ use crate::app::parse::free_format::FreeFormatVariation;
 use crate::app::parse::options::ParseOptions;
 use scursor::{ReadCursor, ReadError};
 
+/// What the function code makes a fragment, and the IIN that only a response carries
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) enum FragmentKind {
+    Request(FunctionCode),
+    Response(ResponseFunction, Iin),
+}
+
+impl FragmentKind {
+    pub(crate) fn function(self) -> FunctionCode {
+        match self {
+            Self::Request(function) => function,
+            Self::Response(function, _) => function.into(),
+        }
+    }
+}
+
 #[derive(Copy, Clone)]
 pub(crate) struct ParsedFragment<'a> {
     pub(crate) control: ControlField,
-    pub(crate) function: FunctionCode,
+    pub(crate) kind: FragmentKind,
     pub(crate) options: ParseOptions,
-    pub(crate) iin: Option<Iin>,
     pub(crate) objects: Result<HeaderCollection<'a>, ObjectParseError>,
     pub(crate) raw_fragment: &'a [u8],
     pub(crate) raw_objects: &'a [u8],
@@ -40,21 +55,21 @@ impl<'a> ParsedFragment<'a> {
     }
 
     fn format_header(&self, f: &mut Formatter) -> std::fmt::Result {
-        match self.iin {
-            Some(iin) => write!(
+        match self.kind {
+            FragmentKind::Response(_, iin) => write!(
                 f,
                 "ctrl: {} func: {:?} {} {} ... (len = {})",
                 self.control,
-                self.function,
+                self.kind.function(),
                 iin.iin1,
                 iin.iin2,
                 self.raw_objects.len()
             ),
-            None => write!(
+            FragmentKind::Request(function) => write!(
                 f,
                 "ctrl: {} func: {:?} ... (len = {})",
                 self.control,
-                self.function,
+                function,
                 self.raw_objects.len()
             ),
         }
@@ -62,20 +77,23 @@ impl<'a> ParsedFragment<'a> {
 
     #[cfg_attr(all(test, dnp3_no_panic), no_panic::no_panic)]
     pub(crate) fn to_request(self) -> Result<Request<'a>, RequestValidationError> {
-        if self.iin.is_some() {
-            return Err(RequestValidationError::UnexpectedFunction(self.function));
-        }
+        let function = match self.kind {
+            FragmentKind::Request(function) => function,
+            FragmentKind::Response(function, _) => {
+                return Err(RequestValidationError::UnexpectedFunction(function.into()))
+            }
+        };
 
         if !(self.control.is_fir_and_fin()) {
             return Err(RequestValidationError::NonFirFin);
         }
 
-        if self.control.uns && self.function != FunctionCode::Confirm {
-            return Err(RequestValidationError::UnexpectedUnsBit(self.function));
+        if self.control.uns && function != FunctionCode::Confirm {
+            return Err(RequestValidationError::UnexpectedUnsBit(function));
         }
 
         Ok(Request {
-            header: RequestHeader::new(self.control, self.function),
+            header: RequestHeader::new(self.control, function),
             raw_fragment: self.raw_fragment,
             objects: self.objects,
         })
@@ -83,12 +101,11 @@ impl<'a> ParsedFragment<'a> {
 
     #[cfg_attr(all(test, dnp3_no_panic), no_panic::no_panic)]
     pub(crate) fn to_response(self) -> Result<Response<'a>, ResponseValidationError> {
-        let (function, iin) = match (self.function, self.iin) {
-            (FunctionCode::Response, Some(x)) => (ResponseFunction::Response, x),
-            (FunctionCode::UnsolicitedResponse, Some(x)) => {
-                (ResponseFunction::UnsolicitedResponse, x)
+        let (function, iin) = match self.kind {
+            FragmentKind::Response(function, iin) => (function, iin),
+            FragmentKind::Request(function) => {
+                return Err(ResponseValidationError::UnexpectedFunction(function))
             }
-            _ => return Err(ResponseValidationError::UnexpectedFunction(self.function)),
         };
 
         if !function.is_unsolicited() && self.control.uns {
@@ -123,18 +140,16 @@ impl<'a> ParsedFragment<'a> {
             None => return Err(HeaderParseError::UnknownFunction(control.seq, raw_func)),
             Some(x) => x,
         };
-        let iin = if function.get_function_info().has_iin {
-            Some(Iin::parse(&mut cursor)?)
-        } else {
-            None
+        let kind = match ResponseFunction::from_function(function) {
+            Some(function) => FragmentKind::Response(function, Iin::parse(&mut cursor)?),
+            None => FragmentKind::Request(function),
         };
 
         let objects = cursor.read_all();
         let fragment = Self {
             control,
-            function,
+            kind,
             options,
-            iin,
             objects: HeaderCollection::parse(options, function, objects),
             raw_fragment: fragment,
             raw_objects: objects,
@@ -220,7 +235,7 @@ impl std::fmt::Display for FragmentDisplay<'_> {
                 // if an error occurred, we re-parse the object headers so we can log any headers before the error
                 for header in ObjectParser::one_pass(
                     self.fragment.options,
-                    self.fragment.function,
+                    self.fragment.kind.function(),
                     self.fragment.raw_objects,
                 )
                 .flatten()

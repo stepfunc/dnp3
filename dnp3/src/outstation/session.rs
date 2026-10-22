@@ -1352,7 +1352,7 @@ impl OutstationSession {
     }
 
     fn get_iin2(function: FunctionCode, object_headers: HeaderCollection) -> Iin2 {
-        if function.get_function_info().objects_allowed {
+        if function.objects_allowed() {
             return Iin2::default();
         }
 
