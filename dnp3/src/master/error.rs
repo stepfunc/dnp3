@@ -331,8 +331,13 @@ impl From<ObjectParseError> for TaskError {
 }
 
 impl From<SingleHeaderError> for TaskError {
-    fn from(_: SingleHeaderError) -> Self {
-        TaskError::UnexpectedResponseHeaders
+    fn from(err: SingleHeaderError) -> Self {
+        match err {
+            SingleHeaderError::BadParse(err) => TaskError::MalformedResponse(err),
+            SingleHeaderError::NoHeaders | SingleHeaderError::MoreThanOneHeader => {
+                TaskError::UnexpectedResponseHeaders
+            }
+        }
     }
 }
 

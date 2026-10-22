@@ -166,8 +166,8 @@ impl From<ObjectParseError> for FileError {
 }
 
 impl From<SingleHeaderError> for FileError {
-    fn from(_: SingleHeaderError) -> Self {
-        Self::TaskError(TaskError::UnexpectedResponseHeaders)
+    fn from(err: SingleHeaderError) -> Self {
+        Self::TaskError(err.into())
     }
 }
 

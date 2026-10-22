@@ -1,6 +1,6 @@
 use std::time::Duration;
 
-use crate::app::Sequence;
+use crate::app::{ObjectParseError, Sequence};
 use crate::master::association::AssociationConfig;
 use crate::master::TaskError;
 
@@ -35,7 +35,7 @@ struct Case {
     expected: Result<Duration, TaskError>,
 }
 
-const CASES: [Case; 10] = [
+const CASES: [Case; 14] = [
     // g52v1 with a count of one: 2 seconds
     Case {
         restart: Restart::Cold,
@@ -96,6 +96,34 @@ const CASES: [Case; 10] = [
         objects: &[52, 2, 0x07, 1, 0x02, 0x00, 52, 2, 0x07, 1, 0x03, 0x00],
         expected: Err(TaskError::UnexpectedResponseHeaders),
     },
+    // no object header
+    Case {
+        restart: Restart::Cold,
+        objects: &[],
+        expected: Err(TaskError::UnexpectedResponseHeaders),
+    },
+    // two g52v1 time delays
+    Case {
+        restart: Restart::Cold,
+        objects: &[52, 1, 0x07, 1, 0x02, 0x00, 52, 1, 0x07, 1, 0x03, 0x00],
+        expected: Err(TaskError::UnexpectedResponseHeaders),
+    },
+    // g52v1 cut short after its qualifier
+    Case {
+        restart: Restart::Cold,
+        objects: &[52, 1, 0x07],
+        expected: Err(TaskError::MalformedResponse(
+            ObjectParseError::InsufficientBytes,
+        )),
+    },
+    // a variation of g52 that doesn't exist
+    Case {
+        restart: Restart::Warm,
+        objects: &[52, 9, 0x07, 1, 0x02, 0x00],
+        expected: Err(TaskError::MalformedResponse(
+            ObjectParseError::UnknownGroupVariation(52, 9),
+        )),
+    },
 ];
 
 #[tokio::test]
@@ -126,6 +154,10 @@ async fn restart_returns_the_time_delay_of_the_response() {
                 case.restart,
                 case.objects
             );
+
+            // nothing else is sent once the master has processed the response
+            harness.master.get_decode_level().await.unwrap();
+            harness.assert_no_events();
         }
     })
     .await;

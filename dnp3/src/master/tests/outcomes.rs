@@ -12,7 +12,8 @@ use tokio::time::Instant;
 use crate::app::control::{Group12Var1, OpType};
 use crate::app::{
     ControlField, FileStatus, FileType, FunctionCode, Group70Var2, Group70Var6, Group70Var7, Iin,
-    Iin1, Iin2, MaybeAsync, Permissions, ResponseHeader, Sequence, Timestamp, Variation,
+    Iin1, Iin2, MaybeAsync, ObjectParseError, Permissions, ResponseHeader, Sequence, Timestamp,
+    Variation,
 };
 use crate::link::{EndpointAddress, LinkError};
 use crate::master::association::AssociationConfig;
@@ -634,19 +635,26 @@ async fn no_task_confirms_a_response_with_con_whose_objects_do_not_parse() {
             // a valid fragment whose object header is cut short after its group
             let response = with_con(vec![0xC0, 0x81, 0x00, 0x00, 0x01]);
             respond(&mut started.harness, response).await;
-            assert_ne!(started.reply().await, kind.ok(), "{kind:?}");
-            barrier(&mut started.harness).await;
-            // the task, not the transport, rejects it
-            assert!(
-                matches!(
-                    started.harness.assoc_events.pop().as_slice(),
-                    [AssocInfoEvent::TaskFailure(task_type, err)]
-                        if *task_type == kind.task_type() && *err != TaskError::Transport
-                ),
-                "{kind:?}"
-            );
+            let err = match kind {
+                Kind::Read
+                | Kind::DirectOperate
+                | Kind::SelectBeforeOperate
+                | Kind::ColdRestart
+                | Kind::AuthFile
+                | Kind::OpenFile
+                | Kind::CloseFile
+                | Kind::WriteFileBlock
+                | Kind::GetFileInfo
+                | Kind::ReadDirectory => {
+                    TaskError::MalformedResponse(ObjectParseError::InsufficientBytes)
+                }
+                // these tasks expect no objects, and reject any without parsing them
+                Kind::EmptyResponse | Kind::DeadBands | Kind::TimeSync => {
+                    TaskError::UnexpectedResponseHeaders
+                }
+            };
+            started.expect_failure(err).await;
             assert_eq!(started.harness.io.pop_event(), None, "{kind:?}");
-            assert!(!started.harness.task.is_finished(), "{kind:?}");
         }
     })
     .await;

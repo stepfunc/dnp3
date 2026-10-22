@@ -3,8 +3,8 @@ use std::time::Duration;
 use tokio::task::JoinHandle;
 
 use crate::app::{
-    FileStatus, FunctionCode, Group70Var3, Group70Var5, Iin, Iin1, Iin2, Permissions, Sequence,
-    Shutdown, Timestamp,
+    FileStatus, FunctionCode, Group70Var3, Group70Var5, Iin, Iin1, Iin2, ObjectParseError,
+    Permissions, Sequence, Shutdown, Timestamp,
 };
 use crate::master::association::AssociationConfig;
 use crate::master::tasks::file::REQUEST_ID;
@@ -108,6 +108,16 @@ fn open_response(seq: u8, status: FileStatus) -> Vec<u8> {
     super::file_status_response(seq, HANDLE, 8, 128, status)
 }
 
+/// Why [`unparseable_response`] doesn't parse
+const UNPARSEABLE: ObjectParseError = ObjectParseError::UnknownGroupVariation(70, 99);
+
+/// A response whose object header is a variation of g70 that doesn't exist
+fn unparseable_response(seq: u8) -> Vec<u8> {
+    let mut response = super::no_object_response(seq);
+    response.extend_from_slice(&[70, 99]);
+    response
+}
+
 /// Open without credentials and expect the READ of block 0
 async fn open(harness: &mut TestHarness) {
     harness.expect_write(open_request(0, 0)).await;
@@ -151,8 +161,8 @@ async fn read_to_close(harness: &mut TestHarness, reader: &RecordingReader) {
 enum Finished {
     /// `task_success`, with the sequence number of the last request
     Success(u8),
-    /// `task_fail` with `UnexpectedResponseHeaders`
-    Failure,
+    /// `task_fail` with this error
+    Failure(TaskError),
 }
 
 /// Check that the read task, whose first request had function code `first`, finished this way and
@@ -163,9 +173,7 @@ async fn expect_finished(harness: &mut TestHarness, first: FunctionCode, finishe
         Finished::Success(seq) => {
             AssocInfoEvent::TaskSuccess(TaskType::FileRead, first, Sequence::new(seq))
         }
-        Finished::Failure => {
-            AssocInfoEvent::TaskFailure(TaskType::FileRead, TaskError::UnexpectedResponseHeaders)
-        }
+        Finished::Failure(err) => AssocInfoEvent::TaskFailure(TaskType::FileRead, err),
     };
     assert_eq!(
         harness.assoc_events.pop(),
@@ -252,21 +260,30 @@ enum OpenFailure {
     OpenVariation,
     /// OPEN is answered without an object header
     NoObjectHeader,
+    /// AUTHENTICATE is answered with an object header that doesn't parse
+    AuthUnparseable,
+    /// OPEN is answered with an object header that doesn't parse
+    OpenUnparseable,
 }
 
-const OPEN_FAILURES: [OpenFailure; 5] = [
+const OPEN_FAILURES: [OpenFailure; 7] = [
     OpenFailure::NoPermission,
     OpenFailure::AuthVariation,
     OpenFailure::OpenStatus,
     OpenFailure::OpenVariation,
     OpenFailure::NoObjectHeader,
+    OpenFailure::AuthUnparseable,
+    OpenFailure::OpenUnparseable,
 ];
 
 impl OpenFailure {
     fn credentials(self) -> Option<FileCredentials> {
         match self {
-            Self::NoPermission | Self::AuthVariation => Some(credentials()),
-            Self::OpenStatus | Self::OpenVariation | Self::NoObjectHeader => None,
+            Self::NoPermission | Self::AuthVariation | Self::AuthUnparseable => Some(credentials()),
+            Self::OpenStatus
+            | Self::OpenVariation
+            | Self::NoObjectHeader
+            | Self::OpenUnparseable => None,
         }
     }
 
@@ -284,6 +301,23 @@ impl OpenFailure {
             Self::AuthVariation | Self::OpenVariation => FileError::BadResponse,
             Self::OpenStatus => FileError::BadStatus(FileStatus::FileNotFound),
             Self::NoObjectHeader => FileError::TaskError(TaskError::UnexpectedResponseHeaders),
+            Self::AuthUnparseable | Self::OpenUnparseable => {
+                FileError::TaskError(TaskError::MalformedResponse(UNPARSEABLE))
+            }
+        }
+    }
+
+    /// How the `AssociationInformation` sees the task end
+    fn finished(self) -> Finished {
+        match self {
+            Self::NoPermission
+            | Self::AuthVariation
+            | Self::OpenStatus
+            | Self::OpenVariation
+            | Self::NoObjectHeader => Finished::Failure(TaskError::UnexpectedResponseHeaders),
+            Self::AuthUnparseable | Self::OpenUnparseable => {
+                Finished::Failure(TaskError::MalformedResponse(UNPARSEABLE))
+            }
         }
     }
 
@@ -298,6 +332,8 @@ impl OpenFailure {
             ),
             Self::OpenVariation => (open_request(0, 0), auth_response(0, 7)),
             Self::NoObjectHeader => (open_request(0, 0), super::no_object_response(0)),
+            Self::AuthUnparseable => (AUTH_REQUEST.to_vec(), unparseable_response(0)),
+            Self::OpenUnparseable => (open_request(0, 0), unparseable_response(0)),
         };
         harness.expect_write(request).await;
         harness.process_response(response).await;
@@ -311,7 +347,7 @@ async fn open_failures_abort_the_reader_and_fail_the_task_without_a_close() {
             let mut harness = create_association(AssociationConfig::quiet()).await;
             let reader = start_read(&mut harness, read_config(), failure.credentials()).await;
             failure.answer(&mut harness).await;
-            expect_finished(&mut harness, failure.first(), Finished::Failure).await;
+            expect_finished(&mut harness, failure.first(), failure.finished()).await;
             harness.assert_no_events();
             assert_eq!(
                 reader.pop(),
@@ -334,6 +370,8 @@ enum Ending {
     Handle,
     /// READ is answered without an object header
     NoObjectHeader,
+    /// READ is answered with an object header that doesn't parse
+    Unparseable,
     /// a block that isn't the last exceeds the configured maximum file size
     MaxFileSize,
     /// the last block exceeds the configured maximum file size
@@ -344,11 +382,12 @@ enum Ending {
     ReaderAbortOnLastBlock,
 }
 
-const ENDINGS: [Ending; 8] = [
+const ENDINGS: [Ending; 9] = [
     Ending::BlockVariation,
     Ending::BlockNumber,
     Ending::Handle,
     Ending::NoObjectHeader,
+    Ending::Unparseable,
     Ending::MaxFileSize,
     Ending::MaxFileSizeOnLastBlock,
     Ending::ReaderAbort,
@@ -369,6 +408,7 @@ impl Ending {
             | Self::BlockNumber
             | Self::Handle
             | Self::NoObjectHeader
+            | Self::Unparseable
             | Self::ReaderAbort
             | Self::ReaderAbortOnLastBlock => read_config(),
         }
@@ -381,6 +421,7 @@ impl Ending {
             | Self::BlockNumber
             | Self::Handle
             | Self::NoObjectHeader
+            | Self::Unparseable
             | Self::MaxFileSize
             | Self::MaxFileSizeOnLastBlock => false,
         }
@@ -395,8 +436,9 @@ impl Ending {
             | Self::ReaderAbort
             | Self::ReaderAbortOnLastBlock => closed,
             Self::BlockVariation | Self::BlockNumber | Self::Handle | Self::NoObjectHeader => {
-                Finished::Failure
+                Finished::Failure(TaskError::UnexpectedResponseHeaders)
             }
+            Self::Unparseable => Finished::Failure(TaskError::MalformedResponse(UNPARSEABLE)),
         }
     }
 
@@ -408,6 +450,7 @@ impl Ending {
                 super::file_transport_response(1, HANDLE + 1, super::last_block(0), b"data")
             }
             Self::NoObjectHeader => super::no_object_response(1),
+            Self::Unparseable => unparseable_response(1),
             Self::MaxFileSize | Self::ReaderAbort => {
                 super::file_transport_response(1, HANDLE, 0, b"data")
             }
@@ -424,6 +467,7 @@ impl Ending {
             Self::BlockNumber => FileError::BadBlockNum,
             Self::Handle => FileError::WrongHandle,
             Self::NoObjectHeader => FileError::TaskError(TaskError::UnexpectedResponseHeaders),
+            Self::Unparseable => FileError::TaskError(TaskError::MalformedResponse(UNPARSEABLE)),
             Self::MaxFileSize | Self::MaxFileSizeOnLastBlock => FileError::MaxLengthExceeded,
             Self::ReaderAbort | Self::ReaderAbortOnLastBlock => FileError::AbortByUser,
         }
@@ -445,23 +489,31 @@ fn close_success(seq: u8) -> Vec<u8> {
 }
 
 /// Every CLOSE response with how it ends a task that it decides: success, and the responses that
-/// fail validation (a bad status, the wrong handle, the wrong variation, and no object header)
-fn close_responses(seq: u8) -> [(Vec<u8>, Finished); 5] {
+/// fail validation (a bad status, the wrong handle, the wrong variation, no object header, and an
+/// object header that doesn't parse)
+fn close_responses(seq: u8) -> [(Vec<u8>, Finished); 6] {
     [
         (close_success(seq), Finished::Success(seq)),
         (
             super::file_status_response(seq, HANDLE, 0, 0, FileStatus::InvalidHandle),
-            Finished::Failure,
+            Finished::Failure(TaskError::UnexpectedResponseHeaders),
         ),
         (
             super::file_status_response(seq, HANDLE + 1, 0, 0, FileStatus::Success),
-            Finished::Failure,
+            Finished::Failure(TaskError::UnexpectedResponseHeaders),
         ),
         (
             super::file_transport_response(seq, HANDLE, 0, b""),
-            Finished::Failure,
+            Finished::Failure(TaskError::UnexpectedResponseHeaders),
         ),
-        (super::no_object_response(seq), Finished::Failure),
+        (
+            super::no_object_response(seq),
+            Finished::Failure(TaskError::UnexpectedResponseHeaders),
+        ),
+        (
+            unparseable_response(seq),
+            Finished::Failure(TaskError::MalformedResponse(UNPARSEABLE)),
+        ),
     ]
 }
 
@@ -714,7 +766,7 @@ async fn directory_read_fails_with_the_error_that_ended_the_transfer() {
             let reply = start_directory_read(&harness, read_config(), failure.credentials());
             failure.answer(&mut harness).await;
             assert_eq!(reply.await.unwrap(), Err(failure.error()), "{failure:?}");
-            expect_finished(&mut harness, failure.first(), Finished::Failure).await;
+            expect_finished(&mut harness, failure.first(), failure.finished()).await;
             harness.assert_no_events();
         }
         for ending in ENDINGS.into_iter().filter(|ending| !ending.reader_aborts()) {

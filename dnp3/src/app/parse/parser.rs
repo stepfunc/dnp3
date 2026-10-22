@@ -371,14 +371,14 @@ pub(crate) struct HeaderCollection<'a> {
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) enum SingleHeaderError {
-    BadParse,
+    BadParse(ObjectParseError),
     NoHeaders,
     MoreThanOneHeader,
 }
 
 impl From<ObjectParseError> for SingleHeaderError {
-    fn from(_: ObjectParseError) -> Self {
-        Self::BadParse
+    fn from(err: ObjectParseError) -> Self {
+        Self::BadParse(err)
     }
 }
 
