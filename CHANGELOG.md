@@ -72,6 +72,7 @@
 * :bell: **The minimum supported Rust version is now 1.85**, which the updated dependencies require. CI now checks it.
 * :star: Add master support for `DIRECT_OPERATE_NO_ACK` (function code 0x06) in Rust and all bindings. See [#466](https://github.com/stepfunc/dnp3/pull/466).
 * :bug: Fix a double free in the bindings when an outstation server fails to bind, for example because the port is already in use. See [#469](https://github.com/stepfunc/dnp3/pull/469).
+* :bug: Fix the bindings panicking when an outstation reports a file or directory name containing a NUL byte, which a C string can't hold. The read now fails with `bad_response`, and a directory listing with such a name fails as a whole. Rust users still receive the exact name. See [#665](https://github.com/stepfunc/dnp3/pull/665).
 * :bug: Flush TLS writes so the last frame isn't left buffered when the socket is under backpressure. Affects masters and outstations. See [#462](https://github.com/stepfunc/dnp3/pull/462).
 ### 1.7.0 ###
 * :star: Add outstation `ConnectionManager` for fine-grained control of TCP and TLS client connections, including dynamic endpoint selection, custom retry logic, and per-connection master address override. See [#381](https://github.com/stepfunc/dnp3/pull/381), [#406](https://github.com/stepfunc/dnp3/pull/406).
