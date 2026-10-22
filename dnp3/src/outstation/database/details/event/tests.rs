@@ -4,6 +4,7 @@ use scursor::WriteCursor;
 use crate::app::measurement::*;
 use crate::master::EventClasses;
 use crate::outstation::database::config::*;
+use crate::outstation::database::details::WriteProgress;
 use crate::outstation::database::read::EventReadHeader;
 use crate::outstation::database::{EventBufferConfig, EventClass};
 use crate::outstation::{BufferState, ClassCount, OutstationApplication, TypeCount};
@@ -256,7 +257,7 @@ impl OutstationApplication for Cleared {
 }
 
 /// write the selected events into a cursor of `size` bytes, returning the result and the bytes
-fn write_bytes(buffer: &mut EventBuffer, size: usize) -> (Result<usize, usize>, Vec<u8>) {
+fn write_bytes(buffer: &mut EventBuffer, size: usize) -> ((usize, WriteProgress), Vec<u8>) {
     let mut backing = vec![0u8; size];
     let mut cursor = WriteCursor::new(backing.as_mut_slice());
     let result = buffer.write_events(&mut cursor);
@@ -264,7 +265,7 @@ fn write_bytes(buffer: &mut EventBuffer, size: usize) -> (Result<usize, usize>, 
 }
 
 /// write the selected events into a cursor of `size` bytes
-fn write(buffer: &mut EventBuffer, size: usize) -> Result<usize, usize> {
+fn write(buffer: &mut EventBuffer, size: usize) -> (usize, WriteProgress) {
     write_bytes(buffer, size).0
 }
 
@@ -280,7 +281,7 @@ fn clear(buffer: &mut EventBuffer) -> Vec<u64> {
 fn drain(buffer: &mut EventBuffer) -> Vec<u64> {
     buffer.reset();
     let selected = buffer.select_by_class(EventClasses::all(), None);
-    assert_eq!(write(buffer, 4096), Ok(selected));
+    assert_eq!(write(buffer, 4096), (selected, WriteProgress::Complete));
     clear(buffer)
 }
 
@@ -368,7 +369,7 @@ fn overflow_persists_until_no_type_is_full() {
 
     // confirming the binary events leaves the counter type full
     assert_eq!(buffer.select_by_header(Kind::Binary.header(false, None)), 2);
-    assert_eq!(write(&mut buffer, 4096), Ok(2));
+    assert_eq!(write(&mut buffer, 4096), (2, WriteProgress::Complete));
     assert!(buffer.is_overflown());
     assert_eq!(clear(&mut buffer), [1, 2]);
     assert!(buffer.is_overflown());
@@ -409,7 +410,7 @@ fn confirm_clears_exactly_the_written_events() {
     );
 
     // room for the first two binary events only, which share a header
-    assert_eq!(write(&mut buffer, 14), Err(2));
+    assert_eq!(write(&mut buffer, 14), (2, WriteProgress::Partial));
     assert_eq!(
         buffer.unwritten_classes(),
         EventClasses::new(true, true, false)
@@ -425,7 +426,7 @@ fn confirm_clears_exactly_the_written_events() {
 
     // the still-selected events can't be selected again, and are written next
     assert_eq!(buffer.select_by_class(EventClasses::all(), None), 1);
-    assert_eq!(write(&mut buffer, 4096), Ok(3));
+    assert_eq!(write(&mut buffer, 4096), (3, WriteProgress::Complete));
     assert_eq!(buffer.unwritten_classes(), EventClasses::none());
     assert_eq!(clear(&mut buffer), [1, 3, 4]);
     assert_eq!(
@@ -451,22 +452,22 @@ fn written_counts_accumulate_across_fragments_until_the_confirm() {
     assert_eq!(buffer.select_by_class(EventClasses::all(), None), 4);
 
     // one binary event per fragment, each written without a confirm in between
-    assert_eq!(write(&mut buffer, 10), Err(1));
+    assert_eq!(write(&mut buffer, 10), (1, WriteProgress::Partial));
     assert_eq!(buffer.unwritten_classes(), EventClasses::all());
-    assert_eq!(write(&mut buffer, 10), Err(1));
+    assert_eq!(write(&mut buffer, 10), (1, WriteProgress::Partial));
     assert_eq!(
         buffer.unwritten_classes(),
         EventClasses::new(true, false, true)
     );
-    assert_eq!(write(&mut buffer, 10), Err(1));
+    assert_eq!(write(&mut buffer, 10), (1, WriteProgress::Partial));
     assert_eq!(
         buffer.unwritten_classes(),
         EventClasses::new(true, false, false)
     );
-    assert_eq!(write(&mut buffer, 0), Err(0));
-    assert_eq!(write(&mut buffer, 4096), Ok(1));
+    assert_eq!(write(&mut buffer, 0), (0, WriteProgress::Partial));
+    assert_eq!(write(&mut buffer, 4096), (1, WriteProgress::Complete));
     assert_eq!(buffer.unwritten_classes(), EventClasses::none());
-    assert_eq!(write(&mut buffer, 4096), Ok(0));
+    assert_eq!(write(&mut buffer, 4096), (0, WriteProgress::Complete));
 
     assert_eq!(clear(&mut buffer), [0, 1, 2, 3]);
     assert_eq!(buffer.unwritten_classes(), EventClasses::none());
@@ -482,7 +483,7 @@ fn evicting_a_written_event_leaves_the_other_written_events_to_the_confirm() {
     binary(&mut buffer, EventClass::Class1).unwrap();
     binary(&mut buffer, EventClass::Class2).unwrap();
     assert_eq!(buffer.select_by_class(EventClasses::all(), None), 2);
-    assert_eq!(write(&mut buffer, 4096), Ok(2));
+    assert_eq!(write(&mut buffer, 4096), (2, WriteProgress::Complete));
     assert_eq!(buffer.unwritten_classes(), EventClasses::none());
 
     // the oldest written event is discarded before the confirm
@@ -525,7 +526,7 @@ fn evicting_every_written_event_leaves_nothing_to_confirm() {
     binary(&mut buffer, EventClass::Class1).unwrap();
     binary(&mut buffer, EventClass::Class1).unwrap();
     assert_eq!(buffer.select_by_class(EventClasses::all(), None), 2);
-    assert_eq!(write(&mut buffer, 4096), Ok(2));
+    assert_eq!(write(&mut buffer, 4096), (2, WriteProgress::Complete));
 
     binary(&mut buffer, EventClass::Class2).unwrap_err();
     binary(&mut buffer, EventClass::Class2).unwrap_err();
@@ -551,7 +552,7 @@ fn reset_rearms_selected_and_written_events_after_an_unconfirmed_series() {
 
     // an unsolicited series writes some of the events and is never confirmed
     assert_eq!(buffer.select_by_class(EventClasses::all(), None), 3);
-    assert_eq!(write(&mut buffer, 10), Err(1));
+    assert_eq!(write(&mut buffer, 10), (1, WriteProgress::Partial));
     assert_eq!(
         buffer.unwritten_classes(),
         EventClasses::new(true, true, false)
@@ -568,7 +569,7 @@ fn reset_rearms_selected_and_written_events_after_an_unconfirmed_series() {
 
     // a READ of class 1 reselects both class 1 events, including the written one
     assert_eq!(buffer.select_by_class(EventClass::Class1.into(), None), 2);
-    assert_eq!(write(&mut buffer, 4096), Ok(2));
+    assert_eq!(write(&mut buffer, 4096), (2, WriteProgress::Complete));
     assert_eq!(buffer.unwritten_classes(), EventClass::Class2.into());
     assert_eq!(clear(&mut buffer), [0, 2]);
     assert_eq!(drain(&mut buffer), [1]);
@@ -581,14 +582,14 @@ fn reset_after_a_partial_write_and_new_events_keeps_insertion_order() {
     binary(&mut buffer, EventClass::Class1).unwrap();
     binary(&mut buffer, EventClass::Class1).unwrap();
     assert_eq!(buffer.select_by_class(EventClasses::all(), None), 2);
-    assert_eq!(write(&mut buffer, 10), Err(1));
+    assert_eq!(write(&mut buffer, 10), (1, WriteProgress::Partial));
 
     binary(&mut buffer, EventClass::Class1).unwrap();
     buffer.reset();
 
     // the limit takes the oldest events
     assert_eq!(buffer.select_by_header(EventReadHeader::Class1(Some(2))), 2);
-    assert_eq!(write(&mut buffer, 4096), Ok(2));
+    assert_eq!(write(&mut buffer, 4096), (2, WriteProgress::Complete));
     assert_eq!(clear(&mut buffer), [0, 1]);
     assert_eq!(drain(&mut buffer), [2]);
 }
@@ -664,7 +665,7 @@ fn type_reads_select_only_their_type_with_limits() {
         buffer.select_by_header(Kind::Counter.header(false, None)),
         0
     );
-    assert_eq!(write(&mut buffer, 4096), Ok(2));
+    assert_eq!(write(&mut buffer, 4096), (2, WriteProgress::Complete));
     assert_eq!(
         buffer.unwritten_classes(),
         EventClasses::new(true, false, true)
@@ -673,7 +674,7 @@ fn type_reads_select_only_their_type_with_limits() {
 
     assert_eq!(buffer.select_by_header(Kind::Binary.header(false, None)), 1);
     assert_eq!(buffer.select_by_header(Kind::Analog.header(false, None)), 1);
-    assert_eq!(write(&mut buffer, 4096), Ok(2));
+    assert_eq!(write(&mut buffer, 4096), (2, WriteProgress::Complete));
     assert_eq!(clear(&mut buffer), [1, 3]);
 }
 
@@ -819,7 +820,7 @@ impl Model {
         clippy::arithmetic_side_effects,
         reason = "the model adds up a few small sizes"
     )]
-    fn write(&mut self, capacity: usize) -> (Result<usize, usize>, Vec<u8>) {
+    fn write(&mut self, capacity: usize) -> ((usize, WriteProgress), Vec<u8>) {
         let mut bytes: Vec<u8> = Vec::new();
         // the group, variation, count position and count of the current header
         let mut header: Option<(u8, u8, usize, u16)> = None;
@@ -835,7 +836,7 @@ impl Model {
                 _ => 5,
             };
             if bytes.len() + header_size + 2 + data.len() > capacity {
-                return (Err(count), bytes);
+                return ((count, WriteProgress::Partial), bytes);
             }
 
             let (position, num) = match header {
@@ -855,7 +856,7 @@ impl Model {
             record.state = State::Written;
             count += 1;
         }
-        (Ok(count), bytes)
+        ((count, WriteProgress::Complete), bytes)
     }
 
     fn clear_written(&mut self) -> Vec<u64> {

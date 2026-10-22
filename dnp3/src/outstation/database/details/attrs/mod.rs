@@ -2,6 +2,7 @@ use crate::app::attr::{AttrDataType, AttrItem, AttrSet, AttrWriteError};
 use crate::app::format::write::HeaderWriter;
 use crate::app::{Iin2, QualifierCode, Variation};
 use crate::outstation::database::details::attrs::map::SetMap;
+use crate::outstation::database::details::WriteProgress;
 use crate::outstation::database::read::AttrHeader;
 use crate::util::bounded::{BoundedQueue, Full};
 use scursor::WriteCursor;
@@ -127,8 +128,7 @@ impl Selection {
         Ok(())
     }
 
-    // return true if we wrote all selected attributes!
-    fn write_all(&mut self, cursor: &mut WriteCursor, map: &SetMap) -> bool {
+    fn write_all(&mut self, cursor: &mut WriteCursor, map: &SetMap) -> WriteProgress {
         while let Some(item) = self.selected.front_mut() {
             let (set, var) = item.current();
 
@@ -136,7 +136,7 @@ impl Selection {
             if var == crate::app::attr::var::LIST_OF_ATTRIBUTE_VARIATIONS {
                 if let Some(vars) = map.variations(set) {
                     if Self::write_attr_list(set, cursor, vars).is_err() {
-                        return false;
+                        return WriteProgress::Partial;
                     }
                 }
             } else {
@@ -146,7 +146,7 @@ impl Selection {
                         Self::tx(cursor, |cur| HeaderWriter::new(cur).write_attribute(attr))
                     {
                         match err {
-                            AttrWriteError::Cursor => return false, // out of space
+                            AttrWriteError::Cursor => return WriteProgress::Partial,
                             AttrWriteError::BadAttribute(err) => {
                                 tracing::error!("Unable to write attribute: {}", err);
                             }
@@ -159,7 +159,7 @@ impl Selection {
                 self.selected.pop_front();
             }
         }
-        true
+        WriteProgress::Complete
     }
 
     fn clear(&mut self) {
@@ -189,7 +189,7 @@ impl AttrHandler {
         &mut self.map
     }
 
-    pub(crate) fn write(&mut self, cursor: &mut WriteCursor) -> bool {
+    pub(crate) fn write(&mut self, cursor: &mut WriteCursor) -> WriteProgress {
         self.selection.write_all(cursor, &self.map)
     }
 
@@ -281,7 +281,7 @@ mod test {
 
         let mut buffer = [0; 64];
         let mut cursor = WriteCursor::new(&mut buffer);
-        assert!(handler.write(&mut cursor));
+        assert_eq!(handler.write(&mut cursor), WriteProgress::Complete);
 
         let mut expected = encode_string(var::DEVICE_SERIAL_NUMBER, "serial");
         expected.extend(encode_string(var::PRODUCT_NAME_AND_MODEL, "product"));

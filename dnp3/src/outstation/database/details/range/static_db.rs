@@ -9,12 +9,12 @@ use crate::outstation::database::config::*;
 use crate::outstation::database::details::event::buffer::Insertable;
 use crate::outstation::database::details::range::traits::StaticVariation;
 use crate::outstation::database::details::range::writer::RangeWriter;
+use crate::outstation::database::details::WriteProgress;
 use crate::outstation::database::read::StaticReadHeader;
 use crate::outstation::database::{ClassZeroConfig, EventClass, EventMode, UpdateOptions};
 
 use crate::app::attr::AttrSet;
 use crate::util::bounded::{BoundedQueue, Full};
-use crate::util::BadWrite;
 use scursor::WriteCursor;
 
 pub(crate) trait EventDetector<T>
@@ -385,7 +385,7 @@ impl StaticDatabase {
         }
     }
 
-    pub(crate) fn write(&mut self, cursor: &mut WriteCursor) -> Result<(), BadWrite> {
+    pub(crate) fn write(&mut self, cursor: &mut WriteCursor) -> WriteProgress {
         while let Some(range) = self.selected.front().copied() {
             match self.write_range(cursor, range) {
                 // done with this header
@@ -398,12 +398,12 @@ impl StaticDatabase {
                     if let Some(front) = self.selected.front_mut() {
                         *front = s;
                     }
-                    return Err(BadWrite);
+                    return WriteProgress::Partial;
                 }
             };
         }
 
-        Ok(())
+        WriteProgress::Complete
     }
 
     fn write_range(
@@ -1083,7 +1083,7 @@ mod tests {
         let mut buffer = [0u8; 64];
         let mut cursor = WriteCursor::new(buffer.as_mut());
 
-        db.write(&mut cursor).unwrap();
+        assert_eq!(db.write(&mut cursor), WriteProgress::Complete);
 
         assert_eq!(
             cursor.written(),
@@ -1111,7 +1111,7 @@ mod tests {
 
         {
             let mut cursor = WriteCursor::new(buffer.as_mut());
-            db.write(&mut cursor).unwrap_err(); // incomplete !
+            assert_eq!(db.write(&mut cursor), WriteProgress::Partial);
 
             assert_eq!(
                 cursor.written(),
@@ -1124,7 +1124,7 @@ mod tests {
 
         {
             let mut cursor = WriteCursor::new(buffer.as_mut());
-            db.write(&mut cursor).unwrap_err(); // incomplete !
+            assert_eq!(db.write(&mut cursor), WriteProgress::Partial);
 
             assert_eq!(
                 cursor.written(),
@@ -1137,7 +1137,7 @@ mod tests {
 
         {
             let mut cursor = WriteCursor::new(buffer.as_mut());
-            db.write(&mut cursor).unwrap(); // complete !
+            assert_eq!(db.write(&mut cursor), WriteProgress::Complete);
 
             assert_eq!(
                 cursor.written(),
@@ -1160,7 +1160,7 @@ mod tests {
         let mut buffer = [0u8; 64];
         let mut cursor = WriteCursor::new(buffer.as_mut());
 
-        db.write(&mut cursor).unwrap();
+        assert_eq!(db.write(&mut cursor), WriteProgress::Complete);
 
         assert_eq!(
             cursor.written(),
@@ -1186,7 +1186,7 @@ mod tests {
         let mut buffer = [0u8; 64];
         let mut cursor = WriteCursor::new(buffer.as_mut());
 
-        db.write(&mut cursor).unwrap();
+        assert_eq!(db.write(&mut cursor), WriteProgress::Complete);
 
         cursor.written().to_vec()
     }
@@ -1411,7 +1411,7 @@ mod tests {
 
         {
             let mut cursor = WriteCursor::new(buffer.as_mut());
-            db.write(&mut cursor).unwrap_err(); // incomplete !
+            assert_eq!(db.write(&mut cursor), WriteProgress::Partial);
 
             assert_eq!(
                 cursor.written(),
@@ -1424,7 +1424,7 @@ mod tests {
 
         {
             let mut cursor = WriteCursor::new(buffer.as_mut());
-            db.write(&mut cursor).unwrap_err(); // incomplete !
+            assert_eq!(db.write(&mut cursor), WriteProgress::Partial);
 
             assert_eq!(
                 cursor.written(),
@@ -1437,7 +1437,7 @@ mod tests {
 
         {
             let mut cursor = WriteCursor::new(buffer.as_mut());
-            db.write(&mut cursor).unwrap(); // complete !
+            assert_eq!(db.write(&mut cursor), WriteProgress::Complete);
 
             assert_eq!(
                 cursor.written(),
@@ -1453,7 +1453,7 @@ mod tests {
         let mut buffer = [0u8; 64];
         let mut cursor = WriteCursor::new(buffer.as_mut());
 
-        db.write(&mut cursor).unwrap();
+        assert_eq!(db.write(&mut cursor), WriteProgress::Complete);
 
         cursor.written().to_vec()
     }
