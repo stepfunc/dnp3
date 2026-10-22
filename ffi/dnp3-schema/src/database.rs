@@ -385,7 +385,13 @@ pub fn define_analog_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgS
             analog_event_variation,
             "Default event variation",
         )?
-        .add(&deadband, Primitive::Double, "Deadband value")?
+        .add(
+            &deadband,
+            Primitive::Double,
+            doc("Deadband value").details(
+                "Must be zero or positive. A NaN or negative value prevents the point from being added. Positive infinity is accepted and suppresses events for value changes.",
+            ),
+        )?
         .doc("Analog configuration")?
         .end_fields()?
         .add_full_initializer("create")?
@@ -459,7 +465,13 @@ fn define_analog_output_status_config(
             analog_output_status_event_variation,
             "Default event variation",
         )?
-        .add(&deadband, Primitive::Double, "Deadband value")?
+        .add(
+            &deadband,
+            Primitive::Double,
+            doc("Deadband value").details(
+                "Must be zero or positive. A NaN or negative value prevents the point from being added. Positive infinity is accepted and suppresses events for value changes.",
+            ),
+        )?
         .doc("Analog Output Status configuration")?
         .end_fields()?
         .add_full_initializer("create")?
@@ -913,7 +925,10 @@ pub(crate) fn define_database(
             Primitive::Bool,
             "True if the point was successfully added, false otherwise",
         )?
-        .doc("Add a new AnalogInput point")?
+        .doc(
+            doc("Add a new AnalogInput point")
+                .details("Returns false, without adding the point, if a point already exists at the index or the deadband is NaN or negative."),
+        )?
         .build()?;
 
     let remove_analog = lib
@@ -975,7 +990,10 @@ pub(crate) fn define_database(
             Primitive::Bool,
             "True if the point was successfully added, false otherwise",
         )?
-        .doc("Add a new Analog Output Status point")?
+        .doc(
+            doc("Add a new Analog Output Status point")
+                .details("Returns false, without adding the point, if a point already exists at the index or the deadband is NaN or negative."),
+        )?
         .build()?;
 
     let remove_analog_output_status = lib

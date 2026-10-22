@@ -402,6 +402,8 @@ pub struct AnalogInputConfig {
     /// default event variation
     pub e_var: EventAnalogInputVariation,
     /// deadband - value of 0 means that any change will trigger an event
+    ///
+    /// Must be zero or positive, otherwise the point is not added
     pub deadband: f64,
 }
 
@@ -417,6 +419,8 @@ pub struct AnalogOutputStatusConfig {
     /// default event variation
     pub e_var: EventAnalogOutputStatusVariation,
     /// deadband - value of 0 means that any change will trigger an event
+    ///
+    /// Must be zero or positive, otherwise the point is not added
     pub deadband: f64,
 }
 
