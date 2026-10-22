@@ -21,6 +21,7 @@ use crate::util::buffer::Buffer;
 use crate::util::channel::Receiver;
 use crate::util::phys::PhysLayer;
 
+use crate::app::parse::options::ParseOptions;
 use crate::link::reader::LinkModes;
 use crate::util::session::{Enabled, RunError, StopReason};
 use tokio::time::Instant;
@@ -60,6 +61,11 @@ impl MasterTask {
 
     pub(crate) fn seed_link(&mut self, seed_data: &[u8]) -> Result<(), LinkError> {
         self.reader.seed_link(seed_data)
+    }
+
+    /// Parse with `options` instead of those read when the task was created
+    pub(crate) fn set_parse_options(&mut self, options: ParseOptions) {
+        self.reader.set_parse_options(options)
     }
 }
 

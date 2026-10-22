@@ -9,6 +9,7 @@ use crate::util::phys::PhysLayer;
 use crate::util::session::{Enabled, Session};
 use std::future::Future;
 
+use crate::app::parse::options::ParseOptions;
 use crate::tcp::accept::{Acceptor, Listen};
 use crate::tcp::ServerHandle;
 use crate::util::shutdown::ShutdownListener;
@@ -180,6 +181,7 @@ type LinkIdResult = std::io::Result<(PhysLayer, SocketAddr, LinkIdentity)>;
 struct AcceptTask<C: ConnectionHandler, L: Listen> {
     conn_id: u64,
     link_id_config: LinkIdConfig,
+    parse_options: ParseOptions,
     acceptor: Acceptor<L>,
     shutdown_listener: ShutdownListener,
     handler: C,
@@ -201,6 +203,7 @@ impl<C: ConnectionHandler, L: Listen> AcceptTask<C, L> {
         Self {
             conn_id: 0,
             link_id_config,
+            parse_options: ParseOptions::get_static(),
             acceptor: Acceptor::new(listener),
             shutdown_listener,
             handler,
@@ -307,7 +310,9 @@ impl<C: ConnectionHandler, L: Listen> AcceptTask<C, L> {
         accept: AcceptConfig,
         link_id: Option<LinkIdentity>,
     ) {
-        let Some((task, channel)) = SessionTask::create(phys, accept, link_id.as_ref()) else {
+        let Some((task, channel)) =
+            SessionTask::create(phys, self.parse_options, accept, link_id.as_ref())
+        else {
             return;
         };
 
@@ -334,6 +339,7 @@ struct SessionTask {
 impl SessionTask {
     fn create(
         phys: PhysLayer,
+        parse_options: ParseOptions,
         accept: AcceptConfig,
         link_id: Option<&LinkIdentity>,
     ) -> Option<(Self, MasterChannel)> {
@@ -344,6 +350,7 @@ impl SessionTask {
             accept.config,
             rx,
         );
+        task.set_parse_options(parse_options);
         let seed_data: &[u8] = link_id.map_or(&[], |id| &id.header_bytes);
         if let Err(err) = task.seed_link(seed_data) {
             tracing::error!("unable to seed link layer: {err:?}");

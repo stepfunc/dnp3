@@ -9,7 +9,6 @@ use super::task::MasterTask as InnerMasterTask;
 use super::{
     AssociationConfig, AssociationError, AssociationHandler, AssociationInformation, ReadHandler,
 };
-use crate::app::parse::options::ParseOptions;
 use crate::app::{Listener, Timeout};
 use crate::link::reader::LinkModes;
 use crate::link::{EndpointAddress, LinkErrorMode, LinkReadMode};

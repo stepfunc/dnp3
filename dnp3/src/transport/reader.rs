@@ -82,6 +82,11 @@ impl<T: Transport> TransportReader<T> {
         }
     }
 
+    /// Parse with `options` instead of those read when the reader was created
+    pub(crate) fn set_parse_options(&mut self, options: ParseOptions) {
+        self.parse_options = options;
+    }
+
     pub(crate) async fn read(
         &mut self,
         io: &mut PhysLayer,
