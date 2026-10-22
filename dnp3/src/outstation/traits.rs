@@ -470,10 +470,10 @@ impl DefaultControlHandler {
 
 impl ControlHandler for DefaultControlHandler {}
 
-impl ControlSupport<Group12Var1> for DefaultControlHandler {
+impl<T> ControlSupport<T> for DefaultControlHandler {
     fn select(
         &mut self,
-        _control: Group12Var1,
+        _control: T,
         _index: u16,
         _database: &mut DatabaseHandle,
     ) -> CommandStatus {
@@ -482,91 +482,7 @@ impl ControlSupport<Group12Var1> for DefaultControlHandler {
 
     fn operate(
         &mut self,
-        _control: Group12Var1,
-        _index: u16,
-        _op_type: OperateType,
-        _database: &mut DatabaseHandle,
-    ) -> CommandStatus {
-        self.status
-    }
-}
-
-impl ControlSupport<Group41Var1> for DefaultControlHandler {
-    fn select(
-        &mut self,
-        _control: Group41Var1,
-        _index: u16,
-        _database: &mut DatabaseHandle,
-    ) -> CommandStatus {
-        self.status
-    }
-
-    fn operate(
-        &mut self,
-        _control: Group41Var1,
-        _index: u16,
-        _op_type: OperateType,
-        _database: &mut DatabaseHandle,
-    ) -> CommandStatus {
-        self.status
-    }
-}
-
-impl ControlSupport<Group41Var2> for DefaultControlHandler {
-    fn select(
-        &mut self,
-        _control: Group41Var2,
-        _index: u16,
-        _database: &mut DatabaseHandle,
-    ) -> CommandStatus {
-        self.status
-    }
-
-    fn operate(
-        &mut self,
-        _control: Group41Var2,
-        _index: u16,
-        _op_type: OperateType,
-        _database: &mut DatabaseHandle,
-    ) -> CommandStatus {
-        self.status
-    }
-}
-
-impl ControlSupport<Group41Var3> for DefaultControlHandler {
-    fn select(
-        &mut self,
-        _control: Group41Var3,
-        _index: u16,
-        _database: &mut DatabaseHandle,
-    ) -> CommandStatus {
-        self.status
-    }
-
-    fn operate(
-        &mut self,
-        _control: Group41Var3,
-        _index: u16,
-        _op_type: OperateType,
-        _database: &mut DatabaseHandle,
-    ) -> CommandStatus {
-        self.status
-    }
-}
-
-impl ControlSupport<Group41Var4> for DefaultControlHandler {
-    fn select(
-        &mut self,
-        _control: Group41Var4,
-        _index: u16,
-        _database: &mut DatabaseHandle,
-    ) -> CommandStatus {
-        self.status
-    }
-
-    fn operate(
-        &mut self,
-        _control: Group41Var4,
+        _control: T,
         _index: u16,
         _op_type: OperateType,
         _database: &mut DatabaseHandle,
