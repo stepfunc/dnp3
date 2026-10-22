@@ -574,3 +574,49 @@ impl ControlSupport<Group41Var4> for DefaultControlHandler {
         self.status
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::outstation::config::OutstationConfig;
+    use crate::outstation::database::{ClassZeroConfig, EventBufferConfig};
+
+    /// what the handler returns to select and operate, for each control type
+    fn statuses(handler: &mut dyn ControlHandler) -> [CommandStatus; 10] {
+        fn both<T: Copy, H: ControlSupport<T> + ?Sized>(
+            handler: &mut H,
+            control: T,
+            database: &mut DatabaseHandle,
+        ) -> [CommandStatus; 2] {
+            [
+                handler.select(control, 7, database),
+                handler.operate(control, 7, OperateType::DirectOperate, database),
+            ]
+        }
+
+        let mut database = DatabaseHandle::new(
+            OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS,
+            ClassZeroConfig::default(),
+            EventBufferConfig::no_events(),
+        );
+        let db = &mut database;
+        let [a, b] = both(handler, Group12Var1::from_op_type(OpType::LatchOn), db);
+        let [c, d] = both(handler, Group41Var1::new(1), db);
+        let [e, f] = both(handler, Group41Var2::new(2), db);
+        let [g, h] = both(handler, Group41Var3::new(3.0), db);
+        let [i, j] = both(handler, Group41Var4::new(4.0), db);
+        [a, b, c, d, e, f, g, h, i, j]
+    }
+
+    #[test]
+    fn default_control_handler_returns_its_status_for_every_control() {
+        assert_eq!(
+            statuses(DefaultControlHandler::create().as_mut()),
+            [CommandStatus::NotSupported; 10]
+        );
+        assert_eq!(
+            statuses(DefaultControlHandler::with_status(CommandStatus::HardwareError).as_mut()),
+            [CommandStatus::HardwareError; 10]
+        );
+    }
+}

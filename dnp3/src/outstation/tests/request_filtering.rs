@@ -158,6 +158,7 @@ impl LinkHarness {
         config.decode_level = level;
         let (sender, events) = event_handlers();
         let (_, application) = MockOutstationApplication::create(sender.clone());
+        let (_, information) = MockOutstationInformation::create(sender.clone());
         let (mut task, handle) = OutstationTask::<RealTransport>::with_transport(
             Enabled::Yes,
             LinkModes::test(),
@@ -165,7 +166,7 @@ impl LinkHarness {
             config,
             PhysAddr::None,
             application,
-            MockOutstationInformation::create(sender.clone()),
+            information,
             MockControlHandler::create(sender, ControlStatuses::default()),
         );
         let (io, io_handle) = sfio_tokio_mock_io::mock();

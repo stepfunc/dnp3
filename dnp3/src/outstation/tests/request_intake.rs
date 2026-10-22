@@ -7,7 +7,7 @@ use tokio::time::Instant;
 
 use crate::app::measurement::*;
 use crate::app::variations::Group41Var2;
-use crate::app::FunctionCode;
+use crate::app::{ControlField, FunctionCode, RequestHeader, Sequence};
 use crate::link::header::BroadcastConfirmMode;
 use crate::outstation::config::OutstationConfig;
 use crate::outstation::database::*;
@@ -1075,6 +1075,155 @@ async fn disable_unsolicited_in_the_unsolicited_confirm_wait_ends_the_series_and
     harness.send_and_process(&unsolicited_confirm(1)).await;
     harness.check_events(&[Event::UnsolicitedConfirmReceived(1)]);
     probe(&mut harness, 3, RESTART).await;
+}
+
+// ---------- process_request_from_idle ----------
+
+/// the information callback for a request with one fragment, from idle
+fn from_idle(function: FunctionCode, uns: bool, seq: u8) -> Event {
+    Event::RequestFromIdle(RequestHeader {
+        control: ControlField {
+            fir: true,
+            fin: true,
+            con: false,
+            uns,
+            seq: Sequence::new(seq),
+        },
+        function,
+    })
+}
+
+/// requests and confirms in idle are reported, but not a request with an unknown function code
+#[tokio::test]
+async fn requests_and_confirms_in_idle_are_reported_to_the_information_callback() {
+    // an empty response is none
+    let cases: [(&[u8], Vec<u8>, Option<Event>); 6] = [
+        (
+            &read_class_0(0),
+            response(false, 0, RESTART, 0).to_vec(),
+            Some(from_idle(FunctionCode::Read, false, 0)),
+        ),
+        (
+            &record_current_time(0),
+            response(false, 0, RESTART, 0).to_vec(),
+            Some(from_idle(FunctionCode::RecordCurrentTime, false, 0)),
+        ),
+        (
+            &malformed(0),
+            response(false, 0, RESTART, PARAMETER_ERROR).to_vec(),
+            Some(from_idle(FunctionCode::Read, false, 0)),
+        ),
+        (
+            &confirm(0),
+            Vec::new(),
+            Some(from_idle(FunctionCode::Confirm, false, 0)),
+        ),
+        (
+            &unsolicited_confirm(0),
+            Vec::new(),
+            Some(from_idle(FunctionCode::Confirm, true, 0)),
+        ),
+        (
+            &unknown_function(0),
+            response(false, 0, RESTART, NO_FUNC_CODE_SUPPORT).to_vec(),
+            None,
+        ),
+    ];
+
+    for (request, expected, event) in cases {
+        let mut harness = new_harness(get_default_config());
+        harness.record_requests_from_idle();
+        if expected.is_empty() {
+            harness.send_and_process(request).await;
+            harness.expect_no_response();
+        } else {
+            harness.test_request_response(request, &expected).await;
+        }
+        if let Some(event) = event {
+            harness.check_events(&[event]);
+        }
+        harness.check_no_events();
+    }
+}
+
+#[tokio::test]
+async fn discarded_select_in_idle_is_not_reported_to_the_information_callback() {
+    let mut harness = new_harness(get_default_config());
+    harness.record_requests_from_idle();
+
+    harness
+        .test_request_response(
+            &control(FunctionCode::Select, 0, 7),
+            &control_response(false, 0, RESTART, 0),
+        )
+        .await;
+    harness.check_events(&[from_idle(FunctionCode::Select, false, 0)]);
+    harness.check_events(&selected());
+
+    harness
+        .send_and_process(&control(FunctionCode::Select, 0, 8))
+        .await;
+    harness.expect_no_response();
+    harness.check_no_events();
+}
+
+/// the request that ends the solicited confirm wait is reported once the session is back in idle
+#[tokio::test]
+async fn request_retained_from_the_solicited_confirm_wait_is_reported_to_the_information_callback()
+{
+    let mut harness = new_harness(get_default_config());
+    harness.record_requests_from_idle();
+
+    add_binary_event(&mut harness.handle.database);
+    let mut expected = response(true, 0, RESTART, 0).to_vec();
+    expected.extend_from_slice(G2V1_EVENT);
+    harness
+        .test_request_response(&read_class_1(0), &expected)
+        .await;
+    harness.check_events(&[
+        from_idle(FunctionCode::Read, false, 0),
+        Event::EnterSolicitedConfirmWait(0),
+    ]);
+
+    harness
+        .test_request_response(
+            &record_current_time(1),
+            &response(false, 1, RESTART | CLASS_1, 0),
+        )
+        .await;
+    harness.check_events(&[
+        Event::SolicitedConfirmWaitNewRequest,
+        from_idle(FunctionCode::RecordCurrentTime, false, 1),
+    ]);
+    harness.check_no_events();
+}
+
+/// neither the requests in the unsolicited confirm wait nor the deferred READ are reported
+#[tokio::test]
+async fn requests_in_the_unsolicited_confirm_wait_are_not_reported_to_the_information_callback() {
+    let mut harness = new_harness(get_default_unsolicited_config());
+    harness.record_requests_from_idle();
+    enter_unsolicited_confirm_wait(&mut harness).await;
+
+    harness
+        .test_request_response(&record_current_time(1), &response(false, 1, RESTART, 0))
+        .await;
+    harness.send_and_process(&read_class_0(2)).await;
+    harness.expect_no_response();
+    harness.send_and_process(&confirm(1)).await;
+    harness.check_no_events();
+
+    harness.send_and_process(&unsolicited_confirm(0)).await;
+    harness.check_events(&[Event::UnsolicitedConfirmReceived(0)]);
+    harness
+        .expect_response(&response(false, 2, RESTART, 0))
+        .await;
+    harness.check_no_events();
+
+    harness
+        .test_request_response(&record_current_time(3), &response(false, 3, RESTART, 0))
+        .await;
+    harness.check_events(&[from_idle(FunctionCode::RecordCurrentTime, false, 3)]);
 }
 
 // ---------- link activity ----------

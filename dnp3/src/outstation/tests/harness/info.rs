@@ -1,3 +1,6 @@
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
+
 use crate::app::FunctionCode;
 use crate::app::RequestHeader;
 use crate::app::Sequence;
@@ -6,17 +9,28 @@ use crate::outstation::traits::{BroadcastAction, OutstationInformation};
 
 pub(crate) struct MockOutstationInformation {
     events: EventSender,
+    /// whether to record `process_request_from_idle`, which most tests leave out
+    requests_from_idle: Arc<AtomicBool>,
 }
 
 impl MockOutstationInformation {
-    pub(crate) fn create(events: EventSender) -> Box<dyn OutstationInformation> {
-        Box::new(Self { events })
+    pub(crate) fn create(events: EventSender) -> (Arc<AtomicBool>, Box<dyn OutstationInformation>) {
+        let requests_from_idle = Arc::new(AtomicBool::new(false));
+        (
+            requests_from_idle.clone(),
+            Box::new(Self {
+                events,
+                requests_from_idle,
+            }),
+        )
     }
 }
 
 impl OutstationInformation for MockOutstationInformation {
-    fn process_request_from_idle(&mut self, _header: RequestHeader) {
-        // we ignore this one in tests b/c it's just too noisy
+    fn process_request_from_idle(&mut self, header: RequestHeader) {
+        if self.requests_from_idle.load(Ordering::Relaxed) {
+            self.events.send(Event::RequestFromIdle(header))
+        }
     }
 
     fn broadcast_received(&mut self, function: FunctionCode, action: BroadcastAction) {
