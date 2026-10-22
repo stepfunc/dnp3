@@ -10,6 +10,11 @@ use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::TcpSocket;
 
+#[cfg(test)]
+use tests::lookup_host;
+#[cfg(not(test))]
+use tokio::net::lookup_host;
+
 pub(crate) struct ClientTask {
     session: Session,
     connect_handler: Box<dyn ClientConnectionHandler>,
@@ -62,31 +67,29 @@ impl ClientTask {
                 .connect_to_addr(addr, info.timeout, info.local_endpoint, None)
                 .await
                 .map(|x| (x, addr, None)),
-            EndpointInner::Hostname(hostname) => {
-                match tokio::net::lookup_host(hostname.as_str()).await {
-                    Ok(addrs) => {
-                        for addr in addrs {
-                            if let Some(x) = self
-                                .connect_to_addr(
-                                    addr,
-                                    info.timeout,
-                                    info.local_endpoint,
-                                    Some(hostname.as_str()),
-                                )
-                                .await
-                            {
-                                return Some((x, addr, Some(hostname.clone())));
-                            }
+            EndpointInner::Hostname(hostname) => match lookup_host(hostname.as_str()).await {
+                Ok(addrs) => {
+                    for addr in addrs {
+                        if let Some(x) = self
+                            .connect_to_addr(
+                                addr,
+                                info.timeout,
+                                info.local_endpoint,
+                                Some(hostname.as_str()),
+                            )
+                            .await
+                        {
+                            return Some((x, addr, Some(hostname.clone())));
                         }
-                        None
                     }
-                    Err(err) => {
-                        tracing::warn!("Unable to resolve: '{hostname}', err: {err}");
-                        self.connect_handler.resolution_failed(hostname.as_str());
-                        None
-                    }
+                    None
                 }
-            }
+                Err(err) => {
+                    tracing::warn!("Unable to resolve: '{hostname}', err: {err}");
+                    self.connect_handler.resolution_failed(hostname.as_str());
+                    None
+                }
+            },
         }
     }
 
@@ -226,18 +229,43 @@ mod tests {
     use crate::link::EndpointAddress;
     use crate::master::{MasterChannelConfig, MasterChannelType};
     use crate::tcp::{wire_master_client, Endpoint};
+    use crate::util::test_support::watchdog;
     use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+
+    /// a hostname the test resolver answers with the addresses after the prefix, separated by
+    /// commas, so a test controls the resolution without DNS
+    const CANNED: &str = "canned:";
+
+    /// [`tokio::net::lookup_host`], except for a hostname starting with [`CANNED`]
+    pub(super) async fn lookup_host(host: &str) -> std::io::Result<std::vec::IntoIter<SocketAddr>> {
+        let addrs: Vec<SocketAddr> = match host.strip_prefix(CANNED) {
+            Some(list) => list
+                .split(',')
+                .filter(|x| !x.is_empty())
+                .map(|x| x.parse().unwrap())
+                .collect(),
+            None => tokio::net::lookup_host(host).await?.collect(),
+        };
+        Ok(addrs.into_iter())
+    }
 
     #[derive(Debug, PartialEq, Eq)]
     enum Event {
-        Connecting(SocketAddr),
-        ConnectFailed(SocketAddr),
-        Connected(SocketAddr),
+        Connecting(SocketAddr, Option<String>),
+        ConnectFailed(SocketAddr, Option<String>),
+        Connected(SocketAddr, Option<String>),
+        ResolutionFailed(String),
     }
 
     struct RecordingHandler {
-        endpoint: Option<SocketAddr>,
+        attempts: std::collections::VecDeque<ConnectionInfo>,
         events: UnboundedSender<Event>,
+    }
+
+    impl RecordingHandler {
+        fn record(&self, event: Event) {
+            drop(self.events.send(event));
+        }
     }
 
     impl ClientConnectionHandler for RecordingHandler {
@@ -250,23 +278,24 @@ mod tests {
         }
 
         fn next(&mut self) -> Result<ConnectionInfo, Duration> {
-            // attempt a single connection, then ask the task to sleep
-            match self.endpoint.take() {
-                Some(addr) => Ok(ConnectionInfo::new(Endpoint::address(addr))),
-                None => Err(Duration::from_secs(60)),
-            }
+            // make each attempt once, then ask the task to sleep
+            self.attempts.pop_front().ok_or(Duration::from_secs(60))
         }
 
-        fn connecting(&mut self, addr: SocketAddr, _: Option<&str>) {
-            drop(self.events.send(Event::Connecting(addr)));
+        fn connecting(&mut self, addr: SocketAddr, hostname: Option<&str>) {
+            self.record(Event::Connecting(addr, hostname.map(String::from)));
         }
 
-        fn connect_failed(&mut self, addr: SocketAddr, _: Option<&str>) {
-            drop(self.events.send(Event::ConnectFailed(addr)));
+        fn connect_failed(&mut self, addr: SocketAddr, hostname: Option<&str>) {
+            self.record(Event::ConnectFailed(addr, hostname.map(String::from)));
         }
 
-        fn connected(&mut self, addr: SocketAddr, _: Option<&str>) {
-            drop(self.events.send(Event::Connected(addr)));
+        fn connected(&mut self, addr: SocketAddr, hostname: Option<&str>) {
+            self.record(Event::Connected(addr, hostname.map(String::from)));
+        }
+
+        fn resolution_failed(&mut self, hostname: &str) {
+            self.record(Event::ResolutionFailed(hostname.to_string()));
         }
     }
 
@@ -274,9 +303,20 @@ mod tests {
         addr: SocketAddr,
         post_connection: PostConnectionHandler,
     ) -> (ClientTask, UnboundedReceiver<Event>) {
+        client_task_with(
+            vec![ConnectionInfo::new(Endpoint::address(addr))],
+            post_connection,
+        )
+    }
+
+    /// a task that makes the attempts once each
+    fn client_task_with(
+        attempts: Vec<ConnectionInfo>,
+        post_connection: PostConnectionHandler,
+    ) -> (ClientTask, UnboundedReceiver<Event>) {
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
         let handler = RecordingHandler {
-            endpoint: Some(addr),
+            attempts: attempts.into(),
             events: tx,
         };
         let (task, _channel) = wire_master_client(
@@ -298,18 +338,34 @@ mod tests {
         events
     }
 
-    #[tokio::test]
-    async fn refused_connection_notifies_connect_failed() {
-        // the port stays reserved by a bound socket that never listens, so connects are refused
+    /// a port that refuses connections, reserved while the returned socket lives
+    fn refusing_port() -> (TcpSocket, SocketAddr) {
+        // a bound socket that never listens
         let reserved = TcpSocket::new_v4().unwrap();
         reserved.bind("127.0.0.1:0".parse().unwrap()).unwrap();
         let addr = reserved.local_addr().unwrap();
+        (reserved, addr)
+    }
+
+    /// the address and hostname of a successful connection
+    fn connected_to(
+        result: Result<(PhysLayer, SocketAddr, Option<Arc<String>>), Duration>,
+    ) -> Result<(SocketAddr, Option<String>), Duration> {
+        result.map(|(_, addr, hostname)| (addr, hostname.map(|x| x.to_string())))
+    }
+
+    #[tokio::test]
+    async fn refused_connection_notifies_connect_failed() {
+        let (reserved, addr) = refusing_port();
         let (mut task, mut rx) = client_task(addr, PostConnectionHandler::Tcp);
 
         assert_eq!(task.connect().await.err(), Some(Duration::from_secs(60)));
         assert_eq!(
             events(&mut rx),
-            [Event::Connecting(addr), Event::ConnectFailed(addr)]
+            [
+                Event::Connecting(addr, None),
+                Event::ConnectFailed(addr, None)
+            ]
         );
         drop(reserved);
     }
@@ -323,7 +379,7 @@ mod tests {
         assert_eq!(task.connect().await.ok().map(|(_, x, _)| x), Some(addr));
         assert_eq!(
             events(&mut rx),
-            [Event::Connecting(addr), Event::Connected(addr)]
+            [Event::Connecting(addr, None), Event::Connected(addr, None)]
         );
     }
 
@@ -346,7 +402,139 @@ mod tests {
         server.await.unwrap();
         assert_eq!(
             events(&mut rx),
-            [Event::Connecting(addr), Event::ConnectFailed(addr)]
+            [
+                Event::Connecting(addr, None),
+                Event::ConnectFailed(addr, None)
+            ]
         );
+    }
+
+    fn hostname(host: &str) -> ConnectionInfo {
+        ConnectionInfo::new(Endpoint::hostname(host.to_string()))
+    }
+
+    #[tokio::test]
+    async fn hostname_tries_each_resolved_address_in_order() {
+        watchdog(async {
+            let (_reserved, refused) = refusing_port();
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let addr = listener.local_addr().unwrap();
+            let host = format!("{CANNED}{refused},{addr}");
+            let (mut task, mut rx) =
+                client_task_with(vec![hostname(&host)], PostConnectionHandler::Tcp);
+
+            assert_eq!(
+                connected_to(task.connect().await),
+                Ok((addr, Some(host.clone())))
+            );
+            let host = Some(host);
+            assert_eq!(
+                events(&mut rx),
+                [
+                    Event::Connecting(refused, host.clone()),
+                    Event::ConnectFailed(refused, host.clone()),
+                    Event::Connecting(addr, host.clone()),
+                    Event::Connected(addr, host),
+                ]
+            );
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn localhost_reaches_a_loopback_listener() {
+        watchdog(async {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let addr = listener.local_addr().unwrap();
+            let host = format!("localhost:{}", addr.port());
+            let (mut task, mut rx) =
+                client_task_with(vec![hostname(&host)], PostConnectionHandler::Tcp);
+
+            assert_eq!(
+                connected_to(task.connect().await),
+                Ok((addr, Some(host.clone())))
+            );
+            let host = Some(host);
+            let mut events = events(&mut rx);
+            // localhost may also resolve to addresses with no listener, such as ::1, tried first
+            let last = events.split_off(events.len().saturating_sub(2));
+            assert_eq!(
+                last,
+                [
+                    Event::Connecting(addr, host.clone()),
+                    Event::Connected(addr, host.clone())
+                ]
+            );
+            for pair in events.chunks(2) {
+                let [Event::Connecting(x, h1), Event::ConnectFailed(y, h2)] = pair else {
+                    panic!("unexpected events {pair:?}");
+                };
+                assert_eq!((x, h1, h2), (y, &host, &host));
+                assert_ne!(*x, addr);
+            }
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn failed_resolution_notifies_resolution_failed() {
+        watchdog(async {
+            // without a port, the lookup fails before any DNS query
+            let (mut task, mut rx) =
+                client_task_with(vec![hostname("no-port")], PostConnectionHandler::Tcp);
+
+            assert_eq!(
+                connected_to(task.connect().await),
+                Err(Duration::from_secs(60))
+            );
+            assert_eq!(
+                events(&mut rx),
+                [Event::ResolutionFailed("no-port".to_string())]
+            );
+        })
+        .await;
+    }
+
+    // A failed local bind and a hostname that resolves to no addresses aren't connection attempts:
+    // the handler hears nothing of them, and the task moves on to the next endpoint
+
+    #[tokio::test]
+    async fn hostname_resolving_to_no_addresses_notifies_nothing() {
+        watchdog(async {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let addr = listener.local_addr().unwrap();
+            let attempts = vec![
+                hostname(CANNED),
+                ConnectionInfo::new(Endpoint::address(addr)),
+            ];
+            let (mut task, mut rx) = client_task_with(attempts, PostConnectionHandler::Tcp);
+
+            assert_eq!(connected_to(task.connect().await), Ok((addr, None)));
+            assert_eq!(
+                events(&mut rx),
+                [Event::Connecting(addr, None), Event::Connected(addr, None)]
+            );
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn failed_local_bind_notifies_nothing() {
+        watchdog(async {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let addr = listener.local_addr().unwrap();
+            // the listener holds the local endpoint, so binding to it fails
+            let mut bind_fails = ConnectionInfo::new(Endpoint::address(addr));
+            bind_fails.set_local_endpoint(addr);
+            let attempts = vec![bind_fails, ConnectionInfo::new(Endpoint::address(addr))];
+            let (mut task, mut rx) = client_task_with(attempts, PostConnectionHandler::Tcp);
+
+            assert_eq!(connected_to(task.connect().await), Ok((addr, None)));
+            assert_eq!(
+                events(&mut rx),
+                [Event::Connecting(addr, None), Event::Connected(addr, None)]
+            );
+        })
+        .await;
     }
 }

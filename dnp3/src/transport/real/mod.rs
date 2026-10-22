@@ -298,4 +298,41 @@ mod tests {
         assert_eq!(h.read(&frames).await, Some(Item::Fragment(vec![2])));
         assert!(h.writes().is_empty());
     }
+
+    // link function codes with the PRM bit, and the FCB and FCV bits of confirmed user data
+    const RESET_LINK_STATES: u8 = 0x40;
+    const CONFIRMED_USER_DATA_FCB: u8 = 0x73;
+    const ACK: u8 = 0x00;
+
+    /// a data frame from the master to the outstation carrying one segment of a fragment
+    fn master_segment(fir: bool, fin: bool, seq: u8, data: &[u8]) -> Vec<u8> {
+        let header = link_header(true, UNCONFIRMED_USER_DATA, OUTSTATION.wrap(), MASTER);
+        test_data::data_frame(header, test_data::segment(fir, fin, seq), data)
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn data_frame_without_a_transport_header_is_ignored() {
+        let mut h = Harness::new(outstation(Feature::Disabled));
+        let frames = [
+            master_segment(true, false, 0, &[1]),
+            header_only(true, UNCONFIRMED_USER_DATA, OUTSTATION.wrap(), MASTER),
+            master_segment(false, true, 1, &[2]),
+        ];
+        assert_eq!(h.read(&frames).await, Some(Item::Fragment(vec![1, 2])));
+        assert!(h.writes().is_empty());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn confirmed_data_frame_without_a_transport_header_is_acknowledged_and_ignored() {
+        let mut h = Harness::new(outstation(Feature::Disabled));
+        let frames = [
+            header_only(true, RESET_LINK_STATES, OUTSTATION.wrap(), MASTER),
+            master_segment(true, false, 0, &[1]),
+            header_only(true, CONFIRMED_USER_DATA_FCB, OUTSTATION.wrap(), MASTER),
+            master_segment(false, true, 1, &[2]),
+        ];
+        assert_eq!(h.read(&frames).await, Some(Item::Fragment(vec![1, 2])));
+        let ack = header_only(false, ACK, MASTER.wrap(), OUTSTATION);
+        assert_eq!(h.writes(), [ack.clone(), ack]);
+    }
 }

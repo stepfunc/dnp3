@@ -431,19 +431,26 @@ mod tests {
     ) -> (Server, mpsc::UnboundedReceiver<ConnectionState>) {
         let mut server =
             Server::new_tcp_server(LinkErrorMode::Close, "127.0.0.1:0".parse().unwrap());
-        let (tx, rx) = mpsc::unbounded_channel();
-        let (_handle, future) = server
-            .add_outstation_no_spawn(
-                outstation_config(),
-                Box::new(NullApplication),
-                Box::new(NullInformation),
-                crate::outstation::DefaultControlHandler::create(),
-                Box::new(ConnectionListener(tx)),
-                filter,
-            )
-            .unwrap();
-        tokio::spawn(future);
+        let rx = add_outstation(&mut server, filter).unwrap();
         (server, rx)
+    }
+
+    /// add an outstation that reports its connection state, and spawn it
+    fn add_outstation(
+        server: &mut Server,
+        filter: AddressFilter,
+    ) -> Result<mpsc::UnboundedReceiver<ConnectionState>, FilterError> {
+        let (tx, rx) = mpsc::unbounded_channel();
+        let (_handle, future) = server.add_outstation_no_spawn(
+            outstation_config(),
+            Box::new(NullApplication),
+            Box::new(NullInformation),
+            crate::outstation::DefaultControlHandler::create(),
+            Box::new(ConnectionListener(tx)),
+            filter,
+        )?;
+        tokio::spawn(future);
+        Ok(rx)
     }
 
     #[cfg(feature = "enable-tls")]
@@ -578,6 +585,106 @@ mod tests {
             })
             .await;
         }
+    }
+
+    fn exact(addr: &str) -> AddressFilter {
+        AddressFilter::Exact(addr.parse().unwrap())
+    }
+
+    /// spawn the server on a loopback listener, returning the handle that keeps it running and
+    /// the address to connect to
+    async fn spawn_on_loopback(server: Server) -> (ServerHandle, SocketAddr) {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let (handle, task) = server.create_task_with(listener, None);
+        tokio::spawn(task.run());
+        (handle, addr)
+    }
+
+    #[tokio::test]
+    async fn a_connection_goes_to_the_outstation_whose_filter_matches() {
+        watchdog(async {
+            let mut server =
+                Server::new_tcp_server(LinkErrorMode::Close, "127.0.0.1:0".parse().unwrap());
+            // registered first, so routing that ignored the filters would pick it
+            let mut other = add_outstation(&mut server, exact("192.0.2.1")).unwrap();
+            let mut local = add_outstation(&mut server, exact("127.0.0.1")).unwrap();
+            let (_handle, addr) = spawn_on_loopback(server).await;
+
+            let _client = tokio::net::TcpStream::connect(addr).await.unwrap();
+            assert_eq!(local.recv().await, Some(ConnectionState::Connected));
+            assert_eq!(other.try_recv(), Err(mpsc::error::TryRecvError::Empty));
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn a_connection_no_filter_matches_is_closed() {
+        watchdog(async {
+            let (server, mut states) = server_with_filter(exact("192.0.2.1"));
+            let (_handle, addr) = spawn_on_loopback(server).await;
+
+            let mut client = tokio::net::TcpStream::connect(addr).await.unwrap();
+            let mut buffer = [0; 32];
+            assert_eq!(
+                tokio::io::AsyncReadExt::read(&mut client, &mut buffer)
+                    .await
+                    .unwrap(),
+                0
+            );
+            assert_eq!(states.try_recv(), Err(mpsc::error::TryRecvError::Empty));
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn a_filter_overlapping_a_registered_one_is_rejected() {
+        let cases = [
+            (exact("127.0.0.1"), exact("127.0.0.1")),
+            (
+                exact("127.0.0.1"),
+                AddressFilter::AnyOf(
+                    ["10.0.0.1".parse().unwrap(), "127.0.0.1".parse().unwrap()].into(),
+                ),
+            ),
+            (exact("127.0.0.1"), AddressFilter::Any),
+            (AddressFilter::Any, exact("127.0.0.1")),
+            (
+                AddressFilter::WildcardIpv4("127.0.0.*".parse().unwrap()),
+                exact("127.0.0.1"),
+            ),
+        ];
+        for (first, second) in cases {
+            let mut server =
+                Server::new_tcp_server(LinkErrorMode::Close, "127.0.0.1:0".parse().unwrap());
+            add_outstation(&mut server, first).unwrap();
+            assert_eq!(
+                add_outstation(&mut server, second).err(),
+                Some(FilterError::Conflict)
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn a_filter_is_checked_against_every_registered_one() {
+        let mut server =
+            Server::new_tcp_server(LinkErrorMode::Close, "127.0.0.1:0".parse().unwrap());
+        add_outstation(&mut server, exact("127.0.0.1")).unwrap();
+        add_outstation(&mut server, exact("192.0.2.1")).unwrap();
+        add_outstation(
+            &mut server,
+            AddressFilter::WildcardIpv4("10.0.0.*".parse().unwrap()),
+        )
+        .unwrap();
+        // conflicts with the first outstation only
+        assert_eq!(
+            add_outstation(
+                &mut server,
+                AddressFilter::AnyOf(["127.0.0.1".parse().unwrap()].into())
+            )
+            .err(),
+            Some(FilterError::Conflict)
+        );
     }
 
     #[tokio::test]

@@ -145,6 +145,99 @@ async fn outstation_tcp_client_runs_an_outstation_session_over_tcp() {
     expect(&mut states, ClientState::Shutdown).await;
 }
 
+/// The master address an outstation client's connection handler sets, replacing [`MASTER`]
+const NEW_MASTER: u16 = 2;
+
+/// Connects to one endpoint, setting the master address to [`NEW_MASTER`]
+struct NewMasterHandler(std::net::SocketAddr);
+
+impl crate::tcp::ClientConnectionHandler for NewMasterHandler {
+    fn endpoint_span_name(&self) -> String {
+        self.0.to_string()
+    }
+
+    fn disconnected(&mut self, _: std::net::SocketAddr, _: Option<&str>) -> Duration {
+        Duration::from_secs(1)
+    }
+
+    fn next(&mut self) -> Result<crate::tcp::ConnectionInfo, Duration> {
+        let mut info = crate::tcp::ConnectionInfo::new(crate::tcp::Endpoint::address(self.0));
+        info.set_master_address(EndpointAddress::raw(NEW_MASTER));
+        Ok(info)
+    }
+}
+
+/// The link header of unconfirmed user data from the outstation to `master` with the length field
+/// `length` (the header fields plus the user data)
+fn header_to(master: u16, length: u8) -> [u8; 10] {
+    use crate::link::header::{AnyAddress, Header};
+    crate::link::format::header_bytes(
+        Header::unconfirmed_user_data(
+            false,
+            AnyAddress::from(master),
+            AnyAddress::from(OUTSTATION),
+        ),
+        length,
+    )
+}
+
+/// READ requests of class 0 data with sequence numbers 1 and 2
+const CLASS_0_READ_SEQ_1: [u8; 5] = [0xC1, 0x01, 0x3C, 0x01, 0x06];
+const CLASS_0_READ_SEQ_2: [u8; 5] = [0xC2, 0x01, 0x3C, 0x01, 0x06];
+
+/// A frame from `master` carrying a whole application fragment
+fn request(master: u16, fragment: &[u8]) -> Vec<u8> {
+    use crate::link::header::{AnyAddress, Header};
+    use crate::link::test_data::{data_frame, segment};
+    data_frame(
+        Header::unconfirmed_user_data(true, AnyAddress::from(OUTSTATION), AnyAddress::from(master)),
+        segment(true, true, 0),
+        fragment,
+    )
+}
+
+#[tokio::test]
+async fn outstation_tcp_client_uses_the_master_address_its_connection_handler_sets() {
+    crate::util::test_support::watchdog(async {
+        let peer = Peer::new().await;
+        let (listener, mut states) = Timeline::new();
+        let mut handle = crate::tcp::spawn_outstation_tcp_client_2(
+            LinkErrorMode::Close,
+            outstation_config(),
+            Box::new(NewMasterHandler(peer.listener.local_addr().unwrap())),
+            Box::new(NullApplication),
+            Box::new(NullInformation),
+            DefaultControlHandler::create(),
+            listener,
+        );
+        expect(&mut states, ClientState::Disabled).await;
+        handle.enable().await.unwrap();
+        let mut phys = PhysLayer::tcp(peer.accept().await);
+
+        // the null unsolicited response goes to the new master
+        let null_unsolicited = read::<17>(&mut phys).await;
+        assert_eq!(null_unsolicited[..10], header_to(NEW_MASTER, 10));
+
+        // the new master confirms it; then a READ from the configured master is discarded, and the
+        // new master's is answered
+        let uns_seq = null_unsolicited[11] & 0x0F;
+        let requests = [
+            request(NEW_MASTER, &[0xD0 | uns_seq, 0x00]),
+            request(MASTER, &CLASS_0_READ_SEQ_1),
+            request(NEW_MASTER, &CLASS_0_READ_SEQ_2),
+        ]
+        .concat();
+        phys.write(&requests, PhysAddr::None, PhysDecodeLevel::Nothing)
+            .await
+            .unwrap();
+        let response = read::<17>(&mut phys).await;
+        assert_eq!(response[..10], header_to(NEW_MASTER, 10));
+        // after the transport header: the application control (FIR, FIN, seq 2) and RESPONSE
+        assert_eq!(response[11..13], [0xC2, 0x81]);
+    })
+    .await;
+}
+
 #[cfg(feature = "enable-tls")]
 mod tls {
     use super::*;

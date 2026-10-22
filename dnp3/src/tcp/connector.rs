@@ -226,3 +226,127 @@ impl ClientConnectionHandler for SimpleConnectHandler {
         self.backoff.on_success();
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const fn secs(x: u64) -> Duration {
+        Duration::from_secs(x)
+    }
+
+    /// What a connection attempt targets: an address, or a hostname to resolve
+    #[derive(Debug, PartialEq)]
+    enum Target {
+        Address(SocketAddr),
+        Hostname(String),
+    }
+
+    /// The parts of a [`ConnectionInfo`] the handler fills in
+    #[derive(Debug, PartialEq)]
+    struct Attempt {
+        target: Target,
+        timeout: Option<Duration>,
+        local_endpoint: Option<SocketAddr>,
+    }
+
+    fn addr(s: &str) -> SocketAddr {
+        s.parse().unwrap()
+    }
+
+    /// The next attempt, or the delay before the list is tried again
+    fn next(handler: &mut dyn ClientConnectionHandler) -> Result<Attempt, Duration> {
+        handler.next().map(|info| Attempt {
+            target: match info.endpoint.inner {
+                EndpointInner::Address(x) => Target::Address(x),
+                EndpointInner::Hostname(x) => Target::Hostname(x.to_string()),
+            },
+            timeout: info.timeout,
+            local_endpoint: info.local_endpoint,
+        })
+    }
+
+    /// A handler for a main address, a fail-over address and a fail-over hostname, with connect
+    /// delays growing from 1 s to at most 4 s and a 30 s reconnect delay
+    fn handler(options: ConnectOptions) -> Box<dyn ClientConnectionHandler> {
+        let mut list = EndpointList::new("192.0.2.1:20000".to_string(), &[]);
+        list.add("192.0.2.2:20000".to_string());
+        list.add("outstation.test:20000".to_string());
+        SimpleConnectHandler::create(
+            list,
+            options,
+            ConnectStrategy::new(secs(1), secs(4), secs(30)),
+        )
+    }
+
+    fn plain(target: Target) -> Attempt {
+        Attempt {
+            target,
+            timeout: None,
+            local_endpoint: None,
+        }
+    }
+
+    fn main_endpoint() -> Attempt {
+        plain(Target::Address(addr("192.0.2.1:20000")))
+    }
+
+    fn fail_over() -> Attempt {
+        plain(Target::Address(addr("192.0.2.2:20000")))
+    }
+
+    fn fail_over_hostname() -> Attempt {
+        plain(Target::Hostname("outstation.test:20000".to_string()))
+    }
+
+    #[test]
+    fn tries_the_endpoints_in_order_then_backs_off_before_starting_over() {
+        let mut handler = handler(ConnectOptions::default());
+        for delay in [secs(1), secs(2), secs(4), secs(4)] {
+            assert_eq!(next(handler.as_mut()), Ok(main_endpoint()));
+            assert_eq!(next(handler.as_mut()), Ok(fail_over()));
+            assert_eq!(next(handler.as_mut()), Ok(fail_over_hostname()));
+            assert_eq!(next(handler.as_mut()), Err(delay));
+        }
+    }
+
+    #[test]
+    fn a_connection_resets_to_the_main_endpoint_and_the_minimum_delay() {
+        let mut handler = handler(ConnectOptions::default());
+        // fail through the whole list once, so the next failure would wait longer
+        for _ in 0..3 {
+            next(handler.as_mut()).unwrap();
+        }
+        assert_eq!(next(handler.as_mut()), Err(secs(1)));
+
+        assert_eq!(next(handler.as_mut()), Ok(main_endpoint()));
+        assert_eq!(next(handler.as_mut()), Ok(fail_over()));
+        handler.connected(addr("192.0.2.2:20000"), None);
+        assert_eq!(
+            handler.disconnected(addr("192.0.2.2:20000"), None),
+            secs(30)
+        );
+
+        assert_eq!(next(handler.as_mut()), Ok(main_endpoint()));
+        assert_eq!(next(handler.as_mut()), Ok(fail_over()));
+        assert_eq!(next(handler.as_mut()), Ok(fail_over_hostname()));
+        assert_eq!(next(handler.as_mut()), Err(secs(1)));
+    }
+
+    #[test]
+    fn every_attempt_carries_the_connect_options() {
+        let mut options = ConnectOptions::default();
+        options.set_connect_timeout(secs(3));
+        options.set_local_endpoint(addr("192.0.2.100:0"));
+        let mut handler = handler(options);
+
+        for expected in [main_endpoint(), fail_over(), fail_over_hostname()] {
+            let expected = Attempt {
+                timeout: Some(secs(3)),
+                local_endpoint: Some(addr("192.0.2.100:0")),
+                ..expected
+            };
+            assert_eq!(next(handler.as_mut()), Ok(expected));
+        }
+    }
+}
