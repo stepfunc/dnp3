@@ -2,9 +2,10 @@ use super::*;
 use crate::app::file::*;
 use crate::app::parse::parser::Response;
 use crate::app::FunctionCode;
+use crate::master::association::Association;
 use crate::master::file::BlockNumber;
-use crate::master::tasks::{AppTask, NonReadTask, Task};
-use crate::master::{FileAction, FileMode, FileReadConfig, FileReader, TaskError};
+use crate::master::tasks::{AppTask, NonReadTask, ResponseTask, Step, Task};
+use crate::master::{FileAction, FileMode, FileReadConfig, FileReader, TaskError, TaskType};
 
 enum ReaderTypes {
     Trait(Box<dyn FileReader>),
@@ -139,7 +140,81 @@ impl FileReadTask {
         Self::new(settings, state)
     }
 
-    pub(crate) fn function(&self) -> FunctionCode {
+    /// The state that reads the next block, or `None` if this block was the last
+    async fn handle_read_response(
+        settings: &mut Settings,
+        rs: ReadState,
+        header: ObjectHeader<'_>,
+    ) -> Result<Option<ReadState>, FileError> {
+        let obj = match header.details {
+            HeaderDetails::FreeFormat(FreeFormatVariation::Group70Var5(obj)) => obj,
+            _ => {
+                tracing::warn!(
+                    "File READ response contains unexpected variation: {}",
+                    header.variation
+                );
+                return Err(FileError::BadResponse);
+            }
+        };
+
+        let rx_block = BlockNumber::new(obj.block_number);
+
+        if rx_block.bottom_bits() != rs.block.bottom_bits() {
+            tracing::warn!(
+                "Expected file block {} but received block {}",
+                rs.block.bottom_bits(),
+                rx_block.bottom_bits()
+            );
+            return Err(FileError::BadBlockNum);
+        }
+
+        let new_total = match rs.total_rx.checked_add(obj.file_data.len()) {
+            None => {
+                tracing::error!("Total rx file data overflow");
+                return Err(FileError::MaxLengthExceeded);
+            }
+            Some(x) => x,
+        };
+
+        if new_total > settings.config.max_file_size {
+            tracing::warn!(
+                "Received bytes ({new_total}) exceeds configured maximum {}",
+                settings.config.max_file_size
+            );
+            return Err(FileError::MaxLengthExceeded);
+        }
+
+        if settings
+            .reader
+            .block_received(rx_block.bottom_bits(), obj.file_data)
+            .await
+            .is_abort()
+        {
+            tracing::warn!("File transfer aborted by user");
+            return Err(FileError::AbortByUser);
+        }
+
+        Ok(if rx_block.is_last() {
+            None
+        } else {
+            let mut block = BlockNumber::new(obj.block_number);
+            block.increment().map_err(|_| FileError::BadBlockNum)?;
+
+            Some(ReadState {
+                handle: rs.handle,
+                block,
+                total_rx: new_total,
+            })
+        })
+    }
+}
+
+impl ResponseTask for FileReadTask {
+    /// An error that ends the transfer, which the task reports as its success
+    type Output = Option<FileError>;
+    type Error = FileError;
+
+    fn function(&self) -> FunctionCode {
         match self.state {
             State::GetAuth(_) => FunctionCode::AuthenticateFile,
             State::Open(_) => FunctionCode::OpenFile,
@@ -148,8 +223,12 @@ impl FileReadTask {
         }
     }
 
-    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
-        match &self.state {
+    fn task_type(&self) -> TaskType {
+        TaskType::FileRead
+    }
+
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
+        let result = match &self.state {
             State::GetAuth(auth) => write_auth(auth, writer),
             State::Open(auth) => write_open(
                 &self.settings.name.0,
@@ -162,156 +241,78 @@ impl FileReadTask {
             ),
             State::Read(rs) => write_read(*rs, writer),
             State::Close(handle) => write_close(*handle, writer),
-        }
+        };
+        Ok(result?)
     }
 
-    pub(crate) fn on_task_error(mut self, err: TaskError) {
-        self.settings.reader.aborted(FileError::TaskError(err));
-    }
-
-    pub(crate) async fn handle(
-        mut self,
+    async fn on_response(
+        &mut self,
+        _association: &mut Association,
         response: Response<'_>,
-    ) -> Result<Option<NonReadTask>, TaskError> {
-        let header = match response.get_only_object_header() {
-            Ok(x) => x,
-            Err(err) => {
-                self.settings.reader.aborted(err.into());
-                return Err(err.into());
-            }
-        };
+    ) -> Result<Step<Option<FileError>>, FileError> {
+        let header = response.get_only_object_header()?;
 
-        let next = match self.state {
-            State::GetAuth(_) => Self::handle_auth_response(self.settings, header),
-            State::Open(_) => Self::handle_open_response(self.settings, header),
-            State::Read(rs) => Self::handle_read_response(self.settings, rs, header).await,
-            State::Close(_) => Self::handle_close_response(header),
-        };
-
-        Ok(next.map(NonReadTask::FileRead))
-    }
-
-    fn handle_auth_response(mut settings: Settings, header: ObjectHeader) -> Option<FileReadTask> {
-        match parse_auth_response(header) {
-            Ok(key) => Some(FileReadTask::new(settings, State::Open(key))),
-            Err(err) => {
-                settings.reader.aborted(err);
-                None
-            }
-        }
-    }
-
-    fn handle_open_response(mut settings: Settings, header: ObjectHeader) -> Option<FileReadTask> {
-        match parse_open_response(header) {
-            Ok(file) => {
-                if settings.reader.opened(file.file_size).is_abort() {
-                    tracing::warn!("File transfer aborted by user");
-                    settings.reader.aborted(FileError::AbortByUser);
-                    Some(FileReadTask::new(settings, State::Close(file.file_handle)))
-                } else {
-                    Some(FileReadTask::new(
-                        settings,
-                        State::Read(ReadState::new(file.file_handle)),
-                    ))
+        match self.state {
+            State::GetAuth(_) => match parse_auth_response(header) {
+                Ok(key) => {
+                    self.state = State::Open(key);
+                    Ok(Step::Next)
+                }
+                Err(err) => Ok(Step::Done(Some(err))),
+            },
+            State::Open(_) => match parse_open_response(header) {
+                Ok(file) => {
+                    if self.settings.reader.opened(file.file_size).is_abort() {
+                        tracing::warn!("File transfer aborted by user");
+                        self.settings.reader.aborted(FileError::AbortByUser);
+                        self.state = State::Close(file.file_handle);
+                    } else {
+                        self.state = State::Read(ReadState::new(file.file_handle));
+                    }
+                    Ok(Step::Next)
+                }
+                Err(err) => Ok(Step::Done(Some(err))),
+            },
+            State::Read(rs) => {
+                match Self::handle_read_response(&mut self.settings, rs, header).await {
+                    Ok(None) => {
+                        self.settings.reader.completed();
+                        self.state = State::Close(rs.handle);
+                        Ok(Step::Next)
+                    }
+                    Ok(Some(rs)) => {
+                        self.state = State::Read(rs);
+                        Ok(Step::Next)
+                    }
+                    Err(err) => Ok(Step::Done(Some(err))),
                 }
             }
-            Err(err) => {
-                settings.reader.aborted(err);
-                None
+            // the file was already read, so a CLOSE that fails only gets logged
+            State::Close(_) => {
+                let _: Result<(), FileError> = parse_close_response(header)
+                    .and_then(|obj| check_close_status(obj.status_code));
+                Ok(Step::Done(None))
             }
         }
     }
 
-    async fn handle_read_response(
-        mut settings: Settings,
-        rs: ReadState,
-        header: ObjectHeader<'_>,
-    ) -> Option<FileReadTask> {
-        async fn inner(
-            settings: &mut Settings,
-            rs: ReadState,
-            header: ObjectHeader<'_>,
-        ) -> Result<Option<ReadState>, FileError> {
-            let obj = match header.details {
-                HeaderDetails::FreeFormat(FreeFormatVariation::Group70Var5(obj)) => obj,
-                _ => {
-                    tracing::warn!(
-                        "File READ response contains unexpected variation: {}",
-                        header.variation
-                    );
-                    return Err(FileError::BadResponse);
-                }
-            };
-
-            let rx_block = BlockNumber::new(obj.block_number);
-
-            if rx_block.bottom_bits() != rs.block.bottom_bits() {
-                tracing::warn!(
-                    "Expected file block {} but received block {}",
-                    rs.block.bottom_bits(),
-                    rx_block.bottom_bits()
-                );
-                return Err(FileError::BadBlockNum);
-            }
-
-            let new_total = match rs.total_rx.checked_add(obj.file_data.len()) {
-                None => {
-                    tracing::error!("Total rx file data overflow");
-                    return Err(FileError::MaxLengthExceeded);
-                }
-                Some(x) => x,
-            };
-
-            if new_total > settings.config.max_file_size {
-                tracing::warn!(
-                    "Received bytes ({new_total}) exceeds configured maximum {}",
-                    settings.config.max_file_size
-                );
-                return Err(FileError::MaxLengthExceeded);
-            }
-
-            if settings
-                .reader
-                .block_received(rx_block.bottom_bits(), obj.file_data)
-                .await
-                .is_abort()
-            {
-                tracing::warn!("File transfer aborted by user");
-                return Err(FileError::AbortByUser);
-            }
-
-            Ok(if rx_block.is_last() {
-                None
-            } else {
-                let mut block = BlockNumber::new(obj.block_number);
-                block.increment().map_err(|_| FileError::BadBlockNum)?;
-
-                Some(ReadState {
-                    handle: rs.handle,
-                    block,
-                    total_rx: new_total,
-                })
-            })
-        }
-
-        match inner(&mut settings, rs, header).await {
-            Ok(None) => {
-                settings.reader.completed();
-                Some(FileReadTask::new(settings, State::Close(rs.handle)))
-            }
-            Ok(Some(rs)) => Some(FileReadTask::new(settings, State::Read(rs))),
-            Err(err) => {
-                settings.reader.aborted(err);
-                None
-            }
-        }
+    fn from_task_error(err: TaskError) -> FileError {
+        FileError::TaskError(err)
     }
 
-    /// The file was already read, so a CLOSE that fails only gets logged
-    fn handle_close_response(header: ObjectHeader) -> Option<FileReadTask> {
-        let _: Result<(), FileError> =
-            parse_close_response(header).and_then(|obj| check_close_status(obj.status_code));
-        None
+    fn task_error(err: FileError) -> TaskError {
+        err.into()
+    }
+
+    fn complete(
+        mut self,
+        _association: Option<&mut Association>,
+        result: Result<Option<FileError>, FileError>,
+    ) {
+        match result {
+            Ok(None) => {}
+            Ok(Some(err)) | Err(err) => self.settings.reader.aborted(err),
+        }
     }
 }
 

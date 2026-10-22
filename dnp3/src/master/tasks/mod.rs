@@ -1,3 +1,5 @@
+use std::future::Future;
+
 use crate::app::format::write::HeaderWriter;
 use crate::app::parse::parser::{HeaderCollection, Response};
 use crate::app::FunctionCode;
@@ -12,18 +14,18 @@ use crate::master::tasks::auto::AutoTask;
 use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::command_no_ack::CommandNoAckTask;
 use crate::master::tasks::read::SingleReadTask;
-use crate::master::tasks::restart::RestartTask;
+use crate::master::tasks::restart::RestartType;
 use crate::master::tasks::time::{PendingTimeSync, TimeSyncTask};
 use crate::master::{ReadType, TaskType};
 
-use crate::master::tasks::deadbands::WriteDeadBandsTask;
-use crate::master::tasks::empty_response::EmptyResponseTask;
-use crate::master::tasks::file::authenticate::AuthFileTask;
-use crate::master::tasks::file::close::CloseFileTask;
-use crate::master::tasks::file::get_info::GetFileInfoTask;
-use crate::master::tasks::file::open::OpenFileTask;
+use crate::master::tasks::deadbands::DeadBandsRequest;
+use crate::master::tasks::empty_response::EmptyResponseRequest;
+use crate::master::tasks::file::authenticate::AuthFileRequest;
+use crate::master::tasks::file::close::CloseFileRequest;
+use crate::master::tasks::file::get_info::GetFileInfoRequest;
+use crate::master::tasks::file::open::OpenFileRequest;
 use crate::master::tasks::file::read::FileReadTask;
-use crate::master::tasks::file::write_block::WriteBlockTask;
+use crate::master::tasks::file::write_block::WriteBlockRequest;
 use crate::transport::FragmentAddr;
 
 pub(crate) mod auto;
@@ -180,6 +182,148 @@ pub(crate) enum ReadTask {
     SingleRead(SingleReadTask),
 }
 
+/// What a task does after it handles a response
+pub(crate) enum Step<T> {
+    /// send the next request
+    Next,
+    /// the task is complete
+    Done(T),
+}
+
+/// A task that sends requests and handles their responses until it's done
+///
+/// The task never reports its own outcome: the session passes it to [`ResponseTask::complete`]
+/// exactly once, whether the task succeeds, its response is bad, or it fails some other way.
+pub(crate) trait ResponseTask: Send + Sized {
+    /// What the task produces when it succeeds
+    type Output: Send;
+    /// Why the task failed, as its requester sees it
+    type Error: Copy + Send;
+
+    fn function(&self) -> FunctionCode;
+
+    fn task_type(&self) -> TaskType;
+
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError>;
+
+    /// Handle the response to the last request
+    fn on_response(
+        &mut self,
+        association: &mut Association,
+        response: Response<'_>,
+    ) -> impl Future<Output = Result<Step<Self::Output>, Self::Error>> + Send;
+
+    /// The error for a failure outside the task's response handling
+    fn from_task_error(err: TaskError) -> Self::Error;
+
+    /// The error the session and the association see when the task fails
+    fn task_error(err: Self::Error) -> TaskError;
+
+    /// Report the outcome to whoever is waiting for it
+    fn complete(
+        self,
+        association: Option<&mut Association>,
+        result: Result<Self::Output, Self::Error>,
+    );
+}
+
+/// Handle a response, completing the task unless it has another request to send
+async fn respond<T: ResponseTask>(
+    mut task: T,
+    association: &mut Association,
+    response: Response<'_>,
+) -> Result<Option<T>, TaskError> {
+    match task.on_response(association, response).await {
+        Ok(Step::Next) => Ok(Some(task)),
+        Ok(Step::Done(output)) => {
+            task.complete(Some(association), Ok(output));
+            Ok(None)
+        }
+        Err(err) => {
+            task.complete(Some(association), Err(err));
+            Err(T::task_error(err))
+        }
+    }
+}
+
+fn fail<T: ResponseTask>(task: T, association: Option<&mut Association>, err: TaskError) {
+    task.complete(association, Err(T::from_task_error(err)))
+}
+
+/// A request that one response answers
+pub(crate) trait OneShotRequest: Send + Sized {
+    type Output: Send;
+    type Error: Copy + Send + From<TaskError>;
+
+    fn function(&self) -> FunctionCode;
+
+    fn task_type(&self) -> TaskType;
+
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError>;
+
+    fn parse(&self, response: Response<'_>) -> Result<Self::Output, Self::Error>;
+
+    /// The error the session and the association see when the request fails
+    fn task_error(err: Self::Error) -> TaskError;
+
+    fn wrap(task: OneShot<Self>) -> NonReadTask;
+}
+
+/// A task that sends one request and passes the parsed response to its requester
+pub(crate) struct OneShot<R: OneShotRequest> {
+    request: R,
+    promise: Promise<Result<R::Output, R::Error>>,
+}
+
+impl<R: OneShotRequest> OneShot<R> {
+    pub(crate) fn new(request: R, promise: Promise<Result<R::Output, R::Error>>) -> Self {
+        Self { request, promise }
+    }
+}
+
+impl<R: OneShotRequest> From<OneShot<R>> for Task {
+    fn from(value: OneShot<R>) -> Self {
+        Task::App(AppTask::NonRead(R::wrap(value)))
+    }
+}
+
+impl<R: OneShotRequest> ResponseTask for OneShot<R> {
+    type Output = R::Output;
+    type Error = R::Error;
+
+    fn function(&self) -> FunctionCode {
+        self.request.function()
+    }
+
+    fn task_type(&self) -> TaskType {
+        self.request.task_type()
+    }
+
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
+        self.request.write(writer)
+    }
+
+    async fn on_response(
+        &mut self,
+        _association: &mut Association,
+        response: Response<'_>,
+    ) -> Result<Step<R::Output>, R::Error> {
+        self.request.parse(response).map(Step::Done)
+    }
+
+    fn from_task_error(err: TaskError) -> R::Error {
+        err.into()
+    }
+
+    fn task_error(err: R::Error) -> TaskError {
+        R::task_error(err)
+    }
+
+    fn complete(self, _association: Option<&mut Association>, result: Result<R::Output, R::Error>) {
+        self.promise.complete(result)
+    }
+}
+
 pub(crate) enum NonReadTask {
     /// tasks that occur automatically during startup, or based on events or configuration,
     Auto(AutoTask),
@@ -188,23 +332,23 @@ pub(crate) enum NonReadTask {
     /// time synchronization
     TimeSync(TimeSyncTask),
     /// restart operation
-    Restart(RestartTask),
+    Restart(OneShot<RestartType>),
     /// write dead-bands
-    DeadBands(WriteDeadBandsTask),
+    DeadBands(OneShot<DeadBandsRequest>),
     /// Generic task for anything that doesn't have response object headers
-    EmptyResponseTask(EmptyResponseTask),
+    EmptyResponseTask(OneShot<EmptyResponseRequest>),
     /// Read file from the outstation
     FileRead(FileReadTask),
     /// Send username/password and get back an auth key
-    AuthFile(AuthFileTask),
+    AuthFile(OneShot<AuthFileRequest>),
     /// Open a file on the outstation
-    OpenFile(OpenFileTask),
+    OpenFile(OneShot<OpenFileRequest>),
     /// Close a file on the outstation
-    CloseFile(CloseFileTask),
+    CloseFile(OneShot<CloseFileRequest>),
     /// Write a file block
-    WriteFileBlock(WriteBlockTask),
+    WriteFileBlock(OneShot<WriteBlockRequest>),
     /// get info about a file
-    GetFileInfo(GetFileInfoTask),
+    GetFileInfo(OneShot<GetFileInfoRequest>),
 }
 
 impl RequestWriter for ReadTask {
@@ -230,20 +374,19 @@ impl RequestWriter for NonReadTask {
 
     fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
         match self {
-            NonReadTask::Auto(t) => t.write(writer)?,
-            NonReadTask::Command(t) => t.write(writer)?,
-            NonReadTask::TimeSync(t) => t.write(writer)?,
-            NonReadTask::Restart(_) => {}
-            NonReadTask::DeadBands(t) => t.write(writer)?,
-            NonReadTask::EmptyResponseTask(t) => t.write(writer)?,
-            NonReadTask::FileRead(t) => t.write(writer)?,
-            NonReadTask::GetFileInfo(t) => t.write(writer)?,
-            NonReadTask::OpenFile(t) => t.write(writer)?,
-            NonReadTask::CloseFile(t) => t.write(writer)?,
-            NonReadTask::WriteFileBlock(t) => t.write(writer)?,
-            NonReadTask::AuthFile(t) => t.write(writer)?,
+            NonReadTask::Auto(t) => t.write(writer),
+            NonReadTask::Command(t) => t.write(writer),
+            NonReadTask::TimeSync(t) => t.write(writer),
+            NonReadTask::Restart(t) => t.write(writer),
+            NonReadTask::DeadBands(t) => t.write(writer),
+            NonReadTask::EmptyResponseTask(t) => t.write(writer),
+            NonReadTask::FileRead(t) => t.write(writer),
+            NonReadTask::GetFileInfo(t) => t.write(writer),
+            NonReadTask::OpenFile(t) => t.write(writer),
+            NonReadTask::CloseFile(t) => t.write(writer),
+            NonReadTask::WriteFileBlock(t) => t.write(writer),
+            NonReadTask::AuthFile(t) => t.write(writer),
         }
-        Ok(())
     }
 }
 
@@ -359,18 +502,18 @@ impl NonReadTask {
 
     pub(crate) fn on_task_error(self, association: Option<&mut Association>, err: TaskError) {
         match self {
-            Self::Command(task) => task.on_task_error(err),
-            Self::TimeSync(task) => task.on_task_error(association, err),
-            Self::Auto(task) => task.on_task_error(association, err),
-            Self::Restart(task) => task.on_task_error(err),
-            Self::DeadBands(task) => task.on_task_error(err),
-            Self::EmptyResponseTask(task) => task.on_task_error(err),
-            Self::FileRead(task) => task.on_task_error(err),
-            Self::GetFileInfo(task) => task.on_task_error(err),
-            Self::OpenFile(task) => task.on_task_error(err),
-            Self::CloseFile(task) => task.on_task_error(err),
-            Self::WriteFileBlock(task) => task.on_task_error(err),
-            Self::AuthFile(task) => task.on_task_error(err),
+            Self::Command(task) => fail(task, association, err),
+            Self::TimeSync(task) => fail(task, association, err),
+            Self::Auto(task) => fail(task, association, err),
+            Self::Restart(task) => fail(task, association, err),
+            Self::DeadBands(task) => fail(task, association, err),
+            Self::EmptyResponseTask(task) => fail(task, association, err),
+            Self::FileRead(task) => fail(task, association, err),
+            Self::GetFileInfo(task) => fail(task, association, err),
+            Self::OpenFile(task) => fail(task, association, err),
+            Self::CloseFile(task) => fail(task, association, err),
+            Self::WriteFileBlock(task) => fail(task, association, err),
+            Self::AuthFile(task) => fail(task, association, err),
         }
     }
 
@@ -379,40 +522,59 @@ impl NonReadTask {
         association: &mut Association,
         response: Response<'_>,
     ) -> Result<Option<NonReadTask>, TaskError> {
-        match self {
-            Self::Command(task) => task.handle(response),
-            Self::Auto(task) => task.handle(association, response),
-            Self::TimeSync(task) => task.handle(association, response),
-            Self::Restart(task) => task.handle(response),
-            Self::DeadBands(task) => task.handle(response),
-            Self::EmptyResponseTask(task) => task.handle(response),
-            Self::FileRead(task) => task.handle(response).await,
-            Self::GetFileInfo(task) => task.handle(response),
-            Self::OpenFile(task) => task.handle(response),
-            Self::CloseFile(task) => task.handle(response),
-            Self::WriteFileBlock(task) => task.handle(response),
-            Self::AuthFile(task) => task.handle(response),
-        }
+        let next = match self {
+            Self::Command(task) => respond(task, association, response)
+                .await?
+                .map(Self::Command),
+            Self::Auto(task) => respond(task, association, response).await?.map(Self::Auto),
+            Self::TimeSync(task) => respond(task, association, response)
+                .await?
+                .map(Self::TimeSync),
+            Self::Restart(task) => respond(task, association, response)
+                .await?
+                .map(Self::Restart),
+            Self::DeadBands(task) => respond(task, association, response)
+                .await?
+                .map(Self::DeadBands),
+            Self::EmptyResponseTask(task) => respond(task, association, response)
+                .await?
+                .map(Self::EmptyResponseTask),
+            Self::FileRead(task) => respond(task, association, response)
+                .await?
+                .map(Self::FileRead),
+            Self::GetFileInfo(task) => respond(task, association, response)
+                .await?
+                .map(Self::GetFileInfo),
+            Self::OpenFile(task) => respond(task, association, response)
+                .await?
+                .map(Self::OpenFile),
+            Self::CloseFile(task) => respond(task, association, response)
+                .await?
+                .map(Self::CloseFile),
+            Self::WriteFileBlock(task) => respond(task, association, response)
+                .await?
+                .map(Self::WriteFileBlock),
+            Self::AuthFile(task) => respond(task, association, response)
+                .await?
+                .map(Self::AuthFile),
+        };
+        Ok(next)
     }
 
     pub(crate) fn as_task_type(&self) -> TaskType {
         match self {
-            Self::Command(_) => TaskType::Command,
-            Self::Auto(x) => match x {
-                AutoTask::ClearRestartBit => TaskType::ClearRestartBit,
-                AutoTask::EnableUnsolicited(_) => TaskType::EnableUnsolicited,
-                AutoTask::DisableUnsolicited(_) => TaskType::DisableUnsolicited,
-            },
-            Self::TimeSync(_) => TaskType::TimeSync,
-            Self::Restart(_) => TaskType::Restart,
-            Self::DeadBands(_) => TaskType::WriteDeadBands,
-            Self::EmptyResponseTask(_) => TaskType::GenericEmptyResponse(self.function()),
-            Self::FileRead(_) => TaskType::FileRead,
-            Self::GetFileInfo(_) => TaskType::GetFileInfo,
-            Self::AuthFile(_) => TaskType::FileAuth,
-            Self::OpenFile(_) => TaskType::FileOpen,
-            Self::CloseFile(_) => TaskType::FileClose,
-            Self::WriteFileBlock(_) => TaskType::FileWriteBlock,
+            Self::Command(task) => task.task_type(),
+            Self::Auto(task) => task.task_type(),
+            Self::TimeSync(task) => task.task_type(),
+            Self::Restart(task) => task.task_type(),
+            Self::DeadBands(task) => task.task_type(),
+            Self::EmptyResponseTask(task) => task.task_type(),
+            Self::FileRead(task) => task.task_type(),
+            Self::GetFileInfo(task) => task.task_type(),
+            Self::AuthFile(task) => task.task_type(),
+            Self::OpenFile(task) => task.task_type(),
+            Self::CloseFile(task) => task.task_type(),
+            Self::WriteFileBlock(task) => task.task_type(),
         }
     }
 }

@@ -1,10 +1,12 @@
 use crate::app::format::write::HeaderWriter;
-use crate::app::parse::parser::{HeaderCollection, Response};
+use crate::app::parse::parser::Response;
 use crate::app::FunctionCode;
-use crate::master::error::{CommandError, CommandResponseError, TaskError};
+use crate::master::association::Association;
+use crate::master::error::{CommandError, TaskError};
 use crate::master::promise::Promise;
 use crate::master::request::*;
-use crate::master::tasks::{AppTask, NonReadTask, Task};
+use crate::master::tasks::{AppTask, NonReadTask, ResponseTask, Step, Task};
+use crate::master::TaskType;
 
 enum State {
     Select,
@@ -45,28 +47,13 @@ impl CommandTask {
             promise,
         }
     }
+}
 
-    fn new(
-        state: State,
-        headers: CommandHeaders,
-        promise: Promise<Result<(), CommandError>>,
-    ) -> Self {
-        Self {
-            state,
-            headers,
-            promise,
-        }
-    }
+impl ResponseTask for CommandTask {
+    type Output = ();
+    type Error = CommandError;
 
-    fn change_state(self, state: State) -> Self {
-        Self::new(state, self.headers, self.promise)
-    }
-
-    pub(crate) fn wrap(self) -> NonReadTask {
-        NonReadTask::Command(self)
-    }
-
-    pub(crate) fn function(&self) -> FunctionCode {
+    fn function(&self) -> FunctionCode {
         match self.state {
             State::DirectOperate => FunctionCode::DirectOperate,
             State::Select => FunctionCode::Select,
@@ -74,40 +61,44 @@ impl CommandTask {
         }
     }
 
-    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
-        self.headers.write(writer)
+    fn task_type(&self) -> TaskType {
+        TaskType::Command
     }
 
-    fn compare(&self, headers: HeaderCollection) -> Result<(), CommandResponseError> {
-        self.headers.compare(headers)
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
+        Ok(self.headers.write(writer)?)
     }
 
-    pub(crate) fn on_task_error(self, err: TaskError) {
-        self.promise.complete(Err(err.into()))
-    }
+    async fn on_response(
+        &mut self,
+        _association: &mut Association,
+        response: Response<'_>,
+    ) -> Result<Step<()>, CommandError> {
+        let headers = response.objects.map_err(TaskError::MalformedResponse)?;
 
-    pub(crate) fn handle(self, response: Response) -> Result<Option<NonReadTask>, TaskError> {
-        let headers = match response.objects {
-            Ok(x) => x,
-            Err(err) => {
-                self.promise
-                    .complete(Err(TaskError::MalformedResponse(err).into()));
-                return Err(TaskError::MalformedResponse(err));
-            }
-        };
-
-        if let Err(err) = self.compare(headers) {
-            self.promise.complete(Err(err.into()));
-            return Err(TaskError::UnexpectedResponseHeaders);
-        }
+        self.headers.compare(headers)?;
 
         match self.state {
-            State::Select => Ok(Some(self.change_state(State::Operate).wrap())),
-            State::Operate | State::DirectOperate => {
-                // Complete w/ success
-                self.promise.complete(Ok(()));
-                Ok(None)
+            State::Select => {
+                self.state = State::Operate;
+                Ok(Step::Next)
             }
+            State::Operate | State::DirectOperate => Ok(Step::Done(())),
         }
+    }
+
+    fn from_task_error(err: TaskError) -> CommandError {
+        err.into()
+    }
+
+    fn task_error(err: CommandError) -> TaskError {
+        match err {
+            CommandError::Task(err) => err,
+            CommandError::Response(_) => TaskError::UnexpectedResponseHeaders,
+        }
+    }
+
+    fn complete(self, _association: Option<&mut Association>, result: Result<(), CommandError>) {
+        self.promise.complete(result)
     }
 }

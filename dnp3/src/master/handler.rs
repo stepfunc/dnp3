@@ -13,19 +13,19 @@ use crate::master::promise::Promise;
 use crate::master::request::{CommandHeaders, CommandMode, ReadRequest, TimeSyncProcedure};
 use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::command_no_ack::CommandNoAckTask;
-use crate::master::tasks::deadbands::WriteDeadBandsTask;
-use crate::master::tasks::empty_response::EmptyResponseTask;
-use crate::master::tasks::file::authenticate::AuthFileTask;
-use crate::master::tasks::file::close::CloseFileTask;
+use crate::master::tasks::deadbands::DeadBandsRequest;
+use crate::master::tasks::empty_response::EmptyResponseRequest;
+use crate::master::tasks::file::authenticate::AuthFileRequest;
+use crate::master::tasks::file::close::CloseFileRequest;
 use crate::master::tasks::file::directory::DirectoryReader;
-use crate::master::tasks::file::get_info::GetFileInfoTask;
-use crate::master::tasks::file::open::{OpenFileRequest, OpenFileTask};
+use crate::master::tasks::file::get_info::GetFileInfoRequest;
+use crate::master::tasks::file::open::OpenFileRequest;
 use crate::master::tasks::file::read::{FileReadTask, FileReaderType};
-use crate::master::tasks::file::write_block::{WriteBlockRequest, WriteBlockTask};
+use crate::master::tasks::file::write_block::WriteBlockRequest;
 use crate::master::tasks::read::SingleReadTask;
-use crate::master::tasks::restart::{RestartTask, RestartType};
+use crate::master::tasks::restart::RestartType;
 use crate::master::tasks::time::PendingTimeSync;
-use crate::master::tasks::{QueuedTask, Task};
+use crate::master::tasks::{OneShot, QueuedTask, Task};
 use crate::master::{
     AuthKey, BlockNumber, DeadBandHeader, DirReadConfig, FileCredentials, FileError, FileHandle,
     FileInfo, FileMode, FileReadConfig, FileReader, Headers, OpenFile, ReadHandler, WriteError,
@@ -302,7 +302,7 @@ impl AssociationHandle {
         headers: Headers,
     ) -> Result<(), WriteError> {
         let (promise, rx) = Promise::one_shot();
-        let task = EmptyResponseTask::new(function, headers, promise);
+        let task = OneShot::new(EmptyResponseRequest::new(function, headers), promise);
         self.send_task(task).await?;
         rx.await?
     }
@@ -364,7 +364,7 @@ impl AssociationHandle {
 
     async fn restart(&mut self, restart_type: RestartType) -> Result<Duration, TaskError> {
         let (promise, rx) = Promise::one_shot();
-        let task = RestartTask::new(restart_type, promise);
+        let task = OneShot::new(restart_type, promise);
         self.send_task(task).await?;
         rx.await?
     }
@@ -386,7 +386,7 @@ impl AssociationHandle {
         headers: Vec<DeadBandHeader>,
     ) -> Result<(), WriteError> {
         let (promise, rx) = Promise::one_shot();
-        let task = WriteDeadBandsTask::new(headers, promise);
+        let task = OneShot::new(DeadBandsRequest::new(headers), promise);
         self.send_task(task).await?;
         rx.await?
     }
@@ -411,10 +411,7 @@ impl AssociationHandle {
     ) -> Result<AuthKey, FileError> {
         let (promise, rx) = Promise::one_shot();
 
-        let task = AuthFileTask {
-            credentials,
-            promise,
-        };
+        let task = OneShot::new(AuthFileRequest { credentials }, promise);
 
         self.send_task(task).await?;
         rx.await?
@@ -432,17 +429,15 @@ impl AssociationHandle {
     ) -> Result<OpenFile, FileError> {
         let (promise, rx) = Promise::one_shot();
 
-        let task = OpenFileTask {
-            request: OpenFileRequest {
-                file_name: file_name.to_string(),
-                auth_key,
-                file_size,
-                file_mode,
-                permissions,
-                max_block_size,
-            },
-            promise,
+        let request = OpenFileRequest {
+            file_name: file_name.to_string(),
+            auth_key,
+            file_size,
+            file_mode,
+            permissions,
+            max_block_size,
         };
+        let task = OneShot::new(request, promise);
 
         self.send_task(task).await?;
         rx.await?
@@ -457,14 +452,12 @@ impl AssociationHandle {
     ) -> Result<(), FileError> {
         let (promise, rx) = Promise::one_shot();
 
-        let task = WriteBlockTask {
-            request: WriteBlockRequest {
-                handle,
-                block_number,
-                block_data,
-            },
-            promise,
+        let request = WriteBlockRequest {
+            handle,
+            block_number,
+            block_data,
         };
+        let task = OneShot::new(request, promise);
 
         self.send_task(task).await?;
         rx.await?
@@ -474,7 +467,7 @@ impl AssociationHandle {
     pub async fn close_file(&mut self, handle: FileHandle) -> Result<(), FileError> {
         let (promise, rx) = Promise::one_shot();
 
-        let task = CloseFileTask { handle, promise };
+        let task = OneShot::new(CloseFileRequest { handle }, promise);
 
         self.send_task(task).await?;
         rx.await?
@@ -517,7 +510,7 @@ impl AssociationHandle {
         file_path: T,
     ) -> Result<FileInfo, FileError> {
         let (promise, reply) = Promise::one_shot();
-        let task = GetFileInfoTask::new(file_path.to_string(), promise);
+        let task = OneShot::new(GetFileInfoRequest::new(file_path.to_string()), promise);
         self.send_task(task).await?;
         reply.await?
     }

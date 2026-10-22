@@ -1,34 +1,34 @@
 use crate::app::file::*;
 use crate::app::format::write::HeaderWriter;
-use crate::app::format::WriteError;
 use crate::app::parse::free_format::FreeFormatVariation;
 use crate::app::parse::parser::{HeaderDetails, Response};
 use crate::app::{FunctionCode, Timestamp};
-use crate::master::promise::Promise;
-use crate::master::tasks::{AppTask, NonReadTask, Task};
-use crate::master::{FileError, FileInfo, TaskError};
+use crate::master::tasks::{NonReadTask, OneShot, OneShotRequest};
+use crate::master::{FileError, FileInfo, TaskError, TaskType};
 
-pub(crate) struct GetFileInfoTask {
+pub(crate) struct GetFileInfoRequest {
     file_name: String,
-    promise: Promise<Result<FileInfo, FileError>>,
 }
 
-impl From<GetFileInfoTask> for Task {
-    fn from(value: GetFileInfoTask) -> Self {
-        Task::App(AppTask::NonRead(NonReadTask::GetFileInfo(value)))
+impl GetFileInfoRequest {
+    pub(crate) fn new(file_name: String) -> Self {
+        Self { file_name }
     }
 }
 
-impl GetFileInfoTask {
-    pub(crate) fn new(file_name: String, promise: Promise<Result<FileInfo, FileError>>) -> Self {
-        Self { file_name, promise }
-    }
+impl OneShotRequest for GetFileInfoRequest {
+    type Output = FileInfo;
+    type Error = FileError;
 
-    pub(crate) fn function(&self) -> FunctionCode {
+    fn function(&self) -> FunctionCode {
         FunctionCode::GetFileInfo
     }
 
-    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+    fn task_type(&self) -> TaskType {
+        TaskType::GetFileInfo
+    }
+
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
         let obj = Group70Var7 {
             file_type: FileType::Other(0),
             file_size: 0,
@@ -37,35 +37,29 @@ impl GetFileInfoTask {
             request_id: 0xCAFE,
             file_name: self.file_name.as_str(),
         };
-        writer.write_free_format(&obj)
+        Ok(writer.write_free_format(&obj)?)
     }
 
-    pub(crate) fn on_task_error(self, err: TaskError) {
-        self.promise.complete(Err(FileError::TaskError(err)));
-    }
+    fn parse(&self, response: Response<'_>) -> Result<FileInfo, FileError> {
+        let header = response.objects?.get_only_header()?;
 
-    pub(crate) fn handle(self, response: Response) -> Result<Option<NonReadTask>, TaskError> {
-        fn inner(response: Response) -> Result<FileInfo, FileError> {
-            let header = response.objects?.get_only_header()?;
-
-            match header.details {
-                HeaderDetails::FreeFormat(FreeFormatVariation::Group70Var7(obj)) => Ok(obj.into()),
-                HeaderDetails::FreeFormat(FreeFormatVariation::Group70Var4(obj)) => {
-                    if obj.status_code != FileStatus::Success {
-                        tracing::warn!("Unable to get file info: {}", obj.text);
-                    }
-                    Err(FileError::BadStatus(obj.status_code))
+        match header.details {
+            HeaderDetails::FreeFormat(FreeFormatVariation::Group70Var7(obj)) => Ok(obj.into()),
+            HeaderDetails::FreeFormat(FreeFormatVariation::Group70Var4(obj)) => {
+                if obj.status_code != FileStatus::Success {
+                    tracing::warn!("Unable to get file info: {}", obj.text);
                 }
-                _ => Err(FileError::TaskError(TaskError::UnexpectedResponseHeaders)),
+                Err(FileError::BadStatus(obj.status_code))
             }
+            _ => Err(FileError::TaskError(TaskError::UnexpectedResponseHeaders)),
         }
+    }
 
-        let result = inner(response);
-        let ret = match &result {
-            Ok(_) => Ok(None),
-            Err(err) => Err(TaskError::from(*err)),
-        };
-        self.promise.complete(result);
-        ret
+    fn task_error(err: FileError) -> TaskError {
+        err.into()
+    }
+
+    fn wrap(task: OneShot<Self>) -> NonReadTask {
+        NonReadTask::GetFileInfo(task)
     }
 }

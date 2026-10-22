@@ -1,52 +1,44 @@
 use crate::app::format::write::HeaderWriter;
-use crate::app::format::WriteError;
 use crate::app::parse::parser::Response;
 use crate::app::FunctionCode;
-use crate::master::promise::Promise;
-use crate::master::tasks::{AppTask, NonReadTask, Task};
-use crate::master::{FileError, FileHandle, TaskError};
+use crate::master::tasks::{NonReadTask, OneShot, OneShotRequest};
+use crate::master::{FileError, FileHandle, TaskError, TaskType};
 
-pub(crate) struct CloseFileTask {
+pub(crate) struct CloseFileRequest {
     pub(crate) handle: FileHandle,
-    pub(crate) promise: Promise<Result<(), FileError>>,
 }
 
-impl From<CloseFileTask> for Task {
-    fn from(value: CloseFileTask) -> Self {
-        Task::App(AppTask::NonRead(NonReadTask::CloseFile(value)))
-    }
-}
+impl OneShotRequest for CloseFileRequest {
+    type Output = ();
+    type Error = FileError;
 
-impl CloseFileTask {
-    pub(crate) fn function(&self) -> FunctionCode {
+    fn function(&self) -> FunctionCode {
         FunctionCode::CloseFile
     }
 
-    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
-        super::write_close(self.handle, writer)
+    fn task_type(&self) -> TaskType {
+        TaskType::FileClose
     }
 
-    pub(crate) fn on_task_error(self, err: TaskError) {
-        self.promise.complete(Err(err.into()))
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
+        Ok(super::write_close(self.handle, writer)?)
     }
 
-    pub(crate) fn handle(self, response: Response<'_>) -> Result<Option<NonReadTask>, TaskError> {
-        fn process(expected_handle: FileHandle, response: Response<'_>) -> Result<(), FileError> {
-            let obj = super::parse_close_response(response.objects?.get_only_header()?)?;
+    fn parse(&self, response: Response<'_>) -> Result<(), FileError> {
+        let obj = super::parse_close_response(response.objects?.get_only_header()?)?;
 
-            if obj.file_handle != u32::from(expected_handle) {
-                return Err(FileError::WrongHandle);
-            }
-
-            super::check_close_status(obj.status_code)
+        if obj.file_handle != u32::from(self.handle) {
+            return Err(FileError::WrongHandle);
         }
 
-        let result = process(self.handle, response);
-        self.promise.complete(result);
+        super::check_close_status(obj.status_code)
+    }
 
-        match result {
-            Ok(_) => Ok(None),
-            Err(err) => Err(err.into()),
-        }
+    fn task_error(err: FileError) -> TaskError {
+        err.into()
+    }
+
+    fn wrap(task: OneShot<Self>) -> NonReadTask {
+        NonReadTask::CloseFile(task)
     }
 }

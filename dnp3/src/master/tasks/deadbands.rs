@@ -1,19 +1,12 @@
 use crate::app::format::write::HeaderWriter;
 use crate::app::parse::parser::Response;
 use crate::app::FunctionCode;
-use crate::master::promise::Promise;
-use crate::master::tasks::{AppTask, NonReadTask, Task};
-use crate::master::{DeadBandHeader, DeadBandHeaderVariants, TaskError, WriteError};
+use crate::master::tasks::empty_response::{expect_empty, write_error};
+use crate::master::tasks::{NonReadTask, OneShot, OneShotRequest};
+use crate::master::{DeadBandHeader, DeadBandHeaderVariants, TaskError, TaskType, WriteError};
 
-pub(crate) struct WriteDeadBandsTask {
+pub(crate) struct DeadBandsRequest {
     headers: Vec<DeadBandHeader>,
-    promise: Promise<Result<(), WriteError>>,
-}
-
-impl From<WriteDeadBandsTask> for Task {
-    fn from(value: WriteDeadBandsTask) -> Self {
-        Task::App(AppTask::NonRead(NonReadTask::DeadBands(value)))
-    }
 }
 
 impl DeadBandHeaderVariants {
@@ -29,19 +22,25 @@ impl DeadBandHeaderVariants {
     }
 }
 
-impl WriteDeadBandsTask {
-    pub(crate) fn new(
-        headers: Vec<DeadBandHeader>,
-        promise: Promise<Result<(), WriteError>>,
-    ) -> Self {
-        Self { headers, promise }
+impl DeadBandsRequest {
+    pub(crate) fn new(headers: Vec<DeadBandHeader>) -> Self {
+        Self { headers }
     }
+}
 
-    pub(crate) const fn function(&self) -> FunctionCode {
+impl OneShotRequest for DeadBandsRequest {
+    type Output = ();
+    type Error = WriteError;
+
+    fn function(&self) -> FunctionCode {
         FunctionCode::Write
     }
 
-    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
+    fn task_type(&self) -> TaskType {
+        TaskType::WriteDeadBands
+    }
+
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
         for header in self.headers.iter() {
             header.inner.write(writer)?;
         }
@@ -49,18 +48,15 @@ impl WriteDeadBandsTask {
         Ok(())
     }
 
-    pub(crate) fn on_task_error(self, err: TaskError) {
-        self.promise.complete(Err(err.into()))
+    fn parse(&self, response: Response<'_>) -> Result<(), WriteError> {
+        expect_empty(response)
     }
 
-    pub(crate) fn handle(self, response: Response) -> Result<Option<NonReadTask>, TaskError> {
-        if response.raw_objects.is_empty() {
-            self.promise.complete(Ok(()));
-            Ok(None)
-        } else {
-            self.promise
-                .complete(Err(WriteError::Task(TaskError::UnexpectedResponseHeaders)));
-            Err(TaskError::UnexpectedResponseHeaders)
-        }
+    fn task_error(err: WriteError) -> TaskError {
+        write_error(err)
+    }
+
+    fn wrap(task: OneShot<Self>) -> NonReadTask {
+        NonReadTask::DeadBands(task)
     }
 }
