@@ -2,6 +2,8 @@ pub(crate) mod harness;
 
 /// respond/ignore addresses
 mod addressing;
+/// device attributes (group 0)
+mod attributes;
 /// control functionality
 mod controls;
 /// freeze counters tests

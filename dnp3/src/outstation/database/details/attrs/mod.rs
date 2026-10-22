@@ -89,9 +89,11 @@ impl Selection {
         }
     }
 
-    fn tx<F>(cursor: &mut WriteCursor, f: F) -> Result<(), scursor::WriteError>
+    /// Run `f`, rolling the cursor back to its starting position if it fails
+    fn tx<E, F>(cursor: &mut WriteCursor, f: F) -> Result<(), E>
     where
-        F: FnOnce(&mut WriteCursor) -> Result<(), scursor::WriteError>,
+        E: From<scursor::WriteError>,
+        F: FnOnce(&mut WriteCursor) -> Result<(), E>,
     {
         let start = cursor.position();
         let res = f(cursor);
@@ -143,8 +145,9 @@ impl Selection {
             } else {
                 // check if it exists in the user map
                 if let Ok(attr) = map.get(set, var) {
-                    let mut writer = HeaderWriter::new(cursor);
-                    if let Err(err) = writer.write_attribute(attr) {
+                    if let Err(err) =
+                        Self::tx(cursor, |cur| HeaderWriter::new(cur).write_attribute(attr))
+                    {
                         match err {
                             AttrWriteError::Cursor => return false, // out of space
                             AttrWriteError::BadAttribute(err) => {
