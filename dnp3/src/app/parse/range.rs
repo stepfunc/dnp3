@@ -114,3 +114,59 @@ where
         (self.remaining, Some(self.remaining))
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parses_exactly_range_count_items_with_indices() {
+        let data = [0x01, 0x00, 0x02, 0x00, 0x03, 0x00, 0xFF];
+        let mut cursor = ReadCursor::new(&data);
+        let seq = RangedSequence::<u16>::parse(Range::from(10, 12).unwrap(), &mut cursor).unwrap();
+        assert_eq!(cursor.remaining(), 1);
+        let items: Vec<(u16, u16)> = seq.iter().collect();
+        assert_eq!(items, vec![(1, 10), (2, 11), (3, 12)]);
+    }
+
+    #[test]
+    fn parses_at_max_index() {
+        let data = [0x01, 0x00, 0x02, 0x00];
+        let mut cursor = ReadCursor::new(&data);
+        let seq =
+            RangedSequence::<u16>::parse(Range::from(65534, 65535).unwrap(), &mut cursor).unwrap();
+        assert!(cursor.is_empty());
+        let items: Vec<(u16, u16)> = seq.iter().collect();
+        assert_eq!(items, vec![(1, 65534), (2, 65535)]);
+    }
+
+    #[test]
+    fn size_hint_counts_down_and_iterator_stays_exhausted() {
+        let data = [0x01, 0x00, 0x02, 0x00];
+        let mut cursor = ReadCursor::new(&data);
+        let seq = RangedSequence::<u16>::parse(Range::from(0, 1).unwrap(), &mut cursor).unwrap();
+        let mut iter = seq.iter();
+        assert_eq!(iter.size_hint(), (2, Some(2)));
+        assert_eq!(iter.next(), Some((1, 0)));
+        assert_eq!(iter.size_hint(), (1, Some(1)));
+        assert_eq!(iter.next(), Some((2, 1)));
+        assert_eq!(iter.size_hint(), (0, Some(0)));
+        assert_eq!(iter.next(), None);
+        assert_eq!(iter.next(), None);
+        assert_eq!(iter.size_hint(), (0, Some(0)));
+    }
+
+    #[test]
+    fn empty_sequence_yields_nothing() {
+        let seq = RangedSequence::<u16>::empty();
+        assert_eq!(seq.iter().size_hint(), (0, Some(0)));
+        assert_eq!(seq.iter().next(), None);
+    }
+
+    #[test]
+    fn fails_when_data_is_short() {
+        let data = [0x01, 0x00, 0x02];
+        let mut cursor = ReadCursor::new(&data);
+        RangedSequence::<u16>::parse(Range::from(0, 1).unwrap(), &mut cursor).unwrap_err();
+    }
+}
