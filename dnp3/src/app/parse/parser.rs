@@ -1774,6 +1774,16 @@ mod test {
 
         let request = parse_header(&[0xE7, 0x01]).unwrap().to_request().unwrap();
         assert_eq!(request.header.control, control(true, true, true, false, 7));
+
+        // only a CONFIRM may set UNS, to confirm an unsolicited response
+        let request = parse_header(&[0xD0, 0x00]).unwrap().to_request().unwrap();
+        assert_eq!(
+            request.header,
+            RequestHeader {
+                control: control(true, true, false, true, 0),
+                function: FunctionCode::Confirm,
+            }
+        );
     }
 
     #[test]
