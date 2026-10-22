@@ -289,7 +289,7 @@ impl<C: ConnectionHandler, L: Listen> AcceptTask<C, L> {
     }
 
     async fn handle_accept(&mut self, stream: TcpStream, addr: SocketAddr) {
-        let phys = PhysLayer::Tcp(stream);
+        let phys = PhysLayer::tcp(stream);
 
         match self.handler.accept(addr).await {
             Err(Reject) => {

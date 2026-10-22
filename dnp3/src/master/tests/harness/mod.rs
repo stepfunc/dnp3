@@ -38,7 +38,7 @@ pub(crate) async fn create_association_with_handler(
 
     let (io, io_handle) = sfio_tokio_mock_io::mock();
 
-    let mut io = PhysLayer::Mock(io);
+    let mut io = PhysLayer::mock(io);
 
     let outstation_address = EndpointAddress::try_new(1024).unwrap();
 

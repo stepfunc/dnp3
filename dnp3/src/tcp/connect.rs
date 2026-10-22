@@ -16,7 +16,7 @@ impl PostConnectionHandler {
         _endpoint: &SocketAddr,
     ) -> Option<PhysLayer> {
         match self {
-            Self::Tcp => Some(PhysLayer::Tcp(socket)),
+            Self::Tcp => Some(PhysLayer::tcp(socket)),
             #[cfg(feature = "enable-tls")]
             Self::Tls(config) => config.handle_connection(socket, _endpoint).await,
         }

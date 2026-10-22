@@ -76,7 +76,7 @@ enum ServerConnectionHandler {
 impl ServerConnectionHandler {
     async fn handle(&mut self, socket: tokio::net::TcpStream) -> Result<PhysLayer, String> {
         match self {
-            Self::Tcp => Ok(PhysLayer::Tcp(socket)),
+            Self::Tcp => Ok(PhysLayer::tcp(socket)),
             #[cfg(feature = "enable-tls")]
             Self::Tls(config) => config.handle_connection(socket).await,
         }

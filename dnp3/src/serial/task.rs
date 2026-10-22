@@ -63,7 +63,7 @@ impl Connection for SerialTask {
                 self.back_off.on_success();
                 tracing::info!("serial port open");
                 self.listener.update(PortState::Open).get().await;
-                Ok((PhysLayer::Serial(serial), ()))
+                Ok((PhysLayer::serial(serial), ()))
             }
         }
     }

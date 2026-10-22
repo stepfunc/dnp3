@@ -145,7 +145,7 @@ async fn master_tcp_client_runs_a_master_session_over_tcp() {
     states.expect(ClientState::Disabled).await;
     channel.enable().await.unwrap();
     states.expect(ClientState::Connecting).await;
-    let mut phys = PhysLayer::Tcp(peer.accept().await);
+    let mut phys = PhysLayer::tcp(peer.accept().await);
     states.expect(ClientState::Connected).await;
     exchange(&mut phys, &OUTSTATION_REQUEST, &MASTER_REPLY).await;
     drop(channel);
@@ -170,7 +170,7 @@ async fn outstation_tcp_client_runs_an_outstation_session_over_tcp() {
     states.expect(ClientState::Disabled).await;
     handle.enable().await.unwrap();
     states.expect(ClientState::Connecting).await;
-    let mut phys = PhysLayer::Tcp(peer.accept().await);
+    let mut phys = PhysLayer::tcp(peer.accept().await);
     states.expect(ClientState::Connected).await;
     read_null_unsolicited(&mut phys).await;
     exchange(&mut phys, &MASTER_REQUEST, &OUTSTATION_REPLY).await;
@@ -182,6 +182,7 @@ async fn outstation_tcp_client_runs_an_outstation_session_over_tcp() {
 mod tls {
     use super::*;
     use crate::tcp::tls::{MinTlsVersion, TlsClientConfig, TlsServerConfig};
+    use crate::util::phys::PhysIo;
     use std::path::PathBuf;
 
     fn certs() -> PathBuf {
@@ -236,7 +237,7 @@ mod tls {
         channel.enable().await.unwrap();
         states.expect(ClientState::Connecting).await;
         let mut phys = accept_tls(&peer).await;
-        assert!(matches!(phys, PhysLayer::Tls(_)));
+        assert!(matches!(phys.io(), PhysIo::Tls(_)));
         states.expect(ClientState::Connected).await;
         exchange(&mut phys, &OUTSTATION_REQUEST, &MASTER_REPLY).await;
         drop(channel);
