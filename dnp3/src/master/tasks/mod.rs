@@ -497,7 +497,7 @@ impl ReadTask {
         match self {
             ReadTask::StartupIntegrity(_) => {
                 if let Some(association) = association {
-                    association.on_integrity_scan_failure();
+                    association.on_integrity_scan_failure(err);
                 }
             }
             ReadTask::PeriodicPoll(poll) => {
@@ -508,10 +508,13 @@ impl ReadTask {
             }
             ReadTask::EventScan(_) => {
                 if let Some(association) = association {
-                    association.on_event_scan_failure();
+                    association.on_event_scan_failure(err);
                 }
             }
-            ReadTask::SingleRead(task) => task.on_task_error(err),
+            ReadTask::SingleRead(task) => {
+                tracing::warn!("read failed: {err}");
+                task.on_task_error(err);
+            }
         }
     }
 

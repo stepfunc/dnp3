@@ -45,6 +45,29 @@ pub enum ObjectParseError {
     BadEncoding,
 }
 
+impl ObjectParseError {
+    /// True if the error means the parser doesn't support what was received, rather than that it
+    /// was encoded incorrectly
+    pub(crate) fn is_unsupported(&self) -> bool {
+        match self {
+            ObjectParseError::UnknownGroupVariation(_, _)
+            | ObjectParseError::InvalidQualifierForVariation(_, _)
+            | ObjectParseError::UnsupportedFreeFormatCount(_) => true,
+            #[expect(
+                deprecated,
+                reason = "the mapping must cover every variant until removal"
+            )]
+            ObjectParseError::UnsupportedQualifierCode(_) => true,
+            ObjectParseError::UnknownQualifier(_)
+            | ObjectParseError::InsufficientBytes
+            | ObjectParseError::InvalidRange(_, _)
+            | ObjectParseError::ZeroLengthOctetData
+            | ObjectParseError::BadAttribute(_)
+            | ObjectParseError::BadEncoding => false,
+        }
+    }
+}
+
 impl From<TrailingBytes> for ObjectParseError {
     fn from(_: TrailingBytes) -> Self {
         Self::BadEncoding
@@ -183,5 +206,46 @@ impl From<ReadError> for HeaderParseError {
 impl From<InvalidRange> for ObjectParseError {
     fn from(r: InvalidRange) -> Self {
         ObjectParseError::InvalidRange(r.start, r.stop)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn classifies_parser_limitations_as_unsupported() {
+        #[expect(
+            deprecated,
+            reason = "the classification covers every variant until removal"
+        )]
+        let cases = [
+            (ObjectParseError::UnknownGroupVariation(111, 5), true),
+            (
+                ObjectParseError::InvalidQualifierForVariation(
+                    Variation::Group111(5),
+                    QualifierCode::Range8,
+                ),
+                true,
+            ),
+            (
+                ObjectParseError::UnsupportedQualifierCode(QualifierCode::Range8),
+                true,
+            ),
+            (ObjectParseError::UnsupportedFreeFormatCount(2), true),
+            (ObjectParseError::UnknownQualifier(0xFF), false),
+            (ObjectParseError::InsufficientBytes, false),
+            (ObjectParseError::InvalidRange(2, 1), false),
+            (ObjectParseError::ZeroLengthOctetData, false),
+            (
+                ObjectParseError::BadAttribute(AttrParseError::ReadError),
+                false,
+            ),
+            (ObjectParseError::BadEncoding, false),
+        ];
+
+        for (err, expected) in cases {
+            assert_eq!(err.is_unsupported(), expected, "{err:?}");
+        }
     }
 }

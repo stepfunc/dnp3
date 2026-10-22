@@ -536,8 +536,8 @@ impl Association {
         self.startup_integrity_done = true;
     }
 
-    pub(crate) fn on_integrity_scan_failure(&mut self) {
-        tracing::warn!("startup integrity scan failed");
+    pub(crate) fn on_integrity_scan_failure(&mut self, err: TaskError) {
+        tracing::warn!("startup integrity scan failed: {err}");
         self.auto_tasks.integrity_scan.failure(&self.config);
     }
 
@@ -545,8 +545,8 @@ impl Association {
         self.auto_tasks.event_scan.done();
     }
 
-    pub(crate) fn on_event_scan_failure(&mut self) {
-        tracing::warn!("automatic event scan failed");
+    pub(crate) fn on_event_scan_failure(&mut self, err: TaskError) {
+        tracing::warn!("automatic event scan failed: {err}");
         self.auto_tasks.event_scan.failure(&self.config);
     }
 
