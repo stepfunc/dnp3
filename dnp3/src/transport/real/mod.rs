@@ -38,13 +38,10 @@ impl Transport for RealTransport {
 mod tests {
     use std::time::Duration;
 
-    use scursor::WriteCursor;
-
     use super::*;
     use crate::decode::DecodeLevel;
-    use crate::link::constant::MAX_LINK_FRAME_LENGTH;
-    use crate::link::format::{format_data_frame, format_header_only, Payload};
     use crate::link::header::{AnyAddress, ControlField};
+    use crate::link::test_data;
     use crate::outstation::Feature;
     use crate::transport::{
         FragmentAddr, LinkLayerMessageType, TransportData, TransportRead, TransportWrite,
@@ -94,13 +91,7 @@ mod tests {
         data: &[u8],
     ) -> Vec<u8> {
         let header = link_header(from_master, UNCONFIRMED_USER_DATA, destination, source);
-        let transport = header::Header::new(true, true, sequence::Sequence::new(seq));
-        let mut buffer = [0; MAX_LINK_FRAME_LENGTH];
-        let mut cursor = WriteCursor::new(&mut buffer);
-        format_data_frame(header, Payload::new(transport.to_u8(), data), &mut cursor)
-            .unwrap()
-            .frame
-            .to_vec()
+        test_data::data_frame(header, test_data::segment(true, true, seq), data)
     }
 
     fn header_only(
@@ -109,13 +100,7 @@ mod tests {
         destination: AnyAddress,
         source: EndpointAddress,
     ) -> Vec<u8> {
-        let header = link_header(from_master, function, destination, source);
-        let mut buffer = [0; MAX_LINK_FRAME_LENGTH];
-        let mut cursor = WriteCursor::new(&mut buffer);
-        format_header_only(header, &mut cursor)
-            .unwrap()
-            .frame
-            .to_vec()
+        test_data::header_only(link_header(from_master, function, destination, source))
     }
 
     #[derive(Debug, PartialEq)]

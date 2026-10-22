@@ -3,17 +3,15 @@
 
 use std::time::Duration;
 
-use scursor::WriteCursor;
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
 
 use crate::app::parse::options::ParseOptions;
 use crate::app::{BufferSize, FunctionCode, Sequence, Timeout};
 use crate::decode::DecodeLevel;
-use crate::link::constant::MAX_LINK_FRAME_LENGTH;
-use crate::link::format::{format_data_frame, format_header_only, Payload};
 use crate::link::header::{ControlField, Header};
 use crate::link::reader::LinkModes;
+use crate::link::test_data;
 use crate::link::{EndpointAddress, LinkErrorMode};
 use crate::master::association::AssociationConfig;
 use crate::master::task::MasterTask;
@@ -51,17 +49,7 @@ pub(super) fn segment(
     data: &[u8],
 ) -> Vec<u8> {
     let header = Header::unconfirmed_user_data(false, MASTER.wrap(), source.wrap());
-    let transport = crate::transport::real::header::Header::new(
-        fin,
-        fir,
-        crate::transport::real::sequence::Sequence::new(seq),
-    );
-    let mut buffer = [0; MAX_LINK_FRAME_LENGTH];
-    let mut cursor = WriteCursor::new(&mut buffer);
-    format_data_frame(header, Payload::new(transport.to_u8(), data), &mut cursor)
-        .unwrap()
-        .frame
-        .to_vec()
+    test_data::data_frame(header, test_data::segment(fir, fin, seq), data)
 }
 
 /// A whole fragment from the outstation in one segment
@@ -70,13 +58,11 @@ pub(super) fn fragment(source: EndpointAddress, data: &[u8]) -> Vec<u8> {
 }
 
 pub(super) fn header_only(source: EndpointAddress, control: u8) -> Vec<u8> {
-    let header = Header::new(ControlField::from(control), MASTER.wrap(), source.wrap());
-    let mut buffer = [0; MAX_LINK_FRAME_LENGTH];
-    let mut cursor = WriteCursor::new(&mut buffer);
-    format_header_only(header, &mut cursor)
-        .unwrap()
-        .frame
-        .to_vec()
+    test_data::header_only(Header::new(
+        ControlField::from(control),
+        MASTER.wrap(),
+        source.wrap(),
+    ))
 }
 
 /// The application data of a frame written by the master, which carries a single segment

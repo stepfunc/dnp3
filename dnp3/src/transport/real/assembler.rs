@@ -283,7 +283,6 @@ mod tests {
     use super::*;
     use crate::link::header::{BroadcastConfirmMode, FrameType};
     use crate::link::EndpointAddress;
-    use crate::transport::real::sequence::Sequence;
     use crate::util::phys::PhysAddr;
 
     const MAX: usize = 8;
@@ -325,7 +324,7 @@ mod tests {
 
         /// returns true if the segment completed a fragment
         fn segment(&mut self, info: FrameInfo, fir: bool, fin: bool, seq: u8, data: &[u8]) -> bool {
-            let header = Header::new(fin, fir, Sequence::new(seq));
+            let header = crate::link::test_data::segment(fir, fin, seq);
             let discards = &mut self.discards;
             matches!(
                 self.assembler

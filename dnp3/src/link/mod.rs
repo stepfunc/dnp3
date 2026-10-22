@@ -164,8 +164,14 @@ impl std::str::FromStr for EndpointAddress {
 
 #[cfg(test)]
 pub(crate) mod test_data {
+    use scursor::WriteCursor;
+
+    use crate::link::constant::MAX_LINK_FRAME_LENGTH;
+    use crate::link::format::{format_data_frame, format_header_only, Payload};
     use crate::link::function::Function;
     use crate::link::header::{AnyAddress, ControlField, Header};
+    use crate::transport::real::header as transport;
+    use crate::transport::real::sequence::Sequence;
 
     pub(crate) struct TestFrame {
         pub(crate) bytes: &'static [u8],
@@ -272,4 +278,29 @@ pub(crate) mod test_data {
             0x1B, 0x1C, 0x1D, 0x1E, 0x1F, 0x20, 0x21, 0x22,
         ],
     };
+
+    /// A frame with no user data
+    pub(crate) fn header_only(header: Header) -> Vec<u8> {
+        let mut buffer = [0; MAX_LINK_FRAME_LENGTH];
+        let mut cursor = WriteCursor::new(&mut buffer);
+        format_header_only(header, &mut cursor)
+            .unwrap()
+            .frame
+            .to_vec()
+    }
+
+    /// A data frame carrying one transport segment
+    pub(crate) fn data_frame(header: Header, segment: transport::Header, data: &[u8]) -> Vec<u8> {
+        let mut buffer = [0; MAX_LINK_FRAME_LENGTH];
+        let mut cursor = WriteCursor::new(&mut buffer);
+        format_data_frame(header, Payload::new(segment.to_u8(), data), &mut cursor)
+            .unwrap()
+            .frame
+            .to_vec()
+    }
+
+    /// The transport header of a segment
+    pub(crate) fn segment(fir: bool, fin: bool, seq: u8) -> transport::Header {
+        transport::Header::new(fin, fir, Sequence::new(seq))
+    }
 }

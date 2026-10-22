@@ -1,4 +1,3 @@
-use scursor::WriteCursor;
 use tokio::task::JoinHandle;
 use tokio::time::{Duration, Instant};
 
@@ -7,10 +6,9 @@ use crate::app::FunctionCode;
 use crate::decode::{
     AppDecodeLevel, DecodeLevel, LinkDecodeLevel, PhysDecodeLevel, TransportDecodeLevel,
 };
-use crate::link::constant::MAX_LINK_FRAME_LENGTH;
-use crate::link::format::{format_data_frame, header_bytes, Payload};
 use crate::link::header::{AnyAddress, BroadcastConfirmMode, ControlField, Header};
 use crate::link::reader::LinkModes;
+use crate::link::test_data;
 use crate::outstation::config::{Feature, OutstationConfig};
 use crate::outstation::task::OutstationTask;
 use crate::outstation::traits::{BroadcastAction, OperateType};
@@ -104,12 +102,7 @@ fn frame(
         AnyAddress::from(destination),
         AnyAddress::from(source),
     );
-    let mut buffer = [0; MAX_LINK_FRAME_LENGTH];
-    let mut cursor = WriteCursor::new(&mut buffer);
-    format_data_frame(header, Payload::new(0xC0 | transport_seq, app), &mut cursor)
-        .unwrap()
-        .frame
-        .to_vec()
+    test_data::data_frame(header, test_data::segment(true, true, transport_seq), app)
 }
 
 /// a request frame from `source` to `destination`
@@ -710,15 +703,11 @@ async fn unknown_function_from_another_master_keeps_the_selection_in_the_unsolic
 
 /// a header-only frame with the link control octet `control`
 fn header_only(control: u8, destination: u16, source: u16) -> Vec<u8> {
-    header_bytes(
-        Header::new(
-            ControlField::from(control),
-            AnyAddress::from(destination),
-            AnyAddress::from(source),
-        ),
-        5,
-    )
-    .to_vec()
+    test_data::header_only(Header::new(
+        ControlField::from(control),
+        AnyAddress::from(destination),
+        AnyAddress::from(source),
+    ))
 }
 
 /// REQUEST_LINK_STATUS from the master, and the outstation's LINK_STATUS reply

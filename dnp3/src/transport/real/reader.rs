@@ -108,11 +108,8 @@ impl TransportRead for Reader {
 mod tests {
     use std::time::Duration;
 
-    use scursor::WriteCursor;
-
     use super::*;
-    use crate::link::constant::MAX_LINK_FRAME_LENGTH;
-    use crate::link::format::{format_data_frame, format_header_only, Payload};
+    use crate::link::test_data::{self, data_frame, header_only};
 
     const OUTSTATION: EndpointAddress = EndpointAddress::raw(1024);
     const MASTER: EndpointAddress = EndpointAddress::raw(1);
@@ -123,36 +120,7 @@ mod tests {
             OUTSTATION.wrap(),
             MASTER.wrap(),
         );
-        data_frame(header, fir, fin, seq, data)
-    }
-
-    fn data_frame(
-        header: crate::link::header::Header,
-        fir: bool,
-        fin: bool,
-        seq: u8,
-        data: &[u8],
-    ) -> Vec<u8> {
-        let transport = Header::new(
-            fin,
-            fir,
-            crate::transport::real::sequence::Sequence::new(seq),
-        );
-        let mut buffer = [0; MAX_LINK_FRAME_LENGTH];
-        let mut cursor = WriteCursor::new(&mut buffer);
-        format_data_frame(header, Payload::new(transport.to_u8(), data), &mut cursor)
-            .unwrap()
-            .frame
-            .to_vec()
-    }
-
-    fn header_only(header: crate::link::header::Header) -> Vec<u8> {
-        let mut buffer = [0; MAX_LINK_FRAME_LENGTH];
-        let mut cursor = WriteCursor::new(&mut buffer);
-        format_header_only(header, &mut cursor)
-            .unwrap()
-            .frame
-            .to_vec()
+        data_frame(header, test_data::segment(fir, fin, seq), data)
     }
 
     fn link_status_request() -> Vec<u8> {
@@ -363,7 +331,7 @@ mod tests {
         fn confirmed(fcb: bool) -> Vec<u8> {
             let mut header = from_master(CONFIRMED_USER_DATA);
             header.control.fcb = fcb;
-            data_frame(header, true, true, 0, &FRAGMENT)
+            data_frame(header, test_data::segment(true, true, 0), &FRAGMENT)
         }
 
         fn reply(control: u8) -> Vec<u8> {
@@ -540,9 +508,7 @@ mod tests {
                     MASTER.wrap(),
                     OUTSTATION.wrap(),
                 ),
-                true,
-                true,
-                0,
+                test_data::segment(true, true, 0),
                 &FRAGMENT,
             );
             let expected = [rest, &response].concat();
