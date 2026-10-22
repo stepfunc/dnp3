@@ -4,6 +4,8 @@ on:
     tags:
       - "*"
   pull_request:
+  # The merge queue runs the required checks on each queued merge result
+  merge_group:
 # Jobs that write with GITHUB_TOKEN ask for it themselves
 permissions:
   contents: read
