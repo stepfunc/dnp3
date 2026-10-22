@@ -728,7 +728,7 @@ async fn sends_unsolicited_from_one_update() {
             .unwrap();
         let mut num_events = 0;
         match response.objects.unwrap().get_only_header().unwrap().details {
-            HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group32Var1(seq)) => {
+            HeaderDetails::CountAndPrefix16(_, PrefixedVariation::Group32Var1(seq)) => {
                 num_events += seq.iter().count()
             }
             x => panic!("Unexpected header: {x:?}"),

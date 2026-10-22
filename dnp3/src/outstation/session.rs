@@ -1480,47 +1480,35 @@ impl OutstationSession {
         db: &DatabaseHandle,
     ) -> Iin2 {
         match header.details {
-            HeaderDetails::OneByteStartStop(_, _, RangedVariation::Group0(_, Some(attr))) => {
+            HeaderDetails::Range(_, _, RangedVariation::Group0(_, Some(attr))) => {
                 self.handle_write_attr(attr, db).await
             }
-            HeaderDetails::TwoByteStartStop(_, _, RangedVariation::Group0(_, Some(attr))) => {
-                self.handle_write_attr(attr, db).await
-            }
-            HeaderDetails::OneByteStartStop(_, _, RangedVariation::Group80Var1(bits)) => {
+            HeaderDetails::Range(_, _, RangedVariation::Group80Var1(bits)) => {
                 self.handle_write_iin(bits)
             }
-            HeaderDetails::TwoByteStartStop(_, _, RangedVariation::Group80Var1(bits)) => {
-                self.handle_write_iin(bits)
-            }
-            HeaderDetails::OneByteCount(_, CountVariation::Group50Var1(seq)) => {
+            HeaderDetails::Count(_, _, CountVariation::Group50Var1(seq)) => {
                 self.handle_write_abs_time(seq)
             }
-            HeaderDetails::TwoByteCount(_, CountVariation::Group50Var1(seq)) => {
-                self.handle_write_abs_time(seq)
-            }
-            HeaderDetails::OneByteCount(_, CountVariation::Group50Var3(seq)) => {
-                self.handle_write_at_last_recorded_time(seq)
-            }
-            HeaderDetails::TwoByteCount(_, CountVariation::Group50Var3(seq)) => {
+            HeaderDetails::Count(_, _, CountVariation::Group50Var3(seq)) => {
                 self.handle_write_at_last_recorded_time(seq)
             }
             // analog deadbands
-            HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group34Var1(seq)) => {
+            HeaderDetails::CountAndPrefix8(_, PrefixedVariation::Group34Var1(seq)) => {
                 self.handle_write_analog_deadbands(seq, db).await
             }
-            HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group34Var2(seq)) => {
+            HeaderDetails::CountAndPrefix8(_, PrefixedVariation::Group34Var2(seq)) => {
                 self.handle_write_analog_deadbands(seq, db).await
             }
-            HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group34Var3(seq)) => {
+            HeaderDetails::CountAndPrefix8(_, PrefixedVariation::Group34Var3(seq)) => {
                 self.handle_write_analog_deadbands(seq, db).await
             }
-            HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group34Var1(seq)) => {
+            HeaderDetails::CountAndPrefix16(_, PrefixedVariation::Group34Var1(seq)) => {
                 self.handle_write_analog_deadbands(seq, db).await
             }
-            HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group34Var2(seq)) => {
+            HeaderDetails::CountAndPrefix16(_, PrefixedVariation::Group34Var2(seq)) => {
                 self.handle_write_analog_deadbands(seq, db).await
             }
-            HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group34Var3(seq)) => {
+            HeaderDetails::CountAndPrefix16(_, PrefixedVariation::Group34Var3(seq)) => {
                 self.handle_write_analog_deadbands(seq, db).await
             }
             _ => {
@@ -1901,15 +1889,7 @@ impl OutstationSession {
 
         for header in object_headers.iter() {
             match header.details {
-                HeaderDetails::OneByteCount(_, CountVariation::Group50Var2(seq)) => {
-                    match seq.single() {
-                        None => iin.iin2.set(Iin2::PARAMETER_ERROR),
-                        Some(x) => {
-                            timing = Some(x.into());
-                        }
-                    }
-                }
-                HeaderDetails::TwoByteCount(_, CountVariation::Group50Var2(seq)) => {
+                HeaderDetails::Count(_, _, CountVariation::Group50Var2(seq)) => {
                     match seq.single() {
                         None => iin.iin2.set(Iin2::PARAMETER_ERROR),
                         Some(x) => {
@@ -1918,13 +1898,11 @@ impl OutstationSession {
                     }
                 }
                 HeaderDetails::AllObjects(_)
-                | HeaderDetails::OneByteStartStop(..)
-                | HeaderDetails::TwoByteStartStop(..)
-                | HeaderDetails::OneByteCount(..)
-                | HeaderDetails::TwoByteCount(..)
-                | HeaderDetails::OneByteCountAndPrefix(..)
-                | HeaderDetails::TwoByteCountAndPrefix(..)
-                | HeaderDetails::TwoByteFreeFormat(..) => {
+                | HeaderDetails::Range(..)
+                | HeaderDetails::Count(..)
+                | HeaderDetails::CountAndPrefix8(..)
+                | HeaderDetails::CountAndPrefix16(..)
+                | HeaderDetails::FreeFormat(_) => {
                     // other variations require that there be a preceding g50v2
                     match timing {
                         None => {
@@ -1960,17 +1938,13 @@ impl OutstationSession {
                 .application
                 .freeze_counter(FreezeIndices::All, freeze_type, database)
                 .map_or_else(|err| err.into(), |_| Iin2::default()),
-            HeaderDetails::OneByteStartStop(start, stop, RangedVariation::Group20Var0) => self
+            HeaderDetails::Range(_, range, RangedVariation::Group20Var0) => self
                 .application
                 .freeze_counter(
-                    FreezeIndices::Range(start.into(), stop.into()),
+                    FreezeIndices::Range(range.get_start(), range.get_stop()),
                     freeze_type,
                     database,
                 )
-                .map_or_else(|err| err.into(), |_| Iin2::default()),
-            HeaderDetails::TwoByteStartStop(start, stop, RangedVariation::Group20Var0) => self
-                .application
-                .freeze_counter(FreezeIndices::Range(start, stop), freeze_type, database)
                 .map_or_else(|err| err.into(), |_| Iin2::default()),
             _ => match header.variation {
                 Variation::Group20Var0 => Iin2::PARAMETER_ERROR,

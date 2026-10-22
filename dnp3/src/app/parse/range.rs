@@ -11,6 +11,7 @@ pub(crate) struct InvalidRange {
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct Range {
     start: u16,
+    stop: u16,
     count: usize,
 }
 
@@ -22,15 +23,24 @@ impl Range {
             .and_then(|n| n.checked_add(1))
             .ok_or(InvalidRange { start, stop })?;
 
-        Ok(Self { start, count })
+        Ok(Self { start, stop, count })
     }
 
     pub(crate) fn empty() -> Self {
-        Self { start: 0, count: 0 }
+        Self {
+            start: 0,
+            stop: 0,
+            count: 0,
+        }
     }
 
     pub(crate) fn get_start(&self) -> u16 {
         self.start
+    }
+
+    /// the last index of a range from [`Range::from`]
+    pub(crate) fn get_stop(&self) -> u16 {
+        self.stop
     }
 
     pub(crate) fn get_count(&self) -> usize {

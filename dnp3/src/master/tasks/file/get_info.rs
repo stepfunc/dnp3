@@ -49,10 +49,8 @@ impl GetFileInfoTask {
             let header = response.objects?.get_only_header()?;
 
             match header.details {
-                HeaderDetails::TwoByteFreeFormat(_, FreeFormatVariation::Group70Var7(obj)) => {
-                    Ok(obj.into())
-                }
-                HeaderDetails::TwoByteFreeFormat(_, FreeFormatVariation::Group70Var4(obj)) => {
+                HeaderDetails::FreeFormat(FreeFormatVariation::Group70Var7(obj)) => Ok(obj.into()),
+                HeaderDetails::FreeFormat(FreeFormatVariation::Group70Var4(obj)) => {
                     if obj.status_code != FileStatus::Success {
                         tracing::warn!("Unable to get file info: {}", obj.text);
                     }

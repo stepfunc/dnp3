@@ -67,7 +67,7 @@ pub(super) fn write_close(handle: FileHandle, writer: &mut HeaderWriter) -> Resu
 
 pub(super) fn parse_auth_response(header: ObjectHeader) -> Result<AuthKey, FileError> {
     let obj = match header.details {
-        HeaderDetails::TwoByteFreeFormat(_, FreeFormatVariation::Group70Var2(obj)) => obj,
+        HeaderDetails::FreeFormat(FreeFormatVariation::Group70Var2(obj)) => obj,
         _ => {
             tracing::warn!(
                 "File AUTHENTICATE response contains unexpected variation: {}",
@@ -119,7 +119,7 @@ fn parse_status_object<'a>(
     function: &str,
 ) -> Result<Group70Var4<'a>, FileError> {
     match header.details {
-        HeaderDetails::TwoByteFreeFormat(_, FreeFormatVariation::Group70Var4(obj)) => Ok(obj),
+        HeaderDetails::FreeFormat(FreeFormatVariation::Group70Var4(obj)) => Ok(obj),
         _ => {
             tracing::warn!(
                 "File {function} response contains unexpected variation: {}",

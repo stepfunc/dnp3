@@ -167,35 +167,35 @@ impl<'a> ObjectHeader<'a> {
     pub(crate) fn to_control_header(&self) -> Result<ControlHeader<'a>, BadControlHeader> {
         match self.details {
             // one byte headers
-            HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group12Var1(seq)) => {
+            HeaderDetails::CountAndPrefix8(_, PrefixedVariation::Group12Var1(seq)) => {
                 Ok(ControlHeader::OneByteGroup12Var1(seq))
             }
-            HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group41Var1(seq)) => {
+            HeaderDetails::CountAndPrefix8(_, PrefixedVariation::Group41Var1(seq)) => {
                 Ok(ControlHeader::OneByteGroup41Var1(seq))
             }
-            HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group41Var2(seq)) => {
+            HeaderDetails::CountAndPrefix8(_, PrefixedVariation::Group41Var2(seq)) => {
                 Ok(ControlHeader::OneByteGroup41Var2(seq))
             }
-            HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group41Var3(seq)) => {
+            HeaderDetails::CountAndPrefix8(_, PrefixedVariation::Group41Var3(seq)) => {
                 Ok(ControlHeader::OneByteGroup41Var3(seq))
             }
-            HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group41Var4(seq)) => {
+            HeaderDetails::CountAndPrefix8(_, PrefixedVariation::Group41Var4(seq)) => {
                 Ok(ControlHeader::OneByteGroup41Var4(seq))
             }
             // two byte headers
-            HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group12Var1(seq)) => {
+            HeaderDetails::CountAndPrefix16(_, PrefixedVariation::Group12Var1(seq)) => {
                 Ok(ControlHeader::TwoByteGroup12Var1(seq))
             }
-            HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group41Var1(seq)) => {
+            HeaderDetails::CountAndPrefix16(_, PrefixedVariation::Group41Var1(seq)) => {
                 Ok(ControlHeader::TwoByteGroup41Var1(seq))
             }
-            HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group41Var2(seq)) => {
+            HeaderDetails::CountAndPrefix16(_, PrefixedVariation::Group41Var2(seq)) => {
                 Ok(ControlHeader::TwoByteGroup41Var2(seq))
             }
-            HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group41Var3(seq)) => {
+            HeaderDetails::CountAndPrefix16(_, PrefixedVariation::Group41Var3(seq)) => {
                 Ok(ControlHeader::TwoByteGroup41Var3(seq))
             }
-            HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group41Var4(seq)) => {
+            HeaderDetails::CountAndPrefix16(_, PrefixedVariation::Group41Var4(seq)) => {
                 Ok(ControlHeader::TwoByteGroup41Var4(seq))
             }
             _ => Err(BadControlHeader::new(

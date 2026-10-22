@@ -1104,61 +1104,61 @@ impl CommandHeader {
     pub(crate) fn compare(&self, response: HeaderDetails) -> Result<(), CommandResponseError> {
         match self {
             CommandHeader::G12V1U8(items) => match response {
-                HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group12Var1(seq)) => {
+                HeaderDetails::CountAndPrefix8(_, PrefixedVariation::Group12Var1(seq)) => {
                     Self::compare_items(seq, items)
                 }
                 _ => Err(CommandResponseError::HeaderTypeMismatch),
             },
             CommandHeader::G12V1U16(items) => match response {
-                HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group12Var1(seq)) => {
+                HeaderDetails::CountAndPrefix16(_, PrefixedVariation::Group12Var1(seq)) => {
                     Self::compare_items(seq, items)
                 }
                 _ => Err(CommandResponseError::HeaderTypeMismatch),
             },
             CommandHeader::G41V1U8(items) => match response {
-                HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group41Var1(seq)) => {
+                HeaderDetails::CountAndPrefix8(_, PrefixedVariation::Group41Var1(seq)) => {
                     Self::compare_items(seq, items)
                 }
                 _ => Err(CommandResponseError::HeaderTypeMismatch),
             },
             CommandHeader::G41V1U16(items) => match response {
-                HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group41Var1(seq)) => {
+                HeaderDetails::CountAndPrefix16(_, PrefixedVariation::Group41Var1(seq)) => {
                     Self::compare_items(seq, items)
                 }
                 _ => Err(CommandResponseError::HeaderTypeMismatch),
             },
             CommandHeader::G41V2U8(items) => match response {
-                HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group41Var2(seq)) => {
+                HeaderDetails::CountAndPrefix8(_, PrefixedVariation::Group41Var2(seq)) => {
                     Self::compare_items(seq, items)
                 }
                 _ => Err(CommandResponseError::HeaderTypeMismatch),
             },
             CommandHeader::G41V2U16(items) => match response {
-                HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group41Var2(seq)) => {
+                HeaderDetails::CountAndPrefix16(_, PrefixedVariation::Group41Var2(seq)) => {
                     Self::compare_items(seq, items)
                 }
                 _ => Err(CommandResponseError::HeaderTypeMismatch),
             },
             CommandHeader::G41V3U8(items) => match response {
-                HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group41Var3(seq)) => {
+                HeaderDetails::CountAndPrefix8(_, PrefixedVariation::Group41Var3(seq)) => {
                     Self::compare_items(seq, items)
                 }
                 _ => Err(CommandResponseError::HeaderTypeMismatch),
             },
             CommandHeader::G41V3U16(items) => match response {
-                HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group41Var3(seq)) => {
+                HeaderDetails::CountAndPrefix16(_, PrefixedVariation::Group41Var3(seq)) => {
                     Self::compare_items(seq, items)
                 }
                 _ => Err(CommandResponseError::HeaderTypeMismatch),
             },
             CommandHeader::G41V4U8(items) => match response {
-                HeaderDetails::OneByteCountAndPrefix(_, PrefixedVariation::Group41Var4(seq)) => {
+                HeaderDetails::CountAndPrefix8(_, PrefixedVariation::Group41Var4(seq)) => {
                     Self::compare_items(seq, items)
                 }
                 _ => Err(CommandResponseError::HeaderTypeMismatch),
             },
             CommandHeader::G41V4U16(items) => match response {
-                HeaderDetails::TwoByteCountAndPrefix(_, PrefixedVariation::Group41Var4(seq)) => {
+                HeaderDetails::CountAndPrefix16(_, PrefixedVariation::Group41Var4(seq)) => {
                     Self::compare_items(seq, items)
                 }
                 _ => Err(CommandResponseError::HeaderTypeMismatch),
