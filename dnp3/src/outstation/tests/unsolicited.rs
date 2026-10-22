@@ -379,21 +379,18 @@ async fn read_after_disable_unsolicited_during_confirm_wait_reports_unconfirmed_
     harness.check_no_events();
 }
 
-#[tokio::test]
-async fn confirmed_read_after_unsolicited_timeout_does_not_lose_unconfirmed_events() {
-    let mut harness = new_harness(config_with_one_unsolicited_attempt());
-    time_out_unsolicited_event(&mut harness).await;
-
-    // a second event while waiting to retry the unsolicited response
-    harness.handle.database.transaction(|db| {
+fn update_binary_event(handle: &mut DatabaseHandle, value: bool) {
+    handle.transaction(|db| {
         db.update(
             0,
-            &BinaryInput::new(false, Flags::ONLINE, Time::synchronized(0)),
+            &BinaryInput::new(value, Flags::ONLINE, Time::synchronized(0)),
             UpdateOptions::default(),
         )
     });
+}
 
-    // the READ reports both events, not just the one that was never sent
+/// a class 1 READ reports both class 1 events, and its confirm clears them
+async fn read_and_confirm_two_class_1_events(harness: &mut OutstationHarness) {
     harness
         .test_request_response(
             READ_CLASS_1_SEQ1,
@@ -413,6 +410,18 @@ async fn confirmed_read_after_unsolicited_timeout_does_not_lose_unconfirmed_even
         Event::Cleared(1),
         Event::EndConfirm(empty_buffer_state()),
     ]);
+}
+
+#[tokio::test]
+async fn confirmed_read_after_unsolicited_timeout_does_not_lose_unconfirmed_events() {
+    let mut harness = new_harness(config_with_one_unsolicited_attempt());
+    time_out_unsolicited_event(&mut harness).await;
+
+    // a second event while waiting to retry the unsolicited response
+    update_binary_event(&mut harness.handle.database, false);
+
+    // the READ reports both events, not just the one that was never sent
+    read_and_confirm_two_class_1_events(&mut harness).await;
     harness
         .test_request_response(READ_CLASS_1_SEQ2, EMPTY_RESPONSE_SEQ2)
         .await;
@@ -661,7 +670,18 @@ async fn handles_invalid_request_during_unsolicited_confirm_wait() {
     harness.check_events(&[Event::UnsolicitedConfirmReceived(1)]);
 }
 
-#[tokio::test]
+/// longer than the confirm timeout plus the unsolicited retry delay, and shorter than the keep-alive
+/// timeout, so any unsolicited response the outstation would send goes out within it
+const UNSOLICITED_SILENCE: std::time::Duration = std::time::Duration::from_secs(30);
+
+/// run the outstation for [`UNSOLICITED_SILENCE`] of paused time and check that it sends nothing
+async fn expect_silence(harness: &mut OutstationHarness) {
+    tokio::time::sleep(UNSOLICITED_SILENCE).await;
+    harness.expect_no_response();
+    harness.check_no_events();
+}
+
+#[tokio::test(start_paused = true)]
 async fn handles_disable_unsolicited_during_unsolicited_confirm_wait() {
     let mut harness = new_harness(get_default_unsolicited_config());
     confirm_null_unsolicited(&mut harness).await;
@@ -677,9 +697,68 @@ async fn handles_disable_unsolicited_during_unsolicited_confirm_wait() {
         .await;
     harness.check_no_events();
 
-    // check that no other unsolicited responses are sent
-    tokio::time::pause();
-    harness.check_no_events();
+    // neither the unconfirmed event nor a new one is reported in an unsolicited response
+    update_binary_event(&mut harness.handle.database, false);
+    expect_silence(&mut harness).await;
+
+    // both are still there for a READ
+    read_and_confirm_two_class_1_events(&mut harness).await;
+}
+
+const ENABLE_UNSOLICITED_CLASS_2_SEQ0: &[u8] = &[0xC0, 0x14, 0x3C, 0x03, 0x06];
+const DISABLE_UNSOLICITED_CLASS_1_SEQ1: &[u8] = &[0xC1, 0x15, 0x3C, 0x02, 0x06];
+const EMPTY_RESPONSE_SEQ1: &[u8] = &[0xC1, 0x81, 0x80, 0x00];
+
+/// with class 1 disabled for unsolicited responses and class 2 enabled, a class 1 event isn't
+/// reported in an unsolicited response, and a class 2 event is reported on its own
+async fn only_class_2_is_reported_unsolicited(harness: &mut OutstationHarness) {
+    harness.handle.database.transaction(|db| {
+        db.add(0, Some(EventClass::Class1), BinaryInputConfig::default());
+        db.add(1, Some(EventClass::Class2), BinaryInputConfig::default());
+    });
+
+    update_binary_event(&mut harness.handle.database, true);
+    expect_silence(harness).await;
+
+    harness.handle.database.transaction(|db| {
+        db.update(
+            1,
+            &BinaryInput::new(true, Flags::ONLINE, Time::synchronized(0)),
+            UpdateOptions::default(),
+        )
+    });
+    // IIN1.1 for the class 1 event, and the class 2 event at index 1
+    harness
+        .expect_response(&[
+            0xF1, 0x82, 0x82, 0x00, 0x02, 0x01, 0x28, 0x01, 0x00, 0x01, 0x00, 0x81,
+        ])
+        .await;
+    harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
+}
+
+#[tokio::test(start_paused = true)]
+async fn disable_unsolicited_of_one_class_leaves_the_others_enabled() {
+    let mut harness = new_harness(get_default_unsolicited_config());
+    confirm_null_unsolicited(&mut harness).await;
+    enable_unsolicited(&mut harness).await;
+
+    harness
+        .test_request_response(DISABLE_UNSOLICITED_CLASS_1_SEQ1, EMPTY_RESPONSE_SEQ1)
+        .await;
+
+    only_class_2_is_reported_unsolicited(&mut harness).await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn enable_unsolicited_of_one_class_enables_only_that_class() {
+    let mut harness = new_harness(get_default_unsolicited_config());
+    confirm_null_unsolicited(&mut harness).await;
+
+    harness
+        .test_request_response(ENABLE_UNSOLICITED_CLASS_2_SEQ0, EMPTY_RESPONSE_SEQ0)
+        .await;
+
+    only_class_2_is_reported_unsolicited(&mut harness).await;
 }
 
 #[tokio::test]
