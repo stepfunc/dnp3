@@ -255,7 +255,7 @@ async fn auto_time_sync_retries_after_the_backoff_on_timeout() {
 }
 
 #[tokio::test]
-async fn auto_time_sync_without_system_time_retries_with_a_growing_backoff() {
+async fn auto_time_sync_without_system_time_reports_failure_and_retries_with_a_growing_backoff() {
     watchdog(async {
         tokio::time::pause();
         let count = Arc::new(AtomicUsize::new(0));
@@ -268,17 +268,26 @@ async fn auto_time_sync_without_system_time_retries_with_a_growing_backoff() {
         report_need_time(&mut harness, Sequence::default()).await;
         let start = Instant::now();
 
-        // asked at once, then after 1, 2 and 4 more seconds
+        // asked at once, then after 1, 2 and 4 more seconds, and each attempt is reported as a
+        // task that fails without sending a request
+        let attempt = [
+            AssocInfoEvent::TaskStart(
+                TaskType::TimeSync,
+                FunctionCode::RecordCurrentTime,
+                Sequence::new(0),
+            ),
+            AssocInfoEvent::TaskFailure(TaskType::TimeSync, TaskError::SystemTimeNotAvailable),
+        ];
+        let mut events = vec![AssocInfoEvent::Unsolicited(false, Sequence::new(0))];
         for (at_ms, expected) in [(500, 1), (1500, 2), (3500, 3), (7500, 4)] {
             tokio::time::sleep_until(start + Duration::from_millis(at_ms)).await;
             assert_eq!(count.load(Ordering::SeqCst), expected, "at {at_ms} ms");
+            events.extend(attempt);
+            assert_eq!(harness.assoc_events.pop(), events, "at {at_ms} ms");
+            events.clear();
         }
 
         harness.assert_no_events();
-        assert_eq!(
-            harness.assoc_events.pop(),
-            vec![AssocInfoEvent::Unsolicited(false, Sequence::new(0))]
-        );
     })
     .await;
 }

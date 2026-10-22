@@ -531,7 +531,8 @@ impl MasterSession {
                 | TaskError::WriteError
                 | TaskError::BadEncoding(_)
                 | TaskError::NoSuchAssociation(_)
-                | TaskError::NoConnection => Ok(()),
+                | TaskError::NoConnection
+                | TaskError::SystemTimeNotAvailable => Ok(()),
             },
         }
     }

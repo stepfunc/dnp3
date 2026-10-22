@@ -1079,6 +1079,10 @@ fn define_association_information(
     let task_error = lib
         .define_enum("task_error")?
         .add_task_errors()?
+        .push(
+            "system_time_not_available",
+            "the master had no system time to synchronize the outstation with, because {interface:association_handler.get_current_time()} returned an invalid timestamp",
+        )?
         .doc("Task error used in {interface:association_information}")?
         .build()?;
 

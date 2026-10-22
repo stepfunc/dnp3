@@ -93,6 +93,9 @@ pub enum TaskError {
     Shutdown,
     /// The master was disabled
     Disabled,
+    /// The master had no system time to synchronize the outstation with, because the
+    /// [`AssociationHandler`](crate::master::AssociationHandler) didn't provide one
+    SystemTimeNotAvailable,
 }
 
 /// Errors that can occur when adding/modifying polls
@@ -271,6 +274,7 @@ impl std::fmt::Display for TaskError {
             TaskError::RejectedByIin2(iin) => {
                 write!(f, "Rejected by IIN2: {}", iin.iin2)
             }
+            TaskError::SystemTimeNotAvailable => f.write_str("system time not available"),
         }
     }
 }

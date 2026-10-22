@@ -250,8 +250,8 @@ impl RequestError for TimeSyncError {
             TimeSyncError::ClockRollback
             | TimeSyncError::BadOutstationTimeDelay(_)
             | TimeSyncError::Overflow
-            | TimeSyncError::StillNeedsTime
-            | TimeSyncError::SystemTimeNotAvailable => TaskError::UnexpectedResponseHeaders,
+            | TimeSyncError::StillNeedsTime => TaskError::UnexpectedResponseHeaders,
+            TimeSyncError::SystemTimeNotAvailable => TaskError::SystemTimeNotAvailable,
             #[expect(
                 deprecated,
                 reason = "the match must cover every variant until removal"
@@ -524,7 +524,8 @@ impl ReadTask {
                 | TaskError::WriteError
                 | TaskError::BadEncoding(_)
                 | TaskError::NoSuchAssociation(_)
-                | TaskError::NoConnection => ReadFailureLog::Warn(err),
+                | TaskError::NoConnection
+                | TaskError::SystemTimeNotAvailable => ReadFailureLog::Warn(err),
             },
         }
     }

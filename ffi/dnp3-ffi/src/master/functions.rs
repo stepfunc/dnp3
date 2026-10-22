@@ -1379,7 +1379,7 @@ impl From<ffi::ConnectStrategy> for ConnectStrategy {
 }
 
 macro_rules! define_task_from_impl {
-    ($name:ident) => {
+    ($name:ident, $system_time_not_available:ident) => {
         impl From<TaskError> for ffi::$name {
             fn from(err: TaskError) -> Self {
                 match err {
@@ -1404,20 +1404,23 @@ macro_rules! define_task_from_impl {
                     TaskError::Disabled => Self::NoConnection,
                     TaskError::BadEncoding(_) => Self::BadEncoding,
                     TaskError::RejectedByIin2(_) => Self::IinError,
+                    TaskError::SystemTimeNotAvailable => Self::$system_time_not_available,
                 }
             }
         }
     };
 }
 
-define_task_from_impl!(CommandError);
-define_task_from_impl!(TimeSyncError);
-define_task_from_impl!(RestartError);
-define_task_from_impl!(ReadError);
-define_task_from_impl!(LinkStatusError);
-define_task_from_impl!(TaskError);
-define_task_from_impl!(EmptyResponseError);
-define_task_from_impl!(FileError);
+// only a time sync reports SystemTimeNotAvailable; the other errors keep the mapping it had before it
+// was a separate variant
+define_task_from_impl!(CommandError, BadResponse);
+define_task_from_impl!(TimeSyncError, SystemTimeNotAvailable);
+define_task_from_impl!(RestartError, BadResponse);
+define_task_from_impl!(ReadError, BadResponse);
+define_task_from_impl!(LinkStatusError, BadResponse);
+define_task_from_impl!(TaskError, SystemTimeNotAvailable);
+define_task_from_impl!(EmptyResponseError, BadResponse);
+define_task_from_impl!(FileError, BadResponse);
 
 impl From<ffi::FileReadConfig> for FileReadConfig {
     fn from(value: ffi::FileReadConfig) -> Self {
