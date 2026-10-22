@@ -3,20 +3,17 @@
 use std::time::Duration;
 
 use tokio::net::TcpListener;
-use tokio::sync::mpsc;
 
-use crate::app::{ConnectStrategy, Listener, MaybeAsync};
+use crate::app::ConnectStrategy;
 use crate::decode::PhysDecodeLevel;
 use crate::link::{EndpointAddress, LinkErrorMode};
 use crate::master::MasterChannelConfig;
-use crate::outstation::database::EventBufferConfig;
-use crate::outstation::{
-    DefaultControlHandler, OutstationApplication, OutstationConfig, OutstationInformation,
-};
+use crate::outstation::{DefaultControlHandler, OutstationConfig};
 use crate::tcp::{ClientState, ConnectOptions, EndpointList};
 use crate::util::phys::{PhysAddr, PhysLayer};
 use crate::util::test_support::{
-    MASTER_REPLY, MASTER_REQUEST, NULL_UNSOLICITED_HEADER, OUTSTATION_REPLY, OUTSTATION_REQUEST,
+    NullApplication, NullInformation, Timeline, MASTER_REPLY, MASTER_REQUEST,
+    NULL_UNSOLICITED_HEADER, OUTSTATION_REPLY, OUTSTATION_REQUEST,
 };
 
 const MASTER: u16 = 1;
@@ -24,31 +21,11 @@ const OUTSTATION: u16 = 1024;
 
 const TIMEOUT: Duration = Duration::from_secs(5);
 
-struct StateListener(mpsc::UnboundedSender<ClientState>);
-
-impl Listener<ClientState> for StateListener {
-    fn update(&mut self, value: ClientState) -> MaybeAsync<()> {
-        // the test may have finished and dropped the receiver
-        let _: Result<(), _> = self.0.send(value);
-        MaybeAsync::ready(())
-    }
-}
-
-struct States(mpsc::UnboundedReceiver<ClientState>);
-
-impl States {
-    fn new() -> (Box<dyn Listener<ClientState>>, Self) {
-        let (tx, rx) = mpsc::unbounded_channel();
-        (Box::new(StateListener(tx)), Self(rx))
-    }
-
-    async fn expect(&mut self, expected: ClientState) {
-        let state = tokio::time::timeout(TIMEOUT, self.0.recv())
-            .await
-            .unwrap()
-            .unwrap();
-        assert_eq!(state, expected);
-    }
+/// Expect the next state to be `state`, reported within [`TIMEOUT`]
+async fn expect(states: &mut Timeline<ClientState>, state: ClientState) {
+    tokio::time::timeout(TIMEOUT, states.expect_state(state))
+        .await
+        .unwrap();
 }
 
 struct Peer {
@@ -117,23 +94,13 @@ fn master_config() -> MasterChannelConfig {
 }
 
 fn outstation_config() -> OutstationConfig {
-    OutstationConfig::new(
-        EndpointAddress::try_new(OUTSTATION).unwrap(),
-        EndpointAddress::try_new(MASTER).unwrap(),
-        EventBufferConfig::all_types(0),
-    )
+    crate::util::test_support::outstation_config(OUTSTATION, MASTER)
 }
-
-struct NullApplication;
-impl OutstationApplication for NullApplication {}
-
-struct NullInformation;
-impl OutstationInformation for NullInformation {}
 
 #[tokio::test]
 async fn master_tcp_client_runs_a_master_session_over_tcp() {
     let peer = Peer::new().await;
-    let (listener, mut states) = States::new();
+    let (listener, mut states) = Timeline::new();
     let mut channel = crate::tcp::spawn_master_tcp_client_2(
         LinkErrorMode::Close,
         master_config(),
@@ -142,20 +109,20 @@ async fn master_tcp_client_runs_a_master_session_over_tcp() {
         ConnectOptions::default(),
         listener,
     );
-    states.expect(ClientState::Disabled).await;
+    expect(&mut states, ClientState::Disabled).await;
     channel.enable().await.unwrap();
-    states.expect(ClientState::Connecting).await;
+    expect(&mut states, ClientState::Connecting).await;
     let mut phys = PhysLayer::tcp(peer.accept().await);
-    states.expect(ClientState::Connected).await;
+    expect(&mut states, ClientState::Connected).await;
     exchange(&mut phys, &OUTSTATION_REQUEST, &MASTER_REPLY).await;
     drop(channel);
-    states.expect(ClientState::Shutdown).await;
+    expect(&mut states, ClientState::Shutdown).await;
 }
 
 #[tokio::test]
 async fn outstation_tcp_client_runs_an_outstation_session_over_tcp() {
     let peer = Peer::new().await;
-    let (listener, mut states) = States::new();
+    let (listener, mut states) = Timeline::new();
     let mut handle = crate::tcp::spawn_outstation_tcp_client(
         LinkErrorMode::Close,
         peer.endpoints(),
@@ -167,51 +134,22 @@ async fn outstation_tcp_client_runs_an_outstation_session_over_tcp() {
         DefaultControlHandler::create(),
         listener,
     );
-    states.expect(ClientState::Disabled).await;
+    expect(&mut states, ClientState::Disabled).await;
     handle.enable().await.unwrap();
-    states.expect(ClientState::Connecting).await;
+    expect(&mut states, ClientState::Connecting).await;
     let mut phys = PhysLayer::tcp(peer.accept().await);
-    states.expect(ClientState::Connected).await;
+    expect(&mut states, ClientState::Connected).await;
     read_null_unsolicited(&mut phys).await;
     exchange(&mut phys, &MASTER_REQUEST, &OUTSTATION_REPLY).await;
     drop(handle);
-    states.expect(ClientState::Shutdown).await;
+    expect(&mut states, ClientState::Shutdown).await;
 }
 
 #[cfg(feature = "enable-tls")]
 mod tls {
     use super::*;
-    use crate::tcp::tls::{MinTlsVersion, TlsClientConfig, TlsServerConfig};
     use crate::util::phys::PhysIo;
-    use std::path::PathBuf;
-
-    fn certs() -> PathBuf {
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../certs/self_signed")
-    }
-
-    pub(super) fn client_config() -> TlsClientConfig {
-        let certs = certs();
-        TlsClientConfig::self_signed(
-            &certs.join("entity2_cert.pem"),
-            &certs.join("entity1_cert.pem"),
-            &certs.join("entity1_key.pem"),
-            None,
-            MinTlsVersion::V12,
-        )
-        .unwrap()
-    }
-
-    pub(super) fn server_config() -> TlsServerConfig {
-        let certs = certs();
-        TlsServerConfig::self_signed(
-            &certs.join("entity1_cert.pem"),
-            &certs.join("entity2_cert.pem"),
-            &certs.join("entity2_key.pem"),
-            None,
-            MinTlsVersion::V12,
-        )
-        .unwrap()
-    }
+    use crate::util::test_support::tls::{client_config, server_config};
 
     async fn accept_tls(peer: &Peer) -> PhysLayer {
         server_config()
@@ -223,7 +161,7 @@ mod tls {
     #[tokio::test]
     async fn master_tls_client_runs_a_master_session_over_tls() {
         let peer = Peer::new().await;
-        let (listener, mut states) = States::new();
+        let (listener, mut states) = Timeline::new();
         let mut channel = crate::tcp::tls::spawn_master_tls_client_2(
             LinkErrorMode::Close,
             master_config(),
@@ -233,21 +171,21 @@ mod tls {
             listener,
             client_config(),
         );
-        states.expect(ClientState::Disabled).await;
+        expect(&mut states, ClientState::Disabled).await;
         channel.enable().await.unwrap();
-        states.expect(ClientState::Connecting).await;
+        expect(&mut states, ClientState::Connecting).await;
         let mut phys = accept_tls(&peer).await;
         assert!(matches!(phys.io(), PhysIo::Tls(_)));
-        states.expect(ClientState::Connected).await;
+        expect(&mut states, ClientState::Connected).await;
         exchange(&mut phys, &OUTSTATION_REQUEST, &MASTER_REPLY).await;
         drop(channel);
-        states.expect(ClientState::Shutdown).await;
+        expect(&mut states, ClientState::Shutdown).await;
     }
 
     #[tokio::test]
     async fn outstation_tls_client_runs_an_outstation_session_over_tls() {
         let peer = Peer::new().await;
-        let (listener, mut states) = States::new();
+        let (listener, mut states) = Timeline::new();
         let mut handle = crate::tcp::tls::spawn_outstation_tls_client(
             LinkErrorMode::Close,
             peer.endpoints(),
@@ -260,21 +198,21 @@ mod tls {
             listener,
             client_config(),
         );
-        states.expect(ClientState::Disabled).await;
+        expect(&mut states, ClientState::Disabled).await;
         handle.enable().await.unwrap();
-        states.expect(ClientState::Connecting).await;
+        expect(&mut states, ClientState::Connecting).await;
         let mut phys = accept_tls(&peer).await;
-        states.expect(ClientState::Connected).await;
+        expect(&mut states, ClientState::Connected).await;
         read_null_unsolicited(&mut phys).await;
         exchange(&mut phys, &MASTER_REQUEST, &OUTSTATION_REPLY).await;
         drop(handle);
-        states.expect(ClientState::Shutdown).await;
+        expect(&mut states, ClientState::Shutdown).await;
     }
 
     #[tokio::test]
     async fn master_tls_client_does_not_connect_to_a_plain_tcp_peer() {
         let peer = Peer::new().await;
-        let (listener, mut states) = States::new();
+        let (listener, mut states) = Timeline::new();
         let mut channel = crate::tcp::tls::spawn_master_tls_client_2(
             LinkErrorMode::Close,
             master_config(),
@@ -284,20 +222,22 @@ mod tls {
             listener,
             client_config(),
         );
-        states.expect(ClientState::Disabled).await;
+        expect(&mut states, ClientState::Disabled).await;
         channel.enable().await.unwrap();
-        states.expect(ClientState::Connecting).await;
+        expect(&mut states, ClientState::Connecting).await;
         // the peer closes the connection instead of answering the ClientHello
         drop(peer.accept().await);
-        states
-            .expect(ClientState::WaitAfterFailedConnect(Duration::from_secs(1)))
-            .await;
+        expect(
+            &mut states,
+            ClientState::WaitAfterFailedConnect(Duration::from_secs(1)),
+        )
+        .await;
     }
 
     #[tokio::test]
     async fn outstation_tls_client_does_not_connect_to_a_plain_tcp_peer() {
         let peer = Peer::new().await;
-        let (listener, mut states) = States::new();
+        let (listener, mut states) = Timeline::new();
         let mut handle = crate::tcp::tls::spawn_outstation_tls_client(
             LinkErrorMode::Close,
             peer.endpoints(),
@@ -310,14 +250,16 @@ mod tls {
             listener,
             client_config(),
         );
-        states.expect(ClientState::Disabled).await;
+        expect(&mut states, ClientState::Disabled).await;
         handle.enable().await.unwrap();
-        states.expect(ClientState::Connecting).await;
+        expect(&mut states, ClientState::Connecting).await;
         // the peer closes the connection instead of answering the ClientHello
         drop(peer.accept().await);
-        states
-            .expect(ClientState::WaitAfterFailedConnect(Duration::from_secs(1)))
-            .await;
+        expect(
+            &mut states,
+            ClientState::WaitAfterFailedConnect(Duration::from_secs(1)),
+        )
+        .await;
     }
 }
 
@@ -619,7 +561,7 @@ mod lifecycle {
     #[tokio::test]
     async fn disable_while_connecting_takes_effect_once_connected() {
         let peer = Peer::new().await;
-        let (listener, mut states) = States::new();
+        let (listener, mut states) = Timeline::new();
         let mut channel = crate::tcp::spawn_master_tcp_client_2(
             LinkErrorMode::Close,
             master_config(),
@@ -628,12 +570,12 @@ mod lifecycle {
             ConnectOptions::default(),
             listener,
         );
-        states.expect(ClientState::Disabled).await;
+        expect(&mut states, ClientState::Disabled).await;
         channel.enable().await.unwrap();
-        states.expect(ClientState::Connecting).await;
+        expect(&mut states, ClientState::Connecting).await;
         channel.disable().await.unwrap();
-        states.expect(ClientState::Connected).await;
-        states.expect(ClientState::Disabled).await;
+        expect(&mut states, ClientState::Connected).await;
+        expect(&mut states, ClientState::Disabled).await;
         let mut stream = peer.accept().await;
         tokio::time::timeout(TIMEOUT, assert_closed(&mut stream))
             .await
@@ -642,8 +584,8 @@ mod lifecycle {
 
     #[cfg(feature = "enable-tls")]
     mod tls {
-        use super::super::tls::{client_config, server_config};
         use super::*;
+        use crate::util::test_support::tls::{client_config, server_config};
 
         fn spawn_tls_master(peer: &Peer) -> (MasterChannel, Timeline<ClientState>) {
             let (listener, timeline) = Timeline::new();
@@ -719,8 +661,8 @@ mod lifecycle {
         /// ClientHello yet
         async fn connecting_tls_master(
             peer: &Peer,
-        ) -> (MasterChannel, States, tokio::net::TcpStream) {
-            let (listener, mut states) = States::new();
+        ) -> (MasterChannel, Timeline<ClientState>, tokio::net::TcpStream) {
+            let (listener, mut states) = Timeline::new();
             let mut channel = crate::tcp::tls::spawn_master_tls_client_2(
                 LinkErrorMode::Close,
                 master_config(),
@@ -730,9 +672,9 @@ mod lifecycle {
                 listener,
                 client_config(),
             );
-            states.expect(ClientState::Disabled).await;
+            expect(&mut states, ClientState::Disabled).await;
             channel.enable().await.unwrap();
-            states.expect(ClientState::Connecting).await;
+            expect(&mut states, ClientState::Connecting).await;
             let stream = peer.accept().await;
             (channel, states, stream)
         }
@@ -743,8 +685,8 @@ mod lifecycle {
             let (mut channel, mut states, stream) = connecting_tls_master(&peer).await;
             channel.disable().await.unwrap();
             let mut phys = server_config().handle_connection(stream).await.unwrap();
-            states.expect(ClientState::Connected).await;
-            states.expect(ClientState::Disabled).await;
+            expect(&mut states, ClientState::Connected).await;
+            expect(&mut states, ClientState::Disabled).await;
             assert_tls_closed(&mut phys).await;
         }
 
@@ -754,8 +696,8 @@ mod lifecycle {
             let (channel, mut states, stream) = connecting_tls_master(&peer).await;
             drop(channel);
             let mut phys = server_config().handle_connection(stream).await.unwrap();
-            states.expect(ClientState::Connected).await;
-            states.expect(ClientState::Shutdown).await;
+            expect(&mut states, ClientState::Connected).await;
+            expect(&mut states, ClientState::Shutdown).await;
             assert_tls_closed(&mut phys).await;
         }
     }

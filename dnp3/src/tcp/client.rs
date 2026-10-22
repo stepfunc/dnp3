@@ -222,7 +222,7 @@ impl Connection for ClientTask {
 mod tests {
     use super::*;
     use crate::app::parse::options::ParseOptions;
-    use crate::app::MaybeAsync;
+    use crate::app::NullListener;
     use crate::link::reader::LinkModes;
     use crate::link::EndpointAddress;
     use crate::master::{MasterChannelConfig, MasterChannelType};
@@ -271,14 +271,6 @@ mod tests {
         }
     }
 
-    struct NullListener;
-
-    impl Listener<ClientState> for NullListener {
-        fn update(&mut self, _: ClientState) -> MaybeAsync<()> {
-            MaybeAsync::ready(())
-        }
-    }
-
     fn client_task(
         addr: SocketAddr,
         post_connection: PostConnectionHandler,
@@ -295,7 +287,7 @@ mod tests {
             Box::new(handler),
             MasterChannelConfig::new(EndpointAddress::raw(1)),
             post_connection,
-            Box::new(NullListener),
+            NullListener::create(),
         );
         (task, rx)
     }
@@ -340,18 +332,7 @@ mod tests {
     #[cfg(feature = "enable-tls")]
     #[tokio::test]
     async fn failed_tls_handshake_notifies_connect_failed() {
-        use crate::tcp::tls::{MinTlsVersion, TlsClientConfig};
-        use std::path::Path;
-
-        let certs = Path::new(env!("CARGO_MANIFEST_DIR")).join("../certs/self_signed");
-        let config = TlsClientConfig::self_signed(
-            &certs.join("entity2_cert.pem"),
-            &certs.join("entity1_cert.pem"),
-            &certs.join("entity1_key.pem"),
-            None,
-            MinTlsVersion::V12,
-        )
-        .unwrap();
+        let config = crate::util::test_support::tls::client_config();
 
         // a server that closes the connection without answering the ClientHello
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();

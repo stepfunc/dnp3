@@ -13,14 +13,11 @@ use tokio::net::UdpSocket;
 use crate::app::Timeout;
 use crate::link::{EndpointAddress, LinkReadMode};
 use crate::master::{MasterChannel, MasterChannelConfig};
-use crate::outstation::database::EventBufferConfig;
-use crate::outstation::{
-    DefaultControlHandler, OutstationApplication, OutstationConfig, OutstationHandle,
-    OutstationInformation,
-};
+use crate::outstation::{DefaultControlHandler, OutstationHandle};
 use crate::udp::{OutstationUdpConfig, UdpSocketMode};
 use crate::util::test_support::{
-    watchdog, MASTER_REPLY, NULL_UNSOLICITED_HEADER, OUTSTATION_REQUEST,
+    outstation_config, watchdog, NullApplication, NullInformation, MASTER_REPLY,
+    NULL_UNSOLICITED_HEADER, OUTSTATION_REQUEST,
 };
 
 const fn secs(x: u64) -> Duration {
@@ -164,12 +161,6 @@ async fn master_shutdown_during_a_retry_wait_ends_the_task_at_once() {
     .await;
 }
 
-struct NullApplication;
-impl OutstationApplication for NullApplication {}
-
-struct NullInformation;
-impl OutstationInformation for NullInformation {}
-
 fn spawn_outstation(local: SocketAddr, remote: SocketAddr) -> OutstationHandle {
     let udp_config = OutstationUdpConfig {
         local_endpoint: local,
@@ -178,14 +169,9 @@ fn spawn_outstation(local: SocketAddr, remote: SocketAddr) -> OutstationHandle {
         link_read_mode: LinkReadMode::Datagram,
         retry_delay: Timeout::from_secs(2).unwrap(),
     };
-    let config = OutstationConfig::new(
-        EndpointAddress::try_new(1024).unwrap(),
-        EndpointAddress::try_new(1).unwrap(),
-        EventBufferConfig::all_types(0),
-    );
     crate::udp::spawn_outstation_udp(
         udp_config,
-        config,
+        outstation_config(1024, 1),
         Box::new(NullApplication),
         Box::new(NullInformation),
         DefaultControlHandler::create(),
