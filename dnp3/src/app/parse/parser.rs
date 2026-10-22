@@ -158,62 +158,6 @@ impl<'a> ParsedFragment<'a> {
     }
 }
 
-#[derive(Debug)]
-pub(crate) struct ObjectHeader<'a> {
-    pub(crate) details: HeaderDetails<'a>,
-}
-
-impl<'a> ObjectHeader<'a> {
-    pub(crate) fn new(details: HeaderDetails<'a>) -> Self {
-        Self { details }
-    }
-
-    pub(crate) fn variation(&self) -> Variation {
-        self.details.variation()
-    }
-
-    pub(crate) fn format(&self, format_values: bool, f: &mut Formatter) -> std::fmt::Result {
-        let variation = self.variation();
-        write!(
-            f,
-            "{} : {} - {}",
-            variation,
-            variation.description(),
-            self.details.qualifier().description()
-        )?;
-
-        match &self.details {
-            HeaderDetails::AllObjects(_) => return Ok(()),
-            HeaderDetails::Range(_, range, _) => {
-                write!(f, " - [{}, {}]", range.get_start(), range.get_stop())?
-            }
-            HeaderDetails::Count(_, count, _) => write!(f, " - [{count}]")?,
-            HeaderDetails::CountAndPrefix8(count, _) => write!(f, " - [{count}]")?,
-            HeaderDetails::CountAndPrefix16(count, _) => write!(f, " - [{count}]")?,
-            HeaderDetails::FreeFormat(_) => f.write_str(" - [1]")?,
-            HeaderDetails::Read(_, ReadQualifier::AllObjects) => return Ok(()),
-            HeaderDetails::Read(_, ReadQualifier::Range(_, range)) => {
-                write!(f, " - [{}, {}]", range.get_start(), range.get_stop())?
-            }
-            HeaderDetails::Read(_, ReadQualifier::Count(_, count)) => write!(f, " - [{count}]")?,
-        }
-
-        if !format_values {
-            return Ok(());
-        }
-
-        match &self.details {
-            HeaderDetails::AllObjects(_) => Ok(()),
-            HeaderDetails::Range(_, _, seq) => seq.format_objects(f),
-            HeaderDetails::Count(_, _, seq) => seq.format_objects(f),
-            HeaderDetails::CountAndPrefix8(_, seq) => seq.format_objects(f),
-            HeaderDetails::CountAndPrefix16(_, seq) => seq.format_objects(f),
-            HeaderDetails::FreeFormat(var) => var.format_objects(f),
-            HeaderDetails::Read(..) => Ok(()),
-        }
-    }
-}
-
 pub(crate) struct FragmentDisplay<'a> {
     level: AppDecodeLevel,
     fragment: ParsedFragment<'a>,
@@ -302,7 +246,7 @@ impl ReadQualifier {
 }
 
 #[derive(Debug)]
-pub(crate) enum HeaderDetails<'a> {
+pub(crate) enum ObjectHeader<'a> {
     AllObjects(AllObjectsVariation),
     Range(Width, Range, RangedVariation<'a>),
     Count(Width, u16, CountVariation<'a>),
@@ -314,35 +258,76 @@ pub(crate) enum HeaderDetails<'a> {
     Read(Variation, ReadQualifier),
 }
 
-impl HeaderDetails<'_> {
+impl ObjectHeader<'_> {
     pub(crate) fn variation(&self) -> Variation {
         match self {
-            HeaderDetails::AllObjects(objects) => objects.variation(),
-            HeaderDetails::Range(_, _, objects) => objects.variation(),
-            HeaderDetails::Count(_, _, objects) => objects.variation(),
-            HeaderDetails::CountAndPrefix8(_, objects) => objects.variation(),
-            HeaderDetails::CountAndPrefix16(_, objects) => objects.variation(),
-            HeaderDetails::FreeFormat(object) => object.variation(),
-            HeaderDetails::Read(variation, _) => *variation,
+            ObjectHeader::AllObjects(objects) => objects.variation(),
+            ObjectHeader::Range(_, _, objects) => objects.variation(),
+            ObjectHeader::Count(_, _, objects) => objects.variation(),
+            ObjectHeader::CountAndPrefix8(_, objects) => objects.variation(),
+            ObjectHeader::CountAndPrefix16(_, objects) => objects.variation(),
+            ObjectHeader::FreeFormat(object) => object.variation(),
+            ObjectHeader::Read(variation, _) => *variation,
         }
     }
 
     pub(crate) fn qualifier(&self) -> QualifierCode {
         match self {
-            HeaderDetails::AllObjects(_) => QualifierCode::AllObjects,
-            HeaderDetails::Range(width, _, _) => width.range_qualifier(),
-            HeaderDetails::Count(width, _, _) => width.count_qualifier(),
-            HeaderDetails::CountAndPrefix8(_, _) => QualifierCode::CountAndPrefix8,
-            HeaderDetails::CountAndPrefix16(_, _) => QualifierCode::CountAndPrefix16,
-            HeaderDetails::FreeFormat(_) => QualifierCode::FreeFormat16,
-            HeaderDetails::Read(_, qualifier) => qualifier.qualifier(),
+            ObjectHeader::AllObjects(_) => QualifierCode::AllObjects,
+            ObjectHeader::Range(width, _, _) => width.range_qualifier(),
+            ObjectHeader::Count(width, _, _) => width.count_qualifier(),
+            ObjectHeader::CountAndPrefix8(_, _) => QualifierCode::CountAndPrefix8,
+            ObjectHeader::CountAndPrefix16(_, _) => QualifierCode::CountAndPrefix16,
+            ObjectHeader::FreeFormat(_) => QualifierCode::FreeFormat16,
+            ObjectHeader::Read(_, qualifier) => qualifier.qualifier(),
         }
     }
 
     pub(crate) fn count(&self) -> Option<&CountVariation<'_>> {
         match self {
-            HeaderDetails::Count(_, _, objects) => Some(objects),
+            ObjectHeader::Count(_, _, objects) => Some(objects),
             _ => None,
+        }
+    }
+
+    pub(crate) fn format(&self, format_values: bool, f: &mut Formatter) -> std::fmt::Result {
+        let variation = self.variation();
+        write!(
+            f,
+            "{} : {} - {}",
+            variation,
+            variation.description(),
+            self.qualifier().description()
+        )?;
+
+        match self {
+            ObjectHeader::AllObjects(_) => return Ok(()),
+            ObjectHeader::Range(_, range, _) => {
+                write!(f, " - [{}, {}]", range.get_start(), range.get_stop())?
+            }
+            ObjectHeader::Count(_, count, _) => write!(f, " - [{count}]")?,
+            ObjectHeader::CountAndPrefix8(count, _) => write!(f, " - [{count}]")?,
+            ObjectHeader::CountAndPrefix16(count, _) => write!(f, " - [{count}]")?,
+            ObjectHeader::FreeFormat(_) => f.write_str(" - [1]")?,
+            ObjectHeader::Read(_, ReadQualifier::AllObjects) => return Ok(()),
+            ObjectHeader::Read(_, ReadQualifier::Range(_, range)) => {
+                write!(f, " - [{}, {}]", range.get_start(), range.get_stop())?
+            }
+            ObjectHeader::Read(_, ReadQualifier::Count(_, count)) => write!(f, " - [{count}]")?,
+        }
+
+        if !format_values {
+            return Ok(());
+        }
+
+        match self {
+            ObjectHeader::AllObjects(_) => Ok(()),
+            ObjectHeader::Range(_, _, seq) => seq.format_objects(f),
+            ObjectHeader::Count(_, _, seq) => seq.format_objects(f),
+            ObjectHeader::CountAndPrefix8(_, seq) => seq.format_objects(f),
+            ObjectHeader::CountAndPrefix16(_, seq) => seq.format_objects(f),
+            ObjectHeader::FreeFormat(var) => var.format_objects(f),
+            ObjectHeader::Read(..) => Ok(()),
         }
     }
 }
@@ -496,16 +481,12 @@ impl<'a> ObjectParser<'a> {
             QualifierCode::Range16 => self.parse_range(gv, Width::Two),
             QualifierCode::Count8 => self.parse_count(gv, Width::One),
             QualifierCode::Count16 => self.parse_count(gv, Width::Two),
-            QualifierCode::CountAndPrefix8 => {
-                self.parse_count_and_prefix(gv).map(|(count, data)| {
-                    ObjectHeader::new(HeaderDetails::CountAndPrefix8(count, data))
-                })
-            }
-            QualifierCode::CountAndPrefix16 => {
-                self.parse_count_and_prefix(gv).map(|(count, data)| {
-                    ObjectHeader::new(HeaderDetails::CountAndPrefix16(count, data))
-                })
-            }
+            QualifierCode::CountAndPrefix8 => self
+                .parse_count_and_prefix(gv)
+                .map(|(count, data)| ObjectHeader::CountAndPrefix8(count, data)),
+            QualifierCode::CountAndPrefix16 => self
+                .parse_count_and_prefix(gv)
+                .map(|(count, data)| ObjectHeader::CountAndPrefix16(count, data)),
             QualifierCode::FreeFormat16 => self.parse_free_format_u16(gv),
         }
     }
@@ -515,7 +496,7 @@ impl<'a> ObjectParser<'a> {
         qualifier: ReadQualifier,
     ) -> Result<ObjectHeader<'a>, ObjectParseError> {
         if qualifier.accepts(v) {
-            Ok(ObjectHeader::new(HeaderDetails::Read(v, qualifier)))
+            Ok(ObjectHeader::Read(v, qualifier))
         } else {
             Err(ObjectParseError::InvalidQualifierForVariation(
                 v,
@@ -529,7 +510,7 @@ impl<'a> ObjectParser<'a> {
             return Self::parse_read(v, ReadQualifier::AllObjects);
         }
         match AllObjectsVariation::get(v) {
-            Some(av) => Ok(ObjectHeader::new(HeaderDetails::AllObjects(av))),
+            Some(av) => Ok(ObjectHeader::AllObjects(av)),
             None => Err(ObjectParseError::InvalidQualifierForVariation(
                 v,
                 QualifierCode::AllObjects,
@@ -548,7 +529,7 @@ impl<'a> ObjectParser<'a> {
         }
         let data =
             CountVariation::parse_non_read(v, width.count_qualifier(), count, &mut self.cursor)?;
-        Ok(ObjectHeader::new(HeaderDetails::Count(width, count, data)))
+        Ok(ObjectHeader::Count(width, count, data))
     }
 
     fn parse_range(
@@ -569,7 +550,7 @@ impl<'a> ObjectParser<'a> {
             self.options,
             &mut self.cursor,
         )?;
-        Ok(ObjectHeader::new(HeaderDetails::Range(width, range, data)))
+        Ok(ObjectHeader::Range(width, range, data))
     }
 
     /// the count, whose width is the prefix's, and the prefixed objects
@@ -607,7 +588,7 @@ impl<'a> ObjectParser<'a> {
         // all of the designated data must be consumed otherwise the encoding is invalid
         cursor.expect_empty()?;
 
-        Ok(ObjectHeader::new(HeaderDetails::FreeFormat(variation)))
+        Ok(ObjectHeader::FreeFormat(variation))
     }
 }
 
@@ -769,10 +750,7 @@ mod test {
             ]
         );
         for header in headers {
-            assert_matches!(
-                header.details,
-                HeaderDetails::Read(_, ReadQualifier::AllObjects)
-            );
+            assert_matches!(header, ObjectHeader::Read(_, ReadQualifier::AllObjects));
         }
     }
 
@@ -782,8 +760,8 @@ mod test {
         let mut headers = parse_objects(FunctionCode::Operate, header);
 
         let items: Vec<Prefix<u8, Group41Var1>> = assert_matches!(
-            headers.next().unwrap().details,
-            HeaderDetails::CountAndPrefix8(1, PrefixedVariation::<u8>::Group41Var1(seq)) => seq.iter().collect()
+            headers.next().unwrap(),
+            ObjectHeader::CountAndPrefix8(1, PrefixedVariation::<u8>::Group41Var1(seq)) => seq.iter().collect()
         );
 
         assert_eq!(
@@ -805,8 +783,8 @@ mod test {
         let mut headers = parse_objects(FunctionCode::Response, header);
 
         let items: Vec<(DoubleBit, u16)> = assert_matches!(
-            headers.next().unwrap().details,
-            HeaderDetails::Range(Width::One, range, RangedVariation::Group3Var1(seq)) if range == Range::from(1, 4).unwrap() => seq.iter().collect()
+            headers.next().unwrap(),
+            ObjectHeader::Range(Width::One, range, RangedVariation::Group3Var1(seq)) if range == Range::from(1, 4).unwrap() => seq.iter().collect()
         );
 
         assert_eq!(
@@ -827,8 +805,8 @@ mod test {
         let mut headers = parse_objects(FunctionCode::Write, header);
 
         let items: Vec<Group50Var1> = assert_matches!(
-            headers.next().unwrap().details,
-            HeaderDetails::Count(Width::One, 1, CountVariation::Group50Var1(seq)) => seq.iter().collect()
+            headers.next().unwrap(),
+            ObjectHeader::Count(Width::One, 1, CountVariation::Group50Var1(seq)) => seq.iter().collect()
         );
 
         assert_eq!(
@@ -848,8 +826,8 @@ mod test {
         let mut headers = parse_objects(FunctionCode::Response, &input);
 
         let items: Vec<(Group1Var2, u16)> = assert_matches!(
-            headers.next().unwrap().details,
-            HeaderDetails::Range(Width::One, range, RangedVariation::Group1Var2(seq)) if range == Range::from(2, 3).unwrap() => seq.iter().collect()
+            headers.next().unwrap(),
+            ObjectHeader::Range(Width::One, range, RangedVariation::Group1Var2(seq)) if range == Range::from(2, 3).unwrap() => seq.iter().collect()
         );
 
         assert_eq!(
@@ -871,15 +849,15 @@ mod test {
         let header = headers.next().unwrap();
         assert_eq!(header.variation(), Variation::Group1Var2);
         assert_matches!(
-            header.details,
-            HeaderDetails::Read(_, ReadQualifier::Range(Width::One, range)) if range == Range::from(2, 3).unwrap()
+            header,
+            ObjectHeader::Read(_, ReadQualifier::Range(Width::One, range)) if range == Range::from(2, 3).unwrap()
         );
 
         let header = headers.next().unwrap();
         assert_eq!(header.variation(), Variation::Group1Var2);
         assert_matches!(
-            header.details,
-            HeaderDetails::Read(_, ReadQualifier::Range(Width::One, range)) if range == Range::from(7, 9).unwrap()
+            header,
+            ObjectHeader::Read(_, ReadQualifier::Range(Width::One, range)) if range == Range::from(7, 9).unwrap()
         );
 
         assert_matches!(headers.next(), None);
@@ -892,8 +870,8 @@ mod test {
         let mut headers = parse_objects(FunctionCode::Write, &input);
 
         assert_matches!(
-            headers.next().unwrap().details,
-            HeaderDetails::CountAndPrefix8(1, PrefixedVariation::Group34Var1(seq)) => {
+            headers.next().unwrap(),
+            ObjectHeader::CountAndPrefix8(1, PrefixedVariation::Group34Var1(seq)) => {
                 let prefix = seq.single().unwrap();
                 assert_eq!(prefix, Prefix { index: 0x03, value: Group34Var1 { value: 0xFECA }});
             }
@@ -909,8 +887,8 @@ mod test {
         let mut headers = parse_objects(FunctionCode::Write, &input);
 
         let vec: Vec<(bool, u16)> = assert_matches!(
-            headers.next().unwrap().details,
-            HeaderDetails::Range(Width::One, range, RangedVariation::Group80Var1(seq)) if range == Range::from(7, 7).unwrap() => {
+            headers.next().unwrap(),
+            ObjectHeader::Range(Width::One, range, RangedVariation::Group80Var1(seq)) if range == Range::from(7, 7).unwrap() => {
                 seq.iter().collect()
             }
         );
@@ -926,11 +904,11 @@ mod test {
         ];
         let mut headers = parse_objects(FunctionCode::Write, &input);
 
-        let received = match headers.next().unwrap().details {
-            HeaderDetails::Count(Width::One, 1, CountVariation::Group50Var2(seq)) => {
+        let received = match headers.next().unwrap() {
+            ObjectHeader::Count(Width::One, 1, CountVariation::Group50Var2(seq)) => {
                 seq.single().unwrap()
             }
-            _ => panic!("unexpected header details"),
+            _ => panic!("unexpected header"),
         };
 
         assert!(headers.next().is_none());
@@ -950,8 +928,8 @@ mod test {
         let header = headers.next().unwrap();
         assert_eq!(header.variation(), Variation::Group110(0));
         assert_matches!(
-            header.details,
-            HeaderDetails::Read(_, ReadQualifier::Range(Width::One, range)) if range == Range::from(2, 3).unwrap()
+            header,
+            ObjectHeader::Read(_, ReadQualifier::Range(Width::One, range)) if range == Range::from(2, 3).unwrap()
         );
         assert_matches!(headers.next(), None);
     }
@@ -962,8 +940,8 @@ mod test {
         let mut headers = parse_objects(FunctionCode::Response, &input);
 
         let bytes: Vec<(&[u8], u16)> = assert_matches!(
-            headers.next().unwrap().details,
-            HeaderDetails::Range(Width::One, range, RangedVariation::Group110VarX(0x01, seq)) if range == Range::from(1, 2).unwrap() => {
+            headers.next().unwrap(),
+            ObjectHeader::Range(Width::One, range, RangedVariation::Group110VarX(0x01, seq)) if range == Range::from(1, 2).unwrap() => {
                 seq.iter().collect()
             }
         );
@@ -978,8 +956,8 @@ mod test {
         let mut headers = parse_objects(FunctionCode::Response, &input);
 
         let bytes: Vec<(&[u8], u16)> = assert_matches!(
-            headers.next().unwrap().details,
-            HeaderDetails::Range(Width::Two, range, RangedVariation::Group110VarX(0x01, seq)) if range == Range::from(0xFFFF, 0xFFFF).unwrap() => {
+            headers.next().unwrap(),
+            ObjectHeader::Range(Width::Two, range, RangedVariation::Group110VarX(0x01, seq)) if range == Range::from(0xFFFF, 0xFFFF).unwrap() => {
                 seq.iter().collect()
             }
         );
@@ -996,8 +974,8 @@ mod test {
         let mut headers = parse_objects(FunctionCode::Response, &input);
 
         let bytes: Vec<(&[u8], u16)> = assert_matches!(
-            headers.next().unwrap().details,
-            HeaderDetails::CountAndPrefix16(0x02, PrefixedVariation::Group111VarX(0x01, seq)) => {
+            headers.next().unwrap(),
+            ObjectHeader::CountAndPrefix16(0x02, PrefixedVariation::Group111VarX(0x01, seq)) => {
                 seq.iter().collect()
             }
         );
@@ -1020,8 +998,8 @@ mod test {
         .iter();
         let first = headers.next().unwrap();
         assert!(headers.next().is_none());
-        match first.details {
-            HeaderDetails::Range(Width::One, range, RangedVariation::Group110VarX(0, seq))
+        match first {
+            ObjectHeader::Range(Width::One, range, RangedVariation::Group110VarX(0, seq))
                 if range == Range::from(7, 7).unwrap() =>
             {
                 let mut iter = seq.iter();
@@ -1030,7 +1008,7 @@ mod test {
                 assert_eq!(first, (empty, 7));
                 assert_eq!(iter.next(), None);
             }
-            _ => panic!("unexpected header details"),
+            _ => panic!("unexpected header"),
         }
     }
 
@@ -1044,13 +1022,13 @@ mod test {
         assert!(headers.next().is_none());
 
         assert_eq!(first.variation(), Variation::Group0(0xCA));
-        let set = match first.details {
-            HeaderDetails::Range(Width::One, range, RangedVariation::Group0(set))
+        let set = match first {
+            ObjectHeader::Range(Width::One, range, RangedVariation::Group0(set))
                 if range == Range::from(0x07, 0x07).unwrap() =>
             {
                 set
             }
-            _ => panic!("unexpected header details"),
+            _ => panic!("unexpected header"),
         };
 
         assert_eq!(
@@ -1074,8 +1052,8 @@ mod test {
 
         assert_eq!(first.variation(), Variation::Group0(0xCA));
         assert!(std::matches!(
-            first.details,
-            HeaderDetails::Read(_, ReadQualifier::Range(Width::One, range)) if range == Range::from(0x07, 0x07).unwrap()
+            first,
+            ObjectHeader::Read(_, ReadQualifier::Range(Width::One, range)) if range == Range::from(0x07, 0x07).unwrap()
         ));
     }
 
@@ -1102,9 +1080,9 @@ mod test {
         let header = headers.iter().next().unwrap();
 
         assert_eq!(header.variation(), Variation::Group70Var5);
-        let obj = match header.details {
-            HeaderDetails::FreeFormat(FreeFormatVariation::Group70Var5(obj)) => obj,
-            _ => panic!("unexpected header details"),
+        let obj = match header {
+            ObjectHeader::FreeFormat(FreeFormatVariation::Group70Var5(obj)) => obj,
+            _ => panic!("unexpected header"),
         };
         assert_eq!(
             obj,
@@ -1122,8 +1100,8 @@ mod test {
         let header = headers.next().unwrap();
         assert_eq!(header.variation(), Variation::Group50Var1);
         assert_matches!(
-            header.details,
-            HeaderDetails::Read(_, ReadQualifier::Count(Width::One, 1))
+            header,
+            ObjectHeader::Read(_, ReadQualifier::Count(Width::One, 1))
         );
         assert_matches!(headers.next(), None);
 
@@ -1131,8 +1109,8 @@ mod test {
         let header = headers.next().unwrap();
         assert_eq!(header.variation(), Variation::Group50Var1);
         assert_matches!(
-            header.details,
-            HeaderDetails::Read(_, ReadQualifier::Count(Width::Two, 1))
+            header,
+            ObjectHeader::Read(_, ReadQualifier::Count(Width::Two, 1))
         );
         assert_matches!(headers.next(), None);
     }
@@ -1144,21 +1122,15 @@ mod test {
         let header = headers.next().unwrap();
         assert_eq!(header.variation(), Variation::Group50Var1);
         assert_matches!(
-            header.details,
-            HeaderDetails::Read(_, ReadQualifier::Count(Width::One, 1))
+            header,
+            ObjectHeader::Read(_, ReadQualifier::Count(Width::One, 1))
         );
         let header = headers.next().unwrap();
         assert_eq!(header.variation(), Variation::Group60Var2);
-        assert_matches!(
-            header.details,
-            HeaderDetails::Read(_, ReadQualifier::AllObjects)
-        );
+        assert_matches!(header, ObjectHeader::Read(_, ReadQualifier::AllObjects));
         let header = headers.next().unwrap();
         assert_eq!(header.variation(), Variation::Group60Var3);
-        assert_matches!(
-            header.details,
-            HeaderDetails::Read(_, ReadQualifier::AllObjects)
-        );
+        assert_matches!(header, ObjectHeader::Read(_, ReadQualifier::AllObjects));
         assert_matches!(headers.next(), None);
     }
 
@@ -1207,20 +1179,20 @@ mod test {
         let header = headers.next().unwrap();
         assert_eq!(header.variation(), Variation::Group2Var1);
         assert_matches!(
-            header.details,
-            HeaderDetails::Read(_, ReadQualifier::Count(Width::One, 5))
+            header,
+            ObjectHeader::Read(_, ReadQualifier::Count(Width::One, 5))
         );
         let header = headers.next().unwrap();
         assert_eq!(header.variation(), Variation::Group32Var2);
         assert_matches!(
-            header.details,
-            HeaderDetails::Read(_, ReadQualifier::Count(Width::Two, 10))
+            header,
+            ObjectHeader::Read(_, ReadQualifier::Count(Width::Two, 10))
         );
         let header = headers.next().unwrap();
         assert_eq!(header.variation(), Variation::Group111(1));
         assert_matches!(
-            header.details,
-            HeaderDetails::Read(_, ReadQualifier::Count(Width::One, 1))
+            header,
+            ObjectHeader::Read(_, ReadQualifier::Count(Width::One, 1))
         );
         assert_matches!(headers.next(), None);
     }
@@ -1266,8 +1238,8 @@ mod test {
             let header = headers.get_only_header().unwrap();
             assert_eq!(header.variation(), v);
             assert_matches!(
-                header.details,
-                HeaderDetails::Read(_, ReadQualifier::Count(w, 1)) if w == width
+                header,
+                ObjectHeader::Read(_, ReadQualifier::Count(w, 1)) if w == width
             );
         }
     }

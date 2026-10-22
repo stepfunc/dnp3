@@ -9,7 +9,7 @@ use crate::app::format::write::HeaderWriter;
 use crate::app::gen::count::CountVariation;
 use crate::app::gen::ranged::RangedVariation;
 use crate::app::parse::count::CountSequence;
-use crate::app::parse::parser::{HeaderCollection, HeaderDetails, ObjectHeader, Request};
+use crate::app::parse::parser::{HeaderCollection, ObjectHeader, Request};
 use crate::app::parse::range::RangedSequence;
 use crate::app::variations::{
     Group34Var1, Group34Var2, Group34Var3, Group50Var1, Group50Var3, Group52Var1, Group52Var2,
@@ -1621,51 +1621,51 @@ impl OutstationSession {
         header: ObjectHeader<'_>,
         db: &DatabaseHandle,
     ) -> Iin2 {
-        match header.details {
-            HeaderDetails::Range(_, _, RangedVariation::Group0(attr)) => {
+        match header {
+            ObjectHeader::Range(_, _, RangedVariation::Group0(attr)) => {
                 self.handle_write_attr(attr, db).await
             }
-            HeaderDetails::Range(_, _, RangedVariation::Group80Var1(bits)) => {
+            ObjectHeader::Range(_, _, RangedVariation::Group80Var1(bits)) => {
                 self.handle_write_iin(bits)
             }
-            HeaderDetails::Count(_, _, CountVariation::Group50Var1(seq)) => {
+            ObjectHeader::Count(_, _, CountVariation::Group50Var1(seq)) => {
                 self.handle_write_abs_time(seq)
             }
-            HeaderDetails::Count(_, _, CountVariation::Group50Var3(seq)) => {
+            ObjectHeader::Count(_, _, CountVariation::Group50Var3(seq)) => {
                 self.handle_write_at_last_recorded_time(seq)
             }
             // analog deadbands
-            HeaderDetails::Range(_, _, RangedVariation::Group34Var1(seq)) => {
+            ObjectHeader::Range(_, _, RangedVariation::Group34Var1(seq)) => {
                 self.handle_write_ranged_analog_deadbands(seq, db).await
             }
-            HeaderDetails::Range(_, _, RangedVariation::Group34Var2(seq)) => {
+            ObjectHeader::Range(_, _, RangedVariation::Group34Var2(seq)) => {
                 self.handle_write_ranged_analog_deadbands(seq, db).await
             }
-            HeaderDetails::Range(_, _, RangedVariation::Group34Var3(seq)) => {
+            ObjectHeader::Range(_, _, RangedVariation::Group34Var3(seq)) => {
                 self.handle_write_ranged_analog_deadbands(seq, db).await
             }
-            HeaderDetails::CountAndPrefix8(_, PrefixedVariation::Group34Var1(seq)) => {
+            ObjectHeader::CountAndPrefix8(_, PrefixedVariation::Group34Var1(seq)) => {
                 self.handle_write_prefixed_analog_deadbands(seq, db).await
             }
-            HeaderDetails::CountAndPrefix8(_, PrefixedVariation::Group34Var2(seq)) => {
+            ObjectHeader::CountAndPrefix8(_, PrefixedVariation::Group34Var2(seq)) => {
                 self.handle_write_prefixed_analog_deadbands(seq, db).await
             }
-            HeaderDetails::CountAndPrefix8(_, PrefixedVariation::Group34Var3(seq)) => {
+            ObjectHeader::CountAndPrefix8(_, PrefixedVariation::Group34Var3(seq)) => {
                 self.handle_write_prefixed_analog_deadbands(seq, db).await
             }
-            HeaderDetails::CountAndPrefix16(_, PrefixedVariation::Group34Var1(seq)) => {
+            ObjectHeader::CountAndPrefix16(_, PrefixedVariation::Group34Var1(seq)) => {
                 self.handle_write_prefixed_analog_deadbands(seq, db).await
             }
-            HeaderDetails::CountAndPrefix16(_, PrefixedVariation::Group34Var2(seq)) => {
+            ObjectHeader::CountAndPrefix16(_, PrefixedVariation::Group34Var2(seq)) => {
                 self.handle_write_prefixed_analog_deadbands(seq, db).await
             }
-            HeaderDetails::CountAndPrefix16(_, PrefixedVariation::Group34Var3(seq)) => {
+            ObjectHeader::CountAndPrefix16(_, PrefixedVariation::Group34Var3(seq)) => {
                 self.handle_write_prefixed_analog_deadbands(seq, db).await
             }
             _ => {
                 tracing::warn!(
                     "WRITE not supported with qualifier: {} and variation: {}",
-                    header.details.qualifier(),
+                    header.qualifier(),
                     header.variation()
                 );
                 if Self::is_writable(header.variation()) {
@@ -1869,24 +1869,24 @@ impl OutstationSession {
         let mut iin2 = Iin2::default();
 
         for header in object_headers.iter() {
-            match header.details {
-                HeaderDetails::AllObjects(objects)
+            match header {
+                ObjectHeader::AllObjects(objects)
                     if objects.variation() == Variation::Group60Var2 =>
                 {
                     self.state.enabled_unsolicited_classes.class1 = enable;
                 }
-                HeaderDetails::AllObjects(objects)
+                ObjectHeader::AllObjects(objects)
                     if objects.variation() == Variation::Group60Var3 =>
                 {
                     self.state.enabled_unsolicited_classes.class2 = enable;
                 }
-                HeaderDetails::AllObjects(objects)
+                ObjectHeader::AllObjects(objects)
                     if objects.variation() == Variation::Group60Var4 =>
                 {
                     self.state.enabled_unsolicited_classes.class3 = enable;
                 }
                 _ => {
-                    tracing::warn!("received {} unsolicited request for unsupported qualifier ({}) and variation ({})", to_string(enable), header.details.qualifier(), header.variation());
+                    tracing::warn!("received {} unsolicited request for unsupported qualifier ({}) and variation ({})", to_string(enable), header.qualifier(), header.variation());
                     iin2 |= match header.variation() {
                         Variation::Group60Var2
                         | Variation::Group60Var3
@@ -2061,22 +2061,20 @@ impl OutstationSession {
         let mut timing: Option<FreezeInterval> = None;
 
         for header in object_headers.iter() {
-            match header.details {
-                HeaderDetails::Count(_, _, CountVariation::Group50Var2(seq)) => {
-                    match seq.single() {
-                        None => iin.iin2 |= Iin2::PARAMETER_ERROR,
-                        Some(x) => {
-                            timing = Some(x.into());
-                        }
+            match header {
+                ObjectHeader::Count(_, _, CountVariation::Group50Var2(seq)) => match seq.single() {
+                    None => iin.iin2 |= Iin2::PARAMETER_ERROR,
+                    Some(x) => {
+                        timing = Some(x.into());
                     }
-                }
-                HeaderDetails::AllObjects(_)
-                | HeaderDetails::Range(..)
-                | HeaderDetails::Count(..)
-                | HeaderDetails::CountAndPrefix8(..)
-                | HeaderDetails::CountAndPrefix16(..)
-                | HeaderDetails::FreeFormat(_)
-                | HeaderDetails::Read(..) => {
+                },
+                ObjectHeader::AllObjects(_)
+                | ObjectHeader::Range(..)
+                | ObjectHeader::Count(..)
+                | ObjectHeader::CountAndPrefix8(..)
+                | ObjectHeader::CountAndPrefix16(..)
+                | ObjectHeader::FreeFormat(_)
+                | ObjectHeader::Read(..) => {
                     // other variations require that there be a preceding g50v2
                     match timing {
                         None => {
@@ -2107,13 +2105,13 @@ impl OutstationSession {
         freeze_type: FreezeType,
         header: ObjectHeader,
     ) -> Iin2 {
-        match header.details {
-            HeaderDetails::AllObjects(objects) if objects.variation() == Variation::Group20Var0 => {
+        match header {
+            ObjectHeader::AllObjects(objects) if objects.variation() == Variation::Group20Var0 => {
                 self.application
                     .freeze_counter(FreezeIndices::All, freeze_type, database)
                     .map_or_else(|err| err.into(), |_| Iin2::default())
             }
-            HeaderDetails::Range(_, range, RangedVariation::Group20Var0) => self
+            ObjectHeader::Range(_, range, RangedVariation::Group20Var0) => self
                 .application
                 .freeze_counter(
                     FreezeIndices::Range(range.get_start(), range.get_stop()),
