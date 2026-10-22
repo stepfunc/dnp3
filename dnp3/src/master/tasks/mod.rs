@@ -262,23 +262,26 @@ impl ReadTask {
         header: ResponseHeader,
         objects: HeaderCollection<'_>,
     ) -> bool {
+        let read_type = self.read_type();
         match self {
-            ReadTask::StartupIntegrity(_) => {
-                association.handle_integrity_response(header, objects).await
-            }
-            ReadTask::PeriodicPoll(_) => association.handle_poll_response(header, objects).await,
-            ReadTask::EventScan(_) => {
+            ReadTask::SingleRead(SingleReadTask {
+                custom_handler: Some(handler),
+                ..
+            }) => extract_measurements(read_type, header, objects, handler.as_mut()).await,
+            _ => {
                 association
-                    .handle_event_scan_response(header, objects)
+                    .handle_read_response(read_type, header, objects)
                     .await
             }
-            ReadTask::SingleRead(task) => match &mut task.custom_handler {
-                Some(handler) => {
-                    extract_measurements(ReadType::SinglePoll, header, objects, handler.as_mut())
-                        .await
-                }
-                None => association.handle_read_response(header, objects).await,
-            },
+        }
+    }
+
+    /// The ReadType reported to the ReadHandler for this read's responses
+    fn read_type(&self) -> ReadType {
+        match self {
+            ReadTask::StartupIntegrity(_) => ReadType::StartupIntegrity,
+            ReadTask::PeriodicPoll(_) | ReadTask::EventScan(_) => ReadType::PeriodicPoll,
+            ReadTask::SingleRead(_) => ReadType::SinglePoll,
         }
     }
 
