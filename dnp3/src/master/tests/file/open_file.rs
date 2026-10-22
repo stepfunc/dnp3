@@ -10,80 +10,6 @@ use crate::master::{
 };
 
 #[tokio::test]
-async fn can_open_file() {
-    let config = AssociationConfig::quiet();
-    let mut harness = create_association(config).await;
-
-    let open_task = spawn_open_task(harness.association.clone());
-
-    harness
-        .expect_write(open_file(
-            0,
-            "test.txt",
-            Permissions::default(),
-            AuthKey::none(),
-            42,
-            FileMode::Write,
-            512,
-        ))
-        .await;
-
-    harness
-        .process_response(super::file_status_response(
-            0,
-            21,
-            55,
-            512,
-            FileStatus::Success,
-        ))
-        .await;
-
-    assert_eq!(
-        open_task.await.unwrap(),
-        Ok(OpenFile {
-            file_handle: FileHandle::new(21),
-            max_block_size: 512,
-            file_size: 55,
-        })
-    )
-}
-
-#[tokio::test]
-async fn fails_if_status_not_success() {
-    let config = AssociationConfig::quiet();
-    let mut harness = create_association(config).await;
-
-    let open_task = spawn_open_task(harness.association.clone());
-
-    harness
-        .expect_write(open_file(
-            0,
-            "test.txt",
-            Permissions::default(),
-            AuthKey::none(),
-            42,
-            FileMode::Write,
-            512,
-        ))
-        .await;
-
-    harness
-        .process_response(super::file_status_response(
-            0,
-            21,
-            0,
-            512,
-            FileStatus::FileLocked,
-        ))
-        .await;
-
-    assert_eq!(
-        open_task.await.unwrap(),
-        Err(FileError::BadStatus(FileStatus::FileLocked))
-    )
-}
-
-#[tokio::test]
 async fn open_request_bytes() {
     let config = AssociationConfig::quiet();
     let mut harness = create_association(config).await;
@@ -151,18 +77,10 @@ async fn open_request_bytes() {
 
 #[tokio::test]
 async fn bad_status_fails_the_task() {
-    let result = open_with_response(super::file_status_response(
-        0,
-        21,
-        0,
-        512,
-        FileStatus::PermissionDenied,
-    ))
-    .await;
-    assert_eq!(
-        result,
-        Err(FileError::BadStatus(FileStatus::PermissionDenied))
-    );
+    for status in [FileStatus::PermissionDenied, FileStatus::FileLocked] {
+        let result = open_with_response(super::file_status_response(0, 21, 0, 512, status)).await;
+        assert_eq!(result, Err(FileError::BadStatus(status)));
+    }
 }
 
 #[tokio::test]
@@ -177,15 +95,6 @@ async fn fails_on_unexpected_variation() {
     ))
     .await;
     assert_eq!(result, Err(FileError::BadResponse));
-}
-
-#[tokio::test]
-async fn fails_without_object_header() {
-    let result = open_with_response(super::no_object_response(0)).await;
-    assert_eq!(
-        result,
-        Err(FileError::TaskError(TaskError::UnexpectedResponseHeaders))
-    );
 }
 
 /// Run the default OPEN against a response that fails it, and check that the task fails

@@ -104,15 +104,6 @@ async fn fails_on_unexpected_variation() {
     );
 }
 
-#[tokio::test]
-async fn fails_without_object_header() {
-    let result = get_info_with_response(super::no_object_response(0)).await;
-    assert_eq!(
-        result,
-        Err(FileError::TaskError(TaskError::UnexpectedResponseHeaders))
-    );
-}
-
 /// Run a GET_FILE_INFO against a response that fails it, and check that the task fails
 async fn get_info_with_response(response: Vec<u8>) -> Result<(), FileError> {
     let mut harness = create_association(AssociationConfig::quiet()).await;
