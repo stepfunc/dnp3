@@ -286,7 +286,6 @@ pub(crate) enum Step {
 mod tests {
     use super::*;
     use crate::link::error::FrameError;
-    use crate::link::format::{format_data_frame, Payload};
     use crate::link::header::AnyAddress;
     use crate::link::test_data::{
         TestFrame, ACK, CONFIRM_USER_DATA, MULTI_BLOCK_USER_DATA, RESET_LINK, UNCONFIRMED_USER_DATA,
@@ -607,12 +606,8 @@ mod tests {
         let header =
             Header::unconfirmed_user_data(true, AnyAddress::from(1), AnyAddress::from(1024));
         let data = [fill; link::constant::MAX_APP_BYTES_PER_FRAME];
-        let mut buffer = [0; link::constant::MAX_LINK_FRAME_LENGTH];
-        let mut cursor = WriteCursor::new(&mut buffer);
-        let bytes = format_data_frame(header, Payload::new(0xC0, &data), &mut cursor)
-            .unwrap()
-            .frame
-            .to_vec();
+        let bytes =
+            link::test_data::data_frame(header, link::test_data::segment(true, true, 0), &data);
         assert_eq!(bytes.len(), link::constant::MAX_LINK_FRAME_LENGTH);
         (bytes, (header, [&[0xC0], &data[..]].concat()))
     }

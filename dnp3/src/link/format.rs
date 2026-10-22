@@ -163,23 +163,6 @@ mod test {
     const ADDR_A: EndpointAddress = EndpointAddress::raw(0x1234);
     const ADDR_B: EndpointAddress = EndpointAddress::raw(0xABCD);
 
-    fn header_only(header: Header) -> Vec<u8> {
-        let mut buffer = [0; constant::MAX_LINK_FRAME_LENGTH];
-        let mut cursor = WriteCursor::new(&mut buffer);
-        let data = format_header_only(header, &mut cursor).unwrap();
-        assert!(data.payload_only.is_empty());
-        data.frame.to_vec()
-    }
-
-    fn data_frame(header: Header, app_data: &[u8]) -> Vec<u8> {
-        let mut buffer = [0; constant::MAX_LINK_FRAME_LENGTH];
-        let mut cursor = WriteCursor::new(&mut buffer);
-        format_data_frame(header, Payload::new(0xC0, app_data), &mut cursor)
-            .unwrap()
-            .frame
-            .to_vec()
-    }
-
     #[test]
     fn formats_link_status_request_from_master() {
         assert_eq!(
@@ -198,13 +181,18 @@ mod test {
 
     #[test]
     fn formats_header_only_ack_like_fixed_size() {
-        assert_eq!(header_only(ACK.header), ACK.bytes);
+        let mut buffer = [0; constant::MAX_LINK_FRAME_LENGTH];
+        let mut cursor = WriteCursor::new(&mut buffer);
+        let data = format_header_only(ACK.header, &mut cursor).unwrap();
+        assert!(data.payload_only.is_empty());
+        assert_eq!(data.frame, ACK.bytes);
     }
 
     #[test]
     fn formats_header_of_empty_data_frame() {
         let frame = data_frame(
             Header::unconfirmed_user_data(true, ADDR_A.wrap(), ADDR_B.wrap()),
+            segment(true, true, 0),
             &[],
         );
         assert_eq!(
@@ -217,6 +205,7 @@ mod test {
     fn formats_header_of_full_data_frame() {
         let frame = data_frame(
             Header::unconfirmed_user_data(true, ADDR_A.wrap(), ADDR_B.wrap()),
+            segment(true, true, 0),
             &[0xAA; constant::MAX_APP_BYTES_PER_FRAME],
         );
         assert_eq!(frame.len(), constant::MAX_LINK_FRAME_LENGTH);
@@ -230,6 +219,7 @@ mod test {
     fn formats_header_of_broadcast_data_frame() {
         let frame = data_frame(
             Header::unconfirmed_user_data(true, AnyAddress::from(0xFFFF), ADDR_B.wrap()),
+            segment(true, true, 0),
             &[0x01],
         );
         assert_eq!(
@@ -242,6 +232,7 @@ mod test {
     fn formats_header_of_outstation_data_frame() {
         let frame = data_frame(
             Header::unconfirmed_user_data(false, ADDR_B.wrap(), ADDR_A.wrap()),
+            segment(true, true, 0),
             &[0x01],
         );
         assert_eq!(
