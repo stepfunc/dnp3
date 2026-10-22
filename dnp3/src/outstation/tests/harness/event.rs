@@ -2,7 +2,7 @@ use crate::app::variations::{Group12Var1, Group41Var1, Group41Var2, Group41Var3,
 use crate::outstation::traits::{BroadcastAction, OperateType, RestartDelay};
 use crate::outstation::{BufferState, FreezeIndices, FreezeType};
 
-use crate::app::{FunctionCode, Timestamp};
+use crate::app::{FunctionCode, RequestHeader, Timestamp};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum Control {
@@ -40,6 +40,7 @@ pub(crate) enum Event {
     BeginConfirm,
     Cleared(u64),
     EndConfirm(BufferState),
+    RequestFromIdle(RequestHeader),
 }
 
 #[derive(Clone)]
