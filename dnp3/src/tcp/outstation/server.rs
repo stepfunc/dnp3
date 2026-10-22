@@ -77,19 +77,7 @@ impl ServerConnectionHandler {
         match self {
             Self::Tcp => Ok(PhysLayer::Tcp(socket)),
             #[cfg(feature = "enable-tls")]
-            Self::Tls(config) => {
-                // the server accepts one connection at a time, so a handshake that stalls would stop
-                // it accepting any others
-                let timeout = crate::tcp::tls::TLS_HANDSHAKE_TIMEOUT;
-                tokio::time::timeout(timeout, config.handle_connection(socket))
-                    .await
-                    .unwrap_or_else(|_| {
-                        Err(format!(
-                            "TLS handshake didn't complete within {} seconds",
-                            timeout.as_secs()
-                        ))
-                    })
-            }
+            Self::Tls(config) => config.handle_connection(socket).await,
         }
     }
 }
