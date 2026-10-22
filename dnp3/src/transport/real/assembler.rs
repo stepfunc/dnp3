@@ -41,7 +41,7 @@ pub(crate) enum AssemblyState {
 struct Overflow;
 
 /// Why the assembler discarded a segment or the series in progress
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum Discard {
     /// a FIR segment started a new series, dropping the bytes of the one in progress
     NewSeries { len: usize, source: EndpointAddress },
@@ -312,7 +312,7 @@ mod tests {
 
     struct Harness {
         assembler: Assembler,
-        discards: Vec<String>,
+        discards: Vec<Discard>,
     }
 
     impl Harness {
@@ -329,7 +329,7 @@ mod tests {
             let discards = &mut self.discards;
             matches!(
                 self.assembler
-                    .assemble(info, header, data, |d| discards.push(d.to_string())),
+                    .assemble(info, header, data, |d| discards.push(d)),
                 AssemblyState::Complete
             )
         }
@@ -355,7 +355,7 @@ mod tests {
         }
 
         /// takes the discard reasons reported since the last call
-        fn discards(&mut self) -> Vec<String> {
+        fn discards(&mut self) -> Vec<Discard> {
             std::mem::take(&mut self.discards)
         }
 
@@ -800,7 +800,10 @@ mod tests {
         assert!(!h.first(5, &[4]));
         assert_eq!(
             h.discards(),
-            ["received FIR - dropping 3 assembled bytes from 1"]
+            [Discard::NewSeries {
+                len: 3,
+                source: EndpointAddress::raw(1)
+            }]
         );
         assert!(h.last(6, &[5]));
         assert_eq!(h.pop(), Some(vec![4, 5]));
@@ -814,7 +817,10 @@ mod tests {
         assert!(!h.first(1, &[1]));
         assert_eq!(
             h.discards(),
-            ["received FIR - dropping 0 assembled bytes from 1"]
+            [Discard::NewSeries {
+                len: 0,
+                source: EndpointAddress::raw(1)
+            }]
         );
     }
 
@@ -848,9 +854,16 @@ mod tests {
         assert_eq!(
             h.discards(),
             [
-                "ignoring non-FIR segment from 1 with no previous FIR",
-                "ignoring non-FIR segment from 1 with no previous FIR",
-                "ignoring broadcast frame with transport header fir: false and fin: true",
+                Discard::NoSeries {
+                    source: EndpointAddress::raw(1)
+                },
+                Discard::NoSeries {
+                    source: EndpointAddress::raw(1)
+                },
+                Discard::BroadcastSeries {
+                    fir: false,
+                    fin: true
+                },
             ]
         );
         assert_eq!(h.pop(), Some(vec![1, 2]));
@@ -861,7 +874,7 @@ mod tests {
         let mut h = Harness::new();
         assert!(h.single(0, &[1]));
         assert!(!h.first(1, &[2; MAX + 1]));
-        assert_eq!(h.discards(), ["buffer overflow with 9 bytes to write"]);
+        assert_eq!(h.discards(), [Discard::Overflow { len: 9 }]);
         assert_eq!(h.pop(), None);
         h.assert_recovers(2);
     }
@@ -915,31 +928,41 @@ mod tests {
         assert!(!h.first(0, &[1]));
         assert!(!h.middle(1, &[2, 3]));
         assert!(!h.middle(1, &[2, 3]));
-        assert_eq!(h.discards(), ["ignoring repeated segment with seq: 1"]);
+        assert_eq!(h.discards(), [Discard::Repeat { seq: 1 }]);
         assert!(!h.middle(1, &[2, 4]));
-        assert_eq!(
-            h.discards(),
-            ["segment with repeated seq: 1 differs from the previous segment"]
-        );
+        assert_eq!(h.discards(), [Discard::DifferentRepeat { seq: 1 }]);
 
         assert!(!h.first(10, &[1]));
         assert!(!h.middle(12, &[2]));
-        assert_eq!(h.discards(), ["expected seq: 11 but received seq: 12"]);
+        assert_eq!(
+            h.discards(),
+            [Discard::UnexpectedSeq {
+                expected: 11,
+                received: 12
+            }]
+        );
 
         assert!(!h.first(20, &[1; MAX - 1]));
         assert!(!h.middle(21, &[2, 3]));
-        assert_eq!(h.discards(), ["buffer overflow with 2 bytes to write"]);
+        assert_eq!(h.discards(), [Discard::Overflow { len: 2 }]);
 
         assert!(!h.first(30, &[1]));
         assert!(!h.segment(from(2), false, true, 31, &[2]));
-        let discards = h.discards();
-        assert_eq!(discards.len(), 1);
-        assert!(discards[0].starts_with("conflicting addresses"));
+        assert_eq!(
+            h.discards(),
+            [Discard::ConflictingAddress {
+                previous: from(1),
+                received: from(2)
+            }]
+        );
 
         assert!(!h.segment(broadcast(), true, false, 40, &[1]));
         assert_eq!(
             h.discards(),
-            ["ignoring broadcast frame with transport header fir: true and fin: false"]
+            [Discard::BroadcastSeries {
+                fir: true,
+                fin: false
+            }]
         );
         h.assert_recovers(41);
         assert!(h.discards().is_empty());
@@ -951,7 +974,7 @@ mod tests {
         assert!(!h.first(0, &[1, 2]));
         assert!(!h.middle(1, &[3, 4]));
         assert!(!h.middle(1, &[3, 4]));
-        assert_eq!(h.discards(), ["ignoring repeated segment with seq: 1"]);
+        assert_eq!(h.discards(), [Discard::Repeat { seq: 1 }]);
         assert!(h.last(2, &[5]));
         assert_eq!(h.pop(), Some(vec![1, 2, 3, 4, 5]));
     }
@@ -961,11 +984,57 @@ mod tests {
         let mut h = Harness::new();
         assert!(!h.first(0, &[1]));
         assert!(!h.middle(0, &[1]));
-        assert_eq!(
-            h.discards(),
-            ["segment with repeated seq: 0 differs from the previous segment"]
-        );
+        assert_eq!(h.discards(), [Discard::DifferentRepeat { seq: 0 }]);
         assert!(!h.last(1, &[2]));
         assert_eq!(h.pop(), None);
+    }
+
+    #[test]
+    fn discards_display_their_log_messages() {
+        let source = EndpointAddress::raw(1);
+        let cases = [
+            (
+                Discard::NewSeries { len: 3, source },
+                "received FIR - dropping 3 assembled bytes from 1",
+            ),
+            (
+                Discard::BroadcastSeries {
+                    fir: false,
+                    fin: true,
+                },
+                "ignoring broadcast frame with transport header fir: false and fin: true",
+            ),
+            (
+                Discard::NoSeries { source },
+                "ignoring non-FIR segment from 1 with no previous FIR",
+            ),
+            (
+                Discard::Repeat { seq: 1 },
+                "ignoring repeated segment with seq: 1",
+            ),
+            (
+                Discard::DifferentRepeat { seq: 1 },
+                "segment with repeated seq: 1 differs from the previous segment",
+            ),
+            (
+                Discard::UnexpectedSeq {
+                    expected: 11,
+                    received: 12,
+                },
+                "expected seq: 11 but received seq: 12",
+            ),
+            (
+                Discard::Overflow { len: 9 },
+                "buffer overflow with 9 bytes to write",
+            ),
+        ];
+        for (discard, message) in cases {
+            assert_eq!(discard.to_string(), message);
+        }
+        let conflicting = Discard::ConflictingAddress {
+            previous: from(1),
+            received: from(2),
+        };
+        assert!(conflicting.to_string().starts_with("conflicting addresses"));
     }
 }
