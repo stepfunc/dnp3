@@ -16,6 +16,8 @@ use scursor::WriteCursor;
 mod config;
 /// private internal control only needed by the parent module
 mod details;
+#[cfg(test)]
+mod family_tests;
 /// read headers
 pub(crate) mod read;
 
