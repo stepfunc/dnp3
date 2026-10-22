@@ -1,4 +1,3 @@
-use crate::app::parse::options::ParseOptions;
 use crate::decode::DecodeLevel;
 use crate::link::reader::LinkModes;
 use crate::link::EndpointAddress;
@@ -52,14 +51,9 @@ impl<T: Transport> Drop for SessionTeardown<'_, T> {
 
 impl OutstationTask {
     /// create an `OutstationTask` and return it along with an `OutstationHandle` for controlling it
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "a task takes each part of its configuration separately"
-    )]
     pub(crate) fn create(
         initial_state: Enabled,
         link_modes: LinkModes,
-        parse_options: ParseOptions,
         config: OutstationConfig,
         phys_addr: PhysAddr,
         application: Box<dyn OutstationApplication>,
@@ -69,7 +63,6 @@ impl OutstationTask {
         Self::with_transport(
             initial_state,
             link_modes,
-            parse_options,
             config,
             phys_addr,
             application,
@@ -93,14 +86,9 @@ impl OutstationTask<crate::transport::mock::MockTransport> {
 impl<T: Transport> OutstationTask<T> {
     /// create an `OutstationTask` over a transport and return it along with an `OutstationHandle`
     /// for controlling it
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "a task takes each part of its configuration separately"
-    )]
     pub(crate) fn with_transport(
         initial_state: Enabled,
         link_modes: LinkModes,
-        parse_options: ParseOptions,
         config: OutstationConfig,
         phys_addr: PhysAddr,
         application: Box<dyn OutstationApplication>,
@@ -115,7 +103,6 @@ impl<T: Transport> OutstationTask<T> {
         );
         let (reader, writer) = crate::transport::create_transport_layer(
             link_modes,
-            parse_options,
             crate::link::LinkRole::Outstation {
                 self_address: config.features.self_address,
             },

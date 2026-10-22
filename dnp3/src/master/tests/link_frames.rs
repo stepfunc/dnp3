@@ -6,7 +6,6 @@ use std::time::Duration;
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
 
-use crate::app::parse::options::ParseOptions;
 use crate::app::{BufferSize, FunctionCode, Sequence, Timeout};
 use crate::decode::DecodeLevel;
 use crate::link::header::{ControlField, Header};
@@ -101,7 +100,6 @@ impl Harness {
         let mut task = MasterTask::new(
             Enabled::Yes,
             LinkModes::stream(LinkErrorMode::Discard),
-            ParseOptions::default(),
             MasterChannelConfig {
                 master_address: MASTER,
                 decode_level: DecodeLevel::nothing(),

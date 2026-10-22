@@ -1,7 +1,6 @@
 use tokio::task::JoinHandle;
 use tokio::time::{Duration, Instant};
 
-use crate::app::parse::options::ParseOptions;
 use crate::app::FunctionCode;
 use crate::decode::{
     AppDecodeLevel, DecodeLevel, LinkDecodeLevel, PhysDecodeLevel, TransportDecodeLevel,
@@ -134,7 +133,6 @@ impl LinkHarness {
         let (mut task, handle) = OutstationTask::<RealTransport>::with_transport(
             Enabled::Yes,
             LinkModes::test(),
-            ParseOptions::get_static(),
             config,
             PhysAddr::None,
             application,

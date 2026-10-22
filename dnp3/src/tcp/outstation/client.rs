@@ -1,6 +1,5 @@
 use tracing::Instrument;
 
-use crate::app::parse::options::ParseOptions;
 use crate::app::{ConnectStrategy, Listener};
 use crate::link::reader::LinkModes;
 use crate::link::LinkErrorMode;
@@ -65,7 +64,6 @@ pub fn spawn_outstation_tcp_client_2(
     let (task, handle) = OutstationTask::create(
         Enabled::No,
         LinkModes::stream(link_error_mode),
-        ParseOptions::get_static(),
         config,
         PhysAddr::None,
         application,

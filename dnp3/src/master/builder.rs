@@ -151,14 +151,7 @@ fn build_inner_task(
     config: MasterChannelConfig,
     rx: Receiver<super::messages::Message>,
 ) -> InnerMasterTask {
-    InnerMasterTask::with_associations(
-        enabled,
-        associations,
-        link_modes,
-        ParseOptions::get_static(),
-        config,
-        rx,
-    )
+    InnerMasterTask::with_associations(enabled, associations, link_modes, config, rx)
 }
 
 impl MasterBuilder {

@@ -7,7 +7,6 @@ use tokio::time::Instant;
 
 use crate::app::control::{ControlCode, Group12Var1, Group41Var1, OpType, TripCloseCode};
 use crate::app::format::write::{start_request, start_response};
-use crate::app::parse::options::ParseOptions;
 use crate::app::{BufferSize, ControlField, FunctionCode, Iin, ResponseFunction, Sequence};
 use crate::decode::AppDecodeLevel;
 use crate::link::reader::LinkModes;
@@ -381,7 +380,6 @@ async fn operate_no_ack_fails_without_a_connection() {
         Enabled::Yes,
         associations,
         LinkModes::stream(LinkErrorMode::Discard),
-        ParseOptions::default(),
         MasterChannelConfig {
             master_address: EndpointAddress::try_new(1).unwrap(),
             decode_level: AppDecodeLevel::Nothing.into(),

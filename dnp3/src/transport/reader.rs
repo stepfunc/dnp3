@@ -74,9 +74,9 @@ impl TransportReader<crate::transport::mock::MockTransport> {
 }
 
 impl<T: Transport> TransportReader<T> {
-    pub(crate) fn new(parse_options: ParseOptions, inner: T::Reader) -> Self {
+    pub(crate) fn new(inner: T::Reader) -> Self {
         Self {
-            parse_options,
+            parse_options: ParseOptions::get_static(),
             retained: false,
             inner,
         }

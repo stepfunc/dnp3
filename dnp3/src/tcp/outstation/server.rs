@@ -1,4 +1,3 @@
-use crate::app::parse::options::ParseOptions;
 use crate::app::{Listener, Shutdown};
 use crate::link::reader::LinkModes;
 use crate::link::{LinkErrorMode, LinkReadMode};
@@ -207,7 +206,6 @@ impl Server {
         let (task, handle) = OutstationTask::create(
             Enabled::Yes,
             self.link_modes,
-            ParseOptions::get_static(),
             config,
             PhysAddr::None,
             application,
