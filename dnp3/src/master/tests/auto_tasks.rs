@@ -242,3 +242,171 @@ async fn rejected_enable_unsolicited_with_restart_iin_is_not_repeated() {
     let next = tokio::time::timeout(Duration::from_secs(5), harness.io.next_event()).await;
     assert_eq!(next.ok(), None);
 }
+
+/// The response timeout set by the harness plus the default minimum retry delay
+const TIMEOUT_AND_FIRST_RETRY: Duration = Duration::from_secs(2);
+
+/// Let `request` go unanswered, then expect the master to send `retry` exactly `after` the
+/// original request
+async fn expect_retry_after(
+    harness: &mut TestHarness,
+    request: Vec<u8>,
+    retry: Vec<u8>,
+    after: Duration,
+) {
+    expect_write_soon(harness, request).await;
+    let sent = Instant::now();
+    tokio::time::timeout(Duration::from_secs(60), harness.expect_write(retry))
+        .await
+        .expect("the master did not retry the request");
+    TestHarness::assert_elapsed(sent, after);
+}
+
+async fn assert_no_write_for(harness: &mut TestHarness, duration: Duration) {
+    let next = tokio::time::timeout(duration, harness.io.next_event()).await;
+    assert_eq!(next.ok(), None);
+}
+
+#[tokio::test]
+async fn startup_integrity_scan_retries_after_the_backoff_on_timeout() {
+    tokio::time::pause();
+    let config = AssociationConfig {
+        startup_integrity_classes: Classes::all(),
+        ..AssociationConfig::quiet()
+    };
+    let mut seq = Sequence::default();
+    let mut harness = create_association(config).await;
+
+    expect_retry_after(
+        &mut harness,
+        integrity_poll_request(seq.increment()),
+        integrity_poll_request(seq),
+        TIMEOUT_AND_FIRST_RETRY,
+    )
+    .await;
+    harness.process_response(empty_response(seq)).await;
+
+    assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+}
+
+#[tokio::test]
+async fn event_scan_retries_after_the_backoff_on_timeout() {
+    tokio::time::pause();
+    let config = AssociationConfig {
+        event_scan_on_events_available: EventClasses::all(),
+        ..AssociationConfig::quiet()
+    };
+    let mut seq = Sequence::default();
+    let mut harness = create_association(config).await;
+
+    harness
+        .read_and_expect_write(
+            unsol_null_custom_iin(Sequence::default(), CLASS_1_EVENTS),
+            unsol_confirm(Sequence::default()),
+        )
+        .await;
+
+    let class1 = Classes::new(false, EventClasses::new(true, false, false));
+    expect_retry_after(
+        &mut harness,
+        class_scan_request(class1, seq.increment()),
+        class_scan_request(class1, seq),
+        TIMEOUT_AND_FIRST_RETRY,
+    )
+    .await;
+    harness.process_response(empty_response(seq)).await;
+
+    assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+}
+
+#[tokio::test]
+async fn enable_unsolicited_retries_after_the_backoff_on_timeout() {
+    tokio::time::pause();
+    let config = AssociationConfig {
+        enable_unsol_classes: EventClasses::all(),
+        ..AssociationConfig::quiet()
+    };
+    let mut seq = Sequence::default();
+    let mut harness = create_association(config).await;
+
+    expect_retry_after(
+        &mut harness,
+        enable_unsol_request(seq.increment()),
+        enable_unsol_request(seq),
+        TIMEOUT_AND_FIRST_RETRY,
+    )
+    .await;
+    harness.process_response(empty_response(seq)).await;
+
+    assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+}
+
+#[tokio::test]
+async fn clear_restart_backoff_grows_on_timeouts_and_resets_after_success() {
+    tokio::time::pause();
+    let mut seq = Sequence::default();
+    let mut unsol_seq = Sequence::default();
+    let mut harness = create_association(AssociationConfig::quiet()).await;
+
+    harness
+        .read_and_expect_write(unsol_null(unsol_seq, true), unsol_confirm(unsol_seq))
+        .await;
+    unsol_seq.increment();
+
+    // a timeout, then the minimum retry delay
+    expect_retry_after(
+        &mut harness,
+        clear_restart_iin(seq.increment()),
+        clear_restart_iin(seq),
+        TIMEOUT_AND_FIRST_RETRY,
+    )
+    .await;
+    seq.increment();
+    // the retry times out too, and the delay doubles
+    let sent = Instant::now();
+    harness.expect_write(clear_restart_iin(seq)).await;
+    TestHarness::assert_elapsed(sent, Duration::from_secs(3));
+    harness
+        .process_response(empty_response(seq.increment()))
+        .await;
+    assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+
+    // a new restart starts over from the minimum retry delay
+    harness
+        .read_and_expect_write(unsol_null(unsol_seq, true), unsol_confirm(unsol_seq))
+        .await;
+    expect_retry_after(
+        &mut harness,
+        clear_restart_iin(seq.increment()),
+        clear_restart_iin(seq),
+        TIMEOUT_AND_FIRST_RETRY,
+    )
+    .await;
+    harness.process_response(empty_response(seq)).await;
+
+    assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+}
+
+#[tokio::test]
+async fn clear_restart_rejected_without_restart_iin_is_not_repeated() {
+    tokio::time::pause();
+    let mut seq = Sequence::default();
+    let mut harness = create_association(AssociationConfig::quiet()).await;
+
+    harness
+        .read_and_expect_write(
+            unsol_null(Sequence::default(), true),
+            unsol_confirm(Sequence::default()),
+        )
+        .await;
+
+    expect_write_soon(&mut harness, clear_restart_iin(seq)).await;
+    harness
+        .process_response(empty_response_custom_iin(
+            seq.increment(),
+            Iin::new(Iin1::default(), Iin2::NO_FUNC_CODE_SUPPORT),
+        ))
+        .await;
+
+    assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+}
