@@ -5,6 +5,7 @@
 use scursor::WriteCursor;
 
 use crate::app::format::write::{start_request, start_response};
+use crate::app::measurement::AnalogInputDeadBand;
 use crate::app::parse::header_identity_tests::DATALESS_COUNT_VARIATIONS;
 use crate::app::variations::Group32Var2;
 use crate::app::{
@@ -473,4 +474,36 @@ async fn read_with_valid_measurements_before_relative_time_without_cto_delivers_
     );
     assert_eq!(harness.read_events.pop(), Vec::new());
     harness.assert_no_events();
+}
+
+#[tokio::test]
+async fn read_with_g34v0_start_stop_headers_ignores_them_and_processes_the_rest() {
+    // g34v0 over indices 0 to 1 with 1-byte and 2-byte start-stop, which carry no objects
+    let ignored: [&[u8]; 2] = [&[34, 0, 0x00, 0, 1], &[34, 0, 0x01, 0, 0, 1, 0]];
+
+    for header in ignored {
+        let mut seq = Sequence::default();
+        let mut harness = create_association(AssociationConfig::default()).await;
+        let (read, response_seq) = start_read(&mut harness, &mut seq).await;
+        harness.read_events.pop();
+
+        let mut response = read_response(response_seq, true, true, Iin2::default(), None);
+        response.extend_from_slice(header);
+        // g34v1 with a 1-byte start-stop of index 3, a deadband of 0x1234
+        response.extend_from_slice(&[34, 1, 0x00, 3, 3, 0x34, 0x12]);
+        harness.process_response(response).await;
+
+        assert_eq!(read.await.unwrap(), Ok(()));
+        // the response requested confirmation, and is confirmed
+        harness.expect_write(solicited_confirm(response_seq)).await;
+        assert_eq!(
+            harness.read_events.pop(),
+            vec![
+                ReadEvent::BeginFragment(ReadType::SinglePoll),
+                ReadEvent::AnalogInputDeadBand(AnalogInputDeadBand::U16(0x1234), 3),
+                ReadEvent::EndFragment(ReadType::SinglePoll),
+            ]
+        );
+        harness.assert_no_events();
+    }
 }

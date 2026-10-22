@@ -402,6 +402,174 @@ fn analog_output_status_static_variations() {
     );
 }
 
+/// ONLINE and OVER_RANGE
+const ONLINE_OVER_RANGE: u8 = 0x21;
+
+#[test]
+#[rustfmt::skip]
+fn analog_nan_is_zero_with_over_range_in_integer_variations() {
+    const F: u8 = ONLINE_OVER_RANGE;
+    let input = AnalogInput::new(f64::NAN, Flags::ONLINE, time());
+    let output = AnalogOutputStatus::new(f64::NAN, Flags::ONLINE, time());
+
+    {
+        use StaticAnalogInputVariation::*;
+        check_static_variations(
+            |db, s_var| {
+                db.add(INDEX, None, AnalogInputConfig { s_var, ..Default::default() });
+                db.update(INDEX, &input, UpdateOptions::no_event());
+            },
+            Group30Var1,
+            &[
+                (Group30Var1, [30, 1], &[30, 1, 1, 3, 0, 3, 0, F, 0, 0, 0, 0]),
+                (Group30Var2, [30, 2], &[30, 2, 1, 3, 0, 3, 0, F, 0, 0]),
+                // the variations without flags are promoted to report OVER_RANGE
+                (Group30Var3, [30, 3], &[30, 1, 1, 3, 0, 3, 0, F, 0, 0, 0, 0]),
+                (Group30Var4, [30, 4], &[30, 2, 1, 3, 0, 3, 0, F, 0, 0]),
+                (Group30Var5, [30, 5], &[30, 5, 1, 3, 0, 3, 0, 1, 0, 0, 192, 127]),
+                (Group30Var6, [30, 6], &[30, 6, 1, 3, 0, 3, 0, 1, 0, 0, 0, 0, 0, 0, 248, 127]),
+            ],
+        );
+    }
+
+    {
+        use EventAnalogInputVariation::*;
+        check_event_variations(
+            |db, e_var| {
+                db.add(INDEX, Some(EventClass::Class1), AnalogInputConfig { e_var, ..Default::default() });
+                db.update(INDEX, &input, UpdateOptions::default());
+            },
+            Group32Var1,
+            &[
+                (Group32Var1, [32, 1], &[32, 1, 40, 1, 0, 3, 0, F, 0, 0, 0, 0]),
+                (Group32Var2, [32, 2], &[32, 2, 40, 1, 0, 3, 0, F, 0, 0]),
+                (Group32Var3, [32, 3], &[32, 3, 40, 1, 0, 3, 0, F, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6]),
+                (Group32Var4, [32, 4], &[32, 4, 40, 1, 0, 3, 0, F, 0, 0, 1, 2, 3, 4, 5, 6]),
+                (Group32Var5, [32, 5], &[32, 5, 40, 1, 0, 3, 0, 1, 0, 0, 192, 127]),
+                (Group32Var6, [32, 6], &[32, 6, 40, 1, 0, 3, 0, 1, 0, 0, 0, 0, 0, 0, 248, 127]),
+                (Group32Var7, [32, 7], &[32, 7, 40, 1, 0, 3, 0, 1, 0, 0, 192, 127, 1, 2, 3, 4, 5, 6]),
+                (Group32Var8, [32, 8], &[32, 8, 40, 1, 0, 3, 0, 1, 0, 0, 0, 0, 0, 0, 248, 127, 1, 2, 3, 4, 5, 6]),
+            ],
+        );
+    }
+
+    {
+        use StaticAnalogOutputStatusVariation::*;
+        check_static_variations(
+            |db, s_var| {
+                db.add(INDEX, None, AnalogOutputStatusConfig { s_var, ..Default::default() });
+                db.update(INDEX, &output, UpdateOptions::no_event());
+            },
+            Group40Var1,
+            &[
+                (Group40Var1, [40, 1], &[40, 1, 1, 3, 0, 3, 0, F, 0, 0, 0, 0]),
+                (Group40Var2, [40, 2], &[40, 2, 1, 3, 0, 3, 0, F, 0, 0]),
+                (Group40Var3, [40, 3], &[40, 3, 1, 3, 0, 3, 0, 1, 0, 0, 192, 127]),
+                (Group40Var4, [40, 4], &[40, 4, 1, 3, 0, 3, 0, 1, 0, 0, 0, 0, 0, 0, 248, 127]),
+            ],
+        );
+    }
+
+    {
+        use EventAnalogOutputStatusVariation::*;
+        check_event_variations(
+            |db, e_var| {
+                db.add(INDEX, Some(EventClass::Class1), AnalogOutputStatusConfig { e_var, ..Default::default() });
+                db.update(INDEX, &output, UpdateOptions::default());
+            },
+            Group42Var1,
+            &[
+                (Group42Var1, [42, 1], &[42, 1, 40, 1, 0, 3, 0, F, 0, 0, 0, 0]),
+                (Group42Var2, [42, 2], &[42, 2, 40, 1, 0, 3, 0, F, 0, 0]),
+                (Group42Var3, [42, 3], &[42, 3, 40, 1, 0, 3, 0, F, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6]),
+                (Group42Var4, [42, 4], &[42, 4, 40, 1, 0, 3, 0, F, 0, 0, 1, 2, 3, 4, 5, 6]),
+                (Group42Var5, [42, 5], &[42, 5, 40, 1, 0, 3, 0, 1, 0, 0, 192, 127]),
+                (Group42Var6, [42, 6], &[42, 6, 40, 1, 0, 3, 0, 1, 0, 0, 0, 0, 0, 0, 248, 127]),
+                (Group42Var7, [42, 7], &[42, 7, 40, 1, 0, 3, 0, 1, 0, 0, 192, 127, 1, 2, 3, 4, 5, 6]),
+                (Group42Var8, [42, 8], &[42, 8, 40, 1, 0, 3, 0, 1, 0, 0, 0, 0, 0, 0, 248, 127, 1, 2, 3, 4, 5, 6]),
+            ],
+        );
+    }
+}
+
+#[test]
+#[rustfmt::skip]
+fn analog_infinity_stays_infinite_in_single_precision_variations() {
+    const F: u8 = ONLINE_OVER_RANGE;
+    // the high bytes of +infinity and -infinity as an f32, and the clamped i32 an integer
+    // variation reports with OVER_RANGE
+    for (value, f32_sign, i32_bytes) in [
+        (f64::INFINITY, 127, [255, 255, 255, 127]),
+        (f64::NEG_INFINITY, 255, [0, 0, 0, 128]),
+    ] {
+        let [a, b, c, d] = i32_bytes;
+        let input = AnalogInput::new(value, Flags::ONLINE, time());
+        let output = AnalogOutputStatus::new(value, Flags::ONLINE, time());
+
+        {
+            use StaticAnalogInputVariation::*;
+            check_static_variations(
+                |db, s_var| {
+                    db.add(INDEX, None, AnalogInputConfig { s_var, ..Default::default() });
+                    db.update(INDEX, &input, UpdateOptions::no_event());
+                },
+                Group30Var1,
+                &[
+                    (Group30Var1, [30, 1], &[30, 1, 1, 3, 0, 3, 0, F, a, b, c, d]),
+                    (Group30Var5, [30, 5], &[30, 5, 1, 3, 0, 3, 0, 1, 0, 0, 128, f32_sign]),
+                ],
+            );
+        }
+
+        {
+            use EventAnalogInputVariation::*;
+            check_event_variations(
+                |db, e_var| {
+                    db.add(INDEX, Some(EventClass::Class1), AnalogInputConfig { e_var, ..Default::default() });
+                    db.update(INDEX, &input, UpdateOptions::default());
+                },
+                Group32Var1,
+                &[
+                    (Group32Var1, [32, 1], &[32, 1, 40, 1, 0, 3, 0, F, a, b, c, d]),
+                    (Group32Var5, [32, 5], &[32, 5, 40, 1, 0, 3, 0, 1, 0, 0, 128, f32_sign]),
+                    (Group32Var7, [32, 7], &[32, 7, 40, 1, 0, 3, 0, 1, 0, 0, 128, f32_sign, 1, 2, 3, 4, 5, 6]),
+                ],
+            );
+        }
+
+        {
+            use StaticAnalogOutputStatusVariation::*;
+            check_static_variations(
+                |db, s_var| {
+                    db.add(INDEX, None, AnalogOutputStatusConfig { s_var, ..Default::default() });
+                    db.update(INDEX, &output, UpdateOptions::no_event());
+                },
+                Group40Var1,
+                &[
+                    (Group40Var1, [40, 1], &[40, 1, 1, 3, 0, 3, 0, F, a, b, c, d]),
+                    (Group40Var3, [40, 3], &[40, 3, 1, 3, 0, 3, 0, 1, 0, 0, 128, f32_sign]),
+                ],
+            );
+        }
+
+        {
+            use EventAnalogOutputStatusVariation::*;
+            check_event_variations(
+                |db, e_var| {
+                    db.add(INDEX, Some(EventClass::Class1), AnalogOutputStatusConfig { e_var, ..Default::default() });
+                    db.update(INDEX, &output, UpdateOptions::default());
+                },
+                Group42Var1,
+                &[
+                    (Group42Var1, [42, 1], &[42, 1, 40, 1, 0, 3, 0, F, a, b, c, d]),
+                    (Group42Var5, [42, 5], &[42, 5, 40, 1, 0, 3, 0, 1, 0, 0, 128, f32_sign]),
+                    (Group42Var7, [42, 7], &[42, 7, 40, 1, 0, 3, 0, 1, 0, 0, 128, f32_sign, 1, 2, 3, 4, 5, 6]),
+                ],
+            );
+        }
+    }
+}
+
 #[test]
 #[rustfmt::skip]
 fn analog_input_dead_band_variations() {

@@ -190,7 +190,7 @@ const RANGE: &[(u8, &[u8])] = &[
     (21, &[0, 1, 2, 5, 6, 9, 10]),
     (30, &[0, 1, 2, 3, 4, 5, 6]),
     (31, &[0, 1, 2, 3, 4, 5, 6, 7, 8]),
-    (34, &[1, 2, 3]),
+    (34, &[0, 1, 2, 3]),
     (40, &[0, 1, 2, 3, 4]),
     (80, &[1]),
     (102, &[0, 1]),
@@ -379,7 +379,7 @@ fn each_read_header_carries_its_variation_and_qualifier() {
     }
     // the number of variation and qualifier pairs that a READ accepts, counting each variation
     // of groups 0, 110 and 111
-    assert_eq!(accepted, 1626);
+    assert_eq!(accepted, 1628);
 }
 
 #[test]
