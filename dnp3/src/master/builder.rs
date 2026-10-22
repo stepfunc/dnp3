@@ -495,7 +495,7 @@ impl UdpMasterTask {
             factory: UdpFactory::bound(local_endpoint),
             retry_delay: self.retry_delay,
         };
-        let _: Result<(), crate::app::Shutdown> = task.run().await;
+        task.run().await;
     }
 }
 

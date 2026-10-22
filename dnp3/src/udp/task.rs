@@ -1,6 +1,10 @@
-use crate::app::{Shutdown, Timeout};
+use std::time::Duration;
+
+use crate::app::Timeout;
+use crate::link::error::LinkError;
 use crate::udp::layer::UdpFactory;
-use crate::util::session::{RunError, Session, StopReason};
+use crate::util::phys::PhysLayer;
+use crate::util::session::{run_connection, Connection, Session};
 
 pub(crate) struct UdpTask {
     pub(crate) session: Session,
@@ -8,43 +12,35 @@ pub(crate) struct UdpTask {
     pub(crate) retry_delay: Timeout,
 }
 
-enum Delay {
-    Yes,
-    No,
+impl UdpTask {
+    pub(crate) async fn run(mut self) {
+        run_connection(&mut self).await;
+    }
 }
 
-impl UdpTask {
-    pub(crate) async fn run(mut self) -> Result<(), Shutdown> {
-        loop {
-            self.session.wait_for_enabled().await?;
-            if let Delay::Yes = self.run_one().await? {
-                if let Err(reason) = self.session.wait_for_retry(self.retry_delay.into()).await {
-                    Self::handle_stop(reason)?;
-                }
-            }
-        }
+impl Connection for UdpTask {
+    type Peer = ();
+
+    const CLOSE_AFTER_RETRY_WAIT: bool = false;
+
+    fn session(&mut self) -> &mut Session {
+        &mut self.session
     }
 
-    fn handle_stop(reason: StopReason) -> Result<Delay, Shutdown> {
-        match reason {
-            StopReason::Disable => Ok(Delay::No),
-            StopReason::Shutdown => Err(Shutdown),
-        }
-    }
+    async fn disabled(&mut self) {}
 
-    async fn run_one(&mut self) -> Result<Delay, Shutdown> {
+    async fn open(&mut self) -> Result<(PhysLayer, ()), Duration> {
         match self.factory.open().await {
-            Ok(mut phys) => match self.session.run(&mut phys).await {
-                RunError::Stop(r) => Self::handle_stop(r),
-                RunError::Link(err) => {
-                    tracing::warn!("{err}");
-                    Ok(Delay::Yes)
-                }
-            },
+            Ok(phys) => Ok((phys, ())),
             Err(err) => {
                 tracing::error!("{err}");
-                Ok(Delay::Yes)
+                Err(self.retry_delay.into())
             }
         }
+    }
+
+    async fn failed(&mut self, _: (), err: LinkError) -> Duration {
+        tracing::warn!("{err}");
+        self.retry_delay.into()
     }
 }
