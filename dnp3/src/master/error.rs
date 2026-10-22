@@ -1,6 +1,6 @@
 use std::error::Error;
 
-use crate::app::control::CommandStatus;
+use crate::app::control::{CommandStatus, ControlCode};
 use crate::app::{Iin, Iin2};
 use crate::app::{ObjectParseError, Shutdown};
 use crate::link::error::LinkError;
@@ -39,12 +39,17 @@ pub enum AssociationError {
 pub enum BadEncoding {
     /// Attribute could not be encoded
     Attribute(BadAttribute),
+    /// Control code whose fields encode to a byte that parses back to a different control code
+    ControlCode(ControlCode),
 }
 
 impl std::fmt::Display for BadEncoding {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             BadEncoding::Attribute(x) => write!(f, "Bad attribute encoding: {x}"),
+            BadEncoding::ControlCode(x) => {
+                write!(f, "Control code does not encode to the same value: {x}")
+            }
         }
     }
 }

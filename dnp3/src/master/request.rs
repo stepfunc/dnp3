@@ -13,7 +13,7 @@ use crate::app::CommandObject;
 use crate::app::Timestamp;
 use crate::app::Variation::Group0;
 use crate::master::error::CommandResponseError;
-use crate::master::TaskError;
+use crate::master::{BadEncoding, TaskError};
 use crate::outstation::FreezeInterval;
 
 /// Controls how a command request is issued
@@ -779,7 +779,11 @@ impl CommandHeaders {
         }
     }
 
-    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
+    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
+        for header in self.headers.iter() {
+            header.validate().map_err(TaskError::BadEncoding)?;
+        }
+
         for header in self.headers.iter() {
             header.write(writer)?;
         }
@@ -973,6 +977,13 @@ impl CommandHeader {
         I::header(C::header(vec![(command, index)]))
     }
 
+    fn validate(&self) -> Result<(), BadEncoding> {
+        match self {
+            CommandHeader::U8(items) => items.validate(),
+            CommandHeader::U16(items) => items.validate(),
+        }
+    }
+
     pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         match self {
             CommandHeader::U8(items) => items.write(writer),
@@ -994,6 +1005,21 @@ impl CommandHeader {
 }
 
 impl<I: Index> CommandItems<I> {
+    fn validate(&self) -> Result<(), BadEncoding> {
+        match self {
+            CommandItems::G12V1(items) => {
+                match items.iter().find(|(x, _)| !x.code.is_canonical()) {
+                    Some((x, _)) => Err(BadEncoding::ControlCode(x.code)),
+                    None => Ok(()),
+                }
+            }
+            CommandItems::G41V1(_)
+            | CommandItems::G41V2(_)
+            | CommandItems::G41V3(_)
+            | CommandItems::G41V4(_) => Ok(()),
+        }
+    }
+
     fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         match self {
             CommandItems::G12V1(items) => writer.write_prefixed_items(items.iter()),

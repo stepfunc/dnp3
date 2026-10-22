@@ -23,7 +23,7 @@ impl RequestWriter for CommandNoAckTask {
     }
 
     fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
-        Ok(self.headers.write(writer)?)
+        self.headers.write(writer)
     }
 }
 

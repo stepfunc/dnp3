@@ -5,7 +5,7 @@ use sfio_tokio_mock_io::Event;
 use tokio::sync::oneshot::error::TryRecvError;
 use tokio::time::Instant;
 
-use crate::app::control::{Group12Var1, OpType};
+use crate::app::control::{ControlCode, Group12Var1, OpType, TripCloseCode};
 use crate::app::format::write::{start_request, start_response};
 use crate::app::parse::options::ParseOptions;
 use crate::app::{BufferSize, ControlField, FunctionCode, Iin, ResponseFunction, Sequence};
@@ -21,9 +21,9 @@ use crate::master::tests::harness::requests::{empty_response, unsol_confirm, uns
 use crate::master::tests::harness::{create_association, AssocInfoEvent, TestHarness};
 use crate::master::Classes;
 use crate::master::{
-    AssociationHandle, AssociationHandler, AssociationInformation, CommandBuilder, CommandHeaders,
-    CommandMode, CommandSupport, MasterChannel, MasterChannelConfig, MasterChannelType,
-    ReadHandler, ReadRequest, TaskError, TaskType,
+    AssociationHandle, AssociationHandler, AssociationInformation, BadEncoding, CommandBuilder,
+    CommandError, CommandHeaders, CommandMode, CommandSupport, MasterChannel, MasterChannelConfig,
+    MasterChannelType, ReadHandler, ReadRequest, TaskError, TaskType,
 };
 use crate::transport::FragmentAddr;
 use crate::util::phys::PhysAddr;
@@ -393,4 +393,40 @@ async fn operate_no_ack_fails_without_a_connection() {
     task.process_next_message().await.unwrap();
 
     assert_eq!(operate.await.unwrap(), Err(TaskError::NoConnection));
+}
+
+/// Codes whose fields encode to a byte that parses back to a different `ControlCode`
+fn non_canonical_codes() -> [ControlCode; 3] {
+    [
+        // encodes as PULSE_ON
+        ControlCode::from_op_type(OpType::Unknown(0x11)),
+        // encodes as CLOSE + PULSE_ON
+        ControlCode::from_tcc_and_op_type(TripCloseCode::Unknown(5), OpType::PulseOn),
+        // encodes as PULSE_ON, which parses back as the named variant
+        ControlCode::from_op_type(OpType::Unknown(1)),
+    ]
+}
+
+#[tokio::test]
+async fn non_canonical_control_codes_are_rejected_before_anything_is_sent() {
+    let mut harness = quiet_association().await;
+
+    for code in non_canonical_codes() {
+        let headers = || CommandBuilder::single_header_u16(Group12Var1::from_code(code), 3);
+        let expected = TaskError::BadEncoding(BadEncoding::ControlCode(code));
+
+        for mode in [CommandMode::DirectOperate, CommandMode::SelectBeforeOperate] {
+            assert_eq!(
+                harness.association.operate(mode, headers()).await,
+                Err(CommandError::Task(expected))
+            );
+            harness.assert_no_events();
+        }
+
+        assert_eq!(
+            harness.association.operate_no_ack(headers()).await,
+            Err(expected)
+        );
+        harness.assert_no_events();
+    }
 }

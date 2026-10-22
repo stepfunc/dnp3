@@ -63,7 +63,7 @@ impl ControlCode {
     }
 
     pub(crate) fn as_u8(self) -> u8 {
-        let mut x = (self.tcc.as_u8() << 6) & Self::TCC_MASK;
+        let mut x = self.tcc.as_u8() << 6;
         if self.clear {
             x |= Self::CR_MASK;
         }
@@ -72,6 +72,11 @@ impl ControlCode {
         }
         x |= self.op_type.as_u8() & Self::OP_MASK;
         x
+    }
+
+    /// true if the fields encode to a byte that parses back to this same value
+    pub(crate) fn is_canonical(self) -> bool {
+        Self::from(self.as_u8()) == self
     }
 }
 
@@ -223,6 +228,19 @@ mod test {
     fn round_trips_every_parsed_value() {
         for byte in 0..=u8::MAX {
             assert_eq!(ControlCode::from(byte).as_u8(), byte);
+            assert!(ControlCode::from(byte).is_canonical());
+        }
+    }
+
+    #[test]
+    fn values_that_alias_another_code_are_not_canonical() {
+        for cc in [
+            ControlCode::from_op_type(OpType::Unknown(0x11)),
+            ControlCode::from_tcc_and_op_type(TripCloseCode::Unknown(5), OpType::PulseOn),
+            ControlCode::from_op_type(OpType::Unknown(1)),
+            ControlCode::from_tcc_and_op_type(TripCloseCode::Unknown(1), OpType::PulseOn),
+        ] {
+            assert!(!cc.is_canonical(), "{cc:?}");
         }
     }
 }
