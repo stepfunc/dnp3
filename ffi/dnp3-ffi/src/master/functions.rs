@@ -28,17 +28,21 @@ pub struct FileInfoIterator {
 }
 
 impl FileInfoIterator {
-    pub(crate) fn new(inner: std::vec::IntoIter<FileInfo>) -> Self {
-        Self {
-            inner,
+    /// Returns `None` if any name contains a NUL, which a C string can't hold
+    pub(crate) fn new(items: Vec<FileInfo>) -> Option<Self> {
+        if items.iter().any(|x| x.name.contains('\0')) {
+            return None;
+        }
+        Some(Self {
+            inner: items.into_iter(),
             current_name: Default::default(),
             current_info: None,
-        }
+        })
     }
 
     pub(crate) fn next(&mut self) -> Option<&ffi::FileInfo> {
         let next = self.inner.next()?;
-        self.current_name = CString::new(next.name).unwrap();
+        self.current_name = CString::new(next.name).ok()?;
         let file_type: ffi::FileType = next.file_type.into();
         self.current_info = Some(ffi::FileInfo {
             file_name: self.current_name.as_ptr(),

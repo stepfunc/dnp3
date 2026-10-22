@@ -3,6 +3,7 @@
     clippy::default_constructed_unit_structs,
     clippy::needless_lifetimes
 )]
+#![deny(clippy::unwrap_used, clippy::expect_used)]
 
 pub(crate) use crate::tracing::*;
 pub(crate) use app_options::*;
@@ -46,7 +47,12 @@ mod app_options;
 pub mod ffi;
 
 lazy_static::lazy_static! {
-    static ref VERSION: std::ffi::CString = std::ffi::CString::new(dnp3::VERSION).unwrap();
+    static ref VERSION: std::ffi::CString = version_c_string();
+}
+
+#[expect(clippy::expect_used, reason = "the crate version is a constant")]
+fn version_c_string() -> std::ffi::CString {
+    std::ffi::CString::new(dnp3::VERSION).expect("version contains no NUL")
 }
 
 fn version() -> &'static std::ffi::CStr {
