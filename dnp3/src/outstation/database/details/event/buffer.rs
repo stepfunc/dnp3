@@ -1,4 +1,3 @@
-use std::cell::Cell;
 use std::fmt::Debug;
 use std::ops::BitOr;
 
@@ -10,11 +9,11 @@ use crate::outstation::database::{EventBufferConfig, EventClass};
 
 use crate::util::BadWrite;
 
-use super::list::VecList;
 use super::writer::EventWriter;
 
 use crate::outstation::database::details::event::traits::OctetStringLength;
 use crate::outstation::{BufferState, ClassCount, OutstationApplication, TypeCount};
+use records::{EventRecord, EventState, Events};
 use scursor::WriteCursor;
 
 impl From<EventClass> for EventClasses {
@@ -65,219 +64,288 @@ impl Default for EventClasses {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-struct Count {
-    value: usize,
-}
-
-impl Count {
-    fn new() -> Self {
-        Self { value: 0 }
-    }
-
-    fn subtract(&self, other: &Count) -> Self {
-        Self {
-            value: self.value.saturating_sub(other.value),
-        }
-    }
-
-    fn zero(&mut self) {
-        self.value = 0;
-    }
-
-    fn get(&self) -> usize {
-        self.value
-    }
-
-    fn increment(&mut self) {
-        self.value = self.value.saturating_add(1);
-    }
-
-    fn decrement(&mut self) {
-        self.value = self.value.saturating_sub(1);
+fn class_count_mut(count: &mut ClassCount, class: EventClass) -> &mut usize {
+    match class {
+        EventClass::Class1 => &mut count.num_class_1,
+        EventClass::Class2 => &mut count.num_class_2,
+        EventClass::Class3 => &mut count.num_class_3,
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq)]
-struct ClassCounter {
-    num_class_1: Count,
-    num_class_2: Count,
-    num_class_3: Count,
+fn increment(count: &mut usize) {
+    *count = count.saturating_add(1);
 }
 
-impl From<ClassCounter> for ClassCount {
-    fn from(value: ClassCounter) -> Self {
-        Self {
-            num_class_1: value.num_class_1.value,
-            num_class_2: value.num_class_2.value,
-            num_class_3: value.num_class_3.value,
-        }
-    }
+fn decrement(count: &mut usize) {
+    *count = count.saturating_sub(1);
 }
 
-impl ClassCounter {
-    fn new() -> Self {
-        Self {
-            num_class_1: Count::new(),
-            num_class_2: Count::new(),
-            num_class_3: Count::new(),
-        }
-    }
-
-    fn zero(&mut self) {
-        self.num_class_1.zero();
-        self.num_class_2.zero();
-        self.num_class_3.zero();
-    }
-
-    fn subtract(&self, other: &Self) -> Self {
-        Self {
-            num_class_1: self.num_class_1.subtract(&other.num_class_1),
-            num_class_2: self.num_class_2.subtract(&other.num_class_2),
-            num_class_3: self.num_class_3.subtract(&other.num_class_3),
-        }
-    }
-
-    fn increment(&mut self, class: EventClass) {
-        match class {
-            EventClass::Class1 => self.num_class_1.increment(),
-            EventClass::Class2 => self.num_class_2.increment(),
-            EventClass::Class3 => self.num_class_3.increment(),
-        };
-    }
-
-    fn decrement(&mut self, class: EventClass) {
-        match class {
-            EventClass::Class1 => self.num_class_1.decrement(),
-            EventClass::Class2 => self.num_class_2.decrement(),
-            EventClass::Class3 => self.num_class_3.decrement(),
-        }
-    }
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) enum EventType {
+    Binary,
+    DoubleBitBinary,
+    BinaryOutputStatus,
+    Counter,
+    FrozenCounter,
+    Analog,
+    AnalogOutputStatus,
+    OctetString,
 }
 
-#[derive(Copy, Clone)]
-pub(crate) struct TypeCounter {
-    num_binary: Count,
-    num_double_binary: Count,
-    num_binary_output_status: Count,
-    num_counter: Count,
-    num_frozen_counter: Count,
-    num_analog: Count,
-    num_analog_output_status: Count,
-    num_octet_string: Count,
-}
+impl EventType {
+    const ALL: [EventType; 8] = [
+        EventType::Binary,
+        EventType::DoubleBitBinary,
+        EventType::BinaryOutputStatus,
+        EventType::Counter,
+        EventType::FrozenCounter,
+        EventType::Analog,
+        EventType::AnalogOutputStatus,
+        EventType::OctetString,
+    ];
 
-impl From<TypeCounter> for TypeCount {
-    fn from(value: TypeCounter) -> Self {
-        Self {
-            num_binary_input: value.num_binary.value,
-            num_double_bit_binary_input: value.num_double_binary.value,
-            num_binary_output_status: value.num_binary_output_status.value,
-            num_counter: value.num_counter.value,
-            num_frozen_counter: value.num_frozen_counter.value,
-            num_analog: value.num_analog.value,
-            num_analog_output_status: value.num_analog_output_status.value,
-            num_octet_string: value.num_octet_string.value,
+    fn max(self, config: &EventBufferConfig) -> usize {
+        usize::from(match self {
+            EventType::Binary => config.max_binary,
+            EventType::DoubleBitBinary => config.max_double_binary,
+            EventType::BinaryOutputStatus => config.max_binary_output_status,
+            EventType::Counter => config.max_counter,
+            EventType::FrozenCounter => config.max_frozen_counter,
+            EventType::Analog => config.max_analog,
+            EventType::AnalogOutputStatus => config.max_analog_output_status,
+            EventType::OctetString => config.max_octet_string,
+        })
+    }
+
+    fn count_mut(self, count: &mut TypeCount) -> &mut usize {
+        match self {
+            EventType::Binary => &mut count.num_binary_input,
+            EventType::DoubleBitBinary => &mut count.num_double_bit_binary_input,
+            EventType::BinaryOutputStatus => &mut count.num_binary_output_status,
+            EventType::Counter => &mut count.num_counter,
+            EventType::FrozenCounter => &mut count.num_frozen_counter,
+            EventType::Analog => &mut count.num_analog,
+            EventType::AnalogOutputStatus => &mut count.num_analog_output_status,
+            EventType::OctetString => &mut count.num_octet_string,
         }
+    }
+
+    fn count(self, mut count: TypeCount) -> usize {
+        *self.count_mut(&mut count)
     }
 }
 
-impl TypeCounter {
-    fn new() -> Self {
-        Self {
-            num_binary: Count::new(),
-            num_double_binary: Count::new(),
-            num_binary_output_status: Count::new(),
-            num_counter: Count::new(),
-            num_frozen_counter: Count::new(),
-            num_analog: Count::new(),
-            num_analog_output_status: Count::new(),
-            num_octet_string: Count::new(),
+/// The event records, and the counts that change with each of their insertions, removals and
+/// state changes. Nothing outside this module changes a record's state or a count.
+mod records {
+    use std::ops::ControlFlow;
+
+    use scursor::WriteCursor;
+
+    use super::super::list::VecList;
+    use super::super::writer::EventWriter;
+    use super::{class_count_mut, decrement, increment, Event, EventType};
+    use crate::master::EventClasses;
+    use crate::outstation::database::EventClass;
+    use crate::outstation::{BufferState, ClassCount, TypeCount};
+
+    #[derive(Copy, Clone, Debug, PartialEq)]
+    pub(super) enum EventState {
+        Unselected,
+        Selected,
+        Written,
+    }
+
+    #[derive(Debug, PartialEq)]
+    pub(super) struct EventRecord {
+        index: u16,
+        id: u64,
+        class: EventClass,
+        event: Event,
+        state: EventState,
+    }
+
+    impl EventRecord {
+        pub(super) fn new(index: u16, id: u64, class: EventClass, event: Event) -> Self {
+            Self {
+                index,
+                id,
+                class,
+                event,
+                state: EventState::Unselected,
+            }
+        }
+
+        pub(super) fn id(&self) -> u64 {
+            self.id
+        }
+
+        pub(super) fn class(&self) -> EventClass {
+            self.class
+        }
+
+        pub(super) fn state(&self) -> EventState {
+            self.state
         }
     }
 
-    fn zero(&mut self) {
-        self.num_binary.zero();
-        self.num_double_binary.zero();
-        self.num_binary_output_status.zero();
-        self.num_counter.zero();
-        self.num_frozen_counter.zero();
-        self.num_analog.zero();
-        self.num_analog_output_status.zero();
-        self.num_octet_string.zero();
+    pub(super) struct Events {
+        list: VecList<EventRecord>,
+        total: BufferState,
+        // records in the Written state
+        written: ClassCount,
     }
 
-    fn increment(&mut self, event: &Event) {
-        self.modify(event, |cnt| cnt.increment())
-    }
-
-    /*
-       fn decrement(&mut self, event: &Event) {
-           self.modify(event, |cnt| cnt.decrement())
-       }
-    */
-
-    fn modify<F>(&mut self, event: &Event, op: F)
-    where
-        F: Fn(&mut Count),
-    {
-        match event {
-            Event::Binary(_, _) => op(&mut self.num_binary),
-            Event::DoubleBitBinary(_, _) => op(&mut self.num_double_binary),
-            Event::BinaryOutputStatus(_, _) => op(&mut self.num_binary_output_status),
-            Event::Counter(_, _) => op(&mut self.num_counter),
-            Event::FrozenCounter(_, _) => op(&mut self.num_frozen_counter),
-            Event::Analog(_, _) => op(&mut self.num_analog),
-            Event::AnalogOutputStatus(_, _) => op(&mut self.num_analog_output_status),
-            Event::OctetString(_, _) => op(&mut self.num_octet_string),
+    impl Events {
+        pub(super) fn new(capacity: usize) -> Self {
+            Self {
+                list: VecList::new(capacity),
+                total: BufferState {
+                    classes: ClassCount::default(),
+                    types: TypeCount {
+                        num_binary_input: 0,
+                        num_double_bit_binary_input: 0,
+                        num_binary_output_status: 0,
+                        num_counter: 0,
+                        num_frozen_counter: 0,
+                        num_analog: 0,
+                        num_analog_output_status: 0,
+                        num_octet_string: 0,
+                    },
+                },
+                written: ClassCount::default(),
+            }
         }
-    }
-}
 
-#[derive(Copy, Clone)]
-struct Counters {
-    types: TypeCounter,
-    classes: ClassCounter,
-}
-
-impl From<Counters> for BufferState {
-    fn from(value: Counters) -> Self {
-        Self {
-            classes: value.classes.into(),
-            types: value.types.into(),
+        pub(super) fn total(&self) -> BufferState {
+            self.total
         }
-    }
-}
 
-impl Counters {
-    fn new() -> Self {
-        Self {
-            types: TypeCounter::new(),
-            classes: ClassCounter::new(),
+        pub(super) fn type_count(&self, event_type: EventType) -> usize {
+            event_type.count(self.total.types)
         }
-    }
 
-    fn zero(&mut self) {
-        self.types.zero();
-        self.classes.zero();
-    }
+        pub(super) fn unwritten_classes(&self) -> EventClasses {
+            let total = self.total.classes;
+            let written = self.written;
+            EventClasses::new(
+                total.num_class_1 > written.num_class_1,
+                total.num_class_2 > written.num_class_2,
+                total.num_class_3 > written.num_class_3,
+            )
+        }
 
-    fn increment(&mut self, record: &EventRecord) {
-        self.types.increment(&record.event);
-        self.classes.increment(record.class);
-    }
+        /// append an unselected record
+        pub(super) fn push(&mut self, record: EventRecord) {
+            let event_type = record.event.event_type();
+            let class = record.class;
+            if self.list.add(record).is_some() {
+                increment(event_type.count_mut(&mut self.total.types));
+                increment(class_count_mut(&mut self.total.classes, class));
+            }
+        }
 
-    fn decrement(&mut self, record: &EventRecord) {
-        self.classes.decrement(record.class);
-        match record.event {
-            Event::Binary(_, _) => self.types.num_binary.decrement(),
-            Event::DoubleBitBinary(_, _) => self.types.num_double_binary.decrement(),
-            Event::BinaryOutputStatus(_, _) => self.types.num_binary_output_status.decrement(),
-            Event::Counter(_, _) => self.types.num_counter.decrement(),
-            Event::FrozenCounter(_, _) => self.types.num_frozen_counter.decrement(),
-            Event::Analog(_, _) => self.types.num_analog.decrement(),
-            Event::AnalogOutputStatus(_, _) => self.types.num_analog_output_status.decrement(),
-            Event::OctetString(_, _) => self.types.num_octet_string.decrement(),
+        /// remove the oldest record of a type, whatever its state, returning its id
+        pub(super) fn remove_oldest(&mut self, event_type: EventType) -> Option<u64> {
+            let record = self
+                .list
+                .remove_first(|r| r.event.event_type() == event_type)?;
+            Self::uncount(&mut self.total, &mut self.written, record);
+            Some(record.id)
+        }
+
+        /// remove every record matching the predicate, passing each one to `removed`
+        pub(super) fn remove_all<F, R>(&mut self, predicate: F, mut removed: R) -> usize
+        where
+            F: FnMut(&EventRecord) -> bool,
+            R: FnMut(&EventRecord),
+        {
+            let total = &mut self.total;
+            let written = &mut self.written;
+            self.list.remove_all(predicate, |record| {
+                Self::uncount(total, written, record);
+                removed(record);
+            })
+        }
+
+        /// select unselected records the selector accepts, oldest first, up to the limit
+        pub(super) fn select<F>(&mut self, limit: Option<usize>, mut selector: F) -> usize
+        where
+            F: FnMut(EventClass, &mut Event) -> bool,
+        {
+            let limit = limit.unwrap_or(usize::MAX);
+            let mut count: usize = 0;
+            self.list.for_each_mut(|record| {
+                if count >= limit {
+                    return ControlFlow::Break(());
+                }
+                if record.state == EventState::Unselected
+                    && selector(record.class, &mut record.event)
+                {
+                    record.state = EventState::Selected;
+                    count = count.saturating_add(1);
+                }
+                ControlFlow::Continue(())
+            });
+            count
+        }
+
+        /// write the selected records in order until the cursor is full, marking them written
+        pub(super) fn write(&mut self, cursor: &mut WriteCursor) -> Result<usize, usize> {
+            let written = &mut self.written;
+            let mut writer = EventWriter::new();
+            let mut count: usize = 0;
+            let mut complete = true;
+            self.list.for_each_mut(|record| {
+                if record.state != EventState::Selected {
+                    return ControlFlow::Continue(());
+                }
+                if record
+                    .event
+                    .write(record.index, cursor, &mut writer)
+                    .is_err()
+                {
+                    complete = false;
+                    return ControlFlow::Break(()); // out of space
+                }
+                Self::set_state(written, record, EventState::Written);
+                count = count.saturating_add(1);
+                ControlFlow::Continue(())
+            });
+
+            if complete {
+                Ok(count)
+            } else {
+                Err(count)
+            }
+        }
+
+        /// return every record to the unselected state
+        pub(super) fn reset(&mut self) {
+            let written = &mut self.written;
+            self.list.for_each_mut(|record| {
+                Self::set_state(written, record, EventState::Unselected);
+                ControlFlow::Continue(())
+            });
+        }
+
+        fn set_state(written: &mut ClassCount, record: &mut EventRecord, state: EventState) {
+            let count = class_count_mut(written, record.class);
+            if record.state == EventState::Written {
+                decrement(count);
+            }
+            if state == EventState::Written {
+                increment(count);
+            }
+            record.state = state;
+        }
+
+        fn uncount(total: &mut BufferState, written: &mut ClassCount, record: &EventRecord) {
+            decrement(record.event.event_type().count_mut(&mut total.types));
+            decrement(class_count_mut(&mut total.classes, record.class));
+            if record.state == EventState::Written {
+                decrement(class_count_mut(written, record.class));
+            }
         }
     }
 }
@@ -288,7 +356,7 @@ where
     T: Copy,
 {
     default: T,
-    selected: Cell<T>,
+    selected: T,
 }
 
 impl<T> Variation<T>
@@ -298,12 +366,12 @@ where
     fn new(default: T) -> Self {
         Self {
             default,
-            selected: Cell::new(default),
+            selected: default,
         }
     }
 
-    fn select_default(&self) {
-        self.selected.set(self.default)
+    fn select_default(&mut self) {
+        self.selected = self.default
     }
 }
 
@@ -338,8 +406,21 @@ pub(crate) enum Event {
 }
 
 impl Event {
-    fn select_default_variation(&self) {
-        match &self {
+    fn event_type(&self) -> EventType {
+        match self {
+            Event::Binary(_, _) => EventType::Binary,
+            Event::DoubleBitBinary(_, _) => EventType::DoubleBitBinary,
+            Event::BinaryOutputStatus(_, _) => EventType::BinaryOutputStatus,
+            Event::Counter(_, _) => EventType::Counter,
+            Event::FrozenCounter(_, _) => EventType::FrozenCounter,
+            Event::Analog(_, _) => EventType::Analog,
+            Event::AnalogOutputStatus(_, _) => EventType::AnalogOutputStatus,
+            Event::OctetString(_, _) => EventType::OctetString,
+        }
+    }
+
+    fn select_default_variation(&mut self) {
+        match self {
             Event::Binary(_, v) => v.select_default(),
             Event::DoubleBitBinary(_, v) => v.select_default(),
             Event::BinaryOutputStatus(_, v) => v.select_default(),
@@ -358,13 +439,13 @@ impl Event {
         writer: &mut EventWriter,
     ) -> Result<(), BadWrite> {
         match &self {
-            Event::Binary(evt, v) => writer.write(cursor, evt, index, v.selected.get()),
-            Event::DoubleBitBinary(evt, v) => writer.write(cursor, evt, index, v.selected.get()),
-            Event::BinaryOutputStatus(evt, v) => writer.write(cursor, evt, index, v.selected.get()),
-            Event::Counter(evt, v) => writer.write(cursor, evt, index, v.selected.get()),
-            Event::FrozenCounter(evt, v) => writer.write(cursor, evt, index, v.selected.get()),
-            Event::Analog(evt, v) => writer.write(cursor, evt, index, v.selected.get()),
-            Event::AnalogOutputStatus(evt, v) => writer.write(cursor, evt, index, v.selected.get()),
+            Event::Binary(evt, v) => writer.write(cursor, evt, index, v.selected),
+            Event::DoubleBitBinary(evt, v) => writer.write(cursor, evt, index, v.selected),
+            Event::BinaryOutputStatus(evt, v) => writer.write(cursor, evt, index, v.selected),
+            Event::Counter(evt, v) => writer.write(cursor, evt, index, v.selected),
+            Event::FrozenCounter(evt, v) => writer.write(cursor, evt, index, v.selected),
+            Event::Analog(evt, v) => writer.write(cursor, evt, index, v.selected),
+            Event::AnalogOutputStatus(evt, v) => writer.write(cursor, evt, index, v.selected),
             Event::OctetString(evt, _) => {
                 writer.write(cursor, evt, index, OctetStringLength(evt.len()))
             }
@@ -372,51 +453,19 @@ impl Event {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq)]
-enum EventState {
-    Unselected,
-    Selected,
-    Written,
-}
-
-#[derive(Debug, PartialEq)]
-pub(crate) struct EventRecord {
-    index: u16,
-    id: u64,
-    class: EventClass,
-    event: Event,
-    state: Cell<EventState>,
-}
-
-impl EventRecord {
-    fn new(index: u16, id: u64, class: EventClass, event: Event) -> Self {
-        Self {
-            index,
-            id,
-            class,
-            event,
-            state: Cell::new(EventState::Unselected),
-        }
-    }
-}
-
 pub(crate) trait Insertable: Sized {
     type EventVariation: Copy;
 
-    fn get_max(config: &EventBufferConfig) -> u16;
-    fn get_type_count(counter: &TypeCounter) -> usize;
-    fn is_type(record: &EventRecord) -> bool;
-    fn increment_type(counter: &mut TypeCounter);
+    const TYPE: EventType;
+
     fn create_event(&self, default_variation: Self::EventVariation) -> Event;
-    // set the selected variation if the record is of this type
-    fn select_variation(record: &EventRecord, variation: Self::EventVariation) -> bool;
+    // set the selected variation if the event is of this type
+    fn select_variation(event: &mut Event, variation: Self::EventVariation) -> bool;
 }
 
 pub(crate) struct EventBuffer {
     config: EventBufferConfig,
-    events: VecList<EventRecord>,
-    total: Counters,
-    written: Counters,
+    events: Events,
     is_overflown: bool,
     next: u64,
 }
@@ -432,21 +481,14 @@ impl EventBuffer {
         let max_size = config.max_events();
         Self {
             config,
-            events: VecList::new(max_size),
-            total: Counters::new(),
-            written: Counters::new(),
+            events: Events::new(max_size),
             is_overflown: false,
             next: 0,
         }
     }
 
     pub(crate) fn unwritten_classes(&self) -> EventClasses {
-        let unwritten = self.total.classes.subtract(&self.written.classes);
-        EventClasses::new(
-            unwritten.num_class_1.value > 0,
-            unwritten.num_class_2.value > 0,
-            unwritten.num_class_3.value > 0,
-        )
+        self.events.unwritten_classes()
     }
 
     pub(crate) fn insert<T>(
@@ -459,7 +501,7 @@ impl EventBuffer {
     where
         T: Insertable,
     {
-        let max = T::get_max(&self.config);
+        let max = T::TYPE.max(&self.config);
 
         if max == 0 {
             return Err(InsertError::TypeMaxIsZero);
@@ -468,32 +510,25 @@ impl EventBuffer {
         let id = self.next;
         self.next = self.next.wrapping_add(1);
 
-        let ret = if T::get_type_count(&self.total.types) == usize::from(max) {
-            if let Some(record) = self.events.remove_first(T::is_type) {
-                self.total.decrement(record);
-                // a written event awaiting confirmation is counted as written too
-                if record.state.get() == EventState::Written {
-                    self.written.decrement(record);
-                }
-                self.is_overflown = true;
-                Err(InsertError::Overflow {
-                    created: id,
-                    discarded: record.id,
-                })
-            } else {
-                Ok(id)
-            }
+        let discarded = if self.events.type_count(T::TYPE) >= max {
+            self.events.remove_oldest(T::TYPE)
         } else {
-            Ok(id)
+            None
         };
 
         let record = EventRecord::new(index, id, class, event.create_event(default_variation));
+        self.events.push(record);
 
-        self.events.add(record);
-        self.total.classes.increment(class);
-        T::increment_type(&mut self.total.types);
-
-        ret
+        match discarded {
+            Some(discarded) => {
+                self.is_overflown = true;
+                Err(InsertError::Overflow {
+                    created: id,
+                    discarded,
+                })
+            }
+            None => Ok(id),
+        }
     }
 
     pub(crate) fn select_by_header(&mut self, header: EventReadHeader) -> usize {
@@ -543,13 +578,13 @@ impl EventBuffer {
     where
         T: Insertable,
     {
-        T::get_type_count(&self.total.types) > 0
+        self.events.type_count(T::TYPE) > 0
     }
 
     pub(crate) fn select_by_class(&mut self, classes: EventClasses, limit: Option<usize>) -> usize {
-        self.select(limit, |e| {
-            if classes.matches(e.class) {
-                e.event.select_default_variation();
+        self.events.select(limit, |class, event| {
+            if classes.matches(class) {
+                event.select_default_variation();
                 true
             } else {
                 false
@@ -579,16 +614,17 @@ impl EventBuffer {
     where
         T: Insertable,
     {
-        self.select(limit, |e| T::select_variation(e, variation))
+        self.events
+            .select(limit, |_, event| T::select_variation(event, variation))
     }
 
     fn select_default_variation<T>(&mut self, limit: Option<usize>) -> usize
     where
         T: Insertable,
     {
-        self.select(limit, |rec| {
-            if T::is_type(rec) {
-                rec.event.select_default_variation();
+        self.events.select(limit, |_, event| {
+            if event.event_type() == T::TYPE {
+                event.select_default_variation();
                 true
             } else {
                 false
@@ -597,168 +633,65 @@ impl EventBuffer {
     }
 
     pub(crate) fn write_events(&mut self, cursor: &mut WriteCursor) -> Result<usize, usize> {
-        let mut count: usize = 0;
-        let mut writer = EventWriter::new();
-        let mut counters = self.written;
-        let mut complete = true;
-        for record in self.selected_iter() {
-            if record
-                .event
-                .write(record.index, cursor, &mut writer)
-                .is_err()
-            {
-                complete = false;
-                break; // out of space
-            }
-
-            counters.increment(record);
-            record.state.set(EventState::Written);
-            count = count.saturating_add(1);
-        }
-        self.written = counters;
-
-        if complete {
-            Ok(count)
-        } else {
-            Err(count)
-        }
+        self.events.write(cursor)
     }
 
     pub(crate) fn clear_written(&mut self, app: &mut dyn OutstationApplication) -> usize {
-        let total = &mut self.total;
-        let count = self.events.remove_all(|event| {
-            if event.state.get() == EventState::Written {
-                app.event_cleared(event.id);
-                total.decrement(event);
-                true
-            } else {
-                false
-            }
-        });
-
-        self.written.zero();
-        if !self.is_any_full() {
-            self.is_overflown = false;
-        }
+        let count = self.events.remove_all(
+            |record| record.state() == EventState::Written,
+            |record| app.event_cleared(record.id()),
+        );
+        self.update_overflow();
         count
     }
 
     pub(crate) fn remove_unselected_by_class(&mut self, classes: EventClasses) -> ClassCount {
-        let total = &mut self.total;
         let mut count = ClassCount::default();
-        self.events.remove_all(|event| {
-            if event.state.get() == EventState::Unselected && classes.matches(event.class) {
-                total.decrement(event);
-                match event.class {
-                    EventClass::Class1 => count.num_class_1 = count.num_class_1.saturating_add(1),
-                    EventClass::Class2 => count.num_class_2 = count.num_class_2.saturating_add(1),
-                    EventClass::Class3 => count.num_class_3 = count.num_class_3.saturating_add(1),
-                }
-                true
-            } else {
-                false
-            }
-        });
-
-        if !self.is_any_full() {
-            self.is_overflown = false;
-        }
+        self.events.remove_all(
+            |record| record.state() == EventState::Unselected && classes.matches(record.class()),
+            |record| increment(class_count_mut(&mut count, record.class())),
+        );
+        self.update_overflow();
         count
     }
 
     pub(crate) fn buffer_state(&self) -> BufferState {
-        self.total.into()
+        self.events.total()
     }
 
     pub(crate) fn reset(&mut self) {
-        for (_, r) in self.events.iter() {
-            r.state.set(EventState::Unselected);
-        }
-        self.written.zero();
+        self.events.reset();
     }
 
     pub(crate) fn is_overflown(&self) -> bool {
         self.is_overflown
     }
 
-    fn is_any_full(&self) -> bool {
-        self.is_full::<measurement::BinaryInput>()
-            || self.is_full::<measurement::DoubleBitBinaryInput>()
-            || self.is_full::<measurement::BinaryOutputStatus>()
-            || self.is_full::<measurement::Counter>()
-            || self.is_full::<measurement::FrozenCounter>()
-            || self.is_full::<measurement::AnalogInput>()
-            || self.is_full::<measurement::AnalogOutputStatus>()
-            || self.is_full::<measurement::OctetString>()
-    }
+    /// the overflow persists until no type is full
+    fn update_overflow(&mut self) {
+        let is_any_full = EventType::ALL.into_iter().any(|event_type| {
+            let max = event_type.max(&self.config);
+            max > 0 && self.events.type_count(event_type) >= max
+        });
 
-    fn is_full<T>(&self) -> bool
-    where
-        T: Insertable,
-    {
-        let max = T::get_max(&self.config);
-
-        if max == 0 {
-            return false;
+        if !is_any_full {
+            self.is_overflown = false;
         }
-
-        T::get_type_count(&self.total.types) >= usize::from(max)
-    }
-
-    fn select<F>(&mut self, limit: Option<usize>, selector: F) -> usize
-    where
-        F: Fn(&EventRecord) -> bool,
-    {
-        let mut count: usize = 0;
-
-        for (_, evt) in self
-            .events
-            .iter()
-            .filter(|(_, e)| e.state.get() == EventState::Unselected && selector(e))
-            .take(limit.unwrap_or(usize::MAX))
-        {
-            evt.state.set(EventState::Selected);
-            count = count.saturating_add(1);
-        }
-
-        count
-    }
-
-    /// iterator over selected values that need to be written
-    fn selected_iter(&self) -> impl Iterator<Item = &EventRecord> {
-        self.events
-            .iter()
-            .map(|x| x.1)
-            .filter(|x| x.state.get() == EventState::Selected)
     }
 }
 
 impl Insertable for measurement::BinaryInput {
     type EventVariation = EventBinaryInputVariation;
 
-    fn get_max(config: &EventBufferConfig) -> u16 {
-        config.max_binary
-    }
-
-    fn get_type_count(counter: &TypeCounter) -> usize {
-        counter.num_binary.get()
-    }
-
-    fn is_type(record: &EventRecord) -> bool {
-        std::matches!(record.event, Event::Binary(_, _))
-    }
-
-    fn increment_type(counter: &mut TypeCounter) {
-        counter.num_binary.increment();
-    }
+    const TYPE: EventType = EventType::Binary;
 
     fn create_event(&self, default_variation: EventBinaryInputVariation) -> Event {
         Event::Binary(*self, Variation::new(default_variation))
     }
 
-    fn select_variation(record: &EventRecord, variation: Self::EventVariation) -> bool {
-        if let Event::Binary(_, v) = &record.event {
-            v.selected.set(variation);
+    fn select_variation(event: &mut Event, variation: Self::EventVariation) -> bool {
+        if let Event::Binary(_, v) = event {
+            v.selected = variation;
             true
         } else {
             false
@@ -769,29 +702,15 @@ impl Insertable for measurement::BinaryInput {
 impl Insertable for measurement::DoubleBitBinaryInput {
     type EventVariation = EventDoubleBitBinaryInputVariation;
 
-    fn get_max(config: &EventBufferConfig) -> u16 {
-        config.max_double_binary
-    }
-
-    fn get_type_count(counter: &TypeCounter) -> usize {
-        counter.num_double_binary.get()
-    }
-
-    fn is_type(record: &EventRecord) -> bool {
-        std::matches!(record.event, Event::DoubleBitBinary(_, _))
-    }
-
-    fn increment_type(counter: &mut TypeCounter) {
-        counter.num_double_binary.increment();
-    }
+    const TYPE: EventType = EventType::DoubleBitBinary;
 
     fn create_event(&self, default_variation: EventDoubleBitBinaryInputVariation) -> Event {
         Event::DoubleBitBinary(*self, Variation::new(default_variation))
     }
 
-    fn select_variation(record: &EventRecord, variation: Self::EventVariation) -> bool {
-        if let Event::DoubleBitBinary(_, v) = &record.event {
-            v.selected.set(variation);
+    fn select_variation(event: &mut Event, variation: Self::EventVariation) -> bool {
+        if let Event::DoubleBitBinary(_, v) = event {
+            v.selected = variation;
             true
         } else {
             false
@@ -802,29 +721,15 @@ impl Insertable for measurement::DoubleBitBinaryInput {
 impl Insertable for measurement::BinaryOutputStatus {
     type EventVariation = EventBinaryOutputStatusVariation;
 
-    fn get_max(config: &EventBufferConfig) -> u16 {
-        config.max_binary_output_status
-    }
-
-    fn get_type_count(counter: &TypeCounter) -> usize {
-        counter.num_binary_output_status.get()
-    }
-
-    fn is_type(record: &EventRecord) -> bool {
-        std::matches!(record.event, Event::BinaryOutputStatus(_, _))
-    }
-
-    fn increment_type(counter: &mut TypeCounter) {
-        counter.num_binary_output_status.increment();
-    }
+    const TYPE: EventType = EventType::BinaryOutputStatus;
 
     fn create_event(&self, default_variation: EventBinaryOutputStatusVariation) -> Event {
         Event::BinaryOutputStatus(*self, Variation::new(default_variation))
     }
 
-    fn select_variation(record: &EventRecord, variation: Self::EventVariation) -> bool {
-        if let Event::BinaryOutputStatus(_, v) = &record.event {
-            v.selected.set(variation);
+    fn select_variation(event: &mut Event, variation: Self::EventVariation) -> bool {
+        if let Event::BinaryOutputStatus(_, v) = event {
+            v.selected = variation;
             true
         } else {
             false
@@ -835,29 +740,15 @@ impl Insertable for measurement::BinaryOutputStatus {
 impl Insertable for measurement::Counter {
     type EventVariation = EventCounterVariation;
 
-    fn get_max(config: &EventBufferConfig) -> u16 {
-        config.max_counter
-    }
-
-    fn get_type_count(counter: &TypeCounter) -> usize {
-        counter.num_counter.get()
-    }
-
-    fn is_type(record: &EventRecord) -> bool {
-        std::matches!(record.event, Event::Counter(_, _))
-    }
-
-    fn increment_type(counter: &mut TypeCounter) {
-        counter.num_counter.increment();
-    }
+    const TYPE: EventType = EventType::Counter;
 
     fn create_event(&self, default_variation: EventCounterVariation) -> Event {
         Event::Counter(*self, Variation::new(default_variation))
     }
 
-    fn select_variation(record: &EventRecord, variation: Self::EventVariation) -> bool {
-        if let Event::Counter(_, v) = &record.event {
-            v.selected.set(variation);
+    fn select_variation(event: &mut Event, variation: Self::EventVariation) -> bool {
+        if let Event::Counter(_, v) = event {
+            v.selected = variation;
             true
         } else {
             false
@@ -868,29 +759,15 @@ impl Insertable for measurement::Counter {
 impl Insertable for measurement::FrozenCounter {
     type EventVariation = EventFrozenCounterVariation;
 
-    fn get_max(config: &EventBufferConfig) -> u16 {
-        config.max_frozen_counter
-    }
-
-    fn get_type_count(counter: &TypeCounter) -> usize {
-        counter.num_frozen_counter.get()
-    }
-
-    fn is_type(record: &EventRecord) -> bool {
-        std::matches!(record.event, Event::FrozenCounter(_, _))
-    }
-
-    fn increment_type(counter: &mut TypeCounter) {
-        counter.num_frozen_counter.increment();
-    }
+    const TYPE: EventType = EventType::FrozenCounter;
 
     fn create_event(&self, default_variation: EventFrozenCounterVariation) -> Event {
         Event::FrozenCounter(*self, Variation::new(default_variation))
     }
 
-    fn select_variation(record: &EventRecord, variation: Self::EventVariation) -> bool {
-        if let Event::FrozenCounter(_, v) = &record.event {
-            v.selected.set(variation);
+    fn select_variation(event: &mut Event, variation: Self::EventVariation) -> bool {
+        if let Event::FrozenCounter(_, v) = event {
+            v.selected = variation;
             true
         } else {
             false
@@ -901,29 +778,15 @@ impl Insertable for measurement::FrozenCounter {
 impl Insertable for measurement::AnalogInput {
     type EventVariation = EventAnalogInputVariation;
 
-    fn get_max(config: &EventBufferConfig) -> u16 {
-        config.max_analog
-    }
-
-    fn get_type_count(counter: &TypeCounter) -> usize {
-        counter.num_analog.get()
-    }
-
-    fn is_type(record: &EventRecord) -> bool {
-        std::matches!(record.event, Event::Analog(_, _))
-    }
-
-    fn increment_type(counter: &mut TypeCounter) {
-        counter.num_analog.increment();
-    }
+    const TYPE: EventType = EventType::Analog;
 
     fn create_event(&self, default_variation: EventAnalogInputVariation) -> Event {
         Event::Analog(*self, Variation::new(default_variation))
     }
 
-    fn select_variation(record: &EventRecord, variation: Self::EventVariation) -> bool {
-        if let Event::Analog(_, v) = &record.event {
-            v.selected.set(variation);
+    fn select_variation(event: &mut Event, variation: Self::EventVariation) -> bool {
+        if let Event::Analog(_, v) = event {
+            v.selected = variation;
             true
         } else {
             false
@@ -934,29 +797,15 @@ impl Insertable for measurement::AnalogInput {
 impl Insertable for measurement::AnalogOutputStatus {
     type EventVariation = EventAnalogOutputStatusVariation;
 
-    fn get_max(config: &EventBufferConfig) -> u16 {
-        config.max_analog_output_status
-    }
-
-    fn get_type_count(counter: &TypeCounter) -> usize {
-        counter.num_analog_output_status.get()
-    }
-
-    fn is_type(record: &EventRecord) -> bool {
-        std::matches!(record.event, Event::AnalogOutputStatus(_, _))
-    }
-
-    fn increment_type(counter: &mut TypeCounter) {
-        counter.num_analog_output_status.increment();
-    }
+    const TYPE: EventType = EventType::AnalogOutputStatus;
 
     fn create_event(&self, default_variation: EventAnalogOutputStatusVariation) -> Event {
         Event::AnalogOutputStatus(*self, Variation::new(default_variation))
     }
 
-    fn select_variation(record: &EventRecord, variation: Self::EventVariation) -> bool {
-        if let Event::AnalogOutputStatus(_, v) = &record.event {
-            v.selected.set(variation);
+    fn select_variation(event: &mut Event, variation: Self::EventVariation) -> bool {
+        if let Event::AnalogOutputStatus(_, v) = event {
+            v.selected = variation;
             true
         } else {
             false
@@ -967,29 +816,15 @@ impl Insertable for measurement::AnalogOutputStatus {
 impl Insertable for measurement::OctetString {
     type EventVariation = EventOctetStringVariation;
 
-    fn get_max(config: &EventBufferConfig) -> u16 {
-        config.max_octet_string
-    }
-
-    fn get_type_count(counter: &TypeCounter) -> usize {
-        counter.num_octet_string.get()
-    }
-
-    fn is_type(record: &EventRecord) -> bool {
-        std::matches!(record.event, Event::OctetString(_, _))
-    }
-
-    fn increment_type(counter: &mut TypeCounter) {
-        counter.num_octet_string.increment();
-    }
+    const TYPE: EventType = EventType::OctetString;
 
     fn create_event(&self, default_variation: EventOctetStringVariation) -> Event {
         Event::OctetString(self.as_boxed_slice(), Variation::new(default_variation))
     }
 
-    fn select_variation(record: &EventRecord, variation: Self::EventVariation) -> bool {
-        if let Event::OctetString(_, v) = &record.event {
-            v.selected.set(variation);
+    fn select_variation(event: &mut Event, variation: Self::EventVariation) -> bool {
+        if let Event::OctetString(_, v) = event {
+            v.selected = variation;
             true
         } else {
             false

@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::ops::ControlFlow;
 
 #[derive(Copy, Clone)]
 struct MetaData {
@@ -13,13 +14,6 @@ impl MetaData {
             version,
             prev,
             next,
-        }
-    }
-
-    fn create_index(&self, index: usize) -> Index {
-        Index {
-            version: self.version,
-            value: index,
         }
     }
 }
@@ -98,30 +92,7 @@ pub(crate) struct VecList<T> {
     state: Option<State>,
 }
 
-pub(crate) struct ListIterator<'a, T> {
-    list: &'a VecList<T>,
-    current: Option<usize>,
-}
-
-impl<'a, T> Iterator for ListIterator<'a, T> {
-    type Item = (Index, &'a T);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let idx = self.current?;
-        let entry = self.list.storage.get(idx)?;
-        self.current = entry.metadata.next;
-        Some((entry.metadata.create_index(idx), &entry.data))
-    }
-}
-
 impl<T> VecList<T> {
-    pub(crate) fn iter(&self) -> ListIterator<'_, T> {
-        ListIterator {
-            list: self,
-            current: self.state.map(|x| x.head),
-        }
-    }
-
     pub(crate) fn new(capacity: usize) -> Self {
         Self {
             capacity,
@@ -181,17 +152,14 @@ impl<T> VecList<T> {
         F: Fn(&T) -> bool,
     {
         let index = self.find_first(&predicate)?;
-
-        if self.remove_at(index) {
-            return self.storage.get(index.value).map(|x| &x.data);
-        }
-
-        None
+        self.take_at(index)
     }
 
-    pub(crate) fn remove_all<F>(&mut self, mut predicate: F) -> usize
+    /// remove every entry matching the predicate, passing each one to `removed` once it's removed
+    pub(crate) fn remove_all<F, R>(&mut self, mut predicate: F, mut removed: R) -> usize
     where
         F: FnMut(&T) -> bool,
+        R: FnMut(&T),
     {
         let mut count: usize = 0;
         let mut current = match self.state {
@@ -211,10 +179,9 @@ impl<T> VecList<T> {
                 (entry.metadata.next, entry_to_delete)
             };
 
-            if let Some(index) = entry_to_remove {
-                if self.remove_at(index) {
-                    count = count.saturating_add(1);
-                }
+            if let Some(data) = entry_to_remove.and_then(|index| self.take_at(index)) {
+                removed(data);
+                count = count.saturating_add(1);
             }
 
             match next {
@@ -223,6 +190,20 @@ impl<T> VecList<T> {
                 }
                 None => return count,
             }
+        }
+    }
+
+    /// visit the entries in order, mutably, until the visitor breaks
+    pub(crate) fn for_each_mut<F>(&mut self, mut visit: F)
+    where
+        F: FnMut(&mut T) -> ControlFlow<()>,
+    {
+        let mut current = self.state.map(|x| x.head);
+        while let Some(entry) = current.and_then(|idx| self.storage.get_mut(idx)) {
+            if visit(&mut entry.data).is_break() {
+                return;
+            }
+            current = entry.metadata.next;
         }
     }
 
@@ -247,6 +228,15 @@ impl<T> VecList<T> {
             }
 
             current = entry.metadata.next?;
+        }
+    }
+
+    /// remove the entry at the index, returning its data, which stays in the free slot until reused
+    fn take_at(&mut self, index: Index) -> Option<&T> {
+        if self.remove_at(index) {
+            self.storage.get(index.value).map(|x| &x.data)
+        } else {
+            None
         }
     }
 
@@ -299,6 +289,31 @@ impl<T> VecList<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    struct ListIterator<'a, T> {
+        list: &'a VecList<T>,
+        current: Option<usize>,
+    }
+
+    impl<'a, T> Iterator for ListIterator<'a, T> {
+        type Item = (Index, &'a T);
+
+        fn next(&mut self) -> Option<Self::Item> {
+            let idx = self.current?;
+            let entry = self.list.storage.get(idx)?;
+            self.current = entry.metadata.next;
+            Some((entry.create_index(idx), &entry.data))
+        }
+    }
+
+    impl<T> VecList<T> {
+        fn iter(&self) -> ListIterator<'_, T> {
+            ListIterator {
+                list: self,
+                current: self.state.map(|x| x.head),
+            }
+        }
+    }
 
     #[test]
     fn cannot_add_entries_past_capacity() {
@@ -442,7 +457,9 @@ mod tests {
                         }
                     }
                     Op::RemoveAll(value) => {
-                        let count = list.remove_all(|x| *x == value);
+                        let mut values = Vec::new();
+                        let count = list.remove_all(|x| *x == value, |x| values.push(*x));
+                        assert_eq!(values, vec![value; count]);
                         let before = self.live.len();
                         let removed = &mut self.removed;
                         self.live.retain(|(index, x)| {
@@ -501,6 +518,29 @@ mod tests {
                 }
             }
         }
+    }
+
+    #[test]
+    fn can_visit_values_mutably_until_break() {
+        let mut list = VecList::new(3);
+        list.add(1).unwrap();
+        list.add(2).unwrap();
+        list.add(3).unwrap();
+
+        let mut visited = Vec::new();
+        list.for_each_mut(|x| {
+            visited.push(*x);
+            *x *= 10;
+            if *x == 20 {
+                ControlFlow::Break(())
+            } else {
+                ControlFlow::Continue(())
+            }
+        });
+
+        assert_eq!(visited, [1, 2]);
+        let values: Vec<i32> = list.iter().map(|(_, x)| *x).collect();
+        assert_eq!(values, [10, 20, 3]);
     }
 
     #[test]
