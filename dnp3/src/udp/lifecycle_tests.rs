@@ -31,12 +31,13 @@ const fn millis(x: u64) -> Duration {
     Duration::from_millis(x)
 }
 
-/// A local address with a port that was free when this returned
-fn free_address() -> SocketAddr {
-    std::net::UdpSocket::bind("127.0.0.1:0")
-        .unwrap()
-        .local_addr()
-        .unwrap()
+/// A free local address, and the socket that holds it until the test drops it
+///
+/// A test drops the socket just before the code under test binds the address, so that no other
+/// socket can take the port in between.
+fn reserve() -> (SocketAddr, std::net::UdpSocket) {
+    let socket = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
+    (socket.local_addr().unwrap(), socket)
 }
 
 /// Whether something holds the address, found by trying to bind it
@@ -79,12 +80,12 @@ async fn exchange_with_master(address: SocketAddr) {
 #[tokio::test(start_paused = true)]
 async fn master_binds_when_enabled_and_retries_a_failed_bind_after_the_delay() {
     watchdog(async {
-        let address = free_address();
+        let (address, blocker) = reserve();
         let mut channel = spawn_master(address);
-        settle().await;
-        assert!(!is_bound(address));
+        // a disabled master doesn't bind: one that tried would fail against the blocker, and bind
+        // when its retry delay ends, before the delay that the enable starts
+        tokio::time::sleep(secs(1)).await;
 
-        let blocker = std::net::UdpSocket::bind(address).unwrap();
         channel.enable().await.unwrap();
         let enabled = tokio::time::Instant::now();
         settle().await;
@@ -107,8 +108,9 @@ async fn master_binds_when_enabled_and_retries_a_failed_bind_after_the_delay() {
 #[tokio::test(start_paused = true)]
 async fn master_disable_during_a_session_closes_the_socket_until_enabled() {
     watchdog(async {
-        let address = free_address();
+        let (address, reservation) = reserve();
         let mut channel = spawn_master(address);
+        drop(reservation);
         channel.enable().await.unwrap();
         settle().await;
         assert!(is_bound(address));
@@ -130,9 +132,8 @@ async fn master_disable_during_a_session_closes_the_socket_until_enabled() {
 #[tokio::test(start_paused = true)]
 async fn master_disable_during_a_retry_wait_skips_the_rest_of_the_delay() {
     watchdog(async {
-        let address = free_address();
+        let (address, blocker) = reserve();
         let mut channel = spawn_master(address);
-        let blocker = std::net::UdpSocket::bind(address).unwrap();
         channel.enable().await.unwrap();
         settle().await;
         channel.disable().await.unwrap();
@@ -151,9 +152,8 @@ async fn master_disable_during_a_retry_wait_skips_the_rest_of_the_delay() {
 #[tokio::test(start_paused = true)]
 async fn master_shutdown_during_a_retry_wait_ends_the_task_at_once() {
     watchdog(async {
-        let address = free_address();
+        let (address, _blocker) = reserve();
         let mut channel = spawn_master(address);
-        let _blocker = std::net::UdpSocket::bind(address).unwrap();
         channel.enable().await.unwrap();
         settle().await;
         assert_eq!(alive_tasks(), 1);
@@ -194,8 +194,9 @@ fn spawn_outstation(local: SocketAddr, remote: SocketAddr) -> OutstationHandle {
 
 #[tokio::test]
 async fn outstation_binds_at_once_and_sends_to_the_remote_endpoint() {
-    let local = free_address();
+    let (local, reservation) = reserve();
     let remote = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+    drop(reservation);
     let handle = spawn_outstation(local, remote.local_addr().unwrap());
 
     let mut buffer = [0; 64];
@@ -222,7 +223,8 @@ async fn outstation_binds_at_once_and_sends_to_the_remote_endpoint() {
 #[tokio::test(start_paused = true)]
 async fn outstation_closes_the_socket_before_waiting_to_retry_a_failed_session() {
     watchdog(async {
-        let local = free_address();
+        let (local, reservation) = reserve();
+        drop(reservation);
         let handle = spawn_outstation(local, "[::1]:20000".parse().unwrap());
         tokio::time::sleep(secs(1)).await;
         assert!(!is_bound(local));
