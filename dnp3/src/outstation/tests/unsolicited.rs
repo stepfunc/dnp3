@@ -265,6 +265,157 @@ async fn deferred_read_of_type_without_points_sets_object_unknown() {
     harness.check_no_events();
 }
 
+const READ_CLASS_0_SEQ1: &[u8] = &[0xC1, 0x01, 0x3C, 0x01, 0x06];
+const READ_CLASS_1_SEQ1: &[u8] = &[0xC1, 0x01, 0x3C, 0x02, 0x06];
+const READ_CLASS_1_SEQ2: &[u8] = &[0xC2, 0x01, 0x3C, 0x02, 0x06];
+const SOL_CONFIRM_SEQ1: &[u8] = &[0xC1, 0x00];
+// IIN1.1 for the pending class 1 event
+const CLASS_0_RESPONSE_SEQ1_WITH_PENDING_EVENTS: &[u8] = &[
+    0xC1, 0x81, 0x82, 0x00, 0x01, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01,
+];
+const G2V1_RESPONSE_SEQ1: &[u8] = &[
+    0xE1, 0x81, 0x80, 0x00, 0x02, 0x01, 0x28, 0x01, 0x00, 0x00, 0x00, 0x81,
+];
+const EMPTY_RESPONSE_SEQ2: &[u8] = &[0xC2, 0x81, 0x80, 0x00];
+
+fn empty_buffer_state() -> BufferState {
+    BufferState {
+        classes: ClassCount {
+            num_class_1: 0,
+            num_class_2: 0,
+            num_class_3: 0,
+        },
+        types: TypeCount {
+            num_binary_input: 0,
+            num_double_bit_binary_input: 0,
+            num_binary_output_status: 0,
+            num_counter: 0,
+            num_frozen_counter: 0,
+            num_analog: 0,
+            num_analog_output_status: 0,
+            num_octet_string: 0,
+        },
+    }
+}
+
+/// a single unsolicited response that isn't retried, with a retry delay that outlasts the test
+fn config_with_one_unsolicited_attempt() -> OutstationConfig {
+    let mut config = config_with_limited_retries(0);
+    config.unsolicited_retry_delay = std::time::Duration::from_secs(3600);
+    config
+}
+
+/// send the class 1 event in an unsolicited response that is never confirmed
+async fn time_out_unsolicited_event(harness: &mut OutstationHarness) {
+    confirm_null_unsolicited(harness).await;
+    enable_unsolicited(harness).await;
+
+    generate_binary_event(&mut harness.handle.database);
+    harness.expect_response(UNSOL_G2V1_SEQ1).await;
+    harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
+
+    tokio::time::pause();
+    harness
+        .wait_for_events(&[Event::UnsolicitedConfirmTimeout(1, false)])
+        .await;
+    tokio::time::resume();
+}
+
+#[tokio::test]
+async fn read_during_unsolicited_retry_delay_reports_unconfirmed_events() {
+    let mut harness = new_harness(config_with_one_unsolicited_attempt());
+    time_out_unsolicited_event(&mut harness).await;
+
+    // the event is still pending
+    harness
+        .test_request_response(
+            super::data::DELAY_MEASURE,
+            &[0xC0, 0x81, 0x82, 0x00, 0x34, 0x02, 0x07, 0x01, 0x00, 0x00],
+        )
+        .await;
+    harness
+        .test_request_response(READ_CLASS_0_SEQ1, CLASS_0_RESPONSE_SEQ1_WITH_PENDING_EVENTS)
+        .await;
+    // and a class 1 READ reports it again
+    harness
+        .test_request_response(READ_CLASS_1_SEQ1, G2V1_RESPONSE_SEQ1)
+        .await;
+    harness.check_events(&[Event::EnterSolicitedConfirmWait(1)]);
+}
+
+#[tokio::test]
+async fn read_after_disable_unsolicited_during_confirm_wait_reports_unconfirmed_events() {
+    let mut harness = new_harness(get_default_unsolicited_config());
+    confirm_null_unsolicited(&mut harness).await;
+    enable_unsolicited(&mut harness).await;
+
+    generate_binary_event(&mut harness.handle.database);
+    harness.expect_response(UNSOL_G2V1_SEQ1).await;
+    harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
+
+    harness
+        .test_request_response(DISABLE_UNSOLICITED_SEQ0, EMPTY_RESPONSE_SEQ0)
+        .await;
+
+    harness
+        .test_request_response(READ_CLASS_1_SEQ1, G2V1_RESPONSE_SEQ1)
+        .await;
+    harness.check_events(&[Event::EnterSolicitedConfirmWait(1)]);
+
+    // the event is cleared once the master confirms the response that delivered it
+    harness.send_and_process(SOL_CONFIRM_SEQ1).await;
+    harness.check_events(&[
+        Event::SolicitedConfirmReceived(1),
+        Event::BeginConfirm,
+        Event::Cleared(0),
+        Event::EndConfirm(empty_buffer_state()),
+    ]);
+    harness
+        .test_request_response(READ_CLASS_1_SEQ2, EMPTY_RESPONSE_SEQ2)
+        .await;
+    harness.check_no_events();
+}
+
+#[tokio::test]
+async fn confirmed_read_after_unsolicited_timeout_does_not_lose_unconfirmed_events() {
+    let mut harness = new_harness(config_with_one_unsolicited_attempt());
+    time_out_unsolicited_event(&mut harness).await;
+
+    // a second event while waiting to retry the unsolicited response
+    harness.handle.database.transaction(|db| {
+        db.update(
+            0,
+            &BinaryInput::new(false, Flags::ONLINE, Time::synchronized(0)),
+            UpdateOptions::default(),
+        )
+    });
+
+    // the READ reports both events, not just the one that was never sent
+    harness
+        .test_request_response(
+            READ_CLASS_1_SEQ1,
+            &[
+                0xE1, 0x81, 0x80, 0x00, 0x02, 0x01, 0x28, 0x02, 0x00, 0x00, 0x00, 0x81, 0x00, 0x00,
+                0x01,
+            ],
+        )
+        .await;
+    harness.check_events(&[Event::EnterSolicitedConfirmWait(1)]);
+
+    harness.send_and_process(SOL_CONFIRM_SEQ1).await;
+    harness.check_events(&[
+        Event::SolicitedConfirmReceived(1),
+        Event::BeginConfirm,
+        Event::Cleared(0),
+        Event::Cleared(1),
+        Event::EndConfirm(empty_buffer_state()),
+    ]);
+    harness
+        .test_request_response(READ_CLASS_1_SEQ2, EMPTY_RESPONSE_SEQ2)
+        .await;
+    harness.check_no_events();
+}
+
 // SELECT and OPERATE for g41v2 index 7, value 513
 const SELECT_SEQ1_G41V2: &[u8] = &[0xC1, 0x03, 41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, 0x00];
 const OPERATE_SEQ2_G41V2: &[u8] = &[0xC2, 0x04, 41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, 0x00];
