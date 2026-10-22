@@ -1225,3 +1225,44 @@ async fn repeated_request_waits_for_the_solicited_confirm_again() {
         .await;
     harness.check_no_events();
 }
+
+/// An unsolicited build that selects class 1 events but writes none of them, because the first
+/// one can't fit in the unsolicited buffer, doesn't leave them selected for the next READ
+#[tokio::test]
+async fn read_after_an_unsolicited_build_that_wrote_nothing_reports_only_what_it_selects() {
+    let mut config = get_default_unsolicited_config();
+    config.unsolicited_buffer_size = BufferSize::min();
+    let mut harness = new_harness(config);
+    confirm_null_unsolicited(&mut harness).await;
+
+    harness.handle.database.transaction(|db| {
+        db.add(0, Some(EventClass::Class1), OctetStringConfig);
+        db.add(0, Some(EventClass::Class2), BinaryInputConfig::default());
+        db.update(
+            0,
+            &OctetString::new(&[0xAA; 255]).unwrap(),
+            UpdateOptions::default(),
+        );
+        db.update(
+            0,
+            &BinaryInput::new(true, Flags::ONLINE, Time::synchronized(0)),
+            UpdateOptions::default(),
+        );
+    });
+
+    // enable class 1 only, after which the unsolicited build selects the octet string event
+    harness
+        .test_request_response(&[0xC0, 0x14, 0x3C, 0x02, 0x06], &[0xC0, 0x81, 0x86, 0x00])
+        .await;
+
+    // a class 2 READ reports the binary event, and not the class 1 octet string
+    harness
+        .test_request_response(
+            &[0xC1, 0x01, 0x3C, 0x03, 0x06],
+            &[
+                0xE1, 0x81, 0x82, 0x00, 0x02, 0x01, 0x28, 0x01, 0x00, 0x00, 0x00, 0x81,
+            ],
+        )
+        .await;
+    harness.check_events(&[Event::EnterSolicitedConfirmWait(1)]);
+}

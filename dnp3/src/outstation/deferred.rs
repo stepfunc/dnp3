@@ -63,18 +63,19 @@ impl DeferredRead {
         let mut iin2 = Iin2::default();
 
         for h in headers.iter() {
-            if let Some(r) = ReadHeader::get(&h) {
-                if let Err(Full) = self.headers.try_push(r) {
-                    tracing::warn!(
-                        "insufficient capacity ({}) for READ header: {} - {}",
-                        self.headers.max(),
-                        h.variation(),
-                        h.details.qualifier()
-                    );
-                    iin2 |= Iin2::PARAMETER_ERROR;
+            match ReadHeader::parse(&h) {
+                Ok(r) => {
+                    if let Err(Full) = self.headers.try_push(r) {
+                        tracing::warn!(
+                            "insufficient capacity ({}) for READ header: {} - {}",
+                            self.headers.max(),
+                            h.variation(),
+                            h.details.qualifier()
+                        );
+                        iin2 |= Iin2::PARAMETER_ERROR;
+                    }
                 }
-            } else {
-                iin2 |= ReadHeader::unsupported(h.variation());
+                Err(err) => iin2 |= err,
             }
         }
 
@@ -85,14 +86,8 @@ impl DeferredRead {
         match self.info {
             None => None,
             Some(x) => {
-                let iin2 = database.transaction(|db| {
-                    db.inner.reset();
-                    let mut iin2 = Iin2::default();
-                    for header in self.headers.iter() {
-                        iin2 |= db.inner.select_by_header(*header);
-                    }
-                    iin2
-                });
+                let iin2 =
+                    database.transaction(|db| db.inner.select_read(self.headers.iter().copied()));
                 self.clear();
                 Some(x.merge(iin2))
             }

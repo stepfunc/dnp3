@@ -71,11 +71,13 @@ enum ReadTarget {
 }
 
 impl ReadHeader {
-    pub(crate) fn get(header: &ObjectHeader) -> Option<ReadHeader> {
+    /// What a header in a READ request selects, or the error for one that READ doesn't support:
+    /// a variation that READ supports with another qualifier has an unsupported qualifier, and
+    /// any other is an unsupported object
+    pub(crate) fn parse(header: &ObjectHeader) -> Result<ReadHeader, Iin2> {
+        let target = ReadTarget::get(header.variation());
         let res = match header.details {
-            HeaderDetails::Read(variation, qualifier) => {
-                ReadTarget::get(variation).and_then(|x| x.with(qualifier))
-            }
+            HeaderDetails::Read(_, qualifier) => target.and_then(|x| x.with(qualifier)),
             HeaderDetails::AllObjects(_)
             | HeaderDetails::Range(_, _, _)
             | HeaderDetails::Count(_, _, _)
@@ -83,24 +85,18 @@ impl ReadHeader {
             | HeaderDetails::CountAndPrefix16(_, _)
             | HeaderDetails::FreeFormat(_) => None,
         };
-        if res.is_none() {
+        res.ok_or_else(|| {
             tracing::warn!(
                 "{} - {} not supported in READ requests",
                 header.variation(),
                 header.details.qualifier()
             );
-        }
-        res
-    }
-
-    /// The error for a header that [`Self::get`] rejects: a variation that READ supports with
-    /// another qualifier has an unsupported qualifier, and any other is an unsupported object
-    pub(crate) fn unsupported(variation: Variation) -> Iin2 {
-        if ReadTarget::get(variation).is_some() {
-            Iin2::PARAMETER_ERROR
-        } else {
-            Iin2::OBJECT_UNKNOWN
-        }
+            if target.is_some() {
+                Iin2::PARAMETER_ERROR
+            } else {
+                Iin2::OBJECT_UNKNOWN
+            }
+        })
     }
 }
 
