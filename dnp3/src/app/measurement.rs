@@ -939,7 +939,7 @@ mod tests {
             (32767.5, OVER_RANGE, i16::MAX),
             (40000.0, OVER_RANGE, i16::MAX),
             (f64::INFINITY, OVER_RANGE, i16::MAX),
-            (f64::NAN, Flags::ONLINE, 0),
+            (f64::NAN, OVER_RANGE, 0),
         ];
 
         for &(value, flags, wire) in cases {
@@ -961,7 +961,7 @@ mod tests {
             (2147483647.5, OVER_RANGE, i32::MAX),
             (1e12, OVER_RANGE, i32::MAX),
             (f64::INFINITY, OVER_RANGE, i32::MAX),
-            (f64::NAN, Flags::ONLINE, 0),
+            (f64::NAN, OVER_RANGE, 0),
         ];
 
         for &(value, flags, wire) in cases {
@@ -986,11 +986,11 @@ mod tests {
             (f32_min, Flags::ONLINE, f32::MIN),
             (f32_min.next_down(), OVER_RANGE, f32::MIN),
             (f64::MIN, OVER_RANGE, f32::MIN),
-            (f64::NEG_INFINITY, OVER_RANGE, f32::MIN),
+            (f64::NEG_INFINITY, Flags::ONLINE, f32::NEG_INFINITY),
             (f32_max, Flags::ONLINE, f32::MAX),
             (f32_max.next_up(), OVER_RANGE, f32::MAX),
             (f64::MAX, OVER_RANGE, f32::MAX),
-            (f64::INFINITY, OVER_RANGE, f32::MAX),
+            (f64::INFINITY, Flags::ONLINE, f32::INFINITY),
             (f64::NAN, Flags::ONLINE, f32::NAN),
         ];
 
