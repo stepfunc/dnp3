@@ -496,8 +496,16 @@ impl<'a> ObjectParser<'a> {
             QualifierCode::Range16 => self.parse_range(gv, Width::Two),
             QualifierCode::Count8 => self.parse_count(gv, Width::One),
             QualifierCode::Count16 => self.parse_count(gv, Width::Two),
-            QualifierCode::CountAndPrefix8 => self.parse_count_and_prefix_u8(gv),
-            QualifierCode::CountAndPrefix16 => self.parse_count_and_prefix_u16(gv),
+            QualifierCode::CountAndPrefix8 => {
+                self.parse_count_and_prefix(gv).map(|(count, data)| {
+                    ObjectHeader::new(HeaderDetails::CountAndPrefix8(count, data))
+                })
+            }
+            QualifierCode::CountAndPrefix16 => {
+                self.parse_count_and_prefix(gv).map(|(count, data)| {
+                    ObjectHeader::new(HeaderDetails::CountAndPrefix16(count, data))
+                })
+            }
             QualifierCode::FreeFormat16 => self.parse_free_format_u16(gv),
         }
     }
@@ -564,26 +572,15 @@ impl<'a> ObjectParser<'a> {
         Ok(ObjectHeader::new(HeaderDetails::Range(width, range, data)))
     }
 
-    fn parse_count_and_prefix_u8(
+    /// the count, whose width is the prefix's, and the prefixed objects
+    fn parse_count_and_prefix<I: Index>(
         &mut self,
         v: Variation,
-    ) -> Result<ObjectHeader<'a>, ObjectParseError> {
-        let count = self.cursor.read_u8()?;
-        let data = PrefixedVariation::<u8>::parse(v, count.into(), self.options, &mut self.cursor)?;
-        Ok(ObjectHeader::new(HeaderDetails::CountAndPrefix8(
-            count, data,
-        )))
-    }
-
-    fn parse_count_and_prefix_u16(
-        &mut self,
-        v: Variation,
-    ) -> Result<ObjectHeader<'a>, ObjectParseError> {
-        let count = self.cursor.read_u16_le()?;
-        let data = PrefixedVariation::<u16>::parse(v, count, self.options, &mut self.cursor)?;
-        Ok(ObjectHeader::new(HeaderDetails::CountAndPrefix16(
-            count, data,
-        )))
+    ) -> Result<(I, PrefixedVariation<'a, I>), ObjectParseError> {
+        let count = I::read(&mut self.cursor)?;
+        let data =
+            PrefixedVariation::<I>::parse(v, count.widen_to_u16(), self.options, &mut self.cursor)?;
+        Ok((count, data))
     }
 
     fn parse_free_format_u16(
