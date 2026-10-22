@@ -516,6 +516,11 @@ impl MasterSession {
                                         }
                                         Ok(association) => {
                                             association.process_iin(response.header.iin);
+                                            if response.header.iin.has_bad_request_error() {
+                                                let err = TaskError::RejectedByIin2(response.header.iin);
+                                                task.on_task_error(Some(association), err);
+                                                return Err(err);
+                                            }
                                             return match task.handle_response(association, response).await? {
                                                 Some(next) => {
                                                     Ok(NextStep::Continue(next))
@@ -588,10 +593,6 @@ impl MasterSession {
 
         if !response.header.control.is_fir_and_fin() {
             return Err(TaskError::MultiFragmentResponse);
-        }
-
-        if response.header.iin.has_bad_request_error() {
-            return Err(TaskError::RejectedByIin2(response.header.iin));
         }
 
         Ok(Some(response))
