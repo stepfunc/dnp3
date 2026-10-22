@@ -4,6 +4,7 @@ use crate::app::format::WriteError;
 use crate::app::{FileStatus, FunctionCode, Group70Var4, Group70Var5, Group70Var6, Variation};
 use scursor::WriteCursor;
 
+mod auth_file;
 mod close_file;
 mod open_file;
 mod read_file;
