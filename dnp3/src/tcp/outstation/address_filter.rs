@@ -80,6 +80,9 @@ impl WildcardIPv4 {
 /// An IPv4 address and its IPv4-mapped IPv6 form (`::ffff:a.b.c.d`) are the same address, so IPv4
 /// filters match IPv4 masters on a server bound to an IPv6 address such as `[::]`.
 ///
+/// Two filters conflict when at least one address matches both. An empty [`AddressFilter::AnyOf`]
+/// matches no address, so it conflicts with no filter, including [`AddressFilter::Any`].
+///
 /// Note: User code not exhaustively match against this enum as new variants may be added in the future.
 #[non_exhaustive]
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -88,7 +91,7 @@ pub enum AddressFilter {
     Any,
     /// allow a specific address
     Exact(std::net::IpAddr),
-    /// allow any of set of addresses
+    /// allow any of set of addresses (an empty set allows none)
     AnyOf(std::collections::HashSet<std::net::IpAddr>),
     /// matches against an IPv4 address with wildcards
     WildcardIpv4(WildcardIPv4),
@@ -112,7 +115,12 @@ impl AddressFilter {
 
     pub(crate) fn conflicts_with(&self, other: &AddressFilter) -> bool {
         match self {
-            AddressFilter::Any => true,
+            AddressFilter::Any => match other {
+                AddressFilter::AnyOf(set) => !set.is_empty(),
+                AddressFilter::Any | AddressFilter::Exact(_) | AddressFilter::WildcardIpv4(_) => {
+                    true
+                }
+            },
             AddressFilter::Exact(x) => other.matches(*x),
             AddressFilter::AnyOf(set) => set.iter().any(|x| other.matches(*x)),
             AddressFilter::WildcardIpv4(wc) => match other {
@@ -267,6 +275,22 @@ mod test {
             for rhs in filters_for_192_168_0_1() {
                 assert!(lhs.conflicts_with(&rhs), "{lhs:?} {rhs:?}");
             }
+        }
+    }
+
+    #[test]
+    fn an_empty_any_of_conflicts_with_no_filter_in_either_order() {
+        let empty = AddressFilter::AnyOf(Default::default());
+        let others = [
+            AddressFilter::Any,
+            AddressFilter::Exact(ip("192.168.0.1")),
+            any_of(&["192.168.0.1"]),
+            AddressFilter::AnyOf(Default::default()),
+            AddressFilter::WildcardIpv4("*.*.*.*".parse().unwrap()),
+        ];
+        for other in others.iter() {
+            assert!(!empty.conflicts_with(other), "{empty:?} {other:?}");
+            assert!(!other.conflicts_with(&empty), "{other:?} {empty:?}");
         }
     }
 
