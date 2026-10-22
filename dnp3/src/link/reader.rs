@@ -255,6 +255,11 @@ pub(crate) enum Step {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::link::error::FrameError;
+    use crate::link::test_data::{
+        TestFrame, ACK, CONFIRM_USER_DATA, MULTI_BLOCK_USER_DATA, RESET_LINK, UNCONFIRMED_USER_DATA,
+    };
+    use crate::udp::layer::UdpLayer;
 
     #[test]
     fn read_buffer_rejects_advances_past_its_bounds() {
@@ -270,8 +275,6 @@ mod tests {
         buffer.advance_read(3).unwrap();
         assert_eq!(buffer.num_bytes_unread(), 0);
     }
-    use crate::link::test_data::{ACK, RESET_LINK};
-    use crate::udp::layer::UdpLayer;
 
     async fn bound() -> (PhysLayer, std::net::SocketAddr) {
         let socket = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
@@ -345,5 +348,189 @@ mod tests {
         let mut reader = datagram_reader();
         assert_eq!(read(&mut reader, &mut io).await, (RESET_LINK.header, addr));
         assert_eq!(read(&mut reader, &mut io).await, (ACK.header, addr));
+    }
+
+    /// a frame's header and payload
+    type Frame = (Header, Vec<u8>);
+
+    fn frame(frame: &TestFrame) -> Frame {
+        (frame.header, frame.payload.to_vec())
+    }
+
+    /// read `chunk` into the reader, then step until it needs more data, adding the frames to
+    /// `frames`
+    fn feed(
+        reader: &mut Reader,
+        payload: &mut FramePayload,
+        chunk: &[u8],
+        frames: &mut Vec<Frame>,
+    ) -> Result<(), LinkError> {
+        reader
+            .write_space()?
+            .get_mut(..chunk.len())
+            .unwrap()
+            .copy_from_slice(chunk);
+        reader.wrote(chunk.len())?;
+        loop {
+            match reader.step(payload)? {
+                Step::Frame(header) => frames.push((header, payload.get().to_vec())),
+                Step::NeedData | Step::PartialDatagram(_) => return Ok(()),
+            }
+        }
+    }
+
+    /// the frames read from `chunks`, and the error that stopped the reader, if any
+    fn receive(modes: LinkModes, chunks: &[&[u8]]) -> (Vec<Frame>, Option<LinkError>) {
+        let mut reader = Reader::new(modes, 2048);
+        let mut payload = FramePayload::new();
+        let mut frames = Vec::new();
+        for chunk in chunks {
+            if let Err(err) = feed(&mut reader, &mut payload, chunk, &mut frames) {
+                return (frames, Some(err));
+            }
+        }
+        (frames, None)
+    }
+
+    /// `bytes` with the last one changed
+    fn with_last_byte_flipped(bytes: &[u8]) -> Vec<u8> {
+        let mut bytes = bytes.to_vec();
+        *bytes.last_mut().unwrap() ^= 0xFF;
+        bytes
+    }
+
+    /// corrupt input, and the error that closes the session on it in `Close` mode
+    fn corruptions() -> Vec<(Vec<u8>, FrameError)> {
+        let mut bad_length = RESET_LINK.bytes.to_vec();
+        bad_length[2] = 4;
+        let mut bad_middle_block_crc = MULTI_BLOCK_USER_DATA.bytes.to_vec();
+        bad_middle_block_crc[45] ^= 0xFF;
+        vec![
+            (vec![0x06], FrameError::UnexpectedStart1(0x06)),
+            (vec![0x05, 0x65], FrameError::UnexpectedStart2(0x65)),
+            // a stray first start byte right before a frame
+            (vec![0x05], FrameError::UnexpectedStart2(0x05)),
+            // stray start bytes right before a frame
+            (vec![0x05, 0x64], FrameError::BadHeaderCrc),
+            (bad_length, FrameError::BadLength(4)),
+            (
+                with_last_byte_flipped(RESET_LINK.bytes),
+                FrameError::BadHeaderCrc,
+            ),
+            (
+                with_last_byte_flipped(CONFIRM_USER_DATA.bytes),
+                FrameError::BadBodyCrc,
+            ),
+            (bad_middle_block_crc, FrameError::BadBodyCrc),
+            // cut inside the header: the next frame's first bytes complete it
+            (
+                CONFIRM_USER_DATA.bytes[..6].to_vec(),
+                FrameError::BadHeaderCrc,
+            ),
+            // cut after the header: the next frame's bytes are read as the body
+            (
+                CONFIRM_USER_DATA.bytes[..10].to_vec(),
+                FrameError::BadBodyCrc,
+            ),
+            // cut inside the body: the next frame's bytes complete it
+            (
+                CONFIRM_USER_DATA.bytes[..15].to_vec(),
+                FrameError::BadBodyCrc,
+            ),
+        ]
+    }
+
+    /// a valid frame, the corrupt input, then two more valid frames
+    fn surround(corrupt: &[u8]) -> Vec<u8> {
+        [
+            RESET_LINK.bytes,
+            corrupt,
+            UNCONFIRMED_USER_DATA.bytes,
+            ACK.bytes,
+        ]
+        .concat()
+    }
+
+    /// the input as one chunk, split in two at every position, and one byte at a time
+    fn chunkings(input: &[u8]) -> Vec<Vec<&[u8]>> {
+        let mut chunkings: Vec<Vec<&[u8]>> = (0..=input.len())
+            .map(|n| {
+                let (first, second) = input.split_at(n);
+                vec![first, second]
+            })
+            .collect();
+        chunkings.push(input.chunks(1).collect());
+        chunkings
+    }
+
+    #[test]
+    fn discard_mode_recovers_the_frames_after_corrupt_input_however_it_arrives() {
+        let expected = vec![
+            frame(&RESET_LINK),
+            frame(&UNCONFIRMED_USER_DATA),
+            frame(&ACK),
+        ];
+        for (corrupt, _) in corruptions() {
+            let input = surround(&corrupt);
+            for chunks in chunkings(&input) {
+                assert_eq!(
+                    receive(LinkModes::stream(LinkErrorMode::Discard), &chunks),
+                    (expected.clone(), None),
+                    "corrupt input {corrupt:02X?} read as {chunks:02X?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn discard_mode_recovers_the_frames_after_corrupt_input_in_one_datagram() {
+        let expected = vec![
+            frame(&RESET_LINK),
+            frame(&UNCONFIRMED_USER_DATA),
+            frame(&ACK),
+        ];
+        for (corrupt, _) in corruptions() {
+            let input = surround(&corrupt);
+            assert_eq!(
+                receive(LinkModes::datagram(LinkErrorMode::Discard), &[&input]),
+                (expected.clone(), None),
+                "corrupt input {corrupt:02X?}"
+            );
+        }
+    }
+
+    #[test]
+    fn close_mode_fails_on_corrupt_input_after_the_frames_before_it() {
+        for (corrupt, error) in corruptions() {
+            let input = surround(&corrupt);
+            for chunks in chunkings(&input) {
+                assert_eq!(
+                    receive(LinkModes::stream(LinkErrorMode::Close), &chunks),
+                    (vec![frame(&RESET_LINK)], Some(LinkError::BadFrame(error))),
+                    "corrupt input {corrupt:02X?} read as {chunks:02X?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn discard_mode_holds_frames_after_a_truncated_frame_until_its_length_arrives() {
+        let mut reader = Reader::new(LinkModes::stream(LinkErrorMode::Discard), 2048);
+        let mut payload = FramePayload::new();
+        let mut frames = Vec::new();
+
+        // the truncated frame announces 17 bytes after its header, and only 12 follow it
+        let truncated = &CONFIRM_USER_DATA.bytes[..12];
+        let first = [truncated, ACK.bytes].concat();
+        feed(&mut reader, &mut payload, &first, &mut frames).unwrap();
+        assert_eq!(frames, []);
+        feed(
+            &mut reader,
+            &mut payload,
+            UNCONFIRMED_USER_DATA.bytes,
+            &mut frames,
+        )
+        .unwrap();
+        assert_eq!(frames, [frame(&ACK), frame(&UNCONFIRMED_USER_DATA)]);
     }
 }
