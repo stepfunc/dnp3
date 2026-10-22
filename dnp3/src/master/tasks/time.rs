@@ -509,9 +509,12 @@ mod tests {
             let (task, _system_time, mut association, mut rx) = non_lan_time_sync_setup();
             let task = check_measure_delay_request(task, &mut association);
             tokio::time::advance(Duration::from_millis(1)).await; // This delay is less than the reported delay of the outstation
-            assert!(send_measure_delay_response(task, &mut association)
-                .await
-                .is_err());
+            assert_eq!(
+                send_measure_delay_response(task, &mut association)
+                    .await
+                    .err(),
+                Some(TaskError::UnexpectedResponseHeaders)
+            );
             assert_eq!(
                 Err(TimeSyncError::BadOutstationTimeDelay(OUTSTATION_DELAY_MS)),
                 rx.try_recv().unwrap()
@@ -536,10 +539,10 @@ mod tests {
 
                 let response = writer.to_parsed().to_response().unwrap();
 
-                assert!(task
-                    .handle_response(&mut association, response)
-                    .await
-                    .is_err());
+                assert_eq!(
+                    task.handle_response(&mut association, response).await.err(),
+                    Some(TaskError::UnexpectedResponseHeaders)
+                );
             }
             assert_eq!(
                 rx.try_recv().unwrap(),
@@ -571,10 +574,10 @@ mod tests {
 
                 let response = writer.to_parsed().to_response().unwrap();
 
-                assert!(task
-                    .handle_response(&mut association, response)
-                    .await
-                    .is_err());
+                assert_eq!(
+                    task.handle_response(&mut association, response).await.err(),
+                    Some(TaskError::UnexpectedResponseHeaders)
+                );
             }
             assert_matches!(
                 rx.try_recv().unwrap(),
@@ -606,10 +609,10 @@ mod tests {
 
                 let response = writer.to_parsed().to_response().unwrap();
 
-                assert!(task
-                    .handle_response(&mut association, response)
-                    .await
-                    .is_err());
+                assert_eq!(
+                    task.handle_response(&mut association, response).await.err(),
+                    Some(TaskError::UnexpectedResponseHeaders)
+                );
             }
             assert_matches!(rx.try_recv().unwrap(), Err(TimeSyncError::StillNeedsTime));
         }
@@ -650,9 +653,12 @@ mod tests {
                 non_lan_time_sync_single_time_setup();
             let task = check_measure_delay_request(task, &mut association);
             tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS.into())).await;
-            assert!(send_measure_delay_response(task, &mut association)
-                .await
-                .is_err());
+            assert_eq!(
+                send_measure_delay_response(task, &mut association)
+                    .await
+                    .err(),
+                Some(TaskError::UnexpectedResponseHeaders)
+            );
             assert_eq!(
                 rx.try_recv().unwrap(),
                 Err(TimeSyncError::SystemTimeNotAvailable)
@@ -773,10 +779,10 @@ mod tests {
 
                 let response = writer.to_parsed().to_response().unwrap();
 
-                assert!(task
-                    .handle_response(&mut association, response)
-                    .await
-                    .is_err());
+                assert_eq!(
+                    task.handle_response(&mut association, response).await.err(),
+                    Some(TaskError::UnexpectedResponseHeaders)
+                );
             }
             assert_eq!(
                 rx.try_recv().unwrap(),
@@ -808,10 +814,10 @@ mod tests {
 
                 let response = writer.to_parsed().to_response().unwrap();
 
-                assert!(task
-                    .handle_response(&mut association, response)
-                    .await
-                    .is_err());
+                assert_eq!(
+                    task.handle_response(&mut association, response).await.err(),
+                    Some(TaskError::UnexpectedResponseHeaders)
+                );
             }
             assert_eq!(
                 rx.try_recv().unwrap(),
@@ -842,10 +848,10 @@ mod tests {
 
                 let response = writer.to_parsed().to_response().unwrap();
 
-                assert!(task
-                    .handle_response(&mut association, response)
-                    .await
-                    .is_err())
+                assert_eq!(
+                    task.handle_response(&mut association, response).await.err(),
+                    Some(TaskError::UnexpectedResponseHeaders)
+                )
             }
             assert_matches!(rx.try_recv().unwrap(), Err(TimeSyncError::StillNeedsTime));
         }

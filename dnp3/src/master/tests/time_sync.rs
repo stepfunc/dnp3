@@ -367,5 +367,26 @@ async fn user_time_sync_that_still_needs_time_fails_and_starts_the_auto_time_syn
     complete_lan_procedure(&mut harness, &mut seq).await;
     TestHarness::assert_elapsed(failed, Duration::ZERO);
 
+    assert_eq!(
+        harness.assoc_events.pop(),
+        vec![
+            AssocInfoEvent::TaskStart(
+                TaskType::TimeSync,
+                FunctionCode::RecordCurrentTime,
+                Sequence::new(0)
+            ),
+            AssocInfoEvent::TaskFailure(TaskType::TimeSync, TaskError::UnexpectedResponseHeaders),
+            AssocInfoEvent::TaskStart(
+                TaskType::TimeSync,
+                FunctionCode::RecordCurrentTime,
+                Sequence::new(2)
+            ),
+            AssocInfoEvent::TaskSuccess(
+                TaskType::TimeSync,
+                FunctionCode::RecordCurrentTime,
+                Sequence::new(3)
+            ),
+        ]
+    );
     assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
 }
