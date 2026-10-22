@@ -8,7 +8,7 @@ use crate::app::{MaybeAsync, ResponseHeader};
 use crate::decode::AppDecodeLevel;
 use crate::link::header::{FrameInfo, FrameType};
 use crate::link::reader::LinkModes;
-use crate::link::EndpointAddress;
+use crate::link::{EndpointAddress, LinkErrorMode};
 use crate::master::association::{AssociationConfig, AssociationMap};
 use crate::master::task::MasterTask;
 use crate::master::{AssociationHandle, MasterChannel, ReadHandler, ReadType};
@@ -46,7 +46,7 @@ pub(crate) async fn create_association(mut config: AssociationConfig) -> TestHar
     let mut task = MasterTask::<MockTransport>::with_transport(
         Enabled::Yes,
         AssociationMap::new(),
-        LinkModes::serial(),
+        LinkModes::stream(LinkErrorMode::Discard),
         ParseOptions::default(),
         task_config,
         rx,
