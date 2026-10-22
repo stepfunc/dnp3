@@ -1854,4 +1854,213 @@ mod test {
             Err(AttrParseError::BadFloatLength(7))
         );
     }
+
+    const STRING_ATTRS: &[StringAttr] = &[
+        StringAttr::ConfigId,
+        StringAttr::ConfigVersion,
+        StringAttr::ConfigDigestAlgorithm,
+        StringAttr::MasterResourceId,
+        StringAttr::UserAssignedSecondaryOperatorName,
+        StringAttr::UserAssignedPrimaryOperatorName,
+        StringAttr::UserAssignedSystemName,
+        StringAttr::UserSpecificAttributes,
+        StringAttr::DeviceManufacturerSoftwareVersion,
+        StringAttr::DeviceManufacturerHardwareVersion,
+        StringAttr::UserAssignedOwnerName,
+        StringAttr::UserAssignedLocation,
+        StringAttr::UserAssignedId,
+        StringAttr::UserAssignedDeviceName,
+        StringAttr::DeviceSerialNumber,
+        StringAttr::DeviceSubsetAndConformance,
+        StringAttr::ProductNameAndModel,
+        StringAttr::DeviceManufacturersName,
+    ];
+
+    const UINT_ATTRS: &[UIntAttr] = &[
+        UIntAttr::SecureAuthVersion,
+        UIntAttr::NumSecurityStatsPerAssoc,
+        UIntAttr::NumMasterDefinedDataSetProto,
+        UIntAttr::NumOutstationDefinedDataSetProto,
+        UIntAttr::NumMasterDefinedDataSets,
+        UIntAttr::NumOutstationDefinedDataSets,
+        UIntAttr::MaxBinaryOutputPerRequest,
+        UIntAttr::LocalTimingAccuracy,
+        UIntAttr::DurationOfTimeAccuracy,
+        UIntAttr::MaxAnalogOutputIndex,
+        UIntAttr::NumAnalogOutputs,
+        UIntAttr::MaxBinaryOutputIndex,
+        UIntAttr::NumBinaryOutputs,
+        UIntAttr::MaxCounterIndex,
+        UIntAttr::NumCounter,
+        UIntAttr::MaxAnalogInputIndex,
+        UIntAttr::NumAnalogInput,
+        UIntAttr::MaxDoubleBitBinaryInputIndex,
+        UIntAttr::NumDoubleBitBinaryInput,
+        UIntAttr::MaxBinaryInputIndex,
+        UIntAttr::NumBinaryInput,
+        UIntAttr::MaxTxFragmentSize,
+        UIntAttr::MaxRxFragmentSize,
+    ];
+
+    const BOOL_ATTRS: &[BoolAttr] = &[
+        BoolAttr::SupportsAnalogOutputEvents,
+        BoolAttr::SupportsBinaryOutputEvents,
+        BoolAttr::SupportsFrozenCounterEvents,
+        BoolAttr::SupportsFrozenCounters,
+        BoolAttr::SupportsCounterEvents,
+        BoolAttr::SupportsFrozenAnalogInputs,
+        BoolAttr::SupportsAnalogInputEvents,
+        BoolAttr::SupportsDoubleBitBinaryInputEvents,
+        BoolAttr::SupportsBinaryInputEvents,
+    ];
+
+    const TIME_ATTRS: &[TimeAttr] = &[TimeAttr::ConfigBuildDate, TimeAttr::ConfigLastChangeDate];
+
+    const OCTET_STRING_ATTRS: &[OctetStringAttr] = &[OctetStringAttr::ConfigDigest];
+
+    const FLOAT_ATTRS: &[FloatAttr] = &[
+        FloatAttr::DeviceLocationAltitude,
+        FloatAttr::DeviceLocationLongitude,
+        FloatAttr::DeviceLocationLatitude,
+    ];
+
+    const VARIATION_LIST_ATTRS: &[VariationListAttr] = &[VariationListAttr::ListOfVariations];
+
+    const LIST: VariationList<'static> = VariationList { data: &[] };
+
+    /// one value of every attribute data type
+    const VALUES: &[AttrValue<'static>] = &[
+        AttrValue::VisibleString("abc"),
+        AttrValue::UnsignedInt(7),
+        AttrValue::SignedInt(1),
+        AttrValue::FloatingPoint(FloatType::F32(1.5)),
+        AttrValue::OctetString(&[0xCA, 0xFE]),
+        AttrValue::Dnp3Time(Timestamp::new(42)),
+        AttrValue::BitString(&[0x01]),
+        AttrValue::AttrList(LIST),
+    ];
+
+    /// every known attribute, its variation, and the value it is parsed from
+    fn known_attributes() -> Vec<(u8, AttrValue<'static>, KnownAttribute<'static>)> {
+        let mut known = Vec::new();
+        for &x in STRING_ATTRS {
+            known.push((
+                x.variation(),
+                AttrValue::VisibleString("abc"),
+                KnownAttribute::String(x, "abc"),
+            ));
+        }
+        for &x in UINT_ATTRS {
+            known.push((
+                x.variation(),
+                AttrValue::UnsignedInt(7),
+                KnownAttribute::UInt(x, 7),
+            ));
+        }
+        for &x in BOOL_ATTRS {
+            known.push((
+                x.variation(),
+                AttrValue::SignedInt(1),
+                KnownAttribute::Bool(x, true),
+            ));
+        }
+        for &x in TIME_ATTRS {
+            known.push((
+                x.variation(),
+                AttrValue::Dnp3Time(Timestamp::new(42)),
+                KnownAttribute::DNP3Time(x, Timestamp::new(42)),
+            ));
+        }
+        for &x in OCTET_STRING_ATTRS {
+            known.push((
+                x.variation(),
+                AttrValue::OctetString(&[0xCA, 0xFE]),
+                KnownAttribute::OctetString(x, &[0xCA, 0xFE]),
+            ));
+        }
+        for &x in FLOAT_ATTRS {
+            known.push((
+                x.variation(),
+                AttrValue::FloatingPoint(FloatType::F32(1.5)),
+                KnownAttribute::Float(x, FloatType::F32(1.5)),
+            ));
+        }
+        for &x in VARIATION_LIST_ATTRS {
+            known.push((
+                x.variation(),
+                AttrValue::AttrList(LIST),
+                KnownAttribute::AttributeList(x, LIST),
+            ));
+        }
+        known
+    }
+
+    fn default_set(variation: u8, value: AttrValue<'static>) -> Attribute<'static> {
+        Attribute {
+            set: AttrSet::Default,
+            variation,
+            value,
+        }
+    }
+
+    #[test]
+    fn known_attribute_variations_are_distinct() {
+        let known = known_attributes();
+        let variations: std::collections::BTreeSet<u8> = known.iter().map(|x| x.0).collect();
+        assert_eq!(variations.len(), known.len());
+    }
+
+    #[test]
+    fn each_known_attribute_is_parsed_from_its_variation() {
+        for (variation, value, expected) in known_attributes() {
+            assert_eq!(
+                AnyAttribute::try_from(&default_set(variation, value)),
+                Ok(AnyAttribute::Known(expected)),
+                "variation {variation}"
+            );
+            assert_ne!(
+                get_default_desc(variation),
+                "Unknown",
+                "variation {variation}"
+            );
+        }
+    }
+
+    #[test]
+    fn other_variations_are_not_known_attributes() {
+        let known: Vec<u8> = known_attributes().iter().map(|x| x.0).collect();
+        for variation in (0..=255).filter(|x| !known.contains(x)) {
+            for &value in VALUES {
+                let attr = default_set(variation, value);
+                assert_eq!(AnyAttribute::try_from(&attr), Ok(AnyAttribute::Other(attr)));
+            }
+            assert_eq!(
+                get_default_desc(variation),
+                "Unknown",
+                "variation {variation}"
+            );
+        }
+    }
+
+    #[test]
+    fn known_attributes_report_the_variation_they_were_parsed_from() {
+        for variation in 0..=255 {
+            for &value in VALUES {
+                if let Ok(AnyAttribute::Known(attr)) =
+                    AnyAttribute::try_from(&default_set(variation, value))
+                {
+                    let reported = match attr {
+                        KnownAttribute::AttributeList(x, _) => x.variation(),
+                        KnownAttribute::String(x, _) => x.variation(),
+                        KnownAttribute::Float(x, _) => x.variation(),
+                        KnownAttribute::UInt(x, _) => x.variation(),
+                        KnownAttribute::Bool(x, _) => x.variation(),
+                        KnownAttribute::OctetString(x, _) => x.variation(),
+                        KnownAttribute::DNP3Time(x, _) => x.variation(),
+                    };
+                    assert_eq!(reported, variation);
+                }
+            }
+        }
+    }
 }
