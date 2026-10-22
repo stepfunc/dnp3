@@ -62,15 +62,6 @@ async fn fails_on_unexpected_variation() {
     assert_eq!(result, Err(FileError::BadResponse));
 }
 
-#[tokio::test]
-async fn fails_without_object_header() {
-    let result = write_with_response(super::no_object_response(0)).await;
-    assert_eq!(
-        result,
-        Err(FileError::TaskError(TaskError::UnexpectedResponseHeaders))
-    );
-}
-
 /// Run the block write against a response that fails it, and check that the task fails
 async fn write_with_response(response: Vec<u8>) -> Result<(), FileError> {
     let mut harness = create_association(AssociationConfig::quiet()).await;

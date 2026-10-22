@@ -174,7 +174,7 @@ async fn read_g34_v3() {
 }
 
 #[tokio::test]
-async fn read_infinite_deadband_saturates_every_variation() {
+async fn read_infinite_deadband_is_infinity_in_g34v3_and_saturates_the_integers() {
     let mut harness = new_harness(get_default_config());
 
     harness
@@ -203,12 +203,12 @@ async fn read_infinite_deadband_saturates_every_variation() {
         )
         .await;
 
-    // g34v3 clamps to f32::MAX
+    // g34v3 is infinity
     harness
         .test_request_response(
             &[0xC2, 0x01, 0x22, 0x03, 0x06],
             &[
-                0xC2, 0x81, 0x80, 0x00, 0x22, 0x03, 0x01, 0x07, 0x00, 0x07, 0x00, 0xFF, 0xFF, 0x7F,
+                0xC2, 0x81, 0x80, 0x00, 0x22, 0x03, 0x01, 0x07, 0x00, 0x07, 0x00, 0x00, 0x00, 0x80,
                 0x7F,
             ],
         )
@@ -233,4 +233,64 @@ async fn read_g34_v0() {
             ],
         )
         .await;
+}
+
+/// the forms of the request header each READ of g34 is sent with: all objects, then 1-byte and
+/// 2-byte start-stop over indices 7 to 8
+const READ_QUALIFIERS: [&[u8]; 3] = [
+    &[0x06],
+    &[0x00, 0x07, 0x08],
+    &[0x01, 0x07, 0x00, 0x08, 0x00],
+];
+
+#[tokio::test]
+async fn read_g34_with_every_subset_level_4_qualifier() {
+    // the variation read, and the variation and objects of the response for indices 7 and 8
+    let variations: [(u8, u8, &[u8]); 4] = [
+        (
+            0x00,
+            0x03,
+            &[0x00, 0x00, 0x28, 0x42, 0x00, 0x00, 0x96, 0x43],
+        ),
+        (0x01, 0x01, &[0x2A, 0x00, 0x2C, 0x01]),
+        (
+            0x02,
+            0x02,
+            &[0x2A, 0x00, 0x00, 0x00, 0x2C, 0x01, 0x00, 0x00],
+        ),
+        (
+            0x03,
+            0x03,
+            &[0x00, 0x00, 0x28, 0x42, 0x00, 0x00, 0x96, 0x43],
+        ),
+    ];
+
+    for (read_variation, response_variation, objects) in variations {
+        for qualifier in READ_QUALIFIERS {
+            let mut harness = new_harness(get_default_config());
+            harness.handle.database.transaction(|db| {
+                db.add(7, Some(EventClass::Class1), config(42.0));
+                db.add(8, Some(EventClass::Class1), config(300.0));
+            });
+
+            let mut request = vec![0xC0, 0x01, 0x22, read_variation];
+            request.extend_from_slice(qualifier);
+            let mut response = vec![
+                0xC0,
+                0x81,
+                0x80,
+                0x00,
+                0x22,
+                response_variation,
+                0x01,
+                0x07,
+                0x00,
+                0x08,
+                0x00,
+            ];
+            response.extend_from_slice(objects);
+
+            harness.test_request_response(&request, &response).await;
+        }
+    }
 }

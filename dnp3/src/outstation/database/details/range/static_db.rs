@@ -274,18 +274,16 @@ impl StaticDatabase {
         }
     }
 
-    pub(crate) fn set_analog_deadband(&mut self, index: u16, deadband: f64) -> bool {
-        let Some(deadband) = Deadband::analog(deadband) else {
-            return false;
-        };
-
-        match self.analog.get_mut(index) {
-            None => false,
-            Some(x) => {
-                x.config.detector = deadband;
-                true
-            }
-        }
+    /// Set the deadband a master wrote, returning the value stored, or None if the deadband is NaN
+    /// or there's no analog input at the index
+    ///
+    /// A negative deadband is stored as 0 (IEEE 1815-2012 A.18)
+    pub(crate) fn set_analog_deadband(&mut self, index: u16, deadband: f64) -> Option<f64> {
+        let deadband = if deadband < 0.0 { 0.0 } else { deadband };
+        let detector = Deadband::analog(deadband)?;
+        let point = self.analog.get_mut(index)?;
+        point.config.detector = detector;
+        Some(deadband)
     }
 
     #[cfg(test)]
@@ -611,23 +609,26 @@ pub(crate) struct Deadband<N> {
     deadband: N,
 }
 
-/// how far apart two values are
-pub(crate) trait Distance: PartialOrd {
-    fn distance(self, other: Self) -> Self;
+/// whether two values differ by more than a deadband
+pub(crate) trait Distance: Copy {
+    fn exceeds(self, other: Self, deadband: Self) -> bool;
 }
 
 impl Distance for u32 {
-    fn distance(self, other: Self) -> Self {
-        self.abs_diff(other)
+    fn exceeds(self, other: Self, deadband: Self) -> bool {
+        self.abs_diff(other) > deadband
     }
 }
 
+/// a change between NaN and a number exceeds any deadband, and NaN to NaN never does, whatever
+/// the payload
 impl Distance for f64 {
-    fn distance(self, other: Self) -> Self {
-        if self > other {
-            self - other
-        } else {
-            other - self
+    fn exceeds(self, other: Self, deadband: Self) -> bool {
+        match (self.is_nan(), other.is_nan()) {
+            (true, true) => false,
+            (true, false) | (false, true) => true,
+            // equal infinities differ by NaN, which exceeds nothing
+            (false, false) => (self - other).abs() > deadband,
         }
     }
 }
@@ -649,7 +650,7 @@ impl Deadband<f64> {
 
 impl<N: Distance> Deadband<N> {
     fn exceeded(&self, lhs: N, rhs: N) -> bool {
-        lhs.distance(rhs) > self.deadband
+        lhs.exceeds(rhs, self.deadband)
     }
 }
 
@@ -727,30 +728,59 @@ mod tests {
     }
 
     #[test]
-    fn float_deadband_keeps_ieee_semantics() {
+    fn float_deadband_treats_nan_as_a_value() {
+        const OTHER_NAN: f64 = f64::from_bits(0x7FF8_0000_0000_0001);
         let deadband = Deadband::analog(1.0).unwrap();
         assert!(!deadband.exceeded(2.0, 2.5));
         assert!(deadband.exceeded(-1.0, 1.0));
         assert!(deadband.exceeded(f64::MAX, f64::MIN));
-        // NaN differences never exceed the deadband
-        assert!(!deadband.exceeded(f64::NAN, 1.0));
-        assert!(!deadband.exceeded(1.0, f64::NAN));
-        // equal infinities differ by NaN
+        // a change between NaN and a number or an infinity exceeds any finite deadband
+        assert!(deadband.exceeded(f64::NAN, 1.0));
+        assert!(deadband.exceeded(1.0, f64::NAN));
+        assert!(deadband.exceeded(f64::NAN, f64::INFINITY));
+        assert!(Deadband::analog(f64::MAX).unwrap().exceeded(f64::NAN, 0.0));
+        // NaN to NaN doesn't, whatever the payload
+        assert!(!deadband.exceeded(f64::NAN, f64::NAN));
+        assert!(!deadband.exceeded(f64::NAN, OTHER_NAN));
+        // a change involving infinity does unless both are the same infinity
         assert!(!deadband.exceeded(f64::INFINITY, f64::INFINITY));
+        assert!(!deadband.exceeded(f64::NEG_INFINITY, f64::NEG_INFINITY));
+        assert!(deadband.exceeded(f64::INFINITY, f64::NEG_INFINITY));
         assert!(deadband.exceeded(f64::INFINITY, 1.0));
+        // an infinite deadband suppresses every value change except to and from NaN
+        let infinite = Deadband::analog(f64::INFINITY).unwrap();
+        assert!(infinite.exceeded(f64::NAN, 1.0));
+        assert!(infinite.exceeded(f64::INFINITY, f64::NAN));
+        assert!(!infinite.exceeded(f64::NAN, OTHER_NAN));
+        assert!(!infinite.exceeded(f64::MAX, f64::MIN));
+        assert!(!infinite.exceeded(f64::INFINITY, f64::NEG_INFINITY));
+        assert!(!infinite.exceeded(f64::INFINITY, 1.0));
     }
 
     #[test]
-    fn written_analog_deadband_must_be_zero_or_positive() {
+    fn written_analog_deadband_treats_negative_values_as_zero() {
         let mut db = StaticDatabase::default();
         assert!(db.add(0, analog_config(StaticAnalogInputVariation::Group30Var1)));
 
-        for deadband in [0.0, -0.0, 1.5, 1e-310, f64::INFINITY] {
-            assert!(db.set_analog_deadband(0, deadband), "{deadband}");
+        let cases = [
+            (0.0, Some(0.0)),
+            (1.5, Some(1.5)),
+            (1e-310, Some(1e-310)),
+            (f64::INFINITY, Some(f64::INFINITY)),
+            (-1.0, Some(0.0)),
+            (f64::NEG_INFINITY, Some(0.0)),
+            (f64::NAN, None),
+        ];
+        for (deadband, stored) in cases {
+            assert_eq!(db.set_analog_deadband(0, deadband), stored, "{deadband}");
         }
-        for deadband in [f64::NAN, -1.0, f64::NEG_INFINITY] {
-            assert!(!db.set_analog_deadband(0, deadband), "{deadband}");
-        }
+        // -0.0 is stored as written
+        assert_eq!(
+            db.set_analog_deadband(0, -0.0).map(f64::to_bits),
+            Some((-0.0f64).to_bits())
+        );
+        // no analog input at the index
+        assert_eq!(db.set_analog_deadband(1, 1.0), None);
     }
 
     fn binary_config(var: StaticBinaryInputVariation) -> PointConfig<BinaryInput> {

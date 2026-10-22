@@ -188,6 +188,8 @@ pub trait OutstationApplication: Sync + Send + 'static {
     ///
     /// The dead-band is automatically updated in the database. This callback allows application code
     /// to persist the modified value to non-volatile memory if desired
+    ///
+    /// A negative dead-band written by the master is stored, and reported here, as 0
     #[expect(
         unused_variables,
         reason = "the default implementation ignores its arguments"

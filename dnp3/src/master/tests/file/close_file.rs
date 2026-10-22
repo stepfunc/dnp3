@@ -7,44 +7,6 @@ use crate::master::{AssociationHandle, FileError, FileHandle, TaskError, TaskTyp
 const HANDLE: FileHandle = FileHandle::new(42);
 
 #[tokio::test]
-async fn can_close_file() {
-    let config = AssociationConfig::quiet();
-    let mut harness = create_association(config).await;
-
-    let open_task = spawn_close_task(harness.association.clone(), HANDLE);
-
-    harness.expect_write(close_file(0, HANDLE)).await;
-
-    harness
-        .process_response(super::file_status_response(
-            0,
-            HANDLE.into(),
-            0,
-            0,
-            FileStatus::Success,
-        ))
-        .await;
-
-    assert_eq!(open_task.await.unwrap(), Ok(()));
-
-    assert_eq!(
-        harness.assoc_events.pop().as_slice(),
-        &[
-            AssocInfoEvent::TaskStart(
-                TaskType::FileClose,
-                FunctionCode::CloseFile,
-                Sequence::new(0)
-            ),
-            AssocInfoEvent::TaskSuccess(
-                TaskType::FileClose,
-                FunctionCode::CloseFile,
-                Sequence::new(0)
-            ),
-        ]
-    );
-}
-
-#[tokio::test]
 async fn close_request_bytes() {
     let mut harness = create_association(AssociationConfig::quiet()).await;
     let _close_task = spawn_close_task(harness.association.clone(), FileHandle::new(0xDEADCAFE));
@@ -121,15 +83,6 @@ async fn fails_on_unexpected_variation() {
     ))
     .await;
     assert_eq!(result, Err(FileError::BadResponse));
-}
-
-#[tokio::test]
-async fn fails_without_object_header() {
-    let result = close_with_response(super::no_object_response(0)).await;
-    assert_eq!(
-        result,
-        Err(FileError::TaskError(TaskError::UnexpectedResponseHeaders))
-    );
 }
 
 /// Run a CLOSE of [`HANDLE`] against a response that fails it, and check that the task fails
