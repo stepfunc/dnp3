@@ -619,60 +619,13 @@ impl Association {
         }
     }
 
-    pub(crate) async fn handle_integrity_response(
-        &mut self,
-        header: ResponseHeader,
-        objects: HeaderCollection<'_>,
-    ) -> bool {
-        extract_measurements(
-            ReadType::StartupIntegrity,
-            header,
-            objects,
-            self.read_handler.as_mut(),
-        )
-        .await
-    }
-
-    pub(crate) async fn handle_poll_response(
-        &mut self,
-        header: ResponseHeader,
-        objects: HeaderCollection<'_>,
-    ) -> bool {
-        extract_measurements(
-            ReadType::PeriodicPoll,
-            header,
-            objects,
-            self.read_handler.as_mut(),
-        )
-        .await
-    }
-
-    pub(crate) async fn handle_event_scan_response(
-        &mut self,
-        header: ResponseHeader,
-        objects: HeaderCollection<'_>,
-    ) -> bool {
-        extract_measurements(
-            ReadType::PeriodicPoll,
-            header,
-            objects,
-            self.read_handler.as_mut(),
-        )
-        .await
-    }
-
     pub(crate) async fn handle_read_response(
         &mut self,
+        read_type: ReadType,
         header: ResponseHeader,
         objects: HeaderCollection<'_>,
     ) -> bool {
-        extract_measurements(
-            ReadType::SinglePoll,
-            header,
-            objects,
-            self.read_handler.as_mut(),
-        )
-        .await
+        extract_measurements(read_type, header, objects, self.read_handler.as_mut()).await
     }
 
     pub(crate) fn notify_task_start(
