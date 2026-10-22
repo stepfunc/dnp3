@@ -14,8 +14,8 @@ use crate::master::tasks::command_no_ack::CommandNoAckTask;
 use crate::master::tasks::{AppTask, AssociationTask, NonReadTask, ReadTask, RequestWriter, Task};
 use crate::master::{Association, MasterChannelConfig};
 use crate::transport::{
-    FragmentAddr, RealTransport, Transport, TransportReader, TransportResponse,
-    TransportResponseError, TransportWriter,
+    FragmentAddr, LinkLayerMessage, LinkLayerMessageType, RealTransport, Transport,
+    TransportReader, TransportResponse, TransportResponseError, TransportWriter,
 };
 use crate::util::buffer::Buffer;
 use crate::util::channel::Receiver;
@@ -197,7 +197,7 @@ enum Event<'a> {
     /// a fragment arrived, and link activity was credited to its source
     Fragment(FragmentAddr, Response<'a>),
     /// a link-layer message arrived, and link activity was credited to its source
-    LinkLayer,
+    LinkLayer(LinkLayerMessage),
     /// a fragment arrived that isn't a valid response
     Malformed(TransportResponseError),
     /// the read completed without a fragment or link-layer message
@@ -298,7 +298,7 @@ impl MasterSession {
                         .handle_fragment_while_idle(io, writer, source, response)
                         .await
                 }
-                Event::LinkLayer => {}
+                Event::LinkLayer(_) => {}
                 // we need to recheck the tasks
                 Event::Timeout | Event::Message | Event::Malformed(_) | Event::Nothing => {
                     return Ok(())
@@ -333,7 +333,7 @@ impl MasterSession {
             }
             Some(TransportResponse::LinkLayerMessage(msg)) => {
                 self.notify_link_activity(msg.source);
-                Event::LinkLayer
+                Event::LinkLayer(msg)
             }
             Some(TransportResponse::Error(err)) => Event::Malformed(err),
             None => Event::Nothing,
@@ -590,7 +590,7 @@ impl MasterSession {
                     Ok(Event::Timeout) => break 'failed deadline.expired(),
                     Ok(Event::Malformed(err)) => break 'failed err.into(),
                     Ok(Event::Fragment(source, response)) => (source, response),
-                    Ok(Event::Message | Event::LinkLayer | Event::Nothing) => continue,
+                    Ok(Event::Message | Event::LinkLayer(_) | Event::Nothing) => continue,
                 };
 
                 let response = match self
@@ -677,7 +677,7 @@ impl MasterSession {
                         Event::Timeout => return Err(deadline.expired()),
                         Event::Malformed(err) => return Err(err.into()),
                         Event::Fragment(source, response) => (source, response),
-                        Event::Message | Event::LinkLayer | Event::Nothing => continue,
+                        Event::Message | Event::LinkLayer(_) | Event::Nothing => continue,
                     };
 
                 if let Some(response) = self
@@ -896,14 +896,17 @@ impl MasterSession {
         loop {
             match self.next_event(io, reader, Some(deadline.at)).await? {
                 Event::Timeout => return Err(deadline.expired()),
-                Event::LinkLayer => return Ok(()),
+                Event::LinkLayer(LinkLayerMessage {
+                    source,
+                    message: LinkLayerMessageType::LinkStatusResponse,
+                }) if source == destination.link => return Ok(()),
                 Event::Fragment(source, response) => {
                     self.handle_fragment_while_idle(io, writer, source, response)
                         .await?;
                     return Err(TaskError::UnexpectedResponseHeaders);
                 }
                 Event::Malformed(_) => return Err(TaskError::UnexpectedResponseHeaders),
-                Event::Message | Event::Nothing => {}
+                Event::LinkLayer(_) | Event::Message | Event::Nothing => {}
             }
         }
     }
