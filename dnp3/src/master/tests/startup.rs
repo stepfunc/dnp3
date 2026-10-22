@@ -12,7 +12,6 @@ use crate::util::test_support::watchdog;
 
 use super::harness::requests::*;
 use super::harness::{create_association, TestHarness};
-use crate::util::test_support::watchdog;
 
 #[tokio::test]
 async fn master_startup_procedure() {
