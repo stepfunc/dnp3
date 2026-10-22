@@ -25,7 +25,7 @@ use crate::outstation::control::collection::{
     ControlCollection, ControlLimit, ControlMode, ControlTransaction,
 };
 use crate::outstation::control::select::SelectState;
-use crate::outstation::database::{DatabaseHandle, ResponseInfo};
+use crate::outstation::database::DatabaseHandle;
 use crate::outstation::deferred::DeferredRead;
 use crate::outstation::response::{Prepared, ResponseSlot};
 use crate::outstation::task::{ConfigurationChange, OutstationMessage};
@@ -111,30 +111,15 @@ impl RetryCounter {
     }
 }
 
-impl ResponseInfo {
-    fn get_response_series(&self, ecsn: Sequence) -> Option<ResponseSeries> {
-        if self.need_confirm() {
-            Some(ResponseSeries::new(ecsn, self.complete))
-        } else {
-            None
-        }
-    }
-}
-
 #[derive(Copy, Clone)]
 struct LastValidRequest {
     seq: Sequence,
     request_hash: u64,
-    series: Option<ResponseSeries>,
 }
 
 impl LastValidRequest {
-    fn new(seq: Sequence, request_hash: u64, series: Option<ResponseSeries>) -> Self {
-        LastValidRequest {
-            seq,
-            request_hash,
-            series,
-        }
+    fn new(seq: Sequence, request_hash: u64) -> Self {
+        LastValidRequest { seq, request_hash }
     }
 }
 
@@ -189,18 +174,6 @@ enum UnsolicitedState {
     Ready(Option<tokio::time::Instant>),
 }
 
-/// What a request does to the selection, following IEEE 1815-2012 4.4.4 Rule 4 and Table 4-9.
-/// Ending a selection early can only make an OPERATE fail, while keeping one too long could
-/// execute a control, so every request ends it except the few cases that keep it
-enum SelectionAction {
-    /// a CONFIRM, which isn't a request, or a retry of the SELECT
-    Keep,
-    /// a SELECT with the selection's sequence number but different contents
-    Discard,
-    /// any other request, which ends the selection, giving it to an OPERATE to check
-    Take(Option<SelectState>),
-}
-
 /// a broadcast whose IIN1.0 hasn't been cleared
 #[derive(Copy, Clone)]
 struct PendingBroadcast {
@@ -209,6 +182,62 @@ struct PendingBroadcast {
     solicited_reported: bool,
     /// an unsolicited response has carried IIN1.0 for this broadcast
     unsolicited_reported: bool,
+}
+
+#[derive(Copy, Clone)]
+enum ResponseKind {
+    Solicited,
+    Unsolicited,
+}
+
+/// IIN1.0 for the last broadcast received. It ends with the first response that reports it, or,
+/// when the broadcast requires a confirm, once the master confirms a response that reported it.
+#[derive(Default)]
+struct BroadcastIin(Option<PendingBroadcast>);
+
+impl BroadcastIin {
+    fn received(&mut self, mode: BroadcastConfirmMode) {
+        self.0 = Some(PendingBroadcast {
+            mode,
+            solicited_reported: false,
+            unsolicited_reported: false,
+        });
+    }
+
+    /// Report the broadcast in a response: IIN1.0, and in a solicited response, CON if the
+    /// broadcast requires a confirm
+    fn report(&mut self, header: &mut ResponseHeader, kind: ResponseKind) {
+        let Some(pending) = &mut self.0 else {
+            return;
+        };
+
+        header.iin |= Iin1::BROADCAST;
+
+        if pending.mode != BroadcastConfirmMode::Mandatory {
+            self.0 = None;
+            return;
+        }
+
+        match kind {
+            ResponseKind::Solicited => {
+                header.control.con = true;
+                pending.solicited_reported = true;
+            }
+            ResponseKind::Unsolicited => pending.unsolicited_reported = true,
+        }
+    }
+
+    /// The master confirmed a response of this kind. Returns true if that ended the IIN1.0.
+    fn confirmed(&mut self, kind: ResponseKind) -> bool {
+        let reported = self.0.is_some_and(|pending| match kind {
+            ResponseKind::Solicited => pending.solicited_reported,
+            ResponseKind::Unsolicited => pending.unsolicited_reported,
+        });
+        if reported {
+            self.0 = None;
+        }
+        reported
+    }
 }
 
 /// state that mutates while the session runs
@@ -221,7 +250,7 @@ struct SessionState {
     unsolicited_seq: Sequence,
     deferred_read: DeferredRead,
     last_recorded_time: Option<tokio::time::Instant>,
-    broadcast: Option<PendingBroadcast>,
+    broadcast: BroadcastIin,
 }
 
 impl SessionState {
@@ -235,7 +264,7 @@ impl SessionState {
             unsolicited_seq: Sequence::default(),
             deferred_read: DeferredRead::new(max_read_headers),
             last_recorded_time: None,
-            broadcast: None,
+            broadcast: BroadcastIin::default(),
         }
     }
 
@@ -291,6 +320,8 @@ enum UnsolicitedWaitResult {
     Complete(UnsolicitedResult),
 }
 
+/// A request, classified against the last valid request
+#[derive(Copy, Clone)]
 enum FragmentType<'a> {
     MalformedRequest(u64, ObjectParseError),
     NewRead(u64, HeaderCollection<'a>),
@@ -298,17 +329,47 @@ enum FragmentType<'a> {
     NewNonRead(u64, HeaderCollection<'a>),
     RepeatNonRead(u64),
     Broadcast(BroadcastConfirmMode),
-    SolicitedConfirm(Sequence),
-    UnsolicitedConfirm(Sequence),
 }
 
-/// How the idle state answers a request
-enum IdleResponse {
-    /// record the request as the last valid request and publish its response, if it has one
-    New(LastValidRequest, Option<Prepared>),
-    /// a repeated non-read request: send the published response again exactly as it was, and wait
-    /// for its confirm again if it asked for one
-    Repeat,
+impl FragmentType<'_> {
+    fn is_read(&self) -> bool {
+        match self {
+            FragmentType::NewRead(..) | FragmentType::RepeatRead(..) => true,
+            FragmentType::MalformedRequest(..)
+            | FragmentType::NewNonRead(..)
+            | FragmentType::RepeatNonRead(_)
+            | FragmentType::Broadcast(_) => false,
+        }
+    }
+}
+
+/// A fragment from the master, after [`OutstationSession::receive`] filtered and classified it
+enum Intake<'a> {
+    /// nothing to answer: no fragment, a link-layer message, a fragment that isn't a valid
+    /// request, or a SELECT that the selection discards
+    Nothing,
+    /// a request with an unknown function code, answered with IIN2.0
+    UnknownFunction(FragmentAddr, Sequence),
+    /// the confirm of a solicited or an unsolicited response
+    Confirm(FragmentAddr, RequestHeader),
+    /// a request, for the state to answer or defer
+    Request(Received<'a>),
+}
+
+#[derive(Copy, Clone)]
+struct Received<'a> {
+    info: FragmentInfo,
+    request: Request<'a>,
+    fragment: FragmentType<'a>,
+}
+
+/// What a state does with a READ
+#[derive(Copy, Clone)]
+enum Reads {
+    /// answer it now
+    Answer,
+    /// keep it until the session returns to idle (IEEE 1815-2012 Table 6-1 row 25)
+    Defer,
 }
 
 #[derive(Copy, Clone)]
@@ -436,9 +497,9 @@ impl OutstationSession {
         database: &DatabaseHandle,
     ) -> Result<ResponseHeader, LinkError> {
         response.header_mut().iin |= self.get_response_iin(database);
-        if let Some(broadcast) = &mut self.state.broadcast {
-            broadcast.unsolicited_reported = true;
-        }
+        self.state
+            .broadcast
+            .report(response.header_mut(), ResponseKind::Unsolicited);
 
         writer
             .write(
@@ -505,14 +566,41 @@ impl OutstationSession {
 
     fn finish_solicited_header(&mut self, header: &mut ResponseHeader, database: &DatabaseHandle) {
         header.iin |= self.get_response_iin(database);
+        self.state.broadcast.report(header, ResponseKind::Solicited);
+    }
 
-        // Determine if we need to ask for confirmation due to broadcast
-        if let Some(broadcast) = &mut self.state.broadcast {
-            if broadcast.mode == BroadcastConfirmMode::Mandatory {
-                header.control.con = true;
+    /// The confirm that a written solicited response waits for: its own, or a mandatory
+    /// broadcast's
+    fn awaited_confirm(header: ResponseHeader) -> Option<ResponseSeries> {
+        header
+            .control
+            .con
+            .then(|| ResponseSeries::new(header.control.seq, header.control.fin))
+    }
+
+    /// Answer a request that becomes the last valid request, publishing its response if it has
+    /// one. Returns the confirm that the response waits for.
+    async fn respond<T: Transport>(
+        &mut self,
+        io: &mut PhysLayer,
+        writer: &mut TransportWriter<T>,
+        respond_to: FragmentAddr,
+        request: LastValidRequest,
+        response: Option<Prepared>,
+        database: &DatabaseHandle,
+    ) -> Result<Option<ResponseSeries>, LinkError> {
+        let confirm = match response {
+            Some(response) => Self::awaited_confirm(
+                self.write_solicited(io, writer, respond_to, response, database)
+                    .await?,
+            ),
+            None => {
+                self.sol.clear();
+                None
             }
-            broadcast.solicited_reported = true;
-        }
+        };
+        self.state.last_valid_request = Some(request);
+        Ok(confirm)
     }
 
     async fn repeat_solicited<T: Transport>(
@@ -808,129 +896,56 @@ impl OutstationSession {
         }
 
         let guard = self.pop_request(reader);
-        let (info, request) = match guard.get() {
-            None => return Ok(UnsolicitedWaitResult::ReadNext),
-            Some(TransportRequest::Request(info, request)) => {
-                self.on_link_activity();
-                (info, request)
-            }
-            Some(TransportRequest::LinkLayerMessage) => {
-                self.on_link_activity();
-                return Ok(UnsolicitedWaitResult::ReadNext);
-            }
-            Some(TransportRequest::Error(from, err)) => {
-                self.on_link_activity();
-                if let Some(seq) = Self::error_response_seq(err) {
-                    // a request with an unknown function code ends the selection
-                    self.state.select = None;
-                    self.state.deferred_read.clear();
-                    self.write_error_response(io, from, writer, seq, database)
-                        .await?;
-                }
-                return Ok(UnsolicitedWaitResult::ReadNext);
-            }
-        };
-
-        let fragment = self.classify(info, request);
-        let selection = match self.selection_for(
-            &fragment,
-            request.header.function,
-            request.header.control.seq,
-        ) {
-            SelectionAction::Discard => return Ok(UnsolicitedWaitResult::ReadNext),
-            SelectionAction::Keep => None,
-            SelectionAction::Take(selection) => selection,
-        };
-
-        match fragment {
-            FragmentType::UnsolicitedConfirm(seq) => {
-                if seq == uns_ecsn {
-                    if self.state.broadcast.is_some_and(|b| b.unsolicited_reported) {
-                        self.state.broadcast = None;
-                    }
-                    self.info.unsolicited_confirmed(seq);
-                    Ok(UnsolicitedWaitResult::Complete(
-                        UnsolicitedResult::Confirmed,
-                    ))
-                } else {
-                    tracing::warn!(
-                        "ignoring unsolicited confirm with wrong sequence number ({})",
-                        seq.value()
-                    );
-                    Ok(UnsolicitedWaitResult::ReadNext)
-                }
-            }
-            FragmentType::SolicitedConfirm(_) => {
-                if self.state.broadcast.is_some_and(|b| b.solicited_reported) {
-                    self.state.broadcast = None
-                } else {
-                    tracing::warn!("ignoring solicited confirm");
-                }
-                Ok(UnsolicitedWaitResult::ReadNext)
-            }
-            FragmentType::Broadcast(mode) => {
-                self.state.deferred_read.clear();
-                self.process_broadcast(database, mode, request).await;
-                Ok(UnsolicitedWaitResult::ReadNext)
-            }
-            FragmentType::MalformedRequest(hash, err) => {
-                self.state.deferred_read.clear();
-
-                // IEEE 1815-2012 clause 6.1: a request whose objects don't parse is still the last
-                // request, answered with IIN2, as from idle
-                let seq = request.header.control.seq;
-                let response = Prepared::empty_solicited(seq, Iin::default() | Iin2::from(err));
-                self.write_solicited(io, writer, info.addr, response, database)
+        let received = match self.receive(&guard) {
+            Intake::Nothing => return Ok(UnsolicitedWaitResult::ReadNext),
+            Intake::UnknownFunction(from, seq) => {
+                self.answer_unknown_function(io, writer, from, seq, database)
                     .await?;
-                self.state.last_valid_request = Some(LastValidRequest::new(seq, hash, None));
-                Ok(UnsolicitedWaitResult::ReadNext)
+                return Ok(UnsolicitedWaitResult::ReadNext);
             }
-            FragmentType::NewNonRead(hash, objects) => {
-                self.state.deferred_read.clear();
-                let response = self
-                    .handle_non_read(
-                        database,
-                        request.header.function,
-                        request.header.control.seq,
-                        hash,
-                        selection,
-                        objects,
-                    )
-                    .await;
-                match response {
-                    Some(response) => {
-                        self.write_solicited(io, writer, info.addr, response, database)
-                            .await?;
-                    }
-                    None => self.sol.clear(),
-                }
-                self.state.last_valid_request = Some(LastValidRequest::new(
-                    request.header.control.seq,
-                    hash,
-                    None,
-                ));
+            Intake::Confirm(_, header) => {
+                return Ok(self.confirm_in_unsolicited_wait(uns_ecsn, header));
+            }
+            Intake::Request(received) => received,
+        };
 
-                // Cancel unsolicited series if it's a DISABLE_UNSOLICITED
-                if request.header.function == FunctionCode::DisableUnsolicited {
-                    return Ok(UnsolicitedWaitResult::Complete(
-                        UnsolicitedResult::ReturnToIdle,
-                    ));
-                }
+        let selection = self.take_selection(&received.fragment);
+        let disable = matches!(received.fragment, FragmentType::NewNonRead(..))
+            && received.request.header.function == FunctionCode::DisableUnsolicited;
 
-                Ok(UnsolicitedWaitResult::ReadNext)
-            }
-            FragmentType::NewRead(hash, headers) | FragmentType::RepeatRead(hash, headers) => {
-                self.state
-                    .deferred_read
-                    .set(hash, request.header.control.seq, info, headers);
-                Ok(UnsolicitedWaitResult::ReadNext)
-            }
-            FragmentType::RepeatNonRead(_) => {
-                self.repeat_solicited(io, info.addr, writer).await?;
-                self.state.deferred_read.clear();
-                Ok(UnsolicitedWaitResult::ReadNext)
-            }
+        self.accept(io, writer, database, received, selection, Reads::Defer)
+            .await?;
+
+        if disable {
+            // DISABLE_UNSOLICITED ends the unsolicited response series
+            return Ok(UnsolicitedWaitResult::Complete(
+                UnsolicitedResult::ReturnToIdle,
+            ));
         }
+
+        Ok(UnsolicitedWaitResult::ReadNext)
+    }
+
+    fn confirm_in_unsolicited_wait(
+        &mut self,
+        uns_ecsn: Sequence,
+        header: RequestHeader,
+    ) -> UnsolicitedWaitResult {
+        let seq = header.control.seq;
+        if header.control.uns {
+            if seq == uns_ecsn {
+                self.state.broadcast.confirmed(ResponseKind::Unsolicited);
+                self.info.unsolicited_confirmed(seq);
+                return UnsolicitedWaitResult::Complete(UnsolicitedResult::Confirmed);
+            }
+            tracing::warn!(
+                "ignoring unsolicited confirm with wrong sequence number ({})",
+                seq.value()
+            );
+        } else if !self.state.broadcast.confirmed(ResponseKind::Solicited) {
+            tracing::warn!("ignoring solicited confirm");
+        }
+        UnsolicitedWaitResult::ReadNext
     }
 
     async fn read_until<T: Transport>(
@@ -1011,18 +1026,19 @@ impl OutstationSession {
     ) -> Result<(), RunError> {
         if let Some(x) = self.state.deferred_read.select(database) {
             tracing::info!("handling deferred READ request");
-            let (response, mut series) = self.format_read_response(database, true, x.seq, x.iin2);
-            let header = self
-                .write_solicited(io, writer, x.info.addr, response, database)
+            let response = self.format_read_response(database, true, x.seq, x.iin2);
+            let confirm = self
+                .respond(
+                    io,
+                    writer,
+                    x.info.addr,
+                    LastValidRequest::new(x.seq, x.hash),
+                    Some(response),
+                    database,
+                )
                 .await?;
-            self.state.last_valid_request = Some(LastValidRequest::new(x.seq, x.hash, series));
 
-            // check if an extra confirmation was added due to broadcast
-            if header.control.con && series.is_none() {
-                series = Some(ResponseSeries::new(header.control.seq, true));
-            }
-
-            if let Some(series) = series {
+            if let Some(series) = confirm {
                 // enter the solicited confirm wait state
                 self.sol_confirm_wait(io, reader, writer, database, series)
                     .instrument(tracing::info_span!(
@@ -1045,114 +1061,152 @@ impl OutstationSession {
         database: &mut DatabaseHandle,
     ) -> Result<(), RunError> {
         let guard = self.pop_request(reader);
-        match guard.get() {
-            Some(TransportRequest::Request(info, request)) => {
-                self.on_link_activity();
-                match self
-                    .process_request_from_idle(info, request, database)
-                    .await
-                {
-                    None => {}
-                    Some(IdleResponse::Repeat) => {
-                        self.repeat_solicited(io, info.addr, writer).await?;
-
-                        // a response that asked for a confirm asks for it again
-                        if let Some(header) = self.sol.header().filter(|h| h.control.con) {
-                            drop(guard);
-                            let series = ResponseSeries::new(header.control.seq, true);
-                            self.sol_confirm_wait(io, reader, writer, database, series)
-                                .instrument(tracing::info_span!(
-                                    "SolConfirmWait",
-                                    "ecsn" = series.ecsn.value()
-                                ))
-                                .await?;
-                        }
-                    }
-                    Some(IdleResponse::New(mut result, response)) => {
-                        // optional response
-                        match response {
-                            Some(response) => {
-                                let header = self
-                                    .write_solicited(io, writer, info.addr, response, database)
-                                    .await?;
-
-                                // check if an extra confirmation was added due to broadcast
-                                if header.control.con && result.series.is_none() {
-                                    result.series =
-                                        Some(ResponseSeries::new(header.control.seq, true));
-                                }
-                            }
-                            None => self.sol.clear(),
-                        }
-
-                        self.state.last_valid_request = Some(result);
-
-                        // maybe start a response series
-                        if let Some(series) = result.series {
-                            drop(guard);
-                            // enter the solicited confirm wait state
-                            self.sol_confirm_wait(io, reader, writer, database, series)
-                                .instrument(tracing::info_span!(
-                                    "SolConfirmWait",
-                                    "ecsn" = series.ecsn.value()
-                                ))
-                                .await?;
-                        }
-                    }
-                }
+        let confirm = match self.receive(&guard) {
+            Intake::Nothing => None,
+            Intake::UnknownFunction(from, seq) => {
+                self.answer_unknown_function(io, writer, from, seq, database)
+                    .await?;
+                None
             }
-            Some(TransportRequest::LinkLayerMessage) => {
-                self.on_link_activity();
+            Intake::Confirm(_, header) => {
+                self.info.process_request_from_idle(header);
+                let kind = if header.control.uns {
+                    "unsolicited"
+                } else {
+                    "solicited"
+                };
+                tracing::warn!(
+                    "ignoring {kind} CONFIRM from idle state with seq: {}",
+                    header.control.seq.value()
+                );
+                None
             }
-            Some(TransportRequest::Error(from, err)) => {
-                self.on_link_activity();
-                if let Some(seq) = Self::error_response_seq(err) {
-                    // a request with an unknown function code ends the selection
-                    self.state.select = None;
-                    self.write_error_response(io, from, writer, seq, database)
-                        .await?;
-                }
+            Intake::Request(received) => {
+                let selection = self.take_selection(&received.fragment);
+                self.info.process_request_from_idle(received.request.header);
+                self.accept(io, writer, database, received, selection, Reads::Answer)
+                    .await?
             }
-            None => (),
+        };
+        drop(guard);
+
+        if let Some(series) = confirm {
+            // enter the solicited confirm wait state
+            self.sol_confirm_wait(io, reader, writer, database, series)
+                .instrument(tracing::info_span!(
+                    "SolConfirmWait",
+                    "ecsn" = series.ecsn.value()
+                ))
+                .await?;
         }
 
         Ok(())
     }
 
-    async fn process_request_from_idle(
-        &mut self,
-        info: FragmentInfo,
-        request: Request<'_>,
-        database: &mut DatabaseHandle,
-    ) -> Option<IdleResponse> {
-        let seq = request.header.control.seq;
-        let fragment = self.classify(info, request);
-        let selection = match self.selection_for(&fragment, request.header.function, seq) {
-            SelectionAction::Discard => return None,
-            SelectionAction::Keep => None,
-            SelectionAction::Take(selection) => selection,
+    /// Take the master's next fragment. This is where every request enters the session, in any
+    /// state: any fragment from the master is link activity, and a request is classified once,
+    /// against the last valid request and the selection.
+    fn receive<'a, T: Transport>(&mut self, guard: &'a RequestGuard<'_, T>) -> Intake<'a> {
+        let (info, request) = match guard.get() {
+            None => return Intake::Nothing,
+            Some(TransportRequest::LinkLayerMessage) => {
+                self.on_link_activity();
+                return Intake::Nothing;
+            }
+            Some(TransportRequest::Error(from, err)) => {
+                self.on_link_activity();
+                return match Self::error_response_seq(err) {
+                    Some(seq) => Intake::UnknownFunction(from, seq),
+                    None => Intake::Nothing,
+                };
+            }
+            Some(TransportRequest::Request(info, request)) => {
+                self.on_link_activity();
+                (info, request)
+            }
         };
 
-        self.info.process_request_from_idle(request.header);
+        if request.header.function == FunctionCode::Confirm {
+            return Intake::Confirm(info.addr, request.header);
+        }
+
+        let fragment = self.classify(info, request);
+        if self.is_discarded_select(
+            &fragment,
+            request.header.function,
+            request.header.control.seq,
+        ) {
+            return Intake::Nothing;
+        }
+
+        Intake::Request(Received {
+            info,
+            request,
+            fragment,
+        })
+    }
+
+    /// Accept a request in idle or the unsolicited confirm wait (IEEE 1815-2012 Table 6-1 rows
+    /// 4-9 and 24-29): answer it, or defer a READ. A request that isn't a READ discards the
+    /// deferred READ. Returns the confirm that the answer waits for.
+    async fn accept<T: Transport>(
+        &mut self,
+        io: &mut PhysLayer,
+        writer: &mut TransportWriter<T>,
+        database: &mut DatabaseHandle,
+        received: Received<'_>,
+        selection: Option<SelectState>,
+        reads: Reads,
+    ) -> Result<Option<ResponseSeries>, LinkError> {
+        let Received {
+            info,
+            request,
+            fragment,
+        } = received;
+        let seq = request.header.control.seq;
+
+        if !fragment.is_read() {
+            self.state.deferred_read.clear();
+        }
 
         match fragment {
-            FragmentType::MalformedRequest(hash, err) => {
-                let response = Prepared::empty_solicited(seq, Iin::default() | Iin2::from(err));
-                Some(IdleResponse::New(
-                    LastValidRequest::new(seq, hash, None),
-                    Some(response),
-                ))
-            }
             FragmentType::NewRead(hash, objects) | FragmentType::RepeatRead(hash, objects) => {
-                // IEEE 1815-2012 Table 6-1 (Idle, row 8) says to resend the previous response to a
-                // repeated READ. We deliberately answer it as a new READ instead: the fresh response
-                // carries current values, and events that were never confirmed are still buffered,
-                // so they are reported again
-                let (response, series) = self.format_first_read_response(database, seq, objects);
-                Some(IdleResponse::New(
-                    LastValidRequest::new(seq, hash, series),
+                match reads {
+                    Reads::Answer => {
+                        // IEEE 1815-2012 Table 6-1 (Idle, row 8) says to resend the previous
+                        // response to a repeated READ. We deliberately answer it as a new READ
+                        // instead: the fresh response carries current values, and events that were
+                        // never confirmed are still buffered, so they are reported again
+                        let response = self.format_first_read_response(database, seq, objects);
+                        self.respond(
+                            io,
+                            writer,
+                            info.addr,
+                            LastValidRequest::new(seq, hash),
+                            Some(response),
+                            database,
+                        )
+                        .await
+                    }
+                    Reads::Defer => {
+                        self.state.deferred_read.set(hash, seq, info, objects);
+                        Ok(None)
+                    }
+                }
+            }
+            FragmentType::MalformedRequest(hash, err) => {
+                // IEEE 1815-2012 clause 6.1: a request whose objects don't parse is still the last
+                // request, answered with IIN2
+                let response = Prepared::empty_solicited(seq, Iin::default() | Iin2::from(err));
+                self.respond(
+                    io,
+                    writer,
+                    info.addr,
+                    LastValidRequest::new(seq, hash),
                     Some(response),
-                ))
+                    database,
+                )
+                .await
             }
             FragmentType::NewNonRead(hash, objects) => {
                 let response = self
@@ -1165,34 +1219,51 @@ impl OutstationSession {
                         objects,
                     )
                     .await;
-                Some(IdleResponse::New(
-                    LastValidRequest::new(seq, hash, None),
+                self.respond(
+                    io,
+                    writer,
+                    info.addr,
+                    LastValidRequest::new(seq, hash),
                     response,
-                ))
+                    database,
+                )
+                .await
             }
             FragmentType::RepeatNonRead(_) => {
-                // IEEE 1815-2012 Table 6-1: send the same response, byte for byte
-                Some(IdleResponse::Repeat)
+                // IEEE 1815-2012 Table 6-1: send the same response, byte for byte, which waits for
+                // its confirm again if it asked for one
+                self.repeat_solicited(io, info.addr, writer).await?;
+                Ok(self.sol.header().and_then(Self::awaited_confirm))
             }
             FragmentType::Broadcast(mode) => {
                 self.process_broadcast(database, mode, request).await;
-                None
-            }
-            FragmentType::SolicitedConfirm(seq) => {
-                tracing::warn!(
-                    "ignoring solicited CONFIRM from idle state with seq: {}",
-                    seq.value()
-                );
-                None
-            }
-            FragmentType::UnsolicitedConfirm(seq) => {
-                tracing::warn!(
-                    "ignoring unsolicited CONFIRM from idle state with seq: {}",
-                    seq.value()
-                );
-                None
+                Ok(None)
             }
         }
+    }
+
+    /// Answer a request with an unknown function code with IIN2.0. It ends the selection and
+    /// discards a deferred READ, but isn't a valid request, so the last valid request and its
+    /// response stay (TB2016-001).
+    async fn answer_unknown_function<T: Transport>(
+        &mut self,
+        io: &mut PhysLayer,
+        writer: &mut TransportWriter<T>,
+        respond_to: FragmentAddr,
+        seq: Sequence,
+        database: &DatabaseHandle,
+    ) -> Result<(), LinkError> {
+        self.state.select = None;
+        self.state.deferred_read.clear();
+        let iin = Iin::default() | Iin2::NO_FUNC_CODE_SUPPORT;
+        self.write_transient_solicited(
+            io,
+            writer,
+            respond_to,
+            ResponseHeader::solicited(seq, iin),
+            database,
+        )
+        .await
     }
 
     /// The sequence number to answer a request that couldn't be accepted with, if it gets an answer
@@ -1210,31 +1281,12 @@ impl OutstationSession {
         }
     }
 
-    async fn write_error_response<T: Transport>(
-        &mut self,
-        io: &mut PhysLayer,
-        respond_to: FragmentAddr,
-        writer: &mut TransportWriter<T>,
-        seq: Sequence,
-        database: &DatabaseHandle,
-    ) -> Result<(), LinkError> {
-        let iin = Iin::default() | Iin2::NO_FUNC_CODE_SUPPORT;
-        self.write_transient_solicited(
-            io,
-            writer,
-            respond_to,
-            ResponseHeader::solicited(seq, iin),
-            database,
-        )
-        .await
-    }
-
     fn format_first_read_response(
         &mut self,
         database: &mut DatabaseHandle,
         seq: Sequence,
         object_headers: HeaderCollection,
-    ) -> (Prepared, Option<ResponseSeries>) {
+    ) -> Prepared {
         let iin2 = database.select(&object_headers);
         self.format_read_response(database, true, seq, iin2)
     }
@@ -1245,7 +1297,7 @@ impl OutstationSession {
         fir: bool,
         seq: Sequence,
         iin2: Iin2,
-    ) -> (Prepared, Option<ResponseSeries>) {
+    ) -> Prepared {
         let info = match self
             .sol
             .build(|cursor| Ok(database.write_response_headers(cursor)))
@@ -1253,7 +1305,7 @@ impl OutstationSession {
             Ok(info) => info,
             Err(err) => {
                 tracing::error!("unable to write a READ response: {err:?}");
-                return (Prepared::parameter_error(seq), None);
+                return Prepared::parameter_error(seq);
             }
         };
 
@@ -1262,7 +1314,7 @@ impl OutstationSession {
             ResponseFunction::Response,
             Iin::default() | iin2,
         );
-        (Prepared::Stored(header), info.get_response_series(seq))
+        Prepared::Stored(header)
     }
 
     async fn handle_non_read(
@@ -1964,7 +2016,7 @@ impl OutstationSession {
         }
     }
 
-    fn get_response_iin(&mut self, database: &DatabaseHandle) -> Iin {
+    fn get_response_iin(&self, database: &DatabaseHandle) -> Iin {
         let mut iin = Iin::default();
 
         // Restart IIN bit
@@ -1989,15 +2041,6 @@ impl OutstationSession {
             iin |= Iin2::EVENT_BUFFER_OVERFLOW;
         }
 
-        // Broadcast bit
-        if let Some(broadcast) = self.state.broadcast {
-            iin |= Iin1::BROADCAST;
-
-            if broadcast.mode != BroadcastConfirmMode::Mandatory {
-                self.state.broadcast = None;
-            }
-        }
-
         // Application-controlled IIN bits
         iin |= self.application.get_application_iin();
 
@@ -2010,11 +2053,7 @@ impl OutstationSession {
         mode: BroadcastConfirmMode,
         request: Request<'_>,
     ) {
-        self.state.broadcast = Some(PendingBroadcast {
-            mode,
-            solicited_reported: false,
-            unsolicited_reported: false,
-        });
+        self.state.broadcast.received(mode);
         let action = self.process_broadcast_get_action(database, request).await;
         self.info
             .broadcast_received(request.header.function, action)
@@ -2117,9 +2156,7 @@ impl OutstationSession {
                 .await?
             {
                 Confirm::Yes(respond_to) => {
-                    if self.state.broadcast.is_some_and(|b| b.solicited_reported) {
-                        self.state.broadcast = None;
-                    }
+                    self.state.broadcast.confirmed(ResponseKind::Solicited);
 
                     self.end_confirm_wait(database, ConfirmOutcome::Confirmed)
                         .await;
@@ -2130,11 +2167,12 @@ impl OutstationSession {
                     }
                     // format the next response in the series
                     series.ecsn.increment();
-                    let (response, next) =
+                    let response =
                         self.format_read_response(database, false, series.ecsn, Iin2::default());
-                    self.write_solicited(io, writer, respond_to, response, database)
+                    let header = self
+                        .write_solicited(io, writer, respond_to, response, database)
                         .await?;
-                    match next {
+                    match Self::awaited_confirm(header) {
                         None => return Ok(()),
                         Some(next) => {
                             series = next;
@@ -2174,7 +2212,7 @@ impl OutstationSession {
                 // process data
                 TimeoutStatus::No => {
                     let mut guard = self.pop_request(reader);
-                    match self.expect_sol_confirm(ecsn, &mut guard) {
+                    match self.expect_sol_confirm(ecsn, &guard) {
                         ConfirmAction::ContinueWait => {
                             // we ignored whatever the request was and logged it elsewhere
                             // just go back to the loop and read another fragment
@@ -2203,54 +2241,21 @@ impl OutstationSession {
     fn expect_sol_confirm<T: Transport>(
         &mut self,
         ecsn: Sequence,
-        request: &mut RequestGuard<'_, T>,
+        guard: &RequestGuard<'_, T>,
     ) -> ConfirmAction {
-        let (info, request) = match request.get() {
-            Some(TransportRequest::Request(info, request)) => {
-                self.on_link_activity();
-                (info, request)
-            }
-            Some(TransportRequest::LinkLayerMessage) => {
-                self.on_link_activity();
-                return ConfirmAction::ContinueWait;
-            }
-            Some(TransportRequest::Error(_, err)) => {
-                self.on_link_activity();
-                return match Self::error_response_seq(err) {
-                    Some(_) => ConfirmAction::NewRequest,
-                    None => ConfirmAction::ContinueWait,
-                };
-            }
-            None => return ConfirmAction::ContinueWait,
-        };
-
-        let fragment = self.classify(info, request);
-        if self.is_discarded_select(
-            &fragment,
-            request.header.function,
-            request.header.control.seq,
-        ) {
-            return ConfirmAction::ContinueWait;
-        }
-
-        match fragment {
-            FragmentType::MalformedRequest(_, _) => ConfirmAction::NewRequest,
-            FragmentType::NewRead(_, _) => ConfirmAction::NewRequest,
-            FragmentType::RepeatRead(_, _) => {
-                // a request ends the selection; the READ that started this wait already did
-                self.state.select = None;
-                ConfirmAction::EchoLastResponse(info.addr)
-            }
-            FragmentType::NewNonRead(_, _) => ConfirmAction::NewRequest,
-            // this should never happen, but if it does, new request is probably best course of action
-            FragmentType::RepeatNonRead(_) => ConfirmAction::NewRequest,
-            FragmentType::Broadcast(_) => ConfirmAction::NewRequest,
-            FragmentType::SolicitedConfirm(seq) => {
-                if seq == ecsn {
-                    ConfirmAction::Confirmed(info.addr)
+        match self.receive(guard) {
+            Intake::Nothing => ConfirmAction::ContinueWait,
+            Intake::UnknownFunction(_, _) => ConfirmAction::NewRequest,
+            Intake::Confirm(from, header) => {
+                let seq = header.control.seq;
+                if header.control.uns {
+                    self.info.unexpected_confirm(true, seq);
+                    tracing::warn!("ignoring unsolicited confirm with seq: {}", seq.value());
+                    ConfirmAction::ContinueWait
+                } else if seq == ecsn {
+                    ConfirmAction::Confirmed(from)
                 } else {
-                    self.info
-                        .wrong_solicited_confirm_seq(ecsn, request.header.control.seq);
+                    self.info.wrong_solicited_confirm_seq(ecsn, seq);
                     tracing::warn!(
                         "ignoring confirm with wrong sequence number: {}",
                         seq.value()
@@ -2258,23 +2263,23 @@ impl OutstationSession {
                     ConfirmAction::ContinueWait
                 }
             }
-            FragmentType::UnsolicitedConfirm(seq) => {
-                self.info.unexpected_confirm(true, seq);
-                tracing::warn!("ignoring unsolicited confirm with seq: {}", seq.value());
-                ConfirmAction::ContinueWait
-            }
+            Intake::Request(received) => match received.fragment {
+                FragmentType::RepeatRead(_, _) => {
+                    // a request ends the selection; the READ that started this wait already did
+                    self.state.select = None;
+                    ConfirmAction::EchoLastResponse(received.info.addr)
+                }
+                // a new request ends the wait, and is answered from idle
+                FragmentType::MalformedRequest(_, _)
+                | FragmentType::NewRead(_, _)
+                | FragmentType::NewNonRead(_, _)
+                | FragmentType::RepeatNonRead(_)
+                | FragmentType::Broadcast(_) => ConfirmAction::NewRequest,
+            },
         }
     }
 
     fn classify<'a>(&self, info: FragmentInfo, request: Request<'a>) -> FragmentType<'a> {
-        if request.header.function == FunctionCode::Confirm {
-            return if request.header.control.uns {
-                FragmentType::UnsolicitedConfirm(request.header.control.seq)
-            } else {
-                FragmentType::SolicitedConfirm(request.header.control.seq)
-            };
-        }
-
         if let Some(mode) = info.broadcast {
             return FragmentType::Broadcast(mode);
         }
@@ -2321,34 +2326,21 @@ impl OutstationSession {
         discarded
     }
 
-    /// Decide what a request does to the selection, ending it unless it's kept
-    fn selection_for(
-        &mut self,
-        fragment: &FragmentType,
-        function: FunctionCode,
-        seq: Sequence,
-    ) -> SelectionAction {
-        if self.is_discarded_select(fragment, function, seq) {
-            return SelectionAction::Discard;
-        }
-        match fragment {
-            FragmentType::SolicitedConfirm(_) | FragmentType::UnsolicitedConfirm(_) => {
-                return SelectionAction::Keep
+    /// End the selection, giving it to an OPERATE to check, unless the request is a retry of the
+    /// SELECT. IEEE 1815-2012 4.4.4 Rule 4 and Table 4-9: ending a selection early can only make
+    /// an OPERATE fail, while keeping one too long could execute a control, so every request ends
+    /// it except a retry of the SELECT and a SELECT that it discards. A confirm isn't a request.
+    fn take_selection(&mut self, fragment: &FragmentType) -> Option<SelectState> {
+        if let FragmentType::RepeatNonRead(hash) = fragment {
+            if self
+                .state
+                .select
+                .is_some_and(|select| select.request_hash() == *hash)
+            {
+                return None;
             }
-            FragmentType::RepeatNonRead(hash) => {
-                if let Some(select) = self.state.select {
-                    if select.request_hash() == *hash {
-                        return SelectionAction::Keep;
-                    }
-                }
-            }
-            FragmentType::MalformedRequest(_, _)
-            | FragmentType::NewRead(_, _)
-            | FragmentType::RepeatRead(_, _)
-            | FragmentType::NewNonRead(_, _)
-            | FragmentType::Broadcast(_) => {}
         }
-        SelectionAction::Take(self.state.select.take())
+        self.state.select.take()
     }
 
     fn on_link_activity(&mut self) {
