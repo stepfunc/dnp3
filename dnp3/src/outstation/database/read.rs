@@ -1,9 +1,10 @@
 use crate::app::parse::parser::{ObjectHeader, ReadQualifier};
 use crate::app::parse::range::Range;
-use crate::app::{Iin2, Variation};
+use crate::app::{FunctionCode, Iin2, Variation};
 use crate::outstation::database::config::*;
 use crate::outstation::database::details::range::static_db::IndexRange;
 use crate::outstation::database::EventClass;
+use crate::outstation::target::{self, Target};
 
 /// The static points of one type that a READ selects, in the variation it asks for, if any
 #[derive(Copy, Clone)]
@@ -71,32 +72,9 @@ enum ReadTarget {
 }
 
 impl ReadHeader {
-    /// What a header in a READ request selects, or the error for one that READ doesn't support:
-    /// a variation that READ supports with another qualifier has an unsupported qualifier, and
-    /// any other is an unsupported object
-    pub(crate) fn parse(header: &ObjectHeader) -> Result<ReadHeader, Iin2> {
-        let target = ReadTarget::get(header.variation());
-        let res = match *header {
-            ObjectHeader::Read(_, qualifier) => target.and_then(|x| x.with(qualifier)),
-            ObjectHeader::AllObjects(_)
-            | ObjectHeader::Range(_, _, _)
-            | ObjectHeader::Count(_, _, _)
-            | ObjectHeader::CountAndPrefix8(_, _)
-            | ObjectHeader::CountAndPrefix16(_, _)
-            | ObjectHeader::FreeFormat(_) => None,
-        };
-        res.ok_or_else(|| {
-            tracing::warn!(
-                "{} - {} not supported in READ requests",
-                header.variation(),
-                header.qualifier()
-            );
-            if target.is_some() {
-                Iin2::PARAMETER_ERROR
-            } else {
-                Iin2::OBJECT_UNKNOWN
-            }
-        })
+    /// What a header in a READ request selects, or the error for one that READ doesn't support
+    pub(crate) fn parse(header: ObjectHeader) -> Result<ReadHeader, Iin2> {
+        target::select::<ReadTarget>(FunctionCode::Read, header)
     }
 }
 
@@ -104,9 +82,19 @@ fn index_range(range: Range) -> IndexRange {
     IndexRange::new(range.get_start(), range.get_stop())
 }
 
-impl ReadTarget {
-    /// the header for this target with a qualifier
-    fn with(self, qualifier: ReadQualifier) -> Option<ReadHeader> {
+impl Target for ReadTarget {
+    type Header<'a> = ReadHeader;
+
+    fn with(self, header: ObjectHeader<'_>) -> Option<ReadHeader> {
+        let qualifier = match header {
+            ObjectHeader::Read(_, qualifier) => qualifier,
+            ObjectHeader::AllObjects(_)
+            | ObjectHeader::Range(_, _, _)
+            | ObjectHeader::Count(_, _, _)
+            | ObjectHeader::CountAndPrefix8(_, _)
+            | ObjectHeader::CountAndPrefix16(_, _)
+            | ObjectHeader::FreeFormat(_) => return None,
+        };
         match (self, qualifier) {
             (Self::Class0, ReadQualifier::AllObjects) => Some(ReadHeader::Class0),
             (Self::Static(target), ReadQualifier::AllObjects) => {
@@ -134,7 +122,6 @@ impl ReadTarget {
         }
     }
 
-    /// what a READ of the variation selects, if READ supports it
     fn get(variation: Variation) -> Option<Self> {
         use AnalogInputDeadBandVariation::*;
         use EventAnalogInputVariation::*;

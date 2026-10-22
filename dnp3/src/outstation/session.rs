@@ -7,7 +7,6 @@ use crate::app::attr::Attribute;
 use crate::app::control::CommandStatus;
 use crate::app::format::write::HeaderWriter;
 use crate::app::gen::count::CountVariation;
-use crate::app::gen::ranged::RangedVariation;
 use crate::app::parse::count::CountSequence;
 use crate::app::parse::parser::{HeaderCollection, ObjectHeader, Request};
 use crate::app::parse::range::RangedSequence;
@@ -25,9 +24,10 @@ use crate::outstation::control::collection::{
     ControlCollection, ControlLimit, ControlMode, ControlTransaction,
 };
 use crate::outstation::control::select::SelectState;
-use crate::outstation::database::DatabaseHandle;
+use crate::outstation::database::{DatabaseHandle, EventClass};
 use crate::outstation::deferred::DeferredRead;
 use crate::outstation::response::{Prepared, ResponseSlot, Staged};
+use crate::outstation::target::{self, DeadBands, FreezeTarget, WriteHeader, WriteTarget};
 use crate::outstation::task::{ConfigurationChange, OutstationMessage};
 use crate::outstation::traits::*;
 use crate::transport::{
@@ -38,7 +38,6 @@ use crate::util::channel::Receiver;
 use crate::util::deadline::deadline;
 use crate::util::phys::PhysLayer;
 
-use crate::app::gen::prefixed::PrefixedVariation;
 use crate::app::parse::bit::BitSequence;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
@@ -1409,27 +1408,41 @@ impl OutstationSession {
                 database,
                 seq,
                 object_headers,
+                function,
                 FreezeType::ImmediateFreeze,
             ))),
             FunctionCode::ImmediateFreezeNoResponse => {
-                self.handle_freeze(database, seq, object_headers, FreezeType::ImmediateFreeze);
+                self.handle_freeze(
+                    database,
+                    seq,
+                    object_headers,
+                    function,
+                    FreezeType::ImmediateFreeze,
+                );
                 None
             }
             FunctionCode::FreezeClear => Some(sol.empty(self.handle_freeze(
                 database,
                 seq,
                 object_headers,
+                function,
                 FreezeType::FreezeAndClear,
             ))),
             FunctionCode::FreezeClearNoResponse => {
-                self.handle_freeze(database, seq, object_headers, FreezeType::FreezeAndClear);
+                self.handle_freeze(
+                    database,
+                    seq,
+                    object_headers,
+                    function,
+                    FreezeType::FreezeAndClear,
+                );
                 None
             }
             FunctionCode::FreezeAtTime => {
-                Some(sol.empty(self.handle_freeze_at_time(database, seq, object_headers)))
+                Some(sol.empty(self.handle_freeze_at_time(database, seq, object_headers, function)))
             }
             FunctionCode::FreezeAtTimeNoResponse => {
-                self.handle_freeze_at_time(database, seq, object_headers);
+                self.handle_freeze_at_time(database, seq, object_headers, function);
                 None
             }
             FunctionCode::EnableUnsolicited => Some(
@@ -1603,78 +1616,42 @@ impl OutstationSession {
         iin
     }
 
+    async fn handle_write_dead_bands<V>(
+        &mut self,
+        items: DeadBands<'_, V>,
+        db: &DatabaseHandle,
+    ) -> Iin2
+    where
+        V: FixedSizeVariation + Into<f64>,
+    {
+        match items {
+            DeadBands::Range(seq) => self.handle_write_ranged_analog_deadbands(seq, db).await,
+            DeadBands::OneBytePrefix(seq) => {
+                self.handle_write_prefixed_analog_deadbands(seq, db).await
+            }
+            DeadBands::TwoBytePrefix(seq) => {
+                self.handle_write_prefixed_analog_deadbands(seq, db).await
+            }
+        }
+    }
+
     async fn handle_single_write_header(
         &mut self,
         header: ObjectHeader<'_>,
         db: &DatabaseHandle,
     ) -> Iin2 {
+        let header = match target::select::<WriteTarget>(FunctionCode::Write, header) {
+            Ok(header) => header,
+            Err(iin2) => return iin2,
+        };
         match header {
-            ObjectHeader::Range(_, _, RangedVariation::Group0(attr)) => {
-                self.handle_write_attr(attr, db).await
-            }
-            ObjectHeader::Range(_, _, RangedVariation::Group80Var1(bits)) => {
-                self.handle_write_iin(bits)
-            }
-            ObjectHeader::Count(_, _, CountVariation::Group50Var1(seq)) => {
-                self.handle_write_abs_time(seq)
-            }
-            ObjectHeader::Count(_, _, CountVariation::Group50Var3(seq)) => {
-                self.handle_write_at_last_recorded_time(seq)
-            }
-            // analog deadbands
-            ObjectHeader::Range(_, _, RangedVariation::Group34Var1(seq)) => {
-                self.handle_write_ranged_analog_deadbands(seq, db).await
-            }
-            ObjectHeader::Range(_, _, RangedVariation::Group34Var2(seq)) => {
-                self.handle_write_ranged_analog_deadbands(seq, db).await
-            }
-            ObjectHeader::Range(_, _, RangedVariation::Group34Var3(seq)) => {
-                self.handle_write_ranged_analog_deadbands(seq, db).await
-            }
-            ObjectHeader::CountAndPrefix8(_, PrefixedVariation::Group34Var1(seq)) => {
-                self.handle_write_prefixed_analog_deadbands(seq, db).await
-            }
-            ObjectHeader::CountAndPrefix8(_, PrefixedVariation::Group34Var2(seq)) => {
-                self.handle_write_prefixed_analog_deadbands(seq, db).await
-            }
-            ObjectHeader::CountAndPrefix8(_, PrefixedVariation::Group34Var3(seq)) => {
-                self.handle_write_prefixed_analog_deadbands(seq, db).await
-            }
-            ObjectHeader::CountAndPrefix16(_, PrefixedVariation::Group34Var1(seq)) => {
-                self.handle_write_prefixed_analog_deadbands(seq, db).await
-            }
-            ObjectHeader::CountAndPrefix16(_, PrefixedVariation::Group34Var2(seq)) => {
-                self.handle_write_prefixed_analog_deadbands(seq, db).await
-            }
-            ObjectHeader::CountAndPrefix16(_, PrefixedVariation::Group34Var3(seq)) => {
-                self.handle_write_prefixed_analog_deadbands(seq, db).await
-            }
-            _ => {
-                tracing::warn!(
-                    "WRITE not supported with qualifier: {} and variation: {}",
-                    header.qualifier(),
-                    header.variation()
-                );
-                if Self::is_writable(header.variation()) {
-                    Iin2::PARAMETER_ERROR
-                } else {
-                    Iin2::OBJECT_UNKNOWN
-                }
-            }
-        }
-    }
-
-    /// variations that WRITE supports with some qualifier
-    fn is_writable(variation: Variation) -> bool {
-        match variation {
-            Variation::Group0(var) => var != 255,
-            Variation::Group34Var1
-            | Variation::Group34Var2
-            | Variation::Group34Var3
-            | Variation::Group50Var1
-            | Variation::Group50Var3
-            | Variation::Group80Var1 => true,
-            _ => false,
+            WriteHeader::Attr(attr) => self.handle_write_attr(attr, db).await,
+            WriteHeader::Iin(bits) => self.handle_write_iin(bits),
+            WriteHeader::AbsoluteTime(seq) => self.handle_write_abs_time(seq),
+            WriteHeader::LastRecordedTime(seq) => self.handle_write_at_last_recorded_time(seq),
+            WriteHeader::DeadBands16(items) => self.handle_write_dead_bands(items, db).await,
+            WriteHeader::DeadBands32(items) => self.handle_write_dead_bands(items, db).await,
+            WriteHeader::DeadBandsFloat(items) => self.handle_write_dead_bands(items, db).await,
         }
     }
 
@@ -1840,47 +1817,26 @@ impl OutstationSession {
         seq: Sequence,
         object_headers: HeaderCollection,
     ) -> ResponseHeader {
-        fn to_string(enable: bool) -> &'static str {
-            if enable {
-                "ENABLE"
-            } else {
-                "DISABLE"
-            }
-        }
+        let function = if enable {
+            FunctionCode::EnableUnsolicited
+        } else {
+            FunctionCode::DisableUnsolicited
+        };
 
         if self.config.unsolicited.is_disabled() {
-            tracing::warn!("received {} unsolicited request, but unsolicited support is disabled by configuration", to_string(enable));
+            tracing::warn!("received {function:?} request, but unsolicited support is disabled by configuration");
             return ResponseHeader::solicited(seq, Iin::default() | Iin2::NO_FUNC_CODE_SUPPORT);
         }
 
         let mut iin2 = Iin2::default();
 
+        let classes = &mut self.state.enabled_unsolicited_classes;
         for header in object_headers.iter() {
-            match header {
-                ObjectHeader::AllObjects(objects)
-                    if objects.variation() == Variation::Group60Var2 =>
-                {
-                    self.state.enabled_unsolicited_classes.class1 = enable;
-                }
-                ObjectHeader::AllObjects(objects)
-                    if objects.variation() == Variation::Group60Var3 =>
-                {
-                    self.state.enabled_unsolicited_classes.class2 = enable;
-                }
-                ObjectHeader::AllObjects(objects)
-                    if objects.variation() == Variation::Group60Var4 =>
-                {
-                    self.state.enabled_unsolicited_classes.class3 = enable;
-                }
-                _ => {
-                    tracing::warn!("received {} unsolicited request for unsupported qualifier ({}) and variation ({})", to_string(enable), header.qualifier(), header.variation());
-                    iin2 |= match header.variation() {
-                        Variation::Group60Var2
-                        | Variation::Group60Var3
-                        | Variation::Group60Var4 => Iin2::PARAMETER_ERROR,
-                        _ => Iin2::OBJECT_UNKNOWN,
-                    };
-                }
+            match target::select::<EventClass>(function, header) {
+                Ok(EventClass::Class1) => classes.class1 = enable,
+                Ok(EventClass::Class2) => classes.class2 = enable,
+                Ok(EventClass::Class3) => classes.class3 = enable,
+                Err(err) => iin2 |= err,
             }
         }
 
@@ -2026,12 +1982,13 @@ impl OutstationSession {
         database: &mut DatabaseHandle,
         seq: Sequence,
         object_headers: HeaderCollection,
+        function: FunctionCode,
         freeze_type: FreezeType,
     ) -> ResponseHeader {
         let mut iin = Iin::default();
 
         for header in object_headers.iter() {
-            iin |= self.handle_freeze_header(database, freeze_type, header);
+            iin |= self.handle_freeze_header(database, function, freeze_type, header);
         }
 
         ResponseHeader::solicited(seq, iin)
@@ -2042,6 +1999,7 @@ impl OutstationSession {
         database: &mut DatabaseHandle,
         seq: Sequence,
         object_headers: HeaderCollection,
+        function: FunctionCode,
     ) -> ResponseHeader {
         let mut iin = Iin::default();
 
@@ -2074,6 +2032,7 @@ impl OutstationSession {
                         Some(x) => {
                             iin |= self.handle_freeze_header(
                                 database,
+                                function,
                                 FreezeType::FreezeAtTime(x),
                                 header,
                             );
@@ -2089,27 +2048,16 @@ impl OutstationSession {
     fn handle_freeze_header(
         &mut self,
         database: &mut DatabaseHandle,
+        function: FunctionCode,
         freeze_type: FreezeType,
         header: ObjectHeader,
     ) -> Iin2 {
-        match header {
-            ObjectHeader::AllObjects(objects) if objects.variation() == Variation::Group20Var0 => {
-                self.application
-                    .freeze_counter(FreezeIndices::All, freeze_type, database)
-                    .map_or_else(|err| err.into(), |_| Iin2::default())
-            }
-            ObjectHeader::Range(_, range, RangedVariation::Group20Var0) => self
+        match target::select::<FreezeTarget>(function, header) {
+            Ok(indices) => self
                 .application
-                .freeze_counter(
-                    FreezeIndices::Range(range.get_start(), range.get_stop()),
-                    freeze_type,
-                    database,
-                )
+                .freeze_counter(indices, freeze_type, database)
                 .map_or_else(|err| err.into(), |_| Iin2::default()),
-            _ => match header.variation() {
-                Variation::Group20Var0 => Iin2::PARAMETER_ERROR,
-                _ => Iin2::OBJECT_UNKNOWN,
-            },
+            Err(err) => err,
         }
     }
 
@@ -2192,15 +2140,27 @@ impl OutstationSession {
                 BroadcastAction::Processed
             }
             FunctionCode::ImmediateFreezeNoResponse => {
-                self.handle_freeze(database, seq, objects, FreezeType::ImmediateFreeze);
+                self.handle_freeze(
+                    database,
+                    seq,
+                    objects,
+                    request.header.function,
+                    FreezeType::ImmediateFreeze,
+                );
                 BroadcastAction::Processed
             }
             FunctionCode::FreezeClearNoResponse => {
-                self.handle_freeze(database, seq, objects, FreezeType::FreezeAndClear);
+                self.handle_freeze(
+                    database,
+                    seq,
+                    objects,
+                    request.header.function,
+                    FreezeType::FreezeAndClear,
+                );
                 BroadcastAction::Processed
             }
             FunctionCode::FreezeAtTimeNoResponse => {
-                self.handle_freeze_at_time(database, seq, objects);
+                self.handle_freeze_at_time(database, seq, objects, request.header.function);
                 BroadcastAction::Processed
             }
             FunctionCode::RecordCurrentTime => {

@@ -63,14 +63,13 @@ impl DeferredRead {
         let mut iin2 = Iin2::default();
 
         for h in headers.iter() {
-            match ReadHeader::parse(&h) {
+            let (variation, qualifier) = (h.variation(), h.qualifier());
+            match ReadHeader::parse(h) {
                 Ok(r) => {
                     if let Err(Full) = self.headers.try_push(r) {
                         tracing::warn!(
-                            "insufficient capacity ({}) for READ header: {} - {}",
+                            "insufficient capacity ({}) for READ header: {variation} - {qualifier}",
                             self.headers.max(),
-                            h.variation(),
-                            h.qualifier()
                         );
                         iin2 |= Iin2::PARAMETER_ERROR;
                     }

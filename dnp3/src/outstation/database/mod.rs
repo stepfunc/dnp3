@@ -533,7 +533,7 @@ impl DatabaseHandle {
         self.with_database(|db| {
             let mut unsupported = Iin2::default();
             let selected = db.inner.select_read(headers.iter().filter_map(|header| {
-                ReadHeader::parse(&header)
+                ReadHeader::parse(header)
                     .map_err(|err| unsupported |= err)
                     .ok()
             }));
