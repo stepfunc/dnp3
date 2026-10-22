@@ -1,6 +1,6 @@
 use crate::app::{Listener, Shutdown};
 use crate::link::reader::LinkModes;
-use crate::link::{LinkErrorMode, LinkReadMode};
+use crate::link::LinkErrorMode;
 use crate::outstation::task::OutstationTask;
 use crate::outstation::{
     ConnectionState, ControlHandler, OutstationApplication, OutstationConfig, OutstationHandle,
@@ -105,10 +105,7 @@ impl Server {
     /// to the specified address
     pub fn new_tcp_server(link_error_mode: LinkErrorMode, address: SocketAddr) -> Self {
         Self {
-            link_modes: LinkModes {
-                error_mode: link_error_mode,
-                read_mode: LinkReadMode::Stream,
-            },
+            link_modes: LinkModes::stream(link_error_mode),
             connection_id: 0,
             address,
             outstations: Vec::new(),

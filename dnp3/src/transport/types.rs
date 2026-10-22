@@ -85,7 +85,7 @@ pub(crate) enum TransportRequestError {
 }
 
 impl RequestValidationError {
-    pub(crate) fn into(self, seq: Sequence) -> TransportRequestError {
+    pub(crate) fn with_seq(self, seq: Sequence) -> TransportRequestError {
         TransportRequestError::RequestValidationError(seq, self)
     }
 }

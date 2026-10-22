@@ -11,7 +11,6 @@ use std::future::Future;
 
 use crate::tcp::accept::{Acceptor, Listen};
 use crate::tcp::ServerHandle;
-use crate::util::future::forever;
 use crate::util::shutdown::ShutdownListener;
 use std::io::ErrorKind;
 use std::net::SocketAddr;
@@ -247,7 +246,7 @@ impl<C: ConnectionHandler, L: Listen> AcceptTask<C, L> {
             if can_accept {
                 self.acceptor.accept().await
             } else {
-                forever().await
+                std::future::pending().await
             }
         };
 

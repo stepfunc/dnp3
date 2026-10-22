@@ -1,6 +1,8 @@
-//! Links the parsers and the transport assembler into the test binary with input the compiler can't know, so that the
-//! functions marked `no_panic` here and in the parsers are checked for every input. The link
-//! fails if the optimizer can't remove every path to a panic from one of them.
+//! Links the application parsers, the master's extraction, the transport assembler, the link
+//! frame reader and the link layer's header processing into the test binary with input the
+//! compiler can't know, so that every function marked `no_panic`, here or in the crate, is
+//! checked for every input. The link fails if the optimizer can't remove every path to a panic
+//! from one of them.
 //!
 //! Built by the `no-panic` CI job with `--cfg dnp3_no_panic`, in release with LTO and one
 //! codegen unit, which the optimizer needs to see through calls into other crates

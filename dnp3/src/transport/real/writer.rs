@@ -63,7 +63,7 @@ impl TransportWrite for Writer {
                 Payload::new(header.to_u8(), chunk),
                 &mut cursor,
             )?;
-            if level.link.header_enabled() {
+            if level.link.enabled() {
                 tracing::info!("LINK TX - {}", data.to_link_display(level.link));
             }
             io.write(data.frame, destination.phys, level.physical)

@@ -168,7 +168,7 @@ impl<T: Transport> TransportReader<T> {
             Err(err) => {
                 return Some(TransportRequest::Error(
                     fragment.info.addr,
-                    err.into(parsed.control.seq),
+                    err.with_seq(parsed.control.seq),
                 ))
             }
         };

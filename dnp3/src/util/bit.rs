@@ -79,45 +79,27 @@ pub(crate) fn format_bitfield(
     name: &'static str,
     names: [&'static str; 8],
 ) -> std::fmt::Result {
-    fn push(f: &mut Formatter, prev: bool, s: &'static str) -> std::fmt::Result {
-        if prev {
-            f.write_str(", ")?;
-        }
-        f.write_str(s)
-    }
+    const MASKS: [BitMask; 8] = [
+        bits::BIT_0,
+        bits::BIT_1,
+        bits::BIT_2,
+        bits::BIT_3,
+        bits::BIT_4,
+        bits::BIT_5,
+        bits::BIT_6,
+        bits::BIT_7,
+    ];
 
     let mut prev = false;
     write!(f, "{name}: [")?;
-    if value.bit_0() {
-        push(f, prev, names[0])?;
-        prev = true;
-    }
-    if value.bit_1() {
-        push(f, prev, names[1])?;
-        prev = true;
-    }
-    if value.bit_2() {
-        push(f, prev, names[2])?;
-        prev = true;
-    }
-    if value.bit_3() {
-        push(f, prev, names[3])?;
-        prev = true;
-    }
-    if value.bit_4() {
-        push(f, prev, names[4])?;
-        prev = true;
-    }
-    if value.bit_5() {
-        push(f, prev, names[5])?;
-        prev = true;
-    }
-    if value.bit_6() {
-        push(f, prev, names[6])?;
-        prev = true;
-    }
-    if value.bit_7() {
-        push(f, prev, names[7])?;
+    for (mask, name) in MASKS.iter().zip(names) {
+        if value & mask.value != 0 {
+            if prev {
+                f.write_str(", ")?;
+            }
+            f.write_str(name)?;
+            prev = true;
+        }
     }
 
     f.write_str("]")

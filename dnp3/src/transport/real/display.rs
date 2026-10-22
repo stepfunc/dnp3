@@ -19,7 +19,7 @@ impl<'a> SegmentDisplay<'a> {
 
 impl std::fmt::Display for SegmentDisplay<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        if self.level.header_enabled() {
+        if self.level.enabled() {
             write!(
                 f,
                 "FIN: {} FIR: {} SEQ: {} length: {}",
