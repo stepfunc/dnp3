@@ -8,6 +8,8 @@ mod g70v6;
 mod g70v7;
 mod g70v8;
 mod permissions;
+#[cfg(test)]
+mod redaction_tests;
 
 pub(crate) use g70v2::*;
 pub(crate) use g70v3::*;
