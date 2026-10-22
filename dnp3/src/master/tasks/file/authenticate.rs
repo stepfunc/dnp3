@@ -1,7 +1,7 @@
 use crate::app::format::write::HeaderWriter;
 use crate::app::format::WriteError;
 use crate::app::parse::parser::Response;
-use crate::app::{FunctionCode, Group70Var2};
+use crate::app::FunctionCode;
 use crate::master::promise::Promise;
 use crate::master::tasks::{AppTask, NonReadTask, Task};
 use crate::master::{AuthKey, FileCredentials, FileError, TaskError};
@@ -23,12 +23,7 @@ impl AuthFileTask {
     }
 
     pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
-        let obj = Group70Var2 {
-            auth_key: 0,
-            user_name: &self.credentials.user_name,
-            password: &self.credentials.password,
-        };
-        writer.write_free_format(&obj)
+        super::write_auth(&self.credentials, writer)
     }
 
     pub(crate) fn on_task_error(self, err: TaskError) {
@@ -37,7 +32,7 @@ impl AuthFileTask {
 
     pub(crate) fn handle(self, response: Response<'_>) -> Result<Option<NonReadTask>, TaskError> {
         fn process(response: Response<'_>) -> Result<AuthKey, FileError> {
-            super::handle_auth_response(response.objects?.get_only_header()?)
+            super::parse_auth_response(response.objects?.get_only_header()?)
         }
 
         let result = process(response);

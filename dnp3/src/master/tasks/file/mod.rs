@@ -2,8 +2,8 @@ use crate::app::format::write::HeaderWriter;
 use crate::app::format::WriteError;
 use crate::app::parse::free_format::FreeFormatVariation;
 use crate::app::parse::parser::{HeaderDetails, ObjectHeader};
-use crate::app::{FileStatus, Group70Var2, Group70Var4};
-use crate::master::{AuthKey, FileCredentials, FileError, FileHandle};
+use crate::app::{FileStatus, Group70Var2, Group70Var3, Group70Var4, Permissions, Timestamp};
+use crate::master::{AuthKey, FileCredentials, FileError, FileHandle, FileMode, OpenFile};
 
 pub(crate) mod authenticate;
 pub(crate) mod close;
@@ -31,6 +31,28 @@ pub(super) fn write_auth(
     writer.write_free_format(&obj)
 }
 
+pub(super) fn write_open(
+    file_name: &str,
+    auth_key: AuthKey,
+    permissions: Permissions,
+    file_size: u32,
+    mode: FileMode,
+    max_block_size: u16,
+    writer: &mut HeaderWriter,
+) -> Result<(), WriteError> {
+    let obj = Group70Var3 {
+        time_of_creation: Timestamp::zero(),
+        permissions,
+        auth_key: auth_key.into(),
+        file_size,
+        mode,
+        max_block_size,
+        request_id: REQUEST_ID,
+        file_name,
+    };
+    writer.write_free_format(&obj)
+}
+
 pub(super) fn write_close(handle: FileHandle, writer: &mut HeaderWriter) -> Result<(), WriteError> {
     let obj = Group70Var4 {
         file_handle: handle.into(),
@@ -43,7 +65,7 @@ pub(super) fn write_close(handle: FileHandle, writer: &mut HeaderWriter) -> Resu
     writer.write_free_format(&obj)
 }
 
-pub(super) fn handle_auth_response(header: ObjectHeader) -> Result<AuthKey, FileError> {
+pub(super) fn parse_auth_response(header: ObjectHeader) -> Result<AuthKey, FileError> {
     let obj = match header.details {
         HeaderDetails::TwoByteFreeFormat(_, FreeFormatVariation::Group70Var2(obj)) => obj,
         _ => {
@@ -63,40 +85,47 @@ pub(super) fn handle_auth_response(header: ObjectHeader) -> Result<AuthKey, File
     Ok(AuthKey::new(obj.auth_key))
 }
 
-fn handle_open_response(header: ObjectHeader) -> Result<(u32, FileHandle), FileError> {
-    let obj = match header.details {
-        HeaderDetails::TwoByteFreeFormat(_, FreeFormatVariation::Group70Var4(obj)) => obj,
-        _ => {
-            tracing::warn!(
-                "File OPEN response contains unexpected variation: {}",
-                header.variation
-            );
-            return Err(FileError::BadResponse);
-        }
-    };
+pub(super) fn parse_open_response(header: ObjectHeader) -> Result<OpenFile, FileError> {
+    let obj = parse_status_object(header, "OPEN")?;
 
     if obj.status_code != FileStatus::Success {
         tracing::warn!("Unable to open file (status code == {:?})", obj.status_code);
         return Err(FileError::BadStatus(obj.status_code));
     }
 
-    Ok((obj.file_size, FileHandle::new(obj.file_handle)))
+    Ok(OpenFile {
+        max_block_size: obj.max_block_size,
+        file_handle: FileHandle::new(obj.file_handle),
+        file_size: obj.file_size,
+    })
 }
 
-/// The file was already read, so a CLOSE that fails only gets logged
-fn log_close_response(header: ObjectHeader) {
+/// Extract the status object of a CLOSE response; [`check_close_status`] checks its status
+pub(super) fn parse_close_response(header: ObjectHeader<'_>) -> Result<Group70Var4<'_>, FileError> {
+    parse_status_object(header, "CLOSE")
+}
+
+pub(super) fn check_close_status(status: FileStatus) -> Result<(), FileError> {
+    if status != FileStatus::Success {
+        tracing::warn!("Unable to close file (status code == {status:?})");
+        return Err(FileError::BadStatus(status));
+    }
+    Ok(())
+}
+
+/// Extract the g70v4 status object that answers an OPEN or CLOSE
+fn parse_status_object<'a>(
+    header: ObjectHeader<'a>,
+    function: &str,
+) -> Result<Group70Var4<'a>, FileError> {
     match header.details {
-        HeaderDetails::TwoByteFreeFormat(1, FreeFormatVariation::Group70Var4(obj)) => {
-            if obj.status_code != FileStatus::Success {
-                tracing::warn!(
-                    "Unable to close file (status code == {:?})",
-                    obj.status_code
-                );
-            }
+        HeaderDetails::TwoByteFreeFormat(_, FreeFormatVariation::Group70Var4(obj)) => Ok(obj),
+        _ => {
+            tracing::warn!(
+                "File {function} response contains unexpected variation: {}",
+                header.variation
+            );
+            Err(FileError::BadResponse)
         }
-        _ => tracing::warn!(
-            "File CLOSE response contains unexpected variation: {}",
-            header.variation
-        ),
     }
 }
