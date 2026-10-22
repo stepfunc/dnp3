@@ -1,8 +1,10 @@
 use scursor::WriteCursor;
 use tokio::task::JoinHandle;
+use tokio::time::{Duration, Instant};
 
 use crate::app::measurement::{BinaryInput, Flags, Time};
 use crate::app::parse::options::ParseOptions;
+use crate::app::variations::Group41Var2;
 use crate::app::FunctionCode;
 use crate::decode::{
     AppDecodeLevel, DecodeLevel, LinkDecodeLevel, PhysDecodeLevel, TransportDecodeLevel,
@@ -14,7 +16,7 @@ use crate::link::reader::LinkModes;
 use crate::outstation::config::{Feature, OutstationConfig};
 use crate::outstation::database::{Add, BinaryInputConfig, EventClass, Update, UpdateOptions};
 use crate::outstation::task::OutstationTask;
-use crate::outstation::traits::BroadcastAction;
+use crate::outstation::traits::{BroadcastAction, OperateType};
 use crate::outstation::{BufferState, ClassCount, OutstationHandle, TypeCount};
 use crate::transport::RealTransport;
 use crate::util::phys::{PhysAddr, PhysLayer};
@@ -48,6 +50,21 @@ const NO_FUNCTION_SUPPORT_SEQ_1: &[u8] = &[0xC1, 0x81, 0x80, 0x01];
 const CONFIRM_SEQ_0: &[u8] = &[0xC0, 0x00];
 const UNS_CONFIRM_SEQ_0: &[u8] = &[0xD0, 0x00];
 const NULL_UNSOLICITED_SEQ_0: &[u8] = &[0xF0, 0x82, 0x80, 0x00];
+/// a fragment too short for a request header, which gets no response
+const CONTROL_ONLY_SEQ_1: &[u8] = &[0xC1];
+/// REQUEST_LINK_STATUS from the outstation to the master
+const LINK_STATUS_REQUEST: &[u8] = &[0x05, 0x64, 0x05, 0x49, 0x01, 0x00, 0x0A, 0x00, 0xDB, 0x9B];
+const G41V2_INDEX_7: Control = Control::G41V2(Group41Var2::new(513), 7);
+/// g41v2, index 7, value 513
+const SELECT_SEQ_0: &[u8] = &[0xC0, 0x03, 41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, 0x00];
+const OPERATE_SEQ_1: &[u8] = &[0xC1, 0x04, 41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, 0x00];
+const UNKNOWN_FUNCTION_SEQ_0: &[u8] = &[0xC0, 0x70];
+const SELECT_RESPONSE_SEQ_0: &[u8] = &[
+    0xC0, 0x81, 0x80, 0x00, 41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, 0x00,
+];
+const OPERATE_RESPONSE_SEQ_1: &[u8] = &[
+    0xC1, 0x81, 0x80, 0x00, 41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, 0x00,
+];
 
 /// fragments that aren't valid requests, each with sequence 1
 const NOT_REQUESTS: &[&[u8]] = &[
@@ -302,7 +319,7 @@ async fn requests_from_another_master_are_answered_when_any_master_is_allowed() 
 }
 
 #[tokio::test]
-async fn unknown_function_is_answered_to_whichever_master_sent_it() {
+async fn unknown_function_is_answered_only_from_the_configured_master() {
     for level in decode_levels() {
         let mut harness = LinkHarness::new(get_default_config(), level);
         for app in UNKNOWN_FUNCTIONS_SEQ_1 {
@@ -310,6 +327,22 @@ async fn unknown_function_is_answered_to_whichever_master_sent_it() {
             harness
                 .expect_response(MASTER, NO_FUNCTION_SUPPORT_SEQ_1)
                 .await;
+            harness.expect_nothing();
+            harness
+                .send_dropped(&request(OUTSTATION, OTHER_MASTER, app))
+                .await;
+        }
+        harness.probe().await;
+    }
+}
+
+#[tokio::test]
+async fn unknown_function_from_another_master_is_answered_when_any_master_is_allowed() {
+    let mut config = get_default_config();
+    config.features.respond_to_any_master = Feature::Enabled;
+    for level in decode_levels() {
+        let mut harness = LinkHarness::new(config, level);
+        for app in UNKNOWN_FUNCTIONS_SEQ_1 {
             harness.send(&request(OUTSTATION, OTHER_MASTER, app)).await;
             harness
                 .expect_response(OTHER_MASTER, NO_FUNCTION_SUPPORT_SEQ_1)
@@ -484,16 +517,37 @@ async fn solicited_confirm_wait_drops_requests_from_another_master() {
 }
 
 #[tokio::test]
-async fn unknown_function_from_another_master_ends_the_solicited_confirm_wait() {
+async fn unknown_function_from_another_master_does_not_end_the_solicited_confirm_wait() {
     for level in decode_levels() {
         let mut harness = LinkHarness::new(get_default_config(), level);
         enter_sol_confirm_wait(&mut harness).await;
 
+        for app in UNKNOWN_FUNCTIONS_SEQ_1 {
+            harness
+                .send_dropped(&request(OUTSTATION, OTHER_MASTER, app))
+                .await;
+        }
+
+        harness.send(&from_master(CONFIRM_SEQ_0)).await;
+        harness.check_events(&confirmed_events());
+        harness.expect_nothing();
+        harness.send(&from_master(READ_CLASS_0_SEQ_0)).await;
         harness
-            .send(&request(OUTSTATION, OTHER_MASTER, UNKNOWN_FUNCTION_SEQ_1))
+            .expect_response(MASTER, BINARY_0_CLASS_0_RESPONSE_SEQ_0)
             .await;
+        harness.expect_nothing();
+    }
+}
+
+#[tokio::test]
+async fn unknown_function_from_the_master_ends_the_solicited_confirm_wait() {
+    for level in decode_levels() {
+        let mut harness = LinkHarness::new(get_default_config(), level);
+        enter_sol_confirm_wait(&mut harness).await;
+
+        harness.send(&from_master(UNKNOWN_FUNCTION_SEQ_1)).await;
         harness
-            .expect_response(OTHER_MASTER, &[0xC1, 0x81, 0x82, 0x01])
+            .expect_response(MASTER, &[0xC1, 0x81, 0x82, 0x01])
             .await;
         harness.check_events(&[Event::SolicitedConfirmWaitNewRequest]);
         harness.expect_nothing();
@@ -547,14 +601,158 @@ async fn unsolicited_confirm_wait_drops_requests_from_another_master() {
                 .await;
         }
 
-        // an unknown function is answered and the wait goes on
-        harness
-            .send(&request(OUTSTATION, OTHER_MASTER, UNKNOWN_FUNCTION_SEQ_1))
-            .await;
-        harness
-            .expect_response(OTHER_MASTER, NO_FUNCTION_SUPPORT_SEQ_1)
-            .await;
+        for app in UNKNOWN_FUNCTIONS_SEQ_1 {
+            harness
+                .send_dropped(&request(OUTSTATION, OTHER_MASTER, app))
+                .await;
+        }
+
+        harness.send(&from_master(UNS_CONFIRM_SEQ_0)).await;
+        harness.check_events(&[Event::UnsolicitedConfirmReceived(0)]);
         harness.expect_nothing();
+        harness.probe().await;
+    }
+}
+
+const KEEP_ALIVE_TIMEOUT: Duration = Duration::from_secs(10);
+const ACTIVITY_AT: Duration = Duration::from_secs(4);
+
+/// send `frame` at 4 seconds, expecting `response`, and return when the link status request goes out
+async fn link_status_request_after(
+    mut config: OutstationConfig,
+    level: DecodeLevel,
+    frame: &[u8],
+    response: Option<(u16, &[u8])>,
+) -> Duration {
+    config.keep_alive_timeout = Some(KEEP_ALIVE_TIMEOUT);
+    let start = Instant::now();
+    let mut harness = LinkHarness::new(config, level);
+    tokio::time::advance(ACTIVITY_AT).await;
+    harness.send(frame).await;
+    if let Some((destination, app)) = response {
+        harness.expect_response(destination, app).await;
+    }
+    harness.expect_nothing();
+    assert_eq!(
+        harness.io.next_event().await,
+        sfio_tokio_mock_io::Event::Write(LINK_STATUS_REQUEST.to_vec())
+    );
+    start.elapsed()
+}
+
+#[tokio::test(start_paused = true)]
+async fn header_error_from_another_master_does_not_postpone_the_link_status_request() {
+    for level in decode_levels() {
+        for app in [UNKNOWN_FUNCTION_SEQ_1, CONTROL_ONLY_SEQ_1] {
+            assert_eq!(
+                link_status_request_after(
+                    get_default_config(),
+                    level,
+                    &request(OUTSTATION, OTHER_MASTER, app),
+                    None,
+                )
+                .await,
+                KEEP_ALIVE_TIMEOUT
+            );
+        }
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn header_error_from_the_master_postpones_the_link_status_request() {
+    for level in decode_levels() {
+        for (app, response) in [
+            (
+                UNKNOWN_FUNCTION_SEQ_1,
+                Some((MASTER, NO_FUNCTION_SUPPORT_SEQ_1)),
+            ),
+            (CONTROL_ONLY_SEQ_1, None),
+        ] {
+            assert_eq!(
+                link_status_request_after(get_default_config(), level, &from_master(app), response)
+                    .await,
+                ACTIVITY_AT + KEEP_ALIVE_TIMEOUT
+            );
+        }
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn header_error_from_another_master_postpones_the_link_status_request_when_any_master_is_allowed(
+) {
+    let mut config = get_default_config();
+    config.features.respond_to_any_master = Feature::Enabled;
+    for level in decode_levels() {
+        for (app, response) in [
+            (
+                UNKNOWN_FUNCTION_SEQ_1,
+                Some((OTHER_MASTER, NO_FUNCTION_SUPPORT_SEQ_1)),
+            ),
+            (CONTROL_ONLY_SEQ_1, None),
+        ] {
+            assert_eq!(
+                link_status_request_after(
+                    config,
+                    level,
+                    &request(OUTSTATION, OTHER_MASTER, app),
+                    response,
+                )
+                .await,
+                ACTIVITY_AT + KEEP_ALIVE_TIMEOUT
+            );
+        }
+    }
+}
+
+/// SELECT from the master, then an unknown function from another master, then the OPERATE
+async fn unknown_function_from_another_master_keeps_the_selection(harness: &mut LinkHarness) {
+    harness.send(&from_master(SELECT_SEQ_0)).await;
+    harness.expect_response(MASTER, SELECT_RESPONSE_SEQ_0).await;
+    harness.check_events(&[
+        Event::BeginControls,
+        Event::Select(G41V2_INDEX_7),
+        Event::EndControls,
+    ]);
+    harness.expect_nothing();
+
+    for app in [UNKNOWN_FUNCTION_SEQ_0, UNKNOWN_FUNCTION_SEQ_1] {
+        harness
+            .send_dropped(&request(OUTSTATION, OTHER_MASTER, app))
+            .await;
+    }
+
+    harness.send(&from_master(OPERATE_SEQ_1)).await;
+    harness
+        .expect_response(MASTER, OPERATE_RESPONSE_SEQ_1)
+        .await;
+    harness.check_events(&[
+        Event::BeginControls,
+        Event::Operate(G41V2_INDEX_7, OperateType::SelectBeforeOperate),
+        Event::EndControls,
+    ]);
+    harness.expect_nothing();
+}
+
+#[tokio::test]
+async fn unknown_function_from_another_master_between_select_and_operate_keeps_the_selection() {
+    for level in decode_levels() {
+        let mut harness = LinkHarness::new(get_default_config(), level);
+        unknown_function_from_another_master_keeps_the_selection(&mut harness).await;
+    }
+}
+
+#[tokio::test]
+async fn unknown_function_from_another_master_keeps_the_selection_in_the_unsolicited_confirm_wait()
+{
+    for level in decode_levels() {
+        let mut harness = LinkHarness::new(get_default_unsolicited_config(), level);
+        harness
+            .expect_response(MASTER, NULL_UNSOLICITED_SEQ_0)
+            .await;
+        harness.check_events(&[Event::EnterUnsolicitedConfirmWait(0)]);
+        harness.expect_nothing();
+
+        unknown_function_from_another_master_keeps_the_selection(&mut harness).await;
 
         harness.send(&from_master(UNS_CONFIRM_SEQ_0)).await;
         harness.check_events(&[Event::UnsolicitedConfirmReceived(0)]);
