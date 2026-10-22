@@ -737,40 +737,64 @@ pub(crate) trait AnalogConversions {
     fn get_value(&self) -> f64;
     fn get_flags(&self) -> Flags;
 
+    /// the flags with OVER_RANGE set, for a value the variation can't represent
+    fn over_range<N>(&self, value: N) -> (Flags, N) {
+        (self.get_flags().with_bits_set(Self::OVER_RANGE), value)
+    }
+
+    /// NaN is 0 and out of range values clamp, both with OVER_RANGE
     fn to_i16(&self) -> (Flags, i16) {
-        if self.get_value() < i16::MIN.into() {
-            return (self.get_flags().with_bits_set(Self::OVER_RANGE), i16::MIN);
+        let value = self.get_value();
+
+        if value.is_nan() {
+            return self.over_range(0);
         }
 
-        if self.get_value() > i16::MAX.into() {
-            return (self.get_flags().with_bits_set(Self::OVER_RANGE), i16::MAX);
+        if value < i16::MIN.into() {
+            return self.over_range(i16::MIN);
         }
 
-        (self.get_flags(), f64_to_i16(self.get_value()))
+        if value > i16::MAX.into() {
+            return self.over_range(i16::MAX);
+        }
+
+        (self.get_flags(), f64_to_i16(value))
     }
 
+    /// NaN is 0 and out of range values clamp, both with OVER_RANGE
     fn to_i32(&self) -> (Flags, i32) {
-        if self.get_value() < i32::MIN.into() {
-            return (self.get_flags().with_bits_set(Self::OVER_RANGE), i32::MIN);
+        let value = self.get_value();
+
+        if value.is_nan() {
+            return self.over_range(0);
         }
 
-        if self.get_value() > i32::MAX.into() {
-            return (self.get_flags().with_bits_set(Self::OVER_RANGE), i32::MAX);
+        if value < i32::MIN.into() {
+            return self.over_range(i32::MIN);
         }
 
-        (self.get_flags(), f64_to_i32(self.get_value()))
+        if value > i32::MAX.into() {
+            return self.over_range(i32::MAX);
+        }
+
+        (self.get_flags(), f64_to_i32(value))
     }
 
+    /// NaN and infinity are kept, and finite values past the f32 range clamp with OVER_RANGE
     fn to_f32(&self) -> (Flags, f32) {
-        if self.get_value() < f32::MIN.into() {
-            return (self.get_flags().with_bits_set(Self::OVER_RANGE), f32::MIN);
+        let value = self.get_value();
+
+        if value.is_finite() {
+            if value < f32::MIN.into() {
+                return self.over_range(f32::MIN);
+            }
+
+            if value > f32::MAX.into() {
+                return self.over_range(f32::MAX);
+            }
         }
 
-        if self.get_value() > f32::MAX.into() {
-            return (self.get_flags().with_bits_set(Self::OVER_RANGE), f32::MAX);
-        }
-
-        (self.get_flags(), f64_to_f32(self.get_value()))
+        (self.get_flags(), f64_to_f32(value))
     }
 }
 
