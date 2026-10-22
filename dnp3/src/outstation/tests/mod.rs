@@ -30,6 +30,8 @@ mod read_states;
 mod repeats;
 /// which frames and fragments are dropped or answered, over the real link and transport layers
 mod request_filtering;
+/// how a request is answered in idle and in each confirm wait
+mod request_intake;
 /// clear restart IIN + cold/warm restart
 mod restart;
 /// time synchronization
