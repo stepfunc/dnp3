@@ -235,6 +235,14 @@ impl TaskStates {
         *self = Self::new();
     }
 
+    fn state_mut(&mut self, task: &AutoTask) -> &mut AutoTaskState {
+        match task {
+            AutoTask::ClearRestartBit => &mut self.clear_restart_iin,
+            AutoTask::EnableUnsolicited(_) => &mut self.enabled_unsolicited,
+            AutoTask::DisableUnsolicited(_) => &mut self.disable_unsolicited,
+        }
+    }
+
     fn on_restart_iin(&mut self) {
         self.clear_restart_iin.demand();
         self.integrity_scan.demand();
@@ -527,18 +535,12 @@ impl Association {
         self.auto_tasks.event_scan.failure(&self.config);
     }
 
-    pub(crate) fn on_clear_restart_iin_response(&mut self, iin: Iin) {
-        if iin.iin1.get_device_restart() {
-            tracing::warn!("device failed to clear restart IIN bit");
-            self.auto_tasks.clear_restart_iin.failure(&self.config);
-        } else {
-            self.auto_tasks.clear_restart_iin.done();
-        }
+    pub(crate) fn on_auto_task_success(&mut self, task: &AutoTask) {
+        self.auto_tasks.state_mut(task).done();
     }
 
-    pub(crate) fn on_clear_restart_iin_failure(&mut self) {
-        tracing::warn!("failed to clear restart IIN bit");
-        self.auto_tasks.clear_restart_iin.failure(&self.config);
+    pub(crate) fn on_auto_task_failure(&mut self, task: &AutoTask) {
+        self.auto_tasks.state_mut(task).failure(&self.config);
     }
 
     pub(crate) fn on_time_sync_success(&mut self) {
@@ -548,24 +550,6 @@ impl Association {
     pub(crate) fn on_time_sync_failure(&mut self, err: TimeSyncError) {
         tracing::warn!("auto time sync failed: {}", err);
         self.auto_tasks.time_sync.failure(&self.config);
-    }
-
-    pub(crate) fn on_enable_unsolicited_response(&mut self, _iin: Iin) {
-        self.auto_tasks.enabled_unsolicited.done();
-    }
-
-    pub(crate) fn on_enable_unsolicited_failure(&mut self) {
-        tracing::warn!("failed to enable unsolicited responses");
-        self.auto_tasks.enabled_unsolicited.failure(&self.config);
-    }
-
-    pub(crate) fn on_disable_unsolicited_response(&mut self, _iin: Iin) {
-        self.auto_tasks.disable_unsolicited.done();
-    }
-
-    pub(crate) fn on_disable_unsolicited_failure(&mut self) {
-        tracing::warn!("failed to disable unsolicited responses");
-        self.auto_tasks.disable_unsolicited.failure(&self.config);
     }
 
     pub(crate) fn on_link_activity(&mut self) {
