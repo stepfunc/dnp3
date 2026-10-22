@@ -531,16 +531,13 @@ impl DatabaseHandle {
 
     pub(crate) fn select(&mut self, headers: &HeaderCollection) -> Iin2 {
         self.with_database(|db| {
-            let mut iin2 = Iin2::default();
-            for header in headers.iter() {
-                match ReadHeader::get(&header) {
-                    None => {
-                        iin2 |= ReadHeader::unsupported(header.variation());
-                    }
-                    Some(x) => iin2 |= db.inner.select_by_header(x),
-                }
-            }
-            iin2
+            let mut unsupported = Iin2::default();
+            let selected = db.inner.select_read(headers.iter().filter_map(|header| {
+                ReadHeader::parse(&header)
+                    .map_err(|err| unsupported |= err)
+                    .ok()
+            }));
+            selected | unsupported
         })
     }
 
@@ -554,8 +551,7 @@ impl DatabaseHandle {
         cursor: &mut WriteCursor,
     ) -> usize {
         self.with_database(|db| {
-            db.inner.reset();
-            let count = db.inner.select_event_classes(classes);
+            let count = db.inner.select_unsolicited(classes);
             if count == 0 {
                 return 0;
             }

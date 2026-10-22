@@ -66,7 +66,25 @@ impl Database {
         self.event_buffer.is_overflown()
     }
 
-    pub(crate) fn select_by_header(&mut self, header: ReadHeader) -> Iin2 {
+    /// Start the selection for a READ from a reset, so that it never inherits what an earlier
+    /// selection left selected or written
+    pub(crate) fn select_read(&mut self, headers: impl Iterator<Item = ReadHeader>) -> Iin2 {
+        self.reset();
+        let mut iin2 = Iin2::default();
+        for header in headers {
+            iin2 |= self.select_by_header(header);
+        }
+        iin2
+    }
+
+    /// Start the selection of the events in `classes` for an unsolicited response from a reset,
+    /// returning how many it selected
+    pub(crate) fn select_unsolicited(&mut self, classes: EventClasses) -> usize {
+        self.reset();
+        self.event_buffer.select_by_class(classes, None)
+    }
+
+    fn select_by_header(&mut self, header: ReadHeader) -> Iin2 {
         match header {
             ReadHeader::Class0 => self.static_db.select_class_zero(),
             ReadHeader::Static(target, range) => self.static_db.select(target, range),
@@ -123,10 +141,6 @@ impl Database {
 
     pub(crate) fn discard_unselected_events(&mut self, classes: EventClasses) -> ClassCount {
         self.event_buffer.remove_unselected_by_class(classes)
-    }
-
-    pub(crate) fn select_event_classes(&mut self, classes: EventClasses) -> usize {
-        self.event_buffer.select_by_class(classes, None)
     }
 
     pub(crate) fn add<T>(&mut self, index: u16, config: PointConfig<T>) -> bool
