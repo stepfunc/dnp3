@@ -5,7 +5,6 @@ use crate::app::header::{Iin, ResponseFunction, ResponseHeader};
 #[cfg(test)]
 use crate::app::parse::parser::ParsedFragment;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
-use crate::app::sequence::Sequence;
 use crate::app::variations::Variation;
 use crate::app::{FunctionCode, QualifierCode};
 
@@ -172,25 +171,6 @@ impl<'a, 'b> HeaderWriter<'a, 'b> {
         )
         .unwrap()
     }
-}
-
-pub(crate) fn confirm_solicited(
-    seq: Sequence,
-    cursor: &mut WriteCursor,
-) -> Result<(), scursor::WriteError> {
-    start_request(ControlField::request(seq), FunctionCode::Confirm, cursor).map(|_| {})
-}
-
-pub(crate) fn confirm_unsolicited(
-    seq: Sequence,
-    cursor: &mut WriteCursor,
-) -> Result<(), scursor::WriteError> {
-    start_request(
-        ControlField::unsolicited(seq),
-        FunctionCode::Confirm,
-        cursor,
-    )
-    .map(|_| {})
 }
 
 impl Variation {
