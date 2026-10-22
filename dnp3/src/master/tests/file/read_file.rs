@@ -179,60 +179,63 @@ async fn expect_finished(harness: &mut TestHarness, first: FunctionCode, finishe
 
 #[tokio::test]
 async fn full_transfer_with_credentials() {
-    let mut harness = create_association(AssociationConfig::quiet()).await;
-    let reader = start_read(&mut harness, read_config(), Some(credentials())).await;
+    watchdog(async {
+        let mut harness = create_association(AssociationConfig::quiet()).await;
+        let reader = start_read(&mut harness, read_config(), Some(credentials())).await;
 
-    harness.expect_write(AUTH_REQUEST.to_vec()).await;
-    harness.process_response(auth_response(0, 7)).await;
+        harness.expect_write(AUTH_REQUEST.to_vec()).await;
+        harness.process_response(auth_response(0, 7)).await;
 
-    harness.expect_write(open_request(1, 7)).await;
-    harness
-        .process_response(open_response(1, FileStatus::Success))
-        .await;
-    assert_eq!(reader.pop(), [ReaderEvent::Opened(8)]);
+        harness.expect_write(open_request(1, 7)).await;
+        harness
+            .process_response(open_response(1, FileStatus::Success))
+            .await;
+        assert_eq!(reader.pop(), [ReaderEvent::Opened(8)]);
 
-    harness.expect_write(read_request(2, 0)).await;
-    harness
-        .process_response(super::file_transport_response(2, HANDLE, 0, b"abcd"))
-        .await;
-    assert_eq!(reader.pop(), [ReaderEvent::Block(0, b"abcd".to_vec())]);
+        harness.expect_write(read_request(2, 0)).await;
+        harness
+            .process_response(super::file_transport_response(2, HANDLE, 0, b"abcd"))
+            .await;
+        assert_eq!(reader.pop(), [ReaderEvent::Block(0, b"abcd".to_vec())]);
 
-    harness.expect_write(read_request(3, 1)).await;
-    harness
-        .process_response(super::file_transport_response(
-            3,
-            HANDLE,
-            super::last_block(1),
-            b"efgh",
-        ))
-        .await;
-    assert_eq!(
-        reader.pop(),
-        [
-            ReaderEvent::Block(1, b"efgh".to_vec()),
-            ReaderEvent::Completed
-        ]
-    );
+        harness.expect_write(read_request(3, 1)).await;
+        harness
+            .process_response(super::file_transport_response(
+                3,
+                HANDLE,
+                super::last_block(1),
+                b"efgh",
+            ))
+            .await;
+        assert_eq!(
+            reader.pop(),
+            [
+                ReaderEvent::Block(1, b"efgh".to_vec()),
+                ReaderEvent::Completed
+            ]
+        );
 
-    harness
-        .expect_write(close_request_bytes_for(0xC4, HANDLE))
+        harness
+            .expect_write(close_request_bytes_for(0xC4, HANDLE))
+            .await;
+        harness
+            .process_response(super::file_status_response(
+                4,
+                HANDLE,
+                0,
+                0,
+                FileStatus::Success,
+            ))
+            .await;
+        assert_eq!(reader.pop(), []);
+        harness.assert_no_events();
+        expect_finished(
+            &mut harness,
+            FunctionCode::AuthenticateFile,
+            Finished::Success(4),
+        )
         .await;
-    harness
-        .process_response(super::file_status_response(
-            4,
-            HANDLE,
-            0,
-            0,
-            FileStatus::Success,
-        ))
-        .await;
-    assert_eq!(reader.pop(), []);
-    harness.assert_no_events();
-    expect_finished(
-        &mut harness,
-        FunctionCode::AuthenticateFile,
-        Finished::Success(4),
-    )
+    })
     .await;
 }
 
@@ -303,18 +306,21 @@ impl OpenFailure {
 
 #[tokio::test]
 async fn open_failures_abort_the_reader_and_fail_the_task_without_a_close() {
-    for failure in OPEN_FAILURES {
-        let mut harness = create_association(AssociationConfig::quiet()).await;
-        let reader = start_read(&mut harness, read_config(), failure.credentials()).await;
-        failure.answer(&mut harness).await;
-        expect_finished(&mut harness, failure.first(), Finished::Failure).await;
-        harness.assert_no_events();
-        assert_eq!(
-            reader.pop(),
-            [ReaderEvent::Aborted(failure.error())],
-            "{failure:?}"
-        );
-    }
+    watchdog(async {
+        for failure in OPEN_FAILURES {
+            let mut harness = create_association(AssociationConfig::quiet()).await;
+            let reader = start_read(&mut harness, read_config(), failure.credentials()).await;
+            failure.answer(&mut harness).await;
+            expect_finished(&mut harness, failure.first(), Finished::Failure).await;
+            harness.assert_no_events();
+            assert_eq!(
+                reader.pop(),
+                [ReaderEvent::Aborted(failure.error())],
+                "{failure:?}"
+            );
+        }
+    })
+    .await;
 }
 
 /// A READ response that ends the transfer early, after which the master closes the file
@@ -477,61 +483,70 @@ async fn end_file_read(harness: &mut TestHarness, ending: Ending) -> RecordingRe
 
 #[tokio::test]
 async fn early_end_closes_the_file_without_another_callback() {
-    for ending in ENDINGS {
-        for (close, closed) in close_responses(2) {
-            let mut harness = create_association(AssociationConfig::quiet()).await;
-            let reader = end_file_read(&mut harness, ending).await;
-            harness.process_response(close).await;
-            expect_finished(
-                &mut harness,
-                FunctionCode::OpenFile,
-                ending.finished(closed),
-            )
-            .await;
-            harness.assert_no_events();
-            assert_eq!(reader.pop(), [], "{ending:?}");
+    watchdog(async {
+        for ending in ENDINGS {
+            for (close, closed) in close_responses(2) {
+                let mut harness = create_association(AssociationConfig::quiet()).await;
+                let reader = end_file_read(&mut harness, ending).await;
+                harness.process_response(close).await;
+                expect_finished(
+                    &mut harness,
+                    FunctionCode::OpenFile,
+                    ending.finished(closed),
+                )
+                .await;
+                harness.assert_no_events();
+                assert_eq!(reader.pop(), [], "{ending:?}");
+            }
         }
-    }
+    })
+    .await;
 }
 
 #[tokio::test]
 async fn reader_abort_on_open_closes_the_file_without_another_callback() {
-    for (close, finished) in close_responses(1) {
-        let mut harness = create_association(AssociationConfig::quiet()).await;
-        let reader = start_read(&mut harness, read_config(), None).await;
-        reader.set_action(FileAction::Abort);
-        harness.expect_write(open_request(0, 0)).await;
-        harness
-            .process_response(open_response(0, FileStatus::Success))
-            .await;
-        harness
-            .expect_write(close_request_bytes_for(0xC1, HANDLE))
-            .await;
-        assert_eq!(
-            reader.pop(),
-            [
-                ReaderEvent::Opened(8),
-                ReaderEvent::Aborted(FileError::AbortByUser)
-            ]
-        );
-        harness.process_response(close).await;
-        expect_finished(&mut harness, FunctionCode::OpenFile, finished).await;
-        harness.assert_no_events();
-        assert_eq!(reader.pop(), []);
-    }
+    watchdog(async {
+        for (close, finished) in close_responses(1) {
+            let mut harness = create_association(AssociationConfig::quiet()).await;
+            let reader = start_read(&mut harness, read_config(), None).await;
+            reader.set_action(FileAction::Abort);
+            harness.expect_write(open_request(0, 0)).await;
+            harness
+                .process_response(open_response(0, FileStatus::Success))
+                .await;
+            harness
+                .expect_write(close_request_bytes_for(0xC1, HANDLE))
+                .await;
+            assert_eq!(
+                reader.pop(),
+                [
+                    ReaderEvent::Opened(8),
+                    ReaderEvent::Aborted(FileError::AbortByUser)
+                ]
+            );
+            harness.process_response(close).await;
+            expect_finished(&mut harness, FunctionCode::OpenFile, finished).await;
+            harness.assert_no_events();
+            assert_eq!(reader.pop(), []);
+        }
+    })
+    .await;
 }
 
 #[tokio::test]
 async fn close_after_the_last_block_decides_the_task_and_never_reaches_the_reader() {
-    for (close, finished) in close_responses(2) {
-        let mut harness = create_association(AssociationConfig::quiet()).await;
-        let reader = start_read(&mut harness, read_config(), None).await;
-        read_to_close(&mut harness, &reader).await;
-        harness.process_response(close).await;
-        expect_finished(&mut harness, FunctionCode::OpenFile, finished).await;
-        harness.assert_no_events();
-        assert_eq!(reader.pop(), []);
-    }
+    watchdog(async {
+        for (close, finished) in close_responses(2) {
+            let mut harness = create_association(AssociationConfig::quiet()).await;
+            let reader = start_read(&mut harness, read_config(), None).await;
+            read_to_close(&mut harness, &reader).await;
+            harness.process_response(close).await;
+            expect_finished(&mut harness, FunctionCode::OpenFile, finished).await;
+            harness.assert_no_events();
+            assert_eq!(reader.pop(), []);
+        }
+    })
+    .await;
 }
 
 /// The request a file read waits on when something other than its response ends it
@@ -693,57 +708,63 @@ async fn end_directory_read(harness: &mut TestHarness, ending: Ending) {
 
 #[tokio::test]
 async fn directory_read_fails_with_the_error_that_ended_the_transfer() {
-    for failure in OPEN_FAILURES {
-        let mut harness = create_association(AssociationConfig::quiet()).await;
-        let reply = start_directory_read(&harness, read_config(), failure.credentials());
-        failure.answer(&mut harness).await;
-        assert_eq!(reply.await.unwrap(), Err(failure.error()), "{failure:?}");
-        expect_finished(&mut harness, failure.first(), Finished::Failure).await;
-        harness.assert_no_events();
-    }
-    for ending in ENDINGS.into_iter().filter(|ending| !ending.reader_aborts()) {
-        let mut harness = create_association(AssociationConfig::quiet()).await;
-        end_directory_read(&mut harness, ending).await;
-        harness.process_response(close_success(2)).await;
-        let finished = ending.finished(Finished::Success(2));
-        expect_finished(&mut harness, FunctionCode::OpenFile, finished).await;
-        harness.assert_no_events();
-    }
+    watchdog(async {
+        for failure in OPEN_FAILURES {
+            let mut harness = create_association(AssociationConfig::quiet()).await;
+            let reply = start_directory_read(&harness, read_config(), failure.credentials());
+            failure.answer(&mut harness).await;
+            assert_eq!(reply.await.unwrap(), Err(failure.error()), "{failure:?}");
+            expect_finished(&mut harness, failure.first(), Finished::Failure).await;
+            harness.assert_no_events();
+        }
+        for ending in ENDINGS.into_iter().filter(|ending| !ending.reader_aborts()) {
+            let mut harness = create_association(AssociationConfig::quiet()).await;
+            end_directory_read(&mut harness, ending).await;
+            harness.process_response(close_success(2)).await;
+            let finished = ending.finished(Finished::Success(2));
+            expect_finished(&mut harness, FunctionCode::OpenFile, finished).await;
+            harness.assert_no_events();
+        }
+    })
+    .await;
 }
 
 #[tokio::test]
 async fn directory_read_with_unparseable_entries_fails_the_read_but_not_the_task() {
-    // a g70v7 entry for a file named "f", followed by a byte that isn't an entry
-    const ENTRY_THEN_JUNK: &[u8] = &[
-        20, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, b'f', 0x01,
-    ];
-    let config = FileReadConfig {
-        max_block_size: 256,
-        max_file_size: 64,
-    };
-    for data in [[0x01].as_slice(), ENTRY_THEN_JUNK] {
-        let mut harness = create_association(AssociationConfig::quiet()).await;
-        let reply = start_directory_read(&harness, config, None);
-        open(&mut harness).await;
-        harness
-            .process_response(super::file_transport_response(
-                1,
-                HANDLE,
-                super::last_block(0),
-                data,
-            ))
-            .await;
-        assert_eq!(
-            reply.await.unwrap(),
-            Err(FileError::BadResponse),
-            "{data:?}"
-        );
-        harness
-            .expect_write(close_request_bytes_for(0xC2, HANDLE))
-            .await;
-        harness.process_response(close_success(2)).await;
-        expect_finished(&mut harness, FunctionCode::OpenFile, Finished::Success(2)).await;
-    }
+    watchdog(async {
+        // a g70v7 entry for a file named "f", followed by a byte that isn't an entry
+        const ENTRY_THEN_JUNK: &[u8] = &[
+            20, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, b'f', 0x01,
+        ];
+        let config = FileReadConfig {
+            max_block_size: 256,
+            max_file_size: 64,
+        };
+        for data in [[0x01].as_slice(), ENTRY_THEN_JUNK] {
+            let mut harness = create_association(AssociationConfig::quiet()).await;
+            let reply = start_directory_read(&harness, config, None);
+            open(&mut harness).await;
+            harness
+                .process_response(super::file_transport_response(
+                    1,
+                    HANDLE,
+                    super::last_block(0),
+                    data,
+                ))
+                .await;
+            assert_eq!(
+                reply.await.unwrap(),
+                Err(FileError::BadResponse),
+                "{data:?}"
+            );
+            harness
+                .expect_write(close_request_bytes_for(0xC2, HANDLE))
+                .await;
+            harness.process_response(close_success(2)).await;
+            expect_finished(&mut harness, FunctionCode::OpenFile, Finished::Success(2)).await;
+        }
+    })
+    .await;
 }
 
 #[tokio::test(start_paused = true)]

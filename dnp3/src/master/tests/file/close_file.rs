@@ -3,86 +3,106 @@ use crate::master::association::AssociationConfig;
 use crate::master::tasks::file::REQUEST_ID;
 use crate::master::tests::harness::{create_association, AssocInfoEvent, TestHarness};
 use crate::master::{AssociationHandle, FileError, FileHandle, TaskError, TaskType};
+use crate::util::test_support::watchdog;
 
 const HANDLE: FileHandle = FileHandle::new(42);
 
 #[tokio::test]
 async fn close_request_bytes() {
-    let mut harness = create_association(AssociationConfig::quiet()).await;
-    let _close_task = spawn_close_task(harness.association.clone(), FileHandle::new(0xDEADCAFE));
-    harness
-        .expect_write(close_request_bytes_for(0xC0, 0xDEADCAFE))
-        .await;
+    watchdog(async {
+        let mut harness = create_association(AssociationConfig::quiet()).await;
+        let _close_task =
+            spawn_close_task(harness.association.clone(), FileHandle::new(0xDEADCAFE));
+        harness
+            .expect_write(close_request_bytes_for(0xC0, 0xDEADCAFE))
+            .await;
+    })
+    .await;
 }
 
 #[tokio::test]
 async fn fails_on_wrong_handle() {
-    let result = close_with_response(super::file_status_response(
-        0,
-        43,
-        0,
-        0,
-        FileStatus::Success,
-    ))
+    watchdog(async {
+        let result = close_with_response(super::file_status_response(
+            0,
+            43,
+            0,
+            0,
+            FileStatus::Success,
+        ))
+        .await;
+        assert_eq!(result, Err(FileError::WrongHandle));
+    })
     .await;
-    assert_eq!(result, Err(FileError::WrongHandle));
 }
 
 #[tokio::test]
 async fn fails_on_bad_status() {
-    let result = close_with_response(super::file_status_response(
-        0,
-        HANDLE.into(),
-        0,
-        0,
-        FileStatus::InvalidHandle,
-    ))
+    watchdog(async {
+        let result = close_with_response(super::file_status_response(
+            0,
+            HANDLE.into(),
+            0,
+            0,
+            FileStatus::InvalidHandle,
+        ))
+        .await;
+        assert_eq!(result, Err(FileError::BadStatus(FileStatus::InvalidHandle)));
+    })
     .await;
-    assert_eq!(result, Err(FileError::BadStatus(FileStatus::InvalidHandle)));
 }
 
 #[tokio::test]
 async fn wrong_handle_is_reported_before_bad_status() {
-    let result = close_with_response(super::file_status_response(
-        0,
-        43,
-        0,
-        0,
-        FileStatus::InvalidHandle,
-    ))
+    watchdog(async {
+        let result = close_with_response(super::file_status_response(
+            0,
+            43,
+            0,
+            0,
+            FileStatus::InvalidHandle,
+        ))
+        .await;
+        assert_eq!(result, Err(FileError::WrongHandle));
+    })
     .await;
-    assert_eq!(result, Err(FileError::WrongHandle));
 }
 
 #[tokio::test]
 async fn ignores_size_and_block_size_in_response() {
-    let mut harness = create_association(AssociationConfig::quiet()).await;
-    let close_task = spawn_close_task(harness.association.clone(), HANDLE);
-    harness.expect_write(close_file(0, HANDLE)).await;
-    harness
-        .process_response(super::file_status_response(
-            0,
-            HANDLE.into(),
-            1234,
-            512,
-            FileStatus::Success,
-        ))
-        .await;
-    assert_eq!(close_task.await.unwrap(), Ok(()));
+    watchdog(async {
+        let mut harness = create_association(AssociationConfig::quiet()).await;
+        let close_task = spawn_close_task(harness.association.clone(), HANDLE);
+        harness.expect_write(close_file(0, HANDLE)).await;
+        harness
+            .process_response(super::file_status_response(
+                0,
+                HANDLE.into(),
+                1234,
+                512,
+                FileStatus::Success,
+            ))
+            .await;
+        assert_eq!(close_task.await.unwrap(), Ok(()));
+    })
+    .await;
 }
 
 #[tokio::test]
 async fn fails_on_unexpected_variation() {
-    let result = close_with_response(super::response(
-        0,
-        &Group70Var5 {
-            file_handle: HANDLE.into(),
-            block_number: 0,
-            file_data: &[],
-        },
-    ))
+    watchdog(async {
+        let result = close_with_response(super::response(
+            0,
+            &Group70Var5 {
+                file_handle: HANDLE.into(),
+                block_number: 0,
+                file_data: &[],
+            },
+        ))
+        .await;
+        assert_eq!(result, Err(FileError::BadResponse));
+    })
     .await;
-    assert_eq!(result, Err(FileError::BadResponse));
 }
 
 /// Run a CLOSE of [`HANDLE`] against a response that fails it, and check that the task fails

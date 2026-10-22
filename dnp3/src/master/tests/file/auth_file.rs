@@ -2,42 +2,52 @@ use crate::app::{FileStatus, FunctionCode, Group70Var2, Sequence};
 use crate::master::association::AssociationConfig;
 use crate::master::tests::harness::{create_association, AssocInfoEvent, TestHarness};
 use crate::master::{AuthKey, FileCredentials, FileError, TaskError, TaskType};
+use crate::util::test_support::watchdog;
 
 #[tokio::test]
 async fn auth_request_bytes() {
-    let mut harness = create_association(AssociationConfig::quiet()).await;
-    let _auth_task = spawn_auth_task(&harness);
-    harness.expect_write(AUTH_REQUEST.to_vec()).await;
+    watchdog(async {
+        let mut harness = create_association(AssociationConfig::quiet()).await;
+        let _auth_task = spawn_auth_task(&harness);
+        harness.expect_write(AUTH_REQUEST.to_vec()).await;
+    })
+    .await;
 }
 
 #[tokio::test]
 async fn fails_with_no_permission_when_auth_key_is_zero() {
-    let mut harness = create_association(AssociationConfig::quiet()).await;
-    let auth_task = spawn_auth_task(&harness);
-    harness.expect_write(auth_request(0)).await;
-    harness.process_response(auth_response(0, 0)).await;
+    watchdog(async {
+        let mut harness = create_association(AssociationConfig::quiet()).await;
+        let auth_task = spawn_auth_task(&harness);
+        harness.expect_write(auth_request(0)).await;
+        harness.process_response(auth_response(0, 0)).await;
 
-    assert_eq!(
-        auth_task.await.unwrap().map(u32::from),
-        Err(FileError::NoPermission)
-    );
-    expect_failure(&mut harness, TaskError::UnexpectedResponseHeaders);
+        assert_eq!(
+            auth_task.await.unwrap().map(u32::from),
+            Err(FileError::NoPermission)
+        );
+        expect_failure(&mut harness, TaskError::UnexpectedResponseHeaders);
+    })
+    .await;
 }
 
 #[tokio::test]
 async fn fails_on_unexpected_variation() {
-    let mut harness = create_association(AssociationConfig::quiet()).await;
-    let auth_task = spawn_auth_task(&harness);
-    harness.expect_write(auth_request(0)).await;
-    harness
-        .process_response(super::file_status_response(0, 1, 0, 0, FileStatus::Success))
-        .await;
+    watchdog(async {
+        let mut harness = create_association(AssociationConfig::quiet()).await;
+        let auth_task = spawn_auth_task(&harness);
+        harness.expect_write(auth_request(0)).await;
+        harness
+            .process_response(super::file_status_response(0, 1, 0, 0, FileStatus::Success))
+            .await;
 
-    assert_eq!(
-        auth_task.await.unwrap().map(u32::from),
-        Err(FileError::BadResponse)
-    );
-    expect_failure(&mut harness, TaskError::UnexpectedResponseHeaders);
+        assert_eq!(
+            auth_task.await.unwrap().map(u32::from),
+            Err(FileError::BadResponse)
+        );
+        expect_failure(&mut harness, TaskError::UnexpectedResponseHeaders);
+    })
+    .await;
 }
 
 /// AUTHENTICATE_FILE request for user "user" and password "pass" with sequence 0
