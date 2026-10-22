@@ -62,7 +62,6 @@ pub fn spawn_outstation_tcp_client_2(
     control_handler: Box<dyn ControlHandler>,
     listener: Box<dyn Listener<ClientState>>,
 ) -> OutstationHandle {
-    let name = connect_handler.endpoint_span_name();
     let (task, handle) = OutstationTask::create(
         Enabled::No,
         LinkModes::stream(link_error_mode),
@@ -73,20 +72,26 @@ pub fn spawn_outstation_tcp_client_2(
         information,
         control_handler,
     );
-    let session = Session::outstation(task);
-    let mut client = ClientTask::new(
-        session,
+    spawn_outstation_client(
+        task,
         connect_handler,
         PostConnectionHandler::Tcp,
         listener,
+        |name| tracing::info_span!("dnp3-outstation-tcp-client", "endpoint" = ?name),
     );
-
-    let future = async move {
-        client
-            .run()
-            .instrument(tracing::info_span!("dnp3-outstation-tcp-client", "endpoint" = ?name))
-            .await;
-    };
-    tokio::spawn(future);
     handle
+}
+
+/// Spawn a client task running `task` over TCP or TLS, in the span built from the endpoint name
+pub(crate) fn spawn_outstation_client(
+    task: OutstationTask,
+    connect_handler: Box<dyn ClientConnectionHandler>,
+    post_connection: PostConnectionHandler,
+    listener: Box<dyn Listener<ClientState>>,
+    span: fn(&str) -> tracing::Span,
+) {
+    let name = connect_handler.endpoint_span_name();
+    let session = Session::outstation(task);
+    let mut client = ClientTask::new(session, connect_handler, post_connection, listener);
+    tokio::spawn(async move { client.run().instrument(span(&name)).await });
 }
