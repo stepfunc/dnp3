@@ -33,7 +33,7 @@ where
         self.iter().next()
     }
 
-    pub(crate) fn new(count: usize, data: &'a [u8]) -> Self {
+    fn new(count: usize, data: &'a [u8]) -> Self {
         Self {
             count,
             data,
@@ -64,13 +64,8 @@ where
 
     #[cfg_attr(all(test, dnp3_no_panic), no_panic::no_panic)]
     fn next(&mut self) -> Option<Self::Item> {
-        match T::read(&mut self.cursor) {
-            Ok(x) => {
-                self.remaining = self.remaining.saturating_sub(1);
-                Some(x)
-            }
-            Err(_) => None,
-        }
+        self.remaining = self.remaining.checked_sub(1)?;
+        T::read(&mut self.cursor).ok()
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {

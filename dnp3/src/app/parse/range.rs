@@ -66,7 +66,7 @@ where
         Self::new(Range::empty(), &[])
     }
 
-    pub(crate) fn new(range: Range, data: &'a [u8]) -> Self {
+    fn new(range: Range, data: &'a [u8]) -> Self {
         Self {
             range,
             data,
@@ -99,15 +99,11 @@ where
 
     #[cfg_attr(all(test, dnp3_no_panic), no_panic::no_panic)]
     fn next(&mut self) -> Option<Self::Item> {
-        match T::read(&mut self.cursor) {
-            Ok(x) => {
-                let idx = self.index;
-                self.index = self.index.saturating_add(1);
-                self.remaining = self.remaining.saturating_sub(1);
-                Some((x, idx))
-            }
-            Err(_) => None,
-        }
+        self.remaining = self.remaining.checked_sub(1)?;
+        let x = T::read(&mut self.cursor).ok()?;
+        let idx = self.index;
+        self.index = self.index.saturating_add(1);
+        Some((x, idx))
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
