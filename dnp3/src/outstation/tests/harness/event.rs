@@ -2,7 +2,7 @@ use crate::app::variations::{Group12Var1, Group41Var1, Group41Var2, Group41Var3,
 use crate::outstation::traits::{BroadcastAction, OperateType, RestartDelay};
 use crate::outstation::{BufferState, FreezeIndices, FreezeType};
 
-use crate::app::{FunctionCode, RequestHeader, Timestamp};
+use crate::app::{ControlField, FunctionCode, RequestHeader, Sequence, Timestamp};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum Control {
@@ -23,6 +23,20 @@ pub(crate) fn selected() -> [Event; 3] {
         Event::Select(G41V2_INDEX_7),
         Event::EndControls,
     ]
+}
+
+/// the information callback for a request with one fragment, from idle
+pub(crate) fn from_idle(function: FunctionCode, uns: bool, seq: u8) -> Event {
+    Event::RequestFromIdle(RequestHeader {
+        control: ControlField {
+            fir: true,
+            fin: true,
+            con: false,
+            uns,
+            seq: Sequence::new(seq),
+        },
+        function,
+    })
 }
 
 /// the events of an operation of [`G41V2_INDEX_7`]
