@@ -328,20 +328,23 @@ enum Ending {
     Handle,
     /// READ is answered without an object header
     NoObjectHeader,
-    /// the block exceeds the configured maximum file size
+    /// a block that isn't the last exceeds the configured maximum file size
     MaxFileSize,
+    /// the last block exceeds the configured maximum file size
+    MaxFileSizeOnLastBlock,
     /// the reader aborts a block that isn't the last
     ReaderAbort,
     /// the reader aborts the last block
     ReaderAbortOnLastBlock,
 }
 
-const ENDINGS: [Ending; 7] = [
+const ENDINGS: [Ending; 8] = [
     Ending::BlockVariation,
     Ending::BlockNumber,
     Ending::Handle,
     Ending::NoObjectHeader,
     Ending::MaxFileSize,
+    Ending::MaxFileSizeOnLastBlock,
     Ending::ReaderAbort,
     Ending::ReaderAbortOnLastBlock,
 ];
@@ -352,7 +355,7 @@ const CLEANUP_ENDINGS: [Ending; 2] = [Ending::BlockNumber, Ending::MaxFileSize];
 impl Ending {
     fn config(self) -> FileReadConfig {
         match self {
-            Self::MaxFileSize => FileReadConfig {
+            Self::MaxFileSize | Self::MaxFileSizeOnLastBlock => FileReadConfig {
                 max_block_size: 256,
                 max_file_size: 3,
             },
@@ -372,7 +375,8 @@ impl Ending {
             | Self::BlockNumber
             | Self::Handle
             | Self::NoObjectHeader
-            | Self::MaxFileSize => false,
+            | Self::MaxFileSize
+            | Self::MaxFileSizeOnLastBlock => false,
         }
     }
 
@@ -380,7 +384,10 @@ impl Ending {
     /// transfer fails the task, while the master ending it leaves the outcome to the CLOSE
     fn finished(self, closed: Finished) -> Finished {
         match self {
-            Self::MaxFileSize | Self::ReaderAbort | Self::ReaderAbortOnLastBlock => closed,
+            Self::MaxFileSize
+            | Self::MaxFileSizeOnLastBlock
+            | Self::ReaderAbort
+            | Self::ReaderAbortOnLastBlock => closed,
             Self::BlockVariation | Self::BlockNumber | Self::Handle | Self::NoObjectHeader => {
                 Finished::Failure
             }
@@ -398,7 +405,7 @@ impl Ending {
             Self::MaxFileSize | Self::ReaderAbort => {
                 super::file_transport_response(1, HANDLE, 0, b"data")
             }
-            Self::ReaderAbortOnLastBlock => {
+            Self::MaxFileSizeOnLastBlock | Self::ReaderAbortOnLastBlock => {
                 super::file_transport_response(1, HANDLE, super::last_block(0), b"data")
             }
         }
@@ -411,7 +418,7 @@ impl Ending {
             Self::BlockNumber => FileError::BadBlockNum,
             Self::Handle => FileError::WrongHandle,
             Self::NoObjectHeader => FileError::TaskError(TaskError::UnexpectedResponseHeaders),
-            Self::MaxFileSize => FileError::MaxLengthExceeded,
+            Self::MaxFileSize | Self::MaxFileSizeOnLastBlock => FileError::MaxLengthExceeded,
             Self::ReaderAbort | Self::ReaderAbortOnLastBlock => FileError::AbortByUser,
         }
     }
