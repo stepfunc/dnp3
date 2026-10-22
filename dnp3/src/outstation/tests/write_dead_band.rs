@@ -218,3 +218,53 @@ async fn write_g34_with_every_subset_level_4_qualifier() {
         }
     }
 }
+
+#[tokio::test]
+async fn ranged_write_of_g34_applies_the_valid_deadbands_around_rejected_ones() {
+    // g34v3 for indices 3 to 6: 1.5, then 2.0 for index 4 which isn't installed, NaN, then 2.5
+    let objects: &[u8] = &[
+        0x00, 0x00, 0xC0, 0x3F, 0x00, 0x00, 0x00, 0x40, 0x00, 0x00, 0xC0, 0x7F, 0x00, 0x00, 0x20,
+        0x40,
+    ];
+    let ranges: [&[u8]; 2] = [&[0x00, 0x03, 0x06], &[0x01, 0x03, 0x00, 0x06, 0x00]];
+
+    for range in ranges {
+        let mut harness = new_harness(get_default_config());
+        let config = AnalogInputConfig {
+            deadband: 9.0,
+            ..Default::default()
+        };
+        harness.handle.database.transaction(|db| {
+            for index in [3, 5, 6] {
+                db.add(index, Some(EventClass::Class1), config);
+            }
+        });
+
+        let mut request = vec![0xC0, 0x02, 0x22, 0x03];
+        request.extend_from_slice(range);
+        request.extend_from_slice(objects);
+        // IIN2.2 (PARAMETER_ERROR)
+        harness
+            .test_request_response(&request, &[0xC0, 0x81, 0x80, 0x04])
+            .await;
+
+        harness.check_events(&[
+            Event::BeginWriteDeadBands,
+            Event::WriteDeadBand(3, 1.5),
+            Event::WriteDeadBand(6, 2.5),
+            Event::EndWriteDeadBands,
+        ]);
+
+        // index 3 and 6 hold the deadbands written, and index 5 keeps its deadband of 9.0
+        harness
+            .test_request_response(
+                &[0xC1, 0x01, 0x22, 0x03, 0x06],
+                &[
+                    0xC1, 0x81, 0x80, 0x00, 0x22, 0x03, 0x01, 0x03, 0x00, 0x03, 0x00, 0x00, 0x00,
+                    0xC0, 0x3F, 0x22, 0x03, 0x01, 0x05, 0x00, 0x06, 0x00, 0x00, 0x00, 0x10, 0x41,
+                    0x00, 0x00, 0x20, 0x40,
+                ],
+            )
+            .await;
+    }
+}
