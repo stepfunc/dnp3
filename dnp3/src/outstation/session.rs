@@ -21,7 +21,9 @@ use crate::link::header::BroadcastConfirmMode;
 use crate::link::EndpointAddress;
 use crate::master::EventClasses;
 use crate::outstation::config::{Feature, OutstationConfig};
-use crate::outstation::control::collection::{ControlCollection, ControlTransaction};
+use crate::outstation::control::collection::{
+    ControlCollection, ControlLimit, ControlMode, ControlTransaction,
+};
 use crate::outstation::control::select::SelectState;
 use crate::outstation::database::{DatabaseHandle, ResponseInfo};
 use crate::outstation::deferred::DeferredRead;
@@ -1632,23 +1634,38 @@ impl OutstationSession {
         seq: Sequence,
         controls: ControlCollection<'_>,
     ) -> Prepared {
-        // Handle each operate and write the response
-        let max_controls_per_request = self.config.max_controls_per_request;
-        let result =
-            ControlTransaction::execute(self.control_handler.borrow_mut(), database, |tx, db| {
-                self.sol.build(|cursor| {
-                    controls.operate_with_response(
-                        cursor,
-                        OperateType::DirectOperate,
-                        tx,
-                        db,
-                        max_controls_per_request,
-                    )
-                })
-            })
+        let result = self
+            .execute_controls(
+                database,
+                ControlMode::Operate(OperateType::DirectOperate),
+                &controls,
+            )
             .await;
 
         Self::control_response(seq, result)
+    }
+
+    /// Execute the controls and build the response that echoes them, returning their overall
+    /// status
+    async fn execute_controls(
+        &mut self,
+        database: &mut DatabaseHandle,
+        mode: ControlMode,
+        controls: &ControlCollection<'_>,
+    ) -> Result<CommandStatus, scursor::WriteError> {
+        let max_controls_per_request = self.config.max_controls_per_request;
+        ControlTransaction::execute(self.control_handler.borrow_mut(), database, |tx, db| {
+            self.sol.build(|cursor| {
+                controls.execute_with_response(
+                    cursor,
+                    mode,
+                    tx,
+                    db,
+                    ControlLimit::new(max_controls_per_request),
+                )
+            })
+        })
+        .await
     }
 
     /// Echo the controls into an unpublished response, without executing them, to check that the
@@ -1736,7 +1753,7 @@ impl OutstationSession {
     ) {
         let max_controls_per_request = self.config.max_controls_per_request;
         ControlTransaction::execute(self.control_handler.borrow_mut(), database, |tx, db| {
-            controls.operate_no_ack(tx, db, max_controls_per_request)
+            controls.operate_no_ack(tx, db, ControlLimit::new(max_controls_per_request))
         })
         .await;
     }
@@ -1797,14 +1814,8 @@ impl OutstationSession {
         request_hash: u64,
         controls: ControlCollection<'_>,
     ) -> Prepared {
-        // Handle each select and write the response
-        let max_controls_per_request = self.config.max_controls_per_request;
-        let result =
-            ControlTransaction::execute(self.control_handler.borrow_mut(), database, |tx, db| {
-                self.sol.build(|cursor| {
-                    controls.select_with_response(cursor, tx, db, max_controls_per_request)
-                })
-            })
+        let result = self
+            .execute_controls(database, ControlMode::Select, &controls)
             .await;
 
         // Record the select state
@@ -1838,21 +1849,10 @@ impl OutstationSession {
                 .sol
                 .build(|cursor| controls.respond_with_status(cursor, status).map(|_| status)),
             Ok(()) => {
-                let max_controls_per_request = self.config.max_controls_per_request;
-                ControlTransaction::execute(
-                    self.control_handler.borrow_mut(),
+                self.execute_controls(
                     database,
-                    |tx, db| {
-                        self.sol.build(|cursor| {
-                            controls.operate_with_response(
-                                cursor,
-                                OperateType::SelectBeforeOperate,
-                                tx,
-                                db,
-                                max_controls_per_request,
-                            )
-                        })
-                    },
+                    ControlMode::Operate(OperateType::SelectBeforeOperate),
+                    &controls,
                 )
                 .await
             }
