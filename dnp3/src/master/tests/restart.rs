@@ -35,7 +35,7 @@ struct Case {
     expected: Result<Duration, TaskError>,
 }
 
-const CASES: [Case; 5] = [
+const CASES: [Case; 10] = [
     // g52v1 with a count of one: 2 seconds
     Case {
         restart: Restart::Cold,
@@ -64,6 +64,36 @@ const CASES: [Case; 5] = [
     Case {
         restart: Restart::Cold,
         objects: &[1, 2, 0x00, 0, 0, 0x01],
+        expected: Err(TaskError::UnexpectedResponseHeaders),
+    },
+    // g52v1 with a count of zero
+    Case {
+        restart: Restart::Cold,
+        objects: &[52, 1, 0x07, 0],
+        expected: Err(TaskError::UnexpectedResponseHeaders),
+    },
+    // g52v1 with a count of two
+    Case {
+        restart: Restart::Cold,
+        objects: &[52, 1, 0x07, 2, 0x02, 0x00, 0x03, 0x00],
+        expected: Err(TaskError::UnexpectedResponseHeaders),
+    },
+    // g52v2 with a count of zero
+    Case {
+        restart: Restart::Warm,
+        objects: &[52, 2, 0x07, 0],
+        expected: Err(TaskError::UnexpectedResponseHeaders),
+    },
+    // g52v2 with a count of two
+    Case {
+        restart: Restart::Warm,
+        objects: &[52, 2, 0x07, 2, 0x02, 0x00, 0x03, 0x00],
+        expected: Err(TaskError::UnexpectedResponseHeaders),
+    },
+    // two g52v2 headers, each with a count of one
+    Case {
+        restart: Restart::Warm,
+        objects: &[52, 2, 0x07, 1, 0x02, 0x00, 52, 2, 0x07, 1, 0x03, 0x00],
         expected: Err(TaskError::UnexpectedResponseHeaders),
     },
 ];

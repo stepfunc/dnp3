@@ -2,6 +2,7 @@
 //! `AssociationInformation` see it, for each way the task can end, and how responses that don't
 //! belong to the task are handled while it waits
 
+use std::io::ErrorKind;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -13,7 +14,7 @@ use crate::app::{
     ControlField, FileStatus, FileType, FunctionCode, Group70Var2, Group70Var6, Group70Var7, Iin,
     Iin1, Iin2, MaybeAsync, Permissions, ResponseHeader, Sequence, Timestamp, Variation,
 };
-use crate::link::EndpointAddress;
+use crate::link::{EndpointAddress, LinkError};
 use crate::master::association::AssociationConfig;
 use crate::master::promise::Promise;
 use crate::master::tasks::command::CommandTask;
@@ -32,10 +33,11 @@ use crate::master::tests::harness::{
     create_association, create_association_with_handler, AssocInfoEvent, ReadEvent, TestHarness,
 };
 use crate::master::{
-    AssociationHandle, AssociationHandler, AssociationInformation, AuthKey, BlockNumber, Classes,
-    CommandBuilder, CommandError, CommandHeaders, CommandMode, CommandSupport, DeadBandHeader,
-    DirReadConfig, FileCredentials, FileError, FileHandle, FileMode, FileReadConfig, HeaderInfo,
-    Headers, OpenFile, ReadHandler, ReadRequest, ReadType, TaskError, TaskType, TimeSyncError,
+    AssociationError, AssociationHandle, AssociationHandler, AssociationInformation, AuthKey,
+    BlockNumber, Classes, CommandBuilder, CommandError, CommandHeaders, CommandMode,
+    CommandSupport, DeadBandHeader, DirReadConfig, FileCredentials, FileError, FileHandle,
+    FileMode, FileReadConfig, HeaderInfo, Headers, MasterChannel, MasterChannelType, OpenFile,
+    PollError, ReadHandler, ReadRequest, ReadType, TaskError, TaskType, TimeSyncError,
     TimeSyncProcedure, WriteError,
 };
 use crate::util::session::{RunError, StopReason};
@@ -296,96 +298,93 @@ impl Kind {
         AssocInfoEvent::TaskFailure(self.task_type(), err)
     }
 
-    /// Answer the first request, and any requests after it, until the task succeeds, with CON set
-    /// in every response if `con`. Returns the sequence number of the last request.
-    async fn finish(self, harness: &mut TestHarness, request: &[u8], con: bool) -> Sequence {
-        let first = Sequence::new(0);
+    /// The successful response to the first request
+    fn first_response(self, request: &[u8]) -> Vec<u8> {
         match self {
-            Kind::Read | Kind::EmptyResponse | Kind::DeadBands => {
-                answer(harness, con, empty_response(first)).await;
-                first
+            Kind::Read | Kind::EmptyResponse | Kind::DeadBands | Kind::TimeSync => {
+                empty_response(Sequence::new(0))
             }
-            Kind::DirectOperate => {
-                answer(harness, con, echo(request)).await;
-                first
-            }
-            Kind::SelectBeforeOperate => {
-                answer(harness, con, echo(request)).await;
-                let operate = next_request(harness, 1, FunctionCode::Operate).await;
-                answer(harness, con, echo(&operate)).await;
-                Sequence::new(1)
-            }
-            Kind::ColdRestart => {
-                answer(
-                    harness,
-                    con,
-                    vec![0xC0, 0x81, 0x00, 0x00, 52, 1, 0x07, 1, 0x02, 0x00],
-                )
-                .await;
-                first
-            }
-            Kind::TimeSync => {
-                answer(harness, con, empty_response(first)).await;
-                next_request(harness, 1, FunctionCode::Write).await;
-                answer(harness, con, empty_response(Sequence::new(1))).await;
-                Sequence::new(1)
-            }
-            Kind::AuthFile => {
-                let auth = Group70Var2 {
+            Kind::DirectOperate | Kind::SelectBeforeOperate => echo(request),
+            Kind::ColdRestart => vec![0xC0, 0x81, 0x00, 0x00, 52, 1, 0x07, 1, 0x02, 0x00],
+            Kind::AuthFile => file_response(
+                0,
+                &Group70Var2 {
                     auth_key: 42,
                     user_name: "",
                     password: "",
-                };
-                answer(harness, con, file_response(0, &auth)).await;
-                first
-            }
-            Kind::OpenFile => {
-                answer(
-                    harness,
-                    con,
-                    file_status_response(0, HANDLE, 8, 512, FileStatus::Success),
-                )
-                .await;
-                first
-            }
-            Kind::CloseFile => {
-                answer(
-                    harness,
-                    con,
-                    file_status_response(0, HANDLE, 0, 0, FileStatus::Success),
-                )
-                .await;
-                first
-            }
-            Kind::WriteFileBlock => {
-                let status = Group70Var6 {
+                },
+            ),
+            Kind::OpenFile => file_status_response(0, HANDLE, 8, 512, FileStatus::Success),
+            Kind::CloseFile => file_status_response(0, HANDLE, 0, 0, FileStatus::Success),
+            Kind::WriteFileBlock => file_response(
+                0,
+                &Group70Var6 {
                     file_handle: HANDLE,
                     block_number: 0,
                     status_code: FileStatus::Success,
                     text: "",
-                };
-                answer(harness, con, file_response(0, &status)).await;
-                first
-            }
-            Kind::GetFileInfo => {
-                let info = Group70Var7 {
+                },
+            ),
+            Kind::GetFileInfo => file_response(
+                0,
+                &Group70Var7 {
                     file_type: FileType::File,
                     file_size: 1234,
                     time_of_creation: Timestamp::new(5678),
                     permissions: Permissions::default(),
                     request_id: 0xCAFE,
                     file_name: "f.txt",
-                };
-                answer(harness, con, file_response(0, &info)).await;
-                first
+                },
+            ),
+            Kind::ReadDirectory => file_status_response(0, HANDLE, 0, 512, FileStatus::Success),
+        }
+    }
+
+    /// True if the response to the first request must have exactly one object header
+    fn expects_one_header(self) -> bool {
+        match self {
+            Kind::ColdRestart
+            | Kind::AuthFile
+            | Kind::OpenFile
+            | Kind::CloseFile
+            | Kind::WriteFileBlock
+            | Kind::GetFileInfo
+            | Kind::ReadDirectory => true,
+            Kind::Read
+            | Kind::DirectOperate
+            | Kind::SelectBeforeOperate
+            | Kind::EmptyResponse
+            | Kind::DeadBands
+            | Kind::TimeSync => false,
+        }
+    }
+
+    /// Answer the first request, and any requests after it, until the task succeeds, with CON set
+    /// in every response if `con`. Returns the sequence number of the last request.
+    async fn finish(self, harness: &mut TestHarness, request: &[u8], con: bool) -> Sequence {
+        answer(harness, con, self.first_response(request)).await;
+        match self {
+            Kind::Read
+            | Kind::DirectOperate
+            | Kind::ColdRestart
+            | Kind::EmptyResponse
+            | Kind::DeadBands
+            | Kind::AuthFile
+            | Kind::OpenFile
+            | Kind::CloseFile
+            | Kind::WriteFileBlock
+            | Kind::GetFileInfo => Sequence::new(0),
+            Kind::SelectBeforeOperate => {
+                let operate = next_request(harness, 1, FunctionCode::Operate).await;
+                answer(harness, con, echo(&operate)).await;
+                Sequence::new(1)
+            }
+            Kind::TimeSync => {
+                next_request(harness, 1, FunctionCode::Write).await;
+                answer(harness, con, empty_response(Sequence::new(1))).await;
+                Sequence::new(1)
             }
             Kind::ReadDirectory => {
-                answer(
-                    harness,
-                    con,
-                    file_status_response(0, HANDLE, 0, 512, FileStatus::Success),
-                )
-                .await;
                 next_request(harness, 1, FunctionCode::Read).await;
                 answer(
                     harness,
@@ -653,6 +652,38 @@ async fn no_task_confirms_a_response_with_con_whose_objects_do_not_parse() {
     .await;
 }
 
+/// A task whose response must have one object header fails if it has two, here the expected
+/// header twice. The response is still confirmed if it has CON.
+#[tokio::test(start_paused = true)]
+async fn every_single_header_task_fails_on_a_response_with_two_headers() {
+    watchdog(async {
+        for con in [false, true] {
+            for kind in KINDS.into_iter().filter(|kind| kind.expects_one_header()) {
+                let mut started = start(kind).await;
+                let mut response = kind.first_response(&started.request);
+                let header = response[4..].to_vec();
+                response.extend_from_slice(&header);
+                answer(&mut started.harness, con, response).await;
+
+                let err = TaskError::UnexpectedResponseHeaders;
+                assert_eq!(
+                    started.reply().await,
+                    kind.failed(err),
+                    "{kind:?} con: {con}"
+                );
+                barrier(&mut started.harness).await;
+                assert_eq!(
+                    started.harness.assoc_events.pop(),
+                    [kind.failure_event(err)],
+                    "{kind:?} con: {con}"
+                );
+                assert_eq!(started.harness.io.pop_event(), None, "{kind:?} con: {con}");
+            }
+        }
+    })
+    .await;
+}
+
 /// Fragments that aren't valid responses: one too short for the IIN, and a solicited response with
 /// the UNS bit
 const MALFORMED: [&[u8]; 2] = [&[0xC0, 0x81, 0x00], &[0xD0, 0x81, 0x00, 0x00]];
@@ -760,6 +791,47 @@ async fn every_task_fails_with_shutdown_when_the_master_shuts_down() {
             assert_eq!(
                 started.harness.assoc_events.pop(),
                 [kind.failure_event(TaskError::Shutdown)],
+                "{kind:?}"
+            );
+        }
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn every_task_fails_with_a_link_error_when_the_connection_drops() {
+    watchdog(async {
+        let err = LinkError::Stdio(ErrorKind::ConnectionReset);
+        for kind in KINDS {
+            let mut started = start(kind).await;
+            // queued directly, so that the receiver tells a completed promise from a dropped one
+            let (promise, queued) = Promise::one_shot();
+            started
+                .harness
+                .association
+                .send_task(SingleReadTask::new(
+                    ReadRequest::ClassScan(Classes::class0()),
+                    promise,
+                ))
+                .await
+                .unwrap();
+            barrier(&mut started.harness).await;
+
+            started.harness.io.read_error(ErrorKind::ConnectionReset);
+            assert_eq!(
+                started.reply().await,
+                kind.failed(TaskError::Link(err)),
+                "{kind:?}"
+            );
+            assert_eq!(queued.await, Ok(Err(TaskError::Link(err))), "{kind:?}");
+            assert_eq!(
+                (&mut started.harness.task).await.unwrap(),
+                RunError::Link(err),
+                "{kind:?}"
+            );
+            assert_eq!(
+                started.harness.assoc_events.pop(),
+                [kind.failure_event(TaskError::Link(err))],
                 "{kind:?}"
             );
         }
@@ -941,6 +1013,168 @@ async fn queued_tasks_fail_with_no_such_association_when_the_association_is_remo
         barrier(&mut harness).await;
         assert_eq!(reader.pop(), []);
         assert!(!harness.task.is_finished());
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn every_task_fails_with_no_such_association_when_removed_while_it_waits() {
+    watchdog(async {
+        for kind in KINDS {
+            let mut started = start(kind).await;
+            started
+                .harness
+                .master
+                .remove_association(OUTSTATION)
+                .await
+                .unwrap();
+            barrier(&mut started.harness).await;
+            let response = kind.first_response(&started.request);
+            respond(&mut started.harness, response).await;
+
+            let err = TaskError::NoSuchAssociation(OUTSTATION);
+            assert_eq!(started.reply().await, kind.failed(err), "{kind:?}");
+            barrier(&mut started.harness).await;
+            assert_eq!(started.harness.read_events.pop(), [], "{kind:?}");
+            assert_eq!(started.harness.assoc_events.pop(), [], "{kind:?}");
+            assert_eq!(started.harness.io.pop_event(), None, "{kind:?}");
+            assert!(!started.harness.task.is_finished(), "{kind:?}");
+        }
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn requests_to_a_removed_association_fail_with_no_such_association() {
+    watchdog(async {
+        for via_handle in [false, true] {
+            let mut harness =
+                create_association_with_handler(AssociationConfig::quiet(), Box::new(FixedTime))
+                    .await;
+            let mut stale = harness.association.clone();
+            if via_handle {
+                harness.association.clone().remove().await.unwrap();
+            } else {
+                harness.master.remove_association(OUTSTATION).await.unwrap();
+            }
+            barrier(&mut harness).await;
+
+            let err = TaskError::NoSuchAssociation(OUTSTATION);
+            for kind in KINDS {
+                let reply = kind.spawn(stale.clone()).await.unwrap();
+                assert_eq!(reply, kind.failed(err), "{kind:?} {via_handle}");
+            }
+            let poll = stale
+                .add_poll(
+                    ReadRequest::ClassScan(Classes::class0()),
+                    Duration::from_secs(1),
+                )
+                .await;
+            assert_eq!(
+                poll.err(),
+                Some(PollError::NoSuchAssociation(OUTSTATION)),
+                "{via_handle}"
+            );
+            assert_eq!(harness.assoc_events.pop(), [], "{via_handle}");
+
+            // the master still serves another association, and the first thing it writes is that
+            // association's request
+            let log = Log::default();
+            let mut other = harness
+                .master
+                .add_association(
+                    OTHER,
+                    AssociationConfig::quiet(),
+                    Box::new(log.clone()),
+                    Box::new(log.clone()),
+                    Box::new(log.clone()),
+                )
+                .await
+                .unwrap();
+            harness.set_source(OTHER);
+            let read =
+                tokio::spawn(
+                    async move { other.read(ReadRequest::ClassScan(Classes::class0())).await },
+                );
+            next_request(&mut harness, 0, FunctionCode::Read).await;
+            respond(&mut harness, empty_response(Sequence::new(0))).await;
+            assert_eq!(read.await.unwrap(), Ok(()), "{via_handle}");
+        }
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn adding_an_association_fails_for_a_used_address_or_the_wrong_channel_type() {
+    watchdog(async {
+        let mut started = start(Kind::Read).await;
+        let log = Log::default();
+        let duplicate = started
+            .harness
+            .master
+            .add_association(
+                OUTSTATION,
+                AssociationConfig::quiet(),
+                Box::new(log.clone()),
+                Box::new(log.clone()),
+                Box::new(log.clone()),
+            )
+            .await;
+        assert_eq!(
+            duplicate.err(),
+            Some(AssociationError::DuplicateAddress(OUTSTATION))
+        );
+
+        let destination = "127.0.0.1:20000".parse().unwrap();
+        let udp = started
+            .harness
+            .master
+            .add_udp_association(
+                OTHER,
+                destination,
+                AssociationConfig::quiet(),
+                Box::new(log.clone()),
+                Box::new(log.clone()),
+                Box::new(log.clone()),
+            )
+            .await;
+        assert_eq!(
+            udp.err(),
+            Some(AssociationError::WrongChannelType {
+                actual: MasterChannelType::Stream,
+                required: MasterChannelType::Udp,
+            })
+        );
+
+        let (tx, _rx) = crate::util::channel::request_channel();
+        let mut udp_channel = MasterChannel::new(tx, MasterChannelType::Udp);
+        let stream = udp_channel
+            .add_association(
+                OTHER,
+                AssociationConfig::quiet(),
+                Box::new(log.clone()),
+                Box::new(log.clone()),
+                Box::new(log.clone()),
+            )
+            .await;
+        assert_eq!(
+            stream.err(),
+            Some(AssociationError::WrongChannelType {
+                actual: MasterChannelType::Udp,
+                required: MasterChannelType::Stream,
+            })
+        );
+
+        // the existing association still handles its outstation
+        started.expect_success().await;
+        assert_eq!(
+            started.harness.read_events.pop(),
+            [
+                ReadEvent::BeginFragment(ReadType::SinglePoll),
+                ReadEvent::EndFragment(ReadType::SinglePoll),
+            ]
+        );
+        assert_eq!(log.pop(), []);
     })
     .await;
 }

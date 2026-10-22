@@ -326,6 +326,67 @@ async fn user_non_lan_time_sync_completes_the_request() {
     .await;
 }
 
+/// Objects of delay measure responses that don't hold exactly one g52v2
+const BAD_DELAYS: [&[u8]; 5] = [
+    // g52v1 (coarse, in seconds) with a count of one
+    &[52, 1, 0x07, 1, 0x00, 0x00],
+    // g52v2 with a count of zero
+    &[52, 2, 0x07, 0],
+    // g52v2 with a count of two
+    &[52, 2, 0x07, 2, 0x00, 0x00, 0x00, 0x00],
+    // two g52v2 headers, each with a count of one
+    &[52, 2, 0x07, 1, 0x00, 0x00, 52, 2, 0x07, 1, 0x00, 0x00],
+    // a CTO instead of a time delay
+    &[51, 1, 0x07, 1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+];
+
+#[tokio::test(start_paused = true)]
+async fn non_lan_time_sync_fails_without_a_write_if_the_delay_is_not_one_g52v2() {
+    watchdog(async {
+        let mut harness = create_association_with_handler(config(None), Box::new(FixedTime)).await;
+        let mut seq = Sequence::default();
+
+        for objects in BAD_DELAYS {
+            let mut association = harness.association.clone();
+            let sync = tokio::spawn(async move {
+                association
+                    .synchronize_time(TimeSyncProcedure::NonLan)
+                    .await
+            });
+            // the delay measure is the next write, so nothing followed the last failure
+            harness.expect_write(delay_measure(seq)).await;
+            let mut response = empty_response(seq.increment());
+            response.extend_from_slice(objects);
+            harness.process_response(response).await;
+
+            assert_eq!(
+                sync.await.unwrap(),
+                Err(TimeSyncError::Task(TaskError::UnexpectedResponseHeaders)),
+                "{objects:?}"
+            );
+        }
+
+        // a valid delay measure is answered with a WRITE
+        let mut association = harness.association.clone();
+        let sync = tokio::spawn(async move {
+            association
+                .synchronize_time(TimeSyncProcedure::NonLan)
+                .await
+        });
+        harness
+            .expect_write_and_respond(
+                delay_measure(seq),
+                delay_measure_response(seq.increment(), 0),
+            )
+            .await;
+        harness
+            .expect_write_and_respond(write_absolute_time(seq), empty_response(seq.increment()))
+            .await;
+        assert_eq!(sync.await.unwrap(), Ok(()));
+    })
+    .await;
+}
+
 #[tokio::test]
 async fn user_time_sync_timeout_is_reported_to_the_caller_and_not_retried() {
     watchdog(async {
