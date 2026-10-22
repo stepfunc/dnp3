@@ -1044,6 +1044,54 @@ mod tests {
     }
 
     #[test]
+    fn each_flag_family_names_its_bits_in_the_decoded_log() {
+        use crate::app::variations::{
+            Group10Var2, Group1Var2, Group20Var1, Group30Var1, Group3Var2,
+        };
+
+        let cases = [
+            (Group1Var2 { flags: 0 }.to_string(), "flags: 0x00 []"),
+            (
+                Group1Var2 { flags: 0xFF }.to_string(),
+                "flags: 0xFF [ONLINE, RESTART, COMM_LOST, REMOTE_FORCED, LOCAL_FORCED, CHATTER_FILTER, RESERVED(6), STATE]",
+            ),
+            (
+                Group3Var2 { flags: 0 }.to_string(),
+                "flags: 0x00 [state = Intermediate]",
+            ),
+            (
+                Group3Var2 { flags: 0xFF }.to_string(),
+                "flags: 0xFF [ONLINE, RESTART, COMM_LOST, REMOTE_FORCED, LOCAL_FORCED, CHATTER_FILTER, state = Indeterminate]",
+            ),
+            (Group10Var2 { flags: 0 }.to_string(), "flags: 0x00 []"),
+            (
+                Group10Var2 { flags: 0xFF }.to_string(),
+                "flags: 0xFF [ONLINE, RESTART, COMM_LOST, REMOTE_FORCED, LOCAL_FORCED, RESERVED(5), RESERVED(6), STATE]",
+            ),
+            (
+                Group20Var1 { flags: 0, value: 7 }.to_string(),
+                "flags: 0x00 [] value: 7",
+            ),
+            (
+                Group20Var1 { flags: 0xFF, value: 7 }.to_string(),
+                "flags: 0xFF [ONLINE, RESTART, COMM_LOST, REMOTE_FORCED, LOCAL_FORCED, ROLLOVER, DISCONTINUITY, RESERVED(7)] value: 7",
+            ),
+            (
+                Group30Var1 { flags: 0, value: -3 }.to_string(),
+                "flags: 0x00 [] value: -3",
+            ),
+            (
+                Group30Var1 { flags: 0xFF, value: -3 }.to_string(),
+                "flags: 0xFF [ONLINE, RESTART, COMM_LOST, REMOTE_FORCED, LOCAL_FORCED, OVER_RANGE, REFERENCE_ERR, RESERVED(7)] value: -3",
+            ),
+        ];
+
+        for (actual, expected) in cases {
+            assert_eq!(actual, expected);
+        }
+    }
+
+    #[test]
     fn formats_binary_flags() {
         assert_eq!(format!("{}", BinaryFlagFormatter::new(0)), "0x00 []");
         assert_eq!(

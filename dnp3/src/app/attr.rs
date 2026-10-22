@@ -1665,6 +1665,50 @@ mod test {
     use super::*;
 
     #[test]
+    fn each_value_reports_its_data_type() {
+        let owned = [
+            (
+                OwnedAttrValue::VisibleString("a".to_string()),
+                AttrDataType::VisibleString,
+            ),
+            (OwnedAttrValue::UnsignedInt(1), AttrDataType::UnsignedInt),
+            (OwnedAttrValue::SignedInt(-1), AttrDataType::SignedInt),
+            (
+                OwnedAttrValue::FloatingPoint(FloatType::F32(1.0)),
+                AttrDataType::FloatingPoint,
+            ),
+            (
+                OwnedAttrValue::OctetString(vec![1]),
+                AttrDataType::OctetString,
+            ),
+            (
+                OwnedAttrValue::Dnp3Time(Timestamp::new(1)),
+                AttrDataType::Dnp3Time,
+            ),
+            (OwnedAttrValue::BitString(vec![1]), AttrDataType::BitString),
+        ];
+
+        for (value, data_type) in owned {
+            assert_eq!(value.data_type(), data_type);
+            assert_eq!(value.view().data_type(), data_type);
+            assert_eq!(
+                value.view().expect_attr_list().err(),
+                Some(TypeError::new(AttrDataType::AttrList, data_type))
+            );
+        }
+
+        let list = AttrValue::AttrList(VariationList { data: &[] });
+        assert_eq!(list.data_type(), AttrDataType::AttrList);
+        assert_eq!(
+            list.expect_uint().err(),
+            Some(TypeError::new(
+                AttrDataType::UnsignedInt,
+                AttrDataType::AttrList
+            ))
+        );
+    }
+
+    #[test]
     fn parses_visible_string() {
         let vis_str: &[u8] = &[VISIBLE_STRING, 0x05, b'H', b'E', b'L', b'L', b'O'];
         let mut cursor = ReadCursor::new(vis_str);
