@@ -7,6 +7,7 @@ use crate::app::gen::count::CountVariation;
 use crate::app::gen::prefixed::PrefixedVariation;
 use crate::app::gen::ranged::RangedVariation;
 use crate::app::header::{ControlField, Iin, RequestHeader, ResponseFunction, ResponseHeader};
+use crate::app::measurement::Time;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::range::Range;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
@@ -290,6 +291,40 @@ impl ObjectHeader<'_> {
         }
     }
 
+    /// True if the header carries at least one object
+    pub(crate) fn has_objects(&self) -> bool {
+        match self {
+            ObjectHeader::AllObjects(_) | ObjectHeader::Read(..) => false,
+            // a range covers at least one index, and a free-format header holds one object
+            ObjectHeader::Range(..) | ObjectHeader::FreeFormat(_) => true,
+            ObjectHeader::Count(_, count, _) => *count > 0,
+            ObjectHeader::CountAndPrefix8(count, _) => *count > 0,
+            ObjectHeader::CountAndPrefix16(count, _) => *count > 0,
+        }
+    }
+
+    /// True if the header carries objects whose time is relative to a common time of occurrence
+    fn has_relative_time(&self) -> bool {
+        matches!(
+            self.variation(),
+            Variation::Group2Var3 | Variation::Group4Var3
+        ) && self.has_objects()
+    }
+
+    /// If the header is a common time of occurrence, the one for the headers that follow it
+    pub(crate) fn next_cto(&self, prev: Option<Time>) -> Option<Option<Time>> {
+        let time = match self {
+            ObjectHeader::Count(_, 1, CountVariation::Group51Var1(seq)) => {
+                seq.single().map(|x| Time::Synchronized(x.time))
+            }
+            ObjectHeader::Count(_, 1, CountVariation::Group51Var2(seq)) => {
+                seq.single().map(|x| Time::Unsynchronized(x.time))
+            }
+            _ => return None,
+        };
+        Some(time.or(prev))
+    }
+
     pub(crate) fn format(&self, format_values: bool, f: &mut Formatter) -> std::fmt::Result {
         let variation = self.variation();
         write!(
@@ -367,6 +402,7 @@ pub(crate) struct HeaderCollection<'a> {
     options: ParseOptions,
     function: FunctionCode,
     data: &'a [u8],
+    relative_time_without_cto: Option<Variation>,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -390,8 +426,18 @@ impl<'a> HeaderCollection<'a> {
         data: &'a [u8],
     ) -> Result<Self, ObjectParseError> {
         // we first do a single pass to ensure the ASDU is well-formed, returning an error if it occurs
+        let mut cto = None;
+        let mut relative_time_without_cto = None;
         for result in ObjectParser::one_pass(options, function, data) {
-            result?;
+            let header = result?;
+            if let Some(next) = header.next_cto(cto) {
+                cto = next;
+            } else if cto.is_none()
+                && relative_time_without_cto.is_none()
+                && header.has_relative_time()
+            {
+                relative_time_without_cto = Some(header.variation());
+            }
         }
 
         // the headers are well-formed, so the iterator can read them again in a second pass
@@ -399,7 +445,14 @@ impl<'a> HeaderCollection<'a> {
             options,
             function,
             data,
+            relative_time_without_cto,
         })
+    }
+
+    /// The variation of the first header with objects whose time is relative to a common time of
+    /// occurrence, if no common time of occurrence precedes it
+    pub(crate) fn relative_time_without_cto(&self) -> Option<Variation> {
+        self.relative_time_without_cto
     }
 
     pub(crate) fn is_empty(&self) -> bool {
