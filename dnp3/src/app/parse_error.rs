@@ -45,25 +45,38 @@ pub enum ObjectParseError {
     BadEncoding,
 }
 
+/// Whether an [`ObjectParseError`] means the input is invalid or that the parser doesn't support it
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) enum ParseErrorCause {
+    /// The parser doesn't support what was received, which may be valid
+    Unsupported,
+    /// What was received is encoded incorrectly
+    Invalid,
+    /// Either, depending on the case: e.g. a qualifier the specification disallows for a
+    /// variation, or one it allows that the parser doesn't support
+    UnsupportedOrInvalid,
+}
+
 impl ObjectParseError {
-    /// True if the error means the parser doesn't support what was received, rather than that it
-    /// was encoded incorrectly
-    pub(crate) fn is_unsupported(&self) -> bool {
+    /// Whether the error means the input is invalid or that the parser doesn't support it
+    pub(crate) fn cause(&self) -> ParseErrorCause {
         match self {
             ObjectParseError::UnknownGroupVariation(_, _)
-            | ObjectParseError::InvalidQualifierForVariation(_, _)
-            | ObjectParseError::UnsupportedFreeFormatCount(_) => true,
+            | ObjectParseError::UnsupportedFreeFormatCount(_) => ParseErrorCause::Unsupported,
             #[expect(
                 deprecated,
                 reason = "the mapping must cover every variant until removal"
             )]
-            ObjectParseError::UnsupportedQualifierCode(_) => true,
+            ObjectParseError::UnsupportedQualifierCode(_) => ParseErrorCause::Unsupported,
+            ObjectParseError::InvalidQualifierForVariation(_, _) => {
+                ParseErrorCause::UnsupportedOrInvalid
+            }
             ObjectParseError::UnknownQualifier(_)
             | ObjectParseError::InsufficientBytes
             | ObjectParseError::InvalidRange(_, _)
             | ObjectParseError::ZeroLengthOctetData
             | ObjectParseError::BadAttribute(_)
-            | ObjectParseError::BadEncoding => false,
+            | ObjectParseError::BadEncoding => ParseErrorCause::Invalid,
         }
     }
 }
@@ -214,38 +227,40 @@ mod test {
     use super::*;
 
     #[test]
-    fn classifies_parser_limitations_as_unsupported() {
+    fn classifies_each_error_by_cause() {
+        use ParseErrorCause::*;
+
         #[expect(
             deprecated,
             reason = "the classification covers every variant until removal"
         )]
         let cases = [
-            (ObjectParseError::UnknownGroupVariation(111, 5), true),
+            (ObjectParseError::UnknownGroupVariation(111, 5), Unsupported),
             (
                 ObjectParseError::InvalidQualifierForVariation(
                     Variation::Group111(5),
                     QualifierCode::Range8,
                 ),
-                true,
+                UnsupportedOrInvalid,
             ),
             (
                 ObjectParseError::UnsupportedQualifierCode(QualifierCode::Range8),
-                true,
+                Unsupported,
             ),
-            (ObjectParseError::UnsupportedFreeFormatCount(2), true),
-            (ObjectParseError::UnknownQualifier(0xFF), false),
-            (ObjectParseError::InsufficientBytes, false),
-            (ObjectParseError::InvalidRange(2, 1), false),
-            (ObjectParseError::ZeroLengthOctetData, false),
+            (ObjectParseError::UnsupportedFreeFormatCount(2), Unsupported),
+            (ObjectParseError::UnknownQualifier(0xFF), Invalid),
+            (ObjectParseError::InsufficientBytes, Invalid),
+            (ObjectParseError::InvalidRange(2, 1), Invalid),
+            (ObjectParseError::ZeroLengthOctetData, Invalid),
             (
                 ObjectParseError::BadAttribute(AttrParseError::ReadError),
-                false,
+                Invalid,
             ),
-            (ObjectParseError::BadEncoding, false),
+            (ObjectParseError::BadEncoding, Invalid),
         ];
 
         for (err, expected) in cases {
-            assert_eq!(err.is_unsupported(), expected, "{err:?}");
+            assert_eq!(err.cause(), expected, "{err:?}");
         }
     }
 }

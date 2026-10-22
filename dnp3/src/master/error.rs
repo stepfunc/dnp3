@@ -2,7 +2,7 @@ use std::error::Error;
 
 use crate::app::control::{CommandStatus, ControlCode};
 use crate::app::{Iin, Iin2};
-use crate::app::{ObjectParseError, Shutdown};
+use crate::app::{ObjectParseError, ParseErrorCause, Shutdown};
 use crate::link::error::LinkError;
 use crate::link::EndpointAddress;
 use crate::master::association::NoAssociation;
@@ -235,13 +235,13 @@ impl std::fmt::Display for TaskError {
             }
             TaskError::Link(_) => f.write_str("link-layer or I/O error"),
             TaskError::Transport => f.write_str("malformed response"),
-            TaskError::MalformedResponse(err) => {
-                if err.is_unsupported() {
-                    write!(f, "unsupported response content: {err}")
-                } else {
-                    write!(f, "malformed response: {err}")
+            TaskError::MalformedResponse(err) => match err.cause() {
+                ParseErrorCause::Unsupported => write!(f, "unsupported response content: {err}"),
+                ParseErrorCause::Invalid => write!(f, "malformed response: {err}"),
+                ParseErrorCause::UnsupportedOrInvalid => {
+                    write!(f, "unsupported or invalid response content: {err}")
                 }
-            }
+            },
             TaskError::UnexpectedResponseHeaders => {
                 f.write_str("response contains headers that don't match the request")
             }
@@ -486,13 +486,19 @@ mod test {
     #[test]
     fn task_error_words_parse_failures_by_cause() {
         let unsupported =
-            TaskError::MalformedResponse(ObjectParseError::InvalidQualifierForVariation(
-                Variation::Group111(5),
-                QualifierCode::Range8,
-            ));
+            TaskError::MalformedResponse(ObjectParseError::UnknownGroupVariation(1, 9));
         assert_eq!(
             unsupported.to_string(),
-            "unsupported response content: Group111(5) may not be used with the qualifier: 1-byte start/stop (0x00)"
+            "unsupported response content: unknown group/variation: g1v9"
+        );
+
+        let either = TaskError::MalformedResponse(ObjectParseError::InvalidQualifierForVariation(
+            Variation::Group111(5),
+            QualifierCode::Range8,
+        ));
+        assert_eq!(
+            either.to_string(),
+            "unsupported or invalid response content: Group111(5) may not be used with the qualifier: 1-byte start/stop (0x00)"
         );
 
         let malformed = TaskError::MalformedResponse(ObjectParseError::InsufficientBytes);

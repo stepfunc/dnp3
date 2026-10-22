@@ -182,6 +182,15 @@ pub(crate) enum ReadTask {
     SingleRead(SingleReadTask),
 }
 
+/// How a failed read task is logged
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) enum ReadFailureLog {
+    /// Log a warning that names the cause
+    Warn(TaskError),
+    /// Log nothing
+    Nothing,
+}
+
 /// What a task does after it handles a response
 pub(crate) enum Step<T> {
     /// send the next request
@@ -493,28 +502,67 @@ impl ReadTask {
         }
     }
 
+    /// How a failure of this task is logged. User reads don't log a shutdown or disable, which
+    /// fails every queued read
+    fn failure_log(&self, err: TaskError) -> ReadFailureLog {
+        match self {
+            ReadTask::StartupIntegrity(_) | ReadTask::PeriodicPoll(_) | ReadTask::EventScan(_) => {
+                ReadFailureLog::Warn(err)
+            }
+            ReadTask::SingleRead(_) => match err {
+                TaskError::Shutdown | TaskError::Disabled => ReadFailureLog::Nothing,
+                TaskError::TooManyRequests
+                | TaskError::Link(_)
+                | TaskError::Transport
+                | TaskError::RejectedByIin2(_)
+                | TaskError::MalformedResponse(_)
+                | TaskError::UnexpectedResponseHeaders
+                | TaskError::NonFinWithoutCon
+                | TaskError::NeverReceivedFir
+                | TaskError::UnexpectedFir
+                | TaskError::MultiFragmentResponse
+                | TaskError::ResponseTimeout
+                | TaskError::WriteError
+                | TaskError::BadEncoding(_)
+                | TaskError::NoSuchAssociation(_)
+                | TaskError::NoConnection => ReadFailureLog::Warn(err),
+            },
+        }
+    }
+
+    fn log_failure(&self, err: TaskError) {
+        let ReadFailureLog::Warn(cause) = self.failure_log(err) else {
+            return;
+        };
+        match self {
+            ReadTask::StartupIntegrity(_) => {
+                tracing::warn!("startup integrity scan failed: {cause}")
+            }
+            ReadTask::PeriodicPoll(poll) => tracing::warn!("poll {} failed: {cause}", poll.id),
+            ReadTask::EventScan(_) => tracing::warn!("automatic event scan failed: {cause}"),
+            ReadTask::SingleRead(_) => tracing::warn!("read failed: {cause}"),
+        }
+    }
+
     pub(crate) fn on_task_error(self, association: Option<&mut Association>, err: TaskError) {
+        self.log_failure(err);
         match self {
             ReadTask::StartupIntegrity(_) => {
                 if let Some(association) = association {
-                    association.on_integrity_scan_failure(err);
+                    association.on_integrity_scan_failure();
                 }
             }
             ReadTask::PeriodicPoll(poll) => {
                 if let Some(association) = association {
-                    tracing::warn!("poll {} failed: {err}", poll.id);
                     association.complete_poll(poll.id);
                 }
             }
             ReadTask::EventScan(_) => {
                 if let Some(association) = association {
-                    association.on_event_scan_failure(err);
+                    association.on_event_scan_failure();
                 }
             }
-            ReadTask::SingleRead(task) => {
-                tracing::warn!("read failed: {err}");
-                task.on_task_error(err);
-            }
+            ReadTask::SingleRead(task) => task.on_task_error(err),
         }
     }
 
@@ -621,6 +669,71 @@ impl NonReadTask {
             Self::OpenFile(task) => task.task_type(),
             Self::CloseFile(task) => task.task_type(),
             Self::WriteFileBlock(task) => task.task_type(),
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::time::Duration;
+
+    use super::*;
+    use crate::app::ObjectParseError;
+    use crate::master::request::ReadRequest;
+
+    fn read_tasks() -> [ReadTask; 4] {
+        [
+            ReadTask::StartupIntegrity(Classes::all()),
+            ReadTask::PeriodicPoll(Poll::new(
+                0,
+                ReadRequest::class_scan(Classes::class123()),
+                Duration::from_secs(1),
+            )),
+            ReadTask::EventScan(EventClasses::all()),
+            ReadTask::SingleRead(SingleReadTask::new(
+                ReadRequest::class_scan(Classes::all()),
+                Promise::null(),
+            )),
+        ]
+    }
+
+    #[test]
+    fn every_read_task_warns_with_the_cause() {
+        let causes = [
+            TaskError::MalformedResponse(ObjectParseError::InsufficientBytes),
+            TaskError::ResponseTimeout,
+            TaskError::TooManyRequests,
+            TaskError::NoConnection,
+        ];
+        for task in read_tasks() {
+            for cause in causes {
+                assert_eq!(
+                    task.failure_log(cause),
+                    ReadFailureLog::Warn(cause),
+                    "{:?}",
+                    task.as_task_type()
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn only_user_reads_skip_shutdown_and_disable() {
+        for task in read_tasks() {
+            let user_read = matches!(task, ReadTask::SingleRead(_));
+            for cause in [TaskError::Shutdown, TaskError::Disabled] {
+                let expected = if user_read {
+                    ReadFailureLog::Nothing
+                } else {
+                    ReadFailureLog::Warn(cause)
+                };
+                assert_eq!(
+                    task.failure_log(cause),
+                    expected,
+                    "{:?}",
+                    task.as_task_type()
+                );
+            }
         }
     }
 }
