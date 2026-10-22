@@ -313,6 +313,22 @@ enum UnsolicitedResult {
     ReturnToIdle,
 }
 
+/// What the unsolicited confirm wait expects (IEEE 1815-2012 Table 6-1 rows 20-34)
+struct UnsolicitedWait {
+    /// the sequence number of the unsolicited response
+    seq: Sequence,
+    /// the confirm of a solicited response sent during the wait, if one asked for it
+    solicited: Option<ExpectedConfirm>,
+}
+
+/// A solicited response's confirm, expected until the confirm timeout. The timeout is checked
+/// when a confirm arrives, rather than with a timer
+#[derive(Copy, Clone)]
+struct ExpectedConfirm {
+    ecsn: Sequence,
+    deadline: tokio::time::Instant,
+}
+
 #[derive(Copy, Clone)]
 enum UnsolicitedWaitResult {
     Timeout,
@@ -848,9 +864,18 @@ impl OutstationSession {
 
         let mut deadline = self.new_confirm_deadline();
 
+        // IEEE 1815-2012 Table 6-1 rows 22 and 33 would go on to wait for the solicited confirm
+        // after the unsolicited response's wait ends. This wait never does: confirming a
+        // solicited response from here only clears a broadcast's IIN1.0, while the solicited
+        // confirm wait would settle the unsolicited response's events
+        let mut wait = UnsolicitedWait {
+            seq,
+            solicited: None,
+        };
+
         loop {
             match self
-                .wait_for_unsolicited_confirm(seq, deadline, io, reader, writer, database)
+                .wait_for_unsolicited_confirm(&mut wait, deadline, io, reader, writer, database)
                 .instrument(tracing::info_span!("UnsolConfirmWait", "seq" = seq.value()))
                 .await?
             {
@@ -884,7 +909,7 @@ impl OutstationSession {
 
     async fn wait_for_unsolicited_confirm<T: Transport>(
         &mut self,
-        uns_ecsn: Sequence,
+        wait: &mut UnsolicitedWait,
         deadline: tokio::time::Instant,
         io: &mut PhysLayer,
         reader: &mut TransportReader<T>,
@@ -899,12 +924,16 @@ impl OutstationSession {
         let received = match self.receive(&guard) {
             Intake::Nothing => return Ok(UnsolicitedWaitResult::ReadNext),
             Intake::UnknownFunction(from, seq) => {
+                // like a new request, it ends the wait for a solicited confirm, as it ends the
+                // solicited confirm wait. Its IIN2.0 answer isn't the response to a valid request,
+                // so the outstation doesn't wait for that answer's confirm
+                wait.solicited = None;
                 self.answer_unknown_function(io, writer, from, seq, database)
                     .await?;
                 return Ok(UnsolicitedWaitResult::ReadNext);
             }
             Intake::Confirm(_, header) => {
-                return Ok(self.confirm_in_unsolicited_wait(uns_ecsn, header));
+                return Ok(self.confirm_in_unsolicited_wait(wait, header));
             }
             Intake::Request(received) => received,
         };
@@ -913,8 +942,15 @@ impl OutstationSession {
         let disable = matches!(received.fragment, FragmentType::NewNonRead(..))
             && received.request.header.function == FunctionCode::DisableUnsolicited;
 
-        self.accept(io, writer, database, received, selection, Reads::Defer)
+        // Table 6-1 rows 24-29: a request ends the wait for a solicited confirm, and an answer that
+        // asks for one starts it again
+        let confirm = self
+            .accept(io, writer, database, received, selection, Reads::Defer)
             .await?;
+        wait.solicited = confirm.map(|series| ExpectedConfirm {
+            ecsn: series.ecsn,
+            deadline: self.new_confirm_deadline(),
+        });
 
         if disable {
             // DISABLE_UNSOLICITED ends the unsolicited response series
@@ -928,12 +964,12 @@ impl OutstationSession {
 
     fn confirm_in_unsolicited_wait(
         &mut self,
-        uns_ecsn: Sequence,
+        wait: &mut UnsolicitedWait,
         header: RequestHeader,
     ) -> UnsolicitedWaitResult {
         let seq = header.control.seq;
         if header.control.uns {
-            if seq == uns_ecsn {
+            if seq == wait.seq {
                 self.state.broadcast.confirmed(ResponseKind::Unsolicited);
                 self.info.unsolicited_confirmed(seq);
                 return UnsolicitedWaitResult::Complete(UnsolicitedResult::Confirmed);
@@ -942,8 +978,19 @@ impl OutstationSession {
                 "ignoring unsolicited confirm with wrong sequence number ({})",
                 seq.value()
             );
-        } else if !self.state.broadcast.confirmed(ResponseKind::Solicited) {
-            tracing::warn!("ignoring solicited confirm");
+        } else {
+            // Table 6-1 rows 20, 21 and 30: only the expected confirm, before its timeout
+            let now = tokio::time::Instant::now();
+            wait.solicited.take_if(|expected| now >= expected.deadline);
+            if wait
+                .solicited
+                .take_if(|expected| expected.ecsn == seq)
+                .is_some()
+            {
+                self.state.broadcast.confirmed(ResponseKind::Solicited);
+            } else {
+                tracing::warn!("ignoring solicited confirm with seq: {}", seq.value());
+            }
         }
         UnsolicitedWaitResult::ReadNext
     }
