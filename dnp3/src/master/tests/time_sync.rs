@@ -8,7 +8,9 @@ use tokio::time::Instant;
 use crate::app::format::write::{start_request, start_response};
 use crate::app::variations::{Group50Var1, Group50Var3, Group52Var2};
 use crate::app::Timestamp;
-use crate::app::{ControlField, FunctionCode, Iin, Iin1, Iin2, ResponseFunction, Sequence};
+use crate::app::{
+    ControlField, FunctionCode, Iin, Iin1, Iin2, ObjectParseError, ResponseFunction, Sequence,
+};
 use crate::master::association::AssociationConfig;
 use crate::master::tests::harness::AssocInfoEvent;
 use crate::master::{AssociationHandler, TaskError, TaskType, TimeSyncError, TimeSyncProcedure};
@@ -482,6 +484,56 @@ async fn user_time_sync_that_still_needs_time_fails_and_starts_the_auto_time_syn
             ]
         );
         assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn user_non_lan_time_sync_fails_with_the_cause_when_the_delay_measure_response_does_not_parse(
+) {
+    watchdog(async {
+        let cases: [(&[u8], ObjectParseError); 2] = [
+            // g52v2 cut short after its qualifier
+            (&[52, 2, 0x07], ObjectParseError::InsufficientBytes),
+            // a variation of g52 that doesn't exist
+            (
+                &[52, 9, 0x07, 1, 0x00, 0x00],
+                ObjectParseError::UnknownGroupVariation(52, 9),
+            ),
+        ];
+        for (objects, cause) in cases {
+            let mut harness =
+                create_association_with_handler(config(None), Box::new(FixedTime)).await;
+            let seq = Sequence::default();
+
+            let mut association = harness.association.clone();
+            let sync = tokio::spawn(async move {
+                association
+                    .synchronize_time(TimeSyncProcedure::NonLan)
+                    .await
+            });
+            let mut response = empty_response(seq);
+            response.extend_from_slice(objects);
+            harness
+                .expect_write_and_respond(delay_measure(seq), response)
+                .await;
+
+            let err = TaskError::MalformedResponse(cause);
+            assert_eq!(
+                sync.await.unwrap(),
+                Err(TimeSyncError::Task(err)),
+                "{objects:?}"
+            );
+            assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+            assert_eq!(
+                harness.assoc_events.pop(),
+                [
+                    AssocInfoEvent::TaskStart(TaskType::TimeSync, FunctionCode::DelayMeasure, seq),
+                    AssocInfoEvent::TaskFailure(TaskType::TimeSync, err),
+                ],
+                "{objects:?}"
+            );
+        }
     })
     .await;
 }
