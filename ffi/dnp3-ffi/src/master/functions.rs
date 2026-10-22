@@ -5,8 +5,8 @@ use std::str::Utf8Error;
 use std::time::Duration;
 
 use dnp3::app::{
-    BufferSize, ConnectStrategy, Listener, MaybeAsync, PermissionSet, Permissions, RetryStrategy,
-    Timeout, TimeoutRangeError, Timestamp,
+    BufferSize, ConnectStrategy, Listener, MaybeAsync, ParseErrorCause, PermissionSet, Permissions,
+    RetryStrategy, Timeout, TimeoutRangeError, Timestamp,
 };
 use dnp3::link::{EndpointAddress, SpecialAddressError};
 use dnp3::master::*;
@@ -1382,7 +1382,11 @@ macro_rules! define_task_from_impl {
                     TaskError::TooManyRequests => Self::TooManyRequests,
                     TaskError::Link(_) => Self::NoConnection,
                     TaskError::Transport => Self::NoConnection,
-                    TaskError::MalformedResponse(_) => Self::BadResponse,
+                    TaskError::MalformedResponse(err) => match err.into() {
+                        ParseErrorCause::Unsupported => Self::UnsupportedResponse,
+                        ParseErrorCause::Invalid => Self::BadResponse,
+                        ParseErrorCause::UnsupportedOrInvalid => Self::UnsupportedOrBadResponse,
+                    },
                     TaskError::UnexpectedResponseHeaders => Self::BadResponse,
                     TaskError::NonFinWithoutCon => Self::BadResponse,
                     TaskError::NeverReceivedFir => Self::BadResponse,
