@@ -470,6 +470,74 @@ mod test {
     }
 
     #[test]
+    fn the_first_relative_time_header_with_objects_without_cto_is_reported() {
+        // g2v3 count: 0, g4v3 count: 1, g51v1 count: 1, g2v3 count: 1
+        assert_eq!(
+            validate(&[
+                0x02, 0x03, 0x17, 0x00, 0x04, 0x03, 0x17, 0x01, 0x07, 0x01, 0xFF, 0xFF, 0x33, 0x01,
+                0x07, 0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x03, 0x17, 0x01, 0x07, 0x01,
+                0xFF, 0xFF,
+            ]),
+            Err(InvalidResponse::RelativeTimeWithoutCto(
+                Variation::Group4Var3
+            ))
+        );
+    }
+
+    #[test]
+    fn malformed_objects_after_relative_time_without_cto_are_malformed() {
+        // g2v3 count: 1, then g32v2 count: 1 index: 0, missing its flags and value
+        assert_eq!(
+            validate(&[
+                0x02, 0x03, 0x17, 0x01, 0x07, 0x01, 0xFF, 0xFF, 0x20, 0x02, 0x17, 0x01, 0x00
+            ]),
+            Err(InvalidResponse::Malformed(
+                ObjectParseError::InsufficientBytes
+            ))
+        );
+    }
+
+    #[test]
+    fn relative_time_after_a_cto_with_a_count_other_than_one_is_invalid() {
+        for cto in CTOS_WITH_A_COUNT_OTHER_THAN_ONE {
+            let mut input = cto.to_vec();
+            input.extend(G2V3_INDEX_7);
+
+            assert_eq!(
+                validate(&input),
+                Err(InvalidResponse::RelativeTimeWithoutCto(
+                    Variation::Group2Var3
+                )),
+                "{cto:02X?}"
+            );
+        }
+    }
+
+    #[test]
+    fn cto_with_a_count_other_than_one_does_not_replace_the_previous_cto() {
+        // g51v1 count: 1 time: 2
+        let first = [0x33, 0x01, 0x07, 0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00];
+        for cto in CTOS_WITH_A_COUNT_OTHER_THAN_ONE {
+            let mut input = first.to_vec();
+            input.extend_from_slice(cto);
+            input.extend(G2V3_INDEX_7);
+
+            let (delivered, mut handler) = extract(&input);
+
+            assert!(delivered);
+            assert_eq!(
+                handler.pop(),
+                [Header::Binary(vec![binary(
+                    false,
+                    Some(Time::Synchronized(Timestamp::new(0x1_0001))),
+                    7
+                )])],
+                "{cto:02X?}"
+            );
+        }
+    }
+
+    #[test]
     fn g2v3_with_synchronized_cto_yields_synchronized_time() {
         let mut handler = MockHandler::new();
         let objects = HeaderCollection::parse(
@@ -928,6 +996,20 @@ mod test {
 
     // g2v3, 1-byte count and prefix, index 7, relative time 0xFFFF
     const G2V3_INDEX_7: [u8; 8] = [0x02, 0x03, 0x17, 0x01, 0x07, 0x01, 0xFF, 0xFF];
+
+    /// g51v1 and g51v2 with a count of 0 or 2, at both widths of the count
+    const CTOS_WITH_A_COUNT_OTHER_THAN_ONE: [&[u8]; 4] = [
+        &[0x33, 0x01, 0x07, 0x00],
+        &[0x33, 0x02, 0x08, 0x00, 0x00],
+        &[
+            0x33, 0x01, 0x07, 0x02, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
+            0x00, 0x00,
+        ],
+        &[
+            0x33, 0x02, 0x08, 0x02, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00,
+            0x00, 0x00, 0x00,
+        ],
+    ];
 
     #[test]
     fn cto_with_a_two_byte_count_applies_to_the_next_header() {
