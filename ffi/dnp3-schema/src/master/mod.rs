@@ -661,7 +661,11 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         )?
         .param("file_name", StringType, "Complete path to the remote file")?
         .fails_with(shared.error_type.clone())?
-        .doc("Asynchronously retrieve information on a particular file")?
+        .doc(
+            doc("Asynchronously retrieve information on a particular file").details(
+                "A file name containing a NUL octet that a C string can't hold gives {enum:file_error.bad_response}.",
+            ),
+        )?
         .build()?;
 
     let file_info_iter =
@@ -1188,7 +1192,7 @@ fn define_command_mode(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
     Ok(mode)
 }
 
-const DIRECTORY_RESULT_DETAILS: &str = "The result passed to the callback is the source of truth for the read. Entries that fail to parse after the transfer completes give {enum:file_error.bad_response}, while the {interface:association_information} may still report {enum:task_type.file_read} as a success.";
+const DIRECTORY_RESULT_DETAILS: &str = "The result passed to the callback is the source of truth for the read. Entries that fail to parse after the transfer completes, or a name containing a NUL octet that a C string can't hold, give {enum:file_error.bad_response}, while the {interface:association_information} may still report {enum:task_type.file_read} as a success.";
 
 const TASK_ERRORS: &[(&str, &str)] = &[
     ("too_many_requests", "too many user requests queued"),

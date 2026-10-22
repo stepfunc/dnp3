@@ -152,9 +152,13 @@ impl sfio_promise::FutureType<Result<FileInfo, FileError>> for crate::ffi::FileI
     fn complete(self, result: Result<FileInfo, FileError>) {
         match result {
             Ok(info) => {
-                // this stays validate for the duration of the completion callback allowing
+                // this stays valid for the duration of the completion callback allowing
                 // the C string to be copied
-                let name = CString::new(info.name).unwrap();
+                let Ok(name) = CString::new(info.name) else {
+                    tracing::warn!("File name contains a NUL and can't be passed as a C string");
+                    self.on_failure(ffi::FileError::BadResponse);
+                    return;
+                };
                 let info = ffi::FileInfoFields {
                     file_name: &name,
                     file_type: info.file_type.into(),
@@ -180,10 +184,17 @@ impl sfio_promise::FutureType<Result<Vec<FileInfo>, FileError>>
 
     fn complete(self, result: Result<Vec<FileInfo>, FileError>) {
         match result {
-            Ok(items) => {
-                let mut iter = FileInfoIterator::new(items.into_iter());
-                self.on_complete(&mut iter);
-            }
+            Ok(items) => match FileInfoIterator::new(items) {
+                Some(mut iter) => {
+                    self.on_complete(&mut iter);
+                }
+                None => {
+                    tracing::warn!(
+                        "Directory entry name contains a NUL and can't be passed as a C string"
+                    );
+                    self.on_failure(ffi::FileError::BadResponse);
+                }
+            },
             Err(err) => {
                 self.on_failure(err.into());
             }
