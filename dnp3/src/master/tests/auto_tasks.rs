@@ -187,9 +187,8 @@ async fn need_time_iin_in_a_rejected_response_schedules_time_sync() {
     expect_write_soon(&mut harness, vec![0xC0 | seq.value(), RECORD_CURRENT_TIME]).await;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn rejected_clear_restart_retries_after_the_backoff() {
-    tokio::time::pause();
     let mut seq = Sequence::default();
     let mut harness = create_association(AssociationConfig::quiet()).await;
 
@@ -209,8 +208,7 @@ async fn rejected_clear_restart_retries_after_the_backoff() {
     harness
         .expect_write_and_respond(clear_restart_iin(seq), empty_response(seq.increment()))
         .await;
-    let elapsed = failed.elapsed();
-    assert!(elapsed >= Duration::from_secs(1), "{elapsed:?}");
+    TestHarness::assert_elapsed(failed, Duration::from_secs(1));
     harness.assert_no_events();
 }
 

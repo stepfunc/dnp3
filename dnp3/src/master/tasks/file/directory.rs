@@ -34,19 +34,32 @@ impl FileReader for DirectoryReader {
     }
 
     fn completed(&mut self) {
-        fn parse(data: &[u8]) -> Result<Vec<FileInfo>, FileError> {
+        /// Read every entry in `data`, passing each one to `each`
+        fn read_entries<'a>(
+            data: &'a [u8],
+            mut each: impl FnMut(Group70Var7<'a>),
+        ) -> Result<(), FileError> {
             let mut cursor = ReadCursor::new(data);
-            let mut items = Vec::new();
             while !cursor.is_empty() {
                 match Group70Var7::read(&mut cursor) {
-                    Ok(x) => items.push(x),
+                    Ok(x) => each(x),
                     Err(err) => {
                         tracing::warn!("Error reading directory information: {err}");
                         return Err(FileError::BadResponse);
                     }
                 }
             }
-            Ok(items.into_iter().map(|x| x.into()).collect())
+            Ok(())
+        }
+
+        fn parse(data: &[u8]) -> Result<Vec<FileInfo>, FileError> {
+            // every entry is read before any is converted, so a rejected directory allocates
+            // nothing
+            let mut count: usize = 0;
+            read_entries(data, |_| count = count.saturating_add(1))?;
+            let mut items = Vec::with_capacity(count);
+            read_entries(data, |x| items.push(x.into()))?;
+            Ok(items)
         }
 
         // parse the accumulated data

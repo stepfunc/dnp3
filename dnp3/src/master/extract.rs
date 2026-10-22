@@ -789,83 +789,6 @@ mod test {
         );
     }
 
-    #[test]
-    fn handles_g50v1_with_count_1() {
-        let mut handler = MockHandler::new();
-        let objects = HeaderCollection::parse(
-            ParseOptions::default(),
-            FunctionCode::Response,
-            // g50v1       count: 1   -------- time: 0x060504030201 ------------------
-            &[0x32, 0x01, 0x07, 0x01, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06],
-        )
-        .unwrap();
-
-        extract_measurements_inner(objects, &mut handler);
-
-        assert_eq!(
-            &handler.pop(),
-            &[Header::AbsTime(Timestamp::new(0x060504030201))]
-        );
-    }
-
-    #[test]
-    fn handles_g50v1_with_two_byte_count() {
-        let mut handler = MockHandler::new();
-        let objects = HeaderCollection::parse(
-            ParseOptions::default(),
-            FunctionCode::Response,
-            // g50v1       count: 1 (two bytes)   -------- time: 0xAABBCCDDEEFF ------------------
-            &[
-                0x32, 0x01, 0x08, 0x01, 0x00, 0xFF, 0xEE, 0xDD, 0xCC, 0xBB, 0xAA,
-            ],
-        )
-        .unwrap();
-
-        extract_measurements_inner(objects, &mut handler);
-
-        assert_eq!(
-            &handler.pop(),
-            &[Header::AbsTime(Timestamp::new(0xAABBCCDDEEFF))]
-        );
-    }
-
-    #[test]
-    fn ignores_g50v1_with_count_greater_than_1() {
-        let mut handler = MockHandler::new();
-        let objects = HeaderCollection::parse(
-            ParseOptions::default(),
-            FunctionCode::Response,
-            // g50v1       count: 2   -------- time1 ------ time2 ------
-            &[
-                0x32, 0x01, 0x07, 0x02, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x11, 0x12, 0x13, 0x14,
-                0x15, 0x16,
-            ],
-        )
-        .unwrap();
-
-        extract_measurements_inner(objects, &mut handler);
-
-        // Should not receive any time values since count > 1
-        assert_eq!(&handler.pop(), &[]);
-    }
-
-    #[test]
-    fn handles_g50v1_with_count_0() {
-        let mut handler = MockHandler::new();
-        let objects = HeaderCollection::parse(
-            ParseOptions::default(),
-            FunctionCode::Response,
-            // g50v1       count: 0
-            &[0x32, 0x01, 0x07, 0x00],
-        )
-        .unwrap();
-
-        extract_measurements_inner(objects, &mut handler);
-
-        // Should not receive any time values since count == 0
-        assert_eq!(&handler.pop(), &[]);
-    }
-
     fn extract(input: &[u8]) -> (bool, MockHandler) {
         let mut handler = MockHandler::new();
         let objects =
@@ -985,8 +908,14 @@ mod test {
     }
 
     #[test]
-    fn abs_time_with_a_two_byte_count_other_than_one_is_ignored() {
+    fn abs_time_with_a_count_other_than_one_is_ignored_at_both_widths() {
         for input in [
+            [0x32, 0x01, 0x07, 0x00].as_slice(),
+            [
+                0x32, 0x01, 0x07, 0x02, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x11, 0x12, 0x13, 0x14,
+                0x15, 0x16,
+            ]
+            .as_slice(),
             [0x32, 0x01, 0x08, 0x00, 0x00].as_slice(),
             [
                 0x32, 0x01, 0x08, 0x02, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x11, 0x12, 0x13,

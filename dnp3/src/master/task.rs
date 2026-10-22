@@ -2,7 +2,7 @@ use tracing::Instrument;
 
 use crate::app::format::write;
 use crate::app::parse::parser::Response;
-use crate::app::{BufferSize, ControlField, Iin, Iin1, Iin2, Sequence, Timeout};
+use crate::app::{BufferSize, ControlField, FunctionCode, Iin, Iin1, Iin2, Sequence, Timeout};
 use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
 use crate::link::EndpointAddress;
@@ -775,7 +775,8 @@ impl MasterSession {
         outcome.add(response.header.iin, delivered);
 
         if response.header.control.con {
-            self.confirm_solicited(io, destination, seq, writer).await?;
+            self.send_confirm(io, destination, ControlField::request(seq), writer)
+                .await?;
         }
 
         if response.header.control.fin {
@@ -836,8 +837,8 @@ impl MasterSession {
 
         // Send confirmation if required and wasn't ignored
         if valid && response.header.control.con {
-            self.confirm_unsolicited(io, source, response.header.control.seq, writer)
-                .await?;
+            let control = ControlField::unsolicited(response.header.control.seq);
+            self.send_confirm(io, source, control, writer).await?;
         }
 
         Ok(())
@@ -846,31 +847,16 @@ impl MasterSession {
 
 // Sending methods
 impl MasterSession {
-    async fn confirm_solicited<T: Transport>(
+    /// Send a CONFIRM with this control field: solicited or unsolicited, and its sequence
+    async fn send_confirm<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
         dest: FragmentAddr,
-        seq: Sequence,
+        control: ControlField,
         writer: &mut TransportWriter<T>,
     ) -> Result<(), LinkError> {
         let mut cursor = self.tx_buffer.write_cursor();
-        write::confirm_solicited(seq, &mut cursor)?;
-        writer
-            .write(io, self.decode_level, dest, cursor.written())
-            .await?;
-        Ok(())
-    }
-
-    async fn confirm_unsolicited<T: Transport>(
-        &mut self,
-        io: &mut PhysLayer,
-        dest: FragmentAddr,
-        seq: Sequence,
-        writer: &mut TransportWriter<T>,
-    ) -> Result<(), LinkError> {
-        let mut cursor = self.tx_buffer.write_cursor();
-        write::confirm_unsolicited(seq, &mut cursor)?;
-
+        write::start_request(control, FunctionCode::Confirm, &mut cursor)?;
         writer
             .write(io, self.decode_level, dest, cursor.written())
             .await?;

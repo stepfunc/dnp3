@@ -11,7 +11,7 @@ use crate::app::parse::options::ParseOptions;
 use crate::app::{BufferSize, ControlField, FunctionCode, Iin, ResponseFunction, Sequence};
 use crate::decode::AppDecodeLevel;
 use crate::link::reader::LinkModes;
-use crate::link::{EndpointAddress, LinkErrorMode};
+use crate::link::{EndpointAddress, LinkError, LinkErrorMode};
 use crate::master::association::{Association, AssociationConfig, AssociationMap};
 use crate::master::promise::Promise;
 use crate::master::task::MasterTask;
@@ -27,7 +27,8 @@ use crate::master::{
 };
 use crate::transport::FragmentAddr;
 use crate::util::phys::PhysAddr;
-use crate::util::session::Enabled;
+use crate::util::session::{Enabled, RunError};
+use crate::util::test_support::watchdog;
 
 const NO_ACK: FunctionCode = FunctionCode::DirectOperateNoResponse;
 
@@ -296,22 +297,25 @@ async fn unsolicited_response_is_processed_after_a_queued_batch_drains() {
 
 #[tokio::test]
 async fn operate_no_ack_fails_if_the_write_fails() {
-    let mut harness = quiet_association().await;
+    watchdog(async {
+        let mut harness = quiet_association().await;
 
-    harness.io.write_error(ErrorKind::BrokenPipe);
-    let result = harness.association.operate_no_ack(crob()).await;
-    assert!(matches!(result, Err(TaskError::Link(_))), "{result:?}");
+        harness.io.write_error(ErrorKind::BrokenPipe);
+        let result = harness.association.operate_no_ack(crob()).await;
+        let err = LinkError::Stdio(ErrorKind::BrokenPipe);
+        assert_eq!(result, Err(TaskError::Link(err)));
 
-    let events = harness.assoc_events.pop();
-    assert!(
-        events
-            .iter()
-            .all(|e| !matches!(e, AssocInfoEvent::TaskSuccess(..))),
-        "{events:?}"
-    );
-    assert!(events
-        .iter()
-        .any(|e| matches!(e, AssocInfoEvent::TaskFailure(TaskType::Command, _))));
+        // the link error ends the session
+        assert_eq!((&mut harness.task).await.unwrap(), RunError::Link(err));
+        assert_eq!(
+            harness.assoc_events.pop(),
+            [
+                AssocInfoEvent::TaskStart(TaskType::Command, NO_ACK, Sequence::new(0)),
+                AssocInfoEvent::TaskFailure(TaskType::Command, TaskError::Link(err)),
+            ]
+        );
+    })
+    .await;
 }
 
 #[tokio::test]

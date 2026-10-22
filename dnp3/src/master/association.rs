@@ -162,13 +162,17 @@ impl AutoTaskState {
         !self.is_idle()
     }
 
-    /// Create a `Next<QueuedTask>`
-    fn create_next_task(&self, builder: impl FnOnce() -> QueuedTask) -> Next<QueuedTask> {
+    /// Create a `Next<QueuedTask>`, given the time it is `now`
+    fn create_next_task(
+        &self,
+        now: Instant,
+        builder: impl FnOnce() -> QueuedTask,
+    ) -> Next<QueuedTask> {
         match self {
             Self::Idle => Next::None,
             Self::Pending => Next::Now(builder()),
             Self::Failed(_, next) => {
-                if Instant::now() >= *next {
+                if now >= *next {
                     Next::Now(builder())
                 } else {
                     Next::NotBefore(*next)
@@ -249,15 +253,20 @@ impl TaskStates {
         self.enabled_unsolicited.demand();
     }
 
-    fn next(&self, config: &AssociationConfig, association: &Association) -> Next<QueuedTask> {
+    fn next(
+        &self,
+        now: Instant,
+        config: &AssociationConfig,
+        association: &Association,
+    ) -> Next<QueuedTask> {
         if self.clear_restart_iin.is_pending() {
             return self
                 .clear_restart_iin
-                .create_next_task(|| AutoTask::ClearRestartBit.wrap().into());
+                .create_next_task(now, || AutoTask::ClearRestartBit.wrap().into());
         }
 
         if config.disable_unsol_classes.any() && self.disable_unsolicited.is_pending() {
-            return self.disable_unsolicited.create_next_task(|| {
+            return self.disable_unsolicited.create_next_task(now, || {
                 AutoTask::DisableUnsolicited(config.disable_unsol_classes)
                     .wrap()
                     .into()
@@ -265,7 +274,7 @@ impl TaskStates {
         }
 
         if config.startup_integrity_classes.any() && self.integrity_scan.is_pending() {
-            return self.integrity_scan.create_next_task(|| {
+            return self.integrity_scan.create_next_task(now, || {
                 Task::App(AppTask::Read(ReadTask::StartupIntegrity(
                     config.startup_integrity_classes,
                 )))
@@ -277,12 +286,12 @@ impl TaskStates {
             if let Some(procedure) = config.auto_time_sync {
                 return self
                     .time_sync
-                    .create_next_task(|| PendingTimeSync::auto(procedure).into());
+                    .create_next_task(now, || PendingTimeSync::auto(procedure).into());
             }
         }
 
         if config.enable_unsol_classes.any() && self.enabled_unsolicited.is_pending() {
-            return self.enabled_unsolicited.create_next_task(|| {
+            return self.enabled_unsolicited.create_next_task(now, || {
                 AutoTask::EnableUnsolicited(config.enable_unsol_classes)
                     .wrap()
                     .into()
@@ -293,7 +302,7 @@ impl TaskStates {
         if events_to_scan.any() {
             return self
                 .event_scan
-                .create_next_task(|| ReadTask::EventScan(events_to_scan).wrap().into());
+                .create_next_task(now, || ReadTask::EventScan(events_to_scan).wrap().into());
         }
 
         Next::None
@@ -699,7 +708,7 @@ impl Association {
 
     fn get_next_task(&self, now: Instant) -> Next<QueuedTask> {
         // Check for automatic tasks
-        let next_auto_task = self.auto_tasks.next(&self.config, self);
+        let next_auto_task = self.auto_tasks.next(now, &self.config, self);
 
         // Startup tasks must complete prior to polls to link status requests
         if !matches!(next_auto_task, Next::None) {
@@ -867,20 +876,22 @@ impl AssociationMap {
 mod retry_tests {
     use super::*;
 
-    #[test]
-    fn retry_delays_too_long_to_represent_are_scheduled_far_in_the_future() {
+    #[tokio::test(start_paused = true)]
+    async fn retry_delays_too_long_to_represent_are_scheduled_far_in_the_future() {
         let config = AssociationConfig {
             auto_tasks_retry_strategy: RetryStrategy::new(Duration::MAX, Duration::MAX),
             ..AssociationConfig::default()
         };
 
+        // the clock is paused, so the failures are recorded at this instant
+        let now = Instant::now();
         let mut state = AutoTaskState::Pending;
         // the first failure, then a retry whose delay would double past the maximum
         for _ in 0..2 {
             state.failure(&config);
             assert!(matches!(
-                state.create_next_task(unreachable_task),
-                Next::NotBefore(x) if x > Instant::now()
+                state.create_next_task(now, unreachable_task),
+                Next::NotBefore(x) if x == deadline(now, Duration::MAX)
             ));
         }
     }

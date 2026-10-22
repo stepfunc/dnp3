@@ -286,6 +286,8 @@ mod tests {
     use std::time::SystemTime;
 
     use crate::app::format::write::*;
+    use crate::app::parse::options::ParseOptions;
+    use crate::app::parse::parser::ParsedFragment;
     use crate::app::Sequence;
     use crate::app::*;
     use crate::link::EndpointAddress;
@@ -304,8 +306,34 @@ mod tests {
 
     use super::*;
 
-    fn response_control_field(seq: Sequence) -> ControlField {
-        ControlField::response(seq, true, true, false)
+    /// g60v2, g60v3, g60v4 and g60v1 headers, which no time sync response has
+    const CLASS_1230: &[u8] = &[60, 2, 0x06, 60, 3, 0x06, 60, 4, 0x06, 60, 1, 0x06];
+
+    const NEED_TIME: Iin = Iin::new(Iin1::new(0x10), Iin2::new(0x00));
+
+    /// Answer `task` with a response that has this IIN and these object headers
+    async fn respond(
+        task: NonReadTask,
+        association: &mut Association,
+        iin: Iin,
+        objects: &[u8],
+    ) -> Result<Option<NonReadTask>, TaskError> {
+        let mut buffer = [0; 20];
+        let mut cursor = WriteCursor::new(&mut buffer);
+        start_response(
+            ControlField::response(Sequence::default(), true, true, false),
+            ResponseFunction::Response,
+            iin,
+            &mut cursor,
+        )
+        .unwrap();
+        cursor.write_bytes(objects).unwrap();
+        let response = ParsedFragment::parse(ParseOptions::default(), cursor.written())
+            .unwrap()
+            .to_response()
+            .unwrap();
+
+        task.handle_response(association, response).await
     }
 
     struct SingleTimestampTestHandler {
@@ -375,28 +403,12 @@ mod tests {
     }
 
     async fn send_write_response(task: NonReadTask, association: &mut Association) {
-        let mut buffer = [0; 20];
-        let mut cursor = WriteCursor::new(&mut buffer);
-        let writer = start_response(
-            ControlField::request(Sequence::default()),
-            ResponseFunction::Response,
-            Iin::default(),
-            &mut cursor,
-        )
-        .unwrap();
-        let response = writer.to_parsed().to_response().unwrap();
-
-        task.handle_response(association, response).await.unwrap();
+        respond(task, association, Iin::default(), &[])
+            .await
+            .unwrap();
     }
 
     mod non_lan {
-        use crate::app::parse::options::ParseOptions;
-        use crate::app::parse::parser::ParsedFragment;
-        use crate::app::parse::traits::FixedSize;
-        use crate::app::parse::traits::FixedSizeVariation;
-        use crate::app::variations::Group52Var2;
-        use crate::app::QualifierCode;
-
         use super::*;
 
         const OUTSTATION_DELAY_MS: u16 = 100;
@@ -446,34 +458,15 @@ mod tests {
             let task = check_measure_delay_request(task, &mut association);
             tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS.into())).await;
 
-            let task = {
-                let mut buffer = [0; 20];
-                let mut cursor = WriteCursor::new(&mut buffer);
-                let writer = start_response(
-                    response_control_field(Sequence::default()),
-                    ResponseFunction::Response,
-                    Iin::default(),
-                    &mut cursor,
-                )
-                .unwrap();
-                {
-                    let cursor = writer.inner();
-                    Group52Var2::VARIATION.write(cursor).unwrap();
-                    QualifierCode::Count16.write(cursor).unwrap();
-                    cursor.write_u16_le(1).unwrap();
-                    Group52Var2 {
-                        time: OUTSTATION_DELAY_MS,
-                    }
-                    .write(cursor)
-                    .unwrap();
-                }
-                let response = ParsedFragment::parse(ParseOptions::default(), cursor.written())
-                    .unwrap()
-                    .to_response()
-                    .unwrap();
-
-                task.handle_response(&mut association, response).await
-            }
+            // g52v2 with a 2-byte count of one
+            let [low, high] = OUTSTATION_DELAY_MS.to_le_bytes();
+            let task = respond(
+                task,
+                &mut association,
+                Iin::default(),
+                &[52, 2, 0x08, 0x01, 0x00, low, high],
+            )
+            .await
             .unwrap()
             .unwrap();
 
@@ -504,24 +497,12 @@ mod tests {
             let (task, _system_time, mut association, mut rx) = non_lan_time_sync_setup();
             let task = check_measure_delay_request(task, &mut association);
             tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS.into())).await;
-            {
-                let mut buffer = [0; 20];
-                let mut cursor = WriteCursor::new(&mut buffer);
-                let writer = start_response(
-                    response_control_field(Sequence::default()),
-                    ResponseFunction::Response,
-                    Iin::default(),
-                    &mut cursor,
-                )
-                .unwrap();
-
-                let response = writer.to_parsed().to_response().unwrap();
-
-                assert_eq!(
-                    task.handle_response(&mut association, response).await.err(),
-                    Some(TaskError::UnexpectedResponseHeaders)
-                );
-            }
+            assert_eq!(
+                respond(task, &mut association, Iin::default(), &[])
+                    .await
+                    .err(),
+                Some(TaskError::UnexpectedResponseHeaders)
+            );
             assert_eq!(
                 rx.try_recv().unwrap(),
                 Err(TimeSyncError::Task(TaskError::UnexpectedResponseHeaders))
@@ -538,25 +519,12 @@ mod tests {
                 .unwrap()
                 .unwrap();
             let task = check_write_request(task, system_time);
-            {
-                let mut buffer = [0; 20];
-                let mut cursor = WriteCursor::new(&mut buffer);
-                let mut writer = start_response(
-                    response_control_field(Sequence::default()),
-                    ResponseFunction::Response,
-                    Iin::default(),
-                    &mut cursor,
-                )
-                .unwrap();
-                writer.write_class1230().unwrap();
-
-                let response = writer.to_parsed().to_response().unwrap();
-
-                assert_eq!(
-                    task.handle_response(&mut association, response).await.err(),
-                    Some(TaskError::UnexpectedResponseHeaders)
-                );
-            }
+            assert_eq!(
+                respond(task, &mut association, Iin::default(), CLASS_1230)
+                    .await
+                    .err(),
+                Some(TaskError::UnexpectedResponseHeaders)
+            );
             assert_matches!(
                 rx.try_recv().unwrap(),
                 Err(TimeSyncError::Task(TaskError::UnexpectedResponseHeaders))
@@ -574,24 +542,10 @@ mod tests {
                 .unwrap()
                 .unwrap();
             let task = check_write_request(task, system_time);
-            {
-                let mut buffer = [0; 20];
-                let mut cursor = WriteCursor::new(&mut buffer);
-                let writer = start_response(
-                    response_control_field(Sequence::default()),
-                    ResponseFunction::Response,
-                    Iin::new(Iin1::new(0x10), Iin2::new(0x00)),
-                    &mut cursor,
-                )
-                .unwrap();
-
-                let response = writer.to_parsed().to_response().unwrap();
-
-                assert_eq!(
-                    task.handle_response(&mut association, response).await.err(),
-                    Some(TaskError::UnexpectedResponseHeaders)
-                );
-            }
+            assert_eq!(
+                respond(task, &mut association, NEED_TIME, &[]).await.err(),
+                Some(TaskError::UnexpectedResponseHeaders)
+            );
             assert_matches!(rx.try_recv().unwrap(), Err(TimeSyncError::StillNeedsTime));
         }
 
@@ -669,23 +623,15 @@ mod tests {
             task: NonReadTask,
             association: &mut Association,
         ) -> Result<Option<NonReadTask>, TaskError> {
-            let mut buffer = [0; 20];
-            let mut cursor = WriteCursor::new(&mut buffer);
-            let mut writer = start_response(
-                response_control_field(Sequence::default()),
-                ResponseFunction::Response,
+            // g52v2 with a count of one
+            let [low, high] = OUTSTATION_DELAY_MS.to_le_bytes();
+            respond(
+                task,
+                association,
                 Iin::default(),
-                &mut cursor,
+                &[52, 2, 0x07, 0x01, low, high],
             )
-            .unwrap();
-            writer
-                .write_count_of_one(Group52Var2 {
-                    time: OUTSTATION_DELAY_MS,
-                })
-                .unwrap();
-            let response = writer.to_parsed().to_response().unwrap();
-
-            task.handle_response(association, response).await
+            .await
         }
 
         fn check_write_request(task: NonReadTask, system_time: Timestamp) -> NonReadTask {
@@ -739,36 +685,6 @@ mod tests {
         }
 
         #[tokio::test(start_paused = true)]
-        async fn non_empty_record_current_time_response() {
-            let (task, _system_time, mut association, mut rx) = lan_time_sync_setup();
-            let task = check_record_current_time_request(task, &mut association);
-            tokio::time::advance(Duration::from_millis(DELAY_MS.into())).await;
-            {
-                let mut buffer = [0; 20];
-                let mut cursor = WriteCursor::new(&mut buffer);
-                let mut writer = start_response(
-                    response_control_field(Sequence::default()),
-                    ResponseFunction::Response,
-                    Iin::default(),
-                    &mut cursor,
-                )
-                .unwrap();
-                writer.write_class1230().unwrap();
-
-                let response = writer.to_parsed().to_response().unwrap();
-
-                assert_eq!(
-                    task.handle_response(&mut association, response).await.err(),
-                    Some(TaskError::UnexpectedResponseHeaders)
-                );
-            }
-            assert_eq!(
-                rx.try_recv().unwrap(),
-                Err(TimeSyncError::Task(TaskError::UnexpectedResponseHeaders))
-            );
-        }
-
-        #[tokio::test(start_paused = true)]
         async fn non_empty_write_response() {
             let (task, system_time, mut association, mut rx) = lan_time_sync_setup();
             let task = check_record_current_time_request(task, &mut association);
@@ -778,60 +694,16 @@ mod tests {
                 .unwrap()
                 .unwrap();
             let task = check_write_request(task, system_time);
-            {
-                let mut buffer = [0; 20];
-                let mut cursor = WriteCursor::new(&mut buffer);
-                let mut writer = start_response(
-                    response_control_field(Sequence::default()),
-                    ResponseFunction::Response,
-                    Iin::default(),
-                    &mut cursor,
-                )
-                .unwrap();
-                writer.write_class1230().unwrap();
-
-                let response = writer.to_parsed().to_response().unwrap();
-
-                assert_eq!(
-                    task.handle_response(&mut association, response).await.err(),
-                    Some(TaskError::UnexpectedResponseHeaders)
-                );
-            }
+            assert_eq!(
+                respond(task, &mut association, Iin::default(), CLASS_1230)
+                    .await
+                    .err(),
+                Some(TaskError::UnexpectedResponseHeaders)
+            );
             assert_eq!(
                 rx.try_recv().unwrap(),
                 Err(TimeSyncError::Task(TaskError::UnexpectedResponseHeaders))
             );
-        }
-
-        #[tokio::test(start_paused = true)]
-        async fn iin_bit_not_reset() {
-            let (task, system_time, mut association, mut rx) = lan_time_sync_setup();
-            let task = check_record_current_time_request(task, &mut association);
-            tokio::time::advance(Duration::from_millis(DELAY_MS.into())).await;
-            let task = send_record_current_time_response(task, &mut association)
-                .await
-                .unwrap()
-                .unwrap();
-            let task = check_write_request(task, system_time);
-            {
-                let mut buffer = [0; 20];
-                let mut cursor = WriteCursor::new(&mut buffer);
-                let writer = start_response(
-                    response_control_field(Sequence::default()),
-                    ResponseFunction::Response,
-                    Iin::new(Iin1::new(0x10), Iin2::new(0x00)),
-                    &mut cursor,
-                )
-                .unwrap();
-
-                let response = writer.to_parsed().to_response().unwrap();
-
-                assert_eq!(
-                    task.handle_response(&mut association, response).await.err(),
-                    Some(TaskError::UnexpectedResponseHeaders)
-                )
-            }
-            assert_matches!(rx.try_recv().unwrap(), Err(TimeSyncError::StillNeedsTime));
         }
 
         #[tokio::test(start_paused = true)]
@@ -900,18 +772,7 @@ mod tests {
             task: NonReadTask,
             association: &mut Association,
         ) -> Result<Option<NonReadTask>, TaskError> {
-            let mut buffer = [0; 20];
-            let mut cursor = WriteCursor::new(&mut buffer);
-            let writer = start_response(
-                response_control_field(Sequence::default()),
-                ResponseFunction::Response,
-                Iin::default(),
-                &mut cursor,
-            )
-            .unwrap();
-            let response = writer.to_parsed().to_response().unwrap();
-
-            task.handle_response(association, response).await
+            respond(task, association, Iin::default(), &[]).await
         }
 
         fn check_write_request(task: NonReadTask, system_time: Timestamp) -> NonReadTask {

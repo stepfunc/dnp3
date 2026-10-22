@@ -5,7 +5,6 @@ use crate::app::header::{Iin, ResponseFunction, ResponseHeader};
 #[cfg(test)]
 use crate::app::parse::parser::ParsedFragment;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
-use crate::app::sequence::Sequence;
 use crate::app::variations::Variation;
 use crate::app::{FunctionCode, QualifierCode};
 
@@ -39,11 +38,6 @@ pub(crate) fn start_response<'a, 'b>(
 }
 
 impl<'a, 'b> HeaderWriter<'a, 'b> {
-    #[cfg(test)]
-    pub(crate) fn inner(self) -> &'b mut WriteCursor<'a> {
-        self.cursor
-    }
-
     #[cfg(test)]
     pub(crate) fn write_class1230(&mut self) -> Result<(), scursor::WriteError> {
         self.write_all_objects_header(Variation::Group60Var2)?;
@@ -177,25 +171,6 @@ impl<'a, 'b> HeaderWriter<'a, 'b> {
         )
         .unwrap()
     }
-}
-
-pub(crate) fn confirm_solicited(
-    seq: Sequence,
-    cursor: &mut WriteCursor,
-) -> Result<(), scursor::WriteError> {
-    start_request(ControlField::request(seq), FunctionCode::Confirm, cursor).map(|_| {})
-}
-
-pub(crate) fn confirm_unsolicited(
-    seq: Sequence,
-    cursor: &mut WriteCursor,
-) -> Result<(), scursor::WriteError> {
-    start_request(
-        ControlField::unsolicited(seq),
-        FunctionCode::Confirm,
-        cursor,
-    )
-    .map(|_| {})
 }
 
 impl Variation {

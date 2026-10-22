@@ -142,6 +142,25 @@ async fn duplicate_unsolicited_response_is_confirmed_without_processing() {
             AssocInfoEvent::Unsolicited(true, seq)
         ]
     );
+
+    // the same sequence with different data, then the same data with a different sequence, aren't
+    // duplicates
+    let next = Sequence::new(4);
+    for (seq, value) in [(seq, 43), (next, 43)] {
+        harness
+            .read_and_expect_write(unsol_with_data(seq, value, false), unsol_confirm(seq))
+            .await;
+        assert_eq!(
+            harness.read_events.pop(),
+            fragment(&[ReadEvent::AnalogInput]),
+            "{seq:?} {value}"
+        );
+        assert_eq!(
+            harness.assoc_events.pop(),
+            vec![AssocInfoEvent::Unsolicited(false, seq)],
+            "{seq:?} {value}"
+        );
+    }
 }
 
 #[tokio::test]
