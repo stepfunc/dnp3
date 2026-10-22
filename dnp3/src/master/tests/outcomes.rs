@@ -1729,34 +1729,44 @@ async fn directory_read_over_its_size_limit_fails_the_read_but_not_the_task() {
 
 #[tokio::test(start_paused = true)]
 async fn directory_read_with_unparseable_entries_fails_the_read_but_not_the_task() {
+    // a g70v7 entry for a file named "f", followed by a byte that isn't an entry
+    const ENTRY_THEN_JUNK: &[u8] = &[
+        20, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, b'f', 0x01,
+    ];
     watchdog(async {
-        let mut harness = create_association(AssociationConfig::quiet()).await;
-        let reply = start_directory_read(
-            &mut harness,
-            DirReadConfig::default(),
-            None,
-            FunctionCode::OpenFile,
-        )
-        .await;
-        respond(
-            &mut harness,
-            file_status_response(0, HANDLE, 1, 512, FileStatus::Success),
-        )
-        .await;
-        next_request(&mut harness, 1, FunctionCode::Read).await;
-        respond(
-            &mut harness,
-            file_transport_response(1, HANDLE, last_block(0), &[0x01]),
-        )
-        .await;
-        assert_eq!(reply.await.unwrap(), Err(FileError::BadResponse));
-        next_request(&mut harness, 2, FunctionCode::CloseFile).await;
-        respond(
-            &mut harness,
-            file_status_response(2, HANDLE, 0, 0, FileStatus::Success),
-        )
-        .await;
-        expect_directory_task_success(&mut harness, 2).await;
+        for data in [[0x01].as_slice(), ENTRY_THEN_JUNK] {
+            let mut harness = create_association(AssociationConfig::quiet()).await;
+            let reply = start_directory_read(
+                &mut harness,
+                DirReadConfig::default(),
+                None,
+                FunctionCode::OpenFile,
+            )
+            .await;
+            respond(
+                &mut harness,
+                file_status_response(0, HANDLE, 1, 512, FileStatus::Success),
+            )
+            .await;
+            next_request(&mut harness, 1, FunctionCode::Read).await;
+            respond(
+                &mut harness,
+                file_transport_response(1, HANDLE, last_block(0), data),
+            )
+            .await;
+            assert_eq!(
+                reply.await.unwrap(),
+                Err(FileError::BadResponse),
+                "{data:?}"
+            );
+            next_request(&mut harness, 2, FunctionCode::CloseFile).await;
+            respond(
+                &mut harness,
+                file_status_response(2, HANDLE, 0, 0, FileStatus::Success),
+            )
+            .await;
+            expect_directory_task_success(&mut harness, 2).await;
+        }
     })
     .await;
 }
