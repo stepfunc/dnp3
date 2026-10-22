@@ -320,11 +320,9 @@ impl LastUnsolFragment {
 /// and responses for multiple associations (i.e. multi-drop).
 pub(crate) struct Association {
     address: FragmentAddr,
-    response_timeout: Timeout,
     seq: Sequence,
     last_unsol_frag: Option<LastUnsolFragment>,
     request_queue: VecDeque<QueuedTask>,
-    max_request_queue_size: usize,
     auto_tasks: TaskStates,
     read_handler: Box<dyn ReadHandler>,
     assoc_handler: Box<dyn AssociationHandler>,
@@ -346,23 +344,15 @@ impl Association {
     ) -> Self {
         let now = Instant::now();
 
-        Self {
-            response_timeout: config.response_timeout,
+        Self::create(
             address,
-            seq: Sequence::default(),
-            last_unsol_frag: None,
-            request_queue: VecDeque::new(),
-            max_request_queue_size: config.max_queued_user_requests,
-            auto_tasks: TaskStates::new(),
+            config,
             read_handler,
             assoc_handler,
             assoc_info,
-            config,
-            polls: PollMap::new(),
-            next_link_status_deadline: config.keep_alive_timeout.map(|delay| deadline(now, delay)),
-            startup_integrity_done: false,
-            events_available: EventClasses::none(),
-        }
+            PollMap::new(),
+            config.keep_alive_timeout.map(|delay| deadline(now, delay)),
+        )
     }
 
     #[cfg(feature = "unstable")]
@@ -373,20 +363,38 @@ impl Association {
         assoc_handler: Box<dyn AssociationHandler>,
         assoc_info: Box<dyn AssociationInformation>,
     ) -> Self {
+        Self::create(
+            address,
+            config,
+            read_handler,
+            assoc_handler,
+            assoc_info,
+            PollMap::new_deferred(),
+            None,
+        )
+    }
+
+    fn create(
+        address: FragmentAddr,
+        config: AssociationConfig,
+        read_handler: Box<dyn ReadHandler>,
+        assoc_handler: Box<dyn AssociationHandler>,
+        assoc_info: Box<dyn AssociationInformation>,
+        polls: PollMap,
+        next_link_status_deadline: Option<Instant>,
+    ) -> Self {
         Self {
-            response_timeout: config.response_timeout,
             address,
             seq: Sequence::default(),
             last_unsol_frag: None,
             request_queue: VecDeque::new(),
-            max_request_queue_size: config.max_queued_user_requests,
             auto_tasks: TaskStates::new(),
             read_handler,
             assoc_handler,
             assoc_info,
             config,
-            polls: PollMap::new_deferred(),
-            next_link_status_deadline: None,
+            polls,
+            next_link_status_deadline,
             startup_integrity_done: false,
             events_available: EventClasses::none(),
         }
@@ -411,7 +419,7 @@ impl Association {
         match msg {
             AssociationMsgType::QueueTask(task) => {
                 if is_connected {
-                    if self.request_queue.len() < self.max_request_queue_size {
+                    if self.request_queue.len() < self.config.max_queued_user_requests {
                         self.request_queue.push_back(task);
                     } else {
                         task.on_task_error(Some(self), TaskError::TooManyRequests);
@@ -747,7 +755,7 @@ impl AssociationMap {
 
     pub(crate) fn get_timeout(&self, address: EndpointAddress) -> Result<Timeout, TaskError> {
         match self.map.get(&address) {
-            Some(x) => Ok(x.response_timeout),
+            Some(x) => Ok(x.config.response_timeout),
             None => Err(TaskError::NoSuchAssociation(address)),
         }
     }
