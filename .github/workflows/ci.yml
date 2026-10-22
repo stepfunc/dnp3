@@ -59,8 +59,8 @@ jobs:
           components: clippy
       - name: Build the workspace with the features
         run: cargo build --release -p dnp3 -p dnp3-ffi -p dnp3-ffi-java ${{ matrix.feature-args }}
-      - name: Clippy the core crate with the features
-        run: cargo clippy -p dnp3 ${{ matrix.feature-args }} -- -D warnings
+      - name: Clippy the core crate and its tests with the features
+        run: cargo clippy -p dnp3 --all-targets ${{ matrix.feature-args }} -- -D warnings
   # Check the workspace with the minimum supported Rust version declared in Cargo.toml
   msrv:
     runs-on: ubuntu-latest
