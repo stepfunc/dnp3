@@ -15,12 +15,15 @@
 //!   out or was rejected, is rescheduled the same way and isn't retried sooner.
 //! - Demanding a poll runs it at once, and its next run is one period after that run completes. A
 //!   removed poll never runs again.
-//! - Of several polls, the one due first runs first. Polls due at the same time run in the order
-//!   they were added.
+//! - When the master is free, the poll that comes due first runs first. Polls that come due at
+//!   the same time, or that are already due when the master becomes free, run in the order they
+//!   were added, whichever came due first.
 //! - With a keep-alive timeout, the master sends `REQUEST_LINK_STATUS` once nothing has been
 //!   received from the outstation for that long, and not before.
-//! - Any frame received from the outstation restarts that period: a response, an unsolicited
-//!   response, a `LINK_STATUS` reply or a link-layer request. A malformed fragment doesn't.
+//! - The period restarts whenever the master receives a parsed response (solicited or
+//!   unsolicited) or a link-layer message (a `LINK_STATUS` reply or a link-layer request) from the
+//!   outstation. A malformed fragment, or a transport segment that doesn't complete a fragment,
+//!   doesn't restart it.
 //! - An unanswered keep-alive is sent again after each response timeout, until it's answered.
 //! - Between tasks the master sleeps until the next one is due. It doesn't spin, so the paused
 //!   clock keeps advancing; a test that would spin fails on the watchdog.
@@ -38,10 +41,10 @@ use crate::link::{EndpointAddress, LinkErrorMode};
 use crate::master::association::AssociationConfig;
 use crate::master::task::MasterTask;
 use crate::master::tests::harness::requests::{
-    class_scan_request, empty_response_custom_iin, unsol_null,
+    class_scan_request, empty_response, empty_response_custom_iin, unsol_null,
 };
 use crate::master::tests::link_frames::{
-    app_data, fragment, header_only, null, LINK_STATUS, MASTER, OTHER, OUTSTATION,
+    app_data, fragment, header_only, null, segment, LINK_STATUS, MASTER, OTHER, OUTSTATION,
     REQUEST_LINK_STATUS,
 };
 use crate::master::{
@@ -441,7 +444,7 @@ async fn a_removed_poll_never_runs_again() {
 }
 
 #[tokio::test(start_paused = true)]
-async fn the_poll_due_first_runs_first_and_polls_due_together_run_in_the_order_added() {
+async fn the_poll_that_comes_due_first_runs_first_and_polls_due_together_run_in_the_order_added() {
     watchdog(async {
         let mut harness = Harness::new();
         let mut a = harness.add(A, quiet(1)).await;
@@ -461,6 +464,40 @@ async fn the_poll_due_first_runs_first_and_polls_due_together_run_in_the_order_a
                 // both are due
                 (secs(20), read(A, class(1))),
                 (secs(20), read(A, class(2))),
+            ],
+        )
+        .await;
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn polls_already_due_when_the_master_becomes_free_run_in_the_order_added() {
+    watchdog(async {
+        let mut harness = Harness::new();
+        let mut a = harness.add(A, quiet(10)).await;
+        let _polls = [
+            add_poll(&mut a, class(1), secs(10)).await,
+            add_poll(&mut a, class(2), secs(4)).await,
+        ];
+
+        // a user read keeps the master busy from 3 s to 12 s, while both polls come due: the
+        // second at 4 s, the first at 10 s
+        tokio::time::advance(secs(3)).await;
+        let user_read = spawn_read(&a, class(0));
+        assert_eq!(harness.next().await, (secs(3), read(A, class(0))));
+        tokio::time::advance(secs(9)).await;
+        harness.respond().await;
+        assert_eq!(user_read.await.unwrap(), Ok(()));
+
+        expect_answered(
+            &mut harness,
+            &[
+                (secs(12), read(A, class(1))),
+                (secs(12), read(A, class(2))),
+                (secs(16), read(A, class(2))),
+                (secs(20), read(A, class(2))),
+                (secs(22), read(A, class(1))),
             ],
         )
         .await;
@@ -514,7 +551,7 @@ async fn keep_alive_requests_link_status_after_the_link_is_silent_for_the_timeou
 }
 
 #[tokio::test(start_paused = true)]
-async fn any_frame_from_the_outstation_restarts_the_keep_alive_period() {
+async fn responses_and_link_layer_messages_from_the_outstation_restart_the_keep_alive_period() {
     watchdog(async {
         let mut harness = Harness::new();
         let a = harness.add(A, keep_alive(1, secs(10))).await;
@@ -547,7 +584,13 @@ async fn any_frame_from_the_outstation_restarts_the_keep_alive_period() {
         // a malformed fragment doesn't count
         tokio::time::advance(secs(5)).await;
         harness.receive(&fragment(A, &[0xC0, 0x81, 0x00])).await;
-        assert_eq!(harness.next().await, (secs(54), Sent::LinkStatus(A)));
+        expect_answered(&mut harness, &[(secs(54), Sent::LinkStatus(A))]).await;
+
+        // nor does a first segment that doesn't complete a fragment
+        tokio::time::advance(secs(5)).await;
+        let data = empty_response(Sequence::new(0));
+        harness.receive(&segment(A, true, false, 0, &data)).await;
+        assert_eq!(harness.next().await, (secs(64), Sent::LinkStatus(A)));
     })
     .await;
 }

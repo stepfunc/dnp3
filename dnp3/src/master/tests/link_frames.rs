@@ -43,7 +43,13 @@ pub(super) const LINK_STATUS: u8 = 0x0B;
 pub(super) const REQUEST_LINK_STATUS: u8 = 0x49;
 
 /// A data frame from an outstation to the master carrying one transport segment
-fn segment(source: EndpointAddress, fir: bool, fin: bool, seq: u8, data: &[u8]) -> Vec<u8> {
+pub(super) fn segment(
+    source: EndpointAddress,
+    fir: bool,
+    fin: bool,
+    seq: u8,
+    data: &[u8],
+) -> Vec<u8> {
     let header = Header::unconfirmed_user_data(false, MASTER.wrap(), source.wrap());
     let transport = crate::transport::real::header::Header::new(
         fin,
