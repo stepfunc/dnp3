@@ -1,12 +1,17 @@
 use crate::app::measurement::*;
 use crate::app::variations::Group41Var2;
-use crate::app::{FunctionCode, Timestamp};
+use crate::app::{BufferSize, FunctionCode, Timestamp};
 use crate::link::header::BroadcastConfirmMode;
 use crate::outstation::database::*;
 use crate::outstation::tests::harness::*;
 use crate::outstation::traits::{BroadcastAction, OperateType};
 
+// g30v1, 16-bit start/stop, 0 to 149, then class 1 events
+const READ_G30V1_0_TO_149_AND_CLASS_1: &[u8] = &[
+    0xC0, 0x01, 0x1E, 0x01, 0x01, 0x00, 0x00, 0x95, 0x00, 0x3C, 0x02, 0x06,
+];
 const CONFIRM_SEQ_0: &[u8] = &[0xC0, 0x00];
+const CONFIRM_SEQ_1: &[u8] = &[0xC1, 0x00];
 const DELAY_MEASURE_SEQ_0: &[u8] = &[0xC0, 0x17];
 const RECORD_CURRENT_TIME_SEQ_1: &[u8] = &[0xC1, 0x18];
 // restart IIN, no objects
@@ -30,6 +35,47 @@ async fn direct_operate(harness: &mut OutstationHarness) {
         Event::Operate(G41V2_INDEX_7, OperateType::DirectOperate),
         Event::EndControls,
     ]);
+}
+
+#[tokio::test]
+async fn repeated_read_during_a_later_fragment_resends_that_fragment() {
+    let mut config = get_default_config();
+    config.solicited_buffer_size = BufferSize::min();
+    let mut harness = new_harness(config);
+
+    // g30v1 values for several fragments, and an event that changes the length of the first
+    harness.handle.database.transaction(|db| {
+        for index in 0..150 {
+            db.add(index, None, AnalogInputConfig::default());
+        }
+        db.add(0, Some(EventClass::Class1), BinaryInputConfig::default());
+        db.update(
+            0,
+            &BinaryInput::new(true, Flags::ONLINE, Time::Synchronized(Timestamp::new(0))),
+            UpdateOptions::default(),
+        );
+    });
+
+    harness
+        .send_and_process(READ_G30V1_0_TO_149_AND_CLASS_1)
+        .await;
+    let first = harness.expect_write().await;
+    harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
+
+    harness.send_and_process(CONFIRM_SEQ_0).await;
+    let second = harness.expect_write().await;
+    assert_eq!(&second[0..2], &[0x21, 0x81]); // CON, seq 1
+    assert_ne!(first.len(), second.len());
+
+    harness
+        .send_and_process(READ_G30V1_0_TO_149_AND_CLASS_1)
+        .await;
+    harness.expect_response(&second).await;
+
+    // still waiting for the confirm of the second fragment
+    harness.send_and_process(CONFIRM_SEQ_1).await;
+    let third = harness.expect_write().await;
+    assert_eq!(third[0] & 0x0F, 2);
 }
 
 #[tokio::test]
