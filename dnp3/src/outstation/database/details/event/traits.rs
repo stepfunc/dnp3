@@ -1,338 +1,149 @@
 use crate::app::measurement::*;
+use crate::app::parse::traits::FixedSizeVariation;
 use crate::app::variations::*;
 use crate::outstation::database::config::*;
-use crate::outstation::database::details::event::write_fn::{
-    write_cto, write_fixed_size, Continue,
-};
-use crate::outstation::database::details::event::writer::HeaderType;
+use crate::outstation::database::details::event::write_fn::ToVariationCto;
 
-use scursor::{WriteCursor, WriteError};
+/// A variation of events of type `T`
+pub(crate) trait EventVariation<T>: Copy {
+    /// apply the encoder to the type the variation is encoded as
+    ///
+    /// Each variation names the type once, and its group and variation, its encoding and whether
+    /// its time is relative to a CTO all come from that type.
+    fn encode<E>(self, encoder: E) -> E::Output
+    where
+        E: Encoder<T>;
+}
 
-use super::write_fn::write_octet_string;
+/// Something done with an event, given how its variation is encoded
+pub(crate) trait Encoder<T> {
+    type Output;
 
-#[derive(Copy, Clone, PartialEq, Eq)]
-pub(crate) struct OctetStringLength(pub(crate) usize);
+    /// a fixed-size variation
+    fn fixed<V>(self) -> Self::Output
+    where
+        V: FixedSizeVariation,
+        T: ToVariation<V>;
 
-pub(crate) trait EventVariation<T> {
-    fn write(
-        &self,
-        cursor: &mut WriteCursor,
-        event: &T,
-        index: u16,
-        cto: Time,
-    ) -> Result<Continue, WriteError>;
-    fn wrap(&self) -> HeaderType;
-    fn get_group_var(&self, event: &T) -> Result<(u8, u8), WriteError>;
-    fn uses_cto(&self) -> bool {
-        false
-    }
+    /// a fixed-size variation whose time is relative to a common time object (CTO)
+    fn cto<V>(self) -> Self::Output
+    where
+        V: FixedSizeVariation,
+        T: ToVariationCto<V>;
+
+    /// an octet string, whose variation is its length
+    fn octet_string(self) -> Self::Output
+    where
+        T: AsRef<[u8]>;
 }
 
 impl EventVariation<BinaryInput> for EventBinaryInputVariation {
-    fn write(
-        &self,
-        cursor: &mut WriteCursor,
-        event: &BinaryInput,
-        index: u16,
-        cto: Time,
-    ) -> Result<Continue, WriteError> {
+    fn encode<E>(self, encoder: E) -> E::Output
+    where
+        E: Encoder<BinaryInput>,
+    {
         match self {
-            Self::Group2Var1 => {
-                write_fixed_size::<Group2Var1, BinaryInput>(cursor, event, index, cto)
-            }
-            Self::Group2Var2 => {
-                write_fixed_size::<Group2Var2, BinaryInput>(cursor, event, index, cto)
-            }
-            Self::Group2Var3 => write_cto::<Group2Var3, BinaryInput>(cursor, event, index, cto),
+            Self::Group2Var1 => encoder.fixed::<Group2Var1>(),
+            Self::Group2Var2 => encoder.fixed::<Group2Var2>(),
+            Self::Group2Var3 => encoder.cto::<Group2Var3>(),
         }
-    }
-
-    fn wrap(&self) -> HeaderType {
-        HeaderType::Binary(*self)
-    }
-
-    fn get_group_var(&self, _event: &BinaryInput) -> Result<(u8, u8), WriteError> {
-        Ok(match self {
-            Self::Group2Var1 => (2, 1),
-            Self::Group2Var2 => (2, 2),
-            Self::Group2Var3 => (2, 3),
-        })
-    }
-
-    fn uses_cto(&self) -> bool {
-        std::matches!(self, Self::Group2Var3)
-    }
-}
-
-impl EventVariation<BinaryOutputStatus> for EventBinaryOutputStatusVariation {
-    fn write(
-        &self,
-        cursor: &mut WriteCursor,
-        event: &BinaryOutputStatus,
-        index: u16,
-        cto: Time,
-    ) -> Result<Continue, WriteError> {
-        match self {
-            Self::Group11Var1 => {
-                write_fixed_size::<Group11Var1, BinaryOutputStatus>(cursor, event, index, cto)
-            }
-            Self::Group11Var2 => {
-                write_fixed_size::<Group11Var2, BinaryOutputStatus>(cursor, event, index, cto)
-            }
-        }
-    }
-
-    fn wrap(&self) -> HeaderType {
-        HeaderType::BinaryOutputStatus(*self)
-    }
-
-    fn get_group_var(&self, _event: &BinaryOutputStatus) -> Result<(u8, u8), WriteError> {
-        Ok(match self {
-            Self::Group11Var1 => (11, 1),
-            Self::Group11Var2 => (11, 2),
-        })
     }
 }
 
 impl EventVariation<DoubleBitBinaryInput> for EventDoubleBitBinaryInputVariation {
-    fn write(
-        &self,
-        cursor: &mut WriteCursor,
-        event: &DoubleBitBinaryInput,
-        index: u16,
-        cto: Time,
-    ) -> Result<Continue, WriteError> {
+    fn encode<E>(self, encoder: E) -> E::Output
+    where
+        E: Encoder<DoubleBitBinaryInput>,
+    {
         match self {
-            Self::Group4Var1 => {
-                write_fixed_size::<Group4Var1, DoubleBitBinaryInput>(cursor, event, index, cto)
-            }
-            Self::Group4Var2 => {
-                write_fixed_size::<Group4Var2, DoubleBitBinaryInput>(cursor, event, index, cto)
-            }
-            Self::Group4Var3 => {
-                write_cto::<Group4Var3, DoubleBitBinaryInput>(cursor, event, index, cto)
-            }
+            Self::Group4Var1 => encoder.fixed::<Group4Var1>(),
+            Self::Group4Var2 => encoder.fixed::<Group4Var2>(),
+            Self::Group4Var3 => encoder.cto::<Group4Var3>(),
         }
     }
+}
 
-    fn wrap(&self) -> HeaderType {
-        HeaderType::DoubleBitBinary(*self)
-    }
-
-    fn get_group_var(&self, _event: &DoubleBitBinaryInput) -> Result<(u8, u8), WriteError> {
-        Ok(match self {
-            Self::Group4Var1 => (4, 1),
-            Self::Group4Var2 => (4, 2),
-            Self::Group4Var3 => (4, 3),
-        })
-    }
-
-    fn uses_cto(&self) -> bool {
-        std::matches!(self, Self::Group4Var3)
+impl EventVariation<BinaryOutputStatus> for EventBinaryOutputStatusVariation {
+    fn encode<E>(self, encoder: E) -> E::Output
+    where
+        E: Encoder<BinaryOutputStatus>,
+    {
+        match self {
+            Self::Group11Var1 => encoder.fixed::<Group11Var1>(),
+            Self::Group11Var2 => encoder.fixed::<Group11Var2>(),
+        }
     }
 }
 
 impl EventVariation<Counter> for EventCounterVariation {
-    fn write(
-        &self,
-        cursor: &mut WriteCursor,
-        event: &Counter,
-        index: u16,
-        cto: Time,
-    ) -> Result<Continue, WriteError> {
+    fn encode<E>(self, encoder: E) -> E::Output
+    where
+        E: Encoder<Counter>,
+    {
         match self {
-            Self::Group22Var1 => {
-                write_fixed_size::<Group22Var1, Counter>(cursor, event, index, cto)
-            }
-            Self::Group22Var2 => {
-                write_fixed_size::<Group22Var2, Counter>(cursor, event, index, cto)
-            }
-            Self::Group22Var5 => {
-                write_fixed_size::<Group22Var5, Counter>(cursor, event, index, cto)
-            }
-            Self::Group22Var6 => {
-                write_fixed_size::<Group22Var6, Counter>(cursor, event, index, cto)
-            }
+            Self::Group22Var1 => encoder.fixed::<Group22Var1>(),
+            Self::Group22Var2 => encoder.fixed::<Group22Var2>(),
+            Self::Group22Var5 => encoder.fixed::<Group22Var5>(),
+            Self::Group22Var6 => encoder.fixed::<Group22Var6>(),
         }
-    }
-
-    fn wrap(&self) -> HeaderType {
-        HeaderType::Counter(*self)
-    }
-
-    fn get_group_var(&self, _event: &Counter) -> Result<(u8, u8), WriteError> {
-        Ok(match self {
-            Self::Group22Var1 => (22, 1),
-            Self::Group22Var2 => (22, 2),
-            Self::Group22Var5 => (22, 5),
-            Self::Group22Var6 => (22, 6),
-        })
     }
 }
 
 impl EventVariation<FrozenCounter> for EventFrozenCounterVariation {
-    fn write(
-        &self,
-        cursor: &mut WriteCursor,
-        event: &FrozenCounter,
-        index: u16,
-        cto: Time,
-    ) -> Result<Continue, WriteError> {
+    fn encode<E>(self, encoder: E) -> E::Output
+    where
+        E: Encoder<FrozenCounter>,
+    {
         match self {
-            Self::Group23Var1 => {
-                write_fixed_size::<Group23Var1, FrozenCounter>(cursor, event, index, cto)
-            }
-            Self::Group23Var2 => {
-                write_fixed_size::<Group23Var2, FrozenCounter>(cursor, event, index, cto)
-            }
-            Self::Group23Var5 => {
-                write_fixed_size::<Group23Var5, FrozenCounter>(cursor, event, index, cto)
-            }
-            Self::Group23Var6 => {
-                write_fixed_size::<Group23Var6, FrozenCounter>(cursor, event, index, cto)
-            }
+            Self::Group23Var1 => encoder.fixed::<Group23Var1>(),
+            Self::Group23Var2 => encoder.fixed::<Group23Var2>(),
+            Self::Group23Var5 => encoder.fixed::<Group23Var5>(),
+            Self::Group23Var6 => encoder.fixed::<Group23Var6>(),
         }
-    }
-
-    fn wrap(&self) -> HeaderType {
-        HeaderType::FrozenCounter(*self)
-    }
-
-    fn get_group_var(&self, _event: &FrozenCounter) -> Result<(u8, u8), WriteError> {
-        Ok(match self {
-            Self::Group23Var1 => (23, 1),
-            Self::Group23Var2 => (23, 2),
-            Self::Group23Var5 => (23, 5),
-            Self::Group23Var6 => (23, 6),
-        })
     }
 }
 
 impl EventVariation<AnalogInput> for EventAnalogInputVariation {
-    fn write(
-        &self,
-        cursor: &mut WriteCursor,
-        event: &AnalogInput,
-        index: u16,
-        cto: Time,
-    ) -> Result<Continue, WriteError> {
+    fn encode<E>(self, encoder: E) -> E::Output
+    where
+        E: Encoder<AnalogInput>,
+    {
         match self {
-            Self::Group32Var1 => {
-                write_fixed_size::<Group32Var1, AnalogInput>(cursor, event, index, cto)
-            }
-            Self::Group32Var2 => {
-                write_fixed_size::<Group32Var2, AnalogInput>(cursor, event, index, cto)
-            }
-            Self::Group32Var3 => {
-                write_fixed_size::<Group32Var3, AnalogInput>(cursor, event, index, cto)
-            }
-            Self::Group32Var4 => {
-                write_fixed_size::<Group32Var4, AnalogInput>(cursor, event, index, cto)
-            }
-            Self::Group32Var5 => {
-                write_fixed_size::<Group32Var5, AnalogInput>(cursor, event, index, cto)
-            }
-            Self::Group32Var6 => {
-                write_fixed_size::<Group32Var6, AnalogInput>(cursor, event, index, cto)
-            }
-            Self::Group32Var7 => {
-                write_fixed_size::<Group32Var7, AnalogInput>(cursor, event, index, cto)
-            }
-            Self::Group32Var8 => {
-                write_fixed_size::<Group32Var8, AnalogInput>(cursor, event, index, cto)
-            }
+            Self::Group32Var1 => encoder.fixed::<Group32Var1>(),
+            Self::Group32Var2 => encoder.fixed::<Group32Var2>(),
+            Self::Group32Var3 => encoder.fixed::<Group32Var3>(),
+            Self::Group32Var4 => encoder.fixed::<Group32Var4>(),
+            Self::Group32Var5 => encoder.fixed::<Group32Var5>(),
+            Self::Group32Var6 => encoder.fixed::<Group32Var6>(),
+            Self::Group32Var7 => encoder.fixed::<Group32Var7>(),
+            Self::Group32Var8 => encoder.fixed::<Group32Var8>(),
         }
-    }
-
-    fn wrap(&self) -> HeaderType {
-        HeaderType::Analog(*self)
-    }
-
-    fn get_group_var(&self, _event: &AnalogInput) -> Result<(u8, u8), WriteError> {
-        Ok(match self {
-            Self::Group32Var1 => (32, 1),
-            Self::Group32Var2 => (32, 2),
-            Self::Group32Var3 => (32, 3),
-            Self::Group32Var4 => (32, 4),
-            Self::Group32Var5 => (32, 5),
-            Self::Group32Var6 => (32, 6),
-            Self::Group32Var7 => (32, 7),
-            Self::Group32Var8 => (32, 8),
-        })
     }
 }
 
 impl EventVariation<AnalogOutputStatus> for EventAnalogOutputStatusVariation {
-    fn write(
-        &self,
-        cursor: &mut WriteCursor,
-        event: &AnalogOutputStatus,
-        index: u16,
-        cto: Time,
-    ) -> Result<Continue, WriteError> {
+    fn encode<E>(self, encoder: E) -> E::Output
+    where
+        E: Encoder<AnalogOutputStatus>,
+    {
         match self {
-            Self::Group42Var1 => {
-                write_fixed_size::<Group42Var1, AnalogOutputStatus>(cursor, event, index, cto)
-            }
-            Self::Group42Var2 => {
-                write_fixed_size::<Group42Var2, AnalogOutputStatus>(cursor, event, index, cto)
-            }
-            Self::Group42Var3 => {
-                write_fixed_size::<Group42Var3, AnalogOutputStatus>(cursor, event, index, cto)
-            }
-            Self::Group42Var4 => {
-                write_fixed_size::<Group42Var4, AnalogOutputStatus>(cursor, event, index, cto)
-            }
-            Self::Group42Var5 => {
-                write_fixed_size::<Group42Var5, AnalogOutputStatus>(cursor, event, index, cto)
-            }
-            Self::Group42Var6 => {
-                write_fixed_size::<Group42Var6, AnalogOutputStatus>(cursor, event, index, cto)
-            }
-            Self::Group42Var7 => {
-                write_fixed_size::<Group42Var7, AnalogOutputStatus>(cursor, event, index, cto)
-            }
-            Self::Group42Var8 => {
-                write_fixed_size::<Group42Var8, AnalogOutputStatus>(cursor, event, index, cto)
-            }
+            Self::Group42Var1 => encoder.fixed::<Group42Var1>(),
+            Self::Group42Var2 => encoder.fixed::<Group42Var2>(),
+            Self::Group42Var3 => encoder.fixed::<Group42Var3>(),
+            Self::Group42Var4 => encoder.fixed::<Group42Var4>(),
+            Self::Group42Var5 => encoder.fixed::<Group42Var5>(),
+            Self::Group42Var6 => encoder.fixed::<Group42Var6>(),
+            Self::Group42Var7 => encoder.fixed::<Group42Var7>(),
+            Self::Group42Var8 => encoder.fixed::<Group42Var8>(),
         }
-    }
-
-    fn wrap(&self) -> HeaderType {
-        HeaderType::AnalogOutputStatus(*self)
-    }
-
-    fn get_group_var(&self, _event: &AnalogOutputStatus) -> Result<(u8, u8), WriteError> {
-        Ok(match self {
-            Self::Group42Var1 => (42, 1),
-            Self::Group42Var2 => (42, 2),
-            Self::Group42Var3 => (42, 3),
-            Self::Group42Var4 => (42, 4),
-            Self::Group42Var5 => (42, 5),
-            Self::Group42Var6 => (42, 6),
-            Self::Group42Var7 => (42, 7),
-            Self::Group42Var8 => (42, 8),
-        })
     }
 }
 
-impl EventVariation<Box<[u8]>> for OctetStringLength {
-    fn write(
-        &self,
-        cursor: &mut WriteCursor,
-        event: &Box<[u8]>,
-        index: u16,
-        _cto: Time,
-    ) -> Result<Continue, WriteError> {
-        write_octet_string(cursor, event, index)
-    }
-
-    fn wrap(&self) -> HeaderType {
-        HeaderType::OctetString(*self)
-    }
-
-    fn get_group_var(&self, event: &Box<[u8]>) -> Result<(u8, u8), WriteError> {
-        let len = u8::try_from(event.len()).map_err(|_| WriteError::NumericOverflow)?;
-        Ok((111, len))
+impl EventVariation<Box<[u8]>> for EventOctetStringVariation {
+    fn encode<E>(self, encoder: E) -> E::Output
+    where
+        E: Encoder<Box<[u8]>>,
+    {
+        encoder.octet_string()
     }
 }

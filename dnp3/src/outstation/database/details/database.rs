@@ -1,9 +1,8 @@
 use crate::app::Iin2;
 use crate::master::EventClasses;
 use crate::outstation::database::details::event::buffer::{EventBuffer, InsertError};
-use crate::outstation::database::details::range::static_db::{
-    PointConfig, StaticDatabase, Updatable, UpdatableFlags,
-};
+use crate::outstation::database::details::family::{Family, UpdatableFlags};
+use crate::outstation::database::details::range::static_db::{PointConfig, StaticDatabase};
 use crate::outstation::database::read::{EventReadHeader, ReadHeader};
 use crate::outstation::database::{
     ClassZeroConfig, EventBufferConfig, ResponseInfo, UpdateFlagsType, UpdateInfo, UpdateOptions,
@@ -109,7 +108,7 @@ impl Database {
 
     fn is_missing<T>(&self) -> bool
     where
-        T: Updatable,
+        T: Family,
     {
         !self.static_db.has_points::<T>() && !self.event_buffer.has_events::<T>()
     }
@@ -124,21 +123,21 @@ impl Database {
 
     pub(crate) fn add<T>(&mut self, index: u16, config: PointConfig<T>) -> bool
     where
-        T: Updatable,
+        T: Family,
     {
         self.static_db.add(index, config)
     }
 
     pub(crate) fn remove<T>(&mut self, index: u16) -> bool
     where
-        T: Updatable,
+        T: Family,
     {
         self.static_db.remove::<T>(index)
     }
 
     pub(crate) fn get<T>(&self, index: u16) -> Option<T>
     where
-        T: Updatable,
+        T: Family,
     {
         self.static_db.get::<T>(index)
     }
@@ -194,7 +193,7 @@ impl Database {
 
     pub(crate) fn update<T>(&mut self, value: &T, index: u16, options: UpdateOptions) -> UpdateInfo
     where
-        T: Updatable,
+        T: Family,
     {
         let (exists, event_data) = self.static_db.update(value, index, options);
 

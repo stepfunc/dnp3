@@ -6,7 +6,7 @@ use crate::app::measurement::*;
 use crate::app::Iin2;
 use crate::outstation::config::OutstationConfig;
 use crate::outstation::database::config::*;
-use crate::outstation::database::details::event::buffer::Insertable;
+use crate::outstation::database::details::family::Family;
 use crate::outstation::database::details::range::traits::StaticVariation;
 use crate::outstation::database::details::range::writer::RangeWriter;
 use crate::outstation::database::details::WriteProgress;
@@ -19,22 +19,9 @@ use scursor::WriteCursor;
 
 pub(crate) trait EventDetector<T>
 where
-    T: Updatable,
+    T: Family,
 {
     fn is_event(&self, new: &T, old: &T) -> bool;
-}
-
-pub(crate) trait Updatable: Insertable + Clone + Default {
-    type StaticVariation: StaticVariation<Self>;
-    type Detector: EventDetector<Self>;
-    fn get_map(maps: &StaticDatabase) -> &PointMap<Self>;
-    fn get_mut_map(maps: &mut StaticDatabase) -> &mut PointMap<Self>;
-    fn wrap(range: IndexRange, variation: Option<Self::StaticVariation>) -> VariationRange;
-    fn enabled_class_zero(config: &ClassZeroConfig) -> bool;
-}
-
-pub(crate) trait UpdatableFlags: Updatable {
-    fn update_flags(&mut self, flags: Flags, time: Option<Time>);
 }
 
 #[derive(Copy, Clone)]
@@ -112,7 +99,7 @@ impl SpecificVariation {
 
 pub(crate) struct PointConfig<T>
 where
-    T: Updatable,
+    T: Family,
 {
     class: Option<EventClass>,
     detector: T::Detector,
@@ -122,7 +109,7 @@ where
 
 impl<T> PointConfig<T>
 where
-    T: Updatable,
+    T: Family,
 {
     pub(crate) fn new(
         class: Option<EventClass>,
@@ -141,7 +128,7 @@ where
 
 pub(crate) struct Point<T>
 where
-    T: Updatable,
+    T: Family,
 {
     // current value
     current: T,
@@ -155,7 +142,7 @@ where
 
 impl<T> Point<T>
 where
-    T: Updatable + Default,
+    T: Family + Default,
 {
     pub(crate) fn new(config: PointConfig<T>) -> Self {
         Self {
@@ -169,14 +156,14 @@ where
 
 pub(crate) struct PointMap<T>
 where
-    T: Updatable,
+    T: Family,
 {
     inner: BTreeMap<u16, Point<T>>,
 }
 
 impl<T> PointMap<T>
 where
-    T: Updatable,
+    T: Family,
 {
     fn empty() -> Self {
         Self {
@@ -230,7 +217,7 @@ where
             // this allows the outstation to send consistent snapshot of the values when a multi-fragment response is required
             point.selected = point.current.clone();
         }
-        T::wrap(range, variation)
+        T::selection(variation).with(range)
     }
 
     fn select_all(&mut self) -> Option<VariationRange> {
@@ -252,14 +239,14 @@ pub(crate) struct StaticDatabase {
     class_zero: ClassZeroConfig,
     selected: BoundedQueue<VariationRange>,
     // maps for the various types
-    binary: PointMap<BinaryInput>,
-    double_bit_binary: PointMap<DoubleBitBinaryInput>,
-    binary_output_status: PointMap<BinaryOutputStatus>,
-    counter: PointMap<Counter>,
-    frozen_counter: PointMap<FrozenCounter>,
-    analog: PointMap<AnalogInput>,
-    analog_output_status: PointMap<AnalogOutputStatus>,
-    octet_strings: PointMap<OctetString>,
+    pub(crate) binary: PointMap<BinaryInput>,
+    pub(crate) double_bit_binary: PointMap<DoubleBitBinaryInput>,
+    pub(crate) binary_output_status: PointMap<BinaryOutputStatus>,
+    pub(crate) counter: PointMap<Counter>,
+    pub(crate) frozen_counter: PointMap<FrozenCounter>,
+    pub(crate) analog: PointMap<AnalogInput>,
+    pub(crate) analog_output_status: PointMap<AnalogOutputStatus>,
+    pub(crate) octet_strings: PointMap<OctetString>,
 }
 
 impl Default for StaticDatabase {
@@ -317,7 +304,7 @@ impl StaticDatabase {
 
     pub(crate) fn add<T>(&mut self, index: u16, config: PointConfig<T>) -> bool
     where
-        T: Updatable,
+        T: Family,
     {
         let map = self.get_mut_map::<T>();
 
@@ -332,14 +319,14 @@ impl StaticDatabase {
 
     pub(crate) fn remove<T>(&mut self, index: u16) -> bool
     where
-        T: Updatable,
+        T: Family,
     {
         self.get_mut_map::<T>().inner.remove(&index).is_some()
     }
 
     pub(crate) fn get<T>(&self, index: u16) -> Option<T>
     where
-        T: Updatable,
+        T: Family,
     {
         self.get_map::<T>()
             .inner
@@ -354,7 +341,7 @@ impl StaticDatabase {
         options: UpdateOptions,
     ) -> (bool, Option<(T::EventVariation, EventClass)>)
     where
-        T: Updatable,
+        T: Family,
     {
         match self.get_mut_map::<T>().get_mut(index) {
             None => (false, None),
@@ -449,7 +436,7 @@ impl StaticDatabase {
         variation: Option<T::StaticVariation>,
     ) -> Result<(), VariationRange>
     where
-        T: Updatable,
+        T: Family,
     {
         let mut writer = RangeWriter::new();
         for (index, item) in self.get_map::<T>().inner.range(range) {
@@ -461,7 +448,7 @@ impl StaticDatabase {
 
             if writer.write(cursor, *index, &item.selected, info).is_err() {
                 // ran out of space, tell calling code to resume at this index
-                return Err(T::wrap(IndexRange::new(*index, range.stop), variation));
+                return Err(T::selection(variation).with(IndexRange::new(*index, range.stop)));
             }
         }
 
@@ -552,9 +539,9 @@ impl StaticDatabase {
         range: Option<IndexRange>,
     ) -> Iin2
     where
-        T: Updatable,
+        T: Family,
     {
-        let map = T::get_mut_map(self);
+        let map = T::points_mut(self);
 
         let (selected, iin2) = match range {
             Some(range) => match map.check_range(range) {
@@ -574,7 +561,7 @@ impl StaticDatabase {
     /// true if at least one point of the type is installed
     pub(crate) fn has_points<T>(&self) -> bool
     where
-        T: Updatable,
+        T: Family,
     {
         !self.get_map::<T>().inner.is_empty()
     }
@@ -588,24 +575,24 @@ impl StaticDatabase {
 
     fn get_map<T>(&self) -> &PointMap<T>
     where
-        T: Updatable,
+        T: Family,
     {
-        T::get_map(self)
+        T::points(self)
     }
 
     fn get_mut_map<T>(&mut self) -> &mut PointMap<T>
     where
-        T: Updatable,
+        T: Family,
     {
-        T::get_mut_map(self)
+        T::points_mut(self)
     }
 
     fn select_class_zero_type<T>(&mut self) -> Iin2
     where
-        T: Updatable,
+        T: Family,
     {
-        if T::enabled_class_zero(&self.class_zero) {
-            match T::get_mut_map(self).select_all() {
+        if T::in_class_zero(&self.class_zero) {
+            match T::points_mut(self).select_all() {
                 None => Iin2::default(),
                 Some(full_range) => self.push_selection(full_range),
             }
@@ -673,20 +660,12 @@ impl<N: Distance> Deadband<N> {
     }
 }
 
-impl EventDetector<BinaryInput> for FlagsDetector {
-    fn is_event(&self, new: &BinaryInput, old: &BinaryInput) -> bool {
-        new.get_wire_flags() != old.get_wire_flags()
-    }
-}
-
-impl EventDetector<BinaryOutputStatus> for FlagsDetector {
-    fn is_event(&self, new: &BinaryOutputStatus, old: &BinaryOutputStatus) -> bool {
-        new.get_wire_flags() != old.get_wire_flags()
-    }
-}
-
-impl EventDetector<DoubleBitBinaryInput> for FlagsDetector {
-    fn is_event(&self, new: &DoubleBitBinaryInput, old: &DoubleBitBinaryInput) -> bool {
+/// the state of a binary type is one of its wire flags
+impl<T> EventDetector<T> for FlagsDetector
+where
+    T: Family + WireFlags,
+{
+    fn is_event(&self, new: &T, old: &T) -> bool {
         new.get_wire_flags() != old.get_wire_flags()
     }
 }
@@ -721,7 +700,7 @@ impl HasValue<f64> for AnalogOutputStatus {
 
 impl<T, N> EventDetector<T> for Deadband<N>
 where
-    T: Updatable + HasValue<N> + WireFlags,
+    T: Family + HasValue<N> + WireFlags,
     N: Distance,
 {
     fn is_event(&self, new: &T, old: &T) -> bool {
@@ -736,268 +715,6 @@ where
 impl EventDetector<OctetString> for OctetStringDetector {
     fn is_event(&self, new: &OctetString, old: &OctetString) -> bool {
         new.value() != old.value()
-    }
-}
-
-impl Updatable for BinaryInput {
-    type StaticVariation = StaticBinaryInputVariation;
-    type Detector = FlagsDetector;
-
-    fn get_map(maps: &StaticDatabase) -> &PointMap<Self> {
-        &maps.binary
-    }
-
-    fn get_mut_map(maps: &mut StaticDatabase) -> &mut PointMap<Self> {
-        &mut maps.binary
-    }
-
-    fn wrap(range: IndexRange, variation: Option<Self::StaticVariation>) -> VariationRange {
-        SpecificVariation::Binary(variation).with(range)
-    }
-
-    fn enabled_class_zero(config: &ClassZeroConfig) -> bool {
-        config.binary
-    }
-}
-
-impl UpdatableFlags for BinaryInput {
-    fn update_flags(&mut self, flags: Flags, time: Option<Time>) {
-        self.flags = flags;
-        self.time = time;
-    }
-}
-
-impl Updatable for DoubleBitBinaryInput {
-    type StaticVariation = StaticDoubleBitBinaryInputVariation;
-    type Detector = FlagsDetector;
-
-    fn get_map(maps: &StaticDatabase) -> &PointMap<Self> {
-        &maps.double_bit_binary
-    }
-
-    fn get_mut_map(maps: &mut StaticDatabase) -> &mut PointMap<Self> {
-        &mut maps.double_bit_binary
-    }
-
-    fn wrap(range: IndexRange, variation: Option<Self::StaticVariation>) -> VariationRange {
-        SpecificVariation::DoubleBitBinary(variation).with(range)
-    }
-
-    fn enabled_class_zero(config: &ClassZeroConfig) -> bool {
-        config.double_bit_binary
-    }
-}
-
-impl UpdatableFlags for DoubleBitBinaryInput {
-    fn update_flags(&mut self, flags: Flags, time: Option<Time>) {
-        self.flags = flags;
-        self.time = time;
-    }
-}
-
-impl Updatable for BinaryOutputStatus {
-    type StaticVariation = StaticBinaryOutputStatusVariation;
-    type Detector = FlagsDetector;
-
-    fn get_map(maps: &StaticDatabase) -> &PointMap<Self> {
-        &maps.binary_output_status
-    }
-
-    fn get_mut_map(maps: &mut StaticDatabase) -> &mut PointMap<Self> {
-        &mut maps.binary_output_status
-    }
-
-    fn wrap(range: IndexRange, variation: Option<Self::StaticVariation>) -> VariationRange {
-        SpecificVariation::BinaryOutputStatus(variation).with(range)
-    }
-
-    fn enabled_class_zero(config: &ClassZeroConfig) -> bool {
-        config.binary_output_status
-    }
-}
-
-impl UpdatableFlags for BinaryOutputStatus {
-    fn update_flags(&mut self, flags: Flags, time: Option<Time>) {
-        self.flags = flags;
-        self.time = time;
-    }
-}
-impl Updatable for Counter {
-    type StaticVariation = StaticCounterVariation;
-    type Detector = Deadband<u32>;
-
-    fn get_map(maps: &StaticDatabase) -> &PointMap<Self> {
-        &maps.counter
-    }
-
-    fn get_mut_map(maps: &mut StaticDatabase) -> &mut PointMap<Self> {
-        &mut maps.counter
-    }
-
-    fn wrap(range: IndexRange, variation: Option<Self::StaticVariation>) -> VariationRange {
-        SpecificVariation::Counter(variation).with(range)
-    }
-
-    fn enabled_class_zero(config: &ClassZeroConfig) -> bool {
-        config.counter
-    }
-}
-
-impl UpdatableFlags for Counter {
-    fn update_flags(&mut self, flags: Flags, time: Option<Time>) {
-        self.flags = flags;
-        self.time = time;
-    }
-}
-
-impl Updatable for FrozenCounter {
-    type StaticVariation = StaticFrozenCounterVariation;
-    type Detector = Deadband<u32>;
-
-    fn get_map(maps: &StaticDatabase) -> &PointMap<Self> {
-        &maps.frozen_counter
-    }
-
-    fn get_mut_map(maps: &mut StaticDatabase) -> &mut PointMap<Self> {
-        &mut maps.frozen_counter
-    }
-
-    fn wrap(range: IndexRange, variation: Option<Self::StaticVariation>) -> VariationRange {
-        SpecificVariation::FrozenCounter(variation).with(range)
-    }
-
-    fn enabled_class_zero(config: &ClassZeroConfig) -> bool {
-        config.frozen_counter
-    }
-}
-
-impl UpdatableFlags for FrozenCounter {
-    fn update_flags(&mut self, flags: Flags, time: Option<Time>) {
-        self.flags = flags;
-        self.time = time;
-    }
-}
-
-impl Updatable for AnalogInput {
-    type StaticVariation = StaticAnalogInputVariation;
-    type Detector = Deadband<f64>;
-
-    fn get_map(maps: &StaticDatabase) -> &PointMap<Self> {
-        &maps.analog
-    }
-
-    fn get_mut_map(maps: &mut StaticDatabase) -> &mut PointMap<Self> {
-        &mut maps.analog
-    }
-
-    fn wrap(range: IndexRange, variation: Option<Self::StaticVariation>) -> VariationRange {
-        SpecificVariation::Analog(variation).with(range)
-    }
-
-    fn enabled_class_zero(config: &ClassZeroConfig) -> bool {
-        config.analog
-    }
-}
-
-impl UpdatableFlags for AnalogInput {
-    fn update_flags(&mut self, flags: Flags, time: Option<Time>) {
-        self.flags = flags;
-        self.time = time;
-    }
-}
-
-impl Updatable for AnalogOutputStatus {
-    type StaticVariation = StaticAnalogOutputStatusVariation;
-    type Detector = Deadband<f64>;
-
-    fn get_map(maps: &StaticDatabase) -> &PointMap<Self> {
-        &maps.analog_output_status
-    }
-
-    fn get_mut_map(maps: &mut StaticDatabase) -> &mut PointMap<Self> {
-        &mut maps.analog_output_status
-    }
-
-    fn wrap(range: IndexRange, variation: Option<Self::StaticVariation>) -> VariationRange {
-        SpecificVariation::AnalogOutputStatus(variation).with(range)
-    }
-
-    fn enabled_class_zero(config: &ClassZeroConfig) -> bool {
-        config.analog_output_status
-    }
-}
-
-impl UpdatableFlags for AnalogOutputStatus {
-    fn update_flags(&mut self, flags: Flags, time: Option<Time>) {
-        self.flags = flags;
-        self.time = time;
-    }
-}
-
-impl Updatable for OctetString {
-    type StaticVariation = StaticOctetStringVariation;
-    type Detector = OctetStringDetector;
-
-    fn get_map(maps: &StaticDatabase) -> &PointMap<Self> {
-        &maps.octet_strings
-    }
-
-    fn get_mut_map(maps: &mut StaticDatabase) -> &mut PointMap<Self> {
-        &mut maps.octet_strings
-    }
-
-    fn wrap(range: IndexRange, _variation: Option<Self::StaticVariation>) -> VariationRange {
-        SpecificVariation::OctetString.with(range)
-    }
-
-    fn enabled_class_zero(config: &ClassZeroConfig) -> bool {
-        config.octet_string
-    }
-}
-
-impl Default for BinaryInput {
-    fn default() -> Self {
-        Self::new(false, Flags::RESTART, Time::unsynchronized(0))
-    }
-}
-
-impl Default for BinaryOutputStatus {
-    fn default() -> Self {
-        Self::new(false, Flags::RESTART, Time::unsynchronized(0))
-    }
-}
-
-impl Default for DoubleBitBinaryInput {
-    fn default() -> Self {
-        Self::new(
-            DoubleBit::Indeterminate,
-            Flags::RESTART,
-            Time::unsynchronized(0),
-        )
-    }
-}
-
-impl Default for Counter {
-    fn default() -> Self {
-        Self::new(0, Flags::RESTART, Time::unsynchronized(0))
-    }
-}
-
-impl Default for FrozenCounter {
-    fn default() -> Self {
-        Self::new(0, Flags::RESTART, Time::unsynchronized(0))
-    }
-}
-
-impl Default for AnalogInput {
-    fn default() -> Self {
-        Self::new(0.0, Flags::RESTART, Time::unsynchronized(0))
-    }
-}
-
-impl Default for AnalogOutputStatus {
-    fn default() -> Self {
-        Self::new(0.0, Flags::RESTART, Time::unsynchronized(0))
     }
 }
 
