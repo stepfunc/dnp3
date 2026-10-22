@@ -371,3 +371,48 @@ async fn event_type_read_of_zero_events_has_no_error() {
         )
         .await;
 }
+
+#[tokio::test]
+async fn read_of_time_with_a_count_sets_object_unknown() {
+    let mut harness = new_harness(get_default_config());
+
+    // g50v1, count 1, with a 1-byte and a 2-byte count
+    harness
+        .test_request_response(
+            &[0xC0, 0x01, 0x32, 0x01, 0x07, 0x01],
+            OBJECT_UNKNOWN_RESPONSE,
+        )
+        .await;
+    harness
+        .test_request_response(
+            &[0xC0, 0x01, 0x32, 0x01, 0x08, 0x01, 0x00],
+            OBJECT_UNKNOWN_RESPONSE,
+        )
+        .await;
+}
+
+#[tokio::test]
+async fn headers_after_a_read_of_time_with_a_count_are_processed() {
+    let mut harness = new_harness(get_default_config());
+
+    harness.handle.database.transaction(|db| {
+        db.add(0, Some(EventClass::Class1), BinaryInputConfig::default());
+        db.update(
+            0,
+            &BinaryInput::new(true, Flags::ONLINE, Time::synchronized(0)),
+            UpdateOptions::default(),
+        );
+    });
+
+    // g50v1 count 1, then class 1 and class 2
+    harness
+        .test_request_response(
+            &[
+                0xC0, 0x01, 0x32, 0x01, 0x07, 0x01, 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06,
+            ],
+            &[
+                0xE0, 0x81, 0x80, 0x02, 0x02, 0x01, 0x28, 0x01, 0x00, 0x00, 0x00, 0x81,
+            ],
+        )
+        .await;
+}

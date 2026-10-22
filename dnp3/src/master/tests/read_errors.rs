@@ -1,17 +1,23 @@
 //! Reads whose responses carry IIN2.0, IIN2.1 or IIN2.2: a well-formed response is processed, and
-//! the read succeeds if it delivered data
+//! the read succeeds if it delivered data. A malformed response fails the read without delivering
+//! anything.
 
 use scursor::WriteCursor;
 
 use crate::app::format::write::{start_request, start_response};
 use crate::app::variations::Group32Var2;
-use crate::app::{ControlField, FunctionCode, Iin, Iin1, Iin2, ResponseFunction, Sequence};
+use crate::app::{
+    ControlField, FunctionCode, Iin, Iin1, Iin2, ObjectParseError, QualifierCode, ResponseFunction,
+    Sequence, Variation,
+};
 use crate::master::association::AssociationConfig;
 use crate::master::tests::harness::{AssocInfoEvent, TestHarness};
 use crate::master::{Classes, ReadRequest, TaskError, TaskType};
 
 use super::harness::create_association;
-use super::harness::requests::{class_scan_request, startup_procedure};
+use super::harness::requests::{
+    class_scan_request, startup_procedure, unsol_confirm, unsol_null_custom_iin,
+};
 
 fn read_response(seq: Sequence, fin: bool, con: bool, iin2: Iin2, data: Option<i16>) -> Vec<u8> {
     let mut buffer = [0; 20];
@@ -272,4 +278,56 @@ async fn periodic_poll_with_iin2_and_no_data_fails() {
             TaskType::PeriodicPoll,
             TaskError::RejectedByIin2(iin)
         )));
+}
+
+#[tokio::test]
+async fn read_with_counted_event_objects_is_malformed() {
+    let mut seq = Sequence::default();
+    let mut harness = create_association(AssociationConfig::default()).await;
+    let (read, response_seq) = start_read(&mut harness, &mut seq).await;
+    harness.read_events.pop();
+
+    let mut response = read_response(response_seq, true, false, Iin2::default(), None);
+    // g2v1 with a count of 8 and its 8 bytes of object data, which also read as a g32v2 event
+    response.extend_from_slice(&[
+        0x02, 0x01, 0x07, 0x08, 0x20, 0x02, 0x17, 0x01, 0x00, 0x01, 0x07, 0x00,
+    ]);
+    harness.process_response(response).await;
+
+    assert_eq!(
+        read.await.unwrap(),
+        Err(TaskError::MalformedResponse(
+            ObjectParseError::InvalidQualifierForVariation(
+                Variation::Group2Var1,
+                QualifierCode::Count8
+            )
+        ))
+    );
+    assert_eq!(harness.read_events.pop(), Vec::new());
+}
+
+#[tokio::test]
+async fn unsolicited_response_with_counted_event_objects_delivers_nothing() {
+    let mut seq = Sequence::default();
+    let unsol_seq = Sequence::default();
+    let mut harness = create_association(AssociationConfig::default()).await;
+    startup_procedure(&mut harness, &mut seq).await;
+    harness.read_events.pop();
+    harness.assoc_events.pop();
+
+    let mut response = unsol_null_custom_iin(unsol_seq, Iin::default());
+    // g2v1 with a count of 8 and its 8 bytes of object data, which also read as a g32v2 event
+    response.extend_from_slice(&[
+        0x02, 0x01, 0x07, 0x08, 0x20, 0x02, 0x17, 0x01, 0x00, 0x01, 0x07, 0x00,
+    ]);
+    // a malformed unsolicited response is still confirmed
+    harness
+        .read_and_expect_write(response, unsol_confirm(unsol_seq))
+        .await;
+
+    assert_eq!(harness.read_events.pop(), Vec::new());
+    assert_eq!(
+        harness.assoc_events.pop(),
+        vec![AssocInfoEvent::Unsolicited(false, unsol_seq)]
+    );
 }
