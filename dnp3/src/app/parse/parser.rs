@@ -217,6 +217,14 @@ impl<'a> ObjectHeader<'a> {
     }
 }
 
+/// Stands in for the accessor that deriving a header's variation from its payload adds
+#[cfg(test)]
+impl ObjectHeader<'_> {
+    pub(crate) fn variation(&self) -> Variation {
+        self.variation
+    }
+}
+
 pub(crate) struct FragmentDisplay<'a> {
     level: AppDecodeLevel,
     fragment: ParsedFragment<'a>,
