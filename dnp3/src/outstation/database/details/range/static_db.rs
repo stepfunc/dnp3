@@ -622,12 +622,21 @@ impl Distance for u32 {
     }
 }
 
+/// NaN is no distance from NaN, whatever the payload, and infinitely far from any number
 impl Distance for f64 {
     fn distance(self, other: Self) -> Self {
-        if self > other {
-            self - other
-        } else {
-            other - self
+        match (self.is_nan(), other.is_nan()) {
+            (true, true) => 0.0,
+            (true, false) | (false, true) => f64::INFINITY,
+            (false, false) => {
+                let distance = (self - other).abs();
+                // only equal infinities differ by NaN
+                if distance.is_nan() {
+                    0.0
+                } else {
+                    distance
+                }
+            }
         }
     }
 }
@@ -727,17 +736,29 @@ mod tests {
     }
 
     #[test]
-    fn float_deadband_keeps_ieee_semantics() {
+    fn float_deadband_treats_nan_as_a_value() {
+        const OTHER_NAN: f64 = f64::from_bits(0x7FF8_0000_0000_0001);
         let deadband = Deadband::analog(1.0).unwrap();
         assert!(!deadband.exceeded(2.0, 2.5));
         assert!(deadband.exceeded(-1.0, 1.0));
         assert!(deadband.exceeded(f64::MAX, f64::MIN));
-        // NaN differences never exceed the deadband
-        assert!(!deadband.exceeded(f64::NAN, 1.0));
-        assert!(!deadband.exceeded(1.0, f64::NAN));
-        // equal infinities differ by NaN
+        // a change between NaN and a number or an infinity exceeds any finite deadband
+        assert!(deadband.exceeded(f64::NAN, 1.0));
+        assert!(deadband.exceeded(1.0, f64::NAN));
+        assert!(deadband.exceeded(f64::NAN, f64::INFINITY));
+        assert!(Deadband::analog(f64::MAX).unwrap().exceeded(f64::NAN, 0.0));
+        // NaN to NaN doesn't, whatever the payload
+        assert!(!deadband.exceeded(f64::NAN, f64::NAN));
+        assert!(!deadband.exceeded(f64::NAN, OTHER_NAN));
+        // a change involving infinity does unless both are the same infinity
         assert!(!deadband.exceeded(f64::INFINITY, f64::INFINITY));
+        assert!(!deadband.exceeded(f64::NEG_INFINITY, f64::NEG_INFINITY));
+        assert!(deadband.exceeded(f64::INFINITY, f64::NEG_INFINITY));
         assert!(deadband.exceeded(f64::INFINITY, 1.0));
+        // an infinite deadband suppresses every value change
+        let infinite = Deadband::analog(f64::INFINITY).unwrap();
+        assert!(!infinite.exceeded(f64::NAN, 1.0));
+        assert!(!infinite.exceeded(f64::INFINITY, f64::NEG_INFINITY));
     }
 
     #[test]

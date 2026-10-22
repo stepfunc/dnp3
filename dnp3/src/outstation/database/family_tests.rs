@@ -779,6 +779,63 @@ fn analog_types_detect_changes_past_the_deadband() {
 }
 
 #[test]
+#[rustfmt::skip]
+fn analog_types_detect_changes_to_and_from_nan_and_infinity() {
+    const OTHER_NAN: f64 = f64::from_bits(0x7FF8_0000_0000_0001);
+    let steps = [
+        (10.0, true),
+        (f64::NAN, true),
+        (OTHER_NAN, false),
+        (10.0, true),
+        (f64::INFINITY, true),
+        (f64::INFINITY, false),
+        (f64::NEG_INFINITY, true),
+        (f64::NAN, true),
+    ];
+
+    let mut handle = new_handle();
+    handle.transaction(|db| {
+        // the f64 event variations report every value exactly
+        db.add(INDEX, Some(EventClass::Class1), AnalogInputConfig {
+            deadband: 1.5,
+            e_var: EventAnalogInputVariation::Group32Var6,
+            ..Default::default()
+        });
+        db.add(INDEX, Some(EventClass::Class1), AnalogOutputStatusConfig {
+            deadband: 1.5,
+            e_var: EventAnalogOutputStatusVariation::Group42Var6,
+            ..Default::default()
+        });
+        let options = UpdateOptions::default();
+        let mut id = 0;
+        let mut expect = |event: bool| {
+            if !event {
+                return UpdateInfo::NoEvent;
+            }
+            id += 1;
+            UpdateInfo::Created(id - 1)
+        };
+        for (value, event) in steps {
+            let input = AnalogInput::new(value, Flags::ONLINE, time());
+            assert_eq!(db.update2(INDEX, &input, options), expect(event), "input {value}");
+        }
+        for (value, event) in steps {
+            let output = AnalogOutputStatus::new(value, Flags::ONLINE, time());
+            assert_eq!(db.update2(INDEX, &output, options), expect(event), "output {value}");
+        }
+    });
+
+    // index 3, ONLINE and the f64 value
+    let ten = [3, 0, 1, 0, 0, 0, 0, 0, 0, 36, 64];
+    let nan = [3, 0, 1, 0, 0, 0, 0, 0, 0, 248, 127];
+    let inf = [3, 0, 1, 0, 0, 0, 0, 0, 0, 240, 127];
+    let neg_inf = [3, 0, 1, 0, 0, 0, 0, 0, 0, 240, 255];
+    let values = [ten, nan, ten, inf, neg_inf, nan].concat();
+    let expected = [&[32, 6, 40, 6, 0][..], &values, &[42, 6, 40, 6, 0], &values].concat();
+    assert_eq!(read(&mut handle, &CLASS_1), ok(&expected));
+}
+
+#[test]
 fn analog_deadband_written_to_the_database_applies_to_detection() {
     let mut handle = new_handle();
     handle.transaction(|db| {

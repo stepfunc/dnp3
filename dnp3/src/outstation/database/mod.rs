@@ -1042,7 +1042,13 @@ mod test {
             UpdateInfo::Created(0),
             db.update2(0, &AnalogInput::new(0.0, online, time()), options)
         );
-        for value in [f64::MAX, f64::MIN, f64::INFINITY, f64::NEG_INFINITY] {
+        for value in [
+            f64::MAX,
+            f64::MIN,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::NAN,
+        ] {
             assert_eq!(
                 UpdateInfo::NoEvent,
                 db.update2(0, &AnalogInput::new(value, online, time()), options),
@@ -1077,7 +1083,13 @@ mod test {
             UpdateInfo::Created(0),
             db.update2(0, &AnalogOutputStatus::new(0.0, online, time()), options)
         );
-        for value in [f64::MAX, f64::MIN, f64::INFINITY, f64::NEG_INFINITY] {
+        for value in [
+            f64::MAX,
+            f64::MIN,
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::NAN,
+        ] {
             assert_eq!(
                 UpdateInfo::NoEvent,
                 db.update2(0, &AnalogOutputStatus::new(value, online, time()), options),
