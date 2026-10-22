@@ -105,6 +105,7 @@ pub(crate) async fn create_association_with_handler(
 pub(crate) enum ReadEvent {
     BeginFragment(ReadType),
     BinaryInput,
+    DoubleBitBinaryInput,
     AnalogInput,
     /// one deadband of a header, and its index
     AnalogInputDeadBand(AnalogInputDeadBand, u16),
@@ -159,6 +160,14 @@ impl ReadHandler for CountHandler {
         _iter: &mut dyn Iterator<Item = (crate::app::measurement::BinaryInput, u16)>,
     ) {
         self.push(ReadEvent::BinaryInput);
+    }
+
+    fn handle_double_bit_binary_input(
+        &mut self,
+        _info: HeaderInfo,
+        _iter: &mut dyn Iterator<Item = (crate::app::measurement::DoubleBitBinaryInput, u16)>,
+    ) {
+        self.push(ReadEvent::DoubleBitBinaryInput);
     }
 
     fn handle_analog_input(

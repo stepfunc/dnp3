@@ -311,3 +311,85 @@ async fn unsolicited_response_without_con_is_processed_without_confirm() {
     })
     .await;
 }
+
+#[tokio::test]
+async fn unsolicited_g4v3_or_two_byte_prefixed_relative_time_without_cto_is_discarded() {
+    watchdog(async {
+        // g4v3 with a one-byte count and prefix, then g2v3 and g4v3 with a two-byte count and
+        // prefix, each with one event at index 7 with relative time 0xFFFF
+        let events: [&[u8]; 3] = [
+            &[0x04, 0x03, 0x17, 0x01, 0x07, 0x01, 0xFF, 0xFF],
+            &[0x02, 0x03, 0x28, 0x01, 0x00, 0x07, 0x00, 0x01, 0xFF, 0xFF],
+            &[0x04, 0x03, 0x28, 0x01, 0x00, 0x07, 0x00, 0x01, 0xFF, 0xFF],
+        ];
+        for event in events {
+            let mut harness = started().await;
+            let response = unsol_with_objects(Sequence::new(3), &[event]);
+
+            harness.process_response(response.clone()).await;
+            expect_discarded(&mut harness, response).await;
+        }
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn unsolicited_relative_time_after_a_cto_with_a_count_other_than_one_is_discarded() {
+    watchdog(async {
+        // g51v1 and g51v2 with a count of 0 or 2, at both widths of the count
+        let ctos: [&[u8]; 4] = [
+            &[0x33, 0x01, 0x07, 0x00],
+            &[0x33, 0x02, 0x08, 0x00, 0x00],
+            &[
+                0x33, 0x01, 0x07, 0x02, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
+                0x00, 0x00,
+            ],
+            &[
+                0x33, 0x02, 0x08, 0x02, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00,
+                0x00, 0x00, 0x00,
+            ],
+        ];
+        for cto in ctos {
+            let mut harness = started().await;
+            let response = unsol_with_objects(Sequence::new(3), &[cto, RELATIVE_TIME_EVENT]);
+
+            harness.process_response(response.clone()).await;
+            expect_discarded(&mut harness, response).await;
+        }
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn unsolicited_empty_relative_time_headers_without_cto_are_processed_and_confirmed() {
+    watchdog(async {
+        let mut harness = started().await;
+        let seq = Sequence::new(3);
+        // g2v3 and g4v3 with a count of 0, with a one-byte then a two-byte count and prefix
+        let objects: [&[u8]; 4] = [
+            &[0x02, 0x03, 0x17, 0x00],
+            &[0x04, 0x03, 0x17, 0x00],
+            &[0x02, 0x03, 0x28, 0x00, 0x00],
+            &[0x04, 0x03, 0x28, 0x00, 0x00],
+        ];
+
+        harness
+            .read_and_expect_write(unsol_with_objects(seq, &objects), unsol_confirm(seq))
+            .await;
+
+        assert_eq!(
+            harness.read_events.pop(),
+            fragment(&[
+                ReadEvent::BinaryInput,
+                ReadEvent::DoubleBitBinaryInput,
+                ReadEvent::BinaryInput,
+                ReadEvent::DoubleBitBinaryInput,
+            ])
+        );
+        assert_eq!(
+            harness.assoc_events.pop(),
+            vec![AssocInfoEvent::Unsolicited(false, seq)]
+        );
+    })
+    .await;
+}
