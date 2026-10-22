@@ -30,6 +30,8 @@ impl<const MIN_SIZE: usize, const DEFAULT_SIZE: usize> BufferSize<MIN_SIZE, DEFA
     /// minimum allowed buffer size
     pub const MIN: usize = MIN_SIZE;
     /// default buffer size
+    ///
+    /// [`BufferSize::default`] uses the larger of this value and [`Self::MIN`]
     pub const DEFAULT: usize = DEFAULT_SIZE;
 
     pub(crate) fn create_buffer(&self) -> Buffer {
@@ -58,8 +60,9 @@ impl<const MIN_SIZE: usize, const DEFAULT_SIZE: usize> BufferSize<MIN_SIZE, DEFA
 impl<const MIN_SIZE: usize, const DEFAULT_SIZE: usize> Default
     for BufferSize<MIN_SIZE, DEFAULT_SIZE>
 {
+    /// Uses [`BufferSize::DEFAULT`], raised to [`BufferSize::MIN`] if it is smaller
     fn default() -> Self {
-        Self(Self::DEFAULT)
+        Self(Self::DEFAULT.max(Self::MIN))
     }
 }
 
@@ -78,6 +81,14 @@ impl std::error::Error for BufferSizeError {}
 
 #[cfg(test)]
 mod test {
+    use super::BufferSize;
+
+    #[test]
+    fn default_is_never_below_min() {
+        assert_eq!(BufferSize::<500, 100>::default().value(), 500);
+        assert_eq!(BufferSize::<100, 500>::default().value(), 500);
+        assert_eq!(BufferSize::<249, 2048>::default().value(), 2048);
+    }
 
     #[test]
     #[cfg(feature = "serialization")]
