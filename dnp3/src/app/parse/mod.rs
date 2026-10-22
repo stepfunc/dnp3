@@ -1,3 +1,5 @@
+#[cfg(test)]
+mod all_objects_tests;
 pub(crate) mod bit;
 pub(crate) mod bytes;
 pub(crate) mod count;

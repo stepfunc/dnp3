@@ -20,6 +20,8 @@ mod read_dead_band;
 mod read_errors;
 /// fragment boundaries between events, static data and attributes in READ and unsolicited responses
 mod read_fragments;
+/// READ headers the parser rejects or the database can't select, alone and in a deferred READ
+mod read_headers;
 /// READ header, selection and fragment limits
 mod read_limits;
 /// state machine for READ requests
