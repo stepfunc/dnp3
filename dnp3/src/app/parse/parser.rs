@@ -1583,6 +1583,97 @@ mod test {
         }
     }
 
+    // g70v2 with user name "ab" and password "cd"
+    const G70V2: &[u8] = &[
+        12, 0, 2, 0, 14, 0, 2, 0, 0xFE, 0xCA, 0xAD, 0xDE, b'a', b'b', b'c', b'd',
+    ];
+
+    // g70v3 with file name "ab"
+    const G70V3: &[u8] = &[
+        26, 0, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, b'a', b'b',
+    ];
+
+    // g70v7 with file name "ab"
+    const G70V7: &[u8] = &[
+        20, 0, 2, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, b'a', b'b',
+    ];
+
+    fn free_format(var: u8, object: &[u8]) -> Vec<u8> {
+        let length = u16::try_from(object.len()).unwrap();
+        let mut header = vec![70, var, 0x5B, 0x01];
+        header.extend_from_slice(&length.to_le_bytes());
+        header.extend_from_slice(object);
+        header
+    }
+
+    fn with_trailing_byte(object: &[u8]) -> Vec<u8> {
+        let mut object = object.to_vec();
+        object.push(0);
+        object
+    }
+
+    fn with_byte(object: &[u8], index: usize, value: u8) -> Vec<u8> {
+        let mut object = object.to_vec();
+        object[index] = value;
+        object
+    }
+
+    #[test]
+    fn free_format_file_objects_parse_before_corruption() {
+        for (var, function, object) in [
+            (2, FunctionCode::AuthenticateFile, G70V2),
+            (3, FunctionCode::OpenFile, G70V3),
+            (7, FunctionCode::Response, G70V7),
+        ] {
+            let input = free_format(var, object);
+            let headers = ObjectParser::parse(ParseOptions::default(), function, &input).unwrap();
+            let variations: Vec<Variation> = headers.iter().map(|h| h.variation()).collect();
+            assert_eq!(variations, [Variation::lookup(70, var).unwrap()]);
+        }
+    }
+
+    #[test]
+    fn badly_encoded_free_format_objects_are_rejected() {
+        // a user name length that overflows the password offset; 12 + 0xFFFF wraps to 11
+        const G70V2_OVERFLOW: &[u8] = &[12, 0, 0xFF, 0xFF, 11, 0, 0, 0, 0xFE, 0xCA, 0xAD, 0xDE];
+
+        let cases: &[(u8, FunctionCode, Vec<u8>)] = &[
+            // bytes left over inside the declared length
+            (2, FunctionCode::AuthenticateFile, with_trailing_byte(G70V2)),
+            (3, FunctionCode::OpenFile, with_trailing_byte(G70V3)),
+            (7, FunctionCode::Response, with_trailing_byte(G70V7)),
+            // wrong offsets
+            (2, FunctionCode::AuthenticateFile, with_byte(G70V2, 0, 13)),
+            (2, FunctionCode::AuthenticateFile, with_byte(G70V2, 4, 15)),
+            (3, FunctionCode::OpenFile, with_byte(G70V3, 0, 25)),
+            (7, FunctionCode::Response, with_byte(G70V7, 0, 21)),
+            // overflow of the implied password offset
+            (2, FunctionCode::AuthenticateFile, G70V2_OVERFLOW.to_vec()),
+            // strings that aren't UTF-8
+            (
+                2,
+                FunctionCode::AuthenticateFile,
+                with_byte(G70V2, 12, 0xFF),
+            ),
+            (
+                2,
+                FunctionCode::AuthenticateFile,
+                with_byte(G70V2, 14, 0xFF),
+            ),
+            (3, FunctionCode::OpenFile, with_byte(G70V3, 26, 0xFF)),
+            (7, FunctionCode::Response, with_byte(G70V7, 20, 0xFF)),
+        ];
+
+        for (case, (var, function, object)) in cases.iter().enumerate() {
+            let input = free_format(*var, object);
+            assert_eq!(
+                ObjectParser::parse(ParseOptions::default(), *function, &input).err(),
+                Some(ObjectParseError::BadEncoding),
+                "case {case}"
+            );
+        }
+    }
+
     #[test]
     fn object_header_log_format_for_every_qualifier() {
         let mut fragment = vec![0xC0, 0x81, 0x00, 0x00];
