@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use tokio::time::Instant;
 
-use crate::app::{ControlField, FunctionCode, RequestHeader, Sequence};
+use crate::app::FunctionCode;
 use crate::link::header::BroadcastConfirmMode;
 use crate::outstation::config::OutstationConfig;
 use crate::outstation::traits::{BroadcastAction, OperateType};
@@ -932,20 +932,6 @@ async fn disable_unsolicited_in_the_unsolicited_confirm_wait_ends_the_series_and
 }
 
 // ---------- process_request_from_idle ----------
-
-/// the information callback for a request with one fragment, from idle
-fn from_idle(function: FunctionCode, uns: bool, seq: u8) -> Event {
-    Event::RequestFromIdle(RequestHeader {
-        control: ControlField {
-            fir: true,
-            fin: true,
-            con: false,
-            uns,
-            seq: Sequence::new(seq),
-        },
-        function,
-    })
-}
 
 /// requests and confirms in idle are reported, but not a request with an unknown function code
 #[tokio::test]
