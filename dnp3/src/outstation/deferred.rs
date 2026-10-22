@@ -68,13 +68,13 @@ impl DeferredRead {
                     tracing::warn!(
                         "insufficient capacity ({}) for READ header: {} - {}",
                         self.headers.max(),
-                        h.variation,
+                        h.variation(),
                         h.details.qualifier()
                     );
                     iin2 |= Iin2::PARAMETER_ERROR;
                 }
             } else {
-                iin2 |= ReadHeader::unsupported(h.variation);
+                iin2 |= ReadHeader::unsupported(h.variation());
             }
         }
 

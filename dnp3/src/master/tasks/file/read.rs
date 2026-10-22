@@ -160,7 +160,7 @@ impl FileReadTask {
             _ => {
                 tracing::warn!(
                     "File READ response contains unexpected variation: {}",
-                    header.variation
+                    header.variation()
                 );
                 return Err(FileError::BadResponse);
             }

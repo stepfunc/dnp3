@@ -50,6 +50,18 @@ impl<'a> FreeFormatVariation<'a> {
         Ok(object)
     }
 
+    pub(crate) fn variation(&self) -> Variation {
+        match self {
+            FreeFormatVariation::Group70Var2(_) => Variation::Group70Var2,
+            FreeFormatVariation::Group70Var3(_) => Variation::Group70Var3,
+            FreeFormatVariation::Group70Var4(_) => Variation::Group70Var4,
+            FreeFormatVariation::Group70Var5(_) => Variation::Group70Var5,
+            FreeFormatVariation::Group70Var6(_) => Variation::Group70Var6,
+            FreeFormatVariation::Group70Var7(_) => Variation::Group70Var7,
+            FreeFormatVariation::Group70Var8(_) => Variation::Group70Var8,
+        }
+    }
+
     pub(crate) fn format_objects(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             FreeFormatVariation::Group70Var2(x) => x.format(f),

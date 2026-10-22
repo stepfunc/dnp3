@@ -57,7 +57,7 @@ fn all_objects_headers_outside_read_accept_these_variations() {
                     .map(|headers| headers.get_only_header().unwrap());
                 if accepted(group, var) {
                     let header = result.unwrap();
-                    assert_eq!(header.variation, variation);
+                    assert_eq!(header.variation(), variation);
                     assert!(
                         matches!(header.details, HeaderDetails::AllObjects(_)),
                         "{function:?} g{group}v{var}"

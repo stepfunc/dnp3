@@ -10,40 +10,42 @@ object AllObjectsVariationModule extends Module {
   override def lines(implicit indent: Indentation) : Iterator[String] = {
       "use crate::app::variations::Variation;".eol ++
       space ++
-      variationEnumDefinition ++
+      variationDefinition ++
       space ++
-      variationEnumImpl
+      variationImpl
   }
 
-  private def variationEnumDefinition(implicit indent: Indentation) : Iterator[String] = {
-
-    def render(v: Variation) : String = {
-      v match {
-        case SpecificAttribute => s"${v.parent.name}(u8),"
-        case _ =>   s"${v.name},"
-      }
-    }
-
+  private def variationDefinition(implicit indent: Indentation) : Iterator[String] = {
+    "/// A variation that an all-objects header outside a READ can name".eol ++
     "#[derive(Copy, Clone, Debug, PartialEq)]".eol ++
-      bracket("pub(crate) enum AllObjectsVariation") {
-        variations.iterator.map(render)
-      }
-
+    "pub(crate) struct AllObjectsVariation(Variation);".eol
   }
 
-  private def variationEnumImpl(implicit indent: Indentation) : Iterator[String] = {
+  private def variationImpl(implicit indent: Indentation) : Iterator[String] = {
 
-    def getMatcher(v: Variation) : String = v match {
-      case _ : SizedByVariation =>   s"Variation::${v.parent.name}(0) => Some(AllObjectsVariation::${v.name}),"
-      case SpecificAttribute => s"Variation::${v.parent.name}(var) => Some(AllObjectsVariation::${v.parent.name}(var)),"
-      case _ => s"Variation::${v.name} => Some(AllObjectsVariation::${v.name}),"
+    def pattern(v: Variation) : String = v match {
+      case _ : SizedByVariation => s"Variation::${v.parent.name}(0)"
+      case SpecificAttribute => s"Variation::${v.parent.name}(_)"
+      case _ => s"Variation::${v.name}"
     }
+
+    val patterns = variations.map(pattern).toList
 
     bracket("impl AllObjectsVariation") {
       bracket("pub(crate) fn get(v: Variation) -> Option<AllObjectsVariation>") {
         bracket("match v") {
-          variations.map(getMatcher) ++ "_ => None,".eol
+          patterns.headOption.iterator ++
+          indent {
+            patterns.drop(1).iterator.map(p => s"| ${p}")
+          } ++
+          indent {
+            "=> Some(AllObjectsVariation(v)),".eol
+          } ++
+          "_ => None,".eol
         }
+      } ++ space ++
+      bracket("pub(crate) fn variation(self) -> Variation") {
+        "self.0".eol
       }
     }
 
