@@ -1552,4 +1552,251 @@ mod test {
         .join("\n");
         assert_eq!(text, expected);
     }
+
+    fn parse_header(input: &[u8]) -> Result<ParsedFragment<'_>, HeaderParseError> {
+        ParsedFragment::parse(ParseOptions::default(), input)
+    }
+
+    fn control(fir: bool, fin: bool, con: bool, uns: bool, seq: u8) -> ControlField {
+        ControlField {
+            fir,
+            fin,
+            con,
+            uns,
+            seq: Sequence::new(seq),
+        }
+    }
+
+    #[test]
+    fn every_function_code_parses_as_a_request_or_a_response() {
+        for raw in 0..=u8::MAX {
+            let Some(function) = FunctionCode::from(raw) else {
+                let fragment = [0xC5, raw, 0xAA, 0x55];
+                assert_eq!(
+                    parse_header(&fragment).err(),
+                    Some(HeaderParseError::UnknownFunction(Sequence::new(5), raw))
+                );
+                continue;
+            };
+
+            let response_function = match function {
+                FunctionCode::Response => Some(ResponseFunction::Response),
+                FunctionCode::UnsolicitedResponse => Some(ResponseFunction::UnsolicitedResponse),
+                _ => None,
+            };
+            let uns = function == FunctionCode::UnsolicitedResponse;
+            let fragment = [if uns { 0xD5 } else { 0xC5 }, raw, 0xAA, 0x55];
+            let expected_control = control(true, true, false, uns, 5);
+            let parsed = parse_header(&fragment).unwrap();
+
+            match response_function {
+                Some(response_function) => {
+                    let response = parsed.to_response().unwrap();
+                    assert_eq!(
+                        response.header,
+                        ResponseHeader {
+                            control: expected_control,
+                            function: response_function,
+                            iin: Iin {
+                                iin1: Iin1::new(0xAA),
+                                iin2: Iin2::new(0x55),
+                            },
+                        }
+                    );
+                    assert!(response.raw_objects.is_empty());
+                    assert!(response.objects.unwrap().is_empty());
+                    assert_eq!(
+                        parsed.to_request().err(),
+                        Some(RequestValidationError::UnexpectedFunction(function))
+                    );
+                }
+                None => {
+                    let request = parsed.to_request().unwrap();
+                    assert_eq!(
+                        request.header,
+                        RequestHeader {
+                            control: expected_control,
+                            function,
+                        }
+                    );
+                    assert_eq!(request.raw_fragment, &fragment);
+                    // a request has no IIN, so the two bytes after the function code are objects
+                    assert_eq!(
+                        request.objects.err(),
+                        Some(ObjectParseError::UnknownGroupVariation(0xAA, 0x55))
+                    );
+                    assert_eq!(
+                        parsed.to_response().err(),
+                        Some(ResponseValidationError::UnexpectedFunction(function))
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn header_shorter_than_its_function_needs_is_insufficient() {
+        for fragment in [
+            &[][..],
+            &[0xC0],
+            &[0xC0, 0x81],
+            &[0xC0, 0x81, 0x00],
+            &[0xD0, 0x82],
+            &[0xD0, 0x82, 0x00],
+        ] {
+            assert_eq!(
+                parse_header(fragment).err(),
+                Some(HeaderParseError::InsufficientBytes)
+            );
+        }
+
+        assert_eq!(
+            parse_header(&[0xC3, 0x70]).err(),
+            Some(HeaderParseError::UnknownFunction(Sequence::new(3), 0x70))
+        );
+
+        for (fragment, function) in [
+            (&[0xC0, 0x00], FunctionCode::Confirm),
+            (&[0xC0, 0x01], FunctionCode::Read),
+            (&[0xC0, 0x0D], FunctionCode::ColdRestart),
+        ] {
+            let request = parse_header(fragment).unwrap().to_request().unwrap();
+            assert_eq!(request.header.function, function);
+            assert_eq!(request.raw_fragment, fragment);
+            assert!(request.objects.unwrap().is_empty());
+        }
+    }
+
+    #[test]
+    fn request_validation_checks_the_function_then_fir_fin_then_uns() {
+        for (fragment, err) in [
+            (
+                &[0x40, 0x81, 0x00, 0x00][..],
+                RequestValidationError::UnexpectedFunction(FunctionCode::Response),
+            ),
+            (
+                &[0x10, 0x82, 0x00, 0x00],
+                RequestValidationError::UnexpectedFunction(FunctionCode::UnsolicitedResponse),
+            ),
+            (&[0x40, 0x01], RequestValidationError::NonFirFin),
+            (&[0x80, 0x01], RequestValidationError::NonFirFin),
+            (&[0x00, 0x01], RequestValidationError::NonFirFin),
+            (&[0x50, 0x01], RequestValidationError::NonFirFin),
+            (&[0x40, 0x00], RequestValidationError::NonFirFin),
+            (
+                &[0xF0, 0x01],
+                RequestValidationError::UnexpectedUnsBit(FunctionCode::Read),
+            ),
+        ] {
+            test_request_validation_error(fragment, err);
+        }
+
+        let request = parse_header(&[0xE7, 0x01]).unwrap().to_request().unwrap();
+        assert_eq!(request.header.control, control(true, true, true, false, 7));
+    }
+
+    #[test]
+    fn response_validation_checks_the_function_then_uns_then_fir_fin() {
+        for (fragment, err) in [
+            (
+                &[0xD0, 0x01][..],
+                ResponseValidationError::UnexpectedFunction(FunctionCode::Read),
+            ),
+            (
+                &[0x00, 0x00],
+                ResponseValidationError::UnexpectedFunction(FunctionCode::Confirm),
+            ),
+            (
+                &[0x80, 0x82, 0x00, 0x00],
+                ResponseValidationError::UnsolicitedResponseWithoutUnsBit,
+            ),
+            (
+                &[0x90, 0x82, 0x00, 0x00],
+                ResponseValidationError::UnsolicitedResponseWithoutFirAndFin,
+            ),
+            (
+                &[0x50, 0x82, 0x00, 0x00],
+                ResponseValidationError::UnsolicitedResponseWithoutFirAndFin,
+            ),
+            (
+                &[0x10, 0x82, 0x00, 0x00],
+                ResponseValidationError::UnsolicitedResponseWithoutFirAndFin,
+            ),
+            (
+                &[0x50, 0x81, 0x00, 0x00],
+                ResponseValidationError::SolicitedResponseWithUnsBit,
+            ),
+        ] {
+            test_response_validation_error(fragment, err);
+        }
+
+        for (fragment, expected) in [
+            (
+                &[0xA1, 0x81, 0x12, 0x34],
+                control(true, false, true, false, 1),
+            ),
+            (
+                &[0x02, 0x81, 0x12, 0x34],
+                control(false, false, false, false, 2),
+            ),
+            (
+                &[0x43, 0x81, 0x12, 0x34],
+                control(false, true, false, false, 3),
+            ),
+            (
+                &[0xF4, 0x82, 0x12, 0x34],
+                control(true, true, true, true, 4),
+            ),
+        ] {
+            let response = parse_header(fragment).unwrap().to_response().unwrap();
+            assert_eq!(response.header.control, expected);
+            assert_eq!(
+                response.header.iin,
+                Iin {
+                    iin1: Iin1::new(0x12),
+                    iin2: Iin2::new(0x34),
+                }
+            );
+        }
+    }
+
+    #[test]
+    fn objects_follow_the_function_code_in_requests_and_the_iin_in_responses() {
+        let fragment = &[0xC0, 0x01, 60, 1, 0x06];
+        let request = parse_header(fragment).unwrap().to_request().unwrap();
+        let variations: Vec<Variation> = request
+            .objects
+            .unwrap()
+            .iter()
+            .map(|x| x.variation)
+            .collect();
+        assert_eq!(variations, [Variation::Group60Var1]);
+
+        let fragment = &[0xC0, 0x81, 0x00, 0x00, 0x01, 0x02, 0x00, 0x03, 0x03, 0x81];
+        let response = parse_header(fragment).unwrap().to_response().unwrap();
+        assert_eq!(response.raw_objects, &fragment[4..]);
+        let variations: Vec<Variation> = response
+            .objects
+            .unwrap()
+            .iter()
+            .map(|x| x.variation)
+            .collect();
+        assert_eq!(variations, [Variation::Group1Var2]);
+    }
+
+    #[test]
+    fn request_header_log_format() {
+        let fragment = [0xC3, 0x01, 60, 1, 0x06, 60];
+        let text = parse_header(&fragment)
+            .unwrap()
+            .display(AppDecodeLevel::ObjectHeaders)
+            .to_string();
+        let expected = [
+            "ctrl: [fir: true fin: true con: false uns: false seq: 3] func: Read ... (len = 4)",
+            "g60v1 : Class Data - Class 0 - all objects",
+            "decoding err: insufficient bytes for object header",
+        ]
+        .join("\n");
+        assert_eq!(text, expected);
+    }
 }

@@ -52,6 +52,25 @@ async fn function_code_not_supported() {
 }
 
 #[tokio::test]
+async fn object_headers_in_a_request_that_takes_none_set_parameter_error() {
+    let mut harness = new_harness(get_default_config());
+
+    // COLD_RESTART and SAVE_CONFIG take no objects
+    harness
+        .test_request_response(&[0xC0, 0x0D, 60, 1, 0x06], &[0xC0, 0x81, 0x80, 0x05])
+        .await;
+    harness.check_events(&[Event::ColdRestart(None)]);
+    harness
+        .test_request_response(&[0xC1, 0x13, 60, 1, 0x06], &[0xC1, 0x81, 0x80, 0x05])
+        .await;
+
+    // ASSIGN_CLASS takes objects
+    harness
+        .test_request_response(&[0xC2, 0x16, 60, 1, 0x06], &[0xC2, 0x81, 0x80, 0x01])
+        .await;
+}
+
+#[tokio::test]
 async fn object_unknown() {
     let mut harness = new_harness(get_default_config());
 
