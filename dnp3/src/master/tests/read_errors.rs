@@ -5,6 +5,7 @@
 use scursor::WriteCursor;
 
 use crate::app::format::write::{start_request, start_response};
+use crate::app::parse::header_identity_tests::DATALESS_COUNT_VARIATIONS;
 use crate::app::variations::Group32Var2;
 use crate::app::{
     ControlField, FunctionCode, Iin, Iin1, Iin2, ObjectParseError, QualifierCode, ResponseFunction,
@@ -304,6 +305,36 @@ async fn read_with_counted_event_objects_is_malformed() {
         ))
     );
     assert_eq!(harness.read_events.pop(), Vec::new());
+}
+
+#[tokio::test]
+async fn read_with_a_count_of_objects_that_carry_no_data_is_malformed() {
+    for variation in DATALESS_COUNT_VARIATIONS {
+        let (group, var) = variation.to_group_and_var();
+        let counts: [(QualifierCode, &[u8]); 2] = [
+            (QualifierCode::Count8, &[0x07, 0x01]),
+            (QualifierCode::Count16, &[0x08, 0x01, 0x00]),
+        ];
+        for (qualifier, count) in counts {
+            let mut seq = Sequence::default();
+            let mut harness = create_association(AssociationConfig::default()).await;
+            let (read, response_seq) = start_read(&mut harness, &mut seq).await;
+            harness.read_events.pop();
+
+            let mut response = read_response(response_seq, true, false, Iin2::default(), Some(7));
+            response.extend_from_slice(&[group, var]);
+            response.extend_from_slice(count);
+            harness.process_response(response).await;
+
+            assert_eq!(
+                read.await.unwrap(),
+                Err(TaskError::MalformedResponse(
+                    ObjectParseError::InvalidQualifierForVariation(variation, qualifier)
+                ))
+            );
+            assert_eq!(harness.read_events.pop(), Vec::new());
+        }
+    }
 }
 
 #[tokio::test]

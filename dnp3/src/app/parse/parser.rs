@@ -700,6 +700,7 @@ mod test {
     use crate::app::control::CommandStatus;
     use crate::app::header::{ControlField, Iin, Iin1, Iin2};
     use crate::app::measurement::DoubleBit;
+    use crate::app::parse::header_identity_tests::DATALESS_COUNT_VARIATIONS;
     use crate::app::parse::prefix::Prefix;
     use crate::app::parse_error::ResponseValidationError;
     use crate::app::sequence::Sequence;
@@ -1416,28 +1417,50 @@ mod test {
         assert_matches!(headers.next(), None);
     }
 
+    /// each variation in a 1-byte and a 2-byte count header of one object
+    fn dataless_count_headers() -> impl Iterator<Item = (Variation, Width, Vec<u8>)> {
+        DATALESS_COUNT_VARIATIONS.into_iter().flat_map(|v| {
+            let (group, var) = v.to_group_and_var();
+            [
+                (v, Width::One, vec![group, var, 0x07, 0x01]),
+                (v, Width::Two, vec![group, var, 0x08, 0x01, 0x00]),
+            ]
+        })
+    }
+
     #[test]
-    fn count_of_any_variation_class_and_g111v0_is_accepted_outside_read() {
-        let input = [
-            0x02, 0x00, 0x07, 0x01, 0x3C, 0x02, 0x08, 0x01, 0x00, 0x6F, 0x00, 0x07, 0x01,
-        ];
-        let mut headers =
-            ObjectParser::parse(ParseOptions::default(), FunctionCode::Response, &input)
-                .unwrap()
-                .iter();
-        assert_matches!(
-            headers.next().unwrap().details,
-            HeaderDetails::Count(Width::One, 1, CountVariation::Group2Var0)
-        );
-        assert_matches!(
-            headers.next().unwrap().details,
-            HeaderDetails::Count(Width::Two, 1, CountVariation::Group60Var2)
-        );
-        assert_matches!(
-            headers.next().unwrap().details,
-            HeaderDetails::Count(Width::One, 1, CountVariation::Group111Var0)
-        );
-        assert_matches!(headers.next(), None);
+    fn count_of_variation_without_objects_is_rejected_outside_read() {
+        for function in [
+            FunctionCode::Response,
+            FunctionCode::UnsolicitedResponse,
+            FunctionCode::Write,
+            FunctionCode::DirectOperate,
+        ] {
+            for (v, width, input) in dataless_count_headers() {
+                assert_eq!(
+                    ObjectParser::parse(ParseOptions::default(), function, &input).err(),
+                    Some(ObjectParseError::InvalidQualifierForVariation(
+                        v,
+                        width.count_qualifier()
+                    )),
+                    "{function:?} {v:?} {width:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn count_of_variation_without_objects_is_accepted_in_read() {
+        for (v, width, input) in dataless_count_headers() {
+            let headers =
+                ObjectParser::parse(ParseOptions::default(), FunctionCode::Read, &input).unwrap();
+            let header = headers.get_only_header().unwrap();
+            assert_eq!(header.variation(), v);
+            assert_matches!(
+                header.details,
+                HeaderDetails::Read(_, ReadQualifier::Count(w, 1)) if w == width
+            );
+        }
     }
 
     /// one response header with each qualifier, the 1-byte and 2-byte forms of each family next
