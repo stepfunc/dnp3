@@ -140,14 +140,6 @@ impl AppTask {
             Self::NoResponse(task) => task.on_task_error(err),
         }
     }
-
-    pub(crate) fn get_id(&self) -> TaskId {
-        match self {
-            AppTask::Read(_) => TaskId::Function(FunctionCode::Read),
-            AppTask::NonRead(t) => TaskId::Function(t.function()),
-            AppTask::NoResponse(t) => TaskId::Function(t.function()),
-        }
-    }
 }
 
 impl Task {
@@ -161,7 +153,7 @@ impl Task {
     pub(crate) fn get_id(&self) -> TaskId {
         match self {
             Task::LinkStatus(_) => TaskId::LinkStatus,
-            Task::App(task) => task.get_id(),
+            Task::App(task) => TaskId::Function(task.function()),
         }
     }
 }
