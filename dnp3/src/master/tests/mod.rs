@@ -2,7 +2,9 @@ mod harness;
 
 mod auto_tasks;
 mod controls;
+mod link_frames;
 mod link_status;
+mod outcomes;
 mod read_errors;
 mod read_types;
 mod restart;
