@@ -1,14 +1,149 @@
 use crate::app::measurement::*;
 use crate::app::parse::traits::{FixedSize, FixedSizeVariation};
-use crate::app::variations::{Group51Var1, Group51Var2};
+use crate::app::variations::{Group51Var1, Group51Var2, Variation};
 use crate::app::QualifierCode;
-use crate::app::Timestamp;
-use crate::outstation::database::config::*;
-use crate::outstation::database::details::event::traits::{EventVariation, OctetStringLength};
-use crate::outstation::database::details::event::write_fn::Continue;
+use crate::outstation::database::details::event::traits::{Encoder, EventVariation};
+use crate::outstation::database::details::event::write_fn::{
+    write_cto, write_cto_first, write_fixed_size, write_octet_string, Continue, ToVariationCto,
+};
 
 use crate::util::BadWrite;
 use scursor::{WriteCursor, WriteError};
+
+/// The object header that events are written in
+#[derive(Copy, Clone, PartialEq)]
+enum EventHeader {
+    /// a variation whose events don't depend on each other
+    Plain(Variation),
+    /// a variation whose event times are relative to the common time object before the header
+    Cto(Variation, Time),
+}
+
+impl EventHeader {
+    fn variation(self) -> Variation {
+        match self {
+            Self::Plain(variation) => variation,
+            Self::Cto(variation, _) => variation,
+        }
+    }
+}
+
+/// the header an event starts
+struct StartHeader<'a, T>(&'a T);
+
+impl<T> Encoder<T> for StartHeader<'_, T> {
+    type Output = Result<EventHeader, WriteError>;
+
+    fn fixed<V>(self) -> Self::Output
+    where
+        V: FixedSizeVariation,
+        T: ToVariation<V>,
+    {
+        Ok(EventHeader::Plain(V::VARIATION))
+    }
+
+    fn cto<V>(self) -> Self::Output
+    where
+        V: FixedSizeVariation,
+        T: ToVariationCto<V>,
+    {
+        Ok(EventHeader::Cto(V::VARIATION, self.0.get_time().into()))
+    }
+
+    fn octet_string(self) -> Self::Output
+    where
+        T: AsRef<[u8]>,
+    {
+        let len = u8::try_from(self.0.as_ref().len()).map_err(|_| WriteError::NumericOverflow)?;
+        Ok(EventHeader::Plain(Variation::Group111(len)))
+    }
+}
+
+/// write an event as the first in the header it started
+struct WriteFirst<'a, 'b, T> {
+    cursor: &'a mut WriteCursor<'b>,
+    event: &'a T,
+    index: u16,
+}
+
+impl<T> Encoder<T> for WriteFirst<'_, '_, T> {
+    type Output = Result<(), WriteError>;
+
+    fn fixed<V>(self) -> Self::Output
+    where
+        V: FixedSizeVariation,
+        T: ToVariation<V>,
+    {
+        write_fixed_size::<V, T>(self.cursor, self.event, self.index)
+    }
+
+    fn cto<V>(self) -> Self::Output
+    where
+        V: FixedSizeVariation,
+        T: ToVariationCto<V>,
+    {
+        write_cto_first::<V, T>(self.cursor, self.event, self.index)
+    }
+
+    fn octet_string(self) -> Self::Output
+    where
+        T: AsRef<[u8]>,
+    {
+        write_octet_string(self.cursor, self.event.as_ref(), self.index)
+    }
+}
+
+/// write an event after others in a header, if the header can hold it
+struct Append<'a, 'b, T> {
+    cursor: &'a mut WriteCursor<'b>,
+    event: &'a T,
+    index: u16,
+    header: EventHeader,
+}
+
+impl<T> Encoder<T> for Append<'_, '_, T> {
+    type Output = Result<Continue, WriteError>;
+
+    fn fixed<V>(self) -> Self::Output
+    where
+        V: FixedSizeVariation,
+        T: ToVariation<V>,
+    {
+        if self.header != EventHeader::Plain(V::VARIATION) {
+            return Ok(Continue::NewHeader);
+        }
+        write_fixed_size::<V, T>(self.cursor, self.event, self.index)?;
+        Ok(Continue::Ok)
+    }
+
+    fn cto<V>(self) -> Self::Output
+    where
+        V: FixedSizeVariation,
+        T: ToVariationCto<V>,
+    {
+        let EventHeader::Cto(variation, cto) = self.header else {
+            return Ok(Continue::NewHeader);
+        };
+        if variation != V::VARIATION {
+            return Ok(Continue::NewHeader);
+        }
+        write_cto::<V, T>(self.cursor, self.event, self.index, cto)
+    }
+
+    fn octet_string(self) -> Self::Output
+    where
+        T: AsRef<[u8]>,
+    {
+        let bytes = self.event.as_ref();
+        let same_length = u8::try_from(bytes.len())
+            .is_ok_and(|len| self.header == EventHeader::Plain(Variation::Group111(len)));
+        if !same_length {
+            return Ok(Continue::NewHeader);
+        }
+        write_octet_string(self.cursor, bytes, self.index)?;
+        Ok(Continue::Ok)
+    }
+}
 
 #[derive(Copy, Clone)]
 pub(crate) struct HeaderState {
@@ -16,16 +151,13 @@ pub(crate) struct HeaderState {
     count: u16,
     /// position where the final 2-byte count must be written
     count_position: usize,
-    /// the timestamp of the first value - used for CTO variations like g2v3/g4v3
-    cto: Time,
 }
 
 impl HeaderState {
-    fn new(count_position: usize, cto: Time) -> Self {
+    fn new(count_position: usize) -> Self {
         Self {
             count: 1,
             count_position,
-            cto,
         }
     }
 
@@ -39,34 +171,14 @@ impl HeaderState {
 }
 
 #[derive(Copy, Clone)]
-pub(crate) enum HeaderType {
-    Binary(EventBinaryInputVariation),
-    DoubleBitBinary(EventDoubleBitBinaryInputVariation),
-    BinaryOutputStatus(EventBinaryOutputStatusVariation),
-    Counter(EventCounterVariation),
-    FrozenCounter(EventFrozenCounterVariation),
-    Analog(EventAnalogInputVariation),
-    AnalogOutputStatus(EventAnalogOutputStatusVariation),
-    OctetString(OctetStringLength),
-}
-
-#[derive(Copy, Clone)]
 enum State {
     Start,
-    InProgress(HeaderState, HeaderType),
+    InProgress(HeaderState, EventHeader),
     Full,
 }
 
 pub(crate) struct EventWriter {
     state: State,
-}
-
-pub(crate) trait Writable: Sized {
-    type EventVariation: PartialEq + EventVariation<Self>;
-
-    fn get_header_variation(&self, header: &HeaderType) -> Option<Self::EventVariation>;
-
-    fn get_time(&self) -> Option<Time>;
 }
 
 impl EventWriter {
@@ -76,15 +188,15 @@ impl EventWriter {
         }
     }
 
-    pub(crate) fn write<E>(
+    pub(crate) fn write<T, V>(
         &mut self,
         cursor: &mut WriteCursor,
-        event: &E,
+        event: &T,
         index: u16,
-        variation: E::EventVariation,
+        variation: V,
     ) -> Result<(), BadWrite>
     where
-        E: Writable,
+        V: EventVariation<T>,
     {
         // we don't have to worry about setting state to FULL on errors since this traps all errors
         let result = self.try_write(cursor, event, index, variation);
@@ -94,252 +206,114 @@ impl EventWriter {
         result
     }
 
-    fn try_write<E>(
+    fn try_write<T, V>(
         &mut self,
         cursor: &mut WriteCursor,
-        event: &E,
+        event: &T,
         index: u16,
-        variation: E::EventVariation,
+        variation: V,
     ) -> Result<(), BadWrite>
     where
-        E: Writable,
+        V: EventVariation<T>,
     {
-        match self.state {
-            State::Full => Err(BadWrite),
-            State::Start => self.start_new_header(cursor, event, index, variation),
-            State::InProgress(state, header_type) => {
-                match event.get_header_variation(&header_type) {
-                    // different type of header
-                    None => self.start_new_header(cursor, event, index, variation),
-                    // same type of header
-                    Some(current_variation) => {
-                        if current_variation != variation {
-                            self.start_new_header(cursor, event, index, variation)
-                        } else {
-                            // a header whose count is full needs a new header
-                            let Some(new_state) = state.increment() else {
-                                return self.start_new_header(cursor, event, index, variation);
-                            };
+        let (state, header) = match self.state {
+            State::Full => return Err(BadWrite),
+            State::Start => return self.start_new_header(cursor, event, index, variation),
+            State::InProgress(state, header) => (state, header),
+        };
 
-                            let result: Continue = cursor.transaction(|c| {
-                                current_variation.write(c, event, index, state.cto)
-                            })?;
+        // a header whose count is full needs a new header
+        let Some(new_state) = state.increment() else {
+            return self.start_new_header(cursor, event, index, variation);
+        };
 
-                            match result {
-                                Continue::Ok => {
-                                    // write the new count at the count position
-                                    cursor.at_pos(state.count_position, |cur| {
-                                        cur.write_u16_le(new_state.count)
-                                    })?;
-                                    self.state = State::InProgress(new_state, header_type);
-                                    Ok(())
-                                }
-                                Continue::NewHeader => {
-                                    self.start_new_header(cursor, event, index, variation)
-                                }
-                            }
-                        }
-                    }
-                }
+        let result = cursor.transaction(|cursor| {
+            variation.encode(Append {
+                cursor,
+                event,
+                index,
+                header,
+            })
+        })?;
+
+        match result {
+            Continue::Ok => {
+                // write the new count at the count position
+                cursor.at_pos(state.count_position, |cur| {
+                    cur.write_u16_le(new_state.count)
+                })?;
+                self.state = State::InProgress(new_state, header);
+                Ok(())
             }
+            Continue::NewHeader => self.start_new_header(cursor, event, index, variation),
         }
     }
 
     fn write_event_header(
         cursor: &mut WriteCursor,
-        group: u8,
-        variation: u8,
+        variation: Variation,
     ) -> Result<usize, WriteError> {
-        cursor.write_u8(group)?;
-        cursor.write_u8(variation)?;
+        variation.write(cursor)?;
         cursor.write_u8(QualifierCode::CountAndPrefix16.as_u8())?;
         let count_pos = cursor.position();
         cursor.write_u16_le(1)?;
         Ok(count_pos)
     }
 
-    fn write_cto_header<T>(cursor: &mut WriteCursor, cto: &T) -> Result<(), WriteError>
+    fn write_cto_header(cursor: &mut WriteCursor, cto: Time) -> Result<(), WriteError> {
+        let time = cto.timestamp();
+        if cto.is_synchronized() {
+            Self::write_cto_object(cursor, &Group51Var1 { time })
+        } else {
+            Self::write_cto_object(cursor, &Group51Var2 { time })
+        }
+    }
+
+    fn write_cto_object<C>(cursor: &mut WriteCursor, cto: &C) -> Result<(), WriteError>
     where
-        T: FixedSize + FixedSizeVariation,
+        C: FixedSize + FixedSizeVariation,
     {
-        let (g, v) = T::VARIATION.to_group_and_var();
-        cursor.write_u8(g)?;
-        cursor.write_u8(v)?;
+        C::VARIATION.write(cursor)?;
         cursor.write_u8(QualifierCode::Count8.as_u8())?;
         cursor.write_u8(1)?;
         cto.write(cursor)?;
         Ok(())
     }
 
-    fn start_new_header<E>(
+    fn start_new_header<T, V>(
         &mut self,
         cursor: &mut WriteCursor,
-        event: &E,
+        event: &T,
         index: u16,
-        variation: E::EventVariation,
+        variation: V,
     ) -> Result<(), BadWrite>
     where
-        E: Writable,
+        V: EventVariation<T>,
     {
-        let time = event
-            .get_time()
-            .unwrap_or_else(|| Time::Unsynchronized(Timestamp::new(0)));
+        let header = variation.encode(StartHeader(event))?;
 
-        let write_op = |cursor: &mut WriteCursor| -> Result<usize, WriteError> {
-            if variation.uses_cto() {
-                if time.is_synchronized() {
-                    Self::write_cto_header(
-                        cursor,
-                        &Group51Var1 {
-                            time: time.timestamp(),
-                        },
-                    )?;
-                } else {
-                    Self::write_cto_header(
-                        cursor,
-                        &Group51Var2 {
-                            time: time.timestamp(),
-                        },
-                    )?;
-                }
+        let count_pos: usize = cursor.transaction(|cursor| {
+            if let EventHeader::Cto(_, cto) = header {
+                Self::write_cto_header(cursor, cto)?;
             }
-
-            let (group, var) = variation.get_group_var(event)?;
-            let count_pos = Self::write_event_header(cursor, group, var)?;
-            variation.write(cursor, event, index, time).map(|_| ())?;
+            let count_pos = Self::write_event_header(cursor, header.variation())?;
+            variation.encode(WriteFirst {
+                cursor,
+                event,
+                index,
+            })?;
             Ok(count_pos)
-        };
+        })?;
 
-        let count_pos: usize = cursor.transaction(write_op)?;
-
-        self.state = State::InProgress(HeaderState::new(count_pos, time), variation.wrap());
+        self.state = State::InProgress(HeaderState::new(count_pos), header);
         Ok(())
-    }
-}
-
-impl Writable for BinaryInput {
-    type EventVariation = EventBinaryInputVariation;
-
-    fn get_header_variation(&self, header: &HeaderType) -> Option<Self::EventVariation> {
-        match header {
-            HeaderType::Binary(var) => Some(*var),
-            _ => None,
-        }
-    }
-
-    fn get_time(&self) -> Option<Time> {
-        self.time
-    }
-}
-
-impl Writable for DoubleBitBinaryInput {
-    type EventVariation = EventDoubleBitBinaryInputVariation;
-
-    fn get_header_variation(&self, header: &HeaderType) -> Option<Self::EventVariation> {
-        match header {
-            HeaderType::DoubleBitBinary(var) => Some(*var),
-            _ => None,
-        }
-    }
-
-    fn get_time(&self) -> Option<Time> {
-        self.time
-    }
-}
-
-impl Writable for BinaryOutputStatus {
-    type EventVariation = EventBinaryOutputStatusVariation;
-
-    fn get_header_variation(&self, header: &HeaderType) -> Option<Self::EventVariation> {
-        match header {
-            HeaderType::BinaryOutputStatus(var) => Some(*var),
-            _ => None,
-        }
-    }
-
-    fn get_time(&self) -> Option<Time> {
-        self.time
-    }
-}
-
-impl Writable for Counter {
-    type EventVariation = EventCounterVariation;
-
-    fn get_header_variation(&self, header: &HeaderType) -> Option<Self::EventVariation> {
-        match header {
-            HeaderType::Counter(var) => Some(*var),
-            _ => None,
-        }
-    }
-
-    fn get_time(&self) -> Option<Time> {
-        self.time
-    }
-}
-
-impl Writable for FrozenCounter {
-    type EventVariation = EventFrozenCounterVariation;
-
-    fn get_header_variation(&self, header: &HeaderType) -> Option<Self::EventVariation> {
-        match header {
-            HeaderType::FrozenCounter(var) => Some(*var),
-            _ => None,
-        }
-    }
-
-    fn get_time(&self) -> Option<Time> {
-        self.time
-    }
-}
-
-impl Writable for AnalogInput {
-    type EventVariation = EventAnalogInputVariation;
-
-    fn get_header_variation(&self, header: &HeaderType) -> Option<Self::EventVariation> {
-        match header {
-            HeaderType::Analog(var) => Some(*var),
-            _ => None,
-        }
-    }
-
-    fn get_time(&self) -> Option<Time> {
-        self.time
-    }
-}
-
-impl Writable for AnalogOutputStatus {
-    type EventVariation = EventAnalogOutputStatusVariation;
-
-    fn get_header_variation(&self, header: &HeaderType) -> Option<Self::EventVariation> {
-        match header {
-            HeaderType::AnalogOutputStatus(var) => Some(*var),
-            _ => None,
-        }
-    }
-
-    fn get_time(&self) -> Option<Time> {
-        self.time
-    }
-}
-
-impl Writable for Box<[u8]> {
-    type EventVariation = OctetStringLength;
-
-    fn get_header_variation(&self, header: &HeaderType) -> Option<Self::EventVariation> {
-        match header {
-            HeaderType::OctetString(var) => Some(*var),
-            _ => None,
-        }
-    }
-
-    fn get_time(&self) -> Option<Time> {
-        None
     }
 }
 
 #[cfg(test)]
 mod tests {
     use crate::app::measurement::Flags;
+    use crate::outstation::database::config::*;
 
     use super::*;
 

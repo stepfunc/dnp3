@@ -11,7 +11,7 @@ use crate::util::BadWrite;
 
 use super::writer::EventWriter;
 
-use crate::outstation::database::details::event::traits::OctetStringLength;
+use crate::outstation::database::details::family::Family;
 use crate::outstation::database::details::WriteProgress;
 use crate::outstation::{BufferState, ClassCount, OutstationApplication, TypeCount};
 use records::{EventRecord, EventState, Events};
@@ -94,7 +94,7 @@ pub(crate) enum EventType {
 }
 
 impl EventType {
-    const ALL: [EventType; 8] = [
+    pub(crate) const ALL: [EventType; 8] = [
         EventType::Binary,
         EventType::DoubleBitBinary,
         EventType::BinaryOutputStatus,
@@ -105,7 +105,7 @@ impl EventType {
         EventType::OctetString,
     ];
 
-    fn max(self, config: &EventBufferConfig) -> usize {
+    pub(crate) fn max(self, config: &EventBufferConfig) -> usize {
         usize::from(match self {
             EventType::Binary => config.max_binary,
             EventType::DoubleBitBinary => config.max_double_binary,
@@ -362,11 +362,15 @@ impl<T> Variation<T>
 where
     T: Copy,
 {
-    fn new(default: T) -> Self {
+    pub(crate) fn new(default: T) -> Self {
         Self {
             default,
             selected: default,
         }
+    }
+
+    fn select(&mut self, variation: T) {
+        self.selected = variation
     }
 
     fn select_default(&mut self) {
@@ -445,21 +449,9 @@ impl Event {
             Event::FrozenCounter(evt, v) => writer.write(cursor, evt, index, v.selected),
             Event::Analog(evt, v) => writer.write(cursor, evt, index, v.selected),
             Event::AnalogOutputStatus(evt, v) => writer.write(cursor, evt, index, v.selected),
-            Event::OctetString(evt, _) => {
-                writer.write(cursor, evt, index, OctetStringLength(evt.len()))
-            }
+            Event::OctetString(evt, v) => writer.write(cursor, evt, index, v.selected),
         }
     }
-}
-
-pub(crate) trait Insertable: Sized {
-    type EventVariation: Copy;
-
-    const TYPE: EventType;
-
-    fn create_event(&self, default_variation: Self::EventVariation) -> Event;
-    // set the selected variation if the event is of this type
-    fn select_variation(event: &mut Event, variation: Self::EventVariation) -> bool;
 }
 
 pub(crate) struct EventBuffer {
@@ -498,9 +490,9 @@ impl EventBuffer {
         default_variation: T::EventVariation,
     ) -> Result<u64, InsertError>
     where
-        T: Insertable,
+        T: Family,
     {
-        let max = T::TYPE.max(&self.config);
+        let max = T::EVENT_TYPE.max(&self.config);
 
         if max == 0 {
             return Err(InsertError::TypeMaxIsZero);
@@ -509,8 +501,8 @@ impl EventBuffer {
         let id = self.next;
         self.next = self.next.wrapping_add(1);
 
-        let discarded = if self.events.type_count(T::TYPE) >= max {
-            self.events.remove_oldest(T::TYPE)
+        let discarded = if self.events.type_count(T::EVENT_TYPE) >= max {
+            self.events.remove_oldest(T::EVENT_TYPE)
         } else {
             None
         };
@@ -575,9 +567,9 @@ impl EventBuffer {
     /// true if the buffer holds at least one event of the type, whatever its state
     pub(crate) fn has_events<T>(&self) -> bool
     where
-        T: Insertable,
+        T: Family,
     {
-        self.events.type_count(T::TYPE) > 0
+        self.events.type_count(T::EVENT_TYPE) > 0
     }
 
     pub(crate) fn select_by_class(&mut self, classes: EventClasses, limit: Option<usize>) -> usize {
@@ -597,7 +589,7 @@ impl EventBuffer {
         limit: Option<usize>,
     ) -> usize
     where
-        T: Insertable,
+        T: Family,
     {
         match specific_variation {
             Some(x) => self.select_specific_variation::<T>(limit, x),
@@ -611,18 +603,24 @@ impl EventBuffer {
         variation: T::EventVariation,
     ) -> usize
     where
-        T: Insertable,
+        T: Family,
     {
         self.events
-            .select(limit, |_, event| T::select_variation(event, variation))
+            .select(limit, |_, event| match T::event_variation(event) {
+                Some(v) => {
+                    v.select(variation);
+                    true
+                }
+                None => false,
+            })
     }
 
     fn select_default_variation<T>(&mut self, limit: Option<usize>) -> usize
     where
-        T: Insertable,
+        T: Family,
     {
         self.events.select(limit, |_, event| {
-            if event.event_type() == T::TYPE {
+            if event.event_type() == T::EVENT_TYPE {
                 event.select_default_variation();
                 true
             } else {
@@ -676,158 +674,6 @@ impl EventBuffer {
 
         if !is_any_full {
             self.is_overflown = false;
-        }
-    }
-}
-
-impl Insertable for measurement::BinaryInput {
-    type EventVariation = EventBinaryInputVariation;
-
-    const TYPE: EventType = EventType::Binary;
-
-    fn create_event(&self, default_variation: EventBinaryInputVariation) -> Event {
-        Event::Binary(*self, Variation::new(default_variation))
-    }
-
-    fn select_variation(event: &mut Event, variation: Self::EventVariation) -> bool {
-        if let Event::Binary(_, v) = event {
-            v.selected = variation;
-            true
-        } else {
-            false
-        }
-    }
-}
-
-impl Insertable for measurement::DoubleBitBinaryInput {
-    type EventVariation = EventDoubleBitBinaryInputVariation;
-
-    const TYPE: EventType = EventType::DoubleBitBinary;
-
-    fn create_event(&self, default_variation: EventDoubleBitBinaryInputVariation) -> Event {
-        Event::DoubleBitBinary(*self, Variation::new(default_variation))
-    }
-
-    fn select_variation(event: &mut Event, variation: Self::EventVariation) -> bool {
-        if let Event::DoubleBitBinary(_, v) = event {
-            v.selected = variation;
-            true
-        } else {
-            false
-        }
-    }
-}
-
-impl Insertable for measurement::BinaryOutputStatus {
-    type EventVariation = EventBinaryOutputStatusVariation;
-
-    const TYPE: EventType = EventType::BinaryOutputStatus;
-
-    fn create_event(&self, default_variation: EventBinaryOutputStatusVariation) -> Event {
-        Event::BinaryOutputStatus(*self, Variation::new(default_variation))
-    }
-
-    fn select_variation(event: &mut Event, variation: Self::EventVariation) -> bool {
-        if let Event::BinaryOutputStatus(_, v) = event {
-            v.selected = variation;
-            true
-        } else {
-            false
-        }
-    }
-}
-
-impl Insertable for measurement::Counter {
-    type EventVariation = EventCounterVariation;
-
-    const TYPE: EventType = EventType::Counter;
-
-    fn create_event(&self, default_variation: EventCounterVariation) -> Event {
-        Event::Counter(*self, Variation::new(default_variation))
-    }
-
-    fn select_variation(event: &mut Event, variation: Self::EventVariation) -> bool {
-        if let Event::Counter(_, v) = event {
-            v.selected = variation;
-            true
-        } else {
-            false
-        }
-    }
-}
-
-impl Insertable for measurement::FrozenCounter {
-    type EventVariation = EventFrozenCounterVariation;
-
-    const TYPE: EventType = EventType::FrozenCounter;
-
-    fn create_event(&self, default_variation: EventFrozenCounterVariation) -> Event {
-        Event::FrozenCounter(*self, Variation::new(default_variation))
-    }
-
-    fn select_variation(event: &mut Event, variation: Self::EventVariation) -> bool {
-        if let Event::FrozenCounter(_, v) = event {
-            v.selected = variation;
-            true
-        } else {
-            false
-        }
-    }
-}
-
-impl Insertable for measurement::AnalogInput {
-    type EventVariation = EventAnalogInputVariation;
-
-    const TYPE: EventType = EventType::Analog;
-
-    fn create_event(&self, default_variation: EventAnalogInputVariation) -> Event {
-        Event::Analog(*self, Variation::new(default_variation))
-    }
-
-    fn select_variation(event: &mut Event, variation: Self::EventVariation) -> bool {
-        if let Event::Analog(_, v) = event {
-            v.selected = variation;
-            true
-        } else {
-            false
-        }
-    }
-}
-
-impl Insertable for measurement::AnalogOutputStatus {
-    type EventVariation = EventAnalogOutputStatusVariation;
-
-    const TYPE: EventType = EventType::AnalogOutputStatus;
-
-    fn create_event(&self, default_variation: EventAnalogOutputStatusVariation) -> Event {
-        Event::AnalogOutputStatus(*self, Variation::new(default_variation))
-    }
-
-    fn select_variation(event: &mut Event, variation: Self::EventVariation) -> bool {
-        if let Event::AnalogOutputStatus(_, v) = event {
-            v.selected = variation;
-            true
-        } else {
-            false
-        }
-    }
-}
-
-impl Insertable for measurement::OctetString {
-    type EventVariation = EventOctetStringVariation;
-
-    const TYPE: EventType = EventType::OctetString;
-
-    fn create_event(&self, default_variation: EventOctetStringVariation) -> Event {
-        Event::OctetString(self.as_boxed_slice(), Variation::new(default_variation))
-    }
-
-    fn select_variation(event: &mut Event, variation: Self::EventVariation) -> bool {
-        if let Event::OctetString(_, v) = event {
-            v.selected = variation;
-            true
-        } else {
-            false
         }
     }
 }

@@ -1,6 +1,7 @@
 use std::sync::{Arc, Mutex};
 
 pub use config::*;
+use details::event::buffer::EventType;
 use details::range::static_db::{Deadband, FlagsDetector, OctetStringDetector, PointConfig};
 
 use crate::app::measurement::*;
@@ -191,19 +192,7 @@ impl EventBufferConfig {
     }
 
     fn max_events(&self) -> usize {
-        [
-            self.max_binary,
-            self.max_double_binary,
-            self.max_binary_output_status,
-            self.max_counter,
-            self.max_frozen_counter,
-            self.max_analog,
-            self.max_analog_output_status,
-            self.max_octet_string,
-        ]
-        .into_iter()
-        .map(usize::from)
-        .sum()
+        EventType::ALL.into_iter().map(|t| t.max(self)).sum()
     }
 }
 

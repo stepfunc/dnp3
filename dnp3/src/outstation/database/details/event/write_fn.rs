@@ -4,6 +4,7 @@ use crate::app::variations::{Group2Var3, Group4Var3};
 
 use scursor::{WriteCursor, WriteError};
 
+/// whether an event joined the header in progress
 pub(crate) enum Continue {
     Ok,
     NewHeader,
@@ -26,20 +27,33 @@ where
     Ok(())
 }
 
-/// Conforms to the WriteFn<T> function type for any type can be converted to a variation that is fixed size
+/// write an event in a fixed-size variation
 pub(crate) fn write_fixed_size<V, T>(
     cursor: &mut WriteCursor,
     event: &T,
     index: u16,
-    _: Time,
-) -> Result<Continue, WriteError>
+) -> Result<(), WriteError>
 where
     T: ToVariation<V>,
     V: FixedSize,
 {
-    write_prefixed(cursor, &event.to_variation(), index).map(|_| Continue::Ok)
+    write_prefixed(cursor, &event.to_variation(), index)
 }
 
+/// write the first event of a header whose CTO is the event's time
+pub(crate) fn write_cto_first<V, T>(
+    cursor: &mut WriteCursor,
+    event: &T,
+    index: u16,
+) -> Result<(), WriteError>
+where
+    T: ToVariationCto<V>,
+    V: FixedSize,
+{
+    write_prefixed(cursor, &event.to_cto_variation(0), index)
+}
+
+/// write an event relative to the CTO of the header in progress, if its time can be
 pub(crate) fn write_cto<V, T>(
     cursor: &mut WriteCursor,
     event: &T,
@@ -76,10 +90,9 @@ pub(crate) fn write_octet_string(
     cursor: &mut WriteCursor,
     event: &[u8],
     index: u16,
-) -> Result<Continue, WriteError> {
+) -> Result<(), WriteError> {
     cursor.write_u16_le(index)?;
-    cursor.write_bytes(event)?;
-    Ok(Continue::Ok)
+    cursor.write_bytes(event)
 }
 
 impl ToVariationCto<Group2Var3> for BinaryInput {

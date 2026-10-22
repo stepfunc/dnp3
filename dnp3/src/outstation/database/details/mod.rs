@@ -1,6 +1,7 @@
 pub(crate) mod attrs;
 pub(crate) mod database;
 pub(crate) mod event;
+pub(crate) mod family;
 pub(crate) mod range;
 
 /// whether a part of a response wrote everything it selected into the fragment

@@ -140,12 +140,12 @@ impl<T> RangeWriter<T> {
         value: &T,
         info: WriteInfo<T>,
     ) -> Result<State<T>, BadWrite> {
-        let variation = info.variation;
+        let variation = info.variation();
         let state = match &self.state {
             State::Full => return Err(BadWrite),
             State::Start => Self::start_header(cursor, index, value, info)?,
             State::Header(variation, header) => {
-                if *variation == info.variation && is_consecutive(header.index, index) {
+                if *variation == info.variation() && is_consecutive(header.index, index) {
                     Self::write_next_value(cursor, header, index, value)?
                 } else {
                     Self::start_header(cursor, index, value, info)?
@@ -163,11 +163,11 @@ impl<T> RangeWriter<T> {
         info: WriteInfo<T>,
     ) -> Result<HeaderState<T>, BadWrite> {
         let ret = cursor.transaction(|cur| {
-            let stop_pos = write_header(cur, info.variation, index)?;
+            let stop_pos = write_header(cur, info.variation(), index)?;
             Ok(HeaderState::new(
                 index,
                 stop_pos,
-                info.write_type.write_first_value(cur, value)?,
+                info.write_type().write_first_value(cur, value)?,
             ))
         })?;
         Ok(ret)
