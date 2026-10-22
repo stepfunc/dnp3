@@ -31,16 +31,16 @@ use crate::util::phys::PhysLayer;
 use crate::util::session::{Enabled, RunError};
 use crate::util::test_support::watchdog;
 
-const MASTER: EndpointAddress = EndpointAddress::raw(1);
-const OUTSTATION: EndpointAddress = EndpointAddress::raw(1024);
-const OTHER: EndpointAddress = EndpointAddress::raw(2048);
+pub(super) const MASTER: EndpointAddress = EndpointAddress::raw(1);
+pub(super) const OUTSTATION: EndpointAddress = EndpointAddress::raw(1024);
+pub(super) const OTHER: EndpointAddress = EndpointAddress::raw(2048);
 
 const STEP: Duration = Duration::from_millis(250);
 const RESPONSE_TIMEOUT: Duration = Duration::from_secs(1);
 
 // link control bytes sent by an outstation (DIR = 0)
-const LINK_STATUS: u8 = 0x0B;
-const REQUEST_LINK_STATUS: u8 = 0x49;
+pub(super) const LINK_STATUS: u8 = 0x0B;
+pub(super) const REQUEST_LINK_STATUS: u8 = 0x49;
 
 /// A data frame from an outstation to the master carrying one transport segment
 fn segment(source: EndpointAddress, fir: bool, fin: bool, seq: u8, data: &[u8]) -> Vec<u8> {
@@ -59,11 +59,11 @@ fn segment(source: EndpointAddress, fir: bool, fin: bool, seq: u8, data: &[u8]) 
 }
 
 /// A whole fragment from the outstation in one segment
-fn fragment(source: EndpointAddress, data: &[u8]) -> Vec<u8> {
+pub(super) fn fragment(source: EndpointAddress, data: &[u8]) -> Vec<u8> {
     segment(source, true, true, 0, data)
 }
 
-fn header_only(source: EndpointAddress, control: u8) -> Vec<u8> {
+pub(super) fn header_only(source: EndpointAddress, control: u8) -> Vec<u8> {
     let header = Header::new(ControlField::from(control), MASTER.wrap(), source.wrap());
     let mut buffer = [0; MAX_LINK_FRAME_LENGTH];
     let mut cursor = WriteCursor::new(&mut buffer);
@@ -74,12 +74,12 @@ fn header_only(source: EndpointAddress, control: u8) -> Vec<u8> {
 }
 
 /// The application data of a frame written by the master, which carries a single segment
-fn app_data(frame: &[u8]) -> &[u8] {
+pub(super) fn app_data(frame: &[u8]) -> &[u8] {
     // 10 header bytes, the transport header, then the data and its 2-byte CRC
     &frame[11..frame.len().saturating_sub(2)]
 }
 
-struct NullHandler;
+pub(super) struct NullHandler;
 impl ReadHandler for NullHandler {}
 impl AssociationHandler for NullHandler {}
 impl AssociationInformation for NullHandler {}
@@ -157,7 +157,7 @@ fn config() -> AssociationConfig {
     }
 }
 
-fn null() -> Box<NullHandler> {
+pub(super) fn null() -> Box<NullHandler> {
     Box::new(NullHandler)
 }
 
