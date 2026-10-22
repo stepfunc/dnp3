@@ -657,7 +657,7 @@ async fn restart_iin_in_integrity_or_enable_unsolicited_response_starts_the_sequ
 }
 
 #[tokio::test(start_paused = true)]
-async fn clear_restart_answered_with_restart_iin_reports_success_and_retries_after_the_backoff() {
+async fn clear_restart_answered_with_restart_iin_reports_failure_and_retries_after_the_backoff() {
     watchdog(async {
         let mut seq = Sequence::default();
         let mut harness = create_association(AssociationConfig::quiet()).await;
@@ -691,10 +691,9 @@ async fn clear_restart_answered_with_restart_iin_reports_success_and_retries_aft
                     FunctionCode::Write,
                     Sequence::new(0)
                 ),
-                AssocInfoEvent::TaskSuccess(
+                AssocInfoEvent::TaskFailure(
                     TaskType::ClearRestartBit,
-                    FunctionCode::Write,
-                    Sequence::new(0)
+                    TaskError::UnexpectedResponseHeaders
                 ),
                 AssocInfoEvent::TaskStart(
                     TaskType::ClearRestartBit,
