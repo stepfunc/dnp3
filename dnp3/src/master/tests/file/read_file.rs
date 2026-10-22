@@ -466,86 +466,196 @@ async fn aborts_on_unexpected_open_variation() {
     );
 }
 
-/// Run a read against a READ response that ends it, and check how the task finished
-async fn read_failure(
-    config: FileReadConfig,
-    abort: bool,
-    response: Vec<u8>,
-    finished: Finished,
-) -> Vec<Event> {
+/// A READ response that ends the transfer early, after which the master closes the file
+#[derive(Copy, Clone, Debug)]
+enum Ending {
+    /// READ is answered with a g70v4
+    BlockVariation,
+    /// READ returns a block other than the one requested
+    BlockNumber,
+    /// READ is answered without an object header
+    NoObjectHeader,
+    /// the block exceeds the configured maximum file size
+    MaxFileSize,
+    /// the reader aborts a block that isn't the last
+    ReaderAbort,
+    /// the reader aborts the last block
+    ReaderAbortOnLastBlock,
+}
+
+const ENDINGS: [Ending; 6] = [
+    Ending::BlockVariation,
+    Ending::BlockNumber,
+    Ending::NoObjectHeader,
+    Ending::MaxFileSize,
+    Ending::ReaderAbort,
+    Ending::ReaderAbortOnLastBlock,
+];
+
+impl Ending {
+    fn config(self) -> FileReadConfig {
+        match self {
+            Self::MaxFileSize => FileReadConfig {
+                max_block_size: 256,
+                max_file_size: 3,
+            },
+            Self::BlockVariation
+            | Self::BlockNumber
+            | Self::NoObjectHeader
+            | Self::ReaderAbort
+            | Self::ReaderAbortOnLastBlock => read_config(),
+        }
+    }
+
+    fn reader_aborts(self) -> bool {
+        match self {
+            Self::ReaderAbort | Self::ReaderAbortOnLastBlock => true,
+            Self::BlockVariation | Self::BlockNumber | Self::NoObjectHeader | Self::MaxFileSize => {
+                false
+            }
+        }
+    }
+
+    fn response(self) -> Vec<u8> {
+        match self {
+            Self::BlockVariation => open_response(1, FileStatus::Success),
+            Self::BlockNumber => super::file_transport_response(1, HANDLE, 1, b"data"),
+            Self::NoObjectHeader => super::no_object_response(1),
+            Self::MaxFileSize | Self::ReaderAbort => {
+                super::file_transport_response(1, HANDLE, 0, b"data")
+            }
+            Self::ReaderAbortOnLastBlock => {
+                super::file_transport_response(1, HANDLE, super::last_block(0), b"data")
+            }
+        }
+    }
+
+    /// What the reader is told after it opened the file, all before the CLOSE
+    fn events(self) -> Vec<Event> {
+        match self {
+            Self::BlockVariation => vec![Event::Abort(FileError::BadResponse)],
+            Self::BlockNumber => vec![Event::Abort(FileError::BadBlockNum)],
+            Self::NoObjectHeader => vec![Event::Abort(FileError::TaskError(
+                TaskError::UnexpectedResponseHeaders,
+            ))],
+            Self::MaxFileSize => vec![Event::Abort(FileError::MaxLengthExceeded)],
+            Self::ReaderAbort | Self::ReaderAbortOnLastBlock => vec![
+                Event::Rx(0, b"data".to_vec()),
+                Event::Abort(FileError::AbortByUser),
+            ],
+        }
+    }
+}
+
+fn close_success(seq: u8) -> Vec<u8> {
+    super::file_status_response(seq, HANDLE, 0, 0, FileStatus::Success)
+}
+
+/// CLOSE responses that fail validation: a bad status, the wrong handle, the wrong variation,
+/// and no object header
+fn bad_close_responses(seq: u8) -> [Vec<u8>; 4] {
+    [
+        super::file_status_response(seq, HANDLE, 0, 0, FileStatus::InvalidHandle),
+        super::file_status_response(seq, HANDLE + 1, 0, 0, FileStatus::Success),
+        super::file_transport_response(seq, HANDLE, 0, b""),
+        super::no_object_response(seq),
+    ]
+}
+
+/// Run a read against a READ response that ends it early, check that the reader is told once and
+/// before the master closes the file, answer the CLOSE with `close`, and check how the task finished
+async fn read_failure(ending: Ending, close: Vec<u8>, finished: Finished) {
     let mut harness = create_association(AssociationConfig::quiet()).await;
-    let events = start_read(&mut harness, config, None).await;
+    let events = start_read(&mut harness, ending.config(), None).await;
     open_file(&mut harness, &events).await;
-    if abort {
+    if ending.reader_aborts() {
         events.state().action = FileAction::Abort;
     }
-    harness.process_response(response).await;
+    harness.process_response(ending.response()).await;
+    harness
+        .expect_write(close_request_bytes_for(0xC2, HANDLE))
+        .await;
+    assert_eq!(
+        std::iter::from_fn(|| events.pop()).collect::<Vec<_>>(),
+        ending.events(),
+        "{ending:?}"
+    );
+    harness.process_response(close).await;
     expect_finished(&mut harness, FunctionCode::OpenFile, finished).await;
     harness.assert_no_events();
-    std::iter::from_fn(|| events.pop()).collect()
+    assert_eq!(events.pop(), None, "{ending:?}");
 }
 
 #[tokio::test]
-async fn aborts_on_unexpected_read_variation_without_close() {
-    assert_eq!(
-        read_failure(
-            read_config(),
-            false,
-            open_response(1, FileStatus::Success),
-            Finished::Failure
-        )
-        .await,
-        [Event::Abort(FileError::BadResponse)]
-    );
+async fn aborts_on_unexpected_read_variation_and_closes_file() {
+    read_failure(Ending::BlockVariation, close_success(2), Finished::Failure).await;
 }
 
 #[tokio::test]
-async fn aborts_on_wrong_block_number() {
-    assert_eq!(
-        read_failure(
-            read_config(),
-            false,
-            super::file_transport_response(1, HANDLE, 1, b"data"),
-            Finished::Failure
-        )
-        .await,
-        [Event::Abort(FileError::BadBlockNum)]
-    );
+async fn aborts_on_wrong_block_number_and_closes_file() {
+    read_failure(Ending::BlockNumber, close_success(2), Finished::Failure).await;
 }
 
 #[tokio::test]
-async fn aborts_when_max_file_size_is_exceeded() {
-    let config = FileReadConfig {
-        max_block_size: 256,
-        max_file_size: 3,
-    };
-    assert_eq!(
-        read_failure(
-            config,
-            false,
-            super::file_transport_response(1, HANDLE, 0, b"data"),
-            Finished::Success(1)
-        )
-        .await,
-        [Event::Abort(FileError::MaxLengthExceeded)]
-    );
+async fn aborts_on_read_response_without_object_header_and_closes_file() {
+    read_failure(Ending::NoObjectHeader, close_success(2), Finished::Failure).await;
 }
 
 #[tokio::test]
-async fn aborts_when_reader_aborts_block() {
-    assert_eq!(
-        read_failure(
-            read_config(),
-            true,
-            super::file_transport_response(1, HANDLE, 0, b"data"),
-            Finished::Success(1)
-        )
-        .await,
-        [
-            Event::Rx(0, b"data".to_vec()),
-            Event::Abort(FileError::AbortByUser)
-        ]
-    );
+async fn aborts_when_max_file_size_is_exceeded_and_closes_file() {
+    read_failure(Ending::MaxFileSize, close_success(2), Finished::Success(2)).await;
+}
+
+#[tokio::test]
+async fn aborts_when_reader_aborts_block_and_closes_file() {
+    read_failure(Ending::ReaderAbort, close_success(2), Finished::Success(2)).await;
+}
+
+#[tokio::test]
+async fn aborts_when_reader_aborts_last_block_and_closes_file() {
+    read_failure(
+        Ending::ReaderAbortOnLastBlock,
+        close_success(2),
+        Finished::Success(2),
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn bad_close_after_an_early_end_fails_task_without_another_callback() {
+    for ending in ENDINGS {
+        for close in bad_close_responses(2) {
+            read_failure(ending, close, Finished::Failure).await;
+        }
+    }
+}
+
+/// Run a read whose reader aborts when the file opens, and answer the CLOSE with `close`
+async fn open_abort(close: Vec<u8>, finished: Finished) {
+    let mut harness = create_association(AssociationConfig::quiet()).await;
+    let events = start_read(&mut harness, read_config(), None).await;
+    events.state().action = FileAction::Abort;
+    harness.expect_write(open_request(0, 0)).await;
+    harness
+        .process_response(open_response(0, FileStatus::Success))
+        .await;
+    harness
+        .expect_write(close_request_bytes_for(0xC1, HANDLE))
+        .await;
+    assert_eq!(events.pop(), Some(Event::Open(8)));
+    assert_eq!(events.pop(), Some(Event::Abort(FileError::AbortByUser)));
+    assert_eq!(events.pop(), None);
+    harness.process_response(close).await;
+    expect_finished(&mut harness, FunctionCode::OpenFile, finished).await;
+    harness.assert_no_events();
+    assert_eq!(events.pop(), None);
+}
+
+#[tokio::test]
+async fn bad_close_after_open_abort_fails_task_without_another_callback() {
+    for close in bad_close_responses(1) {
+        open_abort(close, Finished::Failure).await;
+    }
 }
 
 /// Run a read to the CLOSE and answer it with `response`, which never reaches the reader
@@ -561,36 +671,32 @@ async fn close_outcome(response: Vec<u8>, finished: Finished) {
 
 #[tokio::test]
 async fn close_success_completes_task() {
-    close_outcome(
-        super::file_status_response(2, HANDLE, 0, 0, FileStatus::Success),
-        Finished::Success(2),
-    )
-    .await;
+    close_outcome(close_success(2), Finished::Success(2)).await;
 }
 
 #[tokio::test]
-async fn close_bad_status_is_only_logged() {
+async fn close_bad_status_fails_task() {
     close_outcome(
         super::file_status_response(2, HANDLE, 0, 0, FileStatus::InvalidHandle),
-        Finished::Success(2),
+        Finished::Failure,
     )
     .await;
 }
 
 #[tokio::test]
-async fn close_wrong_handle_is_ignored() {
+async fn close_wrong_handle_fails_task() {
     close_outcome(
         super::file_status_response(2, HANDLE + 1, 0, 0, FileStatus::Success),
-        Finished::Success(2),
+        Finished::Failure,
     )
     .await;
 }
 
 #[tokio::test]
-async fn close_unexpected_variation_is_only_logged() {
+async fn close_unexpected_variation_fails_task() {
     close_outcome(
         super::file_transport_response(2, HANDLE, 0, b""),
-        Finished::Success(2),
+        Finished::Failure,
     )
     .await;
 }

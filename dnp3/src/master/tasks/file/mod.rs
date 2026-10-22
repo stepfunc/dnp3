@@ -100,16 +100,30 @@ pub(super) fn parse_open_response(header: ObjectHeader) -> Result<OpenFile, File
     })
 }
 
-/// Extract the status object of a CLOSE response; [`check_close_status`] checks its status
-pub(super) fn parse_close_response(header: ObjectHeader<'_>) -> Result<Group70Var4<'_>, FileError> {
-    parse_status_object(header, "CLOSE")
-}
+/// Check that a CLOSE response is the status object for `handle`, and that it reports success
+pub(super) fn check_close_response(
+    handle: FileHandle,
+    header: ObjectHeader<'_>,
+) -> Result<(), FileError> {
+    let obj = parse_status_object(header, "CLOSE")?;
 
-pub(super) fn check_close_status(status: FileStatus) -> Result<(), FileError> {
-    if status != FileStatus::Success {
-        tracing::warn!("Unable to close file (status code == {status:?})");
-        return Err(FileError::BadStatus(status));
+    if obj.file_handle != u32::from(handle) {
+        tracing::warn!(
+            "File CLOSE response has handle {:#010X}, expected {:#010X}",
+            obj.file_handle,
+            u32::from(handle)
+        );
+        return Err(FileError::WrongHandle);
     }
+
+    if obj.status_code != FileStatus::Success {
+        tracing::warn!(
+            "Unable to close file (status code == {:?})",
+            obj.status_code
+        );
+        return Err(FileError::BadStatus(obj.status_code));
+    }
+
     Ok(())
 }
 

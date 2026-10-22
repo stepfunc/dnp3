@@ -1259,16 +1259,16 @@ impl FileReader for RecordingReader {
 
 /// Start a file read, open the file, and wait for the request for the first block
 async fn read_first_block() -> (TestHarness, RecordingReader) {
+    read_first_block_with(FileReadConfig::default()).await
+}
+
+/// [`read_first_block`] with this configuration
+async fn read_first_block_with(config: FileReadConfig) -> (TestHarness, RecordingReader) {
     let mut harness = create_association(AssociationConfig::quiet()).await;
     let reader = RecordingReader::default();
     harness
         .association
-        .read_file(
-            "f.txt",
-            FileReadConfig::default(),
-            Box::new(reader.clone()),
-            None,
-        )
+        .read_file("f.txt", config, Box::new(reader.clone()), None)
         .await
         .unwrap();
     next_request(&mut harness, 0, FunctionCode::OpenFile).await;
@@ -1434,6 +1434,16 @@ async fn file_read_aborts_the_reader_once_when_the_master_shuts_down() {
     .await;
 }
 
+/// Expect the CLOSE that follows the READ with sequence 1, and close the file
+async fn close_file(harness: &mut TestHarness) {
+    next_request(harness, 2, FunctionCode::CloseFile).await;
+    respond(
+        harness,
+        file_status_response(2, HANDLE, 0, 0, FileStatus::Success),
+    )
+    .await;
+}
+
 /// A response from the outstation that ends a file read
 #[derive(Copy, Clone, Debug)]
 enum ContentFailure {
@@ -1530,11 +1540,13 @@ impl ContentFailure {
                     file_status_response(1, HANDLE, 0, 0, FileStatus::Success),
                 )
                 .await;
+                close_file(harness).await;
             }
             Self::BlockNumber => {
                 respond(harness, opened).await;
                 next_request(harness, 1, FunctionCode::Read).await;
                 respond(harness, file_transport_response(1, HANDLE, 1, b"data")).await;
+                close_file(harness).await;
             }
         }
     }
@@ -1658,8 +1670,14 @@ async fn directory_read_over_its_size_limit_fails_the_read_but_not_the_task() {
             file_transport_response(1, HANDLE, last_block(0), b"data"),
         )
         .await;
+        next_request(&mut harness, 2, FunctionCode::CloseFile).await;
         assert_eq!(reply.await.unwrap(), Err(FileError::MaxLengthExceeded));
-        expect_directory_task_success(&mut harness, 1).await;
+        respond(
+            &mut harness,
+            file_status_response(2, HANDLE, 0, 0, FileStatus::Success),
+        )
+        .await;
+        expect_directory_task_success(&mut harness, 2).await;
         assert_eq!(harness.io.pop_event(), None);
     })
     .await;
@@ -1695,6 +1713,199 @@ async fn directory_read_with_unparseable_entries_fails_the_read_but_not_the_task
         )
         .await;
         expect_directory_task_success(&mut harness, 2).await;
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn file_read_sends_no_close_after_a_malformed_read_response() {
+    watchdog(async {
+        for fragment in MALFORMED {
+            let (mut harness, reader) = read_first_block().await;
+            respond(&mut harness, fragment.to_vec()).await;
+            barrier(&mut harness).await;
+            assert_eq!(
+                reader.pop(),
+                [ReaderEvent::Aborted(FileError::TaskError(
+                    TaskError::Transport
+                ))]
+            );
+            assert_eq!(
+                harness.assoc_events.pop(),
+                [AssocInfoEvent::TaskFailure(
+                    TaskType::FileRead,
+                    TaskError::Transport
+                )]
+            );
+            assert_eq!(harness.io.pop_event(), None);
+        }
+    })
+    .await;
+}
+
+/// A READ response that ends a file read early, after which the master closes the file
+#[derive(Copy, Clone, Debug)]
+enum EarlyEnd {
+    /// the outstation returns a block other than the one requested
+    BlockNumber,
+    /// the block exceeds the configured maximum file size
+    SizeLimit,
+}
+
+const EARLY_ENDS: [EarlyEnd; 2] = [EarlyEnd::BlockNumber, EarlyEnd::SizeLimit];
+
+impl EarlyEnd {
+    fn max_file_size(self) -> usize {
+        match self {
+            Self::BlockNumber => 512,
+            Self::SizeLimit => 3,
+        }
+    }
+
+    /// The error that ends the read, which the reader or the directory read is given
+    fn error(self) -> FileError {
+        match self {
+            Self::BlockNumber => FileError::BadBlockNum,
+            Self::SizeLimit => FileError::MaxLengthExceeded,
+        }
+    }
+
+    /// Answer the READ with sequence 1 so that the read ends, and wait for the CLOSE
+    async fn end(self, harness: &mut TestHarness) {
+        let block = match self {
+            Self::BlockNumber => 1,
+            Self::SizeLimit => 0,
+        };
+        respond(harness, file_transport_response(1, HANDLE, block, b"data")).await;
+        next_request(harness, 2, FunctionCode::CloseFile).await;
+    }
+
+    /// Start a file read and end it early, checking that the reader was aborted before the CLOSE
+    async fn file_read(self) -> (TestHarness, RecordingReader) {
+        let (mut harness, reader) = read_first_block_with(FileReadConfig {
+            max_block_size: 512,
+            max_file_size: self.max_file_size(),
+        })
+        .await;
+        self.end(&mut harness).await;
+        assert_eq!(
+            reader.pop(),
+            [ReaderEvent::Aborted(self.error())],
+            "{self:?}"
+        );
+        (harness, reader)
+    }
+
+    /// Start a directory read and end it early, checking that it returned before the CLOSE
+    async fn directory_read(self) -> TestHarness {
+        let mut harness = create_association(AssociationConfig::quiet()).await;
+        let config = DirReadConfig {
+            max_block_size: 512,
+            max_file_size: self.max_file_size(),
+        };
+        let reply = start_directory_read(&mut harness, config, None, FunctionCode::OpenFile).await;
+        respond(
+            &mut harness,
+            file_status_response(0, HANDLE, 4, 512, FileStatus::Success),
+        )
+        .await;
+        next_request(&mut harness, 1, FunctionCode::Read).await;
+        self.end(&mut harness).await;
+        assert_eq!(reply.await.unwrap(), Err(self.error()), "{self:?}");
+        harness
+    }
+}
+
+/// Let the CLOSE time out
+async fn time_out(harness: &mut TestHarness) {
+    tokio::time::sleep(Duration::from_secs(2)).await;
+    barrier(harness).await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn file_read_cleanup_that_times_out_fails_the_task_without_another_callback() {
+    watchdog(async {
+        for end in EARLY_ENDS {
+            let (mut harness, reader) = end.file_read().await;
+            time_out(&mut harness).await;
+            assert_eq!(
+                harness.assoc_events.pop(),
+                [AssocInfoEvent::TaskFailure(
+                    TaskType::FileRead,
+                    TaskError::ResponseTimeout
+                )],
+                "{end:?}"
+            );
+            assert_eq!(reader.pop(), [], "{end:?}");
+            assert_eq!(harness.io.pop_event(), None, "{end:?}");
+        }
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn file_read_cleanup_rejected_by_iin2_fails_the_task_without_another_callback() {
+    watchdog(async {
+        for end in EARLY_ENDS {
+            let (mut harness, reader) = end.file_read().await;
+            respond(
+                &mut harness,
+                empty_response_custom_iin(Sequence::new(2), REJECTED),
+            )
+            .await;
+            barrier(&mut harness).await;
+            assert_eq!(
+                harness.assoc_events.pop(),
+                [AssocInfoEvent::TaskFailure(
+                    TaskType::FileRead,
+                    TaskError::RejectedByIin2(REJECTED)
+                )],
+                "{end:?}"
+            );
+            assert_eq!(reader.pop(), [], "{end:?}");
+            assert_eq!(harness.io.pop_event(), None, "{end:?}");
+        }
+    })
+    .await;
+}
+
+/// Check that the directory read that started with an OPEN failed with `err`
+async fn expect_directory_task_failure(harness: &mut TestHarness, err: TaskError) {
+    barrier(harness).await;
+    assert_eq!(
+        harness.assoc_events.pop(),
+        [
+            AssocInfoEvent::TaskStart(TaskType::FileRead, FunctionCode::OpenFile, Sequence::new(0)),
+            AssocInfoEvent::TaskFailure(TaskType::FileRead, err)
+        ]
+    );
+    assert_eq!(harness.io.pop_event(), None);
+}
+
+#[tokio::test(start_paused = true)]
+async fn directory_read_cleanup_with_a_bad_close_keeps_the_original_error() {
+    watchdog(async {
+        for end in EARLY_ENDS {
+            let mut harness = end.directory_read().await;
+            respond(
+                &mut harness,
+                file_status_response(2, HANDLE, 0, 0, FileStatus::InvalidHandle),
+            )
+            .await;
+            expect_directory_task_failure(&mut harness, TaskError::UnexpectedResponseHeaders).await;
+        }
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn directory_read_cleanup_that_times_out_keeps_the_original_error() {
+    watchdog(async {
+        for end in EARLY_ENDS {
+            let mut harness = end.directory_read().await;
+            time_out(&mut harness).await;
+            expect_directory_task_failure(&mut harness, TaskError::ResponseTimeout).await;
+        }
     })
     .await;
 }
