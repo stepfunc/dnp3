@@ -7,8 +7,9 @@ use crate::app::gen::prefixed::PrefixedVariation;
 use crate::app::parse::count::CountSequence;
 use crate::app::parse::parser::{HeaderCollection, HeaderDetails};
 use crate::app::parse::prefix::Prefix;
-use crate::app::parse::traits::{FixedSizeVariation, Index};
+use crate::app::parse::traits::Index;
 use crate::app::variations::*;
+use crate::app::CommandObject;
 use crate::app::Timestamp;
 use crate::app::Variation::Group0;
 use crate::master::error::CommandResponseError;
@@ -632,88 +633,129 @@ impl From<ReadHeader> for Header {
     }
 }
 
+/// A header of commands with a one-byte or two-byte count and index prefix
 #[derive(Clone)]
 pub(crate) enum CommandHeader {
-    G12V1U8(Vec<(Group12Var1, u8)>),
-    G41V1U8(Vec<(Group41Var1, u8)>),
-    G41V2U8(Vec<(Group41Var2, u8)>),
-    G41V3U8(Vec<(Group41Var3, u8)>),
-    G41V4U8(Vec<(Group41Var4, u8)>),
-    G12V1U16(Vec<(Group12Var1, u16)>),
-    G41V1U16(Vec<(Group41Var1, u16)>),
-    G41V2U16(Vec<(Group41Var2, u16)>),
-    G41V3U16(Vec<(Group41Var3, u16)>),
-    G41V4U16(Vec<(Group41Var4, u16)>),
+    U8(CommandItems<u8>),
+    U16(CommandItems<u16>),
 }
 
-pub(crate) trait Command {
-    fn status(&self) -> CommandStatus;
-    fn to_header_u8(&self, index: u8) -> CommandHeader;
-    fn to_header_u16(&self, index: u16) -> CommandHeader;
+/// The commands in a header, by object type
+#[derive(Clone)]
+pub(crate) enum CommandItems<I> {
+    G12V1(Vec<(Group12Var1, I)>),
+    G41V1(Vec<(Group41Var1, I)>),
+    G41V2(Vec<(Group41Var2, I)>),
+    G41V3(Vec<(Group41Var3, I)>),
+    G41V4(Vec<(Group41Var4, I)>),
+}
+
+/// A command object that `CommandBuilder` adds to a header of its type
+pub(crate) trait Command: CommandObject {
+    /// a header of `items`
+    fn header<I>(items: Vec<(Self, I)>) -> CommandItems<I>;
+
+    /// the items of `header` if it's of this type
+    fn items<I>(header: &mut CommandItems<I>) -> Option<&mut Vec<(Self, I)>>;
+}
+
+/// An index width that `CommandBuilder` addresses commands with
+pub(crate) trait CommandIndex: Index {
+    /// a header of `items`
+    fn header(items: CommandItems<Self>) -> CommandHeader;
+
+    /// the items of `header` if it has this index width
+    fn items(header: &mut CommandHeader) -> Option<&mut CommandItems<Self>>;
 }
 
 impl Command for Group12Var1 {
-    fn status(&self) -> CommandStatus {
-        self.status
+    fn header<I>(items: Vec<(Self, I)>) -> CommandItems<I> {
+        CommandItems::G12V1(items)
     }
 
-    fn to_header_u8(&self, index: u8) -> CommandHeader {
-        CommandHeader::G12V1U8(vec![(*self, index)])
-    }
-
-    fn to_header_u16(&self, index: u16) -> CommandHeader {
-        CommandHeader::G12V1U16(vec![(*self, index)])
+    fn items<I>(header: &mut CommandItems<I>) -> Option<&mut Vec<(Self, I)>> {
+        match header {
+            CommandItems::G12V1(items) => Some(items),
+            _ => None,
+        }
     }
 }
 
 impl Command for Group41Var1 {
-    fn status(&self) -> CommandStatus {
-        self.status
+    fn header<I>(items: Vec<(Self, I)>) -> CommandItems<I> {
+        CommandItems::G41V1(items)
     }
 
-    fn to_header_u8(&self, index: u8) -> CommandHeader {
-        CommandHeader::G41V1U8(vec![(*self, index)])
-    }
-
-    fn to_header_u16(&self, index: u16) -> CommandHeader {
-        CommandHeader::G41V1U16(vec![(*self, index)])
+    fn items<I>(header: &mut CommandItems<I>) -> Option<&mut Vec<(Self, I)>> {
+        match header {
+            CommandItems::G41V1(items) => Some(items),
+            _ => None,
+        }
     }
 }
 
 impl Command for Group41Var2 {
-    fn status(&self) -> CommandStatus {
-        self.status
+    fn header<I>(items: Vec<(Self, I)>) -> CommandItems<I> {
+        CommandItems::G41V2(items)
     }
-    fn to_header_u8(&self, index: u8) -> CommandHeader {
-        CommandHeader::G41V2U8(vec![(*self, index)])
-    }
-    fn to_header_u16(&self, index: u16) -> CommandHeader {
-        CommandHeader::G41V2U16(vec![(*self, index)])
+
+    fn items<I>(header: &mut CommandItems<I>) -> Option<&mut Vec<(Self, I)>> {
+        match header {
+            CommandItems::G41V2(items) => Some(items),
+            _ => None,
+        }
     }
 }
 
 impl Command for Group41Var3 {
-    fn status(&self) -> CommandStatus {
-        self.status
+    fn header<I>(items: Vec<(Self, I)>) -> CommandItems<I> {
+        CommandItems::G41V3(items)
     }
-    fn to_header_u8(&self, index: u8) -> CommandHeader {
-        CommandHeader::G41V3U8(vec![(*self, index)])
-    }
-    fn to_header_u16(&self, index: u16) -> CommandHeader {
-        CommandHeader::G41V3U16(vec![(*self, index)])
+
+    fn items<I>(header: &mut CommandItems<I>) -> Option<&mut Vec<(Self, I)>> {
+        match header {
+            CommandItems::G41V3(items) => Some(items),
+            _ => None,
+        }
     }
 }
 
 impl Command for Group41Var4 {
-    fn status(&self) -> CommandStatus {
-        self.status
-    }
-    fn to_header_u8(&self, index: u8) -> CommandHeader {
-        CommandHeader::G41V4U8(vec![(*self, index)])
+    fn header<I>(items: Vec<(Self, I)>) -> CommandItems<I> {
+        CommandItems::G41V4(items)
     }
 
-    fn to_header_u16(&self, index: u16) -> CommandHeader {
-        CommandHeader::G41V4U16(vec![(*self, index)])
+    fn items<I>(header: &mut CommandItems<I>) -> Option<&mut Vec<(Self, I)>> {
+        match header {
+            CommandItems::G41V4(items) => Some(items),
+            _ => None,
+        }
+    }
+}
+
+impl CommandIndex for u8 {
+    fn header(items: CommandItems<Self>) -> CommandHeader {
+        CommandHeader::U8(items)
+    }
+
+    fn items(header: &mut CommandHeader) -> Option<&mut CommandItems<Self>> {
+        match header {
+            CommandHeader::U8(items) => Some(items),
+            CommandHeader::U16(_) => None,
+        }
+    }
+}
+
+impl CommandIndex for u16 {
+    fn header(items: CommandItems<Self>) -> CommandHeader {
+        CommandHeader::U16(items)
+    }
+
+    fn items(header: &mut CommandHeader) -> Option<&mut CommandItems<Self>> {
+        match header {
+            CommandHeader::U8(_) => None,
+            CommandHeader::U16(items) => Some(items),
+        }
     }
 }
 
@@ -809,143 +851,14 @@ impl CommandBuilder {
         }
     }
 
-    fn add_g12v1_u8(&mut self, command: Group12Var1, index: u8) {
-        if let Some(partial) = self.partial.take() {
-            if let CommandHeader::G12V1U8(mut vec) = partial {
-                vec.push((command, index));
-                self.partial = Some(CommandHeader::G12V1U8(vec));
-            } else {
-                self.headers.push(partial);
-                self.partial = Some(command.to_header_u8(index));
-            }
+    /// Add the command to the partial header if it has the same type and index width, otherwise
+    /// finish that header and start another
+    fn push<C: Command, I: CommandIndex>(&mut self, command: C, index: I) {
+        if let Some(items) = self.partial.as_mut().and_then(I::items).and_then(C::items) {
+            items.push((command, index));
         } else {
-            self.partial = Some(command.to_header_u8(index));
-        }
-    }
-
-    fn add_g12v1_u16(&mut self, command: Group12Var1, index: u16) {
-        if let Some(partial) = self.partial.take() {
-            if let CommandHeader::G12V1U16(mut vec) = partial {
-                vec.push((command, index));
-                self.partial = Some(CommandHeader::G12V1U16(vec));
-            } else {
-                self.headers.push(partial);
-                self.partial = Some(command.to_header_u16(index));
-            }
-        } else {
-            self.partial = Some(command.to_header_u16(index));
-        }
-    }
-
-    fn add_g41v1_u8(&mut self, command: Group41Var1, index: u8) {
-        if let Some(partial) = self.partial.take() {
-            if let CommandHeader::G41V1U8(mut vec) = partial {
-                vec.push((command, index));
-                self.partial = Some(CommandHeader::G41V1U8(vec));
-            } else {
-                self.headers.push(partial);
-                self.partial = Some(command.to_header_u8(index));
-            }
-        } else {
-            self.partial = Some(command.to_header_u8(index));
-        }
-    }
-
-    fn add_g41v1_u16(&mut self, command: Group41Var1, index: u16) {
-        if let Some(partial) = self.partial.take() {
-            if let CommandHeader::G41V1U16(mut vec) = partial {
-                vec.push((command, index));
-                self.partial = Some(CommandHeader::G41V1U16(vec));
-            } else {
-                self.headers.push(partial);
-                self.partial = Some(command.to_header_u16(index));
-            }
-        } else {
-            self.partial = Some(command.to_header_u16(index));
-        }
-    }
-
-    fn add_g41v2_u8(&mut self, command: Group41Var2, index: u8) {
-        if let Some(partial) = self.partial.take() {
-            if let CommandHeader::G41V2U8(mut vec) = partial {
-                vec.push((command, index));
-                self.partial = Some(CommandHeader::G41V2U8(vec));
-            } else {
-                self.headers.push(partial);
-                self.partial = Some(command.to_header_u8(index));
-            }
-        } else {
-            self.partial = Some(command.to_header_u8(index));
-        }
-    }
-
-    fn add_g41v2_u16(&mut self, command: Group41Var2, index: u16) {
-        if let Some(partial) = self.partial.take() {
-            if let CommandHeader::G41V2U16(mut vec) = partial {
-                vec.push((command, index));
-                self.partial = Some(CommandHeader::G41V2U16(vec));
-            } else {
-                self.headers.push(partial);
-                self.partial = Some(command.to_header_u16(index));
-            }
-        } else {
-            self.partial = Some(command.to_header_u16(index));
-        }
-    }
-
-    fn add_g41v3_u8(&mut self, command: Group41Var3, index: u8) {
-        if let Some(partial) = self.partial.take() {
-            if let CommandHeader::G41V3U8(mut vec) = partial {
-                vec.push((command, index));
-                self.partial = Some(CommandHeader::G41V3U8(vec));
-            } else {
-                self.headers.push(partial);
-                self.partial = Some(command.to_header_u8(index));
-            }
-        } else {
-            self.partial = Some(command.to_header_u8(index));
-        }
-    }
-
-    fn add_g41v3_u16(&mut self, command: Group41Var3, index: u16) {
-        if let Some(partial) = self.partial.take() {
-            if let CommandHeader::G41V3U16(mut vec) = partial {
-                vec.push((command, index));
-                self.partial = Some(CommandHeader::G41V3U16(vec));
-            } else {
-                self.headers.push(partial);
-                self.partial = Some(command.to_header_u16(index));
-            }
-        } else {
-            self.partial = Some(command.to_header_u16(index));
-        }
-    }
-
-    fn add_g41v4_u8(&mut self, command: Group41Var4, index: u8) {
-        if let Some(partial) = self.partial.take() {
-            if let CommandHeader::G41V4U8(mut vec) = partial {
-                vec.push((command, index));
-                self.partial = Some(CommandHeader::G41V4U8(vec));
-            } else {
-                self.headers.push(partial);
-                self.partial = Some(command.to_header_u8(index));
-            }
-        } else {
-            self.partial = Some(command.to_header_u8(index));
-        }
-    }
-
-    fn add_g41v4_u16(&mut self, command: Group41Var4, index: u16) {
-        if let Some(partial) = self.partial.take() {
-            if let CommandHeader::G41V4U16(mut vec) = partial {
-                vec.push((command, index));
-                self.partial = Some(CommandHeader::G41V4U16(vec));
-            } else {
-                self.headers.push(partial);
-                self.partial = Some(command.to_header_u16(index));
-            }
-        } else {
-            self.partial = Some(command.to_header_u16(index));
+            self.finish_header();
+            self.partial = Some(CommandHeader::new(command, index));
         }
     }
 
@@ -960,91 +873,91 @@ impl CommandBuilder {
 
 impl CommandSupport<Group12Var1> for CommandBuilder {
     fn add_u8(&mut self, command: Group12Var1, index: u8) {
-        self.add_g12v1_u8(command, index);
+        self.push(command, index);
     }
 
     fn add_u16(&mut self, command: Group12Var1, index: u16) {
-        self.add_g12v1_u16(command, index);
+        self.push(command, index);
     }
 
     fn single_header_u8(command: Group12Var1, index: u8) -> CommandHeaders {
-        CommandHeaders::single(command.to_header_u8(index))
+        CommandHeaders::single(CommandHeader::new(command, index))
     }
 
     fn single_header_u16(command: Group12Var1, index: u16) -> CommandHeaders {
-        CommandHeaders::single(command.to_header_u16(index))
+        CommandHeaders::single(CommandHeader::new(command, index))
     }
 }
 
 impl CommandSupport<Group41Var1> for CommandBuilder {
     fn add_u8(&mut self, command: Group41Var1, index: u8) {
-        self.add_g41v1_u8(command, index);
+        self.push(command, index);
     }
 
     fn add_u16(&mut self, command: Group41Var1, index: u16) {
-        self.add_g41v1_u16(command, index);
+        self.push(command, index);
     }
 
     fn single_header_u8(command: Group41Var1, index: u8) -> CommandHeaders {
-        CommandHeaders::single(command.to_header_u8(index))
+        CommandHeaders::single(CommandHeader::new(command, index))
     }
 
     fn single_header_u16(command: Group41Var1, index: u16) -> CommandHeaders {
-        CommandHeaders::single(command.to_header_u16(index))
+        CommandHeaders::single(CommandHeader::new(command, index))
     }
 }
 
 impl CommandSupport<Group41Var2> for CommandBuilder {
     fn add_u8(&mut self, command: Group41Var2, index: u8) {
-        self.add_g41v2_u8(command, index);
+        self.push(command, index);
     }
 
     fn add_u16(&mut self, command: Group41Var2, index: u16) {
-        self.add_g41v2_u16(command, index);
+        self.push(command, index);
     }
 
     fn single_header_u8(command: Group41Var2, index: u8) -> CommandHeaders {
-        CommandHeaders::single(command.to_header_u8(index))
+        CommandHeaders::single(CommandHeader::new(command, index))
     }
 
     fn single_header_u16(command: Group41Var2, index: u16) -> CommandHeaders {
-        CommandHeaders::single(command.to_header_u16(index))
+        CommandHeaders::single(CommandHeader::new(command, index))
     }
 }
 
 impl CommandSupport<Group41Var3> for CommandBuilder {
     fn add_u8(&mut self, command: Group41Var3, index: u8) {
-        self.add_g41v3_u8(command, index);
+        self.push(command, index);
     }
 
     fn add_u16(&mut self, command: Group41Var3, index: u16) {
-        self.add_g41v3_u16(command, index);
+        self.push(command, index);
     }
 
     fn single_header_u8(command: Group41Var3, index: u8) -> CommandHeaders {
-        CommandHeaders::single(command.to_header_u8(index))
+        CommandHeaders::single(CommandHeader::new(command, index))
     }
 
     fn single_header_u16(command: Group41Var3, index: u16) -> CommandHeaders {
-        CommandHeaders::single(command.to_header_u16(index))
+        CommandHeaders::single(CommandHeader::new(command, index))
     }
 }
 
 impl CommandSupport<Group41Var4> for CommandBuilder {
     fn add_u8(&mut self, command: Group41Var4, index: u8) {
-        self.add_g41v4_u8(command, index);
+        self.push(command, index);
     }
 
     fn add_u16(&mut self, command: Group41Var4, index: u16) {
-        self.add_g41v4_u16(command, index);
+        self.push(command, index);
     }
 
     fn single_header_u8(command: Group41Var4, index: u8) -> CommandHeaders {
-        CommandHeaders::single(command.to_header_u8(index))
+        CommandHeaders::single(CommandHeader::new(command, index))
     }
 
     fn single_header_u16(command: Group41Var4, index: u16) -> CommandHeaders {
-        CommandHeaders::single(command.to_header_u16(index))
+        CommandHeaders::single(CommandHeader::new(command, index))
     }
 }
 
@@ -1055,116 +968,93 @@ impl Default for CommandBuilder {
 }
 
 impl CommandHeader {
-    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
-        match self {
-            CommandHeader::G12V1U8(items) => writer.write_prefixed_items(items.iter()),
-            CommandHeader::G41V1U8(items) => writer.write_prefixed_items(items.iter()),
-            CommandHeader::G41V2U8(items) => writer.write_prefixed_items(items.iter()),
-            CommandHeader::G41V3U8(items) => writer.write_prefixed_items(items.iter()),
-            CommandHeader::G41V4U8(items) => writer.write_prefixed_items(items.iter()),
-            CommandHeader::G12V1U16(items) => writer.write_prefixed_items(items.iter()),
-            CommandHeader::G41V1U16(items) => writer.write_prefixed_items(items.iter()),
-            CommandHeader::G41V2U16(items) => writer.write_prefixed_items(items.iter()),
-            CommandHeader::G41V3U16(items) => writer.write_prefixed_items(items.iter()),
-            CommandHeader::G41V4U16(items) => writer.write_prefixed_items(items.iter()),
-        }
+    /// a header of one command
+    pub(crate) fn new<C: Command, I: CommandIndex>(command: C, index: I) -> Self {
+        I::header(C::header(vec![(command, index)]))
     }
 
-    fn compare_items<V, I>(
-        seq: CountSequence<'_, Prefix<I, V>>,
-        sent: &[(V, I)],
-    ) -> Result<(), CommandResponseError>
-    where
-        V: FixedSizeVariation + Command,
-        I: Index,
-    {
-        let mut received = seq.iter();
-
-        for item in sent {
-            match received.next() {
-                None => return Err(CommandResponseError::ObjectCountMismatch),
-                Some(x) => {
-                    if x.value.status() != CommandStatus::Success {
-                        return Err(CommandResponseError::BadStatus(x.value.status()));
-                    }
-                    if !x.equals(item) {
-                        return Err(CommandResponseError::ObjectValueMismatch);
-                    }
-                }
-            }
+    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
+        match self {
+            CommandHeader::U8(items) => items.write(writer),
+            CommandHeader::U16(items) => items.write(writer),
         }
-
-        if received.next().is_some() {
-            return Err(CommandResponseError::ObjectCountMismatch);
-        }
-
-        Ok(())
     }
 
     pub(crate) fn compare(&self, response: HeaderDetails) -> Result<(), CommandResponseError> {
-        match self {
-            CommandHeader::G12V1U8(items) => match response {
-                HeaderDetails::CountAndPrefix8(_, PrefixedVariation::Group12Var1(seq)) => {
-                    Self::compare_items(seq, items)
-                }
-                _ => Err(CommandResponseError::HeaderTypeMismatch),
-            },
-            CommandHeader::G12V1U16(items) => match response {
-                HeaderDetails::CountAndPrefix16(_, PrefixedVariation::Group12Var1(seq)) => {
-                    Self::compare_items(seq, items)
-                }
-                _ => Err(CommandResponseError::HeaderTypeMismatch),
-            },
-            CommandHeader::G41V1U8(items) => match response {
-                HeaderDetails::CountAndPrefix8(_, PrefixedVariation::Group41Var1(seq)) => {
-                    Self::compare_items(seq, items)
-                }
-                _ => Err(CommandResponseError::HeaderTypeMismatch),
-            },
-            CommandHeader::G41V1U16(items) => match response {
-                HeaderDetails::CountAndPrefix16(_, PrefixedVariation::Group41Var1(seq)) => {
-                    Self::compare_items(seq, items)
-                }
-                _ => Err(CommandResponseError::HeaderTypeMismatch),
-            },
-            CommandHeader::G41V2U8(items) => match response {
-                HeaderDetails::CountAndPrefix8(_, PrefixedVariation::Group41Var2(seq)) => {
-                    Self::compare_items(seq, items)
-                }
-                _ => Err(CommandResponseError::HeaderTypeMismatch),
-            },
-            CommandHeader::G41V2U16(items) => match response {
-                HeaderDetails::CountAndPrefix16(_, PrefixedVariation::Group41Var2(seq)) => {
-                    Self::compare_items(seq, items)
-                }
-                _ => Err(CommandResponseError::HeaderTypeMismatch),
-            },
-            CommandHeader::G41V3U8(items) => match response {
-                HeaderDetails::CountAndPrefix8(_, PrefixedVariation::Group41Var3(seq)) => {
-                    Self::compare_items(seq, items)
-                }
-                _ => Err(CommandResponseError::HeaderTypeMismatch),
-            },
-            CommandHeader::G41V3U16(items) => match response {
-                HeaderDetails::CountAndPrefix16(_, PrefixedVariation::Group41Var3(seq)) => {
-                    Self::compare_items(seq, items)
-                }
-                _ => Err(CommandResponseError::HeaderTypeMismatch),
-            },
-            CommandHeader::G41V4U8(items) => match response {
-                HeaderDetails::CountAndPrefix8(_, PrefixedVariation::Group41Var4(seq)) => {
-                    Self::compare_items(seq, items)
-                }
-                _ => Err(CommandResponseError::HeaderTypeMismatch),
-            },
-            CommandHeader::G41V4U16(items) => match response {
-                HeaderDetails::CountAndPrefix16(_, PrefixedVariation::Group41Var4(seq)) => {
-                    Self::compare_items(seq, items)
-                }
-                _ => Err(CommandResponseError::HeaderTypeMismatch),
-            },
+        match (self, response) {
+            (CommandHeader::U8(items), HeaderDetails::CountAndPrefix8(_, objects)) => {
+                items.compare(objects)
+            }
+            (CommandHeader::U16(items), HeaderDetails::CountAndPrefix16(_, objects)) => {
+                items.compare(objects)
+            }
+            _ => Err(CommandResponseError::HeaderTypeMismatch),
         }
     }
+}
+
+impl<I: Index> CommandItems<I> {
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
+        match self {
+            CommandItems::G12V1(items) => writer.write_prefixed_items(items.iter()),
+            CommandItems::G41V1(items) => writer.write_prefixed_items(items.iter()),
+            CommandItems::G41V2(items) => writer.write_prefixed_items(items.iter()),
+            CommandItems::G41V3(items) => writer.write_prefixed_items(items.iter()),
+            CommandItems::G41V4(items) => writer.write_prefixed_items(items.iter()),
+        }
+    }
+
+    fn compare(&self, response: PrefixedVariation<I>) -> Result<(), CommandResponseError> {
+        match (self, response) {
+            (CommandItems::G12V1(items), PrefixedVariation::Group12Var1(seq)) => {
+                compare_items(seq, items)
+            }
+            (CommandItems::G41V1(items), PrefixedVariation::Group41Var1(seq)) => {
+                compare_items(seq, items)
+            }
+            (CommandItems::G41V2(items), PrefixedVariation::Group41Var2(seq)) => {
+                compare_items(seq, items)
+            }
+            (CommandItems::G41V3(items), PrefixedVariation::Group41Var3(seq)) => {
+                compare_items(seq, items)
+            }
+            (CommandItems::G41V4(items), PrefixedVariation::Group41Var4(seq)) => {
+                compare_items(seq, items)
+            }
+            _ => Err(CommandResponseError::HeaderTypeMismatch),
+        }
+    }
+}
+
+fn compare_items<V, I>(
+    seq: CountSequence<'_, Prefix<I, V>>,
+    sent: &[(V, I)],
+) -> Result<(), CommandResponseError>
+where
+    V: CommandObject,
+    I: Index,
+{
+    let mut received = seq.iter();
+
+    for item in sent {
+        match received.next() {
+            None => return Err(CommandResponseError::ObjectCountMismatch),
+            Some(x) => {
+                if x.value.status() != CommandStatus::Success {
+                    return Err(CommandResponseError::BadStatus(x.value.status()));
+                }
+                if !x.equals(item) {
+                    return Err(CommandResponseError::ObjectValueMismatch);
+                }
+            }
+        }
+    }
+
+    if received.next().is_some() {
+        return Err(CommandResponseError::ObjectCountMismatch);
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -1198,7 +1088,10 @@ mod tests {
     /// each command with 1-byte and then 2-byte addressing
     fn commands() -> [(CommandHeader, CommandHeader); 5] {
         fn both<C: Command>(command: C) -> (CommandHeader, CommandHeader) {
-            (command.to_header_u8(3), command.to_header_u16(259))
+            (
+                CommandHeader::new(command, 3u8),
+                CommandHeader::new(command, 259u16),
+            )
         }
         [
             both(Group12Var1::from_op_type(OpType::LatchOn)),

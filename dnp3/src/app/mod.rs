@@ -22,6 +22,7 @@ pub mod control {
 /// Types association with Device Attributes (Group 0)
 pub mod attr;
 mod control_types;
+pub(crate) use control_types::CommandObject;
 #[rustfmt::skip]
 mod app_enums;
 mod buffer_size;

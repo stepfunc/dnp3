@@ -1,4 +1,6 @@
-use crate::app::control_enums::{OpType, TripCloseCode};
+use crate::app::control_enums::{CommandStatus, OpType, TripCloseCode};
+use crate::app::parse::traits::FixedSizeVariation;
+use crate::app::variations::{Group12Var1, Group41Var1, Group41Var2, Group41Var3, Group41Var4};
 
 /// Control code field used within g12v1
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -80,6 +82,64 @@ impl std::fmt::Display for ControlCode {
             "tcc: {:?} clear: {} queue: {} op_type: {:?}",
             self.tcc, self.clear, self.queue, self.op_type
         )
+    }
+}
+
+/// A command object: the CROB (g12v1) or an analog output block (g41v1 to g41v4)
+pub(crate) trait CommandObject: FixedSizeVariation {
+    fn status(&self) -> CommandStatus;
+
+    /// a copy of the object with a new status
+    fn with_status(self, status: CommandStatus) -> Self;
+}
+
+impl CommandObject for Group12Var1 {
+    fn status(&self) -> CommandStatus {
+        self.status
+    }
+
+    fn with_status(self, status: CommandStatus) -> Self {
+        Self { status, ..self }
+    }
+}
+
+impl CommandObject for Group41Var1 {
+    fn status(&self) -> CommandStatus {
+        self.status
+    }
+
+    fn with_status(self, status: CommandStatus) -> Self {
+        Self { status, ..self }
+    }
+}
+
+impl CommandObject for Group41Var2 {
+    fn status(&self) -> CommandStatus {
+        self.status
+    }
+
+    fn with_status(self, status: CommandStatus) -> Self {
+        Self { status, ..self }
+    }
+}
+
+impl CommandObject for Group41Var3 {
+    fn status(&self) -> CommandStatus {
+        self.status
+    }
+
+    fn with_status(self, status: CommandStatus) -> Self {
+        Self { status, ..self }
+    }
+}
+
+impl CommandObject for Group41Var4 {
+    fn status(&self) -> CommandStatus {
+        self.status
+    }
+
+    fn with_status(self, status: CommandStatus) -> Self {
+        Self { status, ..self }
     }
 }
 
