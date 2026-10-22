@@ -473,6 +473,8 @@ enum Ending {
     BlockVariation,
     /// READ returns a block other than the one requested
     BlockNumber,
+    /// READ returns the last block of a file handle other than the one opened
+    Handle,
     /// READ is answered without an object header
     NoObjectHeader,
     /// the block exceeds the configured maximum file size
@@ -483,9 +485,10 @@ enum Ending {
     ReaderAbortOnLastBlock,
 }
 
-const ENDINGS: [Ending; 6] = [
+const ENDINGS: [Ending; 7] = [
     Ending::BlockVariation,
     Ending::BlockNumber,
+    Ending::Handle,
     Ending::NoObjectHeader,
     Ending::MaxFileSize,
     Ending::ReaderAbort,
@@ -501,6 +504,7 @@ impl Ending {
             },
             Self::BlockVariation
             | Self::BlockNumber
+            | Self::Handle
             | Self::NoObjectHeader
             | Self::ReaderAbort
             | Self::ReaderAbortOnLastBlock => read_config(),
@@ -510,9 +514,11 @@ impl Ending {
     fn reader_aborts(self) -> bool {
         match self {
             Self::ReaderAbort | Self::ReaderAbortOnLastBlock => true,
-            Self::BlockVariation | Self::BlockNumber | Self::NoObjectHeader | Self::MaxFileSize => {
-                false
-            }
+            Self::BlockVariation
+            | Self::BlockNumber
+            | Self::Handle
+            | Self::NoObjectHeader
+            | Self::MaxFileSize => false,
         }
     }
 
@@ -520,6 +526,9 @@ impl Ending {
         match self {
             Self::BlockVariation => open_response(1, FileStatus::Success),
             Self::BlockNumber => super::file_transport_response(1, HANDLE, 1, b"data"),
+            Self::Handle => {
+                super::file_transport_response(1, HANDLE + 1, super::last_block(0), b"data")
+            }
             Self::NoObjectHeader => super::no_object_response(1),
             Self::MaxFileSize | Self::ReaderAbort => {
                 super::file_transport_response(1, HANDLE, 0, b"data")
@@ -535,6 +544,7 @@ impl Ending {
         match self {
             Self::BlockVariation => vec![Event::Abort(FileError::BadResponse)],
             Self::BlockNumber => vec![Event::Abort(FileError::BadBlockNum)],
+            Self::Handle => vec![Event::Abort(FileError::WrongHandle)],
             Self::NoObjectHeader => vec![Event::Abort(FileError::TaskError(
                 TaskError::UnexpectedResponseHeaders,
             ))],
@@ -594,6 +604,11 @@ async fn aborts_on_unexpected_read_variation_and_closes_file() {
 #[tokio::test]
 async fn aborts_on_wrong_block_number_and_closes_file() {
     read_failure(Ending::BlockNumber, close_success(2), Finished::Failure).await;
+}
+
+#[tokio::test]
+async fn aborts_on_wrong_block_handle_and_closes_opened_file() {
+    read_failure(Ending::Handle, close_success(2), Finished::Failure).await;
 }
 
 #[tokio::test]

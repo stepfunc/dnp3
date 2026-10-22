@@ -166,6 +166,15 @@ impl FileReadTask {
             }
         };
 
+        if obj.file_handle != u32::from(rs.handle) {
+            tracing::warn!(
+                "File READ response has handle {:#010X}, expected {:#010X}",
+                obj.file_handle,
+                u32::from(rs.handle)
+            );
+            return Err(FileError::WrongHandle);
+        }
+
         let rx_block = BlockNumber::new(obj.block_number);
 
         if rx_block.bottom_bits() != rs.block.bottom_bits() {
