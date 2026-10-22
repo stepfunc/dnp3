@@ -1,5 +1,6 @@
 use crate::outstation::tests::harness::*;
 use crate::outstation::traits::RestartDelay;
+use crate::util::test_support::watchdog;
 
 const CLEAR_RESTART_IIN: &[u8] = &[0xC0, 0x02, 80, 1, 0x00, 7, 7, 0x00];
 const RESPONSE_NO_RESTART_IIN: &[u8] = &[0xC0, 0x81, 0x00, 0x00];
@@ -78,4 +79,27 @@ async fn handles_warm_restart_when_supported_via_time_delay_coarse() {
         .test_request_response(WARM_RESTART, RESPONSE_TIME_DELAY_COARSE)
         .await;
     harness.check_events(&[Event::WarmRestart(Some(RestartDelay::Seconds(0xCAFE)))])
+}
+
+#[tokio::test(start_paused = true)]
+async fn write_of_the_restart_iin_to_one_sets_parameter_error_and_keeps_it_set() {
+    watchdog(async {
+        let mut harness = new_harness(get_default_config());
+
+        // g80v1, start/stop 7 to 7, value 1
+        harness
+            .test_request_response(
+                &[0xC0, 0x02, 80, 1, 0x00, 7, 7, 0x01],
+                &[0xC0, 0x81, 0x80, 0x04],
+            )
+            .await;
+        harness.check_no_events();
+
+        // IIN1.7 is still set in the next response
+        harness
+            .test_request_response(&read_class_0(1), &[0xC1, 0x81, 0x80, 0x00])
+            .await;
+        harness.check_no_events();
+    })
+    .await;
 }

@@ -2,6 +2,7 @@ use crate::app::variations::{Group12Var1, Group41Var1, Group41Var2, Group41Var3,
 use crate::outstation::traits::{BroadcastAction, OperateType, RestartDelay};
 use crate::outstation::{BufferState, FreezeIndices, FreezeType};
 
+use crate::app::attr::AttrSet;
 use crate::app::{ControlField, FunctionCode, RequestHeader, Sequence, Timestamp};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -72,6 +73,8 @@ pub(crate) enum Event {
     BeginWriteDeadBands,
     WriteDeadBand(u16, f64),
     EndWriteDeadBands,
+    /// the application was asked to validate the WRITE of the attribute (set, variation)
+    WriteDeviceAttr(AttrSet, u8),
     BeginConfirm,
     Cleared(u64),
     EndConfirm(BufferState),

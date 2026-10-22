@@ -1,4 +1,8 @@
+use std::time::Duration;
+
 use crate::app::Timestamp;
+use crate::outstation::RequestError;
+use crate::util::test_support::watchdog;
 
 use super::harness::*;
 
@@ -75,4 +79,187 @@ async fn lan_procedure_with_two_byte_count() {
         .await;
 
     harness.check_events(&[Event::WriteAbsoluteTime(Timestamp::new(0xCAFE))]);
+}
+
+/// WRITE of `count` g50v1 (absolute time) objects, each `time`, with a 1-byte count
+fn write_absolute_time(seq: u8, count: u8, time: u64) -> Vec<u8> {
+    write_time_objects(seq, 1, count, time)
+}
+
+/// WRITE of `count` g50v3 (last recorded time) objects, each `time`, with a 1-byte count
+fn write_last_recorded_time(seq: u8, count: u8, time: u64) -> Vec<u8> {
+    write_time_objects(seq, 3, count, time)
+}
+
+fn write_time_objects(seq: u8, variation: u8, count: u8, time: u64) -> Vec<u8> {
+    let mut bytes = vec![0xC0 | seq, 0x02, 50, variation, 0x07, count];
+    for _ in 0..count {
+        bytes.extend_from_slice(&time.to_le_bytes()[..6]);
+    }
+    bytes
+}
+
+/// an empty response with the restart IIN and `iin2`
+fn empty_response(seq: u8, iin2: u8) -> [u8; 4] {
+    [0xC0 | seq, 0x81, 0x80, iin2]
+}
+
+const IIN2_NONE: u8 = 0x00;
+const IIN2_OBJECT_UNKNOWN: u8 = 0x02;
+const IIN2_PARAMETER_ERROR: u8 = 0x04;
+
+const RECORDED_TIME: u64 = 1_000_000;
+
+/// RECORD_CURRENT_TIME with sequence `seq`, then wait `delay`
+async fn record_and_wait(harness: &mut OutstationHarness, seq: u8, delay: Duration) {
+    harness
+        .test_request_response(&record_current_time(seq), &empty_response(seq, IIN2_NONE))
+        .await;
+    tokio::time::advance(delay).await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn lan_procedure_adds_the_time_elapsed_since_record_current_time() {
+    watchdog(async {
+        let mut harness = new_harness(get_default_config());
+
+        record_and_wait(&mut harness, 0, Duration::from_millis(1234)).await;
+        harness
+            .test_request_response(
+                &write_last_recorded_time(1, 1, RECORDED_TIME),
+                &empty_response(1, IIN2_NONE),
+            )
+            .await;
+
+        harness.check_events(&[Event::WriteAbsoluteTime(Timestamp::new(1_001_234))]);
+        harness.check_no_events();
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn last_recorded_time_is_used_once() {
+    watchdog(async {
+        let mut harness = new_harness(get_default_config());
+
+        record_and_wait(&mut harness, 0, Duration::from_millis(10)).await;
+        harness
+            .test_request_response(
+                &write_last_recorded_time(1, 1, RECORDED_TIME),
+                &empty_response(1, IIN2_NONE),
+            )
+            .await;
+        harness.check_events(&[Event::WriteAbsoluteTime(Timestamp::new(1_000_010))]);
+
+        // a second g50v3, with a new sequence number and time, needs a new RECORD_CURRENT_TIME
+        harness
+            .test_request_response(
+                &write_last_recorded_time(2, 1, 2 * RECORDED_TIME),
+                &empty_response(2, IIN2_PARAMETER_ERROR),
+            )
+            .await;
+        harness.check_no_events();
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn write_of_last_recorded_time_without_record_current_time_sets_parameter_error() {
+    watchdog(async {
+        let mut harness = new_harness(get_default_config());
+
+        harness
+            .test_request_response(
+                &write_last_recorded_time(0, 1, RECORDED_TIME),
+                &empty_response(0, IIN2_PARAMETER_ERROR),
+            )
+            .await;
+        harness.check_no_events();
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn writes_of_time_with_a_count_other_than_one_set_parameter_error() {
+    watchdog(async {
+        let mut harness = new_harness(get_default_config());
+
+        let mut seq: u8 = 0;
+        for count in [0, 2] {
+            harness
+                .test_request_response(
+                    &write_absolute_time(seq, count, RECORDED_TIME),
+                    &empty_response(seq, IIN2_PARAMETER_ERROR),
+                )
+                .await;
+            seq = seq.wrapping_add(1);
+
+            // with a recorded time, so the count is the only problem
+            record_and_wait(&mut harness, seq, Duration::from_millis(10)).await;
+            seq = seq.wrapping_add(1);
+            harness
+                .test_request_response(
+                    &write_last_recorded_time(seq, count, RECORDED_TIME),
+                    &empty_response(seq, IIN2_PARAMETER_ERROR),
+                )
+                .await;
+            seq = seq.wrapping_add(1);
+        }
+        harness.check_no_events();
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn lan_procedure_accepts_the_largest_time_and_rejects_one_past_it() {
+    watchdog(async {
+        let mut harness = new_harness(get_default_config());
+
+        // 1234 ms after the largest 48-bit time less 1234 ms is the largest time
+        record_and_wait(&mut harness, 0, Duration::from_millis(1234)).await;
+        harness
+            .test_request_response(
+                &write_last_recorded_time(1, 1, Timestamp::MAX_VALUE - 1234),
+                &empty_response(1, IIN2_NONE),
+            )
+            .await;
+        harness.check_events(&[Event::WriteAbsoluteTime(Timestamp::max())]);
+
+        // one more millisecond overflows the 48-bit time
+        record_and_wait(&mut harness, 2, Duration::from_millis(1234)).await;
+        harness
+            .test_request_response(
+                &write_last_recorded_time(3, 1, Timestamp::MAX_VALUE - 1233),
+                &empty_response(3, IIN2_PARAMETER_ERROR),
+            )
+            .await;
+        harness.check_no_events();
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn lan_procedure_reports_the_error_of_the_application() {
+    watchdog(async {
+        let mut harness = new_harness(get_default_config());
+
+        let mut seq: u8 = 0;
+        for (err, iin2) in [
+            (RequestError::ParameterError, IIN2_PARAMETER_ERROR),
+            (RequestError::NotSupported, IIN2_OBJECT_UNKNOWN),
+        ] {
+            harness.application_data.lock().unwrap().request_error = Some(err);
+            record_and_wait(&mut harness, seq, Duration::from_millis(10)).await;
+            seq = seq.wrapping_add(1);
+            harness
+                .test_request_response(
+                    &write_last_recorded_time(seq, 1, RECORDED_TIME),
+                    &empty_response(seq, iin2),
+                )
+                .await;
+            seq = seq.wrapping_add(1);
+        }
+        harness.check_no_events();
+    })
+    .await;
 }

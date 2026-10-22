@@ -2,6 +2,7 @@ use crate::app::attr::*;
 use crate::app::BufferSize;
 use crate::outstation::database::AttrDefError;
 use crate::outstation::tests::harness::*;
+use crate::util::test_support::watchdog;
 
 // read g0v254 (all attributes) with qualifier 0x06
 const READ_ALL_ATTRIBUTES: &[u8] = &[0xC0, 0x01, 0x00, 0xFE, 0x06];
@@ -317,4 +318,331 @@ async fn writes_attribute_with_one_and_two_byte_ranges() {
         response.extend(encode_string(var::USER_ASSIGNED_LOCATION, value));
         harness.test_request_response(&read, &response).await;
     }
+}
+
+/// an attribute with a 1-byte start/stop of `set`: its group, variation, qualifier and range
+fn attr_header(set: u8, variation: u8) -> [u8; 5] {
+    [0x00, variation, 0x00, set, set]
+}
+
+/// the data type code, length and value of an attribute
+fn attr_value(data_type: u8, value: &[u8]) -> Vec<u8> {
+    let mut bytes = vec![data_type, value.len().try_into().unwrap()];
+    bytes.extend_from_slice(value);
+    bytes
+}
+
+/// WRITE of one attribute
+fn write_attr(seq: u8, set: u8, variation: u8, data_type: u8, value: &[u8]) -> Vec<u8> {
+    let mut bytes = vec![0xC0 | seq, 0x02];
+    bytes.extend(attr_header(set, variation));
+    bytes.extend(attr_value(data_type, value));
+    bytes
+}
+
+/// READ of one attribute
+fn read_attr(seq: u8, set: u8, variation: u8) -> Vec<u8> {
+    let mut bytes = vec![0xC0 | seq, 0x01];
+    bytes.extend(attr_header(set, variation));
+    bytes
+}
+
+/// the response to a READ of one attribute, with the restart IIN
+fn attr_response(seq: u8, set: u8, variation: u8, data_type: u8, value: &[u8]) -> Vec<u8> {
+    let mut bytes = vec![0xC0 | seq, 0x81, 0x80, 0x00];
+    bytes.extend(attr_header(set, variation));
+    bytes.extend(attr_value(data_type, value));
+    bytes
+}
+
+/// an empty response with the restart IIN and `iin2`
+fn empty_response(seq: u8, iin2: u8) -> [u8; 4] {
+    [0xC0 | seq, 0x81, 0x80, iin2]
+}
+
+// attribute data type codes
+const VSTR: u8 = 1;
+const UINT: u8 = 2;
+const INT: u8 = 3;
+const FLT: u8 = 4;
+const OSTR: u8 = 5;
+const BSTR: u8 = 6;
+const TIME: u8 = 7;
+
+const IIN2_NONE: u8 = 0x00;
+const IIN2_OBJECT_UNKNOWN: u8 = 0x02;
+const IIN2_PARAMETER_ERROR: u8 = 0x04;
+
+/// the default set holds a writable location "old" and a read-only config version "1.0.0"
+fn define_default_set(harness: &mut OutstationHarness) {
+    harness.handle.database.transaction(|db| {
+        db.define_attr(
+            AttrProp::writable(),
+            StringAttr::UserAssignedLocation.with_value("old"),
+        )
+        .unwrap();
+        db.define_attr(
+            AttrProp::default(),
+            StringAttr::ConfigVersion.with_value("1.0.0"),
+        )
+        .unwrap();
+    });
+}
+
+/// READ the location and the config version, expecting the values they were defined with
+async fn expect_default_set_unchanged(harness: &mut OutstationHarness, seq: u8) {
+    harness
+        .test_request_response(
+            &read_attr(seq, 0, var::USER_ASSIGNED_LOCATION),
+            &attr_response(seq, 0, var::USER_ASSIGNED_LOCATION, VSTR, b"old"),
+        )
+        .await;
+    let seq = seq.wrapping_add(1);
+    harness
+        .test_request_response(
+            &read_attr(seq, 0, var::CONFIG_VERSION),
+            &attr_response(seq, 0, var::CONFIG_VERSION, VSTR, b"1.0.0"),
+        )
+        .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn write_of_attribute_that_is_not_writable_sets_object_unknown_and_keeps_the_value() {
+    watchdog(async {
+        let mut harness = new_harness(get_default_config());
+        define_default_set(&mut harness);
+
+        harness
+            .test_request_response(
+                &write_attr(0, 0, var::CONFIG_VERSION, VSTR, b"2.0.0"),
+                &empty_response(0, IIN2_OBJECT_UNKNOWN),
+            )
+            .await;
+        harness.check_no_events();
+
+        expect_default_set_unchanged(&mut harness, 1).await;
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn write_of_attribute_in_undefined_set_sets_parameter_error() {
+    watchdog(async {
+        let mut harness = new_harness(get_default_config());
+        define_default_set(&mut harness);
+
+        harness
+            .test_request_response(
+                &write_attr(0, 5, 1, VSTR, b"new"),
+                &empty_response(0, IIN2_PARAMETER_ERROR),
+            )
+            .await;
+        harness.check_no_events();
+
+        expect_default_set_unchanged(&mut harness, 1).await;
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn write_of_undefined_attribute_in_defined_set_sets_object_unknown() {
+    watchdog(async {
+        let mut harness = new_harness(get_default_config());
+        define_default_set(&mut harness);
+
+        harness
+            .test_request_response(
+                &write_attr(0, 0, var::USER_ASSIGNED_ID, VSTR, b"new"),
+                &empty_response(0, IIN2_OBJECT_UNKNOWN),
+            )
+            .await;
+        harness.check_no_events();
+
+        expect_default_set_unchanged(&mut harness, 1).await;
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn write_of_attribute_with_the_wrong_type_sets_parameter_error_and_keeps_the_value() {
+    watchdog(async {
+        let mut harness = new_harness(get_default_config());
+        define_default_set(&mut harness);
+
+        // the location is a visible string
+        harness
+            .test_request_response(
+                &write_attr(0, 0, var::USER_ASSIGNED_LOCATION, UINT, &[7]),
+                &empty_response(0, IIN2_PARAMETER_ERROR),
+            )
+            .await;
+        harness.check_no_events();
+
+        expect_default_set_unchanged(&mut harness, 1).await;
+    })
+    .await;
+}
+
+/// WRITE "new" to the location with the application answering as configured, expecting one
+/// validation callback
+async fn write_location_with_application_answer(accept: bool, defer: bool) -> OutstationHarness {
+    let mut harness = new_harness(get_default_config());
+    define_default_set(&mut harness);
+    {
+        let mut data = harness.application_data.lock().unwrap();
+        data.accept_attr_writes = accept;
+        data.defer_attr_writes = defer;
+    }
+
+    let iin2 = if accept {
+        IIN2_NONE
+    } else {
+        IIN2_PARAMETER_ERROR
+    };
+    harness
+        .test_request_response(
+            &write_attr(0, 0, var::USER_ASSIGNED_LOCATION, VSTR, b"new"),
+            &empty_response(0, iin2),
+        )
+        .await;
+    harness.check_events(&[Event::WriteDeviceAttr(
+        AttrSet::Default,
+        var::USER_ASSIGNED_LOCATION,
+    )]);
+    harness.check_no_events();
+    harness
+}
+
+#[tokio::test(start_paused = true)]
+async fn write_of_attribute_the_application_rejects_sets_parameter_error_and_keeps_the_value() {
+    watchdog(async {
+        let mut harness = write_location_with_application_answer(false, false).await;
+        expect_default_set_unchanged(&mut harness, 1).await;
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn write_of_attribute_the_application_rejects_later_sets_parameter_error_and_keeps_the_value()
+{
+    watchdog(async {
+        let mut harness = write_location_with_application_answer(false, true).await;
+        expect_default_set_unchanged(&mut harness, 1).await;
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn write_of_attribute_the_application_accepts_later_stores_the_value() {
+    watchdog(async {
+        let mut harness = write_location_with_application_answer(true, true).await;
+        harness
+            .test_request_response(
+                &read_attr(1, 0, var::USER_ASSIGNED_LOCATION),
+                &attr_response(1, 0, var::USER_ASSIGNED_LOCATION, VSTR, b"new"),
+            )
+            .await;
+    })
+    .await;
+}
+
+/// The writable attributes of private set 1, one of each type
+fn typed_attrs() -> [(u8, OwnedAttrValue); 7] {
+    [
+        (1, OwnedAttrValue::UnsignedInt(0)),
+        (2, OwnedAttrValue::SignedInt(0)),
+        (3, OwnedAttrValue::FloatingPoint(FloatType::F64(0.0))),
+        (4, OwnedAttrValue::Dnp3Time(crate::app::Timestamp::new(0))),
+        (5, OwnedAttrValue::OctetString(vec![0x00])),
+        (6, OwnedAttrValue::BitString(vec![0x00])),
+        (7, OwnedAttrValue::VisibleString("old".to_string())),
+    ]
+}
+
+#[tokio::test(start_paused = true)]
+async fn writes_of_every_attribute_type_are_stored_and_read_back_in_the_smallest_encoding() {
+    watchdog(async {
+        let mut harness = new_harness(get_default_config());
+        harness.handle.database.transaction(|db| {
+            for (variation, value) in typed_attrs() {
+                db.define_attr(
+                    AttrProp::writable(),
+                    OwnedAttribute::new(AttrSet::new(1), variation, value),
+                )
+                .unwrap();
+            }
+        });
+
+        // (variation, data type, written bytes, bytes read back)
+        let cases: &[(u8, u8, &[u8], &[u8])] = &[
+            // unsigned integers at the width boundaries: 255, 256, 65535, 65536 and u32::MAX
+            (1, UINT, &[0xFF], &[0xFF]),
+            (1, UINT, &[0x00, 0x01], &[0x00, 0x01]),
+            (1, UINT, &[0xFF, 0xFF], &[0xFF, 0xFF]),
+            (
+                1,
+                UINT,
+                &[0x00, 0x00, 0x01, 0x00],
+                &[0x00, 0x00, 0x01, 0x00],
+            ),
+            (
+                1,
+                UINT,
+                &[0xFF, 0xFF, 0xFF, 0xFF],
+                &[0xFF, 0xFF, 0xFF, 0xFF],
+            ),
+            // values written wider than they need are read back in the smallest width
+            (1, UINT, &[0x01, 0x00, 0x00, 0x00], &[0x01]),
+            (1, UINT, &[0xFF, 0x00], &[0xFF]),
+            // signed integers at the width boundaries: 127, 128, -128, -129, 32767, 32768,
+            // -32768, -32769 and i32::MIN
+            (2, INT, &[0x7F], &[0x7F]),
+            (2, INT, &[0x80, 0x00], &[0x80, 0x00]),
+            (2, INT, &[0x80], &[0x80]),
+            (2, INT, &[0x7F, 0xFF], &[0x7F, 0xFF]),
+            (2, INT, &[0xFF, 0x7F], &[0xFF, 0x7F]),
+            (2, INT, &[0x00, 0x80, 0x00, 0x00], &[0x00, 0x80, 0x00, 0x00]),
+            (2, INT, &[0x00, 0x80], &[0x00, 0x80]),
+            (2, INT, &[0xFF, 0x7F, 0xFF, 0xFF], &[0xFF, 0x7F, 0xFF, 0xFF]),
+            (2, INT, &[0x00, 0x00, 0x00, 0x80], &[0x00, 0x00, 0x00, 0x80]),
+            // -1 written in 4 bytes is read back in 1
+            (2, INT, &[0xFF, 0xFF, 0xFF, 0xFF], &[0xFF]),
+            // a single-precision float keeps its width, then a double-precision one
+            (3, FLT, &1.5f32.to_le_bytes(), &1.5f32.to_le_bytes()),
+            (3, FLT, &(-0.1f64).to_le_bytes(), &(-0.1f64).to_le_bytes()),
+            // 48-bit times, up to the largest
+            (
+                4,
+                TIME,
+                &[0x01, 0x02, 0x03, 0x04, 0x05, 0x06],
+                &[0x01, 0x02, 0x03, 0x04, 0x05, 0x06],
+            ),
+            (4, TIME, &[0xFF; 6], &[0xFF; 6]),
+            (5, OSTR, &[0xDE, 0xAD, 0xBE], &[0xDE, 0xAD, 0xBE]),
+            (6, BSTR, &[0xAA, 0x55], &[0xAA, 0x55]),
+            (7, VSTR, b"new", b"new"),
+        ];
+
+        let mut seq: u8 = 0;
+        for &(variation, data_type, written, read_back) in cases {
+            harness
+                .test_request_response(
+                    &write_attr(seq, 1, variation, data_type, written),
+                    &empty_response(seq, IIN2_NONE),
+                )
+                .await;
+            harness.check_events(&[Event::WriteDeviceAttr(AttrSet::Private(1), variation)]);
+            seq = seq.wrapping_add(1) & 0x0F;
+
+            harness
+                .test_request_response(
+                    &read_attr(seq, 1, variation),
+                    &attr_response(seq, 1, variation, data_type, read_back),
+                )
+                .await;
+            seq = seq.wrapping_add(1) & 0x0F;
+        }
+        harness.check_no_events();
+    })
+    .await;
 }

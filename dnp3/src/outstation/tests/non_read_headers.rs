@@ -6,7 +6,7 @@
 //! A range header names index 0, and a count or a count and prefix header has one object, at
 //! index 0, of zeros (see `accepted_headers`).
 
-use crate::app::attr::{var, AttrProp, StringAttr};
+use crate::app::attr::{var, AttrProp, AttrSet, StringAttr};
 use crate::app::parse::header_identity_tests::accepted_headers;
 use crate::app::parse::options::ParseOptions;
 use crate::app::{FunctionCode, Iin2, QualifierCode, Timestamp, Variation};
@@ -196,7 +196,7 @@ fn write(variation: Variation, qualifier: QualifierCode) -> Expected {
         // only the defined attribute can be written
         V::Group0(var) if var != 255 && is_range(qualifier) => {
             if var == var::USER_ASSIGNED_LOCATION {
-                Expected::ok(Vec::new())
+                Expected::ok(vec![Event::WriteDeviceAttr(AttrSet::Default, var)])
             } else {
                 Expected::Handled(Iin2::OBJECT_UNKNOWN, Vec::new())
             }
