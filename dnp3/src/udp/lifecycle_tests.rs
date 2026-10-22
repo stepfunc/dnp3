@@ -30,8 +30,8 @@ const fn millis(x: u64) -> Duration {
 
 /// A free local address, and the socket that holds it until the test drops it
 ///
-/// A test drops the socket just before the code under test binds the address, so that no other
-/// socket can take the port in between.
+/// A test drops the socket just before the code under test binds the address, which leaves
+/// another socket only a short window to take the port.
 fn reserve() -> (SocketAddr, std::net::UdpSocket) {
     let socket = std::net::UdpSocket::bind("127.0.0.1:0").unwrap();
     (socket.local_addr().unwrap(), socket)
