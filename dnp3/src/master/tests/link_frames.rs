@@ -268,22 +268,63 @@ async fn link_status_request_succeeds_on_a_link_status_response() {
     .await;
 }
 
+/// A link frame that isn't the outstation's reply to a link status request
+#[derive(Copy, Clone, Debug)]
+enum WrongFrame {
+    /// LINK_STATUS from another outstation
+    OtherSource,
+    /// REQUEST_LINK_STATUS from the outstation itself, which the link layer answers
+    Request,
+}
+
+const WRONG_FRAMES: [WrongFrame; 2] = [WrongFrame::OtherSource, WrongFrame::Request];
+
+impl WrongFrame {
+    /// Deliver the frame to the master, checking any reply it writes
+    async fn deliver(self, harness: &mut Harness) {
+        match self {
+            WrongFrame::OtherSource => harness.read(&header_only(OTHER, LINK_STATUS)).await,
+            WrongFrame::Request => {
+                harness
+                    .read(&header_only(OUTSTATION, REQUEST_LINK_STATUS))
+                    .await;
+                let reply = harness.pop_write().await;
+                assert_eq!(reply[3..8], [0x8B, 0x00, 0x04, 0x01, 0x00]);
+            }
+        }
+    }
+}
+
 #[tokio::test(start_paused = true)]
-async fn link_status_request_succeeds_on_any_link_layer_message() {
+async fn link_status_request_ignores_other_link_layer_messages_and_times_out() {
     watchdog(async {
-        // from another outstation
+        for frame in WRONG_FRAMES {
+            let mut harness = Harness::new().await;
+            let (_, task) = start_link_status(&mut harness).await;
+            frame.deliver(&mut harness).await;
+            harness.barrier().await;
+            assert!(!task.is_finished(), "{frame:?}");
+            assert_eq!(
+                task.await.unwrap().0,
+                Err(TaskError::ResponseTimeout),
+                "{frame:?}"
+            );
+        }
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn link_status_request_succeeds_on_the_reply_after_other_link_layer_messages() {
+    watchdog(async {
         let mut harness = Harness::new().await;
         let (_, task) = start_link_status(&mut harness).await;
-        harness.read(&header_only(OTHER, LINK_STATUS)).await;
-        assert_eq!(task.await.unwrap().0, Ok(()));
-
-        // or a link status request from the outstation, which the link layer answers
-        let (_, task) = start_link_status(&mut harness).await;
-        harness
-            .read(&header_only(OUTSTATION, REQUEST_LINK_STATUS))
-            .await;
-        let reply = harness.pop_write().await;
-        assert_eq!(reply[3..8], [0x8B, 0x00, 0x04, 0x01, 0x00]);
+        for frame in WRONG_FRAMES {
+            frame.deliver(&mut harness).await;
+        }
+        harness.barrier().await;
+        assert!(!task.is_finished());
+        harness.read(&header_only(OUTSTATION, LINK_STATUS)).await;
         assert_eq!(task.await.unwrap().0, Ok(()));
     })
     .await;
