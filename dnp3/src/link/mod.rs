@@ -129,6 +129,12 @@ impl std::fmt::Display for EndpointAddress {
     }
 }
 
+/// Parses a decimal `u16` without validating it.
+///
+/// Unlike [`EndpointAddress::try_new`] and `TryFrom<u16>`, this doesn't reject the special
+/// addresses (0xFFF0 to 0xFFFF, which include the self and broadcast addresses), so
+/// `"65535".parse::<EndpointAddress>()` succeeds. To reject them, parse the string as a `u16`
+/// and pass it to [`EndpointAddress::try_new`].
 impl std::str::FromStr for EndpointAddress {
     type Err = std::num::ParseIntError;
 
