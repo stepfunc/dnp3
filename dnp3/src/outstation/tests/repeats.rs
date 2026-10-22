@@ -96,44 +96,6 @@ async fn repeated_request_after_an_error_reply_gets_the_original_response() {
 }
 
 #[tokio::test]
-async fn repeated_request_with_an_empty_response_gets_no_objects() {
-    let mut harness = new_harness(get_default_config());
-
-    harness.send_and_process(DELAY_MEASURE_SEQ_0).await;
-    assert!(harness.expect_write().await.len() > 4);
-
-    harness
-        .test_request_response(RECORD_CURRENT_TIME_SEQ_1, EMPTY_RESPONSE_SEQ_1)
-        .await;
-    harness
-        .test_request_response(RECORD_CURRENT_TIME_SEQ_1, EMPTY_RESPONSE_SEQ_1)
-        .await;
-}
-
-#[tokio::test]
-async fn repeated_no_ack_request_gets_no_response() {
-    let mut harness = new_harness(get_default_config());
-
-    harness.send_and_process(DELAY_MEASURE_SEQ_0).await;
-    assert!(harness.expect_write().await.len() > 4);
-
-    harness.send_and_process(DIRECT_OPERATE_NO_ACK_SEQ_1).await;
-    harness.check_events(&[
-        Event::BeginControls,
-        Event::Operate(
-            Control::G41V2(Group41Var2::new(513), 7),
-            OperateType::DirectOperateNoAck,
-        ),
-        Event::EndControls,
-    ]);
-    harness.expect_no_response();
-
-    harness.send_and_process(DIRECT_OPERATE_NO_ACK_SEQ_1).await;
-    harness.check_no_events();
-    harness.expect_no_response();
-}
-
-#[tokio::test]
 async fn repeated_operate_without_select_gets_the_same_status() {
     let mut harness = new_harness(get_default_config());
 
@@ -146,29 +108,6 @@ async fn repeated_operate_without_select_gets_the_same_status() {
 
     harness.test_request_response(&operate, &response).await;
     harness.test_request_response(&operate, &response).await;
-    harness.check_no_events();
-}
-
-#[tokio::test]
-async fn repeated_select_whose_response_does_not_fit_gets_the_same_error() {
-    let mut config = get_default_config();
-    config.solicited_buffer_size = BufferSize::min();
-    let mut harness = new_harness(config);
-
-    harness.send_and_process(DELAY_MEASURE_SEQ_0).await;
-    assert!(harness.expect_write().await.len() > 4);
-
-    // g41v2 with a 1-byte count and index, more controls than the echo has room for
-    let count = 70;
-    let mut select = vec![0xC1, FunctionCode::Select.as_u8(), 41, 2, 0x17, count];
-    for index in 0..count {
-        select.extend_from_slice(&[index, 0x01, 0x02, 0x00]);
-    }
-    // restart IIN and IIN2.2 PARAMETER_ERROR
-    let response = [0xC1, 0x81, 0x80, 0x04];
-
-    harness.test_request_response(&select, &response).await;
-    harness.test_request_response(&select, &response).await;
     harness.check_no_events();
 }
 

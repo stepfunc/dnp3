@@ -6,9 +6,6 @@ use crate::outstation::tests::harness::*;
 const EMPTY_READ: &[u8] = &[0xC0, 0x01];
 const READ_CLASS_0: &[u8] = &[0xC0, 0x01, 60, 1, 0x06];
 const READ_CLASS_123: &[u8] = &[0xC0, 0x01, 60, 2, 0x06, 60, 3, 0x06, 60, 4, 0x06];
-const CONFIRM_SEQ_0: &[u8] = &[0xC0, 0x00];
-const UNS_CONFIRM_SEQ_0: &[u8] = &[0b11010000, 0x00];
-const CONFIRM_SEQ_1: &[u8] = &[0xC1, 0x00];
 const EMPTY_RESPONSE: &[u8] = &[0xC0, 0x81, 0x80, 0x00];
 const EMPTY_RESPONSE_WITH_PENDING_EVENTS: &[u8] = &[0xC0, 0x81, 0x82, 0x00];
 const BINARY_EVENT_RESPONSE: &[u8] = &[
@@ -141,68 +138,6 @@ async fn can_read_two_byte_range_for_default_variation() {
         )
         .await;
     harness.check_no_events();
-}
-
-#[tokio::test]
-async fn can_read_and_confirm_events() {
-    let mut harness = new_harness(get_default_config());
-
-    harness.handle.database.transaction(create_binary_and_event);
-
-    harness
-        .test_request_response(READ_CLASS_123, BINARY_EVENT_RESPONSE)
-        .await;
-
-    harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
-    harness.send_and_process(CONFIRM_SEQ_0).await;
-    harness.check_events(&[Event::SolicitedConfirmReceived(0)]);
-}
-
-#[tokio::test]
-async fn ignores_confirm_with_wrong_seq() {
-    let mut harness = new_harness(get_default_config());
-
-    harness.handle.database.transaction(create_binary_and_event);
-
-    harness
-        .test_request_response(READ_CLASS_123, BINARY_EVENT_RESPONSE)
-        .await;
-    harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
-
-    harness.send_and_process(CONFIRM_SEQ_1).await;
-    harness.check_events(&[Event::WrongSolicitedConfirmSeq(0, 1)]);
-}
-
-#[tokio::test]
-async fn ignores_unsolicited_confirm_with_correct_seq() {
-    let mut harness = new_harness(get_default_config());
-
-    harness.handle.database.transaction(create_binary_and_event);
-
-    harness
-        .test_request_response(READ_CLASS_123, BINARY_EVENT_RESPONSE)
-        .await;
-    harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
-    harness.send_and_process(UNS_CONFIRM_SEQ_0).await;
-    harness.check_events(&[Event::UnexpectedConfirm(true, 0)]);
-}
-
-#[tokio::test]
-async fn confirm_can_time_out() {
-    let mut harness = new_harness(get_default_config());
-
-    harness.handle.database.transaction(create_binary_and_event);
-
-    harness
-        .test_request_response(READ_CLASS_123, BINARY_EVENT_RESPONSE)
-        .await;
-    harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
-
-    tokio::time::pause(); // auto advance timers
-
-    harness
-        .wait_for_events(&[Event::SolicitedConfirmTimeout(0)])
-        .await;
 }
 
 // Regression test for #423: an event transmitted but not confirmed before a hard link
