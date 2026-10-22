@@ -86,19 +86,6 @@ If your outstation doesn't support unsolicited reporting, set `AssociationConfig
 
 ## Scheduling
 
-Requests within an association are scheduled as follows:
-
-1. User requests such as control operations get top priority.
-2. The association then considers automatic and initialization tasks in this order:
-   1. Clear the RESTART IIN bit if previously observed in a response.
-   2. Disable unsolicited reporting if configured to do so during initialization.
-   3. Perform an integrity scan if configured to do so during initialization.
-   4. Perform automatic time synchronization if enabled, and the master observes the 'NEED_TIME IIN' bit in a response.
-   5. Enable unsolicited reporting if configured to do so during initialization.
-3. Periodic polls execute last.
-
-:::note
-The standard does not specify how requests should be scheduled for multiple associations on a channel. Our implementation uses a per-association task queue. The channel scheduler round-robins through the associations to ensure fair access.
-:::
-
-The `RESTART` IIN bit is automatically cleared by the master whenever the outstation reports it.
+The master runs these startup tasks, and others such as clearing the restart bit and automatic event scans, alongside your
+requests and polls. See [Automatic Tasks and Scheduling](./scheduling.mdx) for when each one runs and how a channel orders
+the work of its associations.
