@@ -82,7 +82,7 @@ class CustomOutstationApplication extends OutstationApplication {
     if (isTimeValid) Timestamp.synchronizedTimestamp(time) else Timestamp.unsynchronizedTimestamp(time)
   }
 
-  private def isTimeValid: Boolean = {
+  def isTimeValid: Boolean = {
     Duration.between(this.lastUpdate, Instant.now).compareTo(refreshRate) <= 0
   }
 
