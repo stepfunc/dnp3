@@ -708,4 +708,70 @@ mod tests {
             link::constant::MAX_LINK_FRAME_LENGTH + 1
         );
     }
+
+    /// The frames a stream reader for `fragment_size` reads from `input` when every read fills
+    /// its buffer, and whether a read found the buffer full with part of a frame unread
+    fn receive_filling_the_buffer(
+        modes: LinkModes,
+        fragment_size: usize,
+        input: &[u8],
+    ) -> (Vec<Frame>, bool) {
+        let mut reader = Reader::new(modes, fragment_size);
+        let mut payload = FramePayload::new();
+        let mut frames = Vec::new();
+        let mut full_with_partial_frame = false;
+        let mut rest = input;
+        while !rest.is_empty() {
+            if reader.buffer.is_full() && reader.buffer.num_bytes_unread() > 0 {
+                full_with_partial_frame = true;
+            }
+            let space = reader.write_space().unwrap().len();
+            assert_ne!(space, 0);
+            let (chunk, tail) = rest.split_at(space.min(rest.len()));
+            feed(&mut reader, &mut payload, chunk, &mut frames).unwrap();
+            rest = tail;
+        }
+        (frames, full_with_partial_frame)
+    }
+
+    #[test]
+    fn stream_reader_keeps_a_partial_frame_when_its_buffer_fills() {
+        let (first, first_frame) = full_frame(0xAA);
+        let (second, second_frame) = full_frame(0xBB);
+        let (third, third_frame) = full_frame(0xCC);
+        let input = [
+            ACK.bytes,
+            &first,
+            UNCONFIRMED_USER_DATA.bytes,
+            &second,
+            MULTI_BLOCK_USER_DATA.bytes,
+            &third,
+            CONFIRM_USER_DATA.bytes,
+            ACK.bytes,
+        ]
+        .concat();
+        let expected = vec![
+            frame(&ACK),
+            first_frame,
+            frame(&UNCONFIRMED_USER_DATA),
+            second_frame,
+            frame(&MULTI_BLOCK_USER_DATA),
+            third_frame,
+            frame(&CONFIRM_USER_DATA),
+            frame(&ACK),
+        ];
+
+        for mode in [LinkErrorMode::Discard, LinkErrorMode::Close] {
+            // the smallest buffer: one frame's read after the longest incomplete frame
+            assert_eq!(
+                receive_filling_the_buffer(
+                    LinkModes::stream(mode),
+                    link::constant::MAX_APP_BYTES_PER_FRAME,
+                    &input,
+                ),
+                (expected.clone(), true),
+                "{mode:?}"
+            );
+        }
+    }
 }
