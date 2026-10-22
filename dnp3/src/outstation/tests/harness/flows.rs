@@ -12,11 +12,9 @@ use crate::outstation::{BufferState, ClassCount, TypeCount};
 /// expect the null unsolicited response sent at startup and confirm it
 pub(crate) async fn confirm_null_unsolicited(harness: &mut OutstationHarness) {
     harness.expect_response(&null_unsolicited(0)).await;
+    harness.check_events(&[Event::EnterUnsolicitedConfirmWait(0)]);
     harness.send_and_process(&unsolicited_confirm(0)).await;
-    harness.check_events(&[
-        Event::EnterUnsolicitedConfirmWait(0),
-        Event::UnsolicitedConfirmReceived(0),
-    ]);
+    harness.check_events(&[Event::UnsolicitedConfirmReceived(0)]);
 }
 
 /// enable unsolicited responses for classes 1, 2 and 3, answered with the restart IIN
