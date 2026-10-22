@@ -11,14 +11,14 @@ pub(crate) enum PostConnectionHandler {
 
 impl PostConnectionHandler {
     pub(crate) async fn post_connect(
-        &mut self,
+        &self,
         socket: TcpStream,
         _endpoint: &SocketAddr,
     ) -> Option<PhysLayer> {
         match self {
             Self::Tcp => Some(PhysLayer::tcp(socket)),
             #[cfg(feature = "enable-tls")]
-            Self::Tls(config) => config.handle_connection(socket, _endpoint).await,
+            Self::Tls(config) => config.handle_connection(socket, _endpoint).await.ok(),
         }
     }
 }
