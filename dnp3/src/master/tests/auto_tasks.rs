@@ -3,7 +3,7 @@ use std::time::Duration;
 use tokio::time::Instant;
 
 use crate::app::Sequence;
-use crate::app::{FunctionCode, Iin, Iin1, Iin2};
+use crate::app::{ControlField, FunctionCode, Iin, Iin1, Iin2};
 use crate::master::association::AssociationConfig;
 use crate::master::request::EventClasses;
 use crate::master::tests::harness::AssocInfoEvent;
@@ -15,6 +15,7 @@ use crate::util::test_support::watchdog;
 
 const BUFFER_OVERFLOW: Iin = Iin::new(Iin1::new(0x00), Iin2::new(0x08));
 const CLASS_1_EVENTS: Iin = Iin::new(Iin1::new(0x02), Iin2::new(0x00));
+const CLASS_2_EVENTS: Iin = Iin::new(Iin1::new(0x04), Iin2::new(0x00));
 
 #[tokio::test]
 async fn auto_integrity_scan_on_buffer_overflow() {
@@ -456,31 +457,151 @@ async fn clear_restart_rejected_without_restart_iin_is_not_repeated() {
 
 const DEVICE_RESTART: Iin = Iin::new(Iin1::new(0x80), Iin2::new(0x00));
 
-#[tokio::test(start_paused = true)]
-async fn event_scan_whose_response_still_reports_events_is_not_repeated() {
-    watchdog(async {
-        let config = AssociationConfig {
-            event_scan_on_events_available: EventClasses::all(),
-            ..AssociationConfig::quiet()
-        };
-        let mut seq = Sequence::default();
-        let mut harness = create_association(config).await;
+/// A response with one binary input event, reporting `iin`
+fn event_response(seq: Sequence, iin: Iin) -> Vec<u8> {
+    let mut response = empty_response_custom_iin(seq, iin);
+    // g2v1 with an 8-bit count of 1, index 0
+    response.extend_from_slice(&[2, 1, 0x17, 1, 0, 0x81]);
+    response
+}
 
+/// An association that scans every event class, after the outstation reports class 1 events
+async fn class_1_events_reported() -> TestHarness {
+    let config = AssociationConfig {
+        event_scan_on_events_available: EventClasses::all(),
+        ..AssociationConfig::quiet()
+    };
+    let mut harness = create_association(config).await;
+    harness
+        .read_and_expect_write(
+            unsol_null_custom_iin(Sequence::default(), CLASS_1_EVENTS),
+            unsol_confirm(Sequence::default()),
+        )
+        .await;
+    harness
+}
+
+#[tokio::test(start_paused = true)]
+async fn event_scan_whose_response_still_reports_events_runs_again_at_once() {
+    watchdog(async {
+        let mut seq = Sequence::default();
+        let mut harness = class_1_events_reported().await;
+
+        // the response to the scan returns events, and reports that more class 1 events are available
+        let class1 = Classes::new(false, EventClasses::new(true, false, false));
+        expect_write_soon(&mut harness, class_scan_request(class1, seq)).await;
         harness
-            .read_and_expect_write(
-                unsol_null_custom_iin(Sequence::default(), CLASS_1_EVENTS),
-                unsol_confirm(Sequence::default()),
-            )
+            .process_response(event_response(seq.increment(), CLASS_1_EVENTS))
+            .await;
+        let answered = Instant::now();
+
+        // the scan runs again at once, reading the classes the last response reported
+        expect_write_soon(&mut harness, class_scan_request(class1, seq)).await;
+        TestHarness::assert_elapsed(answered, Duration::ZERO);
+        harness
+            .process_response(event_response(seq.increment(), CLASS_2_EVENTS))
+            .await;
+        let class2 = Classes::new(false, EventClasses::new(false, true, false));
+        expect_write_soon(&mut harness, class_scan_request(class2, seq)).await;
+        harness
+            .process_response(empty_response(seq.increment()))
             .await;
 
-        // the response to the scan reports that more class 1 events are available
+        assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn event_scan_whose_response_reports_events_but_returns_none_is_not_repeated() {
+    watchdog(async {
+        let mut seq = Sequence::default();
+        let mut harness = class_1_events_reported().await;
+
+        // the outstation keeps the class 1 bit set, but returns no events
         let class1 = Classes::new(false, EventClasses::new(true, false, false));
         expect_write_soon(&mut harness, class_scan_request(class1, seq)).await;
         harness
             .process_response(empty_response_custom_iin(seq.increment(), CLASS_1_EVENTS))
             .await;
 
-        // the scan isn't repeated
+        assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn event_scan_rejected_with_an_iin2_request_error_is_not_repeated() {
+    watchdog(async {
+        let mut seq = Sequence::default();
+        let mut harness = class_1_events_reported().await;
+
+        // the outstation returns events and reports more, but also rejects part of the request
+        let class1 = Classes::new(false, EventClasses::new(true, false, false));
+        let object_unknown = Iin::new(CLASS_1_EVENTS.iin1, Iin2::OBJECT_UNKNOWN);
+        expect_write_soon(&mut harness, class_scan_request(class1, seq)).await;
+        harness
+            .process_response(event_response(seq.increment(), object_unknown))
+            .await;
+
+        assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+    })
+    .await;
+}
+
+/// One fragment of a multi-fragment response with one binary input event, requesting confirmation
+/// unless it's the last
+fn event_fragment(seq: Sequence, fir: bool, fin: bool, iin: Iin) -> Vec<u8> {
+    let mut response = event_response(seq, iin);
+    response[0] = ControlField::response(seq, fir, fin, !fin).to_u8();
+    response
+}
+
+#[tokio::test(start_paused = true)]
+async fn event_scan_with_a_request_error_in_an_earlier_fragment_is_not_repeated() {
+    watchdog(async {
+        let mut seq = Sequence::default();
+        let mut harness = class_1_events_reported().await;
+
+        // the first fragment rejects part of the request, and the last reports more events
+        let class1 = Classes::new(false, EventClasses::new(true, false, false));
+        let parameter_error = Iin::new(CLASS_1_EVENTS.iin1, Iin2::PARAMETER_ERROR);
+        expect_write_soon(&mut harness, class_scan_request(class1, seq)).await;
+        let first = seq.increment();
+        harness
+            .process_response(event_fragment(first, true, false, parameter_error))
+            .await;
+        expect_write_soon(&mut harness, solicited_confirm(first)).await;
+        harness
+            .process_response(event_fragment(seq.increment(), false, true, CLASS_1_EVENTS))
+            .await;
+
+        assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn event_scan_with_iin2_bits_other_than_request_errors_runs_again_at_once() {
+    watchdog(async {
+        let mut seq = Sequence::default();
+        let mut harness = class_1_events_reported().await;
+
+        // the outstation returns events and reports more, along with a corrupt configuration
+        let class1 = Classes::new(false, EventClasses::new(true, false, false));
+        let config_corrupt = Iin::new(CLASS_1_EVENTS.iin1, Iin2::CONFIG_CORRUPT);
+        expect_write_soon(&mut harness, class_scan_request(class1, seq)).await;
+        harness
+            .process_response(event_response(seq.increment(), config_corrupt))
+            .await;
+        let answered = Instant::now();
+
+        expect_write_soon(&mut harness, class_scan_request(class1, seq)).await;
+        TestHarness::assert_elapsed(answered, Duration::ZERO);
+        harness
+            .process_response(empty_response(seq.increment()))
+            .await;
+
         assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
     })
     .await;

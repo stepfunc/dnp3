@@ -10,14 +10,12 @@ use crate::util::skipped::Skipped;
 
 /// Extract measurements from a processable response, sinking them into
 /// something that implements `MeasurementHandler`
-///
-/// Returns true if the values of any header were passed to the handler
 pub(crate) async fn extract_measurements(
     read_type: ReadType,
     header: ResponseHeader,
     objects: ProcessableResponse<'_>,
     handler: &mut dyn ReadHandler,
-) -> bool {
+) -> Delivered {
     handler.begin_fragment(read_type, header).get().await;
     let delivered = extract_measurements_inner(objects, handler);
     handler.end_fragment(read_type, header).get().await;
@@ -29,13 +27,13 @@ pub(crate) async fn extract_measurements(
 pub(crate) fn extract_measurements_inner(
     objects: ProcessableResponse<'_>,
     handler: &mut dyn ReadHandler,
-) -> bool {
-    let mut delivered = false;
+) -> Delivered {
+    let mut delivered = Delivered::default();
     let mut cto = None;
     let mut ignored = Skipped::new();
     for header in objects.objects.iter() {
         match extract_header(&header, cto, handler) {
-            Extracted::Handled => delivered |= header.has_objects(),
+            Extracted::Handled => delivered.add(&header),
             Extracted::Cto(x) => cto = x,
             Extracted::Ignored => ignored.add((header.variation(), header.qualifier())),
         }
@@ -44,6 +42,44 @@ pub(crate) fn extract_measurements_inner(
         tracing::warn!("ignored header variation: {variation} qualifier: {qualifier:?}{count}");
     }
     delivered
+}
+
+/// What extraction passed to the handler
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub(crate) struct Delivered {
+    /// true if the values of any header were passed to the handler
+    pub(crate) values: bool,
+    /// true if any of those values were events
+    pub(crate) events: bool,
+}
+
+impl Delivered {
+    /// Add a header whose values were passed to the handler
+    fn add(&mut self, header: &ObjectHeader) {
+        if header.has_objects() {
+            self.values = true;
+            self.events |= is_event(header);
+        }
+    }
+
+    /// Combine with what another fragment of the same read delivered
+    pub(crate) fn merge(&mut self, other: Self) {
+        self.values |= other.values;
+        self.events |= other.events;
+    }
+}
+
+/// True if the header's variation is an event variation
+fn is_event(header: &ObjectHeader) -> bool {
+    match header {
+        ObjectHeader::CountAndPrefix8(_, variation) => variation.get_header_info().is_event,
+        ObjectHeader::CountAndPrefix16(_, variation) => variation.get_header_info().is_event,
+        ObjectHeader::AllObjects(_)
+        | ObjectHeader::Range(..)
+        | ObjectHeader::Count(..)
+        | ObjectHeader::FreeFormat(_)
+        | ObjectHeader::Read(..) => false,
+    }
 }
 
 /// The objects of a response that the master can process: they parse, and every object with
@@ -831,7 +867,7 @@ mod test {
             input,
         ))
         .unwrap();
-        let delivered = extract_measurements_inner(objects, &mut handler);
+        let delivered = extract_measurements_inner(objects, &mut handler).values;
         (delivered, handler)
     }
 

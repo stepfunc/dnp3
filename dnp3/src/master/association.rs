@@ -11,7 +11,7 @@ use crate::app::{Iin, ResponseHeader};
 use crate::app::{Sequence, Timeout};
 use crate::link::EndpointAddress;
 use crate::master::error::{AssociationError, TaskError, TimeSyncError};
-use crate::master::extract::{extract_measurements, ProcessableResponse};
+use crate::master::extract::{extract_measurements, Delivered, ProcessableResponse};
 use crate::master::handler::AssociationHandler;
 use crate::master::messages::AssociationMsgType;
 use crate::master::poll::{PollHandle, PollMap, PollMsg};
@@ -196,6 +196,11 @@ impl AutoTaskState {
         *self = Self::Idle;
     }
 
+    /// The task was accomplished, but needs to run again
+    fn again(&mut self) {
+        *self = Self::Pending;
+    }
+
     /// The task failed and needs rescheduling
     fn failure(&mut self, config: &AssociationConfig) {
         *self = match self {
@@ -297,7 +302,7 @@ impl TaskStates {
             });
         }
 
-        let events_to_scan = association.events_available & config.event_scan_on_events_available;
+        let events_to_scan = association.events_to_scan();
         if events_to_scan.any() {
             return self
                 .event_scan
@@ -513,8 +518,7 @@ impl Association {
         self.events_available.class1 = iin.iin1.get_class_1_events();
         self.events_available.class2 = iin.iin1.get_class_2_events();
         self.events_available.class3 = iin.iin1.get_class_3_events();
-        let classes_to_scan = self.events_available & self.config.event_scan_on_events_available;
-        if classes_to_scan.any() && self.auto_tasks.event_scan.demand() {
+        if self.events_to_scan().any() && self.auto_tasks.event_scan.demand() {
             tracing::info!("scheduled auto event scan");
         }
     }
@@ -548,8 +552,21 @@ impl Association {
         self.auto_tasks.integrity_scan.failure(&self.config);
     }
 
-    pub(crate) fn on_event_scan_complete(&mut self) {
-        self.auto_tasks.event_scan.done();
+    /// The classes with events available that the automatic event scan reads
+    fn events_to_scan(&self) -> EventClasses {
+        self.events_available & self.config.event_scan_on_events_available
+    }
+
+    /// Complete the event scan, given whether it returned events without an IIN2 request error
+    pub(crate) fn on_event_scan_complete(&mut self, events_without_request_errors: bool) {
+        // the scan's own response can report that more events remain. It only runs again at once
+        // if it read some and the outstation didn't reject it, so an outstation that keeps
+        // reporting events without returning any can't make the master scan back to back
+        if events_without_request_errors && self.events_to_scan().any() {
+            self.auto_tasks.event_scan.again();
+        } else {
+            self.auto_tasks.event_scan.done();
+        }
     }
 
     pub(crate) fn on_event_scan_failure(&mut self) {
@@ -637,7 +654,7 @@ impl Association {
         read_type: ReadType,
         header: ResponseHeader,
         objects: ProcessableResponse<'_>,
-    ) -> bool {
+    ) -> Delivered {
         extract_measurements(read_type, header, objects, self.read_handler.as_mut()).await
     }
 

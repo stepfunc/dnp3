@@ -6,7 +6,7 @@ use crate::app::FunctionCode;
 use crate::app::ResponseHeader;
 use crate::master::association::Association;
 use crate::master::error::TaskError;
-use crate::master::extract::{extract_measurements, ProcessableResponse};
+use crate::master::extract::{extract_measurements, Delivered, ProcessableResponse};
 use crate::master::poll::Poll;
 use crate::master::promise::Promise;
 use crate::master::request::{Classes, EventClasses};
@@ -445,13 +445,13 @@ impl ReadTask {
         Task::App(AppTask::Read(self))
     }
 
-    /// Pass the response's measurements to the handler, returning true if any were delivered
+    /// Pass the response's measurements to the handler, returning what was delivered
     pub(crate) async fn process_response(
         &mut self,
         association: &mut Association,
         header: ResponseHeader,
         objects: ProcessableResponse<'_>,
-    ) -> bool {
+    ) -> Delivered {
         let read_type = self.read_type();
         match self {
             ReadTask::SingleRead(SingleReadTask {
@@ -485,11 +485,18 @@ impl ReadTask {
         }
     }
 
-    pub(crate) fn complete(self, association: &mut Association) {
+    /// Complete the read, given whether it returned events without an IIN2 request error
+    pub(crate) fn complete(
+        self,
+        association: &mut Association,
+        events_without_request_errors: bool,
+    ) {
         match self {
             ReadTask::StartupIntegrity(_) => association.on_integrity_scan_complete(),
             ReadTask::PeriodicPoll(poll) => association.complete_poll(poll.id),
-            ReadTask::EventScan(_) => association.on_event_scan_complete(),
+            ReadTask::EventScan(_) => {
+                association.on_event_scan_complete(events_without_request_errors)
+            }
             ReadTask::SingleRead(task) => task.on_complete(),
         }
     }

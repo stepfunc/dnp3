@@ -8,7 +8,7 @@ use crate::link::error::LinkError;
 use crate::link::EndpointAddress;
 use crate::master::association::{AssociationMap, Next};
 use crate::master::error::TaskError;
-use crate::master::extract::ProcessableResponse;
+use crate::master::extract::{Delivered, ProcessableResponse};
 use crate::master::messages::{MasterMsg, Message};
 use crate::master::tasks::command_no_ack::CommandNoAckTask;
 use crate::master::tasks::{AppTask, AssociationTask, NonReadTask, ReadTask, RequestWriter, Task};
@@ -149,15 +149,21 @@ struct ReadOutcome {
     errors: Iin2,
     /// the IIN1 bits of the last fragment
     iin1: Iin1,
-    /// true if any fragment delivered measurements to the handler
-    delivered: bool,
+    /// what the fragments delivered to the handler
+    delivered: Delivered,
 }
 
 impl ReadOutcome {
-    fn add(&mut self, iin: Iin, delivered: bool) {
+    fn add(&mut self, iin: Iin, delivered: Delivered) {
         self.errors |= iin.bad_request_errors();
         self.iin1 = iin.iin1;
-        self.delivered |= delivered;
+        self.delivered.merge(delivered);
+    }
+
+    /// True if the read returned events, and no fragment reported an IIN2 request error
+    /// (IIN2.0 to IIN2.2), so the outstation didn't reject any part of the request
+    fn events_without_request_errors(&self) -> bool {
+        self.delivered.events && self.errors == Iin2::default()
     }
 
     /// A read with errors still succeeds if it delivered data, or if it's an automatic task
@@ -165,7 +171,7 @@ impl ReadOutcome {
         if self.errors == Iin2::default() {
             return Ok(());
         }
-        if self.delivered || !task.fails_without_data() {
+        if self.delivered.values || !task.fails_without_data() {
             tracing::warn!(
                 "read completed, but the outstation reported: {}",
                 self.errors
@@ -670,19 +676,23 @@ impl MasterSession {
         let association = self.associations.get_mut(dest.link).ok();
 
         match result {
-            Ok(_) => {
+            Ok((seq, events_without_request_errors)) => {
                 if let Some(association) = association {
-                    task.complete(association);
+                    task.complete(association, events_without_request_errors);
                 } else {
                     task.on_task_error(None, TaskError::NoSuchAssociation(dest.link));
                 }
+                Ok(seq)
             }
-            Err(err) => task.on_task_error(association, err),
+            Err(err) => {
+                task.on_task_error(association, err);
+                Err(err)
+            }
         }
-
-        result
     }
 
+    /// Run a read, returning the sequence of the last response and whether the read returned
+    /// events without an IIN2 request error
     async fn execute_read_task<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
@@ -690,7 +700,7 @@ impl MasterSession {
         task: &mut ReadTask,
         writer: &mut TransportWriter<T>,
         reader: &mut TransportReader<T>,
-    ) -> Result<Sequence, TaskError> {
+    ) -> Result<(Sequence, bool), TaskError> {
         let mut seq = self.send_request(io, dest, task, writer).await?;
         let mut is_first = true;
         let mut outcome = ReadOutcome::default();
@@ -734,7 +744,10 @@ impl MasterSession {
 
             match action {
                 // read task complete
-                ReadResponseAction::Complete => return outcome.result(task).map(|()| seq),
+                ReadResponseAction::Complete => {
+                    outcome.result(task)?;
+                    return Ok((seq, outcome.events_without_request_errors()));
+                }
                 // read another response
                 ReadResponseAction::ReadNext => {
                     is_first = false;
