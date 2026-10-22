@@ -794,6 +794,7 @@ impl OutstationSession {
                 return Ok(UnsolicitedWaitResult::ReadNext);
             }
             Some(TransportRequest::Error(from, err)) => {
+                self.on_link_activity();
                 if let Some(seq) = Self::error_response_seq(err) {
                     // a request with an unknown function code ends the selection
                     self.state.select = None;
@@ -898,7 +899,6 @@ impl OutstationSession {
                 Ok(UnsolicitedWaitResult::ReadNext)
             }
             FragmentType::NewRead(hash, headers) | FragmentType::RepeatRead(hash, headers) => {
-                tracing::info_span!("deferring READ request");
                 self.state
                     .deferred_read
                     .set(hash, request.header.control.seq, info, headers);
