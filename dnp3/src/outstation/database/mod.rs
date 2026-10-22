@@ -6,9 +6,10 @@ use details::range::static_db::{Deadband, FlagsDetector, OctetStringDetector, Po
 
 use crate::app::measurement::*;
 use crate::app::parse::parser::HeaderCollection;
-use crate::app::Iin2;
+use crate::app::{FunctionCode, Iin2};
 use crate::master::EventClasses;
 use crate::outstation::database::read::ReadHeader;
+use crate::outstation::target::Selector;
 
 use crate::app::attr::{AttrProp, AttrSet, BadAttribute, OwnedAttribute, TypeError};
 use crate::outstation::{ClassCount, OutstationApplication};
@@ -530,15 +531,18 @@ impl DatabaseHandle {
     }
 
     pub(crate) fn select(&mut self, headers: &HeaderCollection) -> Iin2 {
-        self.with_database(|db| {
+        let mut selector = Selector::new(FunctionCode::Read);
+        let iin2 = self.with_database(|db| {
             let mut unsupported = Iin2::default();
             let selected = db.inner.select_read(headers.iter().filter_map(|header| {
-                ReadHeader::parse(header)
+                ReadHeader::parse(header, &mut selector)
                     .map_err(|err| unsupported |= err)
                     .ok()
             }));
             selected | unsupported
-        })
+        });
+        selector.log();
+        iin2
     }
 
     pub(crate) fn write_response_headers(&mut self, cursor: &mut WriteCursor) -> ResponseInfo {
@@ -852,8 +856,10 @@ impl Get<OctetString> for Database {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::app::parse::options::ParseOptions;
     use crate::app::Timestamp;
     use crate::outstation::config::OutstationConfig;
+    use crate::util::test_support::Levels;
 
     const fn binary(val: bool) -> BinaryInput {
         BinaryInput::new(val, Flags::ONLINE, Time::Synchronized(Timestamp::zero()))
@@ -1122,5 +1128,26 @@ mod test {
             UpdateInfo::Created(3),
             db.update2(0, &AnalogOutputStatus::new(1.0, forced, time()), options)
         );
+    }
+
+    #[test]
+    fn unsupported_read_headers_are_logged_once_per_request() {
+        let mut handle = DatabaseHandle::new(
+            OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS,
+            ClassZeroConfig::default(),
+            EventBufferConfig::all_types(10),
+        );
+        // three g13v1 all objects, which READ doesn't support
+        let headers = HeaderCollection::parse(
+            ParseOptions::default(),
+            FunctionCode::Read,
+            &[0x0D, 0x01, 0x06, 0x0D, 0x01, 0x06, 0x0D, 0x01, 0x06],
+        )
+        .unwrap();
+
+        let mut iin2 = Iin2::default();
+        let levels = Levels::of(|| iin2 = handle.select(&headers));
+        assert_eq!(iin2, Iin2::OBJECT_UNKNOWN);
+        assert_eq!(levels, [tracing::Level::WARN]);
     }
 }

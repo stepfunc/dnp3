@@ -225,7 +225,7 @@ fn fails_task(source: FragmentAddr, destination: FragmentAddr) -> bool {
     if source.link == destination.link {
         return true;
     }
-    tracing::warn!(
+    tracing::debug!(
         "ignoring malformed fragment from {} while expecting response from {}",
         source.link,
         destination.link
@@ -368,7 +368,7 @@ impl MasterSession {
         }
 
         if source.link != destination.link {
-            tracing::warn!(
+            tracing::debug!(
                 "Received response from {} while expecting response from {}",
                 source.link,
                 destination.link
@@ -931,4 +931,26 @@ impl MasterSession {
 enum NextStep {
     Continue(NonReadTask),
     Complete(Sequence),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::util::phys::PhysAddr;
+    use crate::util::test_support::Levels;
+
+    fn addr(link: u16) -> FragmentAddr {
+        FragmentAddr {
+            link: EndpointAddress::raw(link),
+            phys: PhysAddr::None,
+        }
+    }
+
+    #[test]
+    fn a_malformed_fragment_from_another_outstation_is_logged_at_debug() {
+        let mut fails = true;
+        let levels = Levels::of(|| fails = fails_task(addr(2), addr(1)));
+        assert!(!fails);
+        assert_eq!(levels, [tracing::Level::DEBUG]);
+    }
 }

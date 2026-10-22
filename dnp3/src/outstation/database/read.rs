@@ -1,10 +1,10 @@
 use crate::app::parse::parser::{ObjectHeader, ReadQualifier};
 use crate::app::parse::range::Range;
-use crate::app::{FunctionCode, Iin2, Variation};
+use crate::app::{Iin2, Variation};
 use crate::outstation::database::config::*;
 use crate::outstation::database::details::range::static_db::IndexRange;
 use crate::outstation::database::EventClass;
-use crate::outstation::target::{self, Target};
+use crate::outstation::target::{Selector, Target};
 
 /// The static points of one type that a READ selects, in the variation it asks for, if any
 #[derive(Copy, Clone)]
@@ -73,8 +73,8 @@ enum ReadTarget {
 
 impl ReadHeader {
     /// What a header in a READ request selects, or the error for one that READ doesn't support
-    pub(crate) fn parse(header: ObjectHeader) -> Result<ReadHeader, Iin2> {
-        target::select::<ReadTarget>(FunctionCode::Read, header)
+    pub(crate) fn parse(header: ObjectHeader, selector: &mut Selector) -> Result<ReadHeader, Iin2> {
+        selector.select::<ReadTarget>(header)
     }
 }
 

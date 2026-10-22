@@ -6,6 +6,7 @@ use crate::app::variations::*;
 use crate::app::{ObjectParseError, ResponseHeader};
 use crate::master::{HeaderInfo, ReadHandler};
 use crate::master::{ReadType, TaskError};
+use crate::util::skipped::Skipped;
 
 /// Extract measurements from a HeaderCollection, sinking them into
 /// something that implements `MeasurementHandler`
@@ -31,18 +32,16 @@ pub(crate) fn extract_measurements_inner(
 ) -> bool {
     let mut delivered = false;
     let mut cto = None;
+    let mut ignored = Skipped::new();
     for header in objects.iter() {
         match extract_header(&header, cto, handler) {
             Extracted::Handled => delivered |= has_objects(&header),
             Extracted::Cto(x) => cto = x,
-            Extracted::Ignored => {
-                tracing::warn!(
-                    "ignored header variation: {} qualifier: {:?}",
-                    &header.variation(),
-                    &header.qualifier()
-                );
-            }
+            Extracted::Ignored => ignored.add((header.variation(), header.qualifier())),
         }
+    }
+    if let Some(((variation, qualifier), count)) = ignored.first() {
+        tracing::warn!("ignored header variation: {variation} qualifier: {qualifier:?}{count}");
     }
     delivered
 }
@@ -197,6 +196,7 @@ mod test {
     use crate::app::parse::parser::HeaderCollection;
     use crate::app::*;
     use crate::master::{HeaderInfo, ReadHandler};
+    use crate::util::test_support::Levels;
 
     use super::*;
 
@@ -981,5 +981,25 @@ mod test {
                 [Header::Binary(vec![binary(false, None, 7)])]
             );
         }
+    }
+
+    #[test]
+    fn ignored_headers_are_logged_once_per_fragment() {
+        let mut handler = MockHandler::new();
+        let objects = HeaderCollection::parse(
+            ParseOptions::default(),
+            FunctionCode::Response,
+            // three g52v2 count: 1, which the master doesn't extract
+            &[
+                0x34, 0x02, 0x07, 0x01, 0x00, 0x00, 0x34, 0x02, 0x07, 0x01, 0x00, 0x00, 0x34, 0x02,
+                0x07, 0x01, 0x00, 0x00,
+            ],
+        )
+        .unwrap();
+
+        let levels = Levels::of(|| {
+            extract_measurements_inner(objects, &mut handler);
+        });
+        assert_eq!(levels, [tracing::Level::WARN]);
     }
 }

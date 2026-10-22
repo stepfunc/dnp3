@@ -1,7 +1,9 @@
-//! Frames and listeners shared by the tests of the TCP, TLS, serial and UDP channels
+//! Frames and listeners shared by the tests of the TCP, TLS, serial and UDP channels, and a
+//! recorder of the levels that tests log at
 
 use std::fmt::Debug;
 use std::future::Future;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use tokio::sync::mpsc;
@@ -164,4 +166,50 @@ impl<T: Debug + PartialEq + Send + Sync + 'static> Timeline<T> {
     pub(crate) fn now(&self) -> Duration {
         self.start.elapsed()
     }
+}
+
+/// Records the level of each event logged while it is the default subscriber
+#[derive(Clone, Default)]
+pub(crate) struct Levels(Arc<Mutex<Vec<tracing::Level>>>);
+
+impl Levels {
+    /// The levels of the events that `f` logs
+    pub(crate) fn of(f: impl FnOnce()) -> Vec<tracing::Level> {
+        let levels = Self::default();
+        tracing::subscriber::with_default(levels.clone(), f);
+        let logged = levels.0.lock().unwrap().clone();
+        logged
+    }
+
+    /// How many events were logged at `level`
+    pub(crate) fn count(&self, level: tracing::Level) -> usize {
+        self.0
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|x| **x == level)
+            .count()
+    }
+}
+
+impl tracing::Subscriber for Levels {
+    fn enabled(&self, _: &tracing::Metadata<'_>) -> bool {
+        true
+    }
+
+    fn new_span(&self, _: &tracing::span::Attributes<'_>) -> tracing::span::Id {
+        tracing::span::Id::from_u64(1)
+    }
+
+    fn record(&self, _: &tracing::span::Id, _: &tracing::span::Record<'_>) {}
+
+    fn record_follows_from(&self, _: &tracing::span::Id, _: &tracing::span::Id) {}
+
+    fn event(&self, event: &tracing::Event<'_>) {
+        self.0.lock().unwrap().push(*event.metadata().level());
+    }
+
+    fn enter(&self, _: &tracing::span::Id) {}
+
+    fn exit(&self, _: &tracing::span::Id) {}
 }
