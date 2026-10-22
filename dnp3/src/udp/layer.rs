@@ -86,10 +86,7 @@ impl UdpType {
                 .map(|(x, s)| (x, PhysAddr::Udp(s))),
             Self::Connected(x) => x.recv(buffer).await.map(|x| (x, PhysAddr::None)),
             #[cfg(test)]
-            Self::Scripted(x) => x
-                .recv_from(buffer)
-                .await
-                .map(|(x, s)| (x, PhysAddr::Udp(s))),
+            Self::Scripted(x) => x.read(buffer).await,
         }
     }
 
@@ -102,7 +99,7 @@ impl UdpType {
             UdpType::Bound(s) => s.send_to(data, destination(addr)?).await,
             UdpType::Connected(s) => s.send(data).await,
             #[cfg(test)]
-            UdpType::Scripted(s) => s.send_to(data, destination(addr)?),
+            UdpType::Scripted(s) => s.write(data, addr),
         }
     }
 
@@ -111,7 +108,7 @@ impl UdpType {
             UdpType::Bound(_) => true,
             UdpType::Connected(_) => false,
             #[cfg(test)]
-            UdpType::Scripted(_) => true,
+            UdpType::Scripted(s) => s.is_bound(),
         }
     }
 }
@@ -187,22 +184,29 @@ impl UdpLayer {
     }
 }
 
-/// An ICMP error, such as port unreachable, reports that an earlier datagram wasn't delivered.
-/// Windows reports it as a reset, and Linux reports it as a refusal on a connected socket.
+/// The Windows error for an earlier datagram whose time to live expired, which std leaves
+/// uncategorized
+const WSAENETRESET: i32 = 10052;
+
+/// An ICMP error reports that an earlier datagram wasn't delivered. Windows reports port
+/// unreachable as a reset and an expired time to live as `WSAENETRESET`, and Linux reports port
+/// unreachable as a refusal on a connected socket.
 fn is_icmp_error(err: &std::io::Error) -> bool {
     matches!(
         err.kind(),
         ErrorKind::ConnectionReset | ErrorKind::ConnectionRefused
-    )
+    ) || (cfg!(windows) && err.raw_os_error() == Some(WSAENETRESET))
 }
 
-/// Linux reports a send to port 0 as an invalid argument. On Windows and macOS, port 0 is an
-/// unavailable address, and an invalid argument means a socket or programming error.
+/// Linux also reports a send to port 0 as an invalid argument, which on other platforms means a
+/// socket or programming error
 const INVALID_INPUT_IS_DESTINATION: bool = cfg!(any(target_os = "linux", target_os = "android"));
 
-/// A send error caused by the datagram's destination, which leaves the socket usable for others:
-/// no route to it, a broadcast address or a firewall rule, or an address that can't be sent to,
-/// such as port 0
+/// A send error that a bound socket tolerates as the loss of one datagram, because the
+/// destination can cause it: no route to it, a broadcast address, a firewall rule, or an address
+/// that can't be sent to, such as port 0. It doesn't show that other destinations still work: a
+/// firewall can deny every send, and on macOS an unavailable address also covers a bound address
+/// that has gone away.
 fn is_destination_error(err: &std::io::Error) -> bool {
     let kind = err.kind();
     matches!(
@@ -216,7 +220,8 @@ fn is_destination_error(err: &std::io::Error) -> bool {
 
 #[cfg(test)]
 mod scripted {
-    use super::{UdpLayer, UdpType};
+    use super::{destination, UdpLayer, UdpType};
+    use crate::util::phys::PhysAddr;
     use std::collections::VecDeque;
     use std::io::ErrorKind;
     use std::net::SocketAddr;
@@ -224,25 +229,49 @@ mod scripted {
 
     pub(super) type Datagram = (Vec<u8>, SocketAddr);
 
-    /// A bound socket that receives the datagrams a test supplies, and records the ones it sends
+    /// An error for a [`ScriptedSocket`] to return
+    #[derive(Copy, Clone, Debug)]
+    pub(super) enum Fault {
+        Kind(ErrorKind),
+        /// a platform error code
+        Os(i32),
+    }
+
+    impl From<Fault> for std::io::Error {
+        fn from(fault: Fault) -> Self {
+            match fault {
+                Fault::Kind(kind) => kind.into(),
+                Fault::Os(code) => std::io::Error::from_raw_os_error(code),
+            }
+        }
+    }
+
+    /// A socket that receives the datagrams and errors a test supplies, and records the datagrams
+    /// it sends
     ///
     /// Each send attempt first takes the next scripted error, if any are left. Without one, a
-    /// send to port 0 fails with an invalid argument, as it does on Linux.
+    /// send to port 0 fails with an invalid argument, as it does on Linux. A connected socket
+    /// sends to its remote address, and reads datagrams without their source.
     pub(super) struct ScriptedSocket {
-        received: mpsc::UnboundedReceiver<Datagram>,
+        received: mpsc::UnboundedReceiver<Result<Datagram, Fault>>,
         sent: mpsc::UnboundedSender<Datagram>,
-        send_errors: VecDeque<ErrorKind>,
+        send_errors: VecDeque<Fault>,
         send_attempts: usize,
+        connected: Option<SocketAddr>,
     }
 
     /// The test's side of a [`ScriptedSocket`]
     pub(super) struct Remote {
-        pub(super) received: mpsc::UnboundedSender<Datagram>,
+        pub(super) received: mpsc::UnboundedSender<Result<Datagram, Fault>>,
         pub(super) sent: mpsc::UnboundedReceiver<Datagram>,
     }
 
     impl UdpLayer {
-        pub(super) fn scripted(send_errors: &[ErrorKind]) -> (Self, Remote) {
+        /// A layer on a scripted socket, connected to `connected` if it's set and bound otherwise
+        pub(super) fn scripted(
+            connected: Option<SocketAddr>,
+            send_errors: &[Fault],
+        ) -> (Self, Remote) {
             let (received_tx, received_rx) = mpsc::unbounded_channel();
             let (sent_tx, sent_rx) = mpsc::unbounded_channel();
             let socket = ScriptedSocket {
@@ -250,6 +279,7 @@ mod scripted {
                 sent: sent_tx,
                 send_errors: send_errors.iter().copied().collect(),
                 send_attempts: 0,
+                connected,
             };
             let layer = UdpLayer {
                 inner: UdpType::Scripted(socket),
@@ -271,26 +301,35 @@ mod scripted {
     }
 
     impl ScriptedSocket {
-        pub(super) async fn recv_from(
+        pub(super) fn is_bound(&self) -> bool {
+            self.connected.is_none()
+        }
+
+        pub(super) async fn read(
             &mut self,
             buffer: &mut [u8],
-        ) -> std::io::Result<(usize, SocketAddr)> {
-            let Some((data, source)) = self.received.recv().await else {
+        ) -> std::io::Result<(usize, PhysAddr)> {
+            let Some(received) = self.received.recv().await else {
                 return std::future::pending().await;
             };
+            let (data, source) = received?;
             let count = data.len().min(buffer.len());
             buffer[..count].copy_from_slice(&data[..count]);
+            let source = match self.connected {
+                None => PhysAddr::Udp(source),
+                Some(_) => PhysAddr::None,
+            };
             Ok((count, source))
         }
 
-        pub(super) fn send_to(
-            &mut self,
-            data: &[u8],
-            destination: SocketAddr,
-        ) -> std::io::Result<usize> {
+        pub(super) fn write(&mut self, data: &[u8], addr: PhysAddr) -> std::io::Result<usize> {
+            let destination = match self.connected {
+                None => destination(addr)?,
+                Some(remote) => remote,
+            };
             self.send_attempts = self.send_attempts.saturating_add(1);
-            if let Some(kind) = self.send_errors.pop_front() {
-                return Err(kind.into());
+            if let Some(fault) = self.send_errors.pop_front() {
+                return Err(fault.into());
             }
             if destination.port() == 0 {
                 return Err(ErrorKind::InvalidInput.into());
@@ -304,7 +343,7 @@ mod scripted {
 
 #[cfg(test)]
 mod tests {
-    use super::scripted::Datagram;
+    use super::scripted::{Datagram, Fault};
     use super::*;
     use crate::app::parse::options::ParseOptions;
     use crate::decode::PhysDecodeLevel;
@@ -325,7 +364,10 @@ mod tests {
         PEER.parse().unwrap()
     }
 
-    /// The send errors that only lose the datagram on this platform
+    const LINUX: bool = cfg!(any(target_os = "linux", target_os = "android"));
+    const WINDOWS: bool = cfg!(target_os = "windows");
+
+    /// The send errors that only lose the datagram on a bound socket on this platform
     fn destination_errors() -> Vec<ErrorKind> {
         let mut kinds = vec![
             ErrorKind::AddrNotAvailable,
@@ -333,7 +375,7 @@ mod tests {
             ErrorKind::HostUnreachable,
             ErrorKind::PermissionDenied,
         ];
-        if INVALID_INPUT_IS_DESTINATION {
+        if LINUX {
             kinds.push(ErrorKind::InvalidInput);
         }
         kinds
@@ -347,10 +389,18 @@ mod tests {
             ErrorKind::OutOfMemory,
             ErrorKind::BrokenPipe,
         ];
-        if !INVALID_INPUT_IS_DESTINATION {
+        if !LINUX {
             kinds.push(ErrorKind::InvalidInput);
         }
         kinds
+    }
+
+    fn faults(kinds: &[ErrorKind]) -> Vec<Fault> {
+        kinds.iter().copied().map(Fault::Kind).collect()
+    }
+
+    fn ttl_expired() -> std::io::Error {
+        std::io::Error::from_raw_os_error(WSAENETRESET)
     }
 
     #[derive(Debug, PartialEq)]
@@ -375,8 +425,22 @@ mod tests {
         }
     }
 
+    /// Write to the peer from a bound socket
     async fn scripted_write(send_errors: &[ErrorKind], addr: PhysAddr) -> WriteOutcome {
-        let (mut layer, mut remote) = UdpLayer::scripted(send_errors);
+        write_with(None, &faults(send_errors), addr).await
+    }
+
+    /// Write from a socket connected to the peer
+    async fn connected_write(send_errors: &[ErrorKind]) -> WriteOutcome {
+        write_with(Some(peer()), &faults(send_errors), PhysAddr::None).await
+    }
+
+    async fn write_with(
+        connected: Option<SocketAddr>,
+        send_errors: &[Fault],
+        addr: PhysAddr,
+    ) -> WriteOutcome {
+        let (mut layer, mut remote) = UdpLayer::scripted(connected, send_errors);
         let result = layer.write_all(&[1, 2, 3], addr).await;
         let mut sent = Vec::new();
         while let Ok(x) = remote.sent.try_recv() {
@@ -458,15 +522,91 @@ mod tests {
         );
     }
 
+    /// A connected socket only sends to its remote, so these errors apply to every datagram
     #[tokio::test]
-    async fn read_skips_a_datagram_from_port_0() {
-        let (mut layer, remote) = UdpLayer::scripted(&[]);
-        let port_0 = PEER_PORT_0.parse().unwrap();
-        remote.received.send((vec![1], port_0)).unwrap();
-        remote.received.send((vec![2], peer())).unwrap();
+    async fn write_fails_on_a_destination_error_on_a_connected_socket() {
+        for kind in destination_errors() {
+            assert_eq!(
+                (kind, connected_write(&[kind]).await),
+                (kind, WriteOutcome::new(Err(kind), (1, 0), &[]))
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn write_retries_once_after_an_icmp_error_on_a_connected_socket() {
+        assert_eq!(
+            connected_write(&[ErrorKind::ConnectionRefused]).await,
+            WriteOutcome::new(Ok(()), (2, 0), &[1, 2, 3])
+        );
+    }
+
+    #[tokio::test]
+    async fn write_loses_a_datagram_after_a_second_icmp_error_on_a_connected_socket() {
+        assert_eq!(
+            connected_write(&[ErrorKind::ConnectionRefused; 3]).await,
+            WriteOutcome::new(Ok(()), (2, 1), &[])
+        );
+    }
+
+    /// Windows reports an expired time to live as WSAENETRESET, which is otherwise uncategorized
+    #[tokio::test]
+    async fn write_treats_wsaenetreset_as_an_icmp_error_only_on_windows() {
+        for connected in [None, Some(peer())] {
+            let addr = PhysAddr::Udp(peer());
+            let once = write_with(connected, &[Fault::Os(WSAENETRESET)], addr).await;
+            let thrice = write_with(connected, &[Fault::Os(WSAENETRESET); 3], addr).await;
+            let expected = if WINDOWS {
+                (
+                    WriteOutcome::new(Ok(()), (2, 0), &[1, 2, 3]),
+                    WriteOutcome::new(Ok(()), (2, 1), &[]),
+                )
+            } else {
+                let kind = ttl_expired().kind();
+                (
+                    WriteOutcome::new(Err(kind), (1, 0), &[]),
+                    WriteOutcome::new(Err(kind), (1, 2), &[]),
+                )
+            };
+            assert_eq!(
+                (connected, once, thrice),
+                (connected, expected.0, expected.1)
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn read_skips_wsaenetreset_only_on_windows() {
+        let (mut layer, remote) = UdpLayer::scripted(None, &[]);
+        remote.received.send(Err(Fault::Os(WSAENETRESET))).unwrap();
+        remote.received.send(Ok((vec![2], peer()))).unwrap();
 
         let mut buffer = [0; 16];
-        let (count, source) = layer.read(&mut buffer).await.unwrap();
+        let result = tokio::time::timeout(Duration::from_secs(1), layer.read(&mut buffer))
+            .await
+            .unwrap()
+            .map(|(count, source)| (buffer.get(..count).map(<[u8]>::to_vec), source))
+            .map_err(|err| err.raw_os_error());
+        let expected = if WINDOWS {
+            Ok((Some(vec![2]), PhysAddr::Udp(peer())))
+        } else {
+            Err(ttl_expired().raw_os_error())
+        };
+        assert_eq!(result, expected);
+    }
+
+    #[tokio::test]
+    async fn read_skips_a_datagram_from_port_0() {
+        let (mut layer, remote) = UdpLayer::scripted(None, &[]);
+        let port_0 = PEER_PORT_0.parse().unwrap();
+        remote.received.send(Ok((vec![1], port_0))).unwrap();
+        remote.received.send(Ok((vec![2], peer()))).unwrap();
+
+        let mut buffer = [0; 16];
+        let (count, source) = tokio::time::timeout(Duration::from_secs(1), layer.read(&mut buffer))
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(
             (buffer.get(..count), source),
             (Some([2].as_slice()), PhysAddr::Udp(peer()))
@@ -476,7 +616,7 @@ mod tests {
     /// A request for link status from port 0 is ignored, so the reply to it can't end the session
     #[tokio::test]
     async fn master_session_ignores_a_request_from_port_0_and_answers_the_next() {
-        let (layer, mut remote) = UdpLayer::scripted(&[]);
+        let (layer, mut remote) = UdpLayer::scripted(None, &[]);
         let mut phys = PhysLayer::Udp(layer);
         let (_channel, rx) = crate::util::channel::request_channel();
         let mut session = Session::master(MasterTask::new(
@@ -490,17 +630,17 @@ mod tests {
         let port_0 = PEER_PORT_0.parse().unwrap();
         remote
             .received
-            .send((OUTSTATION_REQUEST.to_vec(), port_0))
+            .send(Ok((OUTSTATION_REQUEST.to_vec(), port_0)))
             .unwrap();
         remote
             .received
-            .send((OUTSTATION_REQUEST.to_vec(), peer()))
+            .send(Ok((OUTSTATION_REQUEST.to_vec(), peer())))
             .unwrap();
 
         tokio::select! {
             err = session.run(&mut phys) => panic!("the session ended: {err:?}"),
-            sent = remote.sent.recv() => {
-                assert_eq!(sent, Some((MASTER_REPLY.to_vec(), peer())));
+            sent = tokio::time::timeout(Duration::from_secs(1), remote.sent.recv()) => {
+                assert_eq!(sent, Ok(Some((MASTER_REPLY.to_vec(), peer()))));
             }
         }
     }
