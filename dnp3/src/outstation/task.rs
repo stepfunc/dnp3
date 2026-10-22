@@ -113,12 +113,14 @@ impl<T: Transport> OutstationTask<T> {
             config.class_zero,
             config.event_buffer_config,
         );
-        let (reader, writer) = crate::transport::create_outstation_transport_layer(
+        let (reader, writer) = crate::transport::create_transport_layer(
             link_modes,
             parse_options,
+            crate::link::LinkRole::Outstation {
+                self_address: config.features.self_address,
+            },
             config.outstation_address,
-            config.features.self_address,
-            config.rx_buffer_size,
+            config.rx_buffer_size.value(),
         );
         let destination = FragmentAddr {
             link: config.master_address,

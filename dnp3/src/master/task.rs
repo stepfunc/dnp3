@@ -94,11 +94,12 @@ impl<T: Transport> MasterTask<T> {
             messages,
             associations,
         );
-        let (reader, writer) = crate::transport::create_master_transport_layer(
+        let (reader, writer) = crate::transport::create_transport_layer(
             link_modes,
             parse_options,
+            crate::link::LinkRole::Master,
             config.master_address,
-            config.rx_buffer_size,
+            config.rx_buffer_size.value(),
         );
         Self {
             session,

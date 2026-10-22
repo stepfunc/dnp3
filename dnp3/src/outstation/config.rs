@@ -118,10 +118,6 @@ pub struct OutstationConfig {
 }
 
 impl Feature {
-    pub(crate) fn is_enabled(&self) -> bool {
-        *self == Feature::Enabled
-    }
-
     pub(crate) fn is_disabled(&self) -> bool {
         *self == Feature::Disabled
     }

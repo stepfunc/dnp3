@@ -1,6 +1,5 @@
 use crate::link::reader::LinkModes;
-use crate::link::EndpointAddress;
-use crate::outstation::Feature;
+use crate::link::{EndpointAddress, LinkRole};
 use crate::transport::Transport;
 
 pub(crate) mod assembler;
@@ -22,26 +21,15 @@ impl Transport for RealTransport {
     type Reader = reader::Reader;
     type Writer = writer::Writer;
 
-    fn master(
+    fn new(
         link_modes: LinkModes,
+        role: LinkRole,
         address: EndpointAddress,
         rx_buffer_size: usize,
     ) -> (Self::Reader, Self::Writer) {
         (
-            reader::Reader::master(link_modes, address, rx_buffer_size),
-            writer::Writer::new(crate::app::EndpointType::Master, address),
-        )
-    }
-
-    fn outstation(
-        link_modes: LinkModes,
-        address: EndpointAddress,
-        self_address: Feature,
-        rx_buffer_size: usize,
-    ) -> (Self::Reader, Self::Writer) {
-        (
-            reader::Reader::outstation(link_modes, address, self_address, rx_buffer_size),
-            writer::Writer::new(crate::app::EndpointType::Outstation, address),
+            reader::Reader::new(link_modes, role, address, rx_buffer_size),
+            writer::Writer::new(role, address),
         )
     }
 }

@@ -1,4 +1,3 @@
-use crate::app::EndpointType;
 use crate::decode::DecodeLevel;
 use crate::link::display::LinkDisplay;
 use crate::link::error::LinkError;
@@ -9,7 +8,7 @@ use crate::link::header::{
 };
 use crate::link::parser::FramePayload;
 use crate::link::reader::LinkModes;
-use crate::link::EndpointAddress;
+use crate::link::{EndpointAddress, LinkRole};
 use crate::outstation::Feature;
 use crate::util::phys::{PhysAddr, PhysLayer};
 
@@ -19,8 +18,7 @@ enum SecondaryState {
 }
 
 pub(crate) struct Layer {
-    endpoint_type: EndpointType,
-    self_address: Feature,
+    role: LinkRole,
     local_address: EndpointAddress,
     secondary_state: SecondaryState,
     reader: super::reader::Reader,
@@ -104,13 +102,11 @@ impl Layer {
     pub(crate) fn new(
         link_modes: LinkModes,
         max_rx_fragment_size: usize,
-        endpoint_type: EndpointType,
-        self_address: Feature,
+        role: LinkRole,
         local_address: EndpointAddress,
     ) -> Self {
         Self {
-            endpoint_type,
-            self_address,
+            role,
             local_address,
             secondary_state: SecondaryState::NotReset,
             reader: super::reader::Reader::new(link_modes, max_rx_fragment_size),
@@ -142,7 +138,7 @@ impl Layer {
 
     pub(crate) fn get_header(&self, reply: Reply) -> Header {
         Header::new(
-            ControlField::new(self.endpoint_type.dir_bit(), reply.function),
+            ControlField::new(self.role.dir_bit(), reply.function),
             reply.address.wrap(),
             self.local_address.wrap(),
         )
@@ -180,7 +176,7 @@ impl Layer {
         mut ignore: F,
     ) -> (Option<FrameInfo>, Option<Reply>) {
         // ignore frames sent from the same endpoint type
-        if header.control.master == self.endpoint_type.dir_bit() {
+        if header.control.master == self.role.dir_bit() {
             //  we don't log this
             return (None, None);
         }
@@ -204,25 +200,31 @@ impl Layer {
                     return (None, None);
                 }
             }
-            AnyAddress::SelfAddress => {
-                if self.self_address.is_enabled() {
+            AnyAddress::SelfAddress => match self.role {
+                LinkRole::Outstation {
+                    self_address: Feature::Enabled,
+                } => {
                     // just pretend like it was sent to us
                     None
-                } else {
+                }
+                LinkRole::Master
+                | LinkRole::Outstation {
+                    self_address: Feature::Disabled,
+                } => {
                     ignore(Ignored::SelfAddress);
                     return (None, None);
                 }
-            }
+            },
             AnyAddress::Reserved(x) => {
                 ignore(Ignored::ReservedDestination(x));
                 return (None, None);
             }
-            AnyAddress::Broadcast(mode) => match self.endpoint_type {
-                EndpointType::Master => {
+            AnyAddress::Broadcast(mode) => match self.role {
+                LinkRole::Master => {
                     ignore(Ignored::BroadcastToMaster);
                     return (None, None);
                 }
-                EndpointType::Outstation => Some(mode),
+                LinkRole::Outstation { .. } => Some(mode),
             },
         };
 
@@ -334,24 +336,22 @@ mod test {
     const MASTER: EndpointAddress = EndpointAddress::raw(1);
     const OUTSTATION: EndpointAddress = EndpointAddress::raw(1024);
 
-    fn layer(endpoint_type: EndpointType) -> Layer {
-        let local = match endpoint_type {
-            EndpointType::Master => MASTER,
-            EndpointType::Outstation => OUTSTATION,
+    const OUTSTATION_ROLE: LinkRole = LinkRole::Outstation {
+        self_address: Feature::Disabled,
+    };
+
+    fn layer(role: LinkRole) -> Layer {
+        let local = match role {
+            LinkRole::Master => MASTER,
+            LinkRole::Outstation { .. } => OUTSTATION,
         };
-        Layer::new(
-            LinkModes::test(),
-            2048,
-            endpoint_type,
-            Feature::Disabled,
-            local,
-        )
+        Layer::new(LinkModes::test(), 2048, role, local)
     }
 
     fn reply_to(layer: &mut Layer, function: Function) -> Vec<u8> {
-        let (from_master, source, destination) = match layer.endpoint_type {
-            EndpointType::Master => (false, OUTSTATION, MASTER),
-            EndpointType::Outstation => (true, MASTER, OUTSTATION),
+        let (from_master, source, destination) = match layer.role {
+            LinkRole::Master => (false, OUTSTATION, MASTER),
+            LinkRole::Outstation { .. } => (true, MASTER, OUTSTATION),
         };
         let header = Header::new(
             ControlField::new(from_master, function),
@@ -365,7 +365,7 @@ mod test {
 
     #[test]
     fn outstation_replies_to_link_status_request() {
-        let mut layer = layer(EndpointType::Outstation);
+        let mut layer = layer(OUTSTATION_ROLE);
         assert_eq!(
             reply_to(&mut layer, Function::PriRequestLinkStatus),
             [0x05, 0x64, 0x05, 0x0B, 0x01, 0x00, 0x00, 0x04, 0x64, 0x40]
@@ -374,7 +374,7 @@ mod test {
 
     #[test]
     fn outstation_acks_reset_link_states() {
-        let mut layer = layer(EndpointType::Outstation);
+        let mut layer = layer(OUTSTATION_ROLE);
         assert_eq!(
             reply_to(&mut layer, Function::PriResetLinkStates),
             [0x05, 0x64, 0x05, 0x00, 0x01, 0x00, 0x00, 0x04, 0x27, 0x70]
@@ -383,7 +383,7 @@ mod test {
 
     #[test]
     fn master_replies_to_link_status_request() {
-        let mut layer = layer(EndpointType::Master);
+        let mut layer = layer(LinkRole::Master);
         assert_eq!(
             reply_to(&mut layer, Function::PriRequestLinkStatus),
             [0x05, 0x64, 0x05, 0x8B, 0x00, 0x04, 0x01, 0x00, 0x2E, 0xF7]
@@ -392,7 +392,7 @@ mod test {
 
     #[test]
     fn master_acks_reset_link_states() {
-        let mut layer = layer(EndpointType::Master);
+        let mut layer = layer(LinkRole::Master);
         assert_eq!(
             reply_to(&mut layer, Function::PriResetLinkStates),
             [0x05, 0x64, 0x05, 0x80, 0x00, 0x04, 0x01, 0x00, 0x6D, 0xC7]
