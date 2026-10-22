@@ -230,8 +230,11 @@ impl SetMap {
         }
     }
 
-    /// Iterate over variations in a requested set. This is useful for implementing READ on g0v254.
-    pub(crate) fn variations(&self, set: AttrSet) -> Option<impl Iterator<Item = AttrItem> + '_> {
+    /// Iterate over variations in a requested set. This is useful for implementing READ on g0v255.
+    pub(crate) fn variations(
+        &self,
+        set: AttrSet,
+    ) -> Option<impl ExactSizeIterator<Item = AttrItem> + '_> {
         self.sets.get(&set).map(|x| {
             x.iter().map(|(k, (prop, _))| AttrItem {
                 variation: k.value,
