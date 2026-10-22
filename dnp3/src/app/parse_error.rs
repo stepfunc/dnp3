@@ -33,6 +33,7 @@ pub enum ObjectParseError {
     /// Specified variation and qualifier code are invalid or not supported
     InvalidQualifierForVariation(Variation, QualifierCode),
     /// Specified qualifier code is not supported
+    #[deprecated(since = "1.8.0", note = "never returned; will be removed in 2.0")]
     UnsupportedQualifierCode(QualifierCode),
     /// Free format parser can only handle counts of 1
     UnsupportedFreeFormatCount(u8),
@@ -107,6 +108,7 @@ impl std::fmt::Display for ObjectParseError {
                 q.description(),
                 q.as_u8()
             ),
+            #[expect(deprecated, reason = "Display must cover every variant until removal")]
             ObjectParseError::UnsupportedQualifierCode(q) => write!(
                 f,
                 "Unsupported qualifier code: {} (0x{:02X})",
