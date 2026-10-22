@@ -173,26 +173,51 @@ async fn repeated_select_whose_response_does_not_fit_gets_the_same_error() {
 }
 
 #[tokio::test]
-async fn repeated_request_after_a_malformed_request_during_unsolicited_confirm_wait_gets_the_original_response(
-) {
+async fn request_after_a_malformed_request_during_unsolicited_confirm_wait_is_processed_again() {
+    // direct operate, seq == 3, g41v2 - count == 1, index == 7, value = 513
+    let direct_operate = [0xC3, 0x05, 41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, 0x00];
+    // restart IIN + echo of the request with status == SUCCESS
+    let response = [
+        0xC3, 0x81, 0x80, 0x00, 41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, 0x00,
+    ];
+    // read, seq == 4, g1v2 with a 1-byte start/stop qualifier but no start or stop
+    let malformed = [0xC4, 0x01, 0x01, 0x02, 0x00];
+    // restart IIN and IIN2.2 PARAMETER_ERROR
+    let malformed_response = [0xC4, 0x81, 0x80, 0x04];
+    let operated = [
+        Event::BeginControls,
+        Event::Operate(
+            Control::G41V2(Group41Var2::new(513), 7),
+            OperateType::DirectOperate,
+        ),
+        Event::EndControls,
+    ];
+
     let mut harness = new_harness(get_default_unsolicited_config());
 
     // the null unsolicited response is never confirmed
     harness.expect_response(&[0xF0, 0x82, 0x80, 0x00]).await;
     harness.check_events(&[Event::EnterUnsolicitedConfirmWait(0)]);
 
-    harness.send_and_process(DELAY_MEASURE_SEQ_0).await;
-    let response = harness.expect_write().await;
-    assert!(response.len() > 4);
-
-    // g1v2 with a 1-byte start/stop qualifier but no start or stop
     harness
-        .test_request_response(&[0xC1, 0x01, 0x01, 0x02, 0x00], &[0xC1, 0x81, 0x80, 0x04])
+        .test_request_response(&direct_operate, &response)
         .await;
+    harness.check_events(&operated);
 
-    harness.send_and_process(DELAY_MEASURE_SEQ_0).await;
-    harness.expect_response(&response).await;
+    // the malformed request becomes the last request, and its repeat is answered as before
+    harness
+        .test_request_response(&malformed, &malformed_response)
+        .await;
+    harness
+        .test_request_response(&malformed, &malformed_response)
+        .await;
     harness.check_no_events();
+
+    // so the direct operate isn't a repeat
+    harness
+        .test_request_response(&direct_operate, &response)
+        .await;
+    harness.check_events(&operated);
 }
 
 #[tokio::test]
