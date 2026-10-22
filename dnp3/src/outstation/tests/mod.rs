@@ -16,6 +16,8 @@ mod octet_strings;
 mod read_dead_band;
 /// error IIN for reads of points that aren't installed
 mod read_errors;
+/// READ header, selection and fragment limits
+mod read_limits;
 /// state machine for READ requests
 mod read_states;
 /// responses to repeated requests
