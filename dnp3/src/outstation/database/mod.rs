@@ -1021,7 +1021,7 @@ mod test {
     }
 
     #[test]
-    fn infinite_analog_input_deadband_only_reports_flag_changes() {
+    fn infinite_analog_input_deadband_only_reports_flag_and_nan_changes() {
         let mut db = Database::new(
             OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS,
             ClassZeroConfig::default(),
@@ -1042,27 +1042,34 @@ mod test {
             UpdateInfo::Created(0),
             db.update2(0, &AnalogInput::new(0.0, online, time()), options)
         );
-        for value in [
-            f64::MAX,
-            f64::MIN,
-            f64::INFINITY,
-            f64::NEG_INFINITY,
-            f64::NAN,
-        ] {
+        for value in [f64::MAX, f64::MIN, f64::INFINITY, f64::NEG_INFINITY] {
             assert_eq!(
                 UpdateInfo::NoEvent,
                 db.update2(0, &AnalogInput::new(value, online, time()), options),
                 "{value}"
             );
         }
+        // a change to or from NaN is an event, NaN to NaN isn't
         assert_eq!(
             UpdateInfo::Created(1),
+            db.update2(0, &AnalogInput::new(f64::NAN, online, time()), options)
+        );
+        assert_eq!(
+            UpdateInfo::NoEvent,
+            db.update2(0, &AnalogInput::new(f64::NAN, online, time()), options)
+        );
+        assert_eq!(
+            UpdateInfo::Created(2),
+            db.update2(0, &AnalogInput::new(1.0, online, time()), options)
+        );
+        assert_eq!(
+            UpdateInfo::Created(3),
             db.update2(0, &AnalogInput::new(1.0, forced, time()), options)
         );
     }
 
     #[test]
-    fn infinite_analog_output_status_deadband_only_reports_flag_changes() {
+    fn infinite_analog_output_status_deadband_only_reports_flag_and_nan_changes() {
         let mut db = Database::new(
             OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS,
             ClassZeroConfig::default(),
@@ -1083,21 +1090,36 @@ mod test {
             UpdateInfo::Created(0),
             db.update2(0, &AnalogOutputStatus::new(0.0, online, time()), options)
         );
-        for value in [
-            f64::MAX,
-            f64::MIN,
-            f64::INFINITY,
-            f64::NEG_INFINITY,
-            f64::NAN,
-        ] {
+        for value in [f64::MAX, f64::MIN, f64::INFINITY, f64::NEG_INFINITY] {
             assert_eq!(
                 UpdateInfo::NoEvent,
                 db.update2(0, &AnalogOutputStatus::new(value, online, time()), options),
                 "{value}"
             );
         }
+        // a change to or from NaN is an event, NaN to NaN isn't
         assert_eq!(
             UpdateInfo::Created(1),
+            db.update2(
+                0,
+                &AnalogOutputStatus::new(f64::NAN, online, time()),
+                options
+            )
+        );
+        assert_eq!(
+            UpdateInfo::NoEvent,
+            db.update2(
+                0,
+                &AnalogOutputStatus::new(f64::NAN, online, time()),
+                options
+            )
+        );
+        assert_eq!(
+            UpdateInfo::Created(2),
+            db.update2(0, &AnalogOutputStatus::new(1.0, online, time()), options)
+        );
+        assert_eq!(
+            UpdateInfo::Created(3),
             db.update2(0, &AnalogOutputStatus::new(1.0, forced, time()), options)
         );
     }
