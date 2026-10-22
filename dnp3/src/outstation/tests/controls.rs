@@ -5,7 +5,7 @@
 
 use tokio::time::Duration;
 
-use crate::app::variations::Group41Var2;
+use crate::app::variations::{Group41Var2, Group41Var3, Group41Var4};
 use crate::app::{BufferSize, FunctionCode};
 use crate::link::header::BroadcastConfirmMode;
 use crate::outstation::config::Feature;
@@ -892,4 +892,182 @@ async fn select_whose_request_hashes_to_zero_can_be_retried_and_operated() {
         Event::Operate(g12v1_index_7(), OperateType::SelectBeforeOperate),
         Event::EndControls,
     ]);
+}
+
+const NOT_SUPPORTED: u8 = 4;
+const NO_SELECT: u8 = 2;
+
+const NON_FINITE: [(f32, f64); 3] = [
+    (f32::NAN, f64::NAN),
+    (f32::INFINITY, f64::INFINITY),
+    (f32::NEG_INFINITY, f64::NEG_INFINITY),
+];
+
+/// g41v2 513 at index 7, then g41v3 `f32` at index 8 and g41v4 `f64` at index 9, with
+/// `statuses` in that order
+fn analog_controls(values: (f32, f64), statuses: [u8; 3]) -> Vec<u8> {
+    let (single, double) = values;
+    let [g41v2, g41v3, g41v4] = statuses;
+    let mut objects = vec![41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, g41v2];
+    objects.extend([41, 3, 0x17, 0x01, 0x08]);
+    objects.extend(single.to_le_bytes());
+    objects.push(g41v3);
+    objects.extend([41, 4, 0x17, 0x01, 0x09]);
+    objects.extend(double.to_le_bytes());
+    objects.push(g41v4);
+    objects
+}
+
+fn analog_control_request(seq: u8, function: FunctionCode, values: (f32, f64)) -> Vec<u8> {
+    [
+        &[0xC0 | seq, function.as_u8()][..],
+        &analog_controls(values, [0, 0, 0]),
+    ]
+    .concat()
+}
+
+fn analog_control_response(seq: u8, iin2: u8, values: (f32, f64), statuses: [u8; 3]) -> Vec<u8> {
+    [
+        &[0xC0 | seq, 0x81, 0x80, iin2][..],
+        &analog_controls(values, statuses),
+    ]
+    .concat()
+}
+
+#[tokio::test]
+async fn direct_operate_answers_non_finite_analog_values_with_not_supported() {
+    for values in NON_FINITE {
+        let mut harness = new_harness(get_default_config());
+
+        // IIN2.2 because the first failure is NOT_SUPPORTED
+        harness
+            .test_request_response(
+                &analog_control_request(0, FunctionCode::DirectOperate, values),
+                &analog_control_response(0, 0x04, values, [0, NOT_SUPPORTED, NOT_SUPPORTED]),
+            )
+            .await;
+
+        harness.check_events(&[
+            Event::BeginControls,
+            Event::Operate(G41V2_INDEX_7, OperateType::DirectOperate),
+            Event::EndControls,
+        ]);
+        harness.check_no_events();
+    }
+}
+
+#[tokio::test]
+async fn select_answers_non_finite_analog_values_with_not_supported() {
+    for values in NON_FINITE {
+        let mut harness = new_harness(get_default_config());
+
+        harness
+            .test_request_response(
+                &analog_control_request(0, FunctionCode::Select, values),
+                &analog_control_response(0, 0x04, values, [0, NOT_SUPPORTED, NOT_SUPPORTED]),
+            )
+            .await;
+
+        harness.check_events(&[
+            Event::BeginControls,
+            Event::Select(G41V2_INDEX_7),
+            Event::EndControls,
+        ]);
+        harness.check_no_events();
+
+        // the failed SELECT selects nothing, so the OPERATE can't reach the handler either
+        harness
+            .test_request_response(
+                &analog_control_request(1, FunctionCode::Operate, values),
+                &analog_control_response(1, 0x00, values, [NO_SELECT; 3]),
+            )
+            .await;
+        harness.check_no_events();
+    }
+}
+
+#[tokio::test]
+async fn direct_operate_no_ack_does_not_pass_non_finite_analog_values_to_the_handler() {
+    for values in NON_FINITE {
+        let mut harness = new_harness(get_default_config());
+
+        harness
+            .send_and_process(&analog_control_request(
+                0,
+                FunctionCode::DirectOperateNoResponse,
+                values,
+            ))
+            .await;
+
+        harness.check_events(&[
+            Event::BeginControls,
+            Event::Operate(G41V2_INDEX_7, OperateType::DirectOperateNoAck),
+            Event::EndControls,
+        ]);
+        harness.check_no_events();
+    }
+}
+
+#[tokio::test]
+async fn direct_operate_passes_the_largest_finite_analog_values_to_the_handler() {
+    let values = (f32::MAX, f64::MAX);
+    let mut harness = new_harness(get_default_config());
+
+    harness
+        .test_request_response(
+            &analog_control_request(0, FunctionCode::DirectOperate, values),
+            &analog_control_response(0, 0x00, values, [0, 0, 0]),
+        )
+        .await;
+
+    harness.check_events(&[
+        Event::BeginControls,
+        Event::Operate(G41V2_INDEX_7, OperateType::DirectOperate),
+        Event::Operate(
+            Control::G41V3(Group41Var3::new(f32::MAX), 8),
+            OperateType::DirectOperate,
+        ),
+        Event::Operate(
+            Control::G41V4(Group41Var4::new(f64::MAX), 9),
+            OperateType::DirectOperate,
+        ),
+        Event::EndControls,
+    ]);
+}
+
+const TOO_MANY_OPS: u8 = 8;
+
+#[tokio::test]
+async fn control_limit_applies_before_the_analog_value_check() {
+    // the limit, the statuses of g41v2, g41v3 and g41v4, and the IIN2 of the response
+    let cases = [
+        // the non-finite g41v3 is within the limit, the g41v4 isn't
+        (2, [0, NOT_SUPPORTED, TOO_MANY_OPS], 0x04),
+        // both are past the limit, so the first failure is TOO_MANY_OPS, without IIN2.2
+        (1, [0, TOO_MANY_OPS, TOO_MANY_OPS], 0x00),
+    ];
+
+    for (limit, statuses, iin2) in cases {
+        for values in NON_FINITE {
+            for function in [FunctionCode::Select, FunctionCode::DirectOperate] {
+                let mut config = get_default_config();
+                config.max_controls_per_request = Some(limit);
+                let mut harness = new_harness(config);
+
+                harness
+                    .test_request_response(
+                        &analog_control_request(0, function, values),
+                        &analog_control_response(0, iin2, values, statuses),
+                    )
+                    .await;
+
+                let control = match function {
+                    FunctionCode::Select => Event::Select(G41V2_INDEX_7),
+                    _ => Event::Operate(G41V2_INDEX_7, OperateType::DirectOperate),
+                };
+                harness.check_events(&[Event::BeginControls, control, Event::EndControls]);
+                harness.check_no_events();
+            }
+        }
+    }
 }
