@@ -441,8 +441,11 @@ async fn read_link_identity(
 mod tests {
     use super::*;
     use crate::link::EndpointAddress;
-    use crate::tcp::accept::test_util::{expect_attempts_spaced_by_delay, FaultyListener};
+    use crate::tcp::accept::test_util::{
+        expect_attempt_gaps, Fault, FaultyListener, RESET, UNKNOWN,
+    };
     use crate::tcp::accept::ACCEPT_ERROR_DELAY;
+    use crate::util::test_support::watchdog;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::sync::mpsc;
 
@@ -692,56 +695,94 @@ mod tests {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn accept_errors_are_retried_after_a_fixed_delay() {
-        let (listener, mut attempts) = FaultyListener::new(&[true, true, true]).await;
-        let _client = TcpStream::connect(listener.local_addr()).await.unwrap();
-        let mut server = FaultyServer::spawn(listener, false);
+    async fn accepts_after_accept_errors() {
+        watchdog(async {
+            let (listener, mut attempts) = FaultyListener::new(&[UNKNOWN, RESET, UNKNOWN]).await;
+            let _client = TcpStream::connect(listener.local_addr()).await.unwrap();
+            let mut server = FaultyServer::spawn(listener, false);
 
-        // three failures and the successful accept, each one delay after the last
-        expect_attempts_spaced_by_delay(&mut attempts, 4).await;
-        assert_eq!(server.events.recv().await, Some(Event::Accept));
-        assert_eq!(server.events.recv().await, Some(Event::Start));
+            expect_attempt_gaps(
+                &mut attempts,
+                &[ACCEPT_ERROR_DELAY, Duration::ZERO, ACCEPT_ERROR_DELAY],
+            )
+            .await;
+            assert_eq!(server.events.recv().await, Some(Event::Accept));
+            assert_eq!(server.events.recv().await, Some(Event::Start));
+        })
+        .await;
     }
 
-    // real time: a paused clock can advance past the delay while the link header is in flight
-    #[tokio::test]
+    #[tokio::test(start_paused = true)]
     async fn link_identity_during_accept_error_delay_does_not_cut_it_short() {
-        let (listener, mut attempts) = FaultyListener::new(&[false, true]).await;
-        let mut client = TcpStream::connect(listener.local_addr()).await.unwrap();
-        let mut server = FaultyServer::spawn(listener, true);
+        watchdog(async {
+            let (listener, mut attempts) = FaultyListener::new(&[Fault::None, UNKNOWN]).await;
+            let mut client = TcpStream::connect(listener.local_addr()).await.unwrap();
+            let mut server = FaultyServer::spawn(listener, true);
+            // Waiting for I/O lets a paused clock jump to the next timer. This one keeps each
+            // jump to a millisecond, so the link header arrives long before the retry is due.
+            let ticker = tokio::spawn(async {
+                for _ in 0..2000 {
+                    tokio::time::sleep(Duration::from_millis(1)).await;
+                }
+            });
 
-        attempts.recv().await.unwrap();
-        assert_eq!(server.events.recv().await, Some(Event::Accept));
-        let failed_at = attempts.recv().await.unwrap();
+            attempts.recv().await.unwrap();
+            assert_eq!(server.events.recv().await, Some(Event::Accept));
+            let failed_at = attempts.recv().await.unwrap();
 
-        // identifying the accepted connection ends the select while the server waits to retry
-        client.write_all(&LINK_STATUS_REQUEST).await.unwrap();
-        assert_eq!(
-            server.events.recv().await,
-            Some(Event::AcceptLinkId(1024, 1))
-        );
-        assert_eq!(
-            server.events.recv().await,
-            Some(Event::StartWithLinkId(1024, 1))
-        );
-        assert!(failed_at.elapsed() < ACCEPT_ERROR_DELAY);
+            // identifying the accepted connection ends the select while the server waits to retry
+            client.write_all(&LINK_STATUS_REQUEST).await.unwrap();
+            assert_eq!(
+                server.events.recv().await,
+                Some(Event::AcceptLinkId(1024, 1))
+            );
+            assert_eq!(
+                server.events.recv().await,
+                Some(Event::StartWithLinkId(1024, 1))
+            );
+            assert!(failed_at.elapsed() < Duration::from_millis(100));
 
-        let retried_at = attempts.recv().await.unwrap();
-        assert!(retried_at.duration_since(failed_at) >= ACCEPT_ERROR_DELAY);
+            let retried_at = attempts.recv().await.unwrap();
+            assert_eq!(retried_at.duration_since(failed_at), ACCEPT_ERROR_DELAY);
+            ticker.abort();
+        })
+        .await;
     }
 
     #[tokio::test(start_paused = true)]
     async fn dropping_handle_during_accept_error_delay_stops_server() {
-        let (listener, mut attempts) = FaultyListener::new(&[true]).await;
-        let server = FaultyServer::spawn(listener, false);
+        watchdog(async {
+            let (listener, mut attempts) = FaultyListener::new(&[UNKNOWN]).await;
+            let server = FaultyServer::spawn(listener, false);
 
-        let failed_at = attempts.recv().await.unwrap();
-        tokio::time::advance(Duration::from_millis(500)).await;
-        assert!(!server.task.is_finished());
+            let failed_at = attempts.recv().await.unwrap();
+            tokio::time::advance(Duration::from_millis(500)).await;
+            assert!(!server.task.is_finished());
 
-        drop(server.handle);
-        server.task.await.unwrap();
-        assert!(failed_at.elapsed() < ACCEPT_ERROR_DELAY);
-        assert_eq!(attempts.recv().await, None);
+            drop(server.handle);
+            server.task.await.unwrap();
+            assert!(failed_at.elapsed() < ACCEPT_ERROR_DELAY);
+            assert_eq!(attempts.recv().await, None);
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn dropping_handle_during_connection_errors_stops_server() {
+        static RESETS: [Fault; 1000] = [RESET; 1000];
+        watchdog(async {
+            let (listener, mut attempts) = FaultyListener::new(&RESETS).await;
+            let server = FaultyServer::spawn(listener, false);
+
+            attempts.recv().await.unwrap();
+            drop(server.handle);
+            server.task.await.unwrap();
+            let mut count = 1;
+            while attempts.recv().await.is_some() {
+                count += 1;
+            }
+            assert!(count < RESETS.len(), "{count}");
+        })
+        .await;
     }
 }

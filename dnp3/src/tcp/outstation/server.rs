@@ -383,8 +383,11 @@ mod tests {
     use crate::app::NullListener;
     use crate::link::EndpointAddress;
     use crate::outstation::database::EventBufferConfig;
-    use crate::tcp::accept::test_util::{expect_attempts_spaced_by_delay, FaultyListener};
+    use crate::tcp::accept::test_util::{
+        expect_attempt_gaps, Fault, FaultyListener, RESET, UNKNOWN,
+    };
     use crate::tcp::accept::ACCEPT_ERROR_DELAY;
+    use crate::util::test_support::watchdog;
     use std::time::Duration;
     use tokio::sync::mpsc;
 
@@ -430,35 +433,65 @@ mod tests {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn accept_errors_are_retried_after_a_fixed_delay() {
-        let (listener, mut attempts) = FaultyListener::new(&[true, true, true]).await;
-        let _client = tokio::net::TcpStream::connect(listener.local_addr())
-            .await
-            .unwrap();
-        let (server, mut states) = server_with_outstation();
-        let (_handle, task) = server.create_task_with(listener, None);
-        tokio::spawn(task.run());
+    async fn accepts_after_accept_errors() {
+        watchdog(async {
+            let (listener, mut attempts) = FaultyListener::new(&[UNKNOWN, RESET, UNKNOWN]).await;
+            let _client = tokio::net::TcpStream::connect(listener.local_addr())
+                .await
+                .unwrap();
+            let (server, mut states) = server_with_outstation();
+            let (_handle, task) = server.create_task_with(listener, None);
+            tokio::spawn(task.run());
 
-        // three failures and the successful accept, each one delay after the last
-        expect_attempts_spaced_by_delay(&mut attempts, 4).await;
-        assert_eq!(states.recv().await, Some(ConnectionState::Connected));
+            expect_attempt_gaps(
+                &mut attempts,
+                &[ACCEPT_ERROR_DELAY, Duration::ZERO, ACCEPT_ERROR_DELAY],
+            )
+            .await;
+            assert_eq!(states.recv().await, Some(ConnectionState::Connected));
+        })
+        .await;
     }
 
     #[tokio::test(start_paused = true)]
     async fn dropping_handle_during_accept_error_delay_stops_server() {
-        let (listener, mut attempts) = FaultyListener::new(&[true]).await;
-        let (server, _states) = server_with_outstation();
-        let (handle, task) = server.create_task_with(listener, None);
-        let task = tokio::spawn(task.run());
+        watchdog(async {
+            let (listener, mut attempts) = FaultyListener::new(&[UNKNOWN]).await;
+            let (server, _states) = server_with_outstation();
+            let (handle, task) = server.create_task_with(listener, None);
+            let task = tokio::spawn(task.run());
 
-        let failed_at = attempts.recv().await.unwrap();
-        tokio::time::advance(Duration::from_millis(500)).await;
-        assert!(!task.is_finished());
+            let failed_at = attempts.recv().await.unwrap();
+            tokio::time::advance(Duration::from_millis(500)).await;
+            assert!(!task.is_finished());
 
-        drop(handle);
-        task.await.unwrap();
-        assert!(failed_at.elapsed() < ACCEPT_ERROR_DELAY);
-        assert_eq!(attempts.recv().await, None);
+            drop(handle);
+            task.await.unwrap();
+            assert!(failed_at.elapsed() < ACCEPT_ERROR_DELAY);
+            assert_eq!(attempts.recv().await, None);
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn dropping_handle_during_connection_errors_stops_server() {
+        static RESETS: [Fault; 1000] = [RESET; 1000];
+        watchdog(async {
+            let (listener, mut attempts) = FaultyListener::new(&RESETS).await;
+            let (server, _states) = server_with_outstation();
+            let (handle, task) = server.create_task_with(listener, None);
+            let task = tokio::spawn(task.run());
+
+            attempts.recv().await.unwrap();
+            drop(handle);
+            task.await.unwrap();
+            let mut count = 1;
+            while attempts.recv().await.is_some() {
+                count += 1;
+            }
+            assert!(count < RESETS.len(), "{count}");
+        })
+        .await;
     }
 
     #[cfg(feature = "unstable")]
