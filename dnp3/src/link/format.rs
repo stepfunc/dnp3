@@ -172,6 +172,20 @@ mod test {
     }
 
     #[test]
+    fn formats_data_frame_with_multiple_blocks() {
+        let mut buffer = [0; constant::MAX_LINK_FRAME_LENGTH];
+        let mut cursor = WriteCursor::new(&mut buffer);
+        let (transport, app_data) = MULTI_BLOCK_USER_DATA.payload.split_first().unwrap();
+        let data = format_data_frame(
+            MULTI_BLOCK_USER_DATA.header,
+            Payload::new(*transport, app_data),
+            &mut cursor,
+        )
+        .unwrap();
+        assert_eq!(data.frame, MULTI_BLOCK_USER_DATA.bytes);
+    }
+
+    #[test]
     fn formats_unconfirmed_user_data() {
         let mut buffer = [0; constant::MAX_LINK_FRAME_LENGTH];
         let mut cursor = WriteCursor::new(&mut buffer);
