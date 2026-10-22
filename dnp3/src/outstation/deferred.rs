@@ -70,7 +70,7 @@ impl DeferredRead {
                             "insufficient capacity ({}) for READ header: {} - {}",
                             self.headers.max(),
                             h.variation(),
-                            h.details.qualifier()
+                            h.qualifier()
                         );
                         iin2 |= Iin2::PARAMETER_ERROR;
                     }

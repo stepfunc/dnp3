@@ -1,7 +1,7 @@
 use crate::app::gen::count::CountVariation;
 use crate::app::measurement::*;
 use crate::app::parse::count::CountSequence;
-use crate::app::parse::parser::{HeaderCollection, HeaderDetails, ObjectHeader};
+use crate::app::parse::parser::{HeaderCollection, ObjectHeader};
 use crate::app::variations::*;
 use crate::app::{ObjectParseError, ResponseHeader};
 use crate::master::{HeaderInfo, ReadHandler};
@@ -33,13 +33,13 @@ pub(crate) fn extract_measurements_inner(
     let mut cto = None;
     for header in objects.iter() {
         match extract_header(&header, cto, handler) {
-            Extracted::Handled => delivered |= has_objects(&header.details),
+            Extracted::Handled => delivered |= has_objects(&header),
             Extracted::Cto(x) => cto = x,
             Extracted::Ignored => {
                 tracing::warn!(
                     "ignored header variation: {} qualifier: {:?}",
                     &header.variation(),
-                    &header.details.qualifier()
+                    &header.qualifier()
                 );
             }
         }
@@ -48,14 +48,14 @@ pub(crate) fn extract_measurements_inner(
 }
 
 /// True if the header carries at least one object
-fn has_objects(details: &HeaderDetails) -> bool {
-    match details {
-        HeaderDetails::AllObjects(_) | HeaderDetails::Read(..) => false,
+fn has_objects(header: &ObjectHeader) -> bool {
+    match header {
+        ObjectHeader::AllObjects(_) | ObjectHeader::Read(..) => false,
         // a range covers at least one index, and a free-format header holds one object
-        HeaderDetails::Range(..) | HeaderDetails::FreeFormat(_) => true,
-        HeaderDetails::Count(_, count, _) => *count > 0,
-        HeaderDetails::CountAndPrefix8(count, _) => *count > 0,
-        HeaderDetails::CountAndPrefix16(count, _) => *count > 0,
+        ObjectHeader::Range(..) | ObjectHeader::FreeFormat(_) => true,
+        ObjectHeader::Count(_, count, _) => *count > 0,
+        ObjectHeader::CountAndPrefix8(count, _) => *count > 0,
+        ObjectHeader::CountAndPrefix16(count, _) => *count > 0,
     }
 }
 
@@ -99,7 +99,7 @@ pub(crate) fn validate_response(
     let objects = objects.map_err(InvalidResponse::Malformed)?;
     let mut cto = None;
     for header in objects.iter() {
-        if let Some(next) = next_cto(&header.details, cto) {
+        if let Some(next) = next_cto(&header, cto) {
             cto = next;
         } else if cto.is_none() && has_relative_time(&header) {
             return Err(InvalidResponse::RelativeTimeWithoutCto(header.variation()));
@@ -113,16 +113,16 @@ fn has_relative_time(header: &ObjectHeader) -> bool {
     matches!(
         header.variation(),
         Variation::Group2Var3 | Variation::Group4Var3
-    ) && has_objects(&header.details)
+    ) && has_objects(header)
 }
 
 /// If the header is a common time of occurrence, the one for the headers that follow it
-fn next_cto(details: &HeaderDetails, prev: Option<Time>) -> Option<Option<Time>> {
-    let time = match details {
-        HeaderDetails::Count(_, 1, CountVariation::Group51Var1(seq)) => {
+fn next_cto(header: &ObjectHeader, prev: Option<Time>) -> Option<Option<Time>> {
+    let time = match header {
+        ObjectHeader::Count(_, 1, CountVariation::Group51Var1(seq)) => {
             seq.single().map(|x| Time::Synchronized(x.time))
         }
-        HeaderDetails::Count(_, 1, CountVariation::Group51Var2(seq)) => {
+        ObjectHeader::Count(_, 1, CountVariation::Group51Var2(seq)) => {
             seq.single().map(|x| Time::Unsynchronized(x.time))
         }
         _ => return None,
@@ -154,7 +154,7 @@ pub(crate) fn extract_header<H: ReadHandler + ?Sized>(
     ) -> bool {
         if let Some(item) = seq.single() {
             handler.handle_abs_time(
-                HeaderInfo::new(header.variation(), header.details.qualifier(), false, false),
+                HeaderInfo::new(header.variation(), header.qualifier(), false, false),
                 item.time,
             );
             true
@@ -163,25 +163,23 @@ pub(crate) fn extract_header<H: ReadHandler + ?Sized>(
         }
     }
 
-    if let Some(cto) = next_cto(&header.details, cto) {
+    if let Some(cto) = next_cto(header, cto) {
         return Extracted::Cto(cto);
     }
 
-    let handled = match &header.details {
+    let handled = match &header {
         // handle g50v1 - absolute time (only count == 1 is valid)
-        HeaderDetails::Count(_, 1, CountVariation::Group50Var1(seq)) => {
+        ObjectHeader::Count(_, 1, CountVariation::Group50Var1(seq)) => {
             extract_g50v1(seq, header, handler)
         }
         // everything else
-        HeaderDetails::Range(_, _, var) => {
-            var.extract_measurements_to(header.details.qualifier(), handler)
-        }
-        HeaderDetails::CountAndPrefix8(_, var) => var.extract_measurements_to(cto, handler),
-        HeaderDetails::CountAndPrefix16(_, var) => var.extract_measurements_to(cto, handler),
-        HeaderDetails::AllObjects(_)
-        | HeaderDetails::Count(..)
-        | HeaderDetails::FreeFormat(_)
-        | HeaderDetails::Read(..) => false,
+        ObjectHeader::Range(_, _, var) => var.extract_measurements_to(header.qualifier(), handler),
+        ObjectHeader::CountAndPrefix8(_, var) => var.extract_measurements_to(cto, handler),
+        ObjectHeader::CountAndPrefix16(_, var) => var.extract_measurements_to(cto, handler),
+        ObjectHeader::AllObjects(_)
+        | ObjectHeader::Count(..)
+        | ObjectHeader::FreeFormat(_)
+        | ObjectHeader::Read(..) => false,
     };
 
     if handled {

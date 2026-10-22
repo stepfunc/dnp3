@@ -16,6 +16,7 @@ use crate::transport::mock::reader::RxFrameInfo;
 use crate::transport::mock::MockTransport;
 use crate::util::phys::{PhysAddr, PhysLayer};
 use crate::util::session::{Enabled, RunError};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use tokio::task::JoinHandle;
 
@@ -54,6 +55,7 @@ pub(crate) struct Harness<S> {
     pub(crate) application_data: Arc<Mutex<ApplicationData>>,
     control_statuses: ControlStatuses,
     frame_info: RxFrameInfo,
+    requests_from_idle: Arc<AtomicBool>,
 }
 
 /// connected state: a live mock IO handle and the running session
@@ -123,6 +125,11 @@ impl<S> Harness<S> {
         self.control_statuses.lock().unwrap().insert(index, status);
     }
 
+    /// Report each `process_request_from_idle` call from now on as [`Event::RequestFromIdle`]
+    pub(crate) fn record_requests_from_idle(&self) {
+        self.requests_from_idle.store(true, Ordering::Relaxed);
+    }
+
     /// Change the broadcast address of the requests sent from now on
     pub(crate) fn set_broadcast(&mut self, broadcast: Option<BroadcastConfirmMode>) {
         let mut info = self.frame_info.get().unwrap();
@@ -175,6 +182,7 @@ impl Harness<Connected> {
             application_data,
             control_statuses,
             frame_info,
+            requests_from_idle,
         } = self;
 
         io.read_error(std::io::ErrorKind::ConnectionReset);
@@ -191,6 +199,7 @@ impl Harness<Connected> {
             application_data,
             control_statuses,
             frame_info,
+            requests_from_idle,
         }
     }
 }
@@ -206,6 +215,7 @@ impl Harness<Disconnected> {
             application_data: self.application_data,
             control_statuses: self.control_statuses,
             frame_info: self.frame_info,
+            requests_from_idle: self.requests_from_idle,
         }
     }
 }
@@ -229,6 +239,7 @@ fn new_harness_impl(
 
     let (data, application) = MockOutstationApplication::create(sender.clone());
     let control_statuses = ControlStatuses::default();
+    let (requests_from_idle, information) = MockOutstationInformation::create(sender.clone());
 
     let (mut task, handle) = MockOutstationTask::with_transport(
         Enabled::Yes,
@@ -237,7 +248,7 @@ fn new_harness_impl(
         config,
         PhysAddr::None,
         application,
-        MockOutstationInformation::create(sender.clone()),
+        information,
         MockControlHandler::create(sender.clone(), control_statuses.clone()),
     );
 
@@ -257,5 +268,6 @@ fn new_harness_impl(
         application_data: data,
         control_statuses,
         frame_info,
+        requests_from_idle,
     }
 }

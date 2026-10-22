@@ -8,6 +8,7 @@ mod outcomes;
 mod read_errors;
 mod read_types;
 mod restart;
+mod scheduling;
 mod shared_link;
 mod startup;
 mod time_sync;

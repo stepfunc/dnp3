@@ -724,52 +724,6 @@ mod tests {
             .unwrap();
     }
 
-    #[test]
-    fn cannot_insert_if_max_for_type_is_zero() {
-        let mut buffer = EventBuffer::new(EventBufferConfig::no_events());
-
-        assert_matches!(
-            buffer.insert(
-                1,
-                EventClass::Class1,
-                &BinaryInput::new(true, Flags::ONLINE, Time::synchronized(0)),
-                EventBinaryInputVariation::Group2Var1,
-            ),
-            Err(InsertError::TypeMaxIsZero)
-        )
-    }
-
-    #[test]
-    fn overflows_when_max_for_type_is_exceeded() {
-        let mut buffer = EventBuffer::new(EventBufferConfig::all_types(1));
-
-        let binary = BinaryInput::new(true, Flags::ONLINE, Time::synchronized(0));
-
-        buffer
-            .insert(
-                1,
-                EventClass::Class1,
-                &binary,
-                EventBinaryInputVariation::Group2Var1,
-            )
-            .unwrap();
-
-        let expected = InsertError::Overflow {
-            created: 1,
-            discarded: 0,
-        };
-
-        assert_eq!(
-            buffer.insert(
-                1,
-                EventClass::Class1,
-                &binary,
-                EventBinaryInputVariation::Group2Var1
-            ),
-            Err(expected)
-        )
-    }
-
     fn insert_binary(buffer: &mut EventBuffer, class: EventClass) -> Result<u64, InsertError> {
         buffer.insert(
             1,
@@ -976,38 +930,6 @@ mod tests {
             buffer.remove_unselected_by_class(EventClasses::all())
         );
         assert_eq!(buffer.unwritten_classes(), EventClasses::none());
-    }
-
-    #[test]
-    fn discard_clears_overflow_flag_when_space_is_freed() {
-        let mut buffer = EventBuffer::new(EventBufferConfig::all_types(1));
-
-        let binary = BinaryInput::new(true, Flags::ONLINE, Time::synchronized(0));
-
-        buffer
-            .insert(
-                1,
-                EventClass::Class1,
-                &binary,
-                EventBinaryInputVariation::Group2Var1,
-            )
-            .unwrap();
-
-        buffer
-            .insert(
-                1,
-                EventClass::Class1,
-                &binary,
-                EventBinaryInputVariation::Group2Var1,
-            )
-            .unwrap_err();
-
-        assert!(buffer.is_overflown());
-        assert_eq!(
-            class_counts(1, 0, 0),
-            buffer.remove_unselected_by_class(EventClass::Class1.into())
-        );
-        assert!(!buffer.is_overflown());
     }
 
     #[test]

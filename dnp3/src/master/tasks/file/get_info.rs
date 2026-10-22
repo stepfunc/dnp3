@@ -1,7 +1,7 @@
 use crate::app::file::*;
 use crate::app::format::write::HeaderWriter;
 use crate::app::parse::free_format::FreeFormatVariation;
-use crate::app::parse::parser::{HeaderDetails, Response};
+use crate::app::parse::parser::{ObjectHeader, Response};
 use crate::app::{FunctionCode, Timestamp};
 use crate::master::tasks::{NonReadTask, OneShot, OneShotRequest};
 use crate::master::{FileError, FileInfo, TaskError, TaskType};
@@ -43,9 +43,9 @@ impl OneShotRequest for GetFileInfoRequest {
     fn parse(&self, response: Response<'_>) -> Result<FileInfo, FileError> {
         let header = response.objects?.get_only_header()?;
 
-        match header.details {
-            HeaderDetails::FreeFormat(FreeFormatVariation::Group70Var7(obj)) => Ok(obj.into()),
-            HeaderDetails::FreeFormat(FreeFormatVariation::Group70Var4(obj)) => {
+        match header {
+            ObjectHeader::FreeFormat(FreeFormatVariation::Group70Var7(obj)) => Ok(obj.into()),
+            ObjectHeader::FreeFormat(FreeFormatVariation::Group70Var4(obj)) => {
                 if obj.status_code != FileStatus::Success {
                     tracing::warn!("Unable to get file info: {}", obj.text);
                 }

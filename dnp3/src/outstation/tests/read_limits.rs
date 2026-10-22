@@ -10,12 +10,6 @@ use crate::outstation::config::OutstationConfig;
 use crate::outstation::database::*;
 use crate::outstation::tests::harness::*;
 
-const CONFIRM_SEQ_0: &[u8] = &[0xC0, 0x00];
-const NULL_UNSOL_SEQ_0: &[u8] = &[0xF0, 0x82, 0x80, 0x00];
-const UNS_CONFIRM_SEQ_0: &[u8] = &[0xD0, 0x00];
-const ENABLE_UNSOLICITED_SEQ0: &[u8] = &[
-    0xC0, 0x14, 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06,
-];
 const EMPTY_RESPONSE_SEQ0: &[u8] = &[0xC0, 0x81, 0x80, 0x00];
 const UNSOL_G2V1_SEQ1: &[u8] = &[
     0xF1, 0x82, 0x80, 0x00, 0x02, 0x01, 0x28, 0x01, 0x00, 0x00, 0x00, 0x81,
@@ -157,19 +151,12 @@ async fn deferred_read_iin2(max_read_headers: Option<u16>, header: &[u8], count:
     config.max_read_request_headers = max_read_headers;
     let mut harness = new_harness(config);
 
-    harness.expect_response(NULL_UNSOL_SEQ_0).await;
-    harness.send_and_process(UNS_CONFIRM_SEQ_0).await;
+    harness.expect_response(&null_unsolicited(0)).await;
+    harness.send_and_process(&unsolicited_confirm(0)).await;
     harness
-        .test_request_response(ENABLE_UNSOLICITED_SEQ0, EMPTY_RESPONSE_SEQ0)
+        .test_request_response(ENABLE_UNSOLICITED_SEQ_0, EMPTY_RESPONSE_SEQ0)
         .await;
-    harness.handle.database.transaction(|db| {
-        db.add(0, Some(EventClass::Class1), BinaryInputConfig::default());
-        db.update(
-            0,
-            &BinaryInput::new(true, Flags::ONLINE, Time::synchronized(0)),
-            UpdateOptions::default(),
-        );
-    });
+    harness.handle.database.transaction(add_binary_event);
     harness.expect_response(UNSOL_G2V1_SEQ1).await;
 
     // deferred until the unsolicited confirm wait ends
@@ -367,20 +354,12 @@ async fn static_value_one_byte_past_a_fragment_is_sent_in_the_next() {
     harness.expect_response(&first).await;
     harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
 
-    harness.send_and_process(CONFIRM_SEQ_0).await;
+    harness.send_and_process(&confirm(0)).await;
     harness.check_events(&[Event::SolicitedConfirmReceived(0)]);
     // FIN, seq 1
     let mut last = vec![0x41, 0x81, 0x80, 0x00];
     last.extend(g1v2_restart_values(count - 1, 1));
     harness.expect_response(&last).await;
-}
-
-/// a visible string attribute in the default set
-fn encode_string(variation: u8, value: &str) -> Vec<u8> {
-    let mut bytes = vec![0x00, variation, 0x00, 0x00, 0x00, 0x01];
-    bytes.push(value.len().try_into().unwrap());
-    bytes.extend_from_slice(value.as_bytes());
-    bytes
 }
 
 fn define_two_strings(serial: &str, product: &str) -> impl FnMut(&mut Database) {
@@ -442,7 +421,7 @@ async fn attribute_one_byte_past_a_fragment_is_sent_in_the_next() {
     harness.expect_response(&first).await;
     harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
 
-    harness.send_and_process(CONFIRM_SEQ_0).await;
+    harness.send_and_process(&confirm(0)).await;
     harness.check_events(&[Event::SolicitedConfirmReceived(0)]);
     // FIN, seq 1
     let mut last = vec![0x41, 0x81, 0x80, 0x00];

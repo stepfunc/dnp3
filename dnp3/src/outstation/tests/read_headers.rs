@@ -2,11 +2,6 @@ use crate::app::measurement::*;
 use crate::outstation::database::*;
 use crate::outstation::tests::harness::*;
 
-const NULL_UNSOL_SEQ_0: &[u8] = &[0xF0, 0x82, 0x80, 0x00];
-const UNS_CONFIRM_SEQ_0: &[u8] = &[0xD0, 0x00];
-const ENABLE_UNSOLICITED_SEQ0: &[u8] = &[
-    0xC0, 0x14, 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06,
-];
 const EMPTY_RESPONSE_SEQ0: &[u8] = &[0xC0, 0x81, 0x80, 0x00];
 /// IIN1 reports the class 1 events
 const PARAMETER_ERROR_RESPONSE: &[u8] = &[0xC0, 0x81, 0x82, 0x04];
@@ -56,10 +51,10 @@ async fn read_selects_its_supported_headers_and_reports_the_unsupported_ones() {
 async fn deferred_read_selects_its_supported_headers_and_reports_the_unsupported_ones() {
     let mut harness = new_harness(get_default_unsolicited_config());
 
-    harness.expect_response(NULL_UNSOL_SEQ_0).await;
-    harness.send_and_process(UNS_CONFIRM_SEQ_0).await;
+    harness.expect_response(&null_unsolicited(0)).await;
+    harness.send_and_process(&unsolicited_confirm(0)).await;
     harness
-        .test_request_response(ENABLE_UNSOLICITED_SEQ0, EMPTY_RESPONSE_SEQ0)
+        .test_request_response(ENABLE_UNSOLICITED_SEQ_0, EMPTY_RESPONSE_SEQ0)
         .await;
     harness
         .handle

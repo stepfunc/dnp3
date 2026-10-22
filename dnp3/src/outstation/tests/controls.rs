@@ -12,7 +12,6 @@ use crate::outstation::config::Feature;
 use crate::outstation::tests::harness::*;
 use crate::outstation::traits::{BroadcastAction, OperateType};
 
-const G41V2_INDEX_7: Control = Control::G41V2(Group41Var2::new(513), 7);
 // select, seq == 0, g41v2 - count == 1, index == 7, value = 513, status == SUCCESS,
 const SELECT_SEQ0_G41V2: &[u8] = &[0xC0, 0x03, 41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, 0x00];
 // operate, seq == 1, g41v2 - count == 1, index == 7, value = 513, status == SUCCESS
@@ -73,11 +72,7 @@ async fn performs_direct_operate_no_ack() {
         .send_and_process(DIRECT_OPERATE_NO_ACK_SEQ0_G41V2)
         .await;
 
-    harness.check_events(&[
-        Event::BeginControls,
-        Event::Operate(G41V2_INDEX_7, OperateType::DirectOperateNoAck),
-        Event::EndControls,
-    ])
+    harness.check_events(&operated(OperateType::DirectOperateNoAck))
 }
 
 #[tokio::test]
@@ -126,11 +121,7 @@ async fn rejects_operate_with_non_consecutive_sequence() {
         .test_request_response(SELECT_SEQ0_G41V2, RESPONSE_SEQ0_G41V2_SUCCESS)
         .await;
 
-    harness.check_events(&[
-        Event::BeginControls,
-        Event::Select(G41V2_INDEX_7),
-        Event::EndControls,
-    ]);
+    harness.check_events(&selected());
 
     // ------------ operate -------------
 
@@ -150,11 +141,7 @@ async fn select_can_time_out() {
         .test_request_response(SELECT_SEQ0_G41V2, RESPONSE_SEQ0_G41V2_SUCCESS)
         .await;
 
-    harness.check_events(&[
-        Event::BeginControls,
-        Event::Select(G41V2_INDEX_7),
-        Event::EndControls,
-    ]);
+    harness.check_events(&selected());
 
     tokio::time::pause();
     tokio::time::advance(
@@ -356,11 +343,7 @@ async fn operate_after_a_different_select_whose_response_does_not_fit_is_rejecte
     harness
         .test_request_response(SELECT_SEQ0_G41V2, RESPONSE_SEQ0_G41V2_SUCCESS)
         .await;
-    harness.check_events(&[
-        Event::BeginControls,
-        Event::Select(G41V2_INDEX_7),
-        Event::EndControls,
-    ]);
+    harness.check_events(&selected());
 
     harness
         .test_request_response(
@@ -486,22 +469,14 @@ async fn select(harness: &mut OutstationHarness) {
     harness
         .test_request_response(SELECT_SEQ0_G41V2, RESPONSE_SEQ0_G41V2_SUCCESS)
         .await;
-    harness.check_events(&[
-        Event::BeginControls,
-        Event::Select(G41V2_INDEX_7),
-        Event::EndControls,
-    ]);
+    harness.check_events(&selected());
 }
 
 async fn operate_succeeds(harness: &mut OutstationHarness) {
     harness
         .test_request_response(OPERATE_SEQ1_G41V2, RESPONSE_SEQ1_G41V2_SUCCESS)
         .await;
-    harness.check_events(&[
-        Event::BeginControls,
-        Event::Operate(G41V2_INDEX_7, OperateType::SelectBeforeOperate),
-        Event::EndControls,
-    ]);
+    harness.check_events(&operated(OperateType::SelectBeforeOperate));
 }
 
 async fn operate_gets_no_select(harness: &mut OutstationHarness) {
@@ -523,7 +498,7 @@ async fn request_ends_selection(request: &[u8], response: &[u8]) {
 async fn solicited_confirm_between_select_and_operate_keeps_the_selection() {
     let mut harness = new_harness(get_default_config());
     select(&mut harness).await;
-    harness.send_and_process(&[0xC0, 0x00]).await;
+    harness.send_and_process(&confirm(0)).await;
     harness.expect_no_response();
     operate_succeeds(&mut harness).await;
 }
@@ -532,7 +507,7 @@ async fn solicited_confirm_between_select_and_operate_keeps_the_selection() {
 async fn unsolicited_confirm_between_select_and_operate_keeps_the_selection() {
     let mut harness = new_harness(get_default_config());
     select(&mut harness).await;
-    harness.send_and_process(&[0xD0, 0x00]).await;
+    harness.send_and_process(&unsolicited_confirm(0)).await;
     harness.expect_no_response();
     operate_succeeds(&mut harness).await;
 }
@@ -562,13 +537,13 @@ async fn select_with_the_same_sequence_and_different_objects_is_discarded() {
 
 #[tokio::test]
 async fn read_ends_the_selection() {
-    request_ends_selection(&[0xC5, 0x01, 60, 1, 0x06], &[0xC5, 0x81, 0x80, 0x00]).await;
+    request_ends_selection(&read_class_0(5), &[0xC5, 0x81, 0x80, 0x00]).await;
 }
 
 #[tokio::test]
 async fn delay_measure_ends_the_selection() {
     request_ends_selection(
-        &[0xC5, 0x17],
+        &delay_measure(5),
         &[0xC5, 0x81, 0x80, 0x00, 0x34, 0x02, 0x07, 0x01, 0x00, 0x00],
     )
     .await;
@@ -855,11 +830,7 @@ async fn direct_operate_answers_non_finite_analog_values_with_not_supported() {
             )
             .await;
 
-        harness.check_events(&[
-            Event::BeginControls,
-            Event::Operate(G41V2_INDEX_7, OperateType::DirectOperate),
-            Event::EndControls,
-        ]);
+        harness.check_events(&operated(OperateType::DirectOperate));
         harness.check_no_events();
     }
 }
@@ -876,11 +847,7 @@ async fn select_answers_non_finite_analog_values_with_not_supported() {
             )
             .await;
 
-        harness.check_events(&[
-            Event::BeginControls,
-            Event::Select(G41V2_INDEX_7),
-            Event::EndControls,
-        ]);
+        harness.check_events(&selected());
         harness.check_no_events();
 
         // the failed SELECT selects nothing, so the OPERATE can't reach the handler either
@@ -907,11 +874,7 @@ async fn direct_operate_no_ack_does_not_pass_non_finite_analog_values_to_the_han
             ))
             .await;
 
-        harness.check_events(&[
-            Event::BeginControls,
-            Event::Operate(G41V2_INDEX_7, OperateType::DirectOperateNoAck),
-            Event::EndControls,
-        ]);
+        harness.check_events(&operated(OperateType::DirectOperateNoAck));
         harness.check_no_events();
     }
 }

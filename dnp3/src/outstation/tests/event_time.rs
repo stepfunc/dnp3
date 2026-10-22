@@ -2,8 +2,6 @@ use crate::app::measurement::*;
 use crate::outstation::database::*;
 use crate::outstation::tests::harness::*;
 
-/// READ g60v2, all objects
-const READ_CLASS_1: &[u8] = &[0xC0, 0x01, 0x3C, 0x02, 0x06];
 /// READ g2v2, all objects
 const READ_G2V2: &[u8] = &[0xC0, 0x01, 0x02, 0x02, 0x06];
 
@@ -49,7 +47,7 @@ async fn reports_synchronized_events_in_the_default_g2v2() {
             (0, true, Time::synchronized(1)),
             (1, true, Time::synchronized(2)),
         ],
-        READ_CLASS_1,
+        &read_class_1(0),
         &[
             // FIR, FIN, CON, seq 0, IIN1 restart
             0xE0, 0x81, 0x80, 0x00, // g2v2 (count of 2)
@@ -69,7 +67,7 @@ async fn reports_unsynchronized_events_for_the_default_g2v2_in_g2v3_after_g51v2(
             (0, true, Time::unsynchronized(1)),
             (1, true, Time::unsynchronized(3)),
         ],
-        READ_CLASS_1,
+        &read_class_1(0),
         &[
             // FIR, FIN, CON, seq 0, IIN1 restart
             0xE0, 0x81, 0x80, 0x00, // g51v2 at 1
@@ -90,7 +88,7 @@ async fn reports_mixed_events_for_the_default_g2v2_in_order_of_occurrence() {
             (1, true, Time::unsynchronized(2)),
             (0, false, Time::synchronized(3)),
         ],
-        READ_CLASS_1,
+        &read_class_1(0),
         &[
             // FIR, FIN, CON, seq 0, IIN1 restart
             0xE0, 0x81, 0x80, 0x00, // g2v2 (count of 1), index 0 at 1
@@ -153,7 +151,7 @@ async fn reports_mixed_events_for_the_default_g4v2_in_order_of_occurrence() {
     });
     harness
         .test_request_response(
-            READ_CLASS_1,
+            &read_class_1(0),
             &[
                 // FIR, FIN, CON, seq 0, IIN1 restart
                 0xE0, 0x81, 0x80, 0x00, // g51v2 at 1

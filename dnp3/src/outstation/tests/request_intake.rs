@@ -5,14 +5,10 @@ use std::time::Duration;
 
 use tokio::time::Instant;
 
-use crate::app::measurement::*;
-use crate::app::variations::Group41Var2;
-use crate::app::FunctionCode;
+use crate::app::{ControlField, FunctionCode, RequestHeader, Sequence};
 use crate::link::header::BroadcastConfirmMode;
 use crate::outstation::config::OutstationConfig;
-use crate::outstation::database::*;
 use crate::outstation::traits::{BroadcastAction, OperateType};
-use crate::outstation::{BufferState, ClassCount, TypeCount};
 use crate::transport::mock::writer::LINK_STATUS_REQUEST;
 
 use super::harness::*;
@@ -30,28 +26,8 @@ const MODES: [BroadcastConfirmMode; 3] = [
     BroadcastConfirmMode::Mandatory,
 ];
 
-const fn confirm(seq: u8) -> [u8; 2] {
-    [0xC0 | seq, 0x00]
-}
-
-const fn unsolicited_confirm(seq: u8) -> [u8; 2] {
-    [0xD0 | seq, 0x00]
-}
-
-const fn record_current_time(seq: u8) -> [u8; 2] {
-    [0xC0 | seq, 0x18]
-}
-
 const fn unknown_function(seq: u8) -> [u8; 2] {
     [0xC0 | seq, 0x70]
-}
-
-const fn read_class_0(seq: u8) -> [u8; 5] {
-    [0xC0 | seq, 0x01, 60, 1, 0x06]
-}
-
-const fn read_class_1(seq: u8) -> [u8; 5] {
-    [0xC0 | seq, 0x01, 60, 2, 0x06]
 }
 
 /// a READ of g60v1 without its qualifier, answered with IIN2.2
@@ -65,27 +41,6 @@ const fn response(con: bool, seq: u8, iin1: u8, iin2: u8) -> [u8; 4] {
     [0xC0 | con | seq, 0x81, iin1, iin2]
 }
 
-/// a null unsolicited response with the restart IIN
-const fn null_unsolicited(seq: u8) -> [u8; 4] {
-    [0xF0 | seq, 0x82, RESTART, 0x00]
-}
-
-/// a request for g41v2 at `index` with value 513
-fn control(function: FunctionCode, seq: u8, index: u8) -> Vec<u8> {
-    vec![
-        0xC0 | seq,
-        function.as_u8(),
-        41,
-        2,
-        0x17,
-        0x01,
-        index,
-        0x01,
-        0x02,
-        0x00,
-    ]
-}
-
 /// the echo of a g41v2 request at index 7 with `status`
 fn control_response(con: bool, seq: u8, iin1: u8, status: u8) -> Vec<u8> {
     let mut bytes = response(con, seq, iin1, 0).to_vec();
@@ -93,69 +48,12 @@ fn control_response(con: bool, seq: u8, iin1: u8, status: u8) -> Vec<u8> {
     bytes
 }
 
-const G41V2_INDEX_7: Control = Control::G41V2(Group41Var2::new(513), 7);
-
-fn selected() -> [Event; 3] {
-    [
-        Event::BeginControls,
-        Event::Select(G41V2_INDEX_7),
-        Event::EndControls,
-    ]
-}
-
-fn operated(operate_type: OperateType) -> [Event; 3] {
-    [
-        Event::BeginControls,
-        Event::Operate(G41V2_INDEX_7, operate_type),
-        Event::EndControls,
-    ]
-}
-
-fn empty_buffer() -> BufferState {
-    BufferState {
-        classes: ClassCount {
-            num_class_1: 0,
-            num_class_2: 0,
-            num_class_3: 0,
-        },
-        types: TypeCount {
-            num_binary_input: 0,
-            num_double_bit_binary_input: 0,
-            num_binary_output_status: 0,
-            num_counter: 0,
-            num_frozen_counter: 0,
-            num_analog: 0,
-            num_analog_output_status: 0,
-            num_octet_string: 0,
-        },
-    }
-}
-
-/// one class 1 event, not yet reported
-fn one_event() -> BufferState {
-    let mut state = empty_buffer();
-    state.classes.num_class_1 = 1;
-    state.types.num_binary_input = 1;
-    state
-}
-
-fn add_binary_event(database: &mut DatabaseHandle) {
-    database.transaction(|db| {
-        db.add(0, Some(EventClass::Class1), BinaryInputConfig::default());
-        db.update(
-            0,
-            &BinaryInput::new(true, Flags::ONLINE, Time::synchronized(0)),
-            UpdateOptions::default(),
-        );
-    });
-}
-
 /// the binary event as g2v1 in a response
 const G2V1_EVENT: &[u8] = &[0x02, 0x01, 0x28, 0x01, 0x00, 0x00, 0x00, 0x81];
 
 /// READ class 1 with sequence 0 and one binary event, whose response waits for a confirm
 async fn enter_solicited_confirm_wait(harness: &mut OutstationHarness) {
-    add_binary_event(&mut harness.handle.database);
+    harness.handle.database.transaction(add_binary_event);
     let mut expected = response(true, 0, RESTART, 0).to_vec();
     expected.extend_from_slice(G2V1_EVENT);
     harness
@@ -202,7 +100,7 @@ async fn probe(harness: &mut OutstationHarness, seq: u8, iin1: u8) {
 async fn malformed_request_in_idle_replaces_the_repeat_history() {
     let mut harness = new_harness(get_default_config());
 
-    let direct_operate = control(FunctionCode::DirectOperate, 3, 7);
+    let direct_operate = g41v2_control(FunctionCode::DirectOperate, 3, 7);
     let direct_operate_response = control_response(false, 3, RESTART, 0);
     for _ in 0..2 {
         harness
@@ -229,7 +127,7 @@ async fn malformed_request_in_the_solicited_confirm_wait_ends_it_and_replaces_th
     broadcast(&mut harness, BroadcastConfirmMode::Mandatory, 0).await;
     harness.check_events(&[BROADCAST_PROCESSED]);
 
-    let direct_operate = control(FunctionCode::DirectOperate, 3, 7);
+    let direct_operate = g41v2_control(FunctionCode::DirectOperate, 3, 7);
     let direct_operate_response = control_response(true, 3, RESTART | BROADCAST, 0);
     harness
         .test_request_response(&direct_operate, &direct_operate_response)
@@ -273,14 +171,14 @@ async fn repeated_non_read_in_the_unsolicited_confirm_wait_gets_the_stored_octet
     let mut harness = new_harness(get_default_unsolicited_config());
     enter_unsolicited_confirm_wait(&mut harness).await;
 
-    let direct_operate = control(FunctionCode::DirectOperate, 0, 7);
+    let direct_operate = g41v2_control(FunctionCode::DirectOperate, 0, 7);
     let direct_operate_response = control_response(false, 0, RESTART, 0);
     harness
         .test_request_response(&direct_operate, &direct_operate_response)
         .await;
     harness.check_events(&operated(OperateType::DirectOperate));
 
-    add_binary_event(&mut harness.handle.database);
+    harness.handle.database.transaction(add_binary_event);
 
     harness
         .test_request_response(&direct_operate, &direct_operate_response)
@@ -295,7 +193,7 @@ async fn unknown_function_in_the_unsolicited_confirm_wait_keeps_the_repeat_histo
     let mut harness = new_harness(get_default_unsolicited_config());
     enter_unsolicited_confirm_wait(&mut harness).await;
 
-    let direct_operate = control(FunctionCode::DirectOperate, 0, 7);
+    let direct_operate = g41v2_control(FunctionCode::DirectOperate, 0, 7);
     let direct_operate_response = control_response(false, 0, RESTART, 0);
     harness
         .test_request_response(&direct_operate, &direct_operate_response)
@@ -323,7 +221,7 @@ async fn unknown_function_in_the_solicited_confirm_wait_ends_it_and_keeps_the_re
     broadcast(&mut harness, BroadcastConfirmMode::Mandatory, 0).await;
     harness.check_events(&[BROADCAST_PROCESSED]);
 
-    let direct_operate = control(FunctionCode::DirectOperate, 0, 7);
+    let direct_operate = g41v2_control(FunctionCode::DirectOperate, 0, 7);
     let direct_operate_response = control_response(true, 0, RESTART | BROADCAST, 0);
     harness
         .test_request_response(&direct_operate, &direct_operate_response)
@@ -359,7 +257,7 @@ async fn repeated_non_read_in_the_solicited_confirm_wait_ends_it_and_waits_again
     broadcast(&mut harness, BroadcastConfirmMode::Mandatory, 0).await;
     harness.check_events(&[BROADCAST_PROCESSED]);
 
-    let direct_operate = control(FunctionCode::DirectOperate, 0, 7);
+    let direct_operate = g41v2_control(FunctionCode::DirectOperate, 0, 7);
     let direct_operate_response = control_response(true, 0, RESTART | BROADCAST, 0);
     harness
         .test_request_response(&direct_operate, &direct_operate_response)
@@ -402,7 +300,7 @@ async fn broadcast_in_the_solicited_confirm_wait_ends_it_and_sets_the_broadcast_
             harness.check_events(&[
                 Event::SolicitedConfirmReceived(2),
                 Event::BeginConfirm,
-                Event::EndConfirm(one_event()),
+                Event::EndConfirm(class_1_binaries(1)),
             ]);
         } else {
             harness
@@ -527,25 +425,14 @@ async fn unsolicited_response_consumes_a_broadcast_that_does_not_require_a_confi
         BroadcastConfirmMode::Optional,
     ] {
         let mut harness = new_harness(get_default_unsolicited_config());
-        harness.expect_response(&null_unsolicited(0)).await;
-        harness.send_and_process(&unsolicited_confirm(0)).await;
-        harness.check_events(&[
-            Event::EnterUnsolicitedConfirmWait(0),
-            Event::UnsolicitedConfirmReceived(0),
-        ]);
-        harness
-            .test_request_response(
-                &[0xC0, 0x14, 60, 2, 0x06, 60, 3, 0x06, 60, 4, 0x06],
-                &response(false, 0, RESTART, 0),
-            )
-            .await;
+        confirm_null_unsolicited(&mut harness).await;
+        enable_unsolicited(&mut harness).await;
 
         broadcast(&mut harness, mode, 1).await;
         harness.check_events(&[BROADCAST_PROCESSED]);
 
-        add_binary_event(&mut harness.handle.database);
-        let mut unsolicited = vec![0xF1, 0x82, RESTART | BROADCAST, 0x00];
-        unsolicited.extend_from_slice(G2V1_EVENT);
+        harness.handle.database.transaction(add_binary_event);
+        let unsolicited = unsolicited(1, RESTART | BROADCAST, G2V1_EVENT);
         harness.expect_response(&unsolicited).await;
         harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
 
@@ -558,25 +445,14 @@ async fn unconfirmed_unsolicited_response_leaves_a_mandatory_broadcast_to_report
     let mut config = get_default_unsolicited_config();
     config.max_unsolicited_retries = Some(0);
     let mut harness = new_harness(config);
-    harness.expect_response(&null_unsolicited(0)).await;
-    harness.send_and_process(&unsolicited_confirm(0)).await;
-    harness.check_events(&[
-        Event::EnterUnsolicitedConfirmWait(0),
-        Event::UnsolicitedConfirmReceived(0),
-    ]);
-    harness
-        .test_request_response(
-            &[0xC0, 0x14, 60, 2, 0x06, 60, 3, 0x06, 60, 4, 0x06],
-            &response(false, 0, RESTART, 0),
-        )
-        .await;
+    confirm_null_unsolicited(&mut harness).await;
+    enable_unsolicited(&mut harness).await;
 
     broadcast(&mut harness, BroadcastConfirmMode::Mandatory, 1).await;
     harness.check_events(&[BROADCAST_PROCESSED]);
 
-    add_binary_event(&mut harness.handle.database);
-    let mut unsolicited = vec![0xF1, 0x82, RESTART | BROADCAST, 0x00];
-    unsolicited.extend_from_slice(G2V1_EVENT);
+    harness.handle.database.transaction(add_binary_event);
+    let unsolicited = unsolicited(1, RESTART | BROADCAST, G2V1_EVENT);
     harness.expect_response(&unsolicited).await;
     harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
     harness
@@ -594,7 +470,7 @@ async fn unconfirmed_unsolicited_response_leaves_a_mandatory_broadcast_to_report
     harness.check_events(&[
         Event::SolicitedConfirmReceived(2),
         Event::BeginConfirm,
-        Event::EndConfirm(one_event()),
+        Event::EndConfirm(class_1_binaries(1)),
     ]);
     probe(&mut harness, 3, RESTART | CLASS_1).await;
 }
@@ -632,7 +508,7 @@ async fn deferred_read_reports_a_mandatory_broadcast_and_waits_for_its_confirm()
 async fn confirms_in_idle_are_ignored_and_keep_the_repeat_history() {
     let mut harness = new_harness(get_default_config());
 
-    let direct_operate = control(FunctionCode::DirectOperate, 0, 7);
+    let direct_operate = g41v2_control(FunctionCode::DirectOperate, 0, 7);
     let direct_operate_response = control_response(false, 0, RESTART, 0);
     harness
         .test_request_response(&direct_operate, &direct_operate_response)
@@ -667,7 +543,7 @@ async fn wrong_confirms_in_the_solicited_confirm_wait_are_ignored() {
         Event::SolicitedConfirmReceived(0),
         Event::BeginConfirm,
         Event::Cleared(0),
-        Event::EndConfirm(empty_buffer()),
+        Event::EndConfirm(empty_buffer_state()),
     ]);
     probe(&mut harness, 1, RESTART).await;
 }
@@ -729,22 +605,11 @@ async fn solicited_confirm_of_an_unknown_function_reply_in_the_unsolicited_confi
 async fn late_solicited_confirm_in_the_unsolicited_confirm_wait_does_not_clear_a_reported_broadcast(
 ) {
     let mut harness = new_harness(get_default_unsolicited_config());
-    harness.expect_response(&null_unsolicited(0)).await;
-    harness.send_and_process(&unsolicited_confirm(0)).await;
-    harness.check_events(&[
-        Event::EnterUnsolicitedConfirmWait(0),
-        Event::UnsolicitedConfirmReceived(0),
-    ]);
-    harness
-        .test_request_response(
-            &[0xC0, 0x14, 60, 2, 0x06, 60, 3, 0x06, 60, 4, 0x06],
-            &response(false, 0, RESTART, 0),
-        )
-        .await;
+    confirm_null_unsolicited(&mut harness).await;
+    enable_unsolicited(&mut harness).await;
 
-    add_binary_event(&mut harness.handle.database);
-    let mut unsolicited = vec![0xF1, 0x82, RESTART, 0x00];
-    unsolicited.extend_from_slice(G2V1_EVENT);
+    harness.handle.database.transaction(add_binary_event);
+    let unsolicited = unsolicited(1, RESTART, G2V1_EVENT);
     harness.expect_response(&unsolicited).await;
     harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
 
@@ -771,7 +636,7 @@ async fn late_solicited_confirm_in_the_unsolicited_confirm_wait_does_not_clear_a
         Event::UnsolicitedConfirmReceived(1),
         Event::BeginConfirm,
         Event::Cleared(0),
-        Event::EndConfirm(empty_buffer()),
+        Event::EndConfirm(empty_buffer_state()),
     ]);
 
     harness
@@ -791,18 +656,8 @@ async fn late_solicited_confirm_in_the_unsolicited_confirm_wait_does_not_clear_a
 async fn solicited_confirm_in_the_unsolicited_confirm_wait_does_not_clear_a_broadcast_reported_before_it(
 ) {
     let mut harness = new_harness(get_default_unsolicited_config());
-    harness.expect_response(&null_unsolicited(0)).await;
-    harness.send_and_process(&unsolicited_confirm(0)).await;
-    harness.check_events(&[
-        Event::EnterUnsolicitedConfirmWait(0),
-        Event::UnsolicitedConfirmReceived(0),
-    ]);
-    harness
-        .test_request_response(
-            &[0xC0, 0x14, 60, 2, 0x06, 60, 3, 0x06, 60, 4, 0x06],
-            &response(false, 0, RESTART, 0),
-        )
-        .await;
+    confirm_null_unsolicited(&mut harness).await;
+    enable_unsolicited(&mut harness).await;
 
     broadcast(&mut harness, BroadcastConfirmMode::Mandatory, 1).await;
     harness.check_events(&[BROADCAST_PROCESSED]);
@@ -817,9 +672,8 @@ async fn solicited_confirm_in_the_unsolicited_confirm_wait_does_not_clear_a_broa
         .wait_for_events(&[Event::SolicitedConfirmTimeout(2)])
         .await;
 
-    add_binary_event(&mut harness.handle.database);
-    let mut unsolicited = vec![0xF1, 0x82, RESTART | BROADCAST, 0x00];
-    unsolicited.extend_from_slice(G2V1_EVENT);
+    harness.handle.database.transaction(add_binary_event);
+    let unsolicited = unsolicited(1, RESTART | BROADCAST, G2V1_EVENT);
     harness.expect_response(&unsolicited).await;
     harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
 
@@ -849,7 +703,7 @@ async fn select_in_the_solicited_confirm_wait(harness: &mut OutstationHarness) {
     harness.check_events(&[BROADCAST_PROCESSED]);
     harness
         .test_request_response(
-            &control(FunctionCode::Select, 0, 7),
+            &g41v2_control(FunctionCode::Select, 0, 7),
             &control_response(true, 0, RESTART | BROADCAST, 0),
         )
         .await;
@@ -864,7 +718,7 @@ async fn operate_in_the_solicited_confirm_wait_uses_the_selection() {
 
     harness
         .test_request_response(
-            &control(FunctionCode::Operate, 1, 7),
+            &g41v2_control(FunctionCode::Operate, 1, 7),
             &control_response(true, 1, RESTART | BROADCAST, 0),
         )
         .await;
@@ -881,7 +735,7 @@ async fn select_retry_in_the_solicited_confirm_wait_keeps_the_selection() {
 
     harness
         .test_request_response(
-            &control(FunctionCode::Select, 0, 7),
+            &g41v2_control(FunctionCode::Select, 0, 7),
             &control_response(true, 0, RESTART | BROADCAST, 0),
         )
         .await;
@@ -892,7 +746,7 @@ async fn select_retry_in_the_solicited_confirm_wait_keeps_the_selection() {
 
     harness
         .test_request_response(
-            &control(FunctionCode::Operate, 1, 7),
+            &g41v2_control(FunctionCode::Operate, 1, 7),
             &control_response(true, 1, RESTART | BROADCAST, 0),
         )
         .await;
@@ -910,7 +764,7 @@ async fn discarded_select_in_the_solicited_confirm_wait_continues_the_wait_and_k
     select_in_the_solicited_confirm_wait(&mut harness).await;
 
     harness
-        .send_and_process(&control(FunctionCode::Select, 0, 8))
+        .send_and_process(&g41v2_control(FunctionCode::Select, 0, 8))
         .await;
     harness.expect_no_response();
     harness.check_no_events();
@@ -919,7 +773,7 @@ async fn discarded_select_in_the_solicited_confirm_wait_continues_the_wait_and_k
 
     harness
         .test_request_response(
-            &control(FunctionCode::Operate, 1, 7),
+            &g41v2_control(FunctionCode::Operate, 1, 7),
             &control_response(false, 1, RESTART, 0),
         )
         .await;
@@ -933,14 +787,14 @@ async fn discarded_select_and_confirms_in_the_unsolicited_confirm_wait_keep_the_
 
     harness
         .test_request_response(
-            &control(FunctionCode::Select, 0, 7),
+            &g41v2_control(FunctionCode::Select, 0, 7),
             &control_response(false, 0, RESTART, 0),
         )
         .await;
     harness.check_events(&selected());
 
     for request in [
-        control(FunctionCode::Select, 0, 8),
+        g41v2_control(FunctionCode::Select, 0, 8),
         confirm(0).to_vec(),
         unsolicited_confirm(5).to_vec(),
     ] {
@@ -951,7 +805,7 @@ async fn discarded_select_and_confirms_in_the_unsolicited_confirm_wait_keep_the_
 
     harness
         .test_request_response(
-            &control(FunctionCode::Operate, 1, 7),
+            &g41v2_control(FunctionCode::Operate, 1, 7),
             &control_response(false, 1, RESTART, 0),
         )
         .await;
@@ -1006,10 +860,10 @@ async fn read_in_the_unsolicited_confirm_wait_replaces_the_deferred_read() {
 /// Table 6-1 rows 26-29: a request that isn't a READ discards the deferred READ
 #[tokio::test]
 async fn requests_in_the_unsolicited_confirm_wait_discard_the_deferred_read() {
-    let direct_operate = control(FunctionCode::DirectOperate, 0, 7);
+    let direct_operate = g41v2_control(FunctionCode::DirectOperate, 0, 7);
     let cases: [(&[u8], Vec<u8>); 4] = [
         (
-            &[0xC2, 0x17],
+            &delay_measure(2),
             vec![
                 0xC2, 0x81, RESTART, 0x00, 0x34, 0x02, 0x07, 0x01, 0x00, 0x00,
             ],
@@ -1075,6 +929,155 @@ async fn disable_unsolicited_in_the_unsolicited_confirm_wait_ends_the_series_and
     harness.send_and_process(&unsolicited_confirm(1)).await;
     harness.check_events(&[Event::UnsolicitedConfirmReceived(1)]);
     probe(&mut harness, 3, RESTART).await;
+}
+
+// ---------- process_request_from_idle ----------
+
+/// the information callback for a request with one fragment, from idle
+fn from_idle(function: FunctionCode, uns: bool, seq: u8) -> Event {
+    Event::RequestFromIdle(RequestHeader {
+        control: ControlField {
+            fir: true,
+            fin: true,
+            con: false,
+            uns,
+            seq: Sequence::new(seq),
+        },
+        function,
+    })
+}
+
+/// requests and confirms in idle are reported, but not a request with an unknown function code
+#[tokio::test]
+async fn requests_and_confirms_in_idle_are_reported_to_the_information_callback() {
+    // an empty response is none
+    let cases: [(&[u8], Vec<u8>, Option<Event>); 6] = [
+        (
+            &read_class_0(0),
+            response(false, 0, RESTART, 0).to_vec(),
+            Some(from_idle(FunctionCode::Read, false, 0)),
+        ),
+        (
+            &record_current_time(0),
+            response(false, 0, RESTART, 0).to_vec(),
+            Some(from_idle(FunctionCode::RecordCurrentTime, false, 0)),
+        ),
+        (
+            &malformed(0),
+            response(false, 0, RESTART, PARAMETER_ERROR).to_vec(),
+            Some(from_idle(FunctionCode::Read, false, 0)),
+        ),
+        (
+            &confirm(0),
+            Vec::new(),
+            Some(from_idle(FunctionCode::Confirm, false, 0)),
+        ),
+        (
+            &unsolicited_confirm(0),
+            Vec::new(),
+            Some(from_idle(FunctionCode::Confirm, true, 0)),
+        ),
+        (
+            &unknown_function(0),
+            response(false, 0, RESTART, NO_FUNC_CODE_SUPPORT).to_vec(),
+            None,
+        ),
+    ];
+
+    for (request, expected, event) in cases {
+        let mut harness = new_harness(get_default_config());
+        harness.record_requests_from_idle();
+        if expected.is_empty() {
+            harness.send_and_process(request).await;
+            harness.expect_no_response();
+        } else {
+            harness.test_request_response(request, &expected).await;
+        }
+        if let Some(event) = event {
+            harness.check_events(&[event]);
+        }
+        harness.check_no_events();
+    }
+}
+
+#[tokio::test]
+async fn discarded_select_in_idle_is_not_reported_to_the_information_callback() {
+    let mut harness = new_harness(get_default_config());
+    harness.record_requests_from_idle();
+
+    harness
+        .test_request_response(
+            &g41v2_control(FunctionCode::Select, 0, 7),
+            &control_response(false, 0, RESTART, 0),
+        )
+        .await;
+    harness.check_events(&[from_idle(FunctionCode::Select, false, 0)]);
+    harness.check_events(&selected());
+
+    harness
+        .send_and_process(&g41v2_control(FunctionCode::Select, 0, 8))
+        .await;
+    harness.expect_no_response();
+    harness.check_no_events();
+}
+
+/// the request that ends the solicited confirm wait is reported once the session is back in idle
+#[tokio::test]
+async fn request_retained_from_the_solicited_confirm_wait_is_reported_to_the_information_callback()
+{
+    let mut harness = new_harness(get_default_config());
+    harness.record_requests_from_idle();
+
+    harness.handle.database.transaction(add_binary_event);
+    let mut expected = response(true, 0, RESTART, 0).to_vec();
+    expected.extend_from_slice(G2V1_EVENT);
+    harness
+        .test_request_response(&read_class_1(0), &expected)
+        .await;
+    harness.check_events(&[
+        from_idle(FunctionCode::Read, false, 0),
+        Event::EnterSolicitedConfirmWait(0),
+    ]);
+
+    harness
+        .test_request_response(
+            &record_current_time(1),
+            &response(false, 1, RESTART | CLASS_1, 0),
+        )
+        .await;
+    harness.check_events(&[
+        Event::SolicitedConfirmWaitNewRequest,
+        from_idle(FunctionCode::RecordCurrentTime, false, 1),
+    ]);
+    harness.check_no_events();
+}
+
+/// neither the requests in the unsolicited confirm wait nor the deferred READ are reported
+#[tokio::test]
+async fn requests_in_the_unsolicited_confirm_wait_are_not_reported_to_the_information_callback() {
+    let mut harness = new_harness(get_default_unsolicited_config());
+    harness.record_requests_from_idle();
+    enter_unsolicited_confirm_wait(&mut harness).await;
+
+    harness
+        .test_request_response(&record_current_time(1), &response(false, 1, RESTART, 0))
+        .await;
+    harness.send_and_process(&read_class_0(2)).await;
+    harness.expect_no_response();
+    harness.send_and_process(&confirm(1)).await;
+    harness.check_no_events();
+
+    harness.send_and_process(&unsolicited_confirm(0)).await;
+    harness.check_events(&[Event::UnsolicitedConfirmReceived(0)]);
+    harness
+        .expect_response(&response(false, 2, RESTART, 0))
+        .await;
+    harness.check_no_events();
+
+    harness
+        .test_request_response(&record_current_time(3), &response(false, 3, RESTART, 0))
+        .await;
+    harness.check_events(&[from_idle(FunctionCode::RecordCurrentTime, false, 3)]);
 }
 
 // ---------- link activity ----------

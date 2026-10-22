@@ -2,7 +2,7 @@ use crate::app::variations::{Group12Var1, Group41Var1, Group41Var2, Group41Var3,
 use crate::outstation::traits::{BroadcastAction, OperateType, RestartDelay};
 use crate::outstation::{BufferState, FreezeIndices, FreezeType};
 
-use crate::app::{FunctionCode, Timestamp};
+use crate::app::{FunctionCode, RequestHeader, Timestamp};
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum Control {
@@ -11,6 +11,27 @@ pub(crate) enum Control {
     G41V2(Group41Var2, u16),
     G41V3(Group41Var3, u16),
     G41V4(Group41Var4, u16),
+}
+
+/// the g41v2 control with value 513 at index 7 that tests in several files send
+pub(crate) const G41V2_INDEX_7: Control = Control::G41V2(Group41Var2::new(513), 7);
+
+/// the events of a SELECT of [`G41V2_INDEX_7`]
+pub(crate) fn selected() -> [Event; 3] {
+    [
+        Event::BeginControls,
+        Event::Select(G41V2_INDEX_7),
+        Event::EndControls,
+    ]
+}
+
+/// the events of an operation of [`G41V2_INDEX_7`]
+pub(crate) fn operated(operate_type: OperateType) -> [Event; 3] {
+    [
+        Event::BeginControls,
+        Event::Operate(G41V2_INDEX_7, operate_type),
+        Event::EndControls,
+    ]
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -40,6 +61,7 @@ pub(crate) enum Event {
     BeginConfirm,
     Cleared(u64),
     EndConfirm(BufferState),
+    RequestFromIdle(RequestHeader),
 }
 
 #[derive(Clone)]

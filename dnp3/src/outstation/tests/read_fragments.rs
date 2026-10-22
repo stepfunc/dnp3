@@ -11,7 +11,7 @@ use crate::app::BufferSize;
 use crate::outstation::config::OutstationConfig;
 use crate::outstation::database::*;
 use crate::outstation::tests::harness::*;
-use crate::outstation::{BufferState, ClassCount, TypeCount};
+use crate::outstation::BufferState;
 
 /// g60v2 (class 1)
 const CLASS_1: &[u8] = &[0x3C, 0x02, 0x06];
@@ -79,18 +79,6 @@ fn response(control: u8, iin1: u8, objects: &[&[u8]]) -> Vec<u8> {
     response
 }
 
-/// g2v1 events for the indices, each with flags ONLINE and state true
-fn g2v1_events(indices: Range<u16>) -> Vec<u8> {
-    let count = indices.end - indices.start;
-    let mut bytes = vec![0x02, 0x01, 0x28];
-    bytes.extend(count.to_le_bytes());
-    for index in indices {
-        bytes.extend(index.to_le_bytes());
-        bytes.push(BINARY_TRUE);
-    }
-    bytes
-}
-
 /// g1v2 values with 16-bit start/stop, one flags byte per value
 fn g1v2_values(start: u16, flags: &[u8]) -> Vec<u8> {
     let stop = start + u16::try_from(flags.len()).unwrap() - 1;
@@ -108,14 +96,6 @@ fn g20v1_restart_values(start: u16, count: u16) -> Vec<u8> {
     for _ in 0..count {
         bytes.extend([RESTART, 0x00, 0x00, 0x00, 0x00]);
     }
-    bytes
-}
-
-/// device serial number attribute in the default set
-fn serial_number(value: &str) -> Vec<u8> {
-    let mut bytes = vec![0x00, var::DEVICE_SERIAL_NUMBER, 0x00, 0x00, 0x00, 0x01];
-    bytes.push(value.len().try_into().unwrap());
-    bytes.extend_from_slice(value.as_bytes());
     bytes
 }
 
@@ -150,44 +130,11 @@ fn define_serial_number(value: &str) -> impl FnMut(&mut Database) {
     }
 }
 
-fn class_1_binaries(count: usize) -> BufferState {
-    BufferState {
-        classes: ClassCount {
-            num_class_1: count,
-            num_class_2: 0,
-            num_class_3: 0,
-        },
-        types: TypeCount {
-            num_binary_input: count,
-            num_double_bit_binary_input: 0,
-            num_binary_output_status: 0,
-            num_counter: 0,
-            num_frozen_counter: 0,
-            num_analog: 0,
-            num_analog_output_status: 0,
-            num_octet_string: 0,
-        },
-    }
-}
-
 fn class_1_counter() -> BufferState {
-    BufferState {
-        classes: ClassCount {
-            num_class_1: 1,
-            num_class_2: 0,
-            num_class_3: 0,
-        },
-        types: TypeCount {
-            num_binary_input: 0,
-            num_double_bit_binary_input: 0,
-            num_binary_output_status: 0,
-            num_counter: 1,
-            num_frozen_counter: 0,
-            num_analog: 0,
-            num_analog_output_status: 0,
-            num_octet_string: 0,
-        },
-    }
+    let mut state = empty_buffer_state();
+    state.classes.num_class_1 = 1;
+    state.types.num_counter = 1;
+    state
 }
 
 /// confirm the response with `seq`, expecting it to clear the events with `cleared` ids and leave
@@ -389,7 +336,11 @@ async fn events_that_exactly_fill_a_fragment_leave_attributes_for_the_next() {
 
     // no events, so no confirm
     harness
-        .expect_response(&response(FIN_SEQ_1, IIN1_RESTART, &[&serial_number("S")]))
+        .expect_response(&response(
+            FIN_SEQ_1,
+            IIN1_RESTART,
+            &[&encode_string(var::DEVICE_SERIAL_NUMBER, "S")],
+        ))
         .await;
     harness.check_no_events();
 }
@@ -417,7 +368,10 @@ async fn event_one_byte_past_a_fragment_moves_to_the_next_ahead_of_attributes() 
         .expect_response(&response(
             FIN_CON_SEQ_1,
             IIN1_RESTART,
-            &[COUNTER_0_EVENT, &serial_number("S")],
+            &[
+                COUNTER_0_EVENT,
+                &encode_string(var::DEVICE_SERIAL_NUMBER, "S"),
+            ],
         ))
         .await;
     let counter_id = u64::from(binaries);
@@ -450,7 +404,7 @@ async fn static_data_and_an_attribute_that_exactly_fill_a_fragment_are_sent_in_o
         IIN1_RESTART,
         &[
             &g1v2_values(0, &vec![RESTART; count.into()]),
-            &serial_number("S"),
+            &encode_string(var::DEVICE_SERIAL_NUMBER, "S"),
         ],
     );
     assert_eq!(expected.len(), <BufferSize>::MIN);
@@ -481,7 +435,11 @@ async fn attribute_one_byte_past_a_static_fragment_is_sent_in_the_next() {
     expect_first_and_confirm(&mut harness, &first, 0..0, class_1_binaries(0)).await;
 
     harness
-        .expect_response(&response(FIN_SEQ_1, IIN1_RESTART, &[&serial_number("SN")]))
+        .expect_response(&response(
+            FIN_SEQ_1,
+            IIN1_RESTART,
+            &[&encode_string(var::DEVICE_SERIAL_NUMBER, "SN")],
+        ))
         .await;
     harness.check_no_events();
 }
@@ -533,7 +491,7 @@ async fn class_0_and_attributes_span_fragments_without_a_confirm_for_the_last() 
             IIN1_RESTART,
             &[
                 &g20v1_restart_values(2 * COUNTERS_IN_MIN_FRAGMENT, 6),
-                &serial_number("S"),
+                &encode_string(var::DEVICE_SERIAL_NUMBER, "S"),
             ],
         ))
         .await;
@@ -640,23 +598,10 @@ const CTO_EVENT_ONE_BYTE_SHORT: usize = 4 + 5 + 9 * 25 + 10 + 5 + 5 - 1;
 const SYNCHRONIZED_START: u64 = 2000;
 
 fn class_1_double_bits(count: usize) -> BufferState {
-    BufferState {
-        classes: ClassCount {
-            num_class_1: count,
-            num_class_2: 0,
-            num_class_3: 0,
-        },
-        types: TypeCount {
-            num_binary_input: 0,
-            num_double_bit_binary_input: count,
-            num_binary_output_status: 0,
-            num_counter: 0,
-            num_frozen_counter: 0,
-            num_analog: 0,
-            num_analog_output_status: 0,
-            num_octet_string: 0,
-        },
-    }
+    let mut state = empty_buffer_state();
+    state.classes.num_class_1 = count;
+    state.types.num_double_bit_binary_input = count;
+    state
 }
 
 #[tokio::test]
@@ -732,17 +677,6 @@ async fn unsynchronized_g4v2_event_whose_cto_does_not_fit_starts_the_next_fragme
     harness.check_no_events();
 }
 
-const ENABLE_UNSOLICITED_SEQ0: &[u8] = &[
-    0xC0, 0x14, 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06,
-];
-
-/// an unsolicited response with FIR, FIN and CON
-fn unsolicited(seq: u8, iin1: u8, objects: &[u8]) -> Vec<u8> {
-    let mut response = vec![0xF0 | seq, 0x82, iin1, 0x00];
-    response.extend_from_slice(objects);
-    response
-}
-
 /// confirm the unsolicited response with `seq`, expecting it to clear the events with `cleared`
 /// ids and leave `remaining` class 1 binary events
 async fn confirm_unsolicited(
@@ -751,7 +685,7 @@ async fn confirm_unsolicited(
     cleared: Range<u64>,
     remaining: BufferState,
 ) {
-    harness.send_and_process(&[0xD0 | seq, 0x00]).await;
+    harness.send_and_process(&unsolicited_confirm(seq)).await;
     harness.check_events(&[Event::UnsolicitedConfirmReceived(seq), Event::BeginConfirm]);
     for id in cleared {
         harness.check_events(&[Event::Cleared(id)]);
@@ -765,19 +699,8 @@ async fn enabled_unsolicited_harness(size: usize) -> OutstationHarness {
     config.unsolicited_buffer_size = BufferSize::new(size).unwrap();
     config.event_buffer_config = EventBufferConfig::all_types(100);
     let mut harness = new_harness(config);
-
-    harness
-        .expect_response(&unsolicited(0, IIN1_RESTART, &[]))
-        .await;
-    harness.check_events(&[Event::EnterUnsolicitedConfirmWait(0)]);
-    harness.send_and_process(&[0xD0, 0x00]).await;
-    harness.check_events(&[Event::UnsolicitedConfirmReceived(0)]);
-    harness
-        .test_request_response(
-            ENABLE_UNSOLICITED_SEQ0,
-            &response(FIR_FIN, IIN1_RESTART, &[]),
-        )
-        .await;
+    confirm_null_unsolicited(&mut harness).await;
+    enable_unsolicited(&mut harness).await;
     harness
 }
 

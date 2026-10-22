@@ -8,7 +8,7 @@
 
 use crate::app::attr::AttrParseError;
 use crate::app::parse::options::ParseOptions;
-use crate::app::parse::parser::HeaderCollection;
+use crate::app::parse::parser::{HeaderCollection, ObjectHeader};
 use crate::app::{FunctionCode, ObjectParseError, QualifierCode, Variation};
 
 use ObjectParseError as E;
@@ -32,6 +32,20 @@ const FUNCTIONS: [FunctionCode; 3] = [
     FunctionCode::Write,
     FunctionCode::DirectOperate,
 ];
+
+/// Requests whose all-objects headers the probes also check
+const ALL_OBJECTS_FUNCTIONS: [FunctionCode; 2] = [
+    FunctionCode::ImmediateFreeze,
+    FunctionCode::EnableUnsolicited,
+];
+
+/// The function and qualifier of each header that the probes check
+fn probed() -> impl Iterator<Item = (FunctionCode, QualifierCode)> {
+    FUNCTIONS
+        .into_iter()
+        .flat_map(|function| QUALIFIERS.map(|qualifier| (function, qualifier)))
+        .chain(ALL_OBJECTS_FUNCTIONS.map(|function| (function, Q::AllObjects)))
+}
 
 /// The longest zero-filled payload a probe tries: an index of 2 bytes and a 255 byte octet string
 const MAX_ZEROS: usize = 257;
@@ -301,19 +315,17 @@ pub(crate) fn accepted_headers(
 #[test]
 fn each_qualifier_accepts_these_variations_outside_read() {
     for options in OPTIONS {
-        for function in FUNCTIONS {
-            for qualifier in QUALIFIERS {
-                for variation in Variation::all() {
-                    let actual = match probe(options, function, variation, qualifier) {
-                        Probe::Accepted(_) => Ok(()),
-                        Probe::Rejected(err) => Err(err),
-                    };
-                    assert_eq!(
-                        actual,
-                        expected(options, variation, qualifier),
-                        "{options:?} {function:?} {variation:?} {qualifier:?}"
-                    );
-                }
+        for (function, qualifier) in probed() {
+            for variation in Variation::all() {
+                let actual = match probe(options, function, variation, qualifier) {
+                    Probe::Accepted(_) => Ok(()),
+                    Probe::Rejected(err) => Err(err),
+                };
+                assert_eq!(
+                    actual,
+                    expected(options, variation, qualifier),
+                    "{options:?} {function:?} {variation:?} {qualifier:?}"
+                );
             }
         }
     }
@@ -322,12 +334,20 @@ fn each_qualifier_accepts_these_variations_outside_read() {
 #[test]
 fn each_parsed_header_carries_its_variation_and_qualifier() {
     for options in OPTIONS {
-        for function in FUNCTIONS {
-            for (variation, qualifier, bytes) in accepted_headers(options, function) {
+        for (function, qualifier) in probed() {
+            for variation in Variation::all() {
+                let Probe::Accepted(bytes) = probe(options, function, variation, qualifier) else {
+                    continue;
+                };
                 let headers = HeaderCollection::parse(options, function, &bytes).unwrap();
                 let header = headers.get_only_header().unwrap();
                 assert_eq!(header.variation(), variation);
-                assert_eq!(header.details.qualifier(), qualifier);
+                assert_eq!(header.qualifier(), qualifier);
+                assert!(!matches!(header, ObjectHeader::Read(..)));
+                assert_eq!(
+                    header.count().is_some(),
+                    matches!(qualifier, Q::Count8 | Q::Count16)
+                );
             }
         }
     }
@@ -345,7 +365,7 @@ fn headers_in_one_fragment_each_carry_their_variation_and_qualifier() {
             let headers = HeaderCollection::parse(options, function, &fragment).unwrap();
             let actual: Vec<(Variation, QualifierCode)> = headers
                 .iter()
-                .map(|header| (header.variation(), header.details.qualifier()))
+                .map(|header| (header.variation(), header.qualifier()))
                 .collect();
             let expected: Vec<(Variation, QualifierCode)> =
                 accepted.iter().map(|(v, q, _)| (*v, *q)).collect();
@@ -366,7 +386,8 @@ fn each_read_header_carries_its_variation_and_qualifier() {
             if let Ok(headers) = parsed {
                 let header = headers.get_only_header().unwrap();
                 assert_eq!(header.variation(), variation);
-                assert_eq!(header.details.qualifier(), qualifier);
+                assert_eq!(header.qualifier(), qualifier);
+                assert!(header.count().is_none());
                 accepted += 1;
             }
         }

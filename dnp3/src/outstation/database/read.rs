@@ -1,4 +1,4 @@
-use crate::app::parse::parser::{HeaderDetails, ObjectHeader, ReadQualifier};
+use crate::app::parse::parser::{ObjectHeader, ReadQualifier};
 use crate::app::parse::range::Range;
 use crate::app::{Iin2, Variation};
 use crate::outstation::database::config::*;
@@ -76,20 +76,20 @@ impl ReadHeader {
     /// any other is an unsupported object
     pub(crate) fn parse(header: &ObjectHeader) -> Result<ReadHeader, Iin2> {
         let target = ReadTarget::get(header.variation());
-        let res = match header.details {
-            HeaderDetails::Read(_, qualifier) => target.and_then(|x| x.with(qualifier)),
-            HeaderDetails::AllObjects(_)
-            | HeaderDetails::Range(_, _, _)
-            | HeaderDetails::Count(_, _, _)
-            | HeaderDetails::CountAndPrefix8(_, _)
-            | HeaderDetails::CountAndPrefix16(_, _)
-            | HeaderDetails::FreeFormat(_) => None,
+        let res = match *header {
+            ObjectHeader::Read(_, qualifier) => target.and_then(|x| x.with(qualifier)),
+            ObjectHeader::AllObjects(_)
+            | ObjectHeader::Range(_, _, _)
+            | ObjectHeader::Count(_, _, _)
+            | ObjectHeader::CountAndPrefix8(_, _)
+            | ObjectHeader::CountAndPrefix16(_, _)
+            | ObjectHeader::FreeFormat(_) => None,
         };
         res.ok_or_else(|| {
             tracing::warn!(
                 "{} - {} not supported in READ requests",
                 header.variation(),
-                header.details.qualifier()
+                header.qualifier()
             );
             if target.is_some() {
                 Iin2::PARAMETER_ERROR

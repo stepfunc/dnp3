@@ -2,17 +2,15 @@ use crate::app::measurement::{BinaryInput, Flags, Time};
 use crate::app::parse::header_identity_tests::DATALESS_COUNT_VARIATIONS;
 use crate::app::Timestamp;
 use crate::outstation::database::{Add, BinaryInputConfig, EventClass, Update, UpdateOptions};
-use crate::outstation::{BufferState, ClassCount, TypeCount};
+use crate::outstation::BufferState;
 
 use super::harness::*;
 
 const READ_CLASS_123: &[u8] = &[0xC0, 0x01, 60, 2, 0x06, 60, 3, 0x06, 60, 4, 0x06];
-const READ_CLASS_1: &[u8] = &[0xC0, 0x01, 60, 2, 0x06];
 const RESPONSE_WITH_OVERFLOW: &[u8] = &[
     0xE0, 0x81, 0x80, 0x08, 0x02, 0x01, 0x28, 0x05, 0x00, 0x00, 0x00, 0x81, 0x00, 0x00, 0x01, 0x00,
     0x00, 0x81, 0x00, 0x00, 0x01, 0x00, 0x00, 0x81,
 ];
-const CONFIRM_SEQ_0: &[u8] = &[0xC0, 0x00];
 const EMPTY_RESPONSE: &[u8] = &[0xC0, 0x81, 0x80, 0x00];
 
 #[tokio::test]
@@ -109,11 +107,11 @@ async fn buffer_overflow() {
 
     // Do NOT send confirm, should still set the overflow bit
     harness
-        .test_request_response(READ_CLASS_1, RESPONSE_WITH_OVERFLOW)
+        .test_request_response(&read_class_1(0), RESPONSE_WITH_OVERFLOW)
         .await;
 
     // Send confirmation, check that overflow bit is NOT set
-    harness.send_and_process(CONFIRM_SEQ_0).await;
+    harness.send_and_process(&confirm(0)).await;
     harness
         .test_request_response(READ_CLASS_123, EMPTY_RESPONSE)
         .await;
@@ -128,23 +126,14 @@ fn update_binary(database: &mut crate::outstation::database::Database, index: u1
 }
 
 fn binary_states(binary: usize, classes: [usize; 3]) -> BufferState {
-    BufferState {
-        classes: ClassCount {
-            num_class_1: classes[0],
-            num_class_2: classes[1],
-            num_class_3: classes[2],
-        },
-        types: TypeCount {
-            num_binary_input: binary,
-            num_double_bit_binary_input: 0,
-            num_binary_output_status: 0,
-            num_counter: 0,
-            num_frozen_counter: 0,
-            num_analog: 0,
-            num_analog_output_status: 0,
-            num_octet_string: 0,
-        },
-    }
+    let mut state = empty_buffer_state();
+    [
+        state.classes.num_class_1,
+        state.classes.num_class_2,
+        state.classes.num_class_3,
+    ] = classes;
+    state.types.num_binary_input = binary;
+    state
 }
 
 #[tokio::test]
@@ -164,13 +153,13 @@ async fn class_bits_and_buffer_state_follow_the_events_across_reads_and_confirms
     // IIN1.1 is clear once the class 1 event is written, while IIN1.2 and IIN1.3 remain
     harness
         .test_request_response(
-            READ_CLASS_1,
+            &read_class_1(0),
             &[
                 0xE0, 0x81, 0x8C, 0x00, 0x02, 0x01, 0x28, 0x01, 0x00, 0x00, 0x00, 0x81,
             ],
         )
         .await;
-    harness.send_and_process(CONFIRM_SEQ_0).await;
+    harness.send_and_process(&confirm(0)).await;
     harness.check_events(&[
         Event::EnterSolicitedConfirmWait(0),
         Event::SolicitedConfirmReceived(0),
@@ -187,7 +176,7 @@ async fn class_bits_and_buffer_state_follow_the_events_across_reads_and_confirms
             ],
         )
         .await;
-    harness.send_and_process(&[0xC1, 0x00]).await;
+    harness.send_and_process(&confirm(1)).await;
     harness.check_events(&[
         Event::EnterSolicitedConfirmWait(1),
         Event::SolicitedConfirmReceived(1),
@@ -228,7 +217,7 @@ async fn class_bits_and_buffer_state_follow_the_events_across_reads_and_confirms
             ],
         )
         .await;
-    harness.send_and_process(&[0xC4, 0x00]).await;
+    harness.send_and_process(&confirm(4)).await;
     harness.check_events(&[
         Event::EnterSolicitedConfirmWait(4),
         Event::SolicitedConfirmReceived(4),
@@ -433,23 +422,16 @@ async fn fragments_that_are_not_valid_requests_get_no_response() {
 
     // a valid request is still answered
     harness
-        .test_request_response(&[0xC0, 0x01, 60, 1, 0x06], EMPTY_RESPONSE)
+        .test_request_response(&read_class_0(0), EMPTY_RESPONSE)
         .await;
 }
 
 #[tokio::test]
 async fn fragment_that_is_not_a_valid_request_does_not_end_a_confirm_wait() {
     let mut harness = new_harness(get_default_config());
-    harness.handle.database.transaction(|database| {
-        database.add(0, Some(EventClass::Class1), BinaryInputConfig::default());
-        database.update(
-            0,
-            &BinaryInput::new(true, Flags::ONLINE, Time::Synchronized(Timestamp::new(0))),
-            UpdateOptions::default(),
-        );
-    });
+    harness.handle.database.transaction(add_binary_event);
 
-    harness.send_and_process(READ_CLASS_1).await;
+    harness.send_and_process(&read_class_1(0)).await;
     harness.expect_write().await;
     harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
 
@@ -458,7 +440,7 @@ async fn fragment_that_is_not_a_valid_request_does_not_end_a_confirm_wait() {
     harness.expect_no_response();
     harness.check_no_events();
 
-    harness.send_and_process(CONFIRM_SEQ_0).await;
+    harness.send_and_process(&confirm(0)).await;
     harness.check_events(&[Event::SolicitedConfirmReceived(0)]);
 }
 
