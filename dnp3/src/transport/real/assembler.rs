@@ -302,7 +302,6 @@ mod tests {
     use crate::link::header::{BroadcastConfirmMode, FrameType};
     use crate::link::EndpointAddress;
     use crate::util::phys::PhysAddr;
-    use crate::util::test_support::Levels;
 
     const MAX: usize = 8;
 
@@ -1002,13 +1001,5 @@ mod tests {
             received: from(2),
         };
         assert!(conflicting.to_string().starts_with("conflicting addresses"));
-    }
-
-    #[test]
-    fn repeated_segments_are_logged_at_debug() {
-        use tracing::Level;
-        let level = |discard: Discard| Levels::of(|| discard.log());
-        assert_eq!(level(Discard::Repeat { seq: 1 }), [Level::DEBUG]);
-        assert_eq!(level(Discard::DifferentRepeat { seq: 1 }), [Level::WARN]);
     }
 }

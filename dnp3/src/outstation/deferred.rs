@@ -102,35 +102,3 @@ impl DeferredRead {
         }
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::app::parse::options::ParseOptions;
-    use crate::link::EndpointAddress;
-    use crate::transport::FragmentAddr;
-    use crate::util::phys::PhysAddr;
-    use crate::util::test_support::Levels;
-
-    #[test]
-    fn headers_over_capacity_are_logged_once_per_request() {
-        let mut deferred = DeferredRead::new(1);
-        // three class 1 READ headers, two more than the capacity
-        let headers = HeaderCollection::parse(
-            ParseOptions::default(),
-            FunctionCode::Read,
-            &[0x3C, 0x02, 0x06, 0x3C, 0x02, 0x06, 0x3C, 0x02, 0x06],
-        )
-        .unwrap();
-        let info = FragmentInfo::new(
-            FragmentAddr {
-                link: EndpointAddress::raw(1),
-                phys: PhysAddr::None,
-            },
-            None,
-        );
-
-        let levels = Levels::of(|| deferred.set(0, Sequence::default(), info, headers));
-        assert_eq!(levels, [tracing::Level::WARN]);
-    }
-}

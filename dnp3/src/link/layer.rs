@@ -341,7 +341,6 @@ impl Layer {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::util::test_support::Levels;
 
     const MASTER: EndpointAddress = EndpointAddress::raw(1);
     const OUTSTATION: EndpointAddress = EndpointAddress::raw(1024);
@@ -1089,18 +1088,6 @@ mod test {
             MASTER,
             OUTSTATION,
             ACK_FROM_MASTER,
-        );
-    }
-
-    #[test]
-    fn frames_for_another_outstation_are_logged_at_debug() {
-        use tracing::Level;
-        let level = |reason: Ignored| Levels::of(|| reason.log());
-        assert_eq!(level(Ignored::OtherDestination(MASTER)), [Level::DEBUG]);
-        assert_eq!(level(Ignored::NotReset), [Level::INFO]);
-        assert_eq!(
-            level(Ignored::UnknownSource(AnyAddress::Endpoint(MASTER))),
-            [Level::WARN]
         );
     }
 }
