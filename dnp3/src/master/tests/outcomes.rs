@@ -18,6 +18,7 @@ use crate::master::association::AssociationConfig;
 use crate::master::promise::Promise;
 use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::read::SingleReadTask;
+use crate::master::tasks::time::PendingTimeSync;
 use crate::master::tasks::Task;
 use crate::master::tests::file::{
     file_status_response, file_transport_response, last_block, response as file_response,
@@ -778,6 +779,94 @@ async fn running_and_queued_tasks_complete_their_promises_on_shutdown() {
                 AssocInfoEvent::TaskFailure(TaskType::Command, TaskError::Shutdown),
             ]
         );
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn queued_tasks_fail_with_no_such_association_when_the_association_is_removed() {
+    watchdog(async {
+        let mut harness =
+            create_association_with_handler(AssociationConfig::quiet(), Box::new(FixedTime)).await;
+
+        let (promise, _running) = Promise::one_shot();
+        harness
+            .association
+            .send_task(CommandTask::from_mode(
+                CommandMode::DirectOperate,
+                crob(),
+                promise,
+            ))
+            .await
+            .unwrap();
+        next_request(&mut harness, 0, FunctionCode::DirectOperate).await;
+
+        // tasks queued directly, so that the receivers tell a completed promise from a dropped one
+        let (promise, queued_command) = Promise::one_shot();
+        harness
+            .association
+            .send_task(CommandTask::from_mode(
+                CommandMode::SelectBeforeOperate,
+                crob(),
+                promise,
+            ))
+            .await
+            .unwrap();
+        let (promise, queued_read) = Promise::one_shot();
+        harness
+            .association
+            .send_task(SingleReadTask::new(
+                ReadRequest::ClassScan(Classes::class0()),
+                promise,
+            ))
+            .await
+            .unwrap();
+        let (promise, queued_link_status) = Promise::one_shot();
+        harness
+            .association
+            .send_task(Task::LinkStatus(promise))
+            .await
+            .unwrap();
+        let (promise, queued_time_sync) = Promise::one_shot();
+        harness
+            .association
+            .queue_task(PendingTimeSync::user(TimeSyncProcedure::Lan, promise).into())
+            .await
+            .unwrap();
+        let reader = RecordingReader::default();
+        harness
+            .association
+            .read_file(
+                "f.txt",
+                FileReadConfig::default(),
+                Box::new(reader.clone()),
+                None,
+            )
+            .await
+            .unwrap();
+        barrier(&mut harness).await;
+        harness.assoc_events.pop();
+
+        harness.master.remove_association(OUTSTATION).await.unwrap();
+        barrier(&mut harness).await;
+
+        let err = TaskError::NoSuchAssociation(OUTSTATION);
+        assert_eq!(queued_command.await, Ok(Err(CommandError::Task(err))));
+        assert_eq!(queued_read.await, Ok(Err(err)));
+        assert_eq!(queued_link_status.await, Ok(Err(err)));
+        assert_eq!(queued_time_sync.await, Ok(Err(TimeSyncError::Task(err))));
+        assert_eq!(
+            reader.pop(),
+            [ReaderEvent::Aborted(FileError::TaskError(err))]
+        );
+        assert_eq!(harness.assoc_events.pop(), []);
+        assert!(!harness.task.is_finished());
+
+        // the reader isn't told again once the running task ends
+        tokio::time::sleep(Duration::from_secs(2)).await;
+        barrier(&mut harness).await;
+        assert_eq!(reader.pop(), []);
+        assert!(!harness.task.is_finished());
     })
     .await;
 }

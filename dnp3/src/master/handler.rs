@@ -523,7 +523,7 @@ impl AssociationHandle {
         self.queue_task(QueuedTask::Ready(task.into())).await
     }
 
-    async fn queue_task(&mut self, task: QueuedTask) -> Result<(), Shutdown> {
+    pub(crate) async fn queue_task(&mut self, task: QueuedTask) -> Result<(), Shutdown> {
         self.master
             .send_association_message(self.address, AssociationMsgType::QueueTask(task))
             .await
