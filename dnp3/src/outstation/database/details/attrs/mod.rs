@@ -106,26 +106,24 @@ impl Selection {
     fn write_attr_list(
         set: AttrSet,
         cursor: &mut WriteCursor,
-        items: impl Iterator<Item = AttrItem>,
+        items: impl ExactSizeIterator<Item = AttrItem>,
     ) -> Result<(), scursor::WriteError> {
-        if let (_, Some(num)) = items.size_hint() {
-            if let Some((len, dt)) = get_list_encoding(num) {
-                // we're committed to writing now
-                return Self::tx(cursor, |cur| {
-                    HeaderWriter::new(cur).write_range_only(
-                        Variation::Group0(255),
-                        set.value(),
-                        set.value(),
-                    )?;
-                    cur.write_u8(dt.into())?;
-                    cur.write_u8(len)?;
-                    for item in items {
-                        cur.write_u8(item.variation)?;
-                        cur.write_u8(item.properties.into())?;
-                    }
-                    Ok(())
-                });
-            }
+        if let Some((len, dt)) = get_list_encoding(items.len()) {
+            // we're committed to writing now
+            return Self::tx(cursor, |cur| {
+                HeaderWriter::new(cur).write_range_only(
+                    Variation::Group0(255),
+                    set.value(),
+                    set.value(),
+                )?;
+                cur.write_u8(dt.into())?;
+                cur.write_u8(len)?;
+                for item in items {
+                    cur.write_u8(item.variation)?;
+                    cur.write_u8(item.properties.into())?;
+                }
+                Ok(())
+            });
         }
         Ok(())
     }
