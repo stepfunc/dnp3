@@ -884,11 +884,13 @@ impl MasterSession {
             .send_link_status_request(io, self.decode_level, destination)
             .await?;
 
+        let timeout = self.associations.get_timeout(destination.link)?;
+        let deadline = timeout.deadline_from_now();
+
         loop {
-            let timeout = self.associations.get_timeout(destination.link)?;
             // Wait for something on the link
             tokio::select! {
-                _ = tokio::time::sleep_until(timeout.deadline_from_now()) => {
+                _ = tokio::time::sleep_until(deadline) => {
                     tracing::warn!("no response within timeout: {}", timeout);
                     return Err(TaskError::ResponseTimeout);
                 }
