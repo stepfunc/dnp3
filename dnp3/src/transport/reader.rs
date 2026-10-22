@@ -11,6 +11,8 @@ use crate::util::phys::PhysLayer;
 
 pub(crate) struct TransportReader<T: Transport> {
     parse_options: ParseOptions,
+    /// a guard retained the request at the head, which it already logged
+    retained: bool,
     inner: T::Reader,
 }
 
@@ -36,7 +38,8 @@ impl<'a, T: Transport> RequestGuard<'a, T> {
     }
 
     pub(crate) fn retain(&mut self) {
-        self.canceled = true
+        self.canceled = true;
+        self.reader.retained = true;
     }
 
     /// Parse the available request, or `None` if there is none or it came from another master
@@ -74,6 +77,7 @@ impl<T: Transport> TransportReader<T> {
     pub(crate) fn new(parse_options: ParseOptions, inner: T::Reader) -> Self {
         Self {
             parse_options,
+            retained: false,
             inner,
         }
     }
@@ -87,10 +91,12 @@ impl<T: Transport> TransportReader<T> {
     }
 
     pub(crate) fn reset(&mut self) {
+        self.retained = false;
         self.inner.reset()
     }
 
     fn pop(&mut self) {
+        self.retained = false;
         self.inner.pop();
     }
 
@@ -114,12 +120,18 @@ impl<T: Transport> TransportReader<T> {
         Some(response)
     }
 
-    /// Guard the available request, which is consumed when the guard drops unless retained
+    /// Guard the available request, which is consumed when the guard drops unless retained. A
+    /// retained request was logged when it was first parsed, so it isn't logged again
     pub(crate) fn pop_request(
         &mut self,
         master_address: Option<EndpointAddress>,
         level: AppDecodeLevel,
     ) -> RequestGuard<'_, T> {
+        let level = if self.retained {
+            AppDecodeLevel::Nothing
+        } else {
+            level
+        };
         RequestGuard::new(self, master_address, level)
     }
 
@@ -179,4 +191,87 @@ fn parse(
         }
     }
     parsed
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    use std::sync::Arc;
+
+    use super::*;
+    use crate::link::header::{FrameInfo, FrameType};
+    use crate::link::reader::LinkModes;
+    use crate::link::LinkRole;
+    use crate::transport::mock::MockTransport;
+    use crate::util::phys::PhysAddr;
+
+    /// READ with no object headers
+    const READ: [u8; 2] = [0xC0, 0x01];
+
+    /// Counts the events logged at INFO, the level of a received fragment
+    struct InfoEvents(Arc<AtomicUsize>);
+
+    impl tracing::Subscriber for InfoEvents {
+        fn enabled(&self, _: &tracing::Metadata<'_>) -> bool {
+            true
+        }
+
+        fn new_span(&self, _: &tracing::span::Attributes<'_>) -> tracing::span::Id {
+            tracing::span::Id::from_u64(1)
+        }
+
+        fn record(&self, _: &tracing::span::Id, _: &tracing::span::Record<'_>) {}
+
+        fn record_follows_from(&self, _: &tracing::span::Id, _: &tracing::span::Id) {}
+
+        fn event(&self, event: &tracing::Event<'_>) {
+            if *event.metadata().level() == tracing::Level::INFO {
+                self.0.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+
+        fn enter(&self, _: &tracing::span::Id) {}
+
+        fn exit(&self, _: &tracing::span::Id) {}
+    }
+
+    #[tokio::test]
+    async fn a_retained_request_is_logged_once() {
+        let (io, mut handle) = sfio_tokio_mock_io::mock();
+        let mut io = PhysLayer::mock(io);
+        let (inner, _) = MockTransport::new(
+            LinkModes::test(),
+            LinkRole::Master,
+            EndpointAddress::raw(1),
+            64,
+        );
+        let mut reader = TransportReader::<MockTransport>::new(ParseOptions::default(), inner);
+        reader.set_rx_frame_info(FrameInfo::new(
+            EndpointAddress::raw(1),
+            None,
+            FrameType::Data,
+            PhysAddr::None,
+        ));
+        let count = Arc::new(AtomicUsize::new(0));
+        let _subscriber = tracing::subscriber::set_default(InfoEvents(count.clone()));
+
+        handle.read(&READ);
+        reader.read(&mut io, DecodeLevel::nothing()).await.unwrap();
+        let mut guard = reader.pop_request(None, AppDecodeLevel::Header);
+        assert!(matches!(guard.get(), Some(TransportRequest::Request(..))));
+        guard.retain();
+        drop(guard);
+        let guard = reader.pop_request(None, AppDecodeLevel::Header);
+        assert!(matches!(guard.get(), Some(TransportRequest::Request(..))));
+        drop(guard);
+        assert_eq!(count.load(Ordering::Relaxed), 1);
+
+        // the next request is logged
+        handle.read(&READ);
+        reader.read(&mut io, DecodeLevel::nothing()).await.unwrap();
+        let guard = reader.pop_request(None, AppDecodeLevel::Header);
+        assert!(matches!(guard.get(), Some(TransportRequest::Request(..))));
+        drop(guard);
+        assert_eq!(count.load(Ordering::Relaxed), 2);
+    }
 }
