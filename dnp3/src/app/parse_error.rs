@@ -45,16 +45,35 @@ pub enum ObjectParseError {
     BadEncoding,
 }
 
-/// Whether an [`ObjectParseError`] means the input is invalid or that the parser doesn't support it
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub(crate) enum ParseErrorCause {
-    /// The parser doesn't support what was received, which may be valid
-    Unsupported,
-    /// What was received is encoded incorrectly
-    Invalid,
-    /// Either, depending on the case: e.g. a qualifier the specification disallows for a
-    /// variation, or one it allows that the parser doesn't support
-    UnsupportedOrInvalid,
+#[cfg(feature = "ffi")]
+pub use cause::ParseErrorCause;
+#[cfg(not(feature = "ffi"))]
+pub(crate) use cause::ParseErrorCause;
+
+mod cause {
+    /// Whether an [`ObjectParseError`](super::ObjectParseError) means the input is invalid or
+    /// that the parser doesn't support it
+    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+    #[cfg_attr(feature = "ffi", doc(hidden))]
+    #[cfg_attr(
+        not(feature = "ffi"),
+        expect(unreachable_pub, reason = "public only when building the FFI")
+    )]
+    pub enum ParseErrorCause {
+        /// The parser doesn't support what was received, which may be valid
+        Unsupported,
+        /// What was received is encoded incorrectly
+        Invalid,
+        /// Either, depending on the case: e.g. a qualifier the specification disallows for a
+        /// variation, or one it allows that the parser doesn't support
+        UnsupportedOrInvalid,
+    }
+}
+
+impl From<ObjectParseError> for ParseErrorCause {
+    fn from(err: ObjectParseError) -> Self {
+        err.cause()
+    }
 }
 
 impl ObjectParseError {
