@@ -9,6 +9,7 @@ use crate::link::EndpointAddress;
 use crate::master::association::{AssociationMap, Next};
 use crate::master::error::TaskError;
 use crate::master::messages::{MasterMsg, Message};
+use crate::master::tasks::command_no_ack::CommandNoAckTask;
 use crate::master::tasks::{AppTask, AssociationTask, NonReadTask, ReadTask, RequestWriter, Task};
 use crate::master::{Association, MasterChannelConfig};
 use crate::transport::{
@@ -388,6 +389,9 @@ impl MasterSession {
                         self.run_non_read_task(io, task.dest, t, writer, reader)
                             .await
                     }
+                    AppTask::NoResponse(t) => {
+                        self.run_no_response_task(io, task.dest, t, writer).await
+                    }
                 };
 
                 if let Ok(assoc) = self.associations.get_mut(task.dest.link) {
@@ -437,6 +441,25 @@ impl MasterSession {
         }
     }
 
+    async fn run_no_response_task<T: Transport>(
+        &mut self,
+        io: &mut PhysLayer,
+        dest: FragmentAddr,
+        task: CommandNoAckTask,
+        writer: &mut TransportWriter<T>,
+    ) -> Result<Sequence, TaskError> {
+        match self.send_request(io, dest, &task, writer).await {
+            Ok(seq) => {
+                task.complete();
+                Ok(seq)
+            }
+            Err(err) => {
+                task.on_task_error(err);
+                Err(err)
+            }
+        }
+    }
+
     async fn run_non_read_task<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
@@ -474,11 +497,6 @@ impl MasterSession {
                 task.on_task_error(self.associations.get_mut(dest.link).ok(), err);
                 return Err(err);
             }
-        };
-
-        let task = match task.on_request_sent() {
-            Some(task) => task,
-            None => return Ok(NextStep::Complete(seq)),
         };
 
         let timeout = self.associations.get_timeout(dest.link)?;

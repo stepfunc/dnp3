@@ -58,6 +58,8 @@ pub(crate) enum AppTask {
     Read(ReadTask),
     /// NonRead tasks always require FIR/FIN == 1, but might require multiple read/response cycles, e.g. SBO
     NonRead(NonReadTask),
+    /// Tasks whose request the outstation never responds to, complete once it is sent
+    NoResponse(CommandNoAckTask),
 }
 
 pub(crate) enum Task {
@@ -117,6 +119,7 @@ impl AppTask {
         match self {
             AppTask::Read(t) => t.as_task_type(),
             AppTask::NonRead(t) => t.as_task_type(),
+            AppTask::NoResponse(_) => TaskType::Command,
         }
     }
 
@@ -124,6 +127,7 @@ impl AppTask {
         match self {
             AppTask::Read(t) => t.function(),
             AppTask::NonRead(t) => t.function(),
+            AppTask::NoResponse(t) => t.function(),
         }
     }
 
@@ -131,6 +135,7 @@ impl AppTask {
         match self {
             Self::NonRead(task) => task.on_task_error(association, err),
             Self::Read(task) => task.on_task_error(association, err),
+            Self::NoResponse(task) => task.on_task_error(err),
         }
     }
 
@@ -138,6 +143,7 @@ impl AppTask {
         match self {
             AppTask::Read(_) => TaskId::Function(FunctionCode::Read),
             AppTask::NonRead(t) => TaskId::Function(t.function()),
+            AppTask::NoResponse(t) => TaskId::Function(t.function()),
         }
     }
 }
@@ -179,8 +185,6 @@ pub(crate) enum NonReadTask {
     Auto(AutoTask),
     /// commands initiated from the user API
     Command(CommandTask),
-    /// commands initiated from the user API that the outstation never responds to
-    CommandNoAck(CommandNoAckTask),
     /// time synchronization
     TimeSync(TimeSyncTask),
     /// restart operation
@@ -228,7 +232,6 @@ impl RequestWriter for NonReadTask {
         match self {
             NonReadTask::Auto(t) => t.write(writer)?,
             NonReadTask::Command(t) => t.write(writer)?,
-            NonReadTask::CommandNoAck(t) => t.write(writer)?,
             NonReadTask::TimeSync(t) => t.write(writer)?,
             NonReadTask::Restart(_) => {}
             NonReadTask::DeadBands(t) => t.write(writer)?,
@@ -340,7 +343,6 @@ impl NonReadTask {
     pub(crate) fn function(&self) -> FunctionCode {
         match self {
             Self::Command(task) => task.function(),
-            Self::CommandNoAck(task) => task.function(),
             Self::Auto(task) => task.function(),
             Self::TimeSync(task) => task.function(),
             Self::Restart(task) => task.function(),
@@ -358,7 +360,6 @@ impl NonReadTask {
     pub(crate) fn on_task_error(self, association: Option<&mut Association>, err: TaskError) {
         match self {
             Self::Command(task) => task.on_task_error(err),
-            Self::CommandNoAck(task) => task.on_task_error(err),
             Self::TimeSync(task) => task.on_task_error(association, err),
             Self::Auto(task) => task.on_task_error(association, err),
             Self::Restart(task) => task.on_task_error(err),
@@ -380,12 +381,6 @@ impl NonReadTask {
     ) -> Result<Option<NonReadTask>, TaskError> {
         match self {
             Self::Command(task) => task.handle(response),
-            Self::CommandNoAck(task) => {
-                // the scheduler completes these tasks once the request is sent
-                tracing::error!("received a response for a DIRECT_OPERATE_NO_ACK task");
-                task.complete();
-                Ok(None)
-            }
             Self::Auto(task) => task.handle(association, response),
             Self::TimeSync(task) => task.handle(association, response),
             Self::Restart(task) => task.handle(response),
@@ -402,7 +397,7 @@ impl NonReadTask {
 
     pub(crate) fn as_task_type(&self) -> TaskType {
         match self {
-            Self::Command(_) | Self::CommandNoAck(_) => TaskType::Command,
+            Self::Command(_) => TaskType::Command,
             Self::Auto(x) => match x {
                 AutoTask::ClearRestartBit => TaskType::ClearRestartBit,
                 AutoTask::EnableUnsolicited(_) => TaskType::EnableUnsolicited,
@@ -418,31 +413,6 @@ impl NonReadTask {
             Self::OpenFile(_) => TaskType::FileOpen,
             Self::CloseFile(_) => TaskType::FileClose,
             Self::WriteFileBlock(_) => TaskType::FileWriteBlock,
-        }
-    }
-
-    /// Called after the request has been written to the transport
-    ///
-    /// Tasks whose function code elicits no response complete here and return `None`.
-    /// All other tasks are returned unchanged to await a response.
-    pub(crate) fn on_request_sent(self) -> Option<NonReadTask> {
-        match self {
-            Self::CommandNoAck(task) => {
-                task.complete();
-                None
-            }
-            other @ (Self::Auto(_)
-            | Self::Command(_)
-            | Self::TimeSync(_)
-            | Self::Restart(_)
-            | Self::DeadBands(_)
-            | Self::EmptyResponseTask(_)
-            | Self::FileRead(_)
-            | Self::AuthFile(_)
-            | Self::OpenFile(_)
-            | Self::CloseFile(_)
-            | Self::WriteFileBlock(_)
-            | Self::GetFileInfo(_)) => Some(other),
         }
     }
 }

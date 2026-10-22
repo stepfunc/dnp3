@@ -3,7 +3,7 @@ use crate::app::FunctionCode;
 use crate::master::error::TaskError;
 use crate::master::promise::Promise;
 use crate::master::request::CommandHeaders;
-use crate::master::tasks::{AppTask, NonReadTask, Task};
+use crate::master::tasks::{AppTask, RequestWriter, Task};
 
 /// Command sent with `DIRECT_OPERATE_NO_ACK`, which the outstation never responds to
 pub(crate) struct CommandNoAckTask {
@@ -13,7 +13,17 @@ pub(crate) struct CommandNoAckTask {
 
 impl From<CommandNoAckTask> for Task {
     fn from(value: CommandNoAckTask) -> Self {
-        Task::App(AppTask::NonRead(NonReadTask::CommandNoAck(value)))
+        Task::App(AppTask::NoResponse(value))
+    }
+}
+
+impl RequestWriter for CommandNoAckTask {
+    fn function(&self) -> FunctionCode {
+        self.function()
+    }
+
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
+        Ok(self.headers.write(writer)?)
     }
 }
 
@@ -24,10 +34,6 @@ impl CommandNoAckTask {
 
     pub(crate) fn function(&self) -> FunctionCode {
         FunctionCode::DirectOperateNoResponse
-    }
-
-    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
-        self.headers.write(writer)
     }
 
     pub(crate) fn on_task_error(self, err: TaskError) {
