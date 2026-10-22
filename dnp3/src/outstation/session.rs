@@ -2339,6 +2339,10 @@ impl From<ObjectParseError> for Iin2 {
             ObjectParseError::InvalidQualifierForVariation(_, _) => Iin2::PARAMETER_ERROR,
             ObjectParseError::InvalidRange(_, _) => Iin2::PARAMETER_ERROR,
             ObjectParseError::UnknownGroupVariation(_, _) => Iin2::OBJECT_UNKNOWN,
+            #[expect(
+                deprecated,
+                reason = "the mapping must cover every variant until removal"
+            )]
             ObjectParseError::UnsupportedQualifierCode(_) => Iin2::PARAMETER_ERROR,
             ObjectParseError::UnknownQualifier(_) => Iin2::PARAMETER_ERROR,
             ObjectParseError::ZeroLengthOctetData => Iin2::PARAMETER_ERROR,

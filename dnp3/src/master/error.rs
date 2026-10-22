@@ -102,6 +102,7 @@ pub enum PollError {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum CommandResponseError {
     /// Command failed before receiving a response
+    #[deprecated(since = "1.8.0", note = "never returned; will be removed in 2.0")]
     Request(TaskError),
     /// Outstation indicated that a command was not SUCCESS for the specified reason
     BadStatus(CommandStatus),
@@ -122,6 +123,7 @@ pub enum WriteError {
     /// Error occurred during task execution
     Task(TaskError),
     /// Outstation returned an IIN.2 error
+    #[deprecated(since = "1.8.0", note = "never returned; will be removed in 2.0")]
     IinError(Iin2),
 }
 
@@ -133,6 +135,7 @@ pub enum TimeSyncError {
     /// Clock rollback was detected
     ClockRollback,
     /// System time could not be converted to a UNIX timestamp
+    #[deprecated(since = "1.8.0", note = "never returned; will be removed in 2.0")]
     SystemTimeNotUnix,
     /// Outstation time not return a value time delay
     BadOutstationTimeDelay(u16),
@@ -143,6 +146,7 @@ pub enum TimeSyncError {
     /// System time was not available to perform the synchronization
     SystemTimeNotAvailable,
     /// Outstation returned an IIN.2 error
+    #[deprecated(since = "1.8.0", note = "never returned; will be removed in 2.0")]
     IinError(Iin2),
 }
 /// Parent error type for command tasks
@@ -186,6 +190,7 @@ impl std::fmt::Display for PollError {
 impl std::fmt::Display for CommandResponseError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
+            #[expect(deprecated, reason = "Display must cover every variant until removal")]
             CommandResponseError::Request(err) => write!(f, "{err}"),
             CommandResponseError::BadStatus(status) => write!(
                 f,
@@ -262,6 +267,7 @@ impl std::fmt::Display for TimeSyncError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             TimeSyncError::Task(err) => write!(f, "{err}"),
+            #[expect(deprecated, reason = "Display must cover every variant until removal")]
             TimeSyncError::SystemTimeNotUnix => {
                 f.write_str("the system time cannot be converted to unix time")
             }
@@ -272,6 +278,7 @@ impl std::fmt::Display for TimeSyncError {
             TimeSyncError::ClockRollback => f.write_str("detected a clock rollback"),
             TimeSyncError::StillNeedsTime => f.write_str("outstation did not clear NEED_TIME bit"),
             TimeSyncError::SystemTimeNotAvailable => f.write_str("system time not available"),
+            #[expect(deprecated, reason = "Display must cover every variant until removal")]
             TimeSyncError::IinError(iin2) => write!(f, "outstation indicated an error: {iin2}"),
         }
     }
@@ -281,6 +288,7 @@ impl std::fmt::Display for WriteError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             WriteError::Task(err) => write!(f, "{err}"),
+            #[expect(deprecated, reason = "Display must cover every variant until removal")]
             WriteError::IinError(iin2) => write!(f, "outstation indicated an error: {iin2}"),
         }
     }
