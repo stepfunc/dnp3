@@ -127,6 +127,7 @@ pub(crate) struct SessionConfig {
     unsolicited_retry_delay: std::time::Duration,
     keep_alive_timeout: Option<std::time::Duration>,
     max_controls_per_request: Option<u16>,
+    max_read_headers_per_request: u16,
 }
 impl From<OutstationConfig> for SessionConfig {
     fn from(config: OutstationConfig) -> Self {
@@ -141,6 +142,7 @@ impl From<OutstationConfig> for SessionConfig {
             unsolicited_retry_delay: config.unsolicited_retry_delay,
             keep_alive_timeout: config.keep_alive_timeout,
             max_controls_per_request: config.max_controls_per_request,
+            max_read_headers_per_request: config.read_header_limit(),
         }
     }
 }
@@ -308,13 +310,6 @@ enum ConfirmOutcome {
     Unconfirmed,
 }
 
-#[derive(Copy, Clone)]
-enum UnsolicitedResult {
-    Confirmed,
-    Timeout,
-    ReturnToIdle,
-}
-
 /// What the unsolicited confirm wait expects (IEEE 1815-2012 Table 6-1 rows 20-34)
 struct UnsolicitedWait {
     /// the sequence number of the unsolicited response
@@ -335,7 +330,7 @@ struct ExpectedConfirm {
 enum UnsolicitedWaitResult {
     Timeout,
     ReadNext,
-    Complete(UnsolicitedResult),
+    Complete(ConfirmOutcome),
 }
 
 /// A request, classified against the last valid request
@@ -402,7 +397,7 @@ enum ConfirmAction {
 enum NextIdleAction {
     NoSleep,
     SleepUntilEvent,
-    SleepUnit(tokio::time::Instant),
+    SleepUntil(tokio::time::Instant),
 }
 
 impl NextIdleAction {
@@ -411,9 +406,9 @@ impl NextIdleAction {
             None => self,
             Some(instant) => match self {
                 NextIdleAction::NoSleep => self,
-                NextIdleAction::SleepUntilEvent => Self::SleepUnit(instant),
-                NextIdleAction::SleepUnit(other) => {
-                    Self::SleepUnit(tokio::time::Instant::min(instant, other))
+                NextIdleAction::SleepUntilEvent => Self::SleepUntil(instant),
+                NextIdleAction::SleepUntil(other) => {
+                    Self::SleepUntil(tokio::time::Instant::min(instant, other))
                 }
             },
         }
@@ -421,16 +416,11 @@ impl NextIdleAction {
 }
 
 impl OutstationSession {
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "a session takes each part of its configuration separately"
-    )]
     pub(crate) fn new(
         initial_state: Enabled,
         messages: Receiver<OutstationMessage>,
         destination: FragmentAddr,
         config: SessionConfig,
-        max_read_headers_per_request: u16,
         application: Box<dyn OutstationApplication>,
         information: Box<dyn OutstationInformation>,
         control_handler: Box<dyn ControlHandler>,
@@ -442,8 +432,8 @@ impl OutstationSession {
         Self {
             enabled: initial_state,
             messages,
+            state: SessionState::new(config.max_read_headers_per_request),
             config,
-            state: SessionState::new(max_read_headers_per_request),
             application,
             info: information,
             control_handler,
@@ -685,13 +675,13 @@ impl OutstationSession {
                     .perform_null_unsolicited(io, reader, out, database)
                     .await?
                 {
-                    UnsolicitedResult::Timeout | UnsolicitedResult::ReturnToIdle => {
+                    ConfirmOutcome::Unconfirmed => {
                         self.end_confirm_wait(database, ConfirmOutcome::Unconfirmed)
                             .await;
                         self.state.unsolicited = UnsolicitedState::NullRequired;
                         Ok(NextIdleAction::NoSleep)
                     }
-                    UnsolicitedResult::Confirmed => {
+                    ConfirmOutcome::Confirmed => {
                         self.state.unsolicited = UnsolicitedState::Ready(None);
                         Ok(NextIdleAction::NoSleep)
                     }
@@ -700,29 +690,26 @@ impl OutstationSession {
             UnsolicitedState::Ready(deadline) => {
                 if let Some(deadline) = deadline {
                     if tokio::time::Instant::now() < deadline {
-                        return Ok(NextIdleAction::SleepUnit(deadline)); // not ready yet
+                        return Ok(NextIdleAction::SleepUntil(deadline)); // not ready yet
                     }
                 }
 
                 // perform regular unsolicited
-                match self
+                let Some(outcome) = self
                     .maybe_perform_unsolicited(io, reader, out, database)
                     .await?
-                {
-                    None => {
-                        // there was nothing to send
-                        Ok(NextIdleAction::SleepUntilEvent)
-                    }
-                    Some(UnsolicitedResult::Timeout) | Some(UnsolicitedResult::ReturnToIdle) => {
-                        self.end_confirm_wait(database, ConfirmOutcome::Unconfirmed)
-                            .await;
+                else {
+                    // there was nothing to send
+                    return Ok(NextIdleAction::SleepUntilEvent);
+                };
+                self.end_confirm_wait(database, outcome).await;
+                match outcome {
+                    ConfirmOutcome::Unconfirmed => {
                         let retry_at = self.new_unsolicited_retry_deadline();
                         self.state.unsolicited = UnsolicitedState::Ready(Some(retry_at));
-                        Ok(NextIdleAction::SleepUnit(retry_at))
+                        Ok(NextIdleAction::SleepUntil(retry_at))
                     }
-                    Some(UnsolicitedResult::Confirmed) => {
-                        self.end_confirm_wait(database, ConfirmOutcome::Confirmed)
-                            .await;
+                    ConfirmOutcome::Confirmed => {
                         self.state.unsolicited = UnsolicitedState::Ready(None);
                         Ok(NextIdleAction::NoSleep)
                     }
@@ -771,7 +758,7 @@ impl OutstationSession {
         reader: &mut TransportReader<T>,
         out: &mut Responder<T>,
         database: &mut DatabaseHandle,
-    ) -> Result<UnsolicitedResult, RunError> {
+    ) -> Result<ConfirmOutcome, RunError> {
         let header = ResponseHeader::new(
             ControlField::unsolicited_response(self.state.unsolicited_seq.increment()),
             ResponseFunction::UnsolicitedResponse,
@@ -782,7 +769,8 @@ impl OutstationSession {
             .await?
             .control
             .seq;
-        self.unsolicited_confirm_wait(database, seq, true, io, reader, out)
+        // For null responses, we want to regenerate a response everytime (see section 5.1.1.1.1 Rule 2)
+        self.unsolicited_confirm_wait(database, seq, Some(0), io, reader, out)
             .await
     }
 
@@ -792,7 +780,7 @@ impl OutstationSession {
         reader: &mut TransportReader<T>,
         out: &mut Responder<T>,
         database: &mut DatabaseHandle,
-    ) -> Result<Option<UnsolicitedResult>, RunError> {
+    ) -> Result<Option<ConfirmOutcome>, RunError> {
         if !self.state.enabled_unsolicited_classes.any() {
             return Ok(None);
         }
@@ -806,7 +794,14 @@ impl OutstationSession {
             .control
             .seq;
         let result = self
-            .unsolicited_confirm_wait(database, seq, false, io, reader, out)
+            .unsolicited_confirm_wait(
+                database,
+                seq,
+                self.config.max_unsolicited_retries,
+                io,
+                reader,
+                out,
+            )
             .await?;
         Ok(Some(result))
     }
@@ -833,25 +828,20 @@ impl OutstationSession {
     }
 
     /// Wait for the confirm of the unsolicited response just sent with `seq`, sending it again
-    /// when the wait times out
+    /// when the wait times out, up to `max_retries` times (`None` for no limit)
     async fn unsolicited_confirm_wait<T: Transport>(
         &mut self,
         database: &mut DatabaseHandle,
         seq: Sequence,
-        is_null: bool,
+        max_retries: Option<usize>,
         io: &mut PhysLayer,
         reader: &mut TransportReader<T>,
         out: &mut Responder<T>,
-    ) -> Result<UnsolicitedResult, RunError> {
+    ) -> Result<ConfirmOutcome, RunError> {
         // enter unsolicited confirm wait state
         self.info.enter_unsolicited_confirm_wait(seq);
 
-        let mut retry_count = RetryCounter::new(self.config.max_unsolicited_retries);
-
-        // For null responses, we want to regenerate a response everytime (see section 5.1.1.1.1 Rule 2)
-        if is_null {
-            retry_count = RetryCounter::new(Some(0));
-        }
+        let mut retry_count = RetryCounter::new(max_retries);
 
         let mut deadline = self.new_confirm_deadline();
 
@@ -885,7 +875,7 @@ impl OutstationSession {
                     self.info.unsolicited_confirm_timeout(seq, retry);
 
                     if !retry {
-                        return Ok(UnsolicitedResult::Timeout);
+                        return Ok(ConfirmOutcome::Unconfirmed);
                     }
 
                     // perform a retry
@@ -945,9 +935,7 @@ impl OutstationSession {
 
         if disable {
             // DISABLE_UNSOLICITED ends the unsolicited response series
-            return Ok(UnsolicitedWaitResult::Complete(
-                UnsolicitedResult::ReturnToIdle,
-            ));
+            return Ok(UnsolicitedWaitResult::Complete(ConfirmOutcome::Unconfirmed));
         }
 
         Ok(UnsolicitedWaitResult::ReadNext)
@@ -963,7 +951,7 @@ impl OutstationSession {
             if seq == wait.seq {
                 self.state.broadcast.confirmed(ResponseKind::Unsolicited);
                 self.info.unsolicited_confirmed(seq);
-                return UnsolicitedWaitResult::Complete(UnsolicitedResult::Confirmed);
+                return UnsolicitedWaitResult::Complete(ConfirmOutcome::Confirmed);
             }
             tracing::warn!(
                 "ignoring unsolicited confirm with wrong sequence number ({})",
@@ -994,7 +982,7 @@ impl OutstationSession {
     ) -> Result<TimeoutStatus, RunError> {
         let decode_level = self.config.decode_level;
         tokio::select! {
-             res = self.sleep_until(NextIdleAction::SleepUnit(deadline)) => {
+             res = self.sleep_until(NextIdleAction::SleepUntil(deadline)) => {
                  res?;
                  Ok(TimeoutStatus::Yes)
              }
@@ -1009,7 +997,7 @@ impl OutstationSession {
         async fn sleep_only(next_action: NextIdleAction) {
             match next_action {
                 NextIdleAction::NoSleep => {}
-                NextIdleAction::SleepUnit(x) => tokio::time::sleep_until(x).await,
+                NextIdleAction::SleepUntil(x) => tokio::time::sleep_until(x).await,
                 NextIdleAction::SleepUntilEvent => crate::util::future::forever().await,
             }
         }
@@ -1085,7 +1073,6 @@ impl OutstationSession {
                     ))
                     .await?;
             }
-            self.state.deferred_read.clear();
         }
 
         Ok(())

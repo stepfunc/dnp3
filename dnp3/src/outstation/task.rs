@@ -132,7 +132,6 @@ impl<T: Transport> OutstationTask<T> {
                 rx,
                 destination,
                 config.into(),
-                config.read_header_limit(),
                 application,
                 information,
                 control_handler,
