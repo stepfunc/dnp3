@@ -667,24 +667,28 @@ mod tests {
 
     #[tokio::test]
     async fn a_filter_is_checked_against_every_registered_one() {
-        let mut server =
-            Server::new_tcp_server(LinkErrorMode::Close, "127.0.0.1:0".parse().unwrap());
-        add_outstation(&mut server, exact("127.0.0.1")).unwrap();
-        add_outstation(&mut server, exact("192.0.2.1")).unwrap();
-        add_outstation(
-            &mut server,
-            AddressFilter::WildcardIpv4("10.0.0.*".parse().unwrap()),
-        )
-        .unwrap();
-        // conflicts with the first outstation only
-        assert_eq!(
+        // each conflicts with exactly one of the registered filters, in order
+        let conflicting = ["127.0.0.1", "192.0.2.1", "10.0.0.7"];
+        for addr in conflicting {
+            let mut server =
+                Server::new_tcp_server(LinkErrorMode::Close, "127.0.0.1:0".parse().unwrap());
+            add_outstation(&mut server, exact("127.0.0.1")).unwrap();
+            add_outstation(&mut server, exact("192.0.2.1")).unwrap();
             add_outstation(
                 &mut server,
-                AddressFilter::AnyOf(["127.0.0.1".parse().unwrap()].into())
+                AddressFilter::WildcardIpv4("10.0.0.*".parse().unwrap()),
             )
-            .err(),
-            Some(FilterError::Conflict)
-        );
+            .unwrap();
+            assert_eq!(
+                add_outstation(
+                    &mut server,
+                    AddressFilter::AnyOf([addr.parse().unwrap()].into())
+                )
+                .err(),
+                Some(FilterError::Conflict),
+                "{addr}"
+            );
+        }
     }
 
     #[tokio::test]

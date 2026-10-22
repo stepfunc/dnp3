@@ -441,10 +441,31 @@ mod tests {
         .await;
     }
 
+    /// A listener on 127.0.0.1, and a socket that reserves the same port on ::1 without
+    /// listening, so no other listener can answer a connection to localhost on that port
+    ///
+    /// There is no reservation if the host has no IPv6 loopback, which localhost can't then reach.
+    async fn localhost_listener() -> (tokio::net::TcpListener, Option<TcpSocket>) {
+        for _ in 0..100 {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let port = listener.local_addr().unwrap().port();
+            let Ok(reserved) = TcpSocket::new_v6() else {
+                return (listener, None);
+            };
+            match reserved.bind((std::net::Ipv6Addr::LOCALHOST, port).into()) {
+                Ok(()) => return (listener, Some(reserved)),
+                // the port is taken on ::1, so pick another
+                Err(err) if err.kind() == std::io::ErrorKind::AddrInUse => {}
+                Err(_) => return (listener, None),
+            }
+        }
+        panic!("no port was free on both loopback addresses");
+    }
+
     #[tokio::test]
     async fn localhost_reaches_a_loopback_listener() {
         watchdog(async {
-            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let (listener, _reserved) = localhost_listener().await;
             let addr = listener.local_addr().unwrap();
             let host = format!("localhost:{}", addr.port());
             let (mut task, mut rx) =
@@ -456,7 +477,7 @@ mod tests {
             );
             let host = Some(host);
             let mut events = events(&mut rx);
-            // localhost may also resolve to addresses with no listener, such as ::1, tried first
+            // localhost may also resolve to ::1, which refuses the connection, and try it first
             let last = events.split_off(events.len().saturating_sub(2));
             assert_eq!(
                 last,
