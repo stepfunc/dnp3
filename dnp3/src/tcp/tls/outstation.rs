@@ -227,9 +227,16 @@ impl TlsServerConfig {
         socket: TcpStream,
     ) -> Result<PhysLayer, String> {
         let connector = tokio_rustls::TlsAcceptor::from(self.config.clone());
-        match connector.accept(socket).await {
-            Err(err) => Err(format!("failed to establish TLS session: {err}")),
-            Ok(stream) => Ok(PhysLayer::Tls(Box::new(tokio_rustls::TlsStream::from(
+        // the server accepts one connection at a time, so a handshake that stalls would stop it
+        // accepting any others
+        let handshake = connector.accept(socket);
+        match tokio::time::timeout(super::TLS_HANDSHAKE_TIMEOUT, handshake).await {
+            Err(_) => Err(format!(
+                "TLS handshake didn't complete within {} seconds",
+                super::TLS_HANDSHAKE_TIMEOUT.as_secs()
+            )),
+            Ok(Err(err)) => Err(format!("failed to establish TLS session: {err}")),
+            Ok(Ok(stream)) => Ok(PhysLayer::Tls(Box::new(tokio_rustls::TlsStream::from(
                 stream,
             )))),
         }
