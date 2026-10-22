@@ -4,7 +4,6 @@ use crate::link::crc::{calc_crc, calc_crc_with_0564};
 use crate::link::display::LinkDisplay;
 use crate::link::error::LogicError;
 use crate::link::header::Header;
-use crate::util::slice_ext::SliceExtNoPanic;
 
 use scursor::WriteCursor;
 
@@ -94,7 +93,8 @@ fn format_frame<'a>(
         // the first block contains the transport header
         let (first, remainder) = payload
             .app_data
-            .np_split_at_no_error(constant::MAX_BLOCK_SIZE - 1);
+            .split_at_checked(constant::MAX_BLOCK_SIZE - 1)
+            .unwrap_or((payload.app_data, &[]));
 
         // write the first block
         let begin_first_block = cursor.position();
