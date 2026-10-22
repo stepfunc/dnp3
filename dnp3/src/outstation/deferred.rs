@@ -4,6 +4,7 @@ use crate::app::Sequence;
 use crate::outstation::database::read::ReadHeader;
 use crate::outstation::database::DatabaseHandle;
 use crate::transport::FragmentInfo;
+use crate::util::bounded::{BoundedQueue, Full};
 
 #[derive(Copy, Clone)]
 pub(crate) struct DeferredInfo {
@@ -30,20 +31,20 @@ impl DeferredInfo {
 
 pub(crate) struct DeferredRead {
     info: Option<DeferredInfo>,
-    vec: Vec<ReadHeader>,
+    headers: BoundedQueue<ReadHeader>,
 }
 
 impl DeferredRead {
-    pub(crate) fn new(header_capacity: u16) -> Self {
+    pub(crate) fn new(max_headers: u16) -> Self {
         Self {
             info: None,
-            vec: Vec::with_capacity(header_capacity.into()),
+            headers: BoundedQueue::new(max_headers.into()),
         }
     }
 
     pub(crate) fn clear(&mut self) {
         self.info = None;
-        self.vec.clear();
+        self.headers.clear();
     }
 
     pub(crate) fn is_set(&self) -> bool {
@@ -57,18 +58,16 @@ impl DeferredRead {
         info: FragmentInfo,
         headers: HeaderCollection,
     ) {
-        self.vec.clear();
+        self.headers.clear();
 
         let mut iin2 = Iin2::default();
 
         for h in headers.iter() {
             if let Some(r) = ReadHeader::get(&h) {
-                if self.vec.len() < self.vec.capacity() {
-                    self.vec.push(r)
-                } else {
+                if let Err(Full) = self.headers.try_push(r) {
                     tracing::warn!(
                         "insufficient capacity ({}) for READ header: {} - {}",
-                        self.vec.capacity(),
+                        self.headers.max(),
                         h.variation,
                         h.details.qualifier()
                     );
@@ -89,7 +88,7 @@ impl DeferredRead {
                 let iin2 = database.transaction(|db| {
                     db.inner.reset();
                     let mut iin2 = Iin2::default();
-                    for header in self.vec.iter() {
+                    for header in self.headers.iter() {
                         iin2 |= db.inner.select_by_header(*header);
                     }
                     iin2

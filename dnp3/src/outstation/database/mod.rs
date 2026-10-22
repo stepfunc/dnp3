@@ -426,7 +426,7 @@ impl std::fmt::Debug for Database {
 impl Database {
     /// Create a database by specified how it will buffer events
     pub(crate) fn new(
-        max_read_selection: Option<u16>,
+        max_read_selection: u16,
         class_zero_config: ClassZeroConfig,
         config: EventBufferConfig,
     ) -> Self {
@@ -509,7 +509,7 @@ impl DatabaseHandle {
     }
 
     pub(crate) fn new(
-        max_read_selection: Option<u16>,
+        max_read_selection: u16,
         class_zero_config: ClassZeroConfig,
         event_config: EventBufferConfig,
     ) -> Self {
@@ -864,6 +864,7 @@ impl Get<OctetString> for Database {
 mod test {
     use super::*;
     use crate::app::Timestamp;
+    use crate::outstation::config::OutstationConfig;
 
     const fn binary(val: bool) -> BinaryInput {
         BinaryInput::new(val, Flags::ONLINE, Time::Synchronized(Timestamp::zero()))
@@ -872,7 +873,7 @@ mod test {
     #[test]
     fn returns_no_point_if_point_not_added() {
         let mut db = Database::new(
-            None,
+            OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS,
             ClassZeroConfig::default(),
             EventBufferConfig::all_types(10),
         );
@@ -885,7 +886,7 @@ mod test {
     #[test]
     fn returns_no_event_if_buffer_space_zero() {
         let mut db = Database::new(
-            None,
+            OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS,
             ClassZeroConfig::default(),
             EventBufferConfig::all_types(0),
         );
@@ -899,7 +900,7 @@ mod test {
     #[test]
     fn returns_created_if_event_detected() {
         let mut db = Database::new(
-            None,
+            OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS,
             ClassZeroConfig::default(),
             EventBufferConfig::all_types(3),
         );
@@ -921,7 +922,7 @@ mod test {
     #[test]
     fn returns_overflow_when_event_discarded() {
         let mut db = Database::new(
-            None,
+            OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS,
             ClassZeroConfig::default(),
             EventBufferConfig::all_types(1),
         );
@@ -949,7 +950,7 @@ mod test {
     #[test]
     fn returns_overflow_no_event_if_no_change() {
         let mut db = Database::new(
-            None,
+            OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS,
             ClassZeroConfig::default(),
             EventBufferConfig::all_types(1),
         );
@@ -969,7 +970,7 @@ mod test {
 
     fn empty_db() -> Database {
         Database::new(
-            None,
+            OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS,
             ClassZeroConfig::default(),
             EventBufferConfig::all_types(1),
         )
@@ -1033,7 +1034,7 @@ mod test {
     #[test]
     fn infinite_analog_input_deadband_only_reports_flag_changes() {
         let mut db = Database::new(
-            None,
+            OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS,
             ClassZeroConfig::default(),
             EventBufferConfig::all_types(10),
         );
@@ -1068,7 +1069,7 @@ mod test {
     #[test]
     fn infinite_analog_output_status_deadband_only_reports_flag_changes() {
         let mut db = Database::new(
-            None,
+            OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS,
             ClassZeroConfig::default(),
             EventBufferConfig::all_types(10),
         );
