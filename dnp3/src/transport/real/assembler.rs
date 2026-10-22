@@ -458,6 +458,7 @@ mod tests {
         assert!(!h.middle(1, &[2, 3]));
         assert!(!h.middle(1, &[2, 3]));
         assert!(!h.middle(1, &[2, 3]));
+        assert_eq!(h.discards(), [Discard::Repeat { seq: 1 }; 2]);
         assert!(h.last(2, &[4]));
         assert_eq!(h.pop(), Some(vec![1, 2, 3, 4]));
     }
@@ -798,14 +799,6 @@ mod tests {
     }
 
     #[test]
-    fn reset_discards_a_completed_fragment() {
-        let mut h = Harness::new();
-        assert!(h.single(0, &[1]));
-        h.assembler.reset();
-        assert_eq!(h.pop(), None);
-    }
-
-    #[test]
     fn new_series_reports_the_bytes_it_drops() {
         let mut h = Harness::new();
         assert!(!h.first(0, &[1, 2]));
@@ -884,6 +877,7 @@ mod tests {
         assert!(h.single(0, &[1; MAX]));
         h.assembler.reset();
         assert_eq!(h.peek(), None);
+        assert_eq!(h.pop(), None);
         h.assert_recovers(1);
     }
 
@@ -941,17 +935,6 @@ mod tests {
         );
         h.assert_recovers(41);
         assert!(h.discards().is_empty());
-    }
-
-    #[test]
-    fn repeat_compares_against_the_end_of_the_series() {
-        let mut h = Harness::new();
-        assert!(!h.first(0, &[1, 2]));
-        assert!(!h.middle(1, &[3, 4]));
-        assert!(!h.middle(1, &[3, 4]));
-        assert_eq!(h.discards(), [Discard::Repeat { seq: 1 }]);
-        assert!(h.last(2, &[5]));
-        assert_eq!(h.pop(), Some(vec![1, 2, 3, 4, 5]));
     }
 
     #[test]
