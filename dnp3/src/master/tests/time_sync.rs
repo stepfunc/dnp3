@@ -13,7 +13,10 @@ use crate::app::{
 };
 use crate::master::association::AssociationConfig;
 use crate::master::tests::harness::AssocInfoEvent;
-use crate::master::{AssociationHandler, TaskError, TaskType, TimeSyncError, TimeSyncProcedure};
+use crate::master::{
+    AssociationHandler, Classes, EventClasses, PollHandle, ReadRequest, TaskError, TaskType,
+    TimeSyncError, TimeSyncProcedure,
+};
 
 use super::harness::requests::*;
 use super::harness::{create_association_with_handler, TestHarness};
@@ -645,7 +648,7 @@ async fn startup_harness() -> TestHarness {
 }
 
 #[tokio::test(start_paused = true)]
-async fn auto_time_sync_runs_after_the_integrity_scan_at_startup() {
+async fn auto_time_sync_runs_before_the_integrity_scan_at_startup() {
     watchdog(async {
         let mut harness = startup_harness().await;
         let mut seq = Sequence::default();
@@ -657,10 +660,10 @@ async fn auto_time_sync_runs_after_the_integrity_scan_at_startup() {
                 empty_response_custom_iin(seq.increment(), NEED_TIME),
             )
             .await;
+        complete_lan_procedure(&mut harness, &mut seq).await;
         harness
             .expect_write_and_respond(integrity_poll_request(seq), empty_response(seq.increment()))
             .await;
-        complete_lan_procedure(&mut harness, &mut seq).await;
         harness
             .expect_write_and_respond(enable_unsol_request(seq), empty_response(seq.increment()))
             .await;
@@ -671,7 +674,7 @@ async fn auto_time_sync_runs_after_the_integrity_scan_at_startup() {
 }
 
 #[tokio::test(start_paused = true)]
-async fn auto_time_sync_runs_after_the_integrity_scan_after_a_restart() {
+async fn auto_time_sync_runs_before_the_integrity_scan_after_a_restart() {
     watchdog(async {
         let mut harness = startup_harness().await;
         let mut seq = Sequence::default();
@@ -687,15 +690,145 @@ async fn auto_time_sync_runs_after_the_integrity_scan_after_a_restart() {
         harness
             .expect_write_and_respond(clear_restart_iin(seq), empty_response(seq.increment()))
             .await;
+        complete_lan_procedure(&mut harness, &mut seq).await;
         harness
             .expect_write_and_respond(integrity_poll_request(seq), empty_response(seq.increment()))
             .await;
-        complete_lan_procedure(&mut harness, &mut seq).await;
         harness
             .expect_write_and_respond(enable_unsol_request(seq), empty_response(seq.increment()))
             .await;
 
         assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+    })
+    .await;
+}
+
+const CLASS_1_EVENTS: Iin = Iin::new(Iin1::new(0x02), Iin2::new(0x00));
+
+/// The default startup procedure with the automatic LAN time sync and event scans, and the
+/// handler that provides the system time
+async fn busy_harness(handler: Box<dyn AssociationHandler>) -> TestHarness {
+    let config = AssociationConfig {
+        auto_time_sync: Some(TimeSyncProcedure::Lan),
+        event_scan_on_events_available: EventClasses::all(),
+        ..AssociationConfig::default()
+    };
+    create_association_with_handler(config, handler).await
+}
+
+fn class_1() -> Classes {
+    Classes::new(false, EventClasses::new(true, false, false))
+}
+
+fn class_3() -> Classes {
+    Classes::new(false, EventClasses::new(false, false, true))
+}
+
+/// Add a poll of class 3 events
+async fn add_class_3_poll(harness: &mut TestHarness, period: Duration) -> PollHandle {
+    harness
+        .association
+        .add_poll(ReadRequest::ClassScan(class_3()), period)
+        .await
+        .unwrap()
+}
+
+/// Answer the startup integrity scan, ENABLE_UNSOLICITED, and the event scan that the response to
+/// ENABLE_UNSOLICITED asks for, expecting each request as soon as the previous one is answered
+async fn finish_startup(harness: &mut TestHarness, seq: &mut Sequence) {
+    harness.expect_write(integrity_poll_request(*seq)).await;
+    let answered = Instant::now();
+    harness
+        .process_response(empty_response(seq.increment()))
+        .await;
+    harness
+        .expect_write_and_respond(
+            enable_unsol_request(*seq),
+            empty_response_custom_iin(seq.increment(), CLASS_1_EVENTS),
+        )
+        .await;
+    harness
+        .expect_write_and_respond(
+            class_scan_request(class_1(), *seq),
+            empty_response(seq.increment()),
+        )
+        .await;
+    TestHarness::assert_elapsed(answered, Duration::ZERO);
+}
+
+#[tokio::test(start_paused = true)]
+async fn auto_time_sync_without_system_time_does_not_hold_up_the_association() {
+    watchdog(async {
+        let count = Arc::new(AtomicUsize::new(0));
+        let mut harness = busy_harness(Box::new(NoTime(count.clone()))).await;
+        let mut seq = Sequence::default();
+        let start = Instant::now();
+        let _poll = add_class_3_poll(&mut harness, Duration::from_secs(5)).await;
+
+        // the outstation needs the time, but the master doesn't have it
+        harness
+            .expect_write_and_respond(
+                disable_unsol_request(seq),
+                empty_response_custom_iin(seq.increment(), NEED_TIME),
+            )
+            .await;
+
+        // the time sync fails without a request, and the rest of the startup goes ahead of its
+        // retry
+        finish_startup(&mut harness, &mut seq).await;
+        TestHarness::assert_elapsed(start, Duration::ZERO);
+        assert_eq!(count.load(Ordering::SeqCst), 1);
+
+        // the poll runs on its schedule, while the time sync retries on its own after 1 and 2 s
+        harness
+            .expect_write_and_respond(
+                class_scan_request(class_3(), seq),
+                empty_response(seq.increment()),
+            )
+            .await;
+        TestHarness::assert_elapsed(start, Duration::from_secs(5));
+        assert_eq!(count.load(Ordering::SeqCst), 3);
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn auto_time_sync_that_times_out_does_not_hold_up_the_association() {
+    watchdog(async {
+        let mut harness = busy_harness(Box::new(FixedTime)).await;
+        let mut seq = Sequence::default();
+        let start = Instant::now();
+        let _poll = add_class_3_poll(&mut harness, Duration::from_secs(4)).await;
+
+        // the outstation needs the time, but never answers the time sync
+        harness
+            .expect_write_and_respond(
+                disable_unsol_request(seq),
+                empty_response_custom_iin(seq.increment(), NEED_TIME),
+            )
+            .await;
+        harness.expect_write(record_current_time(seq)).await;
+        seq.increment();
+
+        // the rest of the startup goes as soon as the time sync times out, ahead of its retry
+        finish_startup(&mut harness, &mut seq).await;
+        TestHarness::assert_elapsed(start, Duration::from_secs(1));
+
+        // the time sync retries after its 1 s backoff, and times out again
+        harness.expect_write(record_current_time(seq)).await;
+        seq.increment();
+        TestHarness::assert_elapsed(start, Duration::from_secs(2));
+
+        // the poll runs on its schedule while the time sync waits 2 s for its next retry
+        harness
+            .expect_write_and_respond(
+                class_scan_request(class_3(), seq),
+                empty_response(seq.increment()),
+            )
+            .await;
+        TestHarness::assert_elapsed(start, Duration::from_secs(4));
+        complete_lan_procedure(&mut harness, &mut seq).await;
+        TestHarness::assert_elapsed(start, Duration::from_secs(5));
     })
     .await;
 }

@@ -161,6 +161,11 @@ impl AutoTaskState {
         !self.is_idle()
     }
 
+    /// True if the task failed and is waiting to retry
+    fn has_failed(&self) -> bool {
+        matches!(self, Self::Failed(..))
+    }
+
     /// Create a `Next<QueuedTask>`, given the time it is `now`
     fn create_next_task(
         &self,
@@ -295,6 +300,15 @@ impl TaskStates {
             });
         }
 
+        // the time sync goes before the integrity scan (IEEE 1815-2012 5.1.1.1.2 and 5.1.1.2),
+        // unless it failed: then it retries after the scan once its backoff ends, and doesn't
+        // hold up anything while it waits
+        if !self.time_sync.has_failed() {
+            if let Some(task) = self.time_sync_if_due(now, config) {
+                return Next::Now(task);
+            }
+        }
+
         if config.startup_integrity_classes.any() && self.integrity_scan.is_pending() {
             return self.integrity_scan.create_next_task(now, || {
                 Task::App(AppTask::Read(ReadTask::StartupIntegrity(
@@ -304,12 +318,8 @@ impl TaskStates {
             });
         }
 
-        if self.time_sync.is_pending() {
-            if let Some(procedure) = config.auto_time_sync {
-                return self
-                    .time_sync
-                    .create_next_task(now, || PendingTimeSync::auto(procedure).into());
-            }
+        if let Some(task) = self.time_sync_if_due(now, config) {
+            return Next::Now(task);
         }
 
         if config.enable_unsol_classes.any() && self.enabled_unsolicited.is_pending() {
@@ -328,6 +338,27 @@ impl TaskStates {
         }
 
         Next::None
+    }
+
+    /// The automatic time sync, if it's enabled and due now
+    fn time_sync_if_due(&self, now: Instant, config: &AssociationConfig) -> Option<QueuedTask> {
+        let procedure = config.auto_time_sync?;
+        match self
+            .time_sync
+            .create_next_task(now, || PendingTimeSync::auto(procedure).into())
+        {
+            Next::Now(task) => Some(task),
+            Next::NotBefore(_) | Next::None => None,
+        }
+    }
+
+    /// When the automatic time sync retries, if it failed and is waiting for its backoff to end
+    fn time_sync_retry(&self, now: Instant, config: &AssociationConfig) -> Option<Instant> {
+        config.auto_time_sync?;
+        match self.time_sync {
+            AutoTaskState::Failed(_, next) if now < next => Some(next),
+            AutoTaskState::Idle | AutoTaskState::Pending | AutoTaskState::Failed(..) => None,
+        }
     }
 }
 
@@ -745,6 +776,15 @@ impl Association {
     }
 
     fn get_next_task(&self, now: Instant) -> Next<QueuedTask> {
+        let next = self.get_next_scheduled_task(now);
+        // a failed time sync waiting for its retry doesn't hold up the rest of the association
+        match self.auto_tasks.time_sync_retry(now, &self.config) {
+            Some(retry) => next.or_not_before(retry),
+            None => next,
+        }
+    }
+
+    fn get_next_scheduled_task(&self, now: Instant) -> Next<QueuedTask> {
         // Check for automatic tasks
         let next_auto_task = self.auto_tasks.next(now, &self.config, self);
 
@@ -780,6 +820,17 @@ pub(crate) enum Next<T> {
     None,
     Now(T),
     NotBefore(Instant),
+}
+
+impl<T> Next<T> {
+    /// Also wait for `deadline`, if nothing is ready now
+    fn or_not_before(self, deadline: Instant) -> Self {
+        match self {
+            Self::Now(x) => Self::Now(x),
+            Self::NotBefore(next) => Self::NotBefore(Instant::min(next, deadline)),
+            Self::None => Self::NotBefore(deadline),
+        }
+    }
 }
 
 pub(crate) struct AssociationMap {
