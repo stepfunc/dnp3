@@ -465,3 +465,173 @@ async fn read_link_identity(
         header_bytes,
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::link::EndpointAddress;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::sync::mpsc;
+
+    /// request link status from outstation 1024 to master 1
+    const LINK_STATUS_REQUEST: [u8; 10] =
+        [0x05, 0x64, 0x05, 0x49, 0x01, 0x00, 0x00, 0x04, 0xD2, 0x36];
+    /// link status from master 1 to outstation 1024
+    const LINK_STATUS_RESPONSE: [u8; 10] =
+        [0x05, 0x64, 0x05, 0x8B, 0x00, 0x04, 0x01, 0x00, 0x2E, 0xF7];
+
+    #[derive(Debug, PartialEq)]
+    enum Event {
+        Accept,
+        AcceptLinkId(u16, u16),
+        Start,
+        StartWithLinkId(u16, u16),
+    }
+
+    struct Handler {
+        identify: bool,
+        events: mpsc::UnboundedSender<Event>,
+        channels: mpsc::UnboundedSender<MasterChannel>,
+    }
+
+    fn accept_config() -> AcceptConfig {
+        AcceptConfig {
+            error_mode: LinkErrorMode::Close,
+            config: MasterChannelConfig::new(EndpointAddress::try_new(1).unwrap()),
+        }
+    }
+
+    impl ConnectionHandler for Handler {
+        async fn accept(&mut self, _: SocketAddr) -> Result<AcceptAction, Reject> {
+            self.events.send(Event::Accept).unwrap();
+            if self.identify {
+                Ok(AcceptAction::GetLinkIdentity)
+            } else {
+                Ok(AcceptAction::Accept(accept_config()))
+            }
+        }
+
+        async fn start(&mut self, channel: MasterChannel, _: SocketAddr) {
+            self.events.send(Event::Start).unwrap();
+            self.channels.send(channel).unwrap();
+        }
+
+        async fn accept_link_id(
+            &mut self,
+            _: SocketAddr,
+            source: u16,
+            destination: u16,
+        ) -> Result<AcceptConfig, Reject> {
+            self.events
+                .send(Event::AcceptLinkId(source, destination))
+                .unwrap();
+            Ok(accept_config())
+        }
+
+        async fn start_with_link_id(
+            &mut self,
+            channel: MasterChannel,
+            _: SocketAddr,
+            source: u16,
+            destination: u16,
+        ) {
+            self.events
+                .send(Event::StartWithLinkId(source, destination))
+                .unwrap();
+            self.channels.send(channel).unwrap();
+        }
+    }
+
+    struct Fixture {
+        _server: ServerHandle,
+        stream: TcpStream,
+        events: mpsc::UnboundedReceiver<Event>,
+        channels: mpsc::UnboundedReceiver<MasterChannel>,
+        channel: Option<MasterChannel>,
+    }
+
+    impl Fixture {
+        async fn new(identify: bool) -> Self {
+            let (events_tx, events) = mpsc::unbounded_channel();
+            let (channels_tx, channels) = mpsc::unbounded_channel();
+            let handler = Handler {
+                identify,
+                events: events_tx,
+                channels: channels_tx,
+            };
+            let server = spawn_master_tcp_server(
+                "127.0.0.1:0".parse().unwrap(),
+                LinkIdConfig::new(),
+                handler,
+            )
+            .await
+            .unwrap();
+            let stream = TcpStream::connect(server.local_addr().unwrap())
+                .await
+                .unwrap();
+            Self {
+                _server: server,
+                stream,
+                events,
+                channels,
+                channel: None,
+            }
+        }
+
+        async fn expect_event(&mut self, expected: Event) {
+            let event = tokio::time::timeout(Duration::from_secs(5), self.events.recv())
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(event, expected);
+        }
+
+        async fn enable_channel(&mut self) {
+            let mut channel = tokio::time::timeout(Duration::from_secs(5), self.channels.recv())
+                .await
+                .unwrap()
+                .unwrap();
+            channel.enable().await.unwrap();
+            self.channel = Some(channel);
+        }
+
+        async fn expect_bytes(&mut self, expected: &[u8]) {
+            let mut buffer = vec![0; expected.len()];
+            tokio::time::timeout(Duration::from_secs(5), self.stream.read_exact(&mut buffer))
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(buffer, expected);
+        }
+    }
+
+    #[tokio::test]
+    async fn accepted_session_starts_without_link_identity() {
+        let mut fixture = Fixture::new(false).await;
+        fixture.expect_event(Event::Accept).await;
+        fixture.expect_event(Event::Start).await;
+        fixture.enable_channel().await;
+        fixture
+            .stream
+            .write_all(&LINK_STATUS_REQUEST)
+            .await
+            .unwrap();
+        fixture.expect_bytes(&LINK_STATUS_RESPONSE).await;
+    }
+
+    #[tokio::test]
+    async fn identified_session_is_seeded_with_the_identifying_header() {
+        let mut fixture = Fixture::new(true).await;
+        fixture.expect_event(Event::Accept).await;
+        fixture
+            .stream
+            .write_all(&LINK_STATUS_REQUEST)
+            .await
+            .unwrap();
+        fixture.expect_event(Event::AcceptLinkId(1024, 1)).await;
+        fixture.expect_event(Event::StartWithLinkId(1024, 1)).await;
+        fixture.enable_channel().await;
+        // the session answers the header that was read to identify it
+        fixture.expect_bytes(&LINK_STATUS_RESPONSE).await;
+    }
+}

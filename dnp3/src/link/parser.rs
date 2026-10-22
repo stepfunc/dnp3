@@ -269,6 +269,12 @@ mod test {
     }
 
     #[test]
+    fn parses_frame_with_multiple_blocks() {
+        let mut parser = Parser::new(LinkErrorMode::Close);
+        test_frame_parsing(&mut parser, &MULTI_BLOCK_USER_DATA);
+    }
+
+    #[test]
     fn catches_bad_start1() {
         let mut parser = Parser::new(LinkErrorMode::Close);
         let mut cursor = ReadCursor::new(&[0x06]);
