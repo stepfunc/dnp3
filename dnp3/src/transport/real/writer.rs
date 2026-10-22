@@ -1,8 +1,7 @@
-use crate::app::EndpointType;
 use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
 use crate::link::format::{format_data_frame, format_header_only, Payload};
-use crate::link::EndpointAddress;
+use crate::link::{EndpointAddress, LinkRole};
 use crate::transport::real::display::SegmentDisplay;
 use crate::transport::real::header::Header;
 use crate::transport::real::sequence::Sequence;
@@ -12,16 +11,16 @@ use crate::transport::{FragmentAddr, TransportWrite};
 use scursor::WriteCursor;
 
 pub(crate) struct Writer {
-    endpoint_type: EndpointType,
+    role: LinkRole,
     local_address: EndpointAddress,
     seq: Sequence,
     buffer: [u8; crate::link::constant::MAX_LINK_FRAME_LENGTH],
 }
 
 impl Writer {
-    pub(crate) fn new(endpoint_type: EndpointType, local_address: EndpointAddress) -> Self {
+    pub(crate) fn new(role: LinkRole, local_address: EndpointAddress) -> Self {
         Self {
-            endpoint_type,
+            role,
             local_address,
             seq: Sequence::default(),
             buffer: [0; crate::link::constant::MAX_LINK_FRAME_LENGTH],
@@ -55,7 +54,7 @@ impl TransportWrite for Writer {
                 );
             }
             let link_header = crate::link::header::Header::unconfirmed_user_data(
-                self.endpoint_type.dir_bit(),
+                self.role.dir_bit(),
                 destination.link.wrap(),
                 self.local_address.wrap(),
             );
@@ -82,7 +81,7 @@ impl TransportWrite for Writer {
     ) -> Result<(), LinkError> {
         let mut cursor = WriteCursor::new(&mut self.buffer);
         let header = crate::link::header::Header::request_link_status(
-            self.endpoint_type.dir_bit(),
+            self.role.dir_bit(),
             destination.link,
             self.local_address,
         );

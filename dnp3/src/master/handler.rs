@@ -375,7 +375,7 @@ impl AssociationHandle {
         procedure: TimeSyncProcedure,
     ) -> Result<(), TimeSyncError> {
         let (promise, rx) = Promise::one_shot();
-        self.queue_task(PendingTimeSync::new(procedure, Some(promise)).into())
+        self.queue_task(PendingTimeSync::user(procedure, promise).into())
             .await?;
         rx.await?
     }

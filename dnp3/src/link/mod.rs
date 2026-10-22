@@ -1,4 +1,5 @@
 use crate::link::header::AnyAddress;
+use crate::outstation::Feature;
 
 mod crc;
 pub(crate) mod display;
@@ -11,6 +12,23 @@ pub(crate) mod parser;
 pub(crate) mod reader;
 
 pub use error::{FrameError, LinkError, LogicError};
+
+/// The role of a link-layer endpoint, which sets the direction bit it sends and the frames it accepts
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub(crate) enum LinkRole {
+    Master,
+    /// an outstation, which also accepts frames sent to the self address when `self_address` is enabled
+    Outstation {
+        self_address: Feature,
+    },
+}
+
+impl LinkRole {
+    /// the DIR bit of frames sent by this endpoint
+    pub(crate) fn dir_bit(self) -> bool {
+        matches!(self, Self::Master)
+    }
+}
 
 pub(crate) mod constant {
     pub(crate) const START1: u8 = 0x05;

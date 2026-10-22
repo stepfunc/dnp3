@@ -1,6 +1,5 @@
 use crate::link::reader::LinkModes;
-use crate::link::EndpointAddress;
-use crate::outstation::Feature;
+use crate::link::{EndpointAddress, LinkRole};
 use crate::transport::Transport;
 
 pub(crate) mod reader;
@@ -13,18 +12,10 @@ impl Transport for MockTransport {
     type Reader = reader::MockReader;
     type Writer = writer::MockWriter;
 
-    fn master(
+    fn new(
         _: LinkModes,
+        _: LinkRole,
         _: EndpointAddress,
-        rx_buffer_size: usize,
-    ) -> (Self::Reader, Self::Writer) {
-        (reader::MockReader::new(rx_buffer_size), writer::MockWriter)
-    }
-
-    fn outstation(
-        _: LinkModes,
-        _: EndpointAddress,
-        _: Feature,
         rx_buffer_size: usize,
     ) -> (Self::Reader, Self::Writer) {
         (reader::MockReader::new(rx_buffer_size), writer::MockWriter)

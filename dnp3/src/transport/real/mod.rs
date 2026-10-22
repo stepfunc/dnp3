@@ -1,6 +1,5 @@
 use crate::link::reader::LinkModes;
-use crate::link::EndpointAddress;
-use crate::outstation::Feature;
+use crate::link::{EndpointAddress, LinkRole};
 use crate::transport::Transport;
 
 pub(crate) mod assembler;
@@ -22,26 +21,15 @@ impl Transport for RealTransport {
     type Reader = reader::Reader;
     type Writer = writer::Writer;
 
-    fn master(
+    fn new(
         link_modes: LinkModes,
+        role: LinkRole,
         address: EndpointAddress,
         rx_buffer_size: usize,
     ) -> (Self::Reader, Self::Writer) {
         (
-            reader::Reader::master(link_modes, address, rx_buffer_size),
-            writer::Writer::new(crate::app::EndpointType::Master, address),
-        )
-    }
-
-    fn outstation(
-        link_modes: LinkModes,
-        address: EndpointAddress,
-        self_address: Feature,
-        rx_buffer_size: usize,
-    ) -> (Self::Reader, Self::Writer) {
-        (
-            reader::Reader::outstation(link_modes, address, self_address, rx_buffer_size),
-            writer::Writer::new(crate::app::EndpointType::Outstation, address),
+            reader::Reader::new(link_modes, role, address, rx_buffer_size),
+            writer::Writer::new(role, address),
         )
     }
 }
@@ -57,6 +45,7 @@ mod tests {
     use crate::link::constant::MAX_LINK_FRAME_LENGTH;
     use crate::link::format::{format_data_frame, format_header_only, Payload};
     use crate::link::header::{AnyAddress, ControlField};
+    use crate::outstation::Feature;
     use crate::transport::{
         FragmentAddr, LinkLayerMessageType, TransportData, TransportRead, TransportWrite,
     };
@@ -71,11 +60,16 @@ mod tests {
     const LINK_STATUS: u8 = 0x0B;
 
     fn master() -> (reader::Reader, writer::Writer) {
-        RealTransport::master(LinkModes::test(), MASTER, 2048)
+        RealTransport::new(LinkModes::test(), LinkRole::Master, MASTER, 2048)
     }
 
     fn outstation(self_address: Feature) -> (reader::Reader, writer::Writer) {
-        RealTransport::outstation(LinkModes::test(), OUTSTATION, self_address, 2048)
+        RealTransport::new(
+            LinkModes::test(),
+            LinkRole::Outstation { self_address },
+            OUTSTATION,
+            2048,
+        )
     }
 
     fn link_header(

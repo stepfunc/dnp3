@@ -1,11 +1,9 @@
-use crate::app::EndpointType;
 use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
 use crate::link::header::FrameType;
 use crate::link::parser::FramePayload;
 use crate::link::reader::LinkModes;
-use crate::link::EndpointAddress;
-use crate::outstation::Feature;
+use crate::link::{EndpointAddress, LinkRole};
 use crate::transport::real::assembler::{Assembler, AssemblyState, Discard};
 use crate::transport::real::display::SegmentDisplay;
 use crate::transport::real::header::Header;
@@ -19,38 +17,14 @@ pub(crate) struct Reader {
 }
 
 impl Reader {
-    pub(crate) fn master(
+    pub(crate) fn new(
         link_modes: LinkModes,
+        role: LinkRole,
         source: EndpointAddress,
         max_rx_buffer: usize,
     ) -> Self {
         Self {
-            link: crate::link::layer::Layer::new(
-                link_modes,
-                max_rx_buffer,
-                EndpointType::Master,
-                Feature::Disabled,
-                source,
-            ),
-            assembler: Assembler::new(max_rx_buffer),
-            pending_link_layer_message: None,
-        }
-    }
-
-    pub(crate) fn outstation(
-        link_modes: LinkModes,
-        source: EndpointAddress,
-        self_address: Feature,
-        max_rx_buffer: usize,
-    ) -> Self {
-        Self {
-            link: crate::link::layer::Layer::new(
-                link_modes,
-                max_rx_buffer,
-                EndpointType::Outstation,
-                self_address,
-                source,
-            ),
+            link: crate::link::layer::Layer::new(link_modes, max_rx_buffer, role, source),
             assembler: Assembler::new(max_rx_buffer),
             pending_link_layer_message: None,
         }
@@ -188,7 +162,14 @@ mod tests {
         fn new() -> Self {
             let (io, handle) = sfio_tokio_mock_io::mock();
             Self {
-                reader: Reader::outstation(LinkModes::test(), OUTSTATION, Feature::Disabled, 2048),
+                reader: Reader::new(
+                    LinkModes::test(),
+                    LinkRole::Outstation {
+                        self_address: crate::outstation::Feature::Disabled,
+                    },
+                    OUTSTATION,
+                    2048,
+                ),
                 io: PhysLayer::Mock(io),
                 handle,
             }

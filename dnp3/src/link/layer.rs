@@ -1,4 +1,3 @@
-use crate::app::EndpointType;
 use crate::decode::DecodeLevel;
 use crate::link::display::LinkDisplay;
 use crate::link::error::LinkError;
@@ -9,7 +8,7 @@ use crate::link::header::{
 };
 use crate::link::parser::FramePayload;
 use crate::link::reader::LinkModes;
-use crate::link::EndpointAddress;
+use crate::link::{EndpointAddress, LinkRole};
 use crate::outstation::Feature;
 use crate::util::phys::{PhysAddr, PhysLayer};
 
@@ -19,8 +18,7 @@ enum SecondaryState {
 }
 
 pub(crate) struct Layer {
-    endpoint_type: EndpointType,
-    self_address: Feature,
+    role: LinkRole,
     local_address: EndpointAddress,
     secondary_state: SecondaryState,
     reader: super::reader::Reader,
@@ -104,13 +102,11 @@ impl Layer {
     pub(crate) fn new(
         link_modes: LinkModes,
         max_rx_fragment_size: usize,
-        endpoint_type: EndpointType,
-        self_address: Feature,
+        role: LinkRole,
         local_address: EndpointAddress,
     ) -> Self {
         Self {
-            endpoint_type,
-            self_address,
+            role,
             local_address,
             secondary_state: SecondaryState::NotReset,
             reader: super::reader::Reader::new(link_modes, max_rx_fragment_size),
@@ -142,7 +138,7 @@ impl Layer {
 
     pub(crate) fn get_header(&self, reply: Reply) -> Header {
         Header::new(
-            ControlField::new(self.endpoint_type.dir_bit(), reply.function),
+            ControlField::new(self.role.dir_bit(), reply.function),
             reply.address.wrap(),
             self.local_address.wrap(),
         )
@@ -180,7 +176,7 @@ impl Layer {
         mut ignore: F,
     ) -> (Option<FrameInfo>, Option<Reply>) {
         // ignore frames sent from the same endpoint type
-        if header.control.master == self.endpoint_type.dir_bit() {
+        if header.control.master == self.role.dir_bit() {
             //  we don't log this
             return (None, None);
         }
@@ -204,25 +200,31 @@ impl Layer {
                     return (None, None);
                 }
             }
-            AnyAddress::SelfAddress => {
-                if self.self_address.is_enabled() {
+            AnyAddress::SelfAddress => match self.role {
+                LinkRole::Outstation {
+                    self_address: Feature::Enabled,
+                } => {
                     // just pretend like it was sent to us
                     None
-                } else {
+                }
+                LinkRole::Master
+                | LinkRole::Outstation {
+                    self_address: Feature::Disabled,
+                } => {
                     ignore(Ignored::SelfAddress);
                     return (None, None);
                 }
-            }
+            },
             AnyAddress::Reserved(x) => {
                 ignore(Ignored::ReservedDestination(x));
                 return (None, None);
             }
-            AnyAddress::Broadcast(mode) => match self.endpoint_type {
-                EndpointType::Master => {
+            AnyAddress::Broadcast(mode) => match self.role {
+                LinkRole::Master => {
                     ignore(Ignored::BroadcastToMaster);
                     return (None, None);
                 }
-                EndpointType::Outstation => Some(mode),
+                LinkRole::Outstation { .. } => Some(mode),
             },
         };
 
@@ -349,21 +351,14 @@ mod test {
     ];
 
     fn master() -> Layer {
-        Layer::new(
-            LinkModes::test(),
-            2048,
-            EndpointType::Master,
-            Feature::Disabled,
-            MASTER,
-        )
+        Layer::new(LinkModes::test(), 2048, LinkRole::Master, MASTER)
     }
 
     fn outstation(self_address: Feature) -> Layer {
         Layer::new(
             LinkModes::test(),
             2048,
-            EndpointType::Outstation,
-            self_address,
+            LinkRole::Outstation { self_address },
             OUTSTATION,
         )
     }

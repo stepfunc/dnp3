@@ -8,3 +8,6 @@ pub(crate) mod traits;
 pub(crate) mod write_fn;
 /// event writing
 pub(crate) mod writer;
+
+#[cfg(test)]
+mod tests;

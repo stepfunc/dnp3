@@ -235,6 +235,14 @@ impl TaskStates {
         *self = Self::new();
     }
 
+    fn state_mut(&mut self, task: &AutoTask) -> &mut AutoTaskState {
+        match task {
+            AutoTask::ClearRestartBit => &mut self.clear_restart_iin,
+            AutoTask::EnableUnsolicited(_) => &mut self.enabled_unsolicited,
+            AutoTask::DisableUnsolicited(_) => &mut self.disable_unsolicited,
+        }
+    }
+
     fn on_restart_iin(&mut self) {
         self.clear_restart_iin.demand();
         self.integrity_scan.demand();
@@ -269,7 +277,7 @@ impl TaskStates {
             if let Some(procedure) = config.auto_time_sync {
                 return self
                     .time_sync
-                    .create_next_task(|| PendingTimeSync::new(procedure, None).into());
+                    .create_next_task(|| PendingTimeSync::auto(procedure).into());
             }
         }
 
@@ -312,11 +320,9 @@ impl LastUnsolFragment {
 /// and responses for multiple associations (i.e. multi-drop).
 pub(crate) struct Association {
     address: FragmentAddr,
-    response_timeout: Timeout,
     seq: Sequence,
     last_unsol_frag: Option<LastUnsolFragment>,
     request_queue: VecDeque<QueuedTask>,
-    max_request_queue_size: usize,
     auto_tasks: TaskStates,
     read_handler: Box<dyn ReadHandler>,
     assoc_handler: Box<dyn AssociationHandler>,
@@ -338,23 +344,15 @@ impl Association {
     ) -> Self {
         let now = Instant::now();
 
-        Self {
-            response_timeout: config.response_timeout,
+        Self::create(
             address,
-            seq: Sequence::default(),
-            last_unsol_frag: None,
-            request_queue: VecDeque::new(),
-            max_request_queue_size: config.max_queued_user_requests,
-            auto_tasks: TaskStates::new(),
+            config,
             read_handler,
             assoc_handler,
             assoc_info,
-            config,
-            polls: PollMap::new(),
-            next_link_status_deadline: config.keep_alive_timeout.map(|delay| deadline(now, delay)),
-            startup_integrity_done: false,
-            events_available: EventClasses::none(),
-        }
+            PollMap::new(),
+            config.keep_alive_timeout.map(|delay| deadline(now, delay)),
+        )
     }
 
     #[cfg(feature = "unstable")]
@@ -365,20 +363,38 @@ impl Association {
         assoc_handler: Box<dyn AssociationHandler>,
         assoc_info: Box<dyn AssociationInformation>,
     ) -> Self {
+        Self::create(
+            address,
+            config,
+            read_handler,
+            assoc_handler,
+            assoc_info,
+            PollMap::new_deferred(),
+            None,
+        )
+    }
+
+    fn create(
+        address: FragmentAddr,
+        config: AssociationConfig,
+        read_handler: Box<dyn ReadHandler>,
+        assoc_handler: Box<dyn AssociationHandler>,
+        assoc_info: Box<dyn AssociationInformation>,
+        polls: PollMap,
+        next_link_status_deadline: Option<Instant>,
+    ) -> Self {
         Self {
-            response_timeout: config.response_timeout,
             address,
             seq: Sequence::default(),
             last_unsol_frag: None,
             request_queue: VecDeque::new(),
-            max_request_queue_size: config.max_queued_user_requests,
             auto_tasks: TaskStates::new(),
             read_handler,
             assoc_handler,
             assoc_info,
             config,
-            polls: PollMap::new_deferred(),
-            next_link_status_deadline: None,
+            polls,
+            next_link_status_deadline,
             startup_integrity_done: false,
             events_available: EventClasses::none(),
         }
@@ -403,7 +419,7 @@ impl Association {
         match msg {
             AssociationMsgType::QueueTask(task) => {
                 if is_connected {
-                    if self.request_queue.len() < self.max_request_queue_size {
+                    if self.request_queue.len() < self.config.max_queued_user_requests {
                         self.request_queue.push_back(task);
                     } else {
                         task.on_task_error(Some(self), TaskError::TooManyRequests);
@@ -527,18 +543,12 @@ impl Association {
         self.auto_tasks.event_scan.failure(&self.config);
     }
 
-    pub(crate) fn on_clear_restart_iin_response(&mut self, iin: Iin) {
-        if iin.iin1.get_device_restart() {
-            tracing::warn!("device failed to clear restart IIN bit");
-            self.auto_tasks.clear_restart_iin.failure(&self.config);
-        } else {
-            self.auto_tasks.clear_restart_iin.done();
-        }
+    pub(crate) fn on_auto_task_success(&mut self, task: &AutoTask) {
+        self.auto_tasks.state_mut(task).done();
     }
 
-    pub(crate) fn on_clear_restart_iin_failure(&mut self) {
-        tracing::warn!("failed to clear restart IIN bit");
-        self.auto_tasks.clear_restart_iin.failure(&self.config);
+    pub(crate) fn on_auto_task_failure(&mut self, task: &AutoTask) {
+        self.auto_tasks.state_mut(task).failure(&self.config);
     }
 
     pub(crate) fn on_time_sync_success(&mut self) {
@@ -548,24 +558,6 @@ impl Association {
     pub(crate) fn on_time_sync_failure(&mut self, err: TimeSyncError) {
         tracing::warn!("auto time sync failed: {}", err);
         self.auto_tasks.time_sync.failure(&self.config);
-    }
-
-    pub(crate) fn on_enable_unsolicited_response(&mut self, _iin: Iin) {
-        self.auto_tasks.enabled_unsolicited.done();
-    }
-
-    pub(crate) fn on_enable_unsolicited_failure(&mut self) {
-        tracing::warn!("failed to enable unsolicited responses");
-        self.auto_tasks.enabled_unsolicited.failure(&self.config);
-    }
-
-    pub(crate) fn on_disable_unsolicited_response(&mut self, _iin: Iin) {
-        self.auto_tasks.disable_unsolicited.done();
-    }
-
-    pub(crate) fn on_disable_unsolicited_failure(&mut self) {
-        tracing::warn!("failed to disable unsolicited responses");
-        self.auto_tasks.disable_unsolicited.failure(&self.config);
     }
 
     pub(crate) fn on_link_activity(&mut self) {
@@ -771,7 +763,7 @@ impl AssociationMap {
 
     pub(crate) fn get_timeout(&self, address: EndpointAddress) -> Result<Timeout, TaskError> {
         match self.map.get(&address) {
-            Some(x) => Ok(x.response_timeout),
+            Some(x) => Ok(x.config.response_timeout),
             None => Err(TaskError::NoSuchAssociation(address)),
         }
     }

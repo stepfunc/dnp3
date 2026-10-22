@@ -214,6 +214,31 @@ async fn queued_tasks_run_back_to_back_after_operate_no_ack_and_ignore_its_seque
 }
 
 #[tokio::test]
+async fn requests_beyond_the_queue_limit_fail_with_too_many_requests() {
+    tokio::time::pause();
+    let config = AssociationConfig {
+        max_queued_user_requests: 1,
+        ..AssociationConfig::quiet()
+    };
+    let mut harness = create_association(config).await;
+    let blocker = start_blocker(&mut harness, Sequence::new(0)).await;
+
+    let mut queued = queue_no_ack(&mut harness).await;
+    let rejected = queue_no_ack(&mut harness).await;
+    assert_eq!(rejected.await.unwrap(), Err(TaskError::TooManyRequests));
+    assert_eq!(queued.try_recv(), Err(TryRecvError::Empty));
+
+    harness
+        .process_response(command_response(Sequence::new(0)))
+        .await;
+    assert_eq!(blocker.await.unwrap(), Ok(()));
+    harness
+        .expect_write(command_request(NO_ACK, Sequence::new(1)))
+        .await;
+    assert_eq!(queued.await.unwrap(), Ok(()));
+}
+
+#[tokio::test]
 async fn response_to_operate_no_ack_while_idle_is_ignored() {
     let mut harness = quiet_association().await;
 
