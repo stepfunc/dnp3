@@ -12,9 +12,13 @@ use crate::link::{EndpointAddress, LinkRole};
 use crate::outstation::Feature;
 use crate::util::phys::{PhysAddr, PhysLayer};
 
+/// The secondary station state, owned by the peer that last reset the link
 enum SecondaryState {
     NotReset,
-    Reset(bool), // the next expected fcb
+    Reset {
+        source: EndpointAddress,
+        expected_fcb: bool,
+    },
 }
 
 pub(crate) struct Layer {
@@ -42,7 +46,8 @@ pub(crate) enum Ignored {
     UnconfirmedWithFcv,
     ResetWithFcv,
     ConfirmedWithoutFcv,
-    /// confirmed user data before the link was reset
+    /// confirmed user data from a source that does not own the secondary state, because the link
+    /// was never reset or another source reset it since
     NotReset,
     /// confirmed user data that repeats the previous frame's FCB
     RepeatedFcb,
@@ -82,9 +87,9 @@ impl std::fmt::Display for Ignored {
             Self::ConfirmedWithoutFcv => {
                 f.write_str("ignoring confirmed user data with FCV bit NOT set")
             }
-            Self::NotReset => {
-                f.write_str("ignoring confirmed user data while secondary state is not reset")
-            }
+            Self::NotReset => f.write_str(
+                "ignoring confirmed user data from a source that does not own the link secondary state",
+            ),
             Self::RepeatedFcb => f.write_str("ignoring confirmed user data with non-matching fcb"),
             Self::LinkStatusWithFcv => f.write_str("ignoring request link status with FCV bit set"),
             Self::Function(x) => write!(f, "ignoring frame with function code: {x:?}"),
@@ -257,7 +262,10 @@ impl Layer {
                     return (None, None);
                 }
 
-                self.secondary_state = SecondaryState::Reset(true);
+                self.secondary_state = SecondaryState::Reset {
+                    source,
+                    expected_fcb: true,
+                };
                 (None, Some(Reply::new(source, Function::SecAck)))
             }
             Function::PriConfirmedUserData => {
@@ -267,11 +275,10 @@ impl Layer {
                 }
 
                 match self.secondary_state {
-                    SecondaryState::NotReset => {
-                        ignore(Ignored::NotReset);
-                        (None, None)
-                    }
-                    SecondaryState::Reset(expected) => {
+                    SecondaryState::Reset {
+                        source: owner,
+                        expected_fcb: expected,
+                    } if owner == source => {
                         let response = if broadcast.is_none() {
                             Some(Reply::new(source, Function::SecAck))
                         } else {
@@ -280,7 +287,10 @@ impl Layer {
                         };
 
                         if header.control.fcb == expected {
-                            self.secondary_state = SecondaryState::Reset(!expected);
+                            self.secondary_state = SecondaryState::Reset {
+                                source,
+                                expected_fcb: !expected,
+                            };
                             (
                                 Some(FrameInfo::new(source, broadcast, FrameType::Data, addr)),
                                 response,
@@ -289,6 +299,10 @@ impl Layer {
                             ignore(Ignored::RepeatedFcb);
                             (None, response)
                         }
+                    }
+                    SecondaryState::NotReset | SecondaryState::Reset { .. } => {
+                        ignore(Ignored::NotReset);
+                        (None, None)
                     }
                 }
             }
@@ -532,6 +546,110 @@ mod test {
             MASTER,
             OUTSTATION,
             ACK_FROM_MASTER,
+        );
+    }
+
+    /// `header` sent from `source` instead of the default address of its role
+    fn from(source: EndpointAddress, mut header: Header) -> Header {
+        header.source = source.wrap();
+        header
+    }
+
+    /// the ACK a layer with `local` address sends to `destination`
+    fn ack(from_master: bool, local: EndpointAddress, destination: EndpointAddress) -> Vec<u8> {
+        let header = Header::new(
+            ControlField::new(!from_master, Function::SecAck),
+            destination.wrap(),
+            local.wrap(),
+        );
+        header_bytes(header, super::super::constant::MIN_HEADER_LENGTH_VALUE).to_vec()
+    }
+
+    /// the secondary state belongs to the peer that last reset the link: confirmed user data from
+    /// any other source is ignored without an ACK and leaves the owner's FCB unchanged
+    fn secondary_state_is_owned_by_one_peer(
+        mut layer: Layer,
+        from_master: bool,
+        local: EndpointAddress,
+        a: EndpointAddress,
+        b: EndpointAddress,
+    ) {
+        let reset = |source| {
+            from(
+                source,
+                header(from_master, Function::PriResetLinkStates, local.wrap()),
+            )
+        };
+        let confirmed = |source, fcb| from(source, confirmed(from_master, fcb, local.wrap()));
+        let ack = |destination| Some(ack(from_master, local, destination));
+
+        let processed = process(&mut layer, reset(a));
+        assert_eq!(processed.reply, ack(a));
+
+        let processed = process(&mut layer, confirmed(a, true));
+        assert_eq!(processed.info, Some(data_from(a, None)));
+        assert_eq!(processed.reply, ack(a));
+
+        // the other peer never reset the link, whatever FCB it sends, and each of its frames
+        // leaves the owner's next expected FCB unchanged
+        for fcb in [false, true] {
+            let processed = process(&mut layer, confirmed(b, fcb));
+            assert_eq!(processed.info, None);
+            assert_eq!(processed.reply, None);
+            assert!(matches!(processed.ignored[..], [Ignored::NotReset]));
+
+            let processed = process(&mut layer, confirmed(a, fcb));
+            assert_eq!(processed.info, Some(data_from(a, None)));
+            assert_eq!(processed.reply, ack(a));
+            assert!(processed.ignored.is_empty());
+        }
+
+        // the owner's duplicate is acked without being delivered again
+        let processed = process(&mut layer, confirmed(a, true));
+        assert_eq!(processed.info, None);
+        assert_eq!(processed.reply, ack(a));
+        assert!(matches!(processed.ignored[..], [Ignored::RepeatedFcb]));
+
+        // a reset from the other peer transfers ownership
+        let processed = process(&mut layer, reset(b));
+        assert_eq!(processed.info, None);
+        assert_eq!(processed.reply, ack(b));
+
+        let processed = process(&mut layer, confirmed(a, true));
+        assert_eq!(processed.info, None);
+        assert_eq!(processed.reply, None);
+        assert!(matches!(processed.ignored[..], [Ignored::NotReset]));
+
+        let processed = process(&mut layer, confirmed(b, true));
+        assert_eq!(processed.info, Some(data_from(b, None)));
+        assert_eq!(processed.reply, ack(b));
+        assert!(processed.ignored.is_empty());
+
+        let processed = process(&mut layer, confirmed(b, true));
+        assert_eq!(processed.info, None);
+        assert_eq!(processed.reply, ack(b));
+        assert!(matches!(processed.ignored[..], [Ignored::RepeatedFcb]));
+    }
+
+    #[test]
+    fn outstation_secondary_state_is_owned_by_one_master() {
+        secondary_state_is_owned_by_one_peer(
+            outstation(Feature::Disabled),
+            true,
+            OUTSTATION,
+            MASTER,
+            EndpointAddress::raw(2),
+        );
+    }
+
+    #[test]
+    fn master_secondary_state_is_owned_by_one_outstation() {
+        secondary_state_is_owned_by_one_peer(
+            master(),
+            false,
+            MASTER,
+            OUTSTATION,
+            EndpointAddress::raw(1025),
         );
     }
 
