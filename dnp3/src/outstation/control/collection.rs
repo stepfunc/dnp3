@@ -107,7 +107,7 @@ impl<'a> ObjectHeader<'a> {
             _ => None,
         };
 
-        header.ok_or_else(|| BadControlHeader::new(self.variation, self.details.qualifier()))
+        header.ok_or_else(|| BadControlHeader::new(self.variation(), self.details.qualifier()))
     }
 }
 

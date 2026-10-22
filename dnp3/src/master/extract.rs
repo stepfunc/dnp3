@@ -38,7 +38,7 @@ pub(crate) fn extract_measurements_inner(
             Extracted::Ignored => {
                 tracing::warn!(
                     "ignored header variation: {} qualifier: {:?}",
-                    &header.variation,
+                    &header.variation(),
                     &header.details.qualifier()
                 );
             }
@@ -50,7 +50,7 @@ pub(crate) fn extract_measurements_inner(
 /// True if the header carries at least one object
 fn has_objects(details: &HeaderDetails) -> bool {
     match details {
-        HeaderDetails::AllObjects(_) | HeaderDetails::Read(_) => false,
+        HeaderDetails::AllObjects(_) | HeaderDetails::Read(..) => false,
         // a range covers at least one index, and a free-format header holds one object
         HeaderDetails::Range(..) | HeaderDetails::FreeFormat(_) => true,
         HeaderDetails::Count(_, count, _) => *count > 0,
@@ -102,7 +102,7 @@ pub(crate) fn validate_response(
         if let Some(next) = next_cto(&header.details, cto) {
             cto = next;
         } else if cto.is_none() && has_relative_time(&header) {
-            return Err(InvalidResponse::RelativeTimeWithoutCto(header.variation));
+            return Err(InvalidResponse::RelativeTimeWithoutCto(header.variation()));
         }
     }
     Ok(objects)
@@ -111,7 +111,7 @@ pub(crate) fn validate_response(
 /// True if the header carries objects whose time is relative to a common time of occurrence
 fn has_relative_time(header: &ObjectHeader) -> bool {
     matches!(
-        header.variation,
+        header.variation(),
         Variation::Group2Var3 | Variation::Group4Var3
     ) && has_objects(&header.details)
 }
@@ -154,7 +154,7 @@ pub(crate) fn extract_header<H: ReadHandler + ?Sized>(
     ) -> bool {
         if let Some(item) = seq.single() {
             handler.handle_abs_time(
-                HeaderInfo::new(header.variation, header.details.qualifier(), false, false),
+                HeaderInfo::new(header.variation(), header.details.qualifier(), false, false),
                 item.time,
             );
             true
@@ -174,14 +174,14 @@ pub(crate) fn extract_header<H: ReadHandler + ?Sized>(
         }
         // everything else
         HeaderDetails::Range(_, _, var) => {
-            var.extract_measurements_to(header.variation, header.details.qualifier(), handler)
+            var.extract_measurements_to(header.details.qualifier(), handler)
         }
         HeaderDetails::CountAndPrefix8(_, var) => var.extract_measurements_to(cto, handler),
         HeaderDetails::CountAndPrefix16(_, var) => var.extract_measurements_to(cto, handler),
         HeaderDetails::AllObjects(_)
         | HeaderDetails::Count(..)
         | HeaderDetails::FreeFormat(_)
-        | HeaderDetails::Read(_) => false,
+        | HeaderDetails::Read(..) => false,
     };
 
     if handled {

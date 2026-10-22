@@ -47,6 +47,14 @@ object CountVariationModule extends Module {
       }
     }
 
+    def variationMatcher(v : Variation) : Iterator[String] = {
+      v match {
+        case v : FixedSize if isTime(v) => s"CountVariation::${v.name}(_) => Variation::${v.name},".eol
+        case _ : SizedByVariation => s"CountVariation::${v.parent.name}Var0 => Variation::${v.parent.name}(0),".eol
+        case _ => s"CountVariation::${v.name} => Variation::${v.name},".eol
+      }
+    }
+
     def fmtMatcher(v : Variation) : Iterator[String] = {
       v match {
         case v : FixedSize if isTime(v) => s"CountVariation::${v.name}(seq) => format_count_of_items(f, seq.iter()),".eol
@@ -59,6 +67,11 @@ object CountVariationModule extends Module {
       bracket("pub(crate) fn parse_non_read(v: Variation, qualifier: QualifierCode, count: u16, cursor: &mut ReadCursor<'a>) -> Result<CountVariation<'a>, ObjectParseError>") {
         bracket("match v") {
           nonReadVariations.flatMap(nonReadMatcher) ++ "_ => Err(ObjectParseError::InvalidQualifierForVariation(v, qualifier)),".eol
+        }
+      } ++ space ++
+      bracket("pub(crate) fn variation(&self) -> Variation") {
+        bracket("match self") {
+          nonReadVariations.flatMap(variationMatcher)
         }
       } ++ space ++
       bracket("pub(crate) fn format_objects(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result") {

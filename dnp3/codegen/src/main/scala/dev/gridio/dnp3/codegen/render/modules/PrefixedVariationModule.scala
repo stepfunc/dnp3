@@ -161,6 +161,9 @@ object PrefixedVariationModule extends Module {
           variations.flatMap(parseMatcher) ++ "_ => Err(ObjectParseError::InvalidQualifierForVariation(v, I::COUNT_AND_PREFIX_QUALIFIER)),".eol
         }
       } ++ space ++
+        bracket("pub(crate) fn variation(&self) -> Variation") {
+          "self.get_header_info().variation".eol
+        } ++ space ++
         bracket("pub(crate) fn format_objects(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result") {
           bracket("match self") {
             variations.flatMap(fmtMatcher).iterator

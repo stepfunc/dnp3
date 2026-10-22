@@ -41,7 +41,7 @@ impl OneShotRequest for WriteBlockRequest {
             _ => {
                 tracing::warn!(
                     "File WRITE response contains unexpected variation: {}",
-                    header.variation
+                    header.variation()
                 );
                 return Err(FileError::BadResponse);
             }

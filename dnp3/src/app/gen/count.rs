@@ -89,6 +89,31 @@ impl<'a> CountVariation<'a> {
         }
     }
     
+    pub(crate) fn variation(&self) -> Variation {
+        match self {
+            CountVariation::Group2Var0 => Variation::Group2Var0,
+            CountVariation::Group4Var0 => Variation::Group4Var0,
+            CountVariation::Group11Var0 => Variation::Group11Var0,
+            CountVariation::Group22Var0 => Variation::Group22Var0,
+            CountVariation::Group23Var0 => Variation::Group23Var0,
+            CountVariation::Group32Var0 => Variation::Group32Var0,
+            CountVariation::Group33Var0 => Variation::Group33Var0,
+            CountVariation::Group42Var0 => Variation::Group42Var0,
+            CountVariation::Group50Var1(_) => Variation::Group50Var1,
+            CountVariation::Group50Var2(_) => Variation::Group50Var2,
+            CountVariation::Group50Var3(_) => Variation::Group50Var3,
+            CountVariation::Group50Var4(_) => Variation::Group50Var4,
+            CountVariation::Group51Var1(_) => Variation::Group51Var1,
+            CountVariation::Group51Var2(_) => Variation::Group51Var2,
+            CountVariation::Group52Var1(_) => Variation::Group52Var1,
+            CountVariation::Group52Var2(_) => Variation::Group52Var2,
+            CountVariation::Group60Var2 => Variation::Group60Var2,
+            CountVariation::Group60Var3 => Variation::Group60Var3,
+            CountVariation::Group60Var4 => Variation::Group60Var4,
+            CountVariation::Group111Var0 => Variation::Group111(0),
+        }
+    }
+    
     pub(crate) fn format_objects(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             CountVariation::Group2Var0 => Ok(()),

@@ -214,6 +214,10 @@ impl<'a, I> PrefixedVariation<'a, I> where I : FixedSize + Index + std::fmt::Dis
         }
     }
     
+    pub(crate) fn variation(&self) -> Variation {
+        self.get_header_info().variation
+    }
+    
     pub(crate) fn format_objects(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             PrefixedVariation::Group0(attr) => attr.format(f),
