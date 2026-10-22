@@ -4,7 +4,7 @@ use crate::app::parse::options::ParseOptions;
 use crate::app::parse::parser::{ObjectHeader, ParsedFragment};
 use crate::app::{BufferSize, FunctionCode, Timestamp};
 use crate::link::header::BroadcastConfirmMode;
-use crate::outstation::config::OutstationConfig;
+use crate::outstation::config::{Feature, OutstationConfig};
 use crate::outstation::database::*;
 use crate::outstation::traits::{BroadcastAction, OperateType};
 use crate::util::test_support::watchdog;
@@ -269,37 +269,44 @@ async fn read_during_unsolicited_retry_delay_reports_unconfirmed_events() {
     harness.check_events(&[Event::EnterSolicitedConfirmWait(1)]);
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn read_after_disable_unsolicited_during_confirm_wait_reports_unconfirmed_events() {
-    let mut harness = new_harness(get_default_unsolicited_config());
-    confirm_null_unsolicited(&mut harness).await;
-    enable_unsolicited(&mut harness).await;
+    watchdog(async {
+        let mut harness = new_harness(get_default_unsolicited_config());
+        confirm_null_unsolicited(&mut harness).await;
+        enable_unsolicited(&mut harness).await;
 
-    harness.handle.database.transaction(add_binary_event);
-    harness.expect_response(UNSOL_G2V1_SEQ1).await;
-    harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
+        harness.handle.database.transaction(add_binary_event);
+        harness.expect_response(UNSOL_G2V1_SEQ1).await;
+        harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
 
-    harness
-        .test_request_response(DISABLE_UNSOLICITED_SEQ0, EMPTY_RESPONSE_SEQ0)
-        .await;
+        harness
+            .test_request_response(DISABLE_UNSOLICITED_SEQ0, EMPTY_RESPONSE_SEQ0)
+            .await;
 
-    harness
-        .test_request_response(&read_class_1(1), G2V1_RESPONSE_SEQ1)
-        .await;
-    harness.check_events(&[Event::EnterSolicitedConfirmWait(1)]);
+        // the READ is deferred until the wait times out, without a retry
+        harness
+            .test_request_response(&read_class_1(1), G2V1_RESPONSE_SEQ1)
+            .await;
+        harness.check_events(&[
+            Event::UnsolicitedConfirmTimeout(1, false),
+            Event::EnterSolicitedConfirmWait(1),
+        ]);
 
-    // the event is cleared once the master confirms the response that delivered it
-    harness.send_and_process(&confirm(1)).await;
-    harness.check_events(&[
-        Event::SolicitedConfirmReceived(1),
-        Event::BeginConfirm,
-        Event::Cleared(0),
-        Event::EndConfirm(empty_buffer_state()),
-    ]);
-    harness
-        .test_request_response(&read_class_1(2), EMPTY_RESPONSE_SEQ2)
-        .await;
-    harness.check_no_events();
+        // the event is cleared once the master confirms the response that delivered it
+        harness.send_and_process(&confirm(1)).await;
+        harness.check_events(&[
+            Event::SolicitedConfirmReceived(1),
+            Event::BeginConfirm,
+            Event::Cleared(0),
+            Event::EndConfirm(empty_buffer_state()),
+        ]);
+        harness
+            .test_request_response(&read_class_1(2), EMPTY_RESPONSE_SEQ2)
+            .await;
+        harness.check_no_events();
+    })
+    .await;
 }
 
 fn update_binary_event(handle: &mut DatabaseHandle, value: bool) {
@@ -527,26 +534,33 @@ async fn expect_silence(harness: &mut OutstationHarness) {
 
 #[tokio::test(start_paused = true)]
 async fn handles_disable_unsolicited_during_unsolicited_confirm_wait() {
-    let mut harness = new_harness(get_default_unsolicited_config());
-    confirm_null_unsolicited(&mut harness).await;
-    enable_unsolicited(&mut harness).await;
+    watchdog(async {
+        let mut harness = new_harness(get_default_unsolicited_config());
+        confirm_null_unsolicited(&mut harness).await;
+        enable_unsolicited(&mut harness).await;
 
-    harness.handle.database.transaction(add_binary_event);
-    harness.expect_response(UNSOL_G2V1_SEQ1).await;
-    harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
+        harness.handle.database.transaction(add_binary_event);
+        harness.expect_response(UNSOL_G2V1_SEQ1).await;
+        harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
 
-    // send a disable unsolicited request
-    harness
-        .test_request_response(DISABLE_UNSOLICITED_SEQ0, EMPTY_RESPONSE_SEQ0)
-        .await;
-    harness.check_no_events();
+        // send a disable unsolicited request
+        harness
+            .test_request_response(DISABLE_UNSOLICITED_SEQ0, EMPTY_RESPONSE_SEQ0)
+            .await;
+        harness.check_no_events();
 
-    // neither the unconfirmed event nor a new one is reported in an unsolicited response
-    update_binary_event(&mut harness.handle.database, false);
-    expect_silence(&mut harness).await;
+        // neither the unconfirmed event nor a new one is reported in an unsolicited response: the
+        // wait times out without a retry
+        update_binary_event(&mut harness.handle.database, false);
+        harness
+            .wait_for_events(&[Event::UnsolicitedConfirmTimeout(1, false)])
+            .await;
+        expect_silence(&mut harness).await;
 
-    // both are still there for a READ
-    read_and_confirm_two_class_1_events(&mut harness).await;
+        // both are still there for a READ
+        read_and_confirm_two_class_1_events(&mut harness).await;
+    })
+    .await;
 }
 
 const ENABLE_UNSOLICITED_CLASS_2_SEQ0: &[u8] = &[0xC0, 0x14, 0x3C, 0x03, 0x06];
@@ -1140,14 +1154,18 @@ async fn send_unsolicited_event(harness: &mut OutstationHarness) {
     harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
 }
 
-/// DISABLE_UNSOLICITED for classes 1, 2 and 3 sent to the broadcast address
-async fn broadcast_disable_unsolicited(harness: &mut OutstationHarness) {
+/// a DISABLE_UNSOLICITED sent to the broadcast address, which the outstation handles with `action`
+async fn broadcast_disable_unsolicited(
+    harness: &mut OutstationHarness,
+    request: &[u8],
+    action: BroadcastAction,
+) {
     harness.set_broadcast(Some(BroadcastConfirmMode::NotRequired));
-    harness.send_and_process(DISABLE_UNSOLICITED_SEQ0).await;
+    harness.send_and_process(request).await;
     harness.set_broadcast(None);
     harness.check_events(&[Event::BroadcastReceived(
         FunctionCode::DisableUnsolicited,
-        BroadcastAction::Processed,
+        action,
     )]);
 }
 
@@ -1162,17 +1180,19 @@ async fn confirm_after_disable_unsolicited_during_unsolicited_confirm_wait() {
             .await;
         harness.check_no_events();
 
-        // the DISABLE ended the wait, so the confirm arrives in idle and doesn't clear the event
+        // the wait goes on, so the confirm clears the event
         harness.record_requests_from_idle();
         harness.send_and_process(&unsolicited_confirm(1)).await;
-        harness.check_events(&[from_idle(FunctionCode::Confirm, true, 1)]);
-        harness
-            .test_request_response(&read_class_1(1), G2V1_RESPONSE_SEQ1)
-            .await;
         harness.check_events(&[
-            from_idle(FunctionCode::Read, false, 1),
-            Event::EnterSolicitedConfirmWait(1),
+            Event::UnsolicitedConfirmReceived(1),
+            Event::BeginConfirm,
+            Event::Cleared(0),
+            Event::EndConfirm(empty_buffer_state()),
         ]);
+        harness
+            .test_request_response(&read_class_1(1), EMPTY_RESPONSE_SEQ1)
+            .await;
+        harness.check_events(&[from_idle(FunctionCode::Read, false, 1)]);
     })
     .await;
 }
@@ -1182,13 +1202,18 @@ async fn timeout_after_disable_unsolicited_during_unsolicited_confirm_wait() {
     watchdog(async {
         let mut harness = new_harness(get_default_unsolicited_config());
         send_unsolicited_event(&mut harness).await;
+        let sent = Instant::now();
 
         harness
             .test_request_response(DISABLE_UNSOLICITED_SEQ0, EMPTY_RESPONSE_SEQ0)
             .await;
         harness.check_no_events();
 
-        // the DISABLE ended the wait, so it never times out
+        // the wait times out without a retry
+        harness
+            .wait_for_events(&[Event::UnsolicitedConfirmTimeout(1, false)])
+            .await;
+        assert_eq!(sent.elapsed(), CONFIRM_TIMEOUT);
         expect_silence(&mut harness).await;
 
         // the event is still buffered
@@ -1207,13 +1232,64 @@ async fn timeout_after_broadcast_disable_unsolicited_during_unsolicited_confirm_
         send_unsolicited_event(&mut harness).await;
         let sent = Instant::now();
 
-        broadcast_disable_unsolicited(&mut harness).await;
+        broadcast_disable_unsolicited(
+            &mut harness,
+            DISABLE_UNSOLICITED_SEQ0,
+            BroadcastAction::Processed,
+        )
+        .await;
 
-        // the response is retried, without a limit
-        for retry in 1..=3 {
+        // the wait times out without a retry
+        harness
+            .wait_for_events(&[Event::UnsolicitedConfirmTimeout(1, false)])
+            .await;
+        assert_eq!(sent.elapsed(), CONFIRM_TIMEOUT);
+        expect_silence(&mut harness).await;
+
+        // the event is still buffered, reported with the broadcast
+        harness
+            .test_request_response(
+                &read_class_1(1),
+                &[
+                    0xE1, 0x81, 0x81, 0x00, 0x02, 0x01, 0x28, 0x01, 0x00, 0x00, 0x00, 0x81,
+                ],
+            )
+            .await;
+        harness.check_events(&[Event::EnterSolicitedConfirmWait(1)]);
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn ignored_broadcast_disable_unsolicited_leaves_the_retries() {
+    // the class 1 object header is cut short
+    let malformed: &[u8] = &[0xC0, 0x15, 0x3C, 0x02];
+    let cases = [
+        (
+            Feature::Disabled,
+            DISABLE_UNSOLICITED_SEQ0,
+            BroadcastAction::IgnoredByConfiguration,
+        ),
+        (
+            Feature::Enabled,
+            malformed,
+            BroadcastAction::BadObjectHeaders,
+        ),
+    ];
+
+    watchdog(async {
+        for (broadcast, request, action) in cases {
+            let mut config = get_default_unsolicited_config();
+            config.features.broadcast = broadcast;
+            let mut harness = new_harness(config);
+            send_unsolicited_event(&mut harness).await;
+            let sent = Instant::now();
+
+            broadcast_disable_unsolicited(&mut harness, request, action).await;
+
             harness.expect_response(UNSOL_G2V1_SEQ1).await;
             harness.check_events(&[Event::UnsolicitedConfirmTimeout(1, true)]);
-            assert_eq!(sent.elapsed(), CONFIRM_TIMEOUT * retry);
+            assert_eq!(sent.elapsed(), CONFIRM_TIMEOUT);
         }
     })
     .await;
@@ -1231,20 +1307,11 @@ async fn confirm_after_disable_unsolicited_during_null_unsolicited_confirm_wait(
             .test_request_response(DISABLE_UNSOLICITED_SEQ0, EMPTY_RESPONSE_SEQ0)
             .await;
 
-        // the DISABLE ended the wait, and the null response is sent again at once
-        harness.expect_response(&null_unsolicited(1)).await;
-        harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
-        assert_eq!(start.elapsed(), Duration::ZERO);
-
-        // so the confirm of the first one is ignored
+        // the wait goes on, so the confirm ends it, and the null response isn't sent again
         harness.send_and_process(&unsolicited_confirm(0)).await;
-        harness.check_no_events();
-        harness
-            .wait_for_events(&[Event::UnsolicitedConfirmTimeout(1, false)])
-            .await;
-        harness.expect_response(&null_unsolicited(2)).await;
-        harness.check_events(&[Event::EnterUnsolicitedConfirmWait(2)]);
-        assert_eq!(start.elapsed(), CONFIRM_TIMEOUT);
+        harness.check_events(&[Event::UnsolicitedConfirmReceived(0)]);
+        assert_eq!(start.elapsed(), Duration::ZERO);
+        expect_silence(&mut harness).await;
     })
     .await;
 }
@@ -1261,10 +1328,13 @@ async fn timeout_after_disable_unsolicited_during_null_unsolicited_confirm_wait(
             .test_request_response(DISABLE_UNSOLICITED_SEQ0, EMPTY_RESPONSE_SEQ0)
             .await;
 
-        // the DISABLE ended the wait, and the null response is sent again at once
+        // the null response is sent again once the wait times out
+        harness
+            .wait_for_events(&[Event::UnsolicitedConfirmTimeout(0, false)])
+            .await;
         harness.expect_response(&null_unsolicited(1)).await;
         harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
-        assert_eq!(start.elapsed(), Duration::ZERO);
+        assert_eq!(start.elapsed(), CONFIRM_TIMEOUT);
     })
     .await;
 }
@@ -1277,7 +1347,12 @@ async fn timeout_after_broadcast_disable_unsolicited_during_null_unsolicited_con
         harness.check_events(&[Event::EnterUnsolicitedConfirmWait(0)]);
         let sent = Instant::now();
 
-        broadcast_disable_unsolicited(&mut harness).await;
+        broadcast_disable_unsolicited(
+            &mut harness,
+            DISABLE_UNSOLICITED_SEQ0,
+            BroadcastAction::Processed,
+        )
+        .await;
 
         // the null response is never retried, but sent again, reporting the broadcast
         harness
@@ -1306,10 +1381,15 @@ async fn disable_unsolicited_of_another_class_during_limited_unsolicited_retries
             .await;
         harness.check_no_events();
 
-        // the DISABLE ended the series, and class 1 starts another after the retry delay
+        // the wait times out without its last retry, and class 1 starts another series after the
+        // retry delay
+        harness
+            .wait_for_events(&[Event::UnsolicitedConfirmTimeout(1, false)])
+            .await;
+        assert_eq!(retried.elapsed(), CONFIRM_TIMEOUT);
         harness.expect_response(UNSOL_G2V1_SEQ2).await;
         harness.check_events(&[Event::EnterUnsolicitedConfirmWait(2)]);
-        assert_eq!(retried.elapsed(), RETRY_DELAY);
+        assert_eq!(retried.elapsed(), CONFIRM_TIMEOUT + RETRY_DELAY);
     })
     .await;
 }

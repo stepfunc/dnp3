@@ -902,8 +902,7 @@ async fn requests_in_the_unsolicited_confirm_wait_discard_the_deferred_read() {
 }
 
 #[tokio::test]
-async fn disable_unsolicited_in_the_unsolicited_confirm_wait_ends_the_series_and_is_the_last_request(
-) {
+async fn disable_unsolicited_in_the_unsolicited_confirm_wait_is_the_last_request() {
     let mut harness = new_harness(get_default_unsolicited_config());
     enter_unsolicited_confirm_wait(&mut harness).await;
 
@@ -915,19 +914,15 @@ async fn disable_unsolicited_in_the_unsolicited_confirm_wait_ends_the_series_and
         .test_request_response(&disable, &response(false, 2, RESTART, 0))
         .await;
 
-    // the null unsolicited response is sent again whatever is enabled
-    harness.expect_response(&null_unsolicited(1)).await;
-    harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
-
-    // the repeat gets the same response
+    // the wait goes on, and the repeat gets the same response
     harness
         .test_request_response(&disable, &response(false, 2, RESTART, 0))
         .await;
     harness.check_no_events();
 
     // and the deferred READ is gone
-    harness.send_and_process(&unsolicited_confirm(1)).await;
-    harness.check_events(&[Event::UnsolicitedConfirmReceived(1)]);
+    harness.send_and_process(&unsolicited_confirm(0)).await;
+    harness.check_events(&[Event::UnsolicitedConfirmReceived(0)]);
     probe(&mut harness, 3, RESTART).await;
 }
 
