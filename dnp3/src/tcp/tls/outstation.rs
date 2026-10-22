@@ -225,9 +225,7 @@ impl TlsServerConfig {
                 super::TLS_HANDSHAKE_TIMEOUT.as_secs()
             )),
             Ok(Err(err)) => Err(format!("failed to establish TLS session: {err}")),
-            Ok(Ok(stream)) => Ok(PhysLayer::Tls(Box::new(tokio_rustls::TlsStream::from(
-                stream,
-            )))),
+            Ok(Ok(stream)) => Ok(PhysLayer::tls(tokio_rustls::TlsStream::from(stream))),
         }
     }
 }

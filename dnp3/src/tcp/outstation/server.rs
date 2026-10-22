@@ -76,7 +76,7 @@ enum ServerConnectionHandler {
 impl ServerConnectionHandler {
     async fn handle(&mut self, socket: tokio::net::TcpStream) -> Result<PhysLayer, String> {
         match self {
-            Self::Tcp => Ok(PhysLayer::Tcp(socket)),
+            Self::Tcp => Ok(PhysLayer::tcp(socket)),
             #[cfg(feature = "enable-tls")]
             Self::Tls(config) => config.handle_connection(socket).await,
         }
@@ -415,6 +415,12 @@ mod tests {
 
     /// a server with one outstation that reports its connection state
     fn server_with_outstation() -> (Server, mpsc::UnboundedReceiver<ConnectionState>) {
+        server_with_filter(AddressFilter::Any)
+    }
+
+    fn server_with_filter(
+        filter: AddressFilter,
+    ) -> (Server, mpsc::UnboundedReceiver<ConnectionState>) {
         let mut server =
             Server::new_tcp_server(LinkErrorMode::Close, "127.0.0.1:0".parse().unwrap());
         let (tx, rx) = mpsc::unbounded_channel();
@@ -425,11 +431,38 @@ mod tests {
                 Box::new(NullInformation),
                 crate::outstation::DefaultControlHandler::create(),
                 Box::new(ConnectionListener(tx)),
-                AddressFilter::Any,
+                filter,
             )
             .unwrap();
         tokio::spawn(future);
         (server, rx)
+    }
+
+    #[tokio::test]
+    async fn ipv4_filters_match_ipv4_peers_on_a_dual_stack_listener() {
+        let filters = [
+            AddressFilter::Exact("127.0.0.1".parse().unwrap()),
+            AddressFilter::AnyOf(["127.0.0.1".parse().unwrap()].into()),
+            AddressFilter::WildcardIpv4("127.0.0.*".parse().unwrap()),
+        ];
+        for filter in filters {
+            watchdog(async {
+                let Ok(listener) = tokio::net::TcpListener::bind("[::]:0").await else {
+                    return;
+                };
+                let port = listener.local_addr().unwrap().port();
+                let Ok(_client) = tokio::net::TcpStream::connect(("127.0.0.1", port)).await else {
+                    // the platform doesn't accept IPv4 on an IPv6 socket
+                    return;
+                };
+                let (server, mut states) = server_with_filter(filter);
+                let (_handle, task) = server.create_task_with(listener, None);
+                tokio::spawn(task.run());
+
+                assert_eq!(states.recv().await, Some(ConnectionState::Connected));
+            })
+            .await;
+        }
     }
 
     #[tokio::test(start_paused = true)]

@@ -212,7 +212,7 @@ fn process_link_header(layer: &mut Layer, header: LinkHeader, addr: PhysAddr) ->
     match reply {
         Some(reply) => {
             let header = layer.get_header(reply);
-            layer.format_reply(header).len()
+            Layer::format_reply(header).len()
         }
         None => 0,
     }

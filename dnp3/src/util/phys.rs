@@ -1,9 +1,11 @@
 use crate::decode::PhysDecodeLevel;
+use crate::link::constant::LINK_HEADER_LENGTH;
+use crate::link::error::LogicError;
 use std::io::ErrorKind;
 use std::net::SocketAddr;
 
 use crate::udp::layer::UdpLayer;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::{AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 /// Source or destination at the physical layer from which a link frame was read/written
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -14,8 +16,8 @@ pub(crate) enum PhysAddr {
     Udp(SocketAddr),
 }
 
-/// encapsulates all possible physical layers as an enum
-pub(crate) enum PhysLayer {
+/// The physical layers a session can run over
+pub(crate) enum PhysIo {
     Tcp(tokio::net::TcpStream),
     Udp(UdpLayer),
     /// TLS type is boxed because its size is huge
@@ -25,47 +27,222 @@ pub(crate) enum PhysLayer {
     Serial(tokio_serial::SerialStream),
     #[cfg(test)]
     Mock(sfio_tokio_mock_io::Mock),
+    /// a stream with a bounded buffer, so writes can wait on the peer
+    #[cfg(test)]
+    Duplex(tokio::io::DuplexStream),
+}
+
+/// A physical layer, and the link-layer reply it is writing
+///
+/// The link layer replies to a frame inside a read that callers race against timers and drop.
+/// The reply is queued here and written by [`PhysLayer::finish_reply`], which every later read of
+/// a frame and every write calls first, so dropping the read neither loses the reply nor leaves
+/// part of it ahead of other bytes.
+pub(crate) struct PhysLayer {
+    io: PhysIo,
+    reply: PendingReply,
+}
+
+/// The progress of writing a link-layer reply
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+enum PendingReply {
+    None,
+    /// `frame[written..]` has yet to be written to `addr`
+    Write {
+        frame: [u8; LINK_HEADER_LENGTH],
+        addr: PhysAddr,
+        written: usize,
+    },
+    /// the frame was written to a stream that must still be flushed
+    Flush,
+}
+
+impl PendingReply {
+    /// Record that `count` more bytes were written, moving on to a flush if the stream needs one
+    #[cfg_attr(all(test, dnp3_no_panic), no_panic::no_panic)]
+    fn wrote(&mut self, count: usize, flush: bool) {
+        if let Self::Write { frame, written, .. } = self {
+            *written = written.saturating_add(count);
+            if *written < frame.len() {
+                return;
+            }
+        }
+        *self = if flush { Self::Flush } else { Self::None };
+    }
+
+    /// Write the rest of the reply to a stream, flushing it afterwards if `flush` is set
+    ///
+    /// Each step is a single write or flush, which a dropped future either made or didn't, so
+    /// calling this again resumes where the last call stopped.
+    async fn write_to<S>(&mut self, stream: &mut S, flush: bool) -> Result<(), std::io::Error>
+    where
+        S: AsyncWrite + Unpin,
+    {
+        loop {
+            match self {
+                Self::None => return Ok(()),
+                Self::Write { frame, written, .. } => {
+                    let Some(rest) = frame.get(*written..).filter(|rest| !rest.is_empty()) else {
+                        self.wrote(0, flush);
+                        continue;
+                    };
+                    let count = stream.write(rest).await?;
+                    if count == 0 {
+                        return Err(ErrorKind::WriteZero.into());
+                    }
+                    self.wrote(count, flush);
+                }
+                Self::Flush => {
+                    stream.flush().await?;
+                    *self = Self::None;
+                }
+            }
+        }
+    }
+
+    /// Send the reply as one datagram, which goes out whole or not at all
+    async fn send_to(&mut self, socket: &mut UdpLayer) -> Result<(), std::io::Error> {
+        if let Self::Write { frame, addr, .. } = self {
+            socket.write_all(frame, *addr).await?;
+        }
+        *self = Self::None;
+        Ok(())
+    }
 }
 
 impl std::fmt::Debug for PhysLayer {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            PhysLayer::Tcp(_) => f.write_str("Tcp"),
-            PhysLayer::Udp(_) => f.write_str("Udp"),
+        match self.io {
+            PhysIo::Tcp(_) => f.write_str("Tcp"),
+            PhysIo::Udp(_) => f.write_str("Udp"),
             #[cfg(feature = "enable-tls")]
-            PhysLayer::Tls(_) => f.write_str("Tls"),
+            PhysIo::Tls(_) => f.write_str("Tls"),
             #[cfg(feature = "serial")]
-            PhysLayer::Serial(_) => f.write_str("Serial"),
+            PhysIo::Serial(_) => f.write_str("Serial"),
             #[cfg(test)]
-            PhysLayer::Mock(_) => f.write_str("Mock"),
+            PhysIo::Mock(_) => f.write_str("Mock"),
+            #[cfg(test)]
+            PhysIo::Duplex(_) => f.write_str("Duplex"),
         }
     }
 }
 
 impl PhysLayer {
+    fn new(io: PhysIo) -> Self {
+        Self {
+            io,
+            reply: PendingReply::None,
+        }
+    }
+
+    pub(crate) fn tcp(stream: tokio::net::TcpStream) -> Self {
+        Self::new(PhysIo::Tcp(stream))
+    }
+
+    pub(crate) fn udp(layer: UdpLayer) -> Self {
+        Self::new(PhysIo::Udp(layer))
+    }
+
+    #[cfg(feature = "enable-tls")]
+    pub(crate) fn tls(stream: tokio_rustls::TlsStream<tokio::net::TcpStream>) -> Self {
+        Self::new(PhysIo::Tls(Box::new(stream)))
+    }
+
+    #[cfg(feature = "serial")]
+    pub(crate) fn serial(stream: tokio_serial::SerialStream) -> Self {
+        Self::new(PhysIo::Serial(stream))
+    }
+
+    #[cfg(test)]
+    pub(crate) fn mock(mock: sfio_tokio_mock_io::Mock) -> Self {
+        Self::new(PhysIo::Mock(mock))
+    }
+
+    #[cfg(test)]
+    pub(crate) fn duplex(stream: tokio::io::DuplexStream) -> Self {
+        Self::new(PhysIo::Duplex(stream))
+    }
+
+    #[cfg(test)]
+    pub(crate) fn io(&self) -> &PhysIo {
+        &self.io
+    }
+
+    /// Queue a link-layer reply, which [`Self::finish_reply`] writes
+    ///
+    /// Fails if the last reply hasn't been finished.
+    pub(crate) fn queue_reply(
+        &mut self,
+        frame: [u8; LINK_HEADER_LENGTH],
+        addr: PhysAddr,
+        level: PhysDecodeLevel,
+    ) -> Result<(), LogicError> {
+        if self.reply != PendingReply::None {
+            return Err(LogicError::BadWrite);
+        }
+        if level.enabled() {
+            tracing::info!("PHYS TX - {}", PhysDisplay::new(level, &frame));
+        }
+        self.reply = PendingReply::Write {
+            frame,
+            addr,
+            written: 0,
+        };
+        Ok(())
+    }
+
+    /// Write the rest of a queued reply, if there is one
+    ///
+    /// The future can be dropped and called again without losing or repeating any bytes. A reply
+    /// that fails to write is abandoned, since the error ends the session.
+    pub(crate) async fn finish_reply(&mut self) -> Result<(), std::io::Error> {
+        let reply = &mut self.reply;
+        let result = match &mut self.io {
+            PhysIo::Tcp(x) => reply.write_to(x, false).await,
+            PhysIo::Udp(x) => reply.send_to(x).await,
+            #[cfg(feature = "enable-tls")]
+            PhysIo::Tls(x) => reply.write_to(x.as_mut(), true).await,
+            #[cfg(feature = "serial")]
+            PhysIo::Serial(x) => reply.write_to(x, false).await,
+            #[cfg(test)]
+            PhysIo::Mock(x) => reply.write_to(x, false).await,
+            #[cfg(test)]
+            PhysIo::Duplex(x) => reply.write_to(x, false).await,
+        };
+        if result.is_err() {
+            *reply = PendingReply::None;
+        }
+        result
+    }
+
     pub(crate) async fn read(
         &mut self,
         buffer: &mut [u8],
         level: PhysDecodeLevel,
     ) -> Result<(usize, PhysAddr), std::io::Error> {
-        let (length, addr) = match self {
-            Self::Tcp(x) => {
+        let (length, addr) = match &mut self.io {
+            PhysIo::Tcp(x) => {
                 let count = x.read(buffer).await?;
                 (count, PhysAddr::None)
             }
-            Self::Udp(x) => x.read(buffer).await?,
+            PhysIo::Udp(x) => x.read(buffer).await?,
             #[cfg(feature = "enable-tls")]
-            Self::Tls(x) => {
+            PhysIo::Tls(x) => {
                 let count = x.read(buffer).await?;
                 (count, PhysAddr::None)
             }
             #[cfg(feature = "serial")]
-            Self::Serial(x) => {
+            PhysIo::Serial(x) => {
                 let count = x.read(buffer).await?;
                 (count, PhysAddr::None)
             }
             #[cfg(test)]
-            Self::Mock(x) => {
+            PhysIo::Mock(x) => {
+                let count = x.read(buffer).await?;
+                (count, PhysAddr::None)
+            }
+            #[cfg(test)]
+            PhysIo::Duplex(x) => {
                 let count = x.read(buffer).await?;
                 (count, PhysAddr::None)
             }
@@ -93,19 +270,23 @@ impl PhysLayer {
         addr: PhysAddr,
         level: PhysDecodeLevel,
     ) -> Result<(), std::io::Error> {
+        self.finish_reply().await?;
+
         if level.enabled() {
             tracing::info!("PHYS TX - {}", PhysDisplay::new(level, data));
         }
 
-        match self {
-            Self::Tcp(x) => x.write_all(data).await,
-            Self::Udp(x) => x.write_all(data, addr).await,
+        match &mut self.io {
+            PhysIo::Tcp(x) => x.write_all(data).await,
+            PhysIo::Udp(x) => x.write_all(data, addr).await,
             #[cfg(feature = "enable-tls")]
-            Self::Tls(x) => write_all_and_flush(x, data).await,
+            PhysIo::Tls(x) => write_all_and_flush(x, data).await,
             #[cfg(feature = "serial")]
-            Self::Serial(x) => x.write_all(data).await,
+            PhysIo::Serial(x) => x.write_all(data).await,
             #[cfg(test)]
-            Self::Mock(x) => x.write_all(data).await,
+            PhysIo::Mock(x) => x.write_all(data).await,
+            #[cfg(test)]
+            PhysIo::Duplex(x) => x.write_all(data).await,
         }
     }
 }
@@ -148,7 +329,7 @@ impl std::fmt::Display for PhysDisplay<'_> {
 #[cfg(test)]
 #[cfg(feature = "enable-tls")]
 mod tls_tests {
-    use super::write_all_and_flush;
+    use super::{write_all_and_flush, PendingReply, PhysAddr, LINK_HEADER_LENGTH};
 
     use std::future::Future;
     use std::net::Ipv4Addr;
@@ -266,5 +447,39 @@ mod tls_tests {
         drop(server);
 
         assert!(with_timeout(write).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn reply_resumes_a_cancelled_flush() {
+        let (mut client, mut server) = connect().await;
+        // ciphertext the server hasn't read fills the duplex
+        assert!(matches!(
+            poll_once(pin!(client.write_all(&FRAME))),
+            Poll::Ready(Ok(()))
+        ));
+
+        let frame = [0x05, 0x64, 0x05, 0x00, 0x01, 0x00, 0x00, 0x04, 0x27, 0x70];
+        let mut reply = PendingReply::Write {
+            frame,
+            addr: PhysAddr::None,
+            written: 0,
+        };
+        assert!(poll_once(pin!(reply.write_to(&mut client, true))).is_pending());
+        assert_eq!(reply, PendingReply::Flush);
+
+        let mut received = [0; FRAME.len() + LINK_HEADER_LENGTH];
+        let (write_result, read_result) = with_timeout(async {
+            tokio::join!(
+                reply.write_to(&mut client, true),
+                server.read_exact(&mut received)
+            )
+        })
+        .await;
+        write_result.unwrap();
+        read_result.unwrap();
+
+        assert_eq!(received.as_slice(), [&FRAME[..], &frame].concat());
+        assert_eq!(reply, PendingReply::None);
+        assert!(!client.get_ref().1.wants_write());
     }
 }

@@ -39,11 +39,11 @@ impl UdpFactory {
         match self.0 {
             UdpFactoryType::Bound { local } => {
                 let layer = UdpLayer::bind(local).await?;
-                Ok(PhysLayer::Udp(layer))
+                Ok(PhysLayer::udp(layer))
             }
             UdpFactoryType::Connected { local, remote } => {
                 let layer = UdpLayer::connect(local, remote).await?;
-                Ok(PhysLayer::Udp(layer))
+                Ok(PhysLayer::udp(layer))
             }
         }
     }
@@ -617,7 +617,7 @@ mod tests {
     #[tokio::test]
     async fn master_session_ignores_a_request_from_port_0_and_answers_the_next() {
         let (layer, mut remote) = UdpLayer::scripted(None, &[]);
-        let mut phys = PhysLayer::Udp(layer);
+        let mut phys = PhysLayer::udp(layer);
         let (_channel, rx) = crate::util::channel::request_channel();
         let mut session = Session::master(MasterTask::new(
             Enabled::Yes,
@@ -727,7 +727,7 @@ mod tests {
     async fn read_skips_an_empty_datagram() {
         let socket = tokio::net::UdpSocket::bind(LOCAL).await.unwrap();
         let address = socket.local_addr().unwrap();
-        let mut phys = PhysLayer::Udp(UdpLayer::bound(socket));
+        let mut phys = PhysLayer::udp(UdpLayer::bound(socket));
 
         let remote = tokio::net::UdpSocket::bind(LOCAL).await.unwrap();
         remote.send_to(&[], address).await.unwrap();

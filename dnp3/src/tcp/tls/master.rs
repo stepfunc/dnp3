@@ -219,9 +219,7 @@ impl TlsClientConfig {
                 tracing::warn!("failed to establish TLS session with {endpoint}: {err}");
                 None
             }
-            Ok(Ok(stream)) => Some(PhysLayer::Tls(Box::new(tokio_rustls::TlsStream::from(
-                stream,
-            )))),
+            Ok(Ok(stream)) => Some(PhysLayer::tls(tokio_rustls::TlsStream::from(stream))),
         }
     }
 }

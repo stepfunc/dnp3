@@ -62,7 +62,7 @@ impl OneShotSerialOutstationTask {
     }
 
     pub(crate) async fn run(mut self) {
-        let mut io = PhysLayer::Serial(self.serial);
+        let mut io = PhysLayer::serial(self.serial);
         let _: crate::util::session::RunError = self.task.run(&mut io).await;
     }
 }

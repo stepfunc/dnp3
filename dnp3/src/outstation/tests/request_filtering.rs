@@ -170,7 +170,7 @@ impl LinkHarness {
         );
         let (io, io_handle) = sfio_tokio_mock_io::mock();
         let session = tokio::spawn(async move {
-            let mut io = PhysLayer::Mock(io);
+            let mut io = PhysLayer::mock(io);
             task.run(&mut io).await
         });
         Self {

@@ -896,6 +896,90 @@ mod tests {
         assert_eq!(low_16_bits(0x1234_5678), 0x5678);
     }
 
+    fn analog(value: f64) -> AnalogInput {
+        AnalogInput::new(value, Flags::ONLINE, Time::unsynchronized(0))
+    }
+
+    const OVER_RANGE: Flags = Flags::new(Flags::ONLINE.value | Flags::OVER_RANGE.value);
+
+    #[test]
+    fn i16_conversion_clamps_and_sets_over_range_on_both_sides() {
+        let cases: &[(f64, Flags, i16)] = &[
+            (0.0, Flags::ONLINE, 0),
+            (-1.9, Flags::ONLINE, -1),
+            (-32768.0, Flags::ONLINE, i16::MIN),
+            (-32768.5, OVER_RANGE, i16::MIN),
+            (-40000.0, OVER_RANGE, i16::MIN),
+            (f64::NEG_INFINITY, OVER_RANGE, i16::MIN),
+            (32767.0, Flags::ONLINE, i16::MAX),
+            (32767.5, OVER_RANGE, i16::MAX),
+            (40000.0, OVER_RANGE, i16::MAX),
+            (f64::INFINITY, OVER_RANGE, i16::MAX),
+            (f64::NAN, Flags::ONLINE, 0),
+        ];
+
+        for &(value, flags, wire) in cases {
+            assert_eq!(analog(value).to_i16(), (flags, wire), "value: {value}");
+        }
+    }
+
+    #[test]
+    fn i32_conversion_clamps_and_sets_over_range_on_both_sides() {
+        let cases: &[(f64, Flags, i32)] = &[
+            (0.0, Flags::ONLINE, 0),
+            (40000.0, Flags::ONLINE, 40000),
+            (-40000.0, Flags::ONLINE, -40000),
+            (-2147483648.0, Flags::ONLINE, i32::MIN),
+            (-2147483648.5, OVER_RANGE, i32::MIN),
+            (-1e12, OVER_RANGE, i32::MIN),
+            (f64::NEG_INFINITY, OVER_RANGE, i32::MIN),
+            (2147483647.0, Flags::ONLINE, i32::MAX),
+            (2147483647.5, OVER_RANGE, i32::MAX),
+            (1e12, OVER_RANGE, i32::MAX),
+            (f64::INFINITY, OVER_RANGE, i32::MAX),
+            (f64::NAN, Flags::ONLINE, 0),
+        ];
+
+        for &(value, flags, wire) in cases {
+            assert_eq!(analog(value).to_i32(), (flags, wire), "value: {value}");
+        }
+    }
+
+    #[test]
+    fn f32_conversion_clamps_and_sets_over_range_on_both_sides() {
+        // NaN has no single bit pattern, so compare bits only for numbers
+        fn bits(value: f32) -> Option<u32> {
+            (!value.is_nan()).then(|| value.to_bits())
+        }
+
+        let f32_max: f64 = f32::MAX.into();
+        let f32_min: f64 = f32::MIN.into();
+
+        let cases: &[(f64, Flags, f32)] = &[
+            (0.0, Flags::ONLINE, 0.0),
+            (0.5, Flags::ONLINE, 0.5),
+            (-40000.0, Flags::ONLINE, -40000.0),
+            (f32_min, Flags::ONLINE, f32::MIN),
+            (f32_min.next_down(), OVER_RANGE, f32::MIN),
+            (f64::MIN, OVER_RANGE, f32::MIN),
+            (f64::NEG_INFINITY, OVER_RANGE, f32::MIN),
+            (f32_max, Flags::ONLINE, f32::MAX),
+            (f32_max.next_up(), OVER_RANGE, f32::MAX),
+            (f64::MAX, OVER_RANGE, f32::MAX),
+            (f64::INFINITY, OVER_RANGE, f32::MAX),
+            (f64::NAN, Flags::ONLINE, f32::NAN),
+        ];
+
+        for &(value, flags, wire) in cases {
+            let (actual_flags, actual_wire) = analog(value).to_f32();
+            assert_eq!(
+                (actual_flags, bits(actual_wire)),
+                (flags, bits(wire)),
+                "value: {value}"
+            );
+        }
+    }
+
     #[test]
     fn octet_string_methods() {
         let octet_string = OctetString::new(&[0, 1, 2, 3, 4]).unwrap();
