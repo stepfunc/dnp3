@@ -9,6 +9,8 @@ pub(crate) mod future;
 pub(crate) mod phys;
 pub(crate) mod session;
 pub(crate) mod shutdown;
+#[cfg(test)]
+pub(crate) mod test_support;
 pub(crate) struct Smallest<T>
 where
     T: Copy + PartialOrd,

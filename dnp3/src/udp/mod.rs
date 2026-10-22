@@ -3,6 +3,9 @@ mod master;
 mod outstation;
 pub(crate) mod task;
 
+#[cfg(test)]
+mod lifecycle_tests;
+
 pub use master::*;
 pub use outstation::*;
 
