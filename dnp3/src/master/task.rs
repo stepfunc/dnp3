@@ -499,7 +499,7 @@ impl MasterSession {
 
                     match reader.pop_response() {
                         Some(TransportResponse::Response(source, response)) => {
-                            self.notify_link_activity(dest.link);
+                            self.notify_link_activity(source.link);
 
                             let result = self
                                 .validate_non_read_response(dest, seq, io, writer, source, response)
