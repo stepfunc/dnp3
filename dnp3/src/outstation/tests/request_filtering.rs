@@ -10,8 +10,8 @@ use crate::decode::{
     AppDecodeLevel, DecodeLevel, LinkDecodeLevel, PhysDecodeLevel, TransportDecodeLevel,
 };
 use crate::link::constant::MAX_LINK_FRAME_LENGTH;
-use crate::link::format::{format_data_frame, Payload};
-use crate::link::header::{AnyAddress, BroadcastConfirmMode, Header};
+use crate::link::format::{format_data_frame, header_bytes, Payload};
+use crate::link::header::{AnyAddress, BroadcastConfirmMode, ControlField, Header};
 use crate::link::reader::LinkModes;
 use crate::outstation::config::{Feature, OutstationConfig};
 use crate::outstation::database::{Add, BinaryInputConfig, EventClass, Update, UpdateOptions};
@@ -758,4 +758,107 @@ async fn unknown_function_from_another_master_keeps_the_selection_in_the_unsolic
         harness.check_events(&[Event::UnsolicitedConfirmReceived(0)]);
         harness.expect_nothing();
     }
+}
+
+/// a header-only frame with the link control octet `control`
+fn header_only(control: u8, destination: u16, source: u16) -> Vec<u8> {
+    header_bytes(
+        Header::new(
+            ControlField::from(control),
+            AnyAddress::from(destination),
+            AnyAddress::from(source),
+        ),
+        5,
+    )
+    .to_vec()
+}
+
+/// REQUEST_LINK_STATUS from the master, and the outstation's LINK_STATUS reply
+fn link_status_exchange() -> (Vec<u8>, Vec<u8>) {
+    (
+        header_only(0xC9, OUTSTATION, MASTER),
+        header_only(0x0B, MASTER, OUTSTATION),
+    )
+}
+
+impl LinkHarness {
+    /// send the master's REQUEST_LINK_STATUS and expect the reply
+    async fn exchange_link_status(&mut self) {
+        let (request, reply) = link_status_exchange();
+        self.send(&request).await;
+        assert_eq!(
+            self.io.next_event().await,
+            sfio_tokio_mock_io::Event::Write(reply)
+        );
+    }
+
+    async fn expect_link_status_request(&mut self) {
+        assert_eq!(
+            self.io.next_event().await,
+            sfio_tokio_mock_io::Event::Write(LINK_STATUS_REQUEST.to_vec())
+        );
+    }
+}
+
+fn with_keep_alive(mut config: OutstationConfig) -> OutstationConfig {
+    config.keep_alive_timeout = Some(KEEP_ALIVE_TIMEOUT);
+    config
+}
+
+#[tokio::test(start_paused = true)]
+async fn link_status_request_from_the_master_postpones_the_link_status_request() {
+    let start = Instant::now();
+    let mut harness = LinkHarness::new(
+        with_keep_alive(get_default_config()),
+        DecodeLevel::nothing(),
+    );
+    tokio::time::advance(ACTIVITY_AT).await;
+    harness.exchange_link_status().await;
+    harness.expect_nothing();
+    harness.expect_link_status_request().await;
+    assert_eq!(start.elapsed(), ACTIVITY_AT + KEEP_ALIVE_TIMEOUT);
+}
+
+#[tokio::test(start_paused = true)]
+async fn link_status_request_from_the_master_in_the_solicited_confirm_wait_postpones_the_link_status_request(
+) {
+    let start = Instant::now();
+    let mut harness = LinkHarness::new(
+        with_keep_alive(get_default_config()),
+        DecodeLevel::nothing(),
+    );
+    enter_sol_confirm_wait(&mut harness).await;
+    tokio::time::advance(ACTIVITY_AT).await;
+    harness.exchange_link_status().await;
+    harness.expect_nothing();
+
+    // the confirm wait times out at 5 seconds, before the link status request is due
+    harness.expect_link_status_request().await;
+    harness.check_events(&[Event::SolicitedConfirmTimeout(0)]);
+    assert_eq!(start.elapsed(), ACTIVITY_AT + KEEP_ALIVE_TIMEOUT);
+}
+
+/// the null unsolicited response is sent again every 5 seconds, and the link status request is
+/// only checked between the waits
+#[tokio::test(start_paused = true)]
+async fn link_status_request_from_the_master_in_the_unsolicited_confirm_wait_postpones_the_link_status_request(
+) {
+    let mut harness = LinkHarness::new(
+        with_keep_alive(get_default_unsolicited_config()),
+        DecodeLevel::nothing(),
+    );
+    harness
+        .expect_response(MASTER, NULL_UNSOLICITED_SEQ_0)
+        .await;
+    tokio::time::advance(ACTIVITY_AT).await;
+    harness.exchange_link_status().await;
+
+    // due at 14 seconds, so after the wait that ends at 15, not the one that ends at 10
+    harness
+        .expect_response(MASTER, &[0xF1, 0x82, 0x80, 0x00])
+        .await;
+    harness
+        .expect_response(MASTER, &[0xF2, 0x82, 0x80, 0x00])
+        .await;
+    harness.expect_link_status_request().await;
 }
