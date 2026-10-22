@@ -193,6 +193,7 @@ object RangedVariationModule extends Module {
         case v : AnyVariation if v.parent.groupType.isStatic => Some(v)
         case v : FixedSize if v.parent.groupType.isStatic => Some(v)
         case v : SizedByVariation if v.parent.groupType.isStatic => Some(v)
+        case v : AnyVariation if v.parent.groupType == GroupType.AnalogInputDeadband => Some(v)
         case v : FixedSize if v.parent.groupType == GroupType.AnalogInputDeadband => Some(v)
         case AllAttributesRequest => Some(v)
         case SpecificAttribute => Some(v)

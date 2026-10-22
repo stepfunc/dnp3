@@ -176,6 +176,7 @@ impl ReadQualifier {
                 | Variation::Group31Var6
                 | Variation::Group31Var7
                 | Variation::Group31Var8
+                | Variation::Group34Var0
                 | Variation::Group34Var1
                 | Variation::Group34Var2
                 | Variation::Group34Var3
