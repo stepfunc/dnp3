@@ -1043,7 +1043,7 @@ where
                 if x.value.status() != CommandStatus::Success {
                     return Err(CommandResponseError::BadStatus(x.value.status()));
                 }
-                if !x.equals(item) {
+                if x.index != item.1 || !x.value.echoes(&item.0) {
                     return Err(CommandResponseError::ObjectValueMismatch);
                 }
             }
@@ -1115,6 +1115,79 @@ mod tests {
         for (one, two) in commands() {
             check(&one, &two, Err(CommandResponseError::HeaderTypeMismatch));
             check(&two, &one, Err(CommandResponseError::HeaderTypeMismatch));
+        }
+    }
+
+    const OTHER_NAN_F32: f32 = f32::from_bits(0x7FC0_0001);
+    const OTHER_NAN_F64: f64 = f64::from_bits(0x7FF8_0000_0000_0001);
+
+    /// a sent command and its echo, with 1-byte and then 2-byte addressing
+    fn echo_pairs<C: Command>(sent: C, echo: C) -> [(CommandHeader, CommandHeader); 2] {
+        [
+            (CommandHeader::new(sent, 3u8), CommandHeader::new(echo, 3u8)),
+            (
+                CommandHeader::new(sent, 259u16),
+                CommandHeader::new(echo, 259u16),
+            ),
+        ]
+    }
+
+    /// each pair of g41v3 and g41v4 values, with both index widths
+    fn float_pairs(
+        values: &[(f32, f32)],
+        values64: &[(f64, f64)],
+    ) -> Vec<(CommandHeader, CommandHeader)> {
+        values
+            .iter()
+            .flat_map(|&(sent, echo)| echo_pairs(Group41Var3::new(sent), Group41Var3::new(echo)))
+            .chain(values64.iter().flat_map(|&(sent, echo)| {
+                echo_pairs(Group41Var4::new(sent), Group41Var4::new(echo))
+            }))
+            .collect()
+    }
+
+    #[test]
+    fn exact_nan_echo_matches() {
+        assert_ne!(f32::NAN.to_bits(), OTHER_NAN_F32.to_bits());
+        assert_ne!(f64::NAN.to_bits(), OTHER_NAN_F64.to_bits());
+        let pairs = float_pairs(
+            &[(f32::NAN, f32::NAN), (OTHER_NAN_F32, OTHER_NAN_F32)],
+            &[(f64::NAN, f64::NAN), (OTHER_NAN_F64, OTHER_NAN_F64)],
+        );
+        assert_eq!(pairs.len(), 8);
+        for (sent, echo) in pairs {
+            check(&sent, &echo, Ok(()));
+        }
+    }
+
+    #[test]
+    fn changed_float_value_is_an_object_value_mismatch() {
+        let pairs = float_pairs(
+            &[
+                (2.5, 3.5),
+                (f32::NAN, 2.5),
+                (2.5, f32::NAN),
+                (f32::NAN, OTHER_NAN_F32),
+            ],
+            &[
+                (2.5, 3.5),
+                (f64::NAN, 2.5),
+                (2.5, f64::NAN),
+                (f64::NAN, OTHER_NAN_F64),
+            ],
+        );
+        assert_eq!(pairs.len(), 16);
+        for (sent, echo) in pairs {
+            check(&sent, &echo, Err(CommandResponseError::ObjectValueMismatch));
+        }
+    }
+
+    #[test]
+    fn echo_with_the_other_signed_zero_is_an_object_value_mismatch() {
+        let pairs = float_pairs(&[(0.0, -0.0), (-0.0, 0.0)], &[(0.0, -0.0), (-0.0, 0.0)]);
+        assert_eq!(pairs.len(), 8);
+        for (sent, echo) in pairs {
+            check(&sent, &echo, Err(CommandResponseError::ObjectValueMismatch));
         }
     }
 }
