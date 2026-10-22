@@ -24,7 +24,14 @@ pub(crate) mod requests;
 struct DefaultAssociationHandler;
 impl AssociationHandler for DefaultAssociationHandler {}
 
-pub(crate) async fn create_association(mut config: AssociationConfig) -> TestHarness {
+pub(crate) async fn create_association(config: AssociationConfig) -> TestHarness {
+    create_association_with_handler(config, Box::new(DefaultAssociationHandler)).await
+}
+
+pub(crate) async fn create_association_with_handler(
+    mut config: AssociationConfig,
+    assoc_handler: Box<dyn AssociationHandler>,
+) -> TestHarness {
     // use a 1-second timeout for all tests
     config.response_timeout = Timeout::from_secs(1).unwrap();
 
@@ -74,7 +81,7 @@ pub(crate) async fn create_association(mut config: AssociationConfig) -> TestHar
             outstation_address,
             config,
             Box::new(handler),
-            Box::new(DefaultAssociationHandler),
+            assoc_handler,
             Box::new(info),
         )
         .await
@@ -259,6 +266,17 @@ impl TestHarness {
     pub(crate) async fn process_response(&mut self, data: Vec<u8>) {
         self.io.read(&data);
         assert_eq!(self.io.next_event().await, sfio_tokio_mock_io::Event::Read);
+    }
+
+    /// Check the time elapsed on the paused clock, allowing for tokio rounding each timer up to the
+    /// next millisecond
+    pub(crate) fn assert_elapsed(since: tokio::time::Instant, expected: std::time::Duration) {
+        let elapsed = since.elapsed();
+        assert!(
+            elapsed >= expected
+                && elapsed.saturating_sub(expected) < std::time::Duration::from_millis(10),
+            "expected {expected:?}, elapsed {elapsed:?}"
+        );
     }
 
     pub(crate) fn num_requests(&self) -> u64 {
