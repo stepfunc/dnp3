@@ -311,20 +311,24 @@ mod tests {
 
     struct Harness {
         assembler: Assembler,
+        discards: Vec<String>,
     }
 
     impl Harness {
         fn new() -> Self {
             Self {
                 assembler: Assembler::new(MAX),
+                discards: Vec::new(),
             }
         }
 
         /// returns true if the segment completed a fragment
         fn segment(&mut self, info: FrameInfo, fir: bool, fin: bool, seq: u8, data: &[u8]) -> bool {
             let header = Header::new(fin, fir, Sequence::new(seq));
+            let discards = &mut self.discards;
             matches!(
-                self.assembler.assemble(info, header, data, |_| {}),
+                self.assembler
+                    .assemble(info, header, data, |d| discards.push(d.to_string())),
                 AssemblyState::Complete
             )
         }
@@ -343,6 +347,15 @@ mod tests {
 
         fn single(&mut self, seq: u8, data: &[u8]) -> bool {
             self.segment(info(), true, true, seq, data)
+        }
+
+        fn peek(&self) -> Option<Vec<u8>> {
+            self.assembler.peek().map(|fragment| fragment.data.to_vec())
+        }
+
+        /// takes the discard reasons reported since the last call
+        fn discards(&mut self) -> Vec<String> {
+            std::mem::take(&mut self.discards)
         }
 
         fn pop(&mut self) -> Option<Vec<u8>> {
@@ -774,6 +787,184 @@ mod tests {
         let mut h = Harness::new();
         assert!(h.single(0, &[1]));
         h.assembler.reset();
+        assert_eq!(h.pop(), None);
+    }
+
+    #[test]
+    fn new_series_reports_the_bytes_it_drops() {
+        let mut h = Harness::new();
+        assert!(!h.first(0, &[1, 2]));
+        assert!(!h.middle(1, &[3]));
+        assert!(h.discards().is_empty());
+        assert!(!h.first(5, &[4]));
+        assert_eq!(
+            h.discards(),
+            ["received FIR - dropping 3 assembled bytes from 1"]
+        );
+        assert!(h.last(6, &[5]));
+        assert_eq!(h.pop(), Some(vec![4, 5]));
+        assert!(h.discards().is_empty());
+    }
+
+    #[test]
+    fn new_series_reports_an_empty_series_it_drops() {
+        let mut h = Harness::new();
+        assert!(!h.first(0, &[]));
+        assert!(!h.first(1, &[1]));
+        assert_eq!(
+            h.discards(),
+            ["received FIR - dropping 0 assembled bytes from 1"]
+        );
+    }
+
+    #[test]
+    fn first_segment_after_an_unread_fragment_replaces_it_without_a_discard() {
+        let mut h = Harness::new();
+        assert!(h.single(0, &[1; MAX]));
+        assert!(!h.first(1, &[2]));
+        assert!(h.discards().is_empty());
+        assert_eq!(h.peek(), None);
+        assert!(h.last(2, &[3]));
+        assert_eq!(h.pop(), Some(vec![2, 3]));
+    }
+
+    #[test]
+    fn single_segment_after_an_unread_fragment_replaces_it() {
+        let mut h = Harness::new();
+        assert!(h.single(0, &[1; MAX]));
+        assert!(h.single(1, &[2, 3]));
+        assert!(h.discards().is_empty());
+        assert_eq!(h.pop(), Some(vec![2, 3]));
+    }
+
+    #[test]
+    fn unread_fragment_survives_segments_without_fir() {
+        let mut h = Harness::new();
+        assert!(h.single(0, &[1, 2]));
+        assert!(h.last(1, &[3]));
+        assert!(h.middle(2, &[4]));
+        assert!(h.segment(broadcast(), false, true, 3, &[5]));
+        assert_eq!(
+            h.discards(),
+            [
+                "ignoring non-FIR segment from 1 with no previous FIR",
+                "ignoring non-FIR segment from 1 with no previous FIR",
+                "ignoring broadcast frame with transport header fir: false and fin: true",
+            ]
+        );
+        assert_eq!(h.pop(), Some(vec![1, 2]));
+    }
+
+    #[test]
+    fn unread_fragment_is_dropped_by_an_oversized_first_segment() {
+        let mut h = Harness::new();
+        assert!(h.single(0, &[1]));
+        assert!(!h.first(1, &[2; MAX + 1]));
+        assert_eq!(h.discards(), ["buffer overflow with 9 bytes to write"]);
+        assert_eq!(h.pop(), None);
+        h.assert_recovers(2);
+    }
+
+    #[test]
+    fn series_after_a_taken_fragment_starts_empty() {
+        let mut h = Harness::new();
+        assert!(h.single(0, &[1; MAX]));
+        assert_eq!(h.pop(), Some(vec![1; MAX]));
+        assert!(!h.first(1, &[2; MAX - 1]));
+        assert!(h.last(2, &[3]));
+        let mut expected = vec![2; MAX - 1];
+        expected.push(3);
+        assert_eq!(h.pop(), Some(expected));
+        assert!(h.discards().is_empty());
+    }
+
+    #[test]
+    fn series_after_a_reset_starts_empty() {
+        let mut h = Harness::new();
+        assert!(!h.first(0, &[1; MAX - 1]));
+        h.assembler.reset();
+        assert!(!h.first(1, &[2; MAX - 1]));
+        assert!(h.discards().is_empty());
+        assert!(h.last(2, &[3]));
+        assert_eq!(h.pop().map(|x| x.len()), Some(MAX));
+    }
+
+    #[test]
+    fn reset_after_a_completed_fragment_recovers() {
+        let mut h = Harness::new();
+        assert!(h.single(0, &[1; MAX]));
+        h.assembler.reset();
+        assert_eq!(h.peek(), None);
+        h.assert_recovers(1);
+    }
+
+    #[test]
+    fn series_after_an_abandoned_series_starts_empty() {
+        let mut h = Harness::new();
+        assert!(!h.first(0, &[1; MAX - 1]));
+        assert!(!h.middle(2, &[2]));
+        assert!(!h.first(3, &[3; MAX]));
+        assert!(h.last(4, &[]));
+        assert_eq!(h.pop(), Some(vec![3; MAX]));
+    }
+
+    #[test]
+    fn segment_discards_report_their_reasons() {
+        let mut h = Harness::new();
+        assert!(!h.first(0, &[1]));
+        assert!(!h.middle(1, &[2, 3]));
+        assert!(!h.middle(1, &[2, 3]));
+        assert_eq!(h.discards(), ["ignoring repeated segment with seq: 1"]);
+        assert!(!h.middle(1, &[2, 4]));
+        assert_eq!(
+            h.discards(),
+            ["segment with repeated seq: 1 differs from the previous segment"]
+        );
+
+        assert!(!h.first(10, &[1]));
+        assert!(!h.middle(12, &[2]));
+        assert_eq!(h.discards(), ["expected seq: 11 but received seq: 12"]);
+
+        assert!(!h.first(20, &[1; MAX - 1]));
+        assert!(!h.middle(21, &[2, 3]));
+        assert_eq!(h.discards(), ["buffer overflow with 2 bytes to write"]);
+
+        assert!(!h.first(30, &[1]));
+        assert!(!h.segment(from(2), false, true, 31, &[2]));
+        let discards = h.discards();
+        assert_eq!(discards.len(), 1);
+        assert!(discards[0].starts_with("conflicting addresses"));
+
+        assert!(!h.segment(broadcast(), true, false, 40, &[1]));
+        assert_eq!(
+            h.discards(),
+            ["ignoring broadcast frame with transport header fir: true and fin: false"]
+        );
+        h.assert_recovers(41);
+        assert!(h.discards().is_empty());
+    }
+
+    #[test]
+    fn repeat_compares_against_the_end_of_the_series() {
+        let mut h = Harness::new();
+        assert!(!h.first(0, &[1, 2]));
+        assert!(!h.middle(1, &[3, 4]));
+        assert!(!h.middle(1, &[3, 4]));
+        assert_eq!(h.discards(), ["ignoring repeated segment with seq: 1"]);
+        assert!(h.last(2, &[5]));
+        assert_eq!(h.pop(), Some(vec![1, 2, 3, 4, 5]));
+    }
+
+    #[test]
+    fn repeat_of_the_first_segment_without_fir_abandons_the_series() {
+        let mut h = Harness::new();
+        assert!(!h.first(0, &[1]));
+        assert!(!h.middle(0, &[1]));
+        assert_eq!(
+            h.discards(),
+            ["segment with repeated seq: 0 differs from the previous segment"]
+        );
+        assert!(!h.last(1, &[2]));
         assert_eq!(h.pop(), None);
     }
 }
