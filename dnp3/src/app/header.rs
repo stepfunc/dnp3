@@ -593,3 +593,18 @@ impl ResponseHeader {
         ]
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn bad_request_errors_are_iin2_bits_0_to_2() {
+        for value in 0..=u8::MAX {
+            let iin = Iin::new(Iin1::default(), Iin2::new(value));
+            let errors = value & 0b0000_0111;
+            assert_eq!(iin.bad_request_errors(), Iin2::new(errors), "{value:#04X}");
+            assert_eq!(iin.has_bad_request_error(), errors != 0, "{value:#04X}");
+        }
+    }
+}

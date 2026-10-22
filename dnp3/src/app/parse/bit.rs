@@ -178,6 +178,32 @@ mod tests {
     }
 
     #[test]
+    fn can_parse_bits_across_two_bytes() {
+        let range = Range::from(3, 12).unwrap(); // ten values
+        let data = [0b1010_0110, 0b0000_0010];
+        let mut cursor = ReadCursor::new(&data);
+        let seq = BitSequence::parse(range, &mut cursor).unwrap();
+        assert!(cursor.is_empty());
+        assert_eq!(seq.iter().size_hint(), (10, Some(10)));
+        let vec: Vec<(bool, u16)> = seq.iter().collect();
+        assert_eq!(
+            vec,
+            vec![
+                (false, 3),
+                (true, 4),
+                (true, 5),
+                (false, 6),
+                (false, 7),
+                (true, 8),
+                (false, 9),
+                (true, 10),
+                (false, 11),
+                (true, 12),
+            ]
+        );
+    }
+
+    #[test]
     fn can_parse_single_byte_of_double_bit() {
         let range = Range::from(1, 4).unwrap();
         let data = [0b11_10_01_00];
