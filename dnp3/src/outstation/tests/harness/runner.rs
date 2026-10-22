@@ -114,6 +114,10 @@ impl<S> Harness<S> {
         }
     }
 
+    pub(crate) fn poll_event(&mut self) -> Option<Event> {
+        self.events.poll()
+    }
+
     pub(crate) fn check_no_events(&mut self) {
         if let Some(x) = self.events.poll() {
             panic!("expected no events, but next event is: {x:?}")

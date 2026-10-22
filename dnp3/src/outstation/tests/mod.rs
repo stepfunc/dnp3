@@ -10,6 +10,8 @@ mod controls;
 mod freeze;
 /// various IIN bit tests
 mod iin;
+/// the answer of each non-READ function to every header the parser accepts
+mod non_read_headers;
 /// encoding tests for octet strings
 mod octet_strings;
 /// reading g34
