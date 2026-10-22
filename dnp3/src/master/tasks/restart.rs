@@ -43,10 +43,7 @@ impl OneShotRequest for RestartType {
     fn parse(&self, response: Response<'_>) -> Result<Duration, TaskError> {
         let header = response.get_only_object_header()?;
 
-        let count = header
-            .details
-            .count()
-            .ok_or(TaskError::UnexpectedResponseHeaders)?;
+        let count = header.count().ok_or(TaskError::UnexpectedResponseHeaders)?;
 
         match count {
             CountVariation::Group52Var1(val) => match val.single() {

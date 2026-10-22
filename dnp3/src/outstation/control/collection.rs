@@ -1,7 +1,7 @@
 use crate::app::control::*;
 use crate::app::gen::prefixed::PrefixedVariation;
 use crate::app::parse::count::CountSequence;
-use crate::app::parse::parser::{HeaderCollection, HeaderDetails, HeaderIterator, ObjectHeader};
+use crate::app::parse::parser::{HeaderCollection, HeaderIterator, ObjectHeader};
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::Index;
 use crate::app::{QualifierCode, Variation};
@@ -97,17 +97,17 @@ pub(crate) enum ControlMode {
 
 impl<'a> ObjectHeader<'a> {
     pub(crate) fn to_control_header(&self) -> Result<ControlHeader<'a>, BadControlHeader> {
-        let header = match &self.details {
-            HeaderDetails::CountAndPrefix8(_, objects) => {
+        let header = match self {
+            ObjectHeader::CountAndPrefix8(_, objects) => {
                 ControlObjects::new(objects).map(ControlHeader::OneByte)
             }
-            HeaderDetails::CountAndPrefix16(_, objects) => {
+            ObjectHeader::CountAndPrefix16(_, objects) => {
                 ControlObjects::new(objects).map(ControlHeader::TwoByte)
             }
             _ => None,
         };
 
-        header.ok_or_else(|| BadControlHeader::new(self.variation(), self.details.qualifier()))
+        header.ok_or_else(|| BadControlHeader::new(self.variation(), self.qualifier()))
     }
 }
 

@@ -1,7 +1,7 @@
 use crate::app::gen::prefixed::PrefixedVariation;
 use crate::app::measurement::*;
 use crate::app::parse::options::ParseOptions;
-use crate::app::parse::parser::{HeaderDetails, ParsedFragment};
+use crate::app::parse::parser::{ObjectHeader, ParsedFragment};
 use crate::app::{BufferSize, FunctionCode, Timestamp};
 use crate::link::header::BroadcastConfirmMode;
 use crate::outstation::config::OutstationConfig;
@@ -758,8 +758,8 @@ async fn sends_unsolicited_from_one_update() {
             .to_response()
             .unwrap();
         let mut num_events = 0;
-        match response.objects.unwrap().get_only_header().unwrap().details {
-            HeaderDetails::CountAndPrefix16(_, PrefixedVariation::Group32Var1(seq)) => {
+        match response.objects.unwrap().get_only_header().unwrap() {
+            ObjectHeader::CountAndPrefix16(_, PrefixedVariation::Group32Var1(seq)) => {
                 num_events += seq.iter().count()
             }
             x => panic!("Unexpected header: {x:?}"),

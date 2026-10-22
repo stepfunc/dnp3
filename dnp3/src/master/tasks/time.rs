@@ -166,12 +166,11 @@ impl TimeSyncTask {
 
         let header = response.get_only_object_header().map_err(TaskError::from)?;
 
-        let delay_ms: Option<u16> =
-            if let Some(CountVariation::Group52Var2(seq)) = header.details.count() {
-                seq.single().map(|x| x.time)
-            } else {
-                None
-            };
+        let delay_ms: Option<u16> = if let Some(CountVariation::Group52Var2(seq)) = header.count() {
+            seq.single().map(|x| x.time)
+        } else {
+            None
+        };
 
         let delay_ms = match delay_ms {
             Some(x) => x,
@@ -648,7 +647,7 @@ mod tests {
 
             assert_eq!(request.header.function, FunctionCode::Write);
             let header = request.objects.unwrap().get_only_header().unwrap();
-            match header.details.count().unwrap() {
+            match header.count().unwrap() {
                 CountVariation::Group50Var1(seq) => {
                     assert_eq!(
                         seq.single().unwrap().time,
@@ -789,7 +788,7 @@ mod tests {
 
             assert_eq!(request.header.function, FunctionCode::Write);
             let header = request.objects.unwrap().get_only_header().unwrap();
-            match header.details.count().unwrap() {
+            match header.count().unwrap() {
                 CountVariation::Group50Var3(seq) => {
                     assert_eq!(seq.single().unwrap().time, system_time);
                 }
@@ -824,7 +823,7 @@ mod tests {
             let request = writer.to_parsed().to_request().unwrap();
 
             let header = request.objects.unwrap().get_only_header().unwrap();
-            match header.details.count().unwrap() {
+            match header.count().unwrap() {
                 CountVariation::Group50Var1(seq) => {
                     assert_eq!(seq.single().unwrap().time, system_time);
                 }

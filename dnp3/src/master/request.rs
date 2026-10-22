@@ -5,7 +5,7 @@ use crate::app::control::CommandStatus;
 use crate::app::format::write::HeaderWriter;
 use crate::app::gen::prefixed::PrefixedVariation;
 use crate::app::parse::count::CountSequence;
-use crate::app::parse::parser::{HeaderCollection, HeaderDetails};
+use crate::app::parse::parser::{HeaderCollection, ObjectHeader};
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::Index;
 use crate::app::variations::*;
@@ -785,7 +785,7 @@ impl CommandHeaders {
         for sent in &self.headers {
             match iter.next() {
                 None => return Err(CommandResponseError::HeaderCountMismatch),
-                Some(received) => sent.compare(received.details)?,
+                Some(received) => sent.compare(received)?,
             }
         }
 
@@ -979,12 +979,12 @@ impl CommandHeader {
         }
     }
 
-    pub(crate) fn compare(&self, response: HeaderDetails) -> Result<(), CommandResponseError> {
+    pub(crate) fn compare(&self, response: ObjectHeader) -> Result<(), CommandResponseError> {
         match (self, response) {
-            (CommandHeader::U8(items), HeaderDetails::CountAndPrefix8(_, objects)) => {
+            (CommandHeader::U8(items), ObjectHeader::CountAndPrefix8(_, objects)) => {
                 items.compare(objects)
             }
-            (CommandHeader::U16(items), HeaderDetails::CountAndPrefix16(_, objects)) => {
+            (CommandHeader::U16(items), ObjectHeader::CountAndPrefix16(_, objects)) => {
                 items.compare(objects)
             }
             _ => Err(CommandResponseError::HeaderTypeMismatch),

@@ -8,7 +8,7 @@
 
 use crate::app::attr::AttrParseError;
 use crate::app::parse::options::ParseOptions;
-use crate::app::parse::parser::{HeaderCollection, HeaderDetails};
+use crate::app::parse::parser::{HeaderCollection, ObjectHeader};
 use crate::app::{FunctionCode, ObjectParseError, QualifierCode, Variation};
 
 use ObjectParseError as E;
@@ -342,10 +342,10 @@ fn each_parsed_header_carries_its_variation_and_qualifier() {
                 let headers = HeaderCollection::parse(options, function, &bytes).unwrap();
                 let header = headers.get_only_header().unwrap();
                 assert_eq!(header.variation(), variation);
-                assert_eq!(header.details.qualifier(), qualifier);
-                assert!(!matches!(header.details, HeaderDetails::Read(..)));
+                assert_eq!(header.qualifier(), qualifier);
+                assert!(!matches!(header, ObjectHeader::Read(..)));
                 assert_eq!(
-                    header.details.count().is_some(),
+                    header.count().is_some(),
                     matches!(qualifier, Q::Count8 | Q::Count16)
                 );
             }
@@ -365,7 +365,7 @@ fn headers_in_one_fragment_each_carry_their_variation_and_qualifier() {
             let headers = HeaderCollection::parse(options, function, &fragment).unwrap();
             let actual: Vec<(Variation, QualifierCode)> = headers
                 .iter()
-                .map(|header| (header.variation(), header.details.qualifier()))
+                .map(|header| (header.variation(), header.qualifier()))
                 .collect();
             let expected: Vec<(Variation, QualifierCode)> =
                 accepted.iter().map(|(v, q, _)| (*v, *q)).collect();
@@ -386,8 +386,8 @@ fn each_read_header_carries_its_variation_and_qualifier() {
             if let Ok(headers) = parsed {
                 let header = headers.get_only_header().unwrap();
                 assert_eq!(header.variation(), variation);
-                assert_eq!(header.details.qualifier(), qualifier);
-                assert!(header.details.count().is_none());
+                assert_eq!(header.qualifier(), qualifier);
+                assert!(header.count().is_none());
                 accepted += 1;
             }
         }

@@ -1,6 +1,6 @@
 use crate::app::format::write::HeaderWriter;
 use crate::app::parse::free_format::FreeFormatVariation;
-use crate::app::parse::parser::{HeaderDetails, Response};
+use crate::app::parse::parser::{ObjectHeader, Response};
 use crate::app::{FileStatus, FunctionCode, Group70Var5};
 use crate::master::tasks::{NonReadTask, OneShot, OneShotRequest};
 use crate::master::{BlockNumber, FileError, FileHandle, TaskError, TaskType};
@@ -36,8 +36,8 @@ impl OneShotRequest for WriteBlockRequest {
     fn parse(&self, response: Response<'_>) -> Result<(), FileError> {
         let header = response.objects?.get_only_header()?;
 
-        let obj = match header.details {
-            HeaderDetails::FreeFormat(FreeFormatVariation::Group70Var6(obj)) => obj,
+        let obj = match header {
+            ObjectHeader::FreeFormat(FreeFormatVariation::Group70Var6(obj)) => obj,
             _ => {
                 tracing::warn!(
                     "File WRITE response contains unexpected variation: {}",

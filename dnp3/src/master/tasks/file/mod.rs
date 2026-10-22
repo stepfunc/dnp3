@@ -1,7 +1,7 @@
 use crate::app::format::write::HeaderWriter;
 use crate::app::format::WriteError;
 use crate::app::parse::free_format::FreeFormatVariation;
-use crate::app::parse::parser::{HeaderDetails, ObjectHeader};
+use crate::app::parse::parser::ObjectHeader;
 use crate::app::{FileStatus, Group70Var2, Group70Var3, Group70Var4, Permissions, Timestamp};
 use crate::master::{AuthKey, FileCredentials, FileError, FileHandle, FileMode, OpenFile};
 
@@ -66,8 +66,8 @@ pub(super) fn write_close(handle: FileHandle, writer: &mut HeaderWriter) -> Resu
 }
 
 pub(super) fn parse_auth_response(header: ObjectHeader) -> Result<AuthKey, FileError> {
-    let obj = match header.details {
-        HeaderDetails::FreeFormat(FreeFormatVariation::Group70Var2(obj)) => obj,
+    let obj = match header {
+        ObjectHeader::FreeFormat(FreeFormatVariation::Group70Var2(obj)) => obj,
         _ => {
             tracing::warn!(
                 "File AUTHENTICATE response contains unexpected variation: {}",
@@ -132,8 +132,8 @@ fn parse_status_object<'a>(
     header: ObjectHeader<'a>,
     function: &str,
 ) -> Result<Group70Var4<'a>, FileError> {
-    match header.details {
-        HeaderDetails::FreeFormat(FreeFormatVariation::Group70Var4(obj)) => Ok(obj),
+    match header {
+        ObjectHeader::FreeFormat(FreeFormatVariation::Group70Var4(obj)) => Ok(obj),
         _ => {
             tracing::warn!(
                 "File {function} response contains unexpected variation: {}",
