@@ -34,7 +34,7 @@ pub(crate) struct Reply {
 }
 
 /// Why the link layer ignored a frame
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum Ignored {
     UnknownSource(AnyAddress),
     OtherDestination(EndpointAddress),
@@ -882,5 +882,211 @@ mod test {
                 }
             }
         }
+    }
+
+    /// reset the link and accept confirmed user data with FCB set, so the next FCB the link
+    /// expects is clear
+    fn reset_and_accept_one(
+        layer: &mut Layer,
+        from_master: bool,
+        local: EndpointAddress,
+        source: EndpointAddress,
+    ) {
+        process(
+            layer,
+            header(from_master, Function::PriResetLinkStates, local.wrap()),
+        );
+        let processed = process(layer, confirmed(from_master, true, local.wrap()));
+        assert_eq!(processed.info, Some(data_from(source, None)));
+    }
+
+    /// the next confirmed user data, with FCB clear, is delivered and acked
+    fn assert_next_fcb_is_clear(
+        layer: &mut Layer,
+        from_master: bool,
+        local: EndpointAddress,
+        source: EndpointAddress,
+        ack: [u8; 10],
+    ) {
+        let processed = process(layer, confirmed(from_master, false, local.wrap()));
+        assert_eq!(processed.info, Some(data_from(source, None)));
+        assert_eq!(processed.reply.as_deref(), Some(&ack[..]));
+        assert!(processed.ignored.is_empty());
+    }
+
+    /// each primary function with its FCV bit the wrong way round, and why it's ignored
+    fn wrong_fcv(from_master: bool, destination: AnyAddress) -> [(Header, Ignored); 4] {
+        let with_fcv = |function| {
+            let mut header = header(from_master, function, destination);
+            header.control.fcv = true;
+            header
+        };
+        // the FCB the link expects next, so only the FCV bit can stop it
+        let mut confirmed_without_fcv = confirmed(from_master, false, destination);
+        confirmed_without_fcv.control.fcv = false;
+        [
+            (
+                with_fcv(Function::PriUnconfirmedUserData),
+                Ignored::UnconfirmedWithFcv,
+            ),
+            (
+                with_fcv(Function::PriResetLinkStates),
+                Ignored::ResetWithFcv,
+            ),
+            (confirmed_without_fcv, Ignored::ConfirmedWithoutFcv),
+            (
+                with_fcv(Function::PriRequestLinkStatus),
+                Ignored::LinkStatusWithFcv,
+            ),
+        ]
+    }
+
+    /// frames with the wrong FCV bit are ignored without a reply, and leave the secondary state
+    /// as it was
+    fn frames_with_the_wrong_fcv_bit_are_ignored(
+        mut layer: Layer,
+        from_master: bool,
+        local: EndpointAddress,
+        source: EndpointAddress,
+        ack: [u8; 10],
+    ) {
+        reset_and_accept_one(&mut layer, from_master, local, source);
+        for (header, reason) in wrong_fcv(from_master, local.wrap()) {
+            let processed = process(&mut layer, header);
+            assert_eq!(processed.info, None);
+            assert_eq!(processed.reply, None);
+            assert_eq!(processed.ignored, [reason]);
+        }
+        assert_next_fcb_is_clear(&mut layer, from_master, local, source, ack);
+    }
+
+    #[test]
+    fn outstation_ignores_frames_with_the_wrong_fcv_bit() {
+        frames_with_the_wrong_fcv_bit_are_ignored(
+            outstation(Feature::Disabled),
+            true,
+            OUTSTATION,
+            MASTER,
+            ACK_FROM_OUTSTATION,
+        );
+    }
+
+    #[test]
+    fn master_ignores_frames_with_the_wrong_fcv_bit() {
+        frames_with_the_wrong_fcv_bit_are_ignored(
+            master(),
+            false,
+            MASTER,
+            OUTSTATION,
+            ACK_FROM_MASTER,
+        );
+    }
+
+    /// the lowest and highest reserved addresses
+    const RESERVED: [u16; 2] = [0xFFF0, 0xFFFB];
+
+    /// frames sent to a reserved address are ignored without a reply, and leave the secondary
+    /// state as it was
+    fn frames_to_reserved_addresses_are_ignored(
+        mut layer: Layer,
+        from_master: bool,
+        local: EndpointAddress,
+        source: EndpointAddress,
+        ack: [u8; 10],
+    ) {
+        reset_and_accept_one(&mut layer, from_master, local, source);
+        for address in RESERVED {
+            let mut headers = requests(from_master, AnyAddress::from(address));
+            // the FCB the link expects next, so only the address can stop it
+            headers[2].control.fcb = false;
+            for header in headers {
+                let processed = process(&mut layer, header);
+                assert_eq!(processed.info, None);
+                assert_eq!(processed.reply, None);
+                assert_eq!(processed.ignored, [Ignored::ReservedDestination(address)]);
+            }
+        }
+        assert_next_fcb_is_clear(&mut layer, from_master, local, source, ack);
+    }
+
+    #[test]
+    fn outstation_ignores_frames_to_reserved_addresses() {
+        for self_address in [Feature::Disabled, Feature::Enabled] {
+            frames_to_reserved_addresses_are_ignored(
+                outstation(self_address),
+                true,
+                OUTSTATION,
+                MASTER,
+                ACK_FROM_OUTSTATION,
+            );
+        }
+    }
+
+    #[test]
+    fn master_ignores_frames_to_reserved_addresses() {
+        frames_to_reserved_addresses_are_ignored(
+            master(),
+            false,
+            MASTER,
+            OUTSTATION,
+            ACK_FROM_MASTER,
+        );
+    }
+
+    /// the functions the link layer never acts on: test link states, the secondary functions
+    /// other than link status, and unknown primary and secondary codes
+    const IGNORED_FUNCTIONS: [Function; 6] = [
+        Function::PriTestLinkStates,
+        Function::SecAck,
+        Function::SecNack,
+        Function::SecNotSupported,
+        Function::Unknown(0x41),
+        Function::Unknown(0x0E),
+    ];
+
+    /// frames with a function the link layer doesn't act on are ignored without a reply, whatever
+    /// their FCB and FCV bits, and leave the secondary state as it was
+    fn frames_with_ignored_functions_are_ignored(
+        mut layer: Layer,
+        from_master: bool,
+        local: EndpointAddress,
+        source: EndpointAddress,
+        ack: [u8; 10],
+    ) {
+        reset_and_accept_one(&mut layer, from_master, local, source);
+        for function in IGNORED_FUNCTIONS {
+            for (fcb, fcv) in [(false, false), (false, true), (true, true)] {
+                let mut header = header(from_master, function, local.wrap());
+                header.control.fcb = fcb;
+                header.control.fcv = fcv;
+                let processed = process(&mut layer, header);
+                assert_eq!(processed.info, None);
+                assert_eq!(processed.reply, None);
+                assert_eq!(processed.ignored, [Ignored::Function(function)]);
+            }
+        }
+        assert_next_fcb_is_clear(&mut layer, from_master, local, source, ack);
+    }
+
+    #[test]
+    fn outstation_ignores_frames_with_functions_it_does_not_act_on() {
+        frames_with_ignored_functions_are_ignored(
+            outstation(Feature::Disabled),
+            true,
+            OUTSTATION,
+            MASTER,
+            ACK_FROM_OUTSTATION,
+        );
+    }
+
+    #[test]
+    fn master_ignores_frames_with_functions_it_does_not_act_on() {
+        frames_with_ignored_functions_are_ignored(
+            master(),
+            false,
+            MASTER,
+            OUTSTATION,
+            ACK_FROM_MASTER,
+        );
     }
 }
