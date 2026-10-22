@@ -84,3 +84,35 @@ async fn attribute_that_cannot_be_encoded_is_skipped_without_a_partial_header() 
         .test_request_response(READ_ALL_ATTRIBUTES, &response)
         .await;
 }
+
+#[tokio::test]
+async fn attribute_defined_in_private_set_zero_is_read_from_the_default_set() {
+    let mut harness = new_harness(get_default_config());
+
+    harness.handle.database.transaction(|db| {
+        db.define_attr(
+            AttrProp::default(),
+            OwnedAttribute::new(
+                AttrSet::Private(0),
+                var::DEVICE_SERIAL_NUMBER,
+                OwnedAttrValue::VisibleString("serial".to_string()),
+            ),
+        )
+        .unwrap();
+    });
+
+    // read g0v248 (device serial number) in set 0
+    let request = &[
+        0xC0,
+        0x01,
+        0x00,
+        var::DEVICE_SERIAL_NUMBER,
+        0x00,
+        0x00,
+        0x00,
+    ];
+    let mut response = vec![0xC0, 0x81, 0x80, 0x00];
+    response.extend(encode_string(var::DEVICE_SERIAL_NUMBER, "serial"));
+
+    harness.test_request_response(request, &response).await;
+}

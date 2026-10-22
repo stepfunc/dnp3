@@ -121,8 +121,10 @@ impl SetMap {
     pub(crate) fn define(
         &mut self,
         prop: AttrProp,
-        attr: OwnedAttribute,
+        mut attr: OwnedAttribute,
     ) -> Result<(), AttrDefError> {
+        attr.set = AttrSet::new(attr.set.value());
+
         // reject reserved variations
         let variation = Variation::create(attr.variation)?;
 
@@ -298,6 +300,64 @@ mod test {
         let err = map.define(AttrProp::writable(), attr).unwrap_err();
         assert_eq!(
             err,
+            AttrDefError::NotWritable(
+                AttrSet::Default,
+                StringAttr::DeviceSubsetAndConformance.variation()
+            )
+        );
+    }
+
+    #[test]
+    fn private_set_zero_is_defined_as_the_default_set() {
+        let mut map = SetMap::default();
+        let attr = OwnedAttribute::new(
+            AttrSet::Private(0),
+            StringAttr::UserAssignedLocation.variation(),
+            OwnedAttrValue::VisibleString("Bend".into()),
+        );
+        map.define(AttrProp::writable(), attr).unwrap();
+
+        assert_eq!(map.sets().collect::<Vec<_>>(), vec![AttrSet::Default]);
+        assert_eq!(
+            map.get(
+                AttrSet::Default,
+                StringAttr::UserAssignedLocation.variation()
+            )
+            .unwrap()
+            .set,
+            AttrSet::Default
+        );
+
+        let again = StringAttr::UserAssignedLocation.with_value("Bend");
+        assert_eq!(
+            map.define(AttrProp::writable(), again).unwrap_err(),
+            AttrDefError::AlreadyDefined
+        );
+    }
+
+    #[test]
+    fn private_set_zero_gets_default_set_checks() {
+        let mut map = SetMap::default();
+        let attr = OwnedAttribute::new(
+            AttrSet::Private(0),
+            StringAttr::UserAssignedLocation.variation(),
+            OwnedAttrValue::SignedInt(42),
+        );
+        assert_eq!(
+            map.define(AttrProp::writable(), attr).unwrap_err(),
+            AttrDefError::BadType(TypeError {
+                expected: AttrDataType::VisibleString,
+                actual: AttrDataType::SignedInt
+            })
+        );
+
+        let attr = OwnedAttribute::new(
+            AttrSet::Private(0),
+            StringAttr::DeviceSubsetAndConformance.variation(),
+            OwnedAttrValue::VisibleString("3:2010".into()),
+        );
+        assert_eq!(
+            map.define(AttrProp::writable(), attr).unwrap_err(),
             AttrDefError::NotWritable(
                 AttrSet::Default,
                 StringAttr::DeviceSubsetAndConformance.variation()
