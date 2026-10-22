@@ -1,9 +1,12 @@
 use crate::app::format::write::HeaderWriter;
 use crate::app::parse::parser::Response;
+use crate::app::parse::traits::Index;
 use crate::app::FunctionCode;
 use crate::master::tasks::empty_response::expect_empty;
 use crate::master::tasks::{NonReadTask, OneShot, OneShotRequest};
-use crate::master::{DeadBandHeader, DeadBandHeaderVariants, TaskError, TaskType, WriteError};
+use crate::master::{
+    DeadBandHeader, DeadBandHeaderVariants, DeadBands, TaskError, TaskType, WriteError,
+};
 
 pub(crate) struct DeadBandsRequest {
     headers: Vec<DeadBandHeader>,
@@ -12,12 +15,18 @@ pub(crate) struct DeadBandsRequest {
 impl DeadBandHeaderVariants {
     fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         match self {
-            Self::G34V1U8(x) => writer.write_prefixed_items(x.iter()),
-            Self::G34V1U16(x) => writer.write_prefixed_items(x.iter()),
-            Self::G34V2U8(x) => writer.write_prefixed_items(x.iter()),
-            Self::G34V2U16(x) => writer.write_prefixed_items(x.iter()),
-            Self::G34V3U8(x) => writer.write_prefixed_items(x.iter()),
-            Self::G34V3U16(x) => writer.write_prefixed_items(x.iter()),
+            Self::U8(x) => x.write(writer),
+            Self::U16(x) => x.write(writer),
+        }
+    }
+}
+
+impl<I: Index> DeadBands<I> {
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
+        match self {
+            Self::V1(x) => writer.write_prefixed_items(x.iter()),
+            Self::V2(x) => writer.write_prefixed_items(x.iter()),
+            Self::V3(x) => writer.write_prefixed_items(x.iter()),
         }
     }
 }
