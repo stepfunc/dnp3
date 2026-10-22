@@ -9,8 +9,8 @@ use crate::util::phys::{PhysAddr, PhysLayer};
 use crate::link;
 use scursor::{ReadCursor, WriteCursor};
 
-/// Given a fragment size, how should we size our read buffer
-const fn read_buffer_size(fragment_size: usize) -> usize {
+/// The largest read for a fragment size: the frames that carry a fragment of this size
+const fn max_read_size(fragment_size: usize) -> usize {
     // the link frames needed to carry a fragment of this size, and at least one
     let num_frames = fragment_size.div_ceil(link::constant::MAX_APP_BYTES_PER_FRAME);
     let num_frames = if num_frames == 0 { 1 } else { num_frames };
@@ -19,6 +19,21 @@ const fn read_buffer_size(fragment_size: usize) -> usize {
     num_frames
         .saturating_mul(link::constant::MAX_LINK_FRAME_LENGTH)
         .saturating_add(1)
+}
+
+/// The most bytes of an incomplete frame a stream leaves unread between reads
+const MAX_INCOMPLETE_FRAME: usize = link::constant::MAX_LINK_FRAME_LENGTH - 1;
+
+/// The read buffer for a read mode and fragment size
+///
+/// A datagram reader discards what it can't parse before each read. A stream reader keeps an
+/// incomplete frame, and still has room for the largest read after it.
+const fn read_buffer_size(read_mode: LinkReadMode, fragment_size: usize) -> usize {
+    let read_size = max_read_size(fragment_size);
+    match read_mode {
+        LinkReadMode::Datagram => read_size,
+        LinkReadMode::Stream => read_size.saturating_add(MAX_INCOMPLETE_FRAME),
+    }
 }
 
 /// Combines the error and read modes
@@ -138,7 +153,7 @@ impl ReadBuffer {
 
 impl Reader {
     pub(crate) fn new(link_modes: LinkModes, max_fragment_size: usize) -> Self {
-        let buffer_size = read_buffer_size(max_fragment_size);
+        let buffer_size = read_buffer_size(link_modes.read_mode, max_fragment_size);
 
         Self {
             read_mode: link_modes.read_mode,
@@ -186,7 +201,12 @@ impl Reader {
                     tracing::warn!("Partial datagram of length {length} did not contain a full link-layer frame. Resetting link-layer parser.");
                 }
             }
-            let (count, addr) = io.read(self.write_space()?, level.physical).await?;
+            let space = if io.is_datagram_socket() {
+                self.datagram_space()?
+            } else {
+                self.write_space()?
+            };
+            let (count, addr) = io.read(space, level.physical).await?;
             self.wrote(count)?;
             self.addr = addr;
         }
@@ -233,7 +253,18 @@ impl Reader {
         self.buffer.writable()
     }
 
-    /// Record that `count` bytes were read into [`Self::write_space`]
+    /// The space to read a datagram into, after moving the unread bytes to the start of the buffer
+    ///
+    /// A datagram that doesn't fit is truncated, so this always leaves room for the largest read:
+    /// a stream reader's unread bytes are at most one incomplete frame, and a datagram reader's
+    /// buffer is empty.
+    #[cfg_attr(all(test, dnp3_no_panic), no_panic::no_panic)]
+    pub(crate) fn datagram_space(&mut self) -> Result<&mut [u8], LogicError> {
+        self.buffer.shift_unread_bytes()?;
+        self.buffer.writable()
+    }
+
+    /// Record that `count` bytes were read into [`Self::write_space`] or [`Self::datagram_space`]
     #[cfg_attr(all(test, dnp3_no_panic), no_panic::no_panic)]
     pub(crate) fn wrote(&mut self, count: usize) -> Result<(), LogicError> {
         self.buffer.advance_write(count)
@@ -241,6 +272,7 @@ impl Reader {
 }
 
 /// What [`Reader::step`] did with the data in the buffer
+#[derive(Debug, PartialEq)]
 pub(crate) enum Step {
     /// a complete frame
     Frame(Header),
@@ -254,6 +286,8 @@ pub(crate) enum Step {
 mod tests {
     use super::*;
     use crate::link::error::FrameError;
+    use crate::link::format::{format_data_frame, Payload};
+    use crate::link::header::AnyAddress;
     use crate::link::test_data::{
         TestFrame, ACK, CONFIRM_USER_DATA, MULTI_BLOCK_USER_DATA, RESET_LINK, UNCONFIRMED_USER_DATA,
     };
@@ -355,6 +389,16 @@ mod tests {
         (frame.header, frame.payload.to_vec())
     }
 
+    /// read `chunk` into the reader
+    fn load(reader: &mut Reader, chunk: &[u8]) -> Result<(), LogicError> {
+        reader
+            .write_space()?
+            .get_mut(..chunk.len())
+            .unwrap()
+            .copy_from_slice(chunk);
+        reader.wrote(chunk.len())
+    }
+
     /// read `chunk` into the reader, then step until it needs more data, adding the frames to
     /// `frames`
     fn feed(
@@ -363,12 +407,7 @@ mod tests {
         chunk: &[u8],
         frames: &mut Vec<Frame>,
     ) -> Result<(), LinkError> {
-        reader
-            .write_space()?
-            .get_mut(..chunk.len())
-            .unwrap()
-            .copy_from_slice(chunk);
-        reader.wrote(chunk.len())?;
+        load(reader, chunk)?;
         loop {
             match reader.step(payload)? {
                 Step::Frame(header) => frames.push((header, payload.get().to_vec())),
@@ -530,5 +569,148 @@ mod tests {
         )
         .unwrap();
         assert_eq!(frames, [frame(&ACK), frame(&UNCONFIRMED_USER_DATA)]);
+    }
+
+    #[test]
+    fn only_a_datagram_reader_discards_an_incomplete_frame_and_reports_its_length() {
+        let input = [RESET_LINK.bytes, &ACK.bytes[..4]].concat();
+        let mut payload = FramePayload::new();
+
+        let mut reader = Reader::new(LinkModes::datagram(LinkErrorMode::Discard), 2048);
+        load(&mut reader, &input).unwrap();
+        assert_eq!(
+            reader.step(&mut payload),
+            Ok(Step::Frame(RESET_LINK.header))
+        );
+        assert_eq!(reader.step(&mut payload), Ok(Step::PartialDatagram(4)));
+        assert_eq!(reader.step(&mut payload), Ok(Step::NeedData));
+        // the rest of the frame, alone, is no frame either
+        load(&mut reader, &ACK.bytes[4..]).unwrap();
+        assert_eq!(reader.step(&mut payload), Ok(Step::PartialDatagram(6)));
+        assert_eq!(reader.step(&mut payload), Ok(Step::NeedData));
+
+        let mut reader = Reader::new(LinkModes::stream(LinkErrorMode::Discard), 2048);
+        load(&mut reader, &input).unwrap();
+        assert_eq!(
+            reader.step(&mut payload),
+            Ok(Step::Frame(RESET_LINK.header))
+        );
+        assert_eq!(reader.step(&mut payload), Ok(Step::NeedData));
+        assert_eq!(reader.step(&mut payload), Ok(Step::NeedData));
+        load(&mut reader, &ACK.bytes[4..]).unwrap();
+        assert_eq!(reader.step(&mut payload), Ok(Step::Frame(ACK.header)));
+        assert_eq!(reader.step(&mut payload), Ok(Step::NeedData));
+    }
+
+    /// a frame carrying the most data a frame can, filled with `fill`
+    fn full_frame(fill: u8) -> (Vec<u8>, Frame) {
+        let header =
+            Header::unconfirmed_user_data(true, AnyAddress::from(1), AnyAddress::from(1024));
+        let data = [fill; link::constant::MAX_APP_BYTES_PER_FRAME];
+        let mut buffer = [0; link::constant::MAX_LINK_FRAME_LENGTH];
+        let mut cursor = WriteCursor::new(&mut buffer);
+        let bytes = format_data_frame(header, Payload::new(0xC0, &data), &mut cursor)
+            .unwrap()
+            .frame
+            .to_vec();
+        assert_eq!(bytes.len(), link::constant::MAX_LINK_FRAME_LENGTH);
+        (bytes, (header, [&[0xC0], &data[..]].concat()))
+    }
+
+    /// a UDP stream reader for the smallest fragment size, which one frame carries
+    fn udp_stream_reader() -> Reader {
+        Reader::new(
+            LinkModes::stream(LinkErrorMode::Discard),
+            link::constant::MAX_APP_BYTES_PER_FRAME,
+        )
+    }
+
+    /// the next frame, with its payload, and where it came from
+    async fn next_frame(reader: &mut Reader, io: &mut PhysLayer) -> (Frame, PhysAddr) {
+        let mut payload = FramePayload::new();
+        let read = reader.read_frame(io, &mut payload, DecodeLevel::nothing());
+        let (header, addr) = tokio::time::timeout(std::time::Duration::from_secs(1), read)
+            .await
+            .expect("no frame was read")
+            .unwrap();
+        ((header, payload.get().to_vec()), addr)
+    }
+
+    #[tokio::test]
+    async fn udp_stream_datagram_that_completes_a_buffered_frame_is_not_truncated() {
+        let (mut io, local) = bound().await;
+        let (sender, addr) = sender().await;
+        let (full, full_frame) = full_frame(0xAA);
+        let (start, end) = full.split_at(283);
+        sender
+            .send_to(&[ACK.bytes, start].concat(), local)
+            .await
+            .unwrap();
+        sender
+            .send_to(&[end, ACK.bytes].concat(), local)
+            .await
+            .unwrap();
+
+        let mut reader = udp_stream_reader();
+        assert_eq!(next_frame(&mut reader, &mut io).await, (frame(&ACK), addr));
+        assert_eq!(next_frame(&mut reader, &mut io).await, (full_frame, addr));
+        assert_eq!(next_frame(&mut reader, &mut io).await, (frame(&ACK), addr));
+    }
+
+    #[tokio::test]
+    async fn udp_stream_full_size_datagram_after_the_longest_incomplete_frame_is_not_truncated() {
+        let (mut io, local) = bound().await;
+        let (sender, addr) = sender().await;
+        let (truncated, _) = full_frame(0xAA);
+        let (full, full_frame) = full_frame(0xBB);
+        // all but the last byte of a frame, whose end never arrives
+        sender
+            .send_to(&truncated[..truncated.len() - 1], local)
+            .await
+            .unwrap();
+        sender.send_to(&full, local).await.unwrap();
+
+        let mut reader = udp_stream_reader();
+        assert_eq!(next_frame(&mut reader, &mut io).await, (full_frame, addr));
+    }
+
+    #[tokio::test]
+    async fn udp_stream_full_size_datagrams_that_each_end_in_an_incomplete_frame_are_not_truncated()
+    {
+        let (mut io, local) = bound().await;
+        let (sender, addr) = sender().await;
+        let (first, first_frame) = full_frame(0xAA);
+        let (second, second_frame) = full_frame(0xBB);
+        let (first_start, first_end) = first.split_at(283);
+        let (second_start, second_end) = second.split_at(283);
+        let datagrams = [
+            [ACK.bytes, first_start].concat(),
+            [first_end, second_start].concat(),
+            [second_end, ACK.bytes].concat(),
+        ];
+        assert_eq!(datagrams[1].len(), link::constant::MAX_LINK_FRAME_LENGTH);
+        for datagram in datagrams {
+            sender.send_to(&datagram, local).await.unwrap();
+        }
+
+        let mut reader = udp_stream_reader();
+        assert_eq!(next_frame(&mut reader, &mut io).await, (frame(&ACK), addr));
+        assert_eq!(next_frame(&mut reader, &mut io).await, (first_frame, addr));
+        assert_eq!(next_frame(&mut reader, &mut io).await, (second_frame, addr));
+        assert_eq!(next_frame(&mut reader, &mut io).await, (frame(&ACK), addr));
+    }
+
+    #[test]
+    fn datagram_space_after_the_longest_incomplete_frame_fits_the_largest_datagram_and_one_byte() {
+        let (truncated, _) = full_frame(0xAA);
+        let mut reader = udp_stream_reader();
+        let mut payload = FramePayload::new();
+        load(&mut reader, &truncated[..truncated.len() - 1]).unwrap();
+        assert_eq!(reader.step(&mut payload), Ok(Step::NeedData));
+        // the extra byte shows a datagram that filled the space wasn't truncated
+        assert_eq!(
+            reader.datagram_space().unwrap().len(),
+            link::constant::MAX_LINK_FRAME_LENGTH + 1
+        );
     }
 }

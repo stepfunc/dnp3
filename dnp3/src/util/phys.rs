@@ -168,6 +168,11 @@ impl PhysLayer {
         &self.io
     }
 
+    /// Whether reads return whole datagrams, truncating any that don't fit
+    pub(crate) fn is_datagram_socket(&self) -> bool {
+        matches!(self.io, PhysIo::Udp(_))
+    }
+
     /// Queue a link-layer reply, which [`Self::finish_reply`] writes
     ///
     /// Fails if the last reply hasn't been finished.
