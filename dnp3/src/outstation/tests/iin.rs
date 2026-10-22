@@ -1,6 +1,7 @@
 use crate::app::measurement::{BinaryInput, Flags, Time};
 use crate::app::Timestamp;
 use crate::outstation::database::{Add, BinaryInputConfig, EventClass, Update, UpdateOptions};
+use crate::outstation::{BufferState, ClassCount, TypeCount};
 
 use super::harness::*;
 
@@ -95,6 +96,131 @@ async fn buffer_overflow() {
     harness.send_and_process(CONFIRM_SEQ_0).await;
     harness
         .test_request_response(READ_CLASS_123, EMPTY_RESPONSE)
+        .await;
+}
+
+fn update_binary(database: &mut crate::outstation::database::Database, index: u16, value: bool) {
+    database.update(
+        index,
+        &BinaryInput::new(value, Flags::ONLINE, Time::Synchronized(Timestamp::new(0))),
+        UpdateOptions::default(),
+    );
+}
+
+fn binary_states(binary: usize, classes: [usize; 3]) -> BufferState {
+    BufferState {
+        classes: ClassCount {
+            num_class_1: classes[0],
+            num_class_2: classes[1],
+            num_class_3: classes[2],
+        },
+        types: TypeCount {
+            num_binary_input: binary,
+            num_double_bit_binary_input: 0,
+            num_binary_output_status: 0,
+            num_counter: 0,
+            num_frozen_counter: 0,
+            num_analog: 0,
+            num_analog_output_status: 0,
+            num_octet_string: 0,
+        },
+    }
+}
+
+#[tokio::test]
+async fn class_bits_and_buffer_state_follow_the_events_across_reads_and_confirms() {
+    let mut harness = new_harness(get_default_config());
+
+    // one event in each class, from binary inputs 0, 1 and 2
+    harness.handle.database.transaction(|database| {
+        database.add(0, Some(EventClass::Class1), BinaryInputConfig::default());
+        database.add(1, Some(EventClass::Class2), BinaryInputConfig::default());
+        database.add(2, Some(EventClass::Class3), BinaryInputConfig::default());
+        for index in 0..3 {
+            update_binary(database, index, true);
+        }
+    });
+
+    // IIN1.1 is clear once the class 1 event is written, while IIN1.2 and IIN1.3 remain
+    harness
+        .test_request_response(
+            READ_CLASS_1,
+            &[
+                0xE0, 0x81, 0x8C, 0x00, 0x02, 0x01, 0x28, 0x01, 0x00, 0x00, 0x00, 0x81,
+            ],
+        )
+        .await;
+    harness.send_and_process(CONFIRM_SEQ_0).await;
+    harness.check_events(&[
+        Event::EnterSolicitedConfirmWait(0),
+        Event::SolicitedConfirmReceived(0),
+        Event::BeginConfirm,
+        Event::Cleared(0),
+        Event::EndConfirm(binary_states(2, [0, 1, 1])),
+    ]);
+
+    harness
+        .test_request_response(
+            &[0xC1, 0x01, 60, 3, 0x06],
+            &[
+                0xE1, 0x81, 0x88, 0x00, 0x02, 0x01, 0x28, 0x01, 0x00, 0x01, 0x00, 0x81,
+            ],
+        )
+        .await;
+    harness.send_and_process(&[0xC1, 0x00]).await;
+    harness.check_events(&[
+        Event::EnterSolicitedConfirmWait(1),
+        Event::SolicitedConfirmReceived(1),
+        Event::BeginConfirm,
+        Event::Cleared(1),
+        Event::EndConfirm(binary_states(1, [0, 0, 1])),
+    ]);
+
+    // a new class 1 event, then a class 3 read that is never confirmed
+    harness
+        .handle
+        .database
+        .transaction(|database| update_binary(database, 0, false));
+    harness
+        .test_request_response(
+            &[0xC2, 0x01, 60, 4, 0x06],
+            &[
+                0xE2, 0x81, 0x82, 0x00, 0x02, 0x01, 0x28, 0x01, 0x00, 0x02, 0x00, 0x81,
+            ],
+        )
+        .await;
+    harness.check_events(&[Event::EnterSolicitedConfirmWait(2)]);
+
+    // the next request ends the confirm wait, and the class 3 event is pending again
+    harness
+        .test_request_response(&[0xC3, 0x01], &[0xC3, 0x81, 0x8A, 0x00])
+        .await;
+    harness.check_events(&[Event::SolicitedConfirmWaitNewRequest]);
+    harness.check_no_events();
+
+    // both events are reported in the order they were created
+    harness
+        .test_request_response(
+            &[0xC4, 0x01, 60, 2, 0x06, 60, 3, 0x06, 60, 4, 0x06],
+            &[
+                0xE4, 0x81, 0x80, 0x00, 0x02, 0x01, 0x28, 0x02, 0x00, 0x02, 0x00, 0x81, 0x00, 0x00,
+                0x01,
+            ],
+        )
+        .await;
+    harness.send_and_process(&[0xC4, 0x00]).await;
+    harness.check_events(&[
+        Event::EnterSolicitedConfirmWait(4),
+        Event::SolicitedConfirmReceived(4),
+        Event::BeginConfirm,
+        Event::Cleared(2),
+        Event::Cleared(3),
+        Event::EndConfirm(binary_states(0, [0, 0, 0])),
+    ]);
+    harness.check_no_events();
+
+    harness
+        .test_request_response(&[0xC5, 0x01], &[0xC5, 0x81, 0x80, 0x00])
         .await;
 }
 
