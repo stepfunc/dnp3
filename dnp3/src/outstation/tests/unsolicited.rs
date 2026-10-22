@@ -7,6 +7,7 @@ use crate::outstation::config::OutstationConfig;
 use crate::outstation::database::*;
 use crate::outstation::traits::OperateType;
 use crate::outstation::{BufferState, ClassCount, TypeCount};
+use crate::transport::mock::writer::LINK_STATUS_REQUEST;
 
 use super::harness::*;
 
@@ -16,6 +17,7 @@ const fn uns_confirm(seq: u8) -> u8 {
 
 const NULL_UNSOL_SEQ_0: &[u8] = &[0xF0, 0x82, 0x80, 0x00];
 const NULL_UNSOL_SEQ_1: &[u8] = &[0xF1, 0x82, 0x80, 0x00];
+const NULL_UNSOL_SEQ_2: &[u8] = &[0xF2, 0x82, 0x80, 0x00];
 const UNS_CONFIRM_SEQ_0: &[u8] = &[uns_confirm(0), 0x00];
 const UNS_CONFIRM_SEQ_1: &[u8] = &[uns_confirm(1), 0x00];
 const UNSOL_G2V1_SEQ1: &[u8] = &[
@@ -789,4 +791,23 @@ async fn buffer_overflow_issue() {
             ],
         )
         .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn error_fragment_during_unsolicited_confirm_wait_postpones_the_link_status_request() {
+    let mut config = get_default_unsolicited_config();
+    config.keep_alive_timeout = Some(std::time::Duration::from_secs(7));
+    let mut harness = new_harness(config);
+
+    // the null unsolicited response is never confirmed, so it's sent again every 5 seconds
+    harness.expect_response(NULL_UNSOL_SEQ_0).await;
+
+    // a fragment too short for a request header, which gets no response, at 4 seconds
+    tokio::time::advance(std::time::Duration::from_secs(4)).await;
+    harness.send_and_process(&[0xC0]).await;
+
+    // the link status request isn't due at 10 seconds, only at 15
+    harness.expect_response(NULL_UNSOL_SEQ_1).await;
+    harness.expect_response(NULL_UNSOL_SEQ_2).await;
+    harness.expect_response(LINK_STATUS_REQUEST).await;
 }

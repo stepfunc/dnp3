@@ -3,6 +3,9 @@ use crate::link::error::LinkError;
 use crate::transport::{FragmentAddr, TransportWrite};
 use crate::util::phys::PhysLayer;
 
+/// Written in place of a link status request, which the mock transport has no link layer to frame
+pub(crate) const LINK_STATUS_REQUEST: &[u8] = b"link status request";
+
 pub(crate) struct MockWriter;
 
 impl TransportWrite for MockWriter {
@@ -20,10 +23,12 @@ impl TransportWrite for MockWriter {
 
     async fn write_link_status_request(
         &mut self,
-        _: &mut PhysLayer,
-        _: FragmentAddr,
-        _: DecodeLevel,
+        io: &mut PhysLayer,
+        destination: FragmentAddr,
+        level: DecodeLevel,
     ) -> Result<(), LinkError> {
+        io.write(LINK_STATUS_REQUEST, destination.phys, level.physical)
+            .await?;
         Ok(())
     }
 
