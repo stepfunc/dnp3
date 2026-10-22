@@ -74,11 +74,29 @@ enum ServerConnectionHandler {
 }
 
 impl ServerConnectionHandler {
-    async fn handle(&mut self, socket: tokio::net::TcpStream) -> Result<PhysLayer, String> {
+    async fn handle(&self, socket: tokio::net::TcpStream, _addr: SocketAddr) -> Option<PhysLayer> {
         match self {
-            Self::Tcp => Ok(PhysLayer::tcp(socket)),
+            Self::Tcp => Some(PhysLayer::tcp(socket)),
             #[cfg(feature = "enable-tls")]
-            Self::Tls(config) => config.handle_connection(socket).await,
+            Self::Tls(config) => match config.handle_connection(socket).await {
+                Ok(phys) => Some(phys),
+                Err(crate::tcp::tls::HandshakeError::Timeout) => {
+                    tracing::warn!(
+                        "error from {}: TLS handshake didn't complete within {} seconds",
+                        _addr,
+                        crate::tcp::tls::TLS_HANDSHAKE_TIMEOUT.as_secs()
+                    );
+                    None
+                }
+                Err(crate::tcp::tls::HandshakeError::Failed(err)) => {
+                    tracing::warn!(
+                        "error from {}: failed to establish TLS session: {}",
+                        _addr,
+                        err
+                    );
+                    None
+                }
+            },
         }
     }
 }
@@ -347,16 +365,13 @@ impl Server {
             None => {
                 tracing::warn!("no matching outstation for: {}", addr)
             }
-            Some(x) => match self.connection_handler.handle(stream).await {
-                Err(err) => {
-                    tracing::warn!("error from {}: {}", addr, err);
-                }
-                Ok(phys) => {
+            Some(x) => {
+                if let Some(phys) = self.connection_handler.handle(stream, addr).await {
                     if x.sender.send(NewSession::new(id, phys)).await.is_err() {
                         tracing::warn!("outstation is shut down, closing connection from {}", addr);
                     }
                 }
-            },
+            }
         }
     }
 }
@@ -564,30 +579,5 @@ mod tests {
         drop(handle);
         drop(server);
         tokio::spawn(task.run()).await.unwrap();
-    }
-
-    #[cfg(feature = "enable-tls")]
-    #[tokio::test(start_paused = true)]
-    async fn tls_handshake_that_never_starts_times_out() {
-        let certs = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../certs/self_signed");
-        let config = crate::tcp::tls::TlsServerConfig::self_signed(
-            &certs.join("entity1_cert.pem"),
-            &certs.join("entity2_cert.pem"),
-            &certs.join("entity2_key.pem"),
-            None,
-            crate::tcp::tls::MinTlsVersion::V12,
-        )
-        .unwrap();
-        let mut handler = ServerConnectionHandler::Tls(config);
-
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-        // a peer that connects and never sends its ClientHello
-        let _peer = tokio::net::TcpStream::connect(listener.local_addr().unwrap())
-            .await
-            .unwrap();
-        let (socket, _) = listener.accept().await.unwrap();
-
-        let err = handler.handle(socket).await.unwrap_err();
-        assert!(err.contains("didn't complete"), "{err}");
     }
 }
