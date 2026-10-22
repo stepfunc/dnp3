@@ -65,6 +65,15 @@ pub(crate) mod gen {
 }
 
 #[cfg(test)]
+impl Variation {
+    /// every variation that `lookup` produces, in group and variation order
+    pub(crate) fn all() -> impl Iterator<Item = Variation> {
+        (0..=u8::MAX)
+            .flat_map(|group| (0..=u8::MAX).filter_map(move |var| Variation::lookup(group, var)))
+    }
+}
+
+#[cfg(test)]
 mod test {
     use super::Variation;
 

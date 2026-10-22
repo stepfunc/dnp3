@@ -364,18 +364,15 @@ const DYNAMIC_GROUPS: [u8; 3] = [0, 110, 111];
 
 #[test]
 fn table_covers_every_variation_outside_the_dynamic_groups() {
-    for group in 0..=u8::MAX {
+    for variation in Variation::all() {
+        let (group, var) = variation.to_group_and_var();
         if DYNAMIC_GROUPS.contains(&group) {
             continue;
         }
-        for var in 0..=u8::MAX {
-            if Variation::lookup(group, var).is_some() {
-                assert!(
-                    ROWS.iter().any(|row| row.gv == [group, var]),
-                    "g{group}v{var}"
-                );
-            }
-        }
+        assert!(
+            ROWS.iter().any(|row| row.gv == [group, var]),
+            "g{group}v{var}"
+        );
     }
 }
 

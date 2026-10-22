@@ -36,12 +36,6 @@ const FUNCTIONS: [FunctionCode; 3] = [
 /// The longest zero-filled payload a probe tries: an index of 2 bytes and a 255 byte octet string
 const MAX_ZEROS: usize = 257;
 
-/// Every variation the library knows
-fn all_variations() -> impl Iterator<Item = Variation> {
-    (0..=u8::MAX)
-        .flat_map(|group| (0..=u8::MAX).filter_map(move |var| Variation::lookup(group, var)))
-}
-
 /// The header bytes before the payload: group, variation, qualifier, and the range or count of a
 /// single object
 fn prefix(variation: Variation, qualifier: QualifierCode) -> Vec<u8> {
@@ -295,7 +289,7 @@ pub(crate) fn accepted_headers(
 ) -> Vec<(Variation, QualifierCode, Vec<u8>)> {
     let mut headers = Vec::new();
     for qualifier in QUALIFIERS {
-        for variation in all_variations() {
+        for variation in Variation::all() {
             if let Probe::Accepted(bytes) = probe(options, function, variation, qualifier) {
                 headers.push((variation, qualifier, bytes));
             }
@@ -309,7 +303,7 @@ fn each_qualifier_accepts_these_variations_outside_read() {
     for options in OPTIONS {
         for function in FUNCTIONS {
             for qualifier in QUALIFIERS {
-                for variation in all_variations() {
+                for variation in Variation::all() {
                     let actual = match probe(options, function, variation, qualifier) {
                         Probe::Accepted(_) => Ok(()),
                         Probe::Rejected(err) => Err(err),
@@ -365,7 +359,7 @@ fn each_read_header_carries_its_variation_and_qualifier() {
     let qualifiers = [Q::AllObjects, Q::Range8, Q::Range16, Q::Count8, Q::Count16];
     let mut accepted = 0;
     for qualifier in qualifiers {
-        for variation in all_variations() {
+        for variation in Variation::all() {
             let bytes = prefix(variation, qualifier);
             let parsed =
                 HeaderCollection::parse(ParseOptions::default(), FunctionCode::Read, &bytes);
@@ -437,7 +431,7 @@ fn unknown_variations_and_qualifiers_are_rejected() {
 #[test]
 fn ranges_with_start_after_stop_are_rejected_for_every_variation() {
     for function in FUNCTIONS {
-        for variation in all_variations() {
+        for variation in Variation::all() {
             let (group, var) = variation.to_group_and_var();
             let cases: [(&[u8], ObjectParseError); 2] = [
                 (

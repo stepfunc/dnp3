@@ -47,31 +47,27 @@ fn all_objects_headers_outside_read_accept_these_variations() {
         FunctionCode::ImmediateFreeze,
         FunctionCode::EnableUnsolicited,
     ] {
-        for group in 0..=u8::MAX {
-            for var in 0..=u8::MAX {
-                let Some(variation) = Variation::lookup(group, var) else {
-                    continue;
-                };
-                let input = [group, var, QualifierCode::AllObjects.as_u8()];
-                let result = HeaderCollection::parse(ParseOptions::default(), function, &input)
-                    .map(|headers| headers.get_only_header().unwrap());
-                if accepted(group, var) {
-                    let header = result.unwrap();
-                    assert_eq!(header.variation(), variation);
-                    assert!(
-                        matches!(header.details, HeaderDetails::AllObjects(_)),
-                        "{function:?} g{group}v{var}"
-                    );
-                } else {
-                    assert_eq!(
-                        result.err(),
-                        Some(ObjectParseError::InvalidQualifierForVariation(
-                            variation,
-                            QualifierCode::AllObjects
-                        )),
-                        "{function:?} g{group}v{var}"
-                    );
-                }
+        for variation in Variation::all() {
+            let (group, var) = variation.to_group_and_var();
+            let input = [group, var, QualifierCode::AllObjects.as_u8()];
+            let result = HeaderCollection::parse(ParseOptions::default(), function, &input)
+                .map(|headers| headers.get_only_header().unwrap());
+            if accepted(group, var) {
+                let header = result.unwrap();
+                assert_eq!(header.variation(), variation);
+                assert!(
+                    matches!(header.details, HeaderDetails::AllObjects(_)),
+                    "{function:?} g{group}v{var}"
+                );
+            } else {
+                assert_eq!(
+                    result.err(),
+                    Some(ObjectParseError::InvalidQualifierForVariation(
+                        variation,
+                        QualifierCode::AllObjects
+                    )),
+                    "{function:?} g{group}v{var}"
+                );
             }
         }
     }
