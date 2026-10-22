@@ -114,6 +114,8 @@ impl UdpLayer {
     ) -> Result<(usize, PhysAddr), std::io::Error> {
         let (count, source) = loop {
             match self.inner.read(buffer).await {
+                // an empty datagram is a valid zero-length read, not the end of a stream
+                Ok((0, _)) => tracing::debug!("Discarded empty UDP datagram"),
                 Ok(x) => break x,
                 Err(err) => {
                     if is_icmp_error(&err) {
@@ -164,6 +166,7 @@ fn is_icmp_error(err: &std::io::Error) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::decode::PhysDecodeLevel;
     use std::time::Duration;
 
     const LOCAL: &str = "127.0.0.1:0";
@@ -216,5 +219,27 @@ mod tests {
             .unwrap()
             .unwrap();
         assert_eq!(buffer.get(..count), Some([2].as_slice()));
+    }
+
+    #[tokio::test]
+    async fn read_skips_an_empty_datagram() {
+        let socket = tokio::net::UdpSocket::bind(LOCAL).await.unwrap();
+        let address = socket.local_addr().unwrap();
+        let mut phys = PhysLayer::Udp(UdpLayer::bound(socket));
+
+        let remote = tokio::net::UdpSocket::bind(LOCAL).await.unwrap();
+        remote.send_to(&[], address).await.unwrap();
+        remote.send_to(&[1], address).await.unwrap();
+
+        let mut buffer = [0; 16];
+        let (count, source) = tokio::time::timeout(
+            Duration::from_secs(1),
+            phys.read(&mut buffer, PhysDecodeLevel::Nothing),
+        )
+        .await
+        .unwrap()
+        .unwrap();
+        assert_eq!(buffer.get(..count), Some([1].as_slice()));
+        assert_eq!(source, PhysAddr::Udp(remote.local_addr().unwrap()));
     }
 }

@@ -61,15 +61,14 @@ impl ControlCode {
     }
 
     pub(crate) fn as_u8(self) -> u8 {
-        let mut x = 0;
-        x |= self.tcc.as_u8() << 6;
+        let mut x = (self.tcc.as_u8() << 6) & Self::TCC_MASK;
         if self.clear {
             x |= Self::CR_MASK;
         }
         if self.queue {
             x |= Self::QU_MASK;
         }
-        x |= self.op_type.as_u8();
+        x |= self.op_type.as_u8() & Self::OP_MASK;
         x
     }
 }
@@ -134,5 +133,23 @@ mod test {
                 op_type: OpType::Nul,
             },
         );
+    }
+
+    #[test]
+    fn masks_out_of_range_op_type_when_encoding() {
+        let cc = ControlCode {
+            tcc: TripCloseCode::Nul,
+            clear: false,
+            queue: false,
+            op_type: OpType::Unknown(0x1F),
+        };
+        assert_eq!(cc.as_u8(), 0x0F);
+    }
+
+    #[test]
+    fn round_trips_every_parsed_value() {
+        for byte in 0..=u8::MAX {
+            assert_eq!(ControlCode::from(byte).as_u8(), byte);
+        }
     }
 }
