@@ -74,12 +74,17 @@ impl TransportReader<crate::transport::mock::MockTransport> {
 }
 
 impl<T: Transport> TransportReader<T> {
-    pub(crate) fn new(parse_options: ParseOptions, inner: T::Reader) -> Self {
+    pub(crate) fn new(inner: T::Reader) -> Self {
         Self {
-            parse_options,
+            parse_options: ParseOptions::get_static(),
             retained: false,
             inner,
         }
+    }
+
+    /// Parse with `options` instead of those read when the reader was created
+    pub(crate) fn set_parse_options(&mut self, options: ParseOptions) {
+        self.parse_options = options;
     }
 
     pub(crate) async fn read(
@@ -168,7 +173,7 @@ impl<T: Transport> TransportReader<T> {
             Err(err) => {
                 return Some(TransportRequest::Error(
                     fragment.info.addr,
-                    err.into(parsed.control.seq),
+                    err.with_seq(parsed.control.seq),
                 ))
             }
         };

@@ -4,7 +4,6 @@ pub(crate) use writer::*;
 
 use std::future::Future;
 
-use crate::app::parse::options::ParseOptions;
 use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
 use crate::link::reader::LinkModes;
@@ -76,14 +75,10 @@ pub(crate) trait TransportWrite: Send {
 
 pub(crate) fn create_transport_layer<T: Transport>(
     link_modes: LinkModes,
-    parse_options: ParseOptions,
     role: LinkRole,
     address: EndpointAddress,
     rx_buffer_size: usize,
 ) -> (TransportReader<T>, TransportWriter<T>) {
     let (reader, writer) = T::new(link_modes, role, address, rx_buffer_size);
-    (
-        TransportReader::new(parse_options, reader),
-        TransportWriter::new(writer),
-    )
+    (TransportReader::new(reader), TransportWriter::new(writer))
 }

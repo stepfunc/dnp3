@@ -12,7 +12,6 @@ use std::future::Future;
 use crate::app::parse::options::ParseOptions;
 use crate::tcp::accept::{Acceptor, Listen};
 use crate::tcp::ServerHandle;
-use crate::util::future::forever;
 use crate::util::shutdown::ShutdownListener;
 use std::io::ErrorKind;
 use std::net::SocketAddr;
@@ -250,7 +249,7 @@ impl<C: ConnectionHandler, L: Listen> AcceptTask<C, L> {
             if can_accept {
                 self.acceptor.accept().await
             } else {
-                forever().await
+                std::future::pending().await
             }
         };
 
@@ -348,10 +347,10 @@ impl SessionTask {
         let mut task = MasterTask::new(
             Enabled::No,
             LinkModes::stream(accept.error_mode),
-            parse_options,
             accept.config,
             rx,
         );
+        task.set_parse_options(parse_options);
         let seed_data: &[u8] = link_id.map_or(&[], |id| &id.header_bytes);
         if let Err(err) = task.seed_link(seed_data) {
             tracing::error!("unable to seed link layer: {err:?}");

@@ -345,7 +345,6 @@ mod scripted {
 mod tests {
     use super::scripted::{Datagram, Fault};
     use super::*;
-    use crate::app::parse::options::ParseOptions;
     use crate::decode::PhysDecodeLevel;
     use crate::link::reader::LinkModes;
     use crate::link::{EndpointAddress, LinkErrorMode};
@@ -622,7 +621,6 @@ mod tests {
         let mut session = Session::master(MasterTask::new(
             Enabled::Yes,
             LinkModes::datagram(LinkErrorMode::Discard),
-            ParseOptions::default(),
             MasterChannelConfig::new(EndpointAddress::raw(1)),
             rx,
         ));

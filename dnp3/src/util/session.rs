@@ -225,7 +225,6 @@ async fn run_enabled<C: Connection>(connection: &mut C) -> Result<Infallible, St
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::parse::options::ParseOptions;
     use crate::link::reader::LinkModes;
     use crate::master::task::MasterTask;
     use crate::master::{MasterChannel, MasterChannelConfig, MasterChannelType};
@@ -236,7 +235,6 @@ mod tests {
         let mut session = Session::master(MasterTask::new(
             Enabled::Yes,
             LinkModes::test(),
-            ParseOptions::default(),
             MasterChannelConfig::new(EndpointAddress::raw(1)),
             rx,
         ));

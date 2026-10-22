@@ -1,5 +1,4 @@
 use crate::app::control::CommandStatus;
-use crate::app::parse::options::ParseOptions;
 use crate::decode::AppDecodeLevel;
 use crate::link::header::{BroadcastConfirmMode, FrameInfo, FrameType};
 use crate::link::reader::LinkModes;
@@ -248,7 +247,6 @@ fn new_harness_impl(
     let (mut task, handle) = MockOutstationTask::with_transport(
         Enabled::Yes,
         LinkModes::test(),
-        ParseOptions::get_static(),
         config,
         PhysAddr::None,
         application,

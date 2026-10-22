@@ -221,7 +221,6 @@ impl Connection for ClientTask {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::parse::options::ParseOptions;
     use crate::app::NullListener;
     use crate::link::reader::LinkModes;
     use crate::link::EndpointAddress;
@@ -282,7 +281,6 @@ mod tests {
         };
         let (task, _channel) = wire_master_client(
             LinkModes::test(),
-            ParseOptions::default(),
             MasterChannelType::Stream,
             Box::new(handler),
             MasterChannelConfig::new(EndpointAddress::raw(1)),

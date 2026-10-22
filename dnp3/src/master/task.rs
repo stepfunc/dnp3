@@ -37,7 +37,6 @@ impl MasterTask {
     pub(crate) fn new(
         initial_state: Enabled,
         link_modes: LinkModes,
-        parse_options: ParseOptions,
         config: MasterChannelConfig,
         messages: Receiver<Message>,
     ) -> Self {
@@ -45,7 +44,6 @@ impl MasterTask {
             initial_state,
             AssociationMap::new(),
             link_modes,
-            parse_options,
             config,
             messages,
         )
@@ -55,22 +53,19 @@ impl MasterTask {
         enabled: Enabled,
         associations: AssociationMap,
         link_modes: LinkModes,
-        parse_options: ParseOptions,
         config: MasterChannelConfig,
         messages: Receiver<Message>,
     ) -> Self {
-        Self::with_transport(
-            enabled,
-            associations,
-            link_modes,
-            parse_options,
-            config,
-            messages,
-        )
+        Self::with_transport(enabled, associations, link_modes, config, messages)
     }
 
     pub(crate) fn seed_link(&mut self, seed_data: &[u8]) -> Result<(), LinkError> {
         self.reader.seed_link(seed_data)
+    }
+
+    /// Parse with `options` instead of those read when the task was created
+    pub(crate) fn set_parse_options(&mut self, options: ParseOptions) {
+        self.reader.set_parse_options(options)
     }
 }
 
@@ -90,7 +85,6 @@ impl<T: Transport> MasterTask<T> {
         enabled: Enabled,
         associations: AssociationMap,
         link_modes: LinkModes,
-        parse_options: ParseOptions,
         config: MasterChannelConfig,
         messages: Receiver<Message>,
     ) -> Self {
@@ -103,7 +97,6 @@ impl<T: Transport> MasterTask<T> {
         );
         let (reader, writer) = crate::transport::create_transport_layer(
             link_modes,
-            parse_options,
             crate::link::LinkRole::Master,
             config.master_address,
             config.rx_buffer_size.value(),

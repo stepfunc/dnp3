@@ -997,7 +997,7 @@ impl OutstationSession {
             match next_action {
                 NextIdleAction::NoSleep => {}
                 NextIdleAction::SleepUntil(x) => tokio::time::sleep_until(x).await,
-                NextIdleAction::SleepUntilEvent => crate::util::future::forever().await,
+                NextIdleAction::SleepUntilEvent => std::future::pending().await,
             }
         }
 

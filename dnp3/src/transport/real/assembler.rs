@@ -10,6 +10,7 @@ use crate::transport::{Fragment, FragmentAddr, FragmentInfo};
 /// - a unicast segment that isn't FIR, from a different source or physical address, abandons the
 ///   series
 /// - broadcast segments are accepted only as a single FIR/FIN segment, and others are ignored
+/// - every segment is ignored while a completed fragment waits to be taken
 pub(crate) struct Assembler {
     state: State,
     buffer: Box<[u8]>,
@@ -18,19 +19,21 @@ pub(crate) struct Assembler {
 #[derive(Copy, Clone)]
 enum State {
     Idle,
-    /// a series of `len` bytes is in progress, and `last` and `last_len` describe its most recent
-    /// segment
-    Running {
-        info: FrameInfo,
-        last: Header,
-        last_len: usize,
-        len: usize,
-    },
+    Running(Series),
     /// the first `len` bytes of the buffer hold a fragment waiting to be taken
     Complete {
         info: FragmentInfo,
         len: usize,
     },
+}
+
+/// a series of `len` bytes in progress, whose most recent segment `last` carried `last_len` bytes
+#[derive(Copy, Clone)]
+struct Series {
+    info: FrameInfo,
+    last: Header,
+    last_len: usize,
+    len: usize,
 }
 
 pub(crate) enum AssemblyState {
@@ -62,6 +65,8 @@ pub(crate) enum Discard {
     UnexpectedSeq { expected: u8, received: u8 },
     /// a segment that doesn't fit in the fragment buffer
     Overflow { len: usize },
+    /// a segment received while a completed fragment waits to be taken
+    Pending,
 }
 
 impl Discard {
@@ -97,6 +102,7 @@ impl std::fmt::Display for Discard {
                 write!(f, "expected seq: {expected} but received seq: {received}")
             }
             Self::Overflow { len } => write!(f, "buffer overflow with {len} bytes to write"),
+            Self::Pending => f.write_str("ignoring segment while a fragment waits to be read"),
         }
     }
 }
@@ -143,12 +149,21 @@ impl Assembler {
         data: &[u8],
         mut discard: F,
     ) -> AssemblyState {
+        let series = match self.state {
+            State::Idle => None,
+            State::Running(series) => Some(series),
+            State::Complete { .. } => {
+                discard(Discard::Pending);
+                return AssemblyState::Complete;
+            }
+        };
+
         // FIR always clears the previous assembly
         if header.fir {
-            if let State::Running { info, len, .. } = self.state {
+            if let Some(series) = series {
                 discard(Discard::NewSeries {
-                    len,
-                    source: info.source,
+                    len: series.len,
+                    source: series.info.source,
                 });
             }
             self.state = State::Idle;
@@ -163,64 +178,64 @@ impl Assembler {
                     fin: header.fin,
                 });
             }
-            return self.assembly_state();
-        }
-
-        match self.state {
-            State::Idle | State::Complete { .. } => {
-                if header.fir {
-                    self.append(0, info, header, data, &mut discard);
-                } else {
-                    discard(Discard::NoSeries {
-                        source: info.source,
-                    });
-                }
-            }
-            State::Running {
-                info: previous,
-                last,
-                last_len,
-                len,
-            } => {
-                if info != previous {
-                    discard(Discard::ConflictingAddress {
-                        previous,
-                        received: info,
-                    });
-                    self.state = State::Idle;
-                } else if header.seq.value() == last.seq.value() {
-                    let repeat = header.to_u8() == last.to_u8()
-                        && data.len() == last_len
-                        && self.fragment(len).ends_with(data);
-                    if repeat {
-                        discard(Discard::Repeat {
-                            seq: header.seq.value(),
-                        });
-                    } else {
-                        discard(Discard::DifferentRepeat {
-                            seq: header.seq.value(),
-                        });
-                        self.state = State::Idle;
-                    }
-                } else if header.seq.value() != last.seq.next() {
-                    discard(Discard::UnexpectedSeq {
-                        expected: last.seq.next(),
-                        received: header.seq.value(),
-                    });
-                    self.state = State::Idle;
-                } else {
-                    self.append(len, info, header, data, &mut discard);
-                }
-            }
+        } else if header.fir {
+            self.append(0, info, header, data, &mut discard);
+        } else if let Some(series) = series {
+            self.continue_series(series, info, header, data, &mut discard);
+        } else {
+            discard(Discard::NoSeries {
+                source: info.source,
+            });
         }
 
         self.assembly_state()
     }
 
+    /// Add a segment that isn't FIR to the series in progress
+    fn continue_series<F: FnMut(Discard)>(
+        &mut self,
+        series: Series,
+        info: FrameInfo,
+        header: Header,
+        data: &[u8],
+        discard: &mut F,
+    ) {
+        let last = series.last;
+        if info != series.info {
+            discard(Discard::ConflictingAddress {
+                previous: series.info,
+                received: info,
+            });
+            self.state = State::Idle;
+        } else if header.seq.value() == last.seq.value() {
+            let repeat = header.to_u8() == last.to_u8()
+                && data.len() == series.last_len
+                && self.fragment(series.len).ends_with(data);
+            if repeat {
+                discard(Discard::Repeat {
+                    seq: header.seq.value(),
+                });
+            } else {
+                discard(Discard::DifferentRepeat {
+                    seq: header.seq.value(),
+                });
+                self.state = State::Idle;
+            }
+        } else if header.seq.value() != last.seq.next() {
+            discard(Discard::UnexpectedSeq {
+                expected: last.seq.next(),
+                received: header.seq.value(),
+            });
+            self.state = State::Idle;
+        } else {
+            self.append(series.len, info, header, data, discard);
+        }
+    }
+
     fn assembly_state(&self) -> AssemblyState {
         match self.state {
             State::Complete { .. } => AssemblyState::Complete,
-            State::Idle | State::Running { .. } => AssemblyState::ReadMore,
+            State::Idle | State::Running(_) => AssemblyState::ReadMore,
         }
     }
 
@@ -245,12 +260,12 @@ impl Assembler {
         };
 
         self.state = if !header.fin {
-            State::Running {
+            State::Running(Series {
                 info,
                 last: header,
                 last_len: data.len(),
                 len,
-            }
+            })
         } else if len == 0 {
             // an empty fragment isn't passed to the application layer
             State::Idle
@@ -443,6 +458,7 @@ mod tests {
         assert!(!h.middle(1, &[2, 3]));
         assert!(!h.middle(1, &[2, 3]));
         assert!(!h.middle(1, &[2, 3]));
+        assert_eq!(h.discards(), [Discard::Repeat { seq: 1 }; 2]);
         assert!(h.last(2, &[4]));
         assert_eq!(h.pop(), Some(vec![1, 2, 3, 4]));
     }
@@ -783,14 +799,6 @@ mod tests {
     }
 
     #[test]
-    fn reset_discards_a_completed_fragment() {
-        let mut h = Harness::new();
-        assert!(h.single(0, &[1]));
-        h.assembler.reset();
-        assert_eq!(h.pop(), None);
-    }
-
-    #[test]
     fn new_series_reports_the_bytes_it_drops() {
         let mut h = Harness::new();
         assert!(!h.first(0, &[1, 2]));
@@ -824,58 +832,19 @@ mod tests {
     }
 
     #[test]
-    fn first_segment_after_an_unread_fragment_replaces_it_without_a_discard() {
-        let mut h = Harness::new();
-        assert!(h.single(0, &[1; MAX]));
-        assert!(!h.first(1, &[2]));
-        assert!(h.discards().is_empty());
-        assert_eq!(h.peek(), None);
-        assert!(h.last(2, &[3]));
-        assert_eq!(h.pop(), Some(vec![2, 3]));
-    }
-
-    #[test]
-    fn single_segment_after_an_unread_fragment_replaces_it() {
-        let mut h = Harness::new();
-        assert!(h.single(0, &[1; MAX]));
-        assert!(h.single(1, &[2, 3]));
-        assert!(h.discards().is_empty());
-        assert_eq!(h.pop(), Some(vec![2, 3]));
-    }
-
-    #[test]
-    fn unread_fragment_survives_segments_without_fir() {
+    fn segments_are_ignored_while_a_fragment_waits_to_be_taken() {
         let mut h = Harness::new();
         assert!(h.single(0, &[1, 2]));
-        assert!(h.last(1, &[3]));
-        assert!(h.middle(2, &[4]));
-        assert!(h.segment(broadcast(), false, true, 3, &[5]));
-        assert_eq!(
-            h.discards(),
-            [
-                Discard::NoSeries {
-                    source: EndpointAddress::raw(1)
-                },
-                Discard::NoSeries {
-                    source: EndpointAddress::raw(1)
-                },
-                Discard::BroadcastSeries {
-                    fir: false,
-                    fin: true
-                },
-            ]
-        );
+        assert!(h.first(1, &[3]));
+        assert!(h.single(2, &[4]));
+        assert!(h.middle(3, &[5]));
+        assert!(h.last(4, &[6]));
+        assert!(h.first(5, &[7; MAX + 1]));
+        assert!(h.segment(broadcast(), true, true, 6, &[8]));
+        assert!(h.segment(broadcast(), false, true, 7, &[9]));
+        assert_eq!(h.discards(), [Discard::Pending; 7]);
         assert_eq!(h.pop(), Some(vec![1, 2]));
-    }
-
-    #[test]
-    fn unread_fragment_is_dropped_by_an_oversized_first_segment() {
-        let mut h = Harness::new();
-        assert!(h.single(0, &[1]));
-        assert!(!h.first(1, &[2; MAX + 1]));
-        assert_eq!(h.discards(), [Discard::Overflow { len: 9 }]);
-        assert_eq!(h.pop(), None);
-        h.assert_recovers(2);
+        h.assert_recovers(8);
     }
 
     #[test]
@@ -908,6 +877,7 @@ mod tests {
         assert!(h.single(0, &[1; MAX]));
         h.assembler.reset();
         assert_eq!(h.peek(), None);
+        assert_eq!(h.pop(), None);
         h.assert_recovers(1);
     }
 
@@ -968,17 +938,6 @@ mod tests {
     }
 
     #[test]
-    fn repeat_compares_against_the_end_of_the_series() {
-        let mut h = Harness::new();
-        assert!(!h.first(0, &[1, 2]));
-        assert!(!h.middle(1, &[3, 4]));
-        assert!(!h.middle(1, &[3, 4]));
-        assert_eq!(h.discards(), [Discard::Repeat { seq: 1 }]);
-        assert!(h.last(2, &[5]));
-        assert_eq!(h.pop(), Some(vec![1, 2, 3, 4, 5]));
-    }
-
-    #[test]
     fn repeat_of_the_first_segment_without_fir_abandons_the_series() {
         let mut h = Harness::new();
         assert!(!h.first(0, &[1]));
@@ -1025,6 +984,10 @@ mod tests {
             (
                 Discard::Overflow { len: 9 },
                 "buffer overflow with 9 bytes to write",
+            ),
+            (
+                Discard::Pending,
+                "ignoring segment while a fragment waits to be read",
             ),
         ];
         for (discard, message) in cases {

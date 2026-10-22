@@ -7,7 +7,6 @@ use crate::master::association::Next;
 use crate::master::error::PollError;
 use crate::master::handler::AssociationHandle;
 use crate::master::request::ReadRequest;
-use crate::util::Smallest;
 
 use crate::master::promise::Promise;
 use tokio::time::Instant;
@@ -109,7 +108,7 @@ impl PollMap {
     }
 
     pub(crate) fn next(&self, now: Instant) -> Next<Poll> {
-        let mut earliest = Smallest::<Instant>::new();
+        let mut earliest: Option<Instant> = None;
 
         for poll in self.polls.values() {
             if poll.is_ready(now) {
@@ -117,15 +116,14 @@ impl PollMap {
             }
 
             if let Some(x) = poll.next() {
-                earliest.observe(x)
+                earliest = Some(earliest.map_or(x, |e| e.min(x)));
             }
         }
 
-        if let Some(x) = earliest.value() {
-            return Next::NotBefore(x);
+        match earliest {
+            Some(x) => Next::NotBefore(x),
+            None => Next::None,
         }
-
-        Next::None
     }
 }
 

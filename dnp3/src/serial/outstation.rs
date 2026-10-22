@@ -1,4 +1,3 @@
-use crate::app::parse::options::ParseOptions;
 use crate::app::{Listener, NullListener, RetryStrategy};
 use crate::link::reader::LinkModes;
 use crate::outstation::task::OutstationTask as ProtocolOutstationTask;
@@ -76,7 +75,6 @@ fn create_outstation(
     ProtocolOutstationTask::create(
         Enabled::Yes,
         LinkModes::serial(),
-        ParseOptions::get_static(),
         config,
         PhysAddr::None,
         application,

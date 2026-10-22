@@ -22,7 +22,6 @@ use crate::master::tasks::auto::AutoTask;
 use crate::master::tasks::time::PendingTimeSync;
 use crate::master::tasks::{AppTask, AssociationTask, QueuedTask, ReadTask, Task};
 use crate::master::{AssociationInformation, ReadHandler, ReadType, TaskType};
-use crate::util::Smallest;
 
 use crate::master::promise::Promise;
 use crate::transport::FragmentAddr;
@@ -842,7 +841,7 @@ impl AssociationMap {
 
         // Check for non-priority tasks
         let now = Instant::now();
-        let mut earliest = Smallest::<Instant>::new();
+        let mut earliest: Option<Instant> = None;
 
         for (index, address) in self.priority.iter().enumerate() {
             if let Some(association) = self.map.get_mut(address) {
@@ -856,19 +855,16 @@ impl AssociationMap {
                         let task = AssociationTask::new(association.address, task);
                         return Next::Now(task);
                     }
-                    Next::NotBefore(x) => earliest.observe(x),
+                    Next::NotBefore(x) => earliest = Some(earliest.map_or(x, |e| e.min(x))),
                     Next::None => {}
                 }
             }
         }
 
-        // Return earliest task
-        if let Some(x) = earliest.value() {
-            return Next::NotBefore(x);
+        match earliest {
+            Some(x) => Next::NotBefore(x),
+            None => Next::None,
         }
-
-        // No task found
-        Next::None
     }
 }
 

@@ -3,7 +3,6 @@ use std::sync::{Arc, Mutex};
 use tokio::task::JoinHandle;
 
 use crate::app::measurement::AnalogInputDeadBand;
-use crate::app::parse::options::ParseOptions;
 use crate::app::{BufferSize, Timeout};
 use crate::app::{MaybeAsync, ResponseHeader};
 use crate::decode::AppDecodeLevel;
@@ -56,7 +55,6 @@ pub(crate) async fn create_association_with_handler(
         Enabled::Yes,
         AssociationMap::new(),
         LinkModes::stream(LinkErrorMode::Discard),
-        ParseOptions::default(),
         task_config,
         rx,
     );

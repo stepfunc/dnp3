@@ -1,5 +1,5 @@
 /// Controls the decoding of transmitted and received data at the application, transport, and link layer
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 #[cfg_attr(
     feature = "serialization",
     derive(serde::Serialize, serde::Deserialize)
@@ -111,34 +111,17 @@ impl DecodeLevel {
     }
 }
 
-impl Default for DecodeLevel {
-    fn default() -> Self {
-        Self {
-            application: AppDecodeLevel::Nothing,
-            transport: TransportDecodeLevel::Nothing,
-            link: LinkDecodeLevel::Nothing,
-            physical: PhysDecodeLevel::Nothing,
-        }
-    }
-}
-
 impl From<AppDecodeLevel> for DecodeLevel {
     fn from(application: AppDecodeLevel) -> Self {
         Self {
             application,
-            transport: TransportDecodeLevel::Nothing,
-            link: LinkDecodeLevel::Nothing,
-            physical: PhysDecodeLevel::Nothing,
+            ..Self::default()
         }
     }
 }
 
 impl AppDecodeLevel {
     pub(crate) fn enabled(&self) -> bool {
-        self.header()
-    }
-
-    pub(crate) fn header(&self) -> bool {
         match self {
             AppDecodeLevel::Nothing => false,
             AppDecodeLevel::Header => true,
@@ -168,10 +151,6 @@ impl AppDecodeLevel {
 
 impl TransportDecodeLevel {
     pub(crate) fn enabled(&self) -> bool {
-        self.header_enabled()
-    }
-
-    pub(crate) fn header_enabled(&self) -> bool {
         match self {
             TransportDecodeLevel::Nothing => false,
             TransportDecodeLevel::Header => true,
@@ -190,10 +169,6 @@ impl TransportDecodeLevel {
 
 impl LinkDecodeLevel {
     pub(crate) fn enabled(&self) -> bool {
-        self.header_enabled()
-    }
-
-    pub(crate) fn header_enabled(&self) -> bool {
         match self {
             LinkDecodeLevel::Nothing => false,
             LinkDecodeLevel::Header => true,
@@ -212,10 +187,6 @@ impl LinkDecodeLevel {
 
 impl PhysDecodeLevel {
     pub(crate) fn enabled(&self) -> bool {
-        self.length_enabled()
-    }
-
-    pub(crate) fn length_enabled(&self) -> bool {
         match self {
             PhysDecodeLevel::Nothing => false,
             PhysDecodeLevel::Length => true,

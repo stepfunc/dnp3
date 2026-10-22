@@ -9,7 +9,6 @@ use super::task::MasterTask as InnerMasterTask;
 use super::{
     AssociationConfig, AssociationError, AssociationHandler, AssociationInformation, ReadHandler,
 };
-use crate::app::parse::options::ParseOptions;
 use crate::app::{Listener, Timeout};
 use crate::link::reader::LinkModes;
 use crate::link::{EndpointAddress, LinkErrorMode, LinkReadMode};
@@ -151,14 +150,7 @@ fn build_inner_task(
     config: MasterChannelConfig,
     rx: Receiver<super::messages::Message>,
 ) -> InnerMasterTask {
-    InnerMasterTask::with_associations(
-        enabled,
-        associations,
-        link_modes,
-        ParseOptions::get_static(),
-        config,
-        rx,
-    )
+    InnerMasterTask::with_associations(enabled, associations, link_modes, config, rx)
 }
 
 impl MasterBuilder {
