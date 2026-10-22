@@ -48,19 +48,28 @@ enum TimeoutStatus {
     No,
 }
 
+/// A control request, with what its function needs to know about the selection
 #[derive(Copy, Clone)]
-enum ControlType {
-    Select,
-    Operate,
+enum ControlRequest {
+    Select {
+        /// the request's hash, which the selection records to recognize the SELECT's retry
+        request_hash: u64,
+    },
+    Operate {
+        /// the selection that this request ended
+        selection: Option<SelectState>,
+    },
     DirectOperate,
     DirectOperateNoAck,
 }
 
-impl ControlType {
+impl ControlRequest {
     fn expects_response(self) -> bool {
         match self {
-            ControlType::Select | ControlType::Operate | ControlType::DirectOperate => true,
-            ControlType::DirectOperateNoAck => false,
+            ControlRequest::Select { .. }
+            | ControlRequest::Operate { .. }
+            | ControlRequest::DirectOperate => true,
+            ControlRequest::DirectOperateNoAck => false,
         }
     }
 }
@@ -192,23 +201,6 @@ enum SelectionAction {
     Discard,
     /// any other request, which ends the selection, giving it to an OPERATE to check
     Take(Option<SelectState>),
-}
-
-/// What processing a non-read request needs to know about the selection
-#[derive(Copy, Clone)]
-struct SelectContext {
-    /// the selection that this request ended
-    previous: Option<SelectState>,
-    /// the request's hash, which a SELECT records to recognize its retry
-    request_hash: u64,
-}
-
-impl SelectContext {
-    /// for requests that can't be a SELECT or OPERATE
-    const NONE: Self = Self {
-        previous: None,
-        request_hash: 0,
-    };
 }
 
 /// a broadcast whose IIN1.0 hasn't been cleared
@@ -887,16 +879,13 @@ impl OutstationSession {
             }
             FragmentType::NewNonRead(hash, objects) => {
                 self.state.deferred_read.clear();
-                let select = SelectContext {
-                    previous: selection,
-                    request_hash: hash,
-                };
                 let response = self
                     .handle_non_read(
                         database,
                         request.header.function,
                         request.header.control.seq,
-                        select,
+                        hash,
+                        selection,
                         objects,
                     )
                     .await;
@@ -1158,12 +1147,15 @@ impl OutstationSession {
                 ))
             }
             FragmentType::NewNonRead(hash, objects) => {
-                let select = SelectContext {
-                    previous: selection,
-                    request_hash: hash,
-                };
                 let response = self
-                    .handle_non_read(database, request.header.function, seq, select, objects)
+                    .handle_non_read(
+                        database,
+                        request.header.function,
+                        seq,
+                        hash,
+                        selection,
+                        objects,
+                    )
                     .await;
                 Some(IdleResponse::New(
                     LastValidRequest::new(seq, hash, None),
@@ -1270,7 +1262,8 @@ impl OutstationSession {
         database: &mut DatabaseHandle,
         function: FunctionCode,
         seq: Sequence,
-        select: SelectContext,
+        request_hash: u64,
+        selection: Option<SelectState>,
         object_headers: HeaderCollection<'_>,
     ) -> Option<Prepared> {
         let mut result = match function {
@@ -1288,29 +1281,32 @@ impl OutstationSession {
             }
             // controls
             FunctionCode::Select => {
-                self.handle_controls(ControlType::Select, database, seq, select, object_headers)
-                    .await
-            }
-            FunctionCode::Operate => {
-                self.handle_controls(ControlType::Operate, database, seq, select, object_headers)
-                    .await
-            }
-            FunctionCode::DirectOperate => {
                 self.handle_controls(
-                    ControlType::DirectOperate,
+                    ControlRequest::Select { request_hash },
                     database,
                     seq,
-                    select,
                     object_headers,
                 )
                 .await
             }
-            FunctionCode::DirectOperateNoResponse => {
+            FunctionCode::Operate => {
                 self.handle_controls(
-                    ControlType::DirectOperateNoAck,
+                    ControlRequest::Operate { selection },
                     database,
                     seq,
-                    select,
+                    object_headers,
+                )
+                .await
+            }
+            FunctionCode::DirectOperate => {
+                self.handle_controls(ControlRequest::DirectOperate, database, seq, object_headers)
+                    .await
+            }
+            FunctionCode::DirectOperateNoResponse => {
+                self.handle_controls(
+                    ControlRequest::DirectOperateNoAck,
+                    database,
+                    seq,
                     object_headers,
                 )
                 .await
@@ -1763,10 +1759,9 @@ impl OutstationSession {
 
     async fn handle_controls(
         &mut self,
-        ct: ControlType,
+        request: ControlRequest,
         database: &mut DatabaseHandle,
         seq: Sequence,
-        select: SelectContext,
         object_headers: HeaderCollection<'_>,
     ) -> Option<Prepared> {
         // a control object with an unsupported qualifier fails to parse, so this is an object
@@ -1778,33 +1773,33 @@ impl OutstationSession {
                     err.variation,
                     err.qualifier
                 );
-                return ct.expects_response().then(|| {
+                return request.expects_response().then(|| {
                     Prepared::empty_solicited(seq, Iin::default() | Iin2::OBJECT_UNKNOWN)
                 });
             }
             Ok(controls) => controls,
         };
 
-        if ct.expects_response() && !self.control_response_fits(&controls) {
+        if request.expects_response() && !self.control_response_fits(&controls) {
             tracing::warn!(
                 "ignoring control request whose response doesn't fit in the response buffer"
             );
             return Some(Prepared::parameter_error(seq));
         }
 
-        match ct {
-            ControlType::Select => Some(
-                self.handle_select(database, seq, select.request_hash, controls)
+        match request {
+            ControlRequest::Select { request_hash } => Some(
+                self.handle_select(database, seq, request_hash, controls)
                     .await,
             ),
-            ControlType::Operate => Some(
-                self.handle_operate(database, seq, select.previous, controls)
+            ControlRequest::Operate { selection } => Some(
+                self.handle_operate(database, seq, selection, controls)
                     .await,
             ),
-            ControlType::DirectOperate => {
+            ControlRequest::DirectOperate => {
                 Some(self.handle_direct_operate(database, seq, controls).await)
             }
-            ControlType::DirectOperateNoAck => {
+            ControlRequest::DirectOperateNoAck => {
                 self.handle_direct_operate_no_ack(database, controls).await;
                 None
             }
@@ -2076,14 +2071,8 @@ impl OutstationSession {
                 BroadcastAction::Processed
             }
             FunctionCode::DirectOperateNoResponse => {
-                self.handle_controls(
-                    ControlType::DirectOperateNoAck,
-                    database,
-                    seq,
-                    SelectContext::NONE,
-                    objects,
-                )
-                .await;
+                self.handle_controls(ControlRequest::DirectOperateNoAck, database, seq, objects)
+                    .await;
                 BroadcastAction::Processed
             }
             FunctionCode::ImmediateFreezeNoResponse => {
