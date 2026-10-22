@@ -8,6 +8,8 @@ mod attributes;
 mod control_objects;
 /// control functionality
 mod controls;
+/// binary and double-bit event variations by the time quality of each event
+mod event_time;
 /// freeze counters tests
 mod freeze;
 /// various IIN bit tests

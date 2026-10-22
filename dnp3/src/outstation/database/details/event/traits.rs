@@ -13,6 +13,19 @@ pub(crate) trait EventVariation<T>: Copy {
     fn encode<E>(self, encoder: E) -> E::Output
     where
         E: Encoder<T>;
+
+    /// the variation the event is written in when this one is selected for it
+    ///
+    /// Binary and double-bit events with absolute time must have been recorded while synchronized
+    /// (TB2017-003a 5.1.3.1.2), whether the variation is the default or the one requested.
+    fn for_event(self, _event: &T) -> Self {
+        self
+    }
+}
+
+/// whether an event's time was recorded while the outstation was synchronized
+fn is_synchronized(time: Option<Time>) -> bool {
+    Time::from(time).is_synchronized()
 }
 
 /// Something done with an event, given how its variation is encoded
@@ -48,6 +61,13 @@ impl EventVariation<BinaryInput> for EventBinaryInputVariation {
             Self::Group2Var3 => encoder.cto::<Group2Var3>(),
         }
     }
+
+    fn for_event(self, event: &BinaryInput) -> Self {
+        match self {
+            Self::Group2Var2 if !is_synchronized(event.time) => Self::Group2Var3,
+            Self::Group2Var1 | Self::Group2Var2 | Self::Group2Var3 => self,
+        }
+    }
 }
 
 impl EventVariation<DoubleBitBinaryInput> for EventDoubleBitBinaryInputVariation {
@@ -59,6 +79,13 @@ impl EventVariation<DoubleBitBinaryInput> for EventDoubleBitBinaryInputVariation
             Self::Group4Var1 => encoder.fixed::<Group4Var1>(),
             Self::Group4Var2 => encoder.fixed::<Group4Var2>(),
             Self::Group4Var3 => encoder.cto::<Group4Var3>(),
+        }
+    }
+
+    fn for_event(self, event: &DoubleBitBinaryInput) -> Self {
+        match self {
+            Self::Group4Var2 if !is_synchronized(event.time) => Self::Group4Var3,
+            Self::Group4Var1 | Self::Group4Var2 | Self::Group4Var3 => self,
         }
     }
 }
