@@ -15,9 +15,8 @@
 //!   out or was rejected, is rescheduled the same way and isn't retried sooner.
 //! - Demanding a poll runs it at once, and its next run is one period after that run completes. A
 //!   removed poll never runs again.
-//! - When the master is free, the poll that comes due first runs first. Polls that come due at
-//!   the same time, or that are already due when the master becomes free, run in the order they
-//!   were added, whichever came due first.
+//! - Within an association, when the master picks a poll it takes the first one added that is
+//!   already due, whichever came due first. If no poll is due, it waits for the earliest deadline.
 //! - With a keep-alive timeout, the master sends `REQUEST_LINK_STATUS` once nothing has been
 //!   received from the outstation for that long, and not before.
 //! - The period restarts whenever the master receives a parsed response (solicited or
