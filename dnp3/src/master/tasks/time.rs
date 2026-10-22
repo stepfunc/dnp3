@@ -549,6 +549,23 @@ mod tests {
             assert_matches!(rx.try_recv().unwrap(), Err(TimeSyncError::StillNeedsTime));
         }
 
+        #[tokio::test(start_paused = true)]
+        async fn error_response() {
+            let (task, system_time, mut association, mut rx) = non_lan_time_sync_setup();
+            let task = check_measure_delay_request(task, &mut association);
+            tokio::time::advance(Duration::from_millis(TOTAL_DELAY_MS.into())).await;
+            let task = send_measure_delay_response(task, &mut association)
+                .await
+                .unwrap()
+                .unwrap();
+            let task = check_write_request(task, system_time);
+            task.on_task_error(Some(&mut association), TaskError::ResponseTimeout);
+            assert_eq!(
+                rx.try_recv().unwrap(),
+                Err(TimeSyncError::Task(TaskError::ResponseTimeout))
+            );
+        }
+
         #[test]
         fn no_system_time_at_start() {
             let (task, _system_time, mut association, mut rx) =
@@ -686,6 +703,23 @@ mod tests {
             assert_eq!(
                 rx.try_recv().unwrap(),
                 Err(TimeSyncError::Task(TaskError::UnexpectedResponseHeaders))
+            );
+        }
+
+        #[tokio::test(start_paused = true)]
+        async fn error_response() {
+            let (task, system_time, mut association, mut rx) = lan_time_sync_setup();
+            let task = check_record_current_time_request(task, &mut association);
+            tokio::time::advance(Duration::from_millis(DELAY_MS.into())).await;
+            let task = send_record_current_time_response(task, &mut association)
+                .await
+                .unwrap()
+                .unwrap();
+            let task = check_write_request(task, system_time);
+            task.on_task_error(Some(&mut association), TaskError::ResponseTimeout);
+            assert_eq!(
+                rx.try_recv().unwrap(),
+                Err(TimeSyncError::Task(TaskError::ResponseTimeout))
             );
         }
 
