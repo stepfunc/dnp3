@@ -151,8 +151,8 @@ impl QualifierCode {
             QualifierCode::Range16 => "2-byte start/stop",
             QualifierCode::Count8 => "1-byte count of objects",
             QualifierCode::Count16 => "2-byte count of objects",
-            QualifierCode::CountAndPrefix8 => "1-byte count of objects",
-            QualifierCode::CountAndPrefix16 => "2-byte count of objects",
+            QualifierCode::CountAndPrefix8 => "1-byte count and prefix",
+            QualifierCode::CountAndPrefix16 => "2-byte count and prefix",
             QualifierCode::FreeFormat16 => "2-byte free format",
         }
     }
