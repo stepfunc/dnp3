@@ -2,7 +2,7 @@
 //! accepted is confirmed again without processing, and an invalid one is discarded without
 //! processing or confirming it
 
-use crate::app::{Iin, Sequence};
+use crate::app::{ControlField, Iin, Sequence};
 use crate::master::association::AssociationConfig;
 use crate::master::tests::harness::{AssocInfoEvent, ReadEvent, TestHarness};
 use crate::master::ReadType;
@@ -274,6 +274,40 @@ async fn valid_measurements_before_relative_time_without_cto_are_not_delivered()
         response.extend_from_slice(RELATIVE_TIME_EVENT);
 
         expect_discarded(&mut harness, response).await;
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn unsolicited_response_without_con_is_processed_without_confirm() {
+    watchdog(async {
+        let mut harness = started().await;
+        let seq = Sequence::new(3);
+        let mut response = unsol_with_data(seq, 42, false);
+        let control = ControlField::from(response[0]);
+        response[0] = ControlField {
+            con: false,
+            ..control
+        }
+        .to_u8();
+
+        harness.process_response(response).await;
+        // the next write confirms the next response, so the first one wasn't confirmed
+        let next = Sequence::new(4);
+        harness
+            .read_and_expect_write(unsol_with_data(next, 43, false), unsol_confirm(next))
+            .await;
+
+        let mut events = fragment(&[ReadEvent::AnalogInput]);
+        events.extend(fragment(&[ReadEvent::AnalogInput]));
+        assert_eq!(harness.read_events.pop(), events);
+        assert_eq!(
+            harness.assoc_events.pop(),
+            vec![
+                AssocInfoEvent::Unsolicited(false, seq),
+                AssocInfoEvent::Unsolicited(false, next)
+            ]
+        );
     })
     .await;
 }
