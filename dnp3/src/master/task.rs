@@ -619,6 +619,16 @@ impl MasterSession {
                     break 'failed TaskError::MultiFragmentResponse;
                 }
 
+                // confirm before handling the response, so the confirm precedes any next request
+                if response.header.control.con && response.objects.is_ok() {
+                    if let Err(err) = self
+                        .send_confirm(io, dest, ControlField::request(seq), writer)
+                        .await
+                    {
+                        break 'failed err.into();
+                    }
+                }
+
                 let association = match self.associations.get_mut(dest.link) {
                     Ok(association) => association,
                     Err(err) => break 'failed err.into(),

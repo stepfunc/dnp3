@@ -159,6 +159,29 @@ pub(crate) fn empty_response_custom_iin(seq: Sequence, iin: Iin) -> Vec<u8> {
     cursor.written().to_vec()
 }
 
+/// The same response with the CON bit set
+pub(crate) fn with_con(mut response: Vec<u8>) -> Vec<u8> {
+    let control = ControlField::from(response[0]);
+    response[0] = ControlField {
+        con: true,
+        ..control
+    }
+    .to_u8();
+    response
+}
+
+pub(crate) fn solicited_confirm(seq: Sequence) -> Vec<u8> {
+    let mut buffer = [0; 2];
+    let mut cursor = WriteCursor::new(&mut buffer);
+    start_request(
+        ControlField::request(seq),
+        FunctionCode::Confirm,
+        &mut cursor,
+    )
+    .unwrap();
+    cursor.written().to_vec()
+}
+
 // Unsolicited stuff
 
 pub(crate) fn unsol_null(seq: Sequence, restart_iin: bool) -> Vec<u8> {

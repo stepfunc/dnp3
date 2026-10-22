@@ -8,10 +8,10 @@ use crate::master::association::AssociationConfig;
 use crate::master::request::{Classes, EventClasses};
 use crate::master::tests::harness::AssocInfoEvent;
 use crate::master::{ReadRequest, TaskError, TaskType};
+use crate::util::test_support::watchdog;
 
 use super::harness::requests::*;
 use super::harness::{create_association, TestHarness};
-use crate::util::test_support::watchdog;
 
 #[tokio::test]
 async fn master_startup_procedure() {
@@ -81,6 +81,50 @@ async fn master_startup_procedure() {
                 Sequence::new(2)
             ),]
         );
+    })
+    .await;
+}
+
+/// Respond to the request with this sequence with CON set, and expect the master to confirm it
+async fn respond_with_con(harness: &mut TestHarness, seq: &mut Sequence) {
+    let current = seq.increment();
+    harness
+        .read_and_expect_write(
+            with_con(empty_response(current)),
+            solicited_confirm(current),
+        )
+        .await;
+}
+
+#[tokio::test]
+async fn automatic_tasks_confirm_responses_with_con_before_the_next_request() {
+    watchdog(async {
+        let mut seq = Sequence::default();
+        let mut harness = create_association(AssociationConfig::default()).await;
+
+        harness.expect_write(disable_unsol_request(seq)).await;
+        respond_with_con(&mut harness, &mut seq).await;
+        harness
+            .expect_write_and_respond(integrity_poll_request(seq), empty_response(seq.increment()))
+            .await;
+        harness.expect_write(enable_unsol_request(seq)).await;
+        respond_with_con(&mut harness, &mut seq).await;
+
+        // Unsolicited NULL response with DEVICE_RESTART IIN
+        harness
+            .read_and_expect_write(unsol_null(seq, true), unsol_confirm(seq))
+            .await;
+        harness.expect_write(clear_restart_iin(seq)).await;
+        respond_with_con(&mut harness, &mut seq).await;
+        harness
+            .expect_write_and_respond(integrity_poll_request(seq), empty_response(seq.increment()))
+            .await;
+        harness
+            .expect_write_and_respond(enable_unsol_request(seq), empty_response(seq.increment()))
+            .await;
+
+        harness.master.get_decode_level().await.unwrap();
+        harness.assert_no_events();
     })
     .await;
 }

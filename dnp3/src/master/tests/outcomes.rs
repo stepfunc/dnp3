@@ -10,8 +10,8 @@ use tokio::time::Instant;
 
 use crate::app::control::{Group12Var1, OpType};
 use crate::app::{
-    FileStatus, FileType, FunctionCode, Group70Var2, Group70Var6, Group70Var7, Iin, Iin1, Iin2,
-    MaybeAsync, Permissions, ResponseHeader, Sequence, Timestamp, Variation,
+    ControlField, FileStatus, FileType, FunctionCode, Group70Var2, Group70Var6, Group70Var7, Iin,
+    Iin1, Iin2, MaybeAsync, Permissions, ResponseHeader, Sequence, Timestamp, Variation,
 };
 use crate::link::EndpointAddress;
 use crate::master::association::AssociationConfig;
@@ -26,7 +26,7 @@ use crate::master::tests::file::{
 };
 use crate::master::tests::harness::requests::{
     disable_unsol_request, empty_response, empty_response_custom_iin, integrity_poll_request,
-    unsol_confirm, unsol_with_data,
+    solicited_confirm, unsol_confirm, unsol_with_data, with_con,
 };
 use crate::master::tests::harness::{
     create_association, create_association_with_handler, AssocInfoEvent, ReadEvent, TestHarness,
@@ -296,37 +296,38 @@ impl Kind {
         AssocInfoEvent::TaskFailure(self.task_type(), err)
     }
 
-    /// Answer the first request, and any requests after it, until the task succeeds. Returns the
-    /// sequence number of the last request.
-    async fn finish(self, harness: &mut TestHarness, request: &[u8]) -> Sequence {
+    /// Answer the first request, and any requests after it, until the task succeeds, with CON set
+    /// in every response if `con`. Returns the sequence number of the last request.
+    async fn finish(self, harness: &mut TestHarness, request: &[u8], con: bool) -> Sequence {
         let first = Sequence::new(0);
         match self {
             Kind::Read | Kind::EmptyResponse | Kind::DeadBands => {
-                respond(harness, empty_response(first)).await;
+                answer(harness, con, empty_response(first)).await;
                 first
             }
             Kind::DirectOperate => {
-                respond(harness, echo(request)).await;
+                answer(harness, con, echo(request)).await;
                 first
             }
             Kind::SelectBeforeOperate => {
-                respond(harness, echo(request)).await;
+                answer(harness, con, echo(request)).await;
                 let operate = next_request(harness, 1, FunctionCode::Operate).await;
-                respond(harness, echo(&operate)).await;
+                answer(harness, con, echo(&operate)).await;
                 Sequence::new(1)
             }
             Kind::ColdRestart => {
-                respond(
+                answer(
                     harness,
+                    con,
                     vec![0xC0, 0x81, 0x00, 0x00, 52, 1, 0x07, 1, 0x02, 0x00],
                 )
                 .await;
                 first
             }
             Kind::TimeSync => {
-                respond(harness, empty_response(first)).await;
+                answer(harness, con, empty_response(first)).await;
                 next_request(harness, 1, FunctionCode::Write).await;
-                respond(harness, empty_response(Sequence::new(1))).await;
+                answer(harness, con, empty_response(Sequence::new(1))).await;
                 Sequence::new(1)
             }
             Kind::AuthFile => {
@@ -335,20 +336,22 @@ impl Kind {
                     user_name: "",
                     password: "",
                 };
-                respond(harness, file_response(0, &auth)).await;
+                answer(harness, con, file_response(0, &auth)).await;
                 first
             }
             Kind::OpenFile => {
-                respond(
+                answer(
                     harness,
+                    con,
                     file_status_response(0, HANDLE, 8, 512, FileStatus::Success),
                 )
                 .await;
                 first
             }
             Kind::CloseFile => {
-                respond(
+                answer(
                     harness,
+                    con,
                     file_status_response(0, HANDLE, 0, 0, FileStatus::Success),
                 )
                 .await;
@@ -361,7 +364,7 @@ impl Kind {
                     status_code: FileStatus::Success,
                     text: "",
                 };
-                respond(harness, file_response(0, &status)).await;
+                answer(harness, con, file_response(0, &status)).await;
                 first
             }
             Kind::GetFileInfo => {
@@ -373,24 +376,27 @@ impl Kind {
                     request_id: 0xCAFE,
                     file_name: "f.txt",
                 };
-                respond(harness, file_response(0, &info)).await;
+                answer(harness, con, file_response(0, &info)).await;
                 first
             }
             Kind::ReadDirectory => {
-                respond(
+                answer(
                     harness,
+                    con,
                     file_status_response(0, HANDLE, 0, 512, FileStatus::Success),
                 )
                 .await;
                 next_request(harness, 1, FunctionCode::Read).await;
-                respond(
+                answer(
                     harness,
+                    con,
                     file_transport_response(1, HANDLE, last_block(0), &[]),
                 )
                 .await;
                 next_request(harness, 2, FunctionCode::CloseFile).await;
-                respond(
+                answer(
                     harness,
+                    con,
                     file_status_response(2, HANDLE, 0, 0, FileStatus::Success),
                 )
                 .await;
@@ -402,6 +408,18 @@ impl Kind {
 
 async fn respond(harness: &mut TestHarness, response: Vec<u8>) {
     harness.process_response(response).await;
+}
+
+/// Respond, with CON set if `con`, and check that the master confirms a response with CON before it
+/// writes anything else
+async fn answer(harness: &mut TestHarness, con: bool, response: Vec<u8>) {
+    if !con {
+        respond(harness, response).await;
+        return;
+    }
+    let seq = ControlField::from(response[0]).seq;
+    respond(harness, with_con(response)).await;
+    assert_eq!(harness.pop_write().await, solicited_confirm(seq));
 }
 
 /// Wait for the next request, check its sequence and function code, and return it
@@ -462,9 +480,14 @@ impl Started {
 
     /// Answer the task and check that it succeeds
     async fn expect_success(&mut self) {
+        self.expect_success_with(false).await;
+    }
+
+    /// Answer the task, with CON set in every response if `con`, and check that it succeeds
+    async fn expect_success_with(&mut self, con: bool) {
         let kind = self.kind;
         let request = self.request.clone();
-        let last = kind.finish(&mut self.harness, &request).await;
+        let last = kind.finish(&mut self.harness, &request, con).await;
         assert_eq!(self.reply().await, kind.ok(), "{kind:?}");
         barrier(&mut self.harness).await;
         assert_eq!(
@@ -534,37 +557,97 @@ async fn every_task_fails_on_a_response_without_fin_or_con() {
     .await;
 }
 
+/// A parseable response with the wrong objects is still confirmed if it has CON
 #[tokio::test(start_paused = true)]
 async fn every_task_fails_on_a_response_with_unexpected_objects() {
     watchdog(async {
-        for kind in KINDS.into_iter().filter(|kind| !kind.is_read()) {
+        for con in [false, true] {
+            for kind in KINDS.into_iter().filter(|kind| !kind.is_read()) {
+                let mut started = start(kind).await;
+                let expects_objects =
+                    !matches!(kind, Kind::EmptyResponse | Kind::DeadBands | Kind::TimeSync);
+                let response = if expects_objects {
+                    empty_response(Sequence::new(0))
+                } else {
+                    // a g52v1 time delay
+                    vec![0xC0, 0x81, 0x00, 0x00, 52, 1, 0x07, 1, 0x02, 0x00]
+                };
+                answer(&mut started.harness, con, response).await;
+                let unexpected = TaskError::UnexpectedResponseHeaders;
+                let reply = match kind {
+                    Kind::DirectOperate | Kind::SelectBeforeOperate => {
+                        Reply::Command(Err(CommandError::Response(
+                            crate::master::CommandResponseError::HeaderCountMismatch,
+                        )))
+                    }
+                    _ => kind.failed(unexpected),
+                };
+                assert_eq!(started.reply().await, reply, "{kind:?} con: {con}");
+                barrier(&mut started.harness).await;
+                assert_eq!(
+                    started.harness.assoc_events.pop(),
+                    [kind.failure_event(unexpected)],
+                    "{kind:?} con: {con}"
+                );
+                assert_eq!(started.harness.io.pop_event(), None, "{kind:?} con: {con}");
+            }
+        }
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn every_task_confirms_responses_with_con_before_its_next_request() {
+    watchdog(async {
+        for con in [false, true] {
+            for kind in KINDS {
+                let mut started = start(kind).await;
+                started.expect_success_with(con).await;
+                barrier(&mut started.harness).await;
+                assert_eq!(started.harness.io.pop_event(), None, "{kind:?} con: {con}");
+            }
+        }
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn every_task_confirms_a_response_with_con_rejected_by_iin2() {
+    watchdog(async {
+        for kind in KINDS {
             let mut started = start(kind).await;
-            let expects_objects =
-                !matches!(kind, Kind::EmptyResponse | Kind::DeadBands | Kind::TimeSync);
-            let response = if expects_objects {
-                empty_response(Sequence::new(0))
-            } else {
-                // a g52v1 time delay
-                vec![0xC0, 0x81, 0x00, 0x00, 52, 1, 0x07, 1, 0x02, 0x00]
-            };
+            let response = empty_response_custom_iin(Sequence::new(0), REJECTED);
+            answer(&mut started.harness, true, response).await;
+            started
+                .expect_failure(TaskError::RejectedByIin2(REJECTED))
+                .await;
+            assert_eq!(started.harness.io.pop_event(), None, "{kind:?}");
+        }
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn no_task_confirms_a_response_with_con_whose_objects_do_not_parse() {
+    watchdog(async {
+        for kind in KINDS {
+            let mut started = start(kind).await;
+            // a valid fragment whose object header is cut short after its group
+            let response = with_con(vec![0xC0, 0x81, 0x00, 0x00, 0x01]);
             respond(&mut started.harness, response).await;
-            let unexpected = TaskError::UnexpectedResponseHeaders;
-            let reply = match kind {
-                Kind::DirectOperate | Kind::SelectBeforeOperate => {
-                    Reply::Command(Err(CommandError::Response(
-                        crate::master::CommandResponseError::HeaderCountMismatch,
-                    )))
-                }
-                _ => kind.failed(unexpected),
-            };
-            assert_eq!(started.reply().await, reply, "{kind:?}");
+            assert_ne!(started.reply().await, kind.ok(), "{kind:?}");
             barrier(&mut started.harness).await;
-            assert_eq!(
-                started.harness.assoc_events.pop(),
-                [kind.failure_event(unexpected)],
+            // the task, not the transport, rejects it
+            assert!(
+                matches!(
+                    started.harness.assoc_events.pop().as_slice(),
+                    [AssocInfoEvent::TaskFailure(task_type, err)]
+                        if *task_type == kind.task_type() && *err != TaskError::Transport
+                ),
                 "{kind:?}"
             );
             assert_eq!(started.harness.io.pop_event(), None, "{kind:?}");
+            assert!(!started.harness.task.is_finished(), "{kind:?}");
         }
     })
     .await;
@@ -1034,10 +1117,6 @@ fn read_fragment(seq: Sequence, fir: bool, fin: bool, con: bool) -> Vec<u8> {
         7,
         0,
     ]
-}
-
-fn solicited_confirm(seq: Sequence) -> Vec<u8> {
-    vec![0xC0 | seq.value(), 0x00]
 }
 
 #[tokio::test(start_paused = true)]
