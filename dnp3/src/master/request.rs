@@ -646,10 +646,13 @@ pub(crate) enum CommandHeader {
     G41V4U16(Vec<(Group41Var4, u16)>),
 }
 
-pub(crate) trait Command {
+pub(crate) trait Command: PartialEq {
     fn status(&self) -> CommandStatus;
     fn to_header_u8(&self, index: u8) -> CommandHeader;
     fn to_header_u16(&self, index: u16) -> CommandHeader;
+    fn matches_echo(&self, other: &Self) -> bool {
+        self == other
+    }
 }
 
 impl Command for Group12Var1 {
@@ -702,6 +705,9 @@ impl Command for Group41Var3 {
     fn to_header_u16(&self, index: u16) -> CommandHeader {
         CommandHeader::G41V3U16(vec![(*self, index)])
     }
+    fn matches_echo(&self, other: &Self) -> bool {
+        self.status == other.status && self.value.to_bits() == other.value.to_bits()
+    }
 }
 
 impl Command for Group41Var4 {
@@ -714,6 +720,9 @@ impl Command for Group41Var4 {
 
     fn to_header_u16(&self, index: u16) -> CommandHeader {
         CommandHeader::G41V4U16(vec![(*self, index)])
+    }
+    fn matches_echo(&self, other: &Self) -> bool {
+        self.status == other.status && self.value.to_bits() == other.value.to_bits()
     }
 }
 
@@ -1087,7 +1096,7 @@ impl CommandHeader {
                     if x.value.status() != CommandStatus::Success {
                         return Err(CommandResponseError::BadStatus(x.value.status()));
                     }
-                    if !x.equals(item) {
+                    if x.index != item.1 || !x.value.matches_echo(&item.0) {
                         return Err(CommandResponseError::ObjectValueMismatch);
                     }
                 }
@@ -1223,5 +1232,65 @@ mod tests {
             check(&one, &two, Err(CommandResponseError::HeaderTypeMismatch));
             check(&two, &one, Err(CommandResponseError::HeaderTypeMismatch));
         }
+    }
+
+    #[test]
+    fn nan_floating_point_analog_command_echo_matches() {
+        for (one, two) in [
+            (
+                Group41Var3::new(f32::NAN).to_header_u8(3),
+                Group41Var3::new(f32::NAN).to_header_u16(259),
+            ),
+            (
+                Group41Var4::new(f64::NAN).to_header_u8(3),
+                Group41Var4::new(f64::NAN).to_header_u16(259),
+            ),
+        ] {
+            check(&one, &one, Ok(()));
+            check(&two, &two, Ok(()));
+        }
+    }
+
+    #[test]
+    fn changed_floating_point_analog_command_value_fails() {
+        let sent_f32_nan = Group41Var3::new(f32::NAN).to_header_u8(3);
+        let echo_f32_num = Group41Var3::new(1.0).to_header_u8(3);
+        check(
+            &sent_f32_nan,
+            &echo_f32_num,
+            Err(CommandResponseError::ObjectValueMismatch),
+        );
+        check(
+            &echo_f32_num,
+            &sent_f32_nan,
+            Err(CommandResponseError::ObjectValueMismatch),
+        );
+
+        let sent_f64_nan = Group41Var4::new(f64::NAN).to_header_u8(3);
+        let echo_f64_num = Group41Var4::new(1.0).to_header_u8(3);
+        check(
+            &sent_f64_nan,
+            &echo_f64_num,
+            Err(CommandResponseError::ObjectValueMismatch),
+        );
+        check(
+            &echo_f64_num,
+            &sent_f64_nan,
+            Err(CommandResponseError::ObjectValueMismatch),
+        );
+
+        let echo_f32_other = Group41Var3::new(2.0).to_header_u8(3);
+        check(
+            &echo_f32_num,
+            &echo_f32_other,
+            Err(CommandResponseError::ObjectValueMismatch),
+        );
+
+        let echo_f64_other = Group41Var4::new(2.0).to_header_u8(3);
+        check(
+            &echo_f64_num,
+            &echo_f64_other,
+            Err(CommandResponseError::ObjectValueMismatch),
+        );
     }
 }
