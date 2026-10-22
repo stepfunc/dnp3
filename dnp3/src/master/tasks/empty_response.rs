@@ -1,56 +1,66 @@
 use crate::app::format::write::HeaderWriter;
 use crate::app::parse::parser::Response;
 use crate::app::FunctionCode;
-use crate::master::promise::Promise;
-use crate::master::tasks::{AppTask, NonReadTask, Task};
-use crate::master::{Headers, TaskError, WriteError};
+use crate::master::tasks::{NonReadTask, OneShot, OneShotRequest};
+use crate::master::{Headers, TaskError, TaskType, WriteError};
 
-pub(crate) struct EmptyResponseTask {
+/// Any request whose response has no object headers
+pub(crate) struct EmptyResponseRequest {
     function: FunctionCode,
     headers: Headers,
-    promise: Promise<Result<(), WriteError>>,
 }
 
-impl From<EmptyResponseTask> for Task {
-    fn from(value: EmptyResponseTask) -> Self {
-        Task::App(AppTask::NonRead(NonReadTask::EmptyResponseTask(value)))
+impl EmptyResponseRequest {
+    pub(crate) fn new(function: FunctionCode, headers: Headers) -> Self {
+        Self { function, headers }
     }
 }
 
-impl EmptyResponseTask {
-    pub(crate) fn new(
-        function: FunctionCode,
-        headers: Headers,
-        promise: Promise<Result<(), WriteError>>,
-    ) -> Self {
-        Self {
-            function,
-            headers,
-            promise,
-        }
+/// Check that a response has no object headers
+pub(crate) fn expect_empty(response: Response<'_>) -> Result<(), WriteError> {
+    if response.raw_objects.is_empty() {
+        Ok(())
+    } else {
+        Err(WriteError::Task(TaskError::UnexpectedResponseHeaders))
     }
+}
 
-    pub(crate) const fn function(&self) -> FunctionCode {
+pub(crate) fn write_error(err: WriteError) -> TaskError {
+    match err {
+        WriteError::Task(err) => err,
+        #[expect(
+            deprecated,
+            reason = "the match must cover every variant until removal"
+        )]
+        WriteError::IinError(_) => TaskError::UnexpectedResponseHeaders,
+    }
+}
+
+impl OneShotRequest for EmptyResponseRequest {
+    type Output = ();
+    type Error = WriteError;
+
+    fn function(&self) -> FunctionCode {
         self.function
     }
 
-    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
+    fn task_type(&self) -> TaskType {
+        TaskType::GenericEmptyResponse(self.function)
+    }
+
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
         self.headers.write(writer)
     }
 
-    pub(crate) fn on_task_error(self, err: TaskError) {
-        self.promise.complete(Err(err.into()))
+    fn parse(&self, response: Response<'_>) -> Result<(), WriteError> {
+        expect_empty(response)
     }
 
-    pub(crate) fn handle(self, response: Response) -> Result<Option<NonReadTask>, TaskError> {
-        if !response.raw_objects.is_empty() {
-            self.promise
-                .complete(Err(WriteError::Task(TaskError::UnexpectedResponseHeaders)));
-            return Err(TaskError::UnexpectedResponseHeaders);
-        }
+    fn task_error(err: WriteError) -> TaskError {
+        write_error(err)
+    }
 
-        self.promise.complete(Ok(()));
-
-        Ok(None)
+    fn wrap(task: OneShot<Self>) -> NonReadTask {
+        NonReadTask::EmptyResponseTask(task)
     }
 }

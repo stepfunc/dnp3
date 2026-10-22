@@ -1,10 +1,8 @@
 use crate::app::format::write::HeaderWriter;
-use crate::app::format::WriteError;
 use crate::app::parse::parser::Response;
 use crate::app::{FunctionCode, Permissions};
-use crate::master::promise::Promise;
-use crate::master::tasks::{AppTask, NonReadTask, Task};
-use crate::master::{AuthKey, FileError, FileMode, OpenFile, TaskError};
+use crate::master::tasks::{NonReadTask, OneShot, OneShotRequest};
+use crate::master::{AuthKey, FileError, FileMode, OpenFile, TaskError, TaskType};
 
 pub(crate) struct OpenFileRequest {
     pub(crate) file_name: String,
@@ -15,49 +13,39 @@ pub(crate) struct OpenFileRequest {
     pub(crate) max_block_size: u16,
 }
 
-pub(crate) struct OpenFileTask {
-    pub(crate) request: OpenFileRequest,
-    pub(crate) promise: Promise<Result<OpenFile, FileError>>,
-}
+impl OneShotRequest for OpenFileRequest {
+    type Output = OpenFile;
+    type Error = FileError;
 
-impl From<OpenFileTask> for Task {
-    fn from(value: OpenFileTask) -> Self {
-        Task::App(AppTask::NonRead(NonReadTask::OpenFile(value)))
-    }
-}
-
-impl OpenFileTask {
-    pub(crate) fn function(&self) -> FunctionCode {
+    fn function(&self) -> FunctionCode {
         FunctionCode::OpenFile
     }
 
-    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), WriteError> {
-        super::write_open(
-            &self.request.file_name,
-            self.request.auth_key,
-            self.request.permissions,
-            self.request.file_size,
-            self.request.file_mode,
-            self.request.max_block_size,
+    fn task_type(&self) -> TaskType {
+        TaskType::FileOpen
+    }
+
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
+        Ok(super::write_open(
+            &self.file_name,
+            self.auth_key,
+            self.permissions,
+            self.file_size,
+            self.file_mode,
+            self.max_block_size,
             writer,
-        )
+        )?)
     }
 
-    pub(crate) fn on_task_error(self, err: TaskError) {
-        self.promise.complete(Err(err.into()))
+    fn parse(&self, response: Response<'_>) -> Result<OpenFile, FileError> {
+        super::parse_open_response(response.objects?.get_only_header()?)
     }
 
-    pub(crate) fn handle(self, response: Response<'_>) -> Result<Option<NonReadTask>, TaskError> {
-        fn process(response: Response<'_>) -> Result<OpenFile, FileError> {
-            super::parse_open_response(response.objects?.get_only_header()?)
-        }
+    fn task_error(err: FileError) -> TaskError {
+        err.into()
+    }
 
-        let result = process(response);
-        self.promise.complete(result);
-
-        match result {
-            Ok(_) => Ok(None),
-            Err(err) => Err(err.into()),
-        }
+    fn wrap(task: OneShot<Self>) -> NonReadTask {
+        NonReadTask::OpenFile(task)
     }
 }

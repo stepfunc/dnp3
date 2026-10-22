@@ -10,7 +10,8 @@ use crate::master::association::Association;
 use crate::master::error::{TaskError, TimeSyncError};
 use crate::master::promise::Promise;
 use crate::master::request::TimeSyncProcedure;
-use crate::master::tasks::{AppTask, NonReadTask, Task};
+use crate::master::tasks::{AppTask, NonReadTask, ResponseTask, Step, Task};
+use crate::master::TaskType;
 
 use tokio::time::Instant;
 
@@ -23,22 +24,15 @@ enum Requester {
 }
 
 impl Requester {
-    fn complete(self, association: &mut Association, result: Result<(), TimeSyncError>) {
+    fn complete(self, association: Option<&mut Association>, result: Result<(), TimeSyncError>) {
         match self {
             Self::User(promise) => promise.complete(result),
-            Self::Auto => match result {
-                Ok(()) => association.on_time_sync_success(),
-                Err(err) => association.on_time_sync_failure(err),
-            },
-        }
-    }
-
-    fn on_task_error(self, association: Option<&mut Association>, err: TaskError) {
-        match self {
-            Self::User(promise) => promise.complete(Err(err.into())),
             Self::Auto => {
                 if let Some(association) = association {
-                    association.on_time_sync_failure(err.into());
+                    match result {
+                        Ok(()) => association.on_time_sync_success(),
+                        Err(err) => association.on_time_sync_failure(err),
+                    }
                 }
             }
         }
@@ -91,15 +85,17 @@ impl PendingTimeSync {
         match state {
             Some(state) => Some(TimeSyncTask::new(state, self.requester)),
             None => {
-                self.requester
-                    .complete(association, Err(TimeSyncError::SystemTimeNotAvailable));
+                self.requester.complete(
+                    Some(association),
+                    Err(TimeSyncError::SystemTimeNotAvailable),
+                );
                 None
             }
         }
     }
 
     pub(crate) fn on_task_error(self, association: Option<&mut Association>, err: TaskError) {
-        self.requester.on_task_error(association, err)
+        self.requester.complete(association, Err(err.into()))
     }
 }
 
@@ -146,58 +142,17 @@ impl TimeSyncTask {
         Self { state, requester }
     }
 
-    fn change_state(self, state: State) -> Self {
-        TimeSyncTask::new(state, self.requester)
-    }
-
+    #[cfg(test)]
     pub(crate) fn wrap(self) -> NonReadTask {
         NonReadTask::TimeSync(self)
     }
 
-    pub(crate) fn function(&self) -> FunctionCode {
-        match self.state {
-            State::MeasureDelay(_) => FunctionCode::DelayMeasure,
-            State::WriteAbsoluteTime(_) => FunctionCode::Write,
-            State::RecordCurrentTime(_) => FunctionCode::RecordCurrentTime,
-            State::WriteLastRecordedTime(_) => FunctionCode::Write,
-        }
-    }
-
-    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
-        match self.state {
-            State::MeasureDelay(_) => Ok(()),
-            State::WriteAbsoluteTime(time) => writer.write_count_of_one(Group50Var1 { time }),
-            State::RecordCurrentTime(_) => Ok(()),
-            State::WriteLastRecordedTime(x) => writer.write_count_of_one(Group50Var3 { time: x }),
-        }
-    }
-
-    pub(crate) fn on_task_error(self, association: Option<&mut Association>, err: TaskError) {
-        self.requester.on_task_error(association, err)
-    }
-
-    pub(crate) fn handle(
-        self,
-        association: &mut Association,
-        response: Response,
-    ) -> Result<Option<NonReadTask>, TaskError> {
-        match self.state {
-            State::MeasureDelay(time) => self.handle_delay_measure(association, time, response),
-            State::RecordCurrentTime(time) => {
-                self.handle_record_current_time(association, time, response)
-            }
-            State::WriteAbsoluteTime(_) | State::WriteLastRecordedTime(_) => {
-                self.handle_write(association, response)
-            }
-        }
-    }
-
+    /// The time to write to the outstation, from the response to the delay measurement
     fn handle_delay_measure(
-        self,
         association: &mut Association,
         request_tx: Instant,
         response: Response,
-    ) -> Result<Option<NonReadTask>, TaskError> {
+    ) -> Result<Timestamp, TimeSyncError> {
         let now = Instant::now();
 
         let interval = match now.checked_duration_since(request_tx) {
@@ -205,19 +160,11 @@ impl TimeSyncTask {
             None => {
                 // This should NEVER happen. `tokio::time::Instant` is guaranteed to be monotonic
                 tracing::error!("clock rollback detected while synchronizing outstation");
-                self.report_error(association, TimeSyncError::ClockRollback);
-                return Err(TaskError::UnexpectedResponseHeaders);
+                return Err(TimeSyncError::ClockRollback);
             }
         };
 
-        let header = match response.get_only_object_header() {
-            Ok(x) => x,
-            Err(err) => {
-                let err: TaskError = err.into();
-                self.report_error(association, err.into());
-                return Err(err);
-            }
-        };
+        let header = response.get_only_object_header().map_err(TaskError::from)?;
 
         let delay_ms: Option<u16> =
             if let Some(CountVariation::Group52Var2(seq)) = header.details.count() {
@@ -230,8 +177,7 @@ impl TimeSyncTask {
             Some(x) => x,
             None => {
                 tracing::warn!("received unexpected header(s) in response to delay measure");
-                self.report_error(association, TaskError::UnexpectedResponseHeaders.into());
-                return Err(TaskError::UnexpectedResponseHeaders);
+                return Err(TaskError::UnexpectedResponseHeaders.into());
             }
         };
 
@@ -245,8 +191,7 @@ impl TimeSyncTask {
                 Some(x) => x / 2,
                 None => {
                     tracing::warn!("outstation time delay is larger than the response delay");
-                    self.report_error(association, TimeSyncError::BadOutstationTimeDelay(delay_ms));
-                    return Err(TaskError::UnexpectedResponseHeaders);
+                    return Err(TimeSyncError::BadOutstationTimeDelay(delay_ms));
                 }
             };
 
@@ -254,56 +199,11 @@ impl TimeSyncTask {
             Some(time) => time,
             None => {
                 tracing::warn!("system time not available");
-                self.report_error(association, TimeSyncError::SystemTimeNotAvailable);
-                return Err(TaskError::UnexpectedResponseHeaders);
+                return Err(TimeSyncError::SystemTimeNotAvailable);
             }
         };
 
-        let timestamp = match Self::get_timestamp(time, propagation_delay) {
-            Err(err) => {
-                tracing::error!("{}", err);
-                self.report_error(association, err);
-                return Err(TaskError::UnexpectedResponseHeaders);
-            }
-            Ok(ts) => ts,
-        };
-
-        Ok(Some(
-            self.change_state(State::WriteAbsoluteTime(timestamp))
-                .wrap(),
-        ))
-    }
-
-    fn handle_write(
-        self,
-        association: &mut Association,
-        response: Response,
-    ) -> Result<Option<NonReadTask>, TaskError> {
-        if let Err(err) = check_write_response(&response) {
-            self.report_error(association, err);
-            return Err(TaskError::UnexpectedResponseHeaders);
-        }
-
-        self.requester.complete(association, Ok(()));
-
-        Ok(None)
-    }
-
-    fn handle_record_current_time(
-        self,
-        association: &mut Association,
-        recorded_time: Timestamp,
-        response: Response,
-    ) -> Result<Option<NonReadTask>, TaskError> {
-        if let Err(err) = check_no_objects(&response) {
-            self.report_error(association, err);
-            return Err(TaskError::UnexpectedResponseHeaders);
-        }
-
-        Ok(Some(
-            self.change_state(State::WriteLastRecordedTime(recorded_time))
-                .wrap(),
-        ))
+        Self::get_timestamp(time, propagation_delay).inspect_err(|err| tracing::error!("{}", err))
     }
 
     fn get_timestamp(
@@ -315,9 +215,84 @@ impl TimeSyncTask {
             None => Err(TimeSyncError::Overflow),
         }
     }
+}
 
-    fn report_error(self, association: &mut Association, error: TimeSyncError) {
-        self.requester.complete(association, Err(error))
+impl ResponseTask for TimeSyncTask {
+    type Output = ();
+    type Error = TimeSyncError;
+
+    fn function(&self) -> FunctionCode {
+        match self.state {
+            State::MeasureDelay(_) => FunctionCode::DelayMeasure,
+            State::WriteAbsoluteTime(_) => FunctionCode::Write,
+            State::RecordCurrentTime(_) => FunctionCode::RecordCurrentTime,
+            State::WriteLastRecordedTime(_) => FunctionCode::Write,
+        }
+    }
+
+    fn task_type(&self) -> TaskType {
+        TaskType::TimeSync
+    }
+
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
+        match self.state {
+            State::MeasureDelay(_) => {}
+            State::WriteAbsoluteTime(time) => writer.write_count_of_one(Group50Var1 { time })?,
+            State::RecordCurrentTime(_) => {}
+            State::WriteLastRecordedTime(x) => {
+                writer.write_count_of_one(Group50Var3 { time: x })?
+            }
+        }
+        Ok(())
+    }
+
+    async fn on_response(
+        &mut self,
+        association: &mut Association,
+        response: Response<'_>,
+    ) -> Result<Step<()>, TimeSyncError> {
+        match self.state {
+            State::MeasureDelay(request_tx) => {
+                let timestamp = Self::handle_delay_measure(association, request_tx, response)?;
+                self.state = State::WriteAbsoluteTime(timestamp);
+                Ok(Step::Next)
+            }
+            State::RecordCurrentTime(recorded_time) => {
+                check_no_objects(&response)?;
+                self.state = State::WriteLastRecordedTime(recorded_time);
+                Ok(Step::Next)
+            }
+            State::WriteAbsoluteTime(_) | State::WriteLastRecordedTime(_) => {
+                check_write_response(&response)?;
+                Ok(Step::Done(()))
+            }
+        }
+    }
+
+    fn from_task_error(err: TaskError) -> TimeSyncError {
+        err.into()
+    }
+
+    fn task_error(err: TimeSyncError) -> TaskError {
+        match err {
+            TimeSyncError::Task(err) => err,
+            TimeSyncError::ClockRollback
+            | TimeSyncError::BadOutstationTimeDelay(_)
+            | TimeSyncError::Overflow
+            | TimeSyncError::StillNeedsTime
+            | TimeSyncError::SystemTimeNotAvailable => TaskError::UnexpectedResponseHeaders,
+            #[expect(
+                deprecated,
+                reason = "the match must cover every variant until removal"
+            )]
+            TimeSyncError::SystemTimeNotUnix | TimeSyncError::IinError(_) => {
+                TaskError::UnexpectedResponseHeaders
+            }
+        }
+    }
+
+    fn complete(self, association: Option<&mut Association>, result: Result<(), TimeSyncError>) {
+        self.requester.complete(association, result)
     }
 }
 
