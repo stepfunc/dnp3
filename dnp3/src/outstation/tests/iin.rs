@@ -2,7 +2,8 @@ use crate::app::measurement::{BinaryInput, Flags, Time};
 use crate::app::parse::header_identity_tests::DATALESS_COUNT_VARIATIONS;
 use crate::app::Timestamp;
 use crate::outstation::database::{Add, BinaryInputConfig, EventClass, Update, UpdateOptions};
-use crate::outstation::BufferState;
+use crate::outstation::{ApplicationIin, BufferState, RequestError};
+use crate::util::test_support::watchdog;
 
 use super::harness::*;
 
@@ -388,7 +389,7 @@ async fn non_read_with_a_count_of_objects_that_carry_no_data_is_malformed() {
 #[tokio::test]
 async fn requests_the_application_declines_set_object_unknown() {
     let mut harness = new_harness(get_default_config());
-    harness.application_data.lock().unwrap().supported = false;
+    harness.application_data.lock().unwrap().request_error = Some(RequestError::NotSupported);
 
     harness
         .test_request_response(WRITE_ABSOLUTE_TIME, EMPTY_RESPONSE_OBJECT_UNKNOWN)
@@ -479,4 +480,163 @@ async fn write_of_g34_with_all_objects_sets_parameter_error() {
         .await;
 
     harness.check_no_events();
+}
+
+/// each application IIN flag set alone, with the bits it sets in IIN1 and IIN2
+fn application_iin_flags() -> [(ApplicationIin, u8, u8); 4] {
+    let none = ApplicationIin::default();
+    [
+        (
+            ApplicationIin {
+                need_time: true,
+                ..none
+            },
+            0x10,
+            0x00,
+        ),
+        (
+            ApplicationIin {
+                local_control: true,
+                ..none
+            },
+            0x20,
+            0x00,
+        ),
+        (
+            ApplicationIin {
+                device_trouble: true,
+                ..none
+            },
+            0x40,
+            0x00,
+        ),
+        (
+            ApplicationIin {
+                config_corrupt: true,
+                ..none
+            },
+            0x00,
+            0x20,
+        ),
+    ]
+}
+
+#[tokio::test(start_paused = true)]
+async fn application_iin_flags_are_reported_in_solicited_responses() {
+    watchdog(async {
+        let mut harness = new_harness(get_default_config());
+
+        let mut seq: u8 = 0;
+        for (flags, iin1, iin2) in application_iin_flags() {
+            harness.application_data.lock().unwrap().application_iin = flags;
+
+            // a response to a READ
+            harness
+                .test_request_response(&read_class_0(seq), &[0xC0 | seq, 0x81, 0x80 | iin1, iin2])
+                .await;
+            seq = seq.wrapping_add(1);
+
+            // and the IIN-only answer to an unknown function code
+            harness
+                .test_request_response(
+                    &[0xC0 | seq, 0x70],
+                    &[0xC0 | seq, 0x81, 0x80 | iin1, 0x01 | iin2],
+                )
+                .await;
+            seq = seq.wrapping_add(1);
+        }
+
+        // and none once the application clears them
+        harness.application_data.lock().unwrap().application_iin = ApplicationIin::default();
+        harness
+            .test_request_response(&read_class_0(seq), &[0xC0 | seq, 0x81, 0x80, 0x00])
+            .await;
+        harness.check_no_events();
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn application_iin_flags_are_reported_in_unsolicited_responses() {
+    watchdog(async {
+        for (flags, iin1, iin2) in application_iin_flags() {
+            let mut harness = new_harness(get_default_unsolicited_config());
+            harness.application_data.lock().unwrap().application_iin = flags;
+
+            // the null unsolicited response at startup
+            harness
+                .expect_response(&[0xF0, 0x82, 0x80 | iin1, iin2])
+                .await;
+            harness.check_events(&[Event::EnterUnsolicitedConfirmWait(0)]);
+        }
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn request_errors_of_the_application_set_parameter_error() {
+    watchdog(async {
+        let mut harness = new_harness(get_default_config());
+        harness.application_data.lock().unwrap().request_error = Some(RequestError::ParameterError);
+
+        // WRITE of the absolute time, then IMMEDIATE_FREEZE of all counters
+        harness
+            .test_request_response(WRITE_ABSOLUTE_TIME, EMPTY_RESPONSE_PARAM_ERROR)
+            .await;
+        harness
+            .test_request_response(&[0xC1, 0x07, 20, 0, 0x06], &[0xC1, 0x81, 0x80, 0x04])
+            .await;
+
+        harness.check_no_events();
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn requests_whose_objects_do_not_parse_set_parameter_error() {
+    watchdog(async {
+        let mut harness = new_harness(get_default_config());
+
+        // the function code and objects of each request
+        let requests: &[&[u8]] = &[
+            // READ g1v2 with the unknown qualifier 0x02
+            &[0x01, 1, 2, 0x02],
+            // READ g1v2 with a start/stop of 5 to 4
+            &[0x01, 1, 2, 0x00, 5, 4],
+            // READ g70v5 with a free-format count of 2
+            &[0x01, 70, 5, 0x5B, 2],
+            // WRITE g110v0 (an octet string of zero length) with a start/stop of 0 to 0
+            &[0x02, 110, 0, 0x00, 0, 0],
+            // WRITE g0v240 with an unsigned integer of 3 bytes
+            &[0x02, 0, 240, 0x00, 0, 0, 2, 3, 1, 2, 3],
+            // AUTHENTICATE_FILE with a g70v2 whose user name starts at offset 13, not 12
+            &[
+                0x1D, 70, 2, 0x5B, 1, 16, 0, 13, 0, 2, 0, 14, 0, 2, 0, 0xFE, 0xCA, 0xAD, 0xDE,
+                b'a', b'b', b'c', b'd',
+            ],
+        ];
+
+        for (seq, request) in requests.iter().enumerate() {
+            let seq = u8::try_from(seq).unwrap();
+            let mut bytes = vec![0xC0 | seq];
+            bytes.extend_from_slice(request);
+            harness
+                .test_request_response(&bytes, &[0xC0 | seq, 0x81, 0x80, 0x04])
+                .await;
+        }
+
+        // with the user name at offset 12 the g70v2 parses, and the function isn't supported
+        harness
+            .test_request_response(
+                &[
+                    0xCF, 0x1D, 70, 2, 0x5B, 1, 16, 0, 12, 0, 2, 0, 14, 0, 2, 0, 0xFE, 0xCA, 0xAD,
+                    0xDE, b'a', b'b', b'c', b'd',
+                ],
+                &[0xCF, 0x81, 0x80, 0x01],
+            )
+            .await;
+
+        harness.check_no_events();
+    })
+    .await;
 }

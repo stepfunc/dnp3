@@ -1,9 +1,12 @@
 use std::sync::{Arc, Mutex};
 
+use crate::app::attr::Attribute;
 use crate::app::{MaybeAsync, Timestamp};
 use crate::outstation::database::DatabaseHandle;
 use crate::outstation::tests::harness::{Event, EventSender};
-use crate::outstation::traits::{OutstationApplication, RequestError, RestartDelay};
+use crate::outstation::traits::{
+    ApplicationIin, OutstationApplication, RequestError, RestartDelay,
+};
 use crate::outstation::{BufferState, FreezeIndices, FreezeType};
 
 pub(crate) struct MockOutstationApplication {
@@ -14,8 +17,14 @@ pub(crate) struct MockOutstationApplication {
 pub(crate) struct ApplicationData {
     pub(crate) processing_delay: u16,
     pub(crate) restart_delay: Option<RestartDelay>,
-    /// when false, time writes, freezes and dead-band writes are declined
-    pub(crate) supported: bool,
+    /// when set, time writes and freezes fail with this error, and dead-band writes are declined
+    pub(crate) request_error: Option<RequestError>,
+    /// the IIN bits the application reports for every response
+    pub(crate) application_iin: ApplicationIin,
+    /// whether the application accepts the value of an attribute WRITE
+    pub(crate) accept_attr_writes: bool,
+    /// answer attribute WRITEs from a future that isn't ready when first polled
+    pub(crate) defer_attr_writes: bool,
 }
 
 impl ApplicationData {
@@ -23,7 +32,10 @@ impl ApplicationData {
         Self {
             processing_delay: 0,
             restart_delay: None,
-            supported: true,
+            request_error: None,
+            application_iin: ApplicationIin::default(),
+            accept_attr_writes: true,
+            defer_attr_writes: false,
         }
     }
 }
@@ -47,11 +59,15 @@ impl OutstationApplication for MockOutstationApplication {
     }
 
     fn write_absolute_time(&mut self, time: Timestamp) -> Result<(), RequestError> {
-        if !self.data().supported {
-            return Err(RequestError::NotSupported);
+        if let Some(err) = self.data().request_error {
+            return Err(err);
         }
         self.events.send(Event::WriteAbsoluteTime(time));
         Ok(())
+    }
+
+    fn get_application_iin(&self) -> ApplicationIin {
+        self.data().application_iin
     }
 
     fn cold_restart(&mut self) -> Option<RestartDelay> {
@@ -72,15 +88,15 @@ impl OutstationApplication for MockOutstationApplication {
         freeze_type: FreezeType,
         _db: &mut DatabaseHandle,
     ) -> Result<(), RequestError> {
-        if !self.data().supported {
-            return Err(RequestError::NotSupported);
+        if let Some(err) = self.data().request_error {
+            return Err(err);
         }
         self.events.send(Event::Freeze(indices, freeze_type));
         Ok(())
     }
 
     fn support_write_analog_dead_bands(&mut self) -> bool {
-        self.data().supported
+        self.data().request_error.is_none()
     }
 
     fn begin_write_analog_dead_bands(&mut self) {
@@ -94,6 +110,23 @@ impl OutstationApplication for MockOutstationApplication {
     fn end_write_analog_dead_bands(&mut self) -> MaybeAsync<()> {
         self.events.send(Event::EndWriteDeadBands);
         MaybeAsync::ready(())
+    }
+
+    fn write_device_attr(&mut self, attr: Attribute) -> MaybeAsync<bool> {
+        self.events
+            .send(Event::WriteDeviceAttr(attr.set, attr.variation));
+        let (accept, defer) = {
+            let data = self.data();
+            (data.accept_attr_writes, data.defer_attr_writes)
+        };
+        if defer {
+            MaybeAsync::asynchronous(async move {
+                tokio::task::yield_now().await;
+                accept
+            })
+        } else {
+            MaybeAsync::ready(accept)
+        }
     }
 
     fn begin_confirm(&mut self) {

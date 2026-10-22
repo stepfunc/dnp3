@@ -40,6 +40,8 @@ mod response_slots;
 mod restart;
 /// time synchronization
 mod time;
+/// the confirm, select, unsolicited retry and keep-alive timers
+mod timeouts;
 /// unsolicited responses
 mod unsolicited;
 /// writing g34

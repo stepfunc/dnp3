@@ -1,6 +1,8 @@
+use crate::app::variations::Group50Var2;
 use crate::app::Timestamp;
 use crate::outstation::tests::harness::*;
 use crate::outstation::{FreezeIndices, FreezeInterval, FreezeType};
+use crate::util::test_support::watchdog;
 
 const EMPTY_RESPONSE: &[u8] = &[0xC0, 0x81, 0x80, 0x00];
 const EMPTY_RESPONSE_PARAM_ERROR: &[u8] = &[0xC0, 0x81, 0x80, 0x04];
@@ -226,4 +228,50 @@ async fn freeze_at_time_with_two_byte_count() {
             0xDDCCBBAA,
         )),
     )]);
+}
+
+#[test]
+fn freeze_interval_maps_each_shape_of_time_and_interval() {
+    let time = Timestamp::new(0xFF);
+    let cases = [
+        (Timestamp::zero(), 0, FreezeInterval::FreezeOnceImmediately),
+        (time, 0, FreezeInterval::FreezeOnceAtTime(time)),
+        (
+            Timestamp::zero(),
+            1000,
+            FreezeInterval::PeriodicallyFreezeRelative(1000),
+        ),
+        (time, 1000, FreezeInterval::PeriodicallyFreeze(time, 1000)),
+    ];
+
+    for (time, interval, expected) in cases {
+        assert_eq!(FreezeInterval::new(time, interval), expected);
+        assert_eq!(expected.get_time_and_interval(), (time, interval));
+
+        let g50v2 = Group50Var2 { time, interval };
+        assert_eq!(FreezeInterval::from(g50v2), expected);
+        assert_eq!(Group50Var2::from(expected), g50v2);
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn freeze_at_time_with_two_time_and_interval_objects_sets_parameter_error() {
+    watchdog(async {
+        let mut harness = new_harness(get_default_config());
+
+        // g50v2 with a count of 2, then g20v0 all objects
+        harness
+            .test_request_response(
+                &[
+                    0xC0, 0x0B, 50, 2, 0x07, 2, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0xAA, 0xBB,
+                    0xCC, 0xDD, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0xAA, 0xBB, 0xCC, 0xDD, 20, 0,
+                    0x06,
+                ],
+                EMPTY_RESPONSE_PARAM_ERROR,
+            )
+            .await;
+
+        harness.check_no_events();
+    })
+    .await;
 }
