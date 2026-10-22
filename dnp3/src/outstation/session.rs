@@ -1576,10 +1576,9 @@ impl OutstationSession {
                 .iter()
                 .map(|x| (x.index.widen_to_u16(), x.value.into()))
             {
-                if db.inner.set_analog_deadband(index, deadband) {
-                    self.application.write_analog_dead_band(index, deadband);
-                } else {
-                    iin2 |= Iin2::PARAMETER_ERROR
+                match db.inner.set_analog_deadband(index, deadband) {
+                    Some(deadband) => self.application.write_analog_dead_band(index, deadband),
+                    None => iin2 |= Iin2::PARAMETER_ERROR,
                 }
             }
             iin2

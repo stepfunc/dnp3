@@ -793,7 +793,7 @@ fn analog_deadband_written_to_the_database_applies_to_detection() {
             db.update2(INDEX, &analog(10.0), options),
             UpdateInfo::Created(0)
         );
-        assert!(db.inner.set_analog_deadband(INDEX, 2.0));
+        assert_eq!(db.inner.set_analog_deadband(INDEX, 2.0), Some(2.0));
         assert_eq!(
             db.update2(INDEX, &analog(12.0), options),
             UpdateInfo::NoEvent
