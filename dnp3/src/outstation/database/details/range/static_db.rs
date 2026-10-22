@@ -1657,4 +1657,41 @@ mod tests {
             Iin2::default()
         );
     }
+
+    fn selections_until_parameter_error(db: &mut StaticDatabase) -> usize {
+        let header = StaticReadHeader::Counter(None, Some(IndexRange::new(0, 0)));
+        std::iter::from_fn(|| (db.select(header) == Iin2::default()).then_some(())).count()
+    }
+
+    fn db_with_one_counter() -> StaticDatabase {
+        let mut db = StaticDatabase::default();
+        assert!(db.add(0, counter_config(StaticCounterVariation::Group20Var1)));
+        db
+    }
+
+    #[test]
+    fn selection_limit_defaults_to_the_default_read_header_limit() {
+        let mut db = db_with_one_counter();
+        assert_eq!(
+            selections_until_parameter_error(&mut db),
+            usize::from(OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS)
+        );
+        // a selection past the limit selects nothing
+        assert_eq!(
+            db.selection_count(),
+            usize::from(OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS)
+        );
+    }
+
+    #[test]
+    fn reset_makes_every_selection_available_again() {
+        let mut db = db_with_one_counter();
+        selections_until_parameter_error(&mut db);
+        db.reset();
+        assert_eq!(db.selection_count(), 0);
+        assert_eq!(
+            selections_until_parameter_error(&mut db),
+            usize::from(OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS)
+        );
+    }
 }
