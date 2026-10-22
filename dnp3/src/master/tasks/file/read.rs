@@ -210,7 +210,8 @@ impl FileReadTask {
 }
 
 impl ResponseTask for FileReadTask {
-    /// An error that ends the transfer, which the task reports as its success
+    /// Why the master ended the transfer itself, by user abort or the size limit, which the task
+    /// reports as its success
     type Output = Option<FileError>;
     type Error = FileError;
 
@@ -253,26 +254,21 @@ impl ResponseTask for FileReadTask {
         let header = response.get_only_object_header()?;
 
         match self.state {
-            State::GetAuth(_) => match parse_auth_response(header) {
-                Ok(key) => {
-                    self.state = State::Open(key);
-                    Ok(Step::Next)
+            State::GetAuth(_) => {
+                self.state = State::Open(parse_auth_response(header)?);
+                Ok(Step::Next)
+            }
+            State::Open(_) => {
+                let file = parse_open_response(header)?;
+                if self.settings.reader.opened(file.file_size).is_abort() {
+                    tracing::warn!("File transfer aborted by user");
+                    self.settings.reader.aborted(FileError::AbortByUser);
+                    self.state = State::Close(file.file_handle);
+                } else {
+                    self.state = State::Read(ReadState::new(file.file_handle));
                 }
-                Err(err) => Ok(Step::Done(Some(err))),
-            },
-            State::Open(_) => match parse_open_response(header) {
-                Ok(file) => {
-                    if self.settings.reader.opened(file.file_size).is_abort() {
-                        tracing::warn!("File transfer aborted by user");
-                        self.settings.reader.aborted(FileError::AbortByUser);
-                        self.state = State::Close(file.file_handle);
-                    } else {
-                        self.state = State::Read(ReadState::new(file.file_handle));
-                    }
-                    Ok(Step::Next)
-                }
-                Err(err) => Ok(Step::Done(Some(err))),
-            },
+                Ok(Step::Next)
+            }
             State::Read(rs) => {
                 match Self::handle_read_response(&mut self.settings, rs, header).await {
                     Ok(None) => {
@@ -284,7 +280,10 @@ impl ResponseTask for FileReadTask {
                         self.state = State::Read(rs);
                         Ok(Step::Next)
                     }
-                    Err(err) => Ok(Step::Done(Some(err))),
+                    Err(err @ (FileError::AbortByUser | FileError::MaxLengthExceeded)) => {
+                        Ok(Step::Done(Some(err)))
+                    }
+                    Err(err) => Err(err),
                 }
             }
             // the file was already read, so a CLOSE that fails only gets logged
