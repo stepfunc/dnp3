@@ -11,8 +11,8 @@ use crate::app::{
     Sequence, Variation,
 };
 use crate::master::association::AssociationConfig;
-use crate::master::tests::harness::{AssocInfoEvent, TestHarness};
-use crate::master::{Classes, ReadRequest, TaskError, TaskType};
+use crate::master::tests::harness::{AssocInfoEvent, ReadEvent, TestHarness};
+use crate::master::{Classes, ReadRequest, ReadType, TaskError, TaskType};
 
 use super::harness::create_association;
 use super::harness::requests::{
@@ -320,14 +320,126 @@ async fn unsolicited_response_with_counted_event_objects_delivers_nothing() {
     response.extend_from_slice(&[
         0x02, 0x01, 0x07, 0x08, 0x20, 0x02, 0x17, 0x01, 0x00, 0x01, 0x07, 0x00,
     ]);
-    // a malformed unsolicited response is still confirmed
+    harness.process_response(response).await;
+    // a malformed unsolicited response isn't confirmed, so the next write confirms a valid one
+    let next = Sequence::new(1);
     harness
-        .read_and_expect_write(response, unsol_confirm(unsol_seq))
+        .read_and_expect_write(
+            unsol_null_custom_iin(next, Iin::default()),
+            unsol_confirm(next),
+        )
         .await;
 
-    assert_eq!(harness.read_events.pop(), Vec::new());
+    assert_eq!(
+        harness.read_events.pop(),
+        vec![
+            ReadEvent::BeginFragment(ReadType::Unsolicited),
+            ReadEvent::EndFragment(ReadType::Unsolicited),
+        ]
+    );
     assert_eq!(
         harness.assoc_events.pop(),
-        vec![AssocInfoEvent::Unsolicited(false, unsol_seq)]
+        vec![AssocInfoEvent::Unsolicited(false, next)]
     );
+}
+
+/// g2v3 with a count of 1 and a one-byte index, relative time 0xFFFF
+const RELATIVE_TIME_EVENT: &[u8] = &[0x02, 0x03, 0x17, 0x01, 0x07, 0x01, 0xFF, 0xFF];
+
+#[tokio::test]
+async fn read_with_relative_time_without_cto_fails_without_confirm() {
+    let mut seq = Sequence::default();
+    let mut harness = create_association(AssociationConfig::default()).await;
+    let (read, response_seq) = start_read(&mut harness, &mut seq).await;
+    harness.read_events.pop();
+
+    let mut response = read_response(response_seq, true, true, Iin2::default(), None);
+    response.extend_from_slice(RELATIVE_TIME_EVENT);
+    harness.process_response(response).await;
+
+    assert_eq!(
+        read.await.unwrap(),
+        Err(TaskError::UnexpectedResponseHeaders)
+    );
+    assert_eq!(harness.read_events.pop(), Vec::new());
+    harness.assert_no_events();
+}
+
+#[tokio::test]
+async fn read_with_relative_time_after_cto_succeeds() {
+    let mut seq = Sequence::default();
+    let mut harness = create_association(AssociationConfig::default()).await;
+    let (read, response_seq) = start_read(&mut harness, &mut seq).await;
+    harness.read_events.pop();
+
+    let mut response = read_response(response_seq, true, true, Iin2::default(), None);
+    // g51v1 with a count of 1, time 2
+    response.extend_from_slice(&[0x33, 0x01, 0x07, 0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00]);
+    response.extend_from_slice(RELATIVE_TIME_EVENT);
+    harness.process_response(response).await;
+    harness.expect_write(solicited_confirm(response_seq)).await;
+
+    assert_eq!(read.await.unwrap(), Ok(()));
+    assert_eq!(
+        harness.read_events.pop(),
+        vec![
+            ReadEvent::BeginFragment(ReadType::SinglePoll),
+            ReadEvent::BinaryInput,
+            ReadEvent::EndFragment(ReadType::SinglePoll),
+        ]
+    );
+}
+
+#[tokio::test]
+async fn multi_fragment_read_with_cto_only_in_the_first_fragment_fails() {
+    let mut seq = Sequence::default();
+    let mut harness = create_association(AssociationConfig::default()).await;
+    let (read, first) = start_read(&mut harness, &mut seq).await;
+    harness.read_events.pop();
+
+    let mut response = read_response(first, false, true, Iin2::default(), Some(1));
+    // g51v1 with a count of 1, time 2
+    response.extend_from_slice(&[0x33, 0x01, 0x07, 0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00]);
+    harness.process_response(response).await;
+    harness.expect_write(solicited_confirm(first)).await;
+
+    let mut response = continued_response(seq.increment(), None);
+    // set CON
+    response[0] |= 0x20;
+    response.extend_from_slice(RELATIVE_TIME_EVENT);
+    harness.process_response(response).await;
+
+    assert_eq!(
+        read.await.unwrap(),
+        Err(TaskError::UnexpectedResponseHeaders)
+    );
+    // only the first fragment was delivered
+    assert_eq!(
+        harness.read_events.pop(),
+        vec![
+            ReadEvent::BeginFragment(ReadType::SinglePoll),
+            ReadEvent::AnalogInput,
+            ReadEvent::EndFragment(ReadType::SinglePoll),
+        ]
+    );
+    harness.assert_no_events();
+}
+
+#[tokio::test]
+async fn read_with_valid_measurements_before_relative_time_without_cto_delivers_nothing() {
+    let mut seq = Sequence::default();
+    let mut harness = create_association(AssociationConfig::default()).await;
+    let (read, response_seq) = start_read(&mut harness, &mut seq).await;
+    harness.read_events.pop();
+
+    let mut response = read_response(response_seq, true, true, Iin2::default(), Some(1));
+    response.extend_from_slice(RELATIVE_TIME_EVENT);
+    harness.process_response(response).await;
+
+    assert_eq!(
+        read.await.unwrap(),
+        Err(TaskError::UnexpectedResponseHeaders)
+    );
+    assert_eq!(harness.read_events.pop(), Vec::new());
+    harness.assert_no_events();
 }

@@ -602,6 +602,9 @@ pub trait AssociationInformation: Send + Sync {
     /// Called when a task fails
     fn task_fail(&mut self, _task_type: TaskType, _error: TaskError) {}
 
-    /// Called when an unsolicited response is received
+    /// Called when an unsolicited response is processed, or when it duplicates the last one
+    /// processed (`is_duplicate`). Unsolicited responses that the master discards without
+    /// confirming, because they're invalid or arrive before the startup procedure completes,
+    /// aren't reported
     fn unsolicited_response(&mut self, _is_duplicate: bool, _seq: Sequence) {}
 }
