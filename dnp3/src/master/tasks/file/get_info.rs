@@ -51,7 +51,13 @@ impl OneShotRequest for GetFileInfoRequest {
                 }
                 Err(FileError::BadStatus(obj.status_code))
             }
-            _ => Err(FileError::TaskError(TaskError::UnexpectedResponseHeaders)),
+            _ => {
+                tracing::warn!(
+                    "File GET_FILE_INFO response contains unexpected variation: {}",
+                    header.variation()
+                );
+                Err(FileError::BadResponse)
+            }
         }
     }
 
