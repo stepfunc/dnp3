@@ -10,6 +10,7 @@ use crate::link::header::BroadcastConfirmMode;
 use crate::outstation::config::OutstationConfig;
 use crate::outstation::traits::{BroadcastAction, OperateType};
 use crate::transport::mock::writer::LINK_STATUS_REQUEST;
+use crate::util::test_support::watchdog;
 
 use super::harness::*;
 
@@ -903,27 +904,30 @@ async fn requests_in_the_unsolicited_confirm_wait_discard_the_deferred_read() {
 
 #[tokio::test]
 async fn disable_unsolicited_in_the_unsolicited_confirm_wait_is_the_last_request() {
-    let mut harness = new_harness(get_default_unsolicited_config());
-    enter_unsolicited_confirm_wait(&mut harness).await;
+    watchdog(async {
+        let mut harness = new_harness(get_default_unsolicited_config());
+        enter_unsolicited_confirm_wait(&mut harness).await;
 
-    harness.send_and_process(&read_class_0(1)).await;
-    harness.expect_no_response();
+        harness.send_and_process(&read_class_0(1)).await;
+        harness.expect_no_response();
 
-    let disable = [0xC2, 0x15, 60, 2, 0x06, 60, 3, 0x06, 60, 4, 0x06];
-    harness
-        .test_request_response(&disable, &response(false, 2, RESTART, 0))
-        .await;
+        let disable = [0xC2, 0x15, 60, 2, 0x06, 60, 3, 0x06, 60, 4, 0x06];
+        harness
+            .test_request_response(&disable, &response(false, 2, RESTART, 0))
+            .await;
 
-    // the wait goes on, and the repeat gets the same response
-    harness
-        .test_request_response(&disable, &response(false, 2, RESTART, 0))
-        .await;
-    harness.check_no_events();
+        // the wait goes on, and the repeat gets the same response
+        harness
+            .test_request_response(&disable, &response(false, 2, RESTART, 0))
+            .await;
+        harness.check_no_events();
 
-    // and the deferred READ is gone
-    harness.send_and_process(&unsolicited_confirm(0)).await;
-    harness.check_events(&[Event::UnsolicitedConfirmReceived(0)]);
-    probe(&mut harness, 3, RESTART).await;
+        // and the deferred READ is gone
+        harness.send_and_process(&unsolicited_confirm(0)).await;
+        harness.check_events(&[Event::UnsolicitedConfirmReceived(0)]);
+        probe(&mut harness, 3, RESTART).await;
+    })
+    .await;
 }
 
 // ---------- process_request_from_idle ----------
