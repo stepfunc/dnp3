@@ -533,11 +533,12 @@ impl ResponseFunction {
         }
     }
 
-    /// map the response function to a `FunctionCode`
-    pub(crate) fn function(&self) -> FunctionCode {
-        match self {
-            ResponseFunction::Response => FunctionCode::Response,
-            ResponseFunction::UnsolicitedResponse => FunctionCode::UnsolicitedResponse,
+    /// the response function for a `FunctionCode`, if it is one
+    pub(crate) fn from_function(function: FunctionCode) -> Option<Self> {
+        match function {
+            FunctionCode::Response => Some(ResponseFunction::Response),
+            FunctionCode::UnsolicitedResponse => Some(ResponseFunction::UnsolicitedResponse),
+            _ => None,
         }
     }
 }
@@ -586,7 +587,7 @@ impl ResponseHeader {
     pub(crate) fn to_bytes(self) -> [u8; Self::LENGTH] {
         [
             self.control.to_u8(),
-            self.function.function().as_u8(),
+            FunctionCode::as_u8(self.function.into()),
             self.iin.iin1.value,
             self.iin.iin2.value,
         ]
