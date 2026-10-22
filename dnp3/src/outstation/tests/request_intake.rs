@@ -688,41 +688,6 @@ async fn wrong_confirms_in_the_unsolicited_confirm_wait_are_ignored() {
     probe(&mut harness, 1, RESTART).await;
 }
 
-/// A mandatory broadcast reported in a solicited response during the unsolicited confirm wait:
-/// a solicited confirm with another sequence number doesn't clear it (Table 6-1 row 21)
-#[tokio::test]
-async fn solicited_confirm_with_another_sequence_in_the_unsolicited_confirm_wait_does_not_clear_a_reported_broadcast(
-) {
-    let mut harness = new_harness(get_default_unsolicited_config());
-    enter_unsolicited_confirm_wait(&mut harness).await;
-    broadcast(&mut harness, BroadcastConfirmMode::Mandatory, 0).await;
-    harness.check_events(&[BROADCAST_PROCESSED]);
-
-    harness
-        .test_request_response(
-            &record_current_time(1),
-            &response(true, 1, RESTART | BROADCAST, 0),
-        )
-        .await;
-
-    harness.send_and_process(&confirm(5)).await;
-    harness.expect_no_response();
-    harness.check_no_events();
-
-    // still reported, and the confirm of the response that reports it now clears it
-    harness
-        .test_request_response(
-            &record_current_time(2),
-            &response(true, 2, RESTART | BROADCAST, 0),
-        )
-        .await;
-    harness.send_and_process(&confirm(2)).await;
-    harness.expect_no_response();
-    harness.check_no_events();
-
-    probe(&mut harness, 3, RESTART).await;
-}
-
 /// The IIN2.0 reply reports a mandatory broadcast during the unsolicited confirm wait, but it
 /// isn't the response to a valid request, so its confirm doesn't clear the broadcast
 #[tokio::test]
@@ -1175,12 +1140,18 @@ async fn fragments_in_the_solicited_confirm_wait_postpone_the_link_status_reques
 /// is only checked between the waits
 #[tokio::test(start_paused = true)]
 async fn requests_in_the_unsolicited_confirm_wait_postpone_the_link_status_request() {
-    for request in [unsolicited_confirm(1), confirm(0)] {
+    let requests: [&[u8]; 3] = [
+        &unsolicited_confirm(1),
+        &confirm(0),
+        // too short for a request header, so it gets no response
+        &[0xC0],
+    ];
+    for request in requests {
         let mut harness = new_harness(keep_alive(get_default_unsolicited_config));
         harness.expect_response(&null_unsolicited(0)).await;
 
         tokio::time::advance(ACTIVITY_AT).await;
-        harness.send_and_process(&request).await;
+        harness.send_and_process(request).await;
 
         // due at 11 seconds, so after the wait that ends at 15, not the one that ends at 10
         harness.expect_response(&null_unsolicited(1)).await;

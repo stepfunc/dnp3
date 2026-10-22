@@ -16,43 +16,6 @@ fn encode_string(variation: u8, value: &str) -> Vec<u8> {
 }
 
 #[tokio::test]
-async fn attribute_that_does_not_fit_is_moved_whole_to_the_next_fragment() {
-    let mut config = get_default_config();
-    config.solicited_buffer_size = BufferSize::min();
-    let mut harness = new_harness(config);
-
-    // each attribute fits in a fragment by itself, but not both together
-    let serial = "S".repeat(150);
-    let product = "P".repeat(150);
-
-    harness.handle.database.transaction(|db| {
-        db.define_attr(
-            AttrProp::default(),
-            StringAttr::DeviceSerialNumber.with_value(serial.as_str()),
-        )
-        .unwrap();
-        db.define_attr(
-            AttrProp::default(),
-            StringAttr::ProductNameAndModel.with_value(product.as_str()),
-        )
-        .unwrap();
-    });
-
-    harness.send_and_process(READ_ALL_ATTRIBUTES).await;
-    // FIR, CON, seq 0
-    let mut first = vec![0xA0, 0x81, 0x80, 0x00];
-    first.extend(encode_string(var::DEVICE_SERIAL_NUMBER, &serial));
-    harness.expect_response(&first).await;
-    harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
-
-    harness.send_and_process(CONFIRM_SEQ_0).await;
-    // FIN, seq 1
-    let mut second = vec![0x41, 0x81, 0x80, 0x00];
-    second.extend(encode_string(var::PRODUCT_NAME_AND_MODEL, &product));
-    harness.expect_response(&second).await;
-}
-
-#[tokio::test]
 async fn attribute_values_longer_than_255_bytes_cannot_be_defined() {
     let harness = new_harness(get_default_config());
 

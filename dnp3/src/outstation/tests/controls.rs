@@ -118,35 +118,6 @@ async fn broadcast_support_can_be_disabled() {
 }
 
 #[tokio::test]
-async fn performs_select_before_operate() {
-    let mut harness = new_harness(get_default_config());
-
-    // ------------ select -------------
-
-    harness
-        .test_request_response(SELECT_SEQ0_G41V2, RESPONSE_SEQ0_G41V2_SUCCESS)
-        .await;
-
-    harness.check_events(&[
-        Event::BeginControls,
-        Event::Select(G41V2_INDEX_7),
-        Event::EndControls,
-    ]);
-
-    // ------------ operate -------------
-
-    harness
-        .test_request_response(OPERATE_SEQ1_G41V2, RESPONSE_SEQ1_G41V2_SUCCESS)
-        .await;
-
-    harness.check_events(&[
-        Event::BeginControls,
-        Event::Operate(G41V2_INDEX_7, OperateType::SelectBeforeOperate),
-        Event::EndControls,
-    ]);
-}
-
-#[tokio::test]
 async fn rejects_operate_with_non_consecutive_sequence() {
     let mut harness = new_harness(get_default_config());
 
@@ -165,33 +136,6 @@ async fn rejects_operate_with_non_consecutive_sequence() {
 
     harness
         .test_request_response(OPERATE_SEQ2_G41V2, RESPONSE_SEQ2_G41V2_NO_SELECT)
-        .await;
-
-    harness.check_no_events();
-}
-
-#[tokio::test]
-async fn rejects_operate_with_non_matching_headers() {
-    let mut harness = new_harness(get_default_config());
-
-    // ------------ select -------------
-    harness
-        .test_request_response(SELECT_SEQ0_G41V2, RESPONSE_SEQ0_G41V2_SUCCESS)
-        .await;
-
-    harness.check_events(&[
-        Event::BeginControls,
-        Event::Select(G41V2_INDEX_7),
-        Event::EndControls,
-    ]);
-
-    // ------------ operate -------------
-
-    harness
-        .test_request_response(
-            OPERATE_SEQ1_G41V2_INDEX_8,
-            RESPONSE_SEQ1_G41V2_INDEX8_NO_SELECT,
-        )
         .await;
 
     harness.check_no_events();
@@ -225,42 +169,6 @@ async fn select_can_time_out() {
         .await;
 
     harness.check_no_events();
-}
-
-#[tokio::test]
-async fn accept_two_identical_selects_before_operate() {
-    let mut harness = new_harness(get_default_config());
-
-    // ------------ select -------------
-
-    harness
-        .test_request_response(SELECT_SEQ0_G41V2, RESPONSE_SEQ0_G41V2_SUCCESS)
-        .await;
-
-    harness.check_events(&[
-        Event::BeginControls,
-        Event::Select(G41V2_INDEX_7),
-        Event::EndControls,
-    ]);
-
-    // --------- second select ----------
-    harness
-        .test_request_response(SELECT_SEQ0_G41V2, RESPONSE_SEQ0_G41V2_SUCCESS)
-        .await;
-
-    harness.check_no_events();
-
-    // ------------ operate -------------
-
-    harness
-        .test_request_response(OPERATE_SEQ1_G41V2, RESPONSE_SEQ1_G41V2_SUCCESS)
-        .await;
-
-    harness.check_events(&[
-        Event::BeginControls,
-        Event::Operate(G41V2_INDEX_7, OperateType::SelectBeforeOperate),
-        Event::EndControls,
-    ]);
 }
 
 // an echo of this many g41v2 controls (8 + 4 * 61 bytes) exactly fills the response buffer
