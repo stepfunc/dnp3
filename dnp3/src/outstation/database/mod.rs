@@ -21,6 +21,8 @@ mod details;
 mod family_tests;
 /// read headers
 pub(crate) mod read;
+#[cfg(test)]
+mod read_header_tests;
 
 /// Controls how events are processed when updating values in the database
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
