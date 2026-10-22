@@ -10,6 +10,7 @@ use crate::util::session::{Enabled, Session};
 use std::future::Future;
 
 use crate::app::parse::options::ParseOptions;
+use crate::tcp::accept::{Acceptor, Listen};
 use crate::tcp::ServerHandle;
 use crate::util::future::forever;
 use crate::util::shutdown::ShutdownListener;
@@ -95,19 +96,11 @@ pub async fn spawn_master_tcp_server<C: ConnectionHandler>(
 
     let (token, shutdown_listener) = crate::util::shutdown::shutdown_token();
 
-    let accept_task = AcceptTask {
-        conn_id: 0,
-        link_id_config,
-        parse_options: ParseOptions::get_static(),
-        listener,
-        shutdown_listener,
-        handler,
-        link_id_tasks: JoinSet::new(),
-    };
+    let accept_task = AcceptTask::new(listener, shutdown_listener, link_id_config, handler);
 
     let task = async move {
         tracing::info!("accepting connections");
-        let _: Result<(), crate::app::Shutdown> = accept_task.run().await;
+        let Shutdown = accept_task.run().await;
         tracing::info!("shutdown");
     }
     .instrument(tracing::info_span!("master-tcp-server", addr = ?local_addr));
@@ -186,11 +179,11 @@ pub trait ConnectionHandler: Send + 'static {
 
 type LinkIdResult = std::io::Result<(PhysLayer, SocketAddr, LinkIdentity)>;
 
-struct AcceptTask<C: ConnectionHandler> {
+struct AcceptTask<C: ConnectionHandler, L: Listen> {
     conn_id: u64,
     link_id_config: LinkIdConfig,
     parse_options: ParseOptions,
-    listener: TcpListener,
+    acceptor: Acceptor<L>,
     shutdown_listener: ShutdownListener,
     handler: C,
     link_id_tasks: JoinSet<LinkIdResult>,
@@ -201,18 +194,30 @@ enum TaskEvent {
     LinkId(LinkIdResult),
 }
 
-impl<C: ConnectionHandler> AcceptTask<C> {
-    async fn run(mut self) -> Result<(), Shutdown> {
-        loop {
-            let event = match self.next_event().await {
-                Ok(res) => res?,
-                Err(err) => {
-                    tracing::warn!("I/O error, exiting: {err}");
-                    return Err(Shutdown);
-                }
-            };
+impl<C: ConnectionHandler, L: Listen> AcceptTask<C, L> {
+    fn new(
+        listener: L,
+        shutdown_listener: ShutdownListener,
+        link_id_config: LinkIdConfig,
+        handler: C,
+    ) -> Self {
+        Self {
+            conn_id: 0,
+            link_id_config,
+            parse_options: ParseOptions::get_static(),
+            acceptor: Acceptor::new(listener),
+            shutdown_listener,
+            handler,
+            link_id_tasks: JoinSet::new(),
+        }
+    }
 
-            self.process_event(event).await;
+    async fn run(mut self) -> Shutdown {
+        loop {
+            match self.next_event().await {
+                Ok(event) => self.process_event(event).await,
+                Err(Shutdown) => return Shutdown,
+            }
         }
     }
 
@@ -238,29 +243,28 @@ impl<C: ConnectionHandler> AcceptTask<C> {
         ret
     }
 
-    async fn next_event(&mut self) -> std::io::Result<Result<TaskEvent, Shutdown>> {
+    async fn next_event(&mut self) -> Result<TaskEvent, Shutdown> {
         let can_accept = self.link_id_tasks.len() < self.link_id_config.max_tasks.get();
 
         let accept_connection = async {
             if can_accept {
-                self.listener.accept().await
+                self.acceptor.accept().await
             } else {
                 forever().await
             }
         };
 
         tokio::select! {
-            res = accept_connection  => {
-                let (stream, addr) = res?;
-               Ok(Ok(TaskEvent::Accept(stream, addr)))
+            (stream, addr) = accept_connection  => {
+                Ok(TaskEvent::Accept(stream, addr))
             }
             Some(res) = self.link_id_tasks.join_next(), if !self.link_id_tasks.is_empty() => {
                 // a task that panicked or was cancelled is a failure to identify the link
                 let res = res.unwrap_or_else(|err| Err(std::io::Error::other(err)));
-                Ok(Ok(TaskEvent::LinkId(res)))
+                Ok(TaskEvent::LinkId(res))
             }
             _ = self.shutdown_listener.listen() => {
-                Ok(Err(Shutdown))
+                Err(Shutdown)
             }
         }
     }
@@ -437,6 +441,8 @@ async fn read_link_identity(
 mod tests {
     use super::*;
     use crate::link::EndpointAddress;
+    use crate::tcp::accept::test_util::{expect_attempts_spaced_by_delay, FaultyListener};
+    use crate::tcp::accept::ACCEPT_ERROR_DELAY;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::sync::mpsc;
 
@@ -653,5 +659,89 @@ mod tests {
     async fn header_with_bad_length_is_not_identified() {
         // length 4 with a matching CRC
         rejects_identification([0x05, 0x64, 0x04, 0xC0, 0x01, 0x00, 0x00, 0x04, 0x0E, 0x94]).await;
+    }
+
+    struct FaultyServer {
+        handle: ServerHandle,
+        task: tokio::task::JoinHandle<Shutdown>,
+        events: mpsc::UnboundedReceiver<Event>,
+        _channels: mpsc::UnboundedReceiver<MasterChannel>,
+    }
+
+    impl FaultyServer {
+        fn spawn(listener: FaultyListener, identify: bool) -> Self {
+            let (events_tx, events) = mpsc::unbounded_channel();
+            let (channels_tx, channels) = mpsc::unbounded_channel();
+            let handler = Handler {
+                identify,
+                events: events_tx,
+                channels: channels_tx,
+            };
+            let (token, shutdown_listener) = crate::util::shutdown::shutdown_token();
+            let task = AcceptTask::new(listener, shutdown_listener, LinkIdConfig::new(), handler);
+            Self {
+                handle: ServerHandle {
+                    addr: None,
+                    _token: token,
+                },
+                task: tokio::spawn(task.run()),
+                events,
+                _channels: channels,
+            }
+        }
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn accept_errors_are_retried_after_a_fixed_delay() {
+        let (listener, mut attempts) = FaultyListener::new(&[true, true, true]).await;
+        let _client = TcpStream::connect(listener.local_addr()).await.unwrap();
+        let mut server = FaultyServer::spawn(listener, false);
+
+        // three failures and the successful accept, each one delay after the last
+        expect_attempts_spaced_by_delay(&mut attempts, 4).await;
+        assert_eq!(server.events.recv().await, Some(Event::Accept));
+        assert_eq!(server.events.recv().await, Some(Event::Start));
+    }
+
+    // real time: a paused clock can advance past the delay while the link header is in flight
+    #[tokio::test]
+    async fn link_identity_during_accept_error_delay_does_not_cut_it_short() {
+        let (listener, mut attempts) = FaultyListener::new(&[false, true]).await;
+        let mut client = TcpStream::connect(listener.local_addr()).await.unwrap();
+        let mut server = FaultyServer::spawn(listener, true);
+
+        attempts.recv().await.unwrap();
+        assert_eq!(server.events.recv().await, Some(Event::Accept));
+        let failed_at = attempts.recv().await.unwrap();
+
+        // identifying the accepted connection ends the select while the server waits to retry
+        client.write_all(&LINK_STATUS_REQUEST).await.unwrap();
+        assert_eq!(
+            server.events.recv().await,
+            Some(Event::AcceptLinkId(1024, 1))
+        );
+        assert_eq!(
+            server.events.recv().await,
+            Some(Event::StartWithLinkId(1024, 1))
+        );
+        assert!(failed_at.elapsed() < ACCEPT_ERROR_DELAY);
+
+        let retried_at = attempts.recv().await.unwrap();
+        assert!(retried_at.duration_since(failed_at) >= ACCEPT_ERROR_DELAY);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn dropping_handle_during_accept_error_delay_stops_server() {
+        let (listener, mut attempts) = FaultyListener::new(&[true]).await;
+        let server = FaultyServer::spawn(listener, false);
+
+        let failed_at = attempts.recv().await.unwrap();
+        tokio::time::advance(Duration::from_millis(500)).await;
+        assert!(!server.task.is_finished());
+
+        drop(server.handle);
+        server.task.await.unwrap();
+        assert!(failed_at.elapsed() < ACCEPT_ERROR_DELAY);
+        assert_eq!(attempts.recv().await, None);
     }
 }

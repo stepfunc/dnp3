@@ -7,6 +7,7 @@ use crate::outstation::{
     ConnectionState, ControlHandler, OutstationApplication, OutstationConfig, OutstationHandle,
     OutstationInformation,
 };
+use crate::tcp::accept::{Acceptor, Listen};
 use crate::tcp::server_task::{NewSession, ServerTask as OutstationServerTask};
 use crate::tcp::{AddressFilter, FilterError, ServerHandle};
 use crate::util::channel::Sender;
@@ -41,9 +42,9 @@ impl std::fmt::Debug for Server {
     }
 }
 
-struct AcceptTask {
+struct AcceptTask<L = tokio::net::TcpListener> {
     server: Server,
-    listener: tokio::net::TcpListener,
+    listener: L,
     shutdown_rx: ShutdownListener,
 }
 
@@ -264,6 +265,14 @@ impl Server {
 
     fn create_task(self, listener: tokio::net::TcpListener) -> (ServerHandle, AcceptTask) {
         let addr = listener.local_addr().ok();
+        self.create_task_with(listener, addr)
+    }
+
+    fn create_task_with<L: Listen>(
+        self,
+        listener: L,
+        addr: Option<SocketAddr>,
+    ) -> (ServerHandle, AcceptTask<L>) {
         let (token, shutdown_rx) = crate::util::shutdown::shutdown_token();
 
         let task = AcceptTask {
@@ -294,20 +303,15 @@ impl Server {
         Ok(handle)
     }
 
-    async fn run(
-        &mut self,
-        listener: tokio::net::TcpListener,
-        mut shutdown_rx: ShutdownListener,
-    ) -> Shutdown {
+    async fn run<L: Listen>(&mut self, listener: L, mut shutdown_rx: ShutdownListener) -> Shutdown {
         tracing::info!("accepting connections");
 
-        tokio::select! {
-             _ = self.accept_loop(listener) => {
-                // if the accept loop shuts down we exit
-             }
-             _ = shutdown_rx.listen() => {
-                // if we get the message or shutdown we exit
-             }
+        let mut acceptor = Acceptor::new(listener);
+        loop {
+            tokio::select! {
+                _ = self.accept_one(&mut acceptor) => {}
+                _ = shutdown_rx.listen() => break,
+            }
         }
 
         tracing::info!("shutting down outstations");
@@ -322,24 +326,10 @@ impl Server {
         Shutdown
     }
 
-    async fn accept_loop(&mut self, listener: tokio::net::TcpListener) -> Result<(), Shutdown> {
-        loop {
-            self.accept_one(&listener).await?;
-        }
-    }
-
-    async fn accept_one(&mut self, listener: &tokio::net::TcpListener) -> Result<(), Shutdown> {
-        match listener.accept().await {
-            Ok((stream, addr)) => {
-                crate::tcp::configure_server(&stream);
-                self.process_connection(stream, addr).await;
-                Ok(())
-            }
-            Err(err) => {
-                tracing::error!("{}", err);
-                Err(Shutdown)
-            }
-        }
+    async fn accept_one<L: Listen>(&mut self, acceptor: &mut Acceptor<L>) {
+        let (stream, addr) = acceptor.accept().await;
+        crate::tcp::configure_server(&stream);
+        self.process_connection(stream, addr).await;
     }
 
     async fn process_connection(&mut self, stream: tokio::net::TcpStream, addr: SocketAddr) {
@@ -371,7 +361,7 @@ impl Server {
     }
 }
 
-impl AcceptTask {
+impl<L: Listen> AcceptTask<L> {
     async fn run(mut self) -> Shutdown {
         self.server.run(self.listener, self.shutdown_rx).await
     }
@@ -386,12 +376,17 @@ impl TcpServerTask {
 }
 
 #[cfg(test)]
-#[cfg(feature = "unstable")]
 mod tests {
     use super::*;
+    use crate::app::MaybeAsync;
+    #[cfg(feature = "unstable")]
     use crate::app::NullListener;
     use crate::link::EndpointAddress;
     use crate::outstation::database::EventBufferConfig;
+    use crate::tcp::accept::test_util::{expect_attempts_spaced_by_delay, FaultyListener};
+    use crate::tcp::accept::ACCEPT_ERROR_DELAY;
+    use std::time::Duration;
+    use tokio::sync::mpsc;
 
     struct NullApplication;
     impl OutstationApplication for NullApplication {}
@@ -407,6 +402,66 @@ mod tests {
         )
     }
 
+    struct ConnectionListener(mpsc::UnboundedSender<ConnectionState>);
+    impl Listener<ConnectionState> for ConnectionListener {
+        fn update(&mut self, value: ConnectionState) -> MaybeAsync<()> {
+            self.0.send(value).unwrap();
+            MaybeAsync::ready(())
+        }
+    }
+
+    /// a server with one outstation that reports its connection state
+    fn server_with_outstation() -> (Server, mpsc::UnboundedReceiver<ConnectionState>) {
+        let mut server =
+            Server::new_tcp_server(LinkErrorMode::Close, "127.0.0.1:0".parse().unwrap());
+        let (tx, rx) = mpsc::unbounded_channel();
+        let (_handle, future) = server
+            .add_outstation_no_spawn(
+                outstation_config(),
+                Box::new(NullApplication),
+                Box::new(NullInformation),
+                crate::outstation::DefaultControlHandler::create(),
+                Box::new(ConnectionListener(tx)),
+                AddressFilter::Any,
+            )
+            .unwrap();
+        tokio::spawn(future);
+        (server, rx)
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn accept_errors_are_retried_after_a_fixed_delay() {
+        let (listener, mut attempts) = FaultyListener::new(&[true, true, true]).await;
+        let _client = tokio::net::TcpStream::connect(listener.local_addr())
+            .await
+            .unwrap();
+        let (server, mut states) = server_with_outstation();
+        let (_handle, task) = server.create_task_with(listener, None);
+        tokio::spawn(task.run());
+
+        // three failures and the successful accept, each one delay after the last
+        expect_attempts_spaced_by_delay(&mut attempts, 4).await;
+        assert_eq!(states.recv().await, Some(ConnectionState::Connected));
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn dropping_handle_during_accept_error_delay_stops_server() {
+        let (listener, mut attempts) = FaultyListener::new(&[true]).await;
+        let (server, _states) = server_with_outstation();
+        let (handle, task) = server.create_task_with(listener, None);
+        let task = tokio::spawn(task.run());
+
+        let failed_at = attempts.recv().await.unwrap();
+        tokio::time::advance(Duration::from_millis(500)).await;
+        assert!(!task.is_finished());
+
+        drop(handle);
+        task.await.unwrap();
+        assert!(failed_at.elapsed() < ACCEPT_ERROR_DELAY);
+        assert_eq!(attempts.recv().await, None);
+    }
+
+    #[cfg(feature = "unstable")]
     #[tokio::test]
     async fn into_task_uses_supplied_listener_and_stops_with_handle() {
         let configured_address = "127.0.0.1:0".parse().unwrap();
@@ -423,6 +478,7 @@ mod tests {
         tokio::spawn(task.run()).await.unwrap();
     }
 
+    #[cfg(feature = "unstable")]
     #[tokio::test]
     async fn add_outstation_task_returns_independently_runnable_task() {
         let configured_address = "127.0.0.1:0".parse().unwrap();
