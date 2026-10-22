@@ -268,6 +268,15 @@ enum Confirm {
     NewRequest,
 }
 
+/// How the confirm wait for a response ended
+#[derive(Copy, Clone)]
+enum ConfirmOutcome {
+    /// the master confirmed the response, so its events were delivered
+    Confirmed,
+    /// the response wasn't confirmed, so its events must be reported again
+    Unconfirmed,
+}
+
 #[derive(Copy, Clone)]
 enum UnsolicitedResult {
     Confirmed,
@@ -555,6 +564,8 @@ impl OutstationSession {
                     .await?
                 {
                     UnsolicitedResult::Timeout | UnsolicitedResult::ReturnToIdle => {
+                        self.end_confirm_wait(database, ConfirmOutcome::Unconfirmed)
+                            .await;
                         self.state.unsolicited = UnsolicitedState::NullRequired;
                         Ok(NextIdleAction::NoSleep)
                     }
@@ -581,19 +592,33 @@ impl OutstationSession {
                         Ok(NextIdleAction::SleepUntilEvent)
                     }
                     Some(UnsolicitedResult::Timeout) | Some(UnsolicitedResult::ReturnToIdle) => {
+                        self.end_confirm_wait(database, ConfirmOutcome::Unconfirmed)
+                            .await;
                         let retry_at = self.new_unsolicited_retry_deadline();
                         self.state.unsolicited = UnsolicitedState::Ready(Some(retry_at));
                         Ok(NextIdleAction::SleepUnit(retry_at))
                     }
                     Some(UnsolicitedResult::Confirmed) => {
-                        database
-                            .clear_written_events(self.application.as_mut())
+                        self.end_confirm_wait(database, ConfirmOutcome::Confirmed)
                             .await;
                         self.state.unsolicited = UnsolicitedState::Ready(None);
                         Ok(NextIdleAction::NoSleep)
                     }
                 }
             }
+        }
+    }
+
+    /// Settle the events written into a response once its confirm wait ends: delete them if the
+    /// master confirmed it, otherwise return them to the unselected state to be reported again
+    async fn end_confirm_wait(&mut self, database: &mut DatabaseHandle, outcome: ConfirmOutcome) {
+        match outcome {
+            ConfirmOutcome::Confirmed => {
+                database
+                    .clear_written_events(self.application.as_mut())
+                    .await
+            }
+            ConfirmOutcome::Unconfirmed => database.reset(),
         }
     }
 
@@ -2069,8 +2094,7 @@ impl OutstationSession {
                 Confirm::Yes(respond_to) => {
                     self.state.last_broadcast_type = None;
 
-                    database
-                        .clear_written_events(self.application.as_mut())
+                    self.end_confirm_wait(database, ConfirmOutcome::Confirmed)
                         .await;
 
                     if series.fin {
@@ -2092,12 +2116,14 @@ impl OutstationSession {
                 }
                 Confirm::Timeout => {
                     tracing::warn!("confirm timeout");
-                    database.reset();
+                    self.end_confirm_wait(database, ConfirmOutcome::Unconfirmed)
+                        .await;
                     return Ok(());
                 }
                 Confirm::NewRequest => {
                     tracing::info!("aborting solicited response due to new request");
-                    database.reset();
+                    self.end_confirm_wait(database, ConfirmOutcome::Unconfirmed)
+                        .await;
                     return Ok(());
                 }
             }
