@@ -2,7 +2,7 @@ use tracing::Instrument;
 
 use crate::app::format::write;
 use crate::app::parse::parser::Response;
-use crate::app::{BufferSize, ControlField, Iin, Iin1, Iin2, Sequence};
+use crate::app::{BufferSize, ControlField, Iin, Iin1, Iin2, Sequence, Timeout};
 use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
 use crate::link::EndpointAddress;
@@ -14,7 +14,8 @@ use crate::master::tasks::command_no_ack::CommandNoAckTask;
 use crate::master::tasks::{AppTask, AssociationTask, NonReadTask, ReadTask, RequestWriter, Task};
 use crate::master::{Association, MasterChannelConfig};
 use crate::transport::{
-    FragmentAddr, RealTransport, Transport, TransportReader, TransportResponse, TransportWriter,
+    FragmentAddr, RealTransport, Transport, TransportReader, TransportResponse,
+    TransportResponseError, TransportWriter,
 };
 use crate::util::buffer::Buffer;
 use crate::util::channel::Receiver;
@@ -179,9 +180,52 @@ impl ReadOutcome {
 }
 
 enum ReadResponseAction {
-    Ignore,
     ReadNext,
     Complete,
+}
+
+/// What happened while the session waited
+enum Event<'a> {
+    /// the deadline passed
+    Timeout,
+    /// an API message was processed
+    Message,
+    /// a fragment arrived, and link activity was credited to its source
+    Fragment(FragmentAddr, Response<'a>),
+    /// a link-layer message arrived, and link activity was credited to its source
+    LinkLayer,
+    /// a fragment arrived that isn't a valid response
+    Malformed(TransportResponseError),
+    /// the read completed without a fragment or link-layer message
+    Nothing,
+}
+
+/// When a task stops waiting for a response
+#[derive(Copy, Clone)]
+struct Deadline {
+    at: Instant,
+    timeout: Timeout,
+}
+
+impl Deadline {
+    fn from_now(timeout: Timeout) -> Self {
+        Self {
+            at: timeout.deadline_from_now(),
+            timeout,
+        }
+    }
+
+    fn expired(self) -> TaskError {
+        tracing::warn!("no response within timeout: {}", self.timeout);
+        TaskError::ResponseTimeout
+    }
+}
+
+async fn sleep_until(deadline: Option<Instant>) {
+    match deadline {
+        Some(deadline) => tokio::time::sleep_until(deadline).await,
+        None => std::future::pending().await,
+    }
 }
 
 impl MasterSession {
@@ -217,8 +261,8 @@ impl MasterSession {
                         .instrument(tracing::info_span!("task", "type" = ?id, "dest" = address))
                         .await
                 }
-                Next::NotBefore(time) => self.idle_until(time, io, writer, reader).await,
-                Next::None => self.idle_forever(io, writer, reader).await,
+                Next::NotBefore(time) => self.idle(Some(time), io, writer, reader).await,
+                Next::None => self.idle(None, io, writer, reader).await,
             };
 
             if let Err(err) = result {
@@ -233,72 +277,103 @@ impl MasterSession {
         }
     }
 
-    /// Wait until a message is received or a response is received.
+    /// Wait until a message is received, a response is received, or we reach the time, if any.
     ///
     /// Returns an error only if shutdown or link layer error occurred.
-    async fn idle_forever<T: Transport>(
+    async fn idle<T: Transport>(
         &mut self,
+        until: Option<Instant>,
         io: &mut PhysLayer,
         writer: &mut TransportWriter<T>,
         reader: &mut TransportReader<T>,
     ) -> Result<(), RunError> {
         loop {
-            let decode_level = self.decode_level;
-            tokio::select! {
-                result = self.process_message(true) => {
-                   // we need to recheck the tasks
-                   return Ok(result?);
+            match self.next_event(io, reader, until).await? {
+                Event::Fragment(source, response) => {
+                    return self
+                        .handle_fragment_while_idle(io, writer, source, response)
+                        .await
                 }
-                result = reader.read(io, decode_level) => {
-                   result?;
-                   match reader.pop_response() {
-                        Some(TransportResponse::Response(addr, response)) => {
-                            self.notify_link_activity(addr.link);
-                            return self.handle_fragment_while_idle(io, writer, addr, response).await
-                        }
-                        Some(TransportResponse::LinkLayerMessage(msg)) => self.notify_link_activity(msg.source),
-                        Some(TransportResponse::Error(_)) => return Ok(()), // ignore the malformed response
-                        None => return Ok(()),
-                   }
+                Event::LinkLayer => {}
+                // we need to recheck the tasks
+                Event::Timeout | Event::Message | Event::Malformed(_) | Event::Nothing => {
+                    return Ok(())
                 }
             }
         }
     }
 
-    /// Wait until a message is received, a response is received, or we reach the defined time.
+    /// Wait for the next event: an API message, something read from the transport, or the deadline
     ///
-    /// Returns an error only if shutdown or link layer error occured.
-    async fn idle_until<T: Transport>(
+    /// Returns an error only if shutdown or link layer error occurred.
+    async fn next_event<'a, T: Transport>(
         &mut self,
-        instant: Instant,
+        io: &mut PhysLayer,
+        reader: &'a mut TransportReader<T>,
+        deadline: Option<Instant>,
+    ) -> Result<Event<'a>, RunError> {
+        let decode_level = self.decode_level;
+        tokio::select! {
+            result = self.process_message(true) => {
+                result?;
+                return Ok(Event::Message);
+            }
+            result = reader.read(io, decode_level) => result?,
+            _ = sleep_until(deadline) => return Ok(Event::Timeout),
+        }
+
+        let event = match reader.pop_response() {
+            Some(TransportResponse::Response(source, response)) => {
+                self.notify_link_activity(source.link);
+                Event::Fragment(source, response)
+            }
+            Some(TransportResponse::LinkLayerMessage(msg)) => {
+                self.notify_link_activity(msg.source);
+                Event::LinkLayer
+            }
+            Some(TransportResponse::Error(err)) => Event::Malformed(err),
+            None => Event::Nothing,
+        };
+        Ok(event)
+    }
+
+    /// Pass on a solicited response from `destination` with sequence `seq`. Unsolicited responses
+    /// are processed and confirmed here, and responses from other sources or with other sequence
+    /// numbers are ignored.
+    async fn filter_solicited<'a, T: Transport>(
+        &mut self,
         io: &mut PhysLayer,
         writer: &mut TransportWriter<T>,
-        reader: &mut TransportReader<T>,
-    ) -> Result<(), RunError> {
-        loop {
-            let decode_level = self.decode_level;
-            tokio::select! {
-                result = self.process_message(true) => {
-                   // we need to recheck the tasks
-                   return Ok(result?);
-                }
-                result = reader.read(io, decode_level) => {
-                   result?;
-                   match reader.pop_response() {
-                        Some(TransportResponse::Response(addr, response)) => {
-                            self.notify_link_activity(addr.link);
-                            return self.handle_fragment_while_idle(io, writer, addr, response).await
-                        }
-                        Some(TransportResponse::LinkLayerMessage(msg)) => self.notify_link_activity(msg.source),
-                        Some(TransportResponse::Error(_)) => return Ok(()), // ignore the malformed response
-                        None => return Ok(()),
-                   }
-                }
-                _ = tokio::time::sleep_until(instant) => {
-                   return Ok(());
-                }
-            }
+        destination: FragmentAddr,
+        seq: Sequence,
+        source: FragmentAddr,
+        response: Response<'a>,
+    ) -> Result<Option<Response<'a>>, LinkError> {
+        if response.header.function.is_unsolicited() {
+            self.handle_unsolicited(source, &response, io, writer)
+                .await?;
+            return Ok(None);
         }
+
+        if source.link != destination.link {
+            tracing::warn!(
+                "Received response from {} while expecting response from {}",
+                source.link,
+                destination.link
+            );
+            return Ok(None);
+        }
+
+        if response.header.control.seq != seq {
+            tracing::warn!(
+                "response with seq: {} doesn't match expected seq: {}",
+                response.header.control.seq.value(),
+                seq.value()
+            );
+            return Ok(None);
+        }
+
+        Ok(Some(response))
     }
 
     pub(crate) async fn process_next_message(&mut self) -> Result<(), StopReason> {
@@ -493,129 +568,59 @@ impl MasterSession {
         writer: &mut TransportWriter<T>,
         reader: &mut TransportReader<T>,
     ) -> Result<NextStep, TaskError> {
-        let seq = match self.send_request(io, dest, &task, writer).await {
-            Ok(seq) => seq,
-            Err(err) => {
-                task.on_task_error(self.associations.get_mut(dest.link).ok(), err);
-                return Err(err);
+        let err = 'failed: {
+            let seq = match self.send_request(io, dest, &task, writer).await {
+                Ok(seq) => seq,
+                Err(err) => break 'failed err,
+            };
+
+            let deadline = match self.associations.get_timeout(dest.link) {
+                Ok(timeout) => Deadline::from_now(timeout),
+                Err(err) => break 'failed err,
+            };
+
+            loop {
+                let (source, response) = match self.next_event(io, reader, Some(deadline.at)).await
+                {
+                    Err(err) => break 'failed err.into(),
+                    Ok(Event::Timeout) => break 'failed deadline.expired(),
+                    Ok(Event::Malformed(err)) => break 'failed err.into(),
+                    Ok(Event::Fragment(source, response)) => (source, response),
+                    Ok(Event::Message | Event::LinkLayer | Event::Nothing) => continue,
+                };
+
+                let response = match self
+                    .filter_solicited(io, writer, dest, seq, source, response)
+                    .await
+                {
+                    Err(err) => break 'failed err.into(),
+                    Ok(None) => continue,
+                    Ok(Some(response)) => response,
+                };
+
+                if !response.header.control.is_fir_and_fin() {
+                    break 'failed TaskError::MultiFragmentResponse;
+                }
+
+                let association = match self.associations.get_mut(dest.link) {
+                    Ok(association) => association,
+                    Err(err) => break 'failed err.into(),
+                };
+
+                association.process_iin(response.header.iin);
+                if response.header.iin.has_bad_request_error() {
+                    break 'failed TaskError::RejectedByIin2(response.header.iin);
+                }
+
+                return match task.handle_response(association, response).await? {
+                    Some(next) => Ok(NextStep::Continue(next)),
+                    None => Ok(NextStep::Complete(seq)),
+                };
             }
         };
 
-        let timeout = self.associations.get_timeout(dest.link)?;
-        let deadline = timeout.deadline_from_now();
-
-        loop {
-            tokio::select! {
-                _ = tokio::time::sleep_until(deadline) => {
-                    tracing::warn!("no response within timeout: {}", timeout);
-                    task.on_task_error(self.associations.get_mut(dest.link).ok(), TaskError::ResponseTimeout);
-                    return Err(TaskError::ResponseTimeout);
-                }
-                x = reader.read(io, self.decode_level) => {
-                    if let Err(err) = x {
-                        task.on_task_error(self.associations.get_mut(dest.link).ok(), err.into());
-                        return Err(err.into());
-                    }
-
-                    match reader.pop_response() {
-                        Some(TransportResponse::Response(source, response)) => {
-                            self.notify_link_activity(source.link);
-
-                            let result = self
-                                .validate_non_read_response(dest, seq, io, writer, source, response)
-                                .await;
-
-                            match result {
-                                // continue reading responses until timeout
-                                Ok(None) => continue,
-                                Ok(Some(response)) => {
-                                    match self.associations.get_mut(dest.link) {
-                                        Err(x) => {
-                                            task.on_task_error(None, x.into());
-                                            return Err(x.into());
-                                        }
-                                        Ok(association) => {
-                                            association.process_iin(response.header.iin);
-                                            if response.header.iin.has_bad_request_error() {
-                                                let err = TaskError::RejectedByIin2(response.header.iin);
-                                                task.on_task_error(Some(association), err);
-                                                return Err(err);
-                                            }
-                                            return match task.handle_response(association, response).await? {
-                                                Some(next) => {
-                                                    Ok(NextStep::Continue(next))
-                                                }
-                                                None => {
-                                                    Ok(NextStep::Complete(seq))
-                                                }
-                                            }
-                                        }
-                                    }
-                                }
-                                Err(err) => {
-                                    task.on_task_error(self.associations.get_mut(dest.link).ok(), err);
-                                    return Err(err);
-                                }
-                            }
-                        }
-                        Some(TransportResponse::LinkLayerMessage(msg)) => self.notify_link_activity(msg.source),
-                        Some(TransportResponse::Error(err)) => {
-                            task.on_task_error(self.associations.get_mut(dest.link).ok(), err.into());
-                            return Err(err.into());
-                        },
-                        None => continue,
-                    }
-                }
-                y = self.process_message(true) => {
-                    match y {
-                        Ok(_) => (), // unless shutdown, proceed to next event
-                        Err(err) => {
-                            task.on_task_error(self.associations.get_mut(dest.link).ok(), err.into());
-                            return Err(err.into());
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    async fn validate_non_read_response<'a, T: Transport>(
-        &mut self,
-        destination: FragmentAddr,
-        seq: Sequence,
-        io: &mut PhysLayer,
-        writer: &mut TransportWriter<T>,
-        source: FragmentAddr,
-        response: Response<'a>,
-    ) -> Result<Option<Response<'a>>, TaskError> {
-        if response.header.function.is_unsolicited() {
-            self.handle_unsolicited(source, &response, io, writer)
-                .await?;
-            return Ok(None);
-        }
-
-        if source.link != destination.link {
-            tracing::warn!(
-                "Received response from {} while expecting response from {}",
-                source.link,
-                destination.link
-            );
-            return Ok(None);
-        }
-
-        if response.header.control.seq != seq {
-            tracing::warn!(
-                "unexpected sequence number in response: {}",
-                response.header.control.seq.value()
-            );
-            return Ok(None);
-        }
-
-        if !response.header.control.is_fir_and_fin() {
-            return Err(TaskError::MultiFragmentResponse);
-        }
-
-        Ok(Some(response))
+        task.on_task_error(self.associations.get_mut(dest.link).ok(), err);
+        Err(err)
     }
 
     async fn run_read_task<T: Transport>(
@@ -660,42 +665,43 @@ impl MasterSession {
 
         // read responses until we get a FIN or an error occurs
         loop {
-            let timeout = self.associations.get_timeout(dest.link)?;
-            let deadline = timeout.deadline_from_now();
+            let deadline = Deadline::from_now(self.associations.get_timeout(dest.link)?);
 
-            loop {
-                tokio::select! {
-                    _ = tokio::time::sleep_until(deadline) => {
-                            tracing::warn!("no response within timeout: {}", timeout);
-                            return Err(TaskError::ResponseTimeout);
-                    }
-                    x = reader.read(io, self.decode_level) => {
-                        x?;
-                        match reader.pop_response() {
-                            Some(TransportResponse::Response(addr, response)) => {
-                                self.notify_link_activity(addr.link);
-                                let action = self.process_read_response(dest, is_first, seq, task, &mut outcome, io, writer, addr, response).await?;
-                                match action {
-                                    // continue reading responses on the inner loop
-                                    ReadResponseAction::Ignore => continue,
-                                    // read task complete
-                                    ReadResponseAction::Complete => return outcome.result(task).map(|()| seq),
-                                    // break to the outer loop and read another response
-                                    ReadResponseAction::ReadNext => {
-                                        is_first = false;
-                                        seq = self.associations.get_mut(addr.link)?.increment_seq();
-                                        break;
-                                    }
-                                }
-                            }
-                            Some(TransportResponse::LinkLayerMessage(msg)) => self.notify_link_activity(msg.source),
-                            Some(TransportResponse::Error(err)) => return Err(err.into()),
-                            None => continue
-                        }
-                    }
-                    y = self.process_message(true) => {
-                        y?; // unless shutdown, proceed to next event
-                    }
+            let action = loop {
+                let (source, response) =
+                    match self.next_event(io, reader, Some(deadline.at)).await? {
+                        Event::Timeout => return Err(deadline.expired()),
+                        Event::Malformed(err) => return Err(err.into()),
+                        Event::Fragment(source, response) => (source, response),
+                        Event::Message | Event::LinkLayer | Event::Nothing => continue,
+                    };
+
+                if let Some(response) = self
+                    .filter_solicited(io, writer, dest, seq, source, response)
+                    .await?
+                {
+                    break self
+                        .process_read_response(
+                            dest,
+                            is_first,
+                            seq,
+                            task,
+                            &mut outcome,
+                            io,
+                            writer,
+                            response,
+                        )
+                        .await?;
+                }
+            };
+
+            match action {
+                // read task complete
+                ReadResponseAction::Complete => return outcome.result(task).map(|()| seq),
+                // read another response
+                ReadResponseAction::ReadNext => {
+                    is_first = false;
+                    seq = self.associations.get_mut(dest.link)?.increment_seq();
                 }
             }
         }
@@ -714,35 +720,8 @@ impl MasterSession {
         outcome: &mut ReadOutcome,
         io: &mut PhysLayer,
         writer: &mut TransportWriter<T>,
-        source: FragmentAddr,
         response: Response<'_>,
     ) -> Result<ReadResponseAction, TaskError> {
-        if response.header.function.is_unsolicited() {
-            self.handle_unsolicited(source, &response, io, writer)
-                .await?;
-            return Ok(ReadResponseAction::Ignore);
-        }
-
-        if source.link != destination.link {
-            tracing::warn!(
-                "Received response from {} while expecting response from {}",
-                source.link,
-                destination.link
-            );
-            return Ok(ReadResponseAction::Ignore);
-        }
-
-        if response.header.control.seq != seq {
-            tracing::warn!(
-                "response with seq: {} doesn't match expected seq: {}",
-                response.header.control.seq.value(),
-                seq.value()
-            );
-            return Ok(ReadResponseAction::Ignore);
-        }
-
-        // now do validations
-
         if response.header.control.fir && !is_first {
             return Err(TaskError::UnexpectedFir);
         }
@@ -908,35 +887,19 @@ impl MasterSession {
             .send_link_status_request(io, self.decode_level, destination)
             .await?;
 
-        let timeout = self.associations.get_timeout(destination.link)?;
-        let deadline = timeout.deadline_from_now();
+        let deadline = Deadline::from_now(self.associations.get_timeout(destination.link)?);
 
         loop {
-            // Wait for something on the link
-            tokio::select! {
-                _ = tokio::time::sleep_until(deadline) => {
-                    tracing::warn!("no response within timeout: {}", timeout);
-                    return Err(TaskError::ResponseTimeout);
+            match self.next_event(io, reader, Some(deadline.at)).await? {
+                Event::Timeout => return Err(deadline.expired()),
+                Event::LinkLayer => return Ok(()),
+                Event::Fragment(source, response) => {
+                    self.handle_fragment_while_idle(io, writer, source, response)
+                        .await?;
+                    return Err(TaskError::UnexpectedResponseHeaders);
                 }
-                x = reader.read(io, self.decode_level) => {
-                    x?;
-                    match reader.pop_response() {
-                        Some(TransportResponse::Response(addr, response)) => {
-                            self.notify_link_activity(addr.link);
-                            self.handle_fragment_while_idle(io, writer, addr, response).await?;
-                            return Err(TaskError::UnexpectedResponseHeaders);
-                        }
-                        Some(TransportResponse::LinkLayerMessage(msg)) => {
-                            self.notify_link_activity(msg.source);
-                            return Ok(());
-                        }
-                        Some(TransportResponse::Error(_)) => return Err(TaskError::UnexpectedResponseHeaders),
-                        None => continue,
-                    }
-                }
-                y = self.process_message(true) => {
-                    y?; // unless shutdown, proceed to next event
-                }
+                Event::Malformed(_) => return Err(TaskError::UnexpectedResponseHeaders),
+                Event::Message | Event::Nothing => {}
             }
         }
     }
