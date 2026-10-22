@@ -411,7 +411,7 @@ impl NonReadTask {
             Self::EmptyResponseTask(_) => TaskType::GenericEmptyResponse(self.function()),
             Self::FileRead(_) => TaskType::FileRead,
             Self::GetFileInfo(_) => TaskType::GetFileInfo,
-            Self::AuthFile(_) => TaskType::GetFileInfo,
+            Self::AuthFile(_) => TaskType::FileAuth,
             Self::OpenFile(_) => TaskType::FileOpen,
             Self::CloseFile(_) => TaskType::FileClose,
             Self::WriteFileBlock(_) => TaskType::FileWriteBlock,
