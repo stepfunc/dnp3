@@ -2,7 +2,7 @@ use crate::app::EndpointType;
 use crate::decode::DecodeLevel;
 use crate::link::display::LinkDisplay;
 use crate::link::error::LinkError;
-use crate::link::format::format_header_fixed_size;
+use crate::link::format::header_bytes;
 use crate::link::function::Function;
 use crate::link::header::{
     AnyAddress, BroadcastConfirmMode, ControlField, FrameInfo, FrameType, Header,
@@ -149,7 +149,7 @@ impl Layer {
     }
 
     pub(crate) fn format_reply(&mut self, header: Header) -> &[u8] {
-        format_header_fixed_size(header, &mut self.tx_buffer);
+        self.tx_buffer = header_bytes(header, super::constant::MIN_HEADER_LENGTH_VALUE);
         &self.tx_buffer
     }
 

@@ -44,29 +44,24 @@ impl FrameData<'_> {
     }
 }
 
-// this can all be statically verified not to panic since the buffer is a constant length
-pub(crate) fn format_header_fixed_size(
-    header: Header,
-    buffer: &mut [u8; constant::LINK_HEADER_LENGTH],
-) {
-    fn to_le(x: u16) -> (u8, u8) {
-        let [low, high] = x.to_le_bytes();
-        (low, high)
-    }
-
-    buffer[0] = constant::START1;
-    buffer[1] = constant::START2;
-    buffer[2] = 5;
-    buffer[3] = header.control.to_u8();
-    let (d1, d2) = to_le(header.destination.value());
-    buffer[4] = d1;
-    buffer[5] = d2;
-    let (s1, s2) = to_le(header.source.value());
-    buffer[6] = s1;
-    buffer[7] = s2;
-    let (c1, c2) = to_le(calc_crc(&buffer[0..8]));
-    buffer[8] = c1;
-    buffer[9] = c2;
+/// The 10 bytes of a link header announcing `length` (the header fields plus any user data)
+pub(crate) fn header_bytes(header: Header, length: u8) -> [u8; constant::LINK_HEADER_LENGTH] {
+    let ctrl = header.control.to_u8();
+    let [d0, d1] = header.destination.value().to_le_bytes();
+    let [s0, s1] = header.source.value().to_le_bytes();
+    let [c0, c1] = calc_crc_with_0564(&[length, ctrl, d0, d1, s0, s1]).to_le_bytes();
+    [
+        constant::START1,
+        constant::START2,
+        length,
+        ctrl,
+        d0,
+        d1,
+        s0,
+        s1,
+        c0,
+        c1,
+    ]
 }
 
 pub(crate) fn format_header_only<'a>(
@@ -129,16 +124,7 @@ fn format_frame<'a>(
 
     let start = cursor.position();
 
-    cursor.write_u8(constant::START1)?;
-    cursor.write_u8(constant::START2)?;
-
-    let header_start = cursor.position();
-
-    cursor.write_u8(length)?;
-    cursor.write_u8(header.control.to_u8())?;
-    cursor.write_u16_le(header.destination.value())?;
-    cursor.write_u16_le(header.source.value())?;
-    cursor.write_u16_le(calc_crc_with_0564(cursor.written_since(header_start)?))?;
+    cursor.write_bytes(&header_bytes(header, length))?;
 
     let end_header = cursor.position();
 
@@ -168,9 +154,10 @@ mod test {
 
     #[test]
     fn formats_ack() {
-        let mut buffer = [0; constant::LINK_HEADER_LENGTH];
-        format_header_fixed_size(ACK.header, &mut buffer);
-        assert_eq!(buffer, ACK.bytes);
+        assert_eq!(
+            header_bytes(ACK.header, constant::MIN_HEADER_LENGTH_VALUE),
+            ACK.bytes
+        );
     }
 
     const ADDR_A: EndpointAddress = EndpointAddress::raw(0x1234);
