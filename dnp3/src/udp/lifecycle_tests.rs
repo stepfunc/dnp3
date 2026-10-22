@@ -16,8 +16,8 @@ use crate::master::{MasterChannel, MasterChannelConfig};
 use crate::outstation::{DefaultControlHandler, OutstationHandle};
 use crate::udp::{OutstationUdpConfig, UdpSocketMode};
 use crate::util::test_support::{
-    outstation_config, watchdog, NullApplication, NullInformation, MASTER_REPLY,
-    NULL_UNSOLICITED_HEADER, OUTSTATION_REQUEST,
+    outstation_config, watchdog, NullApplication, NullInformation, MASTER_REPLY, MASTER_REQUEST,
+    NULL_UNSOLICITED_HEADER, OUTSTATION_REPLY, OUTSTATION_REQUEST,
 };
 
 const fn secs(x: u64) -> Duration {
@@ -216,6 +216,41 @@ async fn outstation_closes_the_socket_before_waiting_to_retry_a_failed_session()
         assert!(!is_bound(local));
         assert_eq!(alive_tasks(), 1);
         drop(handle);
+    })
+    .await;
+}
+
+/// A datagram larger than the read buffer doesn't end the session. Most platforms truncate it,
+/// so the outstation answers the request at its start; Windows fails the read, so the outstation
+/// discards all of it.
+#[tokio::test]
+async fn outstation_keeps_answering_after_an_oversized_datagram() {
+    watchdog(async {
+        let (local, reservation) = reserve();
+        let master = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        drop(reservation);
+        let _handle = spawn_outstation(local, master.local_addr().unwrap());
+        let mut buffer = [0; 64];
+        let (count, _) = master.recv_from(&mut buffer).await.unwrap();
+        assert_eq!(
+            (count, buffer.get(..10)),
+            (17, Some(NULL_UNSOLICITED_HEADER.as_slice()))
+        );
+
+        // larger than the read buffer for the default fragment size
+        let mut oversized = MASTER_REQUEST.to_vec();
+        oversized.resize(4096, 0);
+        master.send_to(&oversized, local).await.unwrap();
+        master.send_to(&MASTER_REQUEST, local).await.unwrap();
+
+        let replies = if cfg!(windows) { 1 } else { 2 };
+        for _ in 0..replies {
+            let (count, source) = master.recv_from(&mut buffer).await.unwrap();
+            assert_eq!(
+                (buffer.get(..count), source),
+                (Some(OUTSTATION_REPLY.as_slice()), local)
+            );
+        }
     })
     .await;
 }

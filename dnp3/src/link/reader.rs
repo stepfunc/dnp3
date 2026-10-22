@@ -331,6 +331,44 @@ mod tests {
         Reader::new(LinkModes::datagram(LinkErrorMode::Discard), 2048)
     }
 
+    /// The read of a datagram larger than the buffer returns the bytes that fit on most platforms,
+    /// so the whole frames before the cut are read and the cut one is discarded. Windows fails
+    /// the read instead, so the whole datagram is discarded. Either way the next one is read.
+    #[tokio::test]
+    async fn oversized_datagram_is_truncated_or_discarded_and_the_next_one_is_read() {
+        crate::util::test_support::watchdog(async {
+            let (mut io, local) = bound().await;
+            let (sender, addr) = sender().await;
+            let mut reader = datagram_reader();
+            let full: Vec<Frame> = (0..9).map(|fill| full_frame(fill).1).collect();
+            let oversized: Vec<u8> = [ACK.bytes.to_vec()]
+                .into_iter()
+                .chain((0..9).map(|fill| full_frame(fill).0))
+                .collect::<Vec<_>>()
+                .concat();
+            // the read buffer ends inside the last frame
+            let space = reader.datagram_space().unwrap().len();
+            assert!(oversized.len() > space);
+            assert!(oversized.len() - link::constant::MAX_LINK_FRAME_LENGTH < space);
+            sender.send_to(&oversized, local).await.unwrap();
+            sender.send_to(ACK.bytes, local).await.unwrap();
+
+            let before_next: Vec<Frame> = if cfg!(windows) {
+                Vec::new()
+            } else {
+                [frame(&ACK)]
+                    .into_iter()
+                    .chain(full.into_iter().take(8))
+                    .collect()
+            };
+            for expected in before_next {
+                assert_eq!(next_frame(&mut reader, &mut io).await, (expected, addr));
+            }
+            assert_eq!(next_frame(&mut reader, &mut io).await, (frame(&ACK), addr));
+        })
+        .await;
+    }
+
     #[tokio::test]
     async fn later_datagram_from_another_sender_has_its_address() {
         let (mut io, local) = bound().await;

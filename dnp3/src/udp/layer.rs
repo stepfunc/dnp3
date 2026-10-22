@@ -136,6 +136,10 @@ impl UdpLayer {
                     tracing::debug!("Discarded UDP datagram from port 0 of {}", source.ip())
                 }
                 Ok(x) => break x,
+                Err(err) if is_oversized_datagram(&err) => tracing::warn!(
+                    "Discarded UDP datagram larger than the read buffer of {} bytes",
+                    buffer.len()
+                ),
                 Err(err) => {
                     if is_icmp_error(&err) {
                         tracing::warn!("Trapped ICMP error on UDP read: {}", err);
@@ -196,6 +200,15 @@ fn is_icmp_error(err: &std::io::Error) -> bool {
         err.kind(),
         ErrorKind::ConnectionReset | ErrorKind::ConnectionRefused
     ) || (cfg!(windows) && err.raw_os_error() == Some(WSAENETRESET))
+}
+
+/// The Windows error for a received datagram larger than the buffer, which it discards
+const WSAEMSGSIZE: i32 = 10040;
+
+/// A datagram too large for the read buffer. Windows fails the read without its length and
+/// discards what didn't fit, while other platforms return the truncated length.
+fn is_oversized_datagram(err: &std::io::Error) -> bool {
+    cfg!(windows) && err.raw_os_error() == Some(WSAEMSGSIZE)
 }
 
 /// Linux also reports a send to port 0 as an invalid argument, which on other platforms means a
@@ -574,24 +587,47 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn read_skips_wsaenetreset_only_on_windows() {
+    type ReadOutcome = Result<(Option<Vec<u8>>, PhysAddr), Option<i32>>;
+
+    /// Read from a bound socket whose first read fails with the platform error `code`, and whose
+    /// next read receives a datagram from the peer
+    async fn read_after_os_error(code: i32) -> ReadOutcome {
         let (mut layer, remote) = UdpLayer::scripted(None, &[]);
-        remote.received.send(Err(Fault::Os(WSAENETRESET))).unwrap();
+        remote.received.send(Err(Fault::Os(code))).unwrap();
         remote.received.send(Ok((vec![2], peer()))).unwrap();
 
         let mut buffer = [0; 16];
-        let result = tokio::time::timeout(Duration::from_secs(1), layer.read(&mut buffer))
+        tokio::time::timeout(Duration::from_secs(1), layer.read(&mut buffer))
             .await
             .unwrap()
             .map(|(count, source)| (buffer.get(..count).map(<[u8]>::to_vec), source))
-            .map_err(|err| err.raw_os_error());
-        let expected = if WINDOWS {
+            .map_err(|err| err.raw_os_error())
+    }
+
+    /// The datagram after the error on Windows, and the error elsewhere
+    fn skipped_only_on_windows(code: i32) -> ReadOutcome {
+        if WINDOWS {
             Ok((Some(vec![2]), PhysAddr::Udp(peer())))
         } else {
-            Err(ttl_expired().raw_os_error())
-        };
-        assert_eq!(result, expected);
+            Err(Some(code))
+        }
+    }
+
+    #[tokio::test]
+    async fn read_skips_wsaenetreset_only_on_windows() {
+        assert_eq!(
+            read_after_os_error(WSAENETRESET).await,
+            skipped_only_on_windows(WSAENETRESET)
+        );
+    }
+
+    /// Windows fails the read of a datagram larger than the buffer, which other platforms truncate
+    #[tokio::test]
+    async fn read_skips_wsaemsgsize_only_on_windows() {
+        assert_eq!(
+            read_after_os_error(WSAEMSGSIZE).await,
+            skipped_only_on_windows(WSAEMSGSIZE)
+        );
     }
 
     #[tokio::test]
