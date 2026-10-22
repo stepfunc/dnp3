@@ -55,3 +55,42 @@ impl Function {
         }
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    const FUNCTIONS: &[(Function, u8)] = &[
+        (Function::PriResetLinkStates, 0x40),
+        (Function::PriTestLinkStates, 0x42),
+        (Function::PriConfirmedUserData, 0x43),
+        (Function::PriUnconfirmedUserData, 0x44),
+        (Function::PriRequestLinkStatus, 0x49),
+        (Function::SecAck, 0x00),
+        (Function::SecNack, 0x01),
+        (Function::SecLinkStatus, 0x0B),
+        (Function::SecNotSupported, 0x0F),
+    ];
+
+    #[test]
+    fn round_trips_every_byte() {
+        for byte in 0..=u8::MAX {
+            assert_eq!(Function::from(byte).to_u8(), byte, "{byte:#04X}");
+        }
+    }
+
+    #[test]
+    fn values_match_the_table() {
+        for &(function, value) in FUNCTIONS {
+            assert_eq!(Function::from(value), function, "{value:#04X}");
+            assert_eq!(function.to_u8(), value, "{function:?}");
+        }
+
+        // every value missing from the table is captured as unknown
+        for byte in 0..=u8::MAX {
+            if !FUNCTIONS.iter().any(|&(_, value)| value == byte) {
+                assert_eq!(Function::from(byte), Function::Unknown(byte));
+            }
+        }
+    }
+}

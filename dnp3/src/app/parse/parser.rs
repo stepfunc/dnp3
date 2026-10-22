@@ -1069,6 +1069,61 @@ mod test {
     }
 
     #[test]
+    fn two_byte_range_parses_attribute_set_255() {
+        let input: &[u8] = &[0x00, 0xCA, 0x01, 0xFF, 0x00, 0xFF, 0x00, 0x02, 0x01, 42];
+        for function in [FunctionCode::Response, FunctionCode::Write] {
+            let mut headers = parse_objects(function, input);
+            let first = headers.next().unwrap();
+            assert!(headers.next().is_none());
+            let attr = match first {
+                ObjectHeader::Range(Width::Two, _, RangedVariation::Group0(attr)) => attr,
+                _ => panic!("unexpected header"),
+            };
+            assert_eq!(
+                attr,
+                Attribute {
+                    set: AttrSet::Private(0xFF),
+                    variation: 0xCA,
+                    value: AttrValue::UnsignedInt(42)
+                }
+            );
+        }
+    }
+
+    #[test]
+    fn two_byte_range_rejects_attribute_set_above_255() {
+        let input: &[u8] = &[0x00, 0xCA, 0x01, 0x00, 0x01, 0x00, 0x01, 0x02, 0x01, 42];
+        for function in [FunctionCode::Response, FunctionCode::Write] {
+            let err =
+                HeaderCollection::parse(ParseOptions::default(), function, input).unwrap_err();
+            assert_eq!(
+                err,
+                ObjectParseError::BadAttribute(AttrParseError::SetIdNotU8(256))
+            );
+        }
+    }
+
+    #[test]
+    fn integer_attribute_with_unsupported_length_fails_the_whole_collection() {
+        // user decision D5: only lengths 1, 2 and 4 are supported
+        // data type codes: 2 = unsigned integer, 3 = signed integer
+        for data_type in [2, 3] {
+            // a valid header precedes the bad one
+            let input: &[u8] = &[
+                0x00, 0xCA, 0x00, 0x07, 0x07, 0x02, 0x01, 42, // valid
+                0x00, 0xCB, 0x00, 0x07, 0x07, data_type, 0x03, 1, 2, 3, // length 3
+            ];
+            let err =
+                HeaderCollection::parse(ParseOptions::default(), FunctionCode::Response, input)
+                    .unwrap_err();
+            assert_eq!(
+                err,
+                ObjectParseError::BadAttribute(AttrParseError::BadIntegerLength(3))
+            );
+        }
+    }
+
+    #[test]
     fn parses_free_format() {
         let input: &[u8] = &[
             70, 5, 0x5B, 0x01, 12, 0x00, 0x01, 0x02, 0x03, 0x04, 0xAA, 0xBB, 0xCC, 0xDD, b'd',

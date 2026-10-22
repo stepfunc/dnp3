@@ -117,3 +117,125 @@ impl std::fmt::Display for TimeoutRangeError {
 }
 
 impl std::error::Error for TimeoutRangeError {}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    const JUST_BELOW_MIN: Duration = Duration::from_nanos(999_999);
+    const JUST_ABOVE_MAX: Duration = Duration::from_nanos(3_600_000_000_001);
+
+    #[test]
+    fn range_is_one_millisecond_to_one_hour() {
+        assert_eq!(Timeout::MIN, Duration::from_nanos(1_000_000));
+        assert_eq!(Timeout::MAX, Duration::from_nanos(3_600_000_000_000));
+    }
+
+    #[test]
+    fn from_duration_accepts_only_the_closed_range() {
+        let cases = [
+            (
+                Duration::ZERO,
+                Err(TimeoutRangeError::TooSmall(Duration::ZERO)),
+            ),
+            (
+                JUST_BELOW_MIN,
+                Err(TimeoutRangeError::TooSmall(JUST_BELOW_MIN)),
+            ),
+            (Timeout::MIN, Ok(Timeout::MIN)),
+            (Timeout::MAX, Ok(Timeout::MAX)),
+            (
+                JUST_ABOVE_MAX,
+                Err(TimeoutRangeError::TooLarge(JUST_ABOVE_MAX)),
+            ),
+            (
+                Duration::MAX,
+                Err(TimeoutRangeError::TooLarge(Duration::MAX)),
+            ),
+        ];
+
+        for (input, expected) in cases {
+            assert_eq!(
+                Timeout::from_duration(input).map(Duration::from),
+                expected,
+                "{input:?}"
+            );
+            assert_eq!(
+                Timeout::try_from(input).map(Duration::from),
+                expected,
+                "{input:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn from_millis_and_from_secs_check_the_range() {
+        assert_eq!(
+            Timeout::from_millis(0),
+            Err(TimeoutRangeError::TooSmall(Duration::ZERO))
+        );
+        assert_eq!(
+            Timeout::from_millis(1).map(Duration::from),
+            Ok(Timeout::MIN)
+        );
+        assert_eq!(
+            Timeout::from_secs(3600).map(Duration::from),
+            Ok(Timeout::MAX)
+        );
+        assert_eq!(
+            Timeout::from_secs(3601),
+            Err(TimeoutRangeError::TooLarge(Duration::from_secs(3601)))
+        );
+    }
+
+    #[test]
+    fn saturating_clamps_to_the_range() {
+        let cases = [
+            (Duration::ZERO, Timeout::MIN),
+            (JUST_BELOW_MIN, Timeout::MIN),
+            (Timeout::MIN, Timeout::MIN),
+            (Duration::from_secs(5), Duration::from_secs(5)),
+            (Timeout::MAX, Timeout::MAX),
+            (JUST_ABOVE_MAX, Timeout::MAX),
+            (Duration::MAX, Timeout::MAX),
+        ];
+
+        for (input, expected) in cases {
+            assert_eq!(
+                Duration::from(Timeout::saturating(input)),
+                expected,
+                "{input:?}"
+            );
+        }
+    }
+
+    #[cfg(feature = "serialization")]
+    #[test]
+    fn deserialization_checks_the_range() {
+        let cases = [
+            (Duration::ZERO, None),
+            (JUST_BELOW_MIN, None),
+            (Timeout::MIN, Some(Timeout::MIN)),
+            (Timeout::MAX, Some(Timeout::MAX)),
+            (JUST_ABOVE_MAX, None),
+        ];
+
+        for (input, expected) in cases {
+            let json = serde_json::to_string(&input).unwrap();
+            let parsed = serde_json::from_str::<Timeout>(&json)
+                .ok()
+                .map(Duration::from);
+            assert_eq!(parsed, expected, "{input:?}");
+        }
+    }
+
+    #[cfg(feature = "serialization")]
+    #[test]
+    fn serializes_as_the_inner_duration() {
+        let timeout = Timeout::from_millis(1500).unwrap();
+        assert_eq!(
+            serde_json::to_value(timeout).unwrap(),
+            serde_json::to_value(Duration::from_millis(1500)).unwrap()
+        );
+    }
+}

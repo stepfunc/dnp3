@@ -8,6 +8,8 @@ mod g70v6;
 mod g70v7;
 mod g70v8;
 mod permissions;
+#[cfg(test)]
+mod redaction_tests;
 
 pub(crate) use g70v2::*;
 pub(crate) use g70v3::*;
@@ -194,5 +196,51 @@ impl From<scursor::ReadError> for ReadError {
 impl From<Utf8Error> for ReadError {
     fn from(value: Utf8Error) -> Self {
         Self::BadString(value)
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    const FILE_STATUS: &[(FileStatus, u8)] = &[
+        (FileStatus::Success, 0),
+        (FileStatus::PermissionDenied, 1),
+        (FileStatus::InvalidMode, 2),
+        (FileStatus::FileNotFound, 3),
+        (FileStatus::FileLocked, 4),
+        (FileStatus::TooManyOpen, 5),
+        (FileStatus::InvalidHandle, 6),
+        (FileStatus::WriteBlockSize, 7),
+        (FileStatus::CommLost, 8),
+        (FileStatus::CannotAbort, 9),
+        (FileStatus::NotOpened, 16),
+        (FileStatus::HandleExpired, 17),
+        (FileStatus::BufferOverrun, 18),
+        (FileStatus::Fatal, 19),
+        (FileStatus::BlockSeq, 20),
+        (FileStatus::Undefined, 255),
+    ];
+
+    #[test]
+    fn file_status_round_trips_every_value() {
+        for byte in 0..=u8::MAX {
+            assert_eq!(FileStatus::new(byte).to_u8(), byte);
+        }
+    }
+
+    #[test]
+    fn file_status_values_match_the_table() {
+        for &(status, value) in FILE_STATUS {
+            assert_eq!(FileStatus::new(value), status, "{value}");
+            assert_eq!(status.to_u8(), value, "{status:?}");
+        }
+
+        // every value missing from the table is captured as other
+        for byte in 0..=u8::MAX {
+            if !FILE_STATUS.iter().any(|&(_, value)| value == byte) {
+                assert_eq!(FileStatus::new(byte), FileStatus::Other(byte));
+            }
+        }
     }
 }

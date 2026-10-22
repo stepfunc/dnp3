@@ -194,3 +194,31 @@ impl Header {
         )
     }
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn control_field_round_trips_every_byte() {
+        for byte in 0..=u8::MAX {
+            assert_eq!(ControlField::from(byte).to_u8(), byte, "{byte:#04X}");
+        }
+    }
+
+    #[test]
+    fn control_field_bits_map_to_fields() {
+        for byte in 0..=u8::MAX {
+            assert_eq!(
+                ControlField::from(byte),
+                ControlField {
+                    func: Function::from(byte & 0x4F),
+                    master: byte & 0x80 != 0,
+                    fcb: byte & 0x20 != 0,
+                    fcv: byte & 0x10 != 0,
+                },
+                "{byte:#04X}"
+            );
+        }
+    }
+}
