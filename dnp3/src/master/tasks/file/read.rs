@@ -101,7 +101,10 @@ enum State {
     /// Read the next block
     Read(ReadState),
     /// Close the file
-    Close(FileHandle),
+    ///
+    /// If the transfer ended early, this holds the error that ended it, which the reader was
+    /// already given, until the CLOSE response arrives
+    Close(FileHandle, Option<FileError>),
 }
 
 pub(crate) struct FileReadTask {
@@ -138,6 +141,12 @@ impl FileReadTask {
             Some(x) => State::GetAuth(x),
         };
         Self::new(settings, state)
+    }
+
+    /// Abort the reader with `err`, and close the file once without retries
+    fn end_early(&mut self, handle: FileHandle, err: FileError) {
+        self.settings.reader.aborted(err);
+        self.state = State::Close(handle, Some(err));
     }
 
     /// The state that reads the next block, or `None` if this block was the last
@@ -210,9 +219,7 @@ impl FileReadTask {
 }
 
 impl ResponseTask for FileReadTask {
-    /// Why the master ended the transfer itself, by user abort or the size limit, which the task
-    /// reports as its success
-    type Output = Option<FileError>;
+    type Output = ();
     type Error = FileError;
 
     fn function(&self) -> FunctionCode {
@@ -220,7 +227,7 @@ impl ResponseTask for FileReadTask {
             State::GetAuth(_) => FunctionCode::AuthenticateFile,
             State::Open(_) => FunctionCode::OpenFile,
             State::Read(_) => FunctionCode::Read,
-            State::Close(_) => FunctionCode::CloseFile,
+            State::Close(..) => FunctionCode::CloseFile,
         }
     }
 
@@ -241,7 +248,7 @@ impl ResponseTask for FileReadTask {
                 writer,
             ),
             State::Read(rs) => write_read(*rs, writer),
-            State::Close(handle) => write_close(*handle, writer),
+            State::Close(handle, _) => write_close(*handle, writer),
         };
         Ok(result?)
     }
@@ -250,47 +257,45 @@ impl ResponseTask for FileReadTask {
         &mut self,
         _association: &mut Association,
         response: Response<'_>,
-    ) -> Result<Step<Option<FileError>>, FileError> {
-        let header = response.get_only_object_header()?;
+    ) -> Result<Step<()>, FileError> {
+        let header = response.get_only_object_header().map_err(FileError::from);
 
         match self.state {
             State::GetAuth(_) => {
-                self.state = State::Open(parse_auth_response(header)?);
+                self.state = State::Open(parse_auth_response(header?)?);
                 Ok(Step::Next)
             }
             State::Open(_) => {
-                let file = parse_open_response(header)?;
+                let file = parse_open_response(header?)?;
                 if self.settings.reader.opened(file.file_size).is_abort() {
                     tracing::warn!("File transfer aborted by user");
-                    self.settings.reader.aborted(FileError::AbortByUser);
-                    self.state = State::Close(file.file_handle);
+                    self.end_early(file.file_handle, FileError::AbortByUser);
                 } else {
                     self.state = State::Read(ReadState::new(file.file_handle));
                 }
                 Ok(Step::Next)
             }
             State::Read(rs) => {
-                match Self::handle_read_response(&mut self.settings, rs, header).await {
+                let result = match header {
+                    Ok(header) => Self::handle_read_response(&mut self.settings, rs, header).await,
+                    Err(err) => Err(err),
+                };
+                match result {
                     Ok(None) => {
                         self.settings.reader.completed();
-                        self.state = State::Close(rs.handle);
-                        Ok(Step::Next)
+                        self.state = State::Close(rs.handle, None);
                     }
-                    Ok(Some(rs)) => {
-                        self.state = State::Read(rs);
-                        Ok(Step::Next)
-                    }
-                    Err(err @ (FileError::AbortByUser | FileError::MaxLengthExceeded)) => {
-                        Ok(Step::Done(Some(err)))
-                    }
-                    Err(err) => Err(err),
+                    Ok(Some(rs)) => self.state = State::Read(rs),
+                    Err(err) => self.end_early(rs.handle, err),
                 }
+                Ok(Step::Next)
             }
-            // the file was already read, so a CLOSE that fails only gets logged
-            State::Close(_) => {
-                let _: Result<(), FileError> = parse_close_response(header)
-                    .and_then(|obj| check_close_status(obj.status_code));
-                Ok(Step::Done(None))
+            State::Close(handle, ref mut early) => {
+                let closed = header.and_then(|header| check_close_response(handle, header));
+                match early.take() {
+                    None => closed.map(Step::Done),
+                    Some(err) => closed_early(err, closed).map(Step::Done),
+                }
             }
         }
     }
@@ -303,15 +308,33 @@ impl ResponseTask for FileReadTask {
         err.into()
     }
 
-    fn complete(
-        mut self,
-        _association: Option<&mut Association>,
-        result: Result<Option<FileError>, FileError>,
-    ) {
-        match result {
-            Ok(None) => {}
-            Ok(Some(err)) | Err(err) => self.settings.reader.aborted(err),
+    fn complete(mut self, _association: Option<&mut Association>, result: Result<(), FileError>) {
+        if let Err(err) = result {
+            if let State::Close(_, Some(early)) = self.state {
+                tracing::warn!(
+                    "Unable to close the file after the transfer ended ({early}): {err}"
+                );
+            }
+            self.settings.reader.aborted(err);
         }
+    }
+}
+
+/// How a task whose transfer ended early with `err` ends, once the outstation answered the CLOSE
+fn closed_early(err: FileError, closed: Result<(), FileError>) -> Result<(), FileError> {
+    if let Err(close_err) = closed {
+        tracing::warn!("Unable to close the file after the transfer ended ({err}): {close_err}");
+    }
+
+    match err {
+        // the master ended the transfer itself, which only fails the task if the CLOSE fails
+        FileError::AbortByUser | FileError::MaxLengthExceeded => closed,
+        FileError::BadResponse
+        | FileError::BadStatus(_)
+        | FileError::WrongHandle
+        | FileError::NoPermission
+        | FileError::BadBlockNum
+        | FileError::TaskError(_) => Err(err),
     }
 }
 

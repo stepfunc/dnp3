@@ -25,13 +25,7 @@ impl OneShotRequest for CloseFileRequest {
     }
 
     fn parse(&self, response: Response<'_>) -> Result<(), FileError> {
-        let obj = super::parse_close_response(response.objects?.get_only_header()?)?;
-
-        if obj.file_handle != u32::from(self.handle) {
-            return Err(FileError::WrongHandle);
-        }
-
-        super::check_close_status(obj.status_code)
+        super::check_close_response(self.handle, response.objects?.get_only_header()?)
     }
 
     fn task_error(err: FileError) -> TaskError {
