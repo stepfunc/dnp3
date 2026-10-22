@@ -104,15 +104,9 @@ async fn response_from_another_outstation_during_any_task_refreshes_its_own_keep
 
             tokio::time::advance(Duration::from_secs(9)).await;
 
-            let (request, expected) = match kind {
-                Kind::Read => (
-                    class_scan_request(Classes::class0(), Sequence::new(0)),
-                    Err(TaskError::ResponseTimeout),
-                ),
-                Kind::LinkStatus => (
-                    crate::transport::mock::writer::LINK_STATUS_REQUEST.to_vec(),
-                    Err(TaskError::UnexpectedResponseHeaders),
-                ),
+            let request = match kind {
+                Kind::Read => class_scan_request(Classes::class0(), Sequence::new(0)),
+                Kind::LinkStatus => crate::transport::mock::writer::LINK_STATUS_REQUEST.to_vec(),
             };
             let task = tokio::spawn(async move {
                 match kind {
@@ -124,7 +118,12 @@ async fn response_from_another_outstation_during_any_task_refreshes_its_own_keep
             harness
                 .process_response(empty_response(Sequence::new(0)))
                 .await;
-            assert_eq!(task.await.unwrap(), expected, "{kind:?}");
+            // the task ignores the response, which isn't from its outstation
+            assert_eq!(
+                task.await.unwrap(),
+                Err(TaskError::ResponseTimeout),
+                "{kind:?}"
+            );
 
             // past the original keep-alive deadline, where a link status request would be due if
             // the response hadn't refreshed it

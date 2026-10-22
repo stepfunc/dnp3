@@ -51,7 +51,7 @@ pub(crate) enum LinkLayerMessageType {
 pub(crate) enum TransportResponse<'a> {
     Response(FragmentAddr, Response<'a>),
     LinkLayerMessage(LinkLayerMessage),
-    Error(TransportResponseError),
+    Error(FragmentAddr, TransportResponseError),
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]

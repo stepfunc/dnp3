@@ -580,6 +580,67 @@ async fn every_task_fails_on_a_fragment_too_short_to_be_a_response() {
     .await;
 }
 
+/// Fragments that aren't valid responses: one too short for the IIN, and a solicited response with
+/// the UNS bit
+const MALFORMED: [&[u8]; 2] = [&[0xC0, 0x81, 0x00], &[0xD0, 0x81, 0x00, 0x00]];
+
+#[tokio::test(start_paused = true)]
+async fn every_task_fails_on_a_solicited_response_with_the_uns_bit() {
+    watchdog(async {
+        for kind in KINDS {
+            let mut started = start(kind).await;
+            respond(&mut started.harness, vec![0xD0, 0x81, 0x00, 0x00]).await;
+            started.expect_failure(TaskError::Transport).await;
+        }
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn every_task_ignores_malformed_fragments_from_other_outstations() {
+    watchdog(async {
+        for kind in KINDS {
+            let mut started = start(kind).await;
+            let harness = &mut started.harness;
+            harness.set_source(OTHER);
+            for fragment in MALFORMED {
+                respond(harness, fragment.to_vec()).await;
+            }
+            harness.set_source(OUTSTATION);
+            started.expect_waiting().await;
+            started.expect_success().await;
+        }
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn malformed_fragments_from_other_outstations_do_not_extend_any_task_deadline() {
+    watchdog(async {
+        for kind in KINDS {
+            let mut started = start(kind).await;
+            let now = Instant::now();
+            let harness = &mut started.harness;
+            harness.set_source(OTHER);
+            for fragment in MALFORMED {
+                tokio::time::advance(Duration::from_millis(250)).await;
+                respond(harness, fragment.to_vec()).await;
+            }
+            harness.set_source(OUTSTATION);
+            let err = TaskError::ResponseTimeout;
+            assert_eq!(started.reply().await, kind.failed(err), "{kind:?}");
+            assert_eq!(now.elapsed(), Duration::from_secs(1), "{kind:?}");
+            barrier(&mut started.harness).await;
+            assert_eq!(
+                started.harness.assoc_events.pop(),
+                [kind.failure_event(err)],
+                "{kind:?}"
+            );
+        }
+    })
+    .await;
+}
+
 #[tokio::test(start_paused = true)]
 async fn every_task_fails_with_disabled_when_the_channel_is_disabled() {
     watchdog(async {

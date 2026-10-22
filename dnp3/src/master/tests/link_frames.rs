@@ -17,10 +17,13 @@ use crate::link::reader::LinkModes;
 use crate::link::{EndpointAddress, LinkErrorMode};
 use crate::master::association::AssociationConfig;
 use crate::master::task::MasterTask;
-use crate::master::tests::harness::requests::{empty_response, unsol_null};
+use crate::master::tests::harness::requests::{empty_response, unsol_null, unsol_with_data};
+use crate::master::tests::harness::{
+    AssocInfoEvent, AssociationInformationEventHandler, CountHandler, ReadEvent,
+};
 use crate::master::{
     AssociationHandle, AssociationHandler, AssociationInformation, Classes, MasterChannel,
-    MasterChannelConfig, MasterChannelType, ReadHandler, ReadRequest, TaskError,
+    MasterChannelConfig, MasterChannelType, ReadHandler, ReadRequest, ReadType, TaskError,
 };
 use crate::util::phys::PhysLayer;
 use crate::util::session::{Enabled, RunError};
@@ -175,7 +178,23 @@ impl Kind {
             (result, Instant::now())
         })
     }
+
+    /// The frame from the outstation that completes the task
+    fn reply(self) -> Vec<u8> {
+        match self {
+            Kind::Read => fragment(OUTSTATION, &empty_response(Sequence::new(0))),
+            Kind::NonRead => fragment(
+                OUTSTATION,
+                &[0xC0, 0x81, 0x00, 0x00, 52, 1, 0x07, 1, 0x02, 0x00],
+            ),
+            Kind::LinkStatus => header_only(OUTSTATION, LINK_STATUS),
+        }
+    }
 }
+
+/// Fragments that aren't valid responses: one too short for the IIN, and a solicited response with
+/// the UNS bit
+const MALFORMED: [&[u8]; 2] = [&[0xC0, 0x81, 0x00], &[0xD0, 0x81, 0x00, 0x00]];
 
 /// Input that arrives while a task waits, without completing a fragment
 #[derive(Copy, Clone, Debug)]
@@ -355,6 +374,16 @@ async fn link_status_request_fails_on_a_fragment() {
             Err(TaskError::UnexpectedResponseHeaders)
         );
 
+        // a solicited response with the UNS bit
+        let (_, task) = start_link_status(&mut harness).await;
+        harness
+            .read(&fragment(OUTSTATION, &[0xD0, 0x81, 0x00, 0x00]))
+            .await;
+        assert_eq!(
+            task.await.unwrap().0,
+            Err(TaskError::UnexpectedResponseHeaders)
+        );
+
         // an unsolicited response, which is still processed and confirmed
         let (_, task) = start_link_status(&mut harness).await;
         harness
@@ -388,13 +417,112 @@ async fn application_tasks_ignore_link_layer_messages() {
             harness.barrier().await;
             assert!(!task.is_finished(), "{kind:?}");
 
-            let response = match kind {
-                Kind::NonRead => vec![0xC0, 0x81, 0x00, 0x00, 52, 1, 0x07, 1, 0x02, 0x00],
-                _ => empty_response(Sequence::new(0)),
-            };
-            harness.read(&fragment(OUTSTATION, &response)).await;
+            harness.read(&kind.reply()).await;
             assert_eq!(task.await.unwrap().0, Ok(()), "{kind:?}");
         }
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn tasks_ignore_malformed_fragments_from_other_outstations() {
+    watchdog(async {
+        for kind in KINDS {
+            for malformed in MALFORMED {
+                let mut harness = Harness::new().await;
+                let task = kind.spawn(harness.association.clone());
+                harness.pop_write().await;
+
+                harness.read(&fragment(OTHER, malformed)).await;
+                harness.barrier().await;
+                assert!(!task.is_finished(), "{kind:?} {malformed:?}");
+                assert_eq!(harness.io.pop_event(), None, "{kind:?} {malformed:?}");
+
+                harness.read(&kind.reply()).await;
+                assert_eq!(task.await.unwrap().0, Ok(()), "{kind:?} {malformed:?}");
+            }
+        }
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn malformed_fragments_from_other_outstations_do_not_extend_the_response_deadline() {
+    watchdog(async {
+        for kind in KINDS {
+            let mut harness = Harness::new().await;
+            let task = kind.spawn(harness.association.clone());
+            harness.pop_write().await;
+            let start = Instant::now();
+
+            for malformed in MALFORMED {
+                tokio::time::advance(STEP).await;
+                harness.read(&fragment(OTHER, malformed)).await;
+                harness.barrier().await;
+            }
+
+            let (result, completed) = task.await.unwrap();
+            assert_eq!(result, Err(TaskError::ResponseTimeout), "{kind:?}");
+            assert_eq!(completed, start + RESPONSE_TIMEOUT, "{kind:?}");
+            assert!(!harness.task.is_finished(), "{kind:?}");
+        }
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn link_status_request_processes_responses_from_another_outstation_and_keeps_waiting() {
+    watchdog(async {
+        let mut harness = Harness::new().await;
+        let read_handler = CountHandler::new();
+        let mut read_events = read_handler.events();
+        let (info, mut info_events) = AssociationInformationEventHandler::pair();
+        harness
+            .master
+            .add_association(
+                OTHER,
+                config(),
+                Box::new(read_handler),
+                null(),
+                Box::new(info),
+            )
+            .await
+            .unwrap();
+        let (_, task) = start_link_status(&mut harness).await;
+
+        // a solicited response, which is ignored
+        harness
+            .read(&fragment(OTHER, &empty_response(Sequence::new(0))))
+            .await;
+        // an unsolicited response, which is processed by the other association and confirmed to it
+        harness
+            .read(&fragment(
+                OTHER,
+                &unsol_with_data(Sequence::new(3), 7, false),
+            ))
+            .await;
+        let confirm = harness.pop_write().await;
+        // unconfirmed user data from the master to the other outstation
+        assert_eq!(confirm[3..8], [0xC4, 0x00, 0x08, 0x01, 0x00]);
+        assert_eq!(app_data(&confirm), [0xD3, 0x00]);
+        harness.barrier().await;
+        assert_eq!(
+            read_events.pop(),
+            [
+                ReadEvent::BeginFragment(ReadType::Unsolicited),
+                ReadEvent::AnalogInput,
+                ReadEvent::EndFragment(ReadType::Unsolicited),
+            ]
+        );
+        assert_eq!(
+            info_events.pop(),
+            [AssocInfoEvent::Unsolicited(false, Sequence::new(3))]
+        );
+        assert!(!task.is_finished());
+        assert_eq!(harness.io.pop_event(), None);
+
+        harness.read(&Kind::LinkStatus.reply()).await;
+        assert_eq!(task.await.unwrap().0, Ok(()));
     })
     .await;
 }

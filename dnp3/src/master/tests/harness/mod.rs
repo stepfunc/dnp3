@@ -195,10 +195,10 @@ impl AssocInfoEventQueue {
     }
 }
 
-struct AssociationInformationEventHandler(Arc<Mutex<Vec<AssocInfoEvent>>>);
+pub(crate) struct AssociationInformationEventHandler(Arc<Mutex<Vec<AssocInfoEvent>>>);
 
 impl AssociationInformationEventHandler {
-    fn pair() -> (Self, AssocInfoEventQueue) {
+    pub(crate) fn pair() -> (Self, AssocInfoEventQueue) {
         let events: Arc<Mutex<Vec<AssocInfoEvent>>> = Default::default();
         (Self(events.clone()), AssocInfoEventQueue(events))
     }
