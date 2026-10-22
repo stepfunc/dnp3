@@ -314,11 +314,21 @@ impl Server {
     ///
     /// This must be called from within the Tokio runtime
     pub async fn bind(self) -> Result<ServerHandle, tokio::io::Error> {
+        let listener = tokio::net::TcpListener::bind(self.address).await?;
+        Ok(self.spawn(listener))
+    }
+
+    // Spawning outside the `bind` future keeps the server task from being compiled again in every
+    // crate that awaits `bind`.
+    fn spawn(self, listener: tokio::net::TcpListener) -> ServerHandle {
         let configured_address = self.address;
-        let (handle, future) = self.bind_no_spawn().await?;
+        let (handle, task) = self.create_task(listener);
         let local = handle.local_addr().unwrap_or(configured_address);
-        tokio::spawn(future.instrument(tracing::info_span!("tcp-server", "listen" = ?local)));
-        Ok(handle)
+        tokio::spawn(
+            task.run()
+                .instrument(tracing::info_span!("tcp-server", "listen" = ?local)),
+        );
+        handle
     }
 
     async fn run<L: Listen>(&mut self, listener: L, mut shutdown_rx: ShutdownListener) -> Shutdown {
