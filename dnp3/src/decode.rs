@@ -231,3 +231,57 @@ impl PhysDecodeLevel {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const NOTHING: DecodeLevel = DecodeLevel {
+        application: AppDecodeLevel::Nothing,
+        transport: TransportDecodeLevel::Nothing,
+        link: LinkDecodeLevel::Nothing,
+        physical: PhysDecodeLevel::Nothing,
+    };
+
+    #[test]
+    fn default_and_an_application_level_leave_the_other_layers_off() {
+        assert_eq!(DecodeLevel::default(), NOTHING);
+        assert_eq!(DecodeLevel::nothing(), NOTHING);
+        assert_eq!(
+            DecodeLevel::from(AppDecodeLevel::ObjectValues),
+            DecodeLevel {
+                application: AppDecodeLevel::ObjectValues,
+                ..NOTHING
+            }
+        );
+    }
+
+    #[test]
+    fn every_level_above_nothing_is_enabled() {
+        let app = [
+            AppDecodeLevel::Nothing,
+            AppDecodeLevel::Header,
+            AppDecodeLevel::ObjectHeaders,
+            AppDecodeLevel::ObjectValues,
+        ];
+        assert_eq!(app.map(|x| x.enabled()), [false, true, true, true]);
+        let transport = [
+            TransportDecodeLevel::Nothing,
+            TransportDecodeLevel::Header,
+            TransportDecodeLevel::Payload,
+        ];
+        assert_eq!(transport.map(|x| x.enabled()), [false, true, true]);
+        let link = [
+            LinkDecodeLevel::Nothing,
+            LinkDecodeLevel::Header,
+            LinkDecodeLevel::Payload,
+        ];
+        assert_eq!(link.map(|x| x.enabled()), [false, true, true]);
+        let physical = [
+            PhysDecodeLevel::Nothing,
+            PhysDecodeLevel::Length,
+            PhysDecodeLevel::Data,
+        ];
+        assert_eq!(physical.map(|x| x.enabled()), [false, true, true]);
+    }
+}
