@@ -41,10 +41,6 @@ impl OneShotRequest for OpenFileRequest {
         super::parse_open_response(response.objects?.get_only_header()?)
     }
 
-    fn task_error(err: FileError) -> TaskError {
-        err.into()
-    }
-
     fn wrap(task: OneShot<Self>) -> NonReadTask {
         NonReadTask::OpenFile(task)
     }

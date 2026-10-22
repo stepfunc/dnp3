@@ -16,7 +16,7 @@ use crate::master::tasks::command_no_ack::CommandNoAckTask;
 use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::restart::RestartType;
 use crate::master::tasks::time::{PendingTimeSync, TimeSyncTask};
-use crate::master::{ReadType, TaskType};
+use crate::master::{CommandError, FileError, ReadType, TaskType, TimeSyncError, WriteError};
 
 use crate::master::tasks::deadbands::DeadBandsRequest;
 use crate::master::tasks::empty_response::EmptyResponseRequest;
@@ -198,7 +198,7 @@ pub(crate) trait ResponseTask: Send + Sized {
     /// What the task produces when it succeeds
     type Output: Send;
     /// Why the task failed, as its requester sees it
-    type Error: Copy + Send;
+    type Error: RequestError;
 
     fn function(&self) -> FunctionCode;
 
@@ -213,18 +213,72 @@ pub(crate) trait ResponseTask: Send + Sized {
         response: Response<'_>,
     ) -> impl Future<Output = Result<Step<Self::Output>, Self::Error>> + Send;
 
-    /// The error for a failure outside the task's response handling
-    fn from_task_error(err: TaskError) -> Self::Error;
-
-    /// The error the session and the association see when the task fails
-    fn task_error(err: Self::Error) -> TaskError;
-
     /// Report the outcome to whoever is waiting for it
     fn complete(
         self,
         association: Option<&mut Association>,
         result: Result<Self::Output, Self::Error>,
     );
+}
+
+/// Why a task failed, as its requester sees it
+pub(crate) trait RequestError: Copy + Send + From<TaskError> {
+    /// The error the session and the association see when the task fails
+    fn task_error(self) -> TaskError;
+}
+
+impl RequestError for TaskError {
+    fn task_error(self) -> TaskError {
+        self
+    }
+}
+
+impl RequestError for CommandError {
+    fn task_error(self) -> TaskError {
+        match self {
+            CommandError::Task(err) => err,
+            CommandError::Response(_) => TaskError::UnexpectedResponseHeaders,
+        }
+    }
+}
+
+impl RequestError for TimeSyncError {
+    fn task_error(self) -> TaskError {
+        match self {
+            TimeSyncError::Task(err) => err,
+            TimeSyncError::ClockRollback
+            | TimeSyncError::BadOutstationTimeDelay(_)
+            | TimeSyncError::Overflow
+            | TimeSyncError::StillNeedsTime
+            | TimeSyncError::SystemTimeNotAvailable => TaskError::UnexpectedResponseHeaders,
+            #[expect(
+                deprecated,
+                reason = "the match must cover every variant until removal"
+            )]
+            TimeSyncError::SystemTimeNotUnix | TimeSyncError::IinError(_) => {
+                TaskError::UnexpectedResponseHeaders
+            }
+        }
+    }
+}
+
+impl RequestError for WriteError {
+    fn task_error(self) -> TaskError {
+        match self {
+            WriteError::Task(err) => err,
+            #[expect(
+                deprecated,
+                reason = "the match must cover every variant until removal"
+            )]
+            WriteError::IinError(_) => TaskError::UnexpectedResponseHeaders,
+        }
+    }
+}
+
+impl RequestError for FileError {
+    fn task_error(self) -> TaskError {
+        self.into()
+    }
 }
 
 /// Handle a response, completing the task unless it has another request to send
@@ -241,19 +295,19 @@ async fn respond<T: ResponseTask>(
         }
         Err(err) => {
             task.complete(Some(association), Err(err));
-            Err(T::task_error(err))
+            Err(err.task_error())
         }
     }
 }
 
 fn fail<T: ResponseTask>(task: T, association: Option<&mut Association>, err: TaskError) {
-    task.complete(association, Err(T::from_task_error(err)))
+    task.complete(association, Err(err.into()))
 }
 
 /// A request that one response answers
 pub(crate) trait OneShotRequest: Send + Sized {
     type Output: Send;
-    type Error: Copy + Send + From<TaskError>;
+    type Error: RequestError;
 
     fn function(&self) -> FunctionCode;
 
@@ -262,9 +316,6 @@ pub(crate) trait OneShotRequest: Send + Sized {
     fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError>;
 
     fn parse(&self, response: Response<'_>) -> Result<Self::Output, Self::Error>;
-
-    /// The error the session and the association see when the request fails
-    fn task_error(err: Self::Error) -> TaskError;
 
     fn wrap(task: OneShot<Self>) -> NonReadTask;
 }
@@ -309,14 +360,6 @@ impl<R: OneShotRequest> ResponseTask for OneShot<R> {
         response: Response<'_>,
     ) -> Result<Step<R::Output>, R::Error> {
         self.request.parse(response).map(Step::Done)
-    }
-
-    fn from_task_error(err: TaskError) -> R::Error {
-        err.into()
-    }
-
-    fn task_error(err: R::Error) -> TaskError {
-        R::task_error(err)
     }
 
     fn complete(self, _association: Option<&mut Association>, result: Result<R::Output, R::Error>) {

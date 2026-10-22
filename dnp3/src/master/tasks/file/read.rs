@@ -309,14 +309,6 @@ impl ResponseTask for FileReadTask {
         }
     }
 
-    fn from_task_error(err: TaskError) -> FileError {
-        FileError::TaskError(err)
-    }
-
-    fn task_error(err: FileError) -> TaskError {
-        err.into()
-    }
-
     fn complete(mut self, _association: Option<&mut Association>, result: Result<(), FileError>) {
         if let Err(err) = result {
             if let State::Close(_, Some(early)) = self.state {

@@ -55,10 +55,6 @@ impl OneShotRequest for GetFileInfoRequest {
         }
     }
 
-    fn task_error(err: FileError) -> TaskError {
-        err.into()
-    }
-
     fn wrap(task: OneShot<Self>) -> NonReadTask {
         NonReadTask::GetFileInfo(task)
     }
