@@ -22,6 +22,8 @@ on:
   # trigger is a prerequisite for ever making this a required status check,
   # since a path-filtered workflow reports no status at all.
   pull_request:
+  # audit and osv-scanner are required checks, so they must also run in the merge queue
+  merge_group:
 
 permissions:
   contents: read
