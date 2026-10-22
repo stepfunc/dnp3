@@ -103,12 +103,13 @@ impl<T: Transport> TransportReader<T> {
             }
         };
 
+        let source = fragment.info.addr;
         let response = match parse(options, level, fragment.data) {
             Ok(parsed) => match parsed.to_response() {
-                Ok(response) => TransportResponse::Response(fragment.info.addr, response),
-                Err(err) => TransportResponse::Error(err.into()),
+                Ok(response) => TransportResponse::Response(source, response),
+                Err(err) => TransportResponse::Error(source, err.into()),
             },
-            Err(err) => TransportResponse::Error(err.into()),
+            Err(err) => TransportResponse::Error(source, err.into()),
         };
         Some(response)
     }

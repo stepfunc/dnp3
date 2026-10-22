@@ -198,8 +198,9 @@ enum Event<'a> {
     Fragment(FragmentAddr, Response<'a>),
     /// a link-layer message arrived, and link activity was credited to its source
     LinkLayer(LinkLayerMessage),
-    /// a fragment arrived that isn't a valid response
-    Malformed(TransportResponseError),
+    /// a fragment arrived from this source that isn't a valid response, and no link activity was
+    /// credited
+    Malformed(FragmentAddr, TransportResponseError),
     /// the read completed without a fragment or link-layer message
     Nothing,
 }
@@ -223,6 +224,20 @@ impl Deadline {
         tracing::warn!("no response within timeout: {}", self.timeout);
         TaskError::ResponseTimeout
     }
+}
+
+/// Whether a malformed fragment from `source` fails a task waiting on `destination`. One from
+/// another source is dropped.
+fn fails_task(source: FragmentAddr, destination: FragmentAddr) -> bool {
+    if source.link == destination.link {
+        return true;
+    }
+    tracing::warn!(
+        "ignoring malformed fragment from {} while expecting response from {}",
+        source.link,
+        destination.link
+    );
+    false
 }
 
 async fn sleep_until(deadline: Option<Instant>) {
@@ -300,7 +315,7 @@ impl MasterSession {
                 }
                 Event::LinkLayer(_) => {}
                 // we need to recheck the tasks
-                Event::Timeout | Event::Message | Event::Malformed(_) | Event::Nothing => {
+                Event::Timeout | Event::Message | Event::Malformed(..) | Event::Nothing => {
                     return Ok(())
                 }
             }
@@ -335,7 +350,7 @@ impl MasterSession {
                 self.notify_link_activity(msg.source);
                 Event::LinkLayer(msg)
             }
-            Some(TransportResponse::Error(err)) => Event::Malformed(err),
+            Some(TransportResponse::Error(source, err)) => Event::Malformed(source, err),
             None => Event::Nothing,
         };
         Ok(event)
@@ -588,7 +603,12 @@ impl MasterSession {
                 {
                     Err(err) => break 'failed err.into(),
                     Ok(Event::Timeout) => break 'failed deadline.expired(),
-                    Ok(Event::Malformed(err)) => break 'failed err.into(),
+                    Ok(Event::Malformed(source, err)) => {
+                        if fails_task(source, dest) {
+                            break 'failed err.into();
+                        }
+                        continue;
+                    }
                     Ok(Event::Fragment(source, response)) => (source, response),
                     Ok(Event::Message | Event::LinkLayer(_) | Event::Nothing) => continue,
                 };
@@ -675,7 +695,12 @@ impl MasterSession {
                 let (source, response) =
                     match self.next_event(io, reader, Some(deadline.at)).await? {
                         Event::Timeout => return Err(deadline.expired()),
-                        Event::Malformed(err) => return Err(err.into()),
+                        Event::Malformed(source, err) => {
+                            if fails_task(source, dest) {
+                                return Err(err.into());
+                            }
+                            continue;
+                        }
                         Event::Fragment(source, response) => (source, response),
                         Event::Message | Event::LinkLayer(_) | Event::Nothing => continue,
                     };
@@ -903,9 +928,15 @@ impl MasterSession {
                 Event::Fragment(source, response) => {
                     self.handle_fragment_while_idle(io, writer, source, response)
                         .await?;
-                    return Err(TaskError::UnexpectedResponseHeaders);
+                    if source.link == destination.link {
+                        return Err(TaskError::UnexpectedResponseHeaders);
+                    }
                 }
-                Event::Malformed(_) => return Err(TaskError::UnexpectedResponseHeaders),
+                Event::Malformed(source, _) => {
+                    if fails_task(source, destination) {
+                        return Err(TaskError::UnexpectedResponseHeaders);
+                    }
+                }
                 Event::LinkLayer(_) | Event::Message | Event::Nothing => {}
             }
         }
