@@ -423,6 +423,7 @@ impl From<AttrDefError> for ffi::AttrDefError {
             AttrDefError::BadType(_) => ffi::AttrDefError::BadType,
             AttrDefError::ReservedVariation(_) => ffi::AttrDefError::ReservedVariation,
             AttrDefError::NotWritable(_, _) => ffi::AttrDefError::NotWritable,
+            AttrDefError::BadValue(_) => ffi::AttrDefError::BadValue,
         }
     }
 }

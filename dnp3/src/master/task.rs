@@ -499,7 +499,7 @@ impl MasterSession {
 
                     match reader.pop_response() {
                         Some(TransportResponse::Response(source, response)) => {
-                            self.notify_link_activity(dest.link);
+                            self.notify_link_activity(source.link);
 
                             let result = self
                                 .validate_non_read_response(dest, seq, io, writer, source, response)
@@ -516,6 +516,11 @@ impl MasterSession {
                                         }
                                         Ok(association) => {
                                             association.process_iin(response.header.iin);
+                                            if response.header.iin.has_bad_request_error() {
+                                                let err = TaskError::RejectedByIin2(response.header.iin);
+                                                task.on_task_error(Some(association), err);
+                                                return Err(err);
+                                            }
                                             return match task.handle_response(association, response).await? {
                                                 Some(next) => {
                                                     Ok(NextStep::Continue(next))
@@ -588,10 +593,6 @@ impl MasterSession {
 
         if !response.header.control.is_fir_and_fin() {
             return Err(TaskError::MultiFragmentResponse);
-        }
-
-        if response.header.iin.has_bad_request_error() {
-            return Err(TaskError::RejectedByIin2(response.header.iin));
         }
 
         Ok(Some(response))
@@ -884,11 +885,13 @@ impl MasterSession {
             .send_link_status_request(io, self.decode_level, destination)
             .await?;
 
+        let timeout = self.associations.get_timeout(destination.link)?;
+        let deadline = timeout.deadline_from_now();
+
         loop {
-            let timeout = self.associations.get_timeout(destination.link)?;
             // Wait for something on the link
             tokio::select! {
-                _ = tokio::time::sleep_until(timeout.deadline_from_now()) => {
+                _ = tokio::time::sleep_until(deadline) => {
                     tracing::warn!("no response within timeout: {}", timeout);
                     return Err(TaskError::ResponseTimeout);
                 }

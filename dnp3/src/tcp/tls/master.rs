@@ -5,20 +5,17 @@ use std::sync::Arc;
 
 use crate::app::{ConnectStrategy, Listener};
 use crate::link::LinkErrorMode;
-use crate::master::{MasterChannel, MasterChannelConfig, MasterChannelType};
+use crate::master::{MasterChannel, MasterChannelConfig};
 use crate::tcp::tls::{CertificateMode, MinTlsVersion, TlsError};
 use crate::tcp::{
-    wire_master_client, ClientConnectionHandler, ClientState, ConnectOptions, SimpleConnectHandler,
+    spawn_master_client, ClientConnectionHandler, ClientState, ConnectOptions, SimpleConnectHandler,
 };
 use crate::tcp::{EndpointList, PostConnectionHandler};
 use crate::util::phys::PhysLayer;
 
-use crate::app::parse::options::ParseOptions;
-use crate::link::reader::LinkModes;
 use tokio::net::TcpStream;
 use tokio_rustls::rustls;
 use tokio_rustls::rustls::pki_types::{IpAddr, ServerName};
-use tracing::Instrument;
 
 /// TLS configuration for a client
 pub struct TlsClientConfig {
@@ -85,26 +82,14 @@ pub fn spawn_master_tls_client_3(
     listener: Box<dyn Listener<ClientState>>,
     tls_config: TlsClientConfig,
 ) -> MasterChannel {
-    let name = connection_handler.endpoint_span_name();
-    let (mut task, handle) = wire_master_client(
-        LinkModes::stream(link_error_mode),
-        ParseOptions::get_static(),
-        MasterChannelType::Stream,
-        connection_handler,
+    spawn_master_client(
+        link_error_mode,
         config,
+        connection_handler,
         PostConnectionHandler::Tls(tls_config),
         listener,
-    );
-    let future = async move {
-        task.run()
-            .instrument(tracing::info_span!(
-                "dnp3-master-tls-client",
-                "endpoint" = name
-            ))
-            .await;
-    };
-    tokio::spawn(future);
-    handle
+        |name| tracing::info_span!("dnp3-master-tls-client", "endpoint" = ?name),
+    )
 }
 
 impl TlsClientConfig {

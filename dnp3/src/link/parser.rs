@@ -2,7 +2,6 @@ use crate::link::constant;
 use crate::link::error::*;
 use crate::link::header::{AnyAddress, ControlField, Header};
 use crate::link::LinkErrorMode;
-use crate::util::slice_ext::*;
 
 use scursor::{ReadCursor, ReadError};
 
@@ -40,8 +39,10 @@ impl FramePayload {
             .length
             .checked_add(data.len())
             .ok_or(LogicError::BadSize)?;
-        let mut buff = self.buffer.as_mut();
-        let dest = buff.np_get_mut(self.length..end)?;
+        let dest = self
+            .buffer
+            .get_mut(self.length..end)
+            .ok_or(LogicError::BadSize)?;
         for (dest, src) in dest.iter_mut().zip(data) {
             *dest = *src;
         }
@@ -237,7 +238,9 @@ impl Parser {
                 return Err(LogicError::BadSize.into());
             };
 
-            let (data, crc) = block.np_split_at(data_len)?;
+            let (data, crc) = block
+                .split_at_checked(data_len)
+                .ok_or(LogicError::BadSize)?;
             let crc_value = ReadCursor::new(crc).read_u16_le()?;
             let calc_crc = super::crc::calc_crc(data);
 
@@ -266,6 +269,12 @@ mod test {
         assert_eq!(cursor.remaining(), 0);
         assert_eq!(header, frame.header);
         assert_eq!(payload.get(), frame.payload)
+    }
+
+    #[test]
+    fn parses_frame_with_multiple_blocks() {
+        let mut parser = Parser::new(LinkErrorMode::Close);
+        test_frame_parsing(&mut parser, &MULTI_BLOCK_USER_DATA);
     }
 
     #[test]

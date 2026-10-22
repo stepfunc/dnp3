@@ -2,11 +2,13 @@ use crate::app::gen::prefixed::PrefixedVariation;
 use crate::app::measurement::*;
 use crate::app::parse::options::ParseOptions;
 use crate::app::parse::parser::{HeaderDetails, ParsedFragment};
-use crate::app::{BufferSize, Timestamp};
+use crate::app::{BufferSize, FunctionCode, Timestamp};
+use crate::link::header::BroadcastConfirmMode;
 use crate::outstation::config::OutstationConfig;
 use crate::outstation::database::*;
-use crate::outstation::traits::OperateType;
+use crate::outstation::traits::{BroadcastAction, OperateType};
 use crate::outstation::{BufferState, ClassCount, TypeCount};
+use crate::transport::mock::writer::LINK_STATUS_REQUEST;
 
 use super::harness::*;
 
@@ -16,6 +18,7 @@ const fn uns_confirm(seq: u8) -> u8 {
 
 const NULL_UNSOL_SEQ_0: &[u8] = &[0xF0, 0x82, 0x80, 0x00];
 const NULL_UNSOL_SEQ_1: &[u8] = &[0xF1, 0x82, 0x80, 0x00];
+const NULL_UNSOL_SEQ_2: &[u8] = &[0xF2, 0x82, 0x80, 0x00];
 const UNS_CONFIRM_SEQ_0: &[u8] = &[uns_confirm(0), 0x00];
 const UNS_CONFIRM_SEQ_1: &[u8] = &[uns_confirm(1), 0x00];
 const UNSOL_G2V1_SEQ1: &[u8] = &[
@@ -722,6 +725,136 @@ async fn sends_unsolicited_from_one_update() {
     assert!(total_fragments > 10);
 }
 
+const RECORD_CURRENT_TIME_SEQ0: &[u8] = &[0xC0, 0x18];
+const RECORD_CURRENT_TIME_SEQ1: &[u8] = &[0xC1, 0x18];
+const READ_CLASS_0_SEQ2: &[u8] = &[0xC2, 0x01, 0x3C, 0x01, 0x06];
+const SOL_CONFIRM_SEQ0: &[u8] = &[0xC0, 0x00];
+const BROADCAST_RESPONSE_SEQ1: &[u8] = &[0xC1, 0x81, 0x81, 0x00];
+const BROADCAST_RESPONSE_SEQ1_CON: &[u8] = &[0xE1, 0x81, 0x81, 0x00];
+
+async fn broadcast_record_current_time(
+    harness: &mut OutstationHarness,
+    mode: BroadcastConfirmMode,
+) {
+    harness.set_broadcast(Some(mode));
+    harness.send_and_process(RECORD_CURRENT_TIME_SEQ0).await;
+    harness.set_broadcast(None);
+    harness.check_events(&[Event::BroadcastReceived(
+        FunctionCode::RecordCurrentTime,
+        BroadcastAction::Processed,
+    )]);
+}
+
+async fn broadcast_during_unsolicited_confirm_wait_is_reported_after_the_confirm(
+    mode: BroadcastConfirmMode,
+) {
+    let mut harness = new_harness(get_default_unsolicited_config());
+    harness.expect_response(NULL_UNSOL_SEQ_0).await;
+    harness.check_events(&[Event::EnterUnsolicitedConfirmWait(0)]);
+
+    broadcast_record_current_time(&mut harness, mode).await;
+
+    // the null unsolicited response didn't carry IIN1.0, so its confirm doesn't clear it
+    harness.send_and_process(UNS_CONFIRM_SEQ_0).await;
+    harness.check_events(&[Event::UnsolicitedConfirmReceived(0)]);
+
+    if mode == BroadcastConfirmMode::Mandatory {
+        harness
+            .test_request_response(READ_CLASS_0_SEQ1, BROADCAST_RESPONSE_SEQ1_CON)
+            .await;
+        harness.send_and_process(SOL_CONFIRM_SEQ1).await;
+    } else {
+        harness
+            .test_request_response(READ_CLASS_0_SEQ1, BROADCAST_RESPONSE_SEQ1)
+            .await;
+    }
+
+    harness
+        .test_request_response(READ_CLASS_0_SEQ2, EMPTY_RESPONSE_SEQ2)
+        .await;
+}
+
+#[tokio::test]
+async fn mandatory_broadcast_during_unsolicited_confirm_wait_is_reported_after_the_confirm() {
+    broadcast_during_unsolicited_confirm_wait_is_reported_after_the_confirm(
+        BroadcastConfirmMode::Mandatory,
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn optional_broadcast_during_unsolicited_confirm_wait_is_reported_after_the_confirm() {
+    broadcast_during_unsolicited_confirm_wait_is_reported_after_the_confirm(
+        BroadcastConfirmMode::Optional,
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn unconfirmed_broadcast_during_unsolicited_confirm_wait_is_reported_after_the_confirm() {
+    broadcast_during_unsolicited_confirm_wait_is_reported_after_the_confirm(
+        BroadcastConfirmMode::NotRequired,
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn stray_solicited_confirm_does_not_clear_unreported_mandatory_broadcast() {
+    let mut harness = new_harness(get_default_unsolicited_config());
+    harness.expect_response(NULL_UNSOL_SEQ_0).await;
+    harness.check_events(&[Event::EnterUnsolicitedConfirmWait(0)]);
+
+    broadcast_record_current_time(&mut harness, BroadcastConfirmMode::Mandatory).await;
+
+    // no response has carried IIN1.0 yet
+    harness.send_and_process(SOL_CONFIRM_SEQ0).await;
+    harness.expect_no_response();
+
+    harness
+        .test_request_response(RECORD_CURRENT_TIME_SEQ1, BROADCAST_RESPONSE_SEQ1_CON)
+        .await;
+
+    // the confirm of the response that carried IIN1.0 clears it
+    harness.send_and_process(SOL_CONFIRM_SEQ1).await;
+    harness.send_and_process(UNS_CONFIRM_SEQ_0).await;
+    harness.check_events(&[Event::UnsolicitedConfirmReceived(0)]);
+    harness
+        .test_request_response(READ_CLASS_0_SEQ2, EMPTY_RESPONSE_SEQ2)
+        .await;
+}
+
+#[tokio::test]
+async fn unsolicited_confirm_clears_mandatory_broadcast_it_reported() {
+    let mut harness = new_harness(get_default_unsolicited_config());
+    confirm_null_unsolicited(&mut harness).await;
+    enable_unsolicited(&mut harness).await;
+
+    broadcast_record_current_time(&mut harness, BroadcastConfirmMode::Mandatory).await;
+    generate_binary_event(&mut harness.handle.database);
+
+    harness
+        .expect_response(&[
+            0xF1, 0x82, 0x81, 0x00, // DEVICE_RESTART and BROADCAST
+            0x02, 0x01, 0x28, 0x01, 0x00, 0x00, 0x00, 0x81,
+        ])
+        .await;
+    harness.send_and_process(UNS_CONFIRM_SEQ_1).await;
+    harness.check_events(&[
+        Event::EnterUnsolicitedConfirmWait(1),
+        Event::UnsolicitedConfirmReceived(1),
+    ]);
+
+    harness
+        .test_request_response(
+            READ_CLASS_0_SEQ1,
+            &[
+                0xC1, 0x81, 0x80, 0x00, // only DEVICE_RESTART
+                0x01, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01,
+            ],
+        )
+        .await;
+}
+
 #[tokio::test]
 async fn buffer_overflow_issue() {
     let mut config = get_default_unsolicited_config();
@@ -789,4 +922,23 @@ async fn buffer_overflow_issue() {
             ],
         )
         .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn error_fragment_during_unsolicited_confirm_wait_postpones_the_link_status_request() {
+    let mut config = get_default_unsolicited_config();
+    config.keep_alive_timeout = Some(std::time::Duration::from_secs(7));
+    let mut harness = new_harness(config);
+
+    // the null unsolicited response is never confirmed, so it's sent again every 5 seconds
+    harness.expect_response(NULL_UNSOL_SEQ_0).await;
+
+    // a fragment too short for a request header, which gets no response, at 4 seconds
+    tokio::time::advance(std::time::Duration::from_secs(4)).await;
+    harness.send_and_process(&[0xC0]).await;
+
+    // the link status request isn't due at 10 seconds, only at 15
+    harness.expect_response(NULL_UNSOL_SEQ_1).await;
+    harness.expect_response(NULL_UNSOL_SEQ_2).await;
+    harness.expect_response(LINK_STATUS_REQUEST).await;
 }

@@ -2,7 +2,7 @@ use crate::app::EndpointType;
 use crate::decode::DecodeLevel;
 use crate::link::display::LinkDisplay;
 use crate::link::error::LinkError;
-use crate::link::format::format_header_fixed_size;
+use crate::link::format::header_bytes;
 use crate::link::function::Function;
 use crate::link::header::{
     AnyAddress, BroadcastConfirmMode, ControlField, FrameInfo, FrameType, Header,
@@ -149,7 +149,7 @@ impl Layer {
     }
 
     pub(crate) fn format_reply(&mut self, header: Header) -> &[u8] {
-        format_header_fixed_size(header, &mut self.tx_buffer);
+        self.tx_buffer = header_bytes(header, super::constant::MIN_HEADER_LENGTH_VALUE);
         &self.tx_buffer
     }
 
@@ -324,5 +324,78 @@ impl Layer {
                 (None, None)
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    const MASTER: EndpointAddress = EndpointAddress::raw(1);
+    const OUTSTATION: EndpointAddress = EndpointAddress::raw(1024);
+
+    fn layer(endpoint_type: EndpointType) -> Layer {
+        let local = match endpoint_type {
+            EndpointType::Master => MASTER,
+            EndpointType::Outstation => OUTSTATION,
+        };
+        Layer::new(
+            LinkModes::test(),
+            2048,
+            endpoint_type,
+            Feature::Disabled,
+            local,
+        )
+    }
+
+    fn reply_to(layer: &mut Layer, function: Function) -> Vec<u8> {
+        let (from_master, source, destination) = match layer.endpoint_type {
+            EndpointType::Master => (false, OUTSTATION, MASTER),
+            EndpointType::Outstation => (true, MASTER, OUTSTATION),
+        };
+        let header = Header::new(
+            ControlField::new(from_master, function),
+            destination.wrap(),
+            source.wrap(),
+        );
+        let (_, reply) = layer.process_header(header, PhysAddr::None, |_| {});
+        let header = layer.get_header(reply.unwrap());
+        layer.format_reply(header).to_vec()
+    }
+
+    #[test]
+    fn outstation_replies_to_link_status_request() {
+        let mut layer = layer(EndpointType::Outstation);
+        assert_eq!(
+            reply_to(&mut layer, Function::PriRequestLinkStatus),
+            [0x05, 0x64, 0x05, 0x0B, 0x01, 0x00, 0x00, 0x04, 0x64, 0x40]
+        );
+    }
+
+    #[test]
+    fn outstation_acks_reset_link_states() {
+        let mut layer = layer(EndpointType::Outstation);
+        assert_eq!(
+            reply_to(&mut layer, Function::PriResetLinkStates),
+            [0x05, 0x64, 0x05, 0x00, 0x01, 0x00, 0x00, 0x04, 0x27, 0x70]
+        );
+    }
+
+    #[test]
+    fn master_replies_to_link_status_request() {
+        let mut layer = layer(EndpointType::Master);
+        assert_eq!(
+            reply_to(&mut layer, Function::PriRequestLinkStatus),
+            [0x05, 0x64, 0x05, 0x8B, 0x00, 0x04, 0x01, 0x00, 0x2E, 0xF7]
+        );
+    }
+
+    #[test]
+    fn master_acks_reset_link_states() {
+        let mut layer = layer(EndpointType::Master);
+        assert_eq!(
+            reply_to(&mut layer, Function::PriResetLinkStates),
+            [0x05, 0x64, 0x05, 0x80, 0x00, 0x04, 0x01, 0x00, 0x6D, 0xC7]
+        );
     }
 }

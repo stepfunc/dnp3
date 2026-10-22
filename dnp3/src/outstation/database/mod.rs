@@ -9,7 +9,7 @@ use crate::app::Iin2;
 use crate::master::EventClasses;
 use crate::outstation::database::read::ReadHeader;
 
-use crate::app::attr::{AttrProp, AttrSet, OwnedAttribute, TypeError};
+use crate::app::attr::{AttrProp, AttrSet, BadAttribute, OwnedAttribute, TypeError};
 use crate::outstation::{ClassCount, OutstationApplication};
 use scursor::WriteCursor;
 
@@ -275,6 +275,9 @@ impl ResponseInfo {
 /// The value is initialized to the default of 0.0/false with flags == RESTART.
 pub trait Add<T> {
     /// Add a measurement to the database
+    ///
+    /// Returns false, leaving the database unchanged, if a point of this type already exists
+    /// at the index or the configuration is invalid (e.g. a NaN or negative analog deadband)
     fn add(&mut self, index: u16, class: Option<EventClass>, config: T) -> bool;
 }
 
@@ -371,6 +374,8 @@ pub enum AttrDefError {
     ReservedVariation(u8),
     /// The attribute is not writable
     NotWritable(AttrSet, u8),
+    /// The attribute value cannot be encoded, e.g. a string longer than 255 bytes
+    BadValue(BadAttribute),
 }
 
 impl std::fmt::Display for AttrDefError {
@@ -389,6 +394,7 @@ impl std::fmt::Display for AttrDefError {
                 "Attribute with set = {set:?} and var = {var} cannot be written"
             ),
             Self::AlreadyDefined => write!(f, "The requested attribute is already defined"),
+            Self::BadValue(x) => write!(f, "{x}"),
         }
     }
 }
@@ -396,6 +402,12 @@ impl std::fmt::Display for AttrDefError {
 impl From<TypeError> for AttrDefError {
     fn from(value: TypeError) -> Self {
         Self::BadType(value)
+    }
+}
+
+impl From<BadAttribute> for AttrDefError {
+    fn from(value: BadAttribute) -> Self {
+        Self::BadValue(value)
     }
 }
 
@@ -708,12 +720,14 @@ impl Add<FrozenCounterConfig> for Database {
 
 impl Add<AnalogInputConfig> for Database {
     fn add(&mut self, index: u16, class: Option<EventClass>, config: AnalogInputConfig) -> bool {
-        let config = PointConfig::<AnalogInput>::new(
-            class,
-            Deadband::new(config.deadband),
-            config.s_var,
-            config.e_var,
-        );
+        let Some(deadband) = Deadband::analog(config.deadband) else {
+            tracing::warn!(
+                "analog input {index} not added, invalid deadband: {}",
+                config.deadband
+            );
+            return false;
+        };
+        let config = PointConfig::<AnalogInput>::new(class, deadband, config.s_var, config.e_var);
         self.inner.add(index, config)
     }
 }
@@ -725,12 +739,15 @@ impl Add<AnalogOutputStatusConfig> for Database {
         class: Option<EventClass>,
         config: AnalogOutputStatusConfig,
     ) -> bool {
-        let config = PointConfig::<AnalogOutputStatus>::new(
-            class,
-            Deadband::new(config.deadband),
-            config.s_var,
-            config.e_var,
-        );
+        let Some(deadband) = Deadband::analog(config.deadband) else {
+            tracing::warn!(
+                "analog output status {index} not added, invalid deadband: {}",
+                config.deadband
+            );
+            return false;
+        };
+        let config =
+            PointConfig::<AnalogOutputStatus>::new(class, deadband, config.s_var, config.e_var);
         self.inner.add(index, config)
     }
 }
@@ -944,6 +961,142 @@ mod test {
         assert_eq!(
             UpdateInfo::NoEvent,
             db.update2(0, &binary(true), UpdateOptions::default())
+        );
+    }
+
+    const INVALID_DEADBANDS: [f64; 3] = [f64::NAN, -1.0, f64::NEG_INFINITY];
+    const VALID_DEADBANDS: [f64; 5] = [0.0, -0.0, 1.5, 1e-310, f64::INFINITY];
+
+    fn empty_db() -> Database {
+        Database::new(
+            None,
+            ClassZeroConfig::default(),
+            EventBufferConfig::all_types(1),
+        )
+    }
+
+    #[test]
+    fn rejects_analog_input_with_invalid_deadband() {
+        for deadband in INVALID_DEADBANDS {
+            let mut db = empty_db();
+            let config = AnalogInputConfig {
+                deadband,
+                ..Default::default()
+            };
+            assert!(!db.add(0, Some(EventClass::Class1), config), "{deadband}");
+            assert!(Get::<AnalogInput>::get(&db, 0).is_none(), "{deadband}");
+        }
+    }
+
+    #[test]
+    fn rejects_analog_output_status_with_invalid_deadband() {
+        for deadband in INVALID_DEADBANDS {
+            let mut db = empty_db();
+            let config = AnalogOutputStatusConfig {
+                deadband,
+                ..Default::default()
+            };
+            assert!(!db.add(0, Some(EventClass::Class1), config), "{deadband}");
+            assert!(
+                Get::<AnalogOutputStatus>::get(&db, 0).is_none(),
+                "{deadband}"
+            );
+        }
+    }
+
+    #[test]
+    fn accepts_analog_points_with_valid_deadband() {
+        for deadband in VALID_DEADBANDS {
+            let mut db = empty_db();
+            let input = AnalogInputConfig {
+                deadband,
+                ..Default::default()
+            };
+            let output = AnalogOutputStatusConfig {
+                deadband,
+                ..Default::default()
+            };
+            assert!(db.add(0, Some(EventClass::Class1), input), "{deadband}");
+            assert!(db.add(0, Some(EventClass::Class1), output), "{deadband}");
+            assert!(Get::<AnalogInput>::get(&db, 0).is_some(), "{deadband}");
+            assert!(
+                Get::<AnalogOutputStatus>::get(&db, 0).is_some(),
+                "{deadband}"
+            );
+        }
+    }
+
+    fn time() -> Time {
+        Time::Synchronized(Timestamp::zero())
+    }
+
+    #[test]
+    fn infinite_analog_input_deadband_only_reports_flag_changes() {
+        let mut db = Database::new(
+            None,
+            ClassZeroConfig::default(),
+            EventBufferConfig::all_types(10),
+        );
+        let config = AnalogInputConfig {
+            deadband: f64::INFINITY,
+            ..Default::default()
+        };
+        assert!(db.add(0, Some(EventClass::Class1), config));
+
+        let options = UpdateOptions::default();
+        let online = Flags::ONLINE;
+        let forced = Flags::ONLINE | Flags::LOCAL_FORCED;
+
+        // RESTART -> ONLINE
+        assert_eq!(
+            UpdateInfo::Created(0),
+            db.update2(0, &AnalogInput::new(0.0, online, time()), options)
+        );
+        for value in [f64::MAX, f64::MIN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert_eq!(
+                UpdateInfo::NoEvent,
+                db.update2(0, &AnalogInput::new(value, online, time()), options),
+                "{value}"
+            );
+        }
+        assert_eq!(
+            UpdateInfo::Created(1),
+            db.update2(0, &AnalogInput::new(1.0, forced, time()), options)
+        );
+    }
+
+    #[test]
+    fn infinite_analog_output_status_deadband_only_reports_flag_changes() {
+        let mut db = Database::new(
+            None,
+            ClassZeroConfig::default(),
+            EventBufferConfig::all_types(10),
+        );
+        let config = AnalogOutputStatusConfig {
+            deadband: f64::INFINITY,
+            ..Default::default()
+        };
+        assert!(db.add(0, Some(EventClass::Class1), config));
+
+        let options = UpdateOptions::default();
+        let online = Flags::ONLINE;
+        let forced = Flags::ONLINE | Flags::LOCAL_FORCED;
+
+        // RESTART -> ONLINE
+        assert_eq!(
+            UpdateInfo::Created(0),
+            db.update2(0, &AnalogOutputStatus::new(0.0, online, time()), options)
+        );
+        for value in [f64::MAX, f64::MIN, f64::INFINITY, f64::NEG_INFINITY] {
+            assert_eq!(
+                UpdateInfo::NoEvent,
+                db.update2(0, &AnalogOutputStatus::new(value, online, time()), options),
+                "{value}"
+            );
+        }
+        assert_eq!(
+            UpdateInfo::Created(1),
+            db.update2(0, &AnalogOutputStatus::new(1.0, forced, time()), options)
         );
     }
 }

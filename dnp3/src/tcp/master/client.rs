@@ -57,22 +57,36 @@ pub fn spawn_master_tcp_client_3(
     connection_handler: Box<dyn ClientConnectionHandler>,
     listener: Box<dyn Listener<ClientState>>,
 ) -> MasterChannel {
-    let name = connection_handler.endpoint_span_name();
+    spawn_master_client(
+        link_error_mode,
+        config,
+        connection_handler,
+        PostConnectionHandler::Tcp,
+        listener,
+        |name| tracing::info_span!("dnp3-master-tcp-client", "endpoint" = ?name),
+    )
+}
+
+/// Spawn a master client task over TCP or TLS, running in the span built from the endpoint name
+pub(crate) fn spawn_master_client(
+    link_error_mode: LinkErrorMode,
+    config: MasterChannelConfig,
+    connect_handler: Box<dyn ClientConnectionHandler>,
+    post_connection: PostConnectionHandler,
+    listener: Box<dyn Listener<ClientState>>,
+    span: fn(&str) -> tracing::Span,
+) -> MasterChannel {
+    let name = connect_handler.endpoint_span_name();
     let (mut task, handle) = wire_master_client(
         LinkModes::stream(link_error_mode),
         ParseOptions::get_static(),
         MasterChannelType::Stream,
-        connection_handler,
+        connect_handler,
         config,
-        PostConnectionHandler::Tcp,
+        post_connection,
         listener,
     );
-    let future = async move {
-        task.run()
-            .instrument(tracing::info_span!("dnp3-master-tcp-client", "endpoint" = ?name))
-            .await;
-    };
-    tokio::spawn(future);
+    tokio::spawn(async move { task.run().instrument(span(&name)).await });
     handle
 }
 

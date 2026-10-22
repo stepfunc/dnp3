@@ -272,16 +272,7 @@ impl<C: ConnectionHandler> AcceptTask<C> {
             .await
         {
             Ok(x) => {
-                self.spawn_session(
-                    phys,
-                    addr,
-                    x.config,
-                    self.parse_options,
-                    x.error_mode,
-                    id.header_bytes.as_slice(),
-                    Some(id),
-                )
-                .await;
+                self.spawn_session(phys, addr, x, Some(id)).await;
             }
             Err(Reject) => {
                 tracing::warn!(
@@ -301,16 +292,7 @@ impl<C: ConnectionHandler> AcceptTask<C> {
                 tracing::info!("rejected connection from {addr}");
             }
             Ok(AcceptAction::Accept(x)) => {
-                self.spawn_session(
-                    phys,
-                    addr,
-                    x.config,
-                    self.parse_options,
-                    x.error_mode,
-                    &[],
-                    None,
-                )
-                .await;
+                self.spawn_session(phys, addr, x, None).await;
             }
             Ok(AcceptAction::GetLinkIdentity) => {
                 // spawn a task to identify the remote link layer
@@ -324,28 +306,22 @@ impl<C: ConnectionHandler> AcceptTask<C> {
         }
     }
 
-    #[expect(
-        clippy::too_many_arguments,
-        reason = "a session takes each part of its configuration separately"
-    )]
     async fn spawn_session(
         &mut self,
         phys: PhysLayer,
         addr: SocketAddr,
-        config: MasterChannelConfig,
-        parse_options: ParseOptions,
-        error_mode: LinkErrorMode,
-        seed_data: &[u8],
+        accept: AcceptConfig,
         link_id: Option<LinkIdentity>,
     ) {
         let (tx, rx) = crate::util::channel::request_channel();
         let mut task = MasterTask::new(
             Enabled::No,
-            LinkModes::stream(error_mode),
-            parse_options,
-            config,
+            LinkModes::stream(accept.error_mode),
+            self.parse_options,
+            accept.config,
             rx,
         );
+        let seed_data: &[u8] = link_id.as_ref().map_or(&[], |id| &id.header_bytes);
         if let Err(err) = task.seed_link(seed_data) {
             tracing::error!("unable to seed link layer: {err:?}");
             return;
@@ -464,4 +440,174 @@ async fn read_link_identity(
         destination,
         header_bytes,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::link::EndpointAddress;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::sync::mpsc;
+
+    /// request link status from outstation 1024 to master 1
+    const LINK_STATUS_REQUEST: [u8; 10] =
+        [0x05, 0x64, 0x05, 0x49, 0x01, 0x00, 0x00, 0x04, 0xD2, 0x36];
+    /// link status from master 1 to outstation 1024
+    const LINK_STATUS_RESPONSE: [u8; 10] =
+        [0x05, 0x64, 0x05, 0x8B, 0x00, 0x04, 0x01, 0x00, 0x2E, 0xF7];
+
+    #[derive(Debug, PartialEq)]
+    enum Event {
+        Accept,
+        AcceptLinkId(u16, u16),
+        Start,
+        StartWithLinkId(u16, u16),
+    }
+
+    struct Handler {
+        identify: bool,
+        events: mpsc::UnboundedSender<Event>,
+        channels: mpsc::UnboundedSender<MasterChannel>,
+    }
+
+    fn accept_config() -> AcceptConfig {
+        AcceptConfig {
+            error_mode: LinkErrorMode::Close,
+            config: MasterChannelConfig::new(EndpointAddress::try_new(1).unwrap()),
+        }
+    }
+
+    impl ConnectionHandler for Handler {
+        async fn accept(&mut self, _: SocketAddr) -> Result<AcceptAction, Reject> {
+            self.events.send(Event::Accept).unwrap();
+            if self.identify {
+                Ok(AcceptAction::GetLinkIdentity)
+            } else {
+                Ok(AcceptAction::Accept(accept_config()))
+            }
+        }
+
+        async fn start(&mut self, channel: MasterChannel, _: SocketAddr) {
+            self.events.send(Event::Start).unwrap();
+            self.channels.send(channel).unwrap();
+        }
+
+        async fn accept_link_id(
+            &mut self,
+            _: SocketAddr,
+            source: u16,
+            destination: u16,
+        ) -> Result<AcceptConfig, Reject> {
+            self.events
+                .send(Event::AcceptLinkId(source, destination))
+                .unwrap();
+            Ok(accept_config())
+        }
+
+        async fn start_with_link_id(
+            &mut self,
+            channel: MasterChannel,
+            _: SocketAddr,
+            source: u16,
+            destination: u16,
+        ) {
+            self.events
+                .send(Event::StartWithLinkId(source, destination))
+                .unwrap();
+            self.channels.send(channel).unwrap();
+        }
+    }
+
+    struct Fixture {
+        _server: ServerHandle,
+        stream: TcpStream,
+        events: mpsc::UnboundedReceiver<Event>,
+        channels: mpsc::UnboundedReceiver<MasterChannel>,
+        channel: Option<MasterChannel>,
+    }
+
+    impl Fixture {
+        async fn new(identify: bool) -> Self {
+            let (events_tx, events) = mpsc::unbounded_channel();
+            let (channels_tx, channels) = mpsc::unbounded_channel();
+            let handler = Handler {
+                identify,
+                events: events_tx,
+                channels: channels_tx,
+            };
+            let server = spawn_master_tcp_server(
+                "127.0.0.1:0".parse().unwrap(),
+                LinkIdConfig::new(),
+                handler,
+            )
+            .await
+            .unwrap();
+            let stream = TcpStream::connect(server.local_addr().unwrap())
+                .await
+                .unwrap();
+            Self {
+                _server: server,
+                stream,
+                events,
+                channels,
+                channel: None,
+            }
+        }
+
+        async fn expect_event(&mut self, expected: Event) {
+            let event = tokio::time::timeout(Duration::from_secs(5), self.events.recv())
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(event, expected);
+        }
+
+        async fn enable_channel(&mut self) {
+            let mut channel = tokio::time::timeout(Duration::from_secs(5), self.channels.recv())
+                .await
+                .unwrap()
+                .unwrap();
+            channel.enable().await.unwrap();
+            self.channel = Some(channel);
+        }
+
+        async fn expect_bytes(&mut self, expected: &[u8]) {
+            let mut buffer = vec![0; expected.len()];
+            tokio::time::timeout(Duration::from_secs(5), self.stream.read_exact(&mut buffer))
+                .await
+                .unwrap()
+                .unwrap();
+            assert_eq!(buffer, expected);
+        }
+    }
+
+    #[tokio::test]
+    async fn accepted_session_starts_without_link_identity() {
+        let mut fixture = Fixture::new(false).await;
+        fixture.expect_event(Event::Accept).await;
+        fixture.expect_event(Event::Start).await;
+        fixture.enable_channel().await;
+        fixture
+            .stream
+            .write_all(&LINK_STATUS_REQUEST)
+            .await
+            .unwrap();
+        fixture.expect_bytes(&LINK_STATUS_RESPONSE).await;
+    }
+
+    #[tokio::test]
+    async fn identified_session_is_seeded_with_the_identifying_header() {
+        let mut fixture = Fixture::new(true).await;
+        fixture.expect_event(Event::Accept).await;
+        fixture
+            .stream
+            .write_all(&LINK_STATUS_REQUEST)
+            .await
+            .unwrap();
+        fixture.expect_event(Event::AcceptLinkId(1024, 1)).await;
+        fixture.expect_event(Event::StartWithLinkId(1024, 1)).await;
+        fixture.enable_channel().await;
+        // the session answers the header that was read to identify it
+        fixture.expect_bytes(&LINK_STATUS_RESPONSE).await;
+    }
 }

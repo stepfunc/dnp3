@@ -121,19 +121,45 @@ impl SetMap {
     pub(crate) fn define(
         &mut self,
         prop: AttrProp,
-        attr: OwnedAttribute,
+        mut attr: OwnedAttribute,
     ) -> Result<(), AttrDefError> {
+        attr.set = AttrSet::new(attr.set.value());
+
         // reject reserved variations
         let variation = Variation::create(attr.variation)?;
 
         // ensure that we're using the right types for default attributes
         let _: AnyAttribute = AnyAttribute::try_from(&attr.view())?;
 
+        // reject values that can never be encoded in a response
+        attr.value.check_encodable()?;
+
         // constraints that apply to certain items in the default set
         if attr.set == AttrSet::Default && prop.is_writable() && !variation.can_be_written() {
             return Err(AttrDefError::NotWritable(attr.set, attr.variation));
         }
 
+        self.insert(variation, prop, attr)
+    }
+
+    /// Define an attribute without validating its value, to test how values that can't be
+    /// encoded are handled
+    #[cfg(test)]
+    pub(super) fn define_unchecked(
+        &mut self,
+        prop: AttrProp,
+        attr: OwnedAttribute,
+    ) -> Result<(), AttrDefError> {
+        let variation = Variation::create(attr.variation)?;
+        self.insert(variation, prop, attr)
+    }
+
+    fn insert(
+        &mut self,
+        variation: Variation,
+        prop: AttrProp,
+        attr: OwnedAttribute,
+    ) -> Result<(), AttrDefError> {
         // lookup or create the set
         match self.sets.entry(attr.set) {
             Entry::Occupied(mut e) => match e.get_mut().entry(variation) {
@@ -204,8 +230,11 @@ impl SetMap {
         }
     }
 
-    /// Iterate over variations in a requested set. This is useful for implementing READ on g0v254.
-    pub(crate) fn variations(&self, set: AttrSet) -> Option<impl Iterator<Item = AttrItem> + '_> {
+    /// Iterate over variations in a requested set. This is useful for implementing READ on g0v255.
+    pub(crate) fn variations(
+        &self,
+        set: AttrSet,
+    ) -> Option<impl ExactSizeIterator<Item = AttrItem> + '_> {
         self.sets.get(&set).map(|x| {
             x.iter().map(|(k, (prop, _))| AttrItem {
                 variation: k.value,
@@ -298,6 +327,64 @@ mod test {
         let err = map.define(AttrProp::writable(), attr).unwrap_err();
         assert_eq!(
             err,
+            AttrDefError::NotWritable(
+                AttrSet::Default,
+                StringAttr::DeviceSubsetAndConformance.variation()
+            )
+        );
+    }
+
+    #[test]
+    fn private_set_zero_is_defined_as_the_default_set() {
+        let mut map = SetMap::default();
+        let attr = OwnedAttribute::new(
+            AttrSet::Private(0),
+            StringAttr::UserAssignedLocation.variation(),
+            OwnedAttrValue::VisibleString("Bend".into()),
+        );
+        map.define(AttrProp::writable(), attr).unwrap();
+
+        assert_eq!(map.sets().collect::<Vec<_>>(), vec![AttrSet::Default]);
+        assert_eq!(
+            map.get(
+                AttrSet::Default,
+                StringAttr::UserAssignedLocation.variation()
+            )
+            .unwrap()
+            .set,
+            AttrSet::Default
+        );
+
+        let again = StringAttr::UserAssignedLocation.with_value("Bend");
+        assert_eq!(
+            map.define(AttrProp::writable(), again).unwrap_err(),
+            AttrDefError::AlreadyDefined
+        );
+    }
+
+    #[test]
+    fn private_set_zero_gets_default_set_checks() {
+        let mut map = SetMap::default();
+        let attr = OwnedAttribute::new(
+            AttrSet::Private(0),
+            StringAttr::UserAssignedLocation.variation(),
+            OwnedAttrValue::SignedInt(42),
+        );
+        assert_eq!(
+            map.define(AttrProp::writable(), attr).unwrap_err(),
+            AttrDefError::BadType(TypeError {
+                expected: AttrDataType::VisibleString,
+                actual: AttrDataType::SignedInt
+            })
+        );
+
+        let attr = OwnedAttribute::new(
+            AttrSet::Private(0),
+            StringAttr::DeviceSubsetAndConformance.variation(),
+            OwnedAttrValue::VisibleString("3:2010".into()),
+        );
+        assert_eq!(
+            map.define(AttrProp::writable(), attr).unwrap_err(),
             AttrDefError::NotWritable(
                 AttrSet::Default,
                 StringAttr::DeviceSubsetAndConformance.variation()

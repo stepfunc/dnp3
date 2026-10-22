@@ -160,13 +160,25 @@ impl ClientTask {
         }
         self.connect_handler.connecting(addr, hostname);
 
+        let phys = self.connect_socket(socket, addr, timeout).await;
+        if phys.is_none() {
+            self.connect_handler.connect_failed(addr, hostname);
+        }
+        phys
+    }
+
+    async fn connect_socket(
+        &mut self,
+        socket: TcpSocket,
+        addr: SocketAddr,
+        timeout: Option<Duration>,
+    ) -> Option<PhysLayer> {
         let fut = socket.connect(addr);
         let result = match timeout {
             None => fut.await,
             Some(timeout) => match tokio::time::timeout(timeout, fut).await {
                 Ok(x) => x,
                 Err(_) => {
-                    self.connect_handler.connect_failed(addr, hostname);
                     tracing::warn!(
                         "unable to connect to {} within timeout of {:?}",
                         addr,
@@ -187,12 +199,7 @@ impl ClientTask {
 
         crate::tcp::configure_client(&stream);
 
-        let phys = match self.post_connection.post_connect(stream, &addr).await {
-            Some(x) => x,
-            None => {
-                return None;
-            }
-        };
+        let phys = self.post_connection.post_connect(stream, &addr).await?;
 
         tracing::info!("connected to {}", addr);
 
@@ -225,5 +232,159 @@ impl ClientTask {
                 Ok(())
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::app::parse::options::ParseOptions;
+    use crate::app::MaybeAsync;
+    use crate::link::reader::LinkModes;
+    use crate::link::EndpointAddress;
+    use crate::master::{MasterChannelConfig, MasterChannelType};
+    use crate::tcp::{wire_master_client, Endpoint};
+    use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
+
+    #[derive(Debug, PartialEq, Eq)]
+    enum Event {
+        Connecting(SocketAddr),
+        ConnectFailed(SocketAddr),
+        Connected(SocketAddr),
+    }
+
+    struct RecordingHandler {
+        endpoint: Option<SocketAddr>,
+        events: UnboundedSender<Event>,
+    }
+
+    impl ClientConnectionHandler for RecordingHandler {
+        fn endpoint_span_name(&self) -> String {
+            "test".to_string()
+        }
+
+        fn disconnected(&mut self, _: SocketAddr, _: Option<&str>) -> Duration {
+            Duration::from_secs(60)
+        }
+
+        fn next(&mut self) -> Result<ConnectionInfo, Duration> {
+            // attempt a single connection, then ask the task to sleep
+            match self.endpoint.take() {
+                Some(addr) => Ok(ConnectionInfo::new(Endpoint::address(addr))),
+                None => Err(Duration::from_secs(60)),
+            }
+        }
+
+        fn connecting(&mut self, addr: SocketAddr, _: Option<&str>) {
+            drop(self.events.send(Event::Connecting(addr)));
+        }
+
+        fn connect_failed(&mut self, addr: SocketAddr, _: Option<&str>) {
+            drop(self.events.send(Event::ConnectFailed(addr)));
+        }
+
+        fn connected(&mut self, addr: SocketAddr, _: Option<&str>) {
+            drop(self.events.send(Event::Connected(addr)));
+        }
+    }
+
+    struct NullListener;
+
+    impl Listener<ClientState> for NullListener {
+        fn update(&mut self, _: ClientState) -> MaybeAsync<()> {
+            MaybeAsync::ready(())
+        }
+    }
+
+    fn client_task(
+        addr: SocketAddr,
+        post_connection: PostConnectionHandler,
+    ) -> (ClientTask, UnboundedReceiver<Event>) {
+        let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
+        let handler = RecordingHandler {
+            endpoint: Some(addr),
+            events: tx,
+        };
+        let (task, _channel) = wire_master_client(
+            LinkModes::test(),
+            ParseOptions::default(),
+            MasterChannelType::Stream,
+            Box::new(handler),
+            MasterChannelConfig::new(EndpointAddress::raw(1)),
+            post_connection,
+            Box::new(NullListener),
+        );
+        (task, rx)
+    }
+
+    fn events(rx: &mut UnboundedReceiver<Event>) -> Vec<Event> {
+        let mut events = Vec::new();
+        while let Ok(x) = rx.try_recv() {
+            events.push(x);
+        }
+        events
+    }
+
+    #[tokio::test]
+    async fn refused_connection_notifies_connect_failed() {
+        // the port stays reserved by a bound socket that never listens, so connects are refused
+        let reserved = TcpSocket::new_v4().unwrap();
+        reserved.bind("127.0.0.1:0".parse().unwrap()).unwrap();
+        let addr = reserved.local_addr().unwrap();
+        let (mut task, mut rx) = client_task(addr, PostConnectionHandler::Tcp);
+
+        assert_eq!(task.connect().await.err(), Some(Duration::from_secs(60)));
+        assert_eq!(
+            events(&mut rx),
+            [Event::Connecting(addr), Event::ConnectFailed(addr)]
+        );
+        drop(reserved);
+    }
+
+    #[tokio::test]
+    async fn successful_connection_notifies_connected() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let (mut task, mut rx) = client_task(addr, PostConnectionHandler::Tcp);
+
+        assert_eq!(task.connect().await.ok().map(|(_, x, _)| x), Some(addr));
+        assert_eq!(
+            events(&mut rx),
+            [Event::Connecting(addr), Event::Connected(addr)]
+        );
+    }
+
+    #[cfg(feature = "enable-tls")]
+    #[tokio::test]
+    async fn failed_tls_handshake_notifies_connect_failed() {
+        use crate::tcp::tls::{MinTlsVersion, TlsClientConfig};
+        use std::path::Path;
+
+        let certs = Path::new(env!("CARGO_MANIFEST_DIR")).join("../certs/self_signed");
+        let config = TlsClientConfig::self_signed(
+            &certs.join("entity2_cert.pem"),
+            &certs.join("entity1_cert.pem"),
+            &certs.join("entity1_key.pem"),
+            None,
+            MinTlsVersion::V12,
+        )
+        .unwrap();
+
+        // a server that closes the connection without answering the ClientHello
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let server = tokio::spawn(async move {
+            let (socket, _) = listener.accept().await.unwrap();
+            drop(socket);
+        });
+
+        let (mut task, mut rx) = client_task(addr, PostConnectionHandler::Tls(config));
+
+        assert_eq!(task.connect().await.err(), Some(Duration::from_secs(60)));
+        server.await.unwrap();
+        assert_eq!(
+            events(&mut rx),
+            [Event::Connecting(addr), Event::ConnectFailed(addr)]
+        );
     }
 }
