@@ -601,6 +601,29 @@ mod tests {
         }
     }
 
+    #[tokio::test]
+    async fn bind_serves_connections_on_the_bound_address() {
+        watchdog(async {
+            let (server, mut states) = server_with_outstation();
+            let handle = server.bind().await.unwrap();
+            let addr = handle.local_addr().unwrap();
+            assert_ne!(addr.port(), 0);
+
+            let _client = tokio::net::TcpStream::connect(addr).await.unwrap();
+            assert_eq!(states.recv().await, Some(ConnectionState::Connected));
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn bind_reports_an_address_in_use() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let server = Server::new_tcp_server(LinkErrorMode::Close, listener.local_addr().unwrap());
+
+        let err = server.bind().await.unwrap_err();
+        assert_eq!(err.kind(), std::io::ErrorKind::AddrInUse);
+    }
+
     #[tokio::test(start_paused = true)]
     async fn accepts_after_accept_errors() {
         watchdog(async {
