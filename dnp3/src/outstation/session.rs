@@ -6,7 +6,6 @@ use xxhash_rust::xxh64::xxh64;
 use crate::app::attr::Attribute;
 use crate::app::control::CommandStatus;
 use crate::app::format::write::HeaderWriter;
-use crate::app::gen::all::AllObjectsVariation;
 use crate::app::gen::count::CountVariation;
 use crate::app::gen::ranged::RangedVariation;
 use crate::app::parse::count::CountSequence;
@@ -1591,7 +1590,7 @@ impl OutstationSession {
         db: &DatabaseHandle,
     ) -> Iin2 {
         match header.details {
-            HeaderDetails::Range(_, _, RangedVariation::Group0(_, attr)) => {
+            HeaderDetails::Range(_, _, RangedVariation::Group0(attr)) => {
                 self.handle_write_attr(attr, db).await
             }
             HeaderDetails::Range(_, _, RangedVariation::Group80Var1(bits)) => {
@@ -1626,9 +1625,9 @@ impl OutstationSession {
                 tracing::warn!(
                     "WRITE not supported with qualifier: {} and variation: {}",
                     header.details.qualifier(),
-                    header.variation
+                    header.variation()
                 );
-                if Self::is_writable(header.variation) {
+                if Self::is_writable(header.variation()) {
                     Iin2::PARAMETER_ERROR
                 } else {
                     Iin2::OBJECT_UNKNOWN
@@ -1831,18 +1830,24 @@ impl OutstationSession {
 
         for header in object_headers.iter() {
             match header.details {
-                HeaderDetails::AllObjects(AllObjectsVariation::Group60Var2) => {
+                HeaderDetails::AllObjects(objects)
+                    if objects.variation() == Variation::Group60Var2 =>
+                {
                     self.state.enabled_unsolicited_classes.class1 = enable;
                 }
-                HeaderDetails::AllObjects(AllObjectsVariation::Group60Var3) => {
+                HeaderDetails::AllObjects(objects)
+                    if objects.variation() == Variation::Group60Var3 =>
+                {
                     self.state.enabled_unsolicited_classes.class2 = enable;
                 }
-                HeaderDetails::AllObjects(AllObjectsVariation::Group60Var4) => {
+                HeaderDetails::AllObjects(objects)
+                    if objects.variation() == Variation::Group60Var4 =>
+                {
                     self.state.enabled_unsolicited_classes.class3 = enable;
                 }
                 _ => {
-                    tracing::warn!("received {} unsolicited request for unsupported qualifier ({}) and variation ({})", to_string(enable), header.details.qualifier(), header.variation);
-                    iin2 |= match header.variation {
+                    tracing::warn!("received {} unsolicited request for unsupported qualifier ({}) and variation ({})", to_string(enable), header.details.qualifier(), header.variation());
+                    iin2 |= match header.variation() {
                         Variation::Group60Var2
                         | Variation::Group60Var3
                         | Variation::Group60Var4 => Iin2::PARAMETER_ERROR,
@@ -2012,13 +2017,13 @@ impl OutstationSession {
                 | HeaderDetails::CountAndPrefix8(..)
                 | HeaderDetails::CountAndPrefix16(..)
                 | HeaderDetails::FreeFormat(_)
-                | HeaderDetails::Read(_) => {
+                | HeaderDetails::Read(..) => {
                     // other variations require that there be a preceding g50v2
                     match timing {
                         None => {
                             tracing::warn!(
                                 "freeze-at-time on {} w/o preceding g50v2",
-                                header.variation
+                                header.variation()
                             );
                             iin.iin2.set(Iin2::PARAMETER_ERROR);
                         }
@@ -2044,10 +2049,11 @@ impl OutstationSession {
         header: ObjectHeader,
     ) -> Iin2 {
         match header.details {
-            HeaderDetails::AllObjects(AllObjectsVariation::Group20Var0) => self
-                .application
-                .freeze_counter(FreezeIndices::All, freeze_type, database)
-                .map_or_else(|err| err.into(), |_| Iin2::default()),
+            HeaderDetails::AllObjects(objects) if objects.variation() == Variation::Group20Var0 => {
+                self.application
+                    .freeze_counter(FreezeIndices::All, freeze_type, database)
+                    .map_or_else(|err| err.into(), |_| Iin2::default())
+            }
             HeaderDetails::Range(_, range, RangedVariation::Group20Var0) => self
                 .application
                 .freeze_counter(
@@ -2056,7 +2062,7 @@ impl OutstationSession {
                     database,
                 )
                 .map_or_else(|err| err.into(), |_| Iin2::default()),
-            _ => match header.variation {
+            _ => match header.variation() {
                 Variation::Group20Var0 => Iin2::PARAMETER_ERROR,
                 _ => Iin2::OBJECT_UNKNOWN,
             },

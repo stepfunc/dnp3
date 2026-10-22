@@ -71,7 +71,7 @@ pub(super) fn parse_auth_response(header: ObjectHeader) -> Result<AuthKey, FileE
         _ => {
             tracing::warn!(
                 "File AUTHENTICATE response contains unexpected variation: {}",
-                header.variation
+                header.variation()
             );
             return Err(FileError::BadResponse);
         }
@@ -137,7 +137,7 @@ fn parse_status_object<'a>(
         _ => {
             tracing::warn!(
                 "File {function} response contains unexpected variation: {}",
-                header.variation
+                header.variation()
             );
             Err(FileError::BadResponse)
         }

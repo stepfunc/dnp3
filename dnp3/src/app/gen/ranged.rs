@@ -27,8 +27,7 @@ pub(crate) enum RangedVariation<'a> {
     /// Device Attributes - Non-Specific All Attributes Request
     Group0Var254,
     /// Device Attributes - Specific Attribute
-    /// variation and attribute
-    Group0(u8, crate::app::attr::Attribute<'a>),
+    Group0(crate::app::attr::Attribute<'a>),
     /// Binary Input - Any Variation
     Group1Var0,
     /// Binary Input - Packed Format
@@ -133,7 +132,7 @@ impl<'a> RangedVariation<'a> {
     pub(crate) fn parse_non_read(v: Variation, qualifier: QualifierCode, range: Range, options: ParseOptions, cursor: &mut ReadCursor<'a>) -> Result<RangedVariation<'a>, ObjectParseError> {
         match v {
             Variation::Group0Var254 => Ok(RangedVariation::Group0Var254),
-            Variation::Group0(var) => Ok(RangedVariation::Group0(var, crate::app::attr::Attribute::parse_from_range(var, range, cursor)?)),
+            Variation::Group0(var) => Ok(RangedVariation::Group0(crate::app::attr::Attribute::parse_from_range(var, range, cursor)?)),
             Variation::Group1Var0 => Ok(RangedVariation::Group1Var0),
             Variation::Group1Var1 => Ok(RangedVariation::Group1Var1(BitSequence::parse(range, cursor)?)),
             Variation::Group1Var2 => Ok(RangedVariation::Group1Var2(RangedSequence::parse(range, cursor)?)),
@@ -189,10 +188,66 @@ impl<'a> RangedVariation<'a> {
         }
     }
     
+    pub(crate) fn variation(&self) -> Variation {
+        match self {
+            RangedVariation::Group0Var254 => Variation::Group0Var254,
+            RangedVariation::Group0(attr) => Variation::Group0(attr.variation),
+            RangedVariation::Group1Var0 => Variation::Group1Var0,
+            RangedVariation::Group1Var1(_) => Variation::Group1Var1,
+            RangedVariation::Group1Var2(_) => Variation::Group1Var2,
+            RangedVariation::Group3Var0 => Variation::Group3Var0,
+            RangedVariation::Group3Var1(_) => Variation::Group3Var1,
+            RangedVariation::Group3Var2(_) => Variation::Group3Var2,
+            RangedVariation::Group10Var0 => Variation::Group10Var0,
+            RangedVariation::Group10Var1(_) => Variation::Group10Var1,
+            RangedVariation::Group10Var2(_) => Variation::Group10Var2,
+            RangedVariation::Group20Var0 => Variation::Group20Var0,
+            RangedVariation::Group20Var1(_) => Variation::Group20Var1,
+            RangedVariation::Group20Var2(_) => Variation::Group20Var2,
+            RangedVariation::Group20Var5(_) => Variation::Group20Var5,
+            RangedVariation::Group20Var6(_) => Variation::Group20Var6,
+            RangedVariation::Group21Var0 => Variation::Group21Var0,
+            RangedVariation::Group21Var1(_) => Variation::Group21Var1,
+            RangedVariation::Group21Var2(_) => Variation::Group21Var2,
+            RangedVariation::Group21Var5(_) => Variation::Group21Var5,
+            RangedVariation::Group21Var6(_) => Variation::Group21Var6,
+            RangedVariation::Group21Var9(_) => Variation::Group21Var9,
+            RangedVariation::Group21Var10(_) => Variation::Group21Var10,
+            RangedVariation::Group30Var0 => Variation::Group30Var0,
+            RangedVariation::Group30Var1(_) => Variation::Group30Var1,
+            RangedVariation::Group30Var2(_) => Variation::Group30Var2,
+            RangedVariation::Group30Var3(_) => Variation::Group30Var3,
+            RangedVariation::Group30Var4(_) => Variation::Group30Var4,
+            RangedVariation::Group30Var5(_) => Variation::Group30Var5,
+            RangedVariation::Group30Var6(_) => Variation::Group30Var6,
+            RangedVariation::Group31Var0 => Variation::Group31Var0,
+            RangedVariation::Group31Var1(_) => Variation::Group31Var1,
+            RangedVariation::Group31Var2(_) => Variation::Group31Var2,
+            RangedVariation::Group31Var3(_) => Variation::Group31Var3,
+            RangedVariation::Group31Var4(_) => Variation::Group31Var4,
+            RangedVariation::Group31Var5(_) => Variation::Group31Var5,
+            RangedVariation::Group31Var6(_) => Variation::Group31Var6,
+            RangedVariation::Group31Var7(_) => Variation::Group31Var7,
+            RangedVariation::Group31Var8(_) => Variation::Group31Var8,
+            RangedVariation::Group34Var1(_) => Variation::Group34Var1,
+            RangedVariation::Group34Var2(_) => Variation::Group34Var2,
+            RangedVariation::Group34Var3(_) => Variation::Group34Var3,
+            RangedVariation::Group40Var0 => Variation::Group40Var0,
+            RangedVariation::Group40Var1(_) => Variation::Group40Var1,
+            RangedVariation::Group40Var2(_) => Variation::Group40Var2,
+            RangedVariation::Group40Var3(_) => Variation::Group40Var3,
+            RangedVariation::Group40Var4(_) => Variation::Group40Var4,
+            RangedVariation::Group80Var1(_) => Variation::Group80Var1,
+            RangedVariation::Group102Var0 => Variation::Group102Var0,
+            RangedVariation::Group102Var1(_) => Variation::Group102Var1,
+            RangedVariation::Group110VarX(x, _) => Variation::Group110(*x),
+        }
+    }
+    
     pub(crate) fn format_objects(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             RangedVariation::Group0Var254 => Ok(()),
-            RangedVariation::Group0(_, x) => x.format(f),
+            RangedVariation::Group0(x) => x.format(f),
             RangedVariation::Group1Var0 => Ok(()),
             RangedVariation::Group1Var1(seq) => format_indexed_items(f, seq.iter()),
             RangedVariation::Group1Var2(seq) => format_indexed_items(f, seq.iter()),
@@ -245,27 +300,27 @@ impl<'a> RangedVariation<'a> {
         }
     }
     
-    pub(crate) fn extract_measurements_to<H: ReadHandler + ?Sized>(&self, var: Variation, qualifier: QualifierCode, handler: &mut H) -> bool {
+    pub(crate) fn extract_measurements_to<H: ReadHandler + ?Sized>(&self, qualifier: QualifierCode, handler: &mut H) -> bool {
         match self {
             RangedVariation::Group0Var254 => {
                 false // extraction not supported
             }
-            RangedVariation::Group0(_, attr) => {
-                crate::master::handle_attribute(var, qualifier, attr, handler)
+            RangedVariation::Group0(attr) => {
+                crate::master::handle_attribute(self.variation(), qualifier, attr, handler)
             }
             RangedVariation::Group1Var0 => {
                 false // extraction not supported
             }
             RangedVariation::Group1Var1(seq) => {
                 handler.handle_binary_input(
-                    HeaderInfo::new(var, qualifier, false, false),
+                    HeaderInfo::new(self.variation(), qualifier, false, false),
                     &mut seq.iter().map(|(v,i)| (v.into(), i))
                 );
                 true
             }
             RangedVariation::Group1Var2(seq) => {
                 handler.handle_binary_input(
-                    HeaderInfo::new(var, qualifier, false, true),
+                    HeaderInfo::new(self.variation(), qualifier, false, true),
                     &mut seq.iter().map(|(v,i)| (v.into(), i))
                 );
                 true
@@ -275,14 +330,14 @@ impl<'a> RangedVariation<'a> {
             }
             RangedVariation::Group3Var1(seq) => {
                 handler.handle_double_bit_binary_input(
-                    HeaderInfo::new(var, qualifier, false, false),
+                    HeaderInfo::new(self.variation(), qualifier, false, false),
                     &mut seq.iter().map(|(v,i)| (v.into(), i))
                 );
                 true
             }
             RangedVariation::Group3Var2(seq) => {
                 handler.handle_double_bit_binary_input(
-                    HeaderInfo::new(var, qualifier, false, true),
+                    HeaderInfo::new(self.variation(), qualifier, false, true),
                     &mut seq.iter().map(|(v,i)| (v.into(), i))
                 );
                 true
@@ -292,14 +347,14 @@ impl<'a> RangedVariation<'a> {
             }
             RangedVariation::Group10Var1(seq) => {
                 handler.handle_binary_output_status(
-                    HeaderInfo::new(var, qualifier, false, false),
+                    HeaderInfo::new(self.variation(), qualifier, false, false),
                     &mut seq.iter().map(|(v,i)| (v.into(), i))
                 );
                 true
             }
             RangedVariation::Group10Var2(seq) => {
                 handler.handle_binary_output_status(
-                    HeaderInfo::new(var, qualifier, false, true),
+                    HeaderInfo::new(self.variation(), qualifier, false, true),
                     &mut seq.iter().map(|(v,i)| (v.into(), i))
                 );
                 true
@@ -309,28 +364,28 @@ impl<'a> RangedVariation<'a> {
             }
             RangedVariation::Group20Var1(seq) => {
                 handler.handle_counter(
-                    HeaderInfo::new(var, qualifier, false, true),
+                    HeaderInfo::new(self.variation(), qualifier, false, true),
                     &mut seq.iter().map(|(v,i)| (v.into(), i))
                 );
                 true
             }
             RangedVariation::Group20Var2(seq) => {
                 handler.handle_counter(
-                    HeaderInfo::new(var, qualifier, false, true),
+                    HeaderInfo::new(self.variation(), qualifier, false, true),
                     &mut seq.iter().map(|(v,i)| (v.into(), i))
                 );
                 true
             }
             RangedVariation::Group20Var5(seq) => {
                 handler.handle_counter(
-                    HeaderInfo::new(var, qualifier, false, false),
+                    HeaderInfo::new(self.variation(), qualifier, false, false),
                     &mut seq.iter().map(|(v,i)| (v.into(), i))
                 );
                 true
             }
             RangedVariation::Group20Var6(seq) => {
                 handler.handle_counter(
-                    HeaderInfo::new(var, qualifier, false, false),
+                    HeaderInfo::new(self.variation(), qualifier, false, false),
                     &mut seq.iter().map(|(v,i)| (v.into(), i))
                 );
                 true
@@ -340,42 +395,42 @@ impl<'a> RangedVariation<'a> {
             }
             RangedVariation::Group21Var1(seq) => {
                 handler.handle_frozen_counter(
-                    HeaderInfo::new(var, qualifier, false, true),
+                    HeaderInfo::new(self.variation(), qualifier, false, true),
                     &mut seq.iter().map(|(v,i)| (v.into(), i))
                 );
                 true
             }
             RangedVariation::Group21Var2(seq) => {
                 handler.handle_frozen_counter(
-                    HeaderInfo::new(var, qualifier, false, true),
+                    HeaderInfo::new(self.variation(), qualifier, false, true),
                     &mut seq.iter().map(|(v,i)| (v.into(), i))
                 );
                 true
             }
             RangedVariation::Group21Var5(seq) => {
                 handler.handle_frozen_counter(
-                    HeaderInfo::new(var, qualifier, false, true),
+                    HeaderInfo::new(self.variation(), qualifier, false, true),
                     &mut seq.iter().map(|(v,i)| (v.into(), i))
                 );
                 true
             }
             RangedVariation::Group21Var6(seq) => {
                 handler.handle_frozen_counter(
-                    HeaderInfo::new(var, qualifier, false, true),
+                    HeaderInfo::new(self.variation(), qualifier, false, true),
                     &mut seq.iter().map(|(v,i)| (v.into(), i))
                 );
                 true
             }
             RangedVariation::Group21Var9(seq) => {
                 handler.handle_frozen_counter(
-                    HeaderInfo::new(var, qualifier, false, false),
+                    HeaderInfo::new(self.variation(), qualifier, false, false),
                     &mut seq.iter().map(|(v,i)| (v.into(), i))
                 );
                 true
             }
             RangedVariation::Group21Var10(seq) => {
                 handler.handle_frozen_counter(
-                    HeaderInfo::new(var, qualifier, false, false),
+                    HeaderInfo::new(self.variation(), qualifier, false, false),
                     &mut seq.iter().map(|(v,i)| (v.into(), i))
                 );
                 true
@@ -385,42 +440,42 @@ impl<'a> RangedVariation<'a> {
             }
             RangedVariation::Group30Var1(seq) => {
                 handler.handle_analog_input(
-                    HeaderInfo::new(var, qualifier, false, true),
+                    HeaderInfo::new(self.variation(), qualifier, false, true),
                     &mut seq.iter().map(|(v,i)| (v.into(), i))
                 );
                 true
             }
             RangedVariation::Group30Var2(seq) => {
                 handler.handle_analog_input(
-                    HeaderInfo::new(var, qualifier, false, true),
+                    HeaderInfo::new(self.variation(), qualifier, false, true),
                     &mut seq.iter().map(|(v,i)| (v.into(), i))
                 );
                 true
             }
             RangedVariation::Group30Var3(seq) => {
                 handler.handle_analog_input(
-                    HeaderInfo::new(var, qualifier, false, false),
+                    HeaderInfo::new(self.variation(), qualifier, false, false),
                     &mut seq.iter().map(|(v,i)| (v.into(), i))
                 );
                 true
             }
             RangedVariation::Group30Var4(seq) => {
                 handler.handle_analog_input(
-                    HeaderInfo::new(var, qualifier, false, false),
+                    HeaderInfo::new(self.variation(), qualifier, false, false),
                     &mut seq.iter().map(|(v,i)| (v.into(), i))
                 );
                 true
             }
             RangedVariation::Group30Var5(seq) => {
                 handler.handle_analog_input(
-                    HeaderInfo::new(var, qualifier, false, true),
+                    HeaderInfo::new(self.variation(), qualifier, false, true),
                     &mut seq.iter().map(|(v,i)| (v.into(), i))
                 );
                 true
             }
             RangedVariation::Group30Var6(seq) => {
                 handler.handle_analog_input(
-                    HeaderInfo::new(var, qualifier, false, true),
+                    HeaderInfo::new(self.variation(), qualifier, false, true),
                     &mut seq.iter().map(|(v,i)| (v.into(), i))
                 );
                 true
@@ -430,77 +485,77 @@ impl<'a> RangedVariation<'a> {
             }
             RangedVariation::Group31Var1(seq) => {
                 handler.handle_frozen_analog_input(
-                    HeaderInfo::new(var, qualifier, false, true),
+                    HeaderInfo::new(self.variation(), qualifier, false, true),
                     &mut seq.iter().map(|(v,i)| (v.into(), i))
                 );
                 true
             }
             RangedVariation::Group31Var2(seq) => {
                 handler.handle_frozen_analog_input(
-                    HeaderInfo::new(var, qualifier, false, true),
+                    HeaderInfo::new(self.variation(), qualifier, false, true),
                     &mut seq.iter().map(|(v,i)| (v.into(), i))
                 );
                 true
             }
             RangedVariation::Group31Var3(seq) => {
                 handler.handle_frozen_analog_input(
-                    HeaderInfo::new(var, qualifier, false, true),
+                    HeaderInfo::new(self.variation(), qualifier, false, true),
                     &mut seq.iter().map(|(v,i)| (v.into(), i))
                 );
                 true
             }
             RangedVariation::Group31Var4(seq) => {
                 handler.handle_frozen_analog_input(
-                    HeaderInfo::new(var, qualifier, false, true),
+                    HeaderInfo::new(self.variation(), qualifier, false, true),
                     &mut seq.iter().map(|(v,i)| (v.into(), i))
                 );
                 true
             }
             RangedVariation::Group31Var5(seq) => {
                 handler.handle_frozen_analog_input(
-                    HeaderInfo::new(var, qualifier, false, false),
+                    HeaderInfo::new(self.variation(), qualifier, false, false),
                     &mut seq.iter().map(|(v,i)| (v.into(), i))
                 );
                 true
             }
             RangedVariation::Group31Var6(seq) => {
                 handler.handle_frozen_analog_input(
-                    HeaderInfo::new(var, qualifier, false, false),
+                    HeaderInfo::new(self.variation(), qualifier, false, false),
                     &mut seq.iter().map(|(v,i)| (v.into(), i))
                 );
                 true
             }
             RangedVariation::Group31Var7(seq) => {
                 handler.handle_frozen_analog_input(
-                    HeaderInfo::new(var, qualifier, false, true),
+                    HeaderInfo::new(self.variation(), qualifier, false, true),
                     &mut seq.iter().map(|(v,i)| (v.into(), i))
                 );
                 true
             }
             RangedVariation::Group31Var8(seq) => {
                 handler.handle_frozen_analog_input(
-                    HeaderInfo::new(var, qualifier, false, true),
+                    HeaderInfo::new(self.variation(), qualifier, false, true),
                     &mut seq.iter().map(|(v,i)| (v.into(), i))
                 );
                 true
             }
             RangedVariation::Group34Var1(seq) => {
                 handler.handle_analog_input_dead_band(
-                    HeaderInfo::new(var, qualifier, false, false),
+                    HeaderInfo::new(self.variation(), qualifier, false, false),
                     &mut seq.iter().map(|(v,i)| (v.into(), i))
                 );
                 true
             }
             RangedVariation::Group34Var2(seq) => {
                 handler.handle_analog_input_dead_band(
-                    HeaderInfo::new(var, qualifier, false, false),
+                    HeaderInfo::new(self.variation(), qualifier, false, false),
                     &mut seq.iter().map(|(v,i)| (v.into(), i))
                 );
                 true
             }
             RangedVariation::Group34Var3(seq) => {
                 handler.handle_analog_input_dead_band(
-                    HeaderInfo::new(var, qualifier, false, false),
+                    HeaderInfo::new(self.variation(), qualifier, false, false),
                     &mut seq.iter().map(|(v,i)| (v.into(), i))
                 );
                 true
@@ -510,28 +565,28 @@ impl<'a> RangedVariation<'a> {
             }
             RangedVariation::Group40Var1(seq) => {
                 handler.handle_analog_output_status(
-                    HeaderInfo::new(var, qualifier, false, true),
+                    HeaderInfo::new(self.variation(), qualifier, false, true),
                     &mut seq.iter().map(|(v,i)| (v.into(), i))
                 );
                 true
             }
             RangedVariation::Group40Var2(seq) => {
                 handler.handle_analog_output_status(
-                    HeaderInfo::new(var, qualifier, false, true),
+                    HeaderInfo::new(self.variation(), qualifier, false, true),
                     &mut seq.iter().map(|(v,i)| (v.into(), i))
                 );
                 true
             }
             RangedVariation::Group40Var3(seq) => {
                 handler.handle_analog_output_status(
-                    HeaderInfo::new(var, qualifier, false, true),
+                    HeaderInfo::new(self.variation(), qualifier, false, true),
                     &mut seq.iter().map(|(v,i)| (v.into(), i))
                 );
                 true
             }
             RangedVariation::Group40Var4(seq) => {
                 handler.handle_analog_output_status(
-                    HeaderInfo::new(var, qualifier, false, true),
+                    HeaderInfo::new(self.variation(), qualifier, false, true),
                     &mut seq.iter().map(|(v,i)| (v.into(), i))
                 );
                 true
@@ -544,14 +599,14 @@ impl<'a> RangedVariation<'a> {
             }
             RangedVariation::Group102Var1(seq) => {
                 handler.handle_unsigned_integer(
-                    HeaderInfo::new(var, qualifier, false, false),
+                    HeaderInfo::new(self.variation(), qualifier, false, false),
                     &mut seq.iter().map(|(v,i)| (v.into(), i))
                 );
                 true
             }
             RangedVariation::Group110VarX(_,seq) => {
                 handler.handle_octet_string(
-                    HeaderInfo::new(var, qualifier, false, false),
+                    HeaderInfo::new(self.variation(), qualifier, false, false),
                     &mut seq.iter()
                 );
                 true

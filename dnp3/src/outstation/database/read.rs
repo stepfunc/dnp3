@@ -73,8 +73,8 @@ enum ReadTarget {
 impl ReadHeader {
     pub(crate) fn get(header: &ObjectHeader) -> Option<ReadHeader> {
         let res = match header.details {
-            HeaderDetails::Read(qualifier) => {
-                ReadTarget::get(header.variation).and_then(|x| x.with(qualifier))
+            HeaderDetails::Read(variation, qualifier) => {
+                ReadTarget::get(variation).and_then(|x| x.with(qualifier))
             }
             HeaderDetails::AllObjects(_)
             | HeaderDetails::Range(_, _, _)
@@ -86,7 +86,7 @@ impl ReadHeader {
         if res.is_none() {
             tracing::warn!(
                 "{} - {} not supported in READ requests",
-                header.variation,
+                header.variation(),
                 header.details.qualifier()
             );
         }
