@@ -9,6 +9,7 @@
 * :star: Every public type in the Rust crate implements `Debug`. See [#519](https://github.com/stepfunc/dnp3/pull/519).
 * :star: Export `LinkError`, `FrameError` and `LogicError` from `dnp3::link`. `TaskError::Link` contained a `LinkError` that Rust users couldn't name. See [#539](https://github.com/stepfunc/dnp3/pull/539).
 * :bug: Fix an outstation resending the first fragment's header and length when a READ is repeated while it waits for confirmation of a later fragment. It now resends the fragment awaiting confirmation. See [#504](https://github.com/stepfunc/dnp3/pull/504).
+* :bug: Fix a file reader that aborts in `opened` being told the read failed with `Shutdown`, or with the CLOSE's error, instead of `AbortByUser`. See [#547](https://github.com/stepfunc/dnp3/pull/547).
 * :bug: Encode signed integer device attributes of 127 and 32,767 in one and two bytes, the smallest sizes that hold them, instead of the next size up. See [#517](https://github.com/stepfunc/dnp3/pull/517).
 * :bug: Fix the outstation's event counts when a full event buffer discards an event that was written and awaiting confirmation. The class IIN bits could be wrong until the next confirm. See [#513](https://github.com/stepfunc/dnp3/pull/513).
 * :bug: Fix the outstation losing events from an unsolicited response that was never confirmed, because the confirm timed out or DISABLE_UNSOLICITED ended the series. A READ before the next unsolicited retry left them out, and confirming that READ's response deleted them. See [#546](https://github.com/stepfunc/dnp3/pull/546).

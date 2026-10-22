@@ -165,3 +165,59 @@ async fn closes_file_on_completion() {
         [0xC2, 26, 70, 4, 0x5B, 0x01]
     );
 }
+
+#[tokio::test]
+async fn reports_user_abort_on_open_and_closes_file() {
+    let config = AssociationConfig::quiet();
+    let mut harness = create_association(config).await;
+    let (events, reader) = pair();
+    events.state().action = FileAction::Abort;
+    harness
+        .association
+        .read_file(
+            "./test.txt".to_string(),
+            FileReadConfig::default(),
+            reader,
+            None,
+        )
+        .await
+        .unwrap();
+
+    // file open
+    assert_eq!(harness.pop_write().await[..5], [0xC0, 25, 70, 3, 0x5B]);
+
+    let handle = 0xDEADCAFE;
+
+    harness
+        .process_response(super::file_status_response(
+            0,
+            handle,
+            24,
+            0,
+            FileStatus::Success,
+        ))
+        .await;
+
+    // close file
+    assert_eq!(
+        harness.pop_write().await[..6],
+        [0xC1, 26, 70, 4, 0x5B, 0x01]
+    );
+
+    assert_eq!(events.pop().unwrap(), Event::Open(24));
+    assert_eq!(events.pop().unwrap(), Event::Abort(FileError::AbortByUser));
+    assert_eq!(events.pop(), None);
+
+    harness
+        .process_response(super::file_status_response(
+            1,
+            handle,
+            0,
+            0,
+            FileStatus::Success,
+        ))
+        .await;
+
+    // closing the file doesn't report a second error
+    assert_eq!(events.pop(), None);
+}

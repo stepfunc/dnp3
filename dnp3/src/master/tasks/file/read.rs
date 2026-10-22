@@ -198,6 +198,7 @@ impl FileReadTask {
             Ok((file_size, handle)) => {
                 if settings.reader.opened(file_size).is_abort() {
                     tracing::warn!("File transfer aborted by user");
+                    settings.reader.aborted(FileError::AbortByUser);
                     Some(FileReadTask::new(settings, State::Close(handle)))
                 } else {
                     Some(FileReadTask::new(
