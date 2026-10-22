@@ -194,6 +194,7 @@ async fn write_g34_with_every_subset_level_4_qualifier() {
                 Event::WriteDeadBand(4, objects.deadbands[1]),
                 Event::EndWriteDeadBands,
             ]);
+            harness.check_no_events();
 
             // the database holds the deadbands written, so a READ of the variation returns the
             // objects written
@@ -254,6 +255,7 @@ async fn ranged_write_of_g34_applies_the_valid_deadbands_around_rejected_ones() 
             Event::WriteDeadBand(6, 2.5),
             Event::EndWriteDeadBands,
         ]);
+        harness.check_no_events();
 
         // index 3 and 6 hold the deadbands written, and index 5 keeps its deadband of 9.0
         harness
