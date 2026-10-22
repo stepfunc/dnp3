@@ -1,3 +1,6 @@
+use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
+
 use crate::app::control::CommandStatus;
 use crate::app::variations::{Group12Var1, Group41Var1, Group41Var2, Group41Var3, Group41Var4};
 use crate::app::MaybeAsync;
@@ -5,13 +8,29 @@ use crate::outstation::database::DatabaseHandle;
 use crate::outstation::tests::harness::{Control, Event, EventSender};
 use crate::outstation::traits::{ControlHandler, ControlSupport, OperateType};
 
+/// The status the mock handler returns for each index, `Success` for any index not in the map
+pub(crate) type ControlStatuses = Arc<Mutex<HashMap<u16, CommandStatus>>>;
+
 pub(crate) struct MockControlHandler {
     events: EventSender,
+    statuses: ControlStatuses,
 }
 
 impl MockControlHandler {
-    pub(crate) fn create(events: EventSender) -> Box<dyn ControlHandler> {
-        Box::new(Self { events })
+    pub(crate) fn create(
+        events: EventSender,
+        statuses: ControlStatuses,
+    ) -> Box<dyn ControlHandler> {
+        Box::new(Self { events, statuses })
+    }
+
+    fn status(&self, index: u16) -> CommandStatus {
+        self.statuses
+            .lock()
+            .unwrap()
+            .get(&index)
+            .copied()
+            .unwrap_or(CommandStatus::Success)
     }
 }
 
@@ -24,7 +43,7 @@ impl ControlSupport<Group12Var1> for MockControlHandler {
     ) -> CommandStatus {
         self.events
             .send(Event::Select(Control::G12V1(control, index)));
-        CommandStatus::Success
+        self.status(index)
     }
 
     fn operate(
@@ -36,7 +55,7 @@ impl ControlSupport<Group12Var1> for MockControlHandler {
     ) -> CommandStatus {
         self.events
             .send(Event::Operate(Control::G12V1(control, index), op_type));
-        CommandStatus::Success
+        self.status(index)
     }
 }
 
@@ -49,7 +68,7 @@ impl ControlSupport<Group41Var1> for MockControlHandler {
     ) -> CommandStatus {
         self.events
             .send(Event::Select(Control::G41V1(control, index)));
-        CommandStatus::Success
+        self.status(index)
     }
 
     fn operate(
@@ -61,7 +80,7 @@ impl ControlSupport<Group41Var1> for MockControlHandler {
     ) -> CommandStatus {
         self.events
             .send(Event::Operate(Control::G41V1(control, index), op_type));
-        CommandStatus::Success
+        self.status(index)
     }
 }
 
@@ -74,7 +93,7 @@ impl ControlSupport<Group41Var2> for MockControlHandler {
     ) -> CommandStatus {
         self.events
             .send(Event::Select(Control::G41V2(control, index)));
-        CommandStatus::Success
+        self.status(index)
     }
 
     fn operate(
@@ -86,7 +105,7 @@ impl ControlSupport<Group41Var2> for MockControlHandler {
     ) -> CommandStatus {
         self.events
             .send(Event::Operate(Control::G41V2(control, index), op_type));
-        CommandStatus::Success
+        self.status(index)
     }
 }
 
@@ -99,7 +118,7 @@ impl ControlSupport<Group41Var3> for MockControlHandler {
     ) -> CommandStatus {
         self.events
             .send(Event::Select(Control::G41V3(control, index)));
-        CommandStatus::Success
+        self.status(index)
     }
 
     fn operate(
@@ -111,7 +130,7 @@ impl ControlSupport<Group41Var3> for MockControlHandler {
     ) -> CommandStatus {
         self.events
             .send(Event::Operate(Control::G41V3(control, index), op_type));
-        CommandStatus::Success
+        self.status(index)
     }
 }
 
@@ -124,7 +143,7 @@ impl ControlSupport<Group41Var4> for MockControlHandler {
     ) -> CommandStatus {
         self.events
             .send(Event::Select(Control::G41V4(control, index)));
-        CommandStatus::Success
+        self.status(index)
     }
 
     fn operate(
@@ -136,7 +155,7 @@ impl ControlSupport<Group41Var4> for MockControlHandler {
     ) -> CommandStatus {
         self.events
             .send(Event::Operate(Control::G41V4(control, index), op_type));
-        CommandStatus::Success
+        self.status(index)
     }
 }
 

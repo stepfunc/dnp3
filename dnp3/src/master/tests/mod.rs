@@ -1,6 +1,7 @@
 mod harness;
 
 mod auto_tasks;
+mod command_headers;
 mod controls;
 mod link_frames;
 mod link_status;
