@@ -163,12 +163,104 @@ fn format_frame<'a>(
 mod test {
     use super::super::test_data::*;
     use super::*;
+    use crate::link::header::AnyAddress;
+    use crate::link::EndpointAddress;
 
     #[test]
     fn formats_ack() {
         let mut buffer = [0; constant::LINK_HEADER_LENGTH];
         format_header_fixed_size(ACK.header, &mut buffer);
         assert_eq!(buffer, ACK.bytes);
+    }
+
+    const ADDR_A: EndpointAddress = EndpointAddress::raw(0x1234);
+    const ADDR_B: EndpointAddress = EndpointAddress::raw(0xABCD);
+
+    fn header_only(header: Header) -> Vec<u8> {
+        let mut buffer = [0; constant::MAX_LINK_FRAME_LENGTH];
+        let mut cursor = WriteCursor::new(&mut buffer);
+        let data = format_header_only(header, &mut cursor).unwrap();
+        assert!(data.payload_only.is_empty());
+        data.frame.to_vec()
+    }
+
+    fn data_frame(header: Header, app_data: &[u8]) -> Vec<u8> {
+        let mut buffer = [0; constant::MAX_LINK_FRAME_LENGTH];
+        let mut cursor = WriteCursor::new(&mut buffer);
+        format_data_frame(header, Payload::new(0xC0, app_data), &mut cursor)
+            .unwrap()
+            .frame
+            .to_vec()
+    }
+
+    #[test]
+    fn formats_link_status_request_from_master() {
+        assert_eq!(
+            header_only(Header::request_link_status(true, ADDR_A, ADDR_B)),
+            [0x05, 0x64, 0x05, 0xC9, 0x34, 0x12, 0xCD, 0xAB, 0xE8, 0xB8]
+        );
+    }
+
+    #[test]
+    fn formats_link_status_request_from_outstation() {
+        assert_eq!(
+            header_only(Header::request_link_status(false, ADDR_B, ADDR_A)),
+            [0x05, 0x64, 0x05, 0x49, 0xCD, 0xAB, 0x34, 0x12, 0x24, 0x5B]
+        );
+    }
+
+    #[test]
+    fn formats_header_only_ack_like_fixed_size() {
+        assert_eq!(header_only(ACK.header), ACK.bytes);
+    }
+
+    #[test]
+    fn formats_header_of_empty_data_frame() {
+        let frame = data_frame(
+            Header::unconfirmed_user_data(true, ADDR_A.wrap(), ADDR_B.wrap()),
+            &[],
+        );
+        assert_eq!(
+            frame,
+            [0x05, 0x64, 0x06, 0xC4, 0x34, 0x12, 0xCD, 0xAB, 0xEF, 0xD1, 0xC0, 0x1D, 0x0A]
+        );
+    }
+
+    #[test]
+    fn formats_header_of_full_data_frame() {
+        let frame = data_frame(
+            Header::unconfirmed_user_data(true, ADDR_A.wrap(), ADDR_B.wrap()),
+            &[0xAA; constant::MAX_APP_BYTES_PER_FRAME],
+        );
+        assert_eq!(frame.len(), constant::MAX_LINK_FRAME_LENGTH);
+        assert_eq!(
+            frame.get(..constant::LINK_HEADER_LENGTH).unwrap(),
+            [0x05, 0x64, 0xFF, 0xC4, 0x34, 0x12, 0xCD, 0xAB, 0x69, 0xC8]
+        );
+    }
+
+    #[test]
+    fn formats_header_of_broadcast_data_frame() {
+        let frame = data_frame(
+            Header::unconfirmed_user_data(true, AnyAddress::from(0xFFFF), ADDR_B.wrap()),
+            &[0x01],
+        );
+        assert_eq!(
+            frame.get(..constant::LINK_HEADER_LENGTH).unwrap(),
+            [0x05, 0x64, 0x07, 0xC4, 0xFF, 0xFF, 0xCD, 0xAB, 0x0F, 0x1A]
+        );
+    }
+
+    #[test]
+    fn formats_header_of_outstation_data_frame() {
+        let frame = data_frame(
+            Header::unconfirmed_user_data(false, ADDR_B.wrap(), ADDR_A.wrap()),
+            &[0x01],
+        );
+        assert_eq!(
+            frame.get(..constant::LINK_HEADER_LENGTH).unwrap(),
+            [0x05, 0x64, 0x07, 0x44, 0xCD, 0xAB, 0x34, 0x12, 0xC4, 0x87]
+        );
     }
 
     #[test]
