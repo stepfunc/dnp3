@@ -1433,3 +1433,268 @@ async fn file_read_aborts_the_reader_once_when_the_master_shuts_down() {
     })
     .await;
 }
+
+/// A response from the outstation that ends a file read
+#[derive(Copy, Clone, Debug)]
+enum ContentFailure {
+    /// AUTHENTICATE returns auth key 0
+    NoPermission,
+    /// AUTHENTICATE is answered with a g70v4
+    AuthVariation,
+    /// OPEN returns an unsuccessful status
+    OpenStatus,
+    /// OPEN is answered with a g70v2
+    OpenVariation,
+    /// READ is answered with a g70v4
+    BlockVariation,
+    /// READ returns a block other than the one requested
+    BlockNumber,
+}
+
+const CONTENT_FAILURES: [ContentFailure; 6] = [
+    ContentFailure::NoPermission,
+    ContentFailure::AuthVariation,
+    ContentFailure::OpenStatus,
+    ContentFailure::OpenVariation,
+    ContentFailure::BlockVariation,
+    ContentFailure::BlockNumber,
+];
+
+impl ContentFailure {
+    fn credentials(self) -> Option<FileCredentials> {
+        match self {
+            Self::NoPermission | Self::AuthVariation => Some(FileCredentials {
+                user_name: "user".to_string(),
+                password: "pass".to_string(),
+            }),
+            Self::OpenStatus | Self::OpenVariation | Self::BlockVariation | Self::BlockNumber => {
+                None
+            }
+        }
+    }
+
+    /// The function code of the first request
+    fn first(self) -> FunctionCode {
+        match self.credentials() {
+            Some(_) => FunctionCode::AuthenticateFile,
+            None => FunctionCode::OpenFile,
+        }
+    }
+
+    fn error(self) -> FileError {
+        match self {
+            Self::NoPermission => FileError::NoPermission,
+            Self::AuthVariation | Self::OpenVariation | Self::BlockVariation => {
+                FileError::BadResponse
+            }
+            Self::OpenStatus => FileError::BadStatus(FileStatus::FileNotFound),
+            Self::BlockNumber => FileError::BadBlockNum,
+        }
+    }
+
+    /// What the reader is told, in order
+    fn reader_events(self) -> Vec<ReaderEvent> {
+        let aborted = ReaderEvent::Aborted(self.error());
+        match self {
+            Self::NoPermission | Self::AuthVariation | Self::OpenStatus | Self::OpenVariation => {
+                vec![aborted]
+            }
+            Self::BlockVariation | Self::BlockNumber => vec![ReaderEvent::Opened(4), aborted],
+        }
+    }
+
+    /// Answer the first request, and any requests after it, until this response ends the read
+    async fn respond(self, harness: &mut TestHarness) {
+        let auth = |auth_key| Group70Var2 {
+            auth_key,
+            user_name: "",
+            password: "",
+        };
+        let opened = file_status_response(0, HANDLE, 4, 512, FileStatus::Success);
+        match self {
+            Self::NoPermission => respond(harness, file_response(0, &auth(0))).await,
+            Self::AuthVariation => respond(harness, opened).await,
+            Self::OpenStatus => {
+                respond(
+                    harness,
+                    file_status_response(0, HANDLE, 0, 0, FileStatus::FileNotFound),
+                )
+                .await
+            }
+            Self::OpenVariation => respond(harness, file_response(0, &auth(42))).await,
+            Self::BlockVariation => {
+                respond(harness, opened).await;
+                next_request(harness, 1, FunctionCode::Read).await;
+                respond(
+                    harness,
+                    file_status_response(1, HANDLE, 0, 0, FileStatus::Success),
+                )
+                .await;
+            }
+            Self::BlockNumber => {
+                respond(harness, opened).await;
+                next_request(harness, 1, FunctionCode::Read).await;
+                respond(harness, file_transport_response(1, HANDLE, 1, b"data")).await;
+            }
+        }
+    }
+
+    /// Check that the association saw the read fail, and that the master sent nothing after it
+    async fn expect_task_failure(self, harness: &mut TestHarness) {
+        barrier(harness).await;
+        assert_eq!(
+            harness.assoc_events.pop(),
+            [
+                AssocInfoEvent::TaskStart(TaskType::FileRead, self.first(), Sequence::new(0)),
+                AssocInfoEvent::TaskFailure(
+                    TaskType::FileRead,
+                    TaskError::UnexpectedResponseHeaders
+                )
+            ],
+            "{self:?}"
+        );
+        assert_eq!(harness.io.pop_event(), None, "{self:?}");
+        assert!(!harness.task.is_finished(), "{self:?}");
+    }
+}
+
+#[tokio::test(start_paused = true)]
+async fn file_read_content_failures_abort_the_reader_and_fail_the_task() {
+    watchdog(async {
+        for failure in CONTENT_FAILURES {
+            let mut harness = create_association(AssociationConfig::quiet()).await;
+            let reader = RecordingReader::default();
+            harness
+                .association
+                .read_file(
+                    "f.txt",
+                    FileReadConfig::default(),
+                    Box::new(reader.clone()),
+                    failure.credentials(),
+                )
+                .await
+                .unwrap();
+            next_request(&mut harness, 0, failure.first()).await;
+            failure.respond(&mut harness).await;
+            failure.expect_task_failure(&mut harness).await;
+            assert_eq!(reader.pop(), failure.reader_events(), "{failure:?}");
+        }
+    })
+    .await;
+}
+
+/// Start a directory read and wait for its first request
+async fn start_directory_read(
+    harness: &mut TestHarness,
+    config: DirReadConfig,
+    credentials: Option<FileCredentials>,
+    first: FunctionCode,
+) -> JoinHandle<Result<usize, FileError>> {
+    let mut association = harness.association.clone();
+    let reply = tokio::spawn(async move {
+        association
+            .read_directory("dir", config, credentials)
+            .await
+            .map(|entries| entries.len())
+    });
+    next_request(harness, 0, first).await;
+    reply
+}
+
+/// Check that a directory read that started with an OPEN reported `task_success` with the sequence
+/// number of its last request
+async fn expect_directory_task_success(harness: &mut TestHarness, last: u8) {
+    barrier(harness).await;
+    assert_eq!(
+        harness.assoc_events.pop(),
+        [
+            AssocInfoEvent::TaskStart(TaskType::FileRead, FunctionCode::OpenFile, Sequence::new(0)),
+            AssocInfoEvent::TaskSuccess(
+                TaskType::FileRead,
+                FunctionCode::OpenFile,
+                Sequence::new(last)
+            )
+        ]
+    );
+}
+
+#[tokio::test(start_paused = true)]
+async fn directory_read_content_failures_fail_the_read_and_the_task() {
+    watchdog(async {
+        for failure in CONTENT_FAILURES {
+            let mut harness = create_association(AssociationConfig::quiet()).await;
+            let reply = start_directory_read(
+                &mut harness,
+                DirReadConfig::default(),
+                failure.credentials(),
+                failure.first(),
+            )
+            .await;
+            failure.respond(&mut harness).await;
+            assert_eq!(reply.await.unwrap(), Err(failure.error()), "{failure:?}");
+            failure.expect_task_failure(&mut harness).await;
+        }
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn directory_read_over_its_size_limit_fails_the_read_but_not_the_task() {
+    watchdog(async {
+        let mut harness = create_association(AssociationConfig::quiet()).await;
+        let config = DirReadConfig {
+            max_block_size: 512,
+            max_file_size: 3,
+        };
+        let reply = start_directory_read(&mut harness, config, None, FunctionCode::OpenFile).await;
+        respond(
+            &mut harness,
+            file_status_response(0, HANDLE, 4, 512, FileStatus::Success),
+        )
+        .await;
+        next_request(&mut harness, 1, FunctionCode::Read).await;
+        respond(
+            &mut harness,
+            file_transport_response(1, HANDLE, last_block(0), b"data"),
+        )
+        .await;
+        assert_eq!(reply.await.unwrap(), Err(FileError::MaxLengthExceeded));
+        expect_directory_task_success(&mut harness, 1).await;
+        assert_eq!(harness.io.pop_event(), None);
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn directory_read_with_unparseable_entries_fails_the_read_but_not_the_task() {
+    watchdog(async {
+        let mut harness = create_association(AssociationConfig::quiet()).await;
+        let reply = start_directory_read(
+            &mut harness,
+            DirReadConfig::default(),
+            None,
+            FunctionCode::OpenFile,
+        )
+        .await;
+        respond(
+            &mut harness,
+            file_status_response(0, HANDLE, 1, 512, FileStatus::Success),
+        )
+        .await;
+        next_request(&mut harness, 1, FunctionCode::Read).await;
+        respond(
+            &mut harness,
+            file_transport_response(1, HANDLE, last_block(0), &[0x01]),
+        )
+        .await;
+        assert_eq!(reply.await.unwrap(), Err(FileError::BadResponse));
+        next_request(&mut harness, 2, FunctionCode::CloseFile).await;
+        respond(
+            &mut harness,
+            file_status_response(2, HANDLE, 0, 0, FileStatus::Success),
+        )
+        .await;
+        expect_directory_task_success(&mut harness, 2).await;
+    })
+    .await;
+}

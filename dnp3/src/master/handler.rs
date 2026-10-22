@@ -491,6 +491,10 @@ impl AssociationHandle {
     }
 
     /// Read a file directory
+    ///
+    /// The returned result is the source of truth for the read. Entries that fail to parse after
+    /// the transfer completes return [`FileError::BadResponse`], while the
+    /// [`AssociationInformation`] may still report the [`TaskType::FileRead`] task as a success.
     pub async fn read_directory<T: ToString>(
         &mut self,
         dir_path: T,
@@ -563,7 +567,16 @@ pub enum TaskType {
     WriteDeadBands,
     /// Generic task which
     GenericEmptyResponse(FunctionCode),
-    /// Read a file from the outstation
+    /// Read a file or directory from the outstation
+    ///
+    /// The task fails with [`TaskError::UnexpectedResponseHeaders`] when a response from the
+    /// outstation ends the transfer: an unsuccessful OPEN status, an authentication key of 0, an
+    /// unexpected object variation, or an unexpected block number. When the master ends the
+    /// transfer itself, because the [`FileReader`] aborted it or the file exceeded the configured
+    /// maximum size, that doesn't by itself fail the task.
+    ///
+    /// Success therefore doesn't mean that the transfer succeeded. The [`FileReader`] is the source
+    /// of truth for the transfer.
     FileRead,
     /// Send username/password and get back an auth key
     FileAuth,
@@ -591,6 +604,9 @@ pub trait AssociationInformation: Send + Sync {
     /// Called when a new task is started
     fn task_start(&mut self, _task_type: TaskType, _fc: FunctionCode, _seq: Sequence) {}
     /// Called when a task successfully completes
+    ///
+    /// For [`TaskType::FileRead`], this doesn't mean that the transfer succeeded. See its
+    /// documentation.
     fn task_success(&mut self, _task_type: TaskType, _fc: FunctionCode, _seq: Sequence) {}
     /// Called when a task fails
     fn task_fail(&mut self, _task_type: TaskType, _error: TaskError) {}

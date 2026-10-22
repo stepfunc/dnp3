@@ -697,7 +697,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
             "Configuration for the directory read operation",
         )?
         .fails_with(shared.error_type.clone())?
-        .doc("Asynchronously retrieve a directory listing")?
+        .doc(doc("Asynchronously retrieve a directory listing").details(DIRECTORY_RESULT_DETAILS))?
         .build()?;
 
     let read_directory_with_auth_async = lib
@@ -725,7 +725,8 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         .param("password", StringType, "Password sent to the outstation")?
         .fails_with(shared.error_type.clone())?
         .doc(
-            "Asynchronously retrieve a directory listing by first obtaining an authentication key",
+            doc("Asynchronously retrieve a directory listing by first obtaining an authentication key")
+                .details(DIRECTORY_RESULT_DETAILS),
         )?
         .build()?;
 
@@ -1053,7 +1054,12 @@ fn define_association_information(
             "generic_empty_response",
             "Generic request that expects an empty response",
         )?
-        .push("file_read", "Read a file from the outstation")?
+        .push(
+            "file_read",
+            doc("Read a file or directory from the outstation")
+                .details("The task fails with {enum:task_error.bad_response} when a response from the outstation ends the transfer: an unsuccessful OPEN status, an authentication key of 0, an unexpected object variation, or an unexpected block number. When the master ends the transfer itself, because the {interface:file_reader} aborted it or the file exceeded the configured maximum size, that doesn't by itself fail the task.")
+                .details("Success therefore doesn't mean that the transfer succeeded. The {interface:file_reader} is the source of truth for the transfer."),
+        )?
         .push("get_file_info", "Get information about a file")?
         .push(
             "file_auth",
@@ -1089,7 +1095,11 @@ fn define_association_information(
         )?
         .param("seq", Primitive::U8, "Sequence number of the request")?
         .end_callback()?
-        .begin_callback("task_success", "Called when a task successfully completes")?
+        .begin_callback(
+            "task_success",
+            doc("Called when a task successfully completes")
+                .details("For {enum:task_type.file_read}, this doesn't mean that the transfer succeeded. See its documentation."),
+        )?
         .param(
             "task_type",
             task_type.clone(),
@@ -1177,6 +1187,8 @@ fn define_command_mode(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
 
     Ok(mode)
 }
+
+const DIRECTORY_RESULT_DETAILS: &str = "The result passed to the callback is the source of truth for the read. Entries that fail to parse after the transfer completes give {enum:file_error.bad_response}, while the {interface:association_information} may still report {enum:task_type.file_read} as a success.";
 
 const TASK_ERRORS: &[(&str, &str)] = &[
     ("too_many_requests", "too many user requests queued"),
@@ -1529,7 +1541,8 @@ fn define_file_reader(
     let file_reader = lib
         .define_interface(
         "file_reader",
-        " Callbacks for reading a file from the outstation asynchronously"
+        doc("Callbacks for reading a file from the outstation asynchronously")
+            .details("These callbacks are the source of truth for the transfer. The {interface:association_information} may report {enum:task_type.file_read} as a success even though the transfer was aborted, for example when this reader aborts it or the file exceeds the configured maximum size.")
         )?
         // opened
         .begin_callback("opened",
