@@ -689,9 +689,9 @@ async fn wrong_confirms_in_the_unsolicited_confirm_wait_are_ignored() {
 }
 
 /// A mandatory broadcast reported in a solicited response during the unsolicited confirm wait:
-/// a solicited confirm with another sequence number clears it
+/// a solicited confirm with another sequence number doesn't clear it (Table 6-1 row 21)
 #[tokio::test]
-async fn solicited_confirm_with_another_sequence_in_the_unsolicited_confirm_wait_clears_a_reported_broadcast(
+async fn solicited_confirm_with_another_sequence_in_the_unsolicited_confirm_wait_does_not_clear_a_reported_broadcast(
 ) {
     let mut harness = new_harness(get_default_unsolicited_config());
     enter_unsolicited_confirm_wait(&mut harness).await;
@@ -709,13 +709,24 @@ async fn solicited_confirm_with_another_sequence_in_the_unsolicited_confirm_wait
     harness.expect_no_response();
     harness.check_no_events();
 
-    probe(&mut harness, 2, RESTART).await;
+    // still reported, and the confirm of the response that reports it now clears it
+    harness
+        .test_request_response(
+            &record_current_time(2),
+            &response(true, 2, RESTART | BROADCAST, 0),
+        )
+        .await;
+    harness.send_and_process(&confirm(2)).await;
+    harness.expect_no_response();
+    harness.check_no_events();
+
+    probe(&mut harness, 3, RESTART).await;
 }
 
-/// The IIN2.0 reply reports a mandatory broadcast during the unsolicited confirm wait, and a
-/// solicited confirm clears it
+/// The IIN2.0 reply reports a mandatory broadcast during the unsolicited confirm wait, but it
+/// isn't the response to a valid request, so its confirm doesn't clear the broadcast
 #[tokio::test]
-async fn solicited_confirm_of_an_unknown_function_reply_in_the_unsolicited_confirm_wait_clears_a_reported_broadcast(
+async fn solicited_confirm_of_an_unknown_function_reply_in_the_unsolicited_confirm_wait_does_not_clear_a_reported_broadcast(
 ) {
     let mut harness = new_harness(get_default_unsolicited_config());
     enter_unsolicited_confirm_wait(&mut harness).await;
@@ -733,13 +744,25 @@ async fn solicited_confirm_of_an_unknown_function_reply_in_the_unsolicited_confi
     harness.expect_no_response();
     harness.check_no_events();
 
-    probe(&mut harness, 2, RESTART).await;
+    // still reported, and the confirm of the response that reports it now clears it
+    harness
+        .test_request_response(
+            &record_current_time(2),
+            &response(true, 2, RESTART | BROADCAST, 0),
+        )
+        .await;
+    harness.send_and_process(&confirm(2)).await;
+    harness.expect_no_response();
+    harness.check_no_events();
+
+    probe(&mut harness, 3, RESTART).await;
 }
 
 /// A solicited confirm in the unsolicited confirm wait, after the response's confirm timeout,
-/// clears the mandatory broadcast it reported
+/// doesn't clear the mandatory broadcast it reported (Table 6-1 row 30)
 #[tokio::test(start_paused = true)]
-async fn late_solicited_confirm_in_the_unsolicited_confirm_wait_clears_a_reported_broadcast() {
+async fn late_solicited_confirm_in_the_unsolicited_confirm_wait_does_not_clear_a_reported_broadcast(
+) {
     let mut harness = new_harness(get_default_unsolicited_config());
     harness.expect_response(&null_unsolicited(0)).await;
     harness.send_and_process(&unsolicited_confirm(0)).await;
@@ -785,13 +808,23 @@ async fn late_solicited_confirm_in_the_unsolicited_confirm_wait_clears_a_reporte
         Event::Cleared(0),
         Event::EndConfirm(empty_buffer()),
     ]);
-    probe(&mut harness, 3, RESTART).await;
+
+    harness
+        .test_request_response(
+            &record_current_time(3),
+            &response(true, 3, RESTART | BROADCAST, 0),
+        )
+        .await;
+    harness.check_events(&[Event::EnterSolicitedConfirmWait(3)]);
+    confirm_solicited(&mut harness, 3).await;
+    probe(&mut harness, 4, RESTART).await;
 }
 
 /// A solicited response asks for a confirm and its wait times out; a solicited confirm in the
-/// unsolicited confirm wait that follows still clears the mandatory broadcast
+/// unsolicited confirm wait that follows doesn't clear the mandatory broadcast
 #[tokio::test(start_paused = true)]
-async fn solicited_confirm_in_the_unsolicited_confirm_wait_clears_a_broadcast_reported_before_it() {
+async fn solicited_confirm_in_the_unsolicited_confirm_wait_does_not_clear_a_broadcast_reported_before_it(
+) {
     let mut harness = new_harness(get_default_unsolicited_config());
     harness.expect_response(&null_unsolicited(0)).await;
     harness.send_and_process(&unsolicited_confirm(0)).await;
@@ -829,7 +862,18 @@ async fn solicited_confirm_in_the_unsolicited_confirm_wait_clears_a_broadcast_re
     harness.expect_no_response();
     harness.check_no_events();
 
-    probe(&mut harness, 3, RESTART).await;
+    // still reported, and the confirm of the response that reports it now clears it
+    harness
+        .test_request_response(
+            &record_current_time(3),
+            &response(true, 3, RESTART | BROADCAST, 0),
+        )
+        .await;
+    harness.send_and_process(&confirm(3)).await;
+    harness.expect_no_response();
+    harness.check_no_events();
+
+    probe(&mut harness, 4, RESTART).await;
 }
 
 // ---------- SELECT and OPERATE ----------

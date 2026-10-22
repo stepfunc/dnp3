@@ -1001,3 +1001,227 @@ async fn error_fragment_during_unsolicited_confirm_wait_postpones_the_link_statu
     harness.expect_response(NULL_UNSOL_SEQ_2).await;
     harness.expect_response(LINK_STATUS_REQUEST).await;
 }
+
+// IEEE 1815-2012 Table 6-1 rows 20-30: a solicited response sent during the unsolicited confirm
+// wait can ask for a confirm, here because of a mandatory broadcast. Only that response's confirm,
+// before its confirm timeout, clears the broadcast's IIN1.0.
+
+const RECORD_CURRENT_TIME_SEQ2: &[u8] = &[0xC2, 0x18];
+const RECORD_CURRENT_TIME_SEQ3: &[u8] = &[0xC3, 0x18];
+const SOL_CONFIRM_SEQ2: &[u8] = &[0xC2, 0x00];
+const SOL_CONFIRM_SEQ3: &[u8] = &[0xC3, 0x00];
+const BROADCAST_RESPONSE_SEQ2_CON: &[u8] = &[0xE2, 0x81, 0x81, 0x00];
+const BROADCAST_RESPONSE_SEQ3_CON: &[u8] = &[0xE3, 0x81, 0x81, 0x00];
+const RESPONSE_SEQ3: &[u8] = &[0xC3, 0x81, 0x80, 0x00];
+
+/// the null unsolicited response, never confirmed, and a mandatory broadcast during its wait
+async fn mandatory_broadcast_during_null_unsolicited_wait() -> OutstationHarness {
+    let mut harness = new_harness(get_default_unsolicited_config());
+    harness.expect_response(NULL_UNSOL_SEQ_0).await;
+    harness.check_events(&[Event::EnterUnsolicitedConfirmWait(0)]);
+    broadcast_record_current_time(&mut harness, BroadcastConfirmMode::Mandatory).await;
+    harness
+}
+
+/// the master confirms a solicited response, which gets no answer and no callback
+async fn send_solicited_confirm(harness: &mut OutstationHarness, confirm: &[u8]) {
+    harness.send_and_process(confirm).await;
+    harness.expect_no_response();
+    harness.check_no_events();
+}
+
+/// Table 6-1 row 21
+#[tokio::test]
+async fn solicited_confirm_with_another_sequence_does_not_clear_a_reported_broadcast() {
+    let mut harness = mandatory_broadcast_during_null_unsolicited_wait().await;
+
+    harness
+        .test_request_response(RECORD_CURRENT_TIME_SEQ1, BROADCAST_RESPONSE_SEQ1_CON)
+        .await;
+    send_solicited_confirm(&mut harness, SOL_CONFIRM_SEQ2).await;
+
+    // the wrong confirm didn't clear the broadcast
+    harness
+        .test_request_response(RECORD_CURRENT_TIME_SEQ2, BROADCAST_RESPONSE_SEQ2_CON)
+        .await;
+
+    // nor does it end the wait for the right one, which follows it with no request between
+    send_solicited_confirm(&mut harness, SOL_CONFIRM_SEQ3).await;
+    send_solicited_confirm(&mut harness, SOL_CONFIRM_SEQ2).await;
+    harness
+        .test_request_response(RECORD_CURRENT_TIME_SEQ3, RESPONSE_SEQ3)
+        .await;
+    harness.check_no_events();
+}
+
+/// Table 6-1 row 26: the next request ends the wait for the earlier response's confirm
+#[tokio::test]
+async fn solicited_confirm_of_an_earlier_response_does_not_clear_a_reported_broadcast() {
+    let mut harness = mandatory_broadcast_during_null_unsolicited_wait().await;
+
+    harness
+        .test_request_response(RECORD_CURRENT_TIME_SEQ1, BROADCAST_RESPONSE_SEQ1_CON)
+        .await;
+    harness
+        .test_request_response(RECORD_CURRENT_TIME_SEQ2, BROADCAST_RESPONSE_SEQ2_CON)
+        .await;
+    send_solicited_confirm(&mut harness, SOL_CONFIRM_SEQ1).await;
+
+    harness
+        .test_request_response(RECORD_CURRENT_TIME_SEQ3, BROADCAST_RESPONSE_SEQ3_CON)
+        .await;
+    send_solicited_confirm(&mut harness, SOL_CONFIRM_SEQ3).await;
+    harness
+        .test_request_response(&[0xC4, 0x18], &[0xC4, 0x81, 0x80, 0x00])
+        .await;
+    harness.check_no_events();
+}
+
+/// Table 6-1 row 25: a deferred READ ends the wait for the earlier response's confirm
+#[tokio::test]
+async fn deferred_read_ends_the_wait_for_a_solicited_confirm() {
+    let mut harness = mandatory_broadcast_during_null_unsolicited_wait().await;
+
+    harness
+        .test_request_response(RECORD_CURRENT_TIME_SEQ1, BROADCAST_RESPONSE_SEQ1_CON)
+        .await;
+    harness
+        .send_and_process(&[0xC2, 0x01, 0x3C, 0x01, 0x06])
+        .await;
+    send_solicited_confirm(&mut harness, SOL_CONFIRM_SEQ1).await;
+
+    // the deferred READ reports the broadcast and waits for its confirm
+    harness.send_and_process(UNS_CONFIRM_SEQ_0).await;
+    harness.expect_response(BROADCAST_RESPONSE_SEQ2_CON).await;
+    harness.check_events(&[
+        Event::UnsolicitedConfirmReceived(0),
+        Event::EnterSolicitedConfirmWait(2),
+    ]);
+    harness.send_and_process(SOL_CONFIRM_SEQ2).await;
+    harness.check_events(&[
+        Event::SolicitedConfirmReceived(2),
+        Event::BeginConfirm,
+        Event::EndConfirm(empty_buffer_state()),
+    ]);
+    harness
+        .test_request_response(RECORD_CURRENT_TIME_SEQ3, RESPONSE_SEQ3)
+        .await;
+    harness.check_no_events();
+}
+
+/// The IIN2.0 reply to an unknown function code isn't the response to a valid request, so its
+/// confirm isn't expected
+#[tokio::test]
+async fn solicited_confirm_of_an_unknown_function_reply_does_not_clear_a_reported_broadcast() {
+    let mut harness = mandatory_broadcast_during_null_unsolicited_wait().await;
+
+    harness
+        .test_request_response(&[0xC1, 0x70], &[0xE1, 0x81, 0x81, 0x01])
+        .await;
+    send_solicited_confirm(&mut harness, SOL_CONFIRM_SEQ1).await;
+
+    harness
+        .test_request_response(RECORD_CURRENT_TIME_SEQ2, BROADCAST_RESPONSE_SEQ2_CON)
+        .await;
+    send_solicited_confirm(&mut harness, SOL_CONFIRM_SEQ2).await;
+    harness
+        .test_request_response(RECORD_CURRENT_TIME_SEQ3, RESPONSE_SEQ3)
+        .await;
+    harness.check_no_events();
+}
+
+/// Table 6-1 rows 22 and 33 are skipped: once the unsolicited response's wait ends, so does the
+/// wait for the solicited confirm
+#[tokio::test]
+async fn solicited_confirm_after_the_unsolicited_confirm_wait_does_not_clear_a_reported_broadcast()
+{
+    let mut harness = mandatory_broadcast_during_null_unsolicited_wait().await;
+
+    harness
+        .test_request_response(RECORD_CURRENT_TIME_SEQ1, BROADCAST_RESPONSE_SEQ1_CON)
+        .await;
+    harness.send_and_process(UNS_CONFIRM_SEQ_0).await;
+    harness.check_events(&[Event::UnsolicitedConfirmReceived(0)]);
+    send_solicited_confirm(&mut harness, SOL_CONFIRM_SEQ1).await;
+
+    harness
+        .test_request_response(RECORD_CURRENT_TIME_SEQ2, BROADCAST_RESPONSE_SEQ2_CON)
+        .await;
+    harness.check_events(&[Event::EnterSolicitedConfirmWait(2)]);
+    harness.send_and_process(SOL_CONFIRM_SEQ2).await;
+    harness.check_events(&[
+        Event::SolicitedConfirmReceived(2),
+        Event::BeginConfirm,
+        Event::EndConfirm(empty_buffer_state()),
+    ]);
+    harness
+        .test_request_response(RECORD_CURRENT_TIME_SEQ3, RESPONSE_SEQ3)
+        .await;
+    harness.check_no_events();
+}
+
+/// an unsolicited response with one binary event that is retried until it's confirmed, then a
+/// mandatory broadcast and a solicited response that reports it, which asks for a confirm
+async fn solicited_response_during_unsolicited_retries(harness: &mut OutstationHarness) {
+    confirm_null_unsolicited(harness).await;
+    enable_unsolicited(harness).await;
+
+    generate_binary_event(&mut harness.handle.database);
+    harness.expect_response(UNSOL_G2V1_SEQ1).await;
+    harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
+
+    broadcast_record_current_time(harness, BroadcastConfirmMode::Mandatory).await;
+    harness
+        .test_request_response(RECORD_CURRENT_TIME_SEQ2, BROADCAST_RESPONSE_SEQ2_CON)
+        .await;
+
+    // the retry, in the same wait, after the solicited response's confirm timeout
+    harness.expect_response(UNSOL_G2V1_SEQ1).await;
+    harness.check_events(&[Event::UnsolicitedConfirmTimeout(1, true)]);
+    tokio::time::advance(std::time::Duration::from_secs(1)).await;
+}
+
+/// the confirm of the unsolicited response, after which the outstation is idle
+async fn confirm_unsolicited_event(harness: &mut OutstationHarness) {
+    harness.send_and_process(UNS_CONFIRM_SEQ_1).await;
+    harness.check_events(&[
+        Event::UnsolicitedConfirmReceived(1),
+        Event::BeginConfirm,
+        Event::Cleared(0),
+        Event::EndConfirm(empty_buffer_state()),
+    ]);
+}
+
+/// Table 6-1 row 30, with the timeout checked when the confirm arrives
+#[tokio::test(start_paused = true)]
+async fn solicited_confirm_after_its_timeout_does_not_clear_a_reported_broadcast() {
+    let mut harness = new_harness(get_default_unsolicited_config());
+    solicited_response_during_unsolicited_retries(&mut harness).await;
+
+    send_solicited_confirm(&mut harness, SOL_CONFIRM_SEQ2).await;
+    confirm_unsolicited_event(&mut harness).await;
+
+    harness
+        .test_request_response(RECORD_CURRENT_TIME_SEQ3, BROADCAST_RESPONSE_SEQ3_CON)
+        .await;
+    harness.check_events(&[Event::EnterSolicitedConfirmWait(3)]);
+}
+
+/// Table 6-1 row 28: the repeat gets the same response, which asks for its confirm again, with
+/// a new confirm timeout, as in the solicited confirm wait (row 17)
+#[tokio::test(start_paused = true)]
+async fn repeated_request_waits_for_the_solicited_confirm_again() {
+    let mut harness = new_harness(get_default_unsolicited_config());
+    solicited_response_during_unsolicited_retries(&mut harness).await;
+
+    harness
+        .test_request_response(RECORD_CURRENT_TIME_SEQ2, BROADCAST_RESPONSE_SEQ2_CON)
+        .await;
+    send_solicited_confirm(&mut harness, SOL_CONFIRM_SEQ2).await;
+    confirm_unsolicited_event(&mut harness).await;
+
+    harness
+        .test_request_response(RECORD_CURRENT_TIME_SEQ3, RESPONSE_SEQ3)
+        .await;
+    harness.check_no_events();
+}
