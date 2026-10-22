@@ -7,65 +7,48 @@ use crate::master::file::BlockNumber;
 use crate::master::tasks::{AppTask, NonReadTask, ResponseTask, Step, Task};
 use crate::master::{FileAction, FileMode, FileReadConfig, FileReader, TaskError, TaskType};
 
-enum ReaderTypes {
-    Trait(Box<dyn FileReader>),
-}
-
+/// The user's reader, until it is told how the read ended
 pub(crate) struct FileReaderType {
-    inner: Option<ReaderTypes>,
+    inner: Option<Box<dyn FileReader>>,
 }
 
 impl FileReaderType {
     pub(crate) fn from_reader(reader: Box<dyn FileReader>) -> Self {
         Self {
-            inner: Some(ReaderTypes::Trait(reader)),
+            inner: Some(reader),
         }
     }
 
     fn opened(&mut self, size: u32) -> FileAction {
-        if let Some(x) = self.inner.as_mut() {
-            match x {
-                ReaderTypes::Trait(x) => x.opened(size),
-            }
-        } else {
-            FileAction::Abort
+        match self.inner.as_mut() {
+            Some(x) => x.opened(size),
+            None => FileAction::Abort,
         }
     }
 
     async fn block_received(&mut self, block_num: u32, data: &[u8]) -> FileAction {
-        if let Some(x) = self.inner.as_mut() {
-            match x {
-                ReaderTypes::Trait(x) => x.block_received(block_num, data).get().await,
-            }
-        } else {
-            FileAction::Abort
+        match self.inner.as_mut() {
+            Some(x) => x.block_received(block_num, data).get().await,
+            None => FileAction::Abort,
         }
     }
 
     fn aborted(&mut self, err: FileError) {
-        if let Some(x) = self.inner.take() {
-            match x {
-                ReaderTypes::Trait(mut x) => x.aborted(err),
-            }
+        if let Some(mut x) = self.inner.take() {
+            x.aborted(err);
         }
     }
 
     fn completed(&mut self) {
-        if let Some(x) = self.inner.take() {
-            match x {
-                ReaderTypes::Trait(mut x) => x.completed(),
-            }
+        if let Some(mut x) = self.inner.take() {
+            x.completed();
         }
     }
 }
 
 impl Drop for FileReaderType {
     fn drop(&mut self) {
-        if let Some(x) = self.inner.take() {
-            match x {
-                ReaderTypes::Trait(mut x) => x.aborted(FileError::TaskError(TaskError::Shutdown)),
-            }
-        }
+        self.aborted(FileError::TaskError(TaskError::Shutdown));
     }
 }
 
