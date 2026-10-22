@@ -334,18 +334,14 @@ impl StaticDatabase {
     }
 
     pub(crate) fn set_analog_deadband(&mut self, index: u16, deadband: f64) -> bool {
-        fn zero_or_positive(value: f64) -> bool {
-            value == 0.0 || (value.is_normal() && value.is_sign_positive())
-        }
-
-        if !zero_or_positive(deadband) {
+        let Some(deadband) = Deadband::analog(deadband) else {
             return false;
-        }
+        };
 
         match self.analog.get_mut(index) {
             None => false,
             Some(x) => {
-                x.config.detector.deadband = deadband;
+                x.config.detector = deadband;
                 true
             }
         }
@@ -710,9 +706,16 @@ impl Distance for f64 {
 
 pub(crate) struct OctetStringDetector;
 
-impl<N> Deadband<N> {
-    pub(crate) fn new(value: N) -> Self {
+impl Deadband<u32> {
+    pub(crate) fn new(value: u32) -> Self {
         Self { deadband: value }
+    }
+}
+
+impl Deadband<f64> {
+    /// Analog dead-bands must be zero or positive, which rejects NaN
+    pub(crate) fn analog(value: f64) -> Option<Self> {
+        (value >= 0.0).then_some(Self { deadband: value })
     }
 }
 
@@ -1067,7 +1070,7 @@ mod tests {
 
     #[test]
     fn float_deadband_keeps_ieee_semantics() {
-        let deadband = Deadband::new(1.0f64);
+        let deadband = Deadband::analog(1.0).unwrap();
         assert!(!deadband.exceeded(2.0, 2.5));
         assert!(deadband.exceeded(-1.0, 1.0));
         assert!(deadband.exceeded(f64::MAX, f64::MIN));
@@ -1077,6 +1080,19 @@ mod tests {
         // equal infinities differ by NaN
         assert!(!deadband.exceeded(f64::INFINITY, f64::INFINITY));
         assert!(deadband.exceeded(f64::INFINITY, 1.0));
+    }
+
+    #[test]
+    fn written_analog_deadband_must_be_zero_or_positive() {
+        let mut db = StaticDatabase::default();
+        assert!(db.add(0, analog_config(StaticAnalogInputVariation::Group30Var1)));
+
+        for deadband in [0.0, -0.0, 1.5, 1e-310, f64::INFINITY] {
+            assert!(db.set_analog_deadband(0, deadband), "{deadband}");
+        }
+        for deadband in [f64::NAN, -1.0, f64::NEG_INFINITY] {
+            assert!(!db.set_analog_deadband(0, deadband), "{deadband}");
+        }
     }
 
     fn binary_config(var: StaticBinaryInputVariation) -> PointConfig<BinaryInput> {
@@ -1102,7 +1118,7 @@ mod tests {
             class: Some(EventClass::Class1),
             s_var: var,
             e_var: EventAnalogInputVariation::Group32Var1,
-            detector: Deadband::new(0.0),
+            detector: Deadband::analog(0.0).unwrap(),
         }
     }
 
