@@ -132,7 +132,20 @@ impl<T: Transport> TransportReader<T> {
             TransportData::LinkLayerMessage(_) => return Some(TransportRequest::LinkLayerMessage),
         };
 
-        let parsed = match parse(self.parse_options, level, fragment.data) {
+        let parsed = parse(self.parse_options, level, fragment.data);
+
+        if let Some(required_master_addr) = master_address {
+            if fragment.info.addr.link != required_master_addr {
+                tracing::warn!(
+                    "Discarding ASDU from master address: {} (configured address == {})",
+                    fragment.info.addr.link.raw_value(),
+                    required_master_addr.raw_value()
+                );
+                return None;
+            }
+        }
+
+        let parsed = match parsed {
             Ok(parsed) => parsed,
             Err(err) => return Some(TransportRequest::Error(fragment.info.addr, err.into())),
         };
@@ -146,17 +159,6 @@ impl<T: Transport> TransportReader<T> {
                 ))
             }
         };
-
-        if let Some(required_master_addr) = master_address {
-            if fragment.info.addr.link != required_master_addr {
-                tracing::warn!(
-                    "Discarding ASDU from master address: {} (configured address == {})",
-                    fragment.info.addr.link.raw_value(),
-                    required_master_addr.raw_value()
-                );
-                return None;
-            }
-        }
 
         Some(TransportRequest::Request(fragment.info, request))
     }
