@@ -8,6 +8,9 @@ use tokio::sync::mpsc;
 use tokio::time::Instant;
 
 use crate::app::{Listener, MaybeAsync};
+use crate::link::EndpointAddress;
+use crate::outstation::database::EventBufferConfig;
+use crate::outstation::{OutstationApplication, OutstationConfig, OutstationInformation};
 
 /// request link status from outstation 1024 to master 1, and the master's reply
 pub(crate) const OUTSTATION_REQUEST: [u8; 10] =
@@ -24,6 +27,61 @@ pub(crate) const OUTSTATION_REPLY: [u8; 10] =
 /// the link header of unconfirmed user data from outstation 1024 to master 1 holding 5 bytes
 pub(crate) const NULL_UNSOLICITED_HEADER: [u8; 10] =
     [0x05, 0x64, 0x0A, 0x44, 0x01, 0x00, 0x00, 0x04, 0x67, 0x88];
+
+/// An outstation application that keeps every default
+pub(crate) struct NullApplication;
+impl OutstationApplication for NullApplication {}
+
+/// Outstation information that ignores every notification
+pub(crate) struct NullInformation;
+impl OutstationInformation for NullInformation {}
+
+/// The configuration of outstation `outstation` answering master `master`, with no event buffers
+pub(crate) fn outstation_config(outstation: u16, master: u16) -> OutstationConfig {
+    OutstationConfig::new(
+        EndpointAddress::try_new(outstation).unwrap(),
+        EndpointAddress::try_new(master).unwrap(),
+        EventBufferConfig::all_types(0),
+    )
+}
+
+/// The self-signed certificates in `certs/self_signed`: the client (master, or outstation client)
+/// holds entity1's key and expects entity2's certificate, and the server the reverse
+#[cfg(feature = "enable-tls")]
+pub(crate) mod tls {
+    use std::path::PathBuf;
+
+    use crate::tcp::tls::{MinTlsVersion, TlsClientConfig, TlsServerConfig};
+
+    /// The path of a file in the self-signed certificate directory
+    pub(crate) fn cert(name: &str) -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../certs/self_signed")
+            .join(name)
+    }
+
+    pub(crate) fn client_config() -> TlsClientConfig {
+        TlsClientConfig::self_signed(
+            &cert("entity2_cert.pem"),
+            &cert("entity1_cert.pem"),
+            &cert("entity1_key.pem"),
+            None,
+            MinTlsVersion::V12,
+        )
+        .unwrap()
+    }
+
+    pub(crate) fn server_config() -> TlsServerConfig {
+        TlsServerConfig::self_signed(
+            &cert("entity1_cert.pem"),
+            &cert("entity2_cert.pem"),
+            &cert("entity2_key.pem"),
+            None,
+            MinTlsVersion::V12,
+        )
+        .unwrap()
+    }
+}
 
 /// How long a test may run in wall-clock time before [`watchdog`] fails it
 const WATCHDOG: Duration = Duration::from_secs(30);

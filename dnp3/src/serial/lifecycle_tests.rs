@@ -10,13 +10,11 @@ use std::time::Duration;
 use crate::app::RetryStrategy;
 use crate::link::EndpointAddress;
 use crate::master::{MasterChannel, MasterChannelConfig};
-use crate::outstation::database::EventBufferConfig;
-use crate::outstation::{
-    DefaultControlHandler, OutstationApplication, OutstationConfig, OutstationHandle,
-    OutstationInformation,
-};
+use crate::outstation::{DefaultControlHandler, OutstationHandle};
 use crate::serial::{PortState, SerialSettings};
-use crate::util::test_support::{watchdog, Timeline};
+use crate::util::test_support::{
+    outstation_config, watchdog, NullApplication, NullInformation, Timeline,
+};
 
 const MISSING_PORT: &str = "/path/that/does/not/exist/dnp3-test";
 
@@ -24,23 +22,12 @@ const fn secs(x: u64) -> Duration {
     Duration::from_secs(x)
 }
 
-struct NullApplication;
-impl OutstationApplication for NullApplication {}
-
-struct NullInformation;
-impl OutstationInformation for NullInformation {}
-
 fn spawn_outstation(path: &str, retry: RetryStrategy) -> (OutstationHandle, Timeline<PortState>) {
     let (listener, timeline) = Timeline::new();
-    let config = OutstationConfig::new(
-        EndpointAddress::try_new(1024).unwrap(),
-        EndpointAddress::try_new(1).unwrap(),
-        EventBufferConfig::all_types(0),
-    );
     let handle = crate::serial::spawn_outstation_serial_2(
         path,
         SerialSettings::default(),
-        config,
+        outstation_config(1024, 1),
         retry,
         Box::new(NullApplication),
         Box::new(NullInformation),

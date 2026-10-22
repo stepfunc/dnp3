@@ -225,20 +225,13 @@ impl TlsClientConfig {
 mod tests {
     use super::*;
     use crate::tcp::tls::TLS_HANDSHAKE_TIMEOUT;
+    use crate::util::test_support::tls::client_config;
     use crate::util::test_support::watchdog;
 
     #[tokio::test(start_paused = true)]
     async fn tls_handshake_with_a_server_that_never_answers_times_out() {
         watchdog(async {
-            let certs = Path::new(env!("CARGO_MANIFEST_DIR")).join("../certs/self_signed");
-            let config = TlsClientConfig::self_signed(
-                &certs.join("entity2_cert.pem"),
-                &certs.join("entity1_cert.pem"),
-                &certs.join("entity1_key.pem"),
-                None,
-                MinTlsVersion::V12,
-            )
-            .unwrap();
+            let config = client_config();
 
             // a server that accepts the connection and never answers the ClientHello
             let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();

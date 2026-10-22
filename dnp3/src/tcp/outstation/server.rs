@@ -406,28 +406,16 @@ mod tests {
     use crate::app::MaybeAsync;
     #[cfg(feature = "unstable")]
     use crate::app::NullListener;
-    use crate::link::EndpointAddress;
-    use crate::outstation::database::EventBufferConfig;
     use crate::tcp::accept::test_util::{
         expect_attempt_gaps, Fault, FaultyListener, RESET, UNKNOWN,
     };
     use crate::tcp::accept::ACCEPT_ERROR_DELAY;
-    use crate::util::test_support::watchdog;
+    use crate::util::test_support::{watchdog, NullApplication, NullInformation};
     use std::time::Duration;
     use tokio::sync::mpsc;
 
-    struct NullApplication;
-    impl OutstationApplication for NullApplication {}
-
-    struct NullInformation;
-    impl OutstationInformation for NullInformation {}
-
     fn outstation_config() -> OutstationConfig {
-        OutstationConfig::new(
-            EndpointAddress::try_new(10).unwrap(),
-            EndpointAddress::try_new(1).unwrap(),
-            EventBufferConfig::all_types(0),
-        )
+        crate::util::test_support::outstation_config(10, 1)
     }
 
     struct ConnectionListener(mpsc::UnboundedSender<ConnectionState>);
@@ -466,9 +454,9 @@ mod tests {
     #[cfg(feature = "enable-tls")]
     mod tls {
         use super::*;
-        use crate::tcp::tls::{MinTlsVersion, TlsServerConfig};
+        use crate::tcp::tls::MinTlsVersion;
+        use crate::util::test_support::tls::{cert, server_config};
         use crate::util::test_support::Timeline;
-        use std::path::PathBuf;
         use std::sync::Arc;
         use tokio::io::{AsyncReadExt, AsyncWriteExt};
         use tokio::net::{TcpListener, TcpStream};
@@ -478,25 +466,12 @@ mod tests {
             Duration::from_secs(x)
         }
 
-        fn certs() -> PathBuf {
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../certs/self_signed")
-        }
-
         /// a TLS server on an OS-assigned port with one outstation that reports its connection state
         async fn spawn_tls_server() -> (ServerHandle, SocketAddr, Timeline<ConnectionState>) {
-            let certs = certs();
-            let config = TlsServerConfig::self_signed(
-                &certs.join("entity1_cert.pem"),
-                &certs.join("entity2_cert.pem"),
-                &certs.join("entity2_key.pem"),
-                None,
-                MinTlsVersion::V12,
-            )
-            .unwrap();
             let mut server = Server::new_tls_server(
                 LinkErrorMode::Close,
                 "127.0.0.1:0".parse().unwrap(),
-                config,
+                server_config(),
             );
             let (listener, timeline) = Timeline::new();
             let (_handle, future) = server
@@ -519,12 +494,11 @@ mod tests {
 
         /// complete a TLS handshake with the server as a master holding the expected certificate
         async fn connect_tls(addr: SocketAddr) -> tokio_rustls::client::TlsStream<TcpStream> {
-            let certs = certs();
             let config = sfio_rustls_config::client::self_signed(
                 MinTlsVersion::V12.into(),
-                &certs.join("entity2_cert.pem"),
-                &certs.join("entity1_cert.pem"),
-                &certs.join("entity1_key.pem"),
+                &cert("entity2_cert.pem"),
+                &cert("entity1_cert.pem"),
+                &cert("entity1_key.pem"),
                 None,
             )
             .unwrap();

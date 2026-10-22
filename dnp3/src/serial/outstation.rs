@@ -180,23 +180,11 @@ pub fn spawn_outstation_serial_fault_tolerant(
 #[cfg(feature = "unstable")]
 mod tests {
     use super::*;
-    use crate::link::EndpointAddress;
-    use crate::outstation::database::EventBufferConfig;
-
-    struct NullApplication;
-    impl OutstationApplication for NullApplication {}
-
-    struct NullInformation;
-    impl OutstationInformation for NullInformation {}
+    use crate::util::test_support::{outstation_config, NullApplication, NullInformation};
 
     fn create() -> (SerialOutstation, OutstationHandle) {
-        let config = OutstationConfig::new(
-            EndpointAddress::try_new(10).unwrap(),
-            EndpointAddress::try_new(1).unwrap(),
-            EventBufferConfig::all_types(0),
-        );
         SerialOutstation::new(
-            config,
+            outstation_config(10, 1),
             Box::new(NullApplication),
             Box::new(NullInformation),
             crate::outstation::DefaultControlHandler::create(),

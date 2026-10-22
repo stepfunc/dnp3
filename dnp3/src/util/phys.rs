@@ -338,7 +338,6 @@ mod tls_tests {
 
     use std::future::Future;
     use std::net::Ipv4Addr;
-    use std::path::PathBuf;
     use std::pin::{pin, Pin};
     use std::sync::Arc;
     use std::task::{Context, Poll, Waker};
@@ -349,6 +348,7 @@ mod tls_tests {
     use tokio_rustls::{client, server, TlsAcceptor, TlsConnector};
 
     use crate::tcp::tls::MinTlsVersion;
+    use crate::util::test_support::tls::cert;
 
     // small enough that a single frame's ciphertext can't fit
     const DUPLEX_CAPACITY: usize = 64;
@@ -364,30 +364,24 @@ mod tls_tests {
             .expect("timed out")
     }
 
-    fn cert_path(name: &str) -> PathBuf {
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../certs/self_signed")
-            .join(name)
-    }
-
     async fn connect() -> (
         client::TlsStream<DuplexStream>,
         server::TlsStream<DuplexStream>,
     ) {
         let client_config = sfio_rustls_config::client::self_signed(
             MinTlsVersion::V12.into(),
-            &cert_path("entity2_cert.pem"),
-            &cert_path("entity1_cert.pem"),
-            &cert_path("entity1_key.pem"),
+            &cert("entity2_cert.pem"),
+            &cert("entity1_cert.pem"),
+            &cert("entity1_key.pem"),
             None,
         )
         .unwrap();
 
         let mut server_config = sfio_rustls_config::server::self_signed(
             MinTlsVersion::V12.into(),
-            &cert_path("entity1_cert.pem"),
-            &cert_path("entity2_cert.pem"),
-            &cert_path("entity2_key.pem"),
+            &cert("entity1_cert.pem"),
+            &cert("entity2_cert.pem"),
+            &cert("entity2_key.pem"),
             None,
         )
         .unwrap();
