@@ -486,7 +486,7 @@ impl MasterSession {
                 let res: Result<Sequence, TaskError> = match t {
                     AppTask::Read(t) => self.run_read_task(io, task.dest, t, writer, reader).await,
                     AppTask::NonRead(t) => {
-                        self.run_non_read_task(io, task.dest, t, writer, reader)
+                        std::pin::pin!(self.run_non_read_task(io, task.dest, t, writer, reader))
                             .await
                     }
                     AppTask::NoResponse(t) => {
@@ -574,7 +574,7 @@ impl MasterSession {
         loop {
             next = match next {
                 NextStep::Continue(task) => {
-                    self.run_single_non_read_task(io, dest, task, writer, reader)
+                    std::pin::pin!(self.run_single_non_read_task(io, dest, task, writer, reader))
                         .await?
                 }
                 NextStep::Complete(seq) => {
