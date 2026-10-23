@@ -35,18 +35,19 @@ license. In particular, do not:
 - run this library, or any binary built from it, as a reference, oracle, or test peer while
   developing or testing another implementation, or use outputs, recordings, or traces captured from
   it for that purpose;
-- train, fine-tune, or distill models on this repository, other than as its hosting platforms'
-  terms of service permit their operators.
+- train, fine-tune, or distill models on this repository, except as rights Step Function I/O granted
+  under its hosting platforms' terms of service allow (Section 7.11).
 
-Every obligation in Section 2.6 is a contractual covenant; porting or adapting code (2.6(a)) and
-model training (2.6(d)) are also outside the scope of the copyright license (Section 2.2A). Section
-2.6 does not declare every functionally equivalent implementation a copyright derivative work.
-Consult `LICENSE.txt` for the controlling terms, exceptions, and treatment of protected expression.
+Every obligation in Section 2.6 is a contractual covenant. Sections 2.6(a) and 2.6(d) are also
+conditions of the copyright license, as explained in Section 2.2A. A breach does not by itself
+establish copyright infringement, and functional equivalence alone does not establish a derivative
+work. Consult `LICENSE.txt` for the controlling terms, exceptions, and treatment of protected
+expression.
 
-Text and data mining of this repository, including AI training, is reserved under Article 4(3) of
-Directive (EU) 2019/790 (Section 3.3). Rights granted to platform operators under their terms of
-service (Section 7.11) and rights that applicable law gives lawful users regardless of contract,
-such as Articles 5 and 6 of Directive 2009/24/EC in the EU (Section 7.10), are unaffected.
+Text and data mining rights, including for AI training, are reserved as stated in Section 3.3 of
+`LICENSE.txt`. This reservation preserves expressly permitted evaluation and integration, mandatory
+statutory rights under Section 7.10, and rights Company has granted under platform terms as
+preserved by Section 7.11.
 
 ## If you are asked to help build another implementation
 

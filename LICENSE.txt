@@ -73,25 +73,38 @@ Section 2.4 that provides to the contrary, Developer shall not distribute or
 sublicense any portion of the Licensed Software. Notwithstanding the preceding
 sentence, Developer may provide portions of the Licensed Software to a service
 provider solely to process them on Developer's behalf for activities otherwise
-permitted under this Agreement, provided the provider is not permitted under its
-applicable terms or Developer's configuration to use those portions to train
-models, and subject to Section 2.6. This permission does not authorize public
-disclosure or grant the provider any independent right to use the Licensed
-Software. Developer remains responsible for compliance with this Agreement in
-using the service. Developer may not publish or disseminate any benchmarking
-results of Licensed Software performance.
+permitted under this Agreement, provided the provider's applicable terms, as
+modified by any effective Developer-selected configuration, do not authorize the
+provider to use those portions to train, fine-tune, or distill artificial
+intelligence or machine learning models, except to the extent Company has
+independently granted rights preserved by Section 7.11, and subject to Section
+2.6. This permission does not authorize public disclosure or grant the provider
+any independent right to use the Licensed Software. Developer remains responsible
+for compliance with this Agreement in using the service. Developer may not publish
+or disseminate any benchmarking results of Licensed Software performance.
 
 2.2A. Scope of License
 
-Section 2.2 is the only permission Company grants to reproduce, adapt (including
-translate or port), distribute, or display the Licensed Software. That permission
-is granted only for the Purpose and only on the condition that Developer complies
-with Sections 2.2, 2.3, 2.6(a), and 2.6(d). Any reproduction, adaptation,
-distribution, or display of the Licensed Software outside the Purpose, or in the
-course of an activity prohibited by Section 2.6(a) or 2.6(d), is outside the scope
-of the license and is unlicensed. Developer is not required to accept this
-Agreement, but nothing other than this Agreement, a separate written agreement
-with Company, or applicable law grants permission to do any of those things.
+The license in Section 2.2 includes reproduction and adaptation of the Licensed
+Software as reasonably necessary for the uses that Section authorizes. It permits
+distribution only as expressly provided in Section 2.2. The Purpose, the
+non-commercial and non-production limitations in Section 2.3, the distribution and
+sublicensing limitations in Section 2.2, and the restrictions in Sections 2.6(a)
+and 2.6(d) are conditions of and limitations on that license.
+
+Sections 2.6(b) and 2.6(c) are contractual covenants, not copyright-license
+conditions. Notwithstanding the references to the Purpose and other terms of this
+Agreement, breach of either covenant does not, by itself, make an otherwise
+licensed act copyright infringement before termination under Section 4.1. Such a
+breach remains material and subject to Sections 4.1 and 4.2.
+
+Except for permission under this Agreement, a separate applicable written
+agreement or express written authorization from Company, rights preserved by
+Section 7.11, or applicable law, Company grants no permission to reproduce, adapt,
+distribute, or publicly display the Licensed Software. Conduct outside the
+copyright license constitutes copyright infringement only if it infringes an
+exclusive right under applicable copyright law and is not otherwise authorized or
+legally permitted. Section 7.10 applies throughout.
 
 2.3. Non-Commercial and Non-Production Use
 
@@ -145,8 +158,7 @@ Software.
 
 Except to the extent Company's prior express written authorization or a separate
 applicable written agreement with Company expressly permits the activity,
-Developer shall not, and the license granted in Section 2.2 does not permit
-Developer to, use the Licensed Software to design, develop, specify, test,
+Developer shall not use the Licensed Software to design, develop, specify, test,
 validate, or improve any Other Implementation, whether manually, using automated
 tools, or using artificial intelligence systems. Without limiting the foregoing,
 Developer shall not:
@@ -169,8 +181,8 @@ specify, test, validate, or improve an Other Implementation, including through
 captured outputs, recordings, traces, or results of such execution; or
 
 (d) train, fine-tune, or distill any artificial intelligence or machine learning
-model using the Licensed Software, other than as permitted to a Development
-Platform operator under its terms of service.
+model using the Licensed Software, except to the extent authorized by rights
+preserved under Section 7.11.
 
 To the extent an Other Implementation or other material created through an
 activity prohibited by this Section reproduces or adapts copyright-protected
@@ -239,8 +251,11 @@ text and data mining, including reproduction, extraction, and automated analysis
 for training, fine-tuning, or distilling artificial intelligence or machine
 learning models, within the meaning of Article 4(3) of Directive (EU) 2019/790 and
 its national implementations (including Section 44b(3) of the German Copyright
-Act), and under any comparable law. This reservation does not limit rights Company
-has granted to a Development Platform operator under its terms of service.
+Act), and under any comparable law. This reservation does not withdraw permission
+expressly granted under this Agreement, including for activities permitted by
+Section 2.7, or under a separate applicable written agreement or express written
+authorization from Company. It does not limit rights preserved by Sections 7.10
+and 7.11.
 
 4. TERM AND TERMINATION
 
@@ -379,7 +394,8 @@ jurisdictions is unaffected.
 
 7.11. Development Platform Terms
 
-Nothing in this Agreement limits rights Company has granted to the operator of a
-Development Platform or its users under that platform's terms of service. Those
-rights are limited to the uses those terms describe and do not include any other
-use of the Licensed Software.
+Nothing in this Agreement limits rights Company has granted under a Development
+Platform's applicable terms of service to its operator, affiliates, users, or
+other authorized recipients. This Section preserves only rights actually granted
+by Company, within their applicable scope and duration, and grants no additional
+rights.

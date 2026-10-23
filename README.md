@@ -20,5 +20,6 @@ its source, documentation, tests, binaries, or derived materials to design, deve
 validate, or improve any other implementation of a protocol it implements, including through
 requirement extraction or use as a reference, oracle, or test peer. This applies regardless of
 commercial, open-source, private, or competitive status, subject to the exceptions in the agreement.
-Text and data mining, including AI training, is reserved (Section 3.3). This summary does not amend
-the license. See [`LICENSE.txt`](LICENSE.txt) and [`AGENTS.md`](AGENTS.md).
+Text and data mining rights, including for AI training, are reserved subject to the permissions and
+exceptions stated in Section 3.3. This summary does not amend the license. See
+[`LICENSE.txt`](LICENSE.txt) and [`AGENTS.md`](AGENTS.md).
