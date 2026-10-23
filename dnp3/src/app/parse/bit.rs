@@ -123,180 +123,85 @@ impl<P: Packed> Iterator for PackedIterator<'_, P> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::app::parse::range::{assert_yields_exactly, start_stop};
 
-    #[test]
-    fn correctly_calculates_bytes_for_bits() {
-        assert_eq!(num_bytes_for_bits(0), 0);
-        assert_eq!(num_bytes_for_bits(1), 1);
-        assert_eq!(num_bytes_for_bits(8), 1);
-        assert_eq!(num_bytes_for_bits(7), 1);
-        assert_eq!(num_bytes_for_bits(9), 2);
-        assert_eq!(num_bytes_for_bits(15), 2);
-        assert_eq!(num_bytes_for_bits(16), 2);
+    use proptest::prelude::*;
+
+    /// the bits of a byte, least significant first
+    fn bits(byte: u8) -> [bool; 8] {
+        [0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80].map(|mask| byte & mask != 0)
     }
 
-    #[test]
-    fn correctly_calculates_bytes_for_double_bits() {
-        assert_eq!(num_bytes_for_double_bits(0), 0);
-        assert_eq!(num_bytes_for_double_bits(1), 1);
-        assert_eq!(num_bytes_for_double_bits(3), 1);
-        assert_eq!(num_bytes_for_double_bits(4), 1);
-        assert_eq!(num_bytes_for_double_bits(5), 2);
-        assert_eq!(num_bytes_for_double_bits(8), 2);
-        assert_eq!(num_bytes_for_double_bits(9), 3);
-    }
-
-    #[test]
-    fn can_parse_bit_sequence_at_max_index() {
-        let range = Range::from(65534, 65535).unwrap();
-        let data = [0b0000_0001];
-        let mut cursor = ReadCursor::new(&data);
-        let seq = BitSequence::parse(range, &mut cursor).unwrap();
-        assert!(cursor.is_empty());
-        assert_eq!(seq.iter().size_hint(), (2, Some(2)));
-        let vec: Vec<(bool, u16)> = seq.iter().collect();
-        assert_eq!(vec, vec![(true, 65534), (false, 65535)]);
-    }
-
-    #[test]
-    fn can_parse_bits_across_two_bytes() {
-        let range = Range::from(3, 12).unwrap(); // ten values
-        let data = [0b1010_0110, 0b0000_0010];
-        let mut cursor = ReadCursor::new(&data);
-        let seq = BitSequence::parse(range, &mut cursor).unwrap();
-        assert!(cursor.is_empty());
-        assert_eq!(seq.iter().size_hint(), (10, Some(10)));
-        let vec: Vec<(bool, u16)> = seq.iter().collect();
-        assert_eq!(
-            vec,
-            vec![
-                (false, 3),
-                (true, 4),
-                (true, 5),
-                (false, 6),
-                (false, 7),
-                (true, 8),
-                (false, 9),
-                (true, 10),
-                (false, 11),
-                (true, 12),
-            ]
-        );
-    }
-
-    #[test]
-    fn can_parse_single_byte_of_double_bit() {
-        let range = Range::from(1, 4).unwrap();
-        let data = [0b11_10_01_00];
-        let mut cursor = ReadCursor::new(&data);
-        let seq = DoubleBitSequence::parse(range, &mut cursor).unwrap();
-        assert!(cursor.is_empty());
-        assert_eq!(seq.iter().size_hint(), (4, Some(4)));
-        let vec: Vec<(DoubleBit, u16)> = seq.iter().collect();
-        assert_eq!(
-            vec,
-            vec![
-                (DoubleBit::Intermediate, 1),
-                (DoubleBit::DeterminedOff, 2),
-                (DoubleBit::DeterminedOn, 3),
-                (DoubleBit::Indeterminate, 4),
-            ]
-        );
-    }
-
-    #[test]
-    fn can_parse_double_bit_sequence_at_max_index() {
-        let range = Range::from(65531, 65535).unwrap(); // five values!
-        let data = [0b1000_1101, 0b0000_0011];
-        let mut cursor = ReadCursor::new(&data);
-        let seq = DoubleBitSequence::parse(range, &mut cursor).unwrap();
-        assert!(cursor.is_empty());
-        assert_eq!(seq.iter().size_hint(), (5, Some(5)));
-        let vec: Vec<(DoubleBit, u16)> = seq.iter().collect();
-        assert_eq!(
-            vec,
-            vec![
-                (DoubleBit::DeterminedOff, 65531),
-                (DoubleBit::Indeterminate, 65532),
-                (DoubleBit::Intermediate, 65533),
-                (DoubleBit::DeterminedOn, 65534),
-                (DoubleBit::Indeterminate, 65535),
-            ]
-        );
-    }
-
-    mod property {
-        use super::*;
-
-        use proptest::prelude::*;
-
-        /// a start and stop up to 32 indices apart, with the top of the index space more likely
-        fn start_stop() -> impl Strategy<Value = (u16, u16)> {
-            let start = prop_oneof![any::<u16>(), 65500..=u16::MAX];
-            (start, 0..32u16).prop_map(|(start, len)| (start, start.saturating_add(len)))
-        }
-
-        /// the bits of a byte, least significant first
-        fn bits(byte: u8) -> [bool; 8] {
-            [0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80].map(|mask| byte & mask != 0)
-        }
-
-        /// the double bits of a byte, from the least significant pair
-        fn double_bits(byte: u8) -> [DoubleBit; 4] {
-            [(0x02, 0x01), (0x08, 0x04), (0x20, 0x10), (0x80, 0x40)].map(|(high, low)| {
-                match (byte & high != 0, byte & low != 0) {
-                    (false, false) => DoubleBit::Intermediate,
-                    (false, true) => DoubleBit::DeterminedOff,
-                    (true, false) => DoubleBit::DeterminedOn,
-                    (true, true) => DoubleBit::Indeterminate,
-                }
-            })
-        }
-
-        /// The packed sequence of the range in `bytes` reads only the bytes that hold its values,
-        /// and yields the values of `unpacked` with their indices, then stays exhausted
-        fn check<P, const N: usize>(
-            (start, stop): (u16, u16),
-            bytes: &[u8],
-            unpacked: fn(u8) -> [P; N],
-        ) where
-            P: Packed + Copy + PartialEq + std::fmt::Debug,
-        {
-            let expected: Vec<(P, u16)> = bytes
-                .iter()
-                .flat_map(|byte| unpacked(*byte))
-                .zip(start..=stop)
-                .collect();
-            let used = expected.len().div_ceil(N);
-
-            let range = Range::from(start, stop).unwrap();
-            let mut cursor = ReadCursor::new(bytes);
-            let seq = PackedSequence::<P>::parse(range, &mut cursor).unwrap();
-            assert_eq!(cursor.remaining(), bytes.len().saturating_sub(used));
-            let mut iter = seq.iter();
-            assert_eq!(iter.size_hint(), (expected.len(), Some(expected.len())));
-            assert_eq!(iter.by_ref().collect::<Vec<_>>(), expected);
-            assert_eq!(iter.next(), None);
-            assert_eq!(iter.next(), None);
-            assert_eq!(iter.size_hint(), (0, Some(0)));
-
-            let short = &bytes[..used.saturating_sub(1)];
-            PackedSequence::<P>::parse(range, &mut ReadCursor::new(short)).unwrap_err();
-        }
-
-        proptest! {
-            #![proptest_config(ProptestConfig::with_cases(256))]
-
-            /// Packed bits and double bits are read from the least significant bits of each
-            /// byte, in as many bytes as the values need
-            #[test]
-            fn packed_sequences_yield_the_bits_of_each_byte_in_order(
-                range in start_stop(),
-                bytes in prop::collection::vec(any::<u8>(), 12),
-            ) {
-                check(range, &bytes, bits);
-                check(range, &bytes, double_bits);
+    /// the double bits of a byte, from the least significant pair
+    fn double_bits(byte: u8) -> [DoubleBit; 4] {
+        [(0x02, 0x01), (0x08, 0x04), (0x20, 0x10), (0x80, 0x40)].map(|(high, low)| {
+            match (byte & high != 0, byte & low != 0) {
+                (false, false) => DoubleBit::Intermediate,
+                (false, true) => DoubleBit::DeterminedOff,
+                (true, false) => DoubleBit::DeterminedOn,
+                (true, true) => DoubleBit::Indeterminate,
             }
+        })
+    }
+
+    /// The packed sequence of the range in `bytes` reads only the bytes that hold its values,
+    /// and yields the values of `unpacked` with their indices, then stays exhausted
+    fn check<P, const N: usize>((start, stop): (u16, u16), bytes: &[u8], unpacked: fn(u8) -> [P; N])
+    where
+        P: Packed + Copy + PartialEq + std::fmt::Debug,
+    {
+        let expected: Vec<(P, u16)> = bytes
+            .iter()
+            .flat_map(|byte| unpacked(*byte))
+            .zip(start..=stop)
+            .collect();
+        let used = expected.len().div_ceil(N);
+
+        let range = Range::from(start, stop).unwrap();
+        let mut cursor = ReadCursor::new(bytes);
+        let seq = PackedSequence::<P>::parse(range, &mut cursor).unwrap();
+        assert_eq!(cursor.remaining(), bytes.len().saturating_sub(used));
+        assert_yields_exactly(seq.iter(), &expected);
+
+        let short = &bytes[..used.saturating_sub(1)];
+        PackedSequence::<P>::parse(range, &mut ReadCursor::new(short)).unwrap_err();
+    }
+
+    /// Every length the property draws: bits take one byte per eight values and double bits
+    /// one per four, rounded up
+    #[test]
+    fn packed_sequences_of_each_length() {
+        let bytes = [0xA5; 12];
+        for stop in 0..32 {
+            check((0, stop), &bytes, bits);
+            check((0, stop), &bytes, double_bits);
+        }
+    }
+
+    #[test]
+    fn packed_sequence_examples() {
+        // bits ending at the last index without wrapping
+        check((65534, 65535), &[0b0000_0001], bits);
+        // bits across two bytes
+        check((3, 12), &[0b1010_0110, 0b0000_0010], bits);
+        // each double-bit state in one byte
+        check((1, 4), &[0b11_10_01_00], double_bits);
+        // double bits across two bytes, ending at the last index
+        check((65531, 65535), &[0b1000_1101, 0b0000_0011], double_bits);
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(256))]
+
+        /// Packed bits and double bits are read from the least significant bits of each
+        /// byte, in as many bytes as the values need
+        #[test]
+        fn packed_sequences_yield_the_bits_of_each_byte_in_order(
+            range in start_stop(),
+            bytes in prop::collection::vec(any::<u8>(), 12),
+        ) {
+            check(range, &bytes, bits);
+            check(range, &bytes, double_bits);
         }
     }
 }

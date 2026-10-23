@@ -82,106 +82,66 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::app::parse::range::assert_yields_exactly;
+    use crate::app::variations::Group50Var1;
+    use crate::app::Timestamp;
 
-    #[test]
-    fn parses_exactly_count_items() {
-        let data = [0x01, 0x00, 0x02, 0x00, 0x03, 0x00, 0xFF];
-        let mut cursor = ReadCursor::new(&data);
-        let seq = CountSequence::<u16>::parse(3, &mut cursor).unwrap();
-        assert_eq!(cursor.remaining(), 1);
-        let items: Vec<u16> = seq.iter().collect();
-        assert_eq!(items, vec![1, 2, 3]);
+    use proptest::prelude::*;
+
+    /// The count sequence of `values`, encoded as `objects` and followed by `trailing`, reads
+    /// exactly `objects` and yields each value once, then stays exhausted; only a count of one has
+    /// a single value; one byte less is an error
+    fn check<T>(values: &[T], objects: &[u8], trailing: &[u8])
+    where
+        T: FixedSize + PartialEq + std::fmt::Debug,
+    {
+        let bytes = [objects, trailing].concat();
+        let count = u16::try_from(values.len()).unwrap();
+
+        let mut cursor = ReadCursor::new(&bytes);
+        let seq = CountSequence::<T>::parse(count, &mut cursor).unwrap();
+        assert_eq!(cursor.remaining(), trailing.len());
+        assert_yields_exactly(seq.iter(), values);
+        let single = match values {
+            [x] => Some(*x),
+            _ => None,
+        };
+        assert_eq!(seq.single(), single);
+
+        if let Some(short) = objects.len().checked_sub(1) {
+            CountSequence::<T>::parse(count, &mut ReadCursor::new(&objects[..short])).unwrap_err();
+        }
     }
 
     #[test]
-    fn size_hint_counts_down_and_iterator_stays_exhausted() {
-        let data = [0x01, 0x00, 0x02, 0x00];
-        let mut cursor = ReadCursor::new(&data);
-        let seq = CountSequence::<u16>::parse(2, &mut cursor).unwrap();
-        let mut iter = seq.iter();
-        assert_eq!(iter.size_hint(), (2, Some(2)));
-        assert_eq!(iter.next(), Some(1));
-        assert_eq!(iter.size_hint(), (1, Some(1)));
-        assert_eq!(iter.next(), Some(2));
-        assert_eq!(iter.size_hint(), (0, Some(0)));
-        assert_eq!(iter.next(), None);
-        assert_eq!(iter.next(), None);
-        assert_eq!(iter.size_hint(), (0, Some(0)));
+    fn count_sequence_examples() {
+        // a trailing byte the sequence leaves unread
+        check::<u16>(&[1, 2, 3], &[0x01, 0x00, 0x02, 0x00, 0x03, 0x00], &[0xFF]);
+        // two objects: no single value, and rejected one byte short
+        check::<u16>(&[1, 2], &[0x01, 0x00, 0x02, 0x00], &[]);
+        // a count of zero consumes nothing
+        check::<u16>(&[], &[], &[0xAA]);
+        // a count of one is a single value
+        check::<u16>(&[1], &[0x01, 0x00], &[0x02, 0x00]);
     }
 
-    #[test]
-    fn zero_count_consumes_nothing_and_yields_nothing() {
-        let data = [0xAA];
-        let mut cursor = ReadCursor::new(&data);
-        let seq = CountSequence::<u16>::parse(0, &mut cursor).unwrap();
-        assert_eq!(cursor.remaining(), 1);
-        assert_eq!(seq.iter().size_hint(), (0, Some(0)));
-        assert_eq!(seq.iter().next(), None);
-        assert_eq!(seq.single(), None);
-    }
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(256))]
 
-    #[test]
-    fn single_requires_a_count_of_one() {
-        let data = [0x01, 0x00, 0x02, 0x00];
-        let seq = CountSequence::<u16>::parse(1, &mut ReadCursor::new(&data)).unwrap();
-        assert_eq!(seq.single(), Some(1));
-        let seq = CountSequence::<u16>::parse(2, &mut ReadCursor::new(&data)).unwrap();
-        assert_eq!(seq.single(), None);
-    }
-
-    #[test]
-    fn fails_when_data_is_short() {
-        let data = [0x01, 0x00, 0x02];
-        let mut cursor = ReadCursor::new(&data);
-        CountSequence::<u16>::parse(2, &mut cursor).unwrap_err();
-    }
-
-    mod property {
-        use super::*;
-        use crate::app::variations::Group50Var1;
-        use crate::app::Timestamp;
-
-        use proptest::prelude::*;
-
-        proptest! {
-            #![proptest_config(ProptestConfig::with_cases(256))]
-
-            /// A count sequence reads exactly its objects and yields each once, then stays
-            /// exhausted; one byte less is an error
-            #[test]
-            fn count_sequence_yields_each_object_once(
-                times in prop_oneof![1 => Just(0), 1 => Just(1), 6 => 0..40usize]
-                    .prop_flat_map(|len| prop::collection::vec(0..=Timestamp::MAX_VALUE, len)),
-                trailing in prop::collection::vec(any::<u8>(), 0..4),
-            ) {
-                let objects: Vec<u8> = times.iter().flat_map(|x| x.to_le_bytes()[..6].to_vec()).collect();
-                let values: Vec<Group50Var1> = times
-                    .iter()
-                    .map(|x| Group50Var1 { time: Timestamp::new(*x) })
-                    .collect();
-                let bytes = [objects.as_slice(), &trailing].concat();
-                let count = u16::try_from(values.len()).unwrap();
-
-                let mut cursor = ReadCursor::new(&bytes);
-                let seq = CountSequence::<Group50Var1>::parse(count, &mut cursor).unwrap();
-                prop_assert_eq!(cursor.remaining(), trailing.len());
-                let mut iter = seq.iter();
-                prop_assert_eq!(iter.size_hint(), (values.len(), Some(values.len())));
-                prop_assert_eq!(iter.by_ref().collect::<Vec<_>>(), values.clone());
-                prop_assert_eq!(iter.next(), None);
-                prop_assert_eq!(iter.next(), None);
-                prop_assert_eq!(iter.size_hint(), (0, Some(0)));
-                let single = match values.as_slice() {
-                    [x] => Some(*x),
-                    _ => None,
-                };
-                prop_assert_eq!(seq.single(), single);
-
-                if let Some(short) = objects.len().checked_sub(1) {
-                    CountSequence::<Group50Var1>::parse(count, &mut ReadCursor::new(&objects[..short]))
-                        .unwrap_err();
-                }
-            }
+        /// A count sequence reads exactly its objects and yields each once, then stays
+        /// exhausted; one byte less is an error
+        #[test]
+        fn count_sequence_yields_each_object_once(
+            times in prop_oneof![1 => Just(0), 1 => Just(1), 6 => 0..40usize]
+                .prop_flat_map(|len| prop::collection::vec(0..=Timestamp::MAX_VALUE, len)),
+            trailing in prop::collection::vec(any::<u8>(), 0..4),
+        ) {
+            let objects: Vec<u8> = times.iter().flat_map(|x| x.to_le_bytes()[..6].to_vec()).collect();
+            let values: Vec<Group50Var1> = times
+                .iter()
+                .map(|x| Group50Var1 { time: Timestamp::new(*x) })
+                .collect();
+            check(&values, &objects, &trailing);
         }
     }
 }
