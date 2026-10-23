@@ -404,17 +404,12 @@ impl std::fmt::Display for PhysDisplay<'_> {
 mod reply_tests {
     use super::{PendingReply, PhysAddr, PhysDecodeLevel, PhysLayer};
 
-    use std::future::Future;
     use std::pin::{pin, Pin};
     use std::task::{Context, Poll, Waker};
 
     use tokio::io::AsyncReadExt;
 
-    use crate::util::test_support::{watchdog, OUTSTATION_REPLY};
-
-    fn poll_once<F: Future>(future: Pin<&mut F>) -> Poll<F::Output> {
-        future.poll(&mut Context::from_waker(Waker::noop()))
-    }
+    use crate::util::test_support::{poll_once, watchdog, OUTSTATION_REPLY};
 
     fn written(count: usize) -> PendingReply {
         PendingReply::Write {
@@ -813,9 +808,9 @@ mod tls_tests {
 
     use std::future::Future;
     use std::net::Ipv4Addr;
-    use std::pin::{pin, Pin};
+    use std::pin::pin;
     use std::sync::Arc;
-    use std::task::{Context, Poll, Waker};
+    use std::task::Poll;
     use std::time::Duration;
 
     use tokio::io::{AsyncReadExt, AsyncWriteExt, DuplexStream};
@@ -823,16 +818,14 @@ mod tls_tests {
     use tokio_rustls::{client, server, TlsAcceptor, TlsConnector};
 
     use crate::tcp::tls::MinTlsVersion;
-    use crate::util::test_support::tls::cert;
-    use crate::util::test_support::{MASTER_REPLY, OUTSTATION_REPLY};
+    use crate::util::test_support::tls::{rustls_client, rustls_server};
+    use crate::util::test_support::{
+        poll_once, ACK_FROM_OUTSTATION, MASTER_REPLY, OUTSTATION_REPLY,
+    };
 
     // small enough that a single frame's ciphertext can't fit
     const DUPLEX_CAPACITY: usize = 64;
     const FRAME: [u8; 292] = [0xAB; 292];
-
-    fn poll_once<F: Future>(future: Pin<&mut F>) -> Poll<F::Output> {
-        future.poll(&mut Context::from_waker(Waker::noop()))
-    }
 
     async fn with_timeout<F: Future>(future: F) -> F::Output {
         tokio::time::timeout(Duration::from_secs(5), future)
@@ -844,23 +837,9 @@ mod tls_tests {
         client::TlsStream<DuplexStream>,
         server::TlsStream<DuplexStream>,
     ) {
-        let client_config = sfio_rustls_config::client::self_signed(
-            MinTlsVersion::V12.into(),
-            &cert("entity2_cert.pem"),
-            &cert("entity1_cert.pem"),
-            &cert("entity1_key.pem"),
-            None,
-        )
-        .unwrap();
+        let client_config = rustls_client(MinTlsVersion::V12.into());
 
-        let mut server_config = sfio_rustls_config::server::self_signed(
-            MinTlsVersion::V12.into(),
-            &cert("entity1_cert.pem"),
-            &cert("entity2_cert.pem"),
-            &cert("entity2_key.pem"),
-            None,
-        )
-        .unwrap();
+        let mut server_config = rustls_server(MinTlsVersion::V12.into());
         // session tickets are written after the client handshake completes and would
         // fill the duplex, stalling the server handshake
         server_config.send_tls13_tickets = 0;
@@ -933,9 +912,8 @@ mod tls_tests {
             Poll::Ready(Ok(()))
         ));
 
-        let frame = [0x05, 0x64, 0x05, 0x00, 0x01, 0x00, 0x00, 0x04, 0x27, 0x70];
         let mut reply = PendingReply::Write {
-            frame,
+            frame: ACK_FROM_OUTSTATION,
             addr: PhysAddr::None,
             written: 0,
         };
@@ -953,7 +931,10 @@ mod tls_tests {
         write_result.unwrap();
         read_result.unwrap();
 
-        assert_eq!(received.as_slice(), [&FRAME[..], &frame].concat());
+        assert_eq!(
+            received.as_slice(),
+            [&FRAME[..], &ACK_FROM_OUTSTATION].concat()
+        );
         assert_eq!(reply, PendingReply::None);
         assert!(!client.get_ref().1.wants_write());
     }

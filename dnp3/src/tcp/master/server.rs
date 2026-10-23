@@ -476,18 +476,11 @@ mod tests {
         assert_closed, expect_attempt_gaps, Fault, FaultyListener, LOOPBACK, RESET, UNKNOWN,
     };
     use crate::tcp::accept::ACCEPT_ERROR_DELAY;
-    use crate::util::test_support::watchdog;
+    use crate::util::test_support::{watchdog, MASTER_REPLY, OUTSTATION_REQUEST};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::TcpStream;
     use tokio::sync::mpsc;
     use tokio::time::Instant;
-
-    /// request link status from outstation 1024 to master 1
-    const LINK_STATUS_REQUEST: [u8; 10] =
-        [0x05, 0x64, 0x05, 0x49, 0x01, 0x00, 0x00, 0x04, 0xD2, 0x36];
-    /// link status from master 1 to outstation 1024
-    const LINK_STATUS_RESPONSE: [u8; 10] =
-        [0x05, 0x64, 0x05, 0x8B, 0x00, 0x04, 0x01, 0x00, 0x2E, 0xF7];
 
     #[derive(Debug, PartialEq)]
     enum Event {
@@ -653,41 +646,33 @@ mod tests {
         fixture.expect_event(Event::Accept).await;
         fixture.expect_event(Event::Start).await;
         fixture.enable_channel().await;
-        fixture
-            .stream
-            .write_all(&LINK_STATUS_REQUEST)
-            .await
-            .unwrap();
-        fixture.expect_bytes(&LINK_STATUS_RESPONSE).await;
+        fixture.stream.write_all(&OUTSTATION_REQUEST).await.unwrap();
+        fixture.expect_bytes(&MASTER_REPLY).await;
     }
 
     #[tokio::test]
     async fn identified_session_is_seeded_with_the_identifying_header() {
         let mut fixture = Fixture::new(true).await;
         fixture.expect_event(Event::Accept).await;
-        fixture
-            .stream
-            .write_all(&LINK_STATUS_REQUEST)
-            .await
-            .unwrap();
+        fixture.stream.write_all(&OUTSTATION_REQUEST).await.unwrap();
         fixture.expect_event(Event::AcceptLinkId(1024, 1)).await;
         fixture.expect_event(Event::StartWithLinkId(1024, 1)).await;
         fixture.enable_channel().await;
         // the session answers the header that was read to identify it
-        fixture.expect_bytes(&LINK_STATUS_RESPONSE).await;
+        fixture.expect_bytes(&MASTER_REPLY).await;
     }
 
     #[tokio::test]
     async fn header_with_a_bad_start_crc_or_length_is_not_identified() {
         let with = |index: usize, value: u8| {
-            let mut header = LINK_STATUS_REQUEST;
+            let mut header = OUTSTATION_REQUEST;
             header[index] = value;
             header
         };
         let headers = [
             with(0, 0x06),
             with(1, 0x65),
-            with(9, LINK_STATUS_REQUEST[9] ^ 0xFF),
+            with(9, OUTSTATION_REQUEST[9] ^ 0xFF),
             // length 4 with a matching CRC
             [0x05, 0x64, 0x04, 0xC0, 0x01, 0x00, 0x00, 0x04, 0x0E, 0x94],
         ];
@@ -720,16 +705,16 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn a_header_split_across_reads_is_identified_like_one_read() {
         watchdog(async {
-            let (whole, _) = identify_from(&[&LINK_STATUS_REQUEST]).await;
+            let (whole, _) = identify_from(&[&OUTSTATION_REQUEST]).await;
             let (split, _) =
-                identify_from(&[&LINK_STATUS_REQUEST[..4], &LINK_STATUS_REQUEST[4..]]).await;
+                identify_from(&[&OUTSTATION_REQUEST[..4], &OUTSTATION_REQUEST[4..]]).await;
             let whole = whole.unwrap();
             assert_eq!(
                 whole,
                 LinkIdentity {
                     source: 1024,
                     destination: 1,
-                    header_bytes: LINK_STATUS_REQUEST,
+                    header_bytes: OUTSTATION_REQUEST,
                 }
             );
             assert_eq!(split.unwrap(), whole);
@@ -740,7 +725,7 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn a_peer_closing_mid_header_is_not_identified() {
         watchdog(async {
-            let (result, _) = identify_from(&[&LINK_STATUS_REQUEST[..4]]).await;
+            let (result, _) = identify_from(&[&OUTSTATION_REQUEST[..4]]).await;
             assert_eq!(result.unwrap_err().kind(), ErrorKind::UnexpectedEof);
         })
         .await;
@@ -751,8 +736,8 @@ mod tests {
         watchdog(async {
             let trailing = [0xAA, 0xBB, 0xCC];
             let (result, mut phys) =
-                identify_from(&[&[LINK_STATUS_REQUEST.as_slice(), &trailing].concat()]).await;
-            assert_eq!(result.unwrap().header_bytes, LINK_STATUS_REQUEST);
+                identify_from(&[&[OUTSTATION_REQUEST.as_slice(), &trailing].concat()]).await;
+            assert_eq!(result.unwrap().header_bytes, OUTSTATION_REQUEST);
             let mut buffer = [0; 16];
             let (count, _) = phys
                 .read(&mut buffer, PhysDecodeLevel::Nothing)
@@ -777,11 +762,7 @@ mod tests {
         // rejected by `accept_link_id`
         let mut fixture = Fixture::spawn(true, true).await;
         fixture.expect_event(Event::Accept).await;
-        fixture
-            .stream
-            .write_all(&LINK_STATUS_REQUEST)
-            .await
-            .unwrap();
+        fixture.stream.write_all(&OUTSTATION_REQUEST).await.unwrap();
         fixture.expect_event(Event::AcceptLinkId(1024, 1)).await;
         fixture.expect_closed_without_identity().await;
         assert!(matches!(
@@ -855,7 +836,7 @@ mod tests {
             let failed_at = peers.attempts.recv().await.unwrap();
 
             // identifying the accepted connection ends the select while the server waits to retry
-            client.write_all(&LINK_STATUS_REQUEST).await.unwrap();
+            client.write_all(&OUTSTATION_REQUEST).await.unwrap();
             assert_eq!(
                 server.events.recv().await,
                 Some(Event::AcceptLinkId(1024, 1))
@@ -920,10 +901,10 @@ mod tests {
 
     /// the session on `peer` answers a link status request
     async fn answers(peer: &mut tokio::io::DuplexStream) {
-        peer.write_all(&LINK_STATUS_REQUEST).await.unwrap();
+        peer.write_all(&OUTSTATION_REQUEST).await.unwrap();
         let mut reply = [0; 10];
         peer.read_exact(&mut reply).await.unwrap();
-        assert_eq!(reply, LINK_STATUS_RESPONSE);
+        assert_eq!(reply, MASTER_REPLY);
     }
 
     #[tokio::test(start_paused = true)]
@@ -946,7 +927,7 @@ mod tests {
                 peers.accepts(next_addr).await.duration_since(start),
                 LINK_ID_TIMEOUT
             );
-            next.write_all(&LINK_STATUS_REQUEST).await.unwrap();
+            next.write_all(&OUTSTATION_REQUEST).await.unwrap();
             assert_eq!(
                 server.events.recv().await,
                 Some(Event::AcceptLinkId(1024, 1))
@@ -979,7 +960,7 @@ mod tests {
             );
 
             // identifying the first peer frees the slot
-            first.write_all(&LINK_STATUS_REQUEST).await.unwrap();
+            first.write_all(&OUTSTATION_REQUEST).await.unwrap();
             assert_eq!(
                 server.events.recv().await,
                 Some(Event::AcceptLinkId(1024, 1))

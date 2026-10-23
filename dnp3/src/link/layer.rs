@@ -347,16 +347,11 @@ impl Layer {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::util::test_support::{ACK_FROM_OUTSTATION, MASTER_REPLY, OUTSTATION_REPLY};
 
     const MASTER: EndpointAddress = EndpointAddress::raw(1);
     const OUTSTATION: EndpointAddress = EndpointAddress::raw(1024);
 
-    const LINK_STATUS_FROM_OUTSTATION: [u8; 10] =
-        [0x05, 0x64, 0x05, 0x0B, 0x01, 0x00, 0x00, 0x04, 0x64, 0x40];
-    const ACK_FROM_OUTSTATION: [u8; 10] =
-        [0x05, 0x64, 0x05, 0x00, 0x01, 0x00, 0x00, 0x04, 0x27, 0x70];
-    const LINK_STATUS_FROM_MASTER: [u8; 10] =
-        [0x05, 0x64, 0x05, 0x8B, 0x00, 0x04, 0x01, 0x00, 0x2E, 0xF7];
     const ACK_FROM_MASTER: [u8; 10] = [0x05, 0x64, 0x05, 0x80, 0x00, 0x04, 0x01, 0x00, 0x6D, 0xC7];
 
     const BROADCASTS: [BroadcastConfirmMode; 3] = [
@@ -418,10 +413,7 @@ mod test {
             header(true, Function::PriRequestLinkStatus, OUTSTATION.wrap()),
         );
         assert_eq!(processed.info, Some(link_status_request_from(MASTER)));
-        assert_eq!(
-            processed.reply.as_deref(),
-            Some(&LINK_STATUS_FROM_OUTSTATION[..])
-        );
+        assert_eq!(processed.reply.as_deref(), Some(&OUTSTATION_REPLY[..]));
     }
 
     #[test]
@@ -443,10 +435,7 @@ mod test {
             header(false, Function::PriRequestLinkStatus, MASTER.wrap()),
         );
         assert_eq!(processed.info, Some(link_status_request_from(OUTSTATION)));
-        assert_eq!(
-            processed.reply.as_deref(),
-            Some(&LINK_STATUS_FROM_MASTER[..])
-        );
+        assert_eq!(processed.reply.as_deref(), Some(&MASTER_REPLY[..]));
     }
 
     #[test]

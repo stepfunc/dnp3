@@ -241,7 +241,7 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn tls_handshake_with_a_server_that_never_answers_times_out() {
         watchdog(async {
-            let config = client_config();
+            let config = client_config(MinTlsVersion::V12);
 
             // a server that accepts the connection and never answers the ClientHello
             let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();

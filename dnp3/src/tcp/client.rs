@@ -424,7 +424,8 @@ mod tests {
     #[cfg(feature = "enable-tls")]
     #[tokio::test]
     async fn failed_tls_handshake_notifies_connect_failed() {
-        let config = crate::util::test_support::tls::client_config();
+        let config =
+            crate::util::test_support::tls::client_config(crate::tcp::tls::MinTlsVersion::V12);
 
         // a server that closes the connection without answering the ClientHello
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();

@@ -237,7 +237,7 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn tls_handshake_that_never_starts_times_out() {
         watchdog(async {
-            let config = server_config();
+            let config = server_config(MinTlsVersion::V12);
 
             // a peer that connects and never sends its ClientHello
             let (socket, _peer) = tokio::io::duplex(PIPE);
