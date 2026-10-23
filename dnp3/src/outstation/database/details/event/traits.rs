@@ -30,9 +30,7 @@ pub(crate) trait EventVariation<T>: Copy {
     /// reporting a requested variation as is (TB2017-003a 5.1.3), so that an event without time
     /// isn't given an invented time of 0. Other events with time are written as recorded, since
     /// their timestamps carry no quality.
-    fn for_event(self, _event: &T) -> Self {
-        self
-    }
+    fn for_event(self, event: &T) -> Self;
 }
 
 /// Something done with an event, given how its variation is encoded
@@ -238,5 +236,10 @@ impl EventVariation<Box<[u8]>> for EventOctetStringVariation {
         E: Encoder<Box<[u8]>>,
     {
         encoder.octet_string()
+    }
+
+    fn for_event(self, _event: &Box<[u8]>) -> Self {
+        // octet string events have no time
+        self
     }
 }
