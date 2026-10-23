@@ -419,6 +419,26 @@ impl ReadHeader {
         ReadHeader::LimitedCount16(TwoByteLimitedCountScan::new(variation, count))
     }
 
+    fn variation(self) -> Variation {
+        match self {
+            ReadHeader::Range8(scan) => scan.variation,
+            ReadHeader::Range16(scan) => scan.variation,
+            ReadHeader::AllObjects(scan) => scan.variation,
+            ReadHeader::LimitedCount8(scan) => scan.variation,
+            ReadHeader::LimitedCount16(scan) => scan.variation,
+        }
+    }
+
+    /// The variation must name an object: `Group0(0)` writes g0v0, which names none
+    fn validate(self) -> Result<(), BadEncoding> {
+        let variation = self.variation();
+        let (group, var) = variation.to_group_and_var();
+        match Variation::lookup(group, var) {
+            Some(_) => Ok(()),
+            None => Err(BadEncoding::UndefinedVariation(variation)),
+        }
+    }
+
     pub(crate) fn format(self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         match self {
             ReadHeader::Range8(scan) => scan.write(writer),
@@ -462,7 +482,8 @@ impl Header {
 
     fn validate(&self) -> Result<(), BadEncoding> {
         match self {
-            Header::Read(_) | Header::TimeAndInterval(_) => Ok(()),
+            Header::Read(x) => x.validate(),
+            Header::TimeAndInterval(_) => Ok(()),
             Header::Attribute(x) => x.check_encodable().map_err(BadEncoding::Attribute),
         }
     }
@@ -618,17 +639,23 @@ impl ReadRequest {
         Self::MultipleHeader(headers.to_vec())
     }
 
-    pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
+    pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
         match self {
-            ReadRequest::SingleHeader(req) => req.format(writer),
-            ReadRequest::ClassScan(req) => req.write(writer),
+            ReadRequest::SingleHeader(req) => {
+                req.validate().map_err(TaskError::BadEncoding)?;
+                req.format(writer)?;
+            }
+            ReadRequest::ClassScan(req) => req.write(writer)?,
             ReadRequest::MultipleHeader(reqs) => {
+                for req in reqs {
+                    req.validate().map_err(TaskError::BadEncoding)?;
+                }
                 for req in reqs {
                     req.format(writer)?;
                 }
-                Ok(())
             }
         }
+        Ok(())
     }
 }
 
@@ -1252,6 +1279,49 @@ mod tests {
         );
     }
 
+    #[test]
+    fn read_of_group0_var0_leaves_the_cursor_untouched() {
+        const G0V0: Variation = Variation::Group0(0);
+        let expected = Err(TaskError::BadEncoding(BadEncoding::UndefinedVariation(
+            G0V0,
+        )));
+        let valid = ReadHeader::all_objects(Variation::Group60Var1);
+
+        for header in [
+            ReadHeader::all_objects(G0V0),
+            ReadHeader::one_byte_range(G0V0, 1, 2),
+            ReadHeader::two_byte_range(G0V0, 1, 2),
+            ReadHeader::one_byte_limited_count(G0V0, 1),
+            ReadHeader::two_byte_limited_count(G0V0, 1),
+        ] {
+            for request in [
+                ReadRequest::SingleHeader(header),
+                ReadRequest::multiple_headers(&[valid, header]),
+            ] {
+                let mut buffer = [0u8; 64];
+                let mut cursor = WriteCursor::new(&mut buffer);
+                cursor.write_u8(0xAA).unwrap();
+                assert_eq!(
+                    request.format(&mut HeaderWriter::new(&mut cursor)),
+                    expected,
+                    "{request:?}"
+                );
+                assert_eq!(cursor.written(), &[0xAA], "{request:?}");
+            }
+
+            let headers = Headers::new().add(valid.into()).add(header.into());
+            let mut buffer = [0u8; 64];
+            let mut cursor = WriteCursor::new(&mut buffer);
+            cursor.write_u8(0xAA).unwrap();
+            assert_eq!(
+                headers.write(&mut HeaderWriter::new(&mut cursor)),
+                expected,
+                "{header:?}"
+            );
+            assert_eq!(cursor.written(), &[0xAA], "{header:?}");
+        }
+    }
+
     mod round_trip {
         use super::*;
         use crate::app::gen::count::CountVariation;
@@ -1524,20 +1594,20 @@ mod tests {
             .concat()
         }
 
-        /// found by `read_requests_parse_to_the_headers_written`: the master writes the variation
-        /// it's given, and the outstation rejects one that isn't defined
+        /// found by `read_requests_parse_to_the_headers_written`: variation 0 names no device
+        /// attribute, so the read fails before anything is written
         #[test]
-        fn device_attribute_read_of_an_undefined_variation_is_written_as_given() {
+        fn device_attribute_read_of_variation_0_leaves_the_cursor_untouched() {
             let mut buffer = [0; 16];
             let mut cursor = WriteCursor::new(&mut buffer);
-            ReadRequest::device_attribute(0u8, AttrSet::Private(7))
-                .format(&mut HeaderWriter::new(&mut cursor))
-                .unwrap();
-            assert_eq!(cursor.written(), [0, 0, 0x00, 7, 7]);
             assert_eq!(
-                parse_read(cursor.written()),
-                Err(ObjectParseError::UnknownGroupVariation(0, 0))
+                ReadRequest::device_attribute(0u8, AttrSet::Private(7))
+                    .format(&mut HeaderWriter::new(&mut cursor)),
+                Err(TaskError::BadEncoding(BadEncoding::UndefinedVariation(
+                    Variation::Group0(0)
+                )))
             );
+            assert_eq!(cursor.written(), [0u8; 0]);
         }
 
         proptest! {
@@ -1545,13 +1615,25 @@ mod tests {
 
             /// A READ request is written as its headers, and the outstation parses each header
             /// back to what was written, alone or together, unless a READ doesn't accept the
-            /// variation with that qualifier
+            /// variation with that qualifier. A request with a header for g0v0, which names no
+            /// object, writes nothing
             #[test]
             fn read_requests_parse_to_the_headers_written(request in read_request()) {
                 let mut buffer = [0; 256];
                 let mut cursor = WriteCursor::new(&mut buffer);
-                request.format(&mut HeaderWriter::new(&mut cursor)).unwrap();
+                let result = request.format(&mut HeaderWriter::new(&mut cursor));
                 let model = model_request(&request);
+                if model.iter().any(|(group_var, _)| *group_var == (0, 0)) {
+                    prop_assert_eq!(
+                        result,
+                        Err(TaskError::BadEncoding(BadEncoding::UndefinedVariation(
+                            Variation::Group0(0)
+                        )))
+                    );
+                    prop_assert_eq!(cursor.written(), &[0u8; 0]);
+                    return Ok(());
+                }
+                prop_assert_eq!(result, Ok(()));
                 let written = cursor.written();
                 prop_assert_eq!(written, model.iter().flat_map(model_bytes).collect::<Vec<u8>>());
 

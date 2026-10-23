@@ -21,7 +21,7 @@ use oo_bindgen::model::{BackTraced, EnumHandle, LibraryBuilder};
 pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
     let variation = lib
         .define_enum("variation")?
-        .push("group0", "Device Attributes - Specific attribute (variations 1 to 253 and 255)")?
+        .push("group0", "Device Attributes - Specific attribute (variations 1 to 253 and 255). Only reported in {struct:header_info}: it can't name the attribute, so a request that uses it fails with {enum:read_error.bad_encoding}. Read a specific attribute with {class:request.add_specific_attribute()} and all of them with {enum:variation.group0_var254}")?
         .push("group0_var254", "Device Attributes - All attributes request")?
         .push("group1_var0", "Binary Input - Any variation")?
         .push("group1_var1", "Binary Input - Packed format")?

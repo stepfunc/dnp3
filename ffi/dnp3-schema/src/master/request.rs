@@ -137,7 +137,7 @@ pub(crate) fn define(
         .param(
             "variation",
             Primitive::U8,
-            "Variation of the device attribute",
+            "Variation of the device attribute, 1 to 255 (254 reads every attribute of the set)",
         )?
         .param(
             "set",

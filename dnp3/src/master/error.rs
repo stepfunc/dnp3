@@ -8,7 +8,7 @@ use std::error::Error;
 
 use crate::app::control::{CommandStatus, ControlCode};
 use crate::app::{Iin, Iin2};
-use crate::app::{ObjectParseError, ParseErrorCause, Shutdown};
+use crate::app::{ObjectParseError, ParseErrorCause, Shutdown, Variation};
 use crate::link::error::LinkError;
 use crate::link::EndpointAddress;
 use crate::master::association::NoAssociation;
@@ -47,6 +47,8 @@ pub enum BadEncoding {
     Attribute(BadAttribute),
     /// Control code whose fields encode to a byte that parses back to a different control code
     ControlCode(ControlCode),
+    /// Variation that names no object, such as group 0 variation 0, which a READ can't request
+    UndefinedVariation(Variation),
 }
 
 impl std::fmt::Display for BadEncoding {
@@ -55,6 +57,9 @@ impl std::fmt::Display for BadEncoding {
             BadEncoding::Attribute(x) => write!(f, "Bad attribute encoding: {x}"),
             BadEncoding::ControlCode(x) => {
                 write!(f, "Control code does not encode to the same value: {x}")
+            }
+            BadEncoding::UndefinedVariation(x) => {
+                write!(f, "{x} is not a defined object variation")
             }
         }
     }

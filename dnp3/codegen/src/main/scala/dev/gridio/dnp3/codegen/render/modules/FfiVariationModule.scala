@@ -42,6 +42,16 @@ private object FfiVariation {
     if (hasPayload(v)) v.parent.name else v.name
   }
 
+  /**
+   * The documentation of an FFI value. The specific attribute can't carry its variation, so it can
+   * only be reported, never used to build a request
+   */
+  def schemaDoc(v: Variation): String = v match {
+    case SpecificAttribute =>
+      s"${v.fullDesc}. Only reported in {struct:header_info}: it can't name the attribute, so a request that uses it fails with {enum:read_error.bad_encoding}. Read a specific attribute with {class:request.add_specific_attribute()} and all of them with {enum:variation.group0_var254}"
+    case _ => v.fullDesc
+  }
+
   def ffiValue(v: Variation): String = s"ffi::Variation::${variantName(v)}"
 
   /**
@@ -69,7 +79,7 @@ object FfiVariationSchemaModule extends Module {
       indent {
         ".define_enum(\"variation\")?".eol ++
         FfiVariation.all.iterator.flatMap { v =>
-          s".push(${quoted(FfiVariation.schemaName(v))}, ${quoted(v.fullDesc)})?".eol
+          s".push(${quoted(FfiVariation.schemaName(v))}, ${quoted(FfiVariation.schemaDoc(v))})?".eol
         } ++
         ".doc(\"Group/Variation\")?".eol ++
         ".build()?;".eol
