@@ -17,21 +17,20 @@ use crate::app::{BufferSize, ControlField, FunctionCode, Iin, ResponseFunction, 
 use crate::decode::AppDecodeLevel;
 use crate::link::reader::LinkModes;
 use crate::link::{EndpointAddress, LinkError, LinkErrorMode};
-use crate::master::association::{Association, AssociationConfig, AssociationMap};
+use crate::master::association::{AssociationConfig, AssociationMap};
 use crate::master::promise::Promise;
 use crate::master::task::MasterTask;
 use crate::master::tasks::command_no_ack::CommandNoAckTask;
 use crate::master::tasks::read::SingleReadTask;
+use crate::master::test_fixtures::{association, null};
 use crate::master::tests::harness::requests::{empty_response, unsol_confirm, unsol_with_data};
-use crate::master::tests::harness::{create_association, AssocInfoEvent, TestHarness};
+use crate::master::tests::harness::{create_association, AssocInfoEvent, ReadEvent, TestHarness};
 use crate::master::Classes;
 use crate::master::{
-    AssociationHandle, AssociationHandler, AssociationInformation, BadEncoding, CommandBuilder,
-    CommandError, CommandHeaders, CommandMode, CommandSupport, MasterChannel, MasterChannelConfig,
-    MasterChannelType, ReadHandler, ReadRequest, TaskError, TaskType,
+    AssociationHandle, BadEncoding, CommandBuilder, CommandError, CommandHeaders, CommandMode,
+    CommandSupport, MasterChannel, MasterChannelConfig, MasterChannelType, ReadRequest, TaskError,
+    TaskType,
 };
-use crate::transport::FragmentAddr;
-use crate::util::phys::PhysAddr;
 use crate::util::session::{Enabled, RunError};
 use crate::util::test_support::watchdog;
 
@@ -68,7 +67,6 @@ fn class_scan_request(seq: Sequence) -> Vec<u8> {
 }
 
 async fn quiet_association() -> TestHarness {
-    tokio::time::pause();
     create_association(AssociationConfig::quiet()).await
 }
 
@@ -101,12 +99,7 @@ async fn queue_no_ack(
     rx
 }
 
-/// Every message sent before this returns has been processed by the master task
-async fn barrier(harness: &mut TestHarness) {
-    harness.master.get_decode_level().await.unwrap();
-}
-
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn operate_no_ack_sends_function_code_6_and_completes_without_response() {
     watchdog(async {
         let mut harness = quiet_association().await;
@@ -131,7 +124,7 @@ async fn operate_no_ack_sends_function_code_6_and_completes_without_response() {
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn operate_no_ack_does_not_delay_the_next_task() {
     watchdog(async {
         let mut harness = quiet_association().await;
@@ -180,7 +173,7 @@ async fn operate_no_ack_does_not_delay_the_next_task() {
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn queued_tasks_run_back_to_back_after_operate_no_ack_and_ignore_its_sequence() {
     watchdog(async {
         let mut harness = quiet_association().await;
@@ -196,7 +189,7 @@ async fn queued_tasks_run_back_to_back_after_operate_no_ack_and_ignore_its_seque
             ))
             .await
             .unwrap();
-        barrier(&mut harness).await;
+        harness.barrier().await;
 
         let start = Instant::now();
         harness
@@ -228,10 +221,9 @@ async fn queued_tasks_run_back_to_back_after_operate_no_ack_and_ignore_its_seque
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn requests_beyond_the_queue_limit_fail_with_too_many_requests() {
     watchdog(async {
-        tokio::time::pause();
         let config = AssociationConfig {
             max_queued_user_requests: 1,
             ..AssociationConfig::quiet()
@@ -256,7 +248,7 @@ async fn requests_beyond_the_queue_limit_fail_with_too_many_requests() {
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn response_to_operate_no_ack_while_idle_is_ignored() {
     watchdog(async {
         let mut harness = quiet_association().await;
@@ -270,7 +262,7 @@ async fn response_to_operate_no_ack_while_idle_is_ignored() {
         harness
             .process_response(empty_response(Sequence::new(0)))
             .await;
-        barrier(&mut harness).await;
+        harness.barrier().await;
         harness.assert_no_events();
         assert_eq!(harness.assoc_events.pop(), Vec::new());
 
@@ -282,7 +274,7 @@ async fn response_to_operate_no_ack_while_idle_is_ignored() {
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn unsolicited_response_is_processed_after_a_queued_batch_drains() {
     watchdog(async {
         let mut harness = quiet_association().await;
@@ -292,7 +284,7 @@ async fn unsolicited_response_is_processed_after_a_queued_batch_drains() {
         for _ in 0..3 {
             batch.push(queue_no_ack(&mut harness).await);
         }
-        barrier(&mut harness).await;
+        harness.barrier().await;
 
         // the unsolicited response is already waiting when the batch starts
         harness.io.read(&command_response(Sequence::new(0)));
@@ -313,12 +305,12 @@ async fn unsolicited_response_is_processed_after_a_queued_batch_drains() {
 
         assert_eq!(harness.io.next_event().await, Event::Read);
         harness.expect_write(unsol_confirm(Sequence::new(0))).await;
-        assert_eq!(harness.num_requests(), 1);
+        assert_eq!(harness.read_events.count(ReadEvent::AnalogInput), 1);
     })
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn operate_no_ack_fails_if_the_write_fails() {
     watchdog(async {
         let mut harness = quiet_association().await;
@@ -341,7 +333,7 @@ async fn operate_no_ack_fails_if_the_write_fails() {
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn operate_no_ack_fails_if_the_request_does_not_fit() {
     watchdog(async {
         let mut harness = quiet_association().await;
@@ -366,14 +358,14 @@ async fn operate_no_ack_fails_if_the_request_does_not_fit() {
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn queued_operate_no_ack_fails_when_the_channel_is_disabled() {
     watchdog(async {
         let mut harness = quiet_association().await;
         let blocker = start_blocker(&mut harness, Sequence::new(0)).await;
 
         let no_ack = queue_no_ack(&mut harness).await;
-        barrier(&mut harness).await;
+        harness.barrier().await;
         harness.master.disable().await.unwrap();
 
         assert_eq!(no_ack.await.unwrap(), Err(TaskError::Disabled));
@@ -383,27 +375,13 @@ async fn queued_operate_no_ack_fails_when_the_channel_is_disabled() {
     .await;
 }
 
-struct NullHandler;
-impl ReadHandler for NullHandler {}
-impl AssociationHandler for NullHandler {}
-impl AssociationInformation for NullHandler {}
-
 #[tokio::test]
 async fn operate_no_ack_fails_without_a_connection() {
     watchdog(async {
         let address = EndpointAddress::try_new(1024).unwrap();
         let mut associations = AssociationMap::new();
         associations
-            .register(Association::new(
-                FragmentAddr {
-                    link: address,
-                    phys: PhysAddr::None,
-                },
-                AssociationConfig::quiet(),
-                Box::new(NullHandler),
-                Box::new(NullHandler),
-                Box::new(NullHandler),
-            ))
+            .register(association(address, AssociationConfig::quiet(), null()))
             .unwrap();
 
         let (tx, rx) = crate::util::channel::request_channel();
@@ -492,7 +470,7 @@ fn requests_containing(bad: ControlCode) -> [CommandHeaders; 7] {
     ]
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn non_canonical_control_codes_are_rejected_before_anything_is_sent() {
     watchdog(async {
         let mut harness = quiet_association().await;

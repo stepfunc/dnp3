@@ -4,8 +4,9 @@
 // Text and data mining rights, including for AI training, are reserved under
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
-use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
+use std::time::Duration;
+
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
 
@@ -18,6 +19,7 @@ use crate::link::reader::LinkModes;
 use crate::link::{EndpointAddress, LinkErrorMode};
 use crate::master::association::{AssociationConfig, AssociationMap};
 use crate::master::task::MasterTask;
+use crate::master::test_fixtures::null;
 use crate::master::{AssociationHandle, MasterChannel, ReadHandler, ReadType};
 use crate::master::{
     AssociationHandler, AssociationInformation, HeaderInfo, MasterChannelConfig, MasterChannelType,
@@ -29,11 +31,8 @@ use crate::util::session::{Enabled, RunError};
 
 pub(crate) mod requests;
 
-struct DefaultAssociationHandler;
-impl AssociationHandler for DefaultAssociationHandler {}
-
 pub(crate) async fn create_association(config: AssociationConfig) -> TestHarness {
-    create_association_with_handler(config, Box::new(DefaultAssociationHandler)).await
+    create_association_with_handler(config, null()).await
 }
 
 pub(crate) async fn create_association_with_handler(
@@ -46,7 +45,7 @@ pub(crate) async fn create_association_with_handler(
 /// Like [`create_association`], but [`TestHarness::run_again`] can run the master again after a run
 /// ends
 pub(crate) async fn create_rerunnable_association(config: AssociationConfig) -> TestHarness {
-    create(config, Box::new(DefaultAssociationHandler), true).await
+    create(config, null(), true).await
 }
 
 /// Run the master on a new mock I/O, first waiting while it's disabled as the channel does. When
@@ -119,9 +118,8 @@ async fn create(
     let (master_task, io_handle) = spawn_run(task, keep);
 
     // Create the association
-    let handler = CountHandler::new();
+    let handler = ReadEventHandler::new();
     let (info, assoc_events) = AssociationInformationEventHandler::pair();
-    let num_requests = handler.num_requests.clone();
     let read_events = handler.events();
 
     let association = master
@@ -139,7 +137,6 @@ async fn create(
         task: master_task,
         master,
         association,
-        num_requests,
         assoc_events,
         read_events,
         io: io_handle,
@@ -167,17 +164,27 @@ impl ReadEventQueue {
         let mut guard = self.0.lock().unwrap();
         guard.drain(..).collect()
     }
+
+    /// How many of the callbacks received since the last [`Self::pop`] are `event`, leaving them
+    /// in the queue
+    pub(crate) fn count(&self, event: ReadEvent) -> usize {
+        self.0
+            .lock()
+            .unwrap()
+            .iter()
+            .filter(|x| **x == event)
+            .count()
+    }
 }
 
-pub(crate) struct CountHandler {
-    num_requests: Arc<AtomicU64>,
+/// Records each ReadHandler callback as a [`ReadEvent`]
+pub(crate) struct ReadEventHandler {
     events: Arc<Mutex<Vec<ReadEvent>>>,
 }
 
-impl CountHandler {
+impl ReadEventHandler {
     pub(crate) fn new() -> Self {
         Self {
-            num_requests: Arc::new(AtomicU64::new(0)),
             events: Default::default(),
         }
     }
@@ -191,7 +198,7 @@ impl CountHandler {
     }
 }
 
-impl ReadHandler for CountHandler {
+impl ReadHandler for ReadEventHandler {
     fn begin_fragment(&mut self, read_type: ReadType, _header: ResponseHeader) -> MaybeAsync<()> {
         self.push(ReadEvent::BeginFragment(read_type));
         MaybeAsync::ready(())
@@ -223,7 +230,6 @@ impl ReadHandler for CountHandler {
         _info: HeaderInfo,
         _iter: &mut dyn Iterator<Item = (crate::app::measurement::AnalogInput, u16)>,
     ) {
-        self.num_requests.fetch_add(1, Ordering::SeqCst);
         self.push(ReadEvent::AnalogInput);
     }
 
@@ -308,7 +314,6 @@ pub(crate) struct TestHarness {
     pub(crate) task: JoinHandle<RunError>,
     pub(crate) master: MasterChannel,
     pub(crate) association: AssociationHandle,
-    pub(crate) num_requests: Arc<AtomicU64>,
     pub(crate) assoc_events: AssocInfoEventQueue,
     pub(crate) read_events: ReadEventQueue,
     pub(crate) io: sfio_tokio_mock_io::Handle,
@@ -385,7 +390,38 @@ impl TestHarness {
         );
     }
 
-    pub(crate) fn num_requests(&self) -> u64 {
-        self.num_requests.fetch_add(0, Ordering::Relaxed)
+    /// Every message sent before this returns has been processed by the master task
+    pub(crate) async fn barrier(&mut self) {
+        barrier(&mut self.master).await;
     }
+
+    /// Nothing happens on the mock I/O for `duration`
+    pub(crate) async fn expect_idle_for(&mut self, duration: Duration) {
+        expect_idle_for(&mut self.io, duration).await;
+    }
+
+    /// Expect the master to write `expected` within 5 seconds
+    pub(crate) async fn expect_write_soon(&mut self, expected: Vec<u8>) {
+        self.expect_write_within(Duration::from_secs(5), expected)
+            .await;
+    }
+
+    /// Expect the master to write `expected` within `duration`, failing instead of waiting forever
+    /// if it never does
+    pub(crate) async fn expect_write_within(&mut self, duration: Duration, expected: Vec<u8>) {
+        tokio::time::timeout(duration, self.expect_write(expected))
+            .await
+            .expect("the master did not send the request");
+    }
+}
+
+/// Every message sent to `master` before this returns has been processed by the master task
+pub(crate) async fn barrier(master: &mut MasterChannel) {
+    master.get_decode_level().await.unwrap();
+}
+
+/// Nothing happens on `io` for `duration`
+pub(crate) async fn expect_idle_for(io: &mut sfio_tokio_mock_io::Handle, duration: Duration) {
+    let next = tokio::time::timeout(duration, io.next_event()).await;
+    assert_eq!(next.ok(), None);
 }

@@ -29,13 +29,14 @@ use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::time::PendingTimeSync;
 use crate::master::tasks::Task;
+use crate::master::test_fixtures::FixedTime;
 use crate::master::tests::file::{
     file_status_response, file_transport_response, last_block, response as file_response,
     ReaderEvent, RecordingReader,
 };
 use crate::master::tests::harness::requests::{
-    disable_unsol_request, empty_response, empty_response_custom_iin, integrity_poll_request,
-    solicited_confirm, unsol_confirm, unsol_with_data, with_con,
+    analog_event, disable_unsol_request, empty_response, empty_response_custom_iin,
+    integrity_poll_request, response, solicited_confirm, unsol_confirm, unsol_with_data, with_con,
 };
 use crate::master::tests::harness::{
     create_association, create_association_with_handler, AssocInfoEvent, ReadEvent, TestHarness,
@@ -58,19 +59,6 @@ pub(super) const UNKNOWN: EndpointAddress = EndpointAddress::raw(3000);
 const HANDLE: u32 = 0xDEADCAFE;
 
 const REJECTED: Iin = Iin::new(Iin1::new(0x00), Iin2::NO_FUNC_CODE_SUPPORT);
-
-/// Every message sent before this returns has been processed by the master task
-async fn barrier(harness: &mut TestHarness) {
-    harness.master.get_decode_level().await.unwrap();
-}
-
-pub(super) struct FixedTime;
-
-impl AssociationHandler for FixedTime {
-    fn get_current_time(&self) -> Option<Timestamp> {
-        Some(Timestamp::new(1_700_000_000_000))
-    }
-}
 
 fn crob() -> CommandHeaders {
     CommandBuilder::single_header_u16(Group12Var1::from_op_type(OpType::LatchOn), 3)
@@ -467,7 +455,7 @@ impl Started {
     async fn expect_failure(&mut self, err: TaskError) {
         let kind = self.kind;
         assert_eq!(self.reply().await, kind.failed(err), "{kind:?}");
-        barrier(&mut self.harness).await;
+        self.harness.barrier().await;
         assert_eq!(
             self.harness.assoc_events.pop(),
             [kind.failure_event(err)],
@@ -479,7 +467,7 @@ impl Started {
     /// Check that the task is still waiting for its response, and nothing was written
     async fn expect_waiting(&mut self) {
         let kind = self.kind;
-        barrier(&mut self.harness).await;
+        self.harness.barrier().await;
         assert!(!self.reply.is_finished(), "{kind:?}");
         assert_eq!(self.harness.io.pop_event(), None, "{kind:?}");
         assert_eq!(self.harness.assoc_events.pop(), [], "{kind:?}");
@@ -496,7 +484,7 @@ impl Started {
         let request = self.request.clone();
         let last = kind.finish(&mut self.harness, &request, con).await;
         assert_eq!(self.reply().await, kind.ok(), "{kind:?}");
-        barrier(&mut self.harness).await;
+        self.harness.barrier().await;
         assert_eq!(
             self.harness.assoc_events.pop(),
             [kind.success_event(last)],
@@ -590,7 +578,7 @@ async fn every_task_fails_on_a_response_with_unexpected_objects() {
                     _ => kind.failed(unexpected),
                 };
                 assert_eq!(started.reply().await, reply, "{kind:?} con: {con}");
-                barrier(&mut started.harness).await;
+                started.harness.barrier().await;
                 assert_eq!(
                     started.harness.assoc_events.pop(),
                     [kind.failure_event(unexpected)],
@@ -610,7 +598,7 @@ async fn every_task_confirms_responses_with_con_before_its_next_request() {
             for kind in KINDS {
                 let mut started = start(kind).await;
                 started.expect_success_with(con).await;
-                barrier(&mut started.harness).await;
+                started.harness.barrier().await;
                 assert_eq!(started.harness.io.pop_event(), None, "{kind:?} con: {con}");
             }
         }
@@ -672,7 +660,7 @@ async fn every_single_header_task_fails_on_a_response_with_two_headers() {
                     kind.failed(err),
                     "{kind:?} con: {con}"
                 );
-                barrier(&mut started.harness).await;
+                started.harness.barrier().await;
                 assert_eq!(
                     started.harness.assoc_events.pop(),
                     [kind.failure_event(err)],
@@ -737,7 +725,7 @@ async fn malformed_fragments_from_other_outstations_do_not_extend_any_task_deadl
             let err = TaskError::ResponseTimeout;
             assert_eq!(started.reply().await, kind.failed(err), "{kind:?}");
             assert_eq!(now.elapsed(), Duration::from_secs(1), "{kind:?}");
-            barrier(&mut started.harness).await;
+            started.harness.barrier().await;
             assert_eq!(
                 started.harness.assoc_events.pop(),
                 [kind.failure_event(err)],
@@ -816,7 +804,7 @@ async fn every_task_fails_with_a_link_error_when_the_connection_drops() {
                 ))
                 .await
                 .unwrap();
-            barrier(&mut started.harness).await;
+            started.harness.barrier().await;
 
             started.harness.io.read_error(ErrorKind::ConnectionReset);
             assert_eq!(
@@ -895,7 +883,7 @@ async fn running_and_queued_tasks_complete_their_promises_on_shutdown() {
             )
             .await
             .unwrap();
-        barrier(&mut harness).await;
+        harness.barrier().await;
 
         drop(harness.association);
         drop(harness.master);
@@ -991,11 +979,11 @@ async fn queued_tasks_fail_with_no_such_association_when_the_association_is_remo
             )
             .await
             .unwrap();
-        barrier(&mut harness).await;
+        harness.barrier().await;
         harness.assoc_events.pop();
 
         harness.master.remove_association(OUTSTATION).await.unwrap();
-        barrier(&mut harness).await;
+        harness.barrier().await;
 
         let err = TaskError::NoSuchAssociation(OUTSTATION);
         assert_eq!(queued_command.await, Ok(Err(CommandError::Task(err))));
@@ -1011,7 +999,7 @@ async fn queued_tasks_fail_with_no_such_association_when_the_association_is_remo
 
         // the reader isn't told again once the running task ends
         tokio::time::sleep(Duration::from_secs(2)).await;
-        barrier(&mut harness).await;
+        harness.barrier().await;
         assert_eq!(reader.pop(), []);
         assert!(!harness.task.is_finished());
     })
@@ -1031,7 +1019,7 @@ async fn every_task_fails_with_no_such_association_when_removed_while_it_waits()
                     .remove_association(OUTSTATION)
                     .await
                     .unwrap();
-                barrier(&mut started.harness).await;
+                started.harness.barrier().await;
                 let response = kind.first_response(&started.request);
                 let response = if con { with_con(response) } else { response };
                 respond(&mut started.harness, response).await;
@@ -1042,7 +1030,7 @@ async fn every_task_fails_with_no_such_association_when_removed_while_it_waits()
                     kind.failed(err),
                     "{kind:?} con: {con}"
                 );
-                barrier(&mut started.harness).await;
+                started.harness.barrier().await;
                 assert_eq!(started.harness.read_events.pop(), [], "{kind:?} con: {con}");
                 assert_eq!(
                     started.harness.assoc_events.pop(),
@@ -1070,7 +1058,7 @@ async fn requests_to_a_removed_association_fail_with_no_such_association() {
             } else {
                 harness.master.remove_association(OUTSTATION).await.unwrap();
             }
-            barrier(&mut harness).await;
+            harness.barrier().await;
 
             let err = TaskError::NoSuchAssociation(OUTSTATION);
             for kind in KINDS {
@@ -1213,7 +1201,7 @@ async fn every_task_processes_and_confirms_unsolicited_responses_while_waiting()
             let harness = &mut started.harness;
             respond(harness, unsol_with_data(Sequence::new(5), 7, false)).await;
             harness.expect_write(unsol_confirm(Sequence::new(5))).await;
-            barrier(harness).await;
+            harness.barrier().await;
             assert_eq!(
                 harness.read_events.pop(),
                 [
@@ -1357,22 +1345,11 @@ impl AssociationInformation for Log {
 
 /// A read response fragment with one analog input event
 fn read_fragment(seq: Sequence, fir: bool, fin: bool, con: bool) -> Vec<u8> {
-    let control = (u8::from(fir) << 7) | (u8::from(fin) << 6) | (u8::from(con) << 5);
-    // g32v2, 1-byte count and prefix, one event at index 0 with value 7
-    vec![
-        control | seq.value(),
-        0x81,
-        0x00,
-        0x00,
-        32,
-        2,
-        0x17,
-        1,
-        0,
-        0x01,
-        7,
-        0,
-    ]
+    response(
+        ControlField::response(seq, fir, fin, con),
+        Iin::default(),
+        &analog_event(0x01, 7),
+    )
 }
 
 #[tokio::test(start_paused = true)]
@@ -1595,10 +1572,9 @@ async fn automatic_tasks_fail_with_shutdown_when_the_master_shuts_down() {
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn writing_an_attribute_whose_variation_cannot_carry_a_value_sends_nothing() {
     watchdog(async {
-        tokio::time::pause();
         let mut harness = create_association(AssociationConfig::quiet()).await;
 
         for variation in [

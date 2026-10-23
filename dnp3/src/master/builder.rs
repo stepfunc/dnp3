@@ -503,6 +503,7 @@ mod tests {
     use crate::app::MaybeAsync;
     use crate::master::messages::{AssociationMsgType, Message};
     use crate::master::poll::PollMsg;
+    use crate::master::test_fixtures::null;
     use std::marker::PhantomData;
 
     struct ChannelListener<T> {
@@ -551,15 +552,6 @@ mod tests {
         }
     }
 
-    struct NullReadHandler;
-    impl ReadHandler for NullReadHandler {}
-
-    struct NullAssociationHandler;
-    impl AssociationHandler for NullAssociationHandler {}
-
-    struct NullAssociationInformation;
-    impl AssociationInformation for NullAssociationInformation {}
-
     fn endpoint(value: u16) -> EndpointAddress {
         EndpointAddress::try_new(value).unwrap()
     }
@@ -568,13 +560,7 @@ mod tests {
         builder: &mut MasterBuilder,
         address: EndpointAddress,
     ) -> Result<AssociationBuilder<'_>, AssociationError> {
-        builder.add_association(
-            address,
-            AssociationConfig::quiet(),
-            Box::new(NullReadHandler),
-            Box::new(NullAssociationHandler),
-            Box::new(NullAssociationInformation),
-        )
+        builder.add_association(address, AssociationConfig::quiet(), null(), null(), null())
     }
 
     #[tokio::test]

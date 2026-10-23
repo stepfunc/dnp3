@@ -35,11 +35,6 @@ fn read_config() -> FileReadConfig {
     }
 }
 
-/// Every message sent before this returns has been processed by the master task
-async fn barrier(harness: &mut TestHarness) {
-    harness.master.get_decode_level().await.unwrap();
-}
-
 async fn start_read(
     harness: &mut TestHarness,
     config: FileReadConfig,
@@ -174,7 +169,7 @@ enum Finished {
 /// Check that the read task, whose first request had function code `first`, finished this way and
 /// that the master kept running
 async fn expect_finished(harness: &mut TestHarness, first: FunctionCode, finished: Finished) {
-    barrier(harness).await;
+    harness.barrier().await;
     let last = match finished {
         Finished::Success(seq) => {
             AssocInfoEvent::TaskSuccess(TaskType::FileRead, first, Sequence::new(seq))
@@ -659,10 +654,10 @@ async fn interrupted_file_read_fails_the_task_and_tells_the_reader_once_without_
                 let err = match interruption {
                     Interruption::Timeout => {
                         tokio::time::sleep(Duration::from_millis(999)).await;
-                        barrier(&mut harness).await;
+                        harness.barrier().await;
                         assert_eq!(reader.pop(), [], "{waiting:?}");
                         tokio::time::sleep(Duration::from_millis(2)).await;
-                        barrier(&mut harness).await;
+                        harness.barrier().await;
                         TaskError::ResponseTimeout
                     }
                     Interruption::RejectedByIin2 => {
@@ -672,12 +667,12 @@ async fn interrupted_file_read_fails_the_task_and_tells_the_reader_once_without_
                                 REJECTED,
                             ))
                             .await;
-                        barrier(&mut harness).await;
+                        harness.barrier().await;
                         TaskError::RejectedByIin2(REJECTED)
                     }
                     Interruption::Malformed(fragment) => {
                         harness.process_response(fragment.to_vec()).await;
-                        barrier(&mut harness).await;
+                        harness.barrier().await;
                         TaskError::Transport
                     }
                     Interruption::Disabled => {
@@ -847,7 +842,7 @@ async fn directory_read_cleanup_that_fails_keeps_the_original_error() {
                         .await;
                     TaskError::UnexpectedResponseHeaders
                 };
-                barrier(&mut harness).await;
+                harness.barrier().await;
                 assert_eq!(
                     harness.assoc_events.pop(),
                     [

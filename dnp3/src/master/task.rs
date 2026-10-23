@@ -150,7 +150,7 @@ struct MasterSession {
 
 /// What the fragments of a read reported and delivered, which decides its outcome when it completes
 #[derive(Default)]
-struct ReadOutcome {
+pub(crate) struct ReadOutcome {
     /// the IIN2.0, IIN2.1 and IIN2.2 bits of every fragment
     errors: Iin2,
     /// the IIN1 bits of the last fragment
@@ -160,7 +160,7 @@ struct ReadOutcome {
 }
 
 impl ReadOutcome {
-    fn add(&mut self, iin: Iin, delivered: Delivered) {
+    pub(crate) fn add(&mut self, iin: Iin, delivered: Delivered) {
         self.errors |= iin.bad_request_errors();
         self.iin1 = iin.iin1;
         self.delivered.merge(delivered);
@@ -168,12 +168,12 @@ impl ReadOutcome {
 
     /// True if the read returned events, and no fragment reported an IIN2 request error
     /// (IIN2.0 to IIN2.2), so the outstation didn't reject any part of the request
-    fn events_without_request_errors(&self) -> bool {
+    pub(crate) fn events_without_request_errors(&self) -> bool {
         self.delivered.events && self.errors == Iin2::default()
     }
 
     /// A read with errors still succeeds if it delivered data, or if it's an automatic task
-    fn result(&self, task: &ReadTask) -> Result<(), TaskError> {
+    pub(crate) fn result(&self, task: &ReadTask) -> Result<(), TaskError> {
         if self.errors == Iin2::default() {
             return Ok(());
         }

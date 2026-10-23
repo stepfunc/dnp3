@@ -4,7 +4,6 @@
 // Text and data mining rights, including for AI training, are reserved under
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
-use std::sync::atomic::Ordering;
 use std::time::Duration;
 
 use crate::app::Sequence;
@@ -12,7 +11,7 @@ use crate::app::{FunctionCode, RetryStrategy};
 use crate::app::{Iin, Iin1, Iin2};
 use crate::master::association::AssociationConfig;
 use crate::master::request::{Classes, EventClasses};
-use crate::master::tests::harness::AssocInfoEvent;
+use crate::master::tests::harness::{AssocInfoEvent, ReadEvent};
 use crate::master::{ReadRequest, TaskError, TaskType};
 use crate::util::test_support::watchdog;
 
@@ -129,7 +128,7 @@ async fn automatic_tasks_confirm_responses_with_con_before_the_next_request() {
             .expect_write_and_respond(enable_unsol_request(seq), empty_response(seq.increment()))
             .await;
 
-        harness.master.get_decode_level().await.unwrap();
+        harness.barrier().await;
         harness.assert_no_events();
     })
     .await;
@@ -366,7 +365,7 @@ async fn detect_restart_in_read_response() {
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn ignore_unsolicited_response_with_data_before_first_integrity_poll() {
     watchdog(async {
         let config = AssociationConfig::default();
@@ -400,9 +399,7 @@ async fn ignore_unsolicited_response_with_data_before_first_integrity_poll() {
             .await;
 
         // DO NOT CONFIRM AND IGNORE PAYLOAD
-        assert_eq!(harness.num_requests.fetch_add(0, Ordering::Relaxed), 0);
-
-        tokio::time::pause(); // auto advance time
+        assert_eq!(harness.read_events.count(ReadEvent::AnalogInput), 0);
         harness
             .expect_write_and_respond(clear_restart_iin(seq), empty_response(seq.increment()))
             .await;

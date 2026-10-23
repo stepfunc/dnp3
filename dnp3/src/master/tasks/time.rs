@@ -302,15 +302,9 @@ mod tests {
     use crate::link::EndpointAddress;
     use crate::master::handler::AssociationHandler;
     use crate::master::tasks::RequestWriter;
-    use crate::master::{AssociationConfig, AssociationInformation, ReadHandler};
+    use crate::master::test_fixtures::association;
+    use crate::master::AssociationConfig;
 
-    struct NullReadHandler;
-    impl ReadHandler for NullReadHandler {}
-    struct NullAssociationInformation;
-    impl AssociationInformation for NullAssociationInformation {}
-
-    use crate::transport::FragmentAddr;
-    use crate::util::phys::PhysAddr;
     use scursor::WriteCursor;
 
     use super::*;
@@ -392,18 +386,11 @@ mod tests {
         Association,
         tokio::sync::oneshot::Receiver<Result<(), TimeSyncError>>,
     ) {
-        let dest = FragmentAddr {
-            link: EndpointAddress::try_new(1).unwrap(),
-            phys: PhysAddr::None,
-        };
-
         let system_time = Timestamp::try_from_system_time(SystemTime::now()).unwrap();
-        let association = Association::new(
-            dest,
+        let association = association(
+            EndpointAddress::try_new(1).unwrap(),
             AssociationConfig::default(),
-            Box::new(NullReadHandler),
             handler(system_time),
-            Box::new(NullAssociationInformation),
         );
         let (promise, rx) = Promise::one_shot();
         let task = PendingTimeSync::user(procedure, promise);

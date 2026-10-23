@@ -20,15 +20,15 @@ use crate::link::test_data;
 use crate::link::{EndpointAddress, LinkErrorMode};
 use crate::master::association::AssociationConfig;
 use crate::master::task::MasterTask;
+use crate::master::test_fixtures::null;
 use crate::master::tests::harness::requests::{empty_response, unsol_null, unsol_with_data};
 use crate::master::tests::harness::{
-    AssocInfoEvent, AssocInfoEventQueue, AssociationInformationEventHandler, CountHandler,
-    ReadEvent,
+    barrier, AssocInfoEvent, AssocInfoEventQueue, AssociationInformationEventHandler, ReadEvent,
+    ReadEventHandler,
 };
 use crate::master::{
-    AssociationHandle, AssociationHandler, AssociationInformation, Classes, MasterChannel,
-    MasterChannelConfig, MasterChannelType, ReadHandler, ReadRequest, ReadType, TaskError,
-    TaskType,
+    AssociationHandle, AssociationInformation, Classes, MasterChannel, MasterChannelConfig,
+    MasterChannelType, ReadRequest, ReadType, TaskError, TaskType,
 };
 use crate::util::phys::PhysLayer;
 use crate::util::session::{Enabled, RunError};
@@ -75,11 +75,6 @@ pub(super) fn app_data(frame: &[u8]) -> &[u8] {
     // 10 header bytes, the transport header, then the data and its 2-byte CRC
     &frame[11..frame.len().saturating_sub(2)]
 }
-
-pub(super) struct NullHandler;
-impl ReadHandler for NullHandler {}
-impl AssociationHandler for NullHandler {}
-impl AssociationInformation for NullHandler {}
 
 struct Harness {
     task: JoinHandle<RunError>,
@@ -139,11 +134,6 @@ impl Harness {
         self.io.read(data);
         assert_eq!(self.io.next_event().await, sfio_tokio_mock_io::Event::Read);
     }
-
-    /// Every message sent before this returns has been processed by the master task
-    async fn barrier(&mut self) {
-        self.master.get_decode_level().await.unwrap();
-    }
 }
 
 fn config() -> AssociationConfig {
@@ -151,10 +141,6 @@ fn config() -> AssociationConfig {
         response_timeout: Timeout::from_secs(1).unwrap(),
         ..AssociationConfig::quiet()
     }
-}
-
-pub(super) fn null() -> Box<NullHandler> {
-    Box::new(NullHandler)
 }
 
 /// The kinds of task, which each compute their response deadline
@@ -265,7 +251,7 @@ async fn deadline_holds(kind: Kind, trickle: Trickle) {
                 harness.read(&frame[index..index + 1]).await
             }
         }
-        harness.barrier().await;
+        barrier(&mut harness.master).await;
         tokio::time::advance(STEP).await;
     }
 
@@ -359,7 +345,7 @@ async fn link_status_request_ignores_other_link_layer_messages_and_times_out() {
             let mut harness = Harness::new().await;
             let (_, task) = start_link_status(&mut harness).await;
             frame.deliver(&mut harness).await;
-            harness.barrier().await;
+            barrier(&mut harness.master).await;
             assert!(!task.is_finished(), "{frame:?}");
             assert_eq!(
                 task.await.unwrap().0,
@@ -379,7 +365,7 @@ async fn link_status_request_succeeds_on_the_reply_after_other_link_layer_messag
         for frame in WRONG_FRAMES {
             frame.deliver(&mut harness).await;
         }
-        harness.barrier().await;
+        barrier(&mut harness.master).await;
         assert!(!task.is_finished());
         harness.read(&header_only(OUTSTATION, LINK_STATUS)).await;
         assert_eq!(task.await.unwrap().0, Ok(()));
@@ -452,7 +438,7 @@ async fn application_tasks_ignore_link_layer_messages() {
             // the link layer answers the request
             let reply = harness.pop_write().await;
             assert_eq!(reply[3..8], [0x8B, 0x00, 0x04, 0x01, 0x00], "{kind:?}");
-            harness.barrier().await;
+            barrier(&mut harness.master).await;
             assert!(!task.is_finished(), "{kind:?}");
 
             harness.read(&kind.reply()).await;
@@ -470,18 +456,18 @@ async fn tasks_ignore_malformed_fragments_from_other_outstations() {
                 let (mut harness, mut info) = Harness::reporting().await;
                 let task = kind.spawn(harness.association.clone());
                 harness.pop_write().await;
-                harness.barrier().await;
+                barrier(&mut harness.master).await;
                 assert_eq!(info.pop(), kind.start_events(), "{kind:?}");
 
                 harness.read(&fragment(OTHER, malformed)).await;
-                harness.barrier().await;
+                barrier(&mut harness.master).await;
                 assert!(!task.is_finished(), "{kind:?} {malformed:?}");
                 assert_eq!(harness.io.pop_event(), None, "{kind:?} {malformed:?}");
                 assert_eq!(info.pop(), [], "{kind:?} {malformed:?}");
 
                 harness.read(&kind.reply()).await;
                 assert_eq!(task.await.unwrap().0, Ok(()), "{kind:?} {malformed:?}");
-                harness.barrier().await;
+                barrier(&mut harness.master).await;
                 assert_eq!(
                     info.pop(),
                     kind.end_events(Ok(())),
@@ -505,14 +491,14 @@ async fn malformed_fragments_from_other_outstations_do_not_extend_the_response_d
             for malformed in MALFORMED {
                 tokio::time::advance(STEP).await;
                 harness.read(&fragment(OTHER, malformed)).await;
-                harness.barrier().await;
+                barrier(&mut harness.master).await;
             }
 
             let (result, completed) = task.await.unwrap();
             assert_eq!(result, Err(TaskError::ResponseTimeout), "{kind:?}");
             assert_eq!(completed, start + RESPONSE_TIMEOUT, "{kind:?}");
             assert!(!harness.task.is_finished(), "{kind:?}");
-            harness.barrier().await;
+            barrier(&mut harness.master).await;
             let mut events = kind.start_events();
             events.extend(kind.end_events(result));
             assert_eq!(info.pop(), events, "{kind:?}");
@@ -525,7 +511,7 @@ async fn malformed_fragments_from_other_outstations_do_not_extend_the_response_d
 async fn link_status_request_processes_responses_from_another_outstation_and_keeps_waiting() {
     watchdog(async {
         let mut harness = Harness::new().await;
-        let read_handler = CountHandler::new();
+        let read_handler = ReadEventHandler::new();
         let mut read_events = read_handler.events();
         let (info, mut info_events) = AssociationInformationEventHandler::pair();
         harness
@@ -556,7 +542,7 @@ async fn link_status_request_processes_responses_from_another_outstation_and_kee
         // unconfirmed user data from the master to the other outstation
         assert_eq!(confirm[3..8], [0xC4, 0x00, 0x08, 0x01, 0x00]);
         assert_eq!(app_data(&confirm), [0xD3, 0x00]);
-        harness.barrier().await;
+        barrier(&mut harness.master).await;
         assert_eq!(
             read_events.pop(),
             [

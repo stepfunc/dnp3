@@ -11,13 +11,12 @@ use std::time::Duration;
 use scursor::WriteCursor;
 use tokio::time::Instant;
 
-use crate::app::format::write::{start_request, start_response};
-use crate::app::variations::{Group50Var1, Group50Var3, Group52Var2};
+use crate::app::format::write::start_request;
+use crate::app::variations::{Group50Var1, Group50Var3};
 use crate::app::Timestamp;
-use crate::app::{
-    ControlField, FunctionCode, Iin, Iin1, Iin2, ObjectParseError, ResponseFunction, Sequence,
-};
+use crate::app::{ControlField, FunctionCode, Iin, Iin1, Iin2, ObjectParseError, Sequence};
 use crate::master::association::AssociationConfig;
+use crate::master::test_fixtures::{FixedTime, SYSTEM_TIME};
 use crate::master::tests::harness::AssocInfoEvent;
 use crate::master::{
     AssociationHandler, Classes, EventClasses, PollHandle, ReadRequest, TaskError, TaskType,
@@ -28,16 +27,7 @@ use super::harness::requests::*;
 use super::harness::{create_association_with_handler, TestHarness};
 use crate::util::test_support::watchdog;
 
-const SYSTEM_TIME: Timestamp = Timestamp::new(1_700_000_000_000);
 pub(super) const NEED_TIME: Iin = Iin::new(Iin1::new(0x10), Iin2::new(0x00));
-
-pub(super) struct FixedTime;
-
-impl AssociationHandler for FixedTime {
-    fn get_current_time(&self) -> Option<Timestamp> {
-        Some(SYSTEM_TIME)
-    }
-}
 
 /// Never has the time, and counts how often it is asked for it
 struct NoTime(Arc<AtomicUsize>);
@@ -57,7 +47,6 @@ fn config(auto_time_sync: Option<TimeSyncProcedure>) -> AssociationConfig {
 }
 
 async fn harness(auto_time_sync: Option<TimeSyncProcedure>) -> TestHarness {
-    tokio::time::pause();
     create_association_with_handler(config(auto_time_sync), Box::new(FixedTime)).await
 }
 
@@ -99,19 +88,13 @@ fn write_absolute_time(seq: Sequence) -> Vec<u8> {
 }
 
 fn delay_measure_response(seq: Sequence, delay_ms: u16) -> Vec<u8> {
-    let mut buffer = [0; 32];
-    let mut cursor = WriteCursor::new(&mut buffer);
-    let mut writer = start_response(
+    let [low, high] = delay_ms.to_le_bytes();
+    // g52v2 with a count of one
+    response(
         ControlField::response(seq, true, true, false),
-        ResponseFunction::Response,
         Iin::default(),
-        &mut cursor,
+        &[52, 2, 0x07, 1, low, high],
     )
-    .unwrap();
-    writer
-        .write_count_of_one(Group52Var2 { time: delay_ms })
-        .unwrap();
-    cursor.written().to_vec()
 }
 
 /// Report NEED_TIME in an unsolicited null response
@@ -124,18 +107,10 @@ async fn report_need_time(harness: &mut TestHarness, unsol_seq: Sequence) {
         .await;
 }
 
-async fn assert_no_write_for(harness: &mut TestHarness, duration: Duration) {
-    let next = tokio::time::timeout(duration, harness.io.next_event()).await;
-    assert_eq!(next.ok(), None);
-}
-
 async fn complete_lan_procedure(harness: &mut TestHarness, seq: &mut Sequence) {
-    tokio::time::timeout(
-        Duration::from_secs(60),
-        harness.expect_write(record_current_time(*seq)),
-    )
-    .await
-    .expect("the master did not start the time sync");
+    harness
+        .expect_write_within(Duration::from_secs(60), record_current_time(*seq))
+        .await;
     harness
         .process_response(empty_response(seq.increment()))
         .await;
@@ -147,7 +122,7 @@ async fn complete_lan_procedure(harness: &mut TestHarness, seq: &mut Sequence) {
         .await;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn auto_lan_time_sync_completes_and_is_not_repeated() {
     watchdog(async {
         let mut harness = harness(Some(TimeSyncProcedure::Lan)).await;
@@ -172,12 +147,12 @@ async fn auto_lan_time_sync_completes_and_is_not_repeated() {
                 ),
             ]
         );
-        assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+        harness.expect_idle_for(Duration::from_secs(60)).await;
     })
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn auto_non_lan_time_sync_completes_and_is_not_repeated() {
     watchdog(async {
         let mut harness = harness(Some(TimeSyncProcedure::NonLan)).await;
@@ -211,12 +186,12 @@ async fn auto_non_lan_time_sync_completes_and_is_not_repeated() {
                 ),
             ]
         );
-        assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+        harness.expect_idle_for(Duration::from_secs(60)).await;
     })
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn auto_time_sync_retries_after_the_backoff_when_the_outstation_still_needs_time() {
     watchdog(async {
         let mut harness = harness(Some(TimeSyncProcedure::Lan)).await;
@@ -237,15 +212,14 @@ async fn auto_time_sync_retries_after_the_backoff_when_the_outstation_still_need
         complete_lan_procedure(&mut harness, &mut seq).await;
         TestHarness::assert_elapsed(failed, Duration::from_secs(1));
 
-        assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+        harness.expect_idle_for(Duration::from_secs(60)).await;
     })
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn auto_time_sync_without_system_time_reports_failure_and_retries_with_a_growing_backoff() {
     watchdog(async {
-        tokio::time::pause();
         let count = Arc::new(AtomicUsize::new(0));
         let mut harness = create_association_with_handler(
             config(Some(TimeSyncProcedure::Lan)),
@@ -280,7 +254,7 @@ async fn auto_time_sync_without_system_time_reports_failure_and_retries_with_a_g
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn user_lan_time_sync_completes_the_request() {
     watchdog(async {
         let mut harness = harness(None).await;
@@ -292,12 +266,12 @@ async fn user_lan_time_sync_completes_the_request() {
         complete_lan_procedure(&mut harness, &mut seq).await;
 
         assert_eq!(sync.await.unwrap(), Ok(()));
-        assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+        harness.expect_idle_for(Duration::from_secs(60)).await;
     })
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn user_non_lan_time_sync_completes_the_request() {
     watchdog(async {
         let mut harness = harness(None).await;
@@ -320,7 +294,7 @@ async fn user_non_lan_time_sync_completes_the_request() {
             .await;
 
         assert_eq!(sync.await.unwrap(), Ok(()));
-        assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+        harness.expect_idle_for(Duration::from_secs(60)).await;
     })
     .await;
 }
@@ -386,7 +360,7 @@ async fn non_lan_time_sync_fails_without_a_write_if_the_delay_is_not_one_g52v2()
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn user_time_sync_timeout_is_reported_to_the_caller_and_not_retried() {
     watchdog(async {
         let mut harness = harness(Some(TimeSyncProcedure::Lan)).await;
@@ -402,15 +376,14 @@ async fn user_time_sync_timeout_is_reported_to_the_caller_and_not_retried() {
             sync.await.unwrap(),
             Err(TimeSyncError::Task(TaskError::ResponseTimeout))
         );
-        assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+        harness.expect_idle_for(Duration::from_secs(60)).await;
     })
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn user_time_sync_without_system_time_fails_without_scheduling_a_retry() {
     watchdog(async {
-        tokio::time::pause();
         let count = Arc::new(AtomicUsize::new(0));
         let mut harness = create_association_with_handler(
             config(Some(TimeSyncProcedure::Lan)),
@@ -431,7 +404,7 @@ async fn user_time_sync_without_system_time_fails_without_scheduling_a_retry() {
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn user_time_sync_that_still_needs_time_fails_and_starts_the_auto_time_sync() {
     watchdog(async {
         let mut harness = harness(Some(TimeSyncProcedure::Lan)).await;
@@ -480,7 +453,7 @@ async fn user_time_sync_that_still_needs_time_fails_and_starts_the_auto_time_syn
                 ),
             ]
         );
-        assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+        harness.expect_idle_for(Duration::from_secs(60)).await;
     })
     .await;
 }
@@ -521,7 +494,7 @@ async fn user_non_lan_time_sync_fails_with_the_cause_when_the_delay_measure_resp
                 Err(TimeSyncError::Task(err)),
                 "{objects:?}"
             );
-            assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+            harness.expect_idle_for(Duration::from_secs(60)).await;
             assert_eq!(
                 harness.assoc_events.pop(),
                 [
@@ -606,7 +579,7 @@ async fn user_time_sync_fails_when_the_write_response_has_objects() {
                     Err(TimeSyncError::Task(err)),
                     "{procedure:?} {objects:?}"
                 );
-                assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+                harness.expect_idle_for(Duration::from_secs(60)).await;
                 assert_eq!(
                     harness.assoc_events.pop(),
                     [
@@ -653,7 +626,7 @@ async fn auto_time_sync_runs_before_the_integrity_scan_at_startup() {
             .expect_write_and_respond(enable_unsol_request(seq), empty_response(seq.increment()))
             .await;
 
-        assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+        harness.expect_idle_for(Duration::from_secs(60)).await;
     })
     .await;
 }
@@ -683,7 +656,7 @@ async fn auto_time_sync_runs_before_the_integrity_scan_after_a_restart() {
             .expect_write_and_respond(enable_unsol_request(seq), empty_response(seq.increment()))
             .await;
 
-        assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+        harness.expect_idle_for(Duration::from_secs(60)).await;
     })
     .await;
 }
