@@ -162,40 +162,61 @@ impl<T> VecList<T> {
     }
 
     /// remove every entry matching the predicate, passing each one to `removed` once it's removed
+    ///
+    /// One pass in order: each removed entry is freed where it's found, and the kept entries are
+    /// linked to each other across each run of removed ones.
     pub(crate) fn remove_all<F, R>(&mut self, mut predicate: F, mut removed: R) -> usize
     where
         F: FnMut(&T) -> bool,
         R: FnMut(&T),
     {
-        let mut count: usize = 0;
-        let mut current = match self.state {
-            None => return count,
-            Some(x) => x.head,
+        let Some(state) = self.state else {
+            return 0;
         };
 
-        loop {
-            let (next, entry_to_remove) = {
-                let Some(entry) = self.storage.get(current) else {
-                    return count;
-                };
-                let entry_to_delete = match predicate(&entry.data) {
-                    true => Some(entry.create_index(current)),
-                    false => None,
-                };
-                (entry.metadata.next, entry_to_delete)
+        let mut count: usize = 0;
+        // the kept entries (first, last, how many), and whether entries were removed after the last
+        let mut head: Option<usize> = None;
+        let mut tail: Option<usize> = None;
+        let mut size: usize = 0;
+        let mut unlinked = false;
+
+        let mut current = Some(state.head);
+        while let Some(idx) = current {
+            let Some(entry) = self.storage.get_mut(idx) else {
+                break;
             };
+            current = entry.metadata.next;
 
-            if let Some(data) = entry_to_remove.and_then(|index| self.take_at(index)) {
-                removed(data);
+            if predicate(&entry.data) {
+                entry.is_free = true;
+                self.free_stack.push_back(idx);
+                removed(&entry.data);
                 count = count.saturating_add(1);
-            }
-
-            match next {
-                Some(next) => {
-                    current = next;
+                unlinked = true;
+            } else {
+                if unlinked {
+                    entry.metadata.prev = tail;
+                    self.set_next(tail, Some(idx));
+                    unlinked = false;
                 }
-                None => return count,
+                head = head.or(Some(idx));
+                tail = Some(idx);
+                size = size.saturating_add(1);
             }
+        }
+
+        self.set_next(tail, None);
+        self.state = match (head, tail) {
+            (Some(head), Some(tail)) => Some(State::new(head, tail, size)),
+            _ => None,
+        };
+        count
+    }
+
+    fn set_next(&mut self, entry: Option<usize>, next: Option<usize>) {
+        if let Some(entry) = entry.and_then(|i| self.storage.get_mut(i)) {
+            entry.metadata.next = next;
         }
     }
 

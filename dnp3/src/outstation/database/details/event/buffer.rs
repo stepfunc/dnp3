@@ -254,6 +254,7 @@ mod records {
         }
 
         /// remove the oldest record of a type, whatever its state, returning its id
+        #[cold]
         pub(super) fn remove_oldest(&mut self, event_type: EventType) -> Option<u64> {
             let record = self
                 .list
