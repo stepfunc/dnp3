@@ -107,12 +107,18 @@ pub struct OutstationConfig {
         serde(default = "OutstationConfig::default_keep_alive_timeout")
     )]
     pub keep_alive_timeout: Option<std::time::Duration>,
-    /// Maximum number of headers that will be processed
-    /// in a READ request. Internally, this controls the size of a
-    /// pre-allocated buffer used to process requests. A minimum
-    /// value of [`OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS`] is always enforced.
-    /// Requesting more than this number will result in the PARAMETER_ERROR
-    /// IIN bit being set in the response. Device attributes (group 0) have a
+    /// Limits the selections or headers processed in a READ request. Internally, this controls
+    /// the size of pre-allocated buffers used to process requests. A minimum value of
+    /// [`OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS`] is always enforced.
+    ///
+    /// A READ processed right away counts only the static selections it makes: one per static
+    /// header that selects points, and one per class 0 type that has points. Event headers,
+    /// and headers that select nothing, don't count. A READ that arrives while the outstation
+    /// waits for an unsolicited confirm is held as pending, and holding it counts each header
+    /// that parses, event headers included.
+    ///
+    /// Past the limit, further selections or headers are ignored, the rest are answered, and
+    /// the response sets the PARAMETER_ERROR IIN bit. Device attributes (group 0) have a
     /// separate, fixed limit of 32 selections per READ.
     #[cfg_attr(feature = "serialization", serde(default))]
     pub max_read_request_headers: Option<u16>,
