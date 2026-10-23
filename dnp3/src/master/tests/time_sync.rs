@@ -11,12 +11,10 @@ use std::time::Duration;
 use scursor::WriteCursor;
 use tokio::time::Instant;
 
-use crate::app::format::write::{start_request, start_response};
-use crate::app::variations::{Group50Var1, Group50Var3, Group52Var2};
+use crate::app::format::write::start_request;
+use crate::app::variations::{Group50Var1, Group50Var3};
 use crate::app::Timestamp;
-use crate::app::{
-    ControlField, FunctionCode, Iin, Iin1, Iin2, ObjectParseError, ResponseFunction, Sequence,
-};
+use crate::app::{ControlField, FunctionCode, Iin, Iin1, Iin2, ObjectParseError, Sequence};
 use crate::master::association::AssociationConfig;
 use crate::master::test_fixtures::{FixedTime, SYSTEM_TIME};
 use crate::master::tests::harness::AssocInfoEvent;
@@ -90,19 +88,13 @@ fn write_absolute_time(seq: Sequence) -> Vec<u8> {
 }
 
 fn delay_measure_response(seq: Sequence, delay_ms: u16) -> Vec<u8> {
-    let mut buffer = [0; 32];
-    let mut cursor = WriteCursor::new(&mut buffer);
-    let mut writer = start_response(
+    let [low, high] = delay_ms.to_le_bytes();
+    // g52v2 with a count of one
+    response(
         ControlField::response(seq, true, true, false),
-        ResponseFunction::Response,
         Iin::default(),
-        &mut cursor,
+        &[52, 2, 0x07, 1, low, high],
     )
-    .unwrap();
-    writer
-        .write_count_of_one(Group52Var2 { time: delay_ms })
-        .unwrap();
-    cursor.written().to_vec()
 }
 
 /// Report NEED_TIME in an unsolicited null response

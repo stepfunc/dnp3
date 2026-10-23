@@ -473,12 +473,12 @@ async fn clear_restart_rejected_without_restart_iin_is_not_repeated() {
 
 const DEVICE_RESTART: Iin = Iin::new(Iin1::new(0x80), Iin2::new(0x00));
 
+/// g2v1 with an 8-bit count of 1: index 0, flags 0x81
+const BINARY_EVENT: &[u8] = &[2, 1, 0x17, 1, 0, 0x81];
+
 /// A response with one binary input event, reporting `iin`
 fn event_response(seq: Sequence, iin: Iin) -> Vec<u8> {
-    let mut response = empty_response_custom_iin(seq, iin);
-    // g2v1 with an 8-bit count of 1, index 0
-    response.extend_from_slice(&[2, 1, 0x17, 1, 0, 0x81]);
-    response
+    event_fragment(seq, true, true, iin)
 }
 
 /// An association that scans every event class, after the outstation reports class 1 events
@@ -591,9 +591,11 @@ async fn event_scan_rejected_with_an_iin2_request_error_is_not_repeated() {
 /// One fragment of a multi-fragment response with one binary input event, requesting confirmation
 /// unless it's the last
 fn event_fragment(seq: Sequence, fir: bool, fin: bool, iin: Iin) -> Vec<u8> {
-    let mut response = event_response(seq, iin);
-    response[0] = ControlField::response(seq, fir, fin, !fin).to_u8();
-    response
+    response(
+        ControlField::response(seq, fir, fin, !fin),
+        iin,
+        BINARY_EVENT,
+    )
 }
 
 #[tokio::test(start_paused = true)]

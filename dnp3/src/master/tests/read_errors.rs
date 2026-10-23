@@ -8,15 +8,10 @@
 //! the read succeeds if it delivered data. A malformed response fails the read without delivering
 //! anything.
 
-use scursor::WriteCursor;
-
-use crate::app::format::write::start_response;
 use crate::app::measurement::AnalogInputDeadBand;
 use crate::app::parse::header_identity_tests::DATALESS_COUNT_VARIATIONS;
-use crate::app::variations::Group32Var2;
 use crate::app::{
-    ControlField, Iin, Iin1, Iin2, ObjectParseError, QualifierCode, ResponseFunction, Sequence,
-    Variation,
+    ControlField, Iin, Iin1, Iin2, ObjectParseError, QualifierCode, Sequence, Variation,
 };
 use crate::master::association::AssociationConfig;
 use crate::master::test_objects::{RELATIVE_TIME_EVENT, SYNCHRONIZED_CTO, TRUNCATED_ANALOG_EVENT};
@@ -25,33 +20,27 @@ use crate::master::{Classes, ReadRequest, ReadType, TaskError, TaskType};
 
 use super::harness::create_association;
 use super::harness::requests::{
-    class_scan_request, solicited_confirm, startup_procedure, unsol_confirm, unsol_null_custom_iin,
+    analog_event, class_scan_request, response, solicited_confirm, startup_procedure,
+    unsol_confirm, unsol_null_custom_iin,
 };
 use crate::util::test_support::watchdog;
 
+/// A response fragment with one analog input event with this value, if any
+fn fragment(control: ControlField, iin2: Iin2, data: Option<i16>) -> Vec<u8> {
+    let objects = data.map_or(Vec::new(), |value| analog_event(0x00, value).to_vec());
+    response(control, Iin::new(Iin1::default(), iin2), &objects)
+}
+
 fn read_response(seq: Sequence, fin: bool, con: bool, iin2: Iin2, data: Option<i16>) -> Vec<u8> {
-    let mut buffer = [0; 20];
-    let mut cursor = WriteCursor::new(&mut buffer);
-    let mut response = start_response(
-        ControlField::response(seq, true, fin, con),
-        ResponseFunction::Response,
-        Iin::new(Iin1::default(), iin2),
-        &mut cursor,
-    )
-    .unwrap();
-    if let Some(value) = data {
-        response
-            .write_prefixed_items([(Group32Var2 { value, flags: 0x00 }, 0u8)].iter())
-            .unwrap();
-    }
-    cursor.written().to_vec()
+    fragment(ControlField::response(seq, true, fin, con), iin2, data)
 }
 
 fn continued_response(seq: Sequence, data: Option<i16>) -> Vec<u8> {
-    let mut response = read_response(seq, true, false, Iin2::default(), data);
-    // clear FIR in the control octet
-    response[0] &= !0x80;
-    response
+    fragment(
+        ControlField::response(seq, false, true, false),
+        Iin2::default(),
+        data,
+    )
 }
 
 #[tokio::test]

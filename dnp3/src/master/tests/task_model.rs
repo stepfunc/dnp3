@@ -20,10 +20,13 @@ use sfio_tokio_mock_io::Event;
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
 
-use crate::app::{FunctionCode, Iin, Iin1, Iin2, ObjectParseError, RetryStrategy, Sequence};
+use crate::app::{
+    ControlField, FunctionCode, Iin, Iin1, Iin2, ObjectParseError, RetryStrategy, Sequence,
+};
 use crate::link::EndpointAddress;
 use crate::master::association::AssociationConfig;
 use crate::master::test_fixtures::FixedTime;
+use crate::master::tests::harness::requests::{analog_event, response};
 use crate::master::tests::harness::{
     create_association_with_handler, AssocInfoEvent, ReadEvent, TestHarness,
 };
@@ -177,7 +180,7 @@ impl Objects {
     fn measurement_bytes(self) -> Vec<u8> {
         match self {
             Objects::None | Objects::Correct | Objects::Unexpected => vec![],
-            Objects::AnalogEvent => vec![32, 2, 0x17, 1, 0, 0x01, 7, 0],
+            Objects::AnalogEvent => analog_event(0x01, 7).to_vec(),
             Objects::AnalogStatic => vec![30, 2, 0x00, 0, 0, 0x01, 7, 0],
             Objects::CtoRelative => vec![
                 51, 1, 0x07, 1, 0, 0, 0, 0, 0, 0, 2, 3, 0x17, 1, 0, 0x81, 0x10, 0x00,
@@ -269,14 +272,15 @@ struct Unsolicited {
 impl Unsolicited {
     fn bytes(self) -> Vec<u8> {
         let iin1 = if self.restart { RESTART } else { 0 };
-        fragment(
-            true,
-            true,
-            self.con,
-            true,
-            self.seq,
-            iin1,
-            0,
+        response(
+            ControlField {
+                fir: true,
+                fin: true,
+                con: self.con,
+                uns: true,
+                seq: Sequence::new(self.seq),
+            },
+            Iin::new(Iin1::new(iin1), Iin2::default()),
             &self.objects.measurement_bytes(),
         )
     }
@@ -298,28 +302,6 @@ struct Step {
     input: Input,
     /// milliseconds to wait after the input
     wait: u64,
-}
-
-#[expect(clippy::too_many_arguments, reason = "every field of the header")]
-fn fragment(
-    fir: bool,
-    fin: bool,
-    con: bool,
-    uns: bool,
-    seq: u8,
-    iin1: u8,
-    iin2: u8,
-    objects: &[u8],
-) -> Vec<u8> {
-    let control = (u8::from(fir) << 7)
-        | (u8::from(fin) << 6)
-        | (u8::from(con) << 5)
-        | (u8::from(uns) << 4)
-        | (seq & 0x0F);
-    let function = if uns { 0x82 } else { 0x81 };
-    let mut bytes = vec![control, function, iin1, iin2];
-    bytes.extend_from_slice(objects);
-    bytes
 }
 
 fn next_seq(seq: u8) -> u8 {
@@ -727,14 +709,9 @@ impl Model {
             }
             Task::User(_) | Task::StartupIntegrity => answer.objects.measurement_bytes(),
         };
-        let bytes = fragment(
-            fir,
-            answer.fin,
-            answer.con,
-            false,
-            seq,
-            iin1,
-            answer.iin2,
+        let bytes = response(
+            ControlField::response(Sequence::new(seq), fir, answer.fin, answer.con),
+            Iin::new(Iin1::new(iin1), Iin2::new(answer.iin2)),
             &objects,
         );
 

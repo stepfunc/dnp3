@@ -35,8 +35,8 @@ use crate::master::tests::file::{
     ReaderEvent, RecordingReader,
 };
 use crate::master::tests::harness::requests::{
-    disable_unsol_request, empty_response, empty_response_custom_iin, integrity_poll_request,
-    solicited_confirm, unsol_confirm, unsol_with_data, with_con,
+    analog_event, disable_unsol_request, empty_response, empty_response_custom_iin,
+    integrity_poll_request, response, solicited_confirm, unsol_confirm, unsol_with_data, with_con,
 };
 use crate::master::tests::harness::{
     create_association, create_association_with_handler, AssocInfoEvent, ReadEvent, TestHarness,
@@ -1345,22 +1345,11 @@ impl AssociationInformation for Log {
 
 /// A read response fragment with one analog input event
 fn read_fragment(seq: Sequence, fir: bool, fin: bool, con: bool) -> Vec<u8> {
-    let control = (u8::from(fir) << 7) | (u8::from(fin) << 6) | (u8::from(con) << 5);
-    // g32v2, 1-byte count and prefix, one event at index 0 with value 7
-    vec![
-        control | seq.value(),
-        0x81,
-        0x00,
-        0x00,
-        32,
-        2,
-        0x17,
-        1,
-        0,
-        0x01,
-        7,
-        0,
-    ]
+    response(
+        ControlField::response(seq, fir, fin, con),
+        Iin::default(),
+        &analog_event(0x01, 7),
+    )
 }
 
 #[tokio::test(start_paused = true)]

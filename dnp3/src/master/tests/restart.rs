@@ -6,11 +6,12 @@
 
 use std::time::Duration;
 
-use crate::app::{ObjectParseError, Sequence};
+use crate::app::{ControlField, Iin, ObjectParseError, Sequence};
 use crate::master::association::AssociationConfig;
 use crate::master::TaskError;
 
 use super::harness::create_association;
+use super::harness::requests::response;
 use crate::util::test_support::watchdog;
 
 #[derive(Copy, Clone, Debug)]
@@ -26,12 +27,6 @@ impl Restart {
             Restart::Warm => 0x0E,
         }
     }
-}
-
-fn response(seq: Sequence, objects: &[u8]) -> Vec<u8> {
-    let mut data = vec![0xC0 | seq.value(), 0x81, 0x00, 0x00];
-    data.extend_from_slice(objects);
-    data
 }
 
 /// A restart request, the objects of the response to it, and the result
@@ -149,7 +144,11 @@ async fn restart_returns_the_time_delay_of_the_response() {
             harness
                 .expect_write_and_respond(
                     vec![0xC0, case.restart.function()],
-                    response(seq, case.objects),
+                    response(
+                        ControlField::response(seq, true, true, false),
+                        Iin::default(),
+                        case.objects,
+                    ),
                 )
                 .await;
 

@@ -16,16 +16,16 @@ use crate::master::ReadType;
 
 use super::harness::create_association;
 use super::harness::requests::{
-    startup_procedure, unsol_confirm, unsol_null, unsol_null_custom_iin, unsol_with_data,
+    response, startup_procedure, unsol_confirm, unsol_null, unsol_with_data,
 };
 use crate::util::test_support::watchdog;
 
 fn unsol_with_objects(seq: Sequence, objects: &[&[u8]]) -> Vec<u8> {
-    let mut response = unsol_null_custom_iin(seq, Iin::default());
-    for x in objects {
-        response.extend_from_slice(x);
-    }
-    response
+    response(
+        ControlField::unsolicited_response(seq),
+        Iin::default(),
+        &objects.concat(),
+    )
 }
 
 fn fragment(events: &[ReadEvent]) -> Vec<ReadEvent> {

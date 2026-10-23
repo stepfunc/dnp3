@@ -6,11 +6,7 @@
 
 //! Each kind of read delivers its response to the right handler with the right ReadType
 
-use scursor::WriteCursor;
-
-use crate::app::format::write::start_response;
-use crate::app::variations::Group32Var2;
-use crate::app::{ControlField, Iin, Iin1, Iin2, ResponseFunction, Sequence};
+use crate::app::{ControlField, Iin, Iin1, Iin2, Sequence};
 use crate::master::association::AssociationConfig;
 use crate::master::request::EventClasses;
 use crate::master::tests::harness::{CountHandler, ReadEvent};
@@ -24,19 +20,11 @@ const CLASS_1_EVENTS: Iin = Iin::new(Iin1::new(0x02), Iin2::new(0x00));
 
 /// a single fragment response, not requesting confirmation, with one analog input
 fn response_with_data(seq: Sequence) -> Vec<u8> {
-    let mut buffer = [0; 20];
-    let mut cursor = WriteCursor::new(&mut buffer);
-    let mut response = start_response(
+    response(
         ControlField::response(seq, true, true, false),
-        ResponseFunction::Response,
         Iin::default(),
-        &mut cursor,
+        &analog_event(0x00, 7),
     )
-    .unwrap();
-    response
-        .write_prefixed_items([(Group32Var2 { value: 7, flags: 0 }, 0u8)].iter())
-        .unwrap();
-    cursor.written().to_vec()
 }
 
 fn fragment_with_data(read_type: ReadType) -> Vec<ReadEvent> {
