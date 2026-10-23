@@ -84,7 +84,7 @@ fn is_event(header: &ObjectHeader) -> bool {
 
 /// The objects of a response that the master can process: they parse, and every object with
 /// relative time follows a common time of occurrence in the same fragment
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone)]
 pub(crate) struct ProcessableResponse<'a> {
     objects: HeaderCollection<'a>,
 }

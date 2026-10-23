@@ -367,14 +367,14 @@ impl ObjectHeader<'_> {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone)]
 pub(crate) struct Request<'a> {
     pub(crate) header: RequestHeader,
     pub(crate) raw_fragment: &'a [u8],
     pub(crate) objects: Result<HeaderCollection<'a>, ObjectParseError>,
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone)]
 pub(crate) struct Response<'a> {
     pub(crate) header: ResponseHeader,
     pub(crate) raw_objects: &'a [u8],
@@ -397,7 +397,7 @@ struct ObjectParser<'a> {
 
 /// An abstract collection of pre-validated object headers
 /// that can provide an iterator of the headers.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone)]
 pub(crate) struct HeaderCollection<'a> {
     options: ParseOptions,
     function: FunctionCode,
@@ -1113,11 +1113,13 @@ mod test {
     #[test]
     fn range_parsing_fails_for_specific_attribute_with_count_equal_two() {
         let input: &[u8] = &[0x00, 0xCA, 0x00, 0x07, 0x08, 0x02, 0x01, 42];
-        let err = HeaderCollection::parse(ParseOptions::default(), FunctionCode::Response, input)
-            .unwrap_err();
+        let err =
+            HeaderCollection::parse(ParseOptions::default(), FunctionCode::Response, input).err();
         assert_eq!(
             err,
-            ObjectParseError::BadAttribute(AttrParseError::CountNotOne(2))
+            Some(ObjectParseError::BadAttribute(AttrParseError::CountNotOne(
+                2
+            )))
         );
     }
 
@@ -1147,11 +1149,12 @@ mod test {
     fn two_byte_range_rejects_attribute_set_above_255() {
         let input: &[u8] = &[0x00, 0xCA, 0x01, 0x00, 0x01, 0x00, 0x01, 0x02, 0x01, 42];
         for function in [FunctionCode::Response, FunctionCode::Write] {
-            let err =
-                HeaderCollection::parse(ParseOptions::default(), function, input).unwrap_err();
+            let err = HeaderCollection::parse(ParseOptions::default(), function, input).err();
             assert_eq!(
                 err,
-                ObjectParseError::BadAttribute(AttrParseError::SetIdNotU8(256))
+                Some(ObjectParseError::BadAttribute(AttrParseError::SetIdNotU8(
+                    256
+                )))
             );
         }
     }
@@ -1168,10 +1171,12 @@ mod test {
             ];
             let err =
                 HeaderCollection::parse(ParseOptions::default(), FunctionCode::Response, input)
-                    .unwrap_err();
+                    .err();
             assert_eq!(
                 err,
-                ObjectParseError::BadAttribute(AttrParseError::BadIntegerLength(3))
+                Some(ObjectParseError::BadAttribute(
+                    AttrParseError::BadIntegerLength(3)
+                ))
             );
         }
     }
