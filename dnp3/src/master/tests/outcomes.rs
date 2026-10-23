@@ -1601,3 +1601,54 @@ async fn writing_an_attribute_whose_variation_cannot_carry_a_value_sends_nothing
     })
     .await;
 }
+
+#[tokio::test(start_paused = true)]
+async fn reading_group0_var0_sends_nothing() {
+    watchdog(async {
+        let mut harness = create_association(AssociationConfig::quiet()).await;
+        let g0v0 = Variation::Group0(0);
+        let err = TaskError::BadEncoding(BadEncoding::UndefinedVariation(g0v0));
+
+        assert_eq!(
+            harness
+                .association
+                .read(ReadRequest::all_objects(g0v0))
+                .await,
+            Err(err)
+        );
+        harness.assert_no_events();
+
+        assert_eq!(
+            harness
+                .association
+                .send_and_expect_empty_response(
+                    FunctionCode::Read,
+                    Headers::new().add_all_objects(g0v0)
+                )
+                .await,
+            Err(WriteError::Task(err))
+        );
+        harness.assert_no_events();
+
+        let mut poll = harness
+            .association
+            .add_poll(ReadRequest::all_objects(g0v0), Duration::from_secs(3600))
+            .await
+            .unwrap();
+        harness.assoc_events.pop();
+        poll.demand().await.unwrap();
+        harness.expect_idle_for(Duration::from_secs(1)).await;
+        assert_eq!(
+            harness.assoc_events.pop(),
+            [
+                AssocInfoEvent::TaskStart(
+                    TaskType::PeriodicPoll,
+                    FunctionCode::Read,
+                    Sequence::new(2)
+                ),
+                AssocInfoEvent::TaskFailure(TaskType::PeriodicPoll, err),
+            ]
+        );
+    })
+    .await;
+}
