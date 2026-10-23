@@ -65,21 +65,21 @@ impl Timeout {
 
     /// try to construct a `Timeout` from a count of seconds
     ///
-    /// returns a `RangeError` is < `Timeout::MIN` or > `Timeout::MAX`
+    /// returns a [`TimeoutRangeError`] if it is < [`Timeout::MIN`] or > [`Timeout::MAX`]
     pub fn from_secs(x: u64) -> Result<Self, TimeoutRangeError> {
         Self::from_duration(Duration::from_secs(x))
     }
 
     /// try to construct a `Timeout` from a count of milliseconds
     ///
-    /// returns a `RangeError` is < `Timeout::MIN` or > `Timeout::MAX`
+    /// returns a [`TimeoutRangeError`] if it is < [`Timeout::MIN`] or > [`Timeout::MAX`]
     pub fn from_millis(x: u64) -> Result<Self, TimeoutRangeError> {
         Self::from_duration(Duration::from_millis(x))
     }
 
     /// try to construct a `Timeout` from a `Duration`
     ///
-    /// returns a `RangeError` is < `Timeout::MIN` or > `Timeout::MAX`
+    /// returns a [`TimeoutRangeError`] if it is < [`Timeout::MIN`] or > [`Timeout::MAX`]
     pub fn from_duration(value: Duration) -> Result<Self, TimeoutRangeError> {
         if value < Self::MIN {
             return Err(TimeoutRangeError::TooSmall(value));

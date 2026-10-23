@@ -254,13 +254,44 @@ impl AttrHandler {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::app::attr::{var, AttrProp, StringAttr};
+    use crate::app::attr::{var, AttrProp, AttrValue, StringAttr};
+    use scursor::ReadCursor;
 
     fn encode_string(variation: u8, value: &str) -> Vec<u8> {
         let mut bytes = vec![0x00, variation, 0x00, 0x00, 0x00, 0x01];
         bytes.push(value.len().try_into().unwrap());
         bytes.extend_from_slice(value.as_bytes());
         bytes
+    }
+
+    #[test]
+    fn written_attribute_lists_parse_back() {
+        for count in [127u8, 128, 200, 255] {
+            let items = (0..count).map(|variation| AttrItem {
+                variation,
+                properties: if variation % 2 == 0 {
+                    AttrProp::writable()
+                } else {
+                    AttrProp::default()
+                },
+            });
+
+            let mut buffer = [0; 520];
+            let mut cursor = WriteCursor::new(&mut buffer);
+            Selection::write_attr_list(AttrSet::Private(3), &mut cursor, items.clone()).unwrap();
+
+            // g0v255, 1-byte start/stop range of the set
+            let (header, value) = cursor.written().split_at(5);
+            assert_eq!(header, [0x00, 0xFF, 0x00, 0x03, 0x03]);
+
+            let mut reader = ReadCursor::new(value);
+            let parsed: Vec<AttrItem> = match AttrValue::parse(&mut reader).unwrap() {
+                AttrValue::AttrList(x) => x.iter().collect(),
+                _ => panic!("expected an attribute list of {count} items"),
+            };
+            assert_eq!(parsed, items.collect::<Vec<_>>());
+            assert!(reader.is_empty());
+        }
     }
 
     #[test]

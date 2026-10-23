@@ -1366,17 +1366,23 @@ impl OwnedAttribute {
 
     /// Check that the variation and value can be encoded as an attribute header
     pub(crate) fn check_encodable(&self) -> Result<(), BadAttribute> {
-        match self.variation {
-            0 | var::ALL_ATTRIBUTES_REQUEST | var::LIST_OF_ATTRIBUTE_VARIATIONS => {
-                Err(BadAttribute::BadVariation(self.variation))
-            }
-            _ => self.value.check_encodable(),
+        if is_reserved_variation(self.variation) {
+            return Err(BadAttribute::BadVariation(self.variation));
         }
+        self.value.check_encodable()
     }
 }
 
-fn get_default_desc(var: u8) -> &'static str {
-    match var {
+/// Variations that name a request or a list rather than an attribute value: 0, 254 and 255
+pub(crate) fn is_reserved_variation(variation: u8) -> bool {
+    matches!(
+        variation,
+        0 | var::ALL_ATTRIBUTES_REQUEST | var::LIST_OF_ATTRIBUTE_VARIATIONS
+    )
+}
+
+fn get_default_desc(var: u8) -> Option<&'static str> {
+    let desc = match var {
         var::CONFIG_ID => "Configuration ID",
         var::CONFIG_VERSION => "Configuration version",
         var::CONFIG_BUILD_DATE => "Configuration build date",
@@ -1438,8 +1444,9 @@ fn get_default_desc(var: u8) -> &'static str {
         var::PRODUCT_NAME_AND_MODEL => "Device manufacturer's product name and model",
         var::DEVICE_MANUFACTURER_NAME => "Device manufacturer's name",
         var::LIST_OF_ATTRIBUTE_VARIATIONS => "List of attribute variations",
-        _ => "Unknown",
-    }
+        _ => return None,
+    };
+    Some(desc)
 }
 
 impl<'a> Attribute<'a> {
@@ -1447,7 +1454,7 @@ impl<'a> Attribute<'a> {
         match self.set {
             AttrSet::Default => {
                 // lookup description
-                let desc = get_default_desc(self.variation);
+                let desc = get_default_desc(self.variation).unwrap_or("Unknown");
                 write!(f, "\nDefault set - variation {} - {desc}", self.variation)?;
             }
             AttrSet::Private(x) => {
@@ -1904,6 +1911,40 @@ mod test {
     }
 
     #[test]
+    fn parses_extended_attr_list() {
+        let items: Vec<AttrItem> = (0..200u8)
+            .map(|variation| AttrItem {
+                variation,
+                properties: AttrProp::new(variation % 2),
+            })
+            .collect();
+
+        // the extended length is the length byte + 256
+        let mut bytes = vec![EXT_ATTR_LIST, 0x90];
+        for item in &items {
+            bytes.push(item.variation);
+            bytes.push(item.properties.into());
+        }
+        assert_eq!(bytes.len(), 2 + 400);
+
+        let mut cursor = ReadCursor::new(&bytes);
+        let parsed_list: Vec<AttrItem> = match AttrValue::parse(&mut cursor).unwrap() {
+            AttrValue::AttrList(x) => x.iter().collect(),
+            _ => panic!("expected an attribute list"),
+        };
+        assert_eq!(parsed_list, items);
+        assert!(cursor.is_empty());
+
+        bytes[1] = 0x91;
+        bytes.push(0);
+        let mut cursor = ReadCursor::new(&bytes);
+        assert_eq!(
+            AttrValue::parse(&mut cursor),
+            Err(AttrParseError::BadAttrListLength(0x191))
+        );
+    }
+
+    #[test]
     fn parses_f32() {
         let bytes = [0x01, 0x02, 0x03, 0x04];
         let expected = f32::from_le_bytes(bytes);
@@ -2110,9 +2151,8 @@ mod test {
                 Ok(AnyAttribute::Known(expected)),
                 "variation {variation}"
             );
-            assert_ne!(
-                get_default_desc(variation),
-                "Unknown",
+            assert!(
+                get_default_desc(variation).is_some(),
                 "variation {variation}"
             );
         }
@@ -2126,9 +2166,8 @@ mod test {
                 let attr = default_set(variation, value);
                 assert_eq!(AnyAttribute::try_from(&attr), Ok(AnyAttribute::Other(attr)));
             }
-            assert_eq!(
-                get_default_desc(variation),
-                "Unknown",
+            assert!(
+                get_default_desc(variation).is_none(),
                 "variation {variation}"
             );
         }

@@ -5,7 +5,8 @@
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
 use crate::app::attr::{
-    AnyAttribute, AttrDataType, AttrItem, AttrProp, AttrSet, Attribute, OwnedAttribute, TypeError,
+    is_reserved_variation, AnyAttribute, AttrDataType, AttrItem, AttrProp, AttrSet, Attribute,
+    OwnedAttribute, TypeError,
 };
 use crate::app::Iin2;
 use crate::outstation::database::AttrDefError;
@@ -34,9 +35,10 @@ impl From<Reserved> for AttrError {
 
 impl Variation {
     fn create(value: u8) -> Result<Self, Reserved> {
-        match value {
-            0 | 254 | 255 => Err(Reserved(value)),
-            _ => Ok(Self { value }),
+        if is_reserved_variation(value) {
+            Err(Reserved(value))
+        } else {
+            Ok(Self { value })
         }
     }
 
@@ -72,7 +74,7 @@ pub(crate) enum AttrError {
     SetNotDefined(AttrSet),
     /// The attribute does not match the type expected for set 0
     BadType(TypeError),
-    /// The variation is reserved (254 or 255) and cannot be defined, written, or retrieved
+    /// The variation is reserved (0, 254 or 255) and cannot be defined, written, or retrieved
     ReservedVariation(u8),
     /// The attribute is not writable
     NotWritable(AttrSet, u8),

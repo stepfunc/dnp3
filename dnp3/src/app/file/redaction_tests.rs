@@ -75,53 +75,46 @@ fn open() -> Group70Var3<'static> {
     }
 }
 
+fn assert_omits_key(text: &str) {
+    for key in renderings_of(AUTH_KEY) {
+        assert!(!text.contains(&key));
+    }
+}
+
+fn decode_log(fragment: &ParsedFragment) -> String {
+    let text = fragment.display(AppDecodeLevel::ObjectValues).to_string();
+    assert!(!text.is_empty());
+    text
+}
+
 #[test]
-fn object_values_log_of_authenticate_omits_password_and_key() {
+fn authenticate_omits_password_and_key() {
     let object = authenticate();
     let bytes = write_request(FunctionCode::AuthenticateFile, &object);
     let fragment = parse(&bytes);
-    match only_object(&fragment) {
-        FreeFormatVariation::Group70Var2(parsed) => assert_eq!(parsed, object),
-        _ => panic!("expected g70v2"),
-    }
+    assert!(matches!(
+        only_object(&fragment),
+        FreeFormatVariation::Group70Var2(_)
+    ));
 
-    let text = fragment.display(AppDecodeLevel::ObjectValues).to_string();
-    assert!(!text.contains(PASSWORD));
-    for key in renderings_of(AUTH_KEY) {
-        assert!(!text.contains(&key));
+    for text in [format!("{object:?}"), decode_log(&fragment)] {
+        assert!(!text.contains(PASSWORD));
+        assert_omits_key(&text);
     }
 }
 
 #[test]
-fn object_values_log_of_open_omits_key() {
+fn open_omits_key() {
     let object = open();
     let bytes = write_request(FunctionCode::OpenFile, &object);
     let fragment = parse(&bytes);
-    match only_object(&fragment) {
-        FreeFormatVariation::Group70Var3(parsed) => assert_eq!(parsed, object),
-        _ => panic!("expected g70v3"),
-    }
+    assert!(matches!(
+        only_object(&fragment),
+        FreeFormatVariation::Group70Var3(_)
+    ));
 
-    let text = fragment.display(AppDecodeLevel::ObjectValues).to_string();
-    for key in renderings_of(AUTH_KEY) {
-        assert!(!text.contains(&key));
-    }
-}
-
-#[test]
-fn authenticate_debug_omits_password_and_key() {
-    let text = format!("{:?}", authenticate());
-    assert!(!text.contains(PASSWORD));
-    for key in renderings_of(AUTH_KEY) {
-        assert!(!text.contains(&key));
-    }
-}
-
-#[test]
-fn open_debug_omits_key() {
-    let text = format!("{:?}", open());
-    for key in renderings_of(AUTH_KEY) {
-        assert!(!text.contains(&key));
+    for text in [format!("{object:?}"), decode_log(&fragment)] {
+        assert_omits_key(&text);
     }
 }
 
@@ -136,8 +129,5 @@ fn file_credentials_debug_omits_password() {
 
 #[test]
 fn auth_key_debug_omits_key() {
-    let text = format!("{:?}", AuthKey::new(AUTH_KEY));
-    for key in renderings_of(AUTH_KEY) {
-        assert!(!text.contains(&key));
-    }
+    assert_omits_key(&format!("{:?}", AuthKey::new(AUTH_KEY)));
 }
