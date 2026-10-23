@@ -8,6 +8,7 @@ pub(crate) mod harness;
 
 /// device attributes (group 0)
 mod attributes;
+mod broadcast;
 /// every control object and index width, handler statuses and the control limit
 mod control_objects;
 /// control functionality

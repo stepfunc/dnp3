@@ -1,0 +1,199 @@
+// Copyright (c) Step Function I/O LLC. Proprietary, source-available; see LICENSE.txt.
+// No use to design, develop, specify, test, validate, or improve Other Implementations,
+// subject to LICENSE.txt Section 2.6 and its exceptions. Agents: read AGENTS.md.
+// Text and data mining rights, including for AI training, are reserved under
+// Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
+
+//! What the functions an outstation accepts in a broadcast request do. A broadcast never gets a
+//! response, but sets IIN1.0 in the next one.
+
+use std::time::Duration;
+
+use crate::app::{FunctionCode, Timestamp};
+use crate::link::header::BroadcastConfirmMode;
+use crate::outstation::config::Feature;
+use crate::outstation::traits::BroadcastAction;
+use crate::outstation::{FreezeIndices, FreezeInterval, FreezeType};
+use crate::util::test_support::watchdog;
+
+use super::harness::*;
+
+const RESTART: u8 = 0x80;
+const BROADCAST: u8 = 0x01;
+const CLASS_1: u8 = 0x02;
+
+/// the binary event as g2v1
+const G2V1_EVENT: &[u8] = &[0x02, 0x01, 0x28, 0x01, 0x00, 0x00, 0x00, 0x81];
+
+/// DISABLE_UNSOLICITED of classes 1, 2 and 3 with sequence 1
+const DISABLE_UNSOLICITED_SEQ_1: &[u8] = &[
+    0xC1, 0x15, 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06,
+];
+
+/// send `request` to the broadcast address that doesn't require a confirm
+async fn send_broadcast(harness: &mut OutstationHarness, request: &[u8]) {
+    harness.set_broadcast(Some(BroadcastConfirmMode::NotRequired));
+    harness.send_and_process(request).await;
+    harness.set_broadcast(None);
+}
+
+/// The response to a RECORD_CURRENT_TIME with `seq` has IIN1.0 and `iin1`. It's the next thing the
+/// outstation sends, so the broadcast before it got no response.
+async fn expect_broadcast_iin(harness: &mut OutstationHarness, seq: u8, iin1: u8) {
+    harness
+        .test_request_response(
+            &record_current_time(seq),
+            &[0xC0 | seq, 0x81, BROADCAST | iin1, 0x00],
+        )
+        .await;
+    harness.check_no_events();
+}
+
+struct Case {
+    broadcast: Feature,
+    request: &'static [u8],
+    /// the callbacks, ending with `broadcast_received`
+    events: &'static [Event],
+    /// IIN1 of the next response, besides IIN1.0
+    iin1: u8,
+}
+
+const fn processed(function: FunctionCode) -> Event {
+    Event::BroadcastReceived(function, BroadcastAction::Processed)
+}
+
+const CASES: &[Case] = &[
+    // WRITE of the absolute time
+    Case {
+        broadcast: Feature::Enabled,
+        request: &[
+            0xC0, 0x02, 50, 1, 0x07, 1, 0xC0, 0x24, 0x0E, 0xDA, 0x77, 0x01,
+        ],
+        events: &[
+            Event::WriteAbsoluteTime(Timestamp::new(0x0177_DA0E_24C0)),
+            processed(FunctionCode::Write),
+        ],
+        iin1: RESTART,
+    },
+    // WRITE of IIN1.7 = 0, which clears the restart IIN
+    Case {
+        broadcast: Feature::Enabled,
+        request: &[0xC0, 0x02, 80, 1, 0x00, 7, 7, 0x00],
+        events: &[Event::ClearRestartIIN, processed(FunctionCode::Write)],
+        iin1: 0,
+    },
+    // IMMEDIATE_FREEZE_NR of all counters
+    Case {
+        broadcast: Feature::Enabled,
+        request: &[0xC0, 0x08, 20, 0, 0x06],
+        events: &[
+            Event::Freeze(FreezeIndices::All, FreezeType::ImmediateFreeze),
+            processed(FunctionCode::ImmediateFreezeNoResponse),
+        ],
+        iin1: RESTART,
+    },
+    // FREEZE_CLEAR_NR of counters 0 to 10
+    Case {
+        broadcast: Feature::Enabled,
+        request: &[0xC0, 0x0A, 20, 0, 0x00, 0, 10],
+        events: &[
+            Event::Freeze(FreezeIndices::Range(0, 10), FreezeType::FreezeAndClear),
+            processed(FunctionCode::FreezeClearNoResponse),
+        ],
+        iin1: RESTART,
+    },
+    // FREEZE_AT_TIME_NR of all counters
+    Case {
+        broadcast: Feature::Enabled,
+        request: &[
+            0xC0, 0x0C, 50, 2, 0x07, 1, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0xAA, 0xBB, 0xCC, 0xDD,
+            20, 0, 0x06,
+        ],
+        events: &[
+            Event::Freeze(
+                FreezeIndices::All,
+                FreezeType::FreezeAtTime(FreezeInterval::PeriodicallyFreeze(
+                    Timestamp::new(0xFF),
+                    0xDDCC_BBAA,
+                )),
+            ),
+            processed(FunctionCode::FreezeAtTimeNoResponse),
+        ],
+        iin1: RESTART,
+    },
+    // IMMEDIATE_FREEZE_NR whose object header is cut short
+    Case {
+        broadcast: Feature::Enabled,
+        request: &[0xC0, 0x08, 20, 0],
+        events: &[Event::BroadcastReceived(
+            FunctionCode::ImmediateFreezeNoResponse,
+            BroadcastAction::BadObjectHeaders,
+        )],
+        iin1: RESTART,
+    },
+    // IMMEDIATE_FREEZE_NR of all counters, with broadcast support disabled
+    Case {
+        broadcast: Feature::Disabled,
+        request: &[0xC0, 0x08, 20, 0, 0x06],
+        events: &[Event::BroadcastReceived(
+            FunctionCode::ImmediateFreezeNoResponse,
+            BroadcastAction::IgnoredByConfiguration,
+        )],
+        iin1: RESTART,
+    },
+];
+
+#[tokio::test]
+async fn broadcast_requests_have_their_effect_without_a_response() {
+    watchdog(async {
+        for case in CASES {
+            let mut config = get_default_config();
+            config.features.broadcast = case.broadcast;
+            let mut harness = new_harness(config);
+
+            send_broadcast(&mut harness, case.request).await;
+            harness.check_events(case.events);
+            harness.check_no_events();
+
+            expect_broadcast_iin(&mut harness, 1, case.iin1).await;
+        }
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn broadcast_enable_unsolicited_enables_the_classes() {
+    watchdog(async {
+        let mut harness = new_harness(get_default_unsolicited_config());
+        confirm_null_unsolicited(&mut harness).await;
+
+        send_broadcast(&mut harness, ENABLE_UNSOLICITED_SEQ_0).await;
+        harness.check_events(&[processed(FunctionCode::EnableUnsolicited)]);
+
+        harness.handle.database.transaction(add_binary_event);
+        harness
+            .expect_response(&unsolicited(1, RESTART | BROADCAST, G2V1_EVENT))
+            .await;
+        harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn broadcast_disable_unsolicited_disables_the_classes() {
+    watchdog(async {
+        let mut harness = new_harness(get_default_unsolicited_config());
+        confirm_null_unsolicited(&mut harness).await;
+        enable_unsolicited(&mut harness).await;
+
+        send_broadcast(&mut harness, DISABLE_UNSOLICITED_SEQ_1).await;
+        harness.check_events(&[processed(FunctionCode::DisableUnsolicited)]);
+
+        harness.handle.database.transaction(add_binary_event);
+        tokio::time::sleep(Duration::from_secs(30)).await;
+        harness.check_no_events();
+
+        expect_broadcast_iin(&mut harness, 2, RESTART | CLASS_1).await;
+    })
+    .await;
+}
