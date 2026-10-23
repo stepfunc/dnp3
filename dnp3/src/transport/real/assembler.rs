@@ -42,11 +42,6 @@ struct Series {
     len: usize,
 }
 
-pub(crate) enum AssemblyState {
-    Complete,
-    ReadMore,
-}
-
 struct Overflow;
 
 /// Why the assembler discarded a segment or the series in progress
@@ -157,13 +152,13 @@ impl Assembler {
         header: Header,
         data: &[u8],
         mut discard: F,
-    ) -> AssemblyState {
+    ) {
         let series = match self.state {
             State::Idle => None,
             State::Running(series) => Some(series),
             State::Complete { .. } => {
                 discard(Discard::Pending);
-                return AssemblyState::Complete;
+                return;
             }
         };
 
@@ -196,8 +191,6 @@ impl Assembler {
                 source: info.source,
             });
         }
-
-        self.assembly_state()
     }
 
     /// Add a segment that isn't FIR to the series in progress
@@ -238,13 +231,6 @@ impl Assembler {
             self.state = State::Idle;
         } else {
             self.append(series.len, info, header, data, discard);
-        }
-    }
-
-    fn assembly_state(&self) -> AssemblyState {
-        match self.state {
-            State::Complete { .. } => AssemblyState::Complete,
-            State::Idle | State::Running(_) => AssemblyState::ReadMore,
         }
     }
 
@@ -350,11 +336,9 @@ mod tests {
         fn segment(&mut self, info: FrameInfo, fir: bool, fin: bool, seq: u8, data: &[u8]) -> bool {
             let header = crate::link::test_data::segment(fir, fin, seq);
             let discards = &mut self.discards;
-            matches!(
-                self.assembler
-                    .assemble(info, header, data, |d| discards.push(d)),
-                AssemblyState::Complete
-            )
+            self.assembler
+                .assemble(info, header, data, |d| discards.push(d));
+            self.assembler.peek().is_some()
         }
 
         fn first(&mut self, seq: u8, data: &[u8]) -> bool {
@@ -1173,8 +1157,8 @@ mod tests {
                 Op::Segment(x) => {
                     let header = Header::new(x.fin, x.fir, Sequence::new(x.seq));
                     let mut discards = Vec::new();
-                    let state = assembler.assemble(x.info, header, &x.data, |d| discards.push(d));
-                    Outcome::Assembled(matches!(state, AssemblyState::Complete), discards)
+                    assembler.assemble(x.info, header, &x.data, |d| discards.push(d));
+                    Outcome::Assembled(assembler.peek().is_some(), discards)
                 }
                 Op::Peek => Outcome::Peeked(assembler.peek().map(Completed::new)),
                 Op::Pop => Outcome::Popped(assembler.pop().map(Completed::new)),

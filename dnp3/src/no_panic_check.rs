@@ -29,7 +29,7 @@ use crate::link::{EndpointAddress, LinkErrorMode, LinkRole};
 use crate::master::extract::{extract_header, Extracted, ProcessableResponse};
 use crate::master::{HeaderInfo, ReadHandler};
 use crate::outstation::Feature;
-use crate::transport::real::assembler::{Assembler, AssemblyState};
+use crate::transport::real::assembler::Assembler;
 use crate::transport::real::header::Header;
 use crate::util::phys::PhysAddr;
 
@@ -190,12 +190,11 @@ fn validate(objects: HeaderCollection) -> bool {
 fn assemble(assembler: &mut Assembler, info: FrameInfo, segment: &[u8]) -> usize {
     if let [transport, data @ ..] = segment {
         let header = Header::from_u8(*transport);
-        if let AssemblyState::Complete = assembler.assemble(info, header, data, |_| {}) {
-            let peeked = assembler.peek().map_or(0, |fragment| fragment.data.len());
-            return assembler
-                .pop()
-                .map_or(peeked, |fragment| fragment.data.len());
-        }
+        assembler.assemble(info, header, data, |_| {});
+        let peeked = assembler.peek().map_or(0, |fragment| fragment.data.len());
+        return assembler
+            .pop()
+            .map_or(peeked, |fragment| fragment.data.len());
     }
     0
 }
