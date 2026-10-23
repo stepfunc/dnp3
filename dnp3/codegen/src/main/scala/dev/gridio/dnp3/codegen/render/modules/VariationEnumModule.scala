@@ -119,8 +119,19 @@ object VariationEnumModule extends Module {
 
 
 
+    def hasRelativeTimeFn : Iterator[String] = {
+      val names = ObjectGroup.allVariations.collect {
+        case fs : FixedSize if fs.hasRelativeTime => s"Variation::${fs.name}"
+      }
+
+      "/// True if objects of this variation have a time relative to a common time of occurrence".eol ++
+      bracket("pub(crate) fn has_relative_time(self) -> bool") {
+        s"matches!(self, ${names.mkString(" | ")})".eol
+      }
+    }
+
     bracket("impl Variation") {
-      lookupFn ++ space ++ getGroupVarFn ++ space ++ descriptionFn
+      lookupFn ++ space ++ getGroupVarFn ++ space ++ descriptionFn ++ space ++ hasRelativeTimeFn
     }
 
   }

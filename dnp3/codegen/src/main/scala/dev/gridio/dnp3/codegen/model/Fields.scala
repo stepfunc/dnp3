@@ -38,6 +38,9 @@ object FixedSizeField {
   val time16 = FixedSizeField("time", UInt16Field, Some(FieldAttribute.Timestamp16))
   val time48 = FixedSizeField("time", TimestampField, Some(FieldAttribute.Timestamp48))
 
+  // time delay, not relative to a common time of occurrence
+  val delay16 = FixedSizeField("time", UInt16Field)
+
   // counter values
   val count16 = FixedSizeField("value", UInt16Field, Some(FieldAttribute.Value))
   val count32 = FixedSizeField("value", UInt32Field, Some(FieldAttribute.Value))
