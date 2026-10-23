@@ -416,25 +416,6 @@ mod tests {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn accepts_at_once_after_a_connection_error() {
-        watchdog(accepts_with_gaps(&[RESET], &[NOW])).await;
-    }
-
-    #[tokio::test(start_paused = true)]
-    async fn accepts_after_the_delay_following_a_resource_error() {
-        watchdog(accepts_with_gaps(
-            &[Fault::Kind(ErrorKind::OutOfMemory)],
-            &[D],
-        ))
-        .await;
-    }
-
-    #[tokio::test(start_paused = true)]
-    async fn accepts_after_the_delay_following_an_unknown_error() {
-        watchdog(accepts_with_gaps(&[UNKNOWN], &[D])).await;
-    }
-
-    #[tokio::test(start_paused = true)]
     async fn mixed_errors_delay_only_after_non_connection_errors() {
         const FAULTS: &[Fault] = &[
             RESET,

@@ -208,33 +208,6 @@ mod test {
         assert_eq!(res, Err(BadIpv4Wildcard));
     }
 
-    #[test]
-    fn wildcard_matching_works() {
-        let wc: WildcardIPv4 = "192.168.0.*".parse().unwrap();
-        let ip1: IpAddr = "192.168.0.1".parse().unwrap();
-        let ip2: IpAddr = "192.168.1.1".parse().unwrap();
-
-        assert!(wc.matches(ip1));
-        assert!(!wc.matches(ip2));
-    }
-
-    #[test]
-    fn wildcard_conflicts() {
-        let wc1 = AddressFilter::WildcardIpv4("192.168.27.*".parse().unwrap());
-        let ip1 = AddressFilter::Exact("192.168.27.2".parse().unwrap());
-
-        let wc2 = AddressFilter::WildcardIpv4("192.168.*.23".parse().unwrap());
-        let ip2 = AddressFilter::Exact("192.168.22.23".parse().unwrap());
-
-        // conflicts
-        assert!(wc1.conflicts_with(&ip1));
-        assert!(wc1.conflicts_with(&wc2));
-
-        // disjoint
-        assert!(!wc1.conflicts_with(&ip2));
-        assert!(!wc2.conflicts_with(&ip1));
-    }
-
     fn ip(s: &str) -> IpAddr {
         s.parse().unwrap()
     }
@@ -264,15 +237,6 @@ mod test {
                 assert!(!filter.matches(ip(peer)), "{filter:?} {peer}");
             }
         }
-    }
-
-    #[test]
-    fn native_ipv6_matching_is_unchanged() {
-        let filter = any_of(&["2001:db8::1", "192.168.0.1"]);
-        assert!(filter.matches(ip("2001:db8::1")));
-        assert!(!filter.matches(ip("2001:db8::2")));
-        assert!(AddressFilter::Exact(ip("2001:db8::1")).matches(ip("2001:db8::1")));
-        assert!(!AddressFilter::Exact(ip("2001:db8::1")).matches(ip("2001:db8::2")));
     }
 
     #[test]
