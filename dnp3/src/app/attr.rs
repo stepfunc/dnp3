@@ -1017,6 +1017,9 @@ impl OwnedAttrValue {
 pub enum BadAttribute {
     /// length of the string attribute exceeds what's encodable (max 255)
     BadLength(usize),
+    /// variation can't be written as an attribute value: 0 doesn't exist, 254 is the request for
+    /// all attributes and 255 is the list of attribute variations, which only an outstation sends
+    BadVariation(u8),
 }
 
 impl Display for BadAttribute {
@@ -1025,6 +1028,10 @@ impl Display for BadAttribute {
             BadAttribute::BadLength(x) => write!(
                 f,
                 "Data length {x} can not be encoded in a device attribute (max = 255)"
+            ),
+            BadAttribute::BadVariation(x) => write!(
+                f,
+                "Variation {x} can not be written as a device attribute value (0, 254 and 255 are reserved)"
             ),
         }
     }
@@ -1354,6 +1361,16 @@ impl OwnedAttribute {
             set: self.set,
             variation: self.variation,
             value: self.value.view(),
+        }
+    }
+
+    /// Check that the variation and value can be encoded as an attribute header
+    pub(crate) fn check_encodable(&self) -> Result<(), BadAttribute> {
+        match self.variation {
+            0 | var::ALL_ATTRIBUTES_REQUEST | var::LIST_OF_ATTRIBUTE_VARIATIONS => {
+                Err(BadAttribute::BadVariation(self.variation))
+            }
+            _ => self.value.check_encodable(),
         }
     }
 }
@@ -2136,6 +2153,31 @@ mod test {
                     assert_eq!(reported, variation);
                 }
             }
+        }
+    }
+
+    #[test]
+    fn only_variations_that_carry_a_value_are_encodable() {
+        let attr = |variation, value| OwnedAttribute::new(AttrSet::Default, variation, value);
+        let small = || OwnedAttrValue::UnsignedInt(0);
+        let long = || OwnedAttrValue::VisibleString("a".repeat(256));
+
+        for variation in [
+            0,
+            var::ALL_ATTRIBUTES_REQUEST,
+            var::LIST_OF_ATTRIBUTE_VARIATIONS,
+        ] {
+            let expected = Err(BadAttribute::BadVariation(variation));
+            assert_eq!(attr(variation, small()).check_encodable(), expected);
+            assert_eq!(attr(variation, long()).check_encodable(), expected);
+        }
+
+        for variation in [1, var::DEVICE_MANUFACTURER_NAME, 253] {
+            assert_eq!(attr(variation, small()).check_encodable(), Ok(()));
+            assert_eq!(
+                attr(variation, long()).check_encodable(),
+                Err(BadAttribute::BadLength(256))
+            );
         }
     }
 }

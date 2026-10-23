@@ -460,6 +460,13 @@ impl Header {
         Ok(())
     }
 
+    fn validate(&self) -> Result<(), BadEncoding> {
+        match self {
+            Header::Read(_) | Header::TimeAndInterval(_) => Ok(()),
+            Header::Attribute(x) => x.check_encodable().map_err(BadEncoding::Attribute),
+        }
+    }
+
     #[cfg(feature = "ffi")]
     pub(crate) fn to_read_header(&self) -> Option<ReadHeader> {
         match self {
@@ -553,6 +560,10 @@ impl Headers {
     }
 
     pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
+        for header in self.headers.iter() {
+            header.validate().map_err(TaskError::BadEncoding)?;
+        }
+
         for header in self.headers.iter() {
             header.format(writer)?;
         }
@@ -1229,5 +1240,48 @@ mod tests {
         for (sent, echo) in pairs {
             check(&sent, &echo, Err(CommandResponseError::ObjectValueMismatch));
         }
+    }
+
+    #[test]
+    fn attribute_with_a_variation_that_cannot_carry_a_value_leaves_the_cursor_untouched() {
+        use crate::app::attr::{var, BadAttribute, OwnedAttrValue};
+
+        let headers = |variation| {
+            Headers::new()
+                .add_all_objects(Variation::Group60Var1)
+                .add_attribute(OwnedAttribute::new(
+                    AttrSet::Default,
+                    variation,
+                    OwnedAttrValue::UnsignedInt(0),
+                ))
+        };
+
+        for variation in [
+            0,
+            var::ALL_ATTRIBUTES_REQUEST,
+            var::LIST_OF_ATTRIBUTE_VARIATIONS,
+        ] {
+            let mut buffer = [0u8; 64];
+            let mut cursor = WriteCursor::new(&mut buffer);
+            cursor.write_u8(0xAA).unwrap();
+
+            assert_eq!(
+                headers(variation).write(&mut HeaderWriter::new(&mut cursor)),
+                Err(TaskError::BadEncoding(BadEncoding::Attribute(
+                    BadAttribute::BadVariation(variation)
+                )))
+            );
+            assert_eq!(cursor.written(), &[0xAA]);
+        }
+
+        let mut buffer = [0u8; 64];
+        let mut cursor = WriteCursor::new(&mut buffer);
+        headers(var::DEVICE_MANUFACTURER_NAME)
+            .write(&mut HeaderWriter::new(&mut cursor))
+            .unwrap();
+        assert_eq!(
+            cursor.written(),
+            &[60, 1, 0x06, 0, 252, 0x00, 0, 0, 2, 1, 0]
+        );
     }
 }
