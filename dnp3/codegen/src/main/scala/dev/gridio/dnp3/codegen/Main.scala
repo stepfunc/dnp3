@@ -46,6 +46,8 @@ object Main {
     (ConversionsModule, implPath.resolve("conversion.rs")),
     // the outstation's static and event variation enums
     (OutstationVariationModule, databasePath.resolve("variations.rs")),
+    // what the outstation selects when a READ names each variation
+    (OutstationReadTargetModule, databasePath.resolve("read/target.rs")),
     // the FFI Variation enum and its conversions
     (FfiVariationSchemaModule, ffiPath.resolve("dnp3-schema/src/variation.rs")),
     (FfiVariationConversionModule, ffiPath.resolve("dnp3-ffi/src/variation.rs")),
