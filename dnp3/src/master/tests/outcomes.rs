@@ -635,25 +635,11 @@ async fn no_task_confirms_a_response_with_con_whose_objects_do_not_parse() {
             // a valid fragment whose object header is cut short after its group
             let response = with_con(vec![0xC0, 0x81, 0x00, 0x00, 0x01]);
             respond(&mut started.harness, response).await;
-            let err = match kind {
-                Kind::Read
-                | Kind::DirectOperate
-                | Kind::SelectBeforeOperate
-                | Kind::ColdRestart
-                | Kind::AuthFile
-                | Kind::OpenFile
-                | Kind::CloseFile
-                | Kind::WriteFileBlock
-                | Kind::GetFileInfo
-                | Kind::ReadDirectory => {
-                    TaskError::MalformedResponse(ObjectParseError::InsufficientBytes)
-                }
-                // these tasks expect no objects, and reject any without parsing them
-                Kind::EmptyResponse | Kind::DeadBands | Kind::TimeSync => {
-                    TaskError::UnexpectedResponseHeaders
-                }
-            };
-            started.expect_failure(err).await;
+            started
+                .expect_failure(TaskError::MalformedResponse(
+                    ObjectParseError::InsufficientBytes,
+                ))
+                .await;
             assert_eq!(started.harness.io.pop_event(), None, "{kind:?}");
         }
     })
