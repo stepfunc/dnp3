@@ -10,6 +10,9 @@
 //! by trying to bind it, and whether its task is still running. The master tests pause the clock;
 //! the master has no associations, so its own retry wait is the only timer. With the clock paused,
 //! the outstation's session fails and starts its retry wait before the clock moves.
+//!
+//! The tests of where datagrams are accepted from and sent to use the real clock, because the
+//! socket modes are kernel behavior that only real sockets show.
 
 use std::net::SocketAddr;
 use std::time::Duration;
@@ -18,8 +21,11 @@ use tokio::net::UdpSocket;
 
 use crate::app::Timeout;
 use crate::link::{EndpointAddress, LinkReadMode};
-use crate::master::{MasterChannel, MasterChannelConfig};
-use crate::outstation::{DefaultControlHandler, OutstationHandle};
+use crate::master::{
+    AssociationConfig, AssociationHandle, AssociationHandler, AssociationInformation, Classes,
+    MasterChannel, MasterChannelConfig, ReadHandler, ReadRequest,
+};
+use crate::outstation::{DefaultControlHandler, Feature, OutstationConfig, OutstationHandle};
 use crate::udp::{OutstationUdpConfig, UdpSocketMode};
 use crate::util::test_support::{
     outstation_config, watchdog, NullApplication, NullInformation, MASTER_REPLY, MASTER_REQUEST,
@@ -168,16 +174,30 @@ async fn master_shutdown_during_a_retry_wait_ends_the_task_at_once() {
 }
 
 fn spawn_outstation(local: SocketAddr, remote: SocketAddr) -> OutstationHandle {
+    spawn_outstation_with(
+        UdpSocketMode::OneToMany,
+        outstation_config(1024, 1),
+        local,
+        remote,
+    )
+}
+
+fn spawn_outstation_with(
+    socket_mode: UdpSocketMode,
+    config: OutstationConfig,
+    local: SocketAddr,
+    remote: SocketAddr,
+) -> OutstationHandle {
     let udp_config = OutstationUdpConfig {
         local_endpoint: local,
         remote_endpoint: remote,
-        socket_mode: UdpSocketMode::OneToMany,
+        socket_mode,
         link_read_mode: LinkReadMode::Datagram,
         retry_delay: Timeout::from_secs(2).unwrap(),
     };
     crate::udp::spawn_outstation_udp(
         udp_config,
-        outstation_config(1024, 1),
+        config,
         Box::new(NullApplication),
         Box::new(NullInformation),
         DefaultControlHandler::create(),
@@ -257,6 +277,164 @@ async fn outstation_keeps_answering_after_an_oversized_datagram() {
                 (Some(OUTSTATION_REPLY.as_slice()), local)
             );
         }
+    })
+    .await;
+}
+
+/// Receive the null unsolicited response that the outstation at `outstation` sends when it starts
+async fn expect_null_unsolicited(socket: &UdpSocket, outstation: SocketAddr) {
+    let mut buffer = [0; 64];
+    let (count, source) = socket.recv_from(&mut buffer).await.unwrap();
+    assert_eq!(
+        (count, buffer.get(..10), source),
+        (17, Some(NULL_UNSOLICITED_HEADER.as_slice()), outstation)
+    );
+}
+
+/// Request link status from the outstation at `outstation` as master 1 and check the reply
+async fn exchange_with_outstation(socket: &UdpSocket, outstation: SocketAddr) {
+    socket.send_to(&MASTER_REQUEST, outstation).await.unwrap();
+    let mut buffer = [0; 64];
+    let (count, source) = socket.recv_from(&mut buffer).await.unwrap();
+    assert_eq!(
+        (buffer.get(..count), source),
+        (Some(OUTSTATION_REPLY.as_slice()), outstation)
+    );
+}
+
+/// The socket has no datagram waiting
+///
+/// The outstation answers requests in order, and loopback delivers a datagram before its send
+/// returns, so after the answer to a later request this shows that an earlier one wasn't answered.
+fn assert_nothing_received(socket: UdpSocket) {
+    let socket = socket.into_std().unwrap();
+    let mut buffer = [0; 64];
+    assert_eq!(
+        socket.recv_from(&mut buffer).map_err(|err| err.kind()),
+        Err(std::io::ErrorKind::WouldBlock)
+    );
+}
+
+#[tokio::test]
+async fn one_to_one_outstation_ignores_datagrams_from_other_addresses() {
+    watchdog(async {
+        let (local, reservation) = reserve();
+        let master = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        let other = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        drop(reservation);
+        let _handle = spawn_outstation_with(
+            UdpSocketMode::OneToOne,
+            outstation_config(1024, 1),
+            local,
+            master.local_addr().unwrap(),
+        );
+        expect_null_unsolicited(&master, local).await;
+
+        other.send_to(&MASTER_REQUEST, local).await.unwrap();
+        exchange_with_outstation(&master, local).await;
+        assert_nothing_received(other);
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn one_to_many_outstation_answers_each_requester_at_its_address() {
+    watchdog(async {
+        let (local, reservation) = reserve();
+        let remote = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        let first = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        let second = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        drop(reservation);
+        let _handle = spawn_outstation(local, remote.local_addr().unwrap());
+        expect_null_unsolicited(&remote, local).await;
+
+        exchange_with_outstation(&first, local).await;
+        exchange_with_outstation(&second, local).await;
+        // the remote endpoint is only for unsolicited responses
+        assert_nothing_received(remote);
+    })
+    .await;
+}
+
+struct NullReadHandler;
+impl ReadHandler for NullReadHandler {}
+
+struct NullAssociationHandler;
+impl AssociationHandler for NullAssociationHandler {}
+
+struct NullAssociationInformation;
+impl AssociationInformation for NullAssociationInformation {}
+
+/// Outstation 1024 at `local`, answering master 1 and sending no unsolicited responses
+fn spawn_quiet_outstation(local: SocketAddr, master: SocketAddr) -> OutstationHandle {
+    let mut config = outstation_config(1024, 1);
+    config.features.unsolicited = Feature::Disabled;
+    spawn_outstation_with(UdpSocketMode::OneToMany, config, local, master)
+}
+
+/// An enabled master at `local` with a quiet association to outstation 1024 at `destination`
+async fn spawn_associated_master(
+    local: SocketAddr,
+    destination: SocketAddr,
+) -> (MasterChannel, AssociationHandle) {
+    let mut channel = spawn_master(local);
+    channel.enable().await.unwrap();
+    let association = channel
+        .add_udp_association(
+            EndpointAddress::try_new(1024).unwrap(),
+            destination,
+            AssociationConfig::quiet(),
+            Box::new(NullReadHandler),
+            Box::new(NullAssociationHandler),
+            Box::new(NullAssociationInformation),
+        )
+        .await
+        .unwrap();
+    (channel, association)
+}
+
+fn class0_read() -> ReadRequest {
+    ReadRequest::class_scan(Classes::class0())
+}
+
+#[tokio::test]
+async fn master_udp_association_reads_from_its_destination() {
+    watchdog(async {
+        let (master, master_reservation) = reserve();
+        let (outstation, outstation_reservation) = reserve();
+        drop((master_reservation, outstation_reservation));
+        let _outstation = spawn_quiet_outstation(outstation, master);
+        let (_channel, mut association) = spawn_associated_master(master, outstation).await;
+        assert_eq!(association.read(class0_read()).await, Ok(()));
+    })
+    .await;
+}
+
+/// The master matches a solicited response by its link address alone, not by the address it came
+/// from, so a response relayed from another port completes the request
+#[tokio::test]
+async fn master_udp_association_accepts_a_response_from_another_port() {
+    watchdog(async {
+        let (master, master_reservation) = reserve();
+        let (outstation, outstation_reservation) = reserve();
+        let destination = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        let relay = UdpSocket::bind("127.0.0.1:0").await.unwrap();
+        drop((master_reservation, outstation_reservation));
+        let _outstation = spawn_quiet_outstation(outstation, master);
+        let (_channel, mut association) =
+            spawn_associated_master(master, destination.local_addr().unwrap()).await;
+
+        let forward = async {
+            let mut buffer = [0; 2048];
+            let (count, source) = destination.recv_from(&mut buffer).await.unwrap();
+            assert_eq!(source, master);
+            relay.send_to(&buffer[..count], outstation).await.unwrap();
+            let (count, source) = relay.recv_from(&mut buffer).await.unwrap();
+            assert_eq!(source, outstation);
+            relay.send_to(&buffer[..count], master).await.unwrap();
+        };
+        let ((), result) = tokio::join!(forward, association.read(class0_read()));
+        assert_eq!(result, Ok(()));
     })
     .await;
 }
