@@ -34,6 +34,7 @@ FILES=(
   conformance/pom.xml
   ffi/bindings/java/pom.xml
   ffi/bindings/java/examples/pom.xml
+  ffi/bindings/java/dnp3-tests/pom.xml
   ffi/bindings/dotnet/examples/master/Master.csproj
   ffi/bindings/dotnet/examples/outstation/Outstation.csproj
   ffi/bindings/c/CMakeLists.txt

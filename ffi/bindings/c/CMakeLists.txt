@@ -65,3 +65,25 @@ add_custom_command(TARGET master_example POST_BUILD
 add_custom_command(TARGET outstation_example POST_BUILD 
     COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:dnp3> $<TARGET_FILE_DIR:outstation_example>
 )
+
+# -------------- smoke tests -----------------
+
+# Run by ctest: an outstation and a master in one process, talking over TCP loopback
+enable_testing()
+find_package(Threads REQUIRED)
+
+add_executable(smoke_test smoke_test.c)
+target_link_libraries(smoke_test PRIVATE dnp3 Threads::Threads)
+add_test(NAME smoke_test COMMAND smoke_test)
+
+add_executable(cpp_smoke_test smoke_test.cpp ${DNP3_CPP_FILE})
+target_link_libraries(cpp_smoke_test PRIVATE dnp3_cpp)
+add_test(NAME cpp_smoke_test COMMAND cpp_smoke_test)
+
+set_tests_properties(smoke_test cpp_smoke_test PROPERTIES TIMEOUT 60)
+
+foreach(test smoke_test cpp_smoke_test)
+    add_custom_command(TARGET ${test} POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:dnp3> $<TARGET_FILE_DIR:${test}>
+    )
+endforeach()
