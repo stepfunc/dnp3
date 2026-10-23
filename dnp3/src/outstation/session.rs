@@ -345,6 +345,15 @@ struct ExpectedConfirm {
     deadline: tokio::time::Instant,
 }
 
+/// What [`OutstationSession::accept`] did with a request
+#[derive(Copy, Clone)]
+struct Accepted {
+    /// the confirm that the answer waits for
+    confirm: Option<ResponseSeries>,
+    /// how a broadcast request was processed
+    broadcast: Option<BroadcastAction>,
+}
+
 #[derive(Copy, Clone)]
 enum UnsolicitedWaitResult {
     Timeout,
@@ -944,39 +953,24 @@ impl OutstationSession {
         };
 
         let selection = self.take_selection(&received.fragment);
-        let disable = self.processes_disable_unsolicited(&received);
+        let function = received.request.header.function;
+        let direct = matches!(received.fragment, FragmentType::NewNonRead(..));
 
         // Table 6-1 rows 24-29: a request ends the wait for a solicited confirm, and an answer that
         // asks for one starts it again
-        let confirm = self
+        let accepted = self
             .accept(io, out, database, received, selection, Reads::Defer)
             .await?;
-        wait.solicited = confirm.map(|series| ExpectedConfirm {
+        wait.solicited = accepted.confirm.map(|series| ExpectedConfirm {
             ecsn: series.ecsn,
             deadline: self.new_confirm_deadline(),
         });
 
-        wait.disabled |= disable;
+        // any DISABLE_UNSOLICITED processed, directly or as a broadcast, whatever classes it names
+        wait.disabled |= function == FunctionCode::DisableUnsolicited
+            && (direct || accepted.broadcast == Some(BroadcastAction::Processed));
 
         Ok(UnsolicitedWaitResult::ReadNext)
-    }
-
-    /// Whether the request is a DISABLE_UNSOLICITED that will be processed, either directly or as a
-    /// broadcast, whatever classes it names
-    fn processes_disable_unsolicited(&self, received: &Received) -> bool {
-        if received.request.header.function != FunctionCode::DisableUnsolicited {
-            return false;
-        }
-        match received.fragment {
-            FragmentType::NewNonRead(..) => true,
-            FragmentType::Broadcast(_) => {
-                !self.config.broadcast.is_disabled() && received.request.objects.is_ok()
-            }
-            FragmentType::MalformedRequest(..)
-            | FragmentType::NewRead(..)
-            | FragmentType::RepeatRead(..)
-            | FragmentType::RepeatNonRead(..) => false,
-        }
     }
 
     fn confirm_in_unsolicited_wait(
@@ -1152,6 +1146,7 @@ impl OutstationSession {
                 self.info.process_request_from_idle(received.request.header);
                 self.accept(io, out, database, received, selection, Reads::Answer)
                     .await?
+                    .confirm
             }
         };
         drop(guard);
@@ -1214,7 +1209,8 @@ impl OutstationSession {
 
     /// Accept a request in idle or the unsolicited confirm wait (IEEE 1815-2012 Table 6-1 rows
     /// 4-9 and 24-29): answer it, or defer a READ. A request that isn't a READ discards the
-    /// deferred READ. Returns the confirm that the answer waits for.
+    /// deferred READ. Returns the confirm that the answer waits for, and how a broadcast was
+    /// processed.
     async fn accept<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
@@ -1223,7 +1219,7 @@ impl OutstationSession {
         received: Received<'_>,
         selection: Option<SelectState>,
         reads: Reads,
-    ) -> Result<Option<ResponseSeries>, LinkError> {
+    ) -> Result<Accepted, LinkError> {
         let Received {
             info,
             request,
@@ -1235,7 +1231,7 @@ impl OutstationSession {
             self.state.deferred_read.clear();
         }
 
-        match fragment {
+        let confirm = match fragment {
             FragmentType::NewRead(hash, objects) | FragmentType::RepeatRead(hash, objects) => {
                 match reads {
                     Reads::Answer => {
@@ -1305,10 +1301,18 @@ impl OutstationSession {
                 Ok(out.sol.header().and_then(Self::awaited_confirm))
             }
             FragmentType::Broadcast(mode) => {
-                self.process_broadcast(database, mode, request).await;
-                Ok(None)
+                let action = self.process_broadcast(database, mode, request).await;
+                return Ok(Accepted {
+                    confirm: None,
+                    broadcast: Some(action),
+                });
             }
-        }
+        }?;
+
+        Ok(Accepted {
+            confirm,
+            broadcast: None,
+        })
     }
 
     /// Answer a request with an unknown function code with IIN2.0. It ends the selection and
@@ -2148,11 +2152,12 @@ impl OutstationSession {
         database: &mut DatabaseHandle,
         mode: BroadcastConfirmMode,
         request: Request<'_>,
-    ) {
+    ) -> BroadcastAction {
         self.state.broadcast.received(mode);
         let action = self.process_broadcast_get_action(database, request).await;
         self.info
-            .broadcast_received(request.header.function, action)
+            .broadcast_received(request.header.function, action);
+        action
     }
 
     async fn process_broadcast_get_action(
