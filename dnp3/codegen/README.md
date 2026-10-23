@@ -15,6 +15,8 @@ The code generator creates the following Rust source files:
 - `../src/app/gen/prefixed.rs` - Prefixed variations (with size prefix)
 - `../src/app/gen/read.rs` - The variations a READ request can carry with each qualifier
 - `../src/app/gen/conversion.rs` - Type conversion implementations
+- `../../ffi/dnp3-schema/src/variation.rs` - The FFI `Variation` enum in the bindings schema
+- `../../ffi/dnp3-ffi/src/variation.rs` - Conversions between the FFI `Variation` enum and `dnp3::app::Variation`
 
 ## Requirements
 
