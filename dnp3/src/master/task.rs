@@ -619,6 +619,11 @@ impl MasterSession {
                     break 'failed TaskError::MultiFragmentResponse;
                 }
 
+                // a response for a removed association isn't processed, so it isn't confirmed
+                if let Err(err) = self.associations.get_mut(dest.link) {
+                    break 'failed err.into();
+                }
+
                 // confirm before handling the response, so the confirm precedes any next request
                 if response.header.control.con && response.objects.is_ok() {
                     if let Err(err) = self
