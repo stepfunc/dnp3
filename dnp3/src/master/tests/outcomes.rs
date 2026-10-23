@@ -1011,28 +1011,40 @@ async fn queued_tasks_fail_with_no_such_association_when_the_association_is_remo
     .await;
 }
 
+/// A response with CON isn't confirmed either, since it's for an association that no longer exists
 #[tokio::test(start_paused = true)]
 async fn every_task_fails_with_no_such_association_when_removed_while_it_waits() {
     watchdog(async {
-        for kind in KINDS {
-            let mut started = start(kind).await;
-            started
-                .harness
-                .master
-                .remove_association(OUTSTATION)
-                .await
-                .unwrap();
-            barrier(&mut started.harness).await;
-            let response = kind.first_response(&started.request);
-            respond(&mut started.harness, response).await;
+        for con in [false, true] {
+            for kind in KINDS {
+                let mut started = start(kind).await;
+                started
+                    .harness
+                    .master
+                    .remove_association(OUTSTATION)
+                    .await
+                    .unwrap();
+                barrier(&mut started.harness).await;
+                let response = kind.first_response(&started.request);
+                let response = if con { with_con(response) } else { response };
+                respond(&mut started.harness, response).await;
 
-            let err = TaskError::NoSuchAssociation(OUTSTATION);
-            assert_eq!(started.reply().await, kind.failed(err), "{kind:?}");
-            barrier(&mut started.harness).await;
-            assert_eq!(started.harness.read_events.pop(), [], "{kind:?}");
-            assert_eq!(started.harness.assoc_events.pop(), [], "{kind:?}");
-            assert_eq!(started.harness.io.pop_event(), None, "{kind:?}");
-            assert!(!started.harness.task.is_finished(), "{kind:?}");
+                let err = TaskError::NoSuchAssociation(OUTSTATION);
+                assert_eq!(
+                    started.reply().await,
+                    kind.failed(err),
+                    "{kind:?} con: {con}"
+                );
+                barrier(&mut started.harness).await;
+                assert_eq!(started.harness.read_events.pop(), [], "{kind:?} con: {con}");
+                assert_eq!(
+                    started.harness.assoc_events.pop(),
+                    [],
+                    "{kind:?} con: {con}"
+                );
+                assert_eq!(started.harness.io.pop_event(), None, "{kind:?} con: {con}");
+                assert!(!started.harness.task.is_finished(), "{kind:?} con: {con}");
+            }
         }
     })
     .await;
