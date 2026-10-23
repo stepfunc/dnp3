@@ -20,16 +20,16 @@ object Group50 extends ObjectGroup {
   override def groupType: GroupType = GroupType.Time
 }
 
-object Group50Var1 extends FixedSize(Group50, 1, "Absolute Time")(time48)
+object Group50Var1 extends FixedSize(Group50, 1, "Absolute time")(time48)
 
 object Group50Var2 extends FixedSize(Group50, 2, "Absolute time and interval")(
   time48,
   FixedSizeField("interval", UInt32Field)
 )
 
-object Group50Var3 extends FixedSize(Group50, 3, "Absolute Time at last recorded time")(time48)
+object Group50Var3 extends FixedSize(Group50, 3, "Last recorded time")(time48)
 
-object Group50Var4 extends FixedSize(Group50, 4, "Indexed absolute time and long interval")(
+object Group50Var4 extends FixedSize(Group50, 4, "Indexed time and long interval")(
   time48,
   FixedSizeField("interval", UInt32Field),
   FixedSizeField("units", UInt8Field)

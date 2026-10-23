@@ -26,21 +26,21 @@ use scursor::ReadCursor;
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum CountVariation<'a> {
-    /// Time and Date - Absolute Time
+    /// Time and Date - Absolute time
     Group50Var1(CountSequence<'a, Group50Var1>),
     /// Time and Date - Absolute time and interval
     Group50Var2(CountSequence<'a, Group50Var2>),
-    /// Time and Date - Absolute Time at last recorded time
+    /// Time and Date - Last recorded time
     Group50Var3(CountSequence<'a, Group50Var3>),
-    /// Time and Date - Indexed absolute time and long interval
+    /// Time and Date - Indexed time and long interval
     Group50Var4(CountSequence<'a, Group50Var4>),
-    /// Time and Date CTO - Absolute time, synchronized
+    /// Time and Date CTO - Synchronized absolute time
     Group51Var1(CountSequence<'a, Group51Var1>),
-    /// Time and Date CTO - Absolute time, unsynchronized
+    /// Time and Date CTO - Unsynchronized absolute time
     Group51Var2(CountSequence<'a, Group51Var2>),
-    /// Time Delay - Coarse
+    /// Time Delay - Coarse (seconds)
     Group52Var1(CountSequence<'a, Group52Var1>),
-    /// Time Delay - Fine
+    /// Time Delay - Fine (milliseconds)
     Group52Var2(CountSequence<'a, Group52Var2>),
 }
 

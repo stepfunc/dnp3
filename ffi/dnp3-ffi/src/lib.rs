@@ -41,6 +41,8 @@ mod request;
 mod runtime;
 mod tcp;
 mod tracing;
+#[rustfmt::skip]
+mod variation;
 mod write_dead_band_request;
 
 mod app_options;

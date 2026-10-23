@@ -23,6 +23,6 @@ object Group11 extends ObjectGroup {
 
 object Group11Var0 extends AnyVariation(Group11, 0)
 
-object Group11Var1 extends FixedSize(Group11, 1, outputStatusWithoutTime)(flags)
+object Group11Var1 extends FixedSize(Group11, 1, withoutTime)(flags)
 
-object Group11Var2 extends FixedSize(Group11, 2, outputStatusWithTime)(flags, time48)
+object Group11Var2 extends FixedSize(Group11, 2, withTime)(flags, time48)

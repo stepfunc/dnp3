@@ -26,243 +26,243 @@ use scursor::*;
 /// All variations supported by the library
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Variation {
-    /// Device Attributes - Non-Specific All Attributes Request
+    /// Device Attributes - All attributes request
     Group0Var254,
-    /// Device Attributes - Specific Attribute
+    /// Device Attributes - Specific attribute (variations 1 to 253 and 255)
     Group0(u8),
-    /// Binary Input - Any Variation
+    /// Binary Input - Any variation
     Group1Var0,
-    /// Binary Input - Packed Format
+    /// Binary Input - Packed format
     Group1Var1,
-    /// Binary Input - With Flags
+    /// Binary Input - With flags
     Group1Var2,
-    /// Binary Input Event - Any Variation
+    /// Binary Input Event - Any variation
     Group2Var0,
-    /// Binary Input Event - Without Time
+    /// Binary Input Event - Without time
     Group2Var1,
-    /// Binary Input Event - With Absolute Time
+    /// Binary Input Event - With absolute time
     Group2Var2,
-    /// Binary Input Event - With Relative Time
+    /// Binary Input Event - With relative time
     Group2Var3,
-    /// Double-bit Binary Input - Any Variation
+    /// Double-bit Binary Input - Any variation
     Group3Var0,
-    /// Double-bit Binary Input - Packed Format
+    /// Double-bit Binary Input - Packed format
     Group3Var1,
-    /// Double-bit Binary Input - With Flags
+    /// Double-bit Binary Input - With flags
     Group3Var2,
-    /// Double-bit Binary Input Event - Any Variation
+    /// Double-bit Binary Input Event - Any variation
     Group4Var0,
-    /// Double-bit Binary Input Event - Without Time
+    /// Double-bit Binary Input Event - Without time
     Group4Var1,
-    /// Double-bit Binary Input Event - With Absolute Time
+    /// Double-bit Binary Input Event - With absolute time
     Group4Var2,
-    /// Double-bit Binary Input Event - With Relative Time
+    /// Double-bit Binary Input Event - With relative time
     Group4Var3,
-    /// Binary Output - Any Variation
+    /// Binary Output - Any variation
     Group10Var0,
-    /// Binary Output - Packed Format
+    /// Binary Output - Packed format
     Group10Var1,
-    /// Binary Output - Output Status With Flags
+    /// Binary Output - With flags
     Group10Var2,
-    /// Binary Output Event - Any Variation
+    /// Binary Output Event - Any variation
     Group11Var0,
-    /// Binary Output Event - Output Status Without Time
+    /// Binary Output Event - Without time
     Group11Var1,
-    /// Binary Output Event - Output Status With Time
+    /// Binary Output Event - With time
     Group11Var2,
-    /// Binary Command - Control Relay Output Block
+    /// Binary Output Command - Control relay output block
     Group12Var1,
-    /// Binary Output Command Event - Without Time
+    /// Binary Output Command Event - Without time
     Group13Var1,
-    /// Binary Output Command Event - With Time
+    /// Binary Output Command Event - With time
     Group13Var2,
-    /// Counter - Any Variation
+    /// Counter - Any variation
     Group20Var0,
-    /// Counter - 32-bit With Flag
+    /// Counter - 32-bit with flags
     Group20Var1,
-    /// Counter - 16-bit With Flag
+    /// Counter - 16-bit with flags
     Group20Var2,
-    /// Counter - 32-bit Without Flag
+    /// Counter - 32-bit without flags
     Group20Var5,
-    /// Counter - 16-bit Without Flag
+    /// Counter - 16-bit without flags
     Group20Var6,
-    /// Frozen Counter - Any Variation
+    /// Frozen Counter - Any variation
     Group21Var0,
-    /// Frozen Counter - 32-bit With Flag
+    /// Frozen Counter - 32-bit with flags
     Group21Var1,
-    /// Frozen Counter - 16-bit With Flag
+    /// Frozen Counter - 16-bit with flags
     Group21Var2,
-    /// Frozen Counter - 32-bit With Flag and Time
+    /// Frozen Counter - 32-bit with flags and time
     Group21Var5,
-    /// Frozen Counter - 16-bit With Flag and Time
+    /// Frozen Counter - 16-bit with flags and time
     Group21Var6,
-    /// Frozen Counter - 32-bit Without Flag
+    /// Frozen Counter - 32-bit without flags
     Group21Var9,
-    /// Frozen Counter - 16-bit Without Flag
+    /// Frozen Counter - 16-bit without flags
     Group21Var10,
-    /// Counter Event - Any Variation
+    /// Counter Event - Any variation
     Group22Var0,
-    /// Counter Event - 32-bit With Flag
+    /// Counter Event - 32-bit without time
     Group22Var1,
-    /// Counter Event - 16-bit With Flag
+    /// Counter Event - 16-bit without time
     Group22Var2,
-    /// Counter Event - 32-bit With Flag and Time
+    /// Counter Event - 32-bit with time
     Group22Var5,
-    /// Counter Event - 16-bit With Flag and Time
+    /// Counter Event - 16-bit with time
     Group22Var6,
-    /// Frozen Counter Event - Any Variation
+    /// Frozen Counter Event - Any variation
     Group23Var0,
-    /// Frozen Counter Event - 32-bit With Flag
+    /// Frozen Counter Event - 32-bit without time
     Group23Var1,
-    /// Frozen Counter Event - 16-bit With Flag
+    /// Frozen Counter Event - 16-bit without time
     Group23Var2,
-    /// Frozen Counter Event - 32-bit With Flag and Time
+    /// Frozen Counter Event - 32-bit with time
     Group23Var5,
-    /// Frozen Counter Event - 16-bit With Flag and Time
+    /// Frozen Counter Event - 16-bit with time
     Group23Var6,
-    /// Analog Input - Any Variation
+    /// Analog Input - Any variation
     Group30Var0,
-    /// Analog Input - 32-bit With Flag
+    /// Analog Input - 32-bit with flags
     Group30Var1,
-    /// Analog Input - 16-bit With Flag
+    /// Analog Input - 16-bit with flags
     Group30Var2,
-    /// Analog Input - 32-bit Without Flag
+    /// Analog Input - 32-bit without flags
     Group30Var3,
-    /// Analog Input - 16-bit Without Flag
+    /// Analog Input - 16-bit without flags
     Group30Var4,
-    /// Analog Input - Single-precision With Flag
+    /// Analog Input - Single-precision floating point with flags
     Group30Var5,
-    /// Analog Input - Double-precision With Flag
+    /// Analog Input - Double-precision floating point with flags
     Group30Var6,
-    /// Frozen Analog Input - Any Variation
+    /// Frozen Analog Input - Any variation
     Group31Var0,
-    /// Frozen Analog Input - 32-bit With Flag
+    /// Frozen Analog Input - 32-bit with flags
     Group31Var1,
-    /// Frozen Analog Input - 16-bit With Flag
+    /// Frozen Analog Input - 16-bit with flags
     Group31Var2,
-    /// Frozen Analog Input - 32-bit with Flag and Time-of-Freeze
+    /// Frozen Analog Input - 32-bit with flags and time of freeze
     Group31Var3,
-    /// Frozen Analog Input - 16-bit with Flag and Time-of-Freeze
+    /// Frozen Analog Input - 16-bit with flags and time of freeze
     Group31Var4,
-    /// Frozen Analog Input - 32-bit Without Flag
+    /// Frozen Analog Input - 32-bit without flags
     Group31Var5,
-    /// Frozen Analog Input - 16-bit Without Flag
+    /// Frozen Analog Input - 16-bit without flags
     Group31Var6,
-    /// Frozen Analog Input - Single-precision With Flag
+    /// Frozen Analog Input - Single-precision floating point with flags
     Group31Var7,
-    /// Frozen Analog Input - Double-precision With Flag
+    /// Frozen Analog Input - Double-precision floating point with flags
     Group31Var8,
-    /// Analog Input Event - Any Variation
+    /// Analog Input Event - Any variation
     Group32Var0,
-    /// Analog Input Event - 32-bit With Flag
+    /// Analog Input Event - 32-bit without time
     Group32Var1,
-    /// Analog Input Event - 16-bit With Flag
+    /// Analog Input Event - 16-bit without time
     Group32Var2,
-    /// Analog Input Event - 32-bit With Flag and Time
+    /// Analog Input Event - 32-bit with time
     Group32Var3,
-    /// Analog Input Event - 16-bit With Flag and Time
+    /// Analog Input Event - 16-bit with time
     Group32Var4,
-    /// Analog Input Event - Single-precision With Flag
+    /// Analog Input Event - Single-precision floating point without time
     Group32Var5,
-    /// Analog Input Event - Double-precision With Flag
+    /// Analog Input Event - Double-precision floating point without time
     Group32Var6,
-    /// Analog Input Event - Single-precision With Flag and Time
+    /// Analog Input Event - Single-precision floating point with time
     Group32Var7,
-    /// Analog Input Event - Double-precision With Flag and Time
+    /// Analog Input Event - Double-precision floating point with time
     Group32Var8,
-    /// Frozen Analog Input Event - Any Variation
+    /// Frozen Analog Input Event - Any variation
     Group33Var0,
-    /// Frozen Analog Input Event - 32-bit With Flag
+    /// Frozen Analog Input Event - 32-bit without time
     Group33Var1,
-    /// Frozen Analog Input Event - 16-bit With Flag
+    /// Frozen Analog Input Event - 16-bit without time
     Group33Var2,
-    /// Frozen Analog Input Event - 32-bit with Flag and Time-of-Freeze
+    /// Frozen Analog Input Event - 32-bit with time of freeze
     Group33Var3,
-    /// Frozen Analog Input Event - 16-bit with Flag and Time-of-Freeze
+    /// Frozen Analog Input Event - 16-bit with time of freeze
     Group33Var4,
-    /// Frozen Analog Input Event - Single-precision With Flag
+    /// Frozen Analog Input Event - Single-precision floating point without time
     Group33Var5,
-    /// Frozen Analog Input Event - Double-precision With Flag
+    /// Frozen Analog Input Event - Double-precision floating point without time
     Group33Var6,
-    /// Frozen Analog Input Event - Single-precision With Flag and Time
+    /// Frozen Analog Input Event - Single-precision floating point with time of freeze
     Group33Var7,
-    /// Frozen Analog Input Event - Double-precision With Flag and Time
+    /// Frozen Analog Input Event - Double-precision floating point with time of freeze
     Group33Var8,
-    /// Analog Input Reporting Deadband - Any Variation
+    /// Analog Input Reporting Deadband - Any variation
     Group34Var0,
     /// Analog Input Reporting Deadband - 16-bit
     Group34Var1,
     /// Analog Input Reporting Deadband - 32-bit
     Group34Var2,
-    /// Analog Input Reporting Deadband - Single-precision
+    /// Analog Input Reporting Deadband - Single-precision floating point
     Group34Var3,
-    /// Analog Output Status - Any Variation
+    /// Analog Output Status - Any variation
     Group40Var0,
-    /// Analog Output Status - 32-bit With Flag
+    /// Analog Output Status - 32-bit with flags
     Group40Var1,
-    /// Analog Output Status - 16-bit With Flag
+    /// Analog Output Status - 16-bit with flags
     Group40Var2,
-    /// Analog Output Status - Single-precision With Flag
+    /// Analog Output Status - Single-precision floating point with flags
     Group40Var3,
-    /// Analog Output Status - Double-precision With Flag
+    /// Analog Output Status - Double-precision floating point with flags
     Group40Var4,
-    /// Analog Output - 32-bit With Flag
+    /// Analog Output - 32-bit
     Group41Var1,
-    /// Analog Output - 16-bit With Flag
+    /// Analog Output - 16-bit
     Group41Var2,
-    /// Analog Output - Single-precision
+    /// Analog Output - Single-precision floating point
     Group41Var3,
-    /// Analog Output - Double-precision
+    /// Analog Output - Double-precision floating point
     Group41Var4,
-    /// Analog Output Event - Any Variation
+    /// Analog Output Event - Any variation
     Group42Var0,
-    /// Analog Output Event - 32-bit With Flag
+    /// Analog Output Event - 32-bit without time
     Group42Var1,
-    /// Analog Output Event - 16-bit With Flag
+    /// Analog Output Event - 16-bit without time
     Group42Var2,
-    /// Analog Output Event - 32-bit With Flag and Time
+    /// Analog Output Event - 32-bit with time
     Group42Var3,
-    /// Analog Output Event - 16-bit With Flag and Time
+    /// Analog Output Event - 16-bit with time
     Group42Var4,
-    /// Analog Output Event - Single-precision With Flag
+    /// Analog Output Event - Single-precision floating point without time
     Group42Var5,
-    /// Analog Output Event - Double-precision With Flag
+    /// Analog Output Event - Double-precision floating point without time
     Group42Var6,
-    /// Analog Output Event - Single-precision With Flag and Time
+    /// Analog Output Event - Single-precision floating point with time
     Group42Var7,
-    /// Analog Output Event - Double-precision With Flag and Time
+    /// Analog Output Event - Double-precision floating point with time
     Group42Var8,
-    /// Analog Output Command Event - 32-bit
+    /// Analog Output Command Event - 32-bit without time
     Group43Var1,
-    /// Analog Output Command Event - 16-bit
+    /// Analog Output Command Event - 16-bit without time
     Group43Var2,
-    /// Analog Output Command Event - 32-bit With Time
+    /// Analog Output Command Event - 32-bit with time
     Group43Var3,
-    /// Analog Output Command Event - 16-bit With Time
+    /// Analog Output Command Event - 16-bit with time
     Group43Var4,
-    /// Analog Output Command Event - Single-precision
+    /// Analog Output Command Event - Single-precision floating point without time
     Group43Var5,
-    /// Analog Output Command Event - Double-precision
+    /// Analog Output Command Event - Double-precision floating point without time
     Group43Var6,
-    /// Analog Output Command Event - Single-precision With Time
+    /// Analog Output Command Event - Single-precision floating point with time
     Group43Var7,
-    /// Analog Output Command Event - Double-precision With Time
+    /// Analog Output Command Event - Double-precision floating point with time
     Group43Var8,
-    /// Time and Date - Absolute Time
+    /// Time and Date - Absolute time
     Group50Var1,
     /// Time and Date - Absolute time and interval
     Group50Var2,
-    /// Time and Date - Absolute Time at last recorded time
+    /// Time and Date - Last recorded time
     Group50Var3,
-    /// Time and Date - Indexed absolute time and long interval
+    /// Time and Date - Indexed time and long interval
     Group50Var4,
-    /// Time and Date CTO - Absolute time, synchronized
+    /// Time and Date CTO - Synchronized absolute time
     Group51Var1,
-    /// Time and Date CTO - Absolute time, unsynchronized
+    /// Time and Date CTO - Unsynchronized absolute time
     Group51Var2,
-    /// Time Delay - Coarse
+    /// Time Delay - Coarse (seconds)
     Group52Var1,
-    /// Time Delay - Fine
+    /// Time Delay - Fine (milliseconds)
     Group52Var2,
     /// Class Data - Class 0
     Group60Var1,
@@ -272,23 +272,23 @@ pub enum Variation {
     Group60Var3,
     /// Class Data - Class 3
     Group60Var4,
-    /// File-control - authentication
+    /// File Control - Authentication
     Group70Var2,
-    /// File-control - file command
+    /// File Control - File command
     Group70Var3,
-    /// File-control - file command status
+    /// File Control - File command status
     Group70Var4,
-    /// File-control - file transport
+    /// File Control - File transport
     Group70Var5,
-    /// File-control - file transport status
+    /// File Control - File transport status
     Group70Var6,
-    /// File-control - file descriptor
+    /// File Control - File descriptor
     Group70Var7,
-    /// File-control - file specification string
+    /// File Control - File specification string
     Group70Var8,
-    /// Internal Indications - Packed Format
+    /// Internal Indications - Packed format
     Group80Var1,
-    /// Unsigned Integer - Any Variation
+    /// Unsigned Integer - Any variation
     Group102Var0,
     /// Unsigned Integer - 8-bit
     Group102Var1,
@@ -669,138 +669,138 @@ impl Variation {
     
     pub(crate) fn description(self) -> &'static str {
         match self {
-            Variation::Group0Var254 => "Device Attributes - Non-Specific All Attributes Request",
-            Variation::Group0(_) => "Device Attributes - Specific Attribute",
-            Variation::Group1Var0 => "Binary Input - Any Variation",
-            Variation::Group1Var1 => "Binary Input - Packed Format",
-            Variation::Group1Var2 => "Binary Input - With Flags",
-            Variation::Group2Var0 => "Binary Input Event - Any Variation",
-            Variation::Group2Var1 => "Binary Input Event - Without Time",
-            Variation::Group2Var2 => "Binary Input Event - With Absolute Time",
-            Variation::Group2Var3 => "Binary Input Event - With Relative Time",
-            Variation::Group3Var0 => "Double-bit Binary Input - Any Variation",
-            Variation::Group3Var1 => "Double-bit Binary Input - Packed Format",
-            Variation::Group3Var2 => "Double-bit Binary Input - With Flags",
-            Variation::Group4Var0 => "Double-bit Binary Input Event - Any Variation",
-            Variation::Group4Var1 => "Double-bit Binary Input Event - Without Time",
-            Variation::Group4Var2 => "Double-bit Binary Input Event - With Absolute Time",
-            Variation::Group4Var3 => "Double-bit Binary Input Event - With Relative Time",
-            Variation::Group10Var0 => "Binary Output - Any Variation",
-            Variation::Group10Var1 => "Binary Output - Packed Format",
-            Variation::Group10Var2 => "Binary Output - Output Status With Flags",
-            Variation::Group11Var0 => "Binary Output Event - Any Variation",
-            Variation::Group11Var1 => "Binary Output Event - Output Status Without Time",
-            Variation::Group11Var2 => "Binary Output Event - Output Status With Time",
-            Variation::Group12Var1 => "Binary Command - Control Relay Output Block",
-            Variation::Group13Var1 => "Binary Output Command Event - Without Time",
-            Variation::Group13Var2 => "Binary Output Command Event - With Time",
-            Variation::Group20Var0 => "Counter - Any Variation",
-            Variation::Group20Var1 => "Counter - 32-bit With Flag",
-            Variation::Group20Var2 => "Counter - 16-bit With Flag",
-            Variation::Group20Var5 => "Counter - 32-bit Without Flag",
-            Variation::Group20Var6 => "Counter - 16-bit Without Flag",
-            Variation::Group21Var0 => "Frozen Counter - Any Variation",
-            Variation::Group21Var1 => "Frozen Counter - 32-bit With Flag",
-            Variation::Group21Var2 => "Frozen Counter - 16-bit With Flag",
-            Variation::Group21Var5 => "Frozen Counter - 32-bit With Flag and Time",
-            Variation::Group21Var6 => "Frozen Counter - 16-bit With Flag and Time",
-            Variation::Group21Var9 => "Frozen Counter - 32-bit Without Flag",
-            Variation::Group21Var10 => "Frozen Counter - 16-bit Without Flag",
-            Variation::Group22Var0 => "Counter Event - Any Variation",
-            Variation::Group22Var1 => "Counter Event - 32-bit With Flag",
-            Variation::Group22Var2 => "Counter Event - 16-bit With Flag",
-            Variation::Group22Var5 => "Counter Event - 32-bit With Flag and Time",
-            Variation::Group22Var6 => "Counter Event - 16-bit With Flag and Time",
-            Variation::Group23Var0 => "Frozen Counter Event - Any Variation",
-            Variation::Group23Var1 => "Frozen Counter Event - 32-bit With Flag",
-            Variation::Group23Var2 => "Frozen Counter Event - 16-bit With Flag",
-            Variation::Group23Var5 => "Frozen Counter Event - 32-bit With Flag and Time",
-            Variation::Group23Var6 => "Frozen Counter Event - 16-bit With Flag and Time",
-            Variation::Group30Var0 => "Analog Input - Any Variation",
-            Variation::Group30Var1 => "Analog Input - 32-bit With Flag",
-            Variation::Group30Var2 => "Analog Input - 16-bit With Flag",
-            Variation::Group30Var3 => "Analog Input - 32-bit Without Flag",
-            Variation::Group30Var4 => "Analog Input - 16-bit Without Flag",
-            Variation::Group30Var5 => "Analog Input - Single-precision With Flag",
-            Variation::Group30Var6 => "Analog Input - Double-precision With Flag",
-            Variation::Group31Var0 => "Frozen Analog Input - Any Variation",
-            Variation::Group31Var1 => "Frozen Analog Input - 32-bit With Flag",
-            Variation::Group31Var2 => "Frozen Analog Input - 16-bit With Flag",
-            Variation::Group31Var3 => "Frozen Analog Input - 32-bit with Flag and Time-of-Freeze",
-            Variation::Group31Var4 => "Frozen Analog Input - 16-bit with Flag and Time-of-Freeze",
-            Variation::Group31Var5 => "Frozen Analog Input - 32-bit Without Flag",
-            Variation::Group31Var6 => "Frozen Analog Input - 16-bit Without Flag",
-            Variation::Group31Var7 => "Frozen Analog Input - Single-precision With Flag",
-            Variation::Group31Var8 => "Frozen Analog Input - Double-precision With Flag",
-            Variation::Group32Var0 => "Analog Input Event - Any Variation",
-            Variation::Group32Var1 => "Analog Input Event - 32-bit With Flag",
-            Variation::Group32Var2 => "Analog Input Event - 16-bit With Flag",
-            Variation::Group32Var3 => "Analog Input Event - 32-bit With Flag and Time",
-            Variation::Group32Var4 => "Analog Input Event - 16-bit With Flag and Time",
-            Variation::Group32Var5 => "Analog Input Event - Single-precision With Flag",
-            Variation::Group32Var6 => "Analog Input Event - Double-precision With Flag",
-            Variation::Group32Var7 => "Analog Input Event - Single-precision With Flag and Time",
-            Variation::Group32Var8 => "Analog Input Event - Double-precision With Flag and Time",
-            Variation::Group33Var0 => "Frozen Analog Input Event - Any Variation",
-            Variation::Group33Var1 => "Frozen Analog Input Event - 32-bit With Flag",
-            Variation::Group33Var2 => "Frozen Analog Input Event - 16-bit With Flag",
-            Variation::Group33Var3 => "Frozen Analog Input Event - 32-bit with Flag and Time-of-Freeze",
-            Variation::Group33Var4 => "Frozen Analog Input Event - 16-bit with Flag and Time-of-Freeze",
-            Variation::Group33Var5 => "Frozen Analog Input Event - Single-precision With Flag",
-            Variation::Group33Var6 => "Frozen Analog Input Event - Double-precision With Flag",
-            Variation::Group33Var7 => "Frozen Analog Input Event - Single-precision With Flag and Time",
-            Variation::Group33Var8 => "Frozen Analog Input Event - Double-precision With Flag and Time",
-            Variation::Group34Var0 => "Analog Input Reporting Deadband - Any Variation",
+            Variation::Group0Var254 => "Device Attributes - All attributes request",
+            Variation::Group0(_) => "Device Attributes - Specific attribute (variations 1 to 253 and 255)",
+            Variation::Group1Var0 => "Binary Input - Any variation",
+            Variation::Group1Var1 => "Binary Input - Packed format",
+            Variation::Group1Var2 => "Binary Input - With flags",
+            Variation::Group2Var0 => "Binary Input Event - Any variation",
+            Variation::Group2Var1 => "Binary Input Event - Without time",
+            Variation::Group2Var2 => "Binary Input Event - With absolute time",
+            Variation::Group2Var3 => "Binary Input Event - With relative time",
+            Variation::Group3Var0 => "Double-bit Binary Input - Any variation",
+            Variation::Group3Var1 => "Double-bit Binary Input - Packed format",
+            Variation::Group3Var2 => "Double-bit Binary Input - With flags",
+            Variation::Group4Var0 => "Double-bit Binary Input Event - Any variation",
+            Variation::Group4Var1 => "Double-bit Binary Input Event - Without time",
+            Variation::Group4Var2 => "Double-bit Binary Input Event - With absolute time",
+            Variation::Group4Var3 => "Double-bit Binary Input Event - With relative time",
+            Variation::Group10Var0 => "Binary Output - Any variation",
+            Variation::Group10Var1 => "Binary Output - Packed format",
+            Variation::Group10Var2 => "Binary Output - With flags",
+            Variation::Group11Var0 => "Binary Output Event - Any variation",
+            Variation::Group11Var1 => "Binary Output Event - Without time",
+            Variation::Group11Var2 => "Binary Output Event - With time",
+            Variation::Group12Var1 => "Binary Output Command - Control relay output block",
+            Variation::Group13Var1 => "Binary Output Command Event - Without time",
+            Variation::Group13Var2 => "Binary Output Command Event - With time",
+            Variation::Group20Var0 => "Counter - Any variation",
+            Variation::Group20Var1 => "Counter - 32-bit with flags",
+            Variation::Group20Var2 => "Counter - 16-bit with flags",
+            Variation::Group20Var5 => "Counter - 32-bit without flags",
+            Variation::Group20Var6 => "Counter - 16-bit without flags",
+            Variation::Group21Var0 => "Frozen Counter - Any variation",
+            Variation::Group21Var1 => "Frozen Counter - 32-bit with flags",
+            Variation::Group21Var2 => "Frozen Counter - 16-bit with flags",
+            Variation::Group21Var5 => "Frozen Counter - 32-bit with flags and time",
+            Variation::Group21Var6 => "Frozen Counter - 16-bit with flags and time",
+            Variation::Group21Var9 => "Frozen Counter - 32-bit without flags",
+            Variation::Group21Var10 => "Frozen Counter - 16-bit without flags",
+            Variation::Group22Var0 => "Counter Event - Any variation",
+            Variation::Group22Var1 => "Counter Event - 32-bit without time",
+            Variation::Group22Var2 => "Counter Event - 16-bit without time",
+            Variation::Group22Var5 => "Counter Event - 32-bit with time",
+            Variation::Group22Var6 => "Counter Event - 16-bit with time",
+            Variation::Group23Var0 => "Frozen Counter Event - Any variation",
+            Variation::Group23Var1 => "Frozen Counter Event - 32-bit without time",
+            Variation::Group23Var2 => "Frozen Counter Event - 16-bit without time",
+            Variation::Group23Var5 => "Frozen Counter Event - 32-bit with time",
+            Variation::Group23Var6 => "Frozen Counter Event - 16-bit with time",
+            Variation::Group30Var0 => "Analog Input - Any variation",
+            Variation::Group30Var1 => "Analog Input - 32-bit with flags",
+            Variation::Group30Var2 => "Analog Input - 16-bit with flags",
+            Variation::Group30Var3 => "Analog Input - 32-bit without flags",
+            Variation::Group30Var4 => "Analog Input - 16-bit without flags",
+            Variation::Group30Var5 => "Analog Input - Single-precision floating point with flags",
+            Variation::Group30Var6 => "Analog Input - Double-precision floating point with flags",
+            Variation::Group31Var0 => "Frozen Analog Input - Any variation",
+            Variation::Group31Var1 => "Frozen Analog Input - 32-bit with flags",
+            Variation::Group31Var2 => "Frozen Analog Input - 16-bit with flags",
+            Variation::Group31Var3 => "Frozen Analog Input - 32-bit with flags and time of freeze",
+            Variation::Group31Var4 => "Frozen Analog Input - 16-bit with flags and time of freeze",
+            Variation::Group31Var5 => "Frozen Analog Input - 32-bit without flags",
+            Variation::Group31Var6 => "Frozen Analog Input - 16-bit without flags",
+            Variation::Group31Var7 => "Frozen Analog Input - Single-precision floating point with flags",
+            Variation::Group31Var8 => "Frozen Analog Input - Double-precision floating point with flags",
+            Variation::Group32Var0 => "Analog Input Event - Any variation",
+            Variation::Group32Var1 => "Analog Input Event - 32-bit without time",
+            Variation::Group32Var2 => "Analog Input Event - 16-bit without time",
+            Variation::Group32Var3 => "Analog Input Event - 32-bit with time",
+            Variation::Group32Var4 => "Analog Input Event - 16-bit with time",
+            Variation::Group32Var5 => "Analog Input Event - Single-precision floating point without time",
+            Variation::Group32Var6 => "Analog Input Event - Double-precision floating point without time",
+            Variation::Group32Var7 => "Analog Input Event - Single-precision floating point with time",
+            Variation::Group32Var8 => "Analog Input Event - Double-precision floating point with time",
+            Variation::Group33Var0 => "Frozen Analog Input Event - Any variation",
+            Variation::Group33Var1 => "Frozen Analog Input Event - 32-bit without time",
+            Variation::Group33Var2 => "Frozen Analog Input Event - 16-bit without time",
+            Variation::Group33Var3 => "Frozen Analog Input Event - 32-bit with time of freeze",
+            Variation::Group33Var4 => "Frozen Analog Input Event - 16-bit with time of freeze",
+            Variation::Group33Var5 => "Frozen Analog Input Event - Single-precision floating point without time",
+            Variation::Group33Var6 => "Frozen Analog Input Event - Double-precision floating point without time",
+            Variation::Group33Var7 => "Frozen Analog Input Event - Single-precision floating point with time of freeze",
+            Variation::Group33Var8 => "Frozen Analog Input Event - Double-precision floating point with time of freeze",
+            Variation::Group34Var0 => "Analog Input Reporting Deadband - Any variation",
             Variation::Group34Var1 => "Analog Input Reporting Deadband - 16-bit",
             Variation::Group34Var2 => "Analog Input Reporting Deadband - 32-bit",
-            Variation::Group34Var3 => "Analog Input Reporting Deadband - Single-precision",
-            Variation::Group40Var0 => "Analog Output Status - Any Variation",
-            Variation::Group40Var1 => "Analog Output Status - 32-bit With Flag",
-            Variation::Group40Var2 => "Analog Output Status - 16-bit With Flag",
-            Variation::Group40Var3 => "Analog Output Status - Single-precision With Flag",
-            Variation::Group40Var4 => "Analog Output Status - Double-precision With Flag",
-            Variation::Group41Var1 => "Analog Output - 32-bit With Flag",
-            Variation::Group41Var2 => "Analog Output - 16-bit With Flag",
-            Variation::Group41Var3 => "Analog Output - Single-precision",
-            Variation::Group41Var4 => "Analog Output - Double-precision",
-            Variation::Group42Var0 => "Analog Output Event - Any Variation",
-            Variation::Group42Var1 => "Analog Output Event - 32-bit With Flag",
-            Variation::Group42Var2 => "Analog Output Event - 16-bit With Flag",
-            Variation::Group42Var3 => "Analog Output Event - 32-bit With Flag and Time",
-            Variation::Group42Var4 => "Analog Output Event - 16-bit With Flag and Time",
-            Variation::Group42Var5 => "Analog Output Event - Single-precision With Flag",
-            Variation::Group42Var6 => "Analog Output Event - Double-precision With Flag",
-            Variation::Group42Var7 => "Analog Output Event - Single-precision With Flag and Time",
-            Variation::Group42Var8 => "Analog Output Event - Double-precision With Flag and Time",
-            Variation::Group43Var1 => "Analog Output Command Event - 32-bit",
-            Variation::Group43Var2 => "Analog Output Command Event - 16-bit",
-            Variation::Group43Var3 => "Analog Output Command Event - 32-bit With Time",
-            Variation::Group43Var4 => "Analog Output Command Event - 16-bit With Time",
-            Variation::Group43Var5 => "Analog Output Command Event - Single-precision",
-            Variation::Group43Var6 => "Analog Output Command Event - Double-precision",
-            Variation::Group43Var7 => "Analog Output Command Event - Single-precision With Time",
-            Variation::Group43Var8 => "Analog Output Command Event - Double-precision With Time",
-            Variation::Group50Var1 => "Time and Date - Absolute Time",
+            Variation::Group34Var3 => "Analog Input Reporting Deadband - Single-precision floating point",
+            Variation::Group40Var0 => "Analog Output Status - Any variation",
+            Variation::Group40Var1 => "Analog Output Status - 32-bit with flags",
+            Variation::Group40Var2 => "Analog Output Status - 16-bit with flags",
+            Variation::Group40Var3 => "Analog Output Status - Single-precision floating point with flags",
+            Variation::Group40Var4 => "Analog Output Status - Double-precision floating point with flags",
+            Variation::Group41Var1 => "Analog Output - 32-bit",
+            Variation::Group41Var2 => "Analog Output - 16-bit",
+            Variation::Group41Var3 => "Analog Output - Single-precision floating point",
+            Variation::Group41Var4 => "Analog Output - Double-precision floating point",
+            Variation::Group42Var0 => "Analog Output Event - Any variation",
+            Variation::Group42Var1 => "Analog Output Event - 32-bit without time",
+            Variation::Group42Var2 => "Analog Output Event - 16-bit without time",
+            Variation::Group42Var3 => "Analog Output Event - 32-bit with time",
+            Variation::Group42Var4 => "Analog Output Event - 16-bit with time",
+            Variation::Group42Var5 => "Analog Output Event - Single-precision floating point without time",
+            Variation::Group42Var6 => "Analog Output Event - Double-precision floating point without time",
+            Variation::Group42Var7 => "Analog Output Event - Single-precision floating point with time",
+            Variation::Group42Var8 => "Analog Output Event - Double-precision floating point with time",
+            Variation::Group43Var1 => "Analog Output Command Event - 32-bit without time",
+            Variation::Group43Var2 => "Analog Output Command Event - 16-bit without time",
+            Variation::Group43Var3 => "Analog Output Command Event - 32-bit with time",
+            Variation::Group43Var4 => "Analog Output Command Event - 16-bit with time",
+            Variation::Group43Var5 => "Analog Output Command Event - Single-precision floating point without time",
+            Variation::Group43Var6 => "Analog Output Command Event - Double-precision floating point without time",
+            Variation::Group43Var7 => "Analog Output Command Event - Single-precision floating point with time",
+            Variation::Group43Var8 => "Analog Output Command Event - Double-precision floating point with time",
+            Variation::Group50Var1 => "Time and Date - Absolute time",
             Variation::Group50Var2 => "Time and Date - Absolute time and interval",
-            Variation::Group50Var3 => "Time and Date - Absolute Time at last recorded time",
-            Variation::Group50Var4 => "Time and Date - Indexed absolute time and long interval",
-            Variation::Group51Var1 => "Time and Date CTO - Absolute time, synchronized",
-            Variation::Group51Var2 => "Time and Date CTO - Absolute time, unsynchronized",
-            Variation::Group52Var1 => "Time Delay - Coarse",
-            Variation::Group52Var2 => "Time Delay - Fine",
+            Variation::Group50Var3 => "Time and Date - Last recorded time",
+            Variation::Group50Var4 => "Time and Date - Indexed time and long interval",
+            Variation::Group51Var1 => "Time and Date CTO - Synchronized absolute time",
+            Variation::Group51Var2 => "Time and Date CTO - Unsynchronized absolute time",
+            Variation::Group52Var1 => "Time Delay - Coarse (seconds)",
+            Variation::Group52Var2 => "Time Delay - Fine (milliseconds)",
             Variation::Group60Var1 => "Class Data - Class 0",
             Variation::Group60Var2 => "Class Data - Class 1",
             Variation::Group60Var3 => "Class Data - Class 2",
             Variation::Group60Var4 => "Class Data - Class 3",
-            Variation::Group70Var2 => "File-control - authentication",
-            Variation::Group70Var3 => "File-control - file command",
-            Variation::Group70Var4 => "File-control - file command status",
-            Variation::Group70Var5 => "File-control - file transport",
-            Variation::Group70Var6 => "File-control - file transport status",
-            Variation::Group70Var7 => "File-control - file descriptor",
-            Variation::Group70Var8 => "File-control - file specification string",
-            Variation::Group80Var1 => "Internal Indications - Packed Format",
-            Variation::Group102Var0 => "Unsigned Integer - Any Variation",
+            Variation::Group70Var2 => "File Control - Authentication",
+            Variation::Group70Var3 => "File Control - File command",
+            Variation::Group70Var4 => "File Control - File command status",
+            Variation::Group70Var5 => "File Control - File transport",
+            Variation::Group70Var6 => "File Control - File transport status",
+            Variation::Group70Var7 => "File Control - File descriptor",
+            Variation::Group70Var8 => "File Control - File specification string",
+            Variation::Group80Var1 => "Internal Indications - Packed format",
+            Variation::Group102Var0 => "Unsigned Integer - Any variation",
             Variation::Group102Var1 => "Unsigned Integer - 8-bit",
             Variation::Group110(_) => "Octet String - Sized by variation",
             Variation::Group111(_) => "Octet String Event - Sized by variation",
@@ -820,35 +820,35 @@ pub(crate) struct Group102Var1 {
     pub(crate) value: u8,
 }
 
-/// Time Delay - Fine
+/// Time Delay - Fine (milliseconds)
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group52Var2 {
     /// time field of the variation
     pub(crate) time: u16,
 }
 
-/// Time Delay - Coarse
+/// Time Delay - Coarse (seconds)
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group52Var1 {
     /// time field of the variation
     pub(crate) time: u16,
 }
 
-/// Time and Date CTO - Absolute time, unsynchronized
+/// Time and Date CTO - Unsynchronized absolute time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group51Var2 {
     /// time field of the variation
     pub(crate) time: Timestamp,
 }
 
-/// Time and Date CTO - Absolute time, synchronized
+/// Time and Date CTO - Synchronized absolute time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group51Var1 {
     /// time field of the variation
     pub(crate) time: Timestamp,
 }
 
-/// Time and Date - Indexed absolute time and long interval
+/// Time and Date - Indexed time and long interval
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group50Var4 {
     /// time field of the variation
@@ -859,7 +859,7 @@ pub(crate) struct Group50Var4 {
     pub(crate) units: u8,
 }
 
-/// Time and Date - Absolute Time at last recorded time
+/// Time and Date - Last recorded time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group50Var3 {
     /// time field of the variation
@@ -875,14 +875,14 @@ pub(crate) struct Group50Var2 {
     pub(crate) interval: u32,
 }
 
-/// Time and Date - Absolute Time
+/// Time and Date - Absolute time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group50Var1 {
     /// time field of the variation
     pub(crate) time: Timestamp,
 }
 
-/// Analog Output Command Event - Double-precision With Time
+/// Analog Output Command Event - Double-precision floating point with time
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct Group43Var8 {
     /// status field of the variation
@@ -893,7 +893,7 @@ pub(crate) struct Group43Var8 {
     pub(crate) time: Timestamp,
 }
 
-/// Analog Output Command Event - Single-precision With Time
+/// Analog Output Command Event - Single-precision floating point with time
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct Group43Var7 {
     /// status field of the variation
@@ -904,7 +904,7 @@ pub(crate) struct Group43Var7 {
     pub(crate) time: Timestamp,
 }
 
-/// Analog Output Command Event - Double-precision
+/// Analog Output Command Event - Double-precision floating point without time
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct Group43Var6 {
     /// status field of the variation
@@ -913,7 +913,7 @@ pub(crate) struct Group43Var6 {
     pub(crate) value: f64,
 }
 
-/// Analog Output Command Event - Single-precision
+/// Analog Output Command Event - Single-precision floating point without time
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct Group43Var5 {
     /// status field of the variation
@@ -922,7 +922,7 @@ pub(crate) struct Group43Var5 {
     pub(crate) value: f32,
 }
 
-/// Analog Output Command Event - 16-bit With Time
+/// Analog Output Command Event - 16-bit with time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group43Var4 {
     /// status field of the variation
@@ -933,7 +933,7 @@ pub(crate) struct Group43Var4 {
     pub(crate) time: Timestamp,
 }
 
-/// Analog Output Command Event - 32-bit With Time
+/// Analog Output Command Event - 32-bit with time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group43Var3 {
     /// status field of the variation
@@ -944,7 +944,7 @@ pub(crate) struct Group43Var3 {
     pub(crate) time: Timestamp,
 }
 
-/// Analog Output Command Event - 16-bit
+/// Analog Output Command Event - 16-bit without time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group43Var2 {
     /// status field of the variation
@@ -953,7 +953,7 @@ pub(crate) struct Group43Var2 {
     pub(crate) value: i16,
 }
 
-/// Analog Output Command Event - 32-bit
+/// Analog Output Command Event - 32-bit without time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group43Var1 {
     /// status field of the variation
@@ -962,7 +962,7 @@ pub(crate) struct Group43Var1 {
     pub(crate) value: i32,
 }
 
-/// Analog Output Event - Double-precision With Flag and Time
+/// Analog Output Event - Double-precision floating point with time
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct Group42Var8 {
     /// flags field of the variation
@@ -973,7 +973,7 @@ pub(crate) struct Group42Var8 {
     pub(crate) time: Timestamp,
 }
 
-/// Analog Output Event - Single-precision With Flag and Time
+/// Analog Output Event - Single-precision floating point with time
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct Group42Var7 {
     /// flags field of the variation
@@ -984,7 +984,7 @@ pub(crate) struct Group42Var7 {
     pub(crate) time: Timestamp,
 }
 
-/// Analog Output Event - Double-precision With Flag
+/// Analog Output Event - Double-precision floating point without time
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct Group42Var6 {
     /// flags field of the variation
@@ -993,7 +993,7 @@ pub(crate) struct Group42Var6 {
     pub(crate) value: f64,
 }
 
-/// Analog Output Event - Single-precision With Flag
+/// Analog Output Event - Single-precision floating point without time
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct Group42Var5 {
     /// flags field of the variation
@@ -1002,7 +1002,7 @@ pub(crate) struct Group42Var5 {
     pub(crate) value: f32,
 }
 
-/// Analog Output Event - 16-bit With Flag and Time
+/// Analog Output Event - 16-bit with time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group42Var4 {
     /// flags field of the variation
@@ -1013,7 +1013,7 @@ pub(crate) struct Group42Var4 {
     pub(crate) time: Timestamp,
 }
 
-/// Analog Output Event - 32-bit With Flag and Time
+/// Analog Output Event - 32-bit with time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group42Var3 {
     /// flags field of the variation
@@ -1024,7 +1024,7 @@ pub(crate) struct Group42Var3 {
     pub(crate) time: Timestamp,
 }
 
-/// Analog Output Event - 16-bit With Flag
+/// Analog Output Event - 16-bit without time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group42Var2 {
     /// flags field of the variation
@@ -1033,7 +1033,7 @@ pub(crate) struct Group42Var2 {
     pub(crate) value: i16,
 }
 
-/// Analog Output Event - 32-bit With Flag
+/// Analog Output Event - 32-bit without time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group42Var1 {
     /// flags field of the variation
@@ -1042,7 +1042,7 @@ pub(crate) struct Group42Var1 {
     pub(crate) value: i32,
 }
 
-/// Analog Output - Double-precision
+/// Analog Output - Double-precision floating point
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group41Var4 {
     /// value field of the variation
@@ -1051,7 +1051,7 @@ pub struct Group41Var4 {
     pub status: CommandStatus,
 }
 
-/// Analog Output - Single-precision
+/// Analog Output - Single-precision floating point
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Group41Var3 {
     /// value field of the variation
@@ -1060,7 +1060,7 @@ pub struct Group41Var3 {
     pub status: CommandStatus,
 }
 
-/// Analog Output - 16-bit With Flag
+/// Analog Output - 16-bit
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Group41Var2 {
     /// value field of the variation
@@ -1069,7 +1069,7 @@ pub struct Group41Var2 {
     pub status: CommandStatus,
 }
 
-/// Analog Output - 32-bit With Flag
+/// Analog Output - 32-bit
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Group41Var1 {
     /// value field of the variation
@@ -1078,7 +1078,7 @@ pub struct Group41Var1 {
     pub status: CommandStatus,
 }
 
-/// Analog Output Status - Double-precision With Flag
+/// Analog Output Status - Double-precision floating point with flags
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct Group40Var4 {
     /// flags field of the variation
@@ -1087,7 +1087,7 @@ pub(crate) struct Group40Var4 {
     pub(crate) value: f64,
 }
 
-/// Analog Output Status - Single-precision With Flag
+/// Analog Output Status - Single-precision floating point with flags
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct Group40Var3 {
     /// flags field of the variation
@@ -1096,7 +1096,7 @@ pub(crate) struct Group40Var3 {
     pub(crate) value: f32,
 }
 
-/// Analog Output Status - 16-bit With Flag
+/// Analog Output Status - 16-bit with flags
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group40Var2 {
     /// flags field of the variation
@@ -1105,7 +1105,7 @@ pub(crate) struct Group40Var2 {
     pub(crate) value: i16,
 }
 
-/// Analog Output Status - 32-bit With Flag
+/// Analog Output Status - 32-bit with flags
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group40Var1 {
     /// flags field of the variation
@@ -1114,7 +1114,7 @@ pub(crate) struct Group40Var1 {
     pub(crate) value: i32,
 }
 
-/// Analog Input Reporting Deadband - Single-precision
+/// Analog Input Reporting Deadband - Single-precision floating point
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct Group34Var3 {
     /// value field of the variation
@@ -1135,7 +1135,7 @@ pub(crate) struct Group34Var1 {
     pub(crate) value: u16,
 }
 
-/// Frozen Analog Input Event - Double-precision With Flag and Time
+/// Frozen Analog Input Event - Double-precision floating point with time of freeze
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct Group33Var8 {
     /// flags field of the variation
@@ -1146,7 +1146,7 @@ pub(crate) struct Group33Var8 {
     pub(crate) time: Timestamp,
 }
 
-/// Frozen Analog Input Event - Single-precision With Flag and Time
+/// Frozen Analog Input Event - Single-precision floating point with time of freeze
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct Group33Var7 {
     /// flags field of the variation
@@ -1157,7 +1157,7 @@ pub(crate) struct Group33Var7 {
     pub(crate) time: Timestamp,
 }
 
-/// Frozen Analog Input Event - Double-precision With Flag
+/// Frozen Analog Input Event - Double-precision floating point without time
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct Group33Var6 {
     /// flags field of the variation
@@ -1166,7 +1166,7 @@ pub(crate) struct Group33Var6 {
     pub(crate) value: f64,
 }
 
-/// Frozen Analog Input Event - Single-precision With Flag
+/// Frozen Analog Input Event - Single-precision floating point without time
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct Group33Var5 {
     /// flags field of the variation
@@ -1175,7 +1175,7 @@ pub(crate) struct Group33Var5 {
     pub(crate) value: f32,
 }
 
-/// Frozen Analog Input Event - 16-bit with Flag and Time-of-Freeze
+/// Frozen Analog Input Event - 16-bit with time of freeze
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group33Var4 {
     /// flags field of the variation
@@ -1186,7 +1186,7 @@ pub(crate) struct Group33Var4 {
     pub(crate) time: Timestamp,
 }
 
-/// Frozen Analog Input Event - 32-bit with Flag and Time-of-Freeze
+/// Frozen Analog Input Event - 32-bit with time of freeze
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group33Var3 {
     /// flags field of the variation
@@ -1197,7 +1197,7 @@ pub(crate) struct Group33Var3 {
     pub(crate) time: Timestamp,
 }
 
-/// Frozen Analog Input Event - 16-bit With Flag
+/// Frozen Analog Input Event - 16-bit without time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group33Var2 {
     /// flags field of the variation
@@ -1206,7 +1206,7 @@ pub(crate) struct Group33Var2 {
     pub(crate) value: i16,
 }
 
-/// Frozen Analog Input Event - 32-bit With Flag
+/// Frozen Analog Input Event - 32-bit without time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group33Var1 {
     /// flags field of the variation
@@ -1215,7 +1215,7 @@ pub(crate) struct Group33Var1 {
     pub(crate) value: i32,
 }
 
-/// Analog Input Event - Double-precision With Flag and Time
+/// Analog Input Event - Double-precision floating point with time
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct Group32Var8 {
     /// flags field of the variation
@@ -1226,7 +1226,7 @@ pub(crate) struct Group32Var8 {
     pub(crate) time: Timestamp,
 }
 
-/// Analog Input Event - Single-precision With Flag and Time
+/// Analog Input Event - Single-precision floating point with time
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct Group32Var7 {
     /// flags field of the variation
@@ -1237,7 +1237,7 @@ pub(crate) struct Group32Var7 {
     pub(crate) time: Timestamp,
 }
 
-/// Analog Input Event - Double-precision With Flag
+/// Analog Input Event - Double-precision floating point without time
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct Group32Var6 {
     /// flags field of the variation
@@ -1246,7 +1246,7 @@ pub(crate) struct Group32Var6 {
     pub(crate) value: f64,
 }
 
-/// Analog Input Event - Single-precision With Flag
+/// Analog Input Event - Single-precision floating point without time
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct Group32Var5 {
     /// flags field of the variation
@@ -1255,7 +1255,7 @@ pub(crate) struct Group32Var5 {
     pub(crate) value: f32,
 }
 
-/// Analog Input Event - 16-bit With Flag and Time
+/// Analog Input Event - 16-bit with time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group32Var4 {
     /// flags field of the variation
@@ -1266,7 +1266,7 @@ pub(crate) struct Group32Var4 {
     pub(crate) time: Timestamp,
 }
 
-/// Analog Input Event - 32-bit With Flag and Time
+/// Analog Input Event - 32-bit with time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group32Var3 {
     /// flags field of the variation
@@ -1277,7 +1277,7 @@ pub(crate) struct Group32Var3 {
     pub(crate) time: Timestamp,
 }
 
-/// Analog Input Event - 16-bit With Flag
+/// Analog Input Event - 16-bit without time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group32Var2 {
     /// flags field of the variation
@@ -1286,7 +1286,7 @@ pub(crate) struct Group32Var2 {
     pub(crate) value: i16,
 }
 
-/// Analog Input Event - 32-bit With Flag
+/// Analog Input Event - 32-bit without time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group32Var1 {
     /// flags field of the variation
@@ -1295,7 +1295,7 @@ pub(crate) struct Group32Var1 {
     pub(crate) value: i32,
 }
 
-/// Frozen Analog Input - Double-precision With Flag
+/// Frozen Analog Input - Double-precision floating point with flags
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct Group31Var8 {
     /// flags field of the variation
@@ -1304,7 +1304,7 @@ pub(crate) struct Group31Var8 {
     pub(crate) value: f64,
 }
 
-/// Frozen Analog Input - Single-precision With Flag
+/// Frozen Analog Input - Single-precision floating point with flags
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct Group31Var7 {
     /// flags field of the variation
@@ -1313,21 +1313,21 @@ pub(crate) struct Group31Var7 {
     pub(crate) value: f32,
 }
 
-/// Frozen Analog Input - 16-bit Without Flag
+/// Frozen Analog Input - 16-bit without flags
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group31Var6 {
     /// value field of the variation
     pub(crate) value: i16,
 }
 
-/// Frozen Analog Input - 32-bit Without Flag
+/// Frozen Analog Input - 32-bit without flags
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group31Var5 {
     /// value field of the variation
     pub(crate) value: i32,
 }
 
-/// Frozen Analog Input - 16-bit with Flag and Time-of-Freeze
+/// Frozen Analog Input - 16-bit with flags and time of freeze
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group31Var4 {
     /// flags field of the variation
@@ -1338,7 +1338,7 @@ pub(crate) struct Group31Var4 {
     pub(crate) time: Timestamp,
 }
 
-/// Frozen Analog Input - 32-bit with Flag and Time-of-Freeze
+/// Frozen Analog Input - 32-bit with flags and time of freeze
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group31Var3 {
     /// flags field of the variation
@@ -1349,7 +1349,7 @@ pub(crate) struct Group31Var3 {
     pub(crate) time: Timestamp,
 }
 
-/// Frozen Analog Input - 16-bit With Flag
+/// Frozen Analog Input - 16-bit with flags
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group31Var2 {
     /// flags field of the variation
@@ -1358,7 +1358,7 @@ pub(crate) struct Group31Var2 {
     pub(crate) value: i16,
 }
 
-/// Frozen Analog Input - 32-bit With Flag
+/// Frozen Analog Input - 32-bit with flags
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group31Var1 {
     /// flags field of the variation
@@ -1367,7 +1367,7 @@ pub(crate) struct Group31Var1 {
     pub(crate) value: i32,
 }
 
-/// Analog Input - Double-precision With Flag
+/// Analog Input - Double-precision floating point with flags
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct Group30Var6 {
     /// flags field of the variation
@@ -1376,7 +1376,7 @@ pub(crate) struct Group30Var6 {
     pub(crate) value: f64,
 }
 
-/// Analog Input - Single-precision With Flag
+/// Analog Input - Single-precision floating point with flags
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) struct Group30Var5 {
     /// flags field of the variation
@@ -1385,21 +1385,21 @@ pub(crate) struct Group30Var5 {
     pub(crate) value: f32,
 }
 
-/// Analog Input - 16-bit Without Flag
+/// Analog Input - 16-bit without flags
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group30Var4 {
     /// value field of the variation
     pub(crate) value: i16,
 }
 
-/// Analog Input - 32-bit Without Flag
+/// Analog Input - 32-bit without flags
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group30Var3 {
     /// value field of the variation
     pub(crate) value: i32,
 }
 
-/// Analog Input - 16-bit With Flag
+/// Analog Input - 16-bit with flags
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group30Var2 {
     /// flags field of the variation
@@ -1408,7 +1408,7 @@ pub(crate) struct Group30Var2 {
     pub(crate) value: i16,
 }
 
-/// Analog Input - 32-bit With Flag
+/// Analog Input - 32-bit with flags
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group30Var1 {
     /// flags field of the variation
@@ -1417,7 +1417,7 @@ pub(crate) struct Group30Var1 {
     pub(crate) value: i32,
 }
 
-/// Frozen Counter Event - 16-bit With Flag and Time
+/// Frozen Counter Event - 16-bit with time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group23Var6 {
     /// flags field of the variation
@@ -1428,7 +1428,7 @@ pub(crate) struct Group23Var6 {
     pub(crate) time: Timestamp,
 }
 
-/// Frozen Counter Event - 32-bit With Flag and Time
+/// Frozen Counter Event - 32-bit with time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group23Var5 {
     /// flags field of the variation
@@ -1439,7 +1439,7 @@ pub(crate) struct Group23Var5 {
     pub(crate) time: Timestamp,
 }
 
-/// Frozen Counter Event - 16-bit With Flag
+/// Frozen Counter Event - 16-bit without time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group23Var2 {
     /// flags field of the variation
@@ -1448,7 +1448,7 @@ pub(crate) struct Group23Var2 {
     pub(crate) value: u16,
 }
 
-/// Frozen Counter Event - 32-bit With Flag
+/// Frozen Counter Event - 32-bit without time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group23Var1 {
     /// flags field of the variation
@@ -1457,7 +1457,7 @@ pub(crate) struct Group23Var1 {
     pub(crate) value: u32,
 }
 
-/// Counter Event - 16-bit With Flag and Time
+/// Counter Event - 16-bit with time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group22Var6 {
     /// flags field of the variation
@@ -1468,7 +1468,7 @@ pub(crate) struct Group22Var6 {
     pub(crate) time: Timestamp,
 }
 
-/// Counter Event - 32-bit With Flag and Time
+/// Counter Event - 32-bit with time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group22Var5 {
     /// flags field of the variation
@@ -1479,7 +1479,7 @@ pub(crate) struct Group22Var5 {
     pub(crate) time: Timestamp,
 }
 
-/// Counter Event - 16-bit With Flag
+/// Counter Event - 16-bit without time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group22Var2 {
     /// flags field of the variation
@@ -1488,7 +1488,7 @@ pub(crate) struct Group22Var2 {
     pub(crate) value: u16,
 }
 
-/// Counter Event - 32-bit With Flag
+/// Counter Event - 32-bit without time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group22Var1 {
     /// flags field of the variation
@@ -1497,21 +1497,21 @@ pub(crate) struct Group22Var1 {
     pub(crate) value: u32,
 }
 
-/// Frozen Counter - 16-bit Without Flag
+/// Frozen Counter - 16-bit without flags
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group21Var10 {
     /// value field of the variation
     pub(crate) value: u16,
 }
 
-/// Frozen Counter - 32-bit Without Flag
+/// Frozen Counter - 32-bit without flags
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group21Var9 {
     /// value field of the variation
     pub(crate) value: u32,
 }
 
-/// Frozen Counter - 16-bit With Flag and Time
+/// Frozen Counter - 16-bit with flags and time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group21Var6 {
     /// flags field of the variation
@@ -1522,7 +1522,7 @@ pub(crate) struct Group21Var6 {
     pub(crate) time: Timestamp,
 }
 
-/// Frozen Counter - 32-bit With Flag and Time
+/// Frozen Counter - 32-bit with flags and time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group21Var5 {
     /// flags field of the variation
@@ -1533,7 +1533,7 @@ pub(crate) struct Group21Var5 {
     pub(crate) time: Timestamp,
 }
 
-/// Frozen Counter - 16-bit With Flag
+/// Frozen Counter - 16-bit with flags
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group21Var2 {
     /// flags field of the variation
@@ -1542,7 +1542,7 @@ pub(crate) struct Group21Var2 {
     pub(crate) value: u16,
 }
 
-/// Frozen Counter - 32-bit With Flag
+/// Frozen Counter - 32-bit with flags
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group21Var1 {
     /// flags field of the variation
@@ -1551,21 +1551,21 @@ pub(crate) struct Group21Var1 {
     pub(crate) value: u32,
 }
 
-/// Counter - 16-bit Without Flag
+/// Counter - 16-bit without flags
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group20Var6 {
     /// value field of the variation
     pub(crate) value: u16,
 }
 
-/// Counter - 32-bit Without Flag
+/// Counter - 32-bit without flags
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group20Var5 {
     /// value field of the variation
     pub(crate) value: u32,
 }
 
-/// Counter - 16-bit With Flag
+/// Counter - 16-bit with flags
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group20Var2 {
     /// flags field of the variation
@@ -1574,7 +1574,7 @@ pub(crate) struct Group20Var2 {
     pub(crate) value: u16,
 }
 
-/// Counter - 32-bit With Flag
+/// Counter - 32-bit with flags
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group20Var1 {
     /// flags field of the variation
@@ -1583,7 +1583,7 @@ pub(crate) struct Group20Var1 {
     pub(crate) value: u32,
 }
 
-/// Binary Output Command Event - With Time
+/// Binary Output Command Event - With time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group13Var2 {
     /// flags field of the variation
@@ -1592,14 +1592,14 @@ pub(crate) struct Group13Var2 {
     pub(crate) time: Timestamp,
 }
 
-/// Binary Output Command Event - Without Time
+/// Binary Output Command Event - Without time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group13Var1 {
     /// flags field of the variation
     pub(crate) flags: u8,
 }
 
-/// Binary Command - Control Relay Output Block
+/// Binary Output Command - Control relay output block
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Group12Var1 {
     /// code field of the variation
@@ -1614,7 +1614,7 @@ pub struct Group12Var1 {
     pub status: CommandStatus,
 }
 
-/// Binary Output Event - Output Status With Time
+/// Binary Output Event - With time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group11Var2 {
     /// flags field of the variation
@@ -1623,21 +1623,21 @@ pub(crate) struct Group11Var2 {
     pub(crate) time: Timestamp,
 }
 
-/// Binary Output Event - Output Status Without Time
+/// Binary Output Event - Without time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group11Var1 {
     /// flags field of the variation
     pub(crate) flags: u8,
 }
 
-/// Binary Output - Output Status With Flags
+/// Binary Output - With flags
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group10Var2 {
     /// flags field of the variation
     pub(crate) flags: u8,
 }
 
-/// Double-bit Binary Input Event - With Relative Time
+/// Double-bit Binary Input Event - With relative time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group4Var3 {
     /// flags field of the variation
@@ -1646,7 +1646,7 @@ pub(crate) struct Group4Var3 {
     pub(crate) time: u16,
 }
 
-/// Double-bit Binary Input Event - With Absolute Time
+/// Double-bit Binary Input Event - With absolute time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group4Var2 {
     /// flags field of the variation
@@ -1655,21 +1655,21 @@ pub(crate) struct Group4Var2 {
     pub(crate) time: Timestamp,
 }
 
-/// Double-bit Binary Input Event - Without Time
+/// Double-bit Binary Input Event - Without time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group4Var1 {
     /// flags field of the variation
     pub(crate) flags: u8,
 }
 
-/// Double-bit Binary Input - With Flags
+/// Double-bit Binary Input - With flags
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group3Var2 {
     /// flags field of the variation
     pub(crate) flags: u8,
 }
 
-/// Binary Input Event - With Relative Time
+/// Binary Input Event - With relative time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group2Var3 {
     /// flags field of the variation
@@ -1678,7 +1678,7 @@ pub(crate) struct Group2Var3 {
     pub(crate) time: u16,
 }
 
-/// Binary Input Event - With Absolute Time
+/// Binary Input Event - With absolute time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group2Var2 {
     /// flags field of the variation
@@ -1687,14 +1687,14 @@ pub(crate) struct Group2Var2 {
     pub(crate) time: Timestamp,
 }
 
-/// Binary Input Event - Without Time
+/// Binary Input Event - Without time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group2Var1 {
     /// flags field of the variation
     pub(crate) flags: u8,
 }
 
-/// Binary Input - With Flags
+/// Binary Input - With flags
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group1Var2 {
     /// flags field of the variation

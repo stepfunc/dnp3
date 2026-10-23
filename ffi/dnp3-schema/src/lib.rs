@@ -19,6 +19,7 @@ mod master;
 mod outstation;
 mod shared;
 mod tcp;
+#[rustfmt::skip]
 mod variation;
 
 pub(crate) fn gv(g: u8, v: u8) -> String {

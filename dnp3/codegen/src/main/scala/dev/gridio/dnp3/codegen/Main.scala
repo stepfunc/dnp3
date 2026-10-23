@@ -18,6 +18,7 @@ object Main {
 
   private val appPath: Path = FileSystems.getDefault.getPath("../src/app/")
   private val implPath: Path = appPath.resolve("gen");
+  private val ffiPath: Path = FileSystems.getDefault.getPath("../../ffi/")
 
   private object CommonUseStatements extends Module {
     override def lines(implicit indentation: Indentation): Iterator[String] = {
@@ -41,7 +42,10 @@ object Main {
     (CountVariationModule, implPath.resolve("count.rs")),
     (PrefixedVariationModule, implPath.resolve("prefixed.rs")),
     (ReadQualifierModule, implPath.resolve("read.rs")),
-    (ConversionsModule, implPath.resolve("conversion.rs"))
+    (ConversionsModule, implPath.resolve("conversion.rs")),
+    // the FFI Variation enum and its conversions
+    (FfiVariationSchemaModule, ffiPath.resolve("dnp3-schema/src/variation.rs")),
+    (FfiVariationConversionModule, ffiPath.resolve("dnp3-ffi/src/variation.rs"))
   )
 
   def main(args: Array[String]): Unit = {

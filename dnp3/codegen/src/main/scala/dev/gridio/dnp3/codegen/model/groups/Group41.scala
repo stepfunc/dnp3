@@ -19,9 +19,9 @@ object Group41 extends ObjectGroup {
 
   override def groupType: GroupType = GroupType.Command
 }
-object Group41Var1 extends FixedSize(Group41, 1, bit32WithFlag)(value32, commandStatus)
+object Group41Var1 extends FixedSize(Group41, 1, bit32)(value32, commandStatus)
 
-object Group41Var2 extends FixedSize(Group41, 2, bit16WithFlag)(value16, commandStatus)
+object Group41Var2 extends FixedSize(Group41, 2, bit16)(value16, commandStatus)
 
 object Group41Var3 extends FixedSize(Group41, 3, singlePrecision)(float32, commandStatus)
 

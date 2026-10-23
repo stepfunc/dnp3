@@ -23,18 +23,18 @@ object Group42 extends ObjectGroup {
 
 object Group42Var0 extends AnyVariation(Group42, 0)
 
-object Group42Var1 extends FixedSize(Group42, 1, bit32WithFlag)(flags, value32)
+object Group42Var1 extends FixedSize(Group42, 1, bit32WithoutTime)(flags, value32)
 
-object Group42Var2 extends FixedSize(Group42, 2, bit16WithFlag)(flags, value16)
+object Group42Var2 extends FixedSize(Group42, 2, bit16WithoutTime)(flags, value16)
 
-object Group42Var3 extends FixedSize(Group42, 3, bit32WithFlagTime)(flags, value32, time48)
+object Group42Var3 extends FixedSize(Group42, 3, bit32WithTime)(flags, value32, time48)
 
-object Group42Var4 extends FixedSize(Group42, 4, bit16WithFlagTime)(flags, value16, time48)
+object Group42Var4 extends FixedSize(Group42, 4, bit16WithTime)(flags, value16, time48)
 
-object Group42Var5 extends FixedSize(Group42, 5, singlePrecisionWithFlag)(flags, float32)
+object Group42Var5 extends FixedSize(Group42, 5, singlePrecisionWithoutTime)(flags, float32)
 
-object Group42Var6 extends FixedSize(Group42, 6, doublePrecisionWithFlag)(flags, float64)
+object Group42Var6 extends FixedSize(Group42, 6, doublePrecisionWithoutTime)(flags, float64)
 
-object Group42Var7 extends FixedSize(Group42, 7, singlePrecisionWithFlagTime)(flags, float32, time48)
+object Group42Var7 extends FixedSize(Group42, 7, singlePrecisionWithTime)(flags, float32, time48)
 
-object Group42Var8 extends FixedSize(Group42, 8, doublePrecisionWithFlagTime)(flags, float64, time48)
+object Group42Var8 extends FixedSize(Group42, 8, doublePrecisionWithTime)(flags, float64, time48)

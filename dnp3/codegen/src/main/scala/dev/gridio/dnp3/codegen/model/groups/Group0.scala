@@ -19,8 +19,8 @@ object Group0 extends ObjectGroup {
   override def groupType: GroupType = GroupType.DeviceAttributes
 }
 
-object SpecificAttribute extends BasicGroupVariation (Group0,  Variation.Value(0), "Specific Attribute")
-object AllAttributesRequest extends BasicGroupVariation (Group0,  Variation.Value(254), "Non-Specific All Attributes Request")
+object SpecificAttribute extends BasicGroupVariation (Group0,  Variation.Value(0), "Specific attribute (variations 1 to 253 and 255)")
+object AllAttributesRequest extends BasicGroupVariation (Group0,  Variation.Value(254), "All attributes request")
 
 
 

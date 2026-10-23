@@ -15,7 +15,7 @@ object Group12 extends ObjectGroup {
 
   def group: Byte = 12
 
-  def desc: String = "Binary Command"
+  def desc: String = "Binary Output Command"
 
   override def groupType: GroupType = GroupType.Command
 }

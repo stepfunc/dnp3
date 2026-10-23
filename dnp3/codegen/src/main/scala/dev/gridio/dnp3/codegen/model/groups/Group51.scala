@@ -20,6 +20,6 @@ object Group51 extends ObjectGroup {
   override def groupType: GroupType = GroupType.Time
 }
 
-object Group51Var1 extends FixedSize(Group51, 1, "Absolute time, synchronized")(time48)
+object Group51Var1 extends FixedSize(Group51, 1, "Synchronized absolute time")(time48)
 
-object Group51Var2 extends FixedSize(Group51, 2, "Absolute time, unsynchronized")(time48)
+object Group51Var2 extends FixedSize(Group51, 2, "Unsynchronized absolute time")(time48)
