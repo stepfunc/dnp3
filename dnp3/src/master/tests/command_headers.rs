@@ -16,22 +16,20 @@ use crate::app::parse::parser::HeaderCollection;
 use crate::app::FunctionCode;
 use crate::master::{CommandBuilder, CommandHeaders, CommandResponseError, CommandSupport};
 
-#[derive(Copy, Clone, Debug)]
-enum Command {
-    G12V1,
-    G41V1,
-    G41V2,
-    G41V3,
-    G41V4,
+/// The fields of a command object
+#[derive(Clone, Copy, Debug)]
+enum Value {
+    G12V1 {
+        code: ControlCode,
+        count: u8,
+        on_time: u32,
+        off_time: u32,
+    },
+    G41V1(i32),
+    G41V2(i16),
+    G41V3(f32),
+    G41V4(f64),
 }
-
-const COMMANDS: [Command; 5] = [
-    Command::G12V1,
-    Command::G41V1,
-    Command::G41V2,
-    Command::G41V3,
-    Command::G41V4,
-];
 
 #[derive(Copy, Clone, Debug, PartialEq)]
 enum Width {
@@ -41,35 +39,51 @@ enum Width {
 
 const WIDTHS: [Width; 2] = [Width::One, Width::Two];
 
-impl Command {
-    fn crob() -> Group12Var1 {
-        Group12Var1 {
-            code: ControlCode::from_op_type(OpType::LatchOn),
+/// A command, and its encoding written out by hand, without its trailing status byte
+type Example = (Value, &'static [u8]);
+
+const LATCH_ON: ControlCode = ControlCode {
+    tcc: TripCloseCode::Nul,
+    clear: false,
+    queue: false,
+    op_type: OpType::LatchOn,
+};
+
+/// a command of each type
+const COMMANDS: [Example; 5] = [
+    (
+        Value::G12V1 {
+            code: LATCH_ON,
             count: 1,
             on_time: 100,
             off_time: 200,
-            status: CommandStatus::Success,
-        }
-    }
+        },
+        &[0x03, 0x01, 100, 0, 0, 0, 200, 0, 0, 0],
+    ),
+    (Value::G41V1(-7), &[0xF9, 0xFF, 0xFF, 0xFF]),
+    (Value::G41V2(513), &[0x01, 0x02]),
+    (Value::G41V3(2.5), &[0x00, 0x00, 0x20, 0x40]),
+    (Value::G41V4(2.5), &[0, 0, 0, 0, 0, 0, 0x04, 0x40]),
+];
 
+fn crob(code: ControlCode, count: u8, on_time: u32, off_time: u32) -> Group12Var1 {
+    Group12Var1 {
+        code,
+        count,
+        on_time,
+        off_time,
+        status: CommandStatus::Success,
+    }
+}
+
+impl Value {
     fn group_var(self) -> [u8; 2] {
         match self {
-            Command::G12V1 => [12, 1],
-            Command::G41V1 => [41, 1],
-            Command::G41V2 => [41, 2],
-            Command::G41V3 => [41, 3],
-            Command::G41V4 => [41, 4],
-        }
-    }
-
-    /// the encoded command, without its trailing status byte
-    fn value(self) -> &'static [u8] {
-        match self {
-            Command::G12V1 => &[0x03, 0x01, 100, 0, 0, 0, 200, 0, 0, 0],
-            Command::G41V1 => &[0xF9, 0xFF, 0xFF, 0xFF],
-            Command::G41V2 => &[0x01, 0x02],
-            Command::G41V3 => &[0x00, 0x00, 0x20, 0x40],
-            Command::G41V4 => &[0, 0, 0, 0, 0, 0, 0x04, 0x40],
+            Value::G12V1 { .. } => [12, 1],
+            Value::G41V1(_) => [41, 1],
+            Value::G41V2(_) => [41, 2],
+            Value::G41V3(_) => [41, 3],
+            Value::G41V4(_) => [41, 4],
         }
     }
 
@@ -85,11 +99,16 @@ impl Command {
         }
 
         match self {
-            Command::G12V1 => add(builder, Self::crob(), width, index),
-            Command::G41V1 => add(builder, Group41Var1::new(-7), width, index),
-            Command::G41V2 => add(builder, Group41Var2::new(513), width, index),
-            Command::G41V3 => add(builder, Group41Var3::new(2.5), width, index),
-            Command::G41V4 => add(builder, Group41Var4::new(2.5), width, index),
+            Value::G12V1 {
+                code,
+                count,
+                on_time,
+                off_time,
+            } => add(builder, crob(code, count, on_time, off_time), width, index),
+            Value::G41V1(x) => add(builder, Group41Var1::new(x), width, index),
+            Value::G41V2(x) => add(builder, Group41Var2::new(x), width, index),
+            Value::G41V3(x) => add(builder, Group41Var3::new(x), width, index),
+            Value::G41V4(x) => add(builder, Group41Var4::new(x), width, index),
         }
     }
 
@@ -107,11 +126,16 @@ impl Command {
         }
 
         match self {
-            Command::G12V1 => single(Self::crob(), width, index),
-            Command::G41V1 => single(Group41Var1::new(-7), width, index),
-            Command::G41V2 => single(Group41Var2::new(513), width, index),
-            Command::G41V3 => single(Group41Var3::new(2.5), width, index),
-            Command::G41V4 => single(Group41Var4::new(2.5), width, index),
+            Value::G12V1 {
+                code,
+                count,
+                on_time,
+                off_time,
+            } => single(crob(code, count, on_time, off_time), width, index),
+            Value::G41V1(x) => single(Group41Var1::new(x), width, index),
+            Value::G41V2(x) => single(Group41Var2::new(x), width, index),
+            Value::G41V3(x) => single(Group41Var3::new(x), width, index),
+            Value::G41V4(x) => single(Group41Var4::new(x), width, index),
         }
     }
 }
@@ -139,22 +163,38 @@ impl Width {
     }
 }
 
-/// expected bytes of a header: (command, width, [(index, status)])
-type Header<'a> = (Command, Width, &'a [(u16, u8)]);
+/// A header of objects as bytes: each object's index and value, then its status
+type EncodedHeader = ([u8; 2], Width, Vec<(Vec<u8>, u8)>);
 
-fn encode(headers: &[Header]) -> Vec<u8> {
+/// an object's index, then its encoded value
+fn object(width: Width, index: u16, value: &[u8]) -> Vec<u8> {
+    let mut bytes = Vec::new();
+    width.write(index, &mut bytes);
+    bytes.extend_from_slice(value);
+    bytes
+}
+
+fn to_bytes(headers: &[EncodedHeader]) -> Vec<u8> {
     let mut out = Vec::new();
-    for &(command, width, items) in headers {
-        out.extend_from_slice(&command.group_var());
+    for (group_var, width, objects) in headers {
+        out.extend_from_slice(group_var);
         out.push(width.qualifier());
-        width.write(u16::try_from(items.len()).unwrap(), &mut out);
-        for &(index, status) in items {
-            width.write(index, &mut out);
-            out.extend_from_slice(command.value());
-            out.push(status);
+        width.write(u16::try_from(objects.len()).unwrap(), &mut out);
+        for (object, status) in objects {
+            out.extend_from_slice(object);
+            out.push(*status);
         }
     }
     out
+}
+
+/// a header of one command at each (index, status)
+fn header((value, bytes): Example, width: Width, items: &[(u16, u8)]) -> EncodedHeader {
+    let objects = items
+        .iter()
+        .map(|&(index, status)| (object(width, index, bytes), status))
+        .collect();
+    (value.group_var(), width, objects)
 }
 
 fn write(headers: &CommandHeaders) -> Vec<u8> {
@@ -178,26 +218,10 @@ fn single_header_of_each_command_at_each_width() {
         for width in WIDTHS {
             let index = width.index();
             assert_eq!(
-                write(&command.single(width, index)),
-                encode(&[(command, width, &[(index, 0)])]),
-                "{command:?} {width:?}"
-            );
-        }
-    }
-}
-
-#[test]
-fn builder_merges_consecutive_commands_of_one_type_and_width() {
-    for command in COMMANDS {
-        for width in WIDTHS {
-            let mut builder = CommandBuilder::new();
-            command.add(&mut builder, width, 3);
-            command.add(&mut builder, width, 4);
-            command.add(&mut builder, width, 200);
-            assert_eq!(
-                write(&builder.build()),
-                encode(&[(command, width, &[(3, 0), (4, 0), (200, 0)])]),
-                "{command:?} {width:?}"
+                write(&command.0.single(width, index)),
+                to_bytes(&[header(command, width, &[(index, 0)])]),
+                "{:?} {width:?}",
+                command.0
             );
         }
     }
@@ -205,38 +229,39 @@ fn builder_merges_consecutive_commands_of_one_type_and_width() {
 
 #[test]
 fn builder_starts_a_new_header_when_the_type_or_width_changes() {
+    let [g12v1, g41v1, g41v2, g41v3, g41v4] = COMMANDS;
     let mut builder = CommandBuilder::new();
     let adds = [
-        (Command::G12V1, Width::One, 1),
-        (Command::G12V1, Width::Two, 2),
-        (Command::G12V1, Width::Two, 3),
-        (Command::G41V1, Width::Two, 4),
-        (Command::G41V1, Width::One, 5),
-        (Command::G41V2, Width::One, 6),
-        (Command::G41V2, Width::One, 7),
-        (Command::G41V3, Width::Two, 8),
-        (Command::G41V4, Width::One, 9),
-        (Command::G41V4, Width::Two, 10),
-        (Command::G41V3, Width::Two, 11),
-        (Command::G12V1, Width::One, 12),
+        (g12v1, Width::One, 1),
+        (g12v1, Width::Two, 2),
+        (g12v1, Width::Two, 3),
+        (g41v1, Width::Two, 4),
+        (g41v1, Width::One, 5),
+        (g41v2, Width::One, 6),
+        (g41v2, Width::One, 7),
+        (g41v3, Width::Two, 8),
+        (g41v4, Width::One, 9),
+        (g41v4, Width::Two, 10),
+        (g41v3, Width::Two, 11),
+        (g12v1, Width::One, 12),
     ];
-    for (command, width, index) in adds {
-        command.add(&mut builder, width, index);
+    for ((value, _), width, index) in adds {
+        value.add(&mut builder, width, index);
     }
 
     assert_eq!(
         write(&builder.build()),
-        encode(&[
-            (Command::G12V1, Width::One, &[(1, 0)]),
-            (Command::G12V1, Width::Two, &[(2, 0), (3, 0)]),
-            (Command::G41V1, Width::Two, &[(4, 0)]),
-            (Command::G41V1, Width::One, &[(5, 0)]),
-            (Command::G41V2, Width::One, &[(6, 0), (7, 0)]),
-            (Command::G41V3, Width::Two, &[(8, 0)]),
-            (Command::G41V4, Width::One, &[(9, 0)]),
-            (Command::G41V4, Width::Two, &[(10, 0)]),
-            (Command::G41V3, Width::Two, &[(11, 0)]),
-            (Command::G12V1, Width::One, &[(12, 0)]),
+        to_bytes(&[
+            header(g12v1, Width::One, &[(1, 0)]),
+            header(g12v1, Width::Two, &[(2, 0), (3, 0)]),
+            header(g41v1, Width::Two, &[(4, 0)]),
+            header(g41v1, Width::One, &[(5, 0)]),
+            header(g41v2, Width::One, &[(6, 0), (7, 0)]),
+            header(g41v3, Width::Two, &[(8, 0)]),
+            header(g41v4, Width::One, &[(9, 0)]),
+            header(g41v4, Width::Two, &[(10, 0)]),
+            header(g41v3, Width::Two, &[(11, 0)]),
+            header(g12v1, Width::One, &[(12, 0)]),
         ])
     );
 }
@@ -247,73 +272,46 @@ fn finish_header_splits_commands_of_one_type_and_ignores_an_empty_header() {
         for width in WIDTHS {
             let mut builder = CommandBuilder::new();
             builder.finish_header();
-            command.add(&mut builder, width, 1);
+            command.0.add(&mut builder, width, 1);
             builder.finish_header();
             builder.finish_header();
-            command.add(&mut builder, width, 2);
-            command.add(&mut builder, width, 3);
+            command.0.add(&mut builder, width, 2);
+            command.0.add(&mut builder, width, 3);
             builder.finish_header();
             assert_eq!(
                 write(&builder.build()),
-                encode(&[
-                    (command, width, &[(1, 0)]),
-                    (command, width, &[(2, 0), (3, 0)]),
+                to_bytes(&[
+                    header(command, width, &[(1, 0)]),
+                    header(command, width, &[(2, 0), (3, 0)]),
                 ]),
-                "{command:?} {width:?}"
+                "{:?} {width:?}",
+                command.0
             );
         }
     }
 }
 
-#[test]
-fn empty_builder_writes_no_headers() {
-    assert_eq!(write(&CommandBuilder::new().build()), Vec::<u8>::new());
-}
-
-fn two_of(command: Command, width: Width) -> CommandHeaders {
+fn two_of(value: Value, width: Width) -> CommandHeaders {
     let mut builder = CommandBuilder::new();
-    command.add(&mut builder, width, 3);
-    command.add(&mut builder, width, 4);
+    value.add(&mut builder, width, 3);
+    value.add(&mut builder, width, 4);
     builder.build()
 }
 
 #[test]
-fn echo_of_each_command_at_each_width_is_compared_object_by_object() {
+fn echo_status_is_checked_before_the_value() {
     for command in COMMANDS {
         for width in WIDTHS {
-            let sent = two_of(command, width);
-            let check = |items: &[(u16, u8)], expected| {
-                assert_eq!(
-                    compare(&sent, &encode(&[(command, width, items)])),
-                    expected,
-                    "{command:?} {width:?} {items:?}"
-                );
-            };
-
-            check(&[(3, 0), (4, 0)], Ok(()));
-            check(
-                &[(3, 0), (4, 4)],
-                Err(CommandResponseError::BadStatus(CommandStatus::NotSupported)),
-            );
-            check(
-                &[(3, 200), (4, 0)],
-                Err(CommandResponseError::BadStatus(CommandStatus::Unknown(200))),
-            );
-            // the status is checked before the value
-            check(
-                &[(3, 0), (5, 6)],
+            assert_eq!(
+                compare(
+                    &two_of(command.0, width),
+                    &to_bytes(&[header(command, width, &[(3, 0), (5, 6)])])
+                ),
                 Err(CommandResponseError::BadStatus(
-                    CommandStatus::HardwareError,
+                    CommandStatus::HardwareError
                 )),
-            );
-            check(
-                &[(3, 0), (5, 0)],
-                Err(CommandResponseError::ObjectValueMismatch),
-            );
-            check(&[(3, 0)], Err(CommandResponseError::ObjectCountMismatch));
-            check(
-                &[(3, 0), (4, 0), (5, 0)],
-                Err(CommandResponseError::ObjectCountMismatch),
+                "{:?} {width:?}",
+                command.0
             );
         }
     }
@@ -325,19 +323,22 @@ fn echo_with_another_command_type_or_width_is_a_header_type_mismatch() {
         for sent_width in WIDTHS {
             for echoed in COMMANDS {
                 for echoed_width in WIDTHS {
-                    let expected =
-                        if sent.group_var() == echoed.group_var() && sent_width == echoed_width {
-                            Ok(())
-                        } else {
-                            Err(CommandResponseError::HeaderTypeMismatch)
-                        };
+                    let expected = if sent.0.group_var() == echoed.0.group_var()
+                        && sent_width == echoed_width
+                    {
+                        Ok(())
+                    } else {
+                        Err(CommandResponseError::HeaderTypeMismatch)
+                    };
                     assert_eq!(
                         compare(
-                            &two_of(sent, sent_width),
-                            &encode(&[(echoed, echoed_width, &[(3, 0), (4, 0)])])
+                            &two_of(sent.0, sent_width),
+                            &to_bytes(&[header(echoed, echoed_width, &[(3, 0), (4, 0)])])
                         ),
                         expected,
-                        "{sent:?} {sent_width:?} {echoed:?} {echoed_width:?}"
+                        "{:?} {sent_width:?} {:?} {echoed_width:?}",
+                        sent.0,
+                        echoed.0
                     );
                 }
             }
@@ -345,104 +346,7 @@ fn echo_with_another_command_type_or_width_is_a_header_type_mismatch() {
     }
 }
 
-#[test]
-fn echo_with_more_or_fewer_headers_is_a_header_count_mismatch() {
-    let mut builder = CommandBuilder::new();
-    Command::G12V1.add(&mut builder, Width::One, 3);
-    Command::G41V2.add(&mut builder, Width::Two, 4);
-    let sent = builder.build();
-
-    let first: Header = (Command::G12V1, Width::One, &[(3, 0)]);
-    let second: Header = (Command::G41V2, Width::Two, &[(4, 0)]);
-
-    assert_eq!(compare(&sent, &encode(&[first, second])), Ok(()));
-    assert_eq!(
-        compare(&sent, &encode(&[first])),
-        Err(CommandResponseError::HeaderCountMismatch)
-    );
-    assert_eq!(
-        compare(&sent, &encode(&[first, second, second])),
-        Err(CommandResponseError::HeaderCountMismatch)
-    );
-    // headers are compared in order, so a mismatch in the first is found before the missing second
-    assert_eq!(
-        compare(&sent, &encode(&[second])),
-        Err(CommandResponseError::HeaderTypeMismatch)
-    );
-}
-
-impl Command {
-    /// encodings of the command that each differ from `value()` in one compared field
-    fn other_values(self) -> Vec<Vec<u8>> {
-        let crob = |offset: usize, byte: u8| {
-            let mut value = Command::G12V1.value().to_vec();
-            value[offset] = byte;
-            value
-        };
-        match self {
-            Command::G12V1 => vec![
-                // op type LATCH_OFF
-                crob(0, 0x04),
-                // trip-close code CLOSE
-                crob(0, 0x43),
-                // clear bit
-                crob(0, 0x23),
-                // queue bit
-                crob(0, 0x13),
-                // count
-                crob(1, 0x02),
-                // on time
-                crob(2, 101),
-                // off time
-                crob(6, 201),
-            ],
-            Command::G41V1 => vec![1i32.to_le_bytes().to_vec(), 2i32.to_le_bytes().to_vec()],
-            Command::G41V2 => vec![1i16.to_le_bytes().to_vec(), 2i16.to_le_bytes().to_vec()],
-            Command::G41V3 => vec![1.0f32.to_le_bytes().to_vec(), 2.0f32.to_le_bytes().to_vec()],
-            Command::G41V4 => vec![1.0f64.to_le_bytes().to_vec(), 2.0f64.to_le_bytes().to_vec()],
-        }
-    }
-}
-
-/// echo of `two_of` whose second command is encoded as `value`, at the sent indices and with
-/// success statuses
-fn echo_with_second_value(command: Command, width: Width, value: &[u8]) -> Vec<u8> {
-    let mut out = command.group_var().to_vec();
-    out.push(width.qualifier());
-    width.write(2, &mut out);
-    width.write(3, &mut out);
-    out.extend_from_slice(command.value());
-    out.push(0);
-    width.write(4, &mut out);
-    out.extend_from_slice(value);
-    out.push(0);
-    out
-}
-
-#[test]
-fn echo_with_a_different_value_at_the_same_index_is_an_object_value_mismatch() {
-    for command in COMMANDS {
-        for width in WIDTHS {
-            let sent = two_of(command, width);
-            assert_eq!(
-                compare(
-                    &sent,
-                    &echo_with_second_value(command, width, command.value())
-                ),
-                Ok(()),
-                "{command:?} {width:?}"
-            );
-            for value in command.other_values() {
-                assert_eq!(
-                    compare(&sent, &echo_with_second_value(command, width, &value)),
-                    Err(CommandResponseError::ObjectValueMismatch),
-                    "{command:?} {width:?} {value:?}"
-                );
-            }
-        }
-    }
-}
-
+/// The properties, and the examples among their cases that are kept as fixed cases
 mod property {
     use super::*;
     use crate::app::gen::prefixed::PrefixedVariation;
@@ -451,20 +355,6 @@ mod property {
     use crate::master::{BadEncoding, TaskError};
 
     use proptest::prelude::*;
-
-    #[derive(Clone, Copy, Debug)]
-    enum Value {
-        G12V1 {
-            code: ControlCode,
-            count: u8,
-            on_time: u32,
-            off_time: u32,
-        },
-        G41V1(i32),
-        G41V2(i16),
-        G41V3(f32),
-        G41V4(f64),
-    }
 
     /// The fields of a command object, floats by their bits
     #[derive(Debug, PartialEq)]
@@ -500,16 +390,6 @@ mod property {
     }
 
     impl Value {
-        fn group_var(self) -> [u8; 2] {
-            match self {
-                Value::G12V1 { .. } => [12, 1],
-                Value::G41V1(_) => [41, 1],
-                Value::G41V2(_) => [41, 2],
-                Value::G41V3(_) => [41, 3],
-                Value::G41V4(_) => [41, 4],
-            }
-        }
-
         /// the encoded object, without its status byte
         fn bytes(self) -> Vec<u8> {
             match self {
@@ -546,40 +426,6 @@ mod property {
                 Value::G41V4(x) => Fields::G41V4(x.to_bits(), status),
             }
         }
-
-        fn add(self, builder: &mut CommandBuilder, width: Width, index: u16) {
-            fn add<T>(builder: &mut CommandBuilder, command: T, width: Width, index: u16)
-            where
-                CommandBuilder: CommandSupport<T>,
-            {
-                match width {
-                    Width::One => builder.add_u8(command, u8::try_from(index).unwrap()),
-                    Width::Two => builder.add_u16(command, index),
-                }
-            }
-
-            match self {
-                Value::G12V1 {
-                    code,
-                    count,
-                    on_time,
-                    off_time,
-                } => {
-                    let crob = Group12Var1 {
-                        code,
-                        count,
-                        on_time,
-                        off_time,
-                        status: CommandStatus::Success,
-                    };
-                    add(builder, crob, width, index)
-                }
-                Value::G41V1(x) => add(builder, Group41Var1::new(x), width, index),
-                Value::G41V2(x) => add(builder, Group41Var2::new(x), width, index),
-                Value::G41V3(x) => add(builder, Group41Var3::new(x), width, index),
-                Value::G41V4(x) => add(builder, Group41Var4::new(x), width, index),
-            }
-        }
     }
 
     /// a command added to the builder, which first finishes the header it's building if `finish`
@@ -589,6 +435,17 @@ mod property {
         width: Width,
         index: u16,
         finish: bool,
+    }
+
+    impl Add {
+        fn new(value: Value, width: Width, index: u16) -> Self {
+            Self {
+                value,
+                width,
+                index,
+                finish: false,
+            }
+        }
     }
 
     /// The headers the builder should make: consecutive commands of one type and index width
@@ -612,39 +469,17 @@ mod property {
         headers
     }
 
-    /// A header of objects as bytes: each object's index and value, then its status
-    type EncodedHeader = ([u8; 2], Width, Vec<(Vec<u8>, u8)>);
-
     fn encoded(headers: &[ModelHeader]) -> Vec<EncodedHeader> {
         headers
             .iter()
             .map(|(width, items)| {
                 let objects = items
                     .iter()
-                    .map(|(index, value)| {
-                        let mut bytes = Vec::new();
-                        width.write(*index, &mut bytes);
-                        bytes.extend(value.bytes());
-                        (bytes, 0)
-                    })
+                    .map(|(index, value)| (object(*width, *index, &value.bytes()), 0))
                     .collect();
                 (items[0].1.group_var(), *width, objects)
             })
             .collect()
-    }
-
-    fn to_bytes(headers: &[EncodedHeader]) -> Vec<u8> {
-        let mut out = Vec::new();
-        for (group_var, width, objects) in headers {
-            out.extend_from_slice(group_var);
-            out.push(width.qualifier());
-            width.write(u16::try_from(objects.len()).unwrap(), &mut out);
-            for (object, status) in objects {
-                out.extend_from_slice(object);
-                out.push(*status);
-            }
-        }
-        out
     }
 
     fn prefixed<I: Index>(objects: PrefixedVariation<I>) -> Vec<(u16, Fields)> {
@@ -790,77 +625,76 @@ mod property {
         builder.build()
     }
 
-    /// One change an outstation could make to the echo of a request
+    /// One change an outstation could make to the echo of a request. Each position is taken
+    /// modulo the number of objects, bytes or headers it picks from
     #[derive(Clone, Debug)]
     enum Change {
         /// XOR a byte of an object's index or value
         Object {
-            object: prop::sample::Index,
-            byte: prop::sample::Index,
+            object: usize,
+            byte: usize,
             xor: u8,
         },
         /// a non-zero status for an object
         Status {
-            object: prop::sample::Index,
+            object: usize,
             status: u8,
         },
         /// remove the last object of a header
-        DropLastObject(prop::sample::Index),
+        DropLastObject(usize),
         /// repeat the last object of a header
-        RepeatLastObject(prop::sample::Index),
+        RepeatLastObject(usize),
         DropLastHeader,
         RepeatLastHeader,
     }
 
     fn change() -> impl Strategy<Value = Change> {
         prop_oneof![
-            (
-                any::<prop::sample::Index>(),
-                any::<prop::sample::Index>(),
-                1..=u8::MAX
-            )
+            (any::<usize>(), any::<usize>(), 1..=u8::MAX)
                 .prop_map(|(object, byte, xor)| Change::Object { object, byte, xor }),
-            (any::<prop::sample::Index>(), 1..=u8::MAX)
+            (any::<usize>(), 1..=u8::MAX)
                 .prop_map(|(object, status)| Change::Status { object, status }),
-            any::<prop::sample::Index>().prop_map(Change::DropLastObject),
-            any::<prop::sample::Index>().prop_map(Change::RepeatLastObject),
+            any::<usize>().prop_map(Change::DropLastObject),
+            any::<usize>().prop_map(Change::RepeatLastObject),
             Just(Change::DropLastHeader),
             Just(Change::RepeatLastHeader),
         ]
     }
 
+    /// the position among `len` items, wrapping around
+    fn wrap(position: usize, len: usize) -> usize {
+        position.checked_rem(len).unwrap()
+    }
+
     /// the object at `object` among all the objects of the headers
-    fn object_at<'a>(
-        echo: &'a mut [EncodedHeader],
-        object: &prop::sample::Index,
-    ) -> &'a mut (Vec<u8>, u8) {
-        let num_objects = echo.iter().map(|(_, _, objects)| objects.len()).sum();
+    fn object_at(echo: &mut [EncodedHeader], object: usize) -> &mut (Vec<u8>, u8) {
+        let num_objects: usize = echo.iter().map(|(_, _, objects)| objects.len()).sum();
         echo.iter_mut()
             .flat_map(|(_, _, objects)| objects.iter_mut())
-            .nth(object.index(num_objects))
+            .nth(wrap(object, num_objects))
             .unwrap()
     }
 
     /// apply the change to the echo, and return the error the master reports for it
     fn apply(change: &Change, echo: &mut Vec<EncodedHeader>) -> CommandResponseError {
-        match change {
+        match *change {
             Change::Object { object, byte, xor } => {
                 let (bytes, _) = object_at(echo, object);
-                let byte = byte.index(bytes.len());
+                let byte = wrap(byte, bytes.len());
                 bytes[byte] ^= xor;
                 CommandResponseError::ObjectValueMismatch
             }
             Change::Status { object, status } => {
-                object_at(echo, object).1 = *status;
-                CommandResponseError::BadStatus(CommandStatus::from(*status))
+                object_at(echo, object).1 = status;
+                CommandResponseError::BadStatus(CommandStatus::from(status))
             }
             Change::DropLastObject(header) => {
-                let header = header.index(echo.len());
+                let header = wrap(header, echo.len());
                 echo[header].2.pop();
                 CommandResponseError::ObjectCountMismatch
             }
             Change::RepeatLastObject(header) => {
-                let header = header.index(echo.len());
+                let header = wrap(header, echo.len());
                 let objects = &mut echo[header].2;
                 objects.push(objects.last().unwrap().clone());
                 CommandResponseError::ObjectCountMismatch
@@ -876,64 +710,194 @@ mod property {
         }
     }
 
+    /// The builder groups commands into headers, the master writes them, and the outstation
+    /// parses back the same commands, floats by their bits. A control code whose fields don't
+    /// fit their bits makes the master write nothing.
+    fn check_written_and_parsed_back(adds: &[Add]) {
+        let headers = build(adds);
+        let mut buffer = [0; 1024];
+        let mut cursor = WriteCursor::new(&mut buffer);
+        cursor.write_u8(0xAA).unwrap();
+        let result = headers.write(&mut HeaderWriter::new(&mut cursor));
+
+        let invalid = adds.iter().find_map(|add| match add.value {
+            Value::G12V1 { code, .. } if code_byte(code).is_none() => Some(code),
+            _ => None,
+        });
+        if let Some(code) = invalid {
+            assert_eq!(
+                result,
+                Err(TaskError::BadEncoding(BadEncoding::ControlCode(code)))
+            );
+            assert_eq!(cursor.written(), &[0xAA]);
+            return;
+        }
+
+        result.unwrap();
+        let model = model(adds);
+        let written = &cursor.written()[1..];
+        assert_eq!(written, to_bytes(&encoded(&model)));
+        let expected: Vec<(Width, Vec<(u16, Fields)>)> = model
+            .into_iter()
+            .map(|(width, items)| {
+                let fields = items
+                    .into_iter()
+                    .map(|(index, value)| (index, value.fields()))
+                    .collect();
+                (width, fields)
+            })
+            .collect();
+        assert_eq!(parse_request(written), expected);
+    }
+
+    type CompareResult = Result<(), CommandResponseError>;
+
+    /// The master's comparison of the commands with their echo after the change if any, and the
+    /// result for that change: a match for an exact echo
+    fn compare_echo(adds: &[Add], change: Option<&Change>) -> (CompareResult, CompareResult) {
+        let headers = build(adds);
+        let mut echo = encoded(&model(adds));
+        let expected = match change {
+            None => Ok(()),
+            Some(change) => Err(apply(change, &mut echo)),
+        };
+        (compare(&headers, &to_bytes(&echo)), expected)
+    }
+
+    /// the comparison of the echo with the change is the result for that change, and `expected`
+    fn check_echo(adds: &[Add], change: Option<Change>, expected: CompareResult) {
+        assert_eq!(
+            compare_echo(adds, change.as_ref()),
+            (expected, expected),
+            "{adds:?} {change:?}"
+        );
+    }
+
     proptest! {
         #![proptest_config(ProptestConfig::with_cases(512))]
 
-        /// The builder groups commands into headers, the master writes them, and the outstation
-        /// parses back the same commands, floats by their bits. A control code whose fields
-        /// don't fit their bits makes the master write nothing.
         #[test]
         fn commands_are_written_and_parsed_back(adds in prop::collection::vec(add(2), 0..12)) {
-            let headers = build(&adds);
-            let mut buffer = [0; 1024];
-            let mut cursor = WriteCursor::new(&mut buffer);
-            cursor.write_u8(0xAA).unwrap();
-            let result = headers.write(&mut HeaderWriter::new(&mut cursor));
-
-            let invalid = adds.iter().find_map(|add| match add.value {
-                Value::G12V1 { code, .. } if code_byte(code).is_none() => Some(code),
-                _ => None,
-            });
-            if let Some(code) = invalid {
-                prop_assert_eq!(
-                    result,
-                    Err(TaskError::BadEncoding(BadEncoding::ControlCode(code)))
-                );
-                prop_assert_eq!(cursor.written(), &[0xAA]);
-                return Ok(());
-            }
-
-            result.unwrap();
-            let model = model(&adds);
-            let written = &cursor.written()[1..];
-            prop_assert_eq!(written, to_bytes(&encoded(&model)));
-            let expected: Vec<(Width, Vec<(u16, Fields)>)> = model
-                .into_iter()
-                .map(|(width, items)| {
-                    let fields = items
-                        .into_iter()
-                        .map(|(index, value)| (index, value.fields()))
-                        .collect();
-                    (width, fields)
-                })
-                .collect();
-            prop_assert_eq!(parse_request(written), expected);
+            check_written_and_parsed_back(&adds);
         }
 
-        /// An exact echo of the commands matches them, and one change to it is the error for
-        /// that change
         #[test]
         fn echo_matches_only_when_unchanged(
             adds in prop::collection::vec(add(0), 1..12),
             change in prop::option::of(change()),
         ) {
-            let headers = build(&adds);
-            let mut echo = encoded(&model(&adds));
-            let expected = match &change {
-                None => Ok(()),
-                Some(change) => Err(apply(change, &mut echo)),
-            };
-            prop_assert_eq!(compare(&headers, &to_bytes(&echo)), expected);
+            let (result, expected) = compare_echo(&adds, change.as_ref());
+            prop_assert_eq!(result, expected);
         }
+    }
+
+    /// commands of one type and width at each index, in one header
+    fn adds(value: Value, width: Width, indices: &[u16]) -> Vec<Add> {
+        indices
+            .iter()
+            .map(|&index| Add::new(value, width, index))
+            .collect()
+    }
+
+    #[test]
+    fn empty_builder_writes_no_headers() {
+        check_written_and_parsed_back(&[]);
+    }
+
+    #[test]
+    fn builder_merges_consecutive_commands_of_one_type_and_width() {
+        for (value, _) in COMMANDS {
+            for width in WIDTHS {
+                let adds = adds(value, width, &[3, 4, 200]);
+                assert_eq!(model(&adds).len(), 1);
+                check_written_and_parsed_back(&adds);
+            }
+        }
+    }
+
+    #[test]
+    fn echo_of_each_command_at_each_width_is_compared_object_by_object() {
+        for (value, _) in COMMANDS {
+            for width in WIDTHS {
+                let adds = adds(value, width, &[3, 4]);
+                let check = |change, expected| check_echo(&adds, change, expected);
+
+                check(None, Ok(()));
+                check(
+                    Some(Change::Status {
+                        object: 1,
+                        status: 4,
+                    }),
+                    Err(CommandResponseError::BadStatus(CommandStatus::NotSupported)),
+                );
+                check(
+                    Some(Change::Status {
+                        object: 0,
+                        status: 200,
+                    }),
+                    Err(CommandResponseError::BadStatus(CommandStatus::Unknown(200))),
+                );
+                check(
+                    Some(Change::DropLastObject(0)),
+                    Err(CommandResponseError::ObjectCountMismatch),
+                );
+                check(
+                    Some(Change::RepeatLastObject(0)),
+                    Err(CommandResponseError::ObjectCountMismatch),
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn echo_with_any_byte_of_an_object_changed_is_an_object_value_mismatch() {
+        for (value, _) in COMMANDS {
+            for width in WIDTHS {
+                let adds = adds(value, width, &[3, 4]);
+                let echo = encoded(&model(&adds));
+                for (object, (bytes, _)) in echo[0].2.iter().enumerate() {
+                    for byte in 0..bytes.len() {
+                        // each field of a control code: op type, queue, clear and trip-close code
+                        for xor in [0x01, 0x10, 0x20, 0x40, 0x80] {
+                            check_echo(
+                                &adds,
+                                Some(Change::Object { object, byte, xor }),
+                                Err(CommandResponseError::ObjectValueMismatch),
+                            );
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn echo_with_more_or_fewer_headers_is_a_header_count_mismatch() {
+        let [g12v1, _, g41v2, _, _] = COMMANDS;
+        let adds = [
+            Add::new(g12v1.0, Width::One, 3),
+            Add::new(g41v2.0, Width::Two, 4),
+        ];
+
+        check_echo(&adds, None, Ok(()));
+        check_echo(
+            &adds,
+            Some(Change::DropLastHeader),
+            Err(CommandResponseError::HeaderCountMismatch),
+        );
+        check_echo(
+            &adds,
+            Some(Change::RepeatLastHeader),
+            Err(CommandResponseError::HeaderCountMismatch),
+        );
+        // headers are compared in order, so a mismatch in the first is found before the missing
+        // second
+        assert_eq!(
+            compare(
+                &build(&adds),
+                &to_bytes(&[header(g41v2, Width::Two, &[(4, 0)])])
+            ),
+            Err(CommandResponseError::HeaderTypeMismatch)
+        );
     }
 }
