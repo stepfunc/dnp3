@@ -9,19 +9,22 @@ translation, or reuse. Follow the imported agent policy. Applicable
 written license terms and authorizations govern.
 
 ## Git Commit Guidelines
-- **Never take credit**: Do not add "Generated with Claude Code" or "Co-Authored-By: Claude" to commit messages
+- **Never take credit**: Do not add "Generated with Claude Code" or "Co-Authored-By: Claude" to commit messages or PR descriptions. `main` merges through a squash merge queue, so a PR's description becomes its commit body
 - Keep commit messages professional and focused on the changes
 
 ## Build, Test, Lint Commands
-- Build: `cargo build [--features tls,serial,serialization]`
-- Run all tests: `cargo test`
+- Build: `cargo build` (default features `tls`, `serial`; add e.g. `--features serialization,unstable`)
+- Run all tests: `cargo test --features unstable` (what CI runs; without `unstable` the tests of unstable APIs are skipped)
 - Run specific test: `cargo test --package dnp3 -- outstation::tests::time::responds_to_delay_measure`
 - Run specific module: `cargo test --package dnp3 -- master::tests::startup`
-- Run example: `cargo run --example master [args]`
-- Format code: `cargo fmt`
-- Check lints: `cargo clippy`
-- Run with logging: `RUST_LOG=debug cargo run --example outstation`
-- No-panic check: `RUSTFLAGS="--cfg dnp3_no_panic" CARGO_PROFILE_RELEASE_LTO=thin CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 cargo test -p dnp3 --lib --release --no-run` (use a separate `CARGO_TARGET_DIR`). A link error names a function marked `no_panic` that the optimizer couldn't prove panic-free; see `dnp3/src/no_panic_check.rs`
+- Run an example: examples are workspace packages, e.g. `cargo run -p example-master -- tcp-client` or `cargo run -p example-outstation -- tcp-server` (`-- --help` lists transports and options)
+- Run with logging: the examples ignore `RUST_LOG`; pass `--log-level`, e.g. `cargo run -p example-outstation -- --log-level debug tcp-server`
+- Format code: `cargo fmt --all` (CI runs `cargo fmt --all -- --check`)
+- Check lints: `cargo clippy --all-targets --features serialization,unstable -- -D warnings`. CI also clippies `dnp3` with `--no-default-features` plus each feature alone, and with `tls-aws-lc` in place of `tls` (`linting` and `features` jobs in `.github/workflows/ci.yml`)
+- MSRV check: `cargo +1.88.0 check --locked --workspace --all-targets` (the `msrv` CI job)
+- Docs: `cargo doc -p dnp3 --no-deps`; the guide is Docusaurus under `guide/` (`npm ci && npm run build`)
+- Bindings: `cargo build --release -p dnp3-ffi -p dnp3-ffi-java`, then `cargo run --bin dnp3-bindings -- --c` (or `--dotnet`, `--java`). This generates into `ffi/bindings/` and runs the binding tests; `--no-tests` skips them
+- No-panic check: `RUSTFLAGS="--cfg dnp3_no_panic" CARGO_PROFILE_RELEASE_LTO=thin CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 cargo test -p dnp3 --lib --release --no-run` (use a separate `CARGO_TARGET_DIR`). A link error names a function marked `no_panic` that the optimizer couldn't prove panic-free; see `dnp3/src/no_panic_check.rs`. The `no-panic` CI job pins its toolchain, since a newer one can fail the link without a code change
 
 ## Conformance Tests
 - `.github/workflows/conformance.yml` runs the DNP3 IED certification procedures against the outstation with dnp3c (about 12 minutes). It runs on release tags (gating publishing), weekly on `main`, on demand (`gh workflow run conformance.yml --ref <branch>`), and on PRs labeled `conformance`
@@ -36,15 +39,27 @@ written license terms and authorizations govern.
 - If released versions are exposed in a realistic configuration, raise a patch release with the maintainer; otherwise the fix ships in the next release
 
 ## Code Style Guidelines
-- **No unsafe code**: Unsafe code is forbidden (`unsafe_code = "forbid"`)
-- **Documentation**: All public items must be documented (`missing_docs = "deny"`)
-- **API Design**: Avoid unreachable public items (`unreachable_pub = "deny"`)
-- **Error Handling**: Use proper error types and propagation (no panics in library code)
+- **Lints**: the `dnp3` crate inherits `[workspace.lints.rust]` from `Cargo.toml`: `unsafe_code` is forbidden, and `missing_docs`, `unreachable_pub`, `unnameable_types`, `trivial_casts`, `missing_copy_implementations`, `non_ascii_idents` and `unused` are denied. `dnp3/src/lib.rs` also denies about 30 clippy lints (see it for the full list): panic constructs (`unwrap_used`, `expect_used`, `panic`, `unreachable`, `todo`, ...), `indexing_slicing`, `arithmetic_side_effects`, `as_conversions`, printing, and `allow_attributes`, to guard against accidental panics and unchecked conversions. CI fails on any warning
+- **Other crates**: the FFI, bindings and example crates don't inherit these lints. `dnp3-ffi` uses `unsafe` for the C ABI and denies only `unwrap_used` and `expect_used`
+- **Suppressing a lint**: `#[allow]` is denied in `dnp3`; use the narrowest `#[expect(lint, reason = "...")]`
 - **Panic exceptions**: `unwrap`, `expect`, indexing and unchecked arithmetic are allowed in library code only where input can't reach them: the invariant that protects them is local and trivially true (e.g. a `u8` index into a 256-entry table), or they can only fire after another panic already happened (e.g. a poisoned mutex). Each gets a narrow `#[expect(lint, reason = "...")]`
+- **Lints in tests**: `dnp3/clippy.toml` allows `unwrap`, `expect`, `panic` and indexing in test code. Arithmetic and `as` conversions stay denied; a test module that needs arithmetic says so with a module-level `#![expect(clippy::arithmetic_side_effects, reason = "...")]`
+- **Error Handling**: Use proper error types and propagation
 - **Naming**: Follow Rust naming conventions (snake_case for functions/variables, CamelCase for types)
 - **Imports**: Organize imports by standard lib, external crates, then internal modules
-- **Features**: Support compile-time features (tls, serial, serialization)
+- **Features**: `tls` (ring) and `tls-aws-lc` (AWS-LC), `serial`, `serialization` (serde on public config types), `unstable` (APIs exempt from semver), and `ffi` (only for the FFI build); defaults are `tls` and `serial`. Code must build with `--no-default-features` and with each feature but `ffi` alone (the `features` CI job)
 - **Minimum Rust Version**: 1.88+ (the workspace `rust-version`, checked by the `msrv` CI job)
+
+## Coding and Testing Conventions
+- Compare structured values when testing behavior. Existing formatting tests and credential-redaction tests inspect formatted output; redaction tests assert only that secrets are absent
+- Don't install tracing subscribers or assert on emitted log counts, levels or text
+- No `macro_rules!` just to compress code; use traits, generics and plain Rust
+- When replacing `as` casts, use `x.into()` where the type is inferred, `T::from(x)` only when it isn't, and `cast_signed`/`cast_unsigned` for same-width sign changes
+- Pre-allocated fixed buffers are `Box<[u8]>` with a private length, never `Vec`; don't add allocation to paths that don't allocate
+- In traits, async methods are `fn ... -> impl Future<Output = ...> + Send`, not `async fn`; prefer generics over `dyn` or cfg swaps
+- New tests that drive a session or wait on mock I/O run inside `crate::util::test_support::watchdog`: a 30 s wall-clock timeout fails the test when polled; if it cannot finish, the process aborts after another 5 s
+- Avoid comments that merely repeat the lint policy; document necessary invariants and give lint exceptions a narrow `#[expect(..., reason = "...")]`
+- Don't add test infrastructure where none exists (e.g. `dnp3-ffi` has no tests) without asking
 
 ## Reference Documents
 - The private repository `stepfunc/protocol-reference`, checked out next to this one at `../protocol-reference`, holds the protocol source documents. The DNP3 ones are under `protocols/dnp3/`: IEEE 1815-2012 and related standards, the DNP Users Group technical bulletins, and the IED certification test procedures. Some documents (1815-2012 and the 2.7 and 3.1r1 test procedures) have searchable Markdown extractions; the bulletins are PDFs with an index of what each one changes. It also records our interpretation decisions
