@@ -6,16 +6,24 @@ use std::time::Duration;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::time::Instant;
 
+use crate::util::phys::Socket;
+
 /// How long a server waits before accepting again after `accept()` fails for a reason other
 /// than the incoming connection itself
 pub(crate) const ACCEPT_ERROR_DELAY: Duration = Duration::from_secs(1);
 
 /// Source of accepted TCP connections
 pub(crate) trait Listen: Send {
-    fn accept(&mut self) -> impl Future<Output = std::io::Result<(TcpStream, SocketAddr)>> + Send;
+    type Stream: Socket;
+
+    fn accept(
+        &mut self,
+    ) -> impl Future<Output = std::io::Result<(Self::Stream, SocketAddr)>> + Send;
 }
 
 impl Listen for TcpListener {
+    type Stream = TcpStream;
+
     fn accept(&mut self) -> impl Future<Output = std::io::Result<(TcpStream, SocketAddr)>> + Send {
         TcpListener::accept(self)
     }
@@ -130,7 +138,7 @@ impl<L: Listen> Acceptor<L> {
     ///
     /// This future is cancel-safe: a pending delay survives cancellation and the next call
     /// waits until its original deadline.
-    pub(crate) async fn accept(&mut self) -> (TcpStream, SocketAddr) {
+    pub(crate) async fn accept(&mut self) -> (L::Stream, SocketAddr) {
         loop {
             if let Some(retry_at) = self.retry_at {
                 tokio::time::sleep_until(retry_at).await;
@@ -160,12 +168,14 @@ impl<L: Listen> Acceptor<L> {
 #[cfg(test)]
 pub(crate) mod test_util {
     use super::*;
+    use std::net::IpAddr;
+    use tokio::io::DuplexStream;
     use tokio::sync::mpsc;
 
     /// What one accept call of a [`FaultyListener`] does
     #[derive(Copy, Clone, Debug)]
     pub(crate) enum Fault {
-        /// accept from the real listener
+        /// accept the next connection
         None,
         /// fail with an error of this kind
         Kind(ErrorKind),
@@ -187,38 +197,78 @@ pub(crate) mod test_util {
         }
     }
 
-    /// Applies one entry of `faults` per accept, then accepts from a real listener.
-    ///
-    /// Reports the time of every accept attempt.
+    /// The capacity of each direction of the pipes between [`Peers`] and a [`FaultyListener`],
+    /// which holds a whole TLS flight, so that a peer needn't read while it writes
+    pub(crate) const PIPE: usize = 16 * 1024;
+
+    /// The address of a peer on the loopback interface
+    pub(crate) const LOOPBACK: IpAddr = IpAddr::V4(std::net::Ipv4Addr::LOCALHOST);
+
+    /// Applies one entry of `faults` per accept, then accepts the in-memory connections that its
+    /// [`Peers`] queue, reporting every attempt and every accepted connection
     pub(crate) struct FaultyListener {
-        inner: TcpListener,
         faults: &'static [Fault],
+        connections: mpsc::UnboundedReceiver<(DuplexStream, SocketAddr)>,
         attempts: mpsc::UnboundedSender<Instant>,
+        accepted: mpsc::UnboundedSender<(Instant, SocketAddr)>,
+    }
+
+    /// Connects to a [`FaultyListener`], and observes it
+    pub(crate) struct Peers {
+        connections: mpsc::UnboundedSender<(DuplexStream, SocketAddr)>,
+        last_port: u16,
+        /// when the listener attempted each accept, whether it failed or not
+        pub(crate) attempts: mpsc::UnboundedReceiver<Instant>,
+        /// when the listener accepted each connection, and from which peer
+        accepted: mpsc::UnboundedReceiver<(Instant, SocketAddr)>,
     }
 
     impl FaultyListener {
-        pub(crate) async fn new(
-            faults: &'static [Fault],
-        ) -> (Self, mpsc::UnboundedReceiver<Instant>) {
-            let inner = TcpListener::bind("127.0.0.1:0").await.unwrap();
-            let (attempts, rx) = mpsc::unbounded_channel();
+        pub(crate) fn new(faults: &'static [Fault]) -> (Self, Peers) {
+            let (connections_tx, connections) = mpsc::unbounded_channel();
+            let (attempts_tx, attempts) = mpsc::unbounded_channel();
+            let (accepted_tx, accepted) = mpsc::unbounded_channel();
             (
                 Self {
-                    inner,
                     faults,
-                    attempts,
+                    connections,
+                    attempts: attempts_tx,
+                    accepted: accepted_tx,
                 },
-                rx,
+                Peers {
+                    connections: connections_tx,
+                    last_port: 0,
+                    attempts,
+                    accepted,
+                },
             )
         }
+    }
 
-        pub(crate) fn local_addr(&self) -> SocketAddr {
-            self.inner.local_addr().unwrap()
+    impl Peers {
+        /// Queue a connection from a new port on `ip`; returns this end of it and the peer
+        /// address the listener reports
+        pub(crate) fn connect(&mut self, ip: IpAddr) -> (DuplexStream, SocketAddr) {
+            self.last_port = self.last_port.wrapping_add(1);
+            let addr = SocketAddr::new(ip, self.last_port);
+            let (local, remote) = tokio::io::duplex(PIPE);
+            self.connections.send((remote, addr)).unwrap();
+            (local, addr)
+        }
+
+        /// Wait for the listener to accept the next connection, which must be from `peer`, and
+        /// return when it did
+        pub(crate) async fn accepts(&mut self, peer: SocketAddr) -> Instant {
+            let (at, addr) = self.accepted.recv().await.unwrap();
+            assert_eq!(addr, peer);
+            at
         }
     }
 
     impl Listen for FaultyListener {
-        async fn accept(&mut self) -> std::io::Result<(TcpStream, SocketAddr)> {
+        type Stream = DuplexStream;
+
+        async fn accept(&mut self) -> std::io::Result<(DuplexStream, SocketAddr)> {
             self.attempts.send(Instant::now()).unwrap();
             if let Some((fault, rest)) = self.faults.split_first() {
                 self.faults = rest;
@@ -226,7 +276,16 @@ pub(crate) mod test_util {
                     return Err(err);
                 }
             }
-            self.inner.accept().await
+            // receiving is cancel-safe, so an accept that is dropped loses no queued connection
+            match self.connections.recv().await {
+                Some((stream, addr)) => {
+                    // the test may not be watching
+                    self.accepted.send((Instant::now(), addr)).ok();
+                    Ok((stream, addr))
+                }
+                // like a listener that nobody connects to any more
+                None => std::future::pending().await,
+            }
         }
     }
 
@@ -334,11 +393,11 @@ mod tests {
 
     /// Accept once from `faults` with a client waiting, checking the gaps between attempts
     async fn accepts_with_gaps(faults: &'static [Fault], gaps: &[Duration]) {
-        let (listener, mut attempts) = FaultyListener::new(faults).await;
-        let _client = TcpStream::connect(listener.local_addr()).await.unwrap();
+        let (listener, mut peers) = FaultyListener::new(faults);
+        let _client = peers.connect(LOOPBACK);
         let mut acceptor = Acceptor::new(listener);
         acceptor.accept().await;
-        expect_attempt_gaps(&mut attempts, gaps).await;
+        expect_attempt_gaps(&mut peers.attempts, gaps).await;
     }
 
     #[tokio::test(start_paused = true)]
@@ -376,8 +435,8 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn cancelled_delay_keeps_its_original_deadline() {
         watchdog(async {
-            let (listener, mut attempts) = FaultyListener::new(&[UNKNOWN]).await;
-            let _client = TcpStream::connect(listener.local_addr()).await.unwrap();
+            let (listener, mut peers) = FaultyListener::new(&[UNKNOWN]);
+            let _client = peers.connect(LOOPBACK);
             let mut acceptor = Acceptor::new(listener);
 
             let cancel_after = Duration::from_millis(400);
@@ -385,11 +444,11 @@ mod tests {
                 _ = acceptor.accept() => panic!("accepted during the delay"),
                 _ = tokio::time::sleep(cancel_after) => {}
             }
-            let failed_at = attempts.recv().await.unwrap();
+            let failed_at = peers.attempts.recv().await.unwrap();
             assert_eq!(failed_at.elapsed(), cancel_after);
 
             acceptor.accept().await;
-            let retried_at = attempts.recv().await.unwrap();
+            let retried_at = peers.attempts.recv().await.unwrap();
             assert_eq!(retried_at.duration_since(failed_at), D);
         })
         .await;

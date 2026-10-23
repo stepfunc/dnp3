@@ -5,7 +5,7 @@ use crate::link::reader::LinkModes;
 use crate::link::LinkErrorMode;
 use crate::master::task::MasterTask;
 use crate::master::{MasterChannel, MasterChannelConfig, MasterChannelType};
-use crate::util::phys::PhysLayer;
+use crate::util::phys::{PhysLayer, Socket};
 use crate::util::session::{Enabled, Session};
 use std::future::Future;
 
@@ -17,7 +17,7 @@ use std::io::ErrorKind;
 use std::net::SocketAddr;
 use std::num::NonZeroUsize;
 use std::time::Duration;
-use tokio::net::{TcpListener, TcpStream};
+use tokio::net::TcpListener;
 use tokio::task::JoinSet;
 use tracing::Instrument;
 
@@ -188,8 +188,8 @@ struct AcceptTask<C: ConnectionHandler, L: Listen> {
     link_id_tasks: JoinSet<LinkIdResult>,
 }
 
-enum TaskEvent {
-    Accept(TcpStream, SocketAddr),
+enum TaskEvent<S> {
+    Accept(S, SocketAddr),
     LinkId(LinkIdResult),
 }
 
@@ -220,7 +220,7 @@ impl<C: ConnectionHandler, L: Listen> AcceptTask<C, L> {
         }
     }
 
-    async fn process_event(&mut self, event: TaskEvent) {
+    async fn process_event(&mut self, event: TaskEvent<L::Stream>) {
         match event {
             TaskEvent::Accept(stream, addr) => {
                 tracing::info!("accepted connection from {addr:?}");
@@ -242,7 +242,7 @@ impl<C: ConnectionHandler, L: Listen> AcceptTask<C, L> {
         ret
     }
 
-    async fn next_event(&mut self) -> Result<TaskEvent, Shutdown> {
+    async fn next_event(&mut self) -> Result<TaskEvent<L::Stream>, Shutdown> {
         let can_accept = self.link_id_tasks.len() < self.link_id_config.max_tasks.get();
 
         let accept_connection = async {
@@ -287,8 +287,8 @@ impl<C: ConnectionHandler, L: Listen> AcceptTask<C, L> {
         }
     }
 
-    async fn handle_accept(&mut self, stream: TcpStream, addr: SocketAddr) {
-        let phys = PhysLayer::tcp(stream);
+    async fn handle_accept(&mut self, stream: L::Stream, addr: SocketAddr) {
+        let phys = stream.into_phys();
 
         match self.handler.accept(addr).await {
             Err(Reject) => {
@@ -467,11 +467,12 @@ mod tests {
     use super::*;
     use crate::link::EndpointAddress;
     use crate::tcp::accept::test_util::{
-        expect_attempt_gaps, Fault, FaultyListener, RESET, UNKNOWN,
+        expect_attempt_gaps, Fault, FaultyListener, LOOPBACK, RESET, UNKNOWN,
     };
     use crate::tcp::accept::ACCEPT_ERROR_DELAY;
     use crate::util::test_support::watchdog;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpStream;
     use tokio::sync::mpsc;
 
     /// request link status from outstation 1024 to master 1
@@ -764,12 +765,12 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn accepts_after_accept_errors() {
         watchdog(async {
-            let (listener, mut attempts) = FaultyListener::new(&[UNKNOWN, RESET, UNKNOWN]).await;
-            let _client = TcpStream::connect(listener.local_addr()).await.unwrap();
+            let (listener, mut peers) = FaultyListener::new(&[UNKNOWN, RESET, UNKNOWN]);
+            let _client = peers.connect(LOOPBACK);
             let mut server = FaultyServer::spawn(listener, false);
 
             expect_attempt_gaps(
-                &mut attempts,
+                &mut peers.attempts,
                 &[ACCEPT_ERROR_DELAY, Duration::ZERO, ACCEPT_ERROR_DELAY],
             )
             .await;
@@ -782,20 +783,13 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn link_identity_during_accept_error_delay_does_not_cut_it_short() {
         watchdog(async {
-            let (listener, mut attempts) = FaultyListener::new(&[Fault::None, UNKNOWN]).await;
-            let mut client = TcpStream::connect(listener.local_addr()).await.unwrap();
+            let (listener, mut peers) = FaultyListener::new(&[Fault::None, UNKNOWN]);
+            let (mut client, _) = peers.connect(LOOPBACK);
             let mut server = FaultyServer::spawn(listener, true);
-            // Waiting for I/O lets a paused clock jump to the next timer. This one keeps each
-            // jump to a millisecond, so the link header arrives long before the retry is due.
-            let ticker = tokio::spawn(async {
-                for _ in 0..2000 {
-                    tokio::time::sleep(Duration::from_millis(1)).await;
-                }
-            });
 
-            attempts.recv().await.unwrap();
+            peers.attempts.recv().await.unwrap();
             assert_eq!(server.events.recv().await, Some(Event::Accept));
-            let failed_at = attempts.recv().await.unwrap();
+            let failed_at = peers.attempts.recv().await.unwrap();
 
             // identifying the accepted connection ends the select while the server waits to retry
             client.write_all(&LINK_STATUS_REQUEST).await.unwrap();
@@ -807,11 +801,10 @@ mod tests {
                 server.events.recv().await,
                 Some(Event::StartWithLinkId(1024, 1))
             );
-            assert!(failed_at.elapsed() < Duration::from_millis(100));
+            assert_eq!(failed_at.elapsed(), Duration::ZERO);
 
-            let retried_at = attempts.recv().await.unwrap();
+            let retried_at = peers.attempts.recv().await.unwrap();
             assert_eq!(retried_at.duration_since(failed_at), ACCEPT_ERROR_DELAY);
-            ticker.abort();
         })
         .await;
     }
@@ -819,17 +812,17 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn dropping_handle_during_accept_error_delay_stops_server() {
         watchdog(async {
-            let (listener, mut attempts) = FaultyListener::new(&[UNKNOWN]).await;
+            let (listener, mut peers) = FaultyListener::new(&[UNKNOWN]);
             let server = FaultyServer::spawn(listener, false);
 
-            let failed_at = attempts.recv().await.unwrap();
+            let failed_at = peers.attempts.recv().await.unwrap();
             tokio::time::advance(Duration::from_millis(500)).await;
             assert!(!server.task.is_finished());
 
             drop(server.handle);
             server.task.await.unwrap();
             assert!(failed_at.elapsed() < ACCEPT_ERROR_DELAY);
-            assert_eq!(attempts.recv().await, None);
+            assert_eq!(peers.attempts.recv().await, None);
         })
         .await;
     }
@@ -838,14 +831,14 @@ mod tests {
     async fn dropping_handle_during_connection_errors_stops_server() {
         static RESETS: [Fault; 1000] = [RESET; 1000];
         watchdog(async {
-            let (listener, mut attempts) = FaultyListener::new(&RESETS).await;
+            let (listener, mut peers) = FaultyListener::new(&RESETS);
             let server = FaultyServer::spawn(listener, false);
 
-            attempts.recv().await.unwrap();
+            peers.attempts.recv().await.unwrap();
             drop(server.handle);
             server.task.await.unwrap();
             let mut count = 1;
-            while attempts.recv().await.is_some() {
+            while peers.attempts.recv().await.is_some() {
                 count += 1;
             }
             assert!(count < RESETS.len(), "{count}");

@@ -16,9 +16,8 @@ use crate::tcp::{
     ClientConnectionHandler, ClientState, ConnectOptions, EndpointList, PostConnectionHandler,
     SimpleConnectHandler,
 };
-use crate::util::phys::{PhysAddr, PhysLayer};
+use crate::util::phys::{PhysAddr, PhysLayer, Socket};
 use crate::util::session::Enabled;
-use tokio::net::TcpStream;
 use tokio_rustls::rustls::pki_types::ServerName;
 
 use crate::link::reader::LinkModes;
@@ -209,21 +208,22 @@ impl TlsServerConfig {
         })
     }
 
-    pub(crate) async fn handle_connection(
+    pub(crate) async fn handle_connection<S: Socket>(
         &self,
-        socket: TcpStream,
+        socket: S,
     ) -> Result<PhysLayer, HandshakeError> {
         let connector = tokio_rustls::TlsAcceptor::from(self.config.clone());
         // the server accepts one connection at a time, so a handshake that stalls would stop it
         // accepting any others
         let stream = super::handshake(connector.accept(socket)).await?;
-        Ok(PhysLayer::tls(tokio_rustls::TlsStream::from(stream)))
+        Ok(S::into_tls_phys(tokio_rustls::TlsStream::from(stream)))
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tcp::accept::test_util::PIPE;
     use crate::tcp::tls::TLS_HANDSHAKE_TIMEOUT;
     use crate::util::test_support::tls::server_config;
     use crate::util::test_support::watchdog;
@@ -233,12 +233,8 @@ mod tests {
         watchdog(async {
             let config = server_config();
 
-            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
             // a peer that connects and never sends its ClientHello
-            let _peer = TcpStream::connect(listener.local_addr().unwrap())
-                .await
-                .unwrap();
-            let (socket, _) = listener.accept().await.unwrap();
+            let (socket, _peer) = tokio::io::duplex(PIPE);
 
             let start = tokio::time::Instant::now();
             let result = config.handle_connection(socket).await;
