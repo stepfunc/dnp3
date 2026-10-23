@@ -935,7 +935,7 @@ fn define_outstation_config(
             doc("Delay of inactivity before sending a REQUEST_LINK_STATUS to the master")
                 .details("A value of zero means no automatic keep-alive will be sent."),
         )?
-        .add(&max_read_request_headers, Primitive::U16, doc("Maximum number of headers that will be processed in a READ request.").details("Internally, this controls the size of a pre-allocated buffer used to process requests. A minimum value of 64 is always enforced. Requesting more than this number will result in the PARAMETER_ERROR IIN bit being set in the response."))?
+        .add(&max_read_request_headers, Primitive::U16, doc("Limits the selections or headers processed in a READ request.").details("Internally, this controls the size of pre-allocated buffers used to process requests. A minimum value of 64 is always enforced.").details("A READ answered right away counts only its static data selections against this limit: one per static header, and one per point type that a class 0 header includes. Event headers don't count. A READ that arrives while the outstation waits for an unsolicited confirm is stored and answered afterwards, and storing it counts every header, event headers included.").details("Past the limit, further selections or headers are ignored, the rest are answered, and the response sets the PARAMETER_ERROR IIN bit. Device attributes (group 0) have a separate, fixed limit of 32 selections per READ."))?
         .add(&max_controls_per_request, Primitive::U16, doc("Maximum number of controls in a single request."))?
         .add(&class_zero, class_zero_config, "Controls responses to Class 0 reads")?
         .end_fields()?

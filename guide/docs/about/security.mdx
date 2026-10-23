@@ -121,8 +121,12 @@ derived from the configured receive fragment size. The outstation also limits ho
 
 | Setting | Default | Past the limit |
 |---|---|---|
-| `max_read_request_headers` | 64, which is also the minimum | Further headers are ignored, the rest are answered, and the response sets IIN2.2 |
+| `max_read_request_headers` | 64, which is also the minimum | Further selections or headers are ignored, the rest are answered, and the response sets IIN2.2 |
 | `max_controls_per_request` | No limit | Further controls get the `TOO_MANY_OPS` status, or are skipped for requests that don't get a response |
+
+A READ answered right away counts only its static data selections against the READ limit, so event headers don't use
+it up. A READ that arrives while the outstation waits for an unsolicited confirm is stored until the wait ends, and
+storing it counts every header. Device attributes have their own fixed limit of selections per READ.
 
 ## Protocol validation
 
