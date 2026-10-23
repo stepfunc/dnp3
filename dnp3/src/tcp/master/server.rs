@@ -473,13 +473,14 @@ mod tests {
     use super::*;
     use crate::link::EndpointAddress;
     use crate::tcp::accept::test_util::{
-        expect_attempt_gaps, Fault, FaultyListener, LOOPBACK, RESET, UNKNOWN,
+        assert_closed, expect_attempt_gaps, Fault, FaultyListener, LOOPBACK, RESET, UNKNOWN,
     };
     use crate::tcp::accept::ACCEPT_ERROR_DELAY;
     use crate::util::test_support::watchdog;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::TcpStream;
     use tokio::sync::mpsc;
+    use tokio::time::Instant;
 
     /// request link status from outstation 1024 to master 1
     const LINK_STATUS_REQUEST: [u8; 10] =
@@ -741,11 +742,15 @@ mod tests {
         handle: ServerHandle,
         task: tokio::task::JoinHandle<Shutdown>,
         events: mpsc::UnboundedReceiver<Event>,
-        _channels: mpsc::UnboundedReceiver<MasterChannel>,
+        channels: mpsc::UnboundedReceiver<MasterChannel>,
     }
 
     impl FaultyServer {
         fn spawn(listener: FaultyListener, identify: bool) -> Self {
+            Self::spawn_with(listener, identify, LinkIdConfig::new())
+        }
+
+        fn spawn_with(listener: FaultyListener, identify: bool, config: LinkIdConfig) -> Self {
             let (events_tx, events) = mpsc::unbounded_channel();
             let (channels_tx, channels) = mpsc::unbounded_channel();
             let handler = Handler {
@@ -755,7 +760,7 @@ mod tests {
                 channels: channels_tx,
             };
             let (token, shutdown_listener) = crate::util::shutdown::shutdown_token();
-            let task = AcceptTask::new(listener, shutdown_listener, LinkIdConfig::new(), handler);
+            let task = AcceptTask::new(listener, shutdown_listener, config, handler);
             Self {
                 handle: ServerHandle {
                     addr: None,
@@ -763,7 +768,7 @@ mod tests {
                 },
                 task: tokio::spawn(task.run()),
                 events,
-                _channels: channels,
+                channels,
             }
         }
     }
@@ -848,6 +853,145 @@ mod tests {
                 count += 1;
             }
             assert!(count < RESETS.len(), "{count}");
+        })
+        .await;
+    }
+
+    const LINK_ID_TIMEOUT: Duration = Duration::from_secs(2);
+
+    /// one identification at a time, each given [`LINK_ID_TIMEOUT`]
+    fn one_link_id_task() -> LinkIdConfig {
+        LinkIdConfig::new()
+            .max_tasks(NonZeroUsize::MIN)
+            .timeout(Timeout::from_duration(LINK_ID_TIMEOUT).unwrap())
+    }
+
+    /// the session on `peer` answers a link status request
+    async fn answers(peer: &mut tokio::io::DuplexStream) {
+        peer.write_all(&LINK_STATUS_REQUEST).await.unwrap();
+        let mut reply = [0; 10];
+        peer.read_exact(&mut reply).await.unwrap();
+        assert_eq!(reply, LINK_STATUS_RESPONSE);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_silent_peer_is_closed_at_the_link_id_timeout_and_frees_its_slot() {
+        watchdog(async {
+            let start = Instant::now();
+            let (listener, mut peers) = FaultyListener::new(&[]);
+            let (mut silent, silent_addr) = peers.connect(LOOPBACK);
+            let (mut next, next_addr) = peers.connect(LOOPBACK);
+            let mut server = FaultyServer::spawn_with(listener, true, one_link_id_task());
+            assert_eq!(server.events.recv().await, Some(Event::Accept));
+            assert_eq!(peers.accepts(silent_addr).await, start);
+
+            assert_closed(&mut silent).await;
+            assert_eq!(start.elapsed(), LINK_ID_TIMEOUT);
+
+            // the next event is the accept of the next peer, so the silent one reported nothing
+            assert_eq!(server.events.recv().await, Some(Event::Accept));
+            assert_eq!(
+                peers.accepts(next_addr).await.duration_since(start),
+                LINK_ID_TIMEOUT
+            );
+            next.write_all(&LINK_STATUS_REQUEST).await.unwrap();
+            assert_eq!(
+                server.events.recv().await,
+                Some(Event::AcceptLinkId(1024, 1))
+            );
+            assert_eq!(
+                server.events.recv().await,
+                Some(Event::StartWithLinkId(1024, 1))
+            );
+        })
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_peer_waits_for_a_free_link_id_slot() {
+        watchdog(async {
+            let start = Instant::now();
+            let (listener, mut peers) = FaultyListener::new(&[]);
+            let (mut first, first_addr) = peers.connect(LOOPBACK);
+            let (_second, second_addr) = peers.connect(LOOPBACK);
+            let mut server = FaultyServer::spawn_with(listener, true, one_link_id_task());
+            assert_eq!(server.events.recv().await, Some(Event::Accept));
+            assert_eq!(peers.accepts(first_addr).await, start);
+
+            // short of the timeout, the second peer still isn't accepted
+            let identified_at = Duration::from_secs(1);
+            tokio::time::sleep(identified_at).await;
+            assert_eq!(
+                server.events.try_recv(),
+                Err(mpsc::error::TryRecvError::Empty)
+            );
+
+            // identifying the first peer frees the slot
+            first.write_all(&LINK_STATUS_REQUEST).await.unwrap();
+            assert_eq!(
+                server.events.recv().await,
+                Some(Event::AcceptLinkId(1024, 1))
+            );
+            assert_eq!(
+                server.events.recv().await,
+                Some(Event::StartWithLinkId(1024, 1))
+            );
+            assert_eq!(server.events.recv().await, Some(Event::Accept));
+            assert_eq!(
+                peers.accepts(second_addr).await.duration_since(start),
+                identified_at
+            );
+        })
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn dropping_handle_closes_peers_being_identified_without_starting_sessions() {
+        watchdog(async {
+            let start = Instant::now();
+            let (listener, mut peers) = FaultyListener::new(&[]);
+            let (mut first, _) = peers.connect(LOOPBACK);
+            let (mut second, _) = peers.connect(LOOPBACK);
+            let mut server = FaultyServer::spawn(listener, true);
+            assert_eq!(server.events.recv().await, Some(Event::Accept));
+            assert_eq!(server.events.recv().await, Some(Event::Accept));
+
+            drop(server.handle);
+            let Shutdown = server.task.await.unwrap();
+            assert_closed(&mut first).await;
+            assert_closed(&mut second).await;
+            // closed by the shutdown, not by the identification timeout
+            assert_eq!(start.elapsed(), Duration::ZERO);
+            // the handler was dropped without starting a session
+            assert_eq!(server.events.recv().await, None);
+            assert!(server.channels.recv().await.is_none());
+        })
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_closed_session_ends_its_channel_and_the_next_connection_is_served() {
+        watchdog(async {
+            let (listener, mut peers) = FaultyListener::new(&[]);
+            let (mut first, _) = peers.connect(LOOPBACK);
+            let mut server = FaultyServer::spawn(listener, false);
+            assert_eq!(server.events.recv().await, Some(Event::Accept));
+            assert_eq!(server.events.recv().await, Some(Event::Start));
+            let mut channel = server.channels.recv().await.unwrap();
+            channel.enable().await.unwrap();
+            answers(&mut first).await;
+
+            drop(first);
+            // the session has seen the connection close
+            tokio::time::sleep(Duration::from_millis(1)).await;
+            assert!(matches!(channel.get_decode_level().await, Err(Shutdown)));
+
+            let (mut second, _) = peers.connect(LOOPBACK);
+            assert_eq!(server.events.recv().await, Some(Event::Accept));
+            assert_eq!(server.events.recv().await, Some(Event::Start));
+            let mut channel = server.channels.recv().await.unwrap();
+            channel.enable().await.unwrap();
+            answers(&mut second).await;
         })
         .await;
     }

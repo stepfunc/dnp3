@@ -956,4 +956,194 @@ mod tests {
         drop(server);
         tokio::spawn(task.run()).await.unwrap();
     }
+
+    /// How the server hands connections to an outstation, ends them and reports them, over
+    /// in-memory connections. The clock is paused and only advances once every task is idle, so
+    /// after a sleep the server and the outstation have processed everything sent before it.
+    mod sessions {
+        use super::*;
+        use crate::outstation::{DefaultControlHandler, Feature};
+        use crate::tcp::accept::test_util::assert_closed;
+        use crate::util::test_support::{Timeline, MASTER_REQUEST, OUTSTATION_REPLY};
+        use tokio::io::{AsyncReadExt, AsyncWriteExt, DuplexStream};
+        use tokio::task::JoinHandle;
+
+        const START: Duration = Duration::ZERO;
+        const SETTLE: Duration = Duration::from_millis(1);
+
+        struct Fixture {
+            server: ServerHandle,
+            server_task: JoinHandle<Shutdown>,
+            outstation: OutstationHandle,
+            outstation_task: JoinHandle<()>,
+            states: Timeline<ConnectionState>,
+            peers: Peers,
+        }
+
+        /// a server in `LinkErrorMode::Close` with outstation 1024, which sends nothing until it is
+        /// asked, running on an in-memory listener
+        fn spawn() -> Fixture {
+            let mut config = crate::util::test_support::outstation_config(1024, 1);
+            config.features.unsolicited = Feature::Disabled;
+            let mut server =
+                Server::new_tcp_server(LinkErrorMode::Close, "127.0.0.1:0".parse().unwrap());
+            let (listener, states) = Timeline::new();
+            let (outstation, future) = server
+                .add_outstation_no_spawn(
+                    config,
+                    Box::new(NullApplication),
+                    Box::new(NullInformation),
+                    DefaultControlHandler::create(),
+                    listener,
+                    AddressFilter::Any,
+                )
+                .unwrap();
+            let outstation_task = tokio::spawn(future);
+            let (accept, peers) = FaultyListener::new(&[]);
+            let (server, task) = server.create_task_with(accept, None);
+            Fixture {
+                server,
+                server_task: tokio::spawn(task.run()),
+                outstation,
+                outstation_task,
+                states,
+                peers,
+            }
+        }
+
+        async fn settle() {
+            tokio::time::sleep(SETTLE).await;
+        }
+
+        /// the outstation answers a link status request on `peer`
+        async fn answers(peer: &mut DuplexStream) {
+            peer.write_all(&MASTER_REQUEST).await.unwrap();
+            let mut reply = [0; 10];
+            peer.read_exact(&mut reply).await.unwrap();
+            assert_eq!(reply, OUTSTATION_REPLY);
+        }
+
+        #[tokio::test(start_paused = true)]
+        async fn a_new_connection_replaces_the_session() {
+            watchdog(async {
+                let mut fixture = spawn();
+                let (mut first, _) = fixture.peers.connect(LOOPBACK);
+                answers(&mut first).await;
+                fixture
+                    .states
+                    .expect(START, ConnectionState::Connected)
+                    .await;
+
+                let (mut second, _) = fixture.peers.connect(LOOPBACK);
+                answers(&mut second).await;
+                fixture
+                    .states
+                    .expect(START, ConnectionState::Disconnected)
+                    .await;
+                fixture
+                    .states
+                    .expect(START, ConnectionState::Connected)
+                    .await;
+                assert_closed(&mut first).await;
+
+                settle().await;
+                fixture.states.assert_quiet();
+                answers(&mut second).await;
+            })
+            .await;
+        }
+
+        #[tokio::test(start_paused = true)]
+        async fn a_corrupt_frame_ends_the_session_and_the_next_connection_is_served() {
+            watchdog(async {
+                let mut fixture = spawn();
+                let (mut first, _) = fixture.peers.connect(LOOPBACK);
+                fixture
+                    .states
+                    .expect(START, ConnectionState::Connected)
+                    .await;
+
+                let mut corrupt = MASTER_REQUEST;
+                corrupt[9] ^= 0xFF;
+                first.write_all(&corrupt).await.unwrap();
+                assert_closed(&mut first).await;
+                fixture
+                    .states
+                    .expect(START, ConnectionState::Disconnected)
+                    .await;
+
+                let (mut second, _) = fixture.peers.connect(LOOPBACK);
+                answers(&mut second).await;
+                fixture
+                    .states
+                    .expect(START, ConnectionState::Connected)
+                    .await;
+            })
+            .await;
+        }
+
+        #[tokio::test(start_paused = true)]
+        async fn disabling_closes_the_session_and_connections_until_enabled() {
+            watchdog(async {
+                let mut fixture = spawn();
+                let (mut first, _) = fixture.peers.connect(LOOPBACK);
+                fixture
+                    .states
+                    .expect(START, ConnectionState::Connected)
+                    .await;
+
+                fixture.outstation.disable().await.unwrap();
+                assert_closed(&mut first).await;
+                fixture
+                    .states
+                    .expect(START, ConnectionState::Disconnected)
+                    .await;
+
+                // a connection while disabled is closed without starting a session
+                let (mut second, _) = fixture.peers.connect(LOOPBACK);
+                settle().await;
+                fixture.states.assert_quiet();
+                assert_closed(&mut second).await;
+
+                fixture.outstation.enable().await.unwrap();
+                settle().await;
+                let (mut third, _) = fixture.peers.connect(LOOPBACK);
+                answers(&mut third).await;
+                fixture
+                    .states
+                    .expect(Duration::from_millis(2), ConnectionState::Connected)
+                    .await;
+            })
+            .await;
+        }
+
+        #[tokio::test(start_paused = true)]
+        async fn shutting_down_an_idle_outstation_ends_its_task_and_closes_later_connections() {
+            watchdog(async {
+                let mut fixture = spawn();
+                fixture.outstation.shutdown().await.unwrap();
+                fixture.outstation_task.await.unwrap();
+
+                let (mut peer, _) = fixture.peers.connect(LOOPBACK);
+                assert_closed(&mut peer).await;
+                fixture.states.assert_quiet();
+                // the server keeps running
+                assert!(!fixture.server_task.is_finished());
+            })
+            .await;
+        }
+
+        #[tokio::test(start_paused = true)]
+        async fn dropping_the_server_handle_ends_an_idle_outstation() {
+            watchdog(async {
+                let mut fixture = spawn();
+                drop(fixture.server);
+                let Shutdown = fixture.server_task.await.unwrap();
+                fixture.outstation_task.await.unwrap();
+                assert_eq!(fixture.states.now(), START);
+                fixture.states.assert_quiet();
+            })
+            .await;
+        }
+    }
 }

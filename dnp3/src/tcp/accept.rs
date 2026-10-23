@@ -295,6 +295,15 @@ pub(crate) mod test_util {
         }
     }
 
+    /// Wait for the server to close the connection, which must send nothing more before it does
+    pub(crate) async fn assert_closed(peer: &mut DuplexStream) {
+        let mut bytes = Vec::new();
+        tokio::io::AsyncReadExt::read_to_end(peer, &mut bytes)
+            .await
+            .unwrap();
+        assert_eq!(bytes, Vec::<u8>::new());
+    }
+
     /// Receive one attempt, and then one more per gap, each following the previous by that gap
     pub(crate) async fn expect_attempt_gaps(
         attempts: &mut mpsc::UnboundedReceiver<Instant>,
