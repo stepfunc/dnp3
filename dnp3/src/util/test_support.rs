@@ -9,8 +9,10 @@
 use std::fmt::Debug;
 use std::future::Future;
 use std::io::Write;
+use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
+use std::task::{Context, Poll, Waker};
 use std::time::Duration;
 
 use tokio::sync::mpsc;
@@ -32,6 +34,10 @@ pub(crate) const MASTER_REQUEST: [u8; 10] =
     [0x05, 0x64, 0x05, 0xC9, 0x00, 0x04, 0x01, 0x00, 0x98, 0x81];
 pub(crate) const OUTSTATION_REPLY: [u8; 10] =
     [0x05, 0x64, 0x05, 0x0B, 0x01, 0x00, 0x00, 0x04, 0x64, 0x40];
+
+/// an ACK from outstation 1024 to master 1
+pub(crate) const ACK_FROM_OUTSTATION: [u8; 10] =
+    [0x05, 0x64, 0x05, 0x00, 0x01, 0x00, 0x00, 0x04, 0x27, 0x70];
 
 /// the link header of unconfirmed user data from outstation 1024 to master 1 holding 5 bytes
 pub(crate) const NULL_UNSOLICITED_HEADER: [u8; 10] =
@@ -60,6 +66,9 @@ pub(crate) fn outstation_config(outstation: u16, master: u16) -> OutstationConfi
 pub(crate) mod tls {
     use std::path::PathBuf;
 
+    use sfio_rustls_config::ProtocolVersions;
+    use tokio_rustls::rustls;
+
     use crate::tcp::tls::{MinTlsVersion, TlsClientConfig, TlsServerConfig};
 
     /// The path of a file in the self-signed certificate directory
@@ -76,27 +85,58 @@ pub(crate) mod tls {
             .join(name)
     }
 
-    pub(crate) fn client_config() -> TlsClientConfig {
+    pub(crate) fn client_config(min: MinTlsVersion) -> TlsClientConfig {
         TlsClientConfig::self_signed(
             &cert("entity2_cert.pem"),
             &cert("entity1_cert.pem"),
             &cert("entity1_key.pem"),
             None,
-            MinTlsVersion::V12,
+            min,
         )
         .unwrap()
     }
 
-    pub(crate) fn server_config() -> TlsServerConfig {
+    pub(crate) fn server_config(min: MinTlsVersion) -> TlsServerConfig {
         TlsServerConfig::self_signed(
             &cert("entity1_cert.pem"),
             &cert("entity2_cert.pem"),
             &cert("entity2_key.pem"),
             None,
-            MinTlsVersion::V12,
+            min,
         )
         .unwrap()
     }
+
+    /// The client of [`client_config`], built with rustls directly instead of this crate's
+    /// configuration
+    pub(crate) fn rustls_client(versions: ProtocolVersions) -> rustls::ClientConfig {
+        sfio_rustls_config::client::self_signed(
+            versions,
+            &cert("entity2_cert.pem"),
+            &cert("entity1_cert.pem"),
+            &cert("entity1_key.pem"),
+            None,
+        )
+        .unwrap()
+    }
+
+    /// The server of [`server_config`], built with rustls directly instead of this crate's
+    /// configuration
+    pub(crate) fn rustls_server(versions: ProtocolVersions) -> rustls::ServerConfig {
+        sfio_rustls_config::server::self_signed(
+            versions,
+            &cert("entity1_cert.pem"),
+            &cert("entity2_cert.pem"),
+            &cert("entity2_key.pem"),
+            None,
+        )
+        .unwrap()
+    }
+}
+
+/// Poll a future once with a waker that does nothing
+pub(crate) fn poll_once<F: Future>(future: Pin<&mut F>) -> Poll<F::Output> {
+    future.poll(&mut Context::from_waker(Waker::noop()))
 }
 
 /// How long a test may run in wall-clock time before [`watchdog`] fails it

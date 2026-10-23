@@ -13,7 +13,7 @@ use tokio::net::TcpListener;
 use crate::app::ConnectStrategy;
 use crate::decode::PhysDecodeLevel;
 use crate::link::{EndpointAddress, LinkErrorMode};
-use crate::master::MasterChannelConfig;
+use crate::master::{MasterChannel, MasterChannelConfig};
 use crate::outstation::{DefaultControlHandler, OutstationConfig};
 use crate::tcp::{ClientState, ConnectOptions, EndpointList};
 use crate::util::phys::{PhysAddr, PhysLayer};
@@ -103,18 +103,46 @@ fn outstation_config() -> OutstationConfig {
     crate::util::test_support::outstation_config(OUTSTATION, MASTER)
 }
 
-#[tokio::test]
-async fn master_tcp_client_runs_a_master_session_over_tcp() {
-    let peer = Peer::new().await;
-    let (listener, mut states) = Timeline::new();
-    let mut channel = crate::tcp::spawn_master_tcp_client_2(
+/// Spawn a master TCP client that reports its states
+fn spawn_master(
+    endpoints: EndpointList,
+    strategy: ConnectStrategy,
+) -> (MasterChannel, Timeline<ClientState>) {
+    let (listener, timeline) = Timeline::new();
+    let channel = crate::tcp::spawn_master_tcp_client_2(
         LinkErrorMode::Close,
         master_config(),
-        peer.endpoints(),
-        strategy(),
+        endpoints,
+        strategy,
         ConnectOptions::default(),
         listener,
     );
+    (channel, timeline)
+}
+
+/// Spawn a master TLS client that reports its states
+#[cfg(feature = "enable-tls")]
+fn spawn_tls_master(
+    endpoints: EndpointList,
+    strategy: ConnectStrategy,
+) -> (MasterChannel, Timeline<ClientState>) {
+    let (listener, timeline) = Timeline::new();
+    let channel = crate::tcp::tls::spawn_master_tls_client_2(
+        LinkErrorMode::Close,
+        master_config(),
+        endpoints,
+        strategy,
+        ConnectOptions::default(),
+        listener,
+        crate::util::test_support::tls::client_config(crate::tcp::tls::MinTlsVersion::V12),
+    );
+    (channel, timeline)
+}
+
+#[tokio::test]
+async fn master_tcp_client_runs_a_master_session_over_tcp() {
+    let peer = Peer::new().await;
+    let (mut channel, mut states) = spawn_master(peer.endpoints(), strategy());
     expect(&mut states, ClientState::Disabled).await;
     channel.enable().await.unwrap();
     expect(&mut states, ClientState::Connecting).await;
@@ -247,29 +275,40 @@ async fn outstation_tcp_client_uses_the_master_address_its_connection_handler_se
 #[cfg(feature = "enable-tls")]
 mod tls {
     use super::*;
+    use crate::outstation::OutstationHandle;
+    use crate::tcp::tls::MinTlsVersion;
     use crate::util::phys::PhysIo;
     use crate::util::test_support::tls::{client_config, server_config};
 
     async fn accept_tls(peer: &Peer) -> PhysLayer {
-        server_config()
+        server_config(MinTlsVersion::V12)
             .handle_connection(peer.accept().await)
             .await
             .unwrap()
     }
 
+    /// Spawn an outstation TLS client that reports its states
+    fn spawn_tls_outstation(endpoints: EndpointList) -> (OutstationHandle, Timeline<ClientState>) {
+        let (listener, timeline) = Timeline::new();
+        let handle = crate::tcp::tls::spawn_outstation_tls_client(
+            LinkErrorMode::Close,
+            endpoints,
+            strategy(),
+            ConnectOptions::default(),
+            outstation_config(),
+            Box::new(NullApplication),
+            Box::new(NullInformation),
+            DefaultControlHandler::create(),
+            listener,
+            client_config(MinTlsVersion::V12),
+        );
+        (handle, timeline)
+    }
+
     #[tokio::test]
     async fn master_tls_client_runs_a_master_session_over_tls() {
         let peer = Peer::new().await;
-        let (listener, mut states) = Timeline::new();
-        let mut channel = crate::tcp::tls::spawn_master_tls_client_2(
-            LinkErrorMode::Close,
-            master_config(),
-            peer.endpoints(),
-            strategy(),
-            ConnectOptions::default(),
-            listener,
-            client_config(),
-        );
+        let (mut channel, mut states) = spawn_tls_master(peer.endpoints(), strategy());
         expect(&mut states, ClientState::Disabled).await;
         channel.enable().await.unwrap();
         expect(&mut states, ClientState::Connecting).await;
@@ -284,19 +323,7 @@ mod tls {
     #[tokio::test]
     async fn outstation_tls_client_runs_an_outstation_session_over_tls() {
         let peer = Peer::new().await;
-        let (listener, mut states) = Timeline::new();
-        let mut handle = crate::tcp::tls::spawn_outstation_tls_client(
-            LinkErrorMode::Close,
-            peer.endpoints(),
-            strategy(),
-            ConnectOptions::default(),
-            outstation_config(),
-            Box::new(NullApplication),
-            Box::new(NullInformation),
-            DefaultControlHandler::create(),
-            listener,
-            client_config(),
-        );
+        let (mut handle, mut states) = spawn_tls_outstation(peer.endpoints());
         expect(&mut states, ClientState::Disabled).await;
         handle.enable().await.unwrap();
         expect(&mut states, ClientState::Connecting).await;
@@ -311,16 +338,7 @@ mod tls {
     #[tokio::test]
     async fn master_tls_client_does_not_connect_to_a_plain_tcp_peer() {
         let peer = Peer::new().await;
-        let (listener, mut states) = Timeline::new();
-        let mut channel = crate::tcp::tls::spawn_master_tls_client_2(
-            LinkErrorMode::Close,
-            master_config(),
-            peer.endpoints(),
-            strategy(),
-            ConnectOptions::default(),
-            listener,
-            client_config(),
-        );
+        let (mut channel, mut states) = spawn_tls_master(peer.endpoints(), strategy());
         expect(&mut states, ClientState::Disabled).await;
         channel.enable().await.unwrap();
         expect(&mut states, ClientState::Connecting).await;
@@ -336,19 +354,7 @@ mod tls {
     #[tokio::test]
     async fn outstation_tls_client_does_not_connect_to_a_plain_tcp_peer() {
         let peer = Peer::new().await;
-        let (listener, mut states) = Timeline::new();
-        let mut handle = crate::tcp::tls::spawn_outstation_tls_client(
-            LinkErrorMode::Close,
-            peer.endpoints(),
-            strategy(),
-            ConnectOptions::default(),
-            outstation_config(),
-            Box::new(NullApplication),
-            Box::new(NullInformation),
-            DefaultControlHandler::create(),
-            listener,
-            client_config(),
-        );
+        let (mut handle, mut states) = spawn_tls_outstation(peer.endpoints());
         expect(&mut states, ClientState::Disabled).await;
         handle.enable().await.unwrap();
         expect(&mut states, ClientState::Connecting).await;
@@ -369,8 +375,7 @@ mod tls {
 /// clock jumps only to the end of them.
 mod lifecycle {
     use super::*;
-    use crate::master::MasterChannel;
-    use crate::util::test_support::{watchdog, Timeline};
+    use crate::util::test_support::watchdog;
     use std::io::Read;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::TcpSocket;
@@ -385,22 +390,6 @@ mod lifecycle {
         socket.bind("127.0.0.1:0".parse().unwrap()).unwrap();
         let endpoints = EndpointList::new(socket.local_addr().unwrap().to_string(), &[]);
         (socket, endpoints)
-    }
-
-    fn spawn_master(
-        endpoints: EndpointList,
-        strategy: ConnectStrategy,
-    ) -> (MasterChannel, Timeline<ClientState>) {
-        let (listener, timeline) = Timeline::new();
-        let channel = crate::tcp::spawn_master_tcp_client_2(
-            LinkErrorMode::Close,
-            master_config(),
-            endpoints,
-            strategy,
-            ConnectOptions::default(),
-            listener,
-        );
-        (channel, timeline)
     }
 
     /// Accept without a timeout, which would make a paused clock jump
@@ -660,15 +649,7 @@ mod lifecycle {
     #[tokio::test]
     async fn disable_while_connecting_takes_effect_once_connected() {
         let peer = Peer::new().await;
-        let (listener, mut states) = Timeline::new();
-        let mut channel = crate::tcp::spawn_master_tcp_client_2(
-            LinkErrorMode::Close,
-            master_config(),
-            peer.endpoints(),
-            strategy(),
-            ConnectOptions::default(),
-            listener,
-        );
+        let (mut channel, mut states) = spawn_master(peer.endpoints(), strategy());
         expect(&mut states, ClientState::Disabled).await;
         channel.enable().await.unwrap();
         expect(&mut states, ClientState::Connecting).await;
@@ -684,28 +665,15 @@ mod lifecycle {
     #[cfg(feature = "enable-tls")]
     mod tls {
         use super::*;
-        use crate::util::test_support::tls::{client_config, server_config};
-
-        fn spawn_tls_master(peer: &Peer) -> (MasterChannel, Timeline<ClientState>) {
-            let (listener, timeline) = Timeline::new();
-            let channel = crate::tcp::tls::spawn_master_tls_client_2(
-                LinkErrorMode::Close,
-                master_config(),
-                peer.endpoints(),
-                strategy(),
-                ConnectOptions::default(),
-                listener,
-                client_config(),
-            );
-            (channel, timeline)
-        }
+        use crate::tcp::tls::MinTlsVersion;
+        use crate::util::test_support::tls::server_config;
 
         /// The peer never answers the ClientHello, so the handshake times out after 5 seconds
         #[tokio::test(start_paused = true)]
         async fn disable_during_a_tls_handshake_takes_effect_once_it_fails() {
             watchdog(async {
                 let peer = Peer::new().await;
-                let (mut channel, mut timeline) = spawn_tls_master(&peer);
+                let (mut channel, mut timeline) = spawn_tls_master(peer.endpoints(), strategy());
                 timeline.expect(secs(0), ClientState::Disabled).await;
                 channel.enable().await.unwrap();
                 timeline.expect(secs(0), ClientState::Connecting).await;
@@ -723,7 +691,7 @@ mod lifecycle {
         async fn shutdown_during_a_tls_handshake_takes_effect_once_it_fails() {
             watchdog(async {
                 let peer = Peer::new().await;
-                let (mut channel, mut timeline) = spawn_tls_master(&peer);
+                let (mut channel, mut timeline) = spawn_tls_master(peer.endpoints(), strategy());
                 timeline.expect(secs(0), ClientState::Disabled).await;
                 channel.enable().await.unwrap();
                 timeline.expect(secs(0), ClientState::Connecting).await;
@@ -761,16 +729,7 @@ mod lifecycle {
         async fn connecting_tls_master(
             peer: &Peer,
         ) -> (MasterChannel, Timeline<ClientState>, tokio::net::TcpStream) {
-            let (listener, mut states) = Timeline::new();
-            let mut channel = crate::tcp::tls::spawn_master_tls_client_2(
-                LinkErrorMode::Close,
-                master_config(),
-                peer.endpoints(),
-                strategy(),
-                ConnectOptions::default(),
-                listener,
-                client_config(),
-            );
+            let (mut channel, mut states) = spawn_tls_master(peer.endpoints(), strategy());
             expect(&mut states, ClientState::Disabled).await;
             channel.enable().await.unwrap();
             expect(&mut states, ClientState::Connecting).await;
@@ -783,7 +742,10 @@ mod lifecycle {
             let peer = Peer::new().await;
             let (mut channel, mut states, stream) = connecting_tls_master(&peer).await;
             channel.disable().await.unwrap();
-            let mut phys = server_config().handle_connection(stream).await.unwrap();
+            let mut phys = server_config(MinTlsVersion::V12)
+                .handle_connection(stream)
+                .await
+                .unwrap();
             expect(&mut states, ClientState::Connected).await;
             expect(&mut states, ClientState::Disabled).await;
             assert_tls_closed(&mut phys).await;
@@ -794,7 +756,10 @@ mod lifecycle {
             let peer = Peer::new().await;
             let (channel, mut states, stream) = connecting_tls_master(&peer).await;
             drop(channel);
-            let mut phys = server_config().handle_connection(stream).await.unwrap();
+            let mut phys = server_config(MinTlsVersion::V12)
+                .handle_connection(stream)
+                .await
+                .unwrap();
             expect(&mut states, ClientState::Connected).await;
             expect(&mut states, ClientState::Shutdown).await;
             assert_tls_closed(&mut phys).await;

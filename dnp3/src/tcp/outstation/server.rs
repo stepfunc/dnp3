@@ -449,7 +449,7 @@ mod tests {
     mod tls {
         use super::*;
         use crate::tcp::tls::MinTlsVersion;
-        use crate::util::test_support::tls::{cert, server_config};
+        use crate::util::test_support::tls::{rustls_client, server_config};
         use crate::util::test_support::{
             Timeline, MASTER_REQUEST, NULL_UNSOLICITED_HEADER, OUTSTATION_REPLY,
         };
@@ -471,7 +471,7 @@ mod tests {
             let mut server = Server::new_tls_server(
                 LinkErrorMode::Close,
                 "127.0.0.1:0".parse().unwrap(),
-                server_config(),
+                server_config(MinTlsVersion::V12),
             );
             let (listener, timeline) = Timeline::new();
             let (_handle, future) = server
@@ -520,18 +520,6 @@ mod tests {
             (handle, addr, timeline, task)
         }
 
-        /// the configuration of a master holding the certificate the server expects
-        fn client_config() -> tokio_rustls::rustls::ClientConfig {
-            sfio_rustls_config::client::self_signed(
-                MinTlsVersion::V12.into(),
-                &cert("entity2_cert.pem"),
-                &cert("entity1_cert.pem"),
-                &cert("entity1_key.pem"),
-                None,
-            )
-            .unwrap()
-        }
-
         fn server_name() -> ServerName<'static> {
             ServerName::IpAddress(IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED.into()))
         }
@@ -545,7 +533,7 @@ mod tests {
         async fn handshake<S: AsyncRead + AsyncWrite + Unpin>(
             socket: S,
         ) -> tokio_rustls::client::TlsStream<S> {
-            tokio_rustls::TlsConnector::from(Arc::new(client_config()))
+            tokio_rustls::TlsConnector::from(Arc::new(rustls_client(MinTlsVersion::V12.into())))
                 .connect(server_name(), socket)
                 .await
                 .unwrap()
@@ -554,7 +542,7 @@ mod tests {
         /// the first flight of a master's TLS handshake
         fn client_hello() -> Vec<u8> {
             let mut connection = tokio_rustls::rustls::ClientConnection::new(
-                Arc::new(client_config()),
+                Arc::new(rustls_client(MinTlsVersion::V12.into())),
                 server_name(),
             )
             .unwrap();

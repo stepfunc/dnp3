@@ -25,7 +25,9 @@ use crate::tcp::accept::test_util::PIPE;
 use crate::tcp::tls::{
     CertificateMode, HandshakeError, MinTlsVersion, TlsClientConfig, TlsServerConfig,
 };
-use crate::util::test_support::tls::{ca_chain, cert};
+use crate::util::test_support::tls::{
+    ca_chain, cert, client_config, rustls_client, rustls_server, server_config,
+};
 use crate::util::test_support::watchdog;
 
 /// The subject name of both certificates the authority issued
@@ -37,14 +39,7 @@ const MODES: [CertificateMode; 2] = [CertificateMode::AuthorityBased, Certificat
 fn client(mode: CertificateMode, min: MinTlsVersion) -> TlsClientConfig {
     match mode {
         CertificateMode::AuthorityBased => pki_client(Some(NAME), "ca_cert.pem", min),
-        CertificateMode::SelfSigned => TlsClientConfig::self_signed(
-            &cert("entity2_cert.pem"),
-            &cert("entity1_cert.pem"),
-            &cert("entity1_key.pem"),
-            None,
-            min,
-        )
-        .unwrap(),
+        CertificateMode::SelfSigned => client_config(min),
     }
 }
 
@@ -52,14 +47,7 @@ fn client(mode: CertificateMode, min: MinTlsVersion) -> TlsClientConfig {
 fn server(mode: CertificateMode, min: MinTlsVersion) -> TlsServerConfig {
     match mode {
         CertificateMode::AuthorityBased => pki_server(Some(NAME), &ca_chain("ca_cert.pem"), min),
-        CertificateMode::SelfSigned => TlsServerConfig::self_signed(
-            &cert("entity1_cert.pem"),
-            &cert("entity2_cert.pem"),
-            &cert("entity2_key.pem"),
-            None,
-            min,
-        )
-        .unwrap(),
+        CertificateMode::SelfSigned => server_config(min),
     }
 }
 
@@ -103,16 +91,10 @@ fn peer_client(mode: CertificateMode, versions: ProtocolVersions) -> rustls::Cli
             &ca_chain("entity1_cert.pem"),
             &ca_chain("entity1_key.pem"),
             None,
-        ),
-        CertificateMode::SelfSigned => sfio_rustls_config::client::self_signed(
-            versions,
-            &cert("entity2_cert.pem"),
-            &cert("entity1_cert.pem"),
-            &cert("entity1_key.pem"),
-            None,
-        ),
+        )
+        .unwrap(),
+        CertificateMode::SelfSigned => rustls_client(versions),
     }
-    .unwrap()
 }
 
 /// A peer that would complete a handshake with [`client`], built without this crate's configuration
@@ -125,16 +107,10 @@ fn peer_server(mode: CertificateMode, versions: ProtocolVersions) -> rustls::Ser
             &ca_chain("entity2_cert.pem"),
             &ca_chain("entity2_key.pem"),
             None,
-        ),
-        CertificateMode::SelfSigned => sfio_rustls_config::server::self_signed(
-            versions,
-            &cert("entity1_cert.pem"),
-            &cert("entity2_cert.pem"),
-            &cert("entity2_key.pem"),
-            None,
-        ),
+        )
+        .unwrap(),
+        CertificateMode::SelfSigned => rustls_server(versions),
     }
-    .unwrap()
 }
 
 fn tls12_only() -> ProtocolVersions {

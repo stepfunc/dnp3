@@ -280,9 +280,7 @@ mod tests {
 
     /// reads dropped while the link layer's reply is waiting on the peer
     mod cancel {
-        use std::future::Future;
         use std::pin::pin;
-        use std::task::{Context, Waker};
 
         use tokio::io::{AsyncReadExt, AsyncWriteExt, DuplexStream};
 
@@ -290,6 +288,7 @@ mod tests {
         use crate::link::header::ControlField;
         use crate::transport::{FragmentAddr, TransportWrite};
         use crate::util::phys::PhysAddr;
+        use crate::util::test_support::poll_once;
 
         const FRAGMENT: [u8; 1] = [0xAA];
 
@@ -359,9 +358,7 @@ mod tests {
 
             /// poll a read once and drop it, returning true if it was still pending
             fn read_and_cancel(&mut self) -> bool {
-                let read = pin!(self.reader.read(&mut self.io, DecodeLevel::nothing()));
-                read.poll(&mut Context::from_waker(Waker::noop()))
-                    .is_pending()
+                poll_once(pin!(self.reader.read(&mut self.io, DecodeLevel::nothing()))).is_pending()
             }
 
             /// true if `read` completed instead of waiting for more data
@@ -384,9 +381,7 @@ mod tests {
 
             fn nothing_more_received(&mut self) -> bool {
                 let mut byte = [0];
-                pin!(self.peer.read(&mut byte))
-                    .poll(&mut Context::from_waker(Waker::noop()))
-                    .is_pending()
+                poll_once(pin!(self.peer.read(&mut byte))).is_pending()
             }
 
             fn pop(&mut self) -> Option<Item> {

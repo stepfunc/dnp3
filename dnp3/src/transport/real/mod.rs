@@ -109,6 +109,17 @@ mod tests {
         test_data::header_only(link_header(from_master, function, destination, source))
     }
 
+    /// the bytes written to the mock since the last call
+    fn drain_writes(handle: &mut sfio_tokio_mock_io::Handle) -> Vec<Vec<u8>> {
+        let mut writes = Vec::new();
+        while let Some(event) = handle.pop_event() {
+            if let sfio_tokio_mock_io::Event::Write(x) = event {
+                writes.push(x);
+            }
+        }
+        writes
+    }
+
     #[derive(Debug, PartialEq)]
     enum Item {
         Fragment(Vec<u8>),
@@ -177,13 +188,7 @@ mod tests {
 
         /// the bytes written since the last call
         fn writes(&mut self) -> Vec<Vec<u8>> {
-            let mut writes = Vec::new();
-            while let Some(event) = self.handle.pop_event() {
-                if let sfio_tokio_mock_io::Event::Write(x) = event {
-                    writes.push(x);
-                }
-            }
-            writes
+            drain_writes(&mut self.handle)
         }
     }
 
@@ -527,13 +532,7 @@ mod tests {
                     .write(&mut io, DecodeLevel::nothing(), destination, fragment)
                     .await
                     .unwrap();
-                let mut written = Vec::new();
-                while let Some(event) = handle.pop_event() {
-                    if let sfio_tokio_mock_io::Event::Write(x) = event {
-                        written.push(x);
-                    }
-                }
-                frames.push(written);
+                frames.push(drain_writes(&mut handle));
             }
             frames
         }
@@ -617,13 +616,7 @@ mod tests {
                 }));
             }
 
-            let mut writes = Vec::new();
-            while let Some(event) = handle.pop_event() {
-                if let sfio_tokio_mock_io::Event::Write(x) = event {
-                    writes.push(x);
-                }
-            }
-            (items, writes)
+            (items, drain_writes(&mut handle))
         }
 
         /// the number of segments written, what the reader delivered, and what it wrote back
