@@ -768,34 +768,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_filter_overlapping_a_registered_one_is_rejected() {
-        let cases = [
-            (exact("127.0.0.1"), exact("127.0.0.1")),
-            (
-                exact("127.0.0.1"),
-                AddressFilter::AnyOf(
-                    ["10.0.0.1".parse().unwrap(), "127.0.0.1".parse().unwrap()].into(),
-                ),
-            ),
-            (exact("127.0.0.1"), AddressFilter::Any),
-            (AddressFilter::Any, exact("127.0.0.1")),
-            (
-                AddressFilter::WildcardIpv4("127.0.0.*".parse().unwrap()),
-                exact("127.0.0.1"),
-            ),
-        ];
-        for (first, second) in cases {
-            let mut server =
-                Server::new_tcp_server(LinkErrorMode::Close, "127.0.0.1:0".parse().unwrap());
-            add_outstation(&mut server, first).unwrap();
-            assert_eq!(
-                add_outstation(&mut server, second).err(),
-                Some(FilterError::Conflict)
-            );
-        }
-    }
-
-    #[tokio::test]
     async fn a_filter_is_checked_against_every_registered_one() {
         // each conflicts with exactly one of the registered filters, in order
         let conflicting = ["127.0.0.1", "192.0.2.1", "10.0.0.7"];

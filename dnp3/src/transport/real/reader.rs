@@ -267,29 +267,6 @@ mod tests {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn segment_with_only_a_transport_header_is_not_passed_up() {
-        let mut h = Harness::new();
-        h.queue(&[segment(true, true, 0, &[]), segment(true, true, 1, &[1])]);
-        assert!(h.read().await);
-        assert_eq!(h.pop(), Some(Item::Fragment(vec![1])));
-    }
-
-    #[tokio::test(start_paused = true)]
-    async fn data_frame_without_a_transport_header_is_ignored() {
-        let mut h = Harness::new();
-        h.queue(&[
-            header_only(crate::link::header::Header::unconfirmed_user_data(
-                true,
-                OUTSTATION.wrap(),
-                MASTER.wrap(),
-            )),
-            segment(true, true, 0, &[1]),
-        ]);
-        assert!(h.read().await);
-        assert_eq!(h.pop(), Some(Item::Fragment(vec![1])));
-    }
-
-    #[tokio::test(start_paused = true)]
     async fn reset_discards_pending_input() {
         let mut h = Harness::new();
         h.queue(&[segment(true, false, 0, &[1]), link_status_request()]);

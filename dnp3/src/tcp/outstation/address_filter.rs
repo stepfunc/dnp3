@@ -208,33 +208,6 @@ mod test {
         assert_eq!(res, Err(BadIpv4Wildcard));
     }
 
-    #[test]
-    fn wildcard_matching_works() {
-        let wc: WildcardIPv4 = "192.168.0.*".parse().unwrap();
-        let ip1: IpAddr = "192.168.0.1".parse().unwrap();
-        let ip2: IpAddr = "192.168.1.1".parse().unwrap();
-
-        assert!(wc.matches(ip1));
-        assert!(!wc.matches(ip2));
-    }
-
-    #[test]
-    fn wildcard_conflicts() {
-        let wc1 = AddressFilter::WildcardIpv4("192.168.27.*".parse().unwrap());
-        let ip1 = AddressFilter::Exact("192.168.27.2".parse().unwrap());
-
-        let wc2 = AddressFilter::WildcardIpv4("192.168.*.23".parse().unwrap());
-        let ip2 = AddressFilter::Exact("192.168.22.23".parse().unwrap());
-
-        // conflicts
-        assert!(wc1.conflicts_with(&ip1));
-        assert!(wc1.conflicts_with(&wc2));
-
-        // disjoint
-        assert!(!wc1.conflicts_with(&ip2));
-        assert!(!wc2.conflicts_with(&ip1));
-    }
-
     fn ip(s: &str) -> IpAddr {
         s.parse().unwrap()
     }
@@ -264,15 +237,6 @@ mod test {
                 assert!(!filter.matches(ip(peer)), "{filter:?} {peer}");
             }
         }
-    }
-
-    #[test]
-    fn native_ipv6_matching_is_unchanged() {
-        let filter = any_of(&["2001:db8::1", "192.168.0.1"]);
-        assert!(filter.matches(ip("2001:db8::1")));
-        assert!(!filter.matches(ip("2001:db8::2")));
-        assert!(AddressFilter::Exact(ip("2001:db8::1")).matches(ip("2001:db8::1")));
-        assert!(!AddressFilter::Exact(ip("2001:db8::1")).matches(ip("2001:db8::2")));
     }
 
     #[test]
@@ -380,8 +344,26 @@ mod test {
             }
         }
 
+        /// 0.1.2.3 in each of its forms and the IPv6 addresses that aren't IPv4-mapped, drawn half
+        /// the time so that filters naming a native IPv6 address, or one address in two forms,
+        /// are common
+        fn forms_of_one_address() -> Vec<IpAddr> {
+            let v4 = Ipv4Addr::new(0, 1, 2, 3);
+            vec![
+                IpAddr::V4(v4),
+                IpAddr::V6(v4.to_ipv6_mapped()),
+                IpAddr::V6(v4.to_ipv6_compatible()),
+                ip("::ffff:0:0.1.2.3"),
+                IpAddr::V6(Ipv6Addr::LOCALHOST),
+                ip("2001:db8::1"),
+            ]
+        }
+
         fn address() -> impl Strategy<Value = IpAddr> {
-            prop::sample::select(universe())
+            prop_oneof![
+                prop::sample::select(universe()),
+                prop::sample::select(forms_of_one_address()),
+            ]
         }
 
         fn wildcard_octet() -> impl Strategy<Value = Option<u8>> {
@@ -390,11 +372,13 @@ mod test {
 
         fn filter() -> impl Strategy<Value = AddressFilter> {
             prop_oneof![
-                Just(AddressFilter::Any),
-                address().prop_map(AddressFilter::Exact),
-                prop::collection::vec(address(), 0..4)
+                1 => Just(AddressFilter::Any),
+                1 => address().prop_map(AddressFilter::Exact),
+                1 => prop::collection::vec(address(), 0..4)
                     .prop_map(|x| AddressFilter::AnyOf(x.into_iter().collect())),
-                (
+                // twice as often, so that pairs of wildcards overlapping only through each
+                // other's wildcard octets are common
+                2 => (
                     wildcard_octet(),
                     wildcard_octet(),
                     wildcard_octet(),
