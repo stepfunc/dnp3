@@ -35,6 +35,8 @@ pub enum EventBinaryOutputStatusVariation {
     /// Binary Output Event - Output Status without time
     Group11Var1,
     /// Binary Output Event - Output Status with time
+    ///
+    /// Events recorded without time are reported as `Group11Var1`
     Group11Var2,
 }
 
@@ -71,8 +73,12 @@ pub enum EventCounterVariation {
     /// Counter Event - 16-bit with flag
     Group22Var2,
     /// Counter Event - 32-bit with flag and time
+    ///
+    /// Events recorded without time are reported as `Group22Var1`
     Group22Var5,
     /// Counter Event - 16-bit with flag and time
+    ///
+    /// Events recorded without time are reported as `Group22Var2`
     Group22Var6,
 }
 
@@ -88,8 +94,12 @@ pub enum EventFrozenCounterVariation {
     /// Frozen Counter Event - 16-bit with flag
     Group23Var2,
     /// Frozen Counter Event - 32-bit with flag and time
+    ///
+    /// Events recorded without time are reported as `Group23Var1`
     Group23Var5,
     /// Frozen Counter Event - 16-bit with flag and time
+    ///
+    /// Events recorded without time are reported as `Group23Var2`
     Group23Var6,
 }
 
@@ -105,16 +115,24 @@ pub enum EventAnalogInputVariation {
     /// Analog Input Event - 16-bit with flag
     Group32Var2,
     /// Analog Input Event - 32-bit with flag and time
+    ///
+    /// Events recorded without time are reported as `Group32Var1`
     Group32Var3,
     /// Analog Input Event - 16-bit with flag and time
+    ///
+    /// Events recorded without time are reported as `Group32Var2`
     Group32Var4,
     /// Analog Input Event - Single-precision with flag
     Group32Var5,
     /// Analog Input Event - Double-precision with flag
     Group32Var6,
     /// Analog Input Event - Single-precision with flag and time
+    ///
+    /// Events recorded without time are reported as `Group32Var5`
     Group32Var7,
     /// Analog Input Event - Double-precision with flag and time
+    ///
+    /// Events recorded without time are reported as `Group32Var6`
     Group32Var8,
 }
 
@@ -155,16 +173,24 @@ pub enum EventAnalogOutputStatusVariation {
     /// Analog Output Event - 16-bit with flag
     Group42Var2,
     /// Analog Output Event - 32-bit with flag and time
+    ///
+    /// Events recorded without time are reported as `Group42Var1`
     Group42Var3,
     /// Analog Output Event - 16-bit with flag and time
+    ///
+    /// Events recorded without time are reported as `Group42Var2`
     Group42Var4,
     /// Analog Output Event - Single-precision with flag
     Group42Var5,
     /// Analog Output Event - Double-precision with flag
     Group42Var6,
     /// Analog Output Event - Single-precision with flag and time
+    ///
+    /// Events recorded without time are reported as `Group42Var5`
     Group42Var7,
     /// Analog Output Event - Double-precision with flag and time
+    ///
+    /// Events recorded without time are reported as `Group42Var6`
     Group42Var8,
 }
 

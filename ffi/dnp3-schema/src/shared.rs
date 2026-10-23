@@ -860,11 +860,14 @@ fn declare_timestamp_struct(lib: &mut LibraryBuilder) -> BackTraced<UniversalStr
         .define_enum("time_quality")?
         .push(
             "synchronized_time",
-            "The timestamp is UTC synchronized at the remote device",
+            doc("The timestamp is UTC synchronized at the remote device")
+                .details("The master reports times read from variations with absolute time as synchronized, because those variations have no way to express time quality. Only binary and double-bit input events with absolute time (g2v2 and g4v2) must have been recorded while synchronized (TB2017-003a 5.1.3.1.2). For the others (such as g11, g13, g21, g22, g23, g32, g33, g42 and g43 with time), the outstation's clock may not have been synchronized. Relative times take the quality of their common time of occurrence (g51v1 or g51v2).")
+                .details("Check {struct:header_info.variation} to tell these apart."),
         )?
         .push(
             "unsynchronized_time",
-            "The device indicates the timestamp may be not be synchronized",
+            doc("The device indicates the timestamp may be not be synchronized")
+                .details("The master reports this only for relative times measured from an unsynchronized common time of occurrence (g51v2)."),
         )?
         .push(
             "invalid_time",

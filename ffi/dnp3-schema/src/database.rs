@@ -191,7 +191,11 @@ fn define_binary_output_status_config(
     let binary_output_status_event_variation = lib
         .define_enum("event_binary_output_status_variation")?
         .push(gv(11, 1), "Binary output event - status without time")?
-        .push(gv(11, 2), "Binary output event - status with time")?
+        .push(
+            gv(11, 2),
+            doc("Binary output event - status with time")
+                .details("Events recorded without time are reported as {enum:event_binary_output_status_variation.group11_var1}."),
+        )?
         .doc("Event binary output status variation")?
         .build()?;
 
@@ -237,8 +241,16 @@ fn define_counter_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStru
         .define_enum("event_counter_variation")?
         .push(gv(22, 1), "Counter event - 32-bit with flag")?
         .push(gv(22, 2), "Counter event - 16-bit with flag")?
-        .push(gv(22, 5), "Counter event - 32-bit with flag and time")?
-        .push(gv(22, 6), "Counter event - 16-bit with flag and time")?
+        .push(
+            gv(22, 5),
+            doc("Counter event - 32-bit with flag and time")
+                .details("Events recorded without time are reported as {enum:event_counter_variation.group22_var1}."),
+        )?
+        .push(
+            gv(22, 6),
+            doc("Counter event - 16-bit with flag and time")
+                .details("Events recorded without time are reported as {enum:event_counter_variation.group22_var2}."),
+        )?
         .doc("Event counter variation")?
         .build()?;
 
@@ -291,11 +303,13 @@ fn define_frozen_counter_config(lib: &mut LibraryBuilder) -> BackTraced<Function
         .push(gv(23, 2), "Frozen Counter event - 16-bit with flag")?
         .push(
             gv(23, 5),
-            "Frozen Counter event - 32-bit with flag and time",
+            doc("Frozen Counter event - 32-bit with flag and time")
+                .details("Events recorded without time are reported as {enum:event_frozen_counter_variation.group23_var1}."),
         )?
         .push(
             gv(23, 6),
-            "Frozen Counter event - 16-bit with flag and time",
+            doc("Frozen Counter event - 16-bit with flag and time")
+                .details("Events recorded without time are reported as {enum:event_frozen_counter_variation.group23_var2}."),
         )?
         .doc("Event frozen counter variation")?
         .build()?;
@@ -353,8 +367,16 @@ pub fn define_analog_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgS
         .define_enum("event_analog_input_variation")?
         .push(gv(32, 1), "Analog input event - 32-bit without time")?
         .push(gv(32, 2), "Analog input event - 16-bit without time")?
-        .push(gv(32, 3), "Analog input event - 32-bit with time")?
-        .push(gv(32, 4), "Analog input event - 16-bit with time")?
+        .push(
+            gv(32, 3),
+            doc("Analog input event - 32-bit with time")
+                .details("Events recorded without time are reported as {enum:event_analog_input_variation.group32_var1}."),
+        )?
+        .push(
+            gv(32, 4),
+            doc("Analog input event - 16-bit with time")
+                .details("Events recorded without time are reported as {enum:event_analog_input_variation.group32_var2}."),
+        )?
         .push(
             gv(32, 5),
             "Analog input event - single-precision, floating-point without time",
@@ -365,11 +387,13 @@ pub fn define_analog_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgS
         )?
         .push(
             gv(32, 7),
-            "Analog input event - single-precision, floating-point with time",
+            doc("Analog input event - single-precision, floating-point with time")
+                .details("Events recorded without time are reported as {enum:event_analog_input_variation.group32_var5}."),
         )?
         .push(
             gv(32, 8),
-            "Analog input event - double-precision, floating-point with time",
+            doc("Analog input event - double-precision, floating-point with time")
+                .details("Events recorded without time are reported as {enum:event_analog_input_variation.group32_var6}."),
         )?
         .doc("Event analog variation")?
         .build()?;
@@ -433,8 +457,16 @@ fn define_analog_output_status_config(
         .define_enum("event_analog_output_status_variation")?
         .push(gv(42, 1), "Analog output event - 32-bit without time")?
         .push(gv(42, 2), "Analog output event - 16-bit without time")?
-        .push(gv(42, 3), "Analog output event - 32-bit with time")?
-        .push(gv(42, 4), "Analog output event - 16-bit with time")?
+        .push(
+            gv(42, 3),
+            doc("Analog output event - 32-bit with time")
+                .details("Events recorded without time are reported as {enum:event_analog_output_status_variation.group42_var1}."),
+        )?
+        .push(
+            gv(42, 4),
+            doc("Analog output event - 16-bit with time")
+                .details("Events recorded without time are reported as {enum:event_analog_output_status_variation.group42_var2}."),
+        )?
         .push(
             gv(42, 5),
             "Analog output event - single-precision, floating-point without time",
@@ -445,11 +477,13 @@ fn define_analog_output_status_config(
         )?
         .push(
             gv(42, 7),
-            "Analog output event - single-precision, floating-point with time",
+            doc("Analog output event - single-precision, floating-point with time")
+                .details("Events recorded without time are reported as {enum:event_analog_output_status_variation.group42_var5}."),
         )?
         .push(
             gv(42, 8),
-            "Analog output event - double-precision, floating-point with time",
+            doc("Analog output event - double-precision, floating-point with time")
+                .details("Events recorded without time are reported as {enum:event_analog_output_status_variation.group42_var6}."),
         )?
         .doc("Event analog output status variation")?
         .build()?;
