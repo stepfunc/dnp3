@@ -224,4 +224,79 @@ mod tests {
             ]
         );
     }
+
+    mod property {
+        use super::*;
+
+        use proptest::prelude::*;
+
+        /// a start and stop up to 32 indices apart, with the top of the index space more likely
+        fn start_stop() -> impl Strategy<Value = (u16, u16)> {
+            let start = prop_oneof![any::<u16>(), 65500..=u16::MAX];
+            (start, 0..32u16).prop_map(|(start, len)| (start, start.saturating_add(len)))
+        }
+
+        /// the bits of a byte, least significant first
+        fn bits(byte: u8) -> [bool; 8] {
+            [0x01, 0x02, 0x04, 0x08, 0x10, 0x20, 0x40, 0x80].map(|mask| byte & mask != 0)
+        }
+
+        /// the double bits of a byte, from the least significant pair
+        fn double_bits(byte: u8) -> [DoubleBit; 4] {
+            [(0x02, 0x01), (0x08, 0x04), (0x20, 0x10), (0x80, 0x40)].map(|(high, low)| {
+                match (byte & high != 0, byte & low != 0) {
+                    (false, false) => DoubleBit::Intermediate,
+                    (false, true) => DoubleBit::DeterminedOff,
+                    (true, false) => DoubleBit::DeterminedOn,
+                    (true, true) => DoubleBit::Indeterminate,
+                }
+            })
+        }
+
+        /// The packed sequence of the range in `bytes` reads only the bytes that hold its values,
+        /// and yields the values of `unpacked` with their indices, then stays exhausted
+        fn check<P, const N: usize>(
+            (start, stop): (u16, u16),
+            bytes: &[u8],
+            unpacked: fn(u8) -> [P; N],
+        ) where
+            P: Packed + Copy + PartialEq + std::fmt::Debug,
+        {
+            let expected: Vec<(P, u16)> = bytes
+                .iter()
+                .flat_map(|byte| unpacked(*byte))
+                .zip(start..=stop)
+                .collect();
+            let used = expected.len().div_ceil(N);
+
+            let range = Range::from(start, stop).unwrap();
+            let mut cursor = ReadCursor::new(bytes);
+            let seq = PackedSequence::<P>::parse(range, &mut cursor).unwrap();
+            assert_eq!(cursor.remaining(), bytes.len().saturating_sub(used));
+            let mut iter = seq.iter();
+            assert_eq!(iter.size_hint(), (expected.len(), Some(expected.len())));
+            assert_eq!(iter.by_ref().collect::<Vec<_>>(), expected);
+            assert_eq!(iter.next(), None);
+            assert_eq!(iter.next(), None);
+            assert_eq!(iter.size_hint(), (0, Some(0)));
+
+            let short = &bytes[..used.saturating_sub(1)];
+            PackedSequence::<P>::parse(range, &mut ReadCursor::new(short)).unwrap_err();
+        }
+
+        proptest! {
+            #![proptest_config(ProptestConfig::with_cases(256))]
+
+            /// Packed bits and double bits are read from the least significant bits of each
+            /// byte, in as many bytes as the values need
+            #[test]
+            fn packed_sequences_yield_the_bits_of_each_byte_in_order(
+                range in start_stop(),
+                bytes in prop::collection::vec(any::<u8>(), 12),
+            ) {
+                check(range, &bytes, bits);
+                check(range, &bytes, double_bits);
+            }
+        }
+    }
 }

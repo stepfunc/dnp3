@@ -1284,4 +1284,447 @@ mod tests {
             &[60, 1, 0x06, 0, 252, 0x00, 0, 0, 2, 1, 0]
         );
     }
+
+    mod round_trip {
+        use super::*;
+        use crate::app::gen::count::CountVariation;
+        use crate::app::parse::parser::{ReadQualifier, Width};
+        use crate::app::{ObjectParseError, QualifierCode};
+
+        use proptest::prelude::*;
+
+        /// The qualifier of a READ header as the master should write it
+        #[derive(Clone, Copy, Debug, PartialEq)]
+        enum Qualifier {
+            AllObjects,
+            Range8(u8, u8),
+            Range16(u16, u16),
+            Count8(u8),
+            Count16(u16),
+        }
+
+        impl Qualifier {
+            fn code(self) -> QualifierCode {
+                match self {
+                    Qualifier::AllObjects => QualifierCode::AllObjects,
+                    Qualifier::Range8(..) => QualifierCode::Range8,
+                    Qualifier::Range16(..) => QualifierCode::Range16,
+                    Qualifier::Count8(_) => QualifierCode::Count8,
+                    Qualifier::Count16(_) => QualifierCode::Count16,
+                }
+            }
+
+            /// the qualifier byte, then the start and stop or the count
+            fn bytes(self) -> Vec<u8> {
+                match self {
+                    Qualifier::AllObjects => vec![0x06],
+                    Qualifier::Range8(start, stop) => vec![0x00, start, stop],
+                    Qualifier::Range16(start, stop) => {
+                        [&[0x01][..], &start.to_le_bytes(), &stop.to_le_bytes()].concat()
+                    }
+                    Qualifier::Count8(count) => vec![0x07, count],
+                    Qualifier::Count16(count) => [&[0x08][..], &count.to_le_bytes()].concat(),
+                }
+            }
+
+            fn parsed(qualifier: ReadQualifier) -> Self {
+                let narrow = |x: u16| u8::try_from(x).unwrap();
+                match qualifier {
+                    ReadQualifier::AllObjects => Qualifier::AllObjects,
+                    ReadQualifier::Range(Width::One, range) => {
+                        Qualifier::Range8(narrow(range.get_start()), narrow(range.get_stop()))
+                    }
+                    ReadQualifier::Range(Width::Two, range) => {
+                        Qualifier::Range16(range.get_start(), range.get_stop())
+                    }
+                    ReadQualifier::Count(Width::One, count) => Qualifier::Count8(narrow(count)),
+                    ReadQualifier::Count(Width::Two, count) => Qualifier::Count16(count),
+                }
+            }
+        }
+
+        /// A READ header: the group and variation on the wire, and the qualifier
+        type ModelHeader = ((u8, u8), Qualifier);
+
+        fn model_header(header: ReadHeader) -> ModelHeader {
+            let (variation, qualifier) = match header {
+                ReadHeader::Range8(x) => (x.variation, Qualifier::Range8(x.start, x.stop)),
+                ReadHeader::Range16(x) => (x.variation, Qualifier::Range16(x.start, x.stop)),
+                ReadHeader::AllObjects(x) => (x.variation, Qualifier::AllObjects),
+                ReadHeader::LimitedCount8(x) => (x.variation, Qualifier::Count8(x.count)),
+                ReadHeader::LimitedCount16(x) => (x.variation, Qualifier::Count16(x.count)),
+            };
+            (variation.to_group_and_var(), qualifier)
+        }
+
+        fn model_request(request: &ReadRequest) -> Vec<ModelHeader> {
+            match request {
+                ReadRequest::SingleHeader(header) => vec![model_header(*header)],
+                ReadRequest::MultipleHeader(headers) => {
+                    headers.iter().copied().map(model_header).collect()
+                }
+                // the event classes first, then class 0
+                ReadRequest::ClassScan(classes) => [
+                    (classes.events.class1, (60, 2)),
+                    (classes.events.class2, (60, 3)),
+                    (classes.events.class3, (60, 4)),
+                    (classes.class0, (60, 1)),
+                ]
+                .into_iter()
+                .filter(|(enabled, _)| *enabled)
+                .map(|(_, group_var)| (group_var, Qualifier::AllObjects))
+                .collect(),
+            }
+        }
+
+        fn model_bytes(&((group, var), qualifier): &ModelHeader) -> Vec<u8> {
+            [vec![group, var], qualifier.bytes()].concat()
+        }
+
+        /// The headers of a READ request as the outstation parses them
+        fn parse_read(bytes: &[u8]) -> Result<Vec<ModelHeader>, ObjectParseError> {
+            HeaderCollection::parse(ParseOptions::default(), FunctionCode::Read, bytes)
+                .map(read_headers)
+        }
+
+        /// the headers of a parsed READ request; the iterator stays exhausted once it ends
+        fn read_headers(headers: HeaderCollection) -> Vec<ModelHeader> {
+            let mut iter = headers.iter();
+            let parsed = iter
+                .by_ref()
+                .map(|header| match header {
+                    ObjectHeader::Read(variation, qualifier) => {
+                        (variation.to_group_and_var(), Qualifier::parsed(qualifier))
+                    }
+                    other => panic!("not a READ header: {other:?}"),
+                })
+                .collect();
+            assert!(iter.next().is_none());
+            assert!(iter.next().is_none());
+            parsed
+        }
+
+        /// The kinds of READ qualifier, which accept different variations
+        #[derive(Clone, Copy, Debug)]
+        enum Kind {
+            AllObjects,
+            Range,
+            Count,
+        }
+
+        impl Qualifier {
+            fn kind(self) -> Kind {
+                match self {
+                    Qualifier::AllObjects => Kind::AllObjects,
+                    Qualifier::Range8(..) | Qualifier::Range16(..) => Kind::Range,
+                    Qualifier::Count8(_) | Qualifier::Count16(_) => Kind::Count,
+                }
+            }
+        }
+
+        // The variations of each group that a READ accepts with each kind of qualifier, written
+        // out independently of the parser. Groups 0, 110 and 111 are in `read_accepts`.
+        const ALL_OBJECTS: &[(u8, &[u8])] = &[
+            (1, &[0, 1, 2]),
+            (2, &[0, 1, 2, 3]),
+            (3, &[0, 1, 2]),
+            (4, &[0, 1, 2, 3]),
+            (10, &[0, 1, 2]),
+            (11, &[0, 1, 2]),
+            (13, &[1, 2]),
+            (20, &[0, 1, 2, 5, 6]),
+            (21, &[0, 1, 2, 5, 6, 9, 10]),
+            (22, &[0, 1, 2, 5, 6]),
+            (23, &[0, 1, 2, 5, 6]),
+            (30, &[0, 1, 2, 3, 4, 5, 6]),
+            (31, &[0, 1, 2, 3, 4, 5, 6, 7, 8]),
+            (32, &[0, 1, 2, 3, 4, 5, 6, 7, 8]),
+            (33, &[0, 1, 2, 3, 4, 5, 6, 7, 8]),
+            (34, &[0, 1, 2, 3]),
+            (40, &[0, 1, 2, 3, 4]),
+            (42, &[0, 1, 2, 3, 4, 5, 6, 7, 8]),
+            (43, &[1, 2, 3, 4, 5, 6, 7, 8]),
+            (60, &[1, 2, 3, 4]),
+            (80, &[1]),
+            (102, &[0, 1]),
+        ];
+
+        const RANGE: &[(u8, &[u8])] = &[
+            (1, &[0, 1, 2]),
+            (3, &[0, 1, 2]),
+            (10, &[0, 1, 2]),
+            (20, &[0, 1, 2, 5, 6]),
+            (21, &[0, 1, 2, 5, 6, 9, 10]),
+            (30, &[0, 1, 2, 3, 4, 5, 6]),
+            (31, &[0, 1, 2, 3, 4, 5, 6, 7, 8]),
+            (34, &[0, 1, 2, 3]),
+            (40, &[0, 1, 2, 3, 4]),
+            (80, &[1]),
+            (102, &[0, 1]),
+        ];
+
+        const COUNT: &[(u8, &[u8])] = &[
+            (2, &[0, 1, 2, 3]),
+            (4, &[0, 1, 2, 3]),
+            (11, &[0, 1, 2]),
+            (13, &[1, 2]),
+            (22, &[0, 1, 2, 5, 6]),
+            (23, &[0, 1, 2, 5, 6]),
+            (32, &[0, 1, 2, 3, 4, 5, 6, 7, 8]),
+            (33, &[0, 1, 2, 3, 4, 5, 6, 7, 8]),
+            (42, &[0, 1, 2, 3, 4, 5, 6, 7, 8]),
+            (43, &[1, 2, 3, 4, 5, 6, 7, 8]),
+            (50, &[1, 2, 3, 4]),
+            (51, &[1, 2]),
+            (52, &[1, 2]),
+            (60, &[2, 3, 4]),
+        ];
+
+        /// true if a READ accepts the defined variation with this kind of qualifier
+        fn read_accepts(kind: Kind, (group, var): (u8, u8)) -> bool {
+            let table = match (kind, group) {
+                (Kind::Count, 0) => return false,
+                (_, 0) => return true,
+                (Kind::AllObjects, 110 | 111) | (Kind::Range, 110) => return var == 0,
+                (Kind::Count, 111) => return true,
+                (_, 110 | 111) => return false,
+                (Kind::AllObjects, _) => ALL_OBJECTS,
+                (Kind::Range, _) => RANGE,
+                (Kind::Count, _) => COUNT,
+            };
+            table
+                .iter()
+                .any(|(g, vars)| *g == group && vars.contains(&var))
+        }
+
+        /// what the outstation should parse from the header alone
+        fn expected(header: &ModelHeader) -> Result<ModelHeader, ObjectParseError> {
+            let ((group, var), qualifier) = *header;
+            match Variation::lookup(group, var) {
+                None => Err(ObjectParseError::UnknownGroupVariation(group, var)),
+                Some(_) if read_accepts(qualifier.kind(), (group, var)) => Ok(*header),
+                Some(variation) => Err(ObjectParseError::InvalidQualifierForVariation(
+                    variation,
+                    qualifier.code(),
+                )),
+            }
+        }
+
+        /// one of the variations, with groups 0, 110 and 111, which have a variation for every
+        /// byte, no more likely than the others
+        fn one_of(variations: Vec<Variation>) -> impl Strategy<Value = Variation> {
+            let (strings, others): (Vec<Variation>, Vec<Variation>) = variations
+                .into_iter()
+                .partition(|v| matches!(v.to_group_and_var().0, 0 | 110 | 111));
+            prop_oneof![
+                3 => prop::sample::select(others),
+                1 => prop::sample::select(strings),
+            ]
+        }
+
+        /// a variation a READ accepts with this kind of qualifier, or less often, one it doesn't
+        fn variation(kind: Kind) -> impl Strategy<Value = Variation> {
+            let (accepted, rejected): (Vec<Variation>, Vec<Variation>) =
+                Variation::all().partition(|v| read_accepts(kind, v.to_group_and_var()));
+            prop_oneof![
+                3 => one_of(accepted),
+                1 => one_of(rejected),
+            ]
+        }
+
+        /// a start and stop, with single indices, the whole range and its ends more likely
+        fn range<T>(max: T) -> impl Strategy<Value = (T, T)>
+        where
+            T: Arbitrary + Copy + Ord + Default + std::fmt::Debug + 'static,
+        {
+            let zero = T::default();
+            prop_oneof![
+                2 => (any::<T>(), any::<T>()).prop_map(|(a, b)| (a.min(b), a.max(b))),
+                1 => any::<T>().prop_map(|a| (a, a)),
+                1 => prop::sample::select(vec![(zero, zero), (zero, max), (max, max)]),
+            ]
+        }
+
+        /// a count, with these boundary values more likely
+        fn count<T>(boundaries: Vec<T>) -> impl Strategy<Value = T>
+        where
+            T: Arbitrary + Clone + std::fmt::Debug + 'static,
+        {
+            prop_oneof![
+                2 => any::<T>(),
+                1 => prop::sample::select(boundaries),
+            ]
+        }
+
+        fn read_header() -> impl Strategy<Value = ReadHeader> {
+            prop_oneof![
+                (variation(Kind::Range), range(u8::MAX))
+                    .prop_map(|(v, (start, stop))| { ReadHeader::one_byte_range(v, start, stop) }),
+                (variation(Kind::Range), range(u16::MAX))
+                    .prop_map(|(v, (start, stop))| { ReadHeader::two_byte_range(v, start, stop) }),
+                variation(Kind::AllObjects).prop_map(ReadHeader::all_objects),
+                (variation(Kind::Count), count(vec![0, 1, u8::MAX]))
+                    .prop_map(|(v, count)| ReadHeader::one_byte_limited_count(v, count)),
+                (
+                    variation(Kind::Count),
+                    count(vec![0, 1, 255, 256, u16::MAX])
+                )
+                    .prop_map(|(v, count)| ReadHeader::two_byte_limited_count(v, count)),
+            ]
+        }
+
+        fn read_request() -> impl Strategy<Value = ReadRequest> {
+            prop_oneof![
+                read_header().prop_map(ReadRequest::SingleHeader),
+                prop::collection::vec(read_header(), 0..6)
+                    .prop_map(|headers| ReadRequest::multiple_headers(&headers)),
+                any::<[bool; 4]>().prop_map(|[class0, class1, class2, class3]| {
+                    ReadRequest::class_scan(Classes::new(
+                        class0,
+                        EventClasses::new(class1, class2, class3),
+                    ))
+                }),
+                (count(vec![0, 254, 255]), any::<u8>()).prop_map(|(variation, set)| {
+                    ReadRequest::device_attribute(variation, AttrSet::new(set))
+                }),
+            ]
+        }
+
+        #[derive(Clone, Debug)]
+        enum Item {
+            Read(ReadHeader),
+            /// the time and interval of a g50v2
+            Freeze(u64, u32),
+        }
+
+        fn item() -> impl Strategy<Value = Item> {
+            prop_oneof![
+                read_header().prop_map(Item::Read),
+                (
+                    prop_oneof![Just(0), 0..=Timestamp::MAX_VALUE],
+                    prop_oneof![Just(0), any::<u32>()],
+                )
+                    .prop_map(|(time, interval)| Item::Freeze(time, interval)),
+            ]
+        }
+
+        fn add(headers: Headers, item: &Item) -> Headers {
+            match *item {
+                Item::Read(ReadHeader::Range8(x)) => {
+                    headers.add_range_8(x.variation, x.start, x.stop)
+                }
+                Item::Read(ReadHeader::Range16(x)) => {
+                    headers.add_range_16(x.variation, x.start, x.stop)
+                }
+                Item::Read(ReadHeader::AllObjects(x)) => headers.add_all_objects(x.variation),
+                Item::Read(ReadHeader::LimitedCount8(x)) => {
+                    headers.add_one_byte_limited_count(x.variation, x.count)
+                }
+                Item::Read(ReadHeader::LimitedCount16(x)) => {
+                    headers.add_two_byte_limited_count(x.variation, x.count)
+                }
+                Item::Freeze(time, interval) => {
+                    headers.add_time_and_interval(Timestamp::new(time), interval)
+                }
+            }
+        }
+
+        /// a g50v2 with a count of one: the 48-bit time, then the 32-bit interval
+        fn freeze_bytes(time: u64, interval: u32) -> Vec<u8> {
+            [
+                &[50, 2, 0x07, 1][..],
+                &time.to_le_bytes()[..6],
+                &interval.to_le_bytes(),
+            ]
+            .concat()
+        }
+
+        /// found by `read_requests_parse_to_the_headers_written`: the master writes the variation
+        /// it's given, and the outstation rejects one that isn't defined
+        #[test]
+        fn device_attribute_read_of_an_undefined_variation_is_written_as_given() {
+            let mut buffer = [0; 16];
+            let mut cursor = WriteCursor::new(&mut buffer);
+            ReadRequest::device_attribute(0u8, AttrSet::Private(7))
+                .format(&mut HeaderWriter::new(&mut cursor))
+                .unwrap();
+            assert_eq!(cursor.written(), [0, 0, 0x00, 7, 7]);
+            assert_eq!(
+                parse_read(cursor.written()),
+                Err(ObjectParseError::UnknownGroupVariation(0, 0))
+            );
+        }
+
+        proptest! {
+            #![proptest_config(ProptestConfig::with_cases(512))]
+
+            /// A READ request is written as its headers, and the outstation parses each header
+            /// back to what was written, alone or together, unless a READ doesn't accept the
+            /// variation with that qualifier
+            #[test]
+            fn read_requests_parse_to_the_headers_written(request in read_request()) {
+                let mut buffer = [0; 256];
+                let mut cursor = WriteCursor::new(&mut buffer);
+                request.format(&mut HeaderWriter::new(&mut cursor)).unwrap();
+                let model = model_request(&request);
+                let written = cursor.written();
+                prop_assert_eq!(written, model.iter().flat_map(model_bytes).collect::<Vec<u8>>());
+
+                for header in &model {
+                    prop_assert_eq!(
+                        parse_read(&model_bytes(header)),
+                        expected(header).map(|header| vec![header])
+                    );
+                }
+                let expected: Result<Vec<ModelHeader>, ObjectParseError> =
+                    model.iter().map(expected).collect();
+                prop_assert_eq!(parse_read(written), expected);
+            }
+
+            /// Generic request headers are written as the READ headers and g50v2 freeze times
+            /// they hold, in order, and each g50v2 parses back to its time and interval
+            #[test]
+            fn headers_are_written_in_order(items in prop::collection::vec(item(), 0..6)) {
+                let headers = items.iter().fold(Headers::new(), add);
+                let mut buffer = [0; 256];
+                let mut cursor = WriteCursor::new(&mut buffer);
+                headers.write(&mut HeaderWriter::new(&mut cursor)).unwrap();
+                let expected: Vec<u8> = items
+                    .iter()
+                    .flat_map(|item| match *item {
+                        Item::Read(header) => model_bytes(&model_header(header)),
+                        Item::Freeze(time, interval) => freeze_bytes(time, interval),
+                    })
+                    .collect();
+                prop_assert_eq!(cursor.written(), expected);
+
+                for item in &items {
+                    let Item::Freeze(time, interval) = *item else {
+                        continue;
+                    };
+                    let bytes = freeze_bytes(time, interval);
+                    let parsed = HeaderCollection::parse(
+                        ParseOptions::default(),
+                        FunctionCode::FreezeAtTime,
+                        &bytes,
+                    )
+                    .unwrap()
+                    .get_only_header()
+                    .unwrap();
+                    let ObjectHeader::Count(Width::One, 1, CountVariation::Group50Var2(objects)) =
+                        parsed
+                    else {
+                        return Err(TestCaseError::fail(format!("{parsed:?}")));
+                    };
+                    prop_assert_eq!(
+                        objects.single(),
+                        Some(Group50Var2 {
+                            time: Timestamp::new(time),
+                            interval
+                        })
+                    );
+                }
+            }
+        }
+    }
 }

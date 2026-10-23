@@ -162,4 +162,47 @@ mod tests {
         let mut cursor = ReadCursor::new(&data);
         RangedSequence::<u16>::parse(Range::from(0, 1).unwrap(), &mut cursor).unwrap_err();
     }
+
+    mod property {
+        use super::*;
+
+        use proptest::prelude::*;
+
+        /// a start and stop up to 32 indices apart, with the top of the index space more likely
+        fn start_stop() -> impl Strategy<Value = (u16, u16)> {
+            let start = prop_oneof![any::<u16>(), 65500..=u16::MAX];
+            (start, 0..32u16).prop_map(|(start, len)| (start, start.saturating_add(len)))
+        }
+
+        proptest! {
+            #![proptest_config(ProptestConfig::with_cases(256))]
+
+            /// A ranged sequence reads exactly its objects and yields each with its index, then
+            /// stays exhausted; one byte less is an error
+            #[test]
+            fn ranged_sequence_yields_each_index_once(
+                (start, stop) in start_stop(),
+                values in prop::collection::vec(any::<u16>(), 32),
+                trailing in prop::collection::vec(any::<u8>(), 0..4),
+            ) {
+                let expected: Vec<(u16, u16)> = values.iter().copied().zip(start..=stop).collect();
+                let objects: Vec<u8> = expected.iter().flat_map(|(x, _)| x.to_le_bytes()).collect();
+                let bytes = [objects.as_slice(), &trailing].concat();
+                let range = Range::from(start, stop).unwrap();
+
+                let mut cursor = ReadCursor::new(&bytes);
+                let seq = RangedSequence::<u16>::parse(range, &mut cursor).unwrap();
+                prop_assert_eq!(cursor.remaining(), trailing.len());
+                let mut iter = seq.iter();
+                prop_assert_eq!(iter.size_hint(), (expected.len(), Some(expected.len())));
+                prop_assert_eq!(iter.by_ref().collect::<Vec<_>>(), expected);
+                prop_assert_eq!(iter.next(), None);
+                prop_assert_eq!(iter.next(), None);
+                prop_assert_eq!(iter.size_hint(), (0, Some(0)));
+
+                let short = &objects[..objects.len().saturating_sub(1)];
+                RangedSequence::<u16>::parse(range, &mut ReadCursor::new(short)).unwrap_err();
+            }
+        }
+    }
 }

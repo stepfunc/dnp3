@@ -442,3 +442,498 @@ fn echo_with_a_different_value_at_the_same_index_is_an_object_value_mismatch() {
         }
     }
 }
+
+mod property {
+    use super::*;
+    use crate::app::gen::prefixed::PrefixedVariation;
+    use crate::app::parse::parser::ObjectHeader;
+    use crate::app::parse::traits::Index;
+    use crate::master::{BadEncoding, TaskError};
+
+    use proptest::prelude::*;
+
+    #[derive(Clone, Copy, Debug)]
+    enum Value {
+        G12V1 {
+            code: ControlCode,
+            count: u8,
+            on_time: u32,
+            off_time: u32,
+        },
+        G41V1(i32),
+        G41V2(i16),
+        G41V3(f32),
+        G41V4(f64),
+    }
+
+    /// The fields of a command object, floats by their bits
+    #[derive(Debug, PartialEq)]
+    enum Fields {
+        G12V1(ControlCode, u8, u32, u32, CommandStatus),
+        G41V1(i32, CommandStatus),
+        G41V2(i16, CommandStatus),
+        G41V3(u32, CommandStatus),
+        G41V4(u64, CommandStatus),
+    }
+
+    /// The byte a control code is written as, or `None` if its fields don't fit their bits
+    fn code_byte(code: ControlCode) -> Option<u8> {
+        let tcc = match code.tcc {
+            TripCloseCode::Nul => 0x00,
+            TripCloseCode::Close => 0x40,
+            TripCloseCode::Trip => 0x80,
+            TripCloseCode::Reserved => 0xC0,
+            TripCloseCode::Unknown(_) => return None,
+        };
+        let op_type = match code.op_type {
+            OpType::Nul => 0,
+            OpType::PulseOn => 1,
+            OpType::PulseOff => 2,
+            OpType::LatchOn => 3,
+            OpType::LatchOff => 4,
+            OpType::Unknown(x @ 5..=15) => x,
+            OpType::Unknown(_) => return None,
+        };
+        let clear = if code.clear { 0x20 } else { 0 };
+        let queue = if code.queue { 0x10 } else { 0 };
+        Some(tcc | clear | queue | op_type)
+    }
+
+    impl Value {
+        fn group_var(self) -> [u8; 2] {
+            match self {
+                Value::G12V1 { .. } => [12, 1],
+                Value::G41V1(_) => [41, 1],
+                Value::G41V2(_) => [41, 2],
+                Value::G41V3(_) => [41, 3],
+                Value::G41V4(_) => [41, 4],
+            }
+        }
+
+        /// the encoded object, without its status byte
+        fn bytes(self) -> Vec<u8> {
+            match self {
+                Value::G12V1 {
+                    code,
+                    count,
+                    on_time,
+                    off_time,
+                } => [
+                    &[code_byte(code).unwrap(), count][..],
+                    &on_time.to_le_bytes(),
+                    &off_time.to_le_bytes(),
+                ]
+                .concat(),
+                Value::G41V1(x) => x.to_le_bytes().to_vec(),
+                Value::G41V2(x) => x.to_le_bytes().to_vec(),
+                Value::G41V3(x) => x.to_bits().to_le_bytes().to_vec(),
+                Value::G41V4(x) => x.to_bits().to_le_bytes().to_vec(),
+            }
+        }
+
+        fn fields(self) -> Fields {
+            let status = CommandStatus::Success;
+            match self {
+                Value::G12V1 {
+                    code,
+                    count,
+                    on_time,
+                    off_time,
+                } => Fields::G12V1(code, count, on_time, off_time, status),
+                Value::G41V1(x) => Fields::G41V1(x, status),
+                Value::G41V2(x) => Fields::G41V2(x, status),
+                Value::G41V3(x) => Fields::G41V3(x.to_bits(), status),
+                Value::G41V4(x) => Fields::G41V4(x.to_bits(), status),
+            }
+        }
+
+        fn add(self, builder: &mut CommandBuilder, width: Width, index: u16) {
+            fn add<T>(builder: &mut CommandBuilder, command: T, width: Width, index: u16)
+            where
+                CommandBuilder: CommandSupport<T>,
+            {
+                match width {
+                    Width::One => builder.add_u8(command, u8::try_from(index).unwrap()),
+                    Width::Two => builder.add_u16(command, index),
+                }
+            }
+
+            match self {
+                Value::G12V1 {
+                    code,
+                    count,
+                    on_time,
+                    off_time,
+                } => {
+                    let crob = Group12Var1 {
+                        code,
+                        count,
+                        on_time,
+                        off_time,
+                        status: CommandStatus::Success,
+                    };
+                    add(builder, crob, width, index)
+                }
+                Value::G41V1(x) => add(builder, Group41Var1::new(x), width, index),
+                Value::G41V2(x) => add(builder, Group41Var2::new(x), width, index),
+                Value::G41V3(x) => add(builder, Group41Var3::new(x), width, index),
+                Value::G41V4(x) => add(builder, Group41Var4::new(x), width, index),
+            }
+        }
+    }
+
+    /// a command added to the builder, which first finishes the header it's building if `finish`
+    #[derive(Clone, Debug)]
+    struct Add {
+        value: Value,
+        width: Width,
+        index: u16,
+        finish: bool,
+    }
+
+    /// The headers the builder should make: consecutive commands of one type and index width
+    /// share a header unless it was finished
+    type ModelHeader = (Width, Vec<(u16, Value)>);
+
+    fn model(adds: &[Add]) -> Vec<ModelHeader> {
+        let mut headers: Vec<ModelHeader> = Vec::new();
+        for add in adds {
+            match headers.last_mut() {
+                Some((width, items))
+                    if !add.finish
+                        && *width == add.width
+                        && items[0].1.group_var() == add.value.group_var() =>
+                {
+                    items.push((add.index, add.value))
+                }
+                _ => headers.push((add.width, vec![(add.index, add.value)])),
+            }
+        }
+        headers
+    }
+
+    /// A header of objects as bytes: each object's index and value, then its status
+    type EncodedHeader = ([u8; 2], Width, Vec<(Vec<u8>, u8)>);
+
+    fn encoded(headers: &[ModelHeader]) -> Vec<EncodedHeader> {
+        headers
+            .iter()
+            .map(|(width, items)| {
+                let objects = items
+                    .iter()
+                    .map(|(index, value)| {
+                        let mut bytes = Vec::new();
+                        width.write(*index, &mut bytes);
+                        bytes.extend(value.bytes());
+                        (bytes, 0)
+                    })
+                    .collect();
+                (items[0].1.group_var(), *width, objects)
+            })
+            .collect()
+    }
+
+    fn to_bytes(headers: &[EncodedHeader]) -> Vec<u8> {
+        let mut out = Vec::new();
+        for (group_var, width, objects) in headers {
+            out.extend_from_slice(group_var);
+            out.push(width.qualifier());
+            width.write(u16::try_from(objects.len()).unwrap(), &mut out);
+            for (object, status) in objects {
+                out.extend_from_slice(object);
+                out.push(*status);
+            }
+        }
+        out
+    }
+
+    fn prefixed<I: Index>(objects: PrefixedVariation<I>) -> Vec<(u16, Fields)> {
+        match objects {
+            PrefixedVariation::Group12Var1(seq) => seq
+                .iter()
+                .map(|x| {
+                    let v = x.value;
+                    let fields = Fields::G12V1(v.code, v.count, v.on_time, v.off_time, v.status);
+                    (x.index.widen_to_u16(), fields)
+                })
+                .collect(),
+            PrefixedVariation::Group41Var1(seq) => seq
+                .iter()
+                .map(|x| {
+                    let fields = Fields::G41V1(x.value.value, x.value.status);
+                    (x.index.widen_to_u16(), fields)
+                })
+                .collect(),
+            PrefixedVariation::Group41Var2(seq) => seq
+                .iter()
+                .map(|x| {
+                    let fields = Fields::G41V2(x.value.value, x.value.status);
+                    (x.index.widen_to_u16(), fields)
+                })
+                .collect(),
+            PrefixedVariation::Group41Var3(seq) => seq
+                .iter()
+                .map(|x| {
+                    let fields = Fields::G41V3(x.value.value.to_bits(), x.value.status);
+                    (x.index.widen_to_u16(), fields)
+                })
+                .collect(),
+            PrefixedVariation::Group41Var4(seq) => seq
+                .iter()
+                .map(|x| {
+                    let fields = Fields::G41V4(x.value.value.to_bits(), x.value.status);
+                    (x.index.widen_to_u16(), fields)
+                })
+                .collect(),
+            other => panic!("not a command: {:?}", other.variation()),
+        }
+    }
+
+    /// the commands as the outstation parses them from a request
+    fn parse_request(bytes: &[u8]) -> Vec<(Width, Vec<(u16, Fields)>)> {
+        HeaderCollection::parse(ParseOptions::default(), FunctionCode::DirectOperate, bytes)
+            .unwrap()
+            .iter()
+            .map(|header| match header {
+                ObjectHeader::CountAndPrefix8(_, objects) => (Width::One, prefixed(objects)),
+                ObjectHeader::CountAndPrefix16(_, objects) => (Width::Two, prefixed(objects)),
+                other => panic!("not a command header: {other:?}"),
+            })
+            .collect()
+    }
+
+    /// every bit pattern, with NaN, the infinities and the zeros more likely
+    fn float32() -> impl Strategy<Value = f32> {
+        prop_oneof![
+            3 => any::<u32>().prop_map(f32::from_bits),
+            1 => prop::sample::select(vec![f32::NAN, f32::INFINITY, f32::NEG_INFINITY, 0.0, -0.0]),
+        ]
+    }
+
+    fn float64() -> impl Strategy<Value = f64> {
+        prop_oneof![
+            3 => any::<u64>().prop_map(f64::from_bits),
+            1 => prop::sample::select(vec![f64::NAN, f64::INFINITY, f64::NEG_INFINITY, 0.0, -0.0]),
+        ]
+    }
+
+    /// Control codes whose fields fit their bits, and with `invalid` weight, ones that don't:
+    /// half of those are `Unknown` values that alias a named one, which a byte would parse as
+    fn control_code(invalid: u32) -> impl Strategy<Value = ControlCode> {
+        let tcc = prop_oneof![
+            16 => (0..4u8).prop_map(TripCloseCode::from),
+            invalid => (0..4u8).prop_map(TripCloseCode::Unknown),
+            invalid => (4..=u8::MAX).prop_map(TripCloseCode::Unknown),
+        ];
+        let op_type = prop_oneof![
+            16 => (0..16u8).prop_map(OpType::from),
+            invalid => (0..=4u8).prop_map(OpType::Unknown),
+            invalid => (16..=u8::MAX).prop_map(OpType::Unknown),
+        ];
+        (tcc, op_type, any::<bool>(), any::<bool>()).prop_map(|(tcc, op_type, clear, queue)| {
+            ControlCode {
+                tcc,
+                clear,
+                queue,
+                op_type,
+            }
+        })
+    }
+
+    fn value(invalid_codes: u32) -> impl Strategy<Value = Value> {
+        prop_oneof![
+            (
+                control_code(invalid_codes),
+                any::<u8>(),
+                any::<u32>(),
+                any::<u32>()
+            )
+                .prop_map(|(code, count, on_time, off_time)| Value::G12V1 {
+                    code,
+                    count,
+                    on_time,
+                    off_time,
+                }),
+            any::<i32>().prop_map(Value::G41V1),
+            any::<i16>().prop_map(Value::G41V2),
+            float32().prop_map(Value::G41V3),
+            float64().prop_map(Value::G41V4),
+        ]
+    }
+
+    fn add(invalid_codes: u32) -> impl Strategy<Value = Add> {
+        let width_and_index = prop_oneof![
+            any::<u8>().prop_map(|index| (Width::One, u16::from(index))),
+            any::<u16>().prop_map(|index| (Width::Two, index)),
+        ];
+        (
+            value(invalid_codes),
+            width_and_index,
+            prop::bool::weighted(0.2),
+        )
+            .prop_map(|(value, (width, index), finish)| Add {
+                value,
+                width,
+                index,
+                finish,
+            })
+    }
+
+    fn build(adds: &[Add]) -> CommandHeaders {
+        let mut builder = CommandBuilder::new();
+        for add in adds {
+            if add.finish {
+                builder.finish_header();
+            }
+            add.value.add(&mut builder, add.width, add.index);
+        }
+        builder.build()
+    }
+
+    /// One change an outstation could make to the echo of a request
+    #[derive(Clone, Debug)]
+    enum Change {
+        /// XOR a byte of an object's index or value
+        Object {
+            object: prop::sample::Index,
+            byte: prop::sample::Index,
+            xor: u8,
+        },
+        /// a non-zero status for an object
+        Status {
+            object: prop::sample::Index,
+            status: u8,
+        },
+        /// remove the last object of a header
+        DropLastObject(prop::sample::Index),
+        /// repeat the last object of a header
+        RepeatLastObject(prop::sample::Index),
+        DropLastHeader,
+        RepeatLastHeader,
+    }
+
+    fn change() -> impl Strategy<Value = Change> {
+        prop_oneof![
+            (
+                any::<prop::sample::Index>(),
+                any::<prop::sample::Index>(),
+                1..=u8::MAX
+            )
+                .prop_map(|(object, byte, xor)| Change::Object { object, byte, xor }),
+            (any::<prop::sample::Index>(), 1..=u8::MAX)
+                .prop_map(|(object, status)| Change::Status { object, status }),
+            any::<prop::sample::Index>().prop_map(Change::DropLastObject),
+            any::<prop::sample::Index>().prop_map(Change::RepeatLastObject),
+            Just(Change::DropLastHeader),
+            Just(Change::RepeatLastHeader),
+        ]
+    }
+
+    /// the object at `object` among all the objects of the headers
+    fn object_at<'a>(
+        echo: &'a mut [EncodedHeader],
+        object: &prop::sample::Index,
+    ) -> &'a mut (Vec<u8>, u8) {
+        let num_objects = echo.iter().map(|(_, _, objects)| objects.len()).sum();
+        echo.iter_mut()
+            .flat_map(|(_, _, objects)| objects.iter_mut())
+            .nth(object.index(num_objects))
+            .unwrap()
+    }
+
+    /// apply the change to the echo, and return the error the master reports for it
+    fn apply(change: &Change, echo: &mut Vec<EncodedHeader>) -> CommandResponseError {
+        match change {
+            Change::Object { object, byte, xor } => {
+                let (bytes, _) = object_at(echo, object);
+                let byte = byte.index(bytes.len());
+                bytes[byte] ^= xor;
+                CommandResponseError::ObjectValueMismatch
+            }
+            Change::Status { object, status } => {
+                object_at(echo, object).1 = *status;
+                CommandResponseError::BadStatus(CommandStatus::from(*status))
+            }
+            Change::DropLastObject(header) => {
+                let header = header.index(echo.len());
+                echo[header].2.pop();
+                CommandResponseError::ObjectCountMismatch
+            }
+            Change::RepeatLastObject(header) => {
+                let header = header.index(echo.len());
+                let objects = &mut echo[header].2;
+                objects.push(objects.last().unwrap().clone());
+                CommandResponseError::ObjectCountMismatch
+            }
+            Change::DropLastHeader => {
+                echo.pop();
+                CommandResponseError::HeaderCountMismatch
+            }
+            Change::RepeatLastHeader => {
+                echo.push(echo.last().unwrap().clone());
+                CommandResponseError::HeaderCountMismatch
+            }
+        }
+    }
+
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(512))]
+
+        /// The builder groups commands into headers, the master writes them, and the outstation
+        /// parses back the same commands, floats by their bits. A control code whose fields
+        /// don't fit their bits makes the master write nothing.
+        #[test]
+        fn commands_are_written_and_parsed_back(adds in prop::collection::vec(add(2), 0..12)) {
+            let headers = build(&adds);
+            let mut buffer = [0; 1024];
+            let mut cursor = WriteCursor::new(&mut buffer);
+            cursor.write_u8(0xAA).unwrap();
+            let result = headers.write(&mut HeaderWriter::new(&mut cursor));
+
+            let invalid = adds.iter().find_map(|add| match add.value {
+                Value::G12V1 { code, .. } if code_byte(code).is_none() => Some(code),
+                _ => None,
+            });
+            if let Some(code) = invalid {
+                prop_assert_eq!(
+                    result,
+                    Err(TaskError::BadEncoding(BadEncoding::ControlCode(code)))
+                );
+                prop_assert_eq!(cursor.written(), &[0xAA]);
+                return Ok(());
+            }
+
+            result.unwrap();
+            let model = model(&adds);
+            let written = &cursor.written()[1..];
+            prop_assert_eq!(written, to_bytes(&encoded(&model)));
+            let expected: Vec<(Width, Vec<(u16, Fields)>)> = model
+                .into_iter()
+                .map(|(width, items)| {
+                    let fields = items
+                        .into_iter()
+                        .map(|(index, value)| (index, value.fields()))
+                        .collect();
+                    (width, fields)
+                })
+                .collect();
+            prop_assert_eq!(parse_request(written), expected);
+        }
+
+        /// An exact echo of the commands matches them, and one change to it is the error for
+        /// that change
+        #[test]
+        fn echo_matches_only_when_unchanged(
+            adds in prop::collection::vec(add(0), 1..12),
+            change in prop::option::of(change()),
+        ) {
+            let headers = build(&adds);
+            let mut echo = encoded(&model(&adds));
+            let expected = match &change {
+                None => Ok(()),
+                Some(change) => Err(apply(change, &mut echo)),
+            };
+            prop_assert_eq!(compare(&headers, &to_bytes(&echo)), expected);
+        }
+    }
+}
