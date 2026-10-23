@@ -168,6 +168,27 @@ impl Harness<Connected> {
         );
     }
 
+    /// The next response the outstation already sent, if any, without waiting for one
+    ///
+    /// After [`Self::send_and_process`] returns, the outstation has sent everything it sends in
+    /// answer to the request, so popping until this returns `None` sees every response to it. The
+    /// `Event::Read` that `send_and_process` waits for only says that the outstation consumed the
+    /// request's bytes, but the outstation can't have stopped short of answering when the test
+    /// sees it:
+    /// - the test runs on a current-thread runtime, so the test task only runs again once the
+    ///   outstation task's poll returns;
+    /// - the mock's read and write callbacks run inside that poll, and its writes are ready at
+    ///   once, so the poll returns only when the outstation waits for its next input or timer.
+    ///
+    /// That holds while nothing the outstation awaits in between returns pending, which the mock
+    /// application's deferred attribute writes (`defer_attr_writes`) do.
+    pub(crate) fn pop_response(&mut self) -> Option<Vec<u8>> {
+        match self.state.io.pop_event()? {
+            sfio_tokio_mock_io::Event::Write(bytes) => Some(bytes),
+            x => panic!("Expected write but got: {x:?}"),
+        }
+    }
+
     pub(crate) fn expect_no_response(&mut self) {
         assert_eq!(self.state.io.pop_event(), None);
     }

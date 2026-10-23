@@ -45,6 +45,8 @@ mod request_intake;
 mod response_slots;
 /// clear restart IIN + cold/warm restart
 mod restart;
+/// select-before-operate against a model of Table 4-9
+mod select_operate_model;
 /// time synchronization
 mod time;
 /// the confirm, select, unsolicited retry and keep-alive timers
