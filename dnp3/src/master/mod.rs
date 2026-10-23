@@ -30,6 +30,8 @@ mod header_info_tests;
 pub(crate) mod messages;
 pub(crate) mod poll;
 pub(crate) mod promise;
+#[cfg(test)]
+mod relative_time_tests;
 pub(crate) mod task;
 pub(crate) mod tasks;
 
