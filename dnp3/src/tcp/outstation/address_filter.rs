@@ -314,4 +314,128 @@ mod test {
             }
         }
     }
+
+    mod properties {
+        use super::*;
+        use proptest::prelude::*;
+        use std::net::{Ipv4Addr, Ipv6Addr};
+
+        const OCTETS: [u8; 4] = [0, 1, 2, 3];
+
+        /// Every IPv4 address with octets from 0 to 3 in its native and IPv4-mapped forms, and
+        /// IPv6 addresses that aren't IPv4-mapped. Wildcards only fix octets from 0 to 2, so the
+        /// universe holds an address matched by both filters whenever two filters overlap.
+        fn universe() -> Vec<IpAddr> {
+            let mut addresses = vec![
+                IpAddr::V6(Ipv6Addr::LOCALHOST),
+                ip("2001:db8::1"),
+                // IPv4-compatible and IPv4-translated forms are not IPv4-mapped
+                IpAddr::V6(Ipv4Addr::new(0, 1, 2, 3).to_ipv6_compatible()),
+                ip("::ffff:0:0.1.2.3"),
+            ];
+            for a in OCTETS {
+                for b in OCTETS {
+                    for c in OCTETS {
+                        for d in OCTETS {
+                            let v4 = Ipv4Addr::new(a, b, c, d);
+                            addresses.push(IpAddr::V4(v4));
+                            addresses.push(IpAddr::V6(v4.to_ipv6_mapped()));
+                        }
+                    }
+                }
+            }
+            addresses
+        }
+
+        /// the IPv4 octets an address denotes, decoding the IPv4-mapped prefix from the bytes
+        fn ipv4_octets(addr: IpAddr) -> Option<[u8; 4]> {
+            match addr {
+                IpAddr::V4(x) => Some(x.octets()),
+                IpAddr::V6(x) => match x.octets() {
+                    [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0xFF, 0xFF, a, b, c, d] => Some([a, b, c, d]),
+                    _ => None,
+                },
+            }
+        }
+
+        fn same_address(lhs: IpAddr, rhs: IpAddr) -> bool {
+            match (ipv4_octets(lhs), ipv4_octets(rhs)) {
+                (Some(x), Some(y)) => x == y,
+                (None, None) => lhs == rhs,
+                _ => false,
+            }
+        }
+
+        fn model_matches(filter: &AddressFilter, addr: IpAddr) -> bool {
+            match filter {
+                AddressFilter::Any => true,
+                AddressFilter::Exact(x) => same_address(*x, addr),
+                AddressFilter::AnyOf(set) => set.iter().any(|x| same_address(*x, addr)),
+                AddressFilter::WildcardIpv4(wc) => ipv4_octets(addr).is_some_and(|octets| {
+                    [wc.b3, wc.b2, wc.b1, wc.b0]
+                        .into_iter()
+                        .zip(octets)
+                        .all(|(fixed, octet)| fixed.is_none_or(|fixed| fixed == octet))
+                }),
+            }
+        }
+
+        fn address() -> impl Strategy<Value = IpAddr> {
+            prop::sample::select(universe())
+        }
+
+        fn wildcard_octet() -> impl Strategy<Value = Option<u8>> {
+            prop_oneof![Just(None), (0u8..3).prop_map(Some)]
+        }
+
+        fn filter() -> impl Strategy<Value = AddressFilter> {
+            prop_oneof![
+                Just(AddressFilter::Any),
+                address().prop_map(AddressFilter::Exact),
+                prop::collection::vec(address(), 0..4)
+                    .prop_map(|x| AddressFilter::AnyOf(x.into_iter().collect())),
+                (
+                    wildcard_octet(),
+                    wildcard_octet(),
+                    wildcard_octet(),
+                    wildcard_octet()
+                )
+                    .prop_map(|(b3, b2, b1, b0)| AddressFilter::WildcardIpv4(
+                        WildcardIPv4 { b3, b2, b1, b0 }
+                    )),
+            ]
+        }
+
+        proptest! {
+            #![proptest_config(ProptestConfig::with_cases(256))]
+
+            #[test]
+            fn a_filter_matches_the_canonical_addresses_it_names(filter in filter()) {
+                for addr in universe() {
+                    prop_assert_eq!(
+                        filter.matches(addr),
+                        model_matches(&filter, addr),
+                        "{:?}",
+                        addr
+                    );
+                }
+                // an IPv4 address and its IPv4-mapped form are the same address
+                for addr in universe() {
+                    if let IpAddr::V4(v4) = addr {
+                        let mapped = IpAddr::V6(v4.to_ipv6_mapped());
+                        prop_assert_eq!(filter.matches(addr), filter.matches(mapped));
+                    }
+                }
+            }
+
+            #[test]
+            fn filters_conflict_when_an_address_matches_both(lhs in filter(), rhs in filter()) {
+                let witness = universe()
+                    .into_iter()
+                    .find(|addr| model_matches(&lhs, *addr) && model_matches(&rhs, *addr));
+                prop_assert_eq!(lhs.conflicts_with(&rhs), witness.is_some(), "{:?}", witness);
+                prop_assert_eq!(rhs.conflicts_with(&lhs), witness.is_some(), "{:?}", witness);
+            }
+        }
+    }
 }
