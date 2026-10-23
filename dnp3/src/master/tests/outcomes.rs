@@ -51,9 +51,9 @@ use crate::master::{
 use crate::util::session::{RunError, StopReason};
 use crate::util::test_support::watchdog;
 
-const OUTSTATION: EndpointAddress = EndpointAddress::raw(1024);
-const OTHER: EndpointAddress = EndpointAddress::raw(2048);
-const UNKNOWN: EndpointAddress = EndpointAddress::raw(3000);
+pub(super) const OUTSTATION: EndpointAddress = EndpointAddress::raw(1024);
+pub(super) const OTHER: EndpointAddress = EndpointAddress::raw(2048);
+pub(super) const UNKNOWN: EndpointAddress = EndpointAddress::raw(3000);
 
 const HANDLE: u32 = 0xDEADCAFE;
 
@@ -64,7 +64,7 @@ async fn barrier(harness: &mut TestHarness) {
     harness.master.get_decode_level().await.unwrap();
 }
 
-struct FixedTime;
+pub(super) struct FixedTime;
 
 impl AssociationHandler for FixedTime {
     fn get_current_time(&self) -> Option<Timestamp> {
@@ -85,7 +85,7 @@ fn echo(request: &[u8]) -> Vec<u8> {
 
 /// The kinds of task that wait for a response, as requested through the API
 #[derive(Copy, Clone, Debug)]
-enum Kind {
+pub(super) enum Kind {
     Read,
     DirectOperate,
     SelectBeforeOperate,
@@ -119,7 +119,7 @@ const KINDS: [Kind; 13] = [
 
 /// What the API call returned
 #[derive(Debug, PartialEq)]
-enum Reply {
+pub(super) enum Reply {
     Read(Result<(), TaskError>),
     Command(Result<(), CommandError>),
     Restart(Result<Duration, TaskError>),
@@ -135,7 +135,7 @@ enum Reply {
 }
 
 impl Kind {
-    fn spawn(self, mut association: AssociationHandle) -> JoinHandle<Reply> {
+    pub(super) fn spawn(self, mut association: AssociationHandle) -> JoinHandle<Reply> {
         tokio::spawn(async move {
             let association = &mut association;
             match self {
@@ -220,7 +220,7 @@ impl Kind {
         })
     }
 
-    fn task_type(self) -> TaskType {
+    pub(super) fn task_type(self) -> TaskType {
         match self {
             Kind::Read => TaskType::UserRead,
             Kind::DirectOperate | Kind::SelectBeforeOperate => TaskType::Command,
@@ -238,7 +238,7 @@ impl Kind {
     }
 
     /// The function code of the first request
-    fn function(self) -> FunctionCode {
+    pub(super) fn function(self) -> FunctionCode {
         match self {
             Kind::Read => FunctionCode::Read,
             Kind::DirectOperate => FunctionCode::DirectOperate,
@@ -258,7 +258,7 @@ impl Kind {
         matches!(self, Kind::Read)
     }
 
-    fn ok(self) -> Reply {
+    pub(super) fn ok(self) -> Reply {
         match self {
             Kind::Read => Reply::Read(Ok(())),
             Kind::DirectOperate | Kind::SelectBeforeOperate => Reply::Command(Ok(())),
@@ -277,7 +277,7 @@ impl Kind {
         }
     }
 
-    fn failed(self, err: TaskError) -> Reply {
+    pub(super) fn failed(self, err: TaskError) -> Reply {
         match self {
             Kind::Read => Reply::Read(Err(err)),
             Kind::DirectOperate | Kind::SelectBeforeOperate => {
@@ -307,7 +307,7 @@ impl Kind {
     }
 
     /// The successful response to the first request
-    fn first_response(self, request: &[u8]) -> Vec<u8> {
+    pub(super) fn first_response(self, request: &[u8]) -> Vec<u8> {
         match self {
             Kind::Read | Kind::EmptyResponse | Kind::DeadBands | Kind::TimeSync => {
                 empty_response(Sequence::new(0))
@@ -687,7 +687,7 @@ async fn every_single_header_task_fails_on_a_response_with_two_headers() {
 
 /// Fragments that aren't valid responses: one too short for the IIN, and a solicited response with
 /// the UNS bit
-const MALFORMED: [&[u8]; 2] = [&[0xC0, 0x81, 0x00], &[0xD0, 0x81, 0x00, 0x00]];
+pub(super) const MALFORMED: [&[u8]; 2] = [&[0xC0, 0x81, 0x00], &[0xD0, 0x81, 0x00, 0x00]];
 
 #[tokio::test(start_paused = true)]
 async fn every_task_fails_on_a_malformed_fragment_from_its_outstation() {
@@ -1287,20 +1287,20 @@ async fn every_task_attributes_fragments_from_other_outstations_to_them() {
 
 /// The callbacks of one association, in the order they were made
 #[derive(Copy, Clone, Debug, PartialEq)]
-enum Entry {
+pub(super) enum Entry {
     Read(ReadEvent),
     Info(AssocInfoEvent),
 }
 
 #[derive(Clone, Default)]
-struct Log(Arc<Mutex<Vec<Entry>>>);
+pub(super) struct Log(Arc<Mutex<Vec<Entry>>>);
 
 impl Log {
     fn push(&self, entry: Entry) {
         self.0.lock().unwrap().push(entry);
     }
 
-    fn pop(&self) -> Vec<Entry> {
+    pub(super) fn pop(&self) -> Vec<Entry> {
         std::mem::take(&mut *self.0.lock().unwrap())
     }
 }
