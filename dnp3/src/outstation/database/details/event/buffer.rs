@@ -441,6 +441,7 @@ impl Event {
         }
     }
 
+    #[inline]
     fn write(
         &self,
         index: u16,
