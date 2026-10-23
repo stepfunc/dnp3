@@ -12,7 +12,7 @@
 //! the database holds no frozen analog points. This table pins the target itself.
 
 use crate::app::Variation;
-use crate::outstation::database::config::*;
+use crate::outstation::database::variations::*;
 use crate::outstation::database::EventClass;
 use crate::outstation::target::Target;
 
