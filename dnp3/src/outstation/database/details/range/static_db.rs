@@ -763,6 +763,145 @@ mod tests {
         assert!(!infinite.exceeded(f64::INFINITY, 1.0));
     }
 
+    mod deadband_properties {
+        use super::*;
+        use proptest::prelude::*;
+
+        const OTHER_NAN: f64 = f64::from_bits(0x7FF8_0000_0000_0001);
+
+        fn special() -> impl Strategy<Value = f64> {
+            prop::sample::select(vec![
+                0.0,
+                -0.0,
+                1.0,
+                f64::MAX,
+                f64::MIN,
+                f64::INFINITY,
+                f64::NEG_INFINITY,
+                f64::NAN,
+                -f64::NAN,
+                OTHER_NAN,
+                f64::from_bits(1),
+            ])
+        }
+
+        fn value() -> impl Strategy<Value = f64> {
+            prop_oneof![
+                any::<u64>().prop_map(f64::from_bits),
+                special(),
+                -10.0f64..10.0,
+            ]
+        }
+
+        /// two values, often close enough together that a small deadband decides
+        fn pair() -> impl Strategy<Value = (f64, f64)> {
+            prop_oneof![
+                (value(), value()),
+                (value(), -4.0f64..4.0).prop_map(|(a, delta)| (a, a + delta)),
+            ]
+        }
+
+        /// a valid deadband: zero or positive, possibly infinite
+        fn deadband() -> impl Strategy<Value = f64> {
+            prop_oneof![
+                prop::sample::select(vec![0.0, -0.0, 1.0, f64::MAX, f64::INFINITY]),
+                0.0f64..5.0,
+                any::<u64>().prop_filter_map("a valid deadband", |bits| {
+                    let value = f64::from_bits(bits);
+                    (value >= 0.0).then_some(value)
+                }),
+            ]
+        }
+
+        fn exceeded(a: f64, b: f64, deadband: f64) -> bool {
+            Deadband::analog(deadband).unwrap().exceeded(a, b)
+        }
+
+        /// equal in value, where -0.0 equals 0.0 and every NaN equals every other
+        fn same_value(a: f64, b: f64) -> bool {
+            a.partial_cmp(&b) == Some(std::cmp::Ordering::Equal) || (a.is_nan() && b.is_nan())
+        }
+
+        proptest! {
+            #![proptest_config(ProptestConfig::with_cases(512))]
+
+            #[test]
+            fn float_deadband_is_symmetric_and_never_exceeded_by_the_same_value(
+                (a, b) in pair(),
+                deadband in deadband(),
+            ) {
+                prop_assert_eq!(exceeded(a, b, deadband), exceeded(b, a, deadband));
+                prop_assert!(!exceeded(a, a, deadband));
+            }
+
+            #[test]
+            fn a_larger_float_deadband_never_adds_an_event(
+                (a, b) in pair(),
+                d1 in deadband(),
+                d2 in deadband(),
+            ) {
+                let (small, large) = if d1 <= d2 { (d1, d2) } else { (d2, d1) };
+                if exceeded(a, b, large) {
+                    prop_assert!(exceeded(a, b, small));
+                }
+            }
+
+            #[test]
+            fn float_deadband_limits_are_exact(
+                (a, b) in pair(),
+                deadband in deadband(),
+            ) {
+                // a zero deadband reports every change of value, and nothing else
+                prop_assert_eq!(exceeded(a, b, 0.0), !same_value(a, b));
+                // a change to or from NaN exceeds every deadband, infinite included, and that
+                // is the only change an infinite deadband reports
+                let one_nan = a.is_nan() != b.is_nan();
+                if one_nan {
+                    prop_assert!(exceeded(a, b, deadband));
+                }
+                prop_assert_eq!(exceeded(a, b, f64::INFINITY), one_nan);
+            }
+
+            #[test]
+            fn analog_event_when_flags_differ_or_the_deadband_is_exceeded(
+                (a, b) in pair(),
+                deadband in deadband(),
+                flags in any::<u8>(),
+                other_flags in any::<u8>(),
+            ) {
+                let detector = Deadband::analog(deadband).unwrap();
+                let event = |new_flags: u8, old_flags: u8| {
+                    let new = AnalogInput::new(a, Flags::new(new_flags), Time::unsynchronized(0));
+                    let old = AnalogInput::new(b, Flags::new(old_flags), Time::unsynchronized(0));
+                    detector.is_event(&new, &old)
+                };
+                // with the same flags, only the deadband decides
+                prop_assert_eq!(event(flags, flags), exceeded(a, b, deadband));
+                prop_assert_eq!(
+                    event(flags, other_flags),
+                    flags != other_flags || exceeded(a, b, deadband)
+                );
+            }
+
+            #[test]
+            fn integer_deadband_matches_the_distance(
+                a in any::<u32>(),
+                b in prop_oneof![any::<u32>(), Just(0), Just(u32::MAX)],
+                deadband in prop_oneof![any::<u32>(), 0u32..8],
+            ) {
+                // the larger value is past the smaller one plus the deadband
+                let (low, high) = if a <= b { (a, b) } else { (b, a) };
+                let limit = u64::from(low).checked_add(u64::from(deadband));
+                let detector = Deadband::new(deadband);
+                prop_assert_eq!(
+                    detector.exceeded(a, b),
+                    limit.is_some_and(|limit| u64::from(high) > limit)
+                );
+                prop_assert_eq!(detector.exceeded(a, b), detector.exceeded(b, a));
+            }
+        }
+    }
+
     #[test]
     fn written_analog_deadband_treats_negative_values_as_zero() {
         let mut db = StaticDatabase::default();
