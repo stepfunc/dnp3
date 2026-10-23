@@ -235,7 +235,7 @@ mod tests {
     use crate::link::EndpointAddress;
     use crate::master::{MasterChannelConfig, MasterChannelType};
     use crate::tcp::{wire_master_client, Endpoint};
-    use crate::util::test_support::watchdog;
+    use crate::util::test_support::{watchdog, Timeline};
     use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
 
     /// a hostname the test resolver answers with the addresses after the prefix, separated by
@@ -320,6 +320,15 @@ mod tests {
         attempts: Vec<ConnectionInfo>,
         post_connection: PostConnectionHandler,
     ) -> (ClientTask, UnboundedReceiver<Event>) {
+        client_task_listening(attempts, post_connection, NullListener::create())
+    }
+
+    /// a task that makes the attempts once each and reports its state to `listener`
+    fn client_task_listening(
+        attempts: Vec<ConnectionInfo>,
+        post_connection: PostConnectionHandler,
+        listener: Box<dyn Listener<ClientState>>,
+    ) -> (ClientTask, UnboundedReceiver<Event>) {
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
         let handler = RecordingHandler {
             attempts: attempts.into(),
@@ -331,7 +340,7 @@ mod tests {
             Box::new(handler),
             MasterChannelConfig::new(EndpointAddress::raw(1)),
             post_connection,
-            NullListener::create(),
+            listener,
         );
         (task, rx)
     }
@@ -557,6 +566,52 @@ mod tests {
             let (mut task, mut rx) = client_task_with(attempts, PostConnectionHandler::Tcp);
 
             assert_eq!(connected_to(task.connect().await), Ok((addr, None)));
+            assert_eq!(
+                events(&mut rx),
+                [Event::Connecting(addr, None), Event::Connected(addr, None)]
+            );
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn failed_local_bind_waits_for_the_next_attempt() {
+        watchdog(async {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let addr = listener.local_addr().unwrap();
+            // the listener holds the local endpoint, so binding to it fails
+            let mut bind_fails = ConnectionInfo::new(Endpoint::address(addr));
+            bind_fails.set_local_endpoint(addr);
+            let (states, mut timeline) = Timeline::new();
+            let (mut task, mut rx) =
+                client_task_listening(vec![bind_fails], PostConnectionHandler::Tcp, states);
+
+            assert_eq!(task.open().await.err(), Some(Duration::from_secs(60)));
+            timeline.expect_state(ClientState::Connecting).await;
+            timeline
+                .expect_state(ClientState::WaitAfterFailedConnect(Duration::from_secs(60)))
+                .await;
+            timeline.assert_quiet();
+            assert_eq!(events(&mut rx), []);
+        })
+        .await;
+    }
+
+    // every 127.0.0.0/8 address is on the loopback interface on Linux, but not on all platforms
+    #[cfg(target_os = "linux")]
+    #[tokio::test]
+    async fn connects_from_the_local_endpoint() {
+        watchdog(async {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let addr = listener.local_addr().unwrap();
+            let local = std::net::Ipv4Addr::new(127, 0, 0, 2);
+            let mut info = ConnectionInfo::new(Endpoint::address(addr));
+            info.set_local_endpoint((local, 0).into());
+            let (mut task, mut rx) = client_task_with(vec![info], PostConnectionHandler::Tcp);
+
+            assert_eq!(connected_to(task.connect().await), Ok((addr, None)));
+            let (_stream, peer) = listener.accept().await.unwrap();
+            assert_eq!(peer.ip(), local);
             assert_eq!(
                 events(&mut rx),
                 [Event::Connecting(addr, None), Event::Connected(addr, None)]
