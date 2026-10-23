@@ -1816,6 +1816,13 @@ mod test {
                     ),
                 }
             }
+            // a non-zero payload is rejected the same way
+            let input = [data_type, 0x03, 42, 00, 00];
+            let mut cursor = ReadCursor::new(&input);
+            assert_eq!(
+                AttrValue::parse(&mut cursor),
+                Err(AttrParseError::BadIntegerLength(3))
+            );
         }
     }
 
@@ -2425,6 +2432,7 @@ mod test {
                     OwnedAttrValue::BitString(Vec::new()),
                     OwnedAttrValue::VisibleString("x".repeat(255)),
                     OwnedAttrValue::VisibleString("x".repeat(256)),
+                    OwnedAttrValue::VisibleString("a".repeat(256)),
                     OwnedAttrValue::OctetString(vec![0xAA; 256]),
                 ]);
             let variations = [1, var::DEVICE_MANUFACTURER_NAME, 253]
