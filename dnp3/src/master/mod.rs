@@ -36,6 +36,8 @@ pub(crate) mod promise;
 mod relative_time_tests;
 pub(crate) mod task;
 pub(crate) mod tasks;
+#[cfg(test)]
+mod write_extract_tests;
 
 #[cfg(test)]
 mod tests;
