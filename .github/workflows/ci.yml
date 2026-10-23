@@ -162,6 +162,11 @@ jobs:
   # Paused on PRs during the 1.8.0 refactor series; release tags still build them. Restore before 1.8.0
   bindings-windows:
     if: startsWith(github.ref, 'refs/tags/')
+    # Release tags build the shipped libraries with thin LTO and one codegen unit (smaller and faster,
+    # but slower to build); other runs keep cargo's release defaults. Symbols are not stripped
+    env:
+      CARGO_PROFILE_RELEASE_LTO: ${{ startsWith(github.ref, 'refs/tags/') && 'thin' || 'false' }}
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: ${{ startsWith(github.ref, 'refs/tags/') && '1' || '16' }}
     runs-on: windows-latest
     strategy:
       fail-fast: false
@@ -220,6 +225,11 @@ jobs:
   # Paused on PRs during the 1.8.0 refactor series; release tags still build them. Restore before 1.8.0
   bindings-macos:
     if: startsWith(github.ref, 'refs/tags/')
+    # Release tags build the shipped libraries with thin LTO and one codegen unit (smaller and faster,
+    # but slower to build); other runs keep cargo's release defaults. Symbols are not stripped
+    env:
+      CARGO_PROFILE_RELEASE_LTO: ${{ startsWith(github.ref, 'refs/tags/') && 'thin' || 'false' }}
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: ${{ startsWith(github.ref, 'refs/tags/') && '1' || '16' }}
     strategy:
       fail-fast: false
       matrix:
@@ -260,7 +270,11 @@ jobs:
         run: cargo run --bin dnp3-bindings -- --java -r ${{ matrix.target }} -a ./target/${{ matrix.target }}/release
   # Cross-compilation for Linux to produce portable C and JNI libraries
   bindings-linux:
+    # Release tags build the shipped libraries with thin LTO and one codegen unit (smaller and faster,
+    # but slower to build); other runs keep cargo's release defaults. Symbols are not stripped
     env:
+      CARGO_PROFILE_RELEASE_LTO: ${{ startsWith(github.ref, 'refs/tags/') && 'thin' || 'false' }}
+      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: ${{ startsWith(github.ref, 'refs/tags/') && '1' || '16' }}
       # By default, MUSL will not produce a cdylib with dynamic linkage to MUSL LIB C
       CARGO_TARGET_X86_64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: "-C target-feature=-crt-static"
       CARGO_TARGET_AARCH64_UNKNOWN_LINUX_MUSL_RUSTFLAGS: "-C target-feature=-crt-static"
