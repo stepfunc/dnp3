@@ -5,6 +5,14 @@
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
 use super::*;
+#[cfg(test)]
+use crate::app::format::free_format::FreeFormat;
+#[cfg(test)]
+use crate::app::format::WriteError;
+#[cfg(test)]
+use crate::app::Variation;
+#[cfg(test)]
+use scursor::WriteCursor;
 
 /// Group 70 Variation 8 - File specification string
 ///
@@ -20,19 +28,20 @@ impl<'a> Group70Var8<'a> {
         Ok(())
     }
 
-    // not using this in production yet
-    #[cfg(test)]
-    pub(crate) fn write(
-        &self,
-        cursor: &mut scursor::WriteCursor,
-    ) -> Result<(), scursor::WriteError> {
-        cursor.write_bytes(self.file_specification.as_bytes())
-    }
-
     pub(crate) fn read(cursor: &mut scursor::ReadCursor<'a>) -> Result<Self, ReadError> {
         let file_specification_bytes = cursor.read_all();
         let file_specification = std::str::from_utf8(file_specification_bytes)?;
         Ok(Self { file_specification })
+    }
+}
+
+#[cfg(test)]
+impl FreeFormat for Group70Var8<'_> {
+    const VARIATION: Variation = Variation::Group70Var8;
+
+    fn write(&self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
+        cursor.write_bytes(self.file_specification.as_bytes())?;
+        Ok(())
     }
 }
 
@@ -47,21 +56,14 @@ mod test {
     const DATA: &[u8] = b"test";
 
     #[test]
-    fn writes_valid_object() {
+    fn encodes_known_bytes() {
         let mut buffer = [0; 64];
-
         let mut cursor = scursor::WriteCursor::new(&mut buffer);
         OBJECT.write(&mut cursor).unwrap();
+        assert_eq!(cursor.written(), DATA);
 
-        assert_eq!(cursor.written(), DATA)
-    }
-
-    #[test]
-    fn parses_valid_object() {
         let mut cursor = scursor::ReadCursor::new(DATA);
-        let obj = Group70Var8::read(&mut cursor).unwrap();
-
-        assert_eq!(obj, OBJECT);
+        assert_eq!(Group70Var8::read(&mut cursor).unwrap(), OBJECT);
         assert!(cursor.is_empty());
     }
 }

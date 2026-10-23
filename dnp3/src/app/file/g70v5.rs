@@ -70,21 +70,14 @@ mod test {
     ];
 
     #[test]
-    fn writes_valid_object() {
+    fn encodes_known_bytes() {
         let mut buffer = [0; 64];
-
         let mut cursor = WriteCursor::new(&mut buffer);
         OBJECT.write(&mut cursor).unwrap();
+        assert_eq!(cursor.written(), DATA);
 
-        assert_eq!(cursor.written(), DATA)
-    }
-
-    #[test]
-    fn parses_valid_object() {
         let mut cursor = ReadCursor::new(DATA);
-        let obj = Group70Var5::read(&mut cursor).unwrap();
-
-        assert_eq!(obj, OBJECT);
+        assert_eq!(Group70Var5::read(&mut cursor).unwrap(), OBJECT);
         assert!(cursor.is_empty());
     }
 }
