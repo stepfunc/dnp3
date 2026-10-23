@@ -47,6 +47,8 @@ mod response_slots;
 mod restart;
 /// select-before-operate against a model of Table 4-9
 mod select_operate_model;
+/// the session against a model of its events, IIN, sequence numbers and confirm waits
+mod session_model;
 /// time synchronization
 mod time;
 /// the confirm, select, unsolicited retry and keep-alive timers
