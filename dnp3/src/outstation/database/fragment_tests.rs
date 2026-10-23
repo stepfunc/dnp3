@@ -27,8 +27,7 @@ use crate::app::attr::{AttrProp, AttrSet, OwnedAttrValue, OwnedAttribute};
 use crate::app::parse::options::ParseOptions;
 use crate::app::parse::parser::HeaderCollection;
 use crate::app::{FunctionCode, QualifierCode, ResponseHeader, Timestamp, Variation as V};
-use crate::master::extract::{extract_measurements_inner, ProcessableResponse};
-use crate::master::extract_recorder::{Recorder, Value};
+use crate::master::extract_recorder::{extract, Value};
 use crate::master::HeaderInfo;
 use crate::outstation::config::OutstationConfig;
 use crate::outstation::database::*;
@@ -573,22 +572,18 @@ fn write_fragments(spec: &Spec, size: usize, max_fragments: usize) -> Vec<(Heade
     handle.select(&headers);
 
     let mut buffer = vec![0; size.checked_sub(ResponseHeader::LENGTH).unwrap()];
-    let mut recorder = Recorder::default();
+    let mut values = Vec::new();
     for _ in 0..max_fragments {
         let mut cursor = WriteCursor::new(&mut buffer);
         let info = handle.write_response_headers(&mut cursor);
 
         // the objects parse, and every relative-time event follows a CTO in the same fragment
-        let objects = ProcessableResponse::new(HeaderCollection::parse(
-            ParseOptions::default(),
-            FunctionCode::Response,
-            cursor.written(),
-        ))
-        .unwrap();
-        extract_measurements_inner(objects, &mut recorder);
+        let (result, recorder) = extract(cursor.written());
+        result.unwrap();
+        values.extend(recorder.values());
 
         if info.complete {
-            return recorder.values;
+            return values;
         }
         // the master confirms the fragment
         handle.transaction(|db| db.inner.clear_written_events(&mut Confirms));
@@ -608,7 +603,8 @@ enum Item {
     List(u8),
 }
 
-fn item((info, value): &(HeaderInfo, Value)) -> Item {
+/// What a value identifies, or none for a value of a kind the database doesn't report
+fn item((info, value): &(HeaderInfo, Value)) -> Option<Item> {
     let (kind, index) = match value {
         Value::Binary(_, i) => (Kind::Binary, *i),
         Value::DoubleBit(_, i) => (Kind::DoubleBit, *i),
@@ -618,15 +614,22 @@ fn item((info, value): &(HeaderInfo, Value)) -> Item {
         Value::Analog(_, i) => (Kind::Analog, *i),
         Value::AnalogOutputStatus(_, i) => (Kind::AnalogOutputStatus, *i),
         Value::OctetString(_, i) => (Kind::OctetString, *i),
-        Value::AnalogDeadBand(_, i) => return Item::DeadBand(*i),
-        Value::Attribute(x) => return Item::Attr(x.set.value(), x.variation),
-        Value::AttributeList(set, _) => return Item::List(set.value()),
+        Value::AnalogDeadBand(_, i) => return Some(Item::DeadBand(*i)),
+        Value::Attribute(x) => return Some(Item::Attr(x.set.value(), x.variation)),
+        Value::AttributeList(set, _, _) => return Some(Item::List(set.value())),
+        Value::FrozenAnalog(..)
+        | Value::BinaryCommandEvent(..)
+        | Value::AnalogCommandEvent(..)
+        | Value::UnsignedInteger(..)
+        | Value::KnownAttribute(_)
+        | Value::KnownAttributeList(..)
+        | Value::AbsTime(_) => return None,
     };
-    if info.is_event {
+    Some(if info.is_event {
         Item::Event(kind, index)
     } else {
         Item::Static(kind, index)
-    }
+    })
 }
 
 /// the indices of a kind's points that a range selects
@@ -1056,7 +1059,7 @@ proptest! {
         // the selection fits in the largest fragment, so the reference is written whole
         prop_assume!(encoded_bound(&items) <= LARGEST - ResponseHeader::LENGTH);
         let whole = write_fragments(&spec, LARGEST, 1);
-        prop_assert_eq!(whole.iter().map(item).collect::<Vec<_>>(), items);
+        prop_assert_eq!(whole.iter().map(item).collect::<Option<Vec<_>>>(), Some(items));
 
         let fragmented = write_fragments(&spec, spec.size, max_fragments);
         prop_assert_eq!(fragmented, whole);
