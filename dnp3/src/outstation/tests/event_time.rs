@@ -7,9 +7,20 @@
 use crate::app::measurement::*;
 use crate::outstation::database::*;
 use crate::outstation::tests::harness::*;
+use crate::util::test_support::watchdog;
 
 /// READ g2v2, all objects
 const READ_G2V2: &[u8] = &[0xC0, 0x01, 0x02, 0x02, 0x06];
+/// READ g11v2, all objects
+const READ_G11V2: &[u8] = &[0xC0, 0x01, 0x0B, 0x02, 0x06];
+/// READ g22v5, all objects
+const READ_G22V5: &[u8] = &[0xC0, 0x01, 0x16, 0x05, 0x06];
+/// READ g23v6, all objects
+const READ_G23V6: &[u8] = &[0xC0, 0x01, 0x17, 0x06, 0x06];
+/// READ g32v3, all objects
+const READ_G32V3: &[u8] = &[0xC0, 0x01, 0x20, 0x03, 0x06];
+/// READ g42v7, all objects
+const READ_G42V7: &[u8] = &[0xC0, 0x01, 0x2A, 0x07, 0x06];
 
 fn add_binary_inputs(db: &mut Database, e_var: EventBinaryInputVariation) {
     for index in [0, 1] {
@@ -169,4 +180,295 @@ async fn reports_mixed_events_for_the_default_g4v2_in_order_of_occurrence() {
             ],
         )
         .await;
+}
+
+async fn read_events<F>(configure: F, request: &[u8], response: &[u8])
+where
+    F: FnMut(&mut Database),
+{
+    watchdog(async {
+        let mut harness = new_harness(get_default_config());
+        harness.handle.database.transaction(configure);
+        harness.test_request_response(request, response).await;
+    })
+    .await;
+}
+
+fn add_binary_output_status(db: &mut Database, e_var: EventBinaryOutputStatusVariation) {
+    db.add(
+        0,
+        Some(EventClass::Class1),
+        BinaryOutputStatusConfig::new(StaticBinaryOutputStatusVariation::Group10Var2, e_var),
+    );
+    db.update(
+        0,
+        &BinaryOutputStatus {
+            value: true,
+            flags: Flags::ONLINE,
+            time: None,
+        },
+        UpdateOptions::default(),
+    );
+}
+
+fn add_counter(db: &mut Database, e_var: EventCounterVariation) {
+    db.add(
+        0,
+        Some(EventClass::Class1),
+        CounterConfig::new(StaticCounterVariation::Group20Var1, e_var, 0),
+    );
+    db.update(
+        0,
+        &Counter {
+            value: 7,
+            flags: Flags::ONLINE,
+            time: None,
+        },
+        UpdateOptions::default(),
+    );
+}
+
+fn add_frozen_counter(db: &mut Database, e_var: EventFrozenCounterVariation) {
+    db.add(
+        0,
+        Some(EventClass::Class1),
+        FrozenCounterConfig::new(StaticFrozenCounterVariation::Group21Var1, e_var, 0),
+    );
+    db.update(
+        0,
+        &FrozenCounter {
+            value: 7,
+            flags: Flags::ONLINE,
+            time: None,
+        },
+        UpdateOptions::default(),
+    );
+}
+
+fn add_analog_input(db: &mut Database, e_var: EventAnalogInputVariation, times: &[Option<Time>]) {
+    db.add(
+        0,
+        Some(EventClass::Class1),
+        AnalogInputConfig::new(StaticAnalogInputVariation::Group30Var1, e_var, 0.0),
+    );
+    for (value, &time) in (5..).zip(times) {
+        db.update(
+            0,
+            &AnalogInput {
+                value: f64::from(value),
+                flags: Flags::ONLINE,
+                time,
+            },
+            UpdateOptions::default(),
+        );
+    }
+}
+
+fn add_analog_output_status(db: &mut Database, e_var: EventAnalogOutputStatusVariation) {
+    db.add(
+        0,
+        Some(EventClass::Class1),
+        AnalogOutputStatusConfig::new(StaticAnalogOutputStatusVariation::Group40Var1, e_var, 0.0),
+    );
+    db.update(
+        0,
+        &AnalogOutputStatus {
+            value: 2.5,
+            flags: Flags::ONLINE,
+            time: None,
+        },
+        UpdateOptions::default(),
+    );
+}
+
+#[tokio::test]
+async fn reports_events_without_time_for_the_default_g11v2_in_g11v2_at_time_zero() {
+    read_events(
+        |db| add_binary_output_status(db, EventBinaryOutputStatusVariation::Group11Var2),
+        &read_class_1(0),
+        &[
+            // FIR, FIN, CON, seq 0, IIN1 restart
+            0xE0, 0x81, 0x80, 0x00, // g11v2 (count of 1), index 0 on at 0
+            0x0B, 0x02, 0x28, 0x01, 0x00, 0x00, 0x00, 0x81, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ],
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn reports_events_without_time_for_a_read_of_g11v2_in_g11v2_at_time_zero() {
+    read_events(
+        |db| add_binary_output_status(db, EventBinaryOutputStatusVariation::Group11Var1),
+        READ_G11V2,
+        &[
+            // FIR, FIN, CON, seq 0, IIN1 restart
+            0xE0, 0x81, 0x80, 0x00, // g11v2 (count of 1), index 0 on at 0
+            0x0B, 0x02, 0x28, 0x01, 0x00, 0x00, 0x00, 0x81, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ],
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn reports_events_without_time_for_the_default_g22v5_in_g22v5_at_time_zero() {
+    read_events(
+        |db| add_counter(db, EventCounterVariation::Group22Var5),
+        &read_class_1(0),
+        &[
+            // FIR, FIN, CON, seq 0, IIN1 restart
+            0xE0, 0x81, 0x80, 0x00, // g22v5 (count of 1), index 0 value 7 at 0
+            0x16, 0x05, 0x28, 0x01, 0x00, 0x00, 0x00, 0x01, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+        ],
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn reports_events_without_time_for_a_read_of_g22v5_in_g22v5_at_time_zero() {
+    read_events(
+        |db| add_counter(db, EventCounterVariation::Group22Var1),
+        READ_G22V5,
+        &[
+            // FIR, FIN, CON, seq 0, IIN1 restart
+            0xE0, 0x81, 0x80, 0x00, // g22v5 (count of 1), index 0 value 7 at 0
+            0x16, 0x05, 0x28, 0x01, 0x00, 0x00, 0x00, 0x01, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+        ],
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn reports_events_without_time_for_a_read_of_g23v6_in_g23v6_at_time_zero() {
+    read_events(
+        |db| add_frozen_counter(db, EventFrozenCounterVariation::Group23Var1),
+        READ_G23V6,
+        &[
+            // FIR, FIN, CON, seq 0, IIN1 restart
+            0xE0, 0x81, 0x80, 0x00, // g23v6 (count of 1), index 0 value 7 at 0
+            0x17, 0x06, 0x28, 0x01, 0x00, 0x00, 0x00, 0x01, 0x07, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00,
+        ],
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn reports_events_without_time_for_the_default_g32v3_in_g32v3_at_time_zero() {
+    read_events(
+        |db| add_analog_input(db, EventAnalogInputVariation::Group32Var3, &[None]),
+        &read_class_1(0),
+        &[
+            // FIR, FIN, CON, seq 0, IIN1 restart
+            0xE0, 0x81, 0x80, 0x00, // g32v3 (count of 1), index 0 value 5 at 0
+            0x20, 0x03, 0x28, 0x01, 0x00, 0x00, 0x00, 0x01, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+        ],
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn reports_events_without_time_for_a_read_of_g32v3_in_g32v3_at_time_zero() {
+    read_events(
+        |db| add_analog_input(db, EventAnalogInputVariation::Group32Var1, &[None]),
+        READ_G32V3,
+        &[
+            // FIR, FIN, CON, seq 0, IIN1 restart
+            0xE0, 0x81, 0x80, 0x00, // g32v3 (count of 1), index 0 value 5 at 0
+            0x20, 0x03, 0x28, 0x01, 0x00, 0x00, 0x00, 0x01, 0x05, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+        ],
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn reports_events_without_time_for_the_default_g32v8_in_g32v8_at_time_zero() {
+    read_events(
+        |db| add_analog_input(db, EventAnalogInputVariation::Group32Var8, &[None]),
+        &read_class_1(0),
+        &[
+            // FIR, FIN, CON, seq 0, IIN1 restart
+            0xE0, 0x81, 0x80, 0x00, // g32v8 (count of 1), index 0 value 5.0 at 0
+            0x20, 0x08, 0x28, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x14, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ],
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn reports_events_without_time_for_the_default_g42v7_in_g42v7_at_time_zero() {
+    read_events(
+        |db| add_analog_output_status(db, EventAnalogOutputStatusVariation::Group42Var7),
+        &read_class_1(0),
+        &[
+            // FIR, FIN, CON, seq 0, IIN1 restart
+            0xE0, 0x81, 0x80, 0x00, // g42v7 (count of 1), index 0 value 2.5 at 0
+            0x2A, 0x07, 0x28, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x20, 0x40, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+        ],
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn reports_events_without_time_for_a_read_of_g42v7_in_g42v7_at_time_zero() {
+    read_events(
+        |db| add_analog_output_status(db, EventAnalogOutputStatusVariation::Group42Var1),
+        READ_G42V7,
+        &[
+            // FIR, FIN, CON, seq 0, IIN1 restart
+            0xE0, 0x81, 0x80, 0x00, // g42v7 (count of 1), index 0 value 2.5 at 0
+            0x2A, 0x07, 0x28, 0x01, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x20, 0x40, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+        ],
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn reports_mixed_events_for_the_default_g32v3_in_one_header() {
+    read_events(
+        |db| {
+            add_analog_input(
+                db,
+                EventAnalogInputVariation::Group32Var3,
+                &[Some(Time::synchronized(1)), None],
+            )
+        },
+        &read_class_1(0),
+        &[
+            // FIR, FIN, CON, seq 0, IIN1 restart
+            0xE0, 0x81, 0x80, 0x00, // g32v3 (count of 2)
+            0x20, 0x03, 0x28, 0x02, 0x00, // index 0 value 5 at 1
+            0x00, 0x00, 0x01, 0x05, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00,
+            // index 0 value 6 at 0
+            0x00, 0x00, 0x01, 0x06, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        ],
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn reports_unsynchronized_events_for_the_default_g32v3_in_g32v3_with_their_time() {
+    read_events(
+        |db| {
+            add_analog_input(
+                db,
+                EventAnalogInputVariation::Group32Var3,
+                &[Some(Time::unsynchronized(1))],
+            )
+        },
+        &read_class_1(0),
+        &[
+            // FIR, FIN, CON, seq 0, IIN1 restart
+            0xE0, 0x81, 0x80, 0x00, // g32v3 (count of 1), index 0 value 5 at 1
+            0x20, 0x03, 0x28, 0x01, 0x00, 0x00, 0x00, 0x01, 0x05, 0x00, 0x00, 0x00, 0x01, 0x00,
+            0x00, 0x00, 0x00, 0x00,
+        ],
+    )
+    .await;
 }
