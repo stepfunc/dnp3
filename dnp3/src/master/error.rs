@@ -393,7 +393,10 @@ impl From<TaskError> for CommandError {
 
 impl From<TaskError> for TimeSyncError {
     fn from(err: TaskError) -> Self {
-        TimeSyncError::Task(err)
+        match err {
+            TaskError::SystemTimeNotAvailable => TimeSyncError::SystemTimeNotAvailable,
+            err => TimeSyncError::Task(err),
+        }
     }
 }
 
@@ -497,6 +500,18 @@ mod test {
     use super::*;
     use crate::app::variations::Variation;
     use crate::app::QualifierCode;
+
+    #[test]
+    fn time_sync_error_from_task_error_uses_the_dedicated_system_time_variant() {
+        assert_eq!(
+            TimeSyncError::from(TaskError::SystemTimeNotAvailable),
+            TimeSyncError::SystemTimeNotAvailable
+        );
+        assert_eq!(
+            TimeSyncError::from(TaskError::ResponseTimeout),
+            TimeSyncError::Task(TaskError::ResponseTimeout)
+        );
+    }
 
     #[test]
     fn task_error_words_parse_failures_by_cause() {
