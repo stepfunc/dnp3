@@ -49,6 +49,7 @@ use crate::master::task::MasterTask;
 use crate::master::tests::harness::requests::{
     class_scan_request, empty_response, empty_response_custom_iin, unsol_null,
 };
+use crate::master::tests::harness::{barrier, expect_idle_for};
 use crate::master::tests::link_frames::{
     app_data, fragment, header_only, null, segment, LINK_STATUS, MASTER, OTHER, OUTSTATION,
     REQUEST_LINK_STATUS,
@@ -191,12 +192,6 @@ impl Harness {
         (self.start.elapsed(), sent)
     }
 
-    /// The master writes nothing for `duration`
-    async fn expect_idle_for(&mut self, duration: Duration) {
-        let next = tokio::time::timeout(duration, self.io.next_event()).await;
-        assert_eq!(next.ok(), None);
-    }
-
     async fn receive(&mut self, frame: &[u8]) {
         self.io.read(frame);
         assert_eq!(self.io.next_event().await, sfio_tokio_mock_io::Event::Read);
@@ -225,7 +220,7 @@ impl Harness {
     /// the first round trip waits, so they sit ahead of the second.
     async fn settle(&mut self) {
         for _ in 0..2 {
-            self.master.get_decode_level().await.unwrap();
+            barrier(&mut self.master).await;
         }
     }
 }
@@ -487,7 +482,7 @@ async fn a_removed_poll_never_runs_again() {
         expect_answered(&mut harness, &[(secs(10), read(A, class(1)))]).await;
         tokio::time::advance(secs(2)).await;
         poll.remove().await.unwrap();
-        harness.expect_idle_for(secs(100)).await;
+        expect_idle_for(&mut harness.io, secs(100)).await;
     })
     .await;
 }

@@ -116,15 +116,13 @@ async fn event_scan_reports_periodic_poll() {
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn periodic_poll_reports_periodic_poll() {
     watchdog(async {
         let mut seq = Sequence::default();
         let mut harness = create_association(AssociationConfig::default()).await;
         startup_procedure(&mut harness, &mut seq).await;
         harness.read_events.pop();
-
-        tokio::time::pause();
         let mut association = harness.association.clone();
         let _poll = association
             .add_poll(

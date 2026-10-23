@@ -162,7 +162,7 @@ async fn restart_returns_the_time_delay_of_the_response() {
             );
 
             // nothing else is sent once the master has processed the response
-            harness.master.get_decode_level().await.unwrap();
+            harness.barrier().await;
             harness.assert_no_events();
         }
     })

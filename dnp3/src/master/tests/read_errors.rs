@@ -10,13 +10,13 @@
 
 use scursor::WriteCursor;
 
-use crate::app::format::write::{start_request, start_response};
+use crate::app::format::write::start_response;
 use crate::app::measurement::AnalogInputDeadBand;
 use crate::app::parse::header_identity_tests::DATALESS_COUNT_VARIATIONS;
 use crate::app::variations::Group32Var2;
 use crate::app::{
-    ControlField, FunctionCode, Iin, Iin1, Iin2, ObjectParseError, QualifierCode, ResponseFunction,
-    Sequence, Variation,
+    ControlField, Iin, Iin1, Iin2, ObjectParseError, QualifierCode, ResponseFunction, Sequence,
+    Variation,
 };
 use crate::master::association::AssociationConfig;
 use crate::master::test_objects::{RELATIVE_TIME_EVENT, SYNCHRONIZED_CTO, TRUNCATED_ANALOG_EVENT};
@@ -25,7 +25,7 @@ use crate::master::{Classes, ReadRequest, ReadType, TaskError, TaskType};
 
 use super::harness::create_association;
 use super::harness::requests::{
-    class_scan_request, startup_procedure, unsol_confirm, unsol_null_custom_iin,
+    class_scan_request, solicited_confirm, startup_procedure, unsol_confirm, unsol_null_custom_iin,
 };
 use crate::util::test_support::watchdog;
 
@@ -52,18 +52,6 @@ fn continued_response(seq: Sequence, data: Option<i16>) -> Vec<u8> {
     // clear FIR in the control octet
     response[0] &= !0x80;
     response
-}
-
-fn solicited_confirm(seq: Sequence) -> Vec<u8> {
-    let mut buffer = [0; 2];
-    let mut cursor = WriteCursor::new(&mut buffer);
-    start_request(
-        ControlField::request(seq),
-        FunctionCode::Confirm,
-        &mut cursor,
-    )
-    .unwrap();
-    cursor.written().to_vec()
 }
 
 #[tokio::test]
@@ -97,7 +85,7 @@ async fn read_with_iin2_and_data_delivers_the_data_and_succeeds() {
         harness.expect_write(solicited_confirm(response_seq)).await;
 
         assert_eq!(read.await.unwrap(), Ok(()));
-        assert_eq!(harness.num_requests(), 1);
+        assert_eq!(harness.read_events.count(ReadEvent::AnalogInput), 1);
     })
     .await;
 }
@@ -130,7 +118,7 @@ async fn read_with_iin2_and_no_data_fails() {
                 Iin2::OBJECT_UNKNOWN
             )))
         );
-        assert_eq!(harness.num_requests(), 0);
+        assert_eq!(harness.read_events.count(ReadEvent::AnalogInput), 0);
     })
     .await;
 }
@@ -168,7 +156,7 @@ async fn multi_fragment_read_with_iin2_in_the_first_fragment_reads_every_fragmen
             .await;
 
         assert_eq!(read.await.unwrap(), Ok(()));
-        assert_eq!(harness.num_requests(), 2);
+        assert_eq!(harness.read_events.count(ReadEvent::AnalogInput), 2);
     })
     .await;
 }
@@ -246,7 +234,7 @@ async fn read_with_iin2_and_data_only_in_the_first_fragment_succeeds() {
             .await;
 
         assert_eq!(read.await.unwrap(), Ok(()));
-        assert_eq!(harness.num_requests(), 1);
+        assert_eq!(harness.read_events.count(ReadEvent::AnalogInput), 1);
     })
     .await;
 }
@@ -274,15 +262,13 @@ async fn read_with_iin2_and_an_empty_header_fails() {
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn periodic_poll_with_iin2_and_no_data_fails() {
     watchdog(async {
         let mut seq = Sequence::default();
         let mut harness = create_association(AssociationConfig::default()).await;
         startup_procedure(&mut harness, &mut seq).await;
         drop(harness.assoc_events.pop());
-
-        tokio::time::pause();
         let mut association = harness.association.clone();
         let _poll = association
             .add_poll(

@@ -176,23 +176,15 @@ async fn cold_restart_rejected_with(harness: &mut TestHarness, seq: &mut Sequenc
     assert_eq!(restart.await.unwrap(), Err(TaskError::RejectedByIin2(iin)));
 }
 
-/// Fail instead of waiting forever if the master never sends the request
-async fn expect_write_soon(harness: &mut TestHarness, expected: Vec<u8>) {
-    tokio::time::timeout(Duration::from_secs(5), harness.expect_write(expected))
-        .await
-        .expect("the master did not send the request");
-}
-
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn restart_iin_in_a_rejected_response_schedules_clear_restart() {
     watchdog(async {
-        tokio::time::pause();
         let mut seq = Sequence::default();
         let mut harness = create_association(AssociationConfig::quiet()).await;
 
         cold_restart_rejected_with(&mut harness, &mut seq, RESTART_AND_NO_FUNC_CODE_SUPPORT).await;
 
-        expect_write_soon(&mut harness, clear_restart_iin(seq)).await;
+        harness.expect_write_soon(clear_restart_iin(seq)).await;
         harness
             .process_response(empty_response(seq.increment()))
             .await;
@@ -200,10 +192,9 @@ async fn restart_iin_in_a_rejected_response_schedules_clear_restart() {
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn need_time_iin_in_a_rejected_response_schedules_time_sync() {
     watchdog(async {
-        tokio::time::pause();
         let config = AssociationConfig {
             auto_time_sync: Some(TimeSyncProcedure::Lan),
             ..AssociationConfig::quiet()
@@ -214,7 +205,9 @@ async fn need_time_iin_in_a_rejected_response_schedules_time_sync() {
         cold_restart_rejected_with(&mut harness, &mut seq, NEED_TIME_AND_NO_FUNC_CODE_SUPPORT)
             .await;
 
-        expect_write_soon(&mut harness, vec![0xC0 | seq.value(), RECORD_CURRENT_TIME]).await;
+        harness
+            .expect_write_soon(vec![0xC0 | seq.value(), RECORD_CURRENT_TIME])
+            .await;
     })
     .await;
 }
@@ -228,7 +221,7 @@ async fn rejected_clear_restart_retries_after_the_backoff() {
         cold_restart_rejected_with(&mut harness, &mut seq, RESTART_AND_NO_FUNC_CODE_SUPPORT).await;
 
         // the outstation rejects the clear restart and still reports the restart
-        expect_write_soon(&mut harness, clear_restart_iin(seq)).await;
+        harness.expect_write_soon(clear_restart_iin(seq)).await;
         harness
             .process_response(empty_response_custom_iin(
                 seq.increment(),
@@ -258,7 +251,7 @@ async fn rejected_enable_unsolicited_with_restart_iin_is_repeated_after_the_rest
         let mut harness = create_association(config).await;
 
         // the outstation rejects ENABLE_UNSOLICITED and reports a restart
-        expect_write_soon(&mut harness, enable_unsol_request(seq)).await;
+        harness.expect_write_soon(enable_unsol_request(seq)).await;
         harness
             .process_response(empty_response_custom_iin(
                 seq.increment(),
@@ -266,18 +259,18 @@ async fn rejected_enable_unsolicited_with_restart_iin_is_repeated_after_the_rest
             ))
             .await;
 
-        expect_write_soon(&mut harness, clear_restart_iin(seq)).await;
+        harness.expect_write_soon(clear_restart_iin(seq)).await;
         harness
             .process_response(empty_response(seq.increment()))
             .await;
 
         // the restart starts the sequence over, so ENABLE_UNSOLICITED is sent again
-        expect_write_soon(&mut harness, enable_unsol_request(seq)).await;
+        harness.expect_write_soon(enable_unsol_request(seq)).await;
         harness
             .process_response(empty_response(seq.increment()))
             .await;
 
-        assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+        harness.expect_idle_for(Duration::from_secs(60)).await;
     })
     .await;
 }
@@ -293,18 +286,13 @@ async fn expect_retry_after(
     retry: Vec<u8>,
     after: Duration,
 ) -> Instant {
-    expect_write_soon(harness, request).await;
+    harness.expect_write_soon(request).await;
     let sent = Instant::now();
-    tokio::time::timeout(Duration::from_secs(60), harness.expect_write(retry))
-        .await
-        .expect("the master did not retry the request");
+    harness
+        .expect_write_within(Duration::from_secs(60), retry)
+        .await;
     TestHarness::assert_elapsed(sent, after);
     sent
-}
-
-async fn assert_no_write_for(harness: &mut TestHarness, duration: Duration) {
-    let next = tokio::time::timeout(duration, harness.io.next_event()).await;
-    assert_eq!(next.ok(), None);
 }
 
 /// An auto task whose first request goes unanswered
@@ -402,16 +390,15 @@ async fn auto_tasks_retry_after_the_backoff_on_timeout() {
             // the rest of the task follows the retry without delay
             TestHarness::assert_elapsed(sent, TIMEOUT_AND_FIRST_RETRY);
 
-            assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+            harness.expect_idle_for(Duration::from_secs(60)).await;
         }
     })
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn clear_restart_backoff_grows_on_timeouts_and_resets_after_success() {
     watchdog(async {
-        tokio::time::pause();
         let mut seq = Sequence::default();
         let mut unsol_seq = Sequence::default();
         let mut harness = create_association(AssociationConfig::quiet()).await;
@@ -437,7 +424,7 @@ async fn clear_restart_backoff_grows_on_timeouts_and_resets_after_success() {
         harness
             .process_response(empty_response(seq.increment()))
             .await;
-        assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+        harness.expect_idle_for(Duration::from_secs(60)).await;
 
         // a new restart starts over from the minimum retry delay
         harness
@@ -452,15 +439,14 @@ async fn clear_restart_backoff_grows_on_timeouts_and_resets_after_success() {
         .await;
         harness.process_response(empty_response(seq)).await;
 
-        assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+        harness.expect_idle_for(Duration::from_secs(60)).await;
     })
     .await;
 }
 
-#[tokio::test]
+#[tokio::test(start_paused = true)]
 async fn clear_restart_rejected_without_restart_iin_is_not_repeated() {
     watchdog(async {
-        tokio::time::pause();
         let mut seq = Sequence::default();
         let mut harness = create_association(AssociationConfig::quiet()).await;
 
@@ -471,7 +457,7 @@ async fn clear_restart_rejected_without_restart_iin_is_not_repeated() {
             )
             .await;
 
-        expect_write_soon(&mut harness, clear_restart_iin(seq)).await;
+        harness.expect_write_soon(clear_restart_iin(seq)).await;
         harness
             .process_response(empty_response_custom_iin(
                 seq.increment(),
@@ -479,7 +465,7 @@ async fn clear_restart_rejected_without_restart_iin_is_not_repeated() {
             ))
             .await;
 
-        assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+        harness.expect_idle_for(Duration::from_secs(60)).await;
     })
     .await;
 }
@@ -518,25 +504,31 @@ async fn event_scan_whose_response_still_reports_events_runs_again_at_once() {
 
         // the response to the scan returns events, and reports that more class 1 events are available
         let class1 = Classes::new(false, EventClasses::new(true, false, false));
-        expect_write_soon(&mut harness, class_scan_request(class1, seq)).await;
+        harness
+            .expect_write_soon(class_scan_request(class1, seq))
+            .await;
         harness
             .process_response(event_response(seq.increment(), CLASS_1_EVENTS))
             .await;
         let answered = Instant::now();
 
         // the scan runs again at once, reading the classes the last response reported
-        expect_write_soon(&mut harness, class_scan_request(class1, seq)).await;
+        harness
+            .expect_write_soon(class_scan_request(class1, seq))
+            .await;
         TestHarness::assert_elapsed(answered, Duration::ZERO);
         harness
             .process_response(event_response(seq.increment(), CLASS_2_EVENTS))
             .await;
         let class2 = Classes::new(false, EventClasses::new(false, true, false));
-        expect_write_soon(&mut harness, class_scan_request(class2, seq)).await;
+        harness
+            .expect_write_soon(class_scan_request(class2, seq))
+            .await;
         harness
             .process_response(empty_response(seq.increment()))
             .await;
 
-        assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+        harness.expect_idle_for(Duration::from_secs(60)).await;
     })
     .await;
 }
@@ -548,7 +540,7 @@ async fn answer(
     request: fn(Sequence) -> Vec<u8>,
     iin: Iin,
 ) {
-    expect_write_soon(harness, request(*seq)).await;
+    harness.expect_write_soon(request(*seq)).await;
     harness
         .process_response(empty_response_custom_iin(seq.increment(), iin))
         .await;
@@ -562,12 +554,14 @@ async fn event_scan_whose_response_reports_events_but_returns_none_is_not_repeat
 
         // the outstation keeps the class 1 bit set, but returns no events
         let class1 = Classes::new(false, EventClasses::new(true, false, false));
-        expect_write_soon(&mut harness, class_scan_request(class1, seq)).await;
+        harness
+            .expect_write_soon(class_scan_request(class1, seq))
+            .await;
         harness
             .process_response(empty_response_custom_iin(seq.increment(), CLASS_1_EVENTS))
             .await;
 
-        assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+        harness.expect_idle_for(Duration::from_secs(60)).await;
     })
     .await;
 }
@@ -581,12 +575,14 @@ async fn event_scan_rejected_with_an_iin2_request_error_is_not_repeated() {
         // the outstation returns events and reports more, but also rejects part of the request
         let class1 = Classes::new(false, EventClasses::new(true, false, false));
         let object_unknown = Iin::new(CLASS_1_EVENTS.iin1, Iin2::OBJECT_UNKNOWN);
-        expect_write_soon(&mut harness, class_scan_request(class1, seq)).await;
+        harness
+            .expect_write_soon(class_scan_request(class1, seq))
+            .await;
         harness
             .process_response(event_response(seq.increment(), object_unknown))
             .await;
 
-        assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+        harness.expect_idle_for(Duration::from_secs(60)).await;
     })
     .await;
 }
@@ -608,17 +604,19 @@ async fn event_scan_with_a_request_error_in_an_earlier_fragment_is_not_repeated(
         // the first fragment rejects part of the request, and the last reports more events
         let class1 = Classes::new(false, EventClasses::new(true, false, false));
         let parameter_error = Iin::new(CLASS_1_EVENTS.iin1, Iin2::PARAMETER_ERROR);
-        expect_write_soon(&mut harness, class_scan_request(class1, seq)).await;
+        harness
+            .expect_write_soon(class_scan_request(class1, seq))
+            .await;
         let first = seq.increment();
         harness
             .process_response(event_fragment(first, true, false, parameter_error))
             .await;
-        expect_write_soon(&mut harness, solicited_confirm(first)).await;
+        harness.expect_write_soon(solicited_confirm(first)).await;
         harness
             .process_response(event_fragment(seq.increment(), false, true, CLASS_1_EVENTS))
             .await;
 
-        assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+        harness.expect_idle_for(Duration::from_secs(60)).await;
     })
     .await;
 }
@@ -632,19 +630,23 @@ async fn event_scan_with_iin2_bits_other_than_request_errors_runs_again_at_once(
         // the outstation returns events and reports more, along with a corrupt configuration
         let class1 = Classes::new(false, EventClasses::new(true, false, false));
         let config_corrupt = Iin::new(CLASS_1_EVENTS.iin1, Iin2::CONFIG_CORRUPT);
-        expect_write_soon(&mut harness, class_scan_request(class1, seq)).await;
+        harness
+            .expect_write_soon(class_scan_request(class1, seq))
+            .await;
         harness
             .process_response(event_response(seq.increment(), config_corrupt))
             .await;
         let answered = Instant::now();
 
-        expect_write_soon(&mut harness, class_scan_request(class1, seq)).await;
+        harness
+            .expect_write_soon(class_scan_request(class1, seq))
+            .await;
         TestHarness::assert_elapsed(answered, Duration::ZERO);
         harness
             .process_response(empty_response(seq.increment()))
             .await;
 
-        assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+        harness.expect_idle_for(Duration::from_secs(60)).await;
     })
     .await;
 }
@@ -677,7 +679,7 @@ async fn restart_iin_in_integrity_or_enable_unsolicited_response_starts_the_sequ
         answer(&mut harness, &mut seq, integrity_poll_request, none).await;
         answer(&mut harness, &mut seq, enable_unsol_request, none).await;
 
-        assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+        harness.expect_idle_for(Duration::from_secs(60)).await;
     })
     .await;
 }
@@ -696,7 +698,7 @@ async fn clear_restart_answered_with_restart_iin_reports_failure_and_retries_aft
             .await;
 
         // the outstation accepts the clear restart, but still reports the restart
-        expect_write_soon(&mut harness, clear_restart_iin(seq)).await;
+        harness.expect_write_soon(clear_restart_iin(seq)).await;
         harness
             .process_response(empty_response_custom_iin(seq.increment(), DEVICE_RESTART))
             .await;
@@ -706,7 +708,7 @@ async fn clear_restart_answered_with_restart_iin_reports_failure_and_retries_aft
             .expect_write_and_respond(clear_restart_iin(seq), empty_response(seq.increment()))
             .await;
         TestHarness::assert_elapsed(failed, Duration::from_secs(1));
-        assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+        harness.expect_idle_for(Duration::from_secs(60)).await;
 
         assert_eq!(
             harness.assoc_events.pop(),
