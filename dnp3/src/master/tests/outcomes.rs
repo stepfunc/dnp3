@@ -1318,6 +1318,15 @@ impl ReadHandler for Log {
         MaybeAsync::ready(())
     }
 
+    fn handle_binary_input(
+        &mut self,
+        _info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (crate::app::measurement::BinaryInput, u16)>,
+    ) {
+        iter.for_each(drop);
+        self.push(Entry::Read(ReadEvent::BinaryInput));
+    }
+
     fn handle_analog_input(
         &mut self,
         _info: HeaderInfo,
