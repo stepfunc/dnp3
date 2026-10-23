@@ -856,90 +856,6 @@ mod tests {
         assert_eq!(low_16_bits(0x1234_5678), 0x5678);
     }
 
-    fn analog(value: f64) -> AnalogInput {
-        AnalogInput::new(value, Flags::ONLINE, Time::unsynchronized(0))
-    }
-
-    const OVER_RANGE: Flags = Flags::new(Flags::ONLINE.value | Flags::OVER_RANGE.value);
-
-    #[test]
-    fn i16_conversion_clamps_and_sets_over_range_on_both_sides() {
-        let cases: &[(f64, Flags, i16)] = &[
-            (0.0, Flags::ONLINE, 0),
-            (-1.9, Flags::ONLINE, -1),
-            (-32768.0, Flags::ONLINE, i16::MIN),
-            (-32768.5, OVER_RANGE, i16::MIN),
-            (-40000.0, OVER_RANGE, i16::MIN),
-            (f64::NEG_INFINITY, OVER_RANGE, i16::MIN),
-            (32767.0, Flags::ONLINE, i16::MAX),
-            (32767.5, OVER_RANGE, i16::MAX),
-            (40000.0, OVER_RANGE, i16::MAX),
-            (f64::INFINITY, OVER_RANGE, i16::MAX),
-            (f64::NAN, OVER_RANGE, 0),
-        ];
-
-        for &(value, flags, wire) in cases {
-            assert_eq!(analog(value).to_i16(), (flags, wire), "value: {value}");
-        }
-    }
-
-    #[test]
-    fn i32_conversion_clamps_and_sets_over_range_on_both_sides() {
-        let cases: &[(f64, Flags, i32)] = &[
-            (0.0, Flags::ONLINE, 0),
-            (40000.0, Flags::ONLINE, 40000),
-            (-40000.0, Flags::ONLINE, -40000),
-            (-2147483648.0, Flags::ONLINE, i32::MIN),
-            (-2147483648.5, OVER_RANGE, i32::MIN),
-            (-1e12, OVER_RANGE, i32::MIN),
-            (f64::NEG_INFINITY, OVER_RANGE, i32::MIN),
-            (2147483647.0, Flags::ONLINE, i32::MAX),
-            (2147483647.5, OVER_RANGE, i32::MAX),
-            (1e12, OVER_RANGE, i32::MAX),
-            (f64::INFINITY, OVER_RANGE, i32::MAX),
-            (f64::NAN, OVER_RANGE, 0),
-        ];
-
-        for &(value, flags, wire) in cases {
-            assert_eq!(analog(value).to_i32(), (flags, wire), "value: {value}");
-        }
-    }
-
-    #[test]
-    fn f32_conversion_clamps_and_sets_over_range_on_both_sides() {
-        // NaN has no single bit pattern, so compare bits only for numbers
-        fn bits(value: f32) -> Option<u32> {
-            (!value.is_nan()).then(|| value.to_bits())
-        }
-
-        let f32_max: f64 = f32::MAX.into();
-        let f32_min: f64 = f32::MIN.into();
-
-        let cases: &[(f64, Flags, f32)] = &[
-            (0.0, Flags::ONLINE, 0.0),
-            (0.5, Flags::ONLINE, 0.5),
-            (-40000.0, Flags::ONLINE, -40000.0),
-            (f32_min, Flags::ONLINE, f32::MIN),
-            (f32_min.next_down(), OVER_RANGE, f32::MIN),
-            (f64::MIN, OVER_RANGE, f32::MIN),
-            (f64::NEG_INFINITY, Flags::ONLINE, f32::NEG_INFINITY),
-            (f32_max, Flags::ONLINE, f32::MAX),
-            (f32_max.next_up(), OVER_RANGE, f32::MAX),
-            (f64::MAX, OVER_RANGE, f32::MAX),
-            (f64::INFINITY, Flags::ONLINE, f32::INFINITY),
-            (f64::NAN, Flags::ONLINE, f32::NAN),
-        ];
-
-        for &(value, flags, wire) in cases {
-            let (actual_flags, actual_wire) = analog(value).to_f32();
-            assert_eq!(
-                (actual_flags, bits(actual_wire)),
-                (flags, bits(wire)),
-                "value: {value}"
-            );
-        }
-    }
-
     /// Checks the analog conversions against a model that never converts a float with `as`: it
     /// predicts the wire value as an `f64`, which every `i16`, `i32` and `f32` converts to exactly
     mod conversion_properties {
@@ -964,6 +880,40 @@ mod tests {
             f64::from(f32::MAX) + 2f64.powi(103)
         }
 
+        /// each limit, one less and one more, and the adjacent `f64` values
+        fn neighbors() -> Vec<f64> {
+            limits()
+                .into_iter()
+                .flat_map(|limit| {
+                    [
+                        limit.next_down(),
+                        limit - 1.0,
+                        limit,
+                        limit + 1.0,
+                        limit.next_up(),
+                    ]
+                })
+                .collect()
+        }
+
+        /// the values on both sides of rounding past the f32 range, the infinities, NaN of both
+        /// signs, negative zero and the smallest subnormals
+        fn specials() -> Vec<f64> {
+            vec![
+                past_f32_max(),
+                past_f32_max().next_down(),
+                -past_f32_max(),
+                -past_f32_max().next_down(),
+                f64::INFINITY,
+                f64::NEG_INFINITY,
+                f64::NAN,
+                -f64::NAN,
+                -0.0,
+                f64::from_bits(1),
+                -f64::from_bits(1),
+            ]
+        }
+
         /// every bit pattern, the limits and their neighbors, and the midpoints between adjacent
         /// f32 values, where rounding has to break a tie
         fn value() -> impl Strategy<Value = f64> {
@@ -972,26 +922,8 @@ mod tests {
                 -1e10f64..1e10,
                 (prop::sample::select(limits()), -2.0f64..2.0)
                     .prop_map(|(limit, offset)| limit + offset),
-                (prop::sample::select(limits()), -2i8..=2).prop_map(|(limit, offset)| {
-                    match offset {
-                        -2 => limit.next_down(),
-                        2 => limit.next_up(),
-                        offset => limit + f64::from(offset),
-                    }
-                }),
-                prop::sample::select(vec![
-                    past_f32_max(),
-                    past_f32_max().next_down(),
-                    -past_f32_max(),
-                    -past_f32_max().next_down(),
-                    f64::INFINITY,
-                    f64::NEG_INFINITY,
-                    f64::NAN,
-                    -f64::NAN,
-                    -0.0,
-                    f64::from_bits(1),
-                    -f64::from_bits(1),
-                ]),
+                prop::sample::select(neighbors()),
+                prop::sample::select(specials()),
                 any::<u32>().prop_filter_map("a finite f32 below another", |bits| {
                     let low = f32::from_bits(bits);
                     let high = low.next_up();
@@ -1118,16 +1050,27 @@ mod tests {
             );
         }
 
+        /// checks each analog type that converts to the wire
+        fn check_all(value: f64, flags: Flags) {
+            let time = Time::unsynchronized(0);
+            check(AnalogInput::new(value, flags, time), value, flags);
+            check(FrozenAnalogInput::new(value, flags, time), value, flags);
+            check(AnalogOutputStatus::new(value, flags, time), value, flags);
+        }
+
+        #[test]
+        fn edge_values_match_the_model() {
+            for value in neighbors().into_iter().chain(specials()) {
+                check_all(value, Flags::ONLINE);
+            }
+        }
+
         proptest! {
             #![proptest_config(ProptestConfig::with_cases(1024))]
 
             #[test]
             fn analog_conversions_match_the_model(value in value(), flags in any::<u8>()) {
-                let flags = Flags::new(flags);
-                let time = Time::unsynchronized(0);
-                check(AnalogInput::new(value, flags, time), value, flags);
-                check(FrozenAnalogInput::new(value, flags, time), value, flags);
-                check(AnalogOutputStatus::new(value, flags, time), value, flags);
+                check_all(value, Flags::new(flags));
             }
         }
     }
