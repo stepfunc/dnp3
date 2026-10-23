@@ -30,105 +30,105 @@ use scursor::ReadCursor;
 
 #[derive(Debug, PartialEq)]
 pub(crate) enum RangedVariation<'a> {
-    /// Device Attributes - Non-Specific All Attributes Request
+    /// Device Attributes - All attributes request
     Group0Var254,
-    /// Device Attributes - Specific Attribute
+    /// Device Attributes - Specific attribute (variations 1 to 253 and 255)
     Group0(crate::app::attr::Attribute<'a>),
-    /// Binary Input - Any Variation
+    /// Binary Input - Any variation
     Group1Var0,
-    /// Binary Input - Packed Format
+    /// Binary Input - Packed format
     Group1Var1(BitSequence<'a>),
-    /// Binary Input - With Flags
+    /// Binary Input - With flags
     Group1Var2(RangedSequence<'a, Group1Var2>),
-    /// Double-bit Binary Input - Any Variation
+    /// Double-bit Binary Input - Any variation
     Group3Var0,
-    /// Double-bit Binary Input - Packed Format
+    /// Double-bit Binary Input - Packed format
     Group3Var1(DoubleBitSequence<'a>),
-    /// Double-bit Binary Input - With Flags
+    /// Double-bit Binary Input - With flags
     Group3Var2(RangedSequence<'a, Group3Var2>),
-    /// Binary Output - Any Variation
+    /// Binary Output - Any variation
     Group10Var0,
-    /// Binary Output - Packed Format
+    /// Binary Output - Packed format
     Group10Var1(BitSequence<'a>),
-    /// Binary Output - Output Status With Flags
+    /// Binary Output - With flags
     Group10Var2(RangedSequence<'a, Group10Var2>),
-    /// Counter - Any Variation
+    /// Counter - Any variation
     Group20Var0,
-    /// Counter - 32-bit With Flag
+    /// Counter - 32-bit with flags
     Group20Var1(RangedSequence<'a, Group20Var1>),
-    /// Counter - 16-bit With Flag
+    /// Counter - 16-bit with flags
     Group20Var2(RangedSequence<'a, Group20Var2>),
-    /// Counter - 32-bit Without Flag
+    /// Counter - 32-bit without flags
     Group20Var5(RangedSequence<'a, Group20Var5>),
-    /// Counter - 16-bit Without Flag
+    /// Counter - 16-bit without flags
     Group20Var6(RangedSequence<'a, Group20Var6>),
-    /// Frozen Counter - Any Variation
+    /// Frozen Counter - Any variation
     Group21Var0,
-    /// Frozen Counter - 32-bit With Flag
+    /// Frozen Counter - 32-bit with flags
     Group21Var1(RangedSequence<'a, Group21Var1>),
-    /// Frozen Counter - 16-bit With Flag
+    /// Frozen Counter - 16-bit with flags
     Group21Var2(RangedSequence<'a, Group21Var2>),
-    /// Frozen Counter - 32-bit With Flag and Time
+    /// Frozen Counter - 32-bit with flags and time of freeze
     Group21Var5(RangedSequence<'a, Group21Var5>),
-    /// Frozen Counter - 16-bit With Flag and Time
+    /// Frozen Counter - 16-bit with flags and time of freeze
     Group21Var6(RangedSequence<'a, Group21Var6>),
-    /// Frozen Counter - 32-bit Without Flag
+    /// Frozen Counter - 32-bit without flags
     Group21Var9(RangedSequence<'a, Group21Var9>),
-    /// Frozen Counter - 16-bit Without Flag
+    /// Frozen Counter - 16-bit without flags
     Group21Var10(RangedSequence<'a, Group21Var10>),
-    /// Analog Input - Any Variation
+    /// Analog Input - Any variation
     Group30Var0,
-    /// Analog Input - 32-bit With Flag
+    /// Analog Input - 32-bit with flags
     Group30Var1(RangedSequence<'a, Group30Var1>),
-    /// Analog Input - 16-bit With Flag
+    /// Analog Input - 16-bit with flags
     Group30Var2(RangedSequence<'a, Group30Var2>),
-    /// Analog Input - 32-bit Without Flag
+    /// Analog Input - 32-bit without flags
     Group30Var3(RangedSequence<'a, Group30Var3>),
-    /// Analog Input - 16-bit Without Flag
+    /// Analog Input - 16-bit without flags
     Group30Var4(RangedSequence<'a, Group30Var4>),
-    /// Analog Input - Single-precision With Flag
+    /// Analog Input - Single-precision floating point with flags
     Group30Var5(RangedSequence<'a, Group30Var5>),
-    /// Analog Input - Double-precision With Flag
+    /// Analog Input - Double-precision floating point with flags
     Group30Var6(RangedSequence<'a, Group30Var6>),
-    /// Frozen Analog Input - Any Variation
+    /// Frozen Analog Input - Any variation
     Group31Var0,
-    /// Frozen Analog Input - 32-bit With Flag
+    /// Frozen Analog Input - 32-bit with flags
     Group31Var1(RangedSequence<'a, Group31Var1>),
-    /// Frozen Analog Input - 16-bit With Flag
+    /// Frozen Analog Input - 16-bit with flags
     Group31Var2(RangedSequence<'a, Group31Var2>),
-    /// Frozen Analog Input - 32-bit with Flag and Time-of-Freeze
+    /// Frozen Analog Input - 32-bit with flags and time of freeze
     Group31Var3(RangedSequence<'a, Group31Var3>),
-    /// Frozen Analog Input - 16-bit with Flag and Time-of-Freeze
+    /// Frozen Analog Input - 16-bit with flags and time of freeze
     Group31Var4(RangedSequence<'a, Group31Var4>),
-    /// Frozen Analog Input - 32-bit Without Flag
+    /// Frozen Analog Input - 32-bit without flags
     Group31Var5(RangedSequence<'a, Group31Var5>),
-    /// Frozen Analog Input - 16-bit Without Flag
+    /// Frozen Analog Input - 16-bit without flags
     Group31Var6(RangedSequence<'a, Group31Var6>),
-    /// Frozen Analog Input - Single-precision With Flag
+    /// Frozen Analog Input - Single-precision floating point with flags
     Group31Var7(RangedSequence<'a, Group31Var7>),
-    /// Frozen Analog Input - Double-precision With Flag
+    /// Frozen Analog Input - Double-precision floating point with flags
     Group31Var8(RangedSequence<'a, Group31Var8>),
-    /// Analog Input Reporting Deadband - Any Variation
+    /// Analog Input Reporting Deadband - Any variation
     Group34Var0,
     /// Analog Input Reporting Deadband - 16-bit
     Group34Var1(RangedSequence<'a, Group34Var1>),
     /// Analog Input Reporting Deadband - 32-bit
     Group34Var2(RangedSequence<'a, Group34Var2>),
-    /// Analog Input Reporting Deadband - Single-precision
+    /// Analog Input Reporting Deadband - Single-precision floating point
     Group34Var3(RangedSequence<'a, Group34Var3>),
-    /// Analog Output Status - Any Variation
+    /// Analog Output Status - Any variation
     Group40Var0,
-    /// Analog Output Status - 32-bit With Flag
+    /// Analog Output Status - 32-bit with flags
     Group40Var1(RangedSequence<'a, Group40Var1>),
-    /// Analog Output Status - 16-bit With Flag
+    /// Analog Output Status - 16-bit with flags
     Group40Var2(RangedSequence<'a, Group40Var2>),
-    /// Analog Output Status - Single-precision With Flag
+    /// Analog Output Status - Single-precision floating point with flags
     Group40Var3(RangedSequence<'a, Group40Var3>),
-    /// Analog Output Status - Double-precision With Flag
+    /// Analog Output Status - Double-precision floating point with flags
     Group40Var4(RangedSequence<'a, Group40Var4>),
-    /// Internal Indications - Packed Format
+    /// Internal Indications - Packed format
     Group80Var1(BitSequence<'a>),
-    /// Unsigned Integer - Any Variation
+    /// Unsigned Integer - Any variation
     Group102Var0,
     /// Unsigned Integer - 8-bit
     Group102Var1(RangedSequence<'a, Group102Var1>),

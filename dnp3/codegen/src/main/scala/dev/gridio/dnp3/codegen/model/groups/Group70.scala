@@ -21,15 +21,15 @@ object Group70 extends ObjectGroup {
 
   def group: Byte = 70
 
-  def desc: String = "File-control"
+  def desc: String = "File Control"
 
   override def groupType: GroupType = GroupType.FileControl
 }
 
-object Group70Var2 extends FreeFormat(Group70, 2, "authentication")
-object Group70Var3 extends FreeFormat(Group70, 3, "file command")
-object Group70Var4 extends FreeFormat(Group70, 4, "file command status")
-object Group70Var5 extends FreeFormat(Group70, 5, "file transport")
-object Group70Var6 extends FreeFormat(Group70, 6, "file transport status")
-object Group70Var7 extends FreeFormat(Group70, 7, "file descriptor")
-object Group70Var8 extends FreeFormat(Group70, 8, "file specification string")
+object Group70Var2 extends FreeFormat(Group70, 2, "Authentication")
+object Group70Var3 extends FreeFormat(Group70, 3, "File command")
+object Group70Var4 extends FreeFormat(Group70, 4, "File command status")
+object Group70Var5 extends FreeFormat(Group70, 5, "File transport")
+object Group70Var6 extends FreeFormat(Group70, 6, "File transport status")
+object Group70Var7 extends FreeFormat(Group70, 7, "File descriptor")
+object Group70Var8 extends FreeFormat(Group70, 8, "File specification string")

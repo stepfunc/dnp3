@@ -55,7 +55,7 @@ trait Variation {
 
 class FreeFormat(g: ObjectGroup, v: Byte, desc: String) extends BasicGroupVariation(g, Variation.Value(v), desc)
 
-class AnyVariation(g: ObjectGroup, v: Byte) extends BasicGroupVariation(g, Variation.Value(v), "Any Variation")
+class AnyVariation(g: ObjectGroup, v: Byte) extends BasicGroupVariation(g, Variation.Value(v), VariationNames.anyVariation)
 
 class ClassData(g: ObjectGroup, v: Byte, desc: String) extends BasicGroupVariation(g,  Variation.Value(v), desc)
 

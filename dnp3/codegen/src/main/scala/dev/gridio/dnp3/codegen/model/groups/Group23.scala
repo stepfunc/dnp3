@@ -23,10 +23,10 @@ object Group23 extends ObjectGroup {
 
 object Group23Var0 extends AnyVariation(Group23, 0)
 
-object Group23Var1 extends FixedSize(Group23, 1, bit32WithFlag)(flags, count32)
+object Group23Var1 extends FixedSize(Group23, 1, bit32WithoutTime)(flags, count32)
 
-object Group23Var2 extends FixedSize(Group23, 2, bit16WithFlag)(flags, count16)
+object Group23Var2 extends FixedSize(Group23, 2, bit16WithoutTime)(flags, count16)
 
-object Group23Var5 extends FixedSize(Group23, 5, bit32WithFlagTime)(flags, count32, time48)
+object Group23Var5 extends FixedSize(Group23, 5, bit32WithTimeOfFreeze)(flags, count32, time48)
 
-object Group23Var6 extends FixedSize(Group23, 6, bit16WithFlagTime)(flags, count16, time48)
+object Group23Var6 extends FixedSize(Group23, 6, bit16WithTimeOfFreeze)(flags, count16, time48)

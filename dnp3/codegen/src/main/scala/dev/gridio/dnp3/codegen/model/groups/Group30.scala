@@ -22,14 +22,14 @@ object Group30 extends ObjectGroup {
 
 object Group30Var0 extends AnyVariation(Group30, 0)
 
-object Group30Var1 extends FixedSize(Group30, 1, bit32WithFlag)(flags, value32)
+object Group30Var1 extends FixedSize(Group30, 1, bit32WithFlags)(flags, value32)
 
-object Group30Var2 extends FixedSize(Group30, 2, bit16WithFlag)(flags, value16)
+object Group30Var2 extends FixedSize(Group30, 2, bit16WithFlags)(flags, value16)
 
-object Group30Var3 extends FixedSize(Group30, 3, bit32WithoutFlag)(value32)
+object Group30Var3 extends FixedSize(Group30, 3, bit32WithoutFlags)(value32)
 
-object Group30Var4 extends FixedSize(Group30, 4, bit16WithoutFlag)(value16)
+object Group30Var4 extends FixedSize(Group30, 4, bit16WithoutFlags)(value16)
 
-object Group30Var5 extends FixedSize(Group30, 5, singlePrecisionWithFlag)(flags, float32)
+object Group30Var5 extends FixedSize(Group30, 5, singlePrecisionWithFlags)(flags, float32)
 
-object Group30Var6 extends FixedSize(Group30, 6, doublePrecisionWithFlag)(flags, float64)
+object Group30Var6 extends FixedSize(Group30, 6, doublePrecisionWithFlags)(flags, float64)

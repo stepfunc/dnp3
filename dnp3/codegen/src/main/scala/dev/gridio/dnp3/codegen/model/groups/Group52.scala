@@ -19,6 +19,6 @@ object Group52 extends ObjectGroup {
   override def groupType: GroupType = GroupType.Time
 }
 
-object Group52Var1 extends FixedSize(Group52, 1, "Coarse")(delay16)
+object Group52Var1 extends FixedSize(Group52, 1, "Coarse (seconds)")(delay16)
 
-object Group52Var2 extends FixedSize(Group52, 2, "Fine")(delay16)
+object Group52Var2 extends FixedSize(Group52, 2, "Fine (milliseconds)")(delay16)

@@ -23,10 +23,10 @@ object Group40 extends ObjectGroup {
 
 object Group40Var0 extends AnyVariation(Group40, 0)
 
-object Group40Var1 extends FixedSize(Group40, 1, bit32WithFlag)(flags, value32)
+object Group40Var1 extends FixedSize(Group40, 1, bit32WithFlags)(flags, value32)
 
-object Group40Var2 extends FixedSize(Group40, 2, bit16WithFlag)(flags, value16)
+object Group40Var2 extends FixedSize(Group40, 2, bit16WithFlags)(flags, value16)
 
-object Group40Var3 extends FixedSize(Group40, 3, singlePrecisionWithFlag)(flags, float32)
+object Group40Var3 extends FixedSize(Group40, 3, singlePrecisionWithFlags)(flags, float32)
 
-object Group40Var4 extends FixedSize(Group40, 4, doublePrecisionWithFlag)(flags, float64)
+object Group40Var4 extends FixedSize(Group40, 4, doublePrecisionWithFlags)(flags, float64)
