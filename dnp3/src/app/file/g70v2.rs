@@ -10,7 +10,7 @@ use crate::app::format::WriteError;
 use crate::app::Variation;
 use scursor::{ReadCursor, WriteCursor};
 
-/// Group 70 Variation 3 - authentication
+/// Group 70 Variation 2 - authentication
 ///
 /// This representation is borrowed from the underlying ASDU
 #[derive(PartialEq, Eq)]
