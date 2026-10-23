@@ -29,7 +29,14 @@
 //!   a retry (TB2015-002a, decision 0007 in the protocol reference);
 //! - a repeated request other than a READ gets the stored response's bytes (decision 0002), and a
 //!   repeated READ in the solicited confirm wait gets the current fragment's bytes and restarts the
-//!   wait. Elsewhere a repeated READ is answered as a new one, a deliberate deviation.
+//!   wait. Elsewhere a repeated READ is answered as a new one, a deliberate deviation. A request
+//!   with the sequence number of the last one but other contents is a new request (Table 6-1 row
+//!   18);
+//! - a READ during the unsolicited confirm wait gets no response until the wait ends (Table 6-1 row
+//!   25, TB2015-002a rule 16). A later READ replaces it and any other request discards it. While
+//!   one is held, a timeout ends the wait without a retry. Once the wait ends, by its confirm or a
+//!   timeout, the READ is answered from the events left, before the next unsolicited response, and
+//!   only then becomes the last request a repeat matches.
 //!
 //! The outstation has handled each input when the test looks at what it did, on the guarantee
 //! that `pop_response` describes: the outstation has answered a request once the test sees it read,
@@ -38,10 +45,6 @@
 //! test sleeps, which lets the paused clock fire the outstation's timers on the way, in order.
 //! After each input the test takes every response and callback, so the model accepts no more than
 //! it expects, and checks that the clock agrees with the model's.
-//!
-//! [`Model::covers`] leaves out one input: a READ during the unsolicited confirm wait. The
-//! outstation defers it until the wait ends (Table 6-1 row 25), which this model doesn't follow:
-//! it's a gap in coverage, not a known bug, for the full session model (stage 2) to close.
 
 #![expect(
     clippy::arithmetic_side_effects,
@@ -250,10 +253,6 @@ impl Request {
             Function::DisableUnsolicited(named) => classes(0x15, named),
         }
     }
-
-    fn is_read(&self) -> bool {
-        matches!(self.function, Function::Read(_))
-    }
 }
 
 /// the configuration of a case
@@ -347,6 +346,8 @@ struct Model {
     last_valid: Option<Request>,
     /// the solicited response sent last
     last_solicited: Option<Vec<u8>>,
+    /// the READ received during the unsolicited confirm wait, answered when the wait ends
+    deferred: Option<(u8, Vec<ReadHeader>)>,
     /// the unsolicited response sent last
     last_unsolicited: Option<Vec<u8>>,
     /// the responses that the input made, in the order sent
@@ -381,6 +382,7 @@ impl Model {
             last_request: None,
             last_valid: None,
             last_solicited: None,
+            deferred: None,
             last_unsolicited: None,
             writes: VecDeque::new(),
             callbacks: Vec::new(),
@@ -398,15 +400,19 @@ impl Model {
                 index: *index,
                 ids: self.next_id..self.next_id + count,
             }),
-            Op::Read(headers) => self.new_request(Function::Read(headers.clone())),
-            Op::DelayMeasure => self.new_request(Function::DelayMeasure),
-            Op::ClearRestart => self.new_request(Function::ClearRestart),
-            Op::Enable(classes) => self.new_request(Function::EnableUnsolicited(*classes)),
-            Op::Disable(classes) => self.new_request(Function::DisableUnsolicited(*classes)),
-            Op::Repeat => {
-                let request = self.last_request.clone()?;
-                self.covers(&request).then_some(Input::Request(request))
+            Op::Request(function) => {
+                let seq = self.next_request_seq;
+                self.next_request_seq = next_seq(seq);
+                Some(Input::Request(Request {
+                    seq,
+                    function: function.clone(),
+                }))
             }
+            Op::SameSeq(function) => Some(Input::Request(Request {
+                seq: self.last_request.as_ref()?.seq,
+                function: function.clone(),
+            })),
+            Op::Repeat => self.last_request.clone().map(Input::Request),
             Op::SolicitedConfirm(choice) => {
                 let base = match self.wait {
                     Wait::Solicited { ecsn, .. } => ecsn,
@@ -429,27 +435,6 @@ impl Model {
             }
             Op::Advance(choice) => Some(Input::Advance(self.advance_ms(*choice))),
             Op::Reconnect => Some(Input::Reconnect),
-        }
-    }
-
-    fn new_request(&mut self, function: Function) -> Option<Input> {
-        let request = Request {
-            seq: self.next_request_seq,
-            function,
-        };
-        if !self.covers(&request) {
-            return None;
-        }
-        self.next_request_seq = next_seq(self.next_request_seq);
-        Some(Input::Request(request))
-    }
-
-    /// Whether the model covers the request in the current state (see the module documentation)
-    fn covers(&self, request: &Request) -> bool {
-        match self.wait {
-            Wait::Idle | Wait::Solicited { .. } => true,
-            // a deferred READ: stage 2
-            Wait::Unsolicited { .. } => !request.is_read(),
         }
     }
 
@@ -485,10 +470,10 @@ impl Model {
             Wait::Unsolicited { .. } => Op::UnsolicitedConfirm(ConfirmChoice::Expected),
             Wait::Solicited { .. } => Op::SolicitedConfirm(ConfirmChoice::Expected),
             Wait::Idle if self.setup.unsolicited && self.classes.contains(&true) => {
-                Op::Disable([true; 3])
+                Op::Request(Function::DisableUnsolicited([true; 3]))
             }
             Wait::Idle if self.events.is_empty() => return None,
-            Wait::Idle => Op::Read((0..3).map(|class| ReadHeader::Class(class, None)).collect()),
+            Wait::Idle => Op::Request(read_every_class()),
         })
     }
 
@@ -848,7 +833,18 @@ impl Model {
                     self.run_idle();
                 }
             }
-            Wait::Unsolicited { .. } => self.accept(request),
+            // Table 6-1 row 25: a READ waits for the end of the unsolicited confirm wait, any other
+            // request discards it
+            Wait::Unsolicited { .. } => match request {
+                Request {
+                    seq,
+                    function: Function::Read(headers),
+                } => self.deferred = Some((seq, headers)),
+                request => {
+                    self.deferred = None;
+                    self.accept(request);
+                }
+            },
         }
     }
 
@@ -884,11 +880,23 @@ impl Model {
                         self.clear_written();
                     }
                     self.unsolicited = UnsolicitedState::Ready(None);
-                    self.wait = Wait::Idle;
-                    self.run_idle();
+                    self.end_unsolicited_wait();
                 }
             }
         }
+    }
+
+    /// End the unsolicited confirm wait, answering a READ received during it before anything else
+    fn end_unsolicited_wait(&mut self) {
+        self.wait = Wait::Idle;
+        if let Some((seq, headers)) = self.deferred.take() {
+            self.read(seq, &headers);
+            self.last_valid = Some(Request {
+                seq,
+                function: Function::Read(headers),
+            });
+        }
+        self.run_idle();
     }
 
     /// What the outstation does in idle: send the null unsolicited response until it's confirmed,
@@ -994,7 +1002,8 @@ impl Model {
                     Some(0) => (false, Some(0)),
                     Some(left) => (true, Some(left - 1)),
                 };
-                let retry = retry && !disabled;
+                // TB2015-002a rules 15 and 16: no retry after a DISABLE or with a READ waiting
+                let retry = retry && !disabled && self.deferred.is_none();
                 self.callbacks
                     .push(Event::UnsolicitedConfirmTimeout(seq, retry));
                 if retry {
@@ -1011,23 +1020,24 @@ impl Model {
                     };
                 } else {
                     self.reset();
-                    self.wait = Wait::Idle;
                     self.unsolicited = if null {
                         UnsolicitedState::NullRequired
                     } else {
                         UnsolicitedState::Ready(Some(self.now + self.setup.retry_ms))
                     };
-                    self.run_idle();
+                    self.end_unsolicited_wait();
                 }
             }
         }
     }
 
-    /// A new connection forgets the last request and the stored responses, and returns every event
-    /// to the buffer. The unsolicited state, the enabled classes and the restart IIN stay.
+    /// A new connection forgets the last request, a deferred READ and the stored responses, and
+    /// returns every event to the buffer. The unsolicited state, the enabled classes and the restart
+    /// IIN stay.
     fn reconnect(&mut self) {
         self.reset();
         self.last_valid = None;
+        self.deferred = None;
         self.last_solicited = None;
         self.last_unsolicited = None;
         self.wait = Wait::Idle;
@@ -1070,11 +1080,10 @@ enum Op {
         index: u16,
         count: u64,
     },
-    Read(Vec<ReadHeader>),
-    DelayMeasure,
-    ClearRestart,
-    Enable([bool; 3]),
-    Disable([bool; 3]),
+    /// a request with the next sequence number
+    Request(Function),
+    /// a request with the last request's sequence number
+    SameSeq(Function),
     /// send the last request's bytes again
     Repeat,
     SolicitedConfirm(ConfirmChoice),
@@ -1119,40 +1128,156 @@ fn advance_choice() -> impl Strategy<Value = AdvanceChoice> {
 
 fn update_op() -> impl Strategy<Value = Op> {
     // a few events, or enough to fill more than one response of the minimum size
-    (kind(), 0..POINTS, prop_oneof![3 => 1u64..5, 1 => 30u64..46])
-        .prop_map(|(kind, index, count)| Op::Update { kind, index, count })
+    let count = prop_oneof![3 => 1u64..5, 1 => LARGE_UPDATE];
+    (kind(), 0..POINTS, count).prop_map(|(kind, index, count)| Op::Update { kind, index, count })
+}
+
+/// enough events to fill more than one response of the minimum size
+const LARGE_UPDATE: Range<u64> = 30..46;
+
+fn large_update_op() -> impl Strategy<Value = Op> {
+    (kind(), 0..POINTS, LARGE_UPDATE).prop_map(|(kind, index, count)| Op::Update {
+        kind,
+        index,
+        count,
+    })
+}
+
+fn read_every_class() -> Function {
+    Function::Read((0..3).map(|class| ReadHeader::Class(class, None)).collect())
+}
+
+fn read_function() -> impl Strategy<Value = Function> {
+    prop::collection::vec(read_header(), 1..4).prop_map(Function::Read)
+}
+
+/// a request's function, a READ `reads` times and an ENABLE_UNSOLICITED `enables` times as likely as
+/// each of the others
+fn function(reads: u32, enables: u32) -> impl Strategy<Value = Function> {
+    prop_oneof![
+        reads => read_function(),
+        enables => classes().prop_map(Function::EnableUnsolicited),
+        1 => classes().prop_map(Function::DisableUnsolicited),
+        1 => Just(Function::DelayMeasure),
+        1 => Just(Function::ClearRestart),
+    ]
 }
 
 fn read_op() -> impl Strategy<Value = Op> {
-    prop::collection::vec(read_header(), 1..4).prop_map(Op::Read)
+    read_function().prop_map(Op::Request)
+}
+
+/// a new request, one with the last request's sequence number, or a repeat, each function as
+/// likely as the others
+fn request_op() -> impl Strategy<Value = Op> {
+    prop_oneof![
+        3 => function(1, 1).prop_map(Op::Request),
+        2 => function(1, 1).prop_map(Op::SameSeq),
+        1 => Just(Op::Repeat),
+    ]
 }
 
 fn op() -> impl Strategy<Value = Op> {
     prop_oneof![
         6 => update_op(),
-        5 => read_op(),
+        10 => function(5, 2).prop_map(Op::Request),
+        2 => function(5, 2).prop_map(Op::SameSeq),
         4 => confirm_choice().prop_map(Op::SolicitedConfirm),
         4 => confirm_choice().prop_map(Op::UnsolicitedConfirm),
-        2 => classes().prop_map(Op::Enable),
-        1 => classes().prop_map(Op::Disable),
-        1 => Just(Op::DelayMeasure),
-        1 => Just(Op::ClearRestart),
         2 => Just(Op::Repeat),
         4 => advance_choice().prop_map(Op::Advance),
         2 => Just(Op::Reconnect),
     ]
 }
 
-/// Single ops, and sometimes a READ, an update and another READ in a row. When the first READ
-/// enters the solicited confirm wait and the update is in a class enabled for unsolicited
-/// responses, the second READ is a new request while an unsolicited response is due (Table 6-1 row
-/// 15), which single ops rarely reach.
+/// A READ, an update and any request. When the READ enters the solicited confirm wait and the
+/// update is in a class enabled for unsolicited responses, the request is new while an unsolicited
+/// response is due (Table 6-1 rows 15 and 18), or a repeat.
+fn request_after_read_and_update() -> impl Strategy<Value = Vec<Op>> {
+    (read_op(), update_op(), request_op()).prop_map(|(read, update, next)| vec![read, update, next])
+}
+
+/// The confirm of the null unsolicited response, unsolicited responses enabled for every class but
+/// one, events in that class and a READ of them, which enters the solicited confirm wait, then an
+/// event in an enabled class, due as an unsolicited response, and any request
+fn due_in_the_solicited_wait() -> impl Strategy<Value = Vec<Op>> {
+    (kind(), 0..POINTS, 1u64..5, kind(), 0..POINTS, request_op()).prop_map(
+        |(kind, index, count, due_kind, due_index, request)| {
+            let class = kind.class(index);
+            // the first point from `due_index` on in another class
+            let due_index = (0..POINTS)
+                .map(|offset| (due_index + offset) % POINTS)
+                .find(|index| due_kind.class(*index) != class)
+                .unwrap_or(due_index);
+            vec![
+                Op::UnsolicitedConfirm(ConfirmChoice::Expected),
+                Op::Request(Function::EnableUnsolicited([0, 1, 2].map(|c| c != class))),
+                Op::Update { kind, index, count },
+                Op::Request(Function::Read(vec![ReadHeader::Class(class, None)])),
+                Op::Update {
+                    kind: due_kind,
+                    index: due_index,
+                    count: 1,
+                },
+                request,
+            ]
+        },
+    )
+}
+
+/// Large updates, a READ, the confirm of its first fragment and a repeat of the READ: a repeat of a
+/// later fragment of the series, and of a middle one when there are three or more
+fn repeat_of_a_later_fragment() -> impl Strategy<Value = Vec<Op>> {
+    let read = prop_oneof![read_op(), Just(Op::Request(read_every_class()))];
+    (prop::collection::vec(large_update_op(), 2..5), read).prop_map(|(mut ops, read)| {
+        ops.extend([
+            read,
+            Op::SolicitedConfirm(ConfirmChoice::Expected),
+            Op::Repeat,
+        ]);
+        ops
+    })
+}
+
+/// A READ, a wait shorter than the confirm timeout, a repeat of the READ and a wait to the next
+/// deadline: the timeout of the solicited confirm wait the repeat restarted
+fn timeout_of_a_restarted_wait() -> impl Strategy<Value = Vec<Op>> {
+    let advance = prop_oneof![
+        Just(AdvanceChoice::BeforeDeadline),
+        Just(AdvanceChoice::Millis(1))
+    ];
+    (read_op(), advance).prop_map(|(read, advance)| {
+        vec![
+            read,
+            Op::Advance(advance),
+            Op::Repeat,
+            Op::Advance(AdvanceChoice::AtDeadline),
+        ]
+    })
+}
+
+/// An update, a DISABLE_UNSOLICITED and waits to the next two deadlines: the timeout of an
+/// unsolicited confirm wait after a DISABLE, and the next series after the retry delay
+fn timeout_after_disable() -> impl Strategy<Value = Vec<Op>> {
+    (update_op(), classes()).prop_map(|(update, classes)| {
+        vec![
+            update,
+            Op::Request(Function::DisableUnsolicited(classes)),
+            Op::Advance(AdvanceChoice::AtDeadline),
+            Op::Advance(AdvanceChoice::AtDeadline),
+        ]
+    })
+}
+
+/// Single ops, and runs of ops that reach states single ops rarely do
 fn ops() -> impl Strategy<Value = Vec<Op>> {
     let run = prop_oneof![
-        6 => op().prop_map(|op| vec![op]),
-        1 => (read_op(), update_op(), read_op()).prop_map(|(read, update, next)| {
-            vec![read, update, next]
-        }),
+        16 => op().prop_map(|op| vec![op]),
+        2 => request_after_read_and_update(),
+        3 => due_in_the_solicited_wait(),
+        1 => repeat_of_a_later_fragment(),
+        1 => timeout_of_a_restarted_wait(),
+        1 => timeout_after_disable(),
     ];
     prop::collection::vec(run, 1..40).prop_map(|runs| runs.concat())
 }
@@ -1337,9 +1462,10 @@ async fn check_model(setup: Setup, ops: Vec<Op>) {
 
     // Every event left is reported and confirmed exactly once. The drain adds no events, and the
     // model requires each response to carry some of the events selected for it, so every confirm
-    // deletes at least one event but the first: it may confirm the null response, or a response
-    // whose events were all evicted before the drain. The DISABLE and the READ make two more inputs.
-    let limit = model.events.len() + 3;
+    // deletes at least one event but two: the first may confirm a response whose events were all
+    // evicted before the drain, and one may confirm the null response, which a deferred READ's
+    // answer can hold back until then. The DISABLE and the READ make two more inputs.
+    let limit = model.events.len() + 4;
     for _ in 0..limit {
         let Some(op) = model.drain_op() else {
             break;
@@ -1371,11 +1497,9 @@ proptest! {
     }
 }
 
-/// The property's first failure: a new READ in the solicited confirm wait, after the unsolicited
-/// retry delay has passed, is answered before the unsolicited response that's due (Table 6-1 row
-/// 15)
-#[test]
-fn new_read_in_the_solicited_wait_comes_before_a_due_unsolicited_response() {
+/// A case with unsolicited responses enabled and no retries, whose ops end in the solicited confirm
+/// wait of a READ while an unsolicited response is due, then send `request`
+fn due_in_the_solicited_wait_case(request: Op) -> (Setup, Vec<Op>) {
     let setup = Setup {
         unsolicited: true,
         max_retries: Some(0),
@@ -1389,7 +1513,7 @@ fn new_read_in_the_solicited_wait_comes_before_a_due_unsolicited_response() {
     let ops = vec![
         // the null unsolicited response
         Op::UnsolicitedConfirm(ConfirmChoice::Expected),
-        Op::Enable([false, false, true]),
+        Op::Request(Function::EnableUnsolicited([false, false, true])),
         // a class 3 event, sent unsolicited
         Op::Update {
             kind: Kind::Counter,
@@ -1399,10 +1523,103 @@ fn new_read_in_the_solicited_wait_comes_before_a_due_unsolicited_response() {
         // no retries: the retry delay starts
         Op::Advance(AdvanceChoice::AtDeadline),
         // answered with CON, entering the solicited confirm wait
-        Op::Read(vec![ReadHeader::Class(2, None)]),
+        Op::Request(Function::Read(vec![ReadHeader::Class(2, None)])),
         // past the retry delay, so an unsolicited response is due
         Op::Advance(AdvanceChoice::BeforeDeadline),
-        Op::Read(vec![ReadHeader::Class(0, None)]),
+        request,
     ];
+    (setup, ops)
+}
+
+/// The property's first failure: a new READ in the solicited confirm wait, after the unsolicited
+/// retry delay has passed, is answered before the unsolicited response that's due (Table 6-1 row
+/// 15)
+#[test]
+fn new_read_in_the_solicited_wait_comes_before_a_due_unsolicited_response() {
+    let (setup, ops) =
+        due_in_the_solicited_wait_case(Op::Request(Function::Read(vec![ReadHeader::Class(
+            0, None,
+        )])));
     run_paused(check_model(setup, ops));
+}
+
+/// Like a READ, a new request of another function in the solicited confirm wait is answered
+/// before the unsolicited response that's due (Table 6-1 row 15)
+#[test]
+fn new_non_read_in_the_solicited_wait_comes_before_a_due_unsolicited_response() {
+    let (setup, ops) = due_in_the_solicited_wait_case(Op::Request(Function::DelayMeasure));
+    run_paused(check_model(setup, ops));
+}
+
+/// a case without unsolicited responses, with room for 100 counter events
+fn solicited_only() -> Setup {
+    Setup {
+        unsolicited: false,
+        max_retries: None,
+        confirm_ms: 1000,
+        retry_ms: 5000,
+        max_counter: 100,
+        max_analog: 1,
+        solicited_size: BufferSize::<249, 2048>::MIN,
+        unsolicited_size: BufferSize::<249, 2048>::MIN,
+    }
+}
+
+/// class 1 events, from counter 0
+fn class_1_events(count: u64) -> Op {
+    Op::Update {
+        kind: Kind::Counter,
+        index: 0,
+        count,
+    }
+}
+
+/// A request in the solicited confirm wait with the READ's sequence number but other headers is a
+/// new request, not a repeat (Table 6-1 row 18): it ends the wait and is answered
+#[test]
+fn request_with_the_reads_sequence_number_and_other_headers_is_new() {
+    let ops = vec![
+        class_1_events(3),
+        Op::Request(Function::Read(vec![ReadHeader::Class(0, None)])),
+        // one event, in a new wait for the same sequence number
+        Op::SameSeq(Function::Read(vec![ReadHeader::Class(0, Some(1))])),
+        Op::SolicitedConfirm(ConfirmChoice::Expected),
+        // and a request of another function
+        class_1_events(1),
+        Op::Request(Function::Read(vec![ReadHeader::Class(0, None)])),
+        Op::SameSeq(Function::DelayMeasure),
+    ];
+    run_paused(check_model(solicited_only(), ops));
+}
+
+/// A repeated READ while a middle fragment of its series waits for its confirm gets that fragment's
+/// bytes again, and the series goes on from there
+#[test]
+fn repeated_read_gets_the_middle_fragment_waiting() {
+    let ops = vec![
+        // three fragments of the minimum size
+        class_1_events(80),
+        Op::Request(Function::Read(vec![ReadHeader::Class(0, None)])),
+        Op::SolicitedConfirm(ConfirmChoice::Expected),
+        Op::Repeat,
+        Op::SolicitedConfirm(ConfirmChoice::Expected),
+        Op::SolicitedConfirm(ConfirmChoice::Expected),
+    ];
+    run_paused(check_model(solicited_only(), ops));
+}
+
+/// A repeated READ in the solicited confirm wait restarts the confirm timeout: the wait doesn't end
+/// at the first deadline, but at the one the repeat set
+#[test]
+fn repeated_read_restarts_the_solicited_confirm_timeout() {
+    let ops = vec![
+        class_1_events(1),
+        Op::Request(Function::Read(vec![ReadHeader::Class(0, None)])),
+        Op::Advance(AdvanceChoice::Millis(400)),
+        Op::Repeat,
+        // past the first deadline
+        Op::Advance(AdvanceChoice::Millis(800)),
+        Op::Advance(AdvanceChoice::AtDeadline),
+    ];
+    run_paused(check_model(solicited_only(), ops));
 }
