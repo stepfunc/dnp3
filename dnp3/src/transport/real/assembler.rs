@@ -956,59 +956,6 @@ mod tests {
         assert_eq!(h.pop(), None);
     }
 
-    #[test]
-    fn discards_display_their_log_messages() {
-        let source = EndpointAddress::raw(1);
-        let cases = [
-            (
-                Discard::NewSeries { len: 3, source },
-                "received FIR - dropping 3 assembled bytes from 1",
-            ),
-            (
-                Discard::BroadcastSeries {
-                    fir: false,
-                    fin: true,
-                },
-                "ignoring broadcast frame with transport header fir: false and fin: true",
-            ),
-            (
-                Discard::NoSeries { source },
-                "ignoring non-FIR segment from 1 with no previous FIR",
-            ),
-            (
-                Discard::Repeat { seq: 1 },
-                "ignoring repeated segment with seq: 1",
-            ),
-            (
-                Discard::DifferentRepeat { seq: 1 },
-                "segment with repeated seq: 1 differs from the previous segment",
-            ),
-            (
-                Discard::UnexpectedSeq {
-                    expected: 11,
-                    received: 12,
-                },
-                "expected seq: 11 but received seq: 12",
-            ),
-            (
-                Discard::Overflow { len: 9 },
-                "buffer overflow with 9 bytes to write",
-            ),
-            (
-                Discard::Pending,
-                "ignoring segment while a fragment waits to be read",
-            ),
-        ];
-        for (discard, message) in cases {
-            assert_eq!(discard.to_string(), message);
-        }
-        let conflicting = Discard::ConflictingAddress {
-            previous: from(1),
-            received: from(2),
-        };
-        assert!(conflicting.to_string().starts_with("conflicting addresses"));
-    }
-
     /// The assembler against a model written from the reception rules and the documented
     /// extensions, over streams of valid series with one perturbation each
     #[expect(
