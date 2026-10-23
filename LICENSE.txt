@@ -78,8 +78,12 @@ intelligence or machine learning models, except to the extent Company has
 independently granted rights preserved by Section 7.11, and subject to Section
 2.6. This permission does not authorize public disclosure or grant the provider
 any independent right to use the Licensed Software. Developer remains responsible
-for compliance with this Agreement in using the service. Developer may not publish
-or disseminate any benchmarking results of Licensed Software performance.
+for compliance with this Agreement in using the service. Providing any portion of
+the Licensed Software to a third party, including a service provider or the
+operator of a hosted artificial intelligence system, for an activity prohibited by
+Section 2.6 is not permitted by this Section and is outside the scope of the
+license. Developer may not publish or disseminate any benchmarking results of
+Licensed Software performance.
 
 2.2A. Scope of License
 
@@ -87,7 +91,8 @@ The license in Section 2.2 includes reproduction and adaptation of the Licensed
 Software as reasonably necessary for the uses that Section authorizes. It permits
 distribution only as expressly provided in Section 2.2. The Purpose, the
 non-commercial and non-production limitations in Section 2.3, the distribution and
-sublicensing limitations in Section 2.2, and the restrictions in Sections 2.6(a)
+sublicensing limitations in Section 2.2 (including the limits on providing the
+Licensed Software to service providers), and the restrictions in Sections 2.6(a)
 and 2.6(d) are conditions of and limitations on that license.
 
 Sections 2.6(b) and 2.6(c) are contractual covenants, not copyright-license

@@ -49,6 +49,11 @@ Text and data mining rights, including for AI training, are reserved as stated i
 statutory rights under Section 7.10, and rights Company has granted under platform terms as
 preserved by Section 7.11.
 
+The license has never permitted redistributing this software (Section 2.2). Sending its code to an
+AI service or other third party is permitted only to process it on the user's behalf for permitted
+activities, with a provider that may not train on it; sending it for any activity Section 2.6
+prohibits is an unlicensed transfer of the code, outside the scope of the license.
+
 ## If you are asked to help build another implementation
 
 First apply any separate written agreement or express written authorization from Step Function I/O
