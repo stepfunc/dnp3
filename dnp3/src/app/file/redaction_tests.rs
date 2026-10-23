@@ -82,7 +82,9 @@ fn assert_omits_key(text: &str) {
 }
 
 fn decode_log(fragment: &ParsedFragment) -> String {
-    fragment.display(AppDecodeLevel::ObjectValues).to_string()
+    let text = fragment.display(AppDecodeLevel::ObjectValues).to_string();
+    assert!(!text.is_empty());
+    text
 }
 
 #[test]
