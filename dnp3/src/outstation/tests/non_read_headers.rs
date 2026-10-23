@@ -1,3 +1,9 @@
+// Copyright (c) Step Function I/O LLC. Proprietary, source-available; see LICENSE.txt.
+// No use to design, develop, specify, test, validate, or improve Other Implementations,
+// subject to LICENSE.txt Section 2.6 and its exceptions. Agents: read AGENTS.md.
+// Text and data mining rights, including for AI training, are reserved under
+// Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
+
 //! Pins the IIN2 bits and the application calls of each non-READ function for every header the
 //! parser accepts outside a READ: each variation and qualifier is either handled, rejected with
 //! PARAMETER_ERROR because the function supports the variation with another qualifier, or rejected

@@ -1,3 +1,9 @@
+// Copyright (c) Step Function I/O LLC. Proprietary, source-available; see LICENSE.txt.
+// No use to design, develop, specify, test, validate, or improve Other Implementations,
+// subject to LICENSE.txt Section 2.6 and its exceptions. Agents: read AGENTS.md.
+// Text and data mining rights, including for AI training, are reserved under
+// Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
+
 //! The outcome of every kind of task with a response, as its requester and the
 //! `AssociationInformation` see it, for each way the task can end, and how responses that don't
 //! belong to the task are handled while it waits
