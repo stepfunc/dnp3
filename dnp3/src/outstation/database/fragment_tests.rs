@@ -85,88 +85,28 @@ impl Kind {
     /// the variations a READ of the static points can ask for, the first being variation 0
     fn static_reads(self) -> &'static [V] {
         match self {
-            Kind::Binary => &[V::Group1Var0, V::Group1Var1, V::Group1Var2],
-            Kind::DoubleBit => &[V::Group3Var0, V::Group3Var1, V::Group3Var2],
-            Kind::BinaryOutputStatus => &[V::Group10Var0, V::Group10Var1, V::Group10Var2],
-            Kind::Counter => &[
-                V::Group20Var0,
-                V::Group20Var1,
-                V::Group20Var2,
-                V::Group20Var5,
-                V::Group20Var6,
-            ],
-            Kind::FrozenCounter => &[
-                V::Group21Var0,
-                V::Group21Var1,
-                V::Group21Var2,
-                V::Group21Var5,
-                V::Group21Var6,
-                V::Group21Var9,
-                V::Group21Var10,
-            ],
-            Kind::Analog => &[
-                V::Group30Var0,
-                V::Group30Var1,
-                V::Group30Var2,
-                V::Group30Var3,
-                V::Group30Var4,
-                V::Group30Var5,
-                V::Group30Var6,
-            ],
-            Kind::AnalogOutputStatus => &[
-                V::Group40Var0,
-                V::Group40Var1,
-                V::Group40Var2,
-                V::Group40Var3,
-                V::Group40Var4,
-            ],
-            Kind::OctetString => &[V::Group110(0)],
+            Kind::Binary => BINARY_INPUT_STATIC_READS,
+            Kind::DoubleBit => DOUBLE_BIT_BINARY_INPUT_STATIC_READS,
+            Kind::BinaryOutputStatus => BINARY_OUTPUT_STATUS_STATIC_READS,
+            Kind::Counter => COUNTER_STATIC_READS,
+            Kind::FrozenCounter => FROZEN_COUNTER_STATIC_READS,
+            Kind::Analog => ANALOG_INPUT_STATIC_READS,
+            Kind::AnalogOutputStatus => ANALOG_OUTPUT_STATUS_STATIC_READS,
+            Kind::OctetString => OCTET_STRING_STATIC_READS,
         }
     }
 
     /// the variations a READ of the events can ask for, the first being variation 0
     fn event_reads(self) -> &'static [V] {
         match self {
-            Kind::Binary => &[V::Group2Var0, V::Group2Var1, V::Group2Var2, V::Group2Var3],
-            Kind::DoubleBit => &[V::Group4Var0, V::Group4Var1, V::Group4Var2, V::Group4Var3],
-            Kind::BinaryOutputStatus => &[V::Group11Var0, V::Group11Var1, V::Group11Var2],
-            Kind::Counter => &[
-                V::Group22Var0,
-                V::Group22Var1,
-                V::Group22Var2,
-                V::Group22Var5,
-                V::Group22Var6,
-            ],
-            Kind::FrozenCounter => &[
-                V::Group23Var0,
-                V::Group23Var1,
-                V::Group23Var2,
-                V::Group23Var5,
-                V::Group23Var6,
-            ],
-            Kind::Analog => &[
-                V::Group32Var0,
-                V::Group32Var1,
-                V::Group32Var2,
-                V::Group32Var3,
-                V::Group32Var4,
-                V::Group32Var5,
-                V::Group32Var6,
-                V::Group32Var7,
-                V::Group32Var8,
-            ],
-            Kind::AnalogOutputStatus => &[
-                V::Group42Var0,
-                V::Group42Var1,
-                V::Group42Var2,
-                V::Group42Var3,
-                V::Group42Var4,
-                V::Group42Var5,
-                V::Group42Var6,
-                V::Group42Var7,
-                V::Group42Var8,
-            ],
-            Kind::OctetString => &[V::Group111(0)],
+            Kind::Binary => BINARY_INPUT_EVENT_READS,
+            Kind::DoubleBit => DOUBLE_BIT_BINARY_INPUT_EVENT_READS,
+            Kind::BinaryOutputStatus => BINARY_OUTPUT_STATUS_EVENT_READS,
+            Kind::Counter => COUNTER_EVENT_READS,
+            Kind::FrozenCounter => FROZEN_COUNTER_EVENT_READS,
+            Kind::Analog => ANALOG_INPUT_EVENT_READS,
+            Kind::AnalogOutputStatus => ANALOG_OUTPUT_STATUS_EVENT_READS,
+            Kind::OctetString => OCTET_STRING_EVENT_READS,
         }
     }
 }
@@ -316,124 +256,57 @@ fn update(db: &mut Database, kind: Kind, index: u16, x: &Sample, options: Update
 }
 
 fn add(db: &mut Database, x: &Point) -> bool {
-    use EventAnalogInputVariation as E30;
-    use EventAnalogOutputStatusVariation as E40;
-    use EventCounterVariation as E20;
-    use EventFrozenCounterVariation as E21;
-    use StaticAnalogInputVariation as S30;
-    use StaticAnalogOutputStatusVariation as S40;
-    use StaticCounterVariation as S20;
-    use StaticFrozenCounterVariation as S21;
-
     let (index, class, s, e) = (x.index, x.class, &x.static_variation, &x.event_variation);
     match x.kind {
         Kind::Binary => {
-            use EventBinaryInputVariation as E;
-            use StaticBinaryInputVariation as S;
             let config = BinaryInputConfig {
-                s_var: *s.get(&[S::Group1Var1, S::Group1Var2]),
-                e_var: *e.get(&[E::Group2Var1, E::Group2Var2, E::Group2Var3]),
+                s_var: *s.get(StaticBinaryInputVariation::ALL),
+                e_var: *e.get(EventBinaryInputVariation::ALL),
             };
             db.add(index, class, config)
         }
         Kind::DoubleBit => {
-            use EventDoubleBitBinaryInputVariation as E;
-            use StaticDoubleBitBinaryInputVariation as S;
             let config = DoubleBitBinaryInputConfig {
-                s_var: *s.get(&[S::Group3Var1, S::Group3Var2]),
-                e_var: *e.get(&[E::Group4Var1, E::Group4Var2, E::Group4Var3]),
+                s_var: *s.get(StaticDoubleBitBinaryInputVariation::ALL),
+                e_var: *e.get(EventDoubleBitBinaryInputVariation::ALL),
             };
             db.add(index, class, config)
         }
         Kind::BinaryOutputStatus => {
-            use EventBinaryOutputStatusVariation as E;
-            use StaticBinaryOutputStatusVariation as S;
             let config = BinaryOutputStatusConfig {
-                s_var: *s.get(&[S::Group10Var1, S::Group10Var2]),
-                e_var: *e.get(&[E::Group11Var1, E::Group11Var2]),
+                s_var: *s.get(StaticBinaryOutputStatusVariation::ALL),
+                e_var: *e.get(EventBinaryOutputStatusVariation::ALL),
             };
             db.add(index, class, config)
         }
         Kind::Counter => {
             let config = CounterConfig {
-                s_var: *s.get(&[
-                    S20::Group20Var1,
-                    S20::Group20Var2,
-                    S20::Group20Var5,
-                    S20::Group20Var6,
-                ]),
-                e_var: *e.get(&[
-                    E20::Group22Var1,
-                    E20::Group22Var2,
-                    E20::Group22Var5,
-                    E20::Group22Var6,
-                ]),
+                s_var: *s.get(StaticCounterVariation::ALL),
+                e_var: *e.get(EventCounterVariation::ALL),
                 ..Default::default()
             };
             db.add(index, class, config)
         }
         Kind::FrozenCounter => {
             let config = FrozenCounterConfig {
-                s_var: *s.get(&[
-                    S21::Group21Var1,
-                    S21::Group21Var2,
-                    S21::Group21Var5,
-                    S21::Group21Var6,
-                    S21::Group21Var9,
-                    S21::Group21Var10,
-                ]),
-                e_var: *e.get(&[
-                    E21::Group23Var1,
-                    E21::Group23Var2,
-                    E21::Group23Var5,
-                    E21::Group23Var6,
-                ]),
+                s_var: *s.get(StaticFrozenCounterVariation::ALL),
+                e_var: *e.get(EventFrozenCounterVariation::ALL),
                 ..Default::default()
             };
             db.add(index, class, config)
         }
         Kind::Analog => {
             let config = AnalogInputConfig {
-                s_var: *s.get(&[
-                    S30::Group30Var1,
-                    S30::Group30Var2,
-                    S30::Group30Var3,
-                    S30::Group30Var4,
-                    S30::Group30Var5,
-                    S30::Group30Var6,
-                ]),
-                e_var: *e.get(&[
-                    E30::Group32Var1,
-                    E30::Group32Var2,
-                    E30::Group32Var3,
-                    E30::Group32Var4,
-                    E30::Group32Var5,
-                    E30::Group32Var6,
-                    E30::Group32Var7,
-                    E30::Group32Var8,
-                ]),
+                s_var: *s.get(StaticAnalogInputVariation::ALL),
+                e_var: *e.get(EventAnalogInputVariation::ALL),
                 deadband: x.deadband,
             };
             db.add(index, class, config)
         }
         Kind::AnalogOutputStatus => {
             let config = AnalogOutputStatusConfig {
-                s_var: *s.get(&[
-                    S40::Group40Var1,
-                    S40::Group40Var2,
-                    S40::Group40Var3,
-                    S40::Group40Var4,
-                ]),
-                e_var: *e.get(&[
-                    E40::Group42Var1,
-                    E40::Group42Var2,
-                    E40::Group42Var3,
-                    E40::Group42Var4,
-                    E40::Group42Var5,
-                    E40::Group42Var6,
-                    E40::Group42Var7,
-                    E40::Group42Var8,
-                ]),
+                s_var: *s.get(StaticAnalogOutputStatusVariation::ALL),
+                e_var: *e.get(EventAnalogOutputStatusVariation::ALL),
                 ..Default::default()
             };
             db.add(index, class, config)
@@ -534,15 +407,11 @@ impl Spec {
                 Read::Event(kind, variation, limit) => {
                     count(&mut bytes, *variation.get(kind.event_reads()), *limit)
                 }
-                Read::DeadBand(variation, r) => {
-                    let variations = [
-                        V::Group34Var0,
-                        V::Group34Var1,
-                        V::Group34Var2,
-                        V::Group34Var3,
-                    ];
-                    range(&mut bytes, *variation.get(&variations), *r)
-                }
+                Read::DeadBand(variation, r) => range(
+                    &mut bytes,
+                    *variation.get(ANALOG_INPUT_DEAD_BAND_STATIC_READS),
+                    *r,
+                ),
                 Read::AllSets(var) => {
                     header(&mut bytes, V::Group0(*var), QualifierCode::AllObjects)
                 }

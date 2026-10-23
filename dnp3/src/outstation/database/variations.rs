@@ -16,6 +16,9 @@
 // This file is auto-generated. Do not edit manually
 //
 
+#[cfg(test)]
+use crate::app::Variation;
+
 /// Enum representing all possible `BinaryInput` static variations
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(
@@ -360,3 +363,298 @@ pub(crate) enum AnalogInputDeadBandVariation {
     /// Analog Input Reporting Deadband - Single-precision floating point
     Group34Var3,
 }
+
+#[cfg(test)]
+impl StaticBinaryInputVariation {
+    /// Every variation, in order
+    pub(crate) const ALL: &[Self] = &[Self::Group1Var1, Self::Group1Var2];
+}
+
+#[cfg(test)]
+impl EventBinaryInputVariation {
+    /// Every variation, in order
+    pub(crate) const ALL: &[Self] = &[Self::Group2Var1, Self::Group2Var2, Self::Group2Var3];
+}
+
+#[cfg(test)]
+impl StaticDoubleBitBinaryInputVariation {
+    /// Every variation, in order
+    pub(crate) const ALL: &[Self] = &[Self::Group3Var1, Self::Group3Var2];
+}
+
+#[cfg(test)]
+impl EventDoubleBitBinaryInputVariation {
+    /// Every variation, in order
+    pub(crate) const ALL: &[Self] = &[Self::Group4Var1, Self::Group4Var2, Self::Group4Var3];
+}
+
+#[cfg(test)]
+impl StaticBinaryOutputStatusVariation {
+    /// Every variation, in order
+    pub(crate) const ALL: &[Self] = &[Self::Group10Var1, Self::Group10Var2];
+}
+
+#[cfg(test)]
+impl EventBinaryOutputStatusVariation {
+    /// Every variation, in order
+    pub(crate) const ALL: &[Self] = &[Self::Group11Var1, Self::Group11Var2];
+}
+
+#[cfg(test)]
+impl StaticCounterVariation {
+    /// Every variation, in order
+    pub(crate) const ALL: &[Self] = &[
+        Self::Group20Var1,
+        Self::Group20Var2,
+        Self::Group20Var5,
+        Self::Group20Var6,
+    ];
+}
+
+#[cfg(test)]
+impl EventCounterVariation {
+    /// Every variation, in order
+    pub(crate) const ALL: &[Self] = &[
+        Self::Group22Var1,
+        Self::Group22Var2,
+        Self::Group22Var5,
+        Self::Group22Var6,
+    ];
+}
+
+#[cfg(test)]
+impl StaticFrozenCounterVariation {
+    /// Every variation, in order
+    pub(crate) const ALL: &[Self] = &[
+        Self::Group21Var1,
+        Self::Group21Var2,
+        Self::Group21Var5,
+        Self::Group21Var6,
+        Self::Group21Var9,
+        Self::Group21Var10,
+    ];
+}
+
+#[cfg(test)]
+impl EventFrozenCounterVariation {
+    /// Every variation, in order
+    pub(crate) const ALL: &[Self] = &[
+        Self::Group23Var1,
+        Self::Group23Var2,
+        Self::Group23Var5,
+        Self::Group23Var6,
+    ];
+}
+
+#[cfg(test)]
+impl StaticAnalogInputVariation {
+    /// Every variation, in order
+    pub(crate) const ALL: &[Self] = &[
+        Self::Group30Var1,
+        Self::Group30Var2,
+        Self::Group30Var3,
+        Self::Group30Var4,
+        Self::Group30Var5,
+        Self::Group30Var6,
+    ];
+}
+
+#[cfg(test)]
+impl EventAnalogInputVariation {
+    /// Every variation, in order
+    pub(crate) const ALL: &[Self] = &[
+        Self::Group32Var1,
+        Self::Group32Var2,
+        Self::Group32Var3,
+        Self::Group32Var4,
+        Self::Group32Var5,
+        Self::Group32Var6,
+        Self::Group32Var7,
+        Self::Group32Var8,
+    ];
+}
+
+#[cfg(test)]
+impl StaticAnalogOutputStatusVariation {
+    /// Every variation, in order
+    pub(crate) const ALL: &[Self] = &[
+        Self::Group40Var1,
+        Self::Group40Var2,
+        Self::Group40Var3,
+        Self::Group40Var4,
+    ];
+}
+
+#[cfg(test)]
+impl EventAnalogOutputStatusVariation {
+    /// Every variation, in order
+    pub(crate) const ALL: &[Self] = &[
+        Self::Group42Var1,
+        Self::Group42Var2,
+        Self::Group42Var3,
+        Self::Group42Var4,
+        Self::Group42Var5,
+        Self::Group42Var6,
+        Self::Group42Var7,
+        Self::Group42Var8,
+    ];
+}
+
+/// The variations a READ of the static binary input points can name, variation 0 first
+#[cfg(test)]
+pub(crate) const BINARY_INPUT_STATIC_READS: &[Variation] = &[
+    Variation::Group1Var0,
+    Variation::Group1Var1,
+    Variation::Group1Var2,
+];
+
+/// The variations a READ of the binary input events can name, variation 0 first
+#[cfg(test)]
+pub(crate) const BINARY_INPUT_EVENT_READS: &[Variation] = &[
+    Variation::Group2Var0,
+    Variation::Group2Var1,
+    Variation::Group2Var2,
+    Variation::Group2Var3,
+];
+
+/// The variations a READ of the static double-bit binary input points can name, variation 0 first
+#[cfg(test)]
+pub(crate) const DOUBLE_BIT_BINARY_INPUT_STATIC_READS: &[Variation] = &[
+    Variation::Group3Var0,
+    Variation::Group3Var1,
+    Variation::Group3Var2,
+];
+
+/// The variations a READ of the double-bit binary input events can name, variation 0 first
+#[cfg(test)]
+pub(crate) const DOUBLE_BIT_BINARY_INPUT_EVENT_READS: &[Variation] = &[
+    Variation::Group4Var0,
+    Variation::Group4Var1,
+    Variation::Group4Var2,
+    Variation::Group4Var3,
+];
+
+/// The variations a READ of the static binary output status points can name, variation 0 first
+#[cfg(test)]
+pub(crate) const BINARY_OUTPUT_STATUS_STATIC_READS: &[Variation] = &[
+    Variation::Group10Var0,
+    Variation::Group10Var1,
+    Variation::Group10Var2,
+];
+
+/// The variations a READ of the binary output status events can name, variation 0 first
+#[cfg(test)]
+pub(crate) const BINARY_OUTPUT_STATUS_EVENT_READS: &[Variation] = &[
+    Variation::Group11Var0,
+    Variation::Group11Var1,
+    Variation::Group11Var2,
+];
+
+/// The variations a READ of the static counter points can name, variation 0 first
+#[cfg(test)]
+pub(crate) const COUNTER_STATIC_READS: &[Variation] = &[
+    Variation::Group20Var0,
+    Variation::Group20Var1,
+    Variation::Group20Var2,
+    Variation::Group20Var5,
+    Variation::Group20Var6,
+];
+
+/// The variations a READ of the counter events can name, variation 0 first
+#[cfg(test)]
+pub(crate) const COUNTER_EVENT_READS: &[Variation] = &[
+    Variation::Group22Var0,
+    Variation::Group22Var1,
+    Variation::Group22Var2,
+    Variation::Group22Var5,
+    Variation::Group22Var6,
+];
+
+/// The variations a READ of the static frozen counter points can name, variation 0 first
+#[cfg(test)]
+pub(crate) const FROZEN_COUNTER_STATIC_READS: &[Variation] = &[
+    Variation::Group21Var0,
+    Variation::Group21Var1,
+    Variation::Group21Var2,
+    Variation::Group21Var5,
+    Variation::Group21Var6,
+    Variation::Group21Var9,
+    Variation::Group21Var10,
+];
+
+/// The variations a READ of the frozen counter events can name, variation 0 first
+#[cfg(test)]
+pub(crate) const FROZEN_COUNTER_EVENT_READS: &[Variation] = &[
+    Variation::Group23Var0,
+    Variation::Group23Var1,
+    Variation::Group23Var2,
+    Variation::Group23Var5,
+    Variation::Group23Var6,
+];
+
+/// The variations a READ of the static analog input points can name, variation 0 first
+#[cfg(test)]
+pub(crate) const ANALOG_INPUT_STATIC_READS: &[Variation] = &[
+    Variation::Group30Var0,
+    Variation::Group30Var1,
+    Variation::Group30Var2,
+    Variation::Group30Var3,
+    Variation::Group30Var4,
+    Variation::Group30Var5,
+    Variation::Group30Var6,
+];
+
+/// The variations a READ of the analog input events can name, variation 0 first
+#[cfg(test)]
+pub(crate) const ANALOG_INPUT_EVENT_READS: &[Variation] = &[
+    Variation::Group32Var0,
+    Variation::Group32Var1,
+    Variation::Group32Var2,
+    Variation::Group32Var3,
+    Variation::Group32Var4,
+    Variation::Group32Var5,
+    Variation::Group32Var6,
+    Variation::Group32Var7,
+    Variation::Group32Var8,
+];
+
+/// The variations a READ of the static analog output status points can name, variation 0 first
+#[cfg(test)]
+pub(crate) const ANALOG_OUTPUT_STATUS_STATIC_READS: &[Variation] = &[
+    Variation::Group40Var0,
+    Variation::Group40Var1,
+    Variation::Group40Var2,
+    Variation::Group40Var3,
+    Variation::Group40Var4,
+];
+
+/// The variations a READ of the analog output status events can name, variation 0 first
+#[cfg(test)]
+pub(crate) const ANALOG_OUTPUT_STATUS_EVENT_READS: &[Variation] = &[
+    Variation::Group42Var0,
+    Variation::Group42Var1,
+    Variation::Group42Var2,
+    Variation::Group42Var3,
+    Variation::Group42Var4,
+    Variation::Group42Var5,
+    Variation::Group42Var6,
+    Variation::Group42Var7,
+    Variation::Group42Var8,
+];
+
+/// The variations a READ of the static analog input deadband points can name, variation 0 first
+#[cfg(test)]
+pub(crate) const ANALOG_INPUT_DEAD_BAND_STATIC_READS: &[Variation] = &[
+    Variation::Group34Var0,
+    Variation::Group34Var1,
+    Variation::Group34Var2,
+    Variation::Group34Var3,
+];
+
+/// The variations a READ of the static octet string points can name, variation 0 first
+#[cfg(test)]
+pub(crate) const OCTET_STRING_STATIC_READS: &[Variation] = &[Variation::Group110(0)];
+
+/// The variations a READ of the octet string events can name, variation 0 first
+#[cfg(test)]
+pub(crate) const OCTET_STRING_EVENT_READS: &[Variation] = &[Variation::Group111(0)];
