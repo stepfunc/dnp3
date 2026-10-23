@@ -845,6 +845,128 @@ pub(crate) fn low_16_bits(value: u32) -> u16 {
     u16::from_le_bytes([low, high])
 }
 
+/// Edge values for the analog conversions, and a model of the integer conversions that never
+/// converts a float with `as`, shared by the conversion properties here and master extraction's
+#[cfg(test)]
+pub(crate) mod analog_model {
+    use proptest::prelude::*;
+
+    /// zero and the bounds of i16, i32 and f32
+    fn limits() -> Vec<f64> {
+        vec![
+            0.0,
+            i16::MIN.into(),
+            i16::MAX.into(),
+            i32::MIN.into(),
+            i32::MAX.into(),
+            f32::MIN.into(),
+            f32::MAX.into(),
+        ]
+    }
+
+    /// half an f32 step past `f32::MAX`, where rounding to f32 gives infinity
+    fn past_f32_max() -> f64 {
+        f64::from(f32::MAX) + 2f64.powi(103)
+    }
+
+    /// each limit, one less and one more, and the adjacent `f64` values
+    fn neighbors() -> Vec<f64> {
+        limits()
+            .into_iter()
+            .flat_map(|limit| {
+                [
+                    limit.next_down(),
+                    limit - 1.0,
+                    limit,
+                    limit + 1.0,
+                    limit.next_up(),
+                ]
+            })
+            .collect()
+    }
+
+    /// the values on both sides of rounding past the f32 range, the infinities, NaN of both
+    /// signs, negative zero and the smallest subnormals
+    fn specials() -> Vec<f64> {
+        vec![
+            past_f32_max(),
+            past_f32_max().next_down(),
+            -past_f32_max(),
+            -past_f32_max().next_down(),
+            f64::INFINITY,
+            f64::NEG_INFINITY,
+            f64::NAN,
+            -f64::NAN,
+            -0.0,
+            f64::from_bits(1),
+            -f64::from_bits(1),
+        ]
+    }
+
+    /// fractions, values just past the integer limits, and values far past each range
+    fn fixed() -> Vec<f64> {
+        vec![
+            -1.9,
+            0.5,
+            -0.5,
+            -40000.0,
+            40000.0,
+            -32768.5,
+            32767.5,
+            -2147483648.5,
+            2147483647.5,
+            -1e12,
+            1e12,
+            f64::MIN,
+            f64::MAX,
+        ]
+    }
+
+    /// the limits and their neighbors, the special values and the fixed edges
+    pub(crate) fn edges() -> Vec<f64> {
+        neighbors()
+            .into_iter()
+            .chain(specials())
+            .chain(fixed())
+            .collect()
+    }
+
+    /// every bit pattern, the edges, values near the limits, and the midpoints between adjacent
+    /// f32 values, where rounding has to break a tie
+    pub(crate) fn value() -> impl Strategy<Value = f64> {
+        prop_oneof![
+            any::<u64>().prop_map(f64::from_bits),
+            -1e10f64..1e10,
+            (prop::sample::select(limits()), -2.0f64..2.0)
+                .prop_map(|(limit, offset)| limit + offset),
+            prop::sample::select(neighbors()),
+            prop::sample::select(specials()),
+            prop::sample::select(fixed()),
+            any::<u32>().prop_filter_map("a finite f32 below another", |bits| {
+                let low = f32::from_bits(bits);
+                let high = low.next_up();
+                high.is_finite()
+                    .then(|| (f64::from(low) + f64::from(high)) / 2.0)
+            }),
+        ]
+    }
+
+    /// the wire value as an `f64`, and whether it is over range, for an integer variation with
+    /// the range `[min, max]`: NaN is 0, values past the range clamp, and the rest truncate toward
+    /// zero
+    pub(crate) fn integer(value: f64, min: f64, max: f64) -> (f64, bool) {
+        if value.is_nan() {
+            (0.0, true)
+        } else if value < min {
+            (min, true)
+        } else if value > max {
+            (max, true)
+        } else {
+            (value.trunc(), false)
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -861,90 +983,6 @@ mod tests {
     mod conversion_properties {
         use super::*;
         use proptest::prelude::*;
-
-        /// zero and the bounds of i16, i32 and f32
-        fn limits() -> Vec<f64> {
-            vec![
-                0.0,
-                i16::MIN.into(),
-                i16::MAX.into(),
-                i32::MIN.into(),
-                i32::MAX.into(),
-                f32::MIN.into(),
-                f32::MAX.into(),
-            ]
-        }
-
-        /// half an f32 step past `f32::MAX`, where rounding to f32 gives infinity
-        fn past_f32_max() -> f64 {
-            f64::from(f32::MAX) + 2f64.powi(103)
-        }
-
-        /// each limit, one less and one more, and the adjacent `f64` values
-        fn neighbors() -> Vec<f64> {
-            limits()
-                .into_iter()
-                .flat_map(|limit| {
-                    [
-                        limit.next_down(),
-                        limit - 1.0,
-                        limit,
-                        limit + 1.0,
-                        limit.next_up(),
-                    ]
-                })
-                .collect()
-        }
-
-        /// the values on both sides of rounding past the f32 range, the infinities, NaN of both
-        /// signs, negative zero and the smallest subnormals
-        fn specials() -> Vec<f64> {
-            vec![
-                past_f32_max(),
-                past_f32_max().next_down(),
-                -past_f32_max(),
-                -past_f32_max().next_down(),
-                f64::INFINITY,
-                f64::NEG_INFINITY,
-                f64::NAN,
-                -f64::NAN,
-                -0.0,
-                f64::from_bits(1),
-                -f64::from_bits(1),
-            ]
-        }
-
-        /// every bit pattern, the limits and their neighbors, and the midpoints between adjacent
-        /// f32 values, where rounding has to break a tie
-        fn value() -> impl Strategy<Value = f64> {
-            prop_oneof![
-                any::<u64>().prop_map(f64::from_bits),
-                -1e10f64..1e10,
-                (prop::sample::select(limits()), -2.0f64..2.0)
-                    .prop_map(|(limit, offset)| limit + offset),
-                prop::sample::select(neighbors()),
-                prop::sample::select(specials()),
-                any::<u32>().prop_filter_map("a finite f32 below another", |bits| {
-                    let low = f32::from_bits(bits);
-                    let high = low.next_up();
-                    high.is_finite()
-                        .then(|| (f64::from(low) + f64::from(high)) / 2.0)
-                }),
-            ]
-        }
-
-        /// the wire value as an `f64`, and whether it is over range, for an integer variation
-        fn integer_model(value: f64, min: f64, max: f64) -> (f64, bool) {
-            if value.is_nan() {
-                (0.0, true)
-            } else if value < min {
-                (min, true)
-            } else if value > max {
-                (max, true)
-            } else {
-                (value.trunc(), false)
-            }
-        }
 
         fn expected_flags(flags: Flags, over_range: bool) -> Flags {
             if over_range {
@@ -1033,12 +1071,14 @@ mod tests {
         }
 
         fn check<T: AnalogConversions>(measurement: T, value: f64, flags: Flags) {
-            let (expected, over_range) = integer_model(value, i16::MIN.into(), i16::MAX.into());
+            let (expected, over_range) =
+                analog_model::integer(value, i16::MIN.into(), i16::MAX.into());
             let (actual_flags, actual) = measurement.to_i16();
             assert_eq!(f64::from(actual), expected, "{value}");
             assert_eq!(actual_flags, expected_flags(flags, over_range), "{value}");
 
-            let (expected, over_range) = integer_model(value, i32::MIN.into(), i32::MAX.into());
+            let (expected, over_range) =
+                analog_model::integer(value, i32::MIN.into(), i32::MAX.into());
             let (actual_flags, actual) = measurement.to_i32();
             assert_eq!(f64::from(actual), expected, "{value}");
             assert_eq!(actual_flags, expected_flags(flags, over_range), "{value}");
@@ -1060,22 +1100,7 @@ mod tests {
 
         #[test]
         fn edge_values_match_the_model() {
-            // fractions, values just past the integer limits, and values far past each range
-            let fixed = [
-                -1.9,
-                0.5,
-                -40000.0,
-                40000.0,
-                -32768.5,
-                32767.5,
-                -2147483648.5,
-                2147483647.5,
-                -1e12,
-                1e12,
-                f64::MIN,
-                f64::MAX,
-            ];
-            for value in neighbors().into_iter().chain(specials()).chain(fixed) {
+            for value in analog_model::edges() {
                 check_all(value, Flags::ONLINE);
             }
         }
@@ -1084,7 +1109,7 @@ mod tests {
             #![proptest_config(ProptestConfig::with_cases(1024))]
 
             #[test]
-            fn analog_conversions_match_the_model(value in value(), flags in any::<u8>()) {
+            fn analog_conversions_match_the_model(value in analog_model::value(), flags in any::<u8>()) {
                 check_all(value, Flags::new(flags));
             }
         }
