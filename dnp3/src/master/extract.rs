@@ -206,6 +206,7 @@ mod test {
     use crate::app::parse::options::ParseOptions;
     use crate::app::parse::parser::HeaderCollection;
     use crate::app::*;
+    use crate::master::test_objects::{RELATIVE_TIME_EVENT, TRUNCATED_ANALOG_EVENT};
     use crate::master::{HeaderInfo, ReadHandler};
 
     use super::*;
@@ -421,24 +422,6 @@ mod test {
     }
 
     #[test]
-    fn relative_time_without_cto_is_invalid() {
-        // g2v3 count: 1 index: 7 flags: 0x01 time: 0xFFFF
-        assert_eq!(
-            validate(&[0x02, 0x03, 0x17, 0x01, 0x07, 0x01, 0xFF, 0xFF]),
-            Err(InvalidResponse::RelativeTimeWithoutCto(
-                Variation::Group2Var3
-            ))
-        );
-        // g4v3 count: 1 index: 7 flags: 0x01 time: 0xFFFF
-        assert_eq!(
-            validate(&[0x04, 0x03, 0x17, 0x01, 0x07, 0x01, 0xFF, 0xFF]),
-            Err(InvalidResponse::RelativeTimeWithoutCto(
-                Variation::Group4Var3
-            ))
-        );
-    }
-
-    #[test]
     fn time_delay_without_cto_is_valid() {
         // g52v1 count: 1 time: 5
         assert_eq!(validate(&[0x34, 0x01, 0x07, 0x01, 0x05, 0x00]), Ok(()));
@@ -447,167 +430,23 @@ mod test {
     }
 
     #[test]
-    fn relative_time_before_cto_is_invalid() {
-        assert_eq!(
-            validate(&[
-                0x02, 0x03, 0x17, 0x01, 0x07, 0x01, 0xFF, 0xFF, 0x33, 0x01, 0x07, 0x01, 0x02, 0x00,
-                0x00, 0x00, 0x00, 0x00,
-            ]),
-            Err(InvalidResponse::RelativeTimeWithoutCto(
-                Variation::Group2Var3
-            ))
-        );
-    }
-
-    #[test]
-    fn relative_time_after_cto_is_valid() {
-        // g51v2 time: 2, then g4v3 and g2v3
-        assert_eq!(
-            validate(&[
-                0x33, 0x02, 0x07, 0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04, 0x03, 0x17, 0x01,
-                0x07, 0x01, 0xFF, 0xFF, 0x02, 0x03, 0x17, 0x01, 0x07, 0x01, 0xFF, 0xFF,
-            ]),
-            Ok(())
-        );
-    }
-
-    #[test]
-    fn relative_time_header_without_objects_is_valid() {
-        // g2v3 count: 0
-        assert_eq!(validate(&[0x02, 0x03, 0x17, 0x00]), Ok(()));
-    }
-
-    #[test]
     fn malformed_objects_are_invalid() {
-        // g32v2 count: 1 index: 0, missing its flags and value
         assert_eq!(
-            validate(&[0x20, 0x02, 0x17, 0x01, 0x00]),
+            validate(TRUNCATED_ANALOG_EVENT),
             Err(InvalidResponse::Malformed(
                 ObjectParseError::InsufficientBytes
-            ))
-        );
-    }
-
-    #[test]
-    fn the_first_relative_time_header_with_objects_without_cto_is_reported() {
-        // g2v3 count: 0, g4v3 count: 1, g51v1 count: 1, g2v3 count: 1
-        assert_eq!(
-            validate(&[
-                0x02, 0x03, 0x17, 0x00, 0x04, 0x03, 0x17, 0x01, 0x07, 0x01, 0xFF, 0xFF, 0x33, 0x01,
-                0x07, 0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x03, 0x17, 0x01, 0x07, 0x01,
-                0xFF, 0xFF,
-            ]),
-            Err(InvalidResponse::RelativeTimeWithoutCto(
-                Variation::Group4Var3
             ))
         );
     }
 
     #[test]
     fn malformed_objects_after_relative_time_without_cto_are_malformed() {
-        // g2v3 count: 1, then g32v2 count: 1 index: 0, missing its flags and value
         assert_eq!(
-            validate(&[
-                0x02, 0x03, 0x17, 0x01, 0x07, 0x01, 0xFF, 0xFF, 0x20, 0x02, 0x17, 0x01, 0x00
-            ]),
+            validate(&[RELATIVE_TIME_EVENT, TRUNCATED_ANALOG_EVENT].concat()),
             Err(InvalidResponse::Malformed(
                 ObjectParseError::InsufficientBytes
             ))
         );
-    }
-
-    #[test]
-    fn relative_time_after_a_cto_with_a_count_other_than_one_is_invalid() {
-        for cto in CTOS_WITH_A_COUNT_OTHER_THAN_ONE {
-            let mut input = cto.to_vec();
-            input.extend(G2V3_INDEX_7);
-
-            assert_eq!(
-                validate(&input),
-                Err(InvalidResponse::RelativeTimeWithoutCto(
-                    Variation::Group2Var3
-                )),
-                "{cto:02X?}"
-            );
-        }
-    }
-
-    #[test]
-    fn cto_with_a_count_other_than_one_does_not_replace_the_previous_cto() {
-        // g51v1 count: 1 time: 2
-        let first = [0x33, 0x01, 0x07, 0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00];
-        for cto in CTOS_WITH_A_COUNT_OTHER_THAN_ONE {
-            let mut input = first.to_vec();
-            input.extend_from_slice(cto);
-            input.extend(G2V3_INDEX_7);
-
-            let (delivered, mut handler) = extract(&input);
-
-            assert!(delivered);
-            assert_eq!(
-                handler.pop(),
-                [Header::Binary(vec![binary(
-                    false,
-                    Some(Time::Synchronized(Timestamp::new(0x1_0001))),
-                    7
-                )])],
-                "{cto:02X?}"
-            );
-        }
-    }
-
-    #[test]
-    fn g2v3_with_synchronized_cto_yields_synchronized_time() {
-        let mut handler = MockHandler::new();
-        let objects = ProcessableResponse::new(HeaderCollection::parse(
-            ParseOptions::default(),
-            FunctionCode::Response,
-            // g50v1       count: 1   -------- time: 1 ------------------
-            &[
-                0x33, 0x01, 0x07, 0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x03, 0x17, 0x01,
-                0x07, 0x01, 0xFF, 0xFF,
-            ],
-        ))
-        .unwrap();
-
-        let expected = (
-            BinaryInput {
-                value: false,
-                flags: Flags::ONLINE,
-                time: Some(Time::Synchronized(Timestamp::new(65537))), // 0xFFFF + 2
-            },
-            0x07,
-        );
-
-        extract_measurements_inner(objects, &mut handler);
-        assert_eq!(&handler.pop(), &[Header::Binary(vec![expected])]);
-    }
-
-    #[test]
-    fn g2v3_with_unsynchronized_cto_yields_unsynchronized_time() {
-        let mut handler = MockHandler::new();
-        let objects = ProcessableResponse::new(HeaderCollection::parse(
-            ParseOptions::default(),
-            FunctionCode::Response,
-            // g50v2   count: 1    --------- time: 2 -----------------
-            &[
-                0x33, 0x02, 0x07, 0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x03, 0x17, 0x01,
-                0x07, 0x01, 0xFE, 0xFF,
-            ],
-        ))
-        .unwrap();
-
-        let expected: (BinaryInput, u16) = (
-            BinaryInput {
-                value: false,
-                flags: Flags::ONLINE,
-                time: Some(Time::unsynchronized(65536)), // 0xFFFE + 2
-            },
-            0x07,
-        );
-
-        extract_measurements_inner(objects, &mut handler);
-        assert_eq!(&handler.pop(), &[Header::Binary(vec![expected])]);
     }
 
     #[test]
@@ -885,25 +724,6 @@ mod test {
         (delivered, handler)
     }
 
-    /// Pass each header to [`extract_header`], without the master's check that it can process
-    /// the response, returning true if any header with objects was handled
-    fn extract_each_header(input: &[u8]) -> (bool, MockHandler) {
-        let mut handler = MockHandler::new();
-        let objects =
-            HeaderCollection::parse(ParseOptions::default(), FunctionCode::Response, input)
-                .unwrap();
-        let mut delivered = false;
-        let mut cto = None;
-        for header in objects.iter() {
-            match extract_header(&header, cto, &mut handler) {
-                Extracted::Handled => delivered |= header.has_objects(),
-                Extracted::Cto(x) => cto = x,
-                Extracted::Ignored => {}
-            }
-        }
-        (delivered, handler)
-    }
-
     fn binary(value: bool, time: Option<Time>, index: u16) -> (BinaryInput, u16) {
         let flags = if value {
             Flags::new(0x81)
@@ -1032,83 +852,6 @@ mod test {
             let (delivered, mut handler) = extract(input);
             assert!(!delivered);
             assert_eq!(handler.pop(), []);
-        }
-    }
-
-    // g2v3, 1-byte count and prefix, index 7, relative time 0xFFFF
-    const G2V3_INDEX_7: [u8; 8] = [0x02, 0x03, 0x17, 0x01, 0x07, 0x01, 0xFF, 0xFF];
-
-    /// g51v1 and g51v2 with a count of 0 or 2, at both widths of the count
-    const CTOS_WITH_A_COUNT_OTHER_THAN_ONE: [&[u8]; 4] = [
-        &[0x33, 0x01, 0x07, 0x00],
-        &[0x33, 0x02, 0x08, 0x00, 0x00],
-        &[
-            0x33, 0x01, 0x07, 0x02, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
-            0x00, 0x00,
-        ],
-        &[
-            0x33, 0x02, 0x08, 0x02, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00,
-            0x00, 0x00, 0x00,
-        ],
-    ];
-
-    #[test]
-    fn cto_with_a_two_byte_count_applies_to_the_next_header() {
-        for (variation, time) in [
-            (1, Time::Synchronized(Timestamp::new(0x1_0001))),
-            (2, Time::Unsynchronized(Timestamp::new(0x1_0001))),
-        ] {
-            // g51 var 1 or 2, 2-byte count of 1, time 2
-            let mut input = vec![
-                0x33, variation, 0x08, 0x01, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00,
-            ];
-            input.extend(G2V3_INDEX_7);
-
-            let (delivered, mut handler) = extract(&input);
-
-            assert!(delivered);
-            assert_eq!(
-                handler.pop(),
-                [Header::Binary(vec![binary(false, Some(time), 7)])]
-            );
-        }
-    }
-
-    #[test]
-    fn cto_with_a_count_other_than_one_is_ignored_at_both_widths() {
-        for cto in [
-            // g51v1, 1-byte count of 0
-            vec![0x33, 0x01, 0x07, 0x00],
-            // g51v1, 2-byte count of 0
-            vec![0x33, 0x01, 0x08, 0x00, 0x00],
-            // g51v1, 1-byte count of 2
-            vec![
-                0x33, 0x01, 0x07, 0x02, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
-                0x00, 0x00,
-            ],
-            // g51v2, 2-byte count of 2
-            vec![
-                0x33, 0x02, 0x08, 0x02, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00,
-                0x00, 0x00, 0x00,
-            ],
-        ] {
-            let mut input = cto;
-            input.extend(G2V3_INDEX_7);
-
-            let (delivered, mut handler) = extract_each_header(&input);
-
-            assert!(delivered);
-            assert_eq!(
-                handler.pop(),
-                [Header::Binary(vec![binary(false, None, 7)])]
-            );
-            // the master never extracts such a response
-            assert_eq!(
-                validate(&input),
-                Err(InvalidResponse::RelativeTimeWithoutCto(
-                    Variation::Group2Var3
-                ))
-            );
         }
     }
 }

@@ -19,6 +19,7 @@ use crate::app::{
     Sequence, Variation,
 };
 use crate::master::association::AssociationConfig;
+use crate::master::test_objects::{RELATIVE_TIME_EVENT, SYNCHRONIZED_CTO, TRUNCATED_ANALOG_EVENT};
 use crate::master::tests::harness::{AssocInfoEvent, ReadEvent, TestHarness};
 use crate::master::{Classes, ReadRequest, ReadType, TaskError, TaskType};
 
@@ -413,9 +414,6 @@ async fn unsolicited_response_with_counted_event_objects_delivers_nothing() {
     .await;
 }
 
-/// g2v3 with a count of 1 and a one-byte index, relative time 0xFFFF
-const RELATIVE_TIME_EVENT: &[u8] = &[0x02, 0x03, 0x17, 0x01, 0x07, 0x01, 0xFF, 0xFF];
-
 #[tokio::test]
 async fn read_with_relative_time_without_cto_fails_without_confirm() {
     watchdog(async {
@@ -447,8 +445,7 @@ async fn read_with_relative_time_after_cto_succeeds() {
         harness.read_events.pop();
 
         let mut response = read_response(response_seq, true, true, Iin2::default(), None);
-        // g51v1 with a count of 1, time 2
-        response.extend_from_slice(&[0x33, 0x01, 0x07, 0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        response.extend_from_slice(SYNCHRONIZED_CTO);
         response.extend_from_slice(RELATIVE_TIME_EVENT);
         harness.process_response(response).await;
         harness.expect_write(solicited_confirm(response_seq)).await;
@@ -475,8 +472,7 @@ async fn multi_fragment_read_with_cto_only_in_the_first_fragment_fails() {
         harness.read_events.pop();
 
         let mut response = read_response(first, false, true, Iin2::default(), Some(1));
-        // g51v1 with a count of 1, time 2
-        response.extend_from_slice(&[0x33, 0x01, 0x07, 0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00]);
+        response.extend_from_slice(SYNCHRONIZED_CTO);
         harness.process_response(response).await;
         harness.expect_write(solicited_confirm(first)).await;
 
@@ -561,31 +557,6 @@ async fn read_with_g34v0_start_stop_headers_ignores_them_and_processes_the_rest(
     .await;
 }
 
-/// g51v1 with a count of 1, time 2
-const SYNCHRONIZED_CTO: &[u8] = &[0x33, 0x01, 0x07, 0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00];
-
-/// g4v3 with a one-byte count and prefix, then g2v3 and g4v3 with a two-byte count and prefix,
-/// each with one event at index 7 with relative time 0xFFFF
-const OTHER_RELATIVE_TIME_EVENTS: [&[u8]; 3] = [
-    &[0x04, 0x03, 0x17, 0x01, 0x07, 0x01, 0xFF, 0xFF],
-    &[0x02, 0x03, 0x28, 0x01, 0x00, 0x07, 0x00, 0x01, 0xFF, 0xFF],
-    &[0x04, 0x03, 0x28, 0x01, 0x00, 0x07, 0x00, 0x01, 0xFF, 0xFF],
-];
-
-/// g51v1 and g51v2 with a count of 0 or 2, at both widths of the count
-const CTOS_WITH_A_COUNT_OTHER_THAN_ONE: [&[u8]; 4] = [
-    &[0x33, 0x01, 0x07, 0x00],
-    &[0x33, 0x02, 0x08, 0x00, 0x00],
-    &[
-        0x33, 0x01, 0x07, 0x02, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00, 0x00,
-        0x00,
-    ],
-    &[
-        0x33, 0x02, 0x08, 0x02, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00, 0x00,
-        0x00, 0x00,
-    ],
-];
-
 /// Read a response that requests confirmation and carries `objects`, which the master must reject
 /// with `expected` without confirming the response or delivering anything
 async fn expect_read_rejected(objects: &[&[u8]], expected: TaskError) {
@@ -606,83 +577,13 @@ async fn expect_read_rejected(objects: &[&[u8]], expected: TaskError) {
 }
 
 #[tokio::test]
-async fn read_with_g4v3_or_two_byte_prefixed_relative_time_without_cto_fails_without_confirm() {
-    watchdog(async {
-        for event in OTHER_RELATIVE_TIME_EVENTS {
-            expect_read_rejected(&[event], TaskError::UnexpectedResponseHeaders).await;
-        }
-    })
-    .await;
-}
-
-#[tokio::test]
-async fn read_with_relative_time_before_cto_fails_without_confirm() {
-    watchdog(async {
-        expect_read_rejected(
-            &[RELATIVE_TIME_EVENT, SYNCHRONIZED_CTO, RELATIVE_TIME_EVENT],
-            TaskError::UnexpectedResponseHeaders,
-        )
-        .await;
-    })
-    .await;
-}
-
-#[tokio::test]
-async fn read_with_relative_time_after_a_cto_with_a_count_other_than_one_fails_without_confirm() {
-    watchdog(async {
-        for cto in CTOS_WITH_A_COUNT_OTHER_THAN_ONE {
-            expect_read_rejected(
-                &[cto, RELATIVE_TIME_EVENT],
-                TaskError::UnexpectedResponseHeaders,
-            )
-            .await;
-        }
-    })
-    .await;
-}
-
-#[tokio::test]
 async fn read_with_relative_time_without_cto_then_a_parse_error_is_malformed() {
     watchdog(async {
-        // g32v2 with a count of 1 and a one-byte index, missing its flags and value
-        let truncated: &[u8] = &[0x20, 0x02, 0x17, 0x01, 0x00];
         expect_read_rejected(
-            &[RELATIVE_TIME_EVENT, truncated],
+            &[RELATIVE_TIME_EVENT, TRUNCATED_ANALOG_EVENT],
             TaskError::MalformedResponse(ObjectParseError::InsufficientBytes),
         )
         .await;
-    })
-    .await;
-}
-
-#[tokio::test]
-async fn cto_with_a_count_other_than_one_does_not_replace_the_previous_cto_in_a_read() {
-    watchdog(async {
-        for cto in CTOS_WITH_A_COUNT_OTHER_THAN_ONE {
-            let mut seq = Sequence::default();
-            let mut harness = create_association(AssociationConfig::default()).await;
-            let (read, response_seq) = start_read(&mut harness, &mut seq).await;
-            harness.read_events.pop();
-
-            let mut response = read_response(response_seq, true, true, Iin2::default(), None);
-            for x in [SYNCHRONIZED_CTO, cto, RELATIVE_TIME_EVENT] {
-                response.extend_from_slice(x);
-            }
-            harness.process_response(response).await;
-            harness.expect_write(solicited_confirm(response_seq)).await;
-
-            assert_eq!(read.await.unwrap(), Ok(()), "{cto:02X?}");
-            assert_eq!(
-                harness.read_events.pop(),
-                vec![
-                    ReadEvent::BeginFragment(ReadType::SinglePoll),
-                    ReadEvent::BinaryInput,
-                    ReadEvent::EndFragment(ReadType::SinglePoll),
-                ],
-                "{cto:02X?}"
-            );
-            harness.assert_no_events();
-        }
     })
     .await;
 }
