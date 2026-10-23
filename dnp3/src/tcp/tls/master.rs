@@ -209,10 +209,7 @@ impl TlsClientConfig {
         socket: TcpStream,
         endpoint: &SocketAddr,
     ) -> Result<PhysLayer, HandshakeError> {
-        let connector = tokio_rustls::TlsConnector::from(self.config.clone());
-        // a server that stalls the handshake would otherwise stop the client retrying or moving on to
-        // its other endpoints
-        let result = super::handshake(connector.connect(self.server_name.clone(), socket)).await;
+        let result = self.connect(socket).await;
         match &result {
             Err(HandshakeError::Timeout) => tracing::warn!(
                 "TLS handshake with {endpoint} didn't complete within {} seconds",
@@ -224,6 +221,20 @@ impl TlsClientConfig {
             Ok(_) => {}
         }
         result.map(|stream| PhysLayer::tls(tokio_rustls::TlsStream::from(stream)))
+    }
+
+    /// Run the client side of the TLS handshake over a connected socket
+    pub(super) async fn connect<S>(
+        &self,
+        socket: S,
+    ) -> Result<tokio_rustls::client::TlsStream<S>, HandshakeError>
+    where
+        S: tokio::io::AsyncRead + tokio::io::AsyncWrite + Unpin,
+    {
+        let connector = tokio_rustls::TlsConnector::from(self.config.clone());
+        // a server that stalls the handshake would otherwise stop the client retrying or moving on to
+        // its other endpoints
+        super::handshake(connector.connect(self.server_name.clone(), socket)).await
     }
 }
 

@@ -69,6 +69,13 @@ pub(crate) mod tls {
             .join(name)
     }
 
+    /// The path of a file in the certificate authority directory
+    pub(crate) fn ca_chain(name: &str) -> PathBuf {
+        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../certs/ca_chain")
+            .join(name)
+    }
+
     pub(crate) fn client_config() -> TlsClientConfig {
         TlsClientConfig::self_signed(
             &cert("entity2_cert.pem"),
