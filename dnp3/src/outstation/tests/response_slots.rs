@@ -140,40 +140,6 @@ async fn expect_unsolicited_retry(harness: &mut OutstationHarness, seq: u8, expe
 
 // ---------- retransmission bytes ----------
 
-/// IEEE 1815-2012 Table 6-1 row 17: each repeat of the READ is the fragment awaiting its confirm
-#[tokio::test]
-async fn repeated_read_resends_each_fragment_of_a_series_byte_for_byte() {
-    let (mut harness, first, second) = two_fragment_harness().await;
-    let read = read_class_1(0);
-
-    harness.test_request_response(&read, &first).await;
-    harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
-    harness.test_request_response(&read, &first).await;
-    harness.check_no_events();
-
-    harness.test_request_response(&confirm(0), &second).await;
-    harness.check_events(&[Event::SolicitedConfirmReceived(0)]);
-    check_confirmed(
-        &mut harness,
-        0..EVENTS_IN_MIN_FRAGMENT.into(),
-        class_1_binaries(1),
-    );
-
-    harness.test_request_response(&read, &second).await;
-    harness.test_request_response(&read, &second).await;
-    harness.check_no_events();
-
-    harness.send_and_process(&confirm(1)).await;
-    harness.check_events(&[Event::SolicitedConfirmReceived(1)]);
-    check_confirmed(
-        &mut harness,
-        EVENTS_IN_MIN_FRAGMENT.into()..u64::from(EVENTS_IN_MIN_FRAGMENT) + 1,
-        class_1_binaries(0),
-    );
-    harness.check_no_events();
-    harness.expect_no_response();
-}
-
 // ---------- failed and partial builds ----------
 
 /// a partial unsolicited response, with the events that fit, is sent again unchanged, and the

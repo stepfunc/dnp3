@@ -4,12 +4,11 @@
 // Text and data mining rights, including for AI training, are reserved under
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
-//! Each timer runs for its own configured duration: the confirm timeout, the select timeout, the
-//! unsolicited retry delay, and no keep-alive at all when it is disabled
+//! Each timer runs for its own configured duration: the select timeout, and no keep-alive at all
+//! when it is disabled. The session model's fixed cases pin the confirm timeout and the unsolicited
+//! retry delay
 
 use std::time::Duration;
-
-use tokio::time::Instant;
 
 use crate::app::{FunctionCode, Timeout};
 use crate::outstation::config::OutstationConfig;
@@ -28,70 +27,6 @@ fn with_distinct_timeouts(mut config: OutstationConfig) -> OutstationConfig {
     config.select_timeout = Timeout::from_secs(SELECT_TIMEOUT.as_secs()).unwrap();
     config.unsolicited_retry_delay = RETRY_DELAY;
     config
-}
-
-/// the class 1 event of binary input 0 in a solicited response
-const G2V1_RESPONSE_SEQ0: &[u8] = &[
-    0xE0, 0x81, 0x80, 0x00, 0x02, 0x01, 0x28, 0x01, 0x00, 0x00, 0x00, 0x81,
-];
-
-#[tokio::test(start_paused = true)]
-async fn solicited_confirm_wait_lasts_the_confirm_timeout() {
-    watchdog(async {
-        let mut harness = new_harness(with_distinct_timeouts(get_default_config()));
-        harness.handle.database.transaction(add_binary_event);
-
-        harness
-            .test_request_response(&read_class_1(0), G2V1_RESPONSE_SEQ0)
-            .await;
-        let sent = Instant::now();
-        harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
-
-        harness
-            .wait_for_events(&[Event::SolicitedConfirmTimeout(0)])
-            .await;
-        assert_eq!(sent.elapsed(), CONFIRM_TIMEOUT);
-    })
-    .await;
-}
-
-#[tokio::test(start_paused = true)]
-async fn unsolicited_retries_follow_the_confirm_timeout_and_the_next_series_the_retry_delay() {
-    watchdog(async {
-        let mut config = with_distinct_timeouts(get_default_unsolicited_config());
-        config.max_unsolicited_retries = Some(1);
-        let mut harness = new_harness(config);
-        confirm_null_unsolicited(&mut harness).await;
-        enable_unsolicited(&mut harness).await;
-
-        harness.handle.database.transaction(add_binary_event);
-        let response = unsolicited(1, 0x80, &g2v1_events(0..1));
-        harness.expect_response(&response).await;
-        let sent = Instant::now();
-        harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
-
-        // one retry after the confirm timeout
-        harness
-            .wait_for_events(&[Event::UnsolicitedConfirmTimeout(1, true)])
-            .await;
-        assert_eq!(sent.elapsed(), CONFIRM_TIMEOUT);
-        harness.expect_response(&response).await;
-        assert_eq!(sent.elapsed(), CONFIRM_TIMEOUT);
-
-        // the series ends one confirm timeout later
-        harness
-            .wait_for_events(&[Event::UnsolicitedConfirmTimeout(1, false)])
-            .await;
-        assert_eq!(sent.elapsed(), 2 * CONFIRM_TIMEOUT);
-
-        // and the next series starts after the retry delay
-        harness
-            .expect_response(&unsolicited(2, 0x80, &g2v1_events(0..1)))
-            .await;
-        assert_eq!(sent.elapsed(), 2 * CONFIRM_TIMEOUT + RETRY_DELAY);
-        harness.check_events(&[Event::EnterUnsolicitedConfirmWait(2)]);
-    })
-    .await;
 }
 
 /// the response to a g41v2 control of index 7 with `status`

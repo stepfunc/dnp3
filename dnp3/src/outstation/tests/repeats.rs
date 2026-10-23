@@ -5,16 +5,11 @@
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
 use crate::app::variations::Group41Var2;
-use crate::app::{BufferSize, FunctionCode};
+use crate::app::FunctionCode;
 use crate::link::header::BroadcastConfirmMode;
-use crate::outstation::database::*;
 use crate::outstation::tests::harness::*;
 use crate::outstation::traits::{BroadcastAction, OperateType};
 
-// g30v1, 16-bit start/stop, 0 to 149, then class 1 events
-const READ_G30V1_0_TO_149_AND_CLASS_1: &[u8] = &[
-    0xC0, 0x01, 0x1E, 0x01, 0x01, 0x00, 0x00, 0x95, 0x00, 0x3C, 0x02, 0x06,
-];
 // restart IIN, no objects
 const EMPTY_RESPONSE_SEQ_1: &[u8] = &[0xC1, 0x81, 0x80, 0x00];
 // direct operate no ack, seq == 1, g41v2 - count == 1, index == 7, value = 513
@@ -31,42 +26,6 @@ async fn direct_operate(harness: &mut OutstationHarness) {
         .test_request_response(DIRECT_OPERATE_SEQ_0, DIRECT_OPERATE_RESPONSE_SEQ_0)
         .await;
     harness.check_events(&operated(OperateType::DirectOperate));
-}
-
-#[tokio::test]
-async fn repeated_read_during_a_later_fragment_resends_that_fragment() {
-    let mut config = get_default_config();
-    config.solicited_buffer_size = BufferSize::min();
-    let mut harness = new_harness(config);
-
-    // g30v1 values for several fragments, and an event that changes the length of the first
-    harness.handle.database.transaction(|db| {
-        for index in 0..150 {
-            db.add(index, None, AnalogInputConfig::default());
-        }
-        add_binary_event(db);
-    });
-
-    harness
-        .send_and_process(READ_G30V1_0_TO_149_AND_CLASS_1)
-        .await;
-    let first = harness.expect_write().await;
-    harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
-
-    harness.send_and_process(&confirm(0)).await;
-    let second = harness.expect_write().await;
-    assert_eq!(&second[0..2], &[0x21, 0x81]); // CON, seq 1
-    assert_ne!(first.len(), second.len());
-
-    harness
-        .send_and_process(READ_G30V1_0_TO_149_AND_CLASS_1)
-        .await;
-    harness.expect_response(&second).await;
-
-    // still waiting for the confirm of the second fragment
-    harness.send_and_process(&confirm(1)).await;
-    let third = harness.expect_write().await;
-    assert_eq!(third[0] & 0x0F, 2);
 }
 
 #[tokio::test]

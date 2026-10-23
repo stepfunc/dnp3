@@ -1574,6 +1574,11 @@ fn class_1_events(count: u64) -> Op {
     }
 }
 
+/// a READ of the class 1 events
+fn class_1_read() -> Op {
+    Op::Request(Function::Read(vec![ReadHeader::Class(0, None)]))
+}
+
 /// A request in the solicited confirm wait with the READ's sequence number but other headers is a
 /// new request, not a repeat (Table 6-1 row 18): it ends the wait and is answered
 #[test]
@@ -1592,17 +1597,21 @@ fn request_with_the_reads_sequence_number_and_other_headers_is_new() {
     run_paused(check_model(solicited_only(), ops));
 }
 
-/// A repeated READ while a middle fragment of its series waits for its confirm gets that fragment's
-/// bytes again, and the series goes on from there
+/// A repeated READ while the first, a middle or the last fragment of its series waits for its
+/// confirm gets that fragment's bytes again, as often as it's repeated, and the series goes on from
+/// there
 #[test]
-fn repeated_read_gets_the_middle_fragment_waiting() {
+fn repeated_read_gets_the_fragment_waiting() {
     let ops = vec![
-        // three fragments of the minimum size
+        // three fragments, the first two of the minimum size and the last shorter
         class_1_events(80),
-        Op::Request(Function::Read(vec![ReadHeader::Class(0, None)])),
-        Op::SolicitedConfirm(ConfirmChoice::Expected),
+        class_1_read(),
         Op::Repeat,
         Op::SolicitedConfirm(ConfirmChoice::Expected),
+        Op::Repeat,
+        Op::Repeat,
+        Op::SolicitedConfirm(ConfirmChoice::Expected),
+        Op::Repeat,
         Op::SolicitedConfirm(ConfirmChoice::Expected),
     ];
     run_paused(check_model(solicited_only(), ops));
@@ -1619,7 +1628,237 @@ fn repeated_read_restarts_the_solicited_confirm_timeout() {
         Op::Repeat,
         // past the first deadline
         Op::Advance(AdvanceChoice::Millis(800)),
+        Op::Advance(AdvanceChoice::BeforeDeadline),
         Op::Advance(AdvanceChoice::AtDeadline),
     ];
     run_paused(check_model(solicited_only(), ops));
+}
+
+/// A case with unsolicited responses and room for 100 counter events. The confirm timeout, the
+/// retry delay and the 5 s select timeout all differ, so that none can stand in for another
+fn unsolicited_with_retries(max_retries: Option<usize>) -> Setup {
+    Setup {
+        unsolicited: true,
+        max_retries,
+        confirm_ms: 2000,
+        retry_ms: 11000,
+        max_counter: 100,
+        max_analog: 1,
+        solicited_size: BufferSize::<249, 2048>::MIN,
+        unsolicited_size: BufferSize::<249, 2048>::MIN,
+    }
+}
+
+/// longer than the confirm timeout and the retry delay together
+const SILENCE: AdvanceChoice = AdvanceChoice::Millis(30_000);
+
+/// to 1 ms before the next deadline, and then to it
+fn to_the_deadline() -> Vec<Op> {
+    vec![
+        Op::Advance(AdvanceChoice::BeforeDeadline),
+        Op::Advance(AdvanceChoice::AtDeadline),
+    ]
+}
+
+/// The confirm of the null unsolicited response, unsolicited responses enabled for every class, and
+/// a class 1 event, sent in an unsolicited response that waits for its confirm
+fn unsolicited_class_1_event() -> Vec<Op> {
+    vec![
+        Op::UnsolicitedConfirm(ConfirmChoice::Expected),
+        Op::Request(Function::EnableUnsolicited([true; 3])),
+        class_1_events(1),
+    ]
+}
+
+fn disable_unsolicited(classes: [bool; 3]) -> Op {
+    Op::Request(Function::DisableUnsolicited(classes))
+}
+
+/// The null unsolicited response isn't retried but sent again with the next sequence number each
+/// time its confirm wait times out, whatever the retry limit
+#[test]
+fn null_unsolicited_response_is_sent_again_with_the_next_sequence_number() {
+    for max_retries in [None, Some(2)] {
+        let ops = [to_the_deadline(), to_the_deadline()].concat();
+        run_paused(check_model(unsolicited_with_retries(max_retries), ops));
+    }
+}
+
+/// With no retry limit, an unsolicited response is sent again byte for byte each time its confirm
+/// wait times out, until the master confirms it
+#[test]
+fn unsolicited_response_is_sent_again_until_it_is_confirmed() {
+    let ops = [
+        unsolicited_class_1_event(),
+        to_the_deadline(),
+        to_the_deadline(),
+        to_the_deadline(),
+        vec![Op::UnsolicitedConfirm(ConfirmChoice::Expected)],
+    ]
+    .concat();
+    run_paused(check_model(unsolicited_with_retries(None), ops));
+}
+
+/// After its last retry, an unsolicited series ends at the confirm timeout, and the next series
+/// starts with the next sequence number once the retry delay has passed
+#[test]
+fn next_unsolicited_series_starts_after_the_last_retry_and_the_retry_delay() {
+    for retries in 0..3 {
+        let mut ops = unsolicited_class_1_event();
+        // each retry, the end of the series and the end of the retry delay
+        for _ in 0..retries + 2 {
+            ops.extend(to_the_deadline());
+        }
+        ops.push(Op::UnsolicitedConfirm(ConfirmChoice::Expected));
+        run_paused(check_model(unsolicited_with_retries(Some(retries)), ops));
+    }
+}
+
+/// In the retry delay that follows an unconfirmed unsolicited response, that response's event is
+/// reported in IIN again, and a READ reports it with the one since, and its confirm deletes both
+#[test]
+fn read_in_the_retry_delay_reports_the_events_of_the_unconfirmed_unsolicited_response() {
+    let ops = [
+        unsolicited_class_1_event(),
+        // no retries: the retry delay starts
+        to_the_deadline(),
+        vec![
+            Op::Request(Function::DelayMeasure),
+            class_1_events(1),
+            class_1_read(),
+            Op::SolicitedConfirm(ConfirmChoice::Expected),
+            class_1_read(),
+        ],
+    ]
+    .concat();
+    run_paused(check_model(unsolicited_with_retries(Some(0)), ops));
+}
+
+/// A DISABLE_UNSOLICITED in the confirm wait of the null unsolicited response, or of one with an
+/// event, doesn't end the wait: the confirm that follows does, deleting the event, and nothing is
+/// sent after it
+#[test]
+fn confirm_after_disable_unsolicited_ends_the_unsolicited_confirm_wait() {
+    for wait in [Vec::new(), unsolicited_class_1_event()] {
+        let ops = [
+            wait,
+            vec![
+                disable_unsolicited([true; 3]),
+                Op::UnsolicitedConfirm(ConfirmChoice::Expected),
+                Op::Advance(SILENCE),
+                class_1_read(),
+            ],
+        ]
+        .concat();
+        run_paused(check_model(unsolicited_with_retries(None), ops));
+    }
+}
+
+/// After a DISABLE_UNSOLICITED, the confirm wait of the null unsolicited response times out and the
+/// null response is sent again with the next sequence number. One with an event times out without
+/// a retry, despite no retry limit, and no other series starts: the event is left for a READ
+#[test]
+fn timeout_after_disable_unsolicited_ends_the_unsolicited_confirm_wait_without_a_retry() {
+    let null = [vec![disable_unsolicited([true; 3])], to_the_deadline()].concat();
+    let data = [
+        unsolicited_class_1_event(),
+        vec![disable_unsolicited([true; 3])],
+        to_the_deadline(),
+        vec![Op::Advance(SILENCE), class_1_read()],
+    ]
+    .concat();
+    for ops in [null, data] {
+        run_paused(check_model(unsolicited_with_retries(None), ops));
+    }
+}
+
+/// A DISABLE_UNSOLICITED of another class than the unsolicited response's event ends its retries:
+/// the wait times out without the retry left, and as the event's class is still enabled, the next
+/// series starts after the retry delay
+#[test]
+fn disable_unsolicited_of_another_class_ends_the_unsolicited_retries() {
+    let ops = [
+        unsolicited_class_1_event(),
+        // the first retry
+        vec![
+            Op::Advance(AdvanceChoice::AtDeadline),
+            disable_unsolicited([false, true, false]),
+        ],
+        // the end of the series, and the next one
+        to_the_deadline(),
+        to_the_deadline(),
+        vec![Op::UnsolicitedConfirm(ConfirmChoice::Expected)],
+    ]
+    .concat();
+    run_paused(check_model(unsolicited_with_retries(Some(2)), ops));
+}
+
+/// The solicited confirm wait ends at the confirm timeout, not before
+#[test]
+fn solicited_confirm_wait_ends_at_the_confirm_timeout() {
+    let ops = [vec![class_1_events(1), class_1_read()], to_the_deadline()].concat();
+    run_paused(check_model(solicited_only(), ops));
+}
+
+/// In the solicited confirm wait, a confirm with another sequence number and one with the UNS bit
+/// are reported and ignored, and the expected confirm still deletes the response's event
+#[test]
+fn wrong_confirms_in_the_solicited_confirm_wait_are_ignored() {
+    let ops = vec![
+        class_1_events(1),
+        class_1_read(),
+        Op::SolicitedConfirm(ConfirmChoice::Offset(1)),
+        Op::SolicitedConfirm(ConfirmChoice::OtherKind),
+        Op::SolicitedConfirm(ConfirmChoice::Expected),
+        // whose IIN no longer reports it
+        Op::Request(Function::DelayMeasure),
+    ];
+    run_paused(check_model(solicited_only(), ops));
+}
+
+/// In the confirm wait of the null unsolicited response, and of one with an event, a confirm with
+/// another sequence number and one without the UNS bit are ignored without a callback, and the
+/// expected confirm still ends the wait
+#[test]
+fn wrong_confirms_in_the_unsolicited_confirm_wait_are_ignored() {
+    let wrong = || {
+        vec![
+            Op::UnsolicitedConfirm(ConfirmChoice::Offset(1)),
+            Op::UnsolicitedConfirm(ConfirmChoice::OtherKind),
+        ]
+    };
+    let ops = [
+        wrong(),
+        unsolicited_class_1_event(),
+        wrong(),
+        vec![Op::UnsolicitedConfirm(ConfirmChoice::Expected)],
+    ]
+    .concat();
+    run_paused(check_model(unsolicited_with_retries(None), ops));
+}
+
+/// The unsolicited response that becomes due in the solicited confirm wait is sent once the wait
+/// ends, by its confirm or at its timeout
+#[test]
+fn end_of_the_solicited_confirm_wait_releases_a_due_unsolicited_response() {
+    // unsolicited responses for class 2 only, a READ of a class 1 event that waits for its confirm,
+    // then a class 2 event
+    let due = vec![
+        Op::UnsolicitedConfirm(ConfirmChoice::Expected),
+        Op::Request(Function::EnableUnsolicited([false, true, false])),
+        class_1_events(1),
+        class_1_read(),
+        Op::Update {
+            kind: Kind::Counter,
+            index: 1,
+            count: 1,
+        },
+    ];
+    for end in [
+        vec![Op::SolicitedConfirm(ConfirmChoice::Expected)],
+        to_the_deadline(),
+    ] {
+        let ops = [due.clone(), end].concat();
+        run_paused(check_model(unsolicited_with_retries(None), ops));
+    }
 }

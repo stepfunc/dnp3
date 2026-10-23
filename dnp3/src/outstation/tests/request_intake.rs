@@ -537,43 +537,6 @@ async fn confirms_in_idle_are_ignored_and_keep_the_repeat_history() {
     harness.check_no_events();
 }
 
-#[tokio::test]
-async fn wrong_confirms_in_the_solicited_confirm_wait_are_ignored() {
-    let mut harness = new_harness(get_default_config());
-    enter_solicited_confirm_wait(&mut harness).await;
-
-    harness.send_and_process(&confirm(1)).await;
-    harness.check_events(&[Event::WrongSolicitedConfirmSeq(0, 1)]);
-    harness.send_and_process(&unsolicited_confirm(0)).await;
-    harness.check_events(&[Event::UnexpectedConfirm(true, 0)]);
-    harness.expect_no_response();
-
-    harness.send_and_process(&confirm(0)).await;
-    harness.check_events(&[
-        Event::SolicitedConfirmReceived(0),
-        Event::BeginConfirm,
-        Event::Cleared(0),
-        Event::EndConfirm(empty_buffer_state()),
-    ]);
-    probe(&mut harness, 1, RESTART).await;
-}
-
-#[tokio::test]
-async fn wrong_confirms_in_the_unsolicited_confirm_wait_are_ignored() {
-    let mut harness = new_harness(get_default_unsolicited_config());
-    enter_unsolicited_confirm_wait(&mut harness).await;
-
-    for request in [unsolicited_confirm(1), confirm(0)] {
-        harness.send_and_process(&request).await;
-        harness.expect_no_response();
-        harness.check_no_events();
-    }
-
-    harness.send_and_process(&unsolicited_confirm(0)).await;
-    harness.check_events(&[Event::UnsolicitedConfirmReceived(0)]);
-    probe(&mut harness, 1, RESTART).await;
-}
-
 /// The IIN2.0 reply reports a mandatory broadcast during the unsolicited confirm wait, but it
 /// isn't the response to a valid request, so its confirm doesn't clear the broadcast
 #[tokio::test]
@@ -823,30 +786,6 @@ async fn discarded_select_and_confirms_in_the_unsolicited_confirm_wait_keep_the_
 }
 
 // ---------- READs during the confirm waits ----------
-
-/// Table 6-1 row 17: the repeat restarts the confirm timer
-#[tokio::test(start_paused = true)]
-async fn repeated_read_in_the_solicited_confirm_wait_restarts_the_confirm_timer() {
-    let start = Instant::now();
-    let mut harness = new_harness(get_default_config());
-    enter_solicited_confirm_wait(&mut harness).await;
-
-    tokio::time::advance(Duration::from_secs(3)).await;
-    let mut expected = response(true, 0, RESTART, 0).to_vec();
-    expected.extend_from_slice(G2V1_EVENT);
-    harness
-        .test_request_response(&read_class_1(0), &expected)
-        .await;
-    harness.check_no_events();
-
-    harness
-        .wait_for_events(&[Event::SolicitedConfirmTimeout(0)])
-        .await;
-    assert_eq!(
-        start.elapsed(),
-        Duration::from_secs(3) + OutstationConfig::DEFAULT_CONFIRM_TIMEOUT
-    );
-}
 
 /// Table 6-1 row 25: only the last READ is answered
 #[tokio::test]
@@ -1504,42 +1443,6 @@ async fn request_in_the_solicited_confirm_wait_of_a_deferred_read_is_answered_be
             Event::SolicitedConfirmWaitNewRequest,
             from_idle(FunctionCode::RecordCurrentTime, false, 2),
             Event::EnterUnsolicitedConfirmWait(2),
-        ]);
-    })
-    .await;
-}
-
-#[tokio::test(start_paused = true)]
-async fn solicited_confirm_releases_a_due_unsolicited_response() {
-    watchdog(async {
-        let mut harness = new_harness(unsolicited_config());
-        solicited_confirm_wait_with_unsolicited_due(&mut harness).await;
-
-        harness.send_and_process(&confirm(1)).await;
-        harness.expect_response(&class_2_unsolicited(RESTART)).await;
-        harness.check_events(&[
-            Event::SolicitedConfirmReceived(1),
-            Event::BeginConfirm,
-            Event::Cleared(0),
-            Event::EndConfirm(class_2_binary()),
-            Event::EnterUnsolicitedConfirmWait(1),
-        ]);
-    })
-    .await;
-}
-
-#[tokio::test(start_paused = true)]
-async fn solicited_confirm_timeout_releases_a_due_unsolicited_response() {
-    watchdog(async {
-        let mut harness = new_harness(unsolicited_config());
-        solicited_confirm_wait_with_unsolicited_due(&mut harness).await;
-
-        harness
-            .expect_response(&class_2_unsolicited(RESTART | CLASS_1))
-            .await;
-        harness.check_events(&[
-            Event::SolicitedConfirmTimeout(1),
-            Event::EnterUnsolicitedConfirmWait(1),
         ]);
     })
     .await;
