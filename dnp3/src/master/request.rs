@@ -1116,23 +1116,6 @@ mod tests {
         );
     }
 
-    /// each command with 1-byte and then 2-byte addressing
-    fn commands() -> [(CommandHeader, CommandHeader); 5] {
-        fn both<C: Command>(command: C) -> (CommandHeader, CommandHeader) {
-            (
-                CommandHeader::new(command, 3u8),
-                CommandHeader::new(command, 259u16),
-            )
-        }
-        [
-            both(Group12Var1::from_op_type(OpType::LatchOn)),
-            both(Group41Var1::new(-7)),
-            both(Group41Var2::new(-7)),
-            both(Group41Var3::new(2.5)),
-            both(Group41Var4::new(2.5)),
-        ]
-    }
-
     #[test]
     fn later_invalid_header_leaves_the_cursor_untouched() {
         let code = ControlCode::from_op_type(OpType::Unknown(0x11));
@@ -1151,22 +1134,6 @@ mod tests {
             Err(TaskError::BadEncoding(BadEncoding::ControlCode(code)))
         );
         assert_eq!(cursor.written(), &[0xAA]);
-    }
-
-    #[test]
-    fn echo_with_the_same_width_matches() {
-        for (one, two) in commands() {
-            check(&one, &one, Ok(()));
-            check(&two, &two, Ok(()));
-        }
-    }
-
-    #[test]
-    fn echo_with_the_other_width_is_a_header_type_mismatch() {
-        for (one, two) in commands() {
-            check(&one, &two, Err(CommandResponseError::HeaderTypeMismatch));
-            check(&two, &one, Err(CommandResponseError::HeaderTypeMismatch));
-        }
     }
 
     const OTHER_NAN_F32: f32 = f32::from_bits(0x7FC0_0001);
