@@ -311,7 +311,16 @@ impl ObjectHeader<'_> {
 
     /// True if the header carries objects whose time is relative to a common time of occurrence
     fn has_relative_time(&self) -> bool {
-        self.variation().has_relative_time() && self.has_objects()
+        let has_relative_time = match self {
+            ObjectHeader::CountAndPrefix8(_, objects) => objects.has_relative_time(),
+            ObjectHeader::CountAndPrefix16(_, objects) => objects.has_relative_time(),
+            ObjectHeader::AllObjects(_)
+            | ObjectHeader::Range(..)
+            | ObjectHeader::Count(..)
+            | ObjectHeader::FreeFormat(_)
+            | ObjectHeader::Read(..) => self.variation().has_relative_time(),
+        };
+        has_relative_time && self.has_objects()
     }
 
     /// If the header is a common time of occurrence, the one for the headers that follow it
@@ -537,12 +546,12 @@ impl<'a> ObjectParser<'a> {
             QualifierCode::Range16 => self.parse_range(gv, Width::Two),
             QualifierCode::Count8 => self.parse_count(gv, Width::One),
             QualifierCode::Count16 => self.parse_count(gv, Width::Two),
-            QualifierCode::CountAndPrefix8 => self
-                .parse_count_and_prefix(gv)
-                .map(|(count, data)| ObjectHeader::CountAndPrefix8(count, data)),
-            QualifierCode::CountAndPrefix16 => self
-                .parse_count_and_prefix(gv)
-                .map(|(count, data)| ObjectHeader::CountAndPrefix16(count, data)),
+            QualifierCode::CountAndPrefix8 => {
+                self.parse_count_and_prefix(gv, ObjectHeader::CountAndPrefix8)
+            }
+            QualifierCode::CountAndPrefix16 => {
+                self.parse_count_and_prefix(gv, ObjectHeader::CountAndPrefix16)
+            }
             QualifierCode::FreeFormat16 => self.parse_free_format_u16(gv),
         }
     }
@@ -609,15 +618,20 @@ impl<'a> ObjectParser<'a> {
         Ok(ObjectHeader::Range(width, range, data))
     }
 
-    /// the count, whose width is the prefix's, and the prefixed objects
-    fn parse_count_and_prefix<I: Index>(
+    /// the count, whose width is the prefix's, and the prefixed objects, in the header `make` builds
+    fn parse_count_and_prefix<I, F>(
         &mut self,
         v: Variation,
-    ) -> Result<(I, PrefixedVariation<'a, I>), ObjectParseError> {
+        make: F,
+    ) -> Result<ObjectHeader<'a>, ObjectParseError>
+    where
+        I: Index,
+        F: FnOnce(I, PrefixedVariation<'a, I>) -> ObjectHeader<'a>,
+    {
         let count = I::read(&mut self.cursor)?;
         let data =
             PrefixedVariation::<I>::parse(v, count.widen_to_u16(), self.options, &mut self.cursor)?;
-        Ok((count, data))
+        Ok(make(count, data))
     }
 
     fn parse_free_format_u16(

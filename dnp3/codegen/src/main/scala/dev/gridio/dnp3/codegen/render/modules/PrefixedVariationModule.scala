@@ -170,6 +170,10 @@ object PrefixedVariationModule extends Module {
         bracket("pub(crate) fn variation(&self) -> Variation") {
           "self.get_header_info().variation".eol
         } ++ space ++
+        "/// True if objects of this variation have a time relative to a common time of occurrence".eol ++
+        bracket("pub(crate) fn has_relative_time(&self) -> bool") {
+          s"matches!(self, ${relativeTimeVariations.mkString(" | ")})".eol
+        } ++ space ++
         bracket("pub(crate) fn format_objects(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result") {
           bracket("match self") {
             variations.flatMap(fmtMatcher).iterator
@@ -185,6 +189,12 @@ object PrefixedVariationModule extends Module {
             variations.flatMap(infoMatcher).iterator
           }
         }
+    }
+  }
+
+  private def relativeTimeVariations : Iterator[String] = {
+    variations.collect {
+      case fs : FixedSize if fs.hasRelativeTime => s"PrefixedVariation::${fs.name}(_)"
     }
   }
 

@@ -64,7 +64,7 @@ impl Delivered {
     pub(crate) fn add(&mut self, header: &ObjectHeader) {
         if header.has_objects() {
             self.values = true;
-            self.events |= is_event(header);
+            self.events = self.events || is_event(header);
         }
     }
 
