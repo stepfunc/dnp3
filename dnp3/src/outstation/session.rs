@@ -103,6 +103,11 @@ impl RetryCounter {
             },
         }
     }
+
+    /// allow no further retries
+    fn stop(&mut self) {
+        self.retries = Some(0);
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -332,9 +337,9 @@ struct UnsolicitedWait {
     seq: Sequence,
     /// the confirm of a solicited response sent during the wait, if one asked for it
     solicited: Option<ExpectedConfirm>,
-    /// a DISABLE_UNSOLICITED was processed during the wait, so it ends on timeout without a retry
-    /// (TB2015-002a rule 15, decision 0007)
-    disabled: bool,
+    /// the retries left. A DISABLE_UNSOLICITED processed during the wait stops them, so the wait
+    /// ends on timeout without a retry (TB2015-002a rule 15, decision 0007)
+    retries: RetryCounter,
 }
 
 /// A solicited response's confirm, expected until the confirm timeout. The timeout is checked
@@ -662,8 +667,14 @@ impl OutstationSession {
         // check to see if we should perform unsolicited
         let next_action = self.check_unsolicited(io, reader, out, database).await?;
 
-        // handle a deferred read request if it was produced during unsolicited
-        self.handle_deferred_read(io, reader, out, database).await?;
+        // handle a deferred read request if it was produced during unsolicited. A request that
+        // ends its solicited confirm wait is processed by the next pass, before any unsolicited
+        // response
+        if let SolicitedWait::RequestPending =
+            self.handle_deferred_read(io, reader, out, database).await?
+        {
+            return Ok(());
+        }
 
         // check to see if we should perform a link status check
         self.check_link_status(io, &mut out.writer).await?;
@@ -872,8 +883,6 @@ impl OutstationSession {
         // enter unsolicited confirm wait state
         self.info.enter_unsolicited_confirm_wait(seq);
 
-        let mut retry_count = RetryCounter::new(max_retries);
-
         let mut deadline = self.new_confirm_deadline();
 
         // IEEE 1815-2012 Table 6-1 rows 22 and 33 would go on to wait for the solicited confirm
@@ -883,7 +892,7 @@ impl OutstationSession {
         let mut wait = UnsolicitedWait {
             seq,
             solicited: None,
-            disabled: false,
+            retries: RetryCounter::new(max_retries),
         };
 
         loop {
@@ -897,11 +906,10 @@ impl OutstationSession {
                 }
                 UnsolicitedWaitResult::Complete(result) => return Ok(result),
                 UnsolicitedWaitResult::Timeout => {
-                    let mut retry = retry_count.decrement();
+                    let mut retry = wait.retries.decrement();
 
-                    // If a deferred read is pending, or a DISABLE_UNSOLICITED was processed, we
-                    // want to exit
-                    if self.state.deferred_read.is_set() || wait.disabled {
+                    // If a deferred read is pending, we want to exit
+                    if self.state.deferred_read.is_set() {
                         retry = false;
                     }
 
@@ -967,8 +975,11 @@ impl OutstationSession {
         });
 
         // any DISABLE_UNSOLICITED processed, directly or as a broadcast, whatever classes it names
-        wait.disabled |= function == FunctionCode::DisableUnsolicited
-            && (direct || accepted.broadcast == Some(BroadcastAction::Processed));
+        if function == FunctionCode::DisableUnsolicited
+            && (direct || accepted.broadcast == Some(BroadcastAction::Processed))
+        {
+            wait.retries.stop();
+        }
 
         Ok(UnsolicitedWaitResult::ReadNext)
     }
@@ -1081,36 +1092,31 @@ impl OutstationSession {
         reader: &mut TransportReader<T>,
         out: &mut Responder<T>,
         database: &mut DatabaseHandle,
-    ) -> Result<(), RunError> {
-        if let Some(x) = self.state.deferred_read.select(database) {
-            tracing::info!("handling deferred READ request");
-            let response = Self::format_read_response(&mut out.sol, database, true, x.seq, x.iin2);
-            let confirm = self
-                .respond(
-                    io,
-                    &mut out.writer,
-                    x.info.addr,
-                    LastValidRequest::new(x.seq, x.hash),
-                    response,
-                    database,
-                )
-                .await?;
+    ) -> Result<SolicitedWait, RunError> {
+        let Some(x) = self.state.deferred_read.select(database) else {
+            return Ok(SolicitedWait::Done);
+        };
 
-            if let Some(series) = confirm {
-                // enter the solicited confirm wait state. Its outcome is deliberately ignored: a
-                // request that ends it stays retained, and the next idle pass processes it before
-                // any unsolicited response
-                let _: SolicitedWait = self
-                    .sol_confirm_wait(io, reader, out, database, series)
-                    .instrument(tracing::info_span!(
-                        "SolConfirmWait",
-                        "ecsn" = series.ecsn.value()
-                    ))
-                    .await?;
-            }
-        }
+        tracing::info!("handling deferred READ request");
+        let response = Self::format_read_response(&mut out.sol, database, true, x.seq, x.iin2);
+        let confirm = self
+            .respond(
+                io,
+                &mut out.writer,
+                x.info.addr,
+                LastValidRequest::new(x.seq, x.hash),
+                response,
+                database,
+            )
+            .await?;
 
-        Ok(())
+        let Some(series) = confirm else {
+            return Ok(SolicitedWait::Done);
+        };
+
+        // enter the solicited confirm wait state
+        self.sol_confirm_wait(io, reader, out, database, series)
+            .await
     }
 
     async fn handle_one_request_from_idle<T: Transport>(
@@ -1157,10 +1163,6 @@ impl OutstationSession {
 
         // enter the solicited confirm wait state
         self.sol_confirm_wait(io, reader, out, database, series)
-            .instrument(tracing::info_span!(
-                "SolConfirmWait",
-                "ecsn" = series.ecsn.value()
-            ))
             .await
     }
 
@@ -2253,6 +2255,20 @@ impl OutstationSession {
     }
 
     async fn sol_confirm_wait<T: Transport>(
+        &mut self,
+        io: &mut PhysLayer,
+        reader: &mut TransportReader<T>,
+        out: &mut Responder<T>,
+        database: &mut DatabaseHandle,
+        series: ResponseSeries,
+    ) -> Result<SolicitedWait, RunError> {
+        let span = tracing::info_span!("SolConfirmWait", "ecsn" = series.ecsn.value());
+        self.run_sol_confirm_wait(io, reader, out, database, series)
+            .instrument(span)
+            .await
+    }
+
+    async fn run_sol_confirm_wait<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
         reader: &mut TransportReader<T>,
