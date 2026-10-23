@@ -459,6 +459,348 @@ mod reply_tests {
         })
         .await;
     }
+
+    mod properties {
+        use super::*;
+        use crate::link::constant::LINK_HEADER_LENGTH;
+
+        use std::collections::VecDeque;
+
+        use proptest::prelude::*;
+        use tokio::io::{AsyncRead, AsyncWrite, DuplexStream, ReadBuf};
+
+        type Frame = [u8; LINK_HEADER_LENGTH];
+
+        /// A stream that accepts as many bytes per write as its script says and completes or
+        /// stalls each flush as scripted, then accepts everything once the script runs out
+        #[derive(Default)]
+        struct ScriptedStream {
+            /// how many bytes each write accepts, where 0 stalls the write
+            writes: VecDeque<usize>,
+            /// whether each flush completes
+            flushes: VecDeque<bool>,
+            received: Vec<u8>,
+            /// how many bytes had been received when a flush last completed
+            flushed: Option<usize>,
+        }
+
+        impl AsyncWrite for ScriptedStream {
+            fn poll_write(
+                self: Pin<&mut Self>,
+                _: &mut Context<'_>,
+                buf: &[u8],
+            ) -> Poll<std::io::Result<usize>> {
+                let this = self.get_mut();
+                match this.writes.pop_front() {
+                    Some(0) => Poll::Pending,
+                    capacity => {
+                        let count = capacity.map_or(buf.len(), |x| x.min(buf.len()));
+                        this.received.extend(buf.iter().take(count));
+                        Poll::Ready(Ok(count))
+                    }
+                }
+            }
+
+            fn poll_flush(self: Pin<&mut Self>, _: &mut Context<'_>) -> Poll<std::io::Result<()>> {
+                let this = self.get_mut();
+                if this.flushes.pop_front() == Some(false) {
+                    return Poll::Pending;
+                }
+                this.flushed = Some(this.received.len());
+                Poll::Ready(Ok(()))
+            }
+
+            fn poll_shutdown(
+                self: Pin<&mut Self>,
+                _: &mut Context<'_>,
+            ) -> Poll<std::io::Result<()>> {
+                Poll::Ready(Ok(()))
+            }
+        }
+
+        /// Whether the reply's progress agrees with what the stream received: the stream holds
+        /// exactly the bytes the reply counts as written, in order and once each, and a reply
+        /// to a stream that must be flushed isn't finished until a flush follows its last byte
+        fn consistent(
+            reply: PendingReply,
+            frame: Frame,
+            stream: &ScriptedStream,
+            flush: bool,
+        ) -> bool {
+            let complete = stream.received == frame;
+            match reply {
+                PendingReply::Write {
+                    frame: queued,
+                    written,
+                    ..
+                } => queued == frame && frame.get(..written) == Some(stream.received.as_slice()),
+                PendingReply::Flush => flush && complete,
+                PendingReply::None => {
+                    complete && (!flush || stream.flushed == Some(LINK_HEADER_LENGTH))
+                }
+            }
+        }
+
+        /// Run a case on its own runtime under the [`watchdog`], returning its result to proptest
+        ///
+        /// The cases poll with a no-op waker, so a call that loops forever inside one poll never
+        /// yields; the watchdog then aborts the process rather than letting the test hang. The
+        /// case runs unconstrained, so tokio's cooperative budget can't stall the duplex, which
+        /// the case polls many times without yielding.
+        fn guarded(case: impl FnOnce() -> Result<(), TestCaseError>) -> Result<(), TestCaseError> {
+            let runtime = tokio::runtime::Builder::new_current_thread()
+                .build()
+                .map_err(|err| TestCaseError::fail(err.to_string()))?;
+            runtime.block_on(async {
+                let mut result = Ok(());
+                watchdog(tokio::task::unconstrained(async { result = case() })).await;
+                result
+            })
+        }
+
+        /// bytes a write accepts, weighted toward stalls, single bytes and the frame's length
+        fn capacity() -> impl Strategy<Value = usize> {
+            prop_oneof![
+                2 => Just(0),
+                3 => Just(1),
+                3 => 2usize..9,
+                // around the 10-byte frame
+                2 => prop::sample::select(vec![9usize, 10, 11]),
+                1 => 12usize..64,
+            ]
+        }
+
+        /// how many bytes each write accepts, mostly stalling after a write that made progress
+        fn writes() -> impl Strategy<Value = VecDeque<usize>> {
+            prop::collection::vec((capacity(), prop::bool::weighted(0.6)), 0..16).prop_map(|x| {
+                x.into_iter()
+                    .flat_map(|(capacity, stall)| [Some(capacity), stall.then_some(0)])
+                    .flatten()
+                    .collect()
+            })
+        }
+
+        /// how many times a call is polled before it's dropped, mostly once
+        fn polls() -> impl Strategy<Value = usize> {
+            prop_oneof![
+                1 => Just(0),
+                4 => Just(1),
+                2 => 2usize..=4,
+            ]
+        }
+
+        fn resume_after_cancellations(
+            frame: Frame,
+            flush: bool,
+            writes: VecDeque<usize>,
+            flushes: Vec<bool>,
+            attempts: Vec<usize>,
+        ) -> Result<(), TestCaseError> {
+            let mut stream = ScriptedStream {
+                writes,
+                flushes: flushes.into(),
+                ..Default::default()
+            };
+            let mut reply = PendingReply::Write {
+                frame,
+                addr: PhysAddr::None,
+                written: 0,
+            };
+            for polls in attempts {
+                let mut finished = false;
+                {
+                    let mut write = pin!(reply.write_to(&mut stream, flush));
+                    for _ in 0..polls {
+                        if let Poll::Ready(result) = poll_once(write.as_mut()) {
+                            prop_assert!(result.is_ok());
+                            finished = true;
+                            break;
+                        }
+                    }
+                }
+                prop_assert!(
+                    consistent(reply, frame, &stream, flush),
+                    "{:?} {:?} {:?}",
+                    reply,
+                    stream.received,
+                    stream.flushed
+                );
+                if finished {
+                    prop_assert_eq!(reply, PendingReply::None);
+                }
+            }
+
+            // once the stream stops stalling, the rest of the reply goes out
+            stream.writes.clear();
+            stream.flushes.clear();
+            let result = {
+                let mut write = pin!(reply.write_to(&mut stream, flush));
+                (0..3).find_map(|_| match poll_once(write.as_mut()) {
+                    Poll::Ready(result) => Some(result.is_ok()),
+                    Poll::Pending => None,
+                })
+            };
+            prop_assert_eq!(result, Some(true));
+            prop_assert_eq!(stream.received.as_slice(), &frame[..]);
+            prop_assert_eq!(reply, PendingReply::None);
+            prop_assert!(consistent(reply, frame, &stream, flush));
+            Ok(())
+        }
+
+        proptest! {
+            #![proptest_config(ProptestConfig::with_cases(256))]
+
+            /// Writing a reply to a stream that takes it in arbitrary parts, with each call
+            /// cancelled after an arbitrary number of polls, sends every byte once and in order,
+            /// and a stream that needs it is flushed after the last byte
+            #[test]
+            fn a_reply_resumes_where_a_cancelled_write_stopped(
+                frame in any::<Frame>(),
+                flush in any::<bool>(),
+                writes in writes(),
+                flushes in prop::collection::vec(prop::bool::weighted(0.3), 0..6),
+                attempts in prop::collection::vec(polls(), 0..12),
+            ) {
+                guarded(|| resume_after_cancellations(frame, flush, writes, flushes, attempts))?;
+            }
+        }
+
+        #[derive(Copy, Clone, Debug)]
+        enum Step {
+            /// poll `finish_reply` this many times, then drop it
+            Attempt(usize),
+            /// the peer reads up to this many bytes
+            Drain(usize),
+        }
+
+        fn step() -> impl Strategy<Value = Step> {
+            prop_oneof![
+                (0usize..=3).prop_map(Step::Attempt),
+                (1usize..=12).prop_map(Step::Drain),
+            ]
+        }
+
+        /// read up to `max` bytes the peer has been sent, without waiting
+        fn drain(peer: &mut DuplexStream, max: usize, received: &mut Vec<u8>) {
+            let mut buffer = [0; 16];
+            let mut buf = ReadBuf::new(&mut buffer[..max.min(16)]);
+            let poll = Pin::new(peer).poll_read(&mut Context::from_waker(Waker::noop()), &mut buf);
+            if let Poll::Ready(Ok(())) = poll {
+                received.extend_from_slice(buf.filled());
+            }
+        }
+
+        fn write_after_cancellations(
+            capacity: usize,
+            frame: Frame,
+            steps: Vec<Step>,
+            data: Vec<u8>,
+        ) -> Result<(), TestCaseError> {
+            let (local, mut peer) = tokio::io::duplex(capacity);
+            let mut phys = PhysLayer::duplex(local);
+            prop_assert!(phys
+                .queue_reply(frame, PhysAddr::None, PhysDecodeLevel::Nothing)
+                .is_ok());
+
+            let mut received = Vec::new();
+            for step in steps {
+                match step {
+                    Step::Attempt(polls) => {
+                        let mut finish = pin!(phys.finish_reply());
+                        for _ in 0..polls {
+                            if let Poll::Ready(result) = poll_once(finish.as_mut()) {
+                                prop_assert!(result.is_ok());
+                                break;
+                            }
+                        }
+                    }
+                    Step::Drain(max) => drain(&mut peer, max, &mut received),
+                }
+                prop_assert!(frame.starts_with(&received), "{:?}", received);
+            }
+
+            {
+                // each stalled poll is followed by a read that frees room
+                let mut write = pin!(phys.write(&data, PhysAddr::None, PhysDecodeLevel::Nothing));
+                let mut finished = false;
+                for _ in 0..64 {
+                    if let Poll::Ready(result) = poll_once(write.as_mut()) {
+                        prop_assert!(result.is_ok());
+                        finished = true;
+                        break;
+                    }
+                    drain(&mut peer, 16, &mut received);
+                }
+                prop_assert!(finished);
+            }
+            for _ in 0..2 {
+                drain(&mut peer, 16, &mut received);
+            }
+
+            prop_assert_eq!(received, [&frame[..], &data[..]].concat());
+            prop_assert_eq!(phys.reply, PendingReply::None);
+            Ok(())
+        }
+
+        proptest! {
+            #![proptest_config(ProptestConfig::with_cases(128))]
+
+            /// However often finishing a reply to a stream with little room is cancelled, a
+            /// following write sends the rest of the reply before its own data
+            #[test]
+            fn a_write_follows_the_whole_reply(
+                capacity in 1usize..=12,
+                frame in any::<Frame>(),
+                steps in prop::collection::vec(step(), 0..16),
+                data in prop::collection::vec(any::<u8>(), 1..=20),
+            ) {
+                guarded(|| write_after_cancellations(capacity, frame, steps, data))?;
+            }
+        }
+
+        /// The consistency check rejects a reply that lost track of bytes it wrote, wrote bytes
+        /// twice or skipped a flush
+        #[test]
+        fn consistency_rejects_lost_repeated_and_unflushed_bytes() {
+            let frame = OUTSTATION_REPLY;
+            let stream = |received: &[u8], flushed| ScriptedStream {
+                received: received.to_vec(),
+                flushed,
+                ..Default::default()
+            };
+            let written = |written| PendingReply::Write {
+                frame,
+                addr: PhysAddr::None,
+                written,
+            };
+
+            let repeated = [&frame[..4], &frame[..4]].concat();
+            let none = PendingReply::None;
+            let flush = PendingReply::Flush;
+            // (reply, bytes received, received when last flushed, must flush, consistent)
+            let cases = [
+                (written(4), &frame[..4], None, false, true),
+                // resuming would skip or repeat bytes
+                (written(4), &frame[..8], None, false, false),
+                (written(8), &frame[..4], None, false, false),
+                (written(8), &repeated[..], None, false, false),
+                // a stream that needs flushing gets a flush after the last byte
+                (none, &frame[..], None, false, true),
+                (none, &frame[..], None, true, false),
+                (none, &frame[..], Some(8), true, false),
+                (none, &frame[..], Some(10), true, true),
+                (flush, &frame[..], None, false, false),
+                (flush, &frame[..8], None, true, false),
+            ];
+            for (reply, received, flushed, must_flush, expected) in cases {
+                assert_eq!(
+                    consistent(reply, frame, &stream(received, flushed), must_flush),
+                    expected,
+                    "{reply:?} {received:?} {flushed:?} {must_flush}"
+                );
+            }
+        }
+    }
 }
 
 #[cfg(test)]
