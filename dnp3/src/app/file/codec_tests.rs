@@ -290,27 +290,27 @@ proptest! {
     }
 }
 
-proptest! {
-    #![proptest_config(ProptestConfig::with_cases(32))]
-
-    /// the password offset is 12 plus the length of the user name, which must fit in a u16
-    #[test]
-    fn g70v2_rejects_a_user_name_that_overflows_the_password_offset(
-        len in prop_oneof![65_500usize..=65_540, Just(65_523), Just(65_524)],
-    ) {
+/// the password offset is 12 plus the length of the user name, which must fit in a u16
+#[test]
+fn g70v2_rejects_a_user_name_that_overflows_the_password_offset() {
+    let mut buffer = vec![0u8; 70_000];
+    for len in 65_500usize..=65_540 {
         let user_name = "a".repeat(len);
         let object = Group70Var2 {
             auth_key: 0,
             user_name: &user_name,
             password: "",
         };
-        let mut buffer = vec![0u8; 70_000];
         let mut cursor = WriteCursor::new(&mut buffer);
-        let result = object.write(&mut cursor);
-        if len + 12 <= usize::from(u16::MAX) {
-            prop_assert_eq!(result, Ok(()));
+        let expected = if len + 12 <= usize::from(u16::MAX) {
+            Ok(())
         } else {
-            prop_assert_eq!(result, Err(WriteError::Overflow));
-        }
+            Err(WriteError::Overflow)
+        };
+        assert_eq!(
+            object.write(&mut cursor),
+            expected,
+            "user name length {len}"
+        );
     }
 }
