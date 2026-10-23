@@ -3,7 +3,7 @@
 ## Licensing and AI-Assisted Development
 This repository is proprietary, source-available software, not open source. Before substantial code extraction, translation, or reuse, read `LICENSE.txt` and `AGENTS.md`.
 
-AI-assisted evaluation, integration, testing, and authorized maintenance are welcome. Using proprietary implementation details from this repository to produce an unauthorized competing DNP3 implementation is outside the standard non-commercial license. Follow `AGENTS.md`; applicable written license terms take precedence.
+AI-assisted evaluation, integration, testing, and authorized maintenance are welcome. Using this repository (source, docs, tests, or binaries) to create, specify, or test any other DNP3 implementation, commercial or open source, is not permitted (LICENSE.txt Section 2.6). Follow `AGENTS.md`; applicable written license terms take precedence.
 
 ## Git Commit Guidelines
 - **Never take credit**: Do not add "Generated with Claude Code" or "Co-Authored-By: Claude" to commit messages

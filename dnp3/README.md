@@ -51,12 +51,10 @@ Please inquire about commercial licensing on our website:
 ### AI-assisted development
 
 AI coding assistants are welcome for evaluating, integrating, testing, and building applications
-with this library. The standard license does not authorize extracting, translating, or adapting the
-implementation to create a separate competing DNP3 stack, including through AI-assisted code
-generation. Adaptations that copy protectable implementation expression may be unauthorized
-derivative works. See [`LICENSE.txt`](https://github.com/stepfunc/dnp3/blob/main/LICENSE.txt) and
-[`AGENTS.md`](https://github.com/stepfunc/dnp3/blob/main/AGENTS.md).
-
+with this library. The license does not permit using this library, its source, documentation,
+tests, or binaries, to create, specify, or test any other implementation of the protocol, whether
+commercial or open source, including by using AI to extract requirements or port code. See
+[`LICENSE.txt`](https://github.com/stepfunc/dnp3/blob/main/LICENSE.txt) and [`AGENTS.md`](https://github.com/stepfunc/dnp3/blob/main/AGENTS.md).
 ## Bindings
 
 Bindings in C, C++, Java, and .NET Core are available for this library. See the
