@@ -27,6 +27,21 @@ pub(crate) enum HandshakeError {
     Failed(std::io::Error),
 }
 
+impl HandshakeError {
+    /// Log why the handshake with `peer` didn't produce a session
+    pub(crate) fn log(&self, peer: std::net::SocketAddr) {
+        match self {
+            Self::Timeout => tracing::warn!(
+                "TLS handshake with {peer} didn't complete within {} seconds",
+                TLS_HANDSHAKE_TIMEOUT.as_secs()
+            ),
+            Self::Failed(err) => {
+                tracing::warn!("failed to establish TLS session with {peer}: {err}")
+            }
+        }
+    }
+}
+
 /// Run a handshake, giving up if it doesn't complete within [`TLS_HANDSHAKE_TIMEOUT`]
 async fn handshake<S>(
     handshake: impl std::future::Future<Output = std::io::Result<S>>,

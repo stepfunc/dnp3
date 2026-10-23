@@ -83,25 +83,11 @@ impl ServerConnectionHandler {
         match self {
             Self::Tcp => Some(socket.into_phys()),
             #[cfg(feature = "enable-tls")]
-            Self::Tls(config) => match config.handle_connection(socket).await {
-                Ok(phys) => Some(phys),
-                Err(crate::tcp::tls::HandshakeError::Timeout) => {
-                    tracing::warn!(
-                        "error from {}: TLS handshake didn't complete within {} seconds",
-                        _addr,
-                        crate::tcp::tls::TLS_HANDSHAKE_TIMEOUT.as_secs()
-                    );
-                    None
-                }
-                Err(crate::tcp::tls::HandshakeError::Failed(err)) => {
-                    tracing::warn!(
-                        "error from {}: failed to establish TLS session: {}",
-                        _addr,
-                        err
-                    );
-                    None
-                }
-            },
+            Self::Tls(config) => config
+                .handle_connection(socket)
+                .await
+                .inspect_err(|err| err.log(_addr))
+                .ok(),
         }
     }
 }
