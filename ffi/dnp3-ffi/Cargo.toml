@@ -12,7 +12,7 @@ keywords.workspace = true
 categories.workspace = true
 
 [lib]
-crate-type = ["rlib", "cdylib"]
+crate-type = ["rlib"]
 
 [dependencies]
 lazy_static = "1.0"

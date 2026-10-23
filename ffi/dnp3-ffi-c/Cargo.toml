@@ -1,0 +1,27 @@
+[package]
+name = "dnp3-ffi-c"
+version = "1.8.0-M1"
+
+# inherit from workspace
+rust-version.workspace = true
+edition.workspace = true
+license-file.workspace = true
+homepage.workspace = true
+repository.workspace = true
+keywords.workspace = true
+categories.workspace = true
+
+[lib]
+name = "dnp3_ffi"
+crate-type = ["cdylib"]
+# shares its lib name with dnp3-ffi, so only that one is documented
+doc = false
+
+[dependencies]
+dnp3-ffi-impl = { package = "dnp3-ffi", path = "../dnp3-ffi", default-features = false }
+
+[features]
+default = ["tls", "serial"]
+tls = ["dnp3-ffi-impl/tls"]
+tls-aws-lc = ["dnp3-ffi-impl/tls-aws-lc"]
+serial = ["dnp3-ffi-impl/serial"]
