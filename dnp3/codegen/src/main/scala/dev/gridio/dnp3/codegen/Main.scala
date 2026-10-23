@@ -18,6 +18,7 @@ object Main {
 
   private val appPath: Path = FileSystems.getDefault.getPath("../src/app/")
   private val implPath: Path = appPath.resolve("gen");
+  private val databasePath: Path = FileSystems.getDefault.getPath("../src/outstation/database/")
   private val ffiPath: Path = FileSystems.getDefault.getPath("../../ffi/")
 
   private object CommonUseStatements extends Module {
@@ -43,9 +44,14 @@ object Main {
     (PrefixedVariationModule, implPath.resolve("prefixed.rs")),
     (ReadQualifierModule, implPath.resolve("read.rs")),
     (ConversionsModule, implPath.resolve("conversion.rs")),
+    // the outstation's static and event variation enums
+    (OutstationVariationModule, databasePath.resolve("variations.rs")),
     // the FFI Variation enum and its conversions
     (FfiVariationSchemaModule, ffiPath.resolve("dnp3-schema/src/variation.rs")),
-    (FfiVariationConversionModule, ffiPath.resolve("dnp3-ffi/src/variation.rs"))
+    (FfiVariationConversionModule, ffiPath.resolve("dnp3-ffi/src/variation.rs")),
+    // the FFI outstation variation enums and their conversions
+    (FfiOutstationVariationSchemaModule, ffiPath.resolve("dnp3-schema/src/database/variation.rs")),
+    (FfiOutstationVariationConversionModule, ffiPath.resolve("dnp3-ffi/src/outstation/database/variation.rs"))
   )
 
   def main(args: Array[String]): Unit = {

@@ -11,6 +11,7 @@ use crate::app::measurement::*;
 use crate::master::EventClasses;
 use crate::outstation::database::config::*;
 use crate::outstation::database::details::WriteProgress;
+use crate::outstation::database::variations::*;
 use crate::outstation::database::{EventBufferConfig, EventClass};
 use crate::outstation::{BufferState, ClassCount, OutstationApplication, TypeCount};
 

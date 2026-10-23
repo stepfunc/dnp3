@@ -8,6 +8,8 @@ use crate::gv;
 use crate::shared::SharedDefinitions;
 use oo_bindgen::model::*;
 
+mod variation;
+
 fn define_update_options(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
     let event_mode_enum = lib
         .define_enum("event_mode")?
@@ -83,20 +85,8 @@ fn define_update_flags_type(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> 
 }
 
 fn define_binary_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
-    let binary_static_variation = lib
-        .define_enum("static_binary_input_variation")?
-        .push(gv(1, 1), "Binary input - packed format")?
-        .push(gv(1, 2), "Binary input - with flags")?
-        .doc("Static binary input variation")?
-        .build()?;
-
-    let binary_event_variation = lib
-        .define_enum("event_binary_input_variation")?
-        .push(gv(2, 1), "Binary input event - without time")?
-        .push(gv(2, 2), "Binary input event - with absolute time")?
-        .push(gv(2, 3), "Binary input event - with relative time")?
-        .doc("Event binary input variation")?
-        .build()?;
+    let (binary_static_variation, binary_event_variation) =
+        variation::define_binary_input_variations(lib)?;
 
     let static_variation = Name::create("static_variation")?;
     let event_variation = Name::create("event_variation")?;
@@ -129,26 +119,8 @@ fn define_binary_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStruc
 fn define_double_bit_binary_config(
     lib: &mut LibraryBuilder,
 ) -> BackTraced<FunctionArgStructHandle> {
-    let double_bit_binary_static_variation = lib
-        .define_enum("static_double_bit_binary_input_variation")?
-        .push(gv(3, 1), "Double-bit binary input - packed format")?
-        .push(gv(3, 2), "Double-bit binary input - with flags")?
-        .doc("Static double-bit binary input variation")?
-        .build()?;
-
-    let double_bit_binary_event_variation = lib
-        .define_enum("event_double_bit_binary_input_variation")?
-        .push(gv(4, 1), "Double-bit binary input event - without time")?
-        .push(
-            gv(4, 2),
-            "Double-bit binary input event - with absolute time",
-        )?
-        .push(
-            gv(4, 3),
-            "Double-bit binary input event - with relative time",
-        )?
-        .doc("Event double-bit binary input variation")?
-        .build()?;
+    let (double_bit_binary_static_variation, double_bit_binary_event_variation) =
+        variation::define_double_bit_binary_input_variations(lib)?;
 
     let static_variation = Name::create("static_variation")?;
     let event_variation = Name::create("event_variation")?;
@@ -181,23 +153,8 @@ fn define_double_bit_binary_config(
 fn define_binary_output_status_config(
     lib: &mut LibraryBuilder,
 ) -> BackTraced<FunctionArgStructHandle> {
-    let binary_output_status_static_variation = lib
-        .define_enum("static_binary_output_status_variation")?
-        .push(gv(10, 1), "Binary output - packed format")?
-        .push(gv(10, 2), "Binary output - output status with flags")?
-        .doc("Static binary output status variation")?
-        .build()?;
-
-    let binary_output_status_event_variation = lib
-        .define_enum("event_binary_output_status_variation")?
-        .push(gv(11, 1), "Binary output event - status without time")?
-        .push(
-            gv(11, 2),
-            doc("Binary output event - status with time")
-                .details("Events recorded without time are reported as {enum:event_binary_output_status_variation.group11_var1}."),
-        )?
-        .doc("Event binary output status variation")?
-        .build()?;
+    let (binary_output_status_static_variation, binary_output_status_event_variation) =
+        variation::define_binary_output_status_variations(lib)?;
 
     let static_variation = Name::create("static_variation")?;
     let event_variation = Name::create("event_variation")?;
@@ -228,31 +185,8 @@ fn define_binary_output_status_config(
 }
 
 fn define_counter_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
-    let counter_static_variation = lib
-        .define_enum("static_counter_variation")?
-        .push(gv(20, 1), "Counter - 32-bit with flag")?
-        .push(gv(20, 2), "Counter - 16-bit with flag")?
-        .push(gv(20, 5), "Counter - 32-bit without flag")?
-        .push(gv(20, 6), "Counter - 16-bit without flag")?
-        .doc("Static counter variation")?
-        .build()?;
-
-    let counter_event_variation = lib
-        .define_enum("event_counter_variation")?
-        .push(gv(22, 1), "Counter event - 32-bit with flag")?
-        .push(gv(22, 2), "Counter event - 16-bit with flag")?
-        .push(
-            gv(22, 5),
-            doc("Counter event - 32-bit with flag and time")
-                .details("Events recorded without time are reported as {enum:event_counter_variation.group22_var1}."),
-        )?
-        .push(
-            gv(22, 6),
-            doc("Counter event - 16-bit with flag and time")
-                .details("Events recorded without time are reported as {enum:event_counter_variation.group22_var2}."),
-        )?
-        .doc("Event counter variation")?
-        .build()?;
+    let (counter_static_variation, counter_event_variation) =
+        variation::define_counter_variations(lib)?;
 
     let static_variation = Name::create("static_variation")?;
     let event_variation = Name::create("event_variation")?;
@@ -286,33 +220,8 @@ fn define_counter_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStru
 }
 
 fn define_frozen_counter_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
-    let frozen_counter_static_variation = lib
-        .define_enum("static_frozen_counter_variation")?
-        .push(gv(21, 1), "Frozen Counter - 32-bit with flag")?
-        .push(gv(21, 2), "Frozen Counter - 16-bit with flag")?
-        .push(gv(21, 5), "Frozen Counter - 32-bit with flag and time")?
-        .push(gv(21, 6), "Frozen Counter - 16-bit with flag and time")?
-        .push(gv(21, 9), "Frozen Counter - 32-bit without flag")?
-        .push(gv(21, 10), "Frozen Counter - 16-bit without flag")?
-        .doc("Static frozen counter variation")?
-        .build()?;
-
-    let frozen_counter_event_variation = lib
-        .define_enum("event_frozen_counter_variation")?
-        .push(gv(23, 1), "Frozen Counter event - 32-bit with flag")?
-        .push(gv(23, 2), "Frozen Counter event - 16-bit with flag")?
-        .push(
-            gv(23, 5),
-            doc("Frozen Counter event - 32-bit with flag and time")
-                .details("Events recorded without time are reported as {enum:event_frozen_counter_variation.group23_var1}."),
-        )?
-        .push(
-            gv(23, 6),
-            doc("Frozen Counter event - 16-bit with flag and time")
-                .details("Events recorded without time are reported as {enum:event_frozen_counter_variation.group23_var2}."),
-        )?
-        .doc("Event frozen counter variation")?
-        .build()?;
+    let (frozen_counter_static_variation, frozen_counter_event_variation) =
+        variation::define_frozen_counter_variations(lib)?;
 
     let static_variation = Name::create("static_variation")?;
     let event_variation = Name::create("event_variation")?;
@@ -346,57 +255,8 @@ fn define_frozen_counter_config(lib: &mut LibraryBuilder) -> BackTraced<Function
 }
 
 pub fn define_analog_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgStructHandle> {
-    let analog_static_variation = lib
-        .define_enum("static_analog_input_variation")?
-        .push(gv(30, 1), "Analog input - 32-bit with flag")?
-        .push(gv(30, 2), "Analog input - 16-bit with flag")?
-        .push(gv(30, 3), "Analog input - 32-bit without flag")?
-        .push(gv(30, 4), "Analog input - 16-bit without flag")?
-        .push(
-            gv(30, 5),
-            "Analog input - single-precision, floating-point with flag",
-        )?
-        .push(
-            gv(30, 6),
-            "Analog input - double-precision, floating-point with flag",
-        )?
-        .doc("Static analog variation")?
-        .build()?;
-
-    let analog_event_variation = lib
-        .define_enum("event_analog_input_variation")?
-        .push(gv(32, 1), "Analog input event - 32-bit without time")?
-        .push(gv(32, 2), "Analog input event - 16-bit without time")?
-        .push(
-            gv(32, 3),
-            doc("Analog input event - 32-bit with time")
-                .details("Events recorded without time are reported as {enum:event_analog_input_variation.group32_var1}."),
-        )?
-        .push(
-            gv(32, 4),
-            doc("Analog input event - 16-bit with time")
-                .details("Events recorded without time are reported as {enum:event_analog_input_variation.group32_var2}."),
-        )?
-        .push(
-            gv(32, 5),
-            "Analog input event - single-precision, floating-point without time",
-        )?
-        .push(
-            gv(32, 6),
-            "Analog input event - double-precision, floating-point without time",
-        )?
-        .push(
-            gv(32, 7),
-            doc("Analog input event - single-precision, floating-point with time")
-                .details("Events recorded without time are reported as {enum:event_analog_input_variation.group32_var5}."),
-        )?
-        .push(
-            gv(32, 8),
-            doc("Analog input event - double-precision, floating-point with time")
-                .details("Events recorded without time are reported as {enum:event_analog_input_variation.group32_var6}."),
-        )?
-        .doc("Event analog variation")?
-        .build()?;
+    let (analog_static_variation, analog_event_variation) =
+        variation::define_analog_input_variations(lib)?;
 
     let static_variation = Name::create("static_variation")?;
     let event_variation = Name::create("event_variation")?;
@@ -438,55 +298,8 @@ pub fn define_analog_config(lib: &mut LibraryBuilder) -> BackTraced<FunctionArgS
 fn define_analog_output_status_config(
     lib: &mut LibraryBuilder,
 ) -> BackTraced<FunctionArgStructHandle> {
-    let analog_output_status_static_variation = lib
-        .define_enum("static_analog_output_status_variation")?
-        .push(gv(40, 1), "Analog output status - 32-bit with flag")?
-        .push(gv(40, 2), "Analog output status - 16-bit with flag")?
-        .push(
-            gv(40, 3),
-            "Analog output status - single-precision, floating-point with flag",
-        )?
-        .push(
-            gv(40, 4),
-            "Analog output status - double-precision, floating-point with flag",
-        )?
-        .doc("Static analog output status variation")?
-        .build()?;
-
-    let analog_output_status_event_variation = lib
-        .define_enum("event_analog_output_status_variation")?
-        .push(gv(42, 1), "Analog output event - 32-bit without time")?
-        .push(gv(42, 2), "Analog output event - 16-bit without time")?
-        .push(
-            gv(42, 3),
-            doc("Analog output event - 32-bit with time")
-                .details("Events recorded without time are reported as {enum:event_analog_output_status_variation.group42_var1}."),
-        )?
-        .push(
-            gv(42, 4),
-            doc("Analog output event - 16-bit with time")
-                .details("Events recorded without time are reported as {enum:event_analog_output_status_variation.group42_var2}."),
-        )?
-        .push(
-            gv(42, 5),
-            "Analog output event - single-precision, floating-point without time",
-        )?
-        .push(
-            gv(42, 6),
-            "Analog output event - double-precision, floating-point without time",
-        )?
-        .push(
-            gv(42, 7),
-            doc("Analog output event - single-precision, floating-point with time")
-                .details("Events recorded without time are reported as {enum:event_analog_output_status_variation.group42_var5}."),
-        )?
-        .push(
-            gv(42, 8),
-            doc("Analog output event - double-precision, floating-point with time")
-                .details("Events recorded without time are reported as {enum:event_analog_output_status_variation.group42_var6}."),
-        )?
-        .doc("Event analog output status variation")?
-        .build()?;
+    let (analog_output_status_static_variation, analog_output_status_event_variation) =
+        variation::define_analog_output_status_variations(lib)?;
 
     let static_variation = Name::create("static_variation")?;
     let event_variation = Name::create("event_variation")?;

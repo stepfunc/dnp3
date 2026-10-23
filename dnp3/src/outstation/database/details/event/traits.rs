@@ -9,6 +9,7 @@ use crate::app::parse::traits::FixedSizeVariation;
 use crate::app::variations::*;
 use crate::outstation::database::config::*;
 use crate::outstation::database::details::event::write_fn::ToVariationCto;
+use crate::outstation::database::variations::*;
 
 /// A variation of events of type `T`
 pub(crate) trait EventVariation<T>: Copy {

@@ -15,8 +15,11 @@ The code generator creates the following Rust source files:
 - `../src/app/gen/prefixed.rs` - Prefixed variations (with size prefix)
 - `../src/app/gen/read.rs` - The variations a READ request can carry with each qualifier
 - `../src/app/gen/conversion.rs` - Type conversion implementations
+- `../src/outstation/database/variations.rs` - The static and event variation enums of the outstation's point types
 - `../../ffi/dnp3-schema/src/variation.rs` - The FFI `Variation` enum in the bindings schema
 - `../../ffi/dnp3-ffi/src/variation.rs` - Conversions between the FFI `Variation` enum and `dnp3::app::Variation`
+- `../../ffi/dnp3-schema/src/database/variation.rs` - The FFI outstation variation enums in the bindings schema
+- `../../ffi/dnp3-ffi/src/outstation/database/variation.rs` - Conversions from the FFI outstation variation enums to the Rust ones
 
 ## Requirements
 
@@ -46,6 +49,7 @@ The code generator is structured as follows:
   - `Fields.scala` - Field type definitions
   - `ObjectGroup.scala` - DNP3 object group definitions
   - `Variation.scala` - Variation definitions
+  - `OutstationFamily.scala` - The point types the outstation reports and their static and event groups
   - `groups/` - Individual group definitions (Group0-Group113)
   - `enums/protocol/` - Protocol enumeration definitions
 - `render/` - Code rendering utilities

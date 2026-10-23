@@ -288,8 +288,8 @@ fn write_header(
 #[cfg(test)]
 mod tests {
     use crate::app::measurement::*;
-    use crate::outstation::database::config::*;
     use crate::outstation::database::details::range::traits::StaticVariation;
+    use crate::outstation::database::variations::*;
 
     use super::*;
 

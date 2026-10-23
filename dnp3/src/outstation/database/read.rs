@@ -7,8 +7,8 @@
 use crate::app::parse::parser::{ObjectHeader, ReadQualifier};
 use crate::app::parse::range::Range;
 use crate::app::{Iin2, Variation};
-use crate::outstation::database::config::*;
 use crate::outstation::database::details::range::static_db::IndexRange;
+use crate::outstation::database::variations::*;
 use crate::outstation::database::EventClass;
 use crate::outstation::target::{Selector, Target};
 
