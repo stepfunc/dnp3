@@ -829,6 +829,8 @@ struct Run {
     model: Model,
     /// the last request sent
     last: Option<Request>,
+    /// the select-before-operate controls the handler has operated
+    operations: usize,
 }
 
 impl Run {
@@ -838,6 +840,7 @@ impl Run {
             start: Instant::now(),
             model: Model::new(select_timeout_ms),
             last: None,
+            operations: 0,
         }
     }
 
@@ -904,6 +907,11 @@ impl Run {
             response: responses.pop(),
             events,
         };
+        self.operations += actual
+            .events
+            .iter()
+            .filter(|event| matches!(event, Event::Operate(_, OperateType::SelectBeforeOperate)))
+            .count();
 
         let alternatives = self.model.step(request);
         match alternatives
@@ -921,6 +929,13 @@ impl Run {
             }
         }
     }
+
+    /// nothing follows the last request
+    async fn finish(mut self) {
+        tokio::task::yield_now().await;
+        self.harness.expect_no_response();
+        self.harness.check_no_events();
+    }
 }
 
 async fn check_model(select_timeout_ms: u64, ops: Vec<Op>) {
@@ -928,11 +943,7 @@ async fn check_model(select_timeout_ms: u64, ops: Vec<Op>) {
     for op in ops {
         run.apply(op).await;
     }
-
-    // and nothing follows the last request
-    tokio::task::yield_now().await;
-    run.harness.expect_no_response();
-    run.harness.check_no_events();
+    run.finish().await;
 }
 
 proptest! {
@@ -962,6 +973,113 @@ fn failed_select_ends_the_previous_selection() {
         ),
     ];
     run_paused(check_model(1000, ops));
+}
+
+/// the select timeout of the op lists below, which don't advance the clock
+const SELECT_TIMEOUT_MS: u64 = 1000;
+
+/// a SELECT of the first set with sequence number 0
+const SELECT: Op = Op::Request(RequestOp::Select(SetChoice::Fixed(0), SeqChoice::Fixed(0)));
+
+/// the OPERATE that matches [`SELECT`]
+const OPERATE: Op = Op::Request(RequestOp::Operate(SetChoice::Fixed(0), SeqChoice::Fixed(1)));
+
+/// Runs `ops` against the model, and checks that the handler operates `operations` controls
+/// select-before-operate, the count each op list expects whatever the model predicts
+fn check_operations(ops: &[Op], operations: usize) {
+    run_paused(async {
+        let mut run = Run::new(SELECT_TIMEOUT_MS);
+        for op in ops {
+            run.apply(*op).await;
+        }
+        assert_eq!(run.operations, operations, "{ops:?}");
+        run.finish().await;
+    });
+}
+
+/// [`SELECT`], `between`, then [`OPERATE`]
+fn select_then_operate(between: &[Op]) -> Vec<Op> {
+    [&[SELECT], between, &[OPERATE]].concat()
+}
+
+/// A solicited or unsolicited CONFIRM and a fragment with FIR = 0 aren't requests (Rule 4), and
+/// a SELECT of other objects with the selection's sequence number is discarded (Table 4-9, row
+/// 2): each keeps the selection
+#[test]
+fn confirms_invalid_fragments_and_discarded_selects_keep_the_selection() {
+    for between in [
+        RequestOp::Confirm(false, SeqChoice::Fixed(0)),
+        RequestOp::Confirm(true, SeqChoice::Fixed(0)),
+        RequestOp::NotFirst(SeqChoice::Fixed(0)),
+        // index 8 instead of 7
+        RequestOp::Select(SetChoice::Fixed(2), SeqChoice::Fixed(0)),
+    ] {
+        check_operations(&select_then_operate(&[Op::Request(between)]), 1);
+    }
+}
+
+/// Any other request ends the selection (Rule 4, Table 4-9), the retry of a DIRECT_OPERATE
+/// doesn't restore it, and neither does a SELECT that replaced it
+#[test]
+fn other_requests_end_the_selection() {
+    let direct_operate = Op::Request(RequestOp::DirectOperate(
+        SetChoice::Fixed(0),
+        SeqChoice::Fixed(5),
+    ));
+    for between in [
+        RequestOp::Read(SeqChoice::Fixed(5)),
+        RequestOp::DelayMeasure(SeqChoice::Fixed(5)),
+        RequestOp::Malformed(FunctionCode::Read, SeqChoice::Fixed(5)),
+        // decision 0003: a new request, not the discarded SELECT of Table 4-9 row 2
+        RequestOp::Malformed(FunctionCode::Select, SeqChoice::Fixed(0)),
+        RequestOp::UnknownFunction(SeqChoice::Fixed(5)),
+        RequestOp::DirectOperateNoAck(SetChoice::Fixed(0), SeqChoice::Fixed(5)),
+        // rejected, at index 8 instead of 7
+        RequestOp::Operate(SetChoice::Fixed(2), SeqChoice::Fixed(1)),
+        RequestOp::Select(SetChoice::Fixed(2), SeqChoice::Fixed(5)),
+    ] {
+        check_operations(&select_then_operate(&[Op::Request(between)]), 0);
+    }
+    check_operations(&select_then_operate(&[direct_operate, Op::Repeat]), 0);
+}
+
+/// Each selection operates once, by the OPERATE that matches the latest SELECT
+#[test]
+fn a_selection_operates_once_for_the_latest_select() {
+    let request = |op| Op::Request(op);
+    let cases = [
+        // the retry of the OPERATE repeats its response without operating again
+        (vec![SELECT, OPERATE, Op::Repeat], 1),
+        (vec![OPERATE], 0),
+        (
+            vec![
+                SELECT,
+                request(RequestOp::Select(SetChoice::Fixed(2), SeqChoice::Fixed(5))),
+                request(RequestOp::Operate(SetChoice::Fixed(2), SeqChoice::Fixed(6))),
+            ],
+            1,
+        ),
+        (
+            vec![
+                request(RequestOp::DirectOperate(
+                    SetChoice::Fixed(0),
+                    SeqChoice::Fixed(4),
+                )),
+                request(RequestOp::DirectOperateNoAck(
+                    SetChoice::Fixed(0),
+                    SeqChoice::Fixed(5),
+                )),
+                SELECT,
+                OPERATE,
+            ],
+            1,
+        ),
+        // no longer a retry, since the OPERATE came between them
+        (vec![SELECT, OPERATE, SELECT, OPERATE], 2),
+    ];
+    for (ops, operations) in cases {
+        check_operations(&ops, operations);
+    }
 }
 
 /// The model rejects an OPERATE that executes after a READ ended its selection
