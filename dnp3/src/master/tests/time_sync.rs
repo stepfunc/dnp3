@@ -537,3 +537,89 @@ async fn user_non_lan_time_sync_fails_with_the_cause_when_the_delay_measure_resp
     })
     .await;
 }
+
+/// A WRITE response with objects that parse is rejected as unexpected, and one with objects that
+/// don't parse as malformed, with the cause
+#[tokio::test(start_paused = true)]
+async fn user_time_sync_fails_when_the_write_response_has_objects() {
+    watchdog(async {
+        let cases: [(&[u8], TaskError); 3] = [
+            // a g52v2 time delay
+            (
+                &[52, 2, 0x07, 1, 0x00, 0x00],
+                TaskError::UnexpectedResponseHeaders,
+            ),
+            // a header cut short after its group
+            (
+                &[0x01],
+                TaskError::MalformedResponse(ObjectParseError::InsufficientBytes),
+            ),
+            // a variation of g50 that doesn't exist
+            (
+                &[50, 9, 0x07, 1],
+                TaskError::MalformedResponse(ObjectParseError::UnknownGroupVariation(50, 9)),
+            ),
+        ];
+        let procedures = [
+            TimeSyncProcedure::Lan,
+            TimeSyncProcedure::NonLan,
+            TimeSyncProcedure::DirectWriteAbsTime,
+        ];
+        for procedure in procedures {
+            for (objects, err) in cases {
+                let mut harness =
+                    create_association_with_handler(config(None), Box::new(FixedTime)).await;
+                let mut seq = Sequence::default();
+
+                let mut association = harness.association.clone();
+                let sync =
+                    tokio::spawn(async move { association.synchronize_time(procedure).await });
+                let (first, write) = match procedure {
+                    TimeSyncProcedure::Lan => {
+                        harness
+                            .expect_write_and_respond(
+                                record_current_time(seq),
+                                empty_response(seq.increment()),
+                            )
+                            .await;
+                        (
+                            FunctionCode::RecordCurrentTime,
+                            write_last_recorded_time(seq),
+                        )
+                    }
+                    TimeSyncProcedure::NonLan => {
+                        harness
+                            .expect_write_and_respond(
+                                delay_measure(seq),
+                                delay_measure_response(seq.increment(), 0),
+                            )
+                            .await;
+                        (FunctionCode::DelayMeasure, write_absolute_time(seq))
+                    }
+                    TimeSyncProcedure::DirectWriteAbsTime => {
+                        (FunctionCode::Write, write_absolute_time(seq))
+                    }
+                };
+                let mut response = empty_response(seq);
+                response.extend_from_slice(objects);
+                harness.expect_write_and_respond(write, response).await;
+
+                assert_eq!(
+                    sync.await.unwrap(),
+                    Err(TimeSyncError::Task(err)),
+                    "{procedure:?} {objects:?}"
+                );
+                assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+                assert_eq!(
+                    harness.assoc_events.pop(),
+                    [
+                        AssocInfoEvent::TaskStart(TaskType::TimeSync, first, Sequence::new(0)),
+                        AssocInfoEvent::TaskFailure(TaskType::TimeSync, err),
+                    ],
+                    "{procedure:?} {objects:?}"
+                );
+            }
+        }
+    })
+    .await;
+}

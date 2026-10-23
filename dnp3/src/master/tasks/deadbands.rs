@@ -58,7 +58,7 @@ impl OneShotRequest for DeadBandsRequest {
     }
 
     fn parse(&self, response: Response<'_>) -> Result<(), WriteError> {
-        expect_empty(response)
+        Ok(expect_empty(&response)?)
     }
 
     fn wrap(task: OneShot<Self>) -> NonReadTask {

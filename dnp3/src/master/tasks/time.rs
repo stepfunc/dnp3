@@ -10,6 +10,7 @@ use crate::master::association::Association;
 use crate::master::error::{TaskError, TimeSyncError};
 use crate::master::promise::Promise;
 use crate::master::request::TimeSyncProcedure;
+use crate::master::tasks::empty_response::expect_empty;
 use crate::master::tasks::{AppTask, NonReadTask, ResponseTask, Step, Task};
 use crate::master::TaskType;
 
@@ -119,18 +120,9 @@ impl From<TimeSyncTask> for Task {
     }
 }
 
-/// Check that a response has no object headers
-fn check_no_objects(response: &Response) -> Result<(), TimeSyncError> {
-    if response.raw_objects.is_empty() {
-        Ok(())
-    } else {
-        Err(TimeSyncError::Task(TaskError::UnexpectedResponseHeaders))
-    }
-}
-
 /// Check the response to the WRITE that sets the outstation's time
 fn check_write_response(response: &Response) -> Result<(), TimeSyncError> {
-    check_no_objects(response)?;
+    expect_empty(response)?;
     if response.header.iin.iin1.get_need_time() {
         return Err(TimeSyncError::StillNeedsTime);
     }
@@ -257,7 +249,7 @@ impl ResponseTask for TimeSyncTask {
                 Ok(Step::Next)
             }
             State::RecordCurrentTime(recorded_time) => {
-                check_no_objects(&response)?;
+                expect_empty(&response)?;
                 self.state = State::WriteLastRecordedTime(recorded_time);
                 Ok(Step::Next)
             }

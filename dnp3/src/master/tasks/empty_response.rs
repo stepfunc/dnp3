@@ -17,11 +17,11 @@ impl EmptyResponseRequest {
 }
 
 /// Check that a response has no object headers
-pub(crate) fn expect_empty(response: Response<'_>) -> Result<(), WriteError> {
-    if response.raw_objects.is_empty() {
+pub(crate) fn expect_empty(response: &Response<'_>) -> Result<(), TaskError> {
+    if response.objects?.is_empty() {
         Ok(())
     } else {
-        Err(WriteError::Task(TaskError::UnexpectedResponseHeaders))
+        Err(TaskError::UnexpectedResponseHeaders)
     }
 }
 
@@ -42,7 +42,7 @@ impl OneShotRequest for EmptyResponseRequest {
     }
 
     fn parse(&self, response: Response<'_>) -> Result<(), WriteError> {
-        expect_empty(response)
+        Ok(expect_empty(&response)?)
     }
 
     fn wrap(task: OneShot<Self>) -> NonReadTask {
