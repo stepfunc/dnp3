@@ -12,8 +12,12 @@ use crate::outstation::database::details::range::static_db::IndexRange;
 use crate::outstation::database::EventClass;
 use crate::outstation::target::{Selector, Target};
 
+#[cfg(test)]
+mod target_tests;
+
 /// The static points of one type that a READ selects, in the variation it asks for, if any
 #[derive(Copy, Clone)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
 pub(crate) enum StaticTarget {
     Binary(Option<StaticBinaryInputVariation>),
     DoubleBitBinary(Option<StaticDoubleBitBinaryInputVariation>),
@@ -31,6 +35,7 @@ pub(crate) enum StaticTarget {
 /// The events that a READ selects: those of a class, or those of one type in the variation it
 /// asks for, if any
 #[derive(Copy, Clone)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
 pub(crate) enum EventTarget {
     Class(EventClass),
     Binary(Option<EventBinaryInputVariation>),
@@ -70,6 +75,7 @@ pub(crate) enum ReadHeader {
 
 /// What a READ of a variation selects, whatever its qualifier
 #[derive(Copy, Clone)]
+#[cfg_attr(test, derive(Debug, PartialEq))]
 enum ReadTarget {
     Class0,
     Static(StaticTarget),
