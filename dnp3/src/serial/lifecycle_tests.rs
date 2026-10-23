@@ -97,8 +97,9 @@ async fn master_starts_disabled_and_retries_failed_opens_with_a_fixed_delay() {
 #[cfg(target_os = "linux")]
 mod pty {
     use super::*;
+    use crate::util::test_support::{MASTER_REQUEST, NULL_UNSOLICITED_HEADER, OUTSTATION_REPLY};
     use std::path::PathBuf;
-    use tokio::io::AsyncReadExt;
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio_serial::{SerialPort, SerialStream};
 
     /// A path in the temporary directory that is removed when dropped
@@ -143,6 +144,69 @@ mod pty {
                 .map_err(|err| err.raw_os_error()),
             Err(Some(5)) // EIO
         );
+    }
+
+    /// Expect the null unsolicited response an outstation sends when its session starts, then
+    /// request link status on the controlling side and expect the outstation's reply
+    async fn exchange(controller: &mut SerialStream) {
+        let mut unsolicited = [0; 17];
+        controller.read_exact(&mut unsolicited).await.unwrap();
+        assert_eq!(unsolicited[..10], NULL_UNSOLICITED_HEADER);
+        controller.write_all(&MASTER_REQUEST).await.unwrap();
+        let mut reply = [0; OUTSTATION_REPLY.len()];
+        controller.read_exact(&mut reply).await.unwrap();
+        assert_eq!(reply, OUTSTATION_REPLY);
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn legacy_outstation_ends_with_its_session_without_reopening_the_port() {
+        watchdog(async {
+            let link = Link::new("legacy-outstation");
+            let mut controller = link.connect();
+            let mut handle = crate::serial::spawn_outstation_serial(
+                link.path(),
+                SerialSettings::default(),
+                outstation_config(1024, 1),
+                Box::new(NullApplication),
+                Box::new(NullInformation),
+                DefaultControlHandler::create(),
+            )
+            .unwrap();
+            exchange(&mut controller).await;
+
+            // end the session, and offer a new port at the same path
+            drop(controller);
+            link.remove();
+            let mut next = link.connect();
+            tokio::time::sleep(secs(10)).await;
+            handle.enable().await.unwrap_err();
+            assert_closed(&mut next).await;
+        })
+        .await;
+    }
+
+    #[cfg(feature = "unstable")]
+    #[tokio::test(start_paused = true)]
+    async fn opened_outstation_runs_until_its_session_ends() {
+        watchdog(async {
+            let link = Link::new("opened-outstation");
+            let mut controller = link.connect();
+            let (outstation, _handle) = crate::serial::SerialOutstation::new(
+                outstation_config(1024, 1),
+                Box::new(NullApplication),
+                Box::new(NullInformation),
+                DefaultControlHandler::create(),
+            );
+            let task = outstation
+                .open(link.path(), SerialSettings::default())
+                .unwrap();
+            let task = tokio::spawn(task.run());
+            exchange(&mut controller).await;
+
+            drop(controller);
+            task.await.unwrap();
+        })
+        .await;
     }
 
     #[tokio::test(start_paused = true)]
