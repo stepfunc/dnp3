@@ -491,6 +491,9 @@ mod tests {
 
     struct Handler {
         identify: bool,
+        /// reject the connection at the last decision: `accept` if not identifying, otherwise
+        /// `accept_link_id`
+        reject: bool,
         events: mpsc::UnboundedSender<Event>,
         channels: mpsc::UnboundedSender<MasterChannel>,
     }
@@ -507,6 +510,8 @@ mod tests {
             self.events.send(Event::Accept).unwrap();
             if self.identify {
                 Ok(AcceptAction::GetLinkIdentity)
+            } else if self.reject {
+                Err(Reject)
             } else {
                 Ok(AcceptAction::Accept(accept_config()))
             }
@@ -526,7 +531,11 @@ mod tests {
             self.events
                 .send(Event::AcceptLinkId(source, destination))
                 .unwrap();
-            Ok(accept_config())
+            if self.reject {
+                Err(Reject)
+            } else {
+                Ok(accept_config())
+            }
         }
 
         async fn start_with_link_id(
@@ -553,10 +562,15 @@ mod tests {
 
     impl Fixture {
         async fn new(identify: bool) -> Self {
+            Self::spawn(identify, false).await
+        }
+
+        async fn spawn(identify: bool, reject: bool) -> Self {
             let (events_tx, events) = mpsc::unbounded_channel();
             let (channels_tx, channels) = mpsc::unbounded_channel();
             let handler = Handler {
                 identify,
+                reject,
                 events: events_tx,
                 channels: channels_tx,
             };
@@ -689,6 +703,33 @@ mod tests {
         rejects_identification([0x05, 0x64, 0x04, 0xC0, 0x01, 0x00, 0x00, 0x04, 0x0E, 0x94]).await;
     }
 
+    #[tokio::test]
+    async fn rejected_connections_start_no_session() {
+        // rejected by `accept`
+        let mut fixture = Fixture::spawn(false, true).await;
+        fixture.expect_event(Event::Accept).await;
+        fixture.expect_closed_without_identity().await;
+        assert!(matches!(
+            fixture.channels.try_recv(),
+            Err(mpsc::error::TryRecvError::Empty)
+        ));
+
+        // rejected by `accept_link_id`
+        let mut fixture = Fixture::spawn(true, true).await;
+        fixture.expect_event(Event::Accept).await;
+        fixture
+            .stream
+            .write_all(&LINK_STATUS_REQUEST)
+            .await
+            .unwrap();
+        fixture.expect_event(Event::AcceptLinkId(1024, 1)).await;
+        fixture.expect_closed_without_identity().await;
+        assert!(matches!(
+            fixture.channels.try_recv(),
+            Err(mpsc::error::TryRecvError::Empty)
+        ));
+    }
+
     struct FaultyServer {
         handle: ServerHandle,
         task: tokio::task::JoinHandle<Shutdown>,
@@ -702,6 +743,7 @@ mod tests {
             let (channels_tx, channels) = mpsc::unbounded_channel();
             let handler = Handler {
                 identify,
+                reject: false,
                 events: events_tx,
                 channels: channels_tx,
             };

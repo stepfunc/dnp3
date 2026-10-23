@@ -470,6 +470,20 @@ mod tests {
 
         /// a TLS server on an OS-assigned port with one outstation that reports its connection state
         async fn spawn_tls_server() -> (ServerHandle, SocketAddr, Timeline<ConnectionState>) {
+            let (handle, addr, timeline, _task) = spawn_tls_server_with(AddressFilter::Any).await;
+            (handle, addr, timeline)
+        }
+
+        /// a TLS server on an OS-assigned port with one outstation, registered with `filter`, that
+        /// reports its connection state, and the server's task
+        async fn spawn_tls_server_with(
+            filter: AddressFilter,
+        ) -> (
+            ServerHandle,
+            SocketAddr,
+            Timeline<ConnectionState>,
+            tokio::task::JoinHandle<Shutdown>,
+        ) {
             let mut server = Server::new_tls_server(
                 LinkErrorMode::Close,
                 "127.0.0.1:0".parse().unwrap(),
@@ -483,35 +497,65 @@ mod tests {
                     Box::new(NullInformation),
                     crate::outstation::DefaultControlHandler::create(),
                     listener,
-                    AddressFilter::Any,
+                    filter,
                 )
                 .unwrap();
             tokio::spawn(future);
             let socket = TcpListener::bind("127.0.0.1:0").await.unwrap();
             let addr = socket.local_addr().unwrap();
             let (handle, task) = server.create_task_with(socket, None);
-            tokio::spawn(task.run());
-            (handle, addr, timeline)
+            let task = tokio::spawn(task.run());
+            (handle, addr, timeline, task)
         }
 
-        /// complete a TLS handshake with the server as a master holding the expected certificate
-        async fn connect_tls(addr: SocketAddr) -> tokio_rustls::client::TlsStream<TcpStream> {
-            let config = sfio_rustls_config::client::self_signed(
+        /// the configuration of a master holding the certificate the server expects
+        fn client_config() -> tokio_rustls::rustls::ClientConfig {
+            sfio_rustls_config::client::self_signed(
                 MinTlsVersion::V12.into(),
                 &cert("entity2_cert.pem"),
                 &cert("entity1_cert.pem"),
                 &cert("entity1_key.pem"),
                 None,
             )
-            .unwrap();
+            .unwrap()
+        }
+
+        fn server_name() -> ServerName<'static> {
+            ServerName::IpAddress(IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED.into()))
+        }
+
+        /// complete a TLS handshake with the server as a master holding the expected certificate
+        async fn connect_tls(addr: SocketAddr) -> tokio_rustls::client::TlsStream<TcpStream> {
             let socket = TcpStream::connect(addr).await.unwrap();
-            tokio_rustls::TlsConnector::from(Arc::new(config))
-                .connect(
-                    ServerName::IpAddress(IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED.into())),
-                    socket,
-                )
+            tokio_rustls::TlsConnector::from(Arc::new(client_config()))
+                .connect(server_name(), socket)
                 .await
                 .unwrap()
+        }
+
+        /// the first flight of a master's TLS handshake
+        fn client_hello() -> Vec<u8> {
+            let mut connection = tokio_rustls::rustls::ClientConnection::new(
+                Arc::new(client_config()),
+                server_name(),
+            )
+            .unwrap();
+            let mut hello = Vec::new();
+            connection.write_tls(&mut hello).unwrap();
+            hello
+        }
+
+        /// the content type of a TLS record that carries handshake messages
+        const HANDSHAKE_RECORD: u8 = 0x16;
+
+        /// whether an error means the server closed the connection
+        fn is_closed(err: &std::io::Error) -> bool {
+            matches!(
+                err.kind(),
+                std::io::ErrorKind::ConnectionReset
+                    | std::io::ErrorKind::ConnectionAborted
+                    | std::io::ErrorKind::BrokenPipe
+            )
         }
 
         /// wait for the server to close a connection, discarding anything it sends first
@@ -535,6 +579,52 @@ mod tests {
                 tokio::time::resume();
                 let _session = connect_tls(addr).await;
                 timeline.expect_state(ConnectionState::Connected).await;
+            })
+            .await;
+        }
+
+        #[tokio::test]
+        async fn dropping_handle_during_a_stalled_tls_handshake_stops_server() {
+            watchdog(async {
+                let (handle, addr, mut timeline, task) =
+                    spawn_tls_server_with(AddressFilter::Any).await;
+                // before the server can start the handshake, so before its timeout starts
+                let started = std::time::Instant::now();
+                // a peer that sends its ClientHello and never continues the handshake
+                let mut stalled = TcpStream::connect(addr).await.unwrap();
+                stalled.write_all(&client_hello()).await.unwrap();
+                // the server answered, so its handshake is waiting for the peer
+                let mut record_type = [0; 1];
+                stalled.read_exact(&mut record_type).await.unwrap();
+                assert_eq!(record_type, [HANDSHAKE_RECORD]);
+
+                drop(handle);
+                let Shutdown = task.await.unwrap();
+                assert!(started.elapsed() < crate::tcp::tls::TLS_HANDSHAKE_TIMEOUT);
+                assert_closed(&mut stalled).await;
+                timeline.assert_quiet();
+            })
+            .await;
+        }
+
+        #[tokio::test]
+        async fn an_unmatched_tls_peer_is_closed_before_any_handshake() {
+            watchdog(async {
+                let filter = AddressFilter::Exact("192.0.2.1".parse().unwrap());
+                let (_handle, addr, mut timeline, _task) = spawn_tls_server_with(filter).await;
+                let mut peer = TcpStream::connect(addr).await.unwrap();
+                // the server may already have closed the connection
+                if let Err(err) = peer.write_all(&client_hello()).await {
+                    assert!(is_closed(&err), "{err:?}");
+                }
+
+                // no ServerHello comes back before the connection closes
+                let mut buffer = [0; 64];
+                match peer.read(&mut buffer).await {
+                    Ok(count) => assert_eq!(count, 0),
+                    Err(err) => assert!(is_closed(&err), "{err:?}"),
+                }
+                timeline.assert_quiet();
             })
             .await;
         }
