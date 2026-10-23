@@ -23,11 +23,12 @@ use tokio::time::Instant;
 use crate::app::{FunctionCode, Iin, Iin1, Iin2, ObjectParseError, RetryStrategy, Sequence};
 use crate::link::EndpointAddress;
 use crate::master::association::AssociationConfig;
+use crate::master::test_fixtures::FixedTime;
 use crate::master::tests::harness::{
     create_association_with_handler, AssocInfoEvent, ReadEvent, TestHarness,
 };
 use crate::master::tests::outcomes::{
-    Entry, FixedTime, Kind, Log, Reply, MALFORMED, OTHER, OUTSTATION, UNKNOWN,
+    Entry, Kind, Log, Reply, MALFORMED, OTHER, OUTSTATION, UNKNOWN,
 };
 use crate::master::{Classes, CommandError, CommandResponseError, ReadType, TaskError, TaskType};
 use crate::util::test_support::run_paused;

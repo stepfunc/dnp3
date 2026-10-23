@@ -29,6 +29,7 @@ use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::time::PendingTimeSync;
 use crate::master::tasks::Task;
+use crate::master::test_fixtures::FixedTime;
 use crate::master::tests::file::{
     file_status_response, file_transport_response, last_block, response as file_response,
     ReaderEvent, RecordingReader,
@@ -58,14 +59,6 @@ pub(super) const UNKNOWN: EndpointAddress = EndpointAddress::raw(3000);
 const HANDLE: u32 = 0xDEADCAFE;
 
 const REJECTED: Iin = Iin::new(Iin1::new(0x00), Iin2::NO_FUNC_CODE_SUPPORT);
-
-pub(super) struct FixedTime;
-
-impl AssociationHandler for FixedTime {
-    fn get_current_time(&self) -> Option<Timestamp> {
-        Some(Timestamp::new(1_700_000_000_000))
-    }
-}
 
 fn crob() -> CommandHeaders {
     CommandBuilder::single_header_u16(Group12Var1::from_op_type(OpType::LatchOn), 3)

@@ -1031,30 +1031,17 @@ mod retry_tests {
 #[cfg(feature = "unstable")]
 mod timer_tests {
     use super::*;
-    use crate::master::{AssociationHandler, AssociationInformation, ReadHandler};
-    use crate::util::phys::PhysAddr;
-
-    struct NullReadHandler;
-    impl ReadHandler for NullReadHandler {}
-
-    struct NullAssociationHandler;
-    impl AssociationHandler for NullAssociationHandler {}
-
-    struct NullAssociationInformation;
-    impl AssociationInformation for NullAssociationInformation {}
+    use crate::master::test_fixtures::{fragment_addr, null};
 
     fn deferred_association(keep_alive_timeout: Duration) -> Association {
         let mut config = AssociationConfig::quiet();
         config.keep_alive_timeout = Some(keep_alive_timeout);
         Association::new_deferred(
-            FragmentAddr {
-                link: EndpointAddress::try_new(1).unwrap(),
-                phys: PhysAddr::None,
-            },
+            fragment_addr(EndpointAddress::try_new(1).unwrap()),
             config,
-            Box::new(NullReadHandler),
-            Box::new(NullAssociationHandler),
-            Box::new(NullAssociationInformation),
+            null(),
+            null(),
+            null(),
         )
     }
 

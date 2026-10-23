@@ -19,6 +19,7 @@ use crate::link::reader::LinkModes;
 use crate::link::{EndpointAddress, LinkErrorMode};
 use crate::master::association::{AssociationConfig, AssociationMap};
 use crate::master::task::MasterTask;
+use crate::master::test_fixtures::null;
 use crate::master::{AssociationHandle, MasterChannel, ReadHandler, ReadType};
 use crate::master::{
     AssociationHandler, AssociationInformation, HeaderInfo, MasterChannelConfig, MasterChannelType,
@@ -30,11 +31,8 @@ use crate::util::session::{Enabled, RunError};
 
 pub(crate) mod requests;
 
-struct DefaultAssociationHandler;
-impl AssociationHandler for DefaultAssociationHandler {}
-
 pub(crate) async fn create_association(config: AssociationConfig) -> TestHarness {
-    create_association_with_handler(config, Box::new(DefaultAssociationHandler)).await
+    create_association_with_handler(config, null()).await
 }
 
 pub(crate) async fn create_association_with_handler(
@@ -47,7 +45,7 @@ pub(crate) async fn create_association_with_handler(
 /// Like [`create_association`], but [`TestHarness::run_again`] can run the master again after a run
 /// ends
 pub(crate) async fn create_rerunnable_association(config: AssociationConfig) -> TestHarness {
-    create(config, Box::new(DefaultAssociationHandler), true).await
+    create(config, null(), true).await
 }
 
 /// Run the master on a new mock I/O, first waiting while it's disabled as the channel does. When

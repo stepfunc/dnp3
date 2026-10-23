@@ -17,7 +17,8 @@ use crate::master::{Classes, TaskError, TaskType, TimeSyncProcedure};
 
 use super::harness::requests::*;
 use super::harness::{create_association, create_association_with_handler, TestHarness};
-use super::time_sync::{record_current_time, write_last_recorded_time, FixedTime, NEED_TIME};
+use super::time_sync::{record_current_time, write_last_recorded_time, NEED_TIME};
+use crate::master::test_fixtures::FixedTime;
 use crate::util::test_support::watchdog;
 
 const BUFFER_OVERFLOW: Iin = Iin::new(Iin1::new(0x00), Iin2::new(0x08));

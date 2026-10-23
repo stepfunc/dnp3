@@ -18,6 +18,7 @@ use crate::app::{
     ControlField, FunctionCode, Iin, Iin1, Iin2, ObjectParseError, ResponseFunction, Sequence,
 };
 use crate::master::association::AssociationConfig;
+use crate::master::test_fixtures::{FixedTime, SYSTEM_TIME};
 use crate::master::tests::harness::AssocInfoEvent;
 use crate::master::{
     AssociationHandler, Classes, EventClasses, PollHandle, ReadRequest, TaskError, TaskType,
@@ -28,16 +29,7 @@ use super::harness::requests::*;
 use super::harness::{create_association_with_handler, TestHarness};
 use crate::util::test_support::watchdog;
 
-const SYSTEM_TIME: Timestamp = Timestamp::new(1_700_000_000_000);
 pub(super) const NEED_TIME: Iin = Iin::new(Iin1::new(0x10), Iin2::new(0x00));
-
-pub(super) struct FixedTime;
-
-impl AssociationHandler for FixedTime {
-    fn get_current_time(&self) -> Option<Timestamp> {
-        Some(SYSTEM_TIME)
-    }
-}
 
 /// Never has the time, and counts how often it is asked for it
 struct NoTime(Arc<AtomicUsize>);

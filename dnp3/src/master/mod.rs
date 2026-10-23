@@ -37,6 +37,8 @@ mod relative_time_tests;
 pub(crate) mod task;
 pub(crate) mod tasks;
 #[cfg(test)]
+mod test_fixtures;
+#[cfg(test)]
 mod test_objects;
 #[cfg(test)]
 mod write_extract_tests;

@@ -20,15 +20,15 @@ use crate::link::test_data;
 use crate::link::{EndpointAddress, LinkErrorMode};
 use crate::master::association::AssociationConfig;
 use crate::master::task::MasterTask;
+use crate::master::test_fixtures::null;
 use crate::master::tests::harness::requests::{empty_response, unsol_null, unsol_with_data};
 use crate::master::tests::harness::{
     barrier, AssocInfoEvent, AssocInfoEventQueue, AssociationInformationEventHandler, CountHandler,
     ReadEvent,
 };
 use crate::master::{
-    AssociationHandle, AssociationHandler, AssociationInformation, Classes, MasterChannel,
-    MasterChannelConfig, MasterChannelType, ReadHandler, ReadRequest, ReadType, TaskError,
-    TaskType,
+    AssociationHandle, AssociationInformation, Classes, MasterChannel, MasterChannelConfig,
+    MasterChannelType, ReadRequest, ReadType, TaskError, TaskType,
 };
 use crate::util::phys::PhysLayer;
 use crate::util::session::{Enabled, RunError};
@@ -75,11 +75,6 @@ pub(super) fn app_data(frame: &[u8]) -> &[u8] {
     // 10 header bytes, the transport header, then the data and its 2-byte CRC
     &frame[11..frame.len().saturating_sub(2)]
 }
-
-pub(super) struct NullHandler;
-impl ReadHandler for NullHandler {}
-impl AssociationHandler for NullHandler {}
-impl AssociationInformation for NullHandler {}
 
 struct Harness {
     task: JoinHandle<RunError>,
@@ -146,10 +141,6 @@ fn config() -> AssociationConfig {
         response_timeout: Timeout::from_secs(1).unwrap(),
         ..AssociationConfig::quiet()
     }
-}
-
-pub(super) fn null() -> Box<NullHandler> {
-    Box::new(NullHandler)
 }
 
 /// The kinds of task, which each compute their response deadline

@@ -46,7 +46,7 @@ use crate::master::request::ReadRequest;
 use crate::master::task::ReadOutcome;
 use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::NonReadTask;
-use crate::util::phys::PhysAddr;
+use crate::master::test_fixtures::association;
 use crate::util::test_support::run_paused;
 
 /// What the channel starts, as the model names it
@@ -723,12 +723,6 @@ impl AssociationHandler for Clock {
     }
 }
 
-struct NullReadHandler;
-impl ReadHandler for NullReadHandler {}
-
-struct NullAssociationInformation;
-impl AssociationInformation for NullAssociationInformation {}
-
 impl System {
     fn new() -> Self {
         Self {
@@ -741,15 +735,10 @@ impl System {
 
     fn add(&mut self, config: &Config, address: u16) {
         let link = EndpointAddress::try_new(address).unwrap();
-        let association = Association::new(
-            FragmentAddr {
-                link,
-                phys: PhysAddr::None,
-            },
+        let association = association(
+            link,
             config.association_config(),
-            Box::new(NullReadHandler),
             Box::new(Clock(config.has_clock)),
-            Box::new(NullAssociationInformation),
         );
         self.map.register(association).unwrap();
         self.addresses.push(link);

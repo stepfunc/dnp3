@@ -46,12 +46,13 @@ use crate::link::reader::LinkModes;
 use crate::link::{EndpointAddress, LinkErrorMode};
 use crate::master::association::AssociationConfig;
 use crate::master::task::MasterTask;
+use crate::master::test_fixtures::null;
 use crate::master::tests::harness::requests::{
     class_scan_request, empty_response, empty_response_custom_iin, unsol_null,
 };
 use crate::master::tests::harness::{barrier, expect_idle_for};
 use crate::master::tests::link_frames::{
-    app_data, fragment, header_only, null, segment, LINK_STATUS, MASTER, OTHER, OUTSTATION,
+    app_data, fragment, header_only, segment, LINK_STATUS, MASTER, OTHER, OUTSTATION,
     REQUEST_LINK_STATUS,
 };
 use crate::master::{

@@ -17,21 +17,20 @@ use crate::app::{BufferSize, ControlField, FunctionCode, Iin, ResponseFunction, 
 use crate::decode::AppDecodeLevel;
 use crate::link::reader::LinkModes;
 use crate::link::{EndpointAddress, LinkError, LinkErrorMode};
-use crate::master::association::{Association, AssociationConfig, AssociationMap};
+use crate::master::association::{AssociationConfig, AssociationMap};
 use crate::master::promise::Promise;
 use crate::master::task::MasterTask;
 use crate::master::tasks::command_no_ack::CommandNoAckTask;
 use crate::master::tasks::read::SingleReadTask;
+use crate::master::test_fixtures::{association, null};
 use crate::master::tests::harness::requests::{empty_response, unsol_confirm, unsol_with_data};
 use crate::master::tests::harness::{create_association, AssocInfoEvent, ReadEvent, TestHarness};
 use crate::master::Classes;
 use crate::master::{
-    AssociationHandle, AssociationHandler, AssociationInformation, BadEncoding, CommandBuilder,
-    CommandError, CommandHeaders, CommandMode, CommandSupport, MasterChannel, MasterChannelConfig,
-    MasterChannelType, ReadHandler, ReadRequest, TaskError, TaskType,
+    AssociationHandle, BadEncoding, CommandBuilder, CommandError, CommandHeaders, CommandMode,
+    CommandSupport, MasterChannel, MasterChannelConfig, MasterChannelType, ReadRequest, TaskError,
+    TaskType,
 };
-use crate::transport::FragmentAddr;
-use crate::util::phys::PhysAddr;
 use crate::util::session::{Enabled, RunError};
 use crate::util::test_support::watchdog;
 
@@ -376,27 +375,13 @@ async fn queued_operate_no_ack_fails_when_the_channel_is_disabled() {
     .await;
 }
 
-struct NullHandler;
-impl ReadHandler for NullHandler {}
-impl AssociationHandler for NullHandler {}
-impl AssociationInformation for NullHandler {}
-
 #[tokio::test]
 async fn operate_no_ack_fails_without_a_connection() {
     watchdog(async {
         let address = EndpointAddress::try_new(1024).unwrap();
         let mut associations = AssociationMap::new();
         associations
-            .register(Association::new(
-                FragmentAddr {
-                    link: address,
-                    phys: PhysAddr::None,
-                },
-                AssociationConfig::quiet(),
-                Box::new(NullHandler),
-                Box::new(NullHandler),
-                Box::new(NullHandler),
-            ))
+            .register(association(address, AssociationConfig::quiet(), null()))
             .unwrap();
 
         let (tx, rx) = crate::util::channel::request_channel();
