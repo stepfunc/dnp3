@@ -13,10 +13,10 @@ import dev.gridio.dnp3.codegen.render.given_Conversion_String_RenderString
 
 object EnumModule {
   def application : Module = {
-    new EnumModule(List(FunctionCode, QualifierCode))
+    new EnumModule(List(QualifierCode, FunctionCode))
   }
   def control : Module = {
-    new EnumModule(List(CommandStatus, OpType, TripCloseCode))
+    new EnumModule(List(TripCloseCode, OpType, CommandStatus))
   }
 }
 
@@ -80,13 +80,15 @@ class EnumModule(enums: List[EnumModel]) extends Module {
       }
 
       def serde = {
-        "#[cfg_attr(feature = \"serialization\", derive(serde::Serialize, serde::Deserialize))]"
+        "#[cfg_attr(".eol ++ indentation {
+          "feature = \"serialization\",".eol ++
+          "derive(serde::Serialize, serde::Deserialize)".eol
+        } ++ ")]".eol
       }
-
 
       model.comments.map(commented).iterator ++
         derives.eol ++
-        serde.eol ++
+        serde ++
         bracket(s"pub enum ${model.name}") {
           if(model.captureUnknownValues) {
             values ++ Iterator(commented("captures any value not defined in the enumeration"), "Unknown(u8),")
@@ -120,9 +122,11 @@ class EnumModule(enums: List[EnumModel]) extends Module {
     enumDefinition ++ space ++ enumImpl
   }
 
+  // rustfmt-clean: blank lines carry no indentation and no blank line follows the last enum
   override def lines(implicit indentation: Indentation): Iterator[String] = {
-    "use scursor::{WriteCursor, WriteError};".eol ++
-    space ++
-    spaced(enums.map(m => lines(m)).iterator)
+    val definitions = enums.iterator.zipWithIndex.flatMap { case (m, i) =>
+      (if (i == 0) Iterator.empty else space) ++ lines(m)
+    }
+    ("use scursor::{WriteCursor, WriteError};".eol ++ space ++ definitions).map(l => if (l.isBlank) "" else l)
   }
 }
