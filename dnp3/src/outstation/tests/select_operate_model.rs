@@ -136,9 +136,13 @@ const fn g41v2(index: u16, value: i16, status: u8) -> Obj {
 const FAILING_FIRST: usize = 8;
 const FAILING_LAST: usize = 9;
 
+/// the set with one object at index 0
+const INDEX_0: usize = 10;
+
 /// the first set, and sets that each differ from it in one way, plus the CROB whose handler
-/// status changes and two sets with another object at that index, first and last
-const SETS: [ObjectSet; 10] = [
+/// status changes, two sets with another object at that index, first and last, and an object at
+/// index 0
+const SETS: [ObjectSet; 11] = [
     ObjectSet {
         two_byte_prefix: false,
         objects: &[g41v2(7, 513, 0)],
@@ -188,6 +192,10 @@ const SETS: [ObjectSet; 10] = [
         two_byte_prefix: false,
         objects: &[g41v2(7, 513, 0), g41v2(STATUS_INDEX, 513, 0)],
     },
+    ObjectSet {
+        two_byte_prefix: false,
+        objects: &[g41v2(0, 513, 0)],
+    },
 ];
 
 impl ObjectSet {
@@ -231,7 +239,8 @@ enum Request {
     /// READ class 0
     Read(u8),
     DelayMeasure(u8),
-    /// a SELECT, OPERATE or READ whose objects end early
+    /// a SELECT or OPERATE of the first set without its status code, or a READ whose objects end
+    /// early
     Malformed(FunctionCode, u8),
     UnknownFunction(u8),
     Confirm {
@@ -262,7 +271,9 @@ impl Request {
             Request::DelayMeasure(seq) => delay_measure(seq).to_vec(),
             Request::Malformed(FunctionCode::Read, seq) => vec![0xC0 | seq, 0x01, 60],
             Request::Malformed(function, seq) => {
-                vec![0xC0 | seq, function.as_u8(), 41, 2, 0x17, 0x01, 0x07, 0x01]
+                let mut bytes = control(function, 0, seq);
+                bytes.pop();
+                bytes
             }
             Request::UnknownFunction(seq) => vec![0xC0 | seq, UNKNOWN_FUNCTION],
             Request::Confirm { uns: false, seq } => confirm(seq).to_vec(),
@@ -1023,7 +1034,7 @@ fn confirms_invalid_fragments_and_discarded_selects_keep_the_selection() {
 #[test]
 fn other_requests_end_the_selection() {
     let direct_operate = Op::Request(RequestOp::DirectOperate(
-        SetChoice::Fixed(0),
+        SetChoice::Fixed(INDEX_0),
         SeqChoice::Fixed(5),
     ));
     for between in [
@@ -1033,10 +1044,10 @@ fn other_requests_end_the_selection() {
         // decision 0003: a new request, not the discarded SELECT of Table 4-9 row 2
         RequestOp::Malformed(FunctionCode::Select, SeqChoice::Fixed(0)),
         RequestOp::UnknownFunction(SeqChoice::Fixed(5)),
-        RequestOp::DirectOperateNoAck(SetChoice::Fixed(0), SeqChoice::Fixed(5)),
+        RequestOp::DirectOperateNoAck(SetChoice::Fixed(INDEX_0), SeqChoice::Fixed(5)),
         // rejected, at index 8 instead of 7
         RequestOp::Operate(SetChoice::Fixed(2), SeqChoice::Fixed(1)),
-        RequestOp::Select(SetChoice::Fixed(2), SeqChoice::Fixed(5)),
+        RequestOp::Select(SetChoice::Fixed(INDEX_0), SeqChoice::Fixed(5)),
     ] {
         check_operations(&select_then_operate(&[Op::Request(between)]), 0);
     }
@@ -1054,19 +1065,25 @@ fn a_selection_operates_once_for_the_latest_select() {
         (
             vec![
                 SELECT,
-                request(RequestOp::Select(SetChoice::Fixed(2), SeqChoice::Fixed(5))),
-                request(RequestOp::Operate(SetChoice::Fixed(2), SeqChoice::Fixed(6))),
+                request(RequestOp::Select(
+                    SetChoice::Fixed(INDEX_0),
+                    SeqChoice::Fixed(5),
+                )),
+                request(RequestOp::Operate(
+                    SetChoice::Fixed(INDEX_0),
+                    SeqChoice::Fixed(6),
+                )),
             ],
             1,
         ),
         (
             vec![
                 request(RequestOp::DirectOperate(
-                    SetChoice::Fixed(0),
+                    SetChoice::Fixed(INDEX_0),
                     SeqChoice::Fixed(4),
                 )),
                 request(RequestOp::DirectOperateNoAck(
-                    SetChoice::Fixed(0),
+                    SetChoice::Fixed(INDEX_0),
                     SeqChoice::Fixed(5),
                 )),
                 SELECT,
