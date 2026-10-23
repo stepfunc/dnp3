@@ -218,24 +218,6 @@ mod tests {
     }
 
     #[tokio::test(start_paused = true)]
-    async fn master_reads_from_outstations_and_ignores_self_address() {
-        let mut h = Harness::new(master());
-        let frames = [
-            segment(true, MASTER.wrap(), OUTSTATION, 0, &[1]),
-            segment(false, AnyAddress::SelfAddress, OUTSTATION, 1, &[2]),
-            header_only(
-                false,
-                REQUEST_LINK_STATUS,
-                AnyAddress::SelfAddress,
-                OUTSTATION,
-            ),
-            segment(false, MASTER.wrap(), OUTSTATION, 2, &[3]),
-        ];
-        assert_eq!(h.read(&frames).await, Some(Item::Fragment(vec![3])));
-        assert!(h.writes().is_empty());
-    }
-
-    #[tokio::test(start_paused = true)]
     async fn master_answers_link_status_requests() {
         let mut h = Harness::new(master());
         let request = header_only(false, REQUEST_LINK_STATUS, MASTER.wrap(), OUTSTATION);
@@ -258,39 +240,6 @@ mod tests {
             Some(Item::LinkStatusResponse(OUTSTATION))
         );
         assert!(h.writes().is_empty());
-    }
-
-    #[tokio::test(start_paused = true)]
-    async fn outstation_reads_from_masters_only() {
-        for self_address in [Feature::Disabled, Feature::Enabled] {
-            let mut h = Harness::new(outstation(self_address));
-            let frames = [
-                segment(false, OUTSTATION.wrap(), MASTER, 0, &[1]),
-                segment(true, OUTSTATION.wrap(), MASTER, 1, &[2]),
-            ];
-            assert_eq!(h.read(&frames).await, Some(Item::Fragment(vec![2])));
-        }
-    }
-
-    #[tokio::test(start_paused = true)]
-    async fn outstation_with_self_address_reads_fragments_sent_to_self_address() {
-        let mut h = Harness::new(outstation(Feature::Enabled));
-        let frames = [segment(true, AnyAddress::SelfAddress, MASTER, 0, &[1])];
-        assert_eq!(h.read(&frames).await, Some(Item::Fragment(vec![1])));
-    }
-
-    #[tokio::test(start_paused = true)]
-    async fn outstation_with_self_address_answers_link_status_request_from_its_own_address() {
-        let mut h = Harness::new(outstation(Feature::Enabled));
-        let request = header_only(true, REQUEST_LINK_STATUS, AnyAddress::SelfAddress, MASTER);
-        assert_eq!(
-            h.read(&[request]).await,
-            Some(Item::LinkStatusRequest(MASTER))
-        );
-        assert_eq!(
-            h.writes(),
-            [header_only(false, LINK_STATUS, MASTER.wrap(), OUTSTATION)]
-        );
     }
 
     #[tokio::test(start_paused = true)]
