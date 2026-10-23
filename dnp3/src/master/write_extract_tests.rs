@@ -6,10 +6,10 @@
 
 //! For each measurement family and each variation a READ can ask for, what master extraction
 //! reports from what the outstation database writes equals a reference projection of the
-//! database's values, written here independently of the production conversions
+//! database's values, written independently of the production conversions
 //!
 //! The reference conversions: integers clamp to their range with OVER_RANGE, and NaN is 0 with
-//! OVER_RANGE; finite values past the f32 range clamp with OVER_RANGE, and NaN and infinities are
+//! OVER_RANGE (the model in [`analog_model`], shared with the conversion properties); finite values past the f32 range clamp with OVER_RANGE, and NaN and infinities are
 //! kept; 16-bit counters keep the low 16 bits; variations without flags report ONLINE, and a
 //! variation without flags is promoted to the one with them when the flags it would report aren't
 //! just ONLINE; events without time are reported in the variation without time at the same
@@ -257,25 +257,14 @@ fn absolute(time: Option<Time>) -> Option<Time> {
 
 /// a value in an integer variation with the range `[min, max]`
 fn integer(value: f64, flags: Flags, min: f64, max: f64) -> (Flags, f64) {
-    let over_range = flags | Flags::OVER_RANGE;
-    if value.is_nan() {
-        (over_range, 0.0)
-    } else if value < min {
-        (over_range, min)
-    } else if value > max {
-        (over_range, max)
+    let (value, over_range) = analog_model::integer(value, min, max);
+    let flags = if over_range {
+        flags | Flags::OVER_RANGE
     } else {
-        let truncated = value.trunc();
-        // an integer has no negative zero
-        (
-            flags,
-            if truncated.abs() < 1.0 {
-                0.0
-            } else {
-                truncated
-            },
-        )
-    }
+        flags
+    };
+    // an integer has no negative zero
+    (flags, if value == 0.0 { 0.0 } else { value })
 }
 
 fn i16_value(value: f64, flags: Flags) -> (Flags, f64) {
@@ -640,42 +629,6 @@ fn counter_value() -> impl Strategy<Value = u32> {
     ]
 }
 
-/// values at and around each conversion's limits, and any others
-fn analog_value() -> impl Strategy<Value = f64> {
-    prop_oneof![
-        prop::sample::select(vec![
-            f64::NAN,
-            f64::INFINITY,
-            f64::NEG_INFINITY,
-            0.0,
-            -0.0,
-            0.5,
-            -0.5,
-            32767.0,
-            32767.5,
-            32768.0,
-            -32768.0,
-            -32768.5,
-            -32769.0,
-            2_147_483_647.0,
-            2_147_483_647.5,
-            2_147_483_648.0,
-            -2_147_483_648.0,
-            -2_147_483_648.5,
-            -2_147_483_649.0,
-            f64::from(f32::MAX),
-            f64::from(f32::MIN),
-            3.402_823_7e38,
-            -3.402_823_7e38,
-            f64::MAX,
-            f64::MIN,
-            1e-50,
-        ]),
-        any::<i32>().prop_map(f64::from),
-        any::<f64>(),
-    ]
-}
-
 fn dead_band_value() -> impl Strategy<Value = f64> {
     prop_oneof![
         prop::sample::select(vec![
@@ -760,7 +713,7 @@ proptest! {
 
     #[test]
     fn analog_inputs_are_extracted_as_written(
-        points in points((analog_value(), flags())
+        points in points((analog_model::value(), flags())
             .prop_map(|(value, flags)| AnalogInput { value, flags, time: None }), |x, time| x.time = time),
     ) {
         check(&Points::Analog(points), ANALOG)?;
@@ -768,7 +721,7 @@ proptest! {
 
     #[test]
     fn analog_output_statuses_are_extracted_as_written(
-        points in points((analog_value(), flags())
+        points in points((analog_model::value(), flags())
             .prop_map(|(value, flags)| AnalogOutputStatus { value, flags, time: None }), |x, time| x.time = time),
     ) {
         check(&Points::AnalogOutputStatus(points), ANALOG_OUTPUT_STATUS)?;
