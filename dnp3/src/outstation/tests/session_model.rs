@@ -39,15 +39,9 @@
 //! After each input the test takes every response and callback, so the model accepts no more than
 //! it expects, and checks that the clock agrees with the model's.
 //!
-//! [`Model::covers`] leaves out two inputs:
-//! - a READ during the unsolicited confirm wait. The outstation defers it until the wait ends
-//!   (Table 6-1 row 25), which this model doesn't follow: it's a gap in coverage, not a known bug,
-//!   for the full session model (stage 2) to close;
-//! - a new request during the solicited confirm wait while an unsolicited response is due. Table 6-1
-//!   rows 15 and 18 process the request at once, as the model does, but the outstation sends the
-//!   unsolicited response first and then takes the request in that response's confirm wait,
-//!   deferring a READ. This is a confirmed deviation, being fixed on the branch
-//!   fix/sol-wait-new-request, and the exclusion goes once that fix lands.
+//! [`Model::covers`] leaves out one input: a READ during the unsolicited confirm wait. The
+//! outstation defers it until the wait ends (Table 6-1 row 25), which this model doesn't follow:
+//! it's a gap in coverage, not a known bug, for the full session model (stage 2) to close.
 
 #![expect(
     clippy::arithmetic_side_effects,
@@ -453,34 +447,10 @@ impl Model {
     /// Whether the model covers the request in the current state (see the module documentation)
     fn covers(&self, request: &Request) -> bool {
         match self.wait {
-            Wait::Idle => true,
+            Wait::Idle | Wait::Solicited { .. } => true,
             // a deferred READ: stage 2
             Wait::Unsolicited { .. } => !request.is_read(),
-            // a new request while an unsolicited response is due: the deviation from Table 6-1
-            // row 15 being fixed on fix/sol-wait-new-request
-            Wait::Solicited { .. } => {
-                self.last_valid.as_ref() == Some(request) || !self.sends_unsolicited_from_reset()
-            }
         }
-    }
-
-    /// whether the outstation would send an unsolicited response from idle once every event is
-    /// back in the buffer
-    fn sends_unsolicited_from_reset(&self) -> bool {
-        if !self.setup.unsolicited {
-            return false;
-        }
-        match self.unsolicited {
-            UnsolicitedState::NullRequired => true,
-            UnsolicitedState::Ready(retry_at) => {
-                !retry_at.is_some_and(|retry_at| self.now < retry_at)
-                    && self.events.iter().any(|event| self.enabled(event))
-            }
-        }
-    }
-
-    fn enabled(&self, event: &Buffered) -> bool {
-        self.classes[usize::from(event.class)]
     }
 
     fn next_deadline(&self) -> Option<u64> {
@@ -1147,12 +1117,20 @@ fn advance_choice() -> impl Strategy<Value = AdvanceChoice> {
     ]
 }
 
+fn update_op() -> impl Strategy<Value = Op> {
+    // a few events, or enough to fill more than one response of the minimum size
+    (kind(), 0..POINTS, prop_oneof![3 => 1u64..5, 1 => 30u64..46])
+        .prop_map(|(kind, index, count)| Op::Update { kind, index, count })
+}
+
+fn read_op() -> impl Strategy<Value = Op> {
+    prop::collection::vec(read_header(), 1..4).prop_map(Op::Read)
+}
+
 fn op() -> impl Strategy<Value = Op> {
     prop_oneof![
-        // a few events, or enough to fill more than one response of the minimum size
-        6 => (kind(), 0..POINTS, prop_oneof![3 => 1u64..5, 1 => 30u64..46])
-            .prop_map(|(kind, index, count)| Op::Update { kind, index, count }),
-        5 => prop::collection::vec(read_header(), 1..4).prop_map(Op::Read),
+        6 => update_op(),
+        5 => read_op(),
         4 => confirm_choice().prop_map(Op::SolicitedConfirm),
         4 => confirm_choice().prop_map(Op::UnsolicitedConfirm),
         2 => classes().prop_map(Op::Enable),
@@ -1163,6 +1141,20 @@ fn op() -> impl Strategy<Value = Op> {
         4 => advance_choice().prop_map(Op::Advance),
         2 => Just(Op::Reconnect),
     ]
+}
+
+/// Single ops, and sometimes a READ, an update and another READ in a row. When the first READ
+/// enters the solicited confirm wait and the update is in a class enabled for unsolicited
+/// responses, the second READ is a new request while an unsolicited response is due (Table 6-1 row
+/// 15), which single ops rarely reach.
+fn ops() -> impl Strategy<Value = Vec<Op>> {
+    let run = prop_oneof![
+        6 => op().prop_map(|op| vec![op]),
+        1 => (read_op(), update_op(), read_op()).prop_map(|(read, update, next)| {
+            vec![read, update, next]
+        }),
+    ];
+    prop::collection::vec(run, 1..40).prop_map(|runs| runs.concat())
 }
 
 fn setup() -> impl Strategy<Value = Setup> {
@@ -1373,8 +1365,44 @@ proptest! {
     #[test]
     fn session_follows_the_event_and_confirm_model(
         setup in setup(),
-        ops in prop::collection::vec(op(), 1..48),
+        ops in ops(),
     ) {
         run_paused(check_model(setup, ops));
     }
+}
+
+/// The property's first failure: a new READ in the solicited confirm wait, after the unsolicited
+/// retry delay has passed, is answered before the unsolicited response that's due (Table 6-1 row
+/// 15)
+#[test]
+fn new_read_in_the_solicited_wait_comes_before_a_due_unsolicited_response() {
+    let setup = Setup {
+        unsolicited: true,
+        max_retries: Some(0),
+        confirm_ms: 2047,
+        retry_ms: 2,
+        max_counter: 1,
+        max_analog: 1,
+        solicited_size: BufferSize::<249, 2048>::MIN,
+        unsolicited_size: BufferSize::<249, 2048>::MIN,
+    };
+    let ops = vec![
+        // the null unsolicited response
+        Op::UnsolicitedConfirm(ConfirmChoice::Expected),
+        Op::Enable([false, false, true]),
+        // a class 3 event, sent unsolicited
+        Op::Update {
+            kind: Kind::Counter,
+            index: 2,
+            count: 1,
+        },
+        // no retries: the retry delay starts
+        Op::Advance(AdvanceChoice::AtDeadline),
+        // answered with CON, entering the solicited confirm wait
+        Op::Read(vec![ReadHeader::Class(2, None)]),
+        // past the retry delay, so an unsolicited response is due
+        Op::Advance(AdvanceChoice::BeforeDeadline),
+        Op::Read(vec![ReadHeader::Class(0, None)]),
+    ];
+    run_paused(check_model(setup, ops));
 }
