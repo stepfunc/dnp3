@@ -20,7 +20,7 @@ use dnp3::outstation::*;
 use dnp3::tcp::*;
 
 use clap::Parser;
-use dnp3::app::control::{Group12Var1, OpType};
+use dnp3::app::control::{CommandStatus, Group12Var1, OpType};
 
 fn config(num_values: usize) -> TestConfig {
     TestConfig {
@@ -96,15 +96,26 @@ async fn run(args: Cli) {
         Action::DirectOperate => harness.run_commands(duration).await,
     };
     let elapsed = start.elapsed();
-    let values = config.num_values * iterations;
 
     println!("elapsed time: {elapsed:?}");
-    println!("num requests: {iterations}");
-    println!(
-        "requests/sec: {:.1}",
-        (iterations as f64) / elapsed.as_secs_f64()
-    );
-    println!("meas/sec: {:.1}", (values as f64) / elapsed.as_secs_f64());
+    match args.action {
+        Action::Unsolicited => {
+            let values = config.num_values * iterations;
+            println!("num requests: {iterations}");
+            println!(
+                "requests/sec: {:.1}",
+                (iterations as f64) / elapsed.as_secs_f64()
+            );
+            println!("meas/sec: {:.1}", (values as f64) / elapsed.as_secs_f64());
+        }
+        Action::DirectOperate => {
+            println!("num operates: {iterations}");
+            println!(
+                "operates/sec: {:.1}",
+                (iterations as f64) / elapsed.as_secs_f64()
+            );
+        }
+    }
 }
 
 struct NullOutstationApplication;
@@ -149,7 +160,7 @@ impl TestHarness {
                 let mut pair = pair;
                 let mut iterations: usize = 0;
                 loop {
-                    let err = pair
+                    let result = pair
                         .assoc
                         .operate(
                             CommandMode::DirectOperate,
@@ -158,18 +169,8 @@ impl TestHarness {
                                 3u16,
                             ),
                         )
-                        .await
-                        .unwrap_err();
-                    // the outstation answers NOT_SUPPORTED with IIN2.2, which the master
-                    // reports before the command status
-                    assert!(
-                        matches!(
-                            err,
-                            CommandError::Task(TaskError::RejectedByIin2(iin))
-                                if iin.iin2 == Iin2::PARAMETER_ERROR
-                        ),
-                        "{err:?}"
-                    );
+                        .await;
+                    assert_eq!(result, Ok(()));
                     iterations += 1;
                     if start.elapsed() >= duration {
                         return iterations;
@@ -270,7 +271,9 @@ impl Pair {
                 Self::get_outstation_config(config.outstation_level),
                 Box::new(NullOutstationApplication),
                 Box::new(NullOutstationInformation),
-                DefaultControlHandler::create(),
+                // accept every control without touching the database, so that DIRECT_OPERATE
+                // times the success path and generates no events
+                DefaultControlHandler::with_status(CommandStatus::Success),
                 NullListener::create(),
                 AddressFilter::Any,
             )
