@@ -10,6 +10,8 @@
 //! and only run on Linux, where reading a pseudo-terminal whose other side closed fails with EIO.
 //! With the clock paused, a pending timer makes the clock jump ahead while a
 //! task waits on the port, so the outstation's session timers can move the end of its session.
+//! The outstation tests that exchange frames over the port therefore run on the real clock until
+//! the exchange is done.
 
 use std::time::Duration;
 
@@ -97,6 +99,8 @@ async fn master_starts_disabled_and_retries_failed_opens_with_a_fixed_delay() {
 #[cfg(target_os = "linux")]
 mod pty {
     use super::*;
+    use crate::app::Timeout;
+    use crate::outstation::OutstationConfig;
     use crate::util::test_support::{MASTER_REQUEST, NULL_UNSOLICITED_HEADER, OUTSTATION_REPLY};
     use std::path::PathBuf;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
@@ -146,8 +150,20 @@ mod pty {
         );
     }
 
+    /// The configuration of an outstation that doesn't repeat its null unsolicited response
+    /// before the watchdog expires, and whose link status keep-alive is longer than the watchdog
+    fn session_config() -> OutstationConfig {
+        let mut config = outstation_config(1024, 1);
+        config.confirm_timeout = Timeout::saturating(Timeout::MAX);
+        config
+    }
+
     /// Expect the null unsolicited response an outstation sends when its session starts, then
     /// request link status on the controlling side and expect the outstation's reply
+    ///
+    /// Run on the real clock: with the clock paused, it jumps to the unsolicited confirm timeout
+    /// whenever the runtime waits on the port, so a repeated null unsolicited response can arrive
+    /// in place of the reply.
     async fn exchange(controller: &mut SerialStream) {
         let mut unsolicited = [0; 17];
         controller.read_exact(&mut unsolicited).await.unwrap();
@@ -158,7 +174,7 @@ mod pty {
         assert_eq!(reply, OUTSTATION_REPLY);
     }
 
-    #[tokio::test(start_paused = true)]
+    #[tokio::test]
     async fn legacy_outstation_ends_with_its_session_without_reopening_the_port() {
         watchdog(async {
             let link = Link::new("legacy-outstation");
@@ -166,13 +182,14 @@ mod pty {
             let mut handle = crate::serial::spawn_outstation_serial(
                 link.path(),
                 SerialSettings::default(),
-                outstation_config(1024, 1),
+                session_config(),
                 Box::new(NullApplication),
                 Box::new(NullInformation),
                 DefaultControlHandler::create(),
             )
             .unwrap();
             exchange(&mut controller).await;
+            tokio::time::pause();
 
             // end the session, and offer a new port at the same path
             drop(controller);
@@ -186,13 +203,13 @@ mod pty {
     }
 
     #[cfg(feature = "unstable")]
-    #[tokio::test(start_paused = true)]
+    #[tokio::test]
     async fn opened_outstation_runs_until_its_session_ends() {
         watchdog(async {
             let link = Link::new("opened-outstation");
             let mut controller = link.connect();
             let (outstation, _handle) = crate::serial::SerialOutstation::new(
-                outstation_config(1024, 1),
+                session_config(),
                 Box::new(NullApplication),
                 Box::new(NullInformation),
                 DefaultControlHandler::create(),
