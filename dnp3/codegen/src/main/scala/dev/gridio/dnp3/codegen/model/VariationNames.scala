@@ -29,6 +29,8 @@ object VariationNames {
   val doublePrecisionWithFlags = "Double-precision floating point with flags"
   val bit32WithoutFlags = "32-bit without flags"
   val bit16WithoutFlags = "16-bit without flags"
+  val bit32WithFlagsAndTime = "32-bit with flags and time"
+  val bit16WithFlagsAndTime = "16-bit with flags and time"
   val bit32WithFlagsAndTimeOfFreeze = "32-bit with flags and time of freeze"
   val bit16WithFlagsAndTimeOfFreeze = "16-bit with flags and time of freeze"
   val bit32WithoutTime = "32-bit without time"

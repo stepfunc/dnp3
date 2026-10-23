@@ -68,9 +68,9 @@ pub(crate) enum RangedVariation<'a> {
     Group21Var1(RangedSequence<'a, Group21Var1>),
     /// Frozen Counter - 16-bit with flags
     Group21Var2(RangedSequence<'a, Group21Var2>),
-    /// Frozen Counter - 32-bit with flags and time of freeze
+    /// Frozen Counter - 32-bit with flags and time
     Group21Var5(RangedSequence<'a, Group21Var5>),
-    /// Frozen Counter - 16-bit with flags and time of freeze
+    /// Frozen Counter - 16-bit with flags and time
     Group21Var6(RangedSequence<'a, Group21Var6>),
     /// Frozen Counter - 32-bit without flags
     Group21Var9(RangedSequence<'a, Group21Var9>),

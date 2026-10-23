@@ -37,9 +37,9 @@ object Group21Var1 extends FixedSize(Group21, 1, bit32WithFlags)(flags, count32)
 
 object Group21Var2 extends FixedSize(Group21, 2, bit16WithFlags)(flags, count16)
 
-object Group21Var5 extends FixedSize(Group21, 5, bit32WithFlagsAndTimeOfFreeze)(flags, count32, time48)
+object Group21Var5 extends FixedSize(Group21, 5, bit32WithFlagsAndTime)(flags, count32, time48)
 
-object Group21Var6 extends FixedSize(Group21, 6, bit16WithFlagsAndTimeOfFreeze)(flags, count16, time48)
+object Group21Var6 extends FixedSize(Group21, 6, bit16WithFlagsAndTime)(flags, count16, time48)
 
 object Group21Var9 extends FixedSize(Group21, 9, bit32WithoutFlags)(count32)
 

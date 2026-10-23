@@ -67,9 +67,9 @@ pub(crate) enum PrefixedVariation<'a, I> where I : Index {
     Group23Var1(CountSequence<'a, Prefix<I, Group23Var1>>),
     /// Frozen Counter Event - 16-bit without time
     Group23Var2(CountSequence<'a, Prefix<I, Group23Var2>>),
-    /// Frozen Counter Event - 32-bit with time of freeze
+    /// Frozen Counter Event - 32-bit with time
     Group23Var5(CountSequence<'a, Prefix<I, Group23Var5>>),
-    /// Frozen Counter Event - 16-bit with time of freeze
+    /// Frozen Counter Event - 16-bit with time
     Group23Var6(CountSequence<'a, Prefix<I, Group23Var6>>),
     /// Analog Input Event - 32-bit without time
     Group32Var1(CountSequence<'a, Prefix<I, Group32Var1>>),

@@ -92,9 +92,9 @@ pub enum Variation {
     Group21Var1,
     /// Frozen Counter - 16-bit with flags
     Group21Var2,
-    /// Frozen Counter - 32-bit with flags and time of freeze
+    /// Frozen Counter - 32-bit with flags and time
     Group21Var5,
-    /// Frozen Counter - 16-bit with flags and time of freeze
+    /// Frozen Counter - 16-bit with flags and time
     Group21Var6,
     /// Frozen Counter - 32-bit without flags
     Group21Var9,
@@ -116,9 +116,9 @@ pub enum Variation {
     Group23Var1,
     /// Frozen Counter Event - 16-bit without time
     Group23Var2,
-    /// Frozen Counter Event - 32-bit with time of freeze
+    /// Frozen Counter Event - 32-bit with time
     Group23Var5,
-    /// Frozen Counter Event - 16-bit with time of freeze
+    /// Frozen Counter Event - 16-bit with time
     Group23Var6,
     /// Analog Input - Any variation
     Group30Var0,
@@ -702,8 +702,8 @@ impl Variation {
             Variation::Group21Var0 => "Frozen Counter - Any variation",
             Variation::Group21Var1 => "Frozen Counter - 32-bit with flags",
             Variation::Group21Var2 => "Frozen Counter - 16-bit with flags",
-            Variation::Group21Var5 => "Frozen Counter - 32-bit with flags and time of freeze",
-            Variation::Group21Var6 => "Frozen Counter - 16-bit with flags and time of freeze",
+            Variation::Group21Var5 => "Frozen Counter - 32-bit with flags and time",
+            Variation::Group21Var6 => "Frozen Counter - 16-bit with flags and time",
             Variation::Group21Var9 => "Frozen Counter - 32-bit without flags",
             Variation::Group21Var10 => "Frozen Counter - 16-bit without flags",
             Variation::Group22Var0 => "Counter Event - Any variation",
@@ -714,8 +714,8 @@ impl Variation {
             Variation::Group23Var0 => "Frozen Counter Event - Any variation",
             Variation::Group23Var1 => "Frozen Counter Event - 32-bit without time",
             Variation::Group23Var2 => "Frozen Counter Event - 16-bit without time",
-            Variation::Group23Var5 => "Frozen Counter Event - 32-bit with time of freeze",
-            Variation::Group23Var6 => "Frozen Counter Event - 16-bit with time of freeze",
+            Variation::Group23Var5 => "Frozen Counter Event - 32-bit with time",
+            Variation::Group23Var6 => "Frozen Counter Event - 16-bit with time",
             Variation::Group30Var0 => "Analog Input - Any variation",
             Variation::Group30Var1 => "Analog Input - 32-bit with flags",
             Variation::Group30Var2 => "Analog Input - 16-bit with flags",
@@ -1417,7 +1417,7 @@ pub(crate) struct Group30Var1 {
     pub(crate) value: i32,
 }
 
-/// Frozen Counter Event - 16-bit with time of freeze
+/// Frozen Counter Event - 16-bit with time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group23Var6 {
     /// flags field of the variation
@@ -1428,7 +1428,7 @@ pub(crate) struct Group23Var6 {
     pub(crate) time: Timestamp,
 }
 
-/// Frozen Counter Event - 32-bit with time of freeze
+/// Frozen Counter Event - 32-bit with time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group23Var5 {
     /// flags field of the variation
@@ -1511,7 +1511,7 @@ pub(crate) struct Group21Var9 {
     pub(crate) value: u32,
 }
 
-/// Frozen Counter - 16-bit with flags and time of freeze
+/// Frozen Counter - 16-bit with flags and time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group21Var6 {
     /// flags field of the variation
@@ -1522,7 +1522,7 @@ pub(crate) struct Group21Var6 {
     pub(crate) time: Timestamp,
 }
 
-/// Frozen Counter - 32-bit with flags and time of freeze
+/// Frozen Counter - 32-bit with flags and time
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct Group21Var5 {
     /// flags field of the variation

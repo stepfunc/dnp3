@@ -54,8 +54,8 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
         .push("group21_var0", "Frozen Counter - Any variation")?
         .push("group21_var1", "Frozen Counter - 32-bit with flags")?
         .push("group21_var2", "Frozen Counter - 16-bit with flags")?
-        .push("group21_var5", "Frozen Counter - 32-bit with flags and time of freeze")?
-        .push("group21_var6", "Frozen Counter - 16-bit with flags and time of freeze")?
+        .push("group21_var5", "Frozen Counter - 32-bit with flags and time")?
+        .push("group21_var6", "Frozen Counter - 16-bit with flags and time")?
         .push("group21_var9", "Frozen Counter - 32-bit without flags")?
         .push("group21_var10", "Frozen Counter - 16-bit without flags")?
         .push("group22_var0", "Counter Event - Any variation")?
@@ -66,8 +66,8 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
         .push("group23_var0", "Frozen Counter Event - Any variation")?
         .push("group23_var1", "Frozen Counter Event - 32-bit without time")?
         .push("group23_var2", "Frozen Counter Event - 16-bit without time")?
-        .push("group23_var5", "Frozen Counter Event - 32-bit with time of freeze")?
-        .push("group23_var6", "Frozen Counter Event - 16-bit with time of freeze")?
+        .push("group23_var5", "Frozen Counter Event - 32-bit with time")?
+        .push("group23_var6", "Frozen Counter Event - 16-bit with time")?
         .push("group30_var0", "Analog Input - Any variation")?
         .push("group30_var1", "Analog Input - 32-bit with flags")?
         .push("group30_var2", "Analog Input - 16-bit with flags")?

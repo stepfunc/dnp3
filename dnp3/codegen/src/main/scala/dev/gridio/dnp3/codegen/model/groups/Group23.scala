@@ -27,6 +27,6 @@ object Group23Var1 extends FixedSize(Group23, 1, bit32WithoutTime)(flags, count3
 
 object Group23Var2 extends FixedSize(Group23, 2, bit16WithoutTime)(flags, count16)
 
-object Group23Var5 extends FixedSize(Group23, 5, bit32WithTimeOfFreeze)(flags, count32, time48)
+object Group23Var5 extends FixedSize(Group23, 5, bit32WithTime)(flags, count32, time48)
 
-object Group23Var6 extends FixedSize(Group23, 6, bit16WithTimeOfFreeze)(flags, count16, time48)
+object Group23Var6 extends FixedSize(Group23, 6, bit16WithTime)(flags, count16, time48)
