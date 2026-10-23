@@ -700,8 +700,17 @@ fn dead_band_value() -> impl Strategy<Value = f64> {
     ]
 }
 
-fn read(variations: &'static [Read]) -> impl Strategy<Value = Read> {
-    prop::sample::select(variations)
+/// Write and extract the points in every variation of their family
+fn check(points: &Points, family: &[Read]) -> Result<(), TestCaseError> {
+    for &read in family {
+        prop_assert_eq!(
+            write_and_extract(points, read),
+            expected(points, read),
+            "read {}",
+            read.0
+        );
+    }
+    Ok(())
 }
 
 fn double_bit_state() -> impl Strategy<Value = DoubleBit> {
@@ -720,88 +729,70 @@ proptest! {
     fn binary_inputs_are_extracted_as_written(
         points in points((any::<bool>(), flags())
             .prop_map(|(value, flags)| BinaryInput { value, flags, time: None }), |x, time| x.time = time),
-        read in read(BINARY),
     ) {
-        let points = Points::Binary(points);
-        prop_assert_eq!(write_and_extract(&points, read), expected(&points, read));
+        check(&Points::Binary(points), BINARY)?;
     }
 
     #[test]
     fn double_bit_binary_inputs_are_extracted_as_written(
         points in points((double_bit_state(), flags())
             .prop_map(|(value, flags)| DoubleBitBinaryInput { value, flags, time: None }), |x, time| x.time = time),
-        read in read(DOUBLE_BIT),
     ) {
-        let points = Points::DoubleBit(points);
-        prop_assert_eq!(write_and_extract(&points, read), expected(&points, read));
+        check(&Points::DoubleBit(points), DOUBLE_BIT)?;
     }
 
     #[test]
     fn binary_output_statuses_are_extracted_as_written(
         points in points((any::<bool>(), flags())
             .prop_map(|(value, flags)| BinaryOutputStatus { value, flags, time: None }), |x, time| x.time = time),
-        read in read(BINARY_OUTPUT_STATUS),
     ) {
-        let points = Points::BinaryOutputStatus(points);
-        prop_assert_eq!(write_and_extract(&points, read), expected(&points, read));
+        check(&Points::BinaryOutputStatus(points), BINARY_OUTPUT_STATUS)?;
     }
 
     #[test]
     fn counters_are_extracted_as_written(
         points in points((counter_value(), flags())
             .prop_map(|(value, flags)| Counter { value, flags, time: None }), |x, time| x.time = time),
-        read in read(COUNTER),
     ) {
-        let points = Points::Counter(points);
-        prop_assert_eq!(write_and_extract(&points, read), expected(&points, read));
+        check(&Points::Counter(points), COUNTER)?;
     }
 
     #[test]
     fn frozen_counters_are_extracted_as_written(
         points in points((counter_value(), flags())
             .prop_map(|(value, flags)| FrozenCounter { value, flags, time: None }), |x, time| x.time = time),
-        read in read(FROZEN_COUNTER),
     ) {
-        let points = Points::FrozenCounter(points);
-        prop_assert_eq!(write_and_extract(&points, read), expected(&points, read));
+        check(&Points::FrozenCounter(points), FROZEN_COUNTER)?;
     }
 
     #[test]
     fn analog_inputs_are_extracted_as_written(
         points in points((analog_value(), flags())
             .prop_map(|(value, flags)| AnalogInput { value, flags, time: None }), |x, time| x.time = time),
-        read in read(ANALOG),
     ) {
-        let points = Points::Analog(points);
-        prop_assert_eq!(write_and_extract(&points, read), expected(&points, read));
+        check(&Points::Analog(points), ANALOG)?;
     }
 
     #[test]
     fn analog_output_statuses_are_extracted_as_written(
         points in points((analog_value(), flags())
             .prop_map(|(value, flags)| AnalogOutputStatus { value, flags, time: None }), |x, time| x.time = time),
-        read in read(ANALOG_OUTPUT_STATUS),
     ) {
-        let points = Points::AnalogOutputStatus(points);
-        prop_assert_eq!(write_and_extract(&points, read), expected(&points, read));
+        check(&Points::AnalogOutputStatus(points), ANALOG_OUTPUT_STATUS)?;
     }
 
     #[test]
     fn octet_strings_are_extracted_as_written(
         points in points(prop::collection::vec(any::<u8>(), 1..=255)
             .prop_map(|x| OctetString::new(&x).unwrap()), |_, _| {}),
-        read in read(OCTET_STRING),
     ) {
-        let points = Points::OctetString(points);
-        prop_assert_eq!(write_and_extract(&points, read), expected(&points, read));
+        check(&Points::OctetString(points), OCTET_STRING)?;
     }
 
     #[test]
     fn analog_input_deadbands_are_extracted_as_written(
         points in points(dead_band_value(), |_, _| {}),
-        read in read(DEAD_BAND),
     ) {
-        let points = Points::DeadBand(points);
-        prop_assert_eq!(write_and_extract(&points, read), expected(&points, read));
+        check(&Points::DeadBand(points), DEAD_BAND)?;
     }
 }
