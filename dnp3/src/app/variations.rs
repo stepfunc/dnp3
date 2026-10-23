@@ -806,6 +806,11 @@ impl Variation {
             Variation::Group111(_) => "Octet String Event - Sized by variation",
         }
     }
+    
+    /// True if objects of this variation have a time relative to a common time of occurrence
+    pub(crate) fn has_relative_time(self) -> bool {
+        matches!(self, Variation::Group2Var3 | Variation::Group4Var3)
+    }
 }
 
 /// Unsigned Integer - 8-bit

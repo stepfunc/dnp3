@@ -311,10 +311,7 @@ impl ObjectHeader<'_> {
 
     /// True if the header carries objects whose time is relative to a common time of occurrence
     fn has_relative_time(&self) -> bool {
-        matches!(
-            self.variation(),
-            Variation::Group2Var3 | Variation::Group4Var3
-        ) && self.has_objects()
+        self.variation().has_relative_time() && self.has_objects()
     }
 
     /// If the header is a common time of occurrence, the one for the headers that follow it
