@@ -20,7 +20,10 @@ use scursor::{WriteCursor, WriteError};
 
 /// Application object header types
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serialization", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum QualifierCode {
     ///  8-bit start stop (value == 0x00)
     Range8,
@@ -56,7 +59,7 @@ impl QualifierCode {
             _ => None,
         }
     }
-    
+
     /// convert the enum to its underlying value
     pub fn as_u8(self) -> u8 {
         match self {
@@ -70,7 +73,7 @@ impl QualifierCode {
             QualifierCode::FreeFormat16 => 0x5B,
         }
     }
-    
+
     pub(crate) fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.as_u8())
     }
@@ -78,7 +81,10 @@ impl QualifierCode {
 
 /// Application layer function code enumeration
 #[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-#[cfg_attr(feature = "serialization", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serialization",
+    derive(serde::Serialize, serde::Deserialize)
+)]
 pub enum FunctionCode {
     ///  Master sends this to an outstation to confirm the receipt of an Application Layer fragment (value == 0)
     Confirm,
@@ -189,7 +195,7 @@ impl FunctionCode {
             _ => None,
         }
     }
-    
+
     /// convert the enum to its underlying value
     pub fn as_u8(self) -> u8 {
         match self {
@@ -228,9 +234,8 @@ impl FunctionCode {
             FunctionCode::UnsolicitedResponse => 130,
         }
     }
-    
+
     pub(crate) fn write(self, cursor: &mut WriteCursor) -> Result<(), WriteError> {
         cursor.write_u8(self.as_u8())
     }
 }
-
