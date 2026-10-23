@@ -18,6 +18,10 @@ use crate::master::extract::{
     extract_header, extract_measurements_inner, Delivered, Extracted, InvalidResponse,
     ProcessableResponse,
 };
+use crate::master::test_objects::{
+    CTOS_WITH_A_COUNT_OTHER_THAN_ONE, OTHER_RELATIVE_TIME_EVENTS, RELATIVE_TIME_EVENT,
+    SYNCHRONIZED_CTO,
+};
 use crate::master::{HeaderInfo, ReadHandler};
 
 /// One object header of a generated response fragment
@@ -441,5 +445,79 @@ proptest! {
             spec.encode(&mut objects);
         }
         prop_assert_eq!(run(&objects), model(&specs));
+    }
+}
+
+/// g2v3 or g4v3 with one event at index 7 with flags 0x01 and relative time 0xFFFF
+fn event(double_bit: bool, wide: bool) -> Spec {
+    Spec::Relative {
+        double_bit,
+        wide,
+        objects: vec![(7, 0x01, 0xFFFF)],
+    }
+}
+
+fn cto(synchronized: bool, wide: bool, times: &[u64]) -> Spec {
+    Spec::Cto {
+        synchronized,
+        wide,
+        times: times.to_vec(),
+    }
+}
+
+/// Check that `specs` encode to `objects`, that the model's check decides `check`, and that the
+/// master follows the model
+fn expect_fixed(specs: &[Spec], objects: &[&[u8]], check: Result<(), InvalidResponse>) {
+    let mut encoded = Vec::new();
+    for spec in specs {
+        spec.encode(&mut encoded);
+    }
+    assert_eq!(encoded, objects.concat(), "{specs:?}");
+    let expected = model(specs);
+    assert_eq!(expected.check, check, "{specs:?}");
+    assert_eq!(run(&encoded), expected, "{specs:?}");
+}
+
+/// The responses that both sites acting on the check, reads and unsolicited responses, are tested
+/// with: relative time without a CTO at each variation and width, before a CTO, and after a CTO
+/// with a count other than one, with and without a valid CTO before it
+#[test]
+fn fixed_responses_follow_the_cto_model() {
+    let without_cto = |variation| Err(InvalidResponse::RelativeTimeWithoutCto(variation));
+    let other_events = [
+        (event(true, false), Variation::Group4Var3),
+        (event(false, true), Variation::Group2Var3),
+        (event(true, true), Variation::Group4Var3),
+    ];
+    for ((spec, variation), bytes) in other_events.into_iter().zip(OTHER_RELATIVE_TIME_EVENTS) {
+        expect_fixed(&[spec], &[bytes], without_cto(variation));
+    }
+    expect_fixed(
+        &[
+            event(false, false),
+            cto(true, false, &[2]),
+            event(false, false),
+        ],
+        &[RELATIVE_TIME_EVENT, SYNCHRONIZED_CTO, RELATIVE_TIME_EVENT],
+        without_cto(Variation::Group2Var3),
+    );
+
+    let other_ctos = [
+        cto(true, false, &[]),
+        cto(false, true, &[]),
+        cto(true, false, &[2, 3]),
+        cto(false, true, &[2, 3]),
+    ];
+    for (spec, bytes) in other_ctos.into_iter().zip(CTOS_WITH_A_COUNT_OTHER_THAN_ONE) {
+        expect_fixed(
+            &[spec.clone(), event(false, false)],
+            &[bytes, RELATIVE_TIME_EVENT],
+            without_cto(Variation::Group2Var3),
+        );
+        expect_fixed(
+            &[cto(true, false, &[2]), spec, event(false, false)],
+            &[SYNCHRONIZED_CTO, bytes, RELATIVE_TIME_EVENT],
+            Ok(()),
+        );
     }
 }
