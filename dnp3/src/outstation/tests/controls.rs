@@ -17,6 +17,7 @@ use crate::link::header::BroadcastConfirmMode;
 use crate::outstation::config::Feature;
 use crate::outstation::tests::harness::*;
 use crate::outstation::traits::{BroadcastAction, OperateType};
+use crate::util::test_support::watchdog;
 
 // select, seq == 0, g41v2 - count == 1, index == 7, value = 513, status == SUCCESS,
 const SELECT_SEQ0_G41V2: &[u8] = &[0xC0, 0x03, 41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, 0x00];
@@ -558,6 +559,18 @@ async fn delay_measure_ends_the_selection() {
 #[tokio::test]
 async fn malformed_request_ends_the_selection() {
     request_ends_selection(&[0xC5, 0x01, 60], &[0xC5, 0x81, 0x80, 0x04]).await;
+}
+
+/// decision 0003: a malformed SELECT reusing the selection's sequence number is a new request
+/// answered with IIN2.2, not the discarded SELECT of IEEE 1815-2012 Table 4-9
+#[tokio::test]
+async fn malformed_select_with_the_selections_seq_ends_the_selection() {
+    watchdog(async {
+        // SELECT_SEQ0_G41V2 without its status byte
+        let malformed_select = [0xC0, 0x03, 41, 2, 0x17, 0x01, 0x07, 0x01, 0x02];
+        request_ends_selection(&malformed_select, &parameter_error_response(0)).await;
+    })
+    .await;
 }
 
 #[tokio::test]
