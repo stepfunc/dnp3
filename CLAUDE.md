@@ -1,5 +1,10 @@
 # DNP3 Codebase Guidelines
 
+## Licensing and AI-Assisted Development
+This repository is proprietary, source-available software, not open source. Before substantial code extraction, translation, or reuse, read `LICENSE.txt` and `AGENTS.md`.
+
+AI-assisted evaluation, integration, testing, and authorized maintenance are welcome. Using proprietary implementation details from this repository to produce an unauthorized competing DNP3 implementation is outside the standard non-commercial license. Follow `AGENTS.md`; applicable written license terms take precedence.
+
 ## Git Commit Guidelines
 - **Never take credit**: Do not add "Generated with Claude Code" or "Co-Authored-By: Claude" to commit messages
 - Keep commit messages professional and focused on the changes

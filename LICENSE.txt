@@ -25,9 +25,9 @@ integrating with the Licensed Software.
 1.2. "Developer" shall mean the person or entity downloading the Licensed Software
 or on whose behalf the Licensed Software is downloaded.
 
-1.3. "Development Platform" shall mean GitHub (github.com) or other software
-development platform identified by Company where the Licensed Software can be
-downloaded.
+1.3. "Development Platform" shall mean GitHub (github.com), crates.io, or other
+software development platform or package registry identified by Company where the
+Licensed Software can be downloaded.
 
 1.4. "Effective Date" shall mean the date that the Licensed Software is downloaded
 from the Development Platform.
@@ -38,7 +38,12 @@ that performs a communication function.
 
 1.6. "Purpose" shall mean the effort to integrate the Licensed Software with the
 Developer Application(s) for non-commercial and non-production purposes, including,
-without limitation, evaluation, research, teaching and training.
+without limitation, evaluation, research, teaching and training. For purposes of
+this definition, "training" refers to human education and instruction, not the
+training, fine-tuning, or distillation of artificial intelligence or machine
+learning models using the Licensed Software as training material. Use of existing
+artificial intelligence assistants for evaluation and integration remains
+permitted as provided in Section 2.7.
 
 1.7. Step Function I/O LLC ("Company") is the developer of the Licensed Software.
 
@@ -92,6 +97,42 @@ provide in its discretion. Developer may submit tickets and feedback via the Dev
 Platform. Company will make reasonable efforts to respond to such tickets and feedback,
 but has no obligation to do so, and may cancel such support at any time.
 
+2.6. Restrictions on Competitive Extraction and Derivative Implementations
+
+Except pursuant to Company's prior express written authorization or a separate
+applicable commercial agreement, no license is granted to use the Licensed
+Software, or substantial portions of its source code, tests, documentation, or
+other copyright-protected implementation material, to create, translate, port,
+adapt, reconstruct, or generate a separate or competing implementation of
+substantially equivalent DNP3 protocol functionality. This restriction applies
+whether the activity is undertaken manually, using automated code-generation
+tools, or using artificial intelligence systems.
+
+For the avoidance of doubt, any resulting software or other material that
+reproduces or adapts copyright-protected expression from the Licensed Software is
+not an authorized derivative work under this Agreement, and Developer is not
+granted permission to prepare, use, or distribute such derivative works for the
+purposes described above. The fact that an artificial intelligence system or
+automated tool performs the copying, adaptation, or translation does not enlarge
+the license granted hereunder.
+
+Developer is also not authorized under this Agreement to systematically extract,
+transform, index, or distill the Licensed Software's proprietary implementation
+material for the purpose of developing a separate or competing implementation,
+whether or not a particular resulting work qualifies as a derivative work under
+copyright law, to the extent such contractual restriction is enforceable under
+applicable law.
+
+2.7. Permitted AI-Assisted Evaluation and Integration
+
+Nothing in Section 2.6 prohibits authorized use of artificial intelligence systems
+to evaluate, configure, integrate, test, debug, or conduct permitted security
+research on the Licensed Software as a dependency of a Developer Application,
+provided such activity otherwise complies with this Agreement. Section 2.6 does
+not prohibit independent implementations of DNP3 developed without unauthorized
+use or reproduction of the Licensed Software, or activities that applicable law
+does not permit Company to restrict.
+
 3. OWNERSHIP
 
 3.1. Company Retains Title to Licensed Software
@@ -116,7 +157,8 @@ any obligation of notice or compensation to Developer.
 This Agreement commences on its Effective Date and ends if terminated as
 hereinafter provided. This Agreement will automatically terminate if Developer
 materially breaches this Agreement, including, without limitation, by a violation
-of the non-commercial and non-production use restrictions in Section 2.3.
+of the non-commercial and non-production use restrictions in Section 2.3 or the
+restrictions in Section 2.6.
 
 4.2. Obligations on Termination
 
