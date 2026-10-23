@@ -26,6 +26,8 @@ mod config;
 mod details;
 #[cfg(test)]
 mod family_tests;
+#[cfg(test)]
+mod fragment_tests;
 /// read headers
 pub(crate) mod read;
 #[cfg(test)]
