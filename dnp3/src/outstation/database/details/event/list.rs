@@ -395,7 +395,24 @@ mod tests {
     mod model {
         use super::*;
 
+        use std::cell::RefCell;
+        use std::panic::{catch_unwind, AssertUnwindSafe};
+
         use proptest::prelude::*;
+
+        // every entry is distinct, with a value from a small range for predicates to match
+        #[derive(Copy, Clone, Debug, PartialEq)]
+        struct Item {
+            id: u32,
+            value: u8,
+        }
+
+        // a call from remove_all into one of its closures
+        #[derive(Copy, Clone, Debug, PartialEq)]
+        enum Call {
+            Predicate(u32),
+            Removed(u32),
+        }
 
         #[derive(Debug, Clone)]
         enum Op {
@@ -408,6 +425,8 @@ mod tests {
             RemoveOutOfRange(Option<usize>),
             RemoveFirst(u8),
             RemoveAll(u8),
+            // remove_all of the live entries at the positions whose bits are set
+            RemovePositions(u8),
         }
 
         // a small range of values, so that predicates match more than one entry
@@ -423,27 +442,70 @@ mod tests {
                 1 => prop::option::of(0usize..4).prop_map(Op::RemoveOutOfRange),
                 1 => value().prop_map(Op::RemoveFirst),
                 1 => value().prop_map(Op::RemoveAll),
+                1 => any::<u8>().prop_map(Op::RemovePositions),
             ]
         }
 
-        // the list must behave like a bounded queue of (index, value) pairs in insertion order
+        fn at_positions(mask: u8) -> impl Fn(usize, &Item) -> bool {
+            move |position, _| position < 8 && mask & (1 << position) != 0
+        }
+
+        // the list must behave like a bounded queue of (index, item) pairs in insertion order,
+        // whose freed slots are reused first in, first out
         struct Model {
             capacity: usize,
-            live: VecDeque<(Index, u8)>,
+            // the version of the next index
+            version: u64,
+            next_id: u32,
+            // the slots created so far
+            slots: usize,
+            live: VecDeque<(Index, Item)>,
+            // the free slots, in the order they're reused
+            free: VecDeque<usize>,
             removed: Vec<Index>,
         }
 
         impl Model {
-            fn apply(&mut self, list: &mut VecList<u8>, op: Op) {
+            fn new(list: &VecList<Item>) -> Self {
+                Self {
+                    capacity: list.capacity,
+                    version: list.version,
+                    next_id: 0,
+                    slots: 0,
+                    live: VecDeque::new(),
+                    free: VecDeque::new(),
+                    removed: Vec::new(),
+                }
+            }
+
+            fn free_slot(&mut self, index: Index) {
+                self.free.push_back(index.value);
+                self.removed.push(index);
+            }
+
+            fn apply(&mut self, list: &mut VecList<Item>, op: Op) {
                 match op {
                     Op::Add(value) => {
-                        let result = list.add(value);
+                        let item = Item {
+                            id: self.next_id,
+                            value,
+                        };
+                        self.next_id += 1;
+                        let result = list.add(item);
                         if self.live.len() == self.capacity {
                             assert_eq!(result, None);
                         } else {
-                            let index = result.expect("add failed below capacity");
-                            assert!(self.live.iter().all(|(live, _)| *live != index));
-                            self.live.push_back((index, value));
+                            let slot = match self.free.pop_front() {
+                                Some(slot) => slot,
+                                None => {
+                                    self.slots += 1;
+                                    self.slots - 1
+                                }
+                            };
+                            let index = Index::new(self.version, slot);
+                            self.version = self.version.wrapping_add(1);
+                            assert_eq!(result, Some(index));
+                            self.live.push_back((index, item));
                         }
                     }
                     Op::RemoveLive(position) => {
@@ -455,7 +517,7 @@ mod tests {
                             .remove(position % self.live.len())
                             .expect("position is in range");
                         assert!(list.remove_at(index));
-                        self.removed.push(index);
+                        self.free_slot(index);
                     }
                     Op::RemoveStale(position) => {
                         if self.removed.is_empty() {
@@ -466,52 +528,132 @@ mod tests {
                     }
                     Op::RemoveOutOfRange(offset) => {
                         let value = match offset {
-                            Some(offset) => list.storage.len() + offset,
+                            Some(offset) => self.slots + offset,
                             None => usize::MAX,
                         };
-                        assert!(!list.remove_at(Index::new(list.version, value)));
+                        assert!(!list.remove_at(Index::new(self.version, value)));
                     }
                     Op::RemoveFirst(value) => {
-                        let result = list.remove_first(|x| *x == value).copied();
-                        match self.live.iter().position(|(_, x)| *x == value) {
+                        let result = list.remove_first(|x| x.value == value).copied();
+                        match self.live.iter().position(|(_, x)| x.value == value) {
                             Some(position) => {
-                                let (index, _) =
+                                let (index, item) =
                                     self.live.remove(position).expect("position is in range");
-                                assert_eq!(result, Some(value));
-                                self.removed.push(index);
+                                assert_eq!(result, Some(item));
+                                self.free_slot(index);
                             }
                             None => assert_eq!(result, None),
                         }
                     }
                     Op::RemoveAll(value) => {
-                        let mut values = Vec::new();
-                        let count = list.remove_all(|x| *x == value, |x| values.push(*x));
-                        assert_eq!(values, vec![value; count]);
-                        let before = self.live.len();
-                        let removed = &mut self.removed;
-                        self.live.retain(|(index, x)| {
-                            let keep = *x != value;
-                            if !keep {
-                                removed.push(*index);
-                            }
-                            keep
-                        });
-                        assert_eq!(count, before - self.live.len());
+                        self.remove_all(list, |_, item| item.value == value, None);
+                    }
+                    Op::RemovePositions(mask) => {
+                        self.remove_all(list, at_positions(mask), None);
                     }
                 }
             }
 
-            fn check(&self, list: &VecList<u8>) {
+            // remove_all of the live entries `select` picks by position, panicking in the
+            // closure call `panic_at` if it's reached
+            fn remove_all<S>(&mut self, list: &mut VecList<Item>, select: S, panic_at: Option<Call>)
+            where
+                S: Fn(usize, &Item) -> bool,
+            {
+                let selected: Vec<u32> = self
+                    .live
+                    .iter()
+                    .enumerate()
+                    .filter(|(position, (_, item))| select(*position, item))
+                    .map(|(_, (_, item))| item.id)
+                    .collect();
+
+                // the calls expected in order, up to the one that panics, and the entries removed
+                let mut expected = Vec::new();
+                let mut removed = Vec::new();
+                let mut panics = false;
+                for (_, item) in self.live.iter() {
+                    expected.push(Call::Predicate(item.id));
+                    if panic_at == Some(Call::Predicate(item.id)) {
+                        panics = true;
+                        break;
+                    }
+                    if selected.contains(&item.id) {
+                        removed.push(item.id);
+                        expected.push(Call::Removed(item.id));
+                        if panic_at == Some(Call::Removed(item.id)) {
+                            panics = true;
+                            break;
+                        }
+                    }
+                }
+
+                let calls = RefCell::new(Vec::new());
+                let result = catch_unwind(AssertUnwindSafe(|| {
+                    list.remove_all(
+                        |x| {
+                            calls.borrow_mut().push(Call::Predicate(x.id));
+                            if panic_at == Some(Call::Predicate(x.id)) {
+                                panic!("predicate panics");
+                            }
+                            selected.contains(&x.id)
+                        },
+                        |x| {
+                            calls.borrow_mut().push(Call::Removed(x.id));
+                            if panic_at == Some(Call::Removed(x.id)) {
+                                panic!("callback panics");
+                            }
+                        },
+                    )
+                }));
+
+                assert_eq!(calls.into_inner(), expected);
+                match panics {
+                    true => assert!(result.is_err()),
+                    false => assert_eq!(result.ok(), Some(removed.len())),
+                }
+
+                for id in removed {
+                    let position = self
+                        .live
+                        .iter()
+                        .position(|(_, item)| item.id == id)
+                        .expect("the entry is live");
+                    let (index, _) = self.live.remove(position).expect("position is in range");
+                    self.free_slot(index);
+                }
+            }
+
+            fn check(&self, list: &VecList<Item>) {
                 assert_eq!(list.len(), self.live.len());
                 assert_eq!(list.is_full(), self.live.len() == self.capacity);
-                // bounded, so that a cycle in the links fails here instead of hanging
-                let entries: Vec<(Index, u8)> = list
+                assert_eq!(list.version, self.version);
+
+                // forward, bounded, so that a cycle in the links fails here instead of hanging
+                let entries: Vec<(Index, Item)> = list
                     .iter()
                     .take(self.live.len() + 1)
                     .map(|(i, x)| (i, *x))
                     .collect();
                 assert_eq!(entries, self.live.iter().copied().collect::<Vec<_>>());
-                // the stored ends and size, which iteration alone doesn't fully check
+
+                // backward from the tail
+                let mut backward = Vec::new();
+                let mut current = list.state.map(|s| s.tail);
+                while let Some(idx) = current {
+                    if backward.len() > self.live.len() {
+                        break;
+                    }
+                    let entry = &list.storage[idx];
+                    backward.push((entry.create_index(idx), entry.data));
+                    current = entry.metadata.prev;
+                }
+                assert_eq!(
+                    backward,
+                    self.live.iter().rev().copied().collect::<Vec<_>>()
+                );
+
+                // the stored ends and size
                 let expected = match (self.live.front(), self.live.back()) {
                     (Some((head, _)), Some((tail, _))) => {
                         Some((head.value, tail.value, self.live.len()))
@@ -519,6 +661,61 @@ mod tests {
                     _ => None,
                 };
                 assert_eq!(list.state.map(|s| (s.head, s.tail, s.size)), expected);
+
+                // every slot is either live or free, never both, and the free ones are reused in order
+                assert_eq!(list.storage.len(), self.slots);
+                assert_eq!(list.free_stack, self.free);
+                for (slot, entry) in list.storage.iter().enumerate() {
+                    let is_live = self.live.iter().any(|(index, _)| index.value == slot);
+                    assert_eq!(entry.is_free, self.free.contains(&slot));
+                    assert_ne!(entry.is_free, is_live);
+                }
+            }
+        }
+
+        // a full list of `capacity` entries
+        fn full(capacity: usize) -> (VecList<Item>, Model) {
+            let mut list = VecList::new(capacity);
+            let mut model = Model::new(&list);
+            for value in (0u8..4).cycle().take(capacity) {
+                model.apply(&mut list, Op::Add(value));
+                model.check(&list);
+            }
+            (list, model)
+        }
+
+        // add until the list is full, then once more
+        fn refill(list: &mut VecList<Item>, model: &mut Model) {
+            while !list.is_full() {
+                model.apply(list, Op::Add(0));
+                model.check(list);
+            }
+            model.apply(list, Op::Add(0));
+            model.check(list);
+        }
+
+        const PATTERNS: [u8; 8] = [
+            0b000000, // none
+            0b111111, // all
+            0b000011, // prefix
+            0b110000, // suffix
+            0b011110, // consecutive, in the middle
+            0b010101, // alternating, from the head
+            0b101010, // alternating, to the tail
+            0b100001, // both ends
+        ];
+
+        #[test]
+        fn removes_each_pattern_and_reuses_the_freed_slots() {
+            for mask in PATTERNS {
+                let (mut list, mut model) = full(6);
+                model.apply(&mut list, Op::RemovePositions(mask));
+                model.check(&list);
+                refill(&mut list, &mut model);
+                // and again, with the slots now out of order
+                model.apply(&mut list, Op::RemovePositions(!mask));
+                model.check(&list);
+                refill(&mut list, &mut model);
             }
         }
 
@@ -533,11 +730,7 @@ mod tests {
                 if near_version_wraparound {
                     list.version = u64::MAX - 4;
                 }
-                let mut model = Model {
-                    capacity,
-                    live: VecDeque::new(),
-                    removed: Vec::new(),
-                };
+                let mut model = Model::new(&list);
                 model.check(&list);
                 for op in ops {
                     model.apply(&mut list, op);
