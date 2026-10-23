@@ -439,6 +439,14 @@ mod test {
     }
 
     #[test]
+    fn time_delay_without_cto_is_valid() {
+        // g52v1 count: 1 time: 5
+        assert_eq!(validate(&[0x34, 0x01, 0x07, 0x01, 0x05, 0x00]), Ok(()));
+        // g52v2 count: 1 time: 5
+        assert_eq!(validate(&[0x34, 0x02, 0x07, 0x01, 0x05, 0x00]), Ok(()));
+    }
+
+    #[test]
     fn relative_time_before_cto_is_invalid() {
         assert_eq!(
             validate(&[
