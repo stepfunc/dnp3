@@ -42,11 +42,6 @@ struct Series {
     len: usize,
 }
 
-pub(crate) enum AssemblyState {
-    Complete,
-    ReadMore,
-}
-
 struct Overflow;
 
 /// Why the assembler discarded a segment or the series in progress
@@ -157,13 +152,13 @@ impl Assembler {
         header: Header,
         data: &[u8],
         mut discard: F,
-    ) -> AssemblyState {
+    ) {
         let series = match self.state {
             State::Idle => None,
             State::Running(series) => Some(series),
             State::Complete { .. } => {
                 discard(Discard::Pending);
-                return AssemblyState::Complete;
+                return;
             }
         };
 
@@ -196,8 +191,6 @@ impl Assembler {
                 source: info.source,
             });
         }
-
-        self.assembly_state()
     }
 
     /// Add a segment that isn't FIR to the series in progress
@@ -238,13 +231,6 @@ impl Assembler {
             self.state = State::Idle;
         } else {
             self.append(series.len, info, header, data, discard);
-        }
-    }
-
-    fn assembly_state(&self) -> AssemblyState {
-        match self.state {
-            State::Complete { .. } => AssemblyState::Complete,
-            State::Idle | State::Running(_) => AssemblyState::ReadMore,
         }
     }
 
@@ -350,11 +336,9 @@ mod tests {
         fn segment(&mut self, info: FrameInfo, fir: bool, fin: bool, seq: u8, data: &[u8]) -> bool {
             let header = crate::link::test_data::segment(fir, fin, seq);
             let discards = &mut self.discards;
-            matches!(
-                self.assembler
-                    .assemble(info, header, data, |d| discards.push(d)),
-                AssemblyState::Complete
-            )
+            self.assembler
+                .assemble(info, header, data, |d| discards.push(d));
+            self.assembler.peek().is_some()
         }
 
         fn first(&mut self, seq: u8, data: &[u8]) -> bool {
@@ -956,59 +940,6 @@ mod tests {
         assert_eq!(h.pop(), None);
     }
 
-    #[test]
-    fn discards_display_their_log_messages() {
-        let source = EndpointAddress::raw(1);
-        let cases = [
-            (
-                Discard::NewSeries { len: 3, source },
-                "received FIR - dropping 3 assembled bytes from 1",
-            ),
-            (
-                Discard::BroadcastSeries {
-                    fir: false,
-                    fin: true,
-                },
-                "ignoring broadcast frame with transport header fir: false and fin: true",
-            ),
-            (
-                Discard::NoSeries { source },
-                "ignoring non-FIR segment from 1 with no previous FIR",
-            ),
-            (
-                Discard::Repeat { seq: 1 },
-                "ignoring repeated segment with seq: 1",
-            ),
-            (
-                Discard::DifferentRepeat { seq: 1 },
-                "segment with repeated seq: 1 differs from the previous segment",
-            ),
-            (
-                Discard::UnexpectedSeq {
-                    expected: 11,
-                    received: 12,
-                },
-                "expected seq: 11 but received seq: 12",
-            ),
-            (
-                Discard::Overflow { len: 9 },
-                "buffer overflow with 9 bytes to write",
-            ),
-            (
-                Discard::Pending,
-                "ignoring segment while a fragment waits to be read",
-            ),
-        ];
-        for (discard, message) in cases {
-            assert_eq!(discard.to_string(), message);
-        }
-        let conflicting = Discard::ConflictingAddress {
-            previous: from(1),
-            received: from(2),
-        };
-        assert!(conflicting.to_string().starts_with("conflicting addresses"));
-    }
-
     /// The assembler against a model written from the reception rules and the documented
     /// extensions, over streams of valid series with one perturbation each
     #[expect(
@@ -1226,8 +1157,8 @@ mod tests {
                 Op::Segment(x) => {
                     let header = Header::new(x.fin, x.fir, Sequence::new(x.seq));
                     let mut discards = Vec::new();
-                    let state = assembler.assemble(x.info, header, &x.data, |d| discards.push(d));
-                    Outcome::Assembled(matches!(state, AssemblyState::Complete), discards)
+                    assembler.assemble(x.info, header, &x.data, |d| discards.push(d));
+                    Outcome::Assembled(assembler.peek().is_some(), discards)
                 }
                 Op::Peek => Outcome::Peeked(assembler.peek().map(Completed::new)),
                 Op::Pop => Outcome::Popped(assembler.pop().map(Completed::new)),

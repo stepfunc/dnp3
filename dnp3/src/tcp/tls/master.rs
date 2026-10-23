@@ -17,9 +17,8 @@ use crate::tcp::{
     spawn_master_client, ClientConnectionHandler, ClientState, ConnectOptions, SimpleConnectHandler,
 };
 use crate::tcp::{EndpointList, PostConnectionHandler};
-use crate::util::phys::PhysLayer;
+use crate::util::phys::{PhysLayer, Socket};
 
-use tokio::net::TcpStream;
 use tokio_rustls::rustls;
 use tokio_rustls::rustls::pki_types::{IpAddr, ServerName};
 
@@ -204,23 +203,16 @@ impl TlsClientConfig {
         })
     }
 
-    pub(crate) async fn handle_connection(
+    pub(crate) async fn handle_connection<S: Socket>(
         &self,
-        socket: TcpStream,
+        socket: S,
         endpoint: &SocketAddr,
     ) -> Result<PhysLayer, HandshakeError> {
-        let result = self.connect(socket).await;
-        match &result {
-            Err(HandshakeError::Timeout) => tracing::warn!(
-                "TLS handshake with {endpoint} didn't complete within {} seconds",
-                super::TLS_HANDSHAKE_TIMEOUT.as_secs()
-            ),
-            Err(HandshakeError::Failed(err)) => {
-                tracing::warn!("failed to establish TLS session with {endpoint}: {err}")
-            }
-            Ok(_) => {}
-        }
-        result.map(|stream| PhysLayer::tls(tokio_rustls::TlsStream::from(stream)))
+        let stream = self
+            .connect(socket)
+            .await
+            .inspect_err(|err| err.log(*endpoint))?;
+        Ok(S::into_tls_phys(tokio_rustls::TlsStream::from(stream)))
     }
 
     /// Run the client side of the TLS handshake over a connected socket
@@ -244,6 +236,7 @@ mod tests {
     use crate::tcp::tls::TLS_HANDSHAKE_TIMEOUT;
     use crate::util::test_support::tls::client_config;
     use crate::util::test_support::watchdog;
+    use tokio::net::TcpStream;
 
     #[tokio::test(start_paused = true)]
     async fn tls_handshake_with_a_server_that_never_answers_times_out() {
