@@ -7,7 +7,7 @@ use crate::app::parse::header_identity_tests::accepted_headers;
 use crate::app::parse::options::ParseOptions;
 use crate::app::parse::parser::HeaderCollection;
 use crate::app::{FunctionCode, QualifierCode, Timestamp, Variation};
-use crate::master::extract::extract_measurements_inner;
+use crate::master::extract::{extract_measurements_inner, ProcessableResponse};
 use crate::master::{HeaderInfo, ReadHandler};
 
 use QualifierCode as Q;
@@ -191,7 +191,12 @@ const CTO: [u8; 10] = [51, 1, 0x07, 1, 1, 2, 3, 4, 5, 6];
 
 /// The calls, and whether extraction reports values, for response objects
 fn extract(options: ParseOptions, objects: &[u8]) -> (Vec<Call>, bool) {
-    let objects = HeaderCollection::parse(options, FunctionCode::Response, objects).unwrap();
+    let objects = ProcessableResponse::new(HeaderCollection::parse(
+        options,
+        FunctionCode::Response,
+        objects,
+    ))
+    .unwrap();
     let mut recorder = Recorder::default();
     let delivered = extract_measurements_inner(objects, &mut recorder);
     (recorder.calls, delivered)

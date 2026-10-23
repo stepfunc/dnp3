@@ -1,12 +1,12 @@
 use std::future::Future;
 
 use crate::app::format::write::HeaderWriter;
-use crate::app::parse::parser::{HeaderCollection, Response};
+use crate::app::parse::parser::Response;
 use crate::app::FunctionCode;
 use crate::app::ResponseHeader;
 use crate::master::association::Association;
 use crate::master::error::TaskError;
-use crate::master::extract::extract_measurements;
+use crate::master::extract::{extract_measurements, ProcessableResponse};
 use crate::master::poll::Poll;
 use crate::master::promise::Promise;
 use crate::master::request::{Classes, EventClasses};
@@ -450,7 +450,7 @@ impl ReadTask {
         &mut self,
         association: &mut Association,
         header: ResponseHeader,
-        objects: HeaderCollection<'_>,
+        objects: ProcessableResponse<'_>,
     ) -> bool {
         let read_type = self.read_type();
         match self {

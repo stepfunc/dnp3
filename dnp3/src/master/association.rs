@@ -4,14 +4,14 @@ use std::time::Duration;
 
 use xxhash_rust::xxh64::xxh64;
 
-use crate::app::parse::parser::{HeaderCollection, Response};
+use crate::app::parse::parser::Response;
 use crate::app::Timestamp;
 use crate::app::{ExponentialBackOff, FunctionCode, RetryStrategy};
 use crate::app::{Iin, ResponseHeader};
 use crate::app::{Sequence, Timeout};
 use crate::link::EndpointAddress;
 use crate::master::error::{AssociationError, TaskError, TimeSyncError};
-use crate::master::extract::{extract_measurements, validate_response};
+use crate::master::extract::{extract_measurements, ProcessableResponse};
 use crate::master::handler::AssociationHandler;
 use crate::master::messages::AssociationMsgType;
 use crate::master::poll::{PollHandle, PollMap, PollMsg};
@@ -603,7 +603,7 @@ impl Association {
 
             // An invalid response isn't confirmed or remembered, so the outstation's retry isn't
             // taken for a duplicate
-            let objects = match validate_response(response.objects) {
+            let objects = match ProcessableResponse::new(response.objects) {
                 Ok(objects) => objects,
                 Err(err) => {
                     tracing::warn!("discarding unsolicited response: {err}");
@@ -636,7 +636,7 @@ impl Association {
         &mut self,
         read_type: ReadType,
         header: ResponseHeader,
-        objects: HeaderCollection<'_>,
+        objects: ProcessableResponse<'_>,
     ) -> bool {
         extract_measurements(read_type, header, objects, self.read_handler.as_mut()).await
     }

@@ -8,14 +8,14 @@ use crate::master::{HeaderInfo, ReadHandler};
 use crate::master::{ReadType, TaskError};
 use crate::util::skipped::Skipped;
 
-/// Extract measurements from a HeaderCollection, sinking them into
+/// Extract measurements from a processable response, sinking them into
 /// something that implements `MeasurementHandler`
 ///
 /// Returns true if the values of any header were passed to the handler
 pub(crate) async fn extract_measurements(
     read_type: ReadType,
     header: ResponseHeader,
-    objects: HeaderCollection<'_>,
+    objects: ProcessableResponse<'_>,
     handler: &mut dyn ReadHandler,
 ) -> bool {
     handler.begin_fragment(read_type, header).get().await;
@@ -24,18 +24,18 @@ pub(crate) async fn extract_measurements(
     delivered
 }
 
-/// Extract measurements from a HeaderCollection, sinking them into
+/// Extract measurements from a processable response, sinking them into
 /// something that implements `MeasurementHandler`
 pub(crate) fn extract_measurements_inner(
-    objects: HeaderCollection<'_>,
+    objects: ProcessableResponse<'_>,
     handler: &mut dyn ReadHandler,
 ) -> bool {
     let mut delivered = false;
     let mut cto = None;
     let mut ignored = Skipped::new();
-    for header in objects.iter() {
+    for header in objects.objects.iter() {
         match extract_header(&header, cto, handler) {
-            Extracted::Handled => delivered |= has_objects(&header),
+            Extracted::Handled => delivered |= header.has_objects(),
             Extracted::Cto(x) => cto = x,
             Extracted::Ignored => ignored.add((header.variation(), header.qualifier())),
         }
@@ -46,15 +46,23 @@ pub(crate) fn extract_measurements_inner(
     delivered
 }
 
-/// True if the header carries at least one object
-fn has_objects(header: &ObjectHeader) -> bool {
-    match header {
-        ObjectHeader::AllObjects(_) | ObjectHeader::Read(..) => false,
-        // a range covers at least one index, and a free-format header holds one object
-        ObjectHeader::Range(..) | ObjectHeader::FreeFormat(_) => true,
-        ObjectHeader::Count(_, count, _) => *count > 0,
-        ObjectHeader::CountAndPrefix8(count, _) => *count > 0,
-        ObjectHeader::CountAndPrefix16(count, _) => *count > 0,
+/// The objects of a response that the master can process: they parse, and every object with
+/// relative time follows a common time of occurrence in the same fragment
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct ProcessableResponse<'a> {
+    objects: HeaderCollection<'a>,
+}
+
+impl<'a> ProcessableResponse<'a> {
+    /// Check that the master can process a response's objects
+    pub(crate) fn new(
+        objects: Result<HeaderCollection<'a>, ObjectParseError>,
+    ) -> Result<Self, InvalidResponse> {
+        let objects = objects.map_err(InvalidResponse::Malformed)?;
+        match objects.relative_time_without_cto() {
+            Some(variation) => Err(InvalidResponse::RelativeTimeWithoutCto(variation)),
+            None => Ok(Self { objects }),
+        }
     }
 }
 
@@ -90,45 +98,6 @@ impl From<InvalidResponse> for TaskError {
     }
 }
 
-/// Check that the master can process a response's objects: they parse, and every object with
-/// relative time follows a common time of occurrence in the same fragment
-pub(crate) fn validate_response(
-    objects: Result<HeaderCollection<'_>, ObjectParseError>,
-) -> Result<HeaderCollection<'_>, InvalidResponse> {
-    let objects = objects.map_err(InvalidResponse::Malformed)?;
-    let mut cto = None;
-    for header in objects.iter() {
-        if let Some(next) = next_cto(&header, cto) {
-            cto = next;
-        } else if cto.is_none() && has_relative_time(&header) {
-            return Err(InvalidResponse::RelativeTimeWithoutCto(header.variation()));
-        }
-    }
-    Ok(objects)
-}
-
-/// True if the header carries objects whose time is relative to a common time of occurrence
-fn has_relative_time(header: &ObjectHeader) -> bool {
-    matches!(
-        header.variation(),
-        Variation::Group2Var3 | Variation::Group4Var3
-    ) && has_objects(header)
-}
-
-/// If the header is a common time of occurrence, the one for the headers that follow it
-fn next_cto(header: &ObjectHeader, prev: Option<Time>) -> Option<Option<Time>> {
-    let time = match header {
-        ObjectHeader::Count(_, 1, CountVariation::Group51Var1(seq)) => {
-            seq.single().map(|x| Time::Synchronized(x.time))
-        }
-        ObjectHeader::Count(_, 1, CountVariation::Group51Var2(seq)) => {
-            seq.single().map(|x| Time::Unsynchronized(x.time))
-        }
-        _ => return None,
-    };
-    Some(time.or(prev))
-}
-
 /// What [`extract_header`] did with a header
 pub(crate) enum Extracted {
     /// the header's values were passed to the handler
@@ -162,7 +131,7 @@ pub(crate) fn extract_header<H: ReadHandler + ?Sized>(
         }
     }
 
-    if let Some(cto) = next_cto(header, cto) {
+    if let Some(cto) = header.next_cto(cto) {
         return Extracted::Cto(cto);
     }
 
@@ -401,7 +370,7 @@ mod test {
     }
 
     fn validate(objects: &[u8]) -> Result<(), InvalidResponse> {
-        validate_response(HeaderCollection::parse(
+        ProcessableResponse::new(HeaderCollection::parse(
             ParseOptions::default(),
             FunctionCode::Response,
             objects,
@@ -540,7 +509,7 @@ mod test {
     #[test]
     fn g2v3_with_synchronized_cto_yields_synchronized_time() {
         let mut handler = MockHandler::new();
-        let objects = HeaderCollection::parse(
+        let objects = ProcessableResponse::new(HeaderCollection::parse(
             ParseOptions::default(),
             FunctionCode::Response,
             // g50v1       count: 1   -------- time: 1 ------------------
@@ -548,7 +517,7 @@ mod test {
                 0x33, 0x01, 0x07, 0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x03, 0x17, 0x01,
                 0x07, 0x01, 0xFF, 0xFF,
             ],
-        )
+        ))
         .unwrap();
 
         let expected = (
@@ -567,7 +536,7 @@ mod test {
     #[test]
     fn g2v3_with_unsynchronized_cto_yields_unsynchronized_time() {
         let mut handler = MockHandler::new();
-        let objects = HeaderCollection::parse(
+        let objects = ProcessableResponse::new(HeaderCollection::parse(
             ParseOptions::default(),
             FunctionCode::Response,
             // g50v2   count: 1    --------- time: 2 -----------------
@@ -575,7 +544,7 @@ mod test {
                 0x33, 0x02, 0x07, 0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x03, 0x17, 0x01,
                 0x07, 0x01, 0xFE, 0xFF,
             ],
-        )
+        ))
         .unwrap();
 
         let expected: (BinaryInput, u16) = (
@@ -594,7 +563,7 @@ mod test {
     #[test]
     fn can_calculate_maximum_timestamp() {
         let mut handler = MockHandler::new();
-        let objects = HeaderCollection::parse(
+        let objects = ProcessableResponse::new(HeaderCollection::parse(
             ParseOptions::default(),
             FunctionCode::Response,
             // g50v1      count: 1  --------- time: 0xFFFFFE ----------
@@ -602,7 +571,7 @@ mod test {
                 0x33, 0x01, 0x07, 0x01, 0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x02, 0x03, 0x17, 0x01,
                 0x07, 0x01, 0x01, 0x00,
             ],
-        )
+        ))
         .unwrap();
 
         let expected: (BinaryInput, u16) = (
@@ -621,7 +590,7 @@ mod test {
     #[test]
     fn cto_overflow_of_u48_yields_invalid_time() {
         let mut handler = MockHandler::new();
-        let objects = HeaderCollection::parse(
+        let objects = ProcessableResponse::new(HeaderCollection::parse(
             ParseOptions::default(),
             FunctionCode::Response,
             // g50v1      count: 1  --------- time: 0xFFFFFE ----------
@@ -629,7 +598,7 @@ mod test {
                 0x33, 0x01, 0x07, 0x01, 0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x02, 0x03, 0x17, 0x01,
                 0x07, 0x01, 0x02, 0x00,
             ],
-        )
+        ))
         .unwrap();
 
         let expected: (BinaryInput, u16) = (
@@ -648,14 +617,14 @@ mod test {
     #[test]
     fn handles_frozen_analog_event() {
         let mut handler = MockHandler::new();
-        let objects = HeaderCollection::parse(
+        let objects = ProcessableResponse::new(HeaderCollection::parse(
             ParseOptions::default(),
             FunctionCode::Response,
             &[
                 33, 3, 0x17, 0x01, 0x07, 0x01, 0xDE, 0xAD, 0xCA, 0xFE, 0x01, 0x02, 0x03, 0x04,
                 0x05, 0x06,
             ],
-        )
+        ))
         .unwrap();
 
         let expected: (FrozenAnalogInput, u16) = (
@@ -674,11 +643,11 @@ mod test {
     #[test]
     fn handles_analog_input_dead_band() {
         let mut handler = MockHandler::new();
-        let objects = HeaderCollection::parse(
+        let objects = ProcessableResponse::new(HeaderCollection::parse(
             ParseOptions::default(),
             FunctionCode::Response,
             &[0x22, 1, 0x00, 0x01, 0x02, 0xCA, 0xFE, 0xDE, 0xAD],
-        )
+        ))
         .unwrap();
 
         let items = vec![
@@ -693,11 +662,11 @@ mod test {
     #[test]
     fn handles_static_frozen_analog() {
         let mut handler = MockHandler::new();
-        let objects = HeaderCollection::parse(
+        let objects = ProcessableResponse::new(HeaderCollection::parse(
             ParseOptions::default(),
             FunctionCode::Response,
             &[31, 2, 0x00, 0x07, 0x07, 0x01, 0xCA, 0xFE],
-        )
+        ))
         .unwrap();
 
         let expected: (FrozenAnalogInput, u16) = (
@@ -716,7 +685,7 @@ mod test {
     #[test]
     fn handles_device_attrs() {
         let mut handler = MockHandler::new();
-        let objects = HeaderCollection::parse(
+        let objects = ProcessableResponse::new(HeaderCollection::parse(
             ParseOptions::default(),
             FunctionCode::Response,
             &[
@@ -727,7 +696,7 @@ mod test {
                 // group 0 var 42 - private set == 7 - one byte count and prefix
                 0, 42, 0x17, 0x01, 0x07, 0x01, 0x03, b'F', b'O', b'O',
             ],
-        )
+        ))
         .unwrap();
 
         extract_measurements_inner(objects, &mut handler);
@@ -744,7 +713,7 @@ mod test {
     #[test]
     fn handles_g13v1_and_g13v2() {
         let mut handler = MockHandler::new();
-        let objects = HeaderCollection::parse(
+        let objects = ProcessableResponse::new(HeaderCollection::parse(
             ParseOptions::default(),
             FunctionCode::UnsolicitedResponse,
             &[
@@ -768,7 +737,7 @@ mod test {
                 0xEE,
                 0xFF,
             ],
-        )
+        ))
         .unwrap();
 
         extract_measurements_inner(objects, &mut handler);
@@ -799,7 +768,7 @@ mod test {
     #[test]
     fn handles_g43_object() {
         let mut handler = MockHandler::new();
-        let objects = HeaderCollection::parse(
+        let objects = ProcessableResponse::new(HeaderCollection::parse(
             ParseOptions::default(),
             FunctionCode::UnsolicitedResponse,
             &[
@@ -809,7 +778,7 @@ mod test {
                 0x08, // status  == Too many ops
                 0xFE, 0xCA,
             ],
-        )
+        ))
         .unwrap();
 
         extract_measurements_inner(objects, &mut handler);
@@ -830,7 +799,7 @@ mod test {
     #[test]
     fn handles_g102v1() {
         let mut handler = MockHandler::new();
-        let objects = HeaderCollection::parse(
+        let objects = ProcessableResponse::new(HeaderCollection::parse(
             ParseOptions::default(),
             FunctionCode::UnsolicitedResponse,
             &[
@@ -840,7 +809,7 @@ mod test {
                 0x08, // index 8
                 0xFE, 0xCA,
             ],
-        )
+        ))
         .unwrap();
 
         extract_measurements_inner(objects, &mut handler);
@@ -856,10 +825,32 @@ mod test {
 
     fn extract(input: &[u8]) -> (bool, MockHandler) {
         let mut handler = MockHandler::new();
+        let objects = ProcessableResponse::new(HeaderCollection::parse(
+            ParseOptions::default(),
+            FunctionCode::Response,
+            input,
+        ))
+        .unwrap();
+        let delivered = extract_measurements_inner(objects, &mut handler);
+        (delivered, handler)
+    }
+
+    /// Pass each header to [`extract_header`], without the master's check that it can process
+    /// the response, returning true if any header with objects was handled
+    fn extract_each_header(input: &[u8]) -> (bool, MockHandler) {
+        let mut handler = MockHandler::new();
         let objects =
             HeaderCollection::parse(ParseOptions::default(), FunctionCode::Response, input)
                 .unwrap();
-        let delivered = extract_measurements_inner(objects, &mut handler);
+        let mut delivered = false;
+        let mut cto = None;
+        for header in objects.iter() {
+            match extract_header(&header, cto, &mut handler) {
+                Extracted::Handled => delivered |= header.has_objects(),
+                Extracted::Cto(x) => cto = x,
+                Extracted::Ignored => {}
+            }
+        }
         (delivered, handler)
     }
 
@@ -1054,12 +1045,19 @@ mod test {
             let mut input = cto;
             input.extend(G2V3_INDEX_7);
 
-            let (delivered, mut handler) = extract(&input);
+            let (delivered, mut handler) = extract_each_header(&input);
 
             assert!(delivered);
             assert_eq!(
                 handler.pop(),
                 [Header::Binary(vec![binary(false, None, 7)])]
+            );
+            // the master never extracts such a response
+            assert_eq!(
+                validate(&input),
+                Err(InvalidResponse::RelativeTimeWithoutCto(
+                    Variation::Group2Var3
+                ))
             );
         }
     }

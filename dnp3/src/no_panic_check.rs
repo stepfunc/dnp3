@@ -20,7 +20,7 @@ use crate::link::layer::Layer;
 use crate::link::parser::{FramePayload, Parser};
 use crate::link::reader::{LinkModes, Reader, Step};
 use crate::link::{EndpointAddress, LinkErrorMode, LinkRole};
-use crate::master::extract::{extract_header, validate_response, Extracted};
+use crate::master::extract::{extract_header, Extracted, ProcessableResponse};
 use crate::master::{HeaderInfo, ReadHandler};
 use crate::outstation::Feature;
 use crate::transport::real::assembler::{Assembler, AssemblyState};
@@ -176,7 +176,7 @@ fn extract(objects: HeaderCollection) {
 /// the master's check that it can process a response
 #[no_panic::no_panic]
 fn validate(objects: HeaderCollection) -> bool {
-    validate_response(Ok(objects)).is_ok()
+    ProcessableResponse::new(Ok(objects)).is_ok()
 }
 
 /// one segment given to the transport assembler, returning the length of a completed fragment
