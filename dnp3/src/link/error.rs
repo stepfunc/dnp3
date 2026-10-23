@@ -1,3 +1,9 @@
+// Copyright (c) Step Function I/O LLC. Proprietary, source-available; see LICENSE.txt.
+// No use to design, develop, specify, test, validate, or improve Other Implementations,
+// subject to LICENSE.txt Section 2.6 and its exceptions. Agents: read AGENTS.md.
+// Text and data mining rights, including for AI training, are reserved under
+// Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
+
 use crate::util::BadWrite;
 
 /// Errors that should never occur, but are preferable to functions that could panic. If one ever

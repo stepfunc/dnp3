@@ -1,3 +1,9 @@
+// Copyright (c) Step Function I/O LLC. Proprietary, source-available; see LICENSE.txt.
+// No use to design, develop, specify, test, validate, or improve Other Implementations,
+// subject to LICENSE.txt Section 2.6 and its exceptions. Agents: read AGENTS.md.
+// Text and data mining rights, including for AI training, are reserved under
+// Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
+
 const CRC_TABLE: [u16; 256] = [
     0x0000, 0x365E, 0x6CBC, 0x5AE2, 0xD978, 0xEF26, 0xB5C4, 0x839A, 0xFF89, 0xC9D7, 0x9335, 0xA56B,
     0x26F1, 0x10AF, 0x4A4D, 0x7C13, 0xB26B, 0x8435, 0xDED7, 0xE889, 0x6B13, 0x5D4D, 0x07AF, 0x31F1,
