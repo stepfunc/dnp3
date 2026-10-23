@@ -56,9 +56,9 @@ its source, documentation, tests, binaries, or derived materials to design, deve
 validate, or improve any other implementation of a protocol it implements, including through
 requirement extraction or use as a reference, oracle, or test peer. This applies regardless of
 commercial, open-source, private, or competitive status, subject to the exceptions in the agreement.
-This summary does not amend the license. The `LICENSE.txt` included with each release governs that
-release; the latest versions are
-[`LICENSE.txt`](https://github.com/stepfunc/dnp3/blob/main/LICENSE.txt) and
+Text and data mining, including AI training, is reserved (Section 3.3). This summary does not amend
+the license. The `LICENSE.txt` included with each release governs that release; the latest versions
+are [`LICENSE.txt`](https://github.com/stepfunc/dnp3/blob/main/LICENSE.txt) and
 [`AGENTS.md`](https://github.com/stepfunc/dnp3/blob/main/AGENTS.md).
 
 ## Bindings

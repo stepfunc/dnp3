@@ -27,10 +27,10 @@ integrating with the Licensed Software.
 the Licensed Software, directly or through an automated tool or service, or on
 whose behalf such activity occurs.
 
-1.3. "Development Platform" shall mean GitHub, crates.io, NuGet.org, Maven
-Central, Company's websites, and other software development platforms, package
-registries, or documentation hosting services identified by Company through which
-Company makes the Licensed Software available.
+1.3. "Development Platform" shall mean GitHub, crates.io, docs.rs, NuGet.org,
+Maven Central, Company's websites, and other software development platforms,
+package registries, or documentation hosting services identified by Company
+through which Company makes the Licensed Software available.
 
 1.4. "Effective Date" shall mean the date Developer first accepts this version of
 this Agreement.
@@ -73,13 +73,25 @@ Section 2.4 that provides to the contrary, Developer shall not distribute or
 sublicense any portion of the Licensed Software. Notwithstanding the preceding
 sentence, Developer may provide portions of the Licensed Software to a service
 provider solely to process them on Developer's behalf for activities otherwise
-permitted under this Agreement, provided the provider's applicable terms or
-written agreement limit use to that processing and prohibit model training and use
-for any Other Implementation as defined in Section 2.6. This permission does not
-authorize public disclosure or grant the provider any independent right to use the
-Licensed Software. Developer remains responsible for compliance with this
-Agreement in using the service. Developer may not publish or disseminate any
-benchmarking results of Licensed Software performance.
+permitted under this Agreement, provided the provider is not permitted under its
+applicable terms or Developer's configuration to use those portions to train
+models, and subject to Section 2.6. This permission does not authorize public
+disclosure or grant the provider any independent right to use the Licensed
+Software. Developer remains responsible for compliance with this Agreement in
+using the service. Developer may not publish or disseminate any benchmarking
+results of Licensed Software performance.
+
+2.2A. Scope of License
+
+Section 2.2 is the only permission Company grants to reproduce, adapt (including
+translate or port), distribute, or display the Licensed Software. That permission
+is granted only for the Purpose and only on the condition that Developer complies
+with Sections 2.2, 2.3, 2.6(a), and 2.6(d). Any reproduction, adaptation,
+distribution, or display of the Licensed Software outside the Purpose, or in the
+course of an activity prohibited by Section 2.6(a) or 2.6(d), is outside the scope
+of the license and is unlicensed. Developer is not required to accept this
+Agreement, but nothing other than this Agreement, a separate written agreement
+with Company, or applicable law grants permission to do any of those things.
 
 2.3. Non-Commercial and Non-Production Use
 
@@ -157,7 +169,8 @@ specify, test, validate, or improve an Other Implementation, including through
 captured outputs, recordings, traces, or results of such execution; or
 
 (d) train, fine-tune, or distill any artificial intelligence or machine learning
-model using the Licensed Software.
+model using the Licensed Software, other than as permitted to a Development
+Platform operator under its terms of service.
 
 To the extent an Other Implementation or other material created through an
 activity prohibited by this Section reproduces or adapts copyright-protected
@@ -166,10 +179,11 @@ that reproduction or adaptation, including the preparation, use, or distribution
 of any resulting derivative work. Any such derivative work is unauthorized under
 this Agreement. Functional equivalence alone does not establish that a work is a
 derivative work under copyright law. Use of an artificial intelligence system or
-automated tool does not enlarge the license granted hereunder. The restrictions in
-this Section are contractual obligations and limitations on the license grant and
-apply whether or not a resulting work qualifies as a derivative work, to the
-extent permitted by applicable law.
+automated tool does not enlarge the license granted hereunder. Each obligation in
+this Section is a contractual covenant and applies whether or not a resulting work
+qualifies as a derivative work. Sections 2.6(a) and 2.6(d) are also conditions of
+and limitations on the license in Section 2.2. Any breach of this Section is a
+material breach for purposes of Section 4.1.
 
 2.7. Permitted Evaluation and Integration
 
@@ -195,7 +209,7 @@ subsequent use prohibited by Section 2.6;
 Company's applicable written authorization, within the scope of that
 authorization; or
 
-(e) any activity that applicable law does not permit Company to restrict.
+(e) any act described in Section 7.10.
 
 Except as provided in a separate applicable written agreement or authorization
 from Company, this Section does not expand the Purpose or authorize commercial
@@ -218,6 +232,16 @@ Any feedback provided by Developer pertaining to the Licensed Software shall be
 non-confidential and Company may use and exploit such feedback freely, without
 any obligation of notice or compensation to Developer.
 
+3.3. Text and Data Mining Reservation
+
+Company expressly reserves all rights in the Licensed Software with respect to
+text and data mining, including reproduction, extraction, and automated analysis
+for training, fine-tuning, or distilling artificial intelligence or machine
+learning models, within the meaning of Article 4(3) of Directive (EU) 2019/790 and
+its national implementations (including Section 44b(3) of the German Copyright
+Act), and under any comparable law. This reservation does not limit rights Company
+has granted to a Development Platform operator under its terms of service.
+
 4. TERM AND TERMINATION
 
 4.1. Term and Termination of Agreement
@@ -226,7 +250,7 @@ This Agreement commences on its Effective Date and ends if terminated as
 hereinafter provided. This Agreement will automatically terminate if Developer
 materially breaches this Agreement, including, without limitation, by a violation
 of the non-commercial and non-production use restrictions in Section 2.3 or the
-restrictions in Section 2.6.
+restrictions in Section 2.6, any breach of which is material.
 
 4.2. Obligations on Termination
 
@@ -343,4 +367,19 @@ Developer shall not assign this Agreement, or any right, or delegate any perform
 hereunder without Company's prior written consent, and any such action in violation of
 the foregoing shall be void. Company may freely assign this Agreement.
 
+7.10. Rights That Cannot Be Restricted
 
+Nothing in this Agreement restricts an act that applicable law permits a lawful
+user to perform notwithstanding a contrary contractual term, including, where
+applicable, acts permitted by Articles 5(2), 5(3), and 6 of Directive 2009/24/EC
+as implemented in national law. If a provision, or its application to particular
+conduct, persons, or jurisdictions, is held unenforceable, it shall be enforced to
+the maximum extent permitted, and its application to other conduct, persons, and
+jurisdictions is unaffected.
+
+7.11. Development Platform Terms
+
+Nothing in this Agreement limits rights Company has granted to the operator of a
+Development Platform or its users under that platform's terms of service. Those
+rights are limited to the uses those terms describe and do not include any other
+use of the Licensed Software.
