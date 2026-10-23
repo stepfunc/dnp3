@@ -19,7 +19,8 @@
 //!   unsolicited, event scan, then the first due poll in the order added, then the keep-alive;
 //! - a failed automatic task retries after a delay that starts at the minimum and doubles with
 //!   each consecutive failure up to the maximum, and blocks everything after it until then;
-//! - a failed time sync blocks nothing and retries after the integrity scan;
+//! - a failed time sync blocks nothing and retries after the integrity scan, so a failed task
+//!   ahead of it holds up its retry;
 //! - a poll runs one period after it's added or after its last run ends, at once when demanded,
 //!   and again as soon as a run ends if it was demanded during the run;
 //! - when nothing is ready, the channel sleeps until the earliest time something becomes ready.
@@ -80,13 +81,8 @@ enum Prediction {
         /// the id of the user request
         user: Option<u32>,
     },
-    /// Sleep until `must`, the earliest time some work becomes ready. Waking earlier at one of
-    /// `early` is also correct: each is when a failed time sync comes due behind another failed
-    /// task that still holds it up.
-    Sleep {
-        must: Instant,
-        early: Vec<Instant>,
-    },
+    /// Sleep until the earliest time some work becomes ready
+    Sleep(Instant),
     Nothing,
 }
 
@@ -96,9 +92,7 @@ impl Prediction {
             (Self::Run { assoc, work, .. }, Observed::Run { assoc: a, work: w }) => {
                 *assoc == a && *work == w
             }
-            (Self::Sleep { must, early }, Observed::NotBefore(at)) => {
-                at > now && (at == *must || (at < *must && early.contains(&at)))
-            }
+            (Self::Sleep(wake), Observed::NotBefore(at)) => at > now && at == *wake,
             (Self::Nothing, Observed::Nothing) => true,
             _ => false,
         }
@@ -252,11 +246,8 @@ struct ModelPoll {
 #[derive(Clone, Debug, PartialEq)]
 enum AssocNext {
     Run(Work),
-    /// nothing is ready; `must` and `early` as in [`Prediction::Sleep`]
-    Sleep {
-        must: Option<Instant>,
-        early: Option<Instant>,
-    },
+    /// nothing is ready until this time, if anything is waiting
+    Sleep(Option<Instant>),
 }
 
 fn earliest(lhs: Option<Instant>, rhs: Option<Instant>) -> Option<Instant> {
@@ -358,50 +349,39 @@ impl ModelAssociation {
     fn select(&self, now: Instant) -> AssocNext {
         let config = &self.config;
         let time_sync_failed = matches!(self.time_sync, Auto::Retry { .. });
-        // a failed time sync that isn't due blocks nothing, but the channel must wake for it
-        let time_sync_retry = match self.time_sync {
-            Auto::Retry { at, .. } if config.time_sync && at > now => Some(at),
-            Auto::Idle | Auto::Pending | Auto::Retry { .. } => None,
-        };
         let to_scan = self.events_to_scan();
 
-        // (work, state, whether it applies, whether it's ahead of a failed time sync)
+        // (work, state, whether it applies)
         let order = [
-            (Work::ClearRestart, self.clear_restart, true, true),
+            (Work::ClearRestart, self.clear_restart, true),
             (
                 Work::DisableUnsolicited,
                 self.disable_unsolicited,
                 config.disable_unsolicited,
-                true,
             ),
             (
                 Work::TimeSync,
                 self.time_sync,
                 config.time_sync && !time_sync_failed,
-                true,
             ),
-            (Work::Integrity, self.integrity, config.integrity, true),
+            (Work::Integrity, self.integrity, config.integrity),
             (
                 Work::TimeSync,
                 self.time_sync,
                 config.time_sync && time_sync_failed,
-                false,
             ),
             (
                 Work::EnableUnsolicited,
                 self.enable_unsolicited,
                 config.enable_unsolicited,
-                false,
             ),
-            (
-                Work::EventScan(to_scan),
-                self.event_scan,
-                to_scan.any(),
-                false,
-            ),
+            (Work::EventScan(to_scan), self.event_scan, to_scan.any()),
         ];
 
-        for (work, state, applies, ahead_of_time_sync) in order {
+        // a failed time sync that isn't due blocks nothing, but once nothing ahead of it holds it
+        // up, the channel must wake for its retry
+        let mut time_sync_retry = None;
+        for (work, state, applies) in order {
             if !applies {
                 continue;
             }
@@ -409,21 +389,10 @@ impl ModelAssociation {
                 Auto::Idle => {}
                 Auto::Pending => return AssocNext::Run(work),
                 Auto::Retry { at, .. } if at <= now => return AssocNext::Run(work),
-                Auto::Retry { .. } if work == Work::TimeSync => {}
+                Auto::Retry { at, .. } if work == Work::TimeSync => time_sync_retry = Some(at),
+                // it holds up everything after it
                 Auto::Retry { at, .. } => {
-                    // it holds up everything after it, including a failed time sync that's
-                    // behind it, which may still wake the channel without running
-                    return if ahead_of_time_sync {
-                        AssocNext::Sleep {
-                            must: Some(at),
-                            early: time_sync_retry,
-                        }
-                    } else {
-                        AssocNext::Sleep {
-                            must: earliest(Some(at), time_sync_retry),
-                            early: None,
-                        }
-                    };
+                    return AssocNext::Sleep(earliest(Some(at), time_sync_retry))
                 }
             }
         }
@@ -442,11 +411,11 @@ impl ModelAssociation {
             }
         }
 
-        let mut must = earliest(time_sync_retry, self.keep_alive_at);
+        let mut wake = earliest(time_sync_retry, self.keep_alive_at);
         for poll in self.polls.iter().flatten() {
-            must = earliest(must, Some(poll.next));
+            wake = earliest(wake, Some(poll.next));
         }
-        AssocNext::Sleep { must, early: None }
+        AssocNext::Sleep(wake)
     }
 
     /// The task `run` completed at `now` with this outcome
@@ -633,8 +602,7 @@ impl Model {
             }
         }
 
-        let mut must = None;
-        let mut early = Vec::new();
+        let mut wake = None;
         for position in 0..self.line.len() {
             let index = self.line[position];
             let Some(association) = self.association(index) else {
@@ -649,18 +617,12 @@ impl Model {
                         user: None,
                     };
                 }
-                AssocNext::Sleep {
-                    must: at,
-                    early: early_at,
-                } => {
-                    must = earliest(must, at);
-                    early.extend(early_at);
-                }
+                AssocNext::Sleep(at) => wake = earliest(wake, at),
             }
         }
 
-        match must {
-            Some(must) => Prediction::Sleep { must, early },
+        match wake {
+            Some(wake) => Prediction::Sleep(wake),
             None => Prediction::Nothing,
         }
     }
@@ -1218,13 +1180,53 @@ proptest! {
 
     #[test]
     fn next_task_follows_the_scheduling_model(case in case()) {
-        let runtime = tokio::runtime::Builder::new_current_thread()
-            .enable_time()
-            .start_paused(true)
-            .build()
-            .unwrap();
-        runtime.block_on(run(case))?;
+        run_paused(case)?;
     }
+}
+
+/// Run a case on a paused clock
+fn run_paused(case: Case) -> Result<(), TestCaseError> {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_time()
+        .start_paused(true)
+        .build()
+        .map_err(|err| TestCaseError::fail(err.to_string()))?;
+    runtime.block_on(run(case))
+}
+
+#[test]
+fn sleeps_past_a_failed_time_sync_held_up_by_a_failed_integrity_scan() {
+    let success = Outcome::Answer(Answer {
+        iin: IinBits::default(),
+        events: false,
+    });
+    let need_time = IinBits {
+        need_time: true,
+        ..IinBits::default()
+    };
+    let case = Case {
+        associations: vec![Config {
+            integrity: true,
+            time_sync: true,
+            ..quiet_config()
+        }],
+        addresses: vec![1],
+        ops: vec![
+            Op::Event(Event::Unsolicited(0, need_time)),
+            // the time sync fails, then the integrity scan fails later, so it retries later
+            Op::Step(Vec::new(), Outcome::Timeout),
+            Op::Step(
+                vec![Event::Advance(Duration::from_millis(500))],
+                Outcome::Timeout,
+            ),
+            // the channel sleeps until the integrity scan retries, not until the time sync does
+            Op::Step(Vec::new(), Outcome::Timeout),
+            Op::Sleep,
+            Op::Step(Vec::new(), success),
+            Op::Step(Vec::new(), success),
+        ],
+    };
+    run_paused(case).unwrap();
 }
 
 fn quiet_config() -> Config {
@@ -1306,13 +1308,7 @@ fn model_rejects_a_poll_held_up_by_a_failed_integrity_scan_but_not_by_a_failed_t
         at: retry,
     };
     let prediction = model.pick(now);
-    assert_eq!(
-        prediction,
-        Prediction::Sleep {
-            must: retry,
-            early: Vec::new()
-        }
-    );
+    assert_eq!(prediction, Prediction::Sleep(retry));
     assert!(!prediction.accepts(now, poll));
 
     let association = model.association(index).unwrap();
@@ -1324,6 +1320,35 @@ fn model_rejects_a_poll_held_up_by_a_failed_integrity_scan_but_not_by_a_failed_t
     let prediction = model.pick(now);
     assert!(prediction.accepts(now, poll));
     assert!(!prediction.accepts(now, Observed::NotBefore(retry)));
+}
+
+#[test]
+fn model_rejects_waking_for_a_failed_time_sync_held_up_by_a_failed_integrity_scan() {
+    let now = Instant::now();
+    let time_sync_retry = now + Duration::from_secs(1);
+    let integrity_retry = now + Duration::from_secs(2);
+    let mut model = Model::default();
+    let index = model.add(
+        Config {
+            integrity: true,
+            time_sync: true,
+            ..quiet_config()
+        },
+        now,
+    );
+    let association = model.association(index).unwrap();
+    association.time_sync = Auto::Retry {
+        failures: 1,
+        at: time_sync_retry,
+    };
+    association.integrity = Auto::Retry {
+        failures: 1,
+        at: integrity_retry,
+    };
+
+    let prediction = model.pick(now);
+    assert_eq!(prediction, Prediction::Sleep(integrity_retry));
+    assert!(!prediction.accepts(now, Observed::NotBefore(time_sync_retry)));
 }
 
 #[test]

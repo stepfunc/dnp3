@@ -305,24 +305,30 @@ impl TaskStates {
         }
     }
 
+    /// The next automatic task, and when a failed time sync that's behind it in the order retries
     fn next(
         &self,
         now: Instant,
         config: &AssociationConfig,
         association: &Association,
-    ) -> Next<QueuedTask> {
+    ) -> (Next<QueuedTask>, Option<Instant>) {
         if self.clear_restart_iin.is_active() {
-            return self
-                .clear_restart_iin
-                .create_next_task(now, || AutoTask::ClearRestartBit.wrap().into());
+            return (
+                self.clear_restart_iin
+                    .create_next_task(now, || AutoTask::ClearRestartBit.wrap().into()),
+                None,
+            );
         }
 
         if config.disable_unsol_classes.any() && self.disable_unsolicited.is_active() {
-            return self.disable_unsolicited.create_next_task(now, || {
-                AutoTask::DisableUnsolicited(config.disable_unsol_classes)
-                    .wrap()
-                    .into()
-            });
+            return (
+                self.disable_unsolicited.create_next_task(now, || {
+                    AutoTask::DisableUnsolicited(config.disable_unsol_classes)
+                        .wrap()
+                        .into()
+                }),
+                None,
+            );
         }
 
         // the time sync goes before the integrity scan (IEEE 1815-2012 5.1.1.1.2 and 5.1.1.2),
@@ -330,39 +336,48 @@ impl TaskStates {
         // hold up anything while it waits
         if !self.time_sync.has_failed() {
             if let Some(task) = self.time_sync_if_due(now, config) {
-                return Next::Now(task);
+                return (Next::Now(task), None);
             }
         }
 
         if config.startup_integrity_classes.any() && self.integrity_scan.is_active() {
-            return self.integrity_scan.create_next_task(now, || {
-                Task::App(AppTask::Read(ReadTask::StartupIntegrity(
-                    config.startup_integrity_classes,
-                )))
-                .into()
-            });
+            return (
+                self.integrity_scan.create_next_task(now, || {
+                    Task::App(AppTask::Read(ReadTask::StartupIntegrity(
+                        config.startup_integrity_classes,
+                    )))
+                    .into()
+                }),
+                None,
+            );
         }
 
         if let Some(task) = self.time_sync_if_due(now, config) {
-            return Next::Now(task);
+            return (Next::Now(task), None);
         }
+        let retry = self.time_sync_retry(now, config);
 
         if config.enable_unsol_classes.any() && self.enabled_unsolicited.is_active() {
-            return self.enabled_unsolicited.create_next_task(now, || {
-                AutoTask::EnableUnsolicited(config.enable_unsol_classes)
-                    .wrap()
-                    .into()
-            });
+            return (
+                self.enabled_unsolicited.create_next_task(now, || {
+                    AutoTask::EnableUnsolicited(config.enable_unsol_classes)
+                        .wrap()
+                        .into()
+                }),
+                retry,
+            );
         }
 
         let events_to_scan = association.events_to_scan();
         if events_to_scan.any() {
-            return self
-                .event_scan
-                .create_next_task(now, || ReadTask::EventScan(events_to_scan).wrap().into());
+            return (
+                self.event_scan
+                    .create_next_task(now, || ReadTask::EventScan(events_to_scan).wrap().into()),
+                retry,
+            );
         }
 
-        Next::None
+        (Next::None, retry)
     }
 
     /// The automatic time sync, if it's enabled and due now
@@ -801,23 +816,20 @@ impl Association {
     }
 
     fn get_next_task(&self, now: Instant) -> Next<QueuedTask> {
-        let next = self.get_next_scheduled_task(now);
+        let (next, time_sync_retry) = self.auto_tasks.next(now, &self.config, self);
+        // the automatic tasks must complete before polls and link status requests
+        let next = match next {
+            Next::None => self.next_poll_or_keep_alive(now),
+            next => next,
+        };
         // a failed time sync waiting for its retry doesn't hold up the rest of the association
-        match self.auto_tasks.time_sync_retry(now, &self.config) {
+        match time_sync_retry {
             Some(retry) => next.or_not_before(retry),
             None => next,
         }
     }
 
-    fn get_next_scheduled_task(&self, now: Instant) -> Next<QueuedTask> {
-        // Check for automatic tasks
-        let next_auto_task = self.auto_tasks.next(now, &self.config, self);
-
-        // Startup tasks must complete prior to polls to link status requests
-        if !matches!(next_auto_task, Next::None) {
-            return next_auto_task;
-        }
-
+    fn next_poll_or_keep_alive(&self, now: Instant) -> Next<QueuedTask> {
         match self.polls.next(now) {
             Next::Now(poll) => {
                 // always prioritize polls over link status requests
