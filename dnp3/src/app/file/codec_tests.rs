@@ -274,13 +274,7 @@ proptest! {
         let object = Group70Var8 {
             file_specification: &file_specification,
         };
-        let mut buffer = [0u8; 256];
-        let mut cursor = WriteCursor::new(&mut buffer);
-        object.write(&mut cursor).unwrap();
-        let mut bytes = vec![70, 8, 0x5B, 1];
-        bytes.extend_from_slice(&u16::try_from(cursor.written().len()).unwrap().to_le_bytes());
-        bytes.extend_from_slice(cursor.written());
-
+        let bytes = write(&object);
         prop_assert!(
             matches!(parse(&bytes), Ok(Some(FreeFormatVariation::Group70Var8(x))) if x == object)
         );
