@@ -623,3 +623,70 @@ async fn user_time_sync_fails_when_the_write_response_has_objects() {
     })
     .await;
 }
+
+const DEVICE_RESTART_AND_NEED_TIME: Iin = Iin::new(Iin1::new(0x90), Iin2::new(0x00));
+
+/// The default startup procedure with the automatic LAN time sync
+async fn startup_harness() -> TestHarness {
+    let config = AssociationConfig {
+        auto_time_sync: Some(TimeSyncProcedure::Lan),
+        ..AssociationConfig::default()
+    };
+    create_association_with_handler(config, Box::new(FixedTime)).await
+}
+
+#[tokio::test(start_paused = true)]
+async fn auto_time_sync_runs_after_the_integrity_scan_at_startup() {
+    watchdog(async {
+        let mut harness = startup_harness().await;
+        let mut seq = Sequence::default();
+
+        // the outstation needs the time
+        harness
+            .expect_write_and_respond(
+                disable_unsol_request(seq),
+                empty_response_custom_iin(seq.increment(), NEED_TIME),
+            )
+            .await;
+        harness
+            .expect_write_and_respond(integrity_poll_request(seq), empty_response(seq.increment()))
+            .await;
+        complete_lan_procedure(&mut harness, &mut seq).await;
+        harness
+            .expect_write_and_respond(enable_unsol_request(seq), empty_response(seq.increment()))
+            .await;
+
+        assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+    })
+    .await;
+}
+
+#[tokio::test(start_paused = true)]
+async fn auto_time_sync_runs_after_the_integrity_scan_after_a_restart() {
+    watchdog(async {
+        let mut harness = startup_harness().await;
+        let mut seq = Sequence::default();
+        startup_procedure(&mut harness, &mut seq).await;
+
+        // the outstation restarts and needs the time
+        harness
+            .read_and_expect_write(
+                unsol_null_custom_iin(Sequence::default(), DEVICE_RESTART_AND_NEED_TIME),
+                unsol_confirm(Sequence::default()),
+            )
+            .await;
+        harness
+            .expect_write_and_respond(clear_restart_iin(seq), empty_response(seq.increment()))
+            .await;
+        harness
+            .expect_write_and_respond(integrity_poll_request(seq), empty_response(seq.increment()))
+            .await;
+        complete_lan_procedure(&mut harness, &mut seq).await;
+        harness
+            .expect_write_and_respond(enable_unsol_request(seq), empty_response(seq.increment()))
+            .await;
+
+        assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+    })
+    .await;
+}
