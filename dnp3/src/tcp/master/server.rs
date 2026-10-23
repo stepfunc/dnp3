@@ -677,38 +677,26 @@ mod tests {
         fixture.expect_bytes(&LINK_STATUS_RESPONSE).await;
     }
 
-    async fn rejects_identification(header: [u8; 10]) {
-        let mut fixture = Fixture::new(true).await;
-        fixture.expect_event(Event::Accept).await;
-        fixture.stream.write_all(&header).await.unwrap();
-        fixture.expect_closed_without_identity().await;
-    }
-
     #[tokio::test]
-    async fn header_with_bad_start1_is_not_identified() {
-        let mut header = LINK_STATUS_REQUEST;
-        header[0] = 0x06;
-        rejects_identification(header).await;
-    }
-
-    #[tokio::test]
-    async fn header_with_bad_start2_is_not_identified() {
-        let mut header = LINK_STATUS_REQUEST;
-        header[1] = 0x65;
-        rejects_identification(header).await;
-    }
-
-    #[tokio::test]
-    async fn header_with_bad_crc_is_not_identified() {
-        let mut header = LINK_STATUS_REQUEST;
-        header[9] ^= 0xFF;
-        rejects_identification(header).await;
-    }
-
-    #[tokio::test]
-    async fn header_with_bad_length_is_not_identified() {
-        // length 4 with a matching CRC
-        rejects_identification([0x05, 0x64, 0x04, 0xC0, 0x01, 0x00, 0x00, 0x04, 0x0E, 0x94]).await;
+    async fn header_with_a_bad_start_crc_or_length_is_not_identified() {
+        let with = |index: usize, value: u8| {
+            let mut header = LINK_STATUS_REQUEST;
+            header[index] = value;
+            header
+        };
+        let headers = [
+            with(0, 0x06),
+            with(1, 0x65),
+            with(9, LINK_STATUS_REQUEST[9] ^ 0xFF),
+            // length 4 with a matching CRC
+            [0x05, 0x64, 0x04, 0xC0, 0x01, 0x00, 0x00, 0x04, 0x0E, 0x94],
+        ];
+        for header in headers {
+            let mut fixture = Fixture::new(true).await;
+            fixture.expect_event(Event::Accept).await;
+            fixture.stream.write_all(&header).await.unwrap();
+            fixture.expect_closed_without_identity().await;
+        }
     }
 
     /// identifies the link on a pipe while the peer writes `parts`, pausing after each one, then
