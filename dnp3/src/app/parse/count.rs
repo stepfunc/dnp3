@@ -150,7 +150,8 @@ mod tests {
             /// exhausted; one byte less is an error
             #[test]
             fn count_sequence_yields_each_object_once(
-                times in prop::collection::vec(0..=Timestamp::MAX_VALUE, 0..40),
+                times in prop_oneof![1 => Just(0), 1 => Just(1), 6 => 0..40usize]
+                    .prop_flat_map(|len| prop::collection::vec(0..=Timestamp::MAX_VALUE, len)),
                 trailing in prop::collection::vec(any::<u8>(), 0..4),
             ) {
                 let objects: Vec<u8> = times.iter().flat_map(|x| x.to_le_bytes()[..6].to_vec()).collect();

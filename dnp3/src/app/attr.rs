@@ -2279,6 +2279,27 @@ mod test {
             ]
         }
 
+        /// the limits of each unsigned integer encoding width and the values just past them
+        fn unsigned_edges() -> Vec<u32> {
+            vec![0, 255, 256, 65535, 65536, u32::MAX]
+        }
+
+        /// the limits of each signed integer encoding width and the values just past them
+        fn signed_edges() -> Vec<i32> {
+            vec![
+                -129,
+                -128,
+                127,
+                128,
+                -32769,
+                -32768,
+                32767,
+                32768,
+                i32::MIN,
+                i32::MAX,
+            ]
+        }
+
         fn bytes() -> impl Strategy<Value = Vec<u8>> {
             prop_oneof![
                 Just(Vec::new()),
@@ -2304,27 +2325,10 @@ mod test {
         fn value() -> impl Strategy<Value = OwnedAttrValue> {
             prop_oneof![
                 string().prop_map(OwnedAttrValue::VisibleString),
-                prop_oneof![
-                    any::<u32>(),
-                    prop::sample::select(vec![0, 255, 256, 65535, 65536, u32::MAX]),
-                ]
-                .prop_map(OwnedAttrValue::UnsignedInt),
-                prop_oneof![
-                    any::<i32>(),
-                    prop::sample::select(vec![
-                        -129,
-                        -128,
-                        127,
-                        128,
-                        -32769,
-                        -32768,
-                        32767,
-                        32768,
-                        i32::MIN,
-                        i32::MAX
-                    ]),
-                ]
-                .prop_map(OwnedAttrValue::SignedInt),
+                prop_oneof![any::<u32>(), prop::sample::select(unsigned_edges())]
+                    .prop_map(OwnedAttrValue::UnsignedInt),
+                prop_oneof![any::<i32>(), prop::sample::select(signed_edges())]
+                    .prop_map(OwnedAttrValue::SignedInt),
                 prop_oneof![
                     any::<u32>().prop_map(f32::from_bits),
                     prop::sample::select(special_f32()),
@@ -2488,7 +2492,7 @@ mod test {
         }
 
         #[test]
-        fn special_floats_and_empty_strings_round_trip() {
+        fn edge_values_round_trip() {
             let values = special_f32()
                 .into_iter()
                 .map(|x| OwnedAttrValue::FloatingPoint(FloatType::F32(x)))
@@ -2497,14 +2501,26 @@ mod test {
                         .into_iter()
                         .map(|x| OwnedAttrValue::FloatingPoint(FloatType::F64(x))),
                 )
+                .chain(
+                    unsigned_edges()
+                        .into_iter()
+                        .map(OwnedAttrValue::UnsignedInt),
+                )
+                .chain(signed_edges().into_iter().map(OwnedAttrValue::SignedInt))
                 .chain([
                     OwnedAttrValue::VisibleString(String::new()),
                     OwnedAttrValue::OctetString(Vec::new()),
                     OwnedAttrValue::BitString(Vec::new()),
+                    OwnedAttrValue::VisibleString("x".repeat(255)),
+                    OwnedAttrValue::VisibleString("x".repeat(256)),
+                    OwnedAttrValue::OctetString(vec![0xAA; 256]),
                 ]);
+            let variations = [1, var::DEVICE_MANUFACTURER_NAME, 253]
+                .into_iter()
+                .chain(RESERVED);
             for value in values {
                 for set in [AttrSet::Default, AttrSet::Private(0), AttrSet::Private(255)] {
-                    for variation in [1, var::DEVICE_MANUFACTURER_NAME, 253] {
+                    for variation in variations.clone() {
                         let attr = OwnedAttribute::new(set, variation, value.clone());
                         check_round_trip(&attr).unwrap();
                     }
