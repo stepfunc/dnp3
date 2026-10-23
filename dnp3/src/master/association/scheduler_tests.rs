@@ -46,6 +46,7 @@ use crate::master::request::ReadRequest;
 use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::NonReadTask;
 use crate::util::phys::PhysAddr;
+use crate::util::test_support::run_paused;
 
 /// What the channel starts, as the model names it
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -1180,18 +1181,8 @@ proptest! {
 
     #[test]
     fn next_task_follows_the_scheduling_model(case in case()) {
-        run_paused(case)?;
+        run_paused(run(case))?;
     }
-}
-
-/// Run a case on a paused clock
-fn run_paused(case: Case) -> Result<(), TestCaseError> {
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_time()
-        .start_paused(true)
-        .build()
-        .map_err(|err| TestCaseError::fail(err.to_string()))?;
-    runtime.block_on(run(case))
 }
 
 #[test]
@@ -1226,7 +1217,7 @@ fn sleeps_past_a_failed_time_sync_held_up_by_a_failed_integrity_scan() {
             Op::Step(Vec::new(), success),
         ],
     };
-    run_paused(case).unwrap();
+    run_paused(run(case)).unwrap();
 }
 
 fn quiet_config() -> Config {
