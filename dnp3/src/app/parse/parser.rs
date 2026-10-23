@@ -311,7 +311,16 @@ impl ObjectHeader<'_> {
 
     /// True if the header carries objects whose time is relative to a common time of occurrence
     fn has_relative_time(&self) -> bool {
-        self.variation().has_relative_time() && self.has_objects()
+        let has_relative_time = match self {
+            ObjectHeader::CountAndPrefix8(_, objects) => objects.has_relative_time(),
+            ObjectHeader::CountAndPrefix16(_, objects) => objects.has_relative_time(),
+            ObjectHeader::AllObjects(_)
+            | ObjectHeader::Range(..)
+            | ObjectHeader::Count(..)
+            | ObjectHeader::FreeFormat(_)
+            | ObjectHeader::Read(..) => self.variation().has_relative_time(),
+        };
+        has_relative_time && self.has_objects()
     }
 
     /// If the header is a common time of occurrence, the one for the headers that follow it

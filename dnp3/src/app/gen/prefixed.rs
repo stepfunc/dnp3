@@ -224,6 +224,11 @@ impl<'a, I> PrefixedVariation<'a, I> where I : Index {
         self.get_header_info().variation
     }
     
+    /// True if objects of this variation have a time relative to a common time of occurrence
+    pub(crate) fn has_relative_time(&self) -> bool {
+        matches!(self, PrefixedVariation::Group2Var3(_) | PrefixedVariation::Group4Var3(_))
+    }
+    
     pub(crate) fn format_objects(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             PrefixedVariation::Group0(attr) => attr.format(f),
