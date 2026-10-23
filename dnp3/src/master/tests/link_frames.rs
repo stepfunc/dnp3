@@ -23,8 +23,8 @@ use crate::master::task::MasterTask;
 use crate::master::test_fixtures::null;
 use crate::master::tests::harness::requests::{empty_response, unsol_null, unsol_with_data};
 use crate::master::tests::harness::{
-    barrier, AssocInfoEvent, AssocInfoEventQueue, AssociationInformationEventHandler, CountHandler,
-    ReadEvent,
+    barrier, AssocInfoEvent, AssocInfoEventQueue, AssociationInformationEventHandler, ReadEvent,
+    ReadEventHandler,
 };
 use crate::master::{
     AssociationHandle, AssociationInformation, Classes, MasterChannel, MasterChannelConfig,
@@ -511,7 +511,7 @@ async fn malformed_fragments_from_other_outstations_do_not_extend_the_response_d
 async fn link_status_request_processes_responses_from_another_outstation_and_keeps_waiting() {
     watchdog(async {
         let mut harness = Harness::new().await;
-        let read_handler = CountHandler::new();
+        let read_handler = ReadEventHandler::new();
         let mut read_events = read_handler.events();
         let (info, mut info_events) = AssociationInformationEventHandler::pair();
         harness

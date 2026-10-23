@@ -118,7 +118,7 @@ async fn create(
     let (master_task, io_handle) = spawn_run(task, keep);
 
     // Create the association
-    let handler = CountHandler::new();
+    let handler = ReadEventHandler::new();
     let (info, assoc_events) = AssociationInformationEventHandler::pair();
     let read_events = handler.events();
 
@@ -177,11 +177,12 @@ impl ReadEventQueue {
     }
 }
 
-pub(crate) struct CountHandler {
+/// Records each ReadHandler callback as a [`ReadEvent`]
+pub(crate) struct ReadEventHandler {
     events: Arc<Mutex<Vec<ReadEvent>>>,
 }
 
-impl CountHandler {
+impl ReadEventHandler {
     pub(crate) fn new() -> Self {
         Self {
             events: Default::default(),
@@ -197,7 +198,7 @@ impl CountHandler {
     }
 }
 
-impl ReadHandler for CountHandler {
+impl ReadHandler for ReadEventHandler {
     fn begin_fragment(&mut self, read_type: ReadType, _header: ResponseHeader) -> MaybeAsync<()> {
         self.push(ReadEvent::BeginFragment(read_type));
         MaybeAsync::ready(())

@@ -9,7 +9,7 @@
 use crate::app::{ControlField, Iin, Iin1, Iin2, Sequence};
 use crate::master::association::AssociationConfig;
 use crate::master::request::EventClasses;
-use crate::master::tests::harness::{CountHandler, ReadEvent};
+use crate::master::tests::harness::{ReadEvent, ReadEventHandler};
 use crate::master::{Classes, ReadRequest, ReadType};
 
 use super::harness::create_association;
@@ -173,7 +173,7 @@ async fn single_read_with_custom_handler_reports_single_poll_to_that_handler_onl
         startup_procedure(&mut harness, &mut seq).await;
         harness.read_events.pop();
 
-        let handler = CountHandler::new();
+        let handler = ReadEventHandler::new();
         let mut custom_events = handler.events();
         let mut association = harness.association.clone();
         let read = tokio::spawn(async move {
