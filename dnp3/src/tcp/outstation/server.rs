@@ -402,7 +402,7 @@ mod tests {
     #[cfg(feature = "unstable")]
     use crate::app::NullListener;
     use crate::tcp::accept::test_util::{
-        expect_attempt_gaps, Fault, FaultyListener, RESET, UNKNOWN,
+        expect_attempt_gaps, Fault, FaultyListener, LOOPBACK, RESET, UNKNOWN,
     };
     use crate::tcp::accept::ACCEPT_ERROR_DELAY;
     use crate::util::test_support::{watchdog, NullApplication, NullInformation};
@@ -807,16 +807,14 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn accepts_after_accept_errors() {
         watchdog(async {
-            let (listener, mut attempts) = FaultyListener::new(&[UNKNOWN, RESET, UNKNOWN]).await;
-            let _client = tokio::net::TcpStream::connect(listener.local_addr())
-                .await
-                .unwrap();
+            let (listener, mut peers) = FaultyListener::new(&[UNKNOWN, RESET, UNKNOWN]);
+            let _client = peers.connect(LOOPBACK);
             let (server, mut states) = server_with_outstation();
             let (_handle, task) = server.create_task_with(listener, None);
             tokio::spawn(task.run());
 
             expect_attempt_gaps(
-                &mut attempts,
+                &mut peers.attempts,
                 &[ACCEPT_ERROR_DELAY, Duration::ZERO, ACCEPT_ERROR_DELAY],
             )
             .await;
@@ -828,19 +826,19 @@ mod tests {
     #[tokio::test(start_paused = true)]
     async fn dropping_handle_during_accept_error_delay_stops_server() {
         watchdog(async {
-            let (listener, mut attempts) = FaultyListener::new(&[UNKNOWN]).await;
+            let (listener, mut peers) = FaultyListener::new(&[UNKNOWN]);
             let (server, _states) = server_with_outstation();
             let (handle, task) = server.create_task_with(listener, None);
             let task = tokio::spawn(task.run());
 
-            let failed_at = attempts.recv().await.unwrap();
+            let failed_at = peers.attempts.recv().await.unwrap();
             tokio::time::advance(Duration::from_millis(500)).await;
             assert!(!task.is_finished());
 
             drop(handle);
             task.await.unwrap();
             assert!(failed_at.elapsed() < ACCEPT_ERROR_DELAY);
-            assert_eq!(attempts.recv().await, None);
+            assert_eq!(peers.attempts.recv().await, None);
         })
         .await;
     }
@@ -849,16 +847,16 @@ mod tests {
     async fn dropping_handle_during_connection_errors_stops_server() {
         static RESETS: [Fault; 1000] = [RESET; 1000];
         watchdog(async {
-            let (listener, mut attempts) = FaultyListener::new(&RESETS).await;
+            let (listener, mut peers) = FaultyListener::new(&RESETS);
             let (server, _states) = server_with_outstation();
             let (handle, task) = server.create_task_with(listener, None);
             let task = tokio::spawn(task.run());
 
-            attempts.recv().await.unwrap();
+            peers.attempts.recv().await.unwrap();
             drop(handle);
             task.await.unwrap();
             let mut count = 1;
-            while attempts.recv().await.is_some() {
+            while peers.attempts.recv().await.is_some() {
                 count += 1;
             }
             assert!(count < RESETS.len(), "{count}");
