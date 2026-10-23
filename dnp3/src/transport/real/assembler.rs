@@ -1008,4 +1008,601 @@ mod tests {
         };
         assert!(conflicting.to_string().starts_with("conflicting addresses"));
     }
+
+    /// The assembler against a model written from the reception rules and the documented
+    /// extensions, over streams of valid series with one perturbation each
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "the model adds small lengths, positions and sequence numbers"
+    )]
+    mod properties {
+        use proptest::prelude::*;
+        use proptest::sample::Index;
+
+        use super::*;
+        use crate::transport::real::sequence::Sequence;
+
+        #[derive(Clone, Debug, PartialEq)]
+        struct Segment {
+            info: FrameInfo,
+            fir: bool,
+            fin: bool,
+            seq: u8,
+            data: Vec<u8>,
+        }
+
+        #[derive(Clone, Debug)]
+        enum Op {
+            Segment(Segment),
+            Peek,
+            Pop,
+            Reset,
+        }
+
+        #[derive(Clone, Debug, PartialEq)]
+        struct Completed {
+            source: EndpointAddress,
+            phys: PhysAddr,
+            broadcast: Option<BroadcastConfirmMode>,
+            data: Vec<u8>,
+        }
+
+        impl Completed {
+            fn new(fragment: Fragment<'_>) -> Self {
+                Self {
+                    source: fragment.info.addr.link,
+                    phys: fragment.info.addr.phys,
+                    broadcast: fragment.info.broadcast,
+                    data: fragment.data.to_vec(),
+                }
+            }
+        }
+
+        #[derive(Debug, PartialEq)]
+        enum Outcome {
+            /// whether a fragment is complete, and why anything was discarded
+            Assembled(bool, Vec<Discard>),
+            Peeked(Option<Completed>),
+            Popped(Option<Completed>),
+            Reset,
+        }
+
+        enum State {
+            Idle,
+            /// the bytes received so far, and the segment that added to them last
+            Series {
+                bytes: Vec<u8>,
+                last: Segment,
+            },
+            Completed(Completed),
+        }
+
+        struct Model {
+            state: State,
+        }
+
+        impl Model {
+            fn new() -> Self {
+                Self { state: State::Idle }
+            }
+
+            fn apply(&mut self, op: &Op) -> Outcome {
+                match op {
+                    Op::Segment(segment) => {
+                        let discards = self.segment(segment);
+                        let complete = matches!(self.state, State::Completed(_));
+                        Outcome::Assembled(complete, discards)
+                    }
+                    Op::Peek => Outcome::Peeked(self.completed()),
+                    Op::Pop => {
+                        let completed = self.completed();
+                        if completed.is_some() {
+                            self.state = State::Idle;
+                        }
+                        Outcome::Popped(completed)
+                    }
+                    Op::Reset => {
+                        self.state = State::Idle;
+                        Outcome::Reset
+                    }
+                }
+            }
+
+            fn completed(&self) -> Option<Completed> {
+                match &self.state {
+                    State::Completed(x) => Some(x.clone()),
+                    State::Idle | State::Series { .. } => None,
+                }
+            }
+
+            /// receive a segment, returning why anything was discarded
+            fn segment(&mut self, segment: &Segment) -> Vec<Discard> {
+                let series = match std::mem::replace(&mut self.state, State::Idle) {
+                    // nothing is received while a completed fragment waits to be taken
+                    State::Completed(x) => {
+                        self.state = State::Completed(x);
+                        return vec![Discard::Pending];
+                    }
+                    State::Idle => None,
+                    State::Series { bytes, last } => Some((bytes, last)),
+                };
+
+                let mut discards = Vec::new();
+                if segment.fir {
+                    if let Some((bytes, last)) = &series {
+                        discards.push(Discard::NewSeries {
+                            len: bytes.len(),
+                            source: last.info.source,
+                        });
+                    }
+                }
+
+                let broadcast = segment.info.broadcast.is_some();
+                match series {
+                    _ if broadcast && segment.fir && segment.fin => {
+                        self.append(Vec::new(), segment, &mut discards)
+                    }
+                    series if broadcast => {
+                        discards.push(Discard::BroadcastSeries {
+                            fir: segment.fir,
+                            fin: segment.fin,
+                        });
+                        // a broadcast that isn't FIR leaves the series in progress
+                        if let (false, Some((bytes, last))) = (segment.fir, series) {
+                            self.state = State::Series { bytes, last };
+                        }
+                    }
+                    _ if segment.fir => self.append(Vec::new(), segment, &mut discards),
+                    None => discards.push(Discard::NoSeries {
+                        source: segment.info.source,
+                    }),
+                    Some((bytes, last)) => self.next(bytes, last, segment, &mut discards),
+                }
+                discards
+            }
+
+            /// receive a segment that isn't FIR during a series
+            fn next(
+                &mut self,
+                bytes: Vec<u8>,
+                last: Segment,
+                segment: &Segment,
+                discards: &mut Vec<Discard>,
+            ) {
+                let expected = (last.seq + 1) % 64;
+                if segment.info != last.info {
+                    discards.push(Discard::ConflictingAddress {
+                        previous: last.info,
+                        received: segment.info,
+                    });
+                } else if segment.seq == last.seq && *segment == last {
+                    discards.push(Discard::Repeat { seq: segment.seq });
+                    self.state = State::Series { bytes, last };
+                } else if segment.seq == last.seq {
+                    discards.push(Discard::DifferentRepeat { seq: segment.seq });
+                } else if segment.seq != expected {
+                    discards.push(Discard::UnexpectedSeq {
+                        expected,
+                        received: segment.seq,
+                    });
+                } else {
+                    self.append(bytes, segment, discards);
+                }
+            }
+
+            fn append(
+                &mut self,
+                mut bytes: Vec<u8>,
+                segment: &Segment,
+                discards: &mut Vec<Discard>,
+            ) {
+                if bytes.len() + segment.data.len() > MAX {
+                    discards.push(Discard::Overflow {
+                        len: segment.data.len(),
+                    });
+                    return;
+                }
+                bytes.extend_from_slice(&segment.data);
+                self.state = if !segment.fin {
+                    State::Series {
+                        bytes,
+                        last: segment.clone(),
+                    }
+                } else if bytes.is_empty() {
+                    State::Idle
+                } else {
+                    State::Completed(Completed {
+                        source: segment.info.source,
+                        phys: segment.info.phys_addr,
+                        broadcast: segment.info.broadcast,
+                        data: bytes,
+                    })
+                };
+            }
+        }
+
+        fn apply(assembler: &mut Assembler, op: &Op) -> Outcome {
+            match op {
+                Op::Segment(x) => {
+                    let header = Header::new(x.fin, x.fir, Sequence::new(x.seq));
+                    let mut discards = Vec::new();
+                    let state = assembler.assemble(x.info, header, &x.data, |d| discards.push(d));
+                    Outcome::Assembled(matches!(state, AssemblyState::Complete), discards)
+                }
+                Op::Peek => Outcome::Peeked(assembler.peek().map(Completed::new)),
+                Op::Pop => Outcome::Popped(assembler.pop().map(Completed::new)),
+                Op::Reset => {
+                    assembler.reset();
+                    Outcome::Reset
+                }
+            }
+        }
+
+        /// the assembler and the model agree after every operation, including on the fragment
+        /// waiting to be taken
+        fn check(ops: &[Op]) -> Result<(), TestCaseError> {
+            let mut assembler = Assembler::new(MAX);
+            let mut model = Model::new();
+            for (i, op) in ops.iter().enumerate() {
+                prop_assert_eq!(
+                    apply(&mut assembler, op),
+                    model.apply(op),
+                    "operation {}: {:?}",
+                    i,
+                    op
+                );
+                prop_assert_eq!(
+                    assembler.peek().map(Completed::new),
+                    model.completed(),
+                    "after operation {}",
+                    i
+                );
+            }
+            Ok(())
+        }
+
+        #[derive(Clone, Debug)]
+        enum Change {
+            Byte,
+            Longer,
+            Suffix,
+            Fin,
+            Fir,
+        }
+
+        impl Change {
+            fn apply(&self, segment: &mut Segment) {
+                match self {
+                    Self::Byte => match segment.data.first_mut() {
+                        Some(x) => *x = !*x,
+                        None => segment.data.push(0),
+                    },
+                    Self::Longer => segment.data.push(0),
+                    Self::Suffix if segment.data.is_empty() => segment.data.push(0),
+                    Self::Suffix => {
+                        segment.data.remove(0);
+                    }
+                    Self::Fin => segment.fin = !segment.fin,
+                    Self::Fir => segment.fir = !segment.fir,
+                }
+            }
+        }
+
+        #[derive(Clone, Debug)]
+        enum Perturbation {
+            None,
+            /// send a segment twice
+            Repeat(Index),
+            /// send a segment again, changed
+            ChangedRepeat(Index, Change),
+            /// leave a segment out
+            Drop(Index),
+            /// increment the sequence numbers from a segment on
+            SkipSeq(Index),
+            /// send a segment from another source, physical address or broadcast
+            OtherInfo(Index, FrameInfo),
+            /// stop before a segment
+            Truncate(Index),
+            /// send another segment before a segment, or after the last
+            Insert(Index, Segment),
+            /// peek, pop or reset before a segment, or after the last
+            Interrupt(Index, Op),
+        }
+
+        /// a valid series, perturbed, followed by peeks, pops or a reset
+        #[derive(Clone, Debug)]
+        struct Plan {
+            info: FrameInfo,
+            first_seq: u8,
+            sizes: Vec<usize>,
+            /// the total length, if the sizes are adjusted to it
+            total: Option<usize>,
+            seed: u8,
+            perturbation: Perturbation,
+            tail: Vec<Op>,
+        }
+
+        impl Plan {
+            fn series(&self) -> Vec<Segment> {
+                let mut sizes = self.sizes.clone();
+                if let Some(total) = self.total {
+                    let mut remaining = total;
+                    let last = sizes.len() - 1;
+                    for (i, size) in sizes.iter_mut().enumerate() {
+                        *size = if i == last {
+                            remaining
+                        } else {
+                            remaining.min(*size)
+                        };
+                        remaining -= *size;
+                    }
+                }
+
+                let mut seq = self.first_seq;
+                let mut byte = self.seed;
+                let last = sizes.len() - 1;
+                let mut segments = Vec::new();
+                for (i, size) in sizes.into_iter().enumerate() {
+                    let data = (0..size)
+                        .map(|_| {
+                            byte = byte.wrapping_add(1);
+                            byte
+                        })
+                        .collect();
+                    segments.push(Segment {
+                        info: self.info,
+                        fir: i == 0,
+                        fin: i == last,
+                        seq,
+                        data,
+                    });
+                    seq = (seq + 1) % 64;
+                }
+                segments
+            }
+
+            fn ops(&self) -> Vec<Op> {
+                let mut segments = self.series();
+                let len = segments.len();
+                match &self.perturbation {
+                    Perturbation::None | Perturbation::Interrupt(..) => {}
+                    Perturbation::Repeat(i) => {
+                        let i = i.index(len);
+                        segments.insert(i + 1, segments[i].clone());
+                    }
+                    Perturbation::ChangedRepeat(i, change) => {
+                        let i = i.index(len);
+                        let mut segment = segments[i].clone();
+                        change.apply(&mut segment);
+                        segments.insert(i + 1, segment);
+                    }
+                    Perturbation::Drop(i) => {
+                        segments.remove(i.index(len));
+                    }
+                    Perturbation::SkipSeq(i) => {
+                        for segment in &mut segments[i.index(len)..] {
+                            segment.seq = (segment.seq + 1) % 64;
+                        }
+                    }
+                    Perturbation::OtherInfo(i, info) => segments[i.index(len)].info = *info,
+                    Perturbation::Truncate(i) => segments.truncate(i.index(len)),
+                    Perturbation::Insert(i, segment) => {
+                        segments.insert(i.index(len + 1), segment.clone())
+                    }
+                }
+                let mut ops: Vec<Op> = segments.into_iter().map(Op::Segment).collect();
+                if let Perturbation::Interrupt(i, op) = &self.perturbation {
+                    ops.insert(i.index(ops.len() + 1), op.clone());
+                }
+                ops.extend(self.tail.iter().cloned());
+                ops
+            }
+        }
+
+        fn infos() -> Vec<FrameInfo> {
+            let mut udp = info();
+            udp.phys_addr = PhysAddr::Udp("127.0.0.1:20000".parse().unwrap());
+            let mut optional = broadcast();
+            optional.broadcast = Some(BroadcastConfirmMode::Optional);
+            vec![info(), from(2), udp, broadcast(), optional]
+        }
+
+        fn frame_info() -> impl Strategy<Value = FrameInfo> {
+            prop_oneof![
+                3 => Just(info()),
+                2 => prop::sample::select(infos()),
+            ]
+        }
+
+        fn seq() -> impl Strategy<Value = u8> {
+            // the sequence number wraps within the series
+            prop_oneof![0u8..64, 60u8..64]
+        }
+
+        fn interrupt() -> impl Strategy<Value = Op> {
+            prop_oneof![Just(Op::Peek), Just(Op::Pop), Just(Op::Reset)]
+        }
+
+        fn change() -> impl Strategy<Value = Change> {
+            prop_oneof![
+                Just(Change::Byte),
+                Just(Change::Longer),
+                Just(Change::Suffix),
+                Just(Change::Fin),
+                Just(Change::Fir),
+            ]
+        }
+
+        fn segment() -> impl Strategy<Value = Segment> {
+            (
+                prop::sample::select(infos()),
+                any::<bool>(),
+                any::<bool>(),
+                seq(),
+                prop::collection::vec(any::<u8>(), 0..=3),
+            )
+                .prop_map(|(info, fir, fin, seq, data)| Segment {
+                    info,
+                    fir,
+                    fin,
+                    seq,
+                    data,
+                })
+        }
+
+        fn perturbation() -> impl Strategy<Value = Perturbation> {
+            let i = any::<Index>;
+            prop_oneof![
+                2 => Just(Perturbation::None),
+                2 => i().prop_map(Perturbation::Repeat),
+                3 => (i(), change()).prop_map(|(i, x)| Perturbation::ChangedRepeat(i, x)),
+                1 => i().prop_map(Perturbation::Drop),
+                1 => i().prop_map(Perturbation::SkipSeq),
+                2 => (i(), prop::sample::select(infos()))
+                    .prop_map(|(i, x)| Perturbation::OtherInfo(i, x)),
+                2 => i().prop_map(Perturbation::Truncate),
+                2 => (i(), segment()).prop_map(|(i, x)| Perturbation::Insert(i, x)),
+                2 => (i(), interrupt()).prop_map(|(i, x)| Perturbation::Interrupt(i, x)),
+            ]
+        }
+
+        fn tail() -> impl Strategy<Value = Vec<Op>> {
+            // nothing taken leaves a completed fragment waiting
+            prop_oneof![
+                3 => Just(Vec::new()),
+                2 => Just(vec![Op::Pop]),
+                1 => Just(vec![Op::Peek, Op::Pop]),
+                1 => Just(vec![Op::Peek]),
+                1 => Just(vec![Op::Reset]),
+            ]
+        }
+
+        fn plan() -> impl Strategy<Value = Plan> {
+            (
+                frame_info(),
+                seq(),
+                prop::collection::vec(prop_oneof![0usize..=4, Just(0)], 1..=5),
+                prop_oneof![
+                    4 => Just(None),
+                    1 => Just(Some(0)),
+                    2 => Just(Some(MAX)),
+                    2 => Just(Some(MAX + 1)),
+                ],
+                any::<u8>(),
+                perturbation(),
+                tail(),
+            )
+                .prop_map(
+                    |(info, first_seq, sizes, total, seed, perturbation, tail)| Plan {
+                        info,
+                        first_seq,
+                        sizes,
+                        total,
+                        seed,
+                        perturbation,
+                        tail,
+                    },
+                )
+        }
+
+        fn seg(info: FrameInfo, fir: bool, fin: bool, seq: u8, data: &[u8]) -> Op {
+            Op::Segment(Segment {
+                info,
+                fir,
+                fin,
+                seq,
+                data: data.to_vec(),
+            })
+        }
+
+        fn completed(info: FrameInfo, data: &[u8]) -> Option<Completed> {
+            Some(Completed {
+                source: info.source,
+                phys: info.phys_addr,
+                broadcast: info.broadcast,
+                data: data.to_vec(),
+            })
+        }
+
+        /// hand-derived outcomes where a plausible assembler goes wrong, so the model can't
+        /// accept them
+        #[test]
+        fn model_follows_the_reception_rules() {
+            let a = info();
+            let b = from(2);
+            let assembled = Outcome::Assembled;
+            let cases = [
+                // a completed fragment is kept while later segments are ignored
+                (seg(a, true, true, 0, &[1, 2]), assembled(true, vec![])),
+                (
+                    seg(b, true, true, 1, &[3]),
+                    assembled(true, vec![Discard::Pending]),
+                ),
+                (Op::Peek, Outcome::Peeked(completed(a, &[1, 2]))),
+                (Op::Pop, Outcome::Popped(completed(a, &[1, 2]))),
+                (Op::Pop, Outcome::Popped(None)),
+                // a repeat of a matching suffix isn't a repeat
+                (seg(a, true, false, 62, &[4]), assembled(false, vec![])),
+                (seg(a, false, false, 63, &[5, 6]), assembled(false, vec![])),
+                (
+                    seg(a, false, false, 63, &[6]),
+                    assembled(false, vec![Discard::DifferentRepeat { seq: 63 }]),
+                ),
+                (
+                    seg(a, false, true, 0, &[7]),
+                    assembled(false, vec![Discard::NoSeries { source: a.source }]),
+                ),
+                // the sequence number wraps, and an identical repeat is ignored
+                (seg(b, true, false, 63, &[8]), assembled(false, vec![])),
+                (
+                    seg(b, true, false, 63, &[8]),
+                    assembled(
+                        false,
+                        vec![Discard::NewSeries {
+                            len: 1,
+                            source: b.source,
+                        }],
+                    ),
+                ),
+                (seg(b, false, false, 0, &[]), assembled(false, vec![])),
+                (
+                    seg(b, false, false, 0, &[]),
+                    assembled(false, vec![Discard::Repeat { seq: 0 }]),
+                ),
+                // a broadcast continuation leaves the series, and the series fills the buffer
+                (
+                    seg(broadcast(), false, true, 1, &[9]),
+                    assembled(
+                        false,
+                        vec![Discard::BroadcastSeries {
+                            fir: false,
+                            fin: true,
+                        }],
+                    ),
+                ),
+                (
+                    seg(b, false, true, 1, &[1; MAX - 1]),
+                    assembled(true, vec![]),
+                ),
+                (Op::Reset, Outcome::Reset),
+                (Op::Peek, Outcome::Peeked(None)),
+            ];
+            let mut model = Model::new();
+            for (op, outcome) in &cases {
+                assert_eq!(&model.apply(op), outcome, "{op:?}");
+            }
+            let ops: Vec<Op> = cases.into_iter().map(|(op, _)| op).collect();
+            check(&ops).unwrap();
+        }
+
+        proptest! {
+            #![proptest_config(ProptestConfig::with_cases(128))]
+
+            #[test]
+            fn assembler_follows_the_model(plans in prop::collection::vec(plan(), 1..=8)) {
+                let ops: Vec<Op> = plans.iter().flat_map(Plan::ops).collect();
+                check(&ops)?;
+            }
+        }
+    }
 }
