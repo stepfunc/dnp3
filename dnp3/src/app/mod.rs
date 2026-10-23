@@ -29,7 +29,6 @@ pub mod control {
 pub mod attr;
 mod control_types;
 pub(crate) use control_types::CommandObject;
-#[rustfmt::skip]
 mod app_enums;
 mod buffer_size;
 mod control_enums;
