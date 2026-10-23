@@ -372,7 +372,7 @@ pub enum AttrDefError {
     AlreadyDefined,
     /// The attribute does not match the type expected for set 0
     BadType(TypeError),
-    /// The variation is reserved (254 or 255) and cannot be defined, written, or retrieved
+    /// The variation is reserved (0, 254 or 255) and cannot be defined, written, or retrieved
     ReservedVariation(u8),
     /// The attribute is not writable
     NotWritable(AttrSet, u8),
