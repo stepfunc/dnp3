@@ -18,25 +18,13 @@ use crate::outstation::tests::harness::*;
 use crate::outstation::traits::OperateType;
 use crate::outstation::BufferState;
 
-const RESTART: u8 = 0x80;
-const CLASS_1: u8 = 0x02;
-const PARAMETER_ERROR: u8 = 0x04;
-
-// control fields of solicited responses
-const FIR_FIN: u8 = 0xC0;
+// control fields of solicited responses in a series
 const FIR_CON: u8 = 0xA0;
 const FIN_CON: u8 = 0x60;
 
 /// a response header and a g2v1 header leave room for this many 3-byte events in a minimum
 /// fragment
 const EVENTS_IN_MIN_FRAGMENT: u16 = 80;
-
-/// a solicited response
-fn response(control: u8, seq: u8, iin1: u8, iin2: u8, objects: &[u8]) -> Vec<u8> {
-    let mut bytes = vec![control | seq, 0x81, iin1, iin2];
-    bytes.extend_from_slice(objects);
-    bytes
-}
 
 /// g52v2, the processing delay in a DELAY_MEASURE response
 fn g52v2(delay: u16) -> Vec<u8> {
@@ -107,8 +95,14 @@ async fn two_fragment_harness() -> (OutstationHarness, Vec<u8>, Vec<u8>) {
     let count = EVENTS_IN_MIN_FRAGMENT + 1;
     add_binary_events(&mut harness.handle.database, count);
 
-    let first = response(FIR_CON, 0, RESTART | CLASS_1, 0, &g2v1_events(0..count - 1));
-    let second = response(FIN_CON, 1, RESTART, 0, &g2v1_events(count - 1..count));
+    let first = with_objects(
+        response_header(FIR_CON, iin1::RESTART | iin1::CLASS_1, 0),
+        &g2v1_events(0..count - 1),
+    );
+    let second = with_objects(
+        response_header(FIN_CON | 1, iin1::RESTART, 0),
+        &g2v1_events(count - 1..count),
+    );
     assert_eq!(first.len(), <BufferSize>::MIN);
     (harness, first, second)
 }
@@ -126,7 +120,7 @@ async fn enabled_unsolicited_harness(config: OutstationConfig) -> OutstationHarn
 /// the unsolicited response with one binary event, sent with `seq` and waiting for its confirm
 async fn unsolicited_event(harness: &mut OutstationHarness, seq: u8) -> Vec<u8> {
     add_binary_events(&mut harness.handle.database, 1);
-    let expected = unsolicited(seq, RESTART, &g2v1_events(0..1));
+    let expected = unsolicited(seq, iin1::RESTART, &g2v1_events(0..1));
     harness.expect_response(&expected).await;
     harness.check_events(&[Event::EnterUnsolicitedConfirmWait(seq)]);
     expected
@@ -153,7 +147,7 @@ async fn partial_unsolicited_response_is_resent_byte_for_byte() {
 
     let count = EVENTS_IN_MIN_FRAGMENT + 1;
     add_binary_events(&mut harness.handle.database, count);
-    let first = unsolicited(1, RESTART | CLASS_1, &g2v1_events(0..count - 1));
+    let first = unsolicited(1, iin1::RESTART | iin1::CLASS_1, &g2v1_events(0..count - 1));
     assert_eq!(first.len(), <BufferSize>::MIN);
     harness.expect_response(&first).await;
     harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
@@ -165,7 +159,7 @@ async fn partial_unsolicited_response_is_resent_byte_for_byte() {
     harness.check_events(&[Event::UnsolicitedConfirmReceived(1)]);
     check_confirmed(&mut harness, 0..u64::from(count - 1), class_1_binaries(1));
 
-    let second = unsolicited(2, RESTART, &g2v1_events(count - 1..count));
+    let second = unsolicited(2, iin1::RESTART, &g2v1_events(count - 1..count));
     harness.expect_response(&second).await;
     harness.check_events(&[Event::EnterUnsolicitedConfirmWait(2)]);
     expect_unsolicited_retry(&mut harness, 2, &second).await;
@@ -181,12 +175,12 @@ async fn control_response_that_does_not_fit_is_resent_without_objects() {
     harness
         .test_request_response(
             &delay_measure(0),
-            &response(FIR_FIN, 0, RESTART, 0, &g52v2(0x1234)),
+            &with_objects(empty_response(0, 0), &g52v2(0x1234)),
         )
         .await;
 
     let select = select_that_does_not_fit(1);
-    let error = response(FIR_FIN, 1, RESTART, PARAMETER_ERROR, &[]);
+    let error = empty_response(1, iin2::PARAMETER_ERROR);
     harness.test_request_response(&select, &error).await;
     harness.test_request_response(&select, &error).await;
     harness.check_no_events();
@@ -202,11 +196,8 @@ async fn control_response_is_the_executed_echo_not_the_fit_probe() {
     harness.set_control_status(7, CommandStatus::NotSupported);
 
     let direct_operate = g41v2_control(FunctionCode::DirectOperate, 0, 7);
-    let expected = response(
-        FIR_FIN,
-        0,
-        RESTART,
-        PARAMETER_ERROR,
+    let expected = with_objects(
+        empty_response(0, iin2::PARAMETER_ERROR),
         &control_echo(CommandStatus::NotSupported),
     );
     harness
@@ -231,7 +222,7 @@ async fn fit_probe_in_the_unsolicited_confirm_wait_leaves_the_unsolicited_respon
     let unsolicited = unsolicited_event(&mut harness, 1).await;
 
     let select = select_that_does_not_fit(1);
-    let error = response(FIR_FIN, 1, RESTART, PARAMETER_ERROR, &[]);
+    let error = empty_response(1, iin2::PARAMETER_ERROR);
     harness.test_request_response(&select, &error).await;
     harness.test_request_response(&select, &error).await;
     harness.check_no_events();
@@ -257,11 +248,8 @@ async fn failed_control_in_the_unsolicited_confirm_wait_repeats_the_executed_ech
     harness.set_control_status(7, CommandStatus::HardwareError);
 
     let direct_operate = g41v2_control(FunctionCode::DirectOperate, 1, 7);
-    let echo = response(
-        FIR_FIN,
-        1,
-        RESTART,
-        0,
+    let echo = with_objects(
+        empty_response(1, 0),
         &control_echo(CommandStatus::HardwareError),
     );
     harness.test_request_response(&direct_operate, &echo).await;
@@ -296,7 +284,7 @@ async fn empty_response_after_a_fragment_has_no_objects() {
     harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
 
     // the unconfirmed events are reported again
-    let empty = response(FIR_FIN, 1, RESTART | CLASS_1, 0, &[]);
+    let empty = solicited(1, false, iin1::RESTART | iin1::CLASS_1, 0);
     harness
         .test_request_response(&record_current_time(1), &empty)
         .await;
@@ -307,11 +295,8 @@ async fn empty_response_after_a_fragment_has_no_objects() {
     harness.check_no_events();
 
     // and the series starts again
-    let again = response(
-        FIR_CON,
-        2,
-        RESTART | CLASS_1,
-        0,
+    let again = with_objects(
+        response_header(FIR_CON | 2, iin1::RESTART | iin1::CLASS_1, 0),
         &g2v1_events(0..EVENTS_IN_MIN_FRAGMENT),
     );
     harness
@@ -331,7 +316,7 @@ async fn no_ack_request_clears_the_response_and_the_next_request_rebuilds_it() {
     harness
         .test_request_response(
             &delay_measure(0),
-            &response(FIR_FIN, 0, RESTART, 0, &g52v2(0x1234)),
+            &with_objects(empty_response(0, 0), &g52v2(0x1234)),
         )
         .await;
 
@@ -345,7 +330,7 @@ async fn no_ack_request_clears_the_response_and_the_next_request_rebuilds_it() {
 
     // the DELAY_MEASURE isn't the last request any more, so it's answered again
     set_processing_delay(&harness, 0x5678);
-    let rebuilt = response(FIR_FIN, 0, RESTART, 0, &g52v2(0x5678));
+    let rebuilt = with_objects(empty_response(0, 0), &g52v2(0x5678));
     harness
         .test_request_response(&delay_measure(0), &rebuilt)
         .await;
@@ -366,7 +351,7 @@ async fn reconnect_rebuilds_both_responses() {
     harness
         .test_request_response(
             &delay_measure(1),
-            &response(FIR_FIN, 1, RESTART, 0, &g52v2(0x1234)),
+            &with_objects(empty_response(1, 0), &g52v2(0x1234)),
         )
         .await;
     unsolicited_event(&mut harness, 1).await;
@@ -375,14 +360,14 @@ async fn reconnect_rebuilds_both_responses() {
     set_processing_delay(&harness, 0x5678);
 
     harness
-        .expect_response(&unsolicited(2, RESTART, &g2v1_events(0..1)))
+        .expect_response(&unsolicited(2, iin1::RESTART, &g2v1_events(0..1)))
         .await;
     harness.check_events(&[Event::EnterUnsolicitedConfirmWait(2)]);
 
     harness
         .test_request_response(
             &delay_measure(1),
-            &response(FIR_FIN, 1, RESTART, 0, &g52v2(0x5678)),
+            &with_objects(empty_response(1, 0), &g52v2(0x5678)),
         )
         .await;
     harness.check_no_events();
@@ -398,7 +383,7 @@ async fn solicited_responses_in_the_unsolicited_confirm_wait_leave_the_unsolicit
     set_processing_delay(&harness, 0x1234);
     let unsolicited = unsolicited_event(&mut harness, 1).await;
 
-    let delay = response(FIR_FIN, 1, RESTART, 0, &g52v2(0x1234));
+    let delay = with_objects(empty_response(1, 0), &g52v2(0x1234));
     harness
         .test_request_response(&delay_measure(1), &delay)
         .await;
@@ -408,13 +393,7 @@ async fn solicited_responses_in_the_unsolicited_confirm_wait_leave_the_unsolicit
         .await;
 
     let direct_operate = g41v2_control(FunctionCode::DirectOperate, 2, 7);
-    let echo = response(
-        FIR_FIN,
-        2,
-        RESTART,
-        0,
-        &control_echo(CommandStatus::Success),
-    );
+    let echo = with_objects(empty_response(2, 0), &control_echo(CommandStatus::Success));
     harness.test_request_response(&direct_operate, &echo).await;
     harness.check_events(&operated(OperateType::DirectOperate));
     harness.test_request_response(&direct_operate, &echo).await;
@@ -438,7 +417,7 @@ async fn unsolicited_response_in_idle_leaves_the_solicited_response() {
     let mut harness = enabled_unsolicited_harness(get_default_unsolicited_config()).await;
     set_processing_delay(&harness, 0x1234);
 
-    let delay = response(FIR_FIN, 1, RESTART, 0, &g52v2(0x1234));
+    let delay = with_objects(empty_response(1, 0), &g52v2(0x1234));
     harness
         .test_request_response(&delay_measure(1), &delay)
         .await;

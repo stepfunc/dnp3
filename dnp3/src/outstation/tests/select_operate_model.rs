@@ -298,14 +298,9 @@ impl Request {
     }
 }
 
-/// the response header with the restart IIN, which no request clears
-fn response_header(seq: u8, iin2: u8) -> Vec<u8> {
-    vec![0xC0 | seq, 0x81, 0x80, iin2]
-}
-
 /// a response that echoes the first `count` objects of `set`, each with the status `status` gives
 fn echo(seq: u8, set: usize, count: usize, status: impl Fn(Obj) -> u8) -> Vec<u8> {
-    let mut bytes = response_header(seq, 0);
+    let mut bytes = empty_response(seq, 0).to_vec();
     SETS[set].write(count, status, &mut bytes);
     bytes
 }
@@ -439,7 +434,10 @@ impl Model {
             // SELECT or OPERATE, so it ends the selection (Table 4-9, last row)
             Request::UnknownFunction(_) => {
                 next.selection = None;
-                return vec![(Outcome::response(response_header(seq, 0x01)), next)];
+                return vec![(
+                    Outcome::response(empty_response(seq, iin2::NO_FUNC_CODE_SUPPORT).to_vec()),
+                    next,
+                )];
             }
             _ => {}
         }
@@ -505,16 +503,18 @@ impl Model {
                 outcome.response = None;
                 vec![outcome]
             }
-            Request::Read(seq) => vec![Outcome::response(response_header(seq, 0))],
+            Request::Read(seq) => vec![Outcome::response(empty_response(seq, 0).to_vec())],
             // g52v2: the clock is paused, so no time passes while the outstation processes it
             Request::DelayMeasure(seq) => {
-                let mut response = response_header(seq, 0);
+                let mut response = empty_response(seq, 0).to_vec();
                 response.extend_from_slice(&[52, 2, 0x07, 0x01, 0x00, 0x00]);
                 vec![Outcome::response(response)]
             }
             // decision 0003: answered with IIN2.2 (TB2016-001 4.5.11), even a SELECT with the
             // selection's sequence number
-            Request::Malformed(_, seq) => vec![Outcome::response(response_header(seq, 0x04))],
+            Request::Malformed(_, seq) => vec![Outcome::response(
+                empty_response(seq, iin2::PARAMETER_ERROR).to_vec(),
+            )],
             Request::UnknownFunction(_) | Request::Confirm { .. } | Request::NotFirst(_) => {
                 panic!("{request:?} was answered above")
             }
@@ -827,8 +827,7 @@ fn run_paused(test: impl Future<Output = ()>) {
 }
 
 fn config(select_timeout_ms: u64) -> OutstationConfig {
-    let mut config = get_default_config();
-    config.keep_alive_timeout = None;
+    let mut config = without_keep_alive(get_default_config());
     config.select_timeout = Timeout::from_millis(select_timeout_ms).unwrap();
     config
 }

@@ -16,9 +16,6 @@ use crate::outstation::traits::OperateType;
 
 use CommandStatus::{HardwareError, NoSelect, NotSupported, Success, TooManyOps};
 
-const IIN2_NONE: u8 = 0x00;
-const IIN2_PARAMETER_ERROR: u8 = 0x04;
-
 #[derive(Copy, Clone, Debug)]
 enum Object {
     G12V1,
@@ -169,7 +166,7 @@ fn request(seq: u8, function: FunctionCode, headers: &[Header]) -> Vec<u8> {
 
 /// response with the restart IIN, IIN2 `iin2` and `headers`
 fn response(seq: u8, iin2: u8, headers: &[Header]) -> Vec<u8> {
-    let mut out = vec![0xC0 | seq, 0x81, 0x80, iin2];
+    let mut out = empty_response(seq, iin2).to_vec();
     for header in headers {
         header.write(&mut out);
     }
@@ -210,7 +207,7 @@ async fn run_every_function(headers: &[Header]) {
     harness
         .test_request_response(
             &request(0, FunctionCode::Select, headers),
-            &response(0, IIN2_NONE, &success),
+            &response(0, 0, &success),
         )
         .await;
     harness.check_events(&select_events(headers));
@@ -218,7 +215,7 @@ async fn run_every_function(headers: &[Header]) {
     harness
         .test_request_response(
             &request(1, FunctionCode::Operate, headers),
-            &response(1, IIN2_NONE, &success),
+            &response(1, 0, &success),
         )
         .await;
     harness.check_events(&operate_events(headers, OperateType::SelectBeforeOperate));
@@ -226,7 +223,7 @@ async fn run_every_function(headers: &[Header]) {
     harness
         .test_request_response(
             &request(2, FunctionCode::DirectOperate, headers),
-            &response(2, IIN2_NONE, &success),
+            &response(2, 0, &success),
         )
         .await;
     harness.check_events(&operate_events(headers, OperateType::DirectOperate));
@@ -268,7 +265,7 @@ async fn operate_without_a_select_echoes_no_select_for_every_object_and_width() 
     harness
         .test_request_response(
             &request(0, FunctionCode::Operate, &headers),
-            &response(0, IIN2_NONE, &echo(&headers, |_| NoSelect)),
+            &response(0, 0, &echo(&headers, |_| NoSelect)),
         )
         .await;
     harness.check_no_events();
@@ -291,7 +288,7 @@ async fn status_in_the_request_reaches_the_handler_and_the_echo_carries_the_hand
                     ),
                     &response(
                         0,
-                        IIN2_NONE,
+                        0,
                         &echo(std::slice::from_ref(&header), |i| {
                             if i == width.indices()[1] {
                                 CommandStatus::Unknown(200)
@@ -344,7 +341,7 @@ async fn handler_statuses(statuses: &[(u16, CommandStatus)], iin2: u8) {
             harness
                 .test_request_response(
                     &request(1, FunctionCode::Operate, &headers),
-                    &response(1, IIN2_NONE, &echo(&headers, |_| NoSelect)),
+                    &response(1, 0, &echo(&headers, |_| NoSelect)),
                 )
                 .await;
         } else {
@@ -356,22 +353,22 @@ async fn handler_statuses(statuses: &[(u16, CommandStatus)], iin2: u8) {
 
 #[tokio::test]
 async fn handler_error_is_echoed_without_parameter_error() {
-    handler_statuses(&[(4, HardwareError)], IIN2_NONE).await;
+    handler_statuses(&[(4, HardwareError)], 0).await;
 }
 
 #[tokio::test]
 async fn not_supported_as_the_first_error_sets_parameter_error() {
     handler_statuses(
         &[(4, NotSupported), (259, HardwareError)],
-        IIN2_PARAMETER_ERROR,
+        iin2::PARAMETER_ERROR,
     )
     .await;
-    handler_statuses(&[(513, NotSupported)], IIN2_PARAMETER_ERROR).await;
+    handler_statuses(&[(513, NotSupported)], iin2::PARAMETER_ERROR).await;
 }
 
 #[tokio::test]
 async fn not_supported_after_another_error_does_not_set_parameter_error() {
-    handler_statuses(&[(4, HardwareError), (259, NotSupported)], IIN2_NONE).await;
+    handler_statuses(&[(4, HardwareError), (259, NotSupported)], 0).await;
 }
 
 #[tokio::test]
@@ -382,7 +379,7 @@ async fn handler_errors_during_operate_are_echoed() {
     harness
         .test_request_response(
             &request(0, FunctionCode::Select, &headers),
-            &response(0, IIN2_NONE, &echo(&headers, |_| Success)),
+            &response(0, 0, &echo(&headers, |_| Success)),
         )
         .await;
     harness.check_events(&select_events(&headers));
@@ -394,7 +391,7 @@ async fn handler_errors_during_operate_are_echoed() {
             &request(1, FunctionCode::Operate, &headers),
             &response(
                 1,
-                IIN2_PARAMETER_ERROR,
+                iin2::PARAMETER_ERROR,
                 &echo(&headers, |i| match i {
                     3 => NotSupported,
                     513 => HardwareError,
@@ -454,7 +451,7 @@ async fn control_limit(max: u16) {
     harness
         .test_request_response(
             &request(0, FunctionCode::DirectOperate, &headers),
-            &response(0, IIN2_NONE, &echoed),
+            &response(0, 0, &echoed),
         )
         .await;
     harness.check_events(&events(operate_events(
@@ -478,7 +475,7 @@ async fn control_limit(max: u16) {
     harness
         .test_request_response(
             &request(2, FunctionCode::Select, &headers),
-            &response(2, IIN2_NONE, &echoed),
+            &response(2, 0, &echoed),
         )
         .await;
     harness.check_events(&events(select_events(&handled)));
@@ -488,7 +485,7 @@ async fn control_limit(max: u16) {
         harness
             .test_request_response(
                 &request(3, FunctionCode::Operate, &headers),
-                &response(3, IIN2_NONE, &echoed),
+                &response(3, 0, &echoed),
             )
             .await;
         harness.check_events(&operate_events(&headers, OperateType::SelectBeforeOperate));
@@ -497,7 +494,7 @@ async fn control_limit(max: u16) {
         harness
             .test_request_response(
                 &request(3, FunctionCode::Operate, &headers),
-                &response(3, IIN2_NONE, &echo(&headers, |_| NoSelect)),
+                &response(3, 0, &echo(&headers, |_| NoSelect)),
             )
             .await;
     }

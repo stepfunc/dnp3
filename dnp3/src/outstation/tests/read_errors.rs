@@ -18,10 +18,6 @@ const READ_G1V0_ALL: &[u8] = &[0xC0, 0x01, 0x01, 0x00, 0x06];
 const READ_G2V0_ALL: &[u8] = &[0xC0, 0x01, 0x02, 0x00, 0x06];
 const READ_G2V0_ALL_SEQ_1: &[u8] = &[0xC1, 0x01, 0x02, 0x00, 0x06];
 
-const NULL_RESPONSE: &[u8] = &[0xC0, 0x81, 0x80, 0x00];
-const OBJECT_UNKNOWN_RESPONSE: &[u8] = &[0xC0, 0x81, 0x80, 0x02];
-const PARAMETER_ERROR_RESPONSE: &[u8] = &[0xC0, 0x81, 0x80, 0x04];
-
 const BINARY_EVENT_RESPONSE: &[u8] = &[
     0xE0, 0x81, 0x80, 0x00, 0x02, 0x01, 0x28, 0x01, 0x00, 0x00, 0x00, 0x81,
 ];
@@ -53,18 +49,18 @@ async fn read_of_static_type_without_points_sets_object_unknown() {
 
     // all objects, 8-bit start/stop and 16-bit start/stop
     harness
-        .test_request_response(READ_G1V0_ALL, OBJECT_UNKNOWN_RESPONSE)
+        .test_request_response(READ_G1V0_ALL, &empty_response(0, iin2::OBJECT_UNKNOWN))
         .await;
     harness
         .test_request_response(
             &[0xC0, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00],
-            OBJECT_UNKNOWN_RESPONSE,
+            &empty_response(0, iin2::OBJECT_UNKNOWN),
         )
         .await;
     harness
         .test_request_response(
             &[0xC0, 0x01, 0x01, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00],
-            OBJECT_UNKNOWN_RESPONSE,
+            &empty_response(0, iin2::OBJECT_UNKNOWN),
         )
         .await;
 }
@@ -146,7 +142,7 @@ async fn range_read_with_no_installed_index_sets_parameter_error() {
     harness
         .test_request_response(
             &[0xC0, 0x01, 0x01, 0x00, 0x00, 0x0A, 0x0C],
-            PARAMETER_ERROR_RESPONSE,
+            &empty_response(0, iin2::PARAMETER_ERROR),
         )
         .await;
 }
@@ -184,11 +180,17 @@ async fn read_of_frozen_analogs_sets_object_unknown() {
 
     // g31v0 all objects
     harness
-        .test_request_response(&[0xC0, 0x01, 0x1F, 0x00, 0x06], OBJECT_UNKNOWN_RESPONSE)
+        .test_request_response(
+            &[0xC0, 0x01, 0x1F, 0x00, 0x06],
+            &empty_response(0, iin2::OBJECT_UNKNOWN),
+        )
         .await;
     // g33v0 all objects
     harness
-        .test_request_response(&[0xC0, 0x01, 0x21, 0x00, 0x06], OBJECT_UNKNOWN_RESPONSE)
+        .test_request_response(
+            &[0xC0, 0x01, 0x21, 0x00, 0x06],
+            &empty_response(0, iin2::OBJECT_UNKNOWN),
+        )
         .await;
 }
 
@@ -248,7 +250,7 @@ async fn read_of_event_type_without_points_sets_object_unknown() {
     let mut harness = new_harness(get_default_config());
 
     harness
-        .test_request_response(READ_G2V0_ALL, OBJECT_UNKNOWN_RESPONSE)
+        .test_request_response(READ_G2V0_ALL, &empty_response(0, iin2::OBJECT_UNKNOWN))
         .await;
 }
 
@@ -259,11 +261,17 @@ async fn read_of_other_event_types_without_points_sets_object_unknown() {
     // g4v0, g11v0, g22v0, g23v0, g32v0, g42v0, g111v0
     for group in [4, 11, 22, 23, 32, 42] {
         harness
-            .test_request_response(&[0xC0, 0x01, group, 0x00, 0x06], OBJECT_UNKNOWN_RESPONSE)
+            .test_request_response(
+                &[0xC0, 0x01, group, 0x00, 0x06],
+                &empty_response(0, iin2::OBJECT_UNKNOWN),
+            )
             .await;
     }
     harness
-        .test_request_response(&[0xC0, 0x01, 111, 0x00, 0x06], OBJECT_UNKNOWN_RESPONSE)
+        .test_request_response(
+            &[0xC0, 0x01, 111, 0x00, 0x06],
+            &empty_response(0, iin2::OBJECT_UNKNOWN),
+        )
         .await;
 }
 
@@ -277,7 +285,7 @@ async fn class_reads_without_points_have_no_error() {
             &[
                 0xC0, 0x01, 0x3C, 0x01, 0x06, 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06,
             ],
-            NULL_RESPONSE,
+            &empty_response(0, 0),
         )
         .await;
 }
@@ -292,7 +300,7 @@ async fn read_of_event_type_with_points_but_no_event_class_has_no_error() {
         .transaction(|db| db.add(0, None, BinaryInputConfig::default()));
 
     harness
-        .test_request_response(READ_G2V0_ALL, NULL_RESPONSE)
+        .test_request_response(READ_G2V0_ALL, &empty_response(0, 0))
         .await;
 }
 
@@ -379,13 +387,13 @@ async fn read_of_time_with_a_count_sets_object_unknown() {
     harness
         .test_request_response(
             &[0xC0, 0x01, 0x32, 0x01, 0x07, 0x01],
-            OBJECT_UNKNOWN_RESPONSE,
+            &empty_response(0, iin2::OBJECT_UNKNOWN),
         )
         .await;
     harness
         .test_request_response(
             &[0xC0, 0x01, 0x32, 0x01, 0x08, 0x01, 0x00],
-            OBJECT_UNKNOWN_RESPONSE,
+            &empty_response(0, iin2::OBJECT_UNKNOWN),
         )
         .await;
 }

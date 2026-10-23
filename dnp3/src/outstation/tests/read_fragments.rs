@@ -31,11 +31,6 @@ const BINARY_TRUE: u8 = 0x81;
 /// flags of a point that has never been updated: RESTART
 const RESTART: u8 = 0x02;
 
-/// IIN1 with only DEVICE_RESTART
-const IIN1_RESTART: u8 = 0x80;
-/// IIN1 with DEVICE_RESTART and CLASS_1_EVENTS
-const IIN1_RESTART_CLASS_1: u8 = 0x82;
-
 // control fields of each response in a series
 const FIR_FIN: u8 = 0xC0;
 const FIR_FIN_CON: u8 = 0xE0;
@@ -77,8 +72,9 @@ fn g1v2(start: u16, stop: u16) -> Vec<u8> {
     header
 }
 
+/// a response with no IIN2 bits and the objects of each header
 fn response(control: u8, iin1: u8, objects: &[&[u8]]) -> Vec<u8> {
-    let mut response = vec![control, 0x81, iin1, 0x00];
+    let mut response = response_header(control, iin1, 0).to_vec();
     for object in objects {
         response.extend_from_slice(object);
     }
@@ -184,7 +180,7 @@ async fn events_that_exactly_fill_a_fragment_leave_static_data_for_the_next() {
     harness
         .send_and_process(&read(&[CLASS_1, &g1v2(0, 0)]))
         .await;
-    let first = response(FIR_CON, IIN1_RESTART, &[&g2v1_events(0..count)]);
+    let first = response(FIR_CON, iin1::RESTART, &[&g2v1_events(0..count)]);
     assert_eq!(first.len(), <BufferSize>::MIN);
     expect_first_and_confirm(&mut harness, &first, 0..count.into(), class_1_binaries(0)).await;
 
@@ -192,7 +188,7 @@ async fn events_that_exactly_fill_a_fragment_leave_static_data_for_the_next() {
     harness
         .expect_response(&response(
             FIN_SEQ_1,
-            IIN1_RESTART,
+            iin1::RESTART,
             &[&g1v2_values(0, &[BINARY_TRUE])],
         ))
         .await;
@@ -233,13 +229,17 @@ async fn event_one_byte_past_a_fragment_moves_to_the_next_ahead_of_static_data()
     harness
         .send_and_process(&read(&[CLASS_1, &g1v2(0, 0)]))
         .await;
-    let first = response(FIR_CON, IIN1_RESTART_CLASS_1, &[&g2v1_events(0..binaries)]);
+    let first = response(
+        FIR_CON,
+        iin1::RESTART | iin1::CLASS_1,
+        &[&g2v1_events(0..binaries)],
+    );
     expect_first_and_confirm(&mut harness, &first, 0..binaries.into(), class_1_counter()).await;
 
     harness
         .expect_response(&response(
             FIN_CON_SEQ_1,
-            IIN1_RESTART,
+            iin1::RESTART,
             &[COUNTER_0_EVENT, &g1v2_values(0, &[BINARY_TRUE])],
         ))
         .await;
@@ -273,7 +273,7 @@ async fn an_event_and_static_data_that_exactly_fill_a_fragment_are_sent_in_one()
 
     let expected = response(
         FIR_FIN_CON,
-        IIN1_RESTART,
+        iin1::RESTART,
         &[
             &g2v1_events(0..1),
             &g1v2_values(0, &first_binary_true(count)),
@@ -300,7 +300,7 @@ async fn static_value_one_byte_past_an_event_fragment_is_sent_in_the_next() {
     let flags = first_binary_true(count);
     let first = response(
         FIR_CON,
-        IIN1_RESTART,
+        iin1::RESTART,
         &[
             &g2v1_events(0..1),
             &g1v2_values(0, &flags[..flags.len() - 1]),
@@ -313,7 +313,7 @@ async fn static_value_one_byte_past_an_event_fragment_is_sent_in_the_next() {
     harness
         .expect_response(&response(
             FIN_SEQ_1,
-            IIN1_RESTART,
+            iin1::RESTART,
             &[&g1v2_values(count - 1, &[RESTART])],
         ))
         .await;
@@ -336,7 +336,7 @@ async fn events_that_exactly_fill_a_fragment_leave_attributes_for_the_next() {
     harness
         .send_and_process(&read(&[CLASS_1, ALL_ATTRIBUTES]))
         .await;
-    let first = response(FIR_CON, IIN1_RESTART, &[&g2v1_events(0..count)]);
+    let first = response(FIR_CON, iin1::RESTART, &[&g2v1_events(0..count)]);
     assert_eq!(first.len(), <BufferSize>::MIN);
     expect_first_and_confirm(&mut harness, &first, 0..count.into(), class_1_binaries(0)).await;
 
@@ -344,7 +344,7 @@ async fn events_that_exactly_fill_a_fragment_leave_attributes_for_the_next() {
     harness
         .expect_response(&response(
             FIN_SEQ_1,
-            IIN1_RESTART,
+            iin1::RESTART,
             &[&encode_string(var::DEVICE_SERIAL_NUMBER, "S")],
         ))
         .await;
@@ -367,13 +367,17 @@ async fn event_one_byte_past_a_fragment_moves_to_the_next_ahead_of_attributes() 
     harness
         .send_and_process(&read(&[CLASS_1, ALL_ATTRIBUTES]))
         .await;
-    let first = response(FIR_CON, IIN1_RESTART_CLASS_1, &[&g2v1_events(0..binaries)]);
+    let first = response(
+        FIR_CON,
+        iin1::RESTART | iin1::CLASS_1,
+        &[&g2v1_events(0..binaries)],
+    );
     expect_first_and_confirm(&mut harness, &first, 0..binaries.into(), class_1_counter()).await;
 
     harness
         .expect_response(&response(
             FIN_CON_SEQ_1,
-            IIN1_RESTART,
+            iin1::RESTART,
             &[
                 COUNTER_0_EVENT,
                 &encode_string(var::DEVICE_SERIAL_NUMBER, "S"),
@@ -407,7 +411,7 @@ async fn static_data_and_an_attribute_that_exactly_fill_a_fragment_are_sent_in_o
 
     let expected = response(
         FIR_FIN,
-        IIN1_RESTART,
+        iin1::RESTART,
         &[
             &g1v2_values(0, &vec![RESTART; count.into()]),
             &encode_string(var::DEVICE_SERIAL_NUMBER, "S"),
@@ -435,7 +439,7 @@ async fn attribute_one_byte_past_a_static_fragment_is_sent_in_the_next() {
         .await;
     let first = response(
         FIR_CON,
-        IIN1_RESTART,
+        iin1::RESTART,
         &[&g1v2_values(0, &vec![RESTART; count.into()])],
     );
     expect_first_and_confirm(&mut harness, &first, 0..0, class_1_binaries(0)).await;
@@ -443,7 +447,7 @@ async fn attribute_one_byte_past_a_static_fragment_is_sent_in_the_next() {
     harness
         .expect_response(&response(
             FIN_SEQ_1,
-            IIN1_RESTART,
+            iin1::RESTART,
             &[&encode_string(var::DEVICE_SERIAL_NUMBER, "SN")],
         ))
         .await;
@@ -473,7 +477,7 @@ async fn class_0_and_attributes_span_fragments_without_a_confirm_for_the_last() 
         .await;
     let first = response(
         FIR_CON,
-        IIN1_RESTART,
+        iin1::RESTART,
         &[&g20v1_restart_values(0, COUNTERS_IN_MIN_FRAGMENT)],
     );
     expect_first_and_confirm(&mut harness, &first, 0..0, class_1_binaries(0)).await;
@@ -481,7 +485,7 @@ async fn class_0_and_attributes_span_fragments_without_a_confirm_for_the_last() 
     harness
         .expect_response(&response(
             CON_SEQ_1,
-            IIN1_RESTART,
+            iin1::RESTART,
             &[&g20v1_restart_values(
                 COUNTERS_IN_MIN_FRAGMENT,
                 COUNTERS_IN_MIN_FRAGMENT,
@@ -494,7 +498,7 @@ async fn class_0_and_attributes_span_fragments_without_a_confirm_for_the_last() 
     harness
         .expect_response(&response(
             FIN_SEQ_2,
-            IIN1_RESTART,
+            iin1::RESTART,
             &[
                 &g20v1_restart_values(2 * COUNTERS_IN_MIN_FRAGMENT, 6),
                 &encode_string(var::DEVICE_SERIAL_NUMBER, "S"),
@@ -570,7 +574,7 @@ async fn unsynchronized_g2v2_events_continue_after_a_new_cto_in_the_next_fragmen
     let events: Vec<_> = (0..count).map(|i| (i, BINARY_TRUE, i)).collect();
     let first = response(
         FIR_CON,
-        IIN1_RESTART_CLASS_1,
+        iin1::RESTART | iin1::CLASS_1,
         &[
             &cto(2, UNSYNCHRONIZED_START),
             &relative_time_events(2, &events),
@@ -582,7 +586,7 @@ async fn unsynchronized_g2v2_events_continue_after_a_new_cto_in_the_next_fragmen
     harness
         .expect_response(&response(
             FIN_CON_SEQ_1,
-            IIN1_RESTART,
+            iin1::RESTART,
             &[
                 &cto(2, UNSYNCHRONIZED_START + u64::from(count)),
                 &relative_time_events(2, &[(count, BINARY_TRUE, 0), (count + 1, BINARY_TRUE, 1)]),
@@ -646,7 +650,7 @@ async fn unsynchronized_g4v2_event_whose_cto_does_not_fit_starts_the_next_fragme
         .collect();
     let first = response(
         FIR_CON,
-        IIN1_RESTART_CLASS_1,
+        iin1::RESTART | iin1::CLASS_1,
         &[&absolute_time_events(4, &events)],
     );
     assert_eq!(first.len(), CTO_EVENT_ONE_BYTE_SHORT - 19);
@@ -661,7 +665,7 @@ async fn unsynchronized_g4v2_event_whose_cto_does_not_fit_starts_the_next_fragme
     harness
         .expect_response(&response(
             FIN_CON_SEQ_1,
-            IIN1_RESTART,
+            iin1::RESTART,
             &[
                 &cto(2, UNSYNCHRONIZED_START),
                 &relative_time_events(
@@ -719,7 +723,7 @@ async fn unsolicited_events_that_exactly_fill_a_fragment_are_sent_in_one() {
         .database
         .transaction(add_binaries(count, count));
 
-    let expected = unsolicited(1, IIN1_RESTART, &g2v1_events(0..count));
+    let expected = unsolicited(1, iin1::RESTART, &g2v1_events(0..count));
     assert_eq!(expected.len(), <BufferSize>::MIN);
     harness.expect_response(&expected).await;
     harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
@@ -740,7 +744,7 @@ async fn unsolicited_event_one_byte_past_a_fragment_is_sent_in_the_next_series()
     harness
         .expect_response(&unsolicited(
             1,
-            IIN1_RESTART_CLASS_1,
+            iin1::RESTART | iin1::CLASS_1,
             &g2v1_events(0..count - 1),
         ))
         .await;
@@ -756,7 +760,7 @@ async fn unsolicited_event_one_byte_past_a_fragment_is_sent_in_the_next_series()
     harness
         .expect_response(&unsolicited(
             2,
-            IIN1_RESTART,
+            iin1::RESTART,
             &g2v1_events(count - 1..count),
         ))
         .await;

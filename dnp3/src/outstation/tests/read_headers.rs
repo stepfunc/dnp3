@@ -8,10 +8,6 @@ use crate::app::measurement::*;
 use crate::outstation::database::*;
 use crate::outstation::tests::harness::*;
 
-const EMPTY_RESPONSE_SEQ0: &[u8] = &[0xC0, 0x81, 0x80, 0x00];
-/// IIN1 reports the class 1 events
-const PARAMETER_ERROR_RESPONSE: &[u8] = &[0xC0, 0x81, 0x82, 0x04];
-
 /// READ of four headers, two of them unsupported:
 /// g1v2 8-bit start/stop 0 to 1, g13v1 all objects, g2v0 8-bit count of 1, g111v1 8-bit count of 1
 const READ_SUPPORTED_AND_UNSUPPORTED: &[u8] = &[
@@ -60,7 +56,7 @@ async fn deferred_read_selects_its_supported_headers_and_reports_the_unsupported
     harness.expect_response(&null_unsolicited(0)).await;
     harness.send_and_process(&unsolicited_confirm(0)).await;
     harness
-        .test_request_response(ENABLE_UNSOLICITED_SEQ_0, EMPTY_RESPONSE_SEQ0)
+        .test_request_response(ENABLE_UNSOLICITED_SEQ_0, &empty_response(0, 0))
         .await;
     harness
         .handle
@@ -113,7 +109,15 @@ async fn read_of_a_variation_the_qualifier_cannot_carry_sets_parameter_error() {
 
     for request in requests {
         harness
-            .test_request_response(request, PARAMETER_ERROR_RESPONSE)
+            .test_request_response(
+                request,
+                &solicited(
+                    0,
+                    false,
+                    iin1::RESTART | iin1::CLASS_1,
+                    iin2::PARAMETER_ERROR,
+                ),
+            )
             .await;
     }
 }

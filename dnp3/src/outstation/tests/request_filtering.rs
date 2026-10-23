@@ -31,19 +31,15 @@ const OTHER_MASTER: u16 = 2;
 const OTHER_OUTSTATION: u16 = 11;
 const SELF_ADDRESS: u16 = 0xFFFC;
 
-const EMPTY_RESPONSE_SEQ_0: &[u8] = &[0xC0, 0x81, 0x80, 0x00];
-const EMPTY_RESPONSE_SEQ_1: &[u8] = &[0xC1, 0x81, 0x80, 0x00];
 /// g1v1 with binary input 0, which the confirm-wait tests add
 const BINARY_0_CLASS_0_RESPONSE_SEQ_0: &[u8] = &[
     0xC0, 0x81, 0x80, 0x00, 0x01, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x01,
 ];
 /// a READ whose object header is cut short
 const MALFORMED_READ_SEQ_1: &[u8] = &[0xC1, 0x01, 60];
-const MALFORMED_RESPONSE_SEQ_1: &[u8] = &[0xC1, 0x81, 0x80, 0x04];
 const UNKNOWN_FUNCTION_SEQ_1: &[u8] = &[0xC1, 0x70];
 /// 0x83 (AUTHENTICATE_RESPONSE) isn't a function code the outstation knows
 const UNKNOWN_FUNCTIONS_SEQ_1: &[&[u8]] = &[UNKNOWN_FUNCTION_SEQ_1, &[0xC1, 0x83, 0x80, 0x00]];
-const NO_FUNCTION_SUPPORT_SEQ_1: &[u8] = &[0xC1, 0x81, 0x80, 0x01];
 /// a fragment too short for a request header, which gets no response
 const CONTROL_ONLY_SEQ_1: &[u8] = &[0xC1];
 /// REQUEST_LINK_STATUS from the outstation to the master
@@ -196,7 +192,7 @@ impl LinkHarness {
     /// frames before it
     async fn probe(&mut self) {
         self.send(&from_master(&read_class_0(0))).await;
-        self.expect_response(MASTER, EMPTY_RESPONSE_SEQ_0).await;
+        self.expect_response(MASTER, &empty_response(0, 0)).await;
         self.expect_nothing();
     }
 }
@@ -206,7 +202,7 @@ async fn request_from_the_master_to_the_outstation_is_answered() {
     for level in decode_levels() {
         let mut harness = LinkHarness::new(get_default_config(), level);
         harness.send(&from_master(&read_class_0(1))).await;
-        harness.expect_response(MASTER, EMPTY_RESPONSE_SEQ_1).await;
+        harness.expect_response(MASTER, &empty_response(1, 0)).await;
         harness.expect_nothing();
         harness.probe().await;
     }
@@ -238,7 +234,7 @@ async fn request_to_the_self_address_is_dropped_unless_enabled() {
         harness
             .send(&request(SELF_ADDRESS, MASTER, &read_class_0(1)))
             .await;
-        harness.expect_response(MASTER, EMPTY_RESPONSE_SEQ_1).await;
+        harness.expect_response(MASTER, &empty_response(1, 0)).await;
         harness.probe().await;
     }
 }
@@ -282,7 +278,7 @@ async fn requests_from_another_master_are_answered_when_any_master_is_allowed() 
             .send(&request(OUTSTATION, OTHER_MASTER, &read_class_0(1)))
             .await;
         harness
-            .expect_response(OTHER_MASTER, EMPTY_RESPONSE_SEQ_1)
+            .expect_response(OTHER_MASTER, &empty_response(1, 0))
             .await;
         harness
             .send(&request(OUTSTATION, OTHER_MASTER, &[0xC2, 0x01, 60]))
@@ -302,7 +298,7 @@ async fn unknown_function_is_answered_only_from_the_configured_master() {
         for app in UNKNOWN_FUNCTIONS_SEQ_1 {
             harness.send(&from_master(app)).await;
             harness
-                .expect_response(MASTER, NO_FUNCTION_SUPPORT_SEQ_1)
+                .expect_response(MASTER, &empty_response(1, iin2::NO_FUNC_CODE_SUPPORT))
                 .await;
             harness.expect_nothing();
             harness
@@ -322,7 +318,7 @@ async fn unknown_function_from_another_master_is_answered_when_any_master_is_all
         for app in UNKNOWN_FUNCTIONS_SEQ_1 {
             harness.send(&request(OUTSTATION, OTHER_MASTER, app)).await;
             harness
-                .expect_response(OTHER_MASTER, NO_FUNCTION_SUPPORT_SEQ_1)
+                .expect_response(OTHER_MASTER, &empty_response(1, iin2::NO_FUNC_CODE_SUPPORT))
                 .await;
             harness.expect_nothing();
         }
@@ -336,7 +332,7 @@ async fn malformed_request_from_the_master_is_answered() {
         let mut harness = LinkHarness::new(get_default_config(), level);
         harness.send(&from_master(MALFORMED_READ_SEQ_1)).await;
         harness
-            .expect_response(MASTER, MALFORMED_RESPONSE_SEQ_1)
+            .expect_response(MASTER, &empty_response(1, iin2::PARAMETER_ERROR))
             .await;
         harness.expect_nothing();
         harness.probe().await;
@@ -411,7 +407,7 @@ async fn broadcast_gets_no_response_and_sets_the_broadcast_iin() {
         ]);
         harness.expect_nothing();
         harness.send(&from_master(&read_class_0(1))).await;
-        harness.expect_response(MASTER, EMPTY_RESPONSE_SEQ_1).await;
+        harness.expect_response(MASTER, &empty_response(1, 0)).await;
         harness.expect_nothing();
     }
 }
@@ -619,7 +615,7 @@ async fn header_error_from_the_master_postpones_the_link_status_request() {
         for (app, response) in [
             (
                 UNKNOWN_FUNCTION_SEQ_1,
-                Some((MASTER, NO_FUNCTION_SUPPORT_SEQ_1)),
+                Some((MASTER, &empty_response(1, iin2::NO_FUNC_CODE_SUPPORT)[..])),
             ),
             (CONTROL_ONLY_SEQ_1, None),
         ] {
@@ -641,7 +637,10 @@ async fn header_error_from_another_master_postpones_the_link_status_request_when
         for (app, response) in [
             (
                 UNKNOWN_FUNCTION_SEQ_1,
-                Some((OTHER_MASTER, NO_FUNCTION_SUPPORT_SEQ_1)),
+                Some((
+                    OTHER_MASTER,
+                    &empty_response(1, iin2::NO_FUNC_CODE_SUPPORT)[..],
+                )),
             ),
             (CONTROL_ONLY_SEQ_1, None),
         ] {

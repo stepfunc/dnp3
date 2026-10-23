@@ -10,8 +10,6 @@ use crate::link::header::BroadcastConfirmMode;
 use crate::outstation::tests::harness::*;
 use crate::outstation::traits::{BroadcastAction, OperateType};
 
-// restart IIN, no objects
-const EMPTY_RESPONSE_SEQ_1: &[u8] = &[0xC1, 0x81, 0x80, 0x00];
 // direct operate no ack, seq == 1, g41v2 - count == 1, index == 7, value = 513
 const DIRECT_OPERATE_NO_ACK_SEQ_1: &[u8] = &[0xC1, 0x06, 41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, 0x00];
 // direct operate, seq == 0, g41v2 - count == 1, index == 7, value = 513
@@ -221,7 +219,7 @@ async fn repeated_request_whose_response_asked_for_a_confirm_waits_for_it_again(
 
     // the confirm ended the broadcast's IIN1.0 and its confirm requirement
     harness
-        .test_request_response(&record_current_time(1), EMPTY_RESPONSE_SEQ_1)
+        .test_request_response(&record_current_time(1), &empty_response(1, 0))
         .await;
     harness.check_no_events();
 }

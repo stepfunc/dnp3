@@ -22,9 +22,6 @@ const WRITE_LAST_RECORDED_TIME: &[u8] = &[
     0xC1, 0x02, 50, 3, 0x07, 1, 0xFE, 0xCA, 0x00, 0x00, 0x00, 0x00,
 ];
 
-const EMPTY_RESPONSE_SEQ0: &[u8] = &[0xC0, 0x81, 0x80, 0x00];
-const EMPTY_RESPONSE_SEQ1: &[u8] = &[0xC1, 0x81, 0x80, 0x00];
-
 #[tokio::test]
 async fn responds_to_delay_measure() {
     let mut harness = new_harness(get_default_config());
@@ -46,7 +43,7 @@ async fn non_lan_procedure() {
         .test_request_response(&delay_measure(0), RESPONSE_TIME_DELAY_FINE_CAFE)
         .await;
     harness
-        .test_request_response(WRITE_ABSOLUTE_TIME, EMPTY_RESPONSE_SEQ1)
+        .test_request_response(WRITE_ABSOLUTE_TIME, &empty_response(1, 0))
         .await;
 
     harness.check_events(&[Event::WriteAbsoluteTime(Timestamp::new(1614271096000))]);
@@ -59,10 +56,10 @@ async fn lan_procedure() {
     harness.application_data.lock().unwrap().processing_delay = 0xCAFE;
 
     harness
-        .test_request_response(&record_current_time(0), EMPTY_RESPONSE_SEQ0)
+        .test_request_response(&record_current_time(0), &empty_response(0, 0))
         .await;
     harness
-        .test_request_response(WRITE_LAST_RECORDED_TIME, EMPTY_RESPONSE_SEQ1)
+        .test_request_response(WRITE_LAST_RECORDED_TIME, &empty_response(1, 0))
         .await;
 
     harness.check_events(&[Event::WriteAbsoluteTime(Timestamp::new(0xCAFE))]);
@@ -73,14 +70,14 @@ async fn lan_procedure_with_two_byte_count() {
     let mut harness = new_harness(get_default_config());
 
     harness
-        .test_request_response(&record_current_time(0), EMPTY_RESPONSE_SEQ0)
+        .test_request_response(&record_current_time(0), &empty_response(0, 0))
         .await;
     harness
         .test_request_response(
             &[
                 0xC1, 0x02, 50, 3, 0x08, 1, 0, 0xFE, 0xCA, 0x00, 0x00, 0x00, 0x00,
             ],
-            EMPTY_RESPONSE_SEQ1,
+            &empty_response(1, 0),
         )
         .await;
 
@@ -105,21 +102,12 @@ fn write_time_objects(seq: u8, variation: u8, count: u8, time: u64) -> Vec<u8> {
     bytes
 }
 
-/// an empty response with the restart IIN and `iin2`
-fn empty_response(seq: u8, iin2: u8) -> [u8; 4] {
-    [0xC0 | seq, 0x81, 0x80, iin2]
-}
-
-const IIN2_NONE: u8 = 0x00;
-const IIN2_OBJECT_UNKNOWN: u8 = 0x02;
-const IIN2_PARAMETER_ERROR: u8 = 0x04;
-
 const RECORDED_TIME: u64 = 1_000_000;
 
 /// RECORD_CURRENT_TIME with sequence `seq`, then wait `delay`
 async fn record_and_wait(harness: &mut OutstationHarness, seq: u8, delay: Duration) {
     harness
-        .test_request_response(&record_current_time(seq), &empty_response(seq, IIN2_NONE))
+        .test_request_response(&record_current_time(seq), &empty_response(seq, 0))
         .await;
     tokio::time::advance(delay).await;
 }
@@ -133,7 +121,7 @@ async fn lan_procedure_adds_the_time_elapsed_since_record_current_time() {
         harness
             .test_request_response(
                 &write_last_recorded_time(1, 1, RECORDED_TIME),
-                &empty_response(1, IIN2_NONE),
+                &empty_response(1, 0),
             )
             .await;
 
@@ -152,7 +140,7 @@ async fn last_recorded_time_is_used_once() {
         harness
             .test_request_response(
                 &write_last_recorded_time(1, 1, RECORDED_TIME),
-                &empty_response(1, IIN2_NONE),
+                &empty_response(1, 0),
             )
             .await;
         harness.check_events(&[Event::WriteAbsoluteTime(Timestamp::new(1_000_010))]);
@@ -161,7 +149,7 @@ async fn last_recorded_time_is_used_once() {
         harness
             .test_request_response(
                 &write_last_recorded_time(2, 1, 2 * RECORDED_TIME),
-                &empty_response(2, IIN2_PARAMETER_ERROR),
+                &empty_response(2, iin2::PARAMETER_ERROR),
             )
             .await;
         harness.check_no_events();
@@ -177,7 +165,7 @@ async fn write_of_last_recorded_time_without_record_current_time_sets_parameter_
         harness
             .test_request_response(
                 &write_last_recorded_time(0, 1, RECORDED_TIME),
-                &empty_response(0, IIN2_PARAMETER_ERROR),
+                &empty_response(0, iin2::PARAMETER_ERROR),
             )
             .await;
         harness.check_no_events();
@@ -195,7 +183,7 @@ async fn writes_of_time_with_a_count_other_than_one_set_parameter_error() {
             harness
                 .test_request_response(
                     &write_absolute_time(seq, count, RECORDED_TIME),
-                    &empty_response(seq, IIN2_PARAMETER_ERROR),
+                    &empty_response(seq, iin2::PARAMETER_ERROR),
                 )
                 .await;
             seq = seq.wrapping_add(1);
@@ -206,7 +194,7 @@ async fn writes_of_time_with_a_count_other_than_one_set_parameter_error() {
             harness
                 .test_request_response(
                     &write_last_recorded_time(seq, count, RECORDED_TIME),
-                    &empty_response(seq, IIN2_PARAMETER_ERROR),
+                    &empty_response(seq, iin2::PARAMETER_ERROR),
                 )
                 .await;
             seq = seq.wrapping_add(1);
@@ -226,7 +214,7 @@ async fn lan_procedure_accepts_the_largest_time_and_rejects_one_past_it() {
         harness
             .test_request_response(
                 &write_last_recorded_time(1, 1, Timestamp::MAX_VALUE - 1234),
-                &empty_response(1, IIN2_NONE),
+                &empty_response(1, 0),
             )
             .await;
         harness.check_events(&[Event::WriteAbsoluteTime(Timestamp::max())]);
@@ -236,7 +224,7 @@ async fn lan_procedure_accepts_the_largest_time_and_rejects_one_past_it() {
         harness
             .test_request_response(
                 &write_last_recorded_time(3, 1, Timestamp::MAX_VALUE - 1233),
-                &empty_response(3, IIN2_PARAMETER_ERROR),
+                &empty_response(3, iin2::PARAMETER_ERROR),
             )
             .await;
         harness.check_no_events();
@@ -251,8 +239,8 @@ async fn lan_procedure_reports_the_error_of_the_application() {
 
         let mut seq: u8 = 0;
         for (err, iin2) in [
-            (RequestError::ParameterError, IIN2_PARAMETER_ERROR),
-            (RequestError::NotSupported, IIN2_OBJECT_UNKNOWN),
+            (RequestError::ParameterError, iin2::PARAMETER_ERROR),
+            (RequestError::NotSupported, iin2::OBJECT_UNKNOWN),
         ] {
             harness.application_data.lock().unwrap().request_error = Some(err);
             record_and_wait(&mut harness, seq, Duration::from_millis(10)).await;

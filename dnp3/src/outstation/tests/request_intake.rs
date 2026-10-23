@@ -23,13 +23,6 @@ use crate::util::test_support::watchdog;
 
 use super::harness::*;
 
-const RESTART: u8 = 0x80;
-const BROADCAST: u8 = 0x01;
-const CLASS_1: u8 = 0x02;
-
-const PARAMETER_ERROR: u8 = 0x04;
-const NO_FUNC_CODE_SUPPORT: u8 = 0x01;
-
 const MODES: [BroadcastConfirmMode; 3] = [
     BroadcastConfirmMode::NotRequired,
     BroadcastConfirmMode::Optional,
@@ -45,27 +38,18 @@ const fn malformed(seq: u8) -> [u8; 3] {
     [0xC0 | seq, 0x01, 60]
 }
 
-/// a response header without objects
-const fn response(con: bool, seq: u8, iin1: u8, iin2: u8) -> [u8; 4] {
-    let con = if con { 0x20 } else { 0x00 };
-    [0xC0 | con | seq, 0x81, iin1, iin2]
-}
-
 /// the echo of a g41v2 request at index 7 with `status`
 fn control_response(con: bool, seq: u8, iin1: u8, status: u8) -> Vec<u8> {
-    let mut bytes = response(con, seq, iin1, 0).to_vec();
-    bytes.extend_from_slice(&[41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, status]);
-    bytes
+    with_objects(
+        solicited(seq, con, iin1, 0),
+        &[41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, status],
+    )
 }
-
-/// the binary event as g2v1 in a response
-const G2V1_EVENT: &[u8] = &[0x02, 0x01, 0x28, 0x01, 0x00, 0x00, 0x00, 0x81];
 
 /// READ class 1 with sequence 0 and one binary event, whose response waits for a confirm
 async fn enter_solicited_confirm_wait(harness: &mut OutstationHarness) {
     harness.handle.database.transaction(add_binary_event);
-    let mut expected = response(true, 0, RESTART, 0).to_vec();
-    expected.extend_from_slice(G2V1_EVENT);
+    let expected = class_1_event_response(0, iin1::RESTART);
     harness
         .test_request_response(&read_class_1(0), &expected)
         .await;
@@ -98,7 +82,7 @@ async fn confirm_solicited(harness: &mut OutstationHarness, seq: u8) {
 /// a request that changes nothing, answered with the IIN the outstation has now
 async fn probe(harness: &mut OutstationHarness, seq: u8, iin1: u8) {
     harness
-        .test_request_response(&record_current_time(seq), &response(false, seq, iin1, 0))
+        .test_request_response(&record_current_time(seq), &solicited(seq, false, iin1, 0))
         .await;
     harness.check_no_events();
 }
@@ -111,14 +95,14 @@ async fn malformed_request_in_idle_replaces_the_repeat_history() {
     let mut harness = new_harness(get_default_config());
 
     let direct_operate = g41v2_control(FunctionCode::DirectOperate, 3, 7);
-    let direct_operate_response = control_response(false, 3, RESTART, 0);
+    let direct_operate_response = control_response(false, 3, iin1::RESTART, 0);
     for _ in 0..2 {
         harness
             .test_request_response(&direct_operate, &direct_operate_response)
             .await;
         harness.check_events(&operated(OperateType::DirectOperate));
 
-        let malformed_response = response(false, 4, RESTART, PARAMETER_ERROR);
+        let malformed_response = empty_response(4, iin2::PARAMETER_ERROR);
         harness
             .test_request_response(&malformed(4), &malformed_response)
             .await;
@@ -138,14 +122,19 @@ async fn malformed_request_in_the_solicited_confirm_wait_ends_it_and_replaces_th
     harness.check_events(&[BROADCAST_PROCESSED]);
 
     let direct_operate = g41v2_control(FunctionCode::DirectOperate, 3, 7);
-    let direct_operate_response = control_response(true, 3, RESTART | BROADCAST, 0);
+    let direct_operate_response = control_response(true, 3, iin1::RESTART | iin1::BROADCAST, 0);
     harness
         .test_request_response(&direct_operate, &direct_operate_response)
         .await;
     harness.check_events(&operated(OperateType::DirectOperate));
     harness.check_events(&[Event::EnterSolicitedConfirmWait(3)]);
 
-    let malformed_response = response(true, 4, RESTART | BROADCAST, PARAMETER_ERROR);
+    let malformed_response = solicited(
+        4,
+        true,
+        iin1::RESTART | iin1::BROADCAST,
+        iin2::PARAMETER_ERROR,
+    );
     harness
         .test_request_response(&malformed(4), &malformed_response)
         .await;
@@ -172,7 +161,7 @@ async fn malformed_request_in_the_solicited_confirm_wait_ends_it_and_replaces_th
     harness.check_events(&[Event::EnterSolicitedConfirmWait(3)]);
 
     confirm_solicited(&mut harness, 3).await;
-    probe(&mut harness, 5, RESTART).await;
+    probe(&mut harness, 5, iin1::RESTART).await;
 }
 
 /// D2: the stored octets, not the IIN the outstation has now
@@ -182,7 +171,7 @@ async fn repeated_non_read_in_the_unsolicited_confirm_wait_gets_the_stored_octet
     enter_unsolicited_confirm_wait(&mut harness).await;
 
     let direct_operate = g41v2_control(FunctionCode::DirectOperate, 0, 7);
-    let direct_operate_response = control_response(false, 0, RESTART, 0);
+    let direct_operate_response = control_response(false, 0, iin1::RESTART, 0);
     harness
         .test_request_response(&direct_operate, &direct_operate_response)
         .await;
@@ -195,7 +184,7 @@ async fn repeated_non_read_in_the_unsolicited_confirm_wait_gets_the_stored_octet
         .await;
     harness.check_no_events();
 
-    probe(&mut harness, 1, RESTART | CLASS_1).await;
+    probe(&mut harness, 1, iin1::RESTART | iin1::CLASS_1).await;
 }
 
 #[tokio::test]
@@ -204,7 +193,7 @@ async fn unknown_function_in_the_unsolicited_confirm_wait_keeps_the_repeat_histo
     enter_unsolicited_confirm_wait(&mut harness).await;
 
     let direct_operate = g41v2_control(FunctionCode::DirectOperate, 0, 7);
-    let direct_operate_response = control_response(false, 0, RESTART, 0);
+    let direct_operate_response = control_response(false, 0, iin1::RESTART, 0);
     harness
         .test_request_response(&direct_operate, &direct_operate_response)
         .await;
@@ -213,7 +202,7 @@ async fn unknown_function_in_the_unsolicited_confirm_wait_keeps_the_repeat_histo
     harness
         .test_request_response(
             &unknown_function(1),
-            &response(false, 1, RESTART, NO_FUNC_CODE_SUPPORT),
+            &empty_response(1, iin2::NO_FUNC_CODE_SUPPORT),
         )
         .await;
 
@@ -232,7 +221,7 @@ async fn unknown_function_in_the_solicited_confirm_wait_ends_it_and_keeps_the_re
     harness.check_events(&[BROADCAST_PROCESSED]);
 
     let direct_operate = g41v2_control(FunctionCode::DirectOperate, 0, 7);
-    let direct_operate_response = control_response(true, 0, RESTART | BROADCAST, 0);
+    let direct_operate_response = control_response(true, 0, iin1::RESTART | iin1::BROADCAST, 0);
     harness
         .test_request_response(&direct_operate, &direct_operate_response)
         .await;
@@ -242,7 +231,12 @@ async fn unknown_function_in_the_solicited_confirm_wait_ends_it_and_keeps_the_re
     harness
         .test_request_response(
             &unknown_function(1),
-            &response(true, 1, RESTART | BROADCAST, NO_FUNC_CODE_SUPPORT),
+            &solicited(
+                1,
+                true,
+                iin1::RESTART | iin1::BROADCAST,
+                iin2::NO_FUNC_CODE_SUPPORT,
+            ),
         )
         .await;
     harness.check_events(&[Event::SolicitedConfirmWaitNewRequest]);
@@ -258,7 +252,7 @@ async fn unknown_function_in_the_solicited_confirm_wait_ends_it_and_keeps_the_re
     harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
 
     confirm_solicited(&mut harness, 0).await;
-    probe(&mut harness, 2, RESTART).await;
+    probe(&mut harness, 2, iin1::RESTART).await;
 }
 
 #[tokio::test]
@@ -268,7 +262,7 @@ async fn repeated_non_read_in_the_solicited_confirm_wait_ends_it_and_waits_again
     harness.check_events(&[BROADCAST_PROCESSED]);
 
     let direct_operate = g41v2_control(FunctionCode::DirectOperate, 0, 7);
-    let direct_operate_response = control_response(true, 0, RESTART | BROADCAST, 0);
+    let direct_operate_response = control_response(true, 0, iin1::RESTART | iin1::BROADCAST, 0);
     harness
         .test_request_response(&direct_operate, &direct_operate_response)
         .await;
@@ -284,7 +278,7 @@ async fn repeated_non_read_in_the_solicited_confirm_wait_ends_it_and_waits_again
     ]);
 
     confirm_solicited(&mut harness, 0).await;
-    probe(&mut harness, 1, RESTART).await;
+    probe(&mut harness, 1, iin1::RESTART).await;
 }
 
 // ---------- broadcasts ----------
@@ -300,10 +294,10 @@ async fn broadcast_in_the_solicited_confirm_wait_ends_it_and_sets_the_broadcast_
         harness.check_events(&[Event::SolicitedConfirmWaitNewRequest, BROADCAST_PROCESSED]);
 
         // the unconfirmed event is pending again
-        let iin1 = RESTART | BROADCAST | CLASS_1;
+        let iin1 = iin1::RESTART | iin1::BROADCAST | iin1::CLASS_1;
         if mode == BroadcastConfirmMode::Mandatory {
             harness
-                .test_request_response(&record_current_time(2), &response(true, 2, iin1, 0))
+                .test_request_response(&record_current_time(2), &solicited(2, true, iin1, 0))
                 .await;
             harness.check_events(&[Event::EnterSolicitedConfirmWait(2)]);
             harness.send_and_process(&confirm(2)).await;
@@ -314,12 +308,12 @@ async fn broadcast_in_the_solicited_confirm_wait_ends_it_and_sets_the_broadcast_
             ]);
         } else {
             harness
-                .test_request_response(&record_current_time(2), &response(false, 2, iin1, 0))
+                .test_request_response(&record_current_time(2), &solicited(2, false, iin1, 0))
                 .await;
             harness.check_no_events();
         }
 
-        probe(&mut harness, 3, RESTART | CLASS_1).await;
+        probe(&mut harness, 3, iin1::RESTART | iin1::CLASS_1).await;
     }
 }
 
@@ -345,7 +339,7 @@ async fn broadcast_in_the_unsolicited_confirm_wait_discards_the_deferred_read() 
         harness
             .test_request_response(
                 &record_current_time(3),
-                &response(con, 3, RESTART | BROADCAST, 0),
+                &solicited(3, con, iin1::RESTART | iin1::BROADCAST, 0),
             )
             .await;
         if con {
@@ -365,7 +359,12 @@ async fn unknown_function_reply_in_idle_reports_a_mandatory_broadcast_without_wa
     harness
         .test_request_response(
             &unknown_function(1),
-            &response(true, 1, RESTART | BROADCAST, NO_FUNC_CODE_SUPPORT),
+            &solicited(
+                1,
+                true,
+                iin1::RESTART | iin1::BROADCAST,
+                iin2::NO_FUNC_CODE_SUPPORT,
+            ),
         )
         .await;
     harness.check_no_events();
@@ -378,12 +377,12 @@ async fn unknown_function_reply_in_idle_reports_a_mandatory_broadcast_without_wa
     harness
         .test_request_response(
             &record_current_time(2),
-            &response(true, 2, RESTART | BROADCAST, 0),
+            &solicited(2, true, iin1::RESTART | iin1::BROADCAST, 0),
         )
         .await;
     harness.check_events(&[Event::EnterSolicitedConfirmWait(2)]);
     confirm_solicited(&mut harness, 2).await;
-    probe(&mut harness, 3, RESTART).await;
+    probe(&mut harness, 3, iin1::RESTART).await;
 }
 
 #[tokio::test]
@@ -395,12 +394,17 @@ async fn malformed_request_in_idle_reports_a_mandatory_broadcast_and_waits_for_i
     harness
         .test_request_response(
             &malformed(1),
-            &response(true, 1, RESTART | BROADCAST, PARAMETER_ERROR),
+            &solicited(
+                1,
+                true,
+                iin1::RESTART | iin1::BROADCAST,
+                iin2::PARAMETER_ERROR,
+            ),
         )
         .await;
     harness.check_events(&[Event::EnterSolicitedConfirmWait(1)]);
     confirm_solicited(&mut harness, 1).await;
-    probe(&mut harness, 2, RESTART).await;
+    probe(&mut harness, 2, iin1::RESTART).await;
 }
 
 /// the confirm of the response that reported the broadcast clears it
@@ -414,7 +418,12 @@ async fn malformed_request_in_the_unsolicited_confirm_wait_reports_a_mandatory_b
     harness
         .test_request_response(
             &malformed(1),
-            &response(true, 1, RESTART | BROADCAST, PARAMETER_ERROR),
+            &solicited(
+                1,
+                true,
+                iin1::RESTART | iin1::BROADCAST,
+                iin2::PARAMETER_ERROR,
+            ),
         )
         .await;
     harness.check_no_events();
@@ -423,7 +432,7 @@ async fn malformed_request_in_the_unsolicited_confirm_wait_reports_a_mandatory_b
     harness.expect_no_response();
     harness.check_no_events();
 
-    probe(&mut harness, 2, RESTART).await;
+    probe(&mut harness, 2, iin1::RESTART).await;
 }
 
 /// a broadcast that doesn't require a confirm ends with the first response that reports it, even
@@ -442,11 +451,11 @@ async fn unsolicited_response_consumes_a_broadcast_that_does_not_require_a_confi
         harness.check_events(&[BROADCAST_PROCESSED]);
 
         harness.handle.database.transaction(add_binary_event);
-        let unsolicited = unsolicited(1, RESTART | BROADCAST, G2V1_EVENT);
+        let unsolicited = unsolicited(1, iin1::RESTART | iin1::BROADCAST, &g2v1_events(0..1));
         harness.expect_response(&unsolicited).await;
         harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
 
-        probe(&mut harness, 2, RESTART).await;
+        probe(&mut harness, 2, iin1::RESTART).await;
     }
 }
 
@@ -462,7 +471,7 @@ async fn unconfirmed_unsolicited_response_leaves_a_mandatory_broadcast_to_report
     harness.check_events(&[BROADCAST_PROCESSED]);
 
     harness.handle.database.transaction(add_binary_event);
-    let unsolicited = unsolicited(1, RESTART | BROADCAST, G2V1_EVENT);
+    let unsolicited = unsolicited(1, iin1::RESTART | iin1::BROADCAST, &g2v1_events(0..1));
     harness.expect_response(&unsolicited).await;
     harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
     harness
@@ -472,7 +481,7 @@ async fn unconfirmed_unsolicited_response_leaves_a_mandatory_broadcast_to_report
     harness
         .test_request_response(
             &record_current_time(2),
-            &response(true, 2, RESTART | BROADCAST | CLASS_1, 0),
+            &solicited(2, true, iin1::RESTART | iin1::BROADCAST | iin1::CLASS_1, 0),
         )
         .await;
     harness.check_events(&[Event::EnterSolicitedConfirmWait(2)]);
@@ -482,7 +491,7 @@ async fn unconfirmed_unsolicited_response_leaves_a_mandatory_broadcast_to_report
         Event::BeginConfirm,
         Event::EndConfirm(class_1_binaries(1)),
     ]);
-    probe(&mut harness, 3, RESTART | CLASS_1).await;
+    probe(&mut harness, 3, iin1::RESTART | iin1::CLASS_1).await;
 }
 
 /// a deferred READ is answered as from idle, and its response reports a mandatory broadcast
@@ -502,14 +511,14 @@ async fn deferred_read_reports_a_mandatory_broadcast_and_waits_for_its_confirm()
 
     harness.send_and_process(&unsolicited_confirm(0)).await;
     harness
-        .expect_response(&response(true, 3, RESTART | BROADCAST, 0))
+        .expect_response(&solicited(3, true, iin1::RESTART | iin1::BROADCAST, 0))
         .await;
     harness.check_events(&[
         Event::UnsolicitedConfirmReceived(0),
         Event::EnterSolicitedConfirmWait(3),
     ]);
     confirm_solicited(&mut harness, 3).await;
-    probe(&mut harness, 4, RESTART).await;
+    probe(&mut harness, 4, iin1::RESTART).await;
 }
 
 // ---------- confirms ----------
@@ -519,7 +528,7 @@ async fn confirms_in_idle_are_ignored_and_keep_the_repeat_history() {
     let mut harness = new_harness(get_default_config());
 
     let direct_operate = g41v2_control(FunctionCode::DirectOperate, 0, 7);
-    let direct_operate_response = control_response(false, 0, RESTART, 0);
+    let direct_operate_response = control_response(false, 0, iin1::RESTART, 0);
     harness
         .test_request_response(&direct_operate, &direct_operate_response)
         .await;
@@ -550,7 +559,12 @@ async fn solicited_confirm_of_an_unknown_function_reply_in_the_unsolicited_confi
     harness
         .test_request_response(
             &unknown_function(1),
-            &response(true, 1, RESTART | BROADCAST, NO_FUNC_CODE_SUPPORT),
+            &solicited(
+                1,
+                true,
+                iin1::RESTART | iin1::BROADCAST,
+                iin2::NO_FUNC_CODE_SUPPORT,
+            ),
         )
         .await;
 
@@ -562,14 +576,14 @@ async fn solicited_confirm_of_an_unknown_function_reply_in_the_unsolicited_confi
     harness
         .test_request_response(
             &record_current_time(2),
-            &response(true, 2, RESTART | BROADCAST, 0),
+            &solicited(2, true, iin1::RESTART | iin1::BROADCAST, 0),
         )
         .await;
     harness.send_and_process(&confirm(2)).await;
     harness.expect_no_response();
     harness.check_no_events();
 
-    probe(&mut harness, 3, RESTART).await;
+    probe(&mut harness, 3, iin1::RESTART).await;
 }
 
 /// A solicited confirm in the unsolicited confirm wait, after the response's confirm timeout,
@@ -582,7 +596,7 @@ async fn late_solicited_confirm_in_the_unsolicited_confirm_wait_does_not_clear_a
     enable_unsolicited(&mut harness).await;
 
     harness.handle.database.transaction(add_binary_event);
-    let unsolicited = unsolicited(1, RESTART, G2V1_EVENT);
+    let unsolicited = unsolicited(1, iin1::RESTART, &g2v1_events(0..1));
     harness.expect_response(&unsolicited).await;
     harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
 
@@ -591,7 +605,7 @@ async fn late_solicited_confirm_in_the_unsolicited_confirm_wait_does_not_clear_a
     harness
         .test_request_response(
             &record_current_time(2),
-            &response(true, 2, RESTART | BROADCAST, 0),
+            &solicited(2, true, iin1::RESTART | iin1::BROADCAST, 0),
         )
         .await;
 
@@ -615,12 +629,12 @@ async fn late_solicited_confirm_in_the_unsolicited_confirm_wait_does_not_clear_a
     harness
         .test_request_response(
             &record_current_time(3),
-            &response(true, 3, RESTART | BROADCAST, 0),
+            &solicited(3, true, iin1::RESTART | iin1::BROADCAST, 0),
         )
         .await;
     harness.check_events(&[Event::EnterSolicitedConfirmWait(3)]);
     confirm_solicited(&mut harness, 3).await;
-    probe(&mut harness, 4, RESTART).await;
+    probe(&mut harness, 4, iin1::RESTART).await;
 }
 
 /// A solicited response asks for a confirm and its wait times out; a solicited confirm in the
@@ -637,7 +651,7 @@ async fn solicited_confirm_in_the_unsolicited_confirm_wait_does_not_clear_a_broa
     harness
         .test_request_response(
             &record_current_time(2),
-            &response(true, 2, RESTART | BROADCAST, 0),
+            &solicited(2, true, iin1::RESTART | iin1::BROADCAST, 0),
         )
         .await;
     harness.check_events(&[Event::EnterSolicitedConfirmWait(2)]);
@@ -646,7 +660,7 @@ async fn solicited_confirm_in_the_unsolicited_confirm_wait_does_not_clear_a_broa
         .await;
 
     harness.handle.database.transaction(add_binary_event);
-    let unsolicited = unsolicited(1, RESTART | BROADCAST, G2V1_EVENT);
+    let unsolicited = unsolicited(1, iin1::RESTART | iin1::BROADCAST, &g2v1_events(0..1));
     harness.expect_response(&unsolicited).await;
     harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
 
@@ -658,14 +672,14 @@ async fn solicited_confirm_in_the_unsolicited_confirm_wait_does_not_clear_a_broa
     harness
         .test_request_response(
             &record_current_time(3),
-            &response(true, 3, RESTART | BROADCAST, 0),
+            &solicited(3, true, iin1::RESTART | iin1::BROADCAST, 0),
         )
         .await;
     harness.send_and_process(&confirm(3)).await;
     harness.expect_no_response();
     harness.check_no_events();
 
-    probe(&mut harness, 4, RESTART).await;
+    probe(&mut harness, 4, iin1::RESTART).await;
 }
 
 // ---------- SELECT and OPERATE ----------
@@ -677,7 +691,7 @@ async fn select_in_the_solicited_confirm_wait(harness: &mut OutstationHarness) {
     harness
         .test_request_response(
             &g41v2_control(FunctionCode::Select, 0, 7),
-            &control_response(true, 0, RESTART | BROADCAST, 0),
+            &control_response(true, 0, iin1::RESTART | iin1::BROADCAST, 0),
         )
         .await;
     harness.check_events(&selected());
@@ -692,7 +706,7 @@ async fn operate_in_the_solicited_confirm_wait_uses_the_selection() {
     harness
         .test_request_response(
             &g41v2_control(FunctionCode::Operate, 1, 7),
-            &control_response(true, 1, RESTART | BROADCAST, 0),
+            &control_response(true, 1, iin1::RESTART | iin1::BROADCAST, 0),
         )
         .await;
     harness.check_events(&[Event::SolicitedConfirmWaitNewRequest]);
@@ -709,7 +723,7 @@ async fn select_retry_in_the_solicited_confirm_wait_keeps_the_selection() {
     harness
         .test_request_response(
             &g41v2_control(FunctionCode::Select, 0, 7),
-            &control_response(true, 0, RESTART | BROADCAST, 0),
+            &control_response(true, 0, iin1::RESTART | iin1::BROADCAST, 0),
         )
         .await;
     harness.check_events(&[
@@ -720,7 +734,7 @@ async fn select_retry_in_the_solicited_confirm_wait_keeps_the_selection() {
     harness
         .test_request_response(
             &g41v2_control(FunctionCode::Operate, 1, 7),
-            &control_response(true, 1, RESTART | BROADCAST, 0),
+            &control_response(true, 1, iin1::RESTART | iin1::BROADCAST, 0),
         )
         .await;
     harness.check_events(&[Event::SolicitedConfirmWaitNewRequest]);
@@ -747,7 +761,7 @@ async fn discarded_select_in_the_solicited_confirm_wait_continues_the_wait_and_k
     harness
         .test_request_response(
             &g41v2_control(FunctionCode::Operate, 1, 7),
-            &control_response(false, 1, RESTART, 0),
+            &control_response(false, 1, iin1::RESTART, 0),
         )
         .await;
     harness.check_events(&operated(OperateType::SelectBeforeOperate));
@@ -761,7 +775,7 @@ async fn discarded_select_and_confirms_in_the_unsolicited_confirm_wait_keep_the_
     harness
         .test_request_response(
             &g41v2_control(FunctionCode::Select, 0, 7),
-            &control_response(false, 0, RESTART, 0),
+            &control_response(false, 0, iin1::RESTART, 0),
         )
         .await;
     harness.check_events(&selected());
@@ -779,7 +793,7 @@ async fn discarded_select_and_confirms_in_the_unsolicited_confirm_wait_keep_the_
     harness
         .test_request_response(
             &g41v2_control(FunctionCode::Operate, 1, 7),
-            &control_response(false, 1, RESTART, 0),
+            &control_response(false, 1, iin1::RESTART, 0),
         )
         .await;
     harness.check_events(&operated(OperateType::SelectBeforeOperate));
@@ -800,10 +814,8 @@ async fn read_in_the_unsolicited_confirm_wait_replaces_the_deferred_read() {
 
     harness.send_and_process(&unsolicited_confirm(0)).await;
     harness.check_events(&[Event::UnsolicitedConfirmReceived(0)]);
-    harness
-        .expect_response(&response(false, 2, RESTART, 0))
-        .await;
-    probe(&mut harness, 3, RESTART).await;
+    harness.expect_response(&empty_response(2, 0)).await;
+    probe(&mut harness, 3, iin1::RESTART).await;
 }
 
 /// Table 6-1 rows 26-29: a request that isn't a READ discards the deferred READ
@@ -814,19 +826,31 @@ async fn requests_in_the_unsolicited_confirm_wait_discard_the_deferred_read() {
         (
             &delay_measure(2),
             vec![
-                0xC2, 0x81, RESTART, 0x00, 0x34, 0x02, 0x07, 0x01, 0x00, 0x00,
+                0xC2,
+                0x81,
+                iin1::RESTART,
+                0x00,
+                0x34,
+                0x02,
+                0x07,
+                0x01,
+                0x00,
+                0x00,
             ],
         ),
         (
             &malformed(2),
-            response(false, 2, RESTART, PARAMETER_ERROR).to_vec(),
+            empty_response(2, iin2::PARAMETER_ERROR).to_vec(),
         ),
         (
             &unknown_function(2),
-            response(false, 2, RESTART, NO_FUNC_CODE_SUPPORT).to_vec(),
+            empty_response(2, iin2::NO_FUNC_CODE_SUPPORT).to_vec(),
         ),
         // the repeat of the DIRECT_OPERATE
-        (&direct_operate, control_response(false, 0, RESTART, 0)),
+        (
+            &direct_operate,
+            control_response(false, 0, iin1::RESTART, 0),
+        ),
     ];
 
     for (request, expected) in cases {
@@ -834,7 +858,10 @@ async fn requests_in_the_unsolicited_confirm_wait_discard_the_deferred_read() {
         enter_unsolicited_confirm_wait(&mut harness).await;
 
         harness
-            .test_request_response(&direct_operate, &control_response(false, 0, RESTART, 0))
+            .test_request_response(
+                &direct_operate,
+                &control_response(false, 0, iin1::RESTART, 0),
+            )
             .await;
         harness.check_events(&operated(OperateType::DirectOperate));
 
@@ -846,7 +873,7 @@ async fn requests_in_the_unsolicited_confirm_wait_discard_the_deferred_read() {
 
         harness.send_and_process(&unsolicited_confirm(0)).await;
         harness.check_events(&[Event::UnsolicitedConfirmReceived(0)]);
-        probe(&mut harness, 3, RESTART).await;
+        probe(&mut harness, 3, iin1::RESTART).await;
     }
 }
 
@@ -859,21 +886,21 @@ async fn disable_unsolicited_in_the_unsolicited_confirm_wait_is_the_last_request
         harness.send_and_process(&read_class_0(1)).await;
         harness.expect_no_response();
 
-        let disable = [0xC2, 0x15, 60, 2, 0x06, 60, 3, 0x06, 60, 4, 0x06];
+        let disable = disable_unsolicited(2, [true; 3]);
         harness
-            .test_request_response(&disable, &response(false, 2, RESTART, 0))
+            .test_request_response(&disable, &empty_response(2, 0))
             .await;
 
         // the wait goes on, and the repeat gets the same response
         harness
-            .test_request_response(&disable, &response(false, 2, RESTART, 0))
+            .test_request_response(&disable, &empty_response(2, 0))
             .await;
         harness.check_no_events();
 
         // and the deferred READ is gone
         harness.send_and_process(&unsolicited_confirm(0)).await;
         harness.check_events(&[Event::UnsolicitedConfirmReceived(0)]);
-        probe(&mut harness, 3, RESTART).await;
+        probe(&mut harness, 3, iin1::RESTART).await;
     })
     .await;
 }
@@ -887,17 +914,17 @@ async fn requests_and_confirms_in_idle_are_reported_to_the_information_callback(
     let cases: [(&[u8], Vec<u8>, Option<Event>); 6] = [
         (
             &read_class_0(0),
-            response(false, 0, RESTART, 0).to_vec(),
+            empty_response(0, 0).to_vec(),
             Some(from_idle(FunctionCode::Read, false, 0)),
         ),
         (
             &record_current_time(0),
-            response(false, 0, RESTART, 0).to_vec(),
+            empty_response(0, 0).to_vec(),
             Some(from_idle(FunctionCode::RecordCurrentTime, false, 0)),
         ),
         (
             &malformed(0),
-            response(false, 0, RESTART, PARAMETER_ERROR).to_vec(),
+            empty_response(0, iin2::PARAMETER_ERROR).to_vec(),
             Some(from_idle(FunctionCode::Read, false, 0)),
         ),
         (
@@ -912,7 +939,7 @@ async fn requests_and_confirms_in_idle_are_reported_to_the_information_callback(
         ),
         (
             &unknown_function(0),
-            response(false, 0, RESTART, NO_FUNC_CODE_SUPPORT).to_vec(),
+            empty_response(0, iin2::NO_FUNC_CODE_SUPPORT).to_vec(),
             None,
         ),
     ];
@@ -941,7 +968,7 @@ async fn discarded_select_in_idle_is_not_reported_to_the_information_callback() 
     harness
         .test_request_response(
             &g41v2_control(FunctionCode::Select, 0, 7),
-            &control_response(false, 0, RESTART, 0),
+            &control_response(false, 0, iin1::RESTART, 0),
         )
         .await;
     harness.check_events(&[from_idle(FunctionCode::Select, false, 0)]);
@@ -962,8 +989,7 @@ async fn request_retained_from_the_solicited_confirm_wait_is_reported_to_the_inf
     harness.record_requests_from_idle();
 
     harness.handle.database.transaction(add_binary_event);
-    let mut expected = response(true, 0, RESTART, 0).to_vec();
-    expected.extend_from_slice(G2V1_EVENT);
+    let expected = class_1_event_response(0, iin1::RESTART);
     harness
         .test_request_response(&read_class_1(0), &expected)
         .await;
@@ -975,7 +1001,7 @@ async fn request_retained_from_the_solicited_confirm_wait_is_reported_to_the_inf
     harness
         .test_request_response(
             &record_current_time(1),
-            &response(false, 1, RESTART | CLASS_1, 0),
+            &solicited(1, false, iin1::RESTART | iin1::CLASS_1, 0),
         )
         .await;
     harness.check_events(&[
@@ -993,7 +1019,7 @@ async fn requests_in_the_unsolicited_confirm_wait_are_not_reported_to_the_inform
     enter_unsolicited_confirm_wait(&mut harness).await;
 
     harness
-        .test_request_response(&record_current_time(1), &response(false, 1, RESTART, 0))
+        .test_request_response(&record_current_time(1), &empty_response(1, 0))
         .await;
     harness.send_and_process(&read_class_0(2)).await;
     harness.expect_no_response();
@@ -1002,13 +1028,11 @@ async fn requests_in_the_unsolicited_confirm_wait_are_not_reported_to_the_inform
 
     harness.send_and_process(&unsolicited_confirm(0)).await;
     harness.check_events(&[Event::UnsolicitedConfirmReceived(0)]);
-    harness
-        .expect_response(&response(false, 2, RESTART, 0))
-        .await;
+    harness.expect_response(&empty_response(2, 0)).await;
     harness.check_no_events();
 
     harness
-        .test_request_response(&record_current_time(3), &response(false, 3, RESTART, 0))
+        .test_request_response(&record_current_time(3), &empty_response(3, 0))
         .await;
     harness.check_events(&[from_idle(FunctionCode::RecordCurrentTime, false, 3)]);
 }
@@ -1028,7 +1052,7 @@ fn keep_alive<F: FnOnce() -> OutstationConfig>(config: F) -> OutstationConfig {
 async fn requests_in_idle_postpone_the_link_status_request() {
     for (request, expected) in [
         (confirm(0), None),
-        (record_current_time(0), Some(response(false, 0, RESTART, 0))),
+        (record_current_time(0), Some(empty_response(0, 0))),
     ] {
         let start = Instant::now();
         let mut harness = new_harness(keep_alive(get_default_config));
@@ -1098,22 +1122,6 @@ async fn requests_in_the_unsolicited_confirm_wait_postpone_the_link_status_reque
 
 // ---------- requests that end the solicited confirm wait while an unsolicited response is due ----------
 
-const CLASS_2: u8 = 0x04;
-
-/// unsolicited responses without link status requests, which would break the silences
-fn unsolicited_config() -> OutstationConfig {
-    let mut config = get_default_unsolicited_config();
-    config.keep_alive_timeout = None;
-    config
-}
-
-/// ENABLE_UNSOLICITED for class 2 only, so class 1 events are only reported to READs
-const ENABLE_UNSOLICITED_CLASS_2: [u8; 5] = [0xC0, 0x14, 60, 3, 0x06];
-
-const fn disable_unsolicited_class_2(seq: u8) -> [u8; 5] {
-    [0xC0 | seq, 0x15, 60, 3, 0x06]
-}
-
 /// READ class 3, which has no events in these tests
 const fn read_class_3(seq: u8) -> [u8; 5] {
     [0xC0 | seq, 0x01, 60, 4, 0x06]
@@ -1145,9 +1153,7 @@ fn class_2_binary() -> BufferState {
 
 /// the response to READ class 1 with the binary event at index 0, which asks for a confirm
 fn class_1_event_response(seq: u8, iin1: u8) -> Vec<u8> {
-    let mut bytes = response(true, seq, iin1, 0).to_vec();
-    bytes.extend_from_slice(G2V1_EVENT);
-    bytes
+    with_objects(solicited(seq, true, iin1, 0), &g2v1_events(0..1))
 }
 
 /// the unsolicited response with sequence 1 and the class 2 event at index 1
@@ -1161,11 +1167,11 @@ fn class_2_unsolicited(iin1: u8) -> Vec<u8> {
 async fn solicited_confirm_wait_with_unsolicited_due(harness: &mut OutstationHarness) {
     confirm_null_unsolicited(harness).await;
     harness
-        .test_request_response(&ENABLE_UNSOLICITED_CLASS_2, &response(false, 0, RESTART, 0))
+        .test_request_response(ENABLE_UNSOLICITED_CLASS_2_SEQ_0, &empty_response(0, 0))
         .await;
     harness.handle.database.transaction(add_binary_event);
     harness
-        .test_request_response(&read_class_1(1), &class_1_event_response(1, RESTART))
+        .test_request_response(&read_class_1(1), &class_1_event_response(1, iin1::RESTART))
         .await;
     harness.check_events(&[Event::EnterSolicitedConfirmWait(1)]);
 
@@ -1185,12 +1191,8 @@ async fn confirm_class_2_unsolicited(harness: &mut OutstationHarness) {
     ]);
 }
 
-/// no response for longer than the confirm timeout and the unsolicited retry delay
-async fn expect_silence(harness: &mut OutstationHarness) {
-    tokio::time::sleep(Duration::from_secs(60)).await;
-    harness.expect_no_response();
-    harness.check_no_events();
-}
+/// longer than the confirm timeout and the unsolicited retry delay
+const SILENCE: Duration = Duration::from_secs(60);
 
 /// The sequence numbers of a new request in the solicited confirm wait for the response to the
 /// READ with sequence 1: the next one (Table 6-1 row 15), and the same one with other contents
@@ -1201,17 +1203,17 @@ const NEW_REQUEST_SEQS: [u8; 2] = [2, 1];
 async fn read_in_the_solicited_confirm_wait_is_answered_before_a_due_unsolicited_response() {
     watchdog(async {
         for seq in NEW_REQUEST_SEQS {
-            let mut harness = new_harness(unsolicited_config());
+            let mut harness = new_harness(without_keep_alive(get_default_unsolicited_config()));
             solicited_confirm_wait_with_unsolicited_due(&mut harness).await;
 
             harness
                 .test_request_response(
                     &read_class_3(seq),
-                    &response(false, seq, RESTART | CLASS_1 | CLASS_2, 0),
+                    &solicited(seq, false, iin1::RESTART | iin1::CLASS_1 | iin1::CLASS_2, 0),
                 )
                 .await;
             harness
-                .expect_response(&class_2_unsolicited(RESTART | CLASS_1))
+                .expect_response(&class_2_unsolicited(iin1::RESTART | iin1::CLASS_1))
                 .await;
             harness.check_events(&[
                 Event::SolicitedConfirmWaitNewRequest,
@@ -1220,7 +1222,7 @@ async fn read_in_the_solicited_confirm_wait_is_answered_before_a_due_unsolicited
             ]);
 
             confirm_class_2_unsolicited(&mut harness).await;
-            expect_silence(&mut harness).await;
+            expect_silence(&mut harness, SILENCE).await;
         }
     })
     .await;
@@ -1230,17 +1232,17 @@ async fn read_in_the_solicited_confirm_wait_is_answered_before_a_due_unsolicited
 async fn non_read_in_the_solicited_confirm_wait_is_answered_before_a_due_unsolicited_response() {
     watchdog(async {
         for seq in NEW_REQUEST_SEQS {
-            let mut harness = new_harness(unsolicited_config());
+            let mut harness = new_harness(without_keep_alive(get_default_unsolicited_config()));
             solicited_confirm_wait_with_unsolicited_due(&mut harness).await;
 
             harness
                 .test_request_response(
                     &record_current_time(seq),
-                    &response(false, seq, RESTART | CLASS_1 | CLASS_2, 0),
+                    &solicited(seq, false, iin1::RESTART | iin1::CLASS_1 | iin1::CLASS_2, 0),
                 )
                 .await;
             harness
-                .expect_response(&class_2_unsolicited(RESTART | CLASS_1))
+                .expect_response(&class_2_unsolicited(iin1::RESTART | iin1::CLASS_1))
                 .await;
             harness.check_events(&[
                 Event::SolicitedConfirmWaitNewRequest,
@@ -1249,7 +1251,7 @@ async fn non_read_in_the_solicited_confirm_wait_is_answered_before_a_due_unsolic
             ]);
 
             confirm_class_2_unsolicited(&mut harness).await;
-            expect_silence(&mut harness).await;
+            expect_silence(&mut harness, SILENCE).await;
         }
     })
     .await;
@@ -1259,13 +1261,13 @@ async fn non_read_in_the_solicited_confirm_wait_is_answered_before_a_due_unsolic
 async fn disable_unsolicited_in_the_solicited_confirm_wait_is_processed_before_a_due_unsolicited_response(
 ) {
     watchdog(async {
-        let mut harness = new_harness(unsolicited_config());
+        let mut harness = new_harness(without_keep_alive(get_default_unsolicited_config()));
         solicited_confirm_wait_with_unsolicited_due(&mut harness).await;
 
         harness
             .test_request_response(
-                &disable_unsolicited_class_2(2),
-                &response(false, 2, RESTART | CLASS_1 | CLASS_2, 0),
+                &disable_unsolicited(2, [false, true, false]),
+                &solicited(2, false, iin1::RESTART | iin1::CLASS_1 | iin1::CLASS_2, 0),
             )
             .await;
         harness.check_events(&[
@@ -1274,11 +1276,11 @@ async fn disable_unsolicited_in_the_solicited_confirm_wait_is_processed_before_a
         ]);
 
         // the class 2 event is never reported unsolicited
-        expect_silence(&mut harness).await;
+        expect_silence(&mut harness, SILENCE).await;
         harness
             .test_request_response(
                 &record_current_time(3),
-                &response(false, 3, RESTART | CLASS_1 | CLASS_2, 0),
+                &solicited(3, false, iin1::RESTART | iin1::CLASS_1 | iin1::CLASS_2, 0),
             )
             .await;
         harness.check_events(&[from_idle(FunctionCode::RecordCurrentTime, false, 3)]);
@@ -1291,14 +1293,14 @@ async fn disable_unsolicited_in_the_solicited_confirm_wait_is_processed_before_a
 #[tokio::test(start_paused = true)]
 async fn reads_in_the_solicited_confirm_wait_are_answered_before_a_due_unsolicited_response() {
     watchdog(async {
-        let mut harness = new_harness(unsolicited_config());
+        let mut harness = new_harness(without_keep_alive(get_default_unsolicited_config()));
         solicited_confirm_wait_with_unsolicited_due(&mut harness).await;
 
         for seq in [2, 3] {
             harness
                 .test_request_response(
                     &read_class_1(seq),
-                    &class_1_event_response(seq, RESTART | CLASS_2),
+                    &class_1_event_response(seq, iin1::RESTART | iin1::CLASS_2),
                 )
                 .await;
             harness.check_events(&[
@@ -1309,7 +1311,9 @@ async fn reads_in_the_solicited_confirm_wait_are_answered_before_a_due_unsolicit
         }
 
         harness.send_and_process(&confirm(3)).await;
-        harness.expect_response(&class_2_unsolicited(RESTART)).await;
+        harness
+            .expect_response(&class_2_unsolicited(iin1::RESTART))
+            .await;
         harness.check_events(&[
             Event::SolicitedConfirmReceived(3),
             Event::BeginConfirm,
@@ -1325,7 +1329,7 @@ async fn reads_in_the_solicited_confirm_wait_are_answered_before_a_due_unsolicit
             Event::Cleared(1),
             Event::EndConfirm(empty_buffer_state()),
         ]);
-        expect_silence(&mut harness).await;
+        expect_silence(&mut harness, SILENCE).await;
     })
     .await;
 }
@@ -1337,25 +1341,30 @@ async fn invalid_requests_in_the_solicited_confirm_wait_are_answered_before_a_du
 ) {
     watchdog(async {
         let cases: [(&[u8], u8, Option<Event>); 2] = [
-            (&unknown_function(2), NO_FUNC_CODE_SUPPORT, None),
+            (&unknown_function(2), iin2::NO_FUNC_CODE_SUPPORT, None),
             (
                 &malformed(2),
-                PARAMETER_ERROR,
+                iin2::PARAMETER_ERROR,
                 Some(from_idle(FunctionCode::Read, false, 2)),
             ),
         ];
         for (request, iin2, from_idle) in cases {
-            let mut harness = new_harness(unsolicited_config());
+            let mut harness = new_harness(without_keep_alive(get_default_unsolicited_config()));
             solicited_confirm_wait_with_unsolicited_due(&mut harness).await;
 
             harness
                 .test_request_response(
                     request,
-                    &response(false, 2, RESTART | CLASS_1 | CLASS_2, iin2),
+                    &solicited(
+                        2,
+                        false,
+                        iin1::RESTART | iin1::CLASS_1 | iin1::CLASS_2,
+                        iin2,
+                    ),
                 )
                 .await;
             harness
-                .expect_response(&class_2_unsolicited(RESTART | CLASS_1))
+                .expect_response(&class_2_unsolicited(iin1::RESTART | iin1::CLASS_1))
                 .await;
             harness.check_events(&[Event::SolicitedConfirmWaitNewRequest]);
             if let Some(event) = from_idle {
@@ -1364,7 +1373,7 @@ async fn invalid_requests_in_the_solicited_confirm_wait_are_answered_before_a_du
             harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
 
             confirm_class_2_unsolicited(&mut harness).await;
-            expect_silence(&mut harness).await;
+            expect_silence(&mut harness, SILENCE).await;
         }
     })
     .await;
@@ -1374,12 +1383,12 @@ async fn invalid_requests_in_the_solicited_confirm_wait_are_answered_before_a_du
 async fn broadcast_disable_unsolicited_in_the_solicited_confirm_wait_is_processed_before_a_due_unsolicited_response(
 ) {
     watchdog(async {
-        let mut harness = new_harness(unsolicited_config());
+        let mut harness = new_harness(without_keep_alive(get_default_unsolicited_config()));
         solicited_confirm_wait_with_unsolicited_due(&mut harness).await;
 
         harness.set_broadcast(Some(BroadcastConfirmMode::NotRequired));
         harness
-            .send_and_process(&disable_unsolicited_class_2(2))
+            .send_and_process(&disable_unsolicited(2, [false, true, false]))
             .await;
         harness.set_broadcast(None);
         harness.check_events(&[
@@ -1389,11 +1398,16 @@ async fn broadcast_disable_unsolicited_in_the_solicited_confirm_wait_is_processe
         ]);
 
         // the class 2 event is never reported unsolicited
-        expect_silence(&mut harness).await;
+        expect_silence(&mut harness, SILENCE).await;
         harness
             .test_request_response(
                 &record_current_time(3),
-                &response(false, 3, RESTART | BROADCAST | CLASS_1 | CLASS_2, 0),
+                &solicited(
+                    3,
+                    false,
+                    iin1::RESTART | iin1::BROADCAST | iin1::CLASS_1 | iin1::CLASS_2,
+                    0,
+                ),
             )
             .await;
         harness.check_events(&[from_idle(FunctionCode::RecordCurrentTime, false, 3)]);
@@ -1407,15 +1421,15 @@ async fn broadcast_disable_unsolicited_in_the_solicited_confirm_wait_is_processe
 async fn request_in_the_solicited_confirm_wait_of_a_deferred_read_is_answered_before_a_due_unsolicited_response(
 ) {
     watchdog(async {
-        let mut harness = new_harness(unsolicited_config());
+        let mut harness = new_harness(without_keep_alive(get_default_unsolicited_config()));
         confirm_null_unsolicited(&mut harness).await;
         harness
-            .test_request_response(&ENABLE_UNSOLICITED_CLASS_2, &response(false, 0, RESTART, 0))
+            .test_request_response(ENABLE_UNSOLICITED_CLASS_2_SEQ_0, &empty_response(0, 0))
             .await;
         harness.handle.database.transaction(add_binary_event);
         add_class_2_event(&mut harness, 1);
         harness
-            .expect_response(&class_2_unsolicited(RESTART | CLASS_1))
+            .expect_response(&class_2_unsolicited(iin1::RESTART | iin1::CLASS_1))
             .await;
         harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
 
@@ -1423,7 +1437,7 @@ async fn request_in_the_solicited_confirm_wait_of_a_deferred_read_is_answered_be
         harness.expect_no_response();
         confirm_class_2_unsolicited(&mut harness).await;
         harness
-            .expect_response(&class_1_event_response(1, RESTART))
+            .expect_response(&class_1_event_response(1, iin1::RESTART))
             .await;
         harness.check_events(&[Event::EnterSolicitedConfirmWait(1)]);
 
@@ -1433,11 +1447,15 @@ async fn request_in_the_solicited_confirm_wait_of_a_deferred_read_is_answered_be
         harness
             .test_request_response(
                 &record_current_time(2),
-                &response(false, 2, RESTART | CLASS_1 | CLASS_2, 0),
+                &solicited(2, false, iin1::RESTART | iin1::CLASS_1 | iin1::CLASS_2, 0),
             )
             .await;
         harness
-            .expect_response(&unsolicited(2, RESTART | CLASS_1, &g2v1_events(2..3)))
+            .expect_response(&unsolicited(
+                2,
+                iin1::RESTART | iin1::CLASS_1,
+                &g2v1_events(2..3),
+            ))
             .await;
         harness.check_events(&[
             Event::SolicitedConfirmWaitNewRequest,

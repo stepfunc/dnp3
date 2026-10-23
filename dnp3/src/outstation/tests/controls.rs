@@ -175,16 +175,11 @@ fn g41v2_request(seq: u8, function: FunctionCode, count: u8) -> Vec<u8> {
 
 // response with restart IIN that echoes g41v2_request with every status set to `status`
 fn g41v2_response(seq: u8, count: u8, status: u8) -> Vec<u8> {
-    let mut response = vec![0xC0 | seq, 0x81, 0x80, 0x00, 41, 2, 0x17, count];
+    let mut response = with_objects(empty_response(seq, 0), &[41, 2, 0x17, count]);
     for index in 0..count {
         response.extend_from_slice(&[index, 0x01, 0x02, status]);
     }
     response
-}
-
-// response with restart IIN and IIN2.2 PARAMETER_ERROR, and no objects
-fn parameter_error_response(seq: u8) -> [u8; 4] {
-    [0xC0 | seq, 0x81, 0x80, 0x04]
 }
 
 fn g41v2_select_events(count: u8) -> Vec<Event> {
@@ -284,7 +279,7 @@ async fn direct_operate_whose_headers_fit_alone_but_not_together_is_rejected_wit
     }
 
     harness
-        .test_request_response(&request, &parameter_error_response(0))
+        .test_request_response(&request, &empty_response(0, iin2::PARAMETER_ERROR))
         .await;
 
     harness.check_no_events();
@@ -297,7 +292,7 @@ async fn direct_operate_whose_response_does_not_fit_is_rejected_without_operatin
     harness
         .test_request_response(
             &g41v2_request(0, FunctionCode::DirectOperate, MAX_CONTROLS_IN_RESPONSE + 1),
-            &parameter_error_response(0),
+            &empty_response(0, iin2::PARAMETER_ERROR),
         )
         .await;
 
@@ -311,7 +306,7 @@ async fn select_whose_response_does_not_fit_is_rejected_without_selecting() {
     harness
         .test_request_response(
             &g41v2_request(0, FunctionCode::Select, MAX_CONTROLS_IN_RESPONSE + 1),
-            &parameter_error_response(0),
+            &empty_response(0, iin2::PARAMETER_ERROR),
         )
         .await;
 
@@ -325,7 +320,7 @@ async fn operate_without_select_whose_response_does_not_fit_is_rejected() {
     harness
         .test_request_response(
             &g41v2_request(0, FunctionCode::Operate, MAX_CONTROLS_IN_RESPONSE + 1),
-            &parameter_error_response(0),
+            &empty_response(0, iin2::PARAMETER_ERROR),
         )
         .await;
 
@@ -344,7 +339,7 @@ async fn operate_after_a_different_select_whose_response_does_not_fit_is_rejecte
     harness
         .test_request_response(
             &g41v2_request(1, FunctionCode::Operate, MAX_CONTROLS_IN_RESPONSE + 1),
-            &parameter_error_response(1),
+            &empty_response(1, iin2::PARAMETER_ERROR),
         )
         .await;
 
@@ -513,9 +508,7 @@ fn g12v1_index_7() -> Control {
 }
 
 fn g12v1_response(seq: u8) -> Vec<u8> {
-    let mut response = vec![0xC0 | seq, 0x81, 0x80, 0x00];
-    response.extend_from_slice(&SELECT_SEQ0_G12V1_HASH_ZERO[2..]);
-    response
+    with_objects(empty_response(seq, 0), &SELECT_SEQ0_G12V1_HASH_ZERO[2..])
 }
 
 #[tokio::test]
@@ -581,11 +574,10 @@ fn analog_control_request(seq: u8, function: FunctionCode, values: (f32, f64)) -
 }
 
 fn analog_control_response(seq: u8, iin2: u8, values: (f32, f64), statuses: [u8; 3]) -> Vec<u8> {
-    [
-        &[0xC0 | seq, 0x81, 0x80, iin2][..],
+    with_objects(
+        empty_response(seq, iin2),
         &analog_controls(values, statuses),
-    ]
-    .concat()
+    )
 }
 
 #[tokio::test]
