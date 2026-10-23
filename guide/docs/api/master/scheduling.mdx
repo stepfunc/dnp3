@@ -26,13 +26,15 @@ due.
 |------|---------------------|-----------|
 | Clear the restart bit | When a response reports DEVICE_RESTART (IIN1.7) | IEEE 1815-2012 4.5.8, 5.1.1.1.2 |
 | Disable unsolicited reporting | When the association starts communicating | IEEE 1815-2012 5.1.1.2 |
+| Time synchronization | When a response reports NEED_TIME (IIN1.4) and automatic time synchronization is configured | IEEE 1815-2012 4.5.5, 5.1.1.2, 10.3 |
 | Startup integrity scan | When the association starts communicating, after an outstation restart, and on an event buffer overflow (IIN2.3) if enabled | IEEE 1815-2012 5.1.1.2, TB2017-005 |
-| Time synchronization | When a response reports NEED_TIME (IIN1.4) and automatic time synchronization is configured | IEEE 1815-2012 4.5.5, 10.3 |
 | Enable unsolicited reporting | When the association starts communicating, and after an outstation restart | IEEE 1815-2012 5.1.1.2 |
 | Event scan | When a response reports events (IIN1.1 to IIN1.3) in a class enabled for automatic event scans | IEEE 1815-2012 4.5.2 to 4.5.4 |
 | Keep-alive | When nothing has been received from the outstation for the keep-alive timeout, if one is configured | IEEE 1815-2012 13.2.3.3.1 |
 
 The keep-alive is a link-layer request rather than an application-layer task, and it comes after the association's polls.
+A time synchronization that failed and is waiting to be retried doesn't hold up anything else, as described
+[below](#time-synchronization).
 
 "Starts communicating" means each time the channel connects with the association on it, and when you add an association to
 a channel that is already connected. The startup sequence runs again after every reconnect.
@@ -40,10 +42,10 @@ a channel that is already connected. The startup sequence runs again after every
 ### Startup
 
 The startup sequence is the [initialization](./association_config.mdx#initialization) described with the
-`AssociationConfig`: disable unsolicited reporting, read the startup integrity classes, synchronize the time if the outstation
-asks for it, then enable unsolicited reporting. The unsolicited and integrity steps are each skipped if their classes are
-empty, so an association configured with no unsolicited classes and no integrity classes only synchronizes the time, if
-asked to.
+`AssociationConfig`: disable unsolicited reporting, synchronize the time if the outstation asks for it, read the startup
+integrity classes, then enable unsolicited reporting, in the order of IEEE 1815-2012 5.1.1.2. The unsolicited and integrity
+steps are each skipped if their classes are empty, so an association configured with no unsolicited classes and no
+integrity classes only synchronizes the time, if asked to.
 
 If startup integrity classes are configured, the master ignores unsolicited responses that carry data until the integrity
 scan completes, and doesn't confirm them, so the outstation sends them again later. TB2015-002a describes how a master handles
@@ -54,10 +56,12 @@ integrity scan until its null response is confirmed.
 
 ### Outstation restart
 
-When a response reports DEVICE_RESTART (IIN1.7), the master writes to clear the bit, then repeats the startup integrity scan
-and enables unsolicited reporting again. If one of those two is already in progress, for example when the bit arrives in the
-response to the integrity scan itself, that run counts and it isn't repeated. It doesn't send DISABLE_UNSOLICITED this time. Unsolicited responses with data are
-ignored again until the integrity scan completes.
+When a response reports DEVICE_RESTART (IIN1.7), the master writes to clear the bit, synchronizes the time if the outstation
+asks for it, then repeats the startup integrity scan and enables unsolicited reporting again. It doesn't send
+DISABLE_UNSOLICITED this time. If the bit arrives while the integrity scan or ENABLE_UNSOLICITED is in progress, for example
+in the response to the integrity scan itself, that run doesn't count: the master clears the bit and runs them again, as
+IEEE 1815-2012 5.1.1.1.2 has the procedure recommence. Unsolicited responses with data are ignored again until the integrity
+scan completes.
 
 ### Event scans
 
@@ -65,11 +69,27 @@ When automatic event scans are enabled for some classes, a response that reports
 event scan, unless one is already pending. The scan reads the classes that are both reported and enabled. Its data reaches
 your [ReadHandler](./read_handler.mdx) like the data of a periodic poll.
 
+An outstation may have more events than fit in one response. If the scan returned events, its last response still reports
+events in an enabled class, and the outstation didn't reject any part of the scan with an IIN2 request error
+(NO_FUNC_CODE_SUPPORT, OBJECT_UNKNOWN or PARAMETER_ERROR, IIN2.0 to IIN2.2) in any of its fragments, the scan runs again at
+once, reading the classes that response reported. Otherwise the scan is done, and only a later response that reports events
+schedules the next one. So an outstation that keeps an event bit set without returning events, or that rejects the scan,
+doesn't make the master scan back to back. Other IIN2 bits, such as CONFIG_CORRUPT, don't stop the scan from
+running again.
+
 ### Time synchronization
 
 When automatic time synchronization is configured, NEED_TIME (IIN1.4) in a response schedules it, using the configured
 procedure. It succeeds when the outstation's answer to the time write no longer reports NEED_TIME. If the outstation still
-asks for the time, or the [AssociationHandler](./association_handler.mdx) can't provide it, the master retries later.
+asks for the time, doesn't answer, or the [AssociationHandler](./association_handler.mdx) can't provide the time, the master
+retries later.
+
+The time synchronization goes before the startup integrity scan only until it fails. Unlike the other automatic tasks, a
+failed time synchronization doesn't hold up the rest of the association while it waits for its retry: the integrity scan,
+unsolicited reporting, event scans, polls and the keep-alive all carry on, and the time synchronization retries on its own
+schedule, after the startup integrity scan if that's still due. So a master without a clock, or an outstation that never
+answers the time synchronization, doesn't stall the association. The time synchronization goes first again once it
+succeeds, or when the association starts communicating again.
 
 ### Keep-alive
 
@@ -130,10 +150,11 @@ flowchart TD
    associations with polls due at the same time. A busy association can't hold up the others, but turns are counted in
    requests, not in time.
 3. **Within an association, the order is fixed:** its automatic tasks, then its polls, then its keep-alive.
-   The automatic tasks go in this order: clear the restart bit, disable unsolicited reporting, startup integrity scan,
-   time synchronization, enable unsolicited reporting, event scan. An automatic task waiting to be retried blocks
-   everything after it in the association, so an overdue poll or keep-alive isn't ready to run until that task is
-   (see [below](#what-retries-what-waits-and-what-fails)).
+   The automatic tasks go in this order: clear the restart bit, disable unsolicited reporting, time synchronization,
+   startup integrity scan, enable unsolicited reporting, event scan, except that a failed time synchronization retries
+   after the startup integrity scan. An automatic task waiting to be retried blocks everything after it in the
+   association, so an overdue poll or keep-alive isn't ready to run until that task is, unless the waiting task is the
+   time synchronization (see [below](#what-retries-what-waits-and-what-fails)).
 
 When nothing is ready to run, the master sleeps until the earliest deadline. A new request or an unsolicited response wakes it up.
 
@@ -145,11 +166,11 @@ When nothing is ready to run, the master sleeps until the earliest deadline. A n
   the runs are 13 seconds apart. Time spent waiting for the channel delays the next run as well, so polls on a busy channel
   never pile up; they slow down.
 * **A failed poll isn't retried sooner.** Whether it timed out or the outstation rejected it, the poll runs again one period
-  after it failed.
+  after it failed, unless you demanded it while it ran.
 * **A missed run isn't made up.** A poll that came due several times while the channel was busy or disconnected runs once.
 * **Demanding a poll** makes it due at once. It runs at its association's next turn, after your queued requests, the
   association's automatic tasks and any due polls added before it. Its next run is one period after that run completes.
-  Demanding a poll while it's running has no effect, because its completion sets the next run.
+  Demanding a poll while it's running leaves it due again as soon as that run ends, whether it succeeds or fails.
 * **The first poll added wins.** When an association has several polls due, it runs the one you added first, not the one
   that came due first. For example, a 10 second poll added before a 4 second poll on an otherwise idle association runs
   like this:
@@ -166,7 +187,7 @@ When nothing is ready to run, the master sleeps until the earliest deadline. A n
 | Work | When it fails |
 |------|---------------|
 | Your requests | The error goes back to you. The master doesn't retry. |
-| Polls | Nothing is retried. The poll runs again one period after it failed. |
+| Polls | Nothing is retried. The poll runs again one period after it failed, or at once if it was demanded while it ran. |
 | Automatic tasks | Retried after a delay, counted from the failure, that starts at the minimum of the retry strategy and doubles with each consecutive failure, up to its maximum. A success resets the delay. |
 | Keep-alive | Due again as soon as it times out, and sent at the association's next turn, until the outstation answers. |
 
@@ -179,8 +200,8 @@ Some details:
 * **While an automatic task waits to be retried, the rest of that association waits too:** its later automatic tasks, its
   polls and its keep-alive. Your requests to that association still run, and the other associations on the channel carry
   on. For example, if the outstation never answers the startup integrity scan, the association's polls don't run until it
-  succeeds. The exception is an event scan, which is skipped, and stops blocking, once a later response no longer reports
-  events in its classes.
+  succeeds. There are two exceptions. A time synchronization waiting to be retried doesn't block anything. An event scan
+  is skipped, and stops blocking, once a later response no longer reports events in its classes.
 * An unanswered keep-alive doesn't close the connection. The master keeps asking, each time the previous one has timed out
   and the association gets its turn.
 
@@ -228,9 +249,10 @@ stream of requests delays polls, event scans and startup sequences on the whole 
 wait for each one to complete before sending the next.
 
 **A failing startup holds up polling.** If an outstation keeps failing a startup task, for example by never answering the
-integrity scan, that association's polls stop until the task succeeds. The
+integrity scan, that association's polls stop until the task succeeds. A failing time synchronization is the exception: it
+retries on its own without holding anything up. The
 [AssociationInformation](./association_information.mdx) callbacks report the start and outcome of each application-layer task
 the master sends, with its type, which usually shows which automatic task is failing. Keep-alives and link status checks
-aren't reported. Two retries don't show as failures: a time synchronization that can't start because the system time is
-unavailable sends nothing, and an otherwise successful answer to clearing the restart bit is reported as a success even when
-the outstation still reports DEVICE_RESTART and the master retries it.
+aren't reported. An automatic time synchronization that can't start because the system time is unavailable sends nothing,
+but it's still reported as a time synchronization that starts and fails with the "system time not available" task error.
+An answer to clearing the restart bit that still reports DEVICE_RESTART is reported as a failure, and the master retries it.
