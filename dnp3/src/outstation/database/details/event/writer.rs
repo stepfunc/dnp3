@@ -319,7 +319,7 @@ impl EventWriter {
 #[cfg(test)]
 mod tests {
     use crate::app::measurement::Flags;
-    use crate::outstation::database::config::*;
+    use crate::outstation::database::variations::*;
 
     use super::*;
 

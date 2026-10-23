@@ -10,6 +10,7 @@ use std::ops::BitOr;
 use crate::app::measurement::{self};
 use crate::master::EventClasses;
 use crate::outstation::database::config::*;
+use crate::outstation::database::variations::*;
 use crate::outstation::database::{EventBufferConfig, EventClass};
 
 use crate::util::BadWrite;

@@ -9,6 +9,7 @@ use std::sync::{Arc, Mutex};
 pub use config::*;
 use details::event::buffer::EventType;
 use details::range::static_db::{Deadband, FlagsDetector, OctetStringDetector, PointConfig};
+pub use variations::*;
 
 use crate::app::measurement::*;
 use crate::app::parse::parser::HeaderCollection;
@@ -32,6 +33,8 @@ mod fragment_tests;
 pub(crate) mod read;
 #[cfg(test)]
 mod read_header_tests;
+/// the static and event variation enums, generated from the codegen model
+mod variations;
 
 /// Controls how events are processed when updating values in the database
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]

@@ -14,6 +14,8 @@ use std::ffi::CStr;
 
 use crate::ffi;
 
+mod variation;
+
 impl Default for ffi::UpdateInfoFields {
     fn default() -> Self {
         Self {
@@ -521,19 +523,8 @@ impl From<&ffi::Timestamp> for Option<Time> {
 impl From<ffi::BinaryInputConfig> for BinaryInputConfig {
     fn from(from: ffi::BinaryInputConfig) -> Self {
         Self {
-            s_var: match from.static_variation() {
-                ffi::StaticBinaryInputVariation::Group1Var1 => {
-                    StaticBinaryInputVariation::Group1Var1
-                }
-                ffi::StaticBinaryInputVariation::Group1Var2 => {
-                    StaticBinaryInputVariation::Group1Var2
-                }
-            },
-            e_var: match from.event_variation() {
-                ffi::EventBinaryInputVariation::Group2Var1 => EventBinaryInputVariation::Group2Var1,
-                ffi::EventBinaryInputVariation::Group2Var2 => EventBinaryInputVariation::Group2Var2,
-                ffi::EventBinaryInputVariation::Group2Var3 => EventBinaryInputVariation::Group2Var3,
-            },
+            s_var: from.static_variation().into(),
+            e_var: from.event_variation().into(),
         }
     }
 }
@@ -551,25 +542,8 @@ impl From<ffi::BinaryInput> for BinaryInput {
 impl From<ffi::DoubleBitBinaryInputConfig> for DoubleBitBinaryInputConfig {
     fn from(from: ffi::DoubleBitBinaryInputConfig) -> Self {
         Self {
-            s_var: match from.static_variation() {
-                ffi::StaticDoubleBitBinaryInputVariation::Group3Var1 => {
-                    StaticDoubleBitBinaryInputVariation::Group3Var1
-                }
-                ffi::StaticDoubleBitBinaryInputVariation::Group3Var2 => {
-                    StaticDoubleBitBinaryInputVariation::Group3Var2
-                }
-            },
-            e_var: match from.event_variation() {
-                ffi::EventDoubleBitBinaryInputVariation::Group4Var1 => {
-                    EventDoubleBitBinaryInputVariation::Group4Var1
-                }
-                ffi::EventDoubleBitBinaryInputVariation::Group4Var2 => {
-                    EventDoubleBitBinaryInputVariation::Group4Var2
-                }
-                ffi::EventDoubleBitBinaryInputVariation::Group4Var3 => {
-                    EventDoubleBitBinaryInputVariation::Group4Var3
-                }
-            },
+            s_var: from.static_variation().into(),
+            e_var: from.event_variation().into(),
         }
     }
 }
@@ -592,22 +566,8 @@ impl From<ffi::DoubleBitBinaryInput> for DoubleBitBinaryInput {
 impl From<ffi::BinaryOutputStatusConfig> for BinaryOutputStatusConfig {
     fn from(from: ffi::BinaryOutputStatusConfig) -> Self {
         Self {
-            s_var: match from.static_variation() {
-                ffi::StaticBinaryOutputStatusVariation::Group10Var1 => {
-                    StaticBinaryOutputStatusVariation::Group10Var1
-                }
-                ffi::StaticBinaryOutputStatusVariation::Group10Var2 => {
-                    StaticBinaryOutputStatusVariation::Group10Var2
-                }
-            },
-            e_var: match from.event_variation() {
-                ffi::EventBinaryOutputStatusVariation::Group11Var1 => {
-                    EventBinaryOutputStatusVariation::Group11Var1
-                }
-                ffi::EventBinaryOutputStatusVariation::Group11Var2 => {
-                    EventBinaryOutputStatusVariation::Group11Var2
-                }
-            },
+            s_var: from.static_variation().into(),
+            e_var: from.event_variation().into(),
         }
     }
 }
@@ -625,18 +585,8 @@ impl From<ffi::BinaryOutputStatus> for BinaryOutputStatus {
 impl From<ffi::CounterConfig> for CounterConfig {
     fn from(from: ffi::CounterConfig) -> Self {
         Self {
-            s_var: match from.static_variation() {
-                ffi::StaticCounterVariation::Group20Var1 => StaticCounterVariation::Group20Var1,
-                ffi::StaticCounterVariation::Group20Var2 => StaticCounterVariation::Group20Var2,
-                ffi::StaticCounterVariation::Group20Var5 => StaticCounterVariation::Group20Var5,
-                ffi::StaticCounterVariation::Group20Var6 => StaticCounterVariation::Group20Var6,
-            },
-            e_var: match from.event_variation() {
-                ffi::EventCounterVariation::Group22Var1 => EventCounterVariation::Group22Var1,
-                ffi::EventCounterVariation::Group22Var2 => EventCounterVariation::Group22Var2,
-                ffi::EventCounterVariation::Group22Var5 => EventCounterVariation::Group22Var5,
-                ffi::EventCounterVariation::Group22Var6 => EventCounterVariation::Group22Var6,
-            },
+            s_var: from.static_variation().into(),
+            e_var: from.event_variation().into(),
             deadband: from.deadband(),
         }
     }
@@ -655,40 +605,8 @@ impl From<ffi::Counter> for Counter {
 impl From<ffi::FrozenCounterConfig> for FrozenCounterConfig {
     fn from(from: ffi::FrozenCounterConfig) -> Self {
         Self {
-            s_var: match from.static_variation() {
-                ffi::StaticFrozenCounterVariation::Group21Var1 => {
-                    StaticFrozenCounterVariation::Group21Var1
-                }
-                ffi::StaticFrozenCounterVariation::Group21Var2 => {
-                    StaticFrozenCounterVariation::Group21Var2
-                }
-                ffi::StaticFrozenCounterVariation::Group21Var5 => {
-                    StaticFrozenCounterVariation::Group21Var5
-                }
-                ffi::StaticFrozenCounterVariation::Group21Var6 => {
-                    StaticFrozenCounterVariation::Group21Var6
-                }
-                ffi::StaticFrozenCounterVariation::Group21Var9 => {
-                    StaticFrozenCounterVariation::Group21Var9
-                }
-                ffi::StaticFrozenCounterVariation::Group21Var10 => {
-                    StaticFrozenCounterVariation::Group21Var10
-                }
-            },
-            e_var: match from.event_variation() {
-                ffi::EventFrozenCounterVariation::Group23Var1 => {
-                    EventFrozenCounterVariation::Group23Var1
-                }
-                ffi::EventFrozenCounterVariation::Group23Var2 => {
-                    EventFrozenCounterVariation::Group23Var2
-                }
-                ffi::EventFrozenCounterVariation::Group23Var5 => {
-                    EventFrozenCounterVariation::Group23Var5
-                }
-                ffi::EventFrozenCounterVariation::Group23Var6 => {
-                    EventFrozenCounterVariation::Group23Var6
-                }
-            },
+            s_var: from.static_variation().into(),
+            e_var: from.event_variation().into(),
             deadband: from.deadband(),
         }
     }
@@ -707,52 +625,8 @@ impl From<ffi::FrozenCounter> for FrozenCounter {
 impl From<ffi::AnalogInputConfig> for AnalogInputConfig {
     fn from(from: ffi::AnalogInputConfig) -> Self {
         Self {
-            s_var: match from.static_variation() {
-                ffi::StaticAnalogInputVariation::Group30Var1 => {
-                    StaticAnalogInputVariation::Group30Var1
-                }
-                ffi::StaticAnalogInputVariation::Group30Var2 => {
-                    StaticAnalogInputVariation::Group30Var2
-                }
-                ffi::StaticAnalogInputVariation::Group30Var3 => {
-                    StaticAnalogInputVariation::Group30Var3
-                }
-                ffi::StaticAnalogInputVariation::Group30Var4 => {
-                    StaticAnalogInputVariation::Group30Var4
-                }
-                ffi::StaticAnalogInputVariation::Group30Var5 => {
-                    StaticAnalogInputVariation::Group30Var5
-                }
-                ffi::StaticAnalogInputVariation::Group30Var6 => {
-                    StaticAnalogInputVariation::Group30Var6
-                }
-            },
-            e_var: match from.event_variation() {
-                ffi::EventAnalogInputVariation::Group32Var1 => {
-                    EventAnalogInputVariation::Group32Var1
-                }
-                ffi::EventAnalogInputVariation::Group32Var2 => {
-                    EventAnalogInputVariation::Group32Var2
-                }
-                ffi::EventAnalogInputVariation::Group32Var3 => {
-                    EventAnalogInputVariation::Group32Var3
-                }
-                ffi::EventAnalogInputVariation::Group32Var4 => {
-                    EventAnalogInputVariation::Group32Var4
-                }
-                ffi::EventAnalogInputVariation::Group32Var5 => {
-                    EventAnalogInputVariation::Group32Var5
-                }
-                ffi::EventAnalogInputVariation::Group32Var6 => {
-                    EventAnalogInputVariation::Group32Var6
-                }
-                ffi::EventAnalogInputVariation::Group32Var7 => {
-                    EventAnalogInputVariation::Group32Var7
-                }
-                ffi::EventAnalogInputVariation::Group32Var8 => {
-                    EventAnalogInputVariation::Group32Var8
-                }
-            },
+            s_var: from.static_variation().into(),
+            e_var: from.event_variation().into(),
             deadband: from.deadband(),
         }
     }
@@ -771,46 +645,8 @@ impl From<ffi::AnalogInput> for AnalogInput {
 impl From<ffi::AnalogOutputStatusConfig> for AnalogOutputStatusConfig {
     fn from(from: ffi::AnalogOutputStatusConfig) -> Self {
         Self {
-            s_var: match from.static_variation() {
-                ffi::StaticAnalogOutputStatusVariation::Group40Var1 => {
-                    StaticAnalogOutputStatusVariation::Group40Var1
-                }
-                ffi::StaticAnalogOutputStatusVariation::Group40Var2 => {
-                    StaticAnalogOutputStatusVariation::Group40Var2
-                }
-                ffi::StaticAnalogOutputStatusVariation::Group40Var3 => {
-                    StaticAnalogOutputStatusVariation::Group40Var3
-                }
-                ffi::StaticAnalogOutputStatusVariation::Group40Var4 => {
-                    StaticAnalogOutputStatusVariation::Group40Var4
-                }
-            },
-            e_var: match from.event_variation() {
-                ffi::EventAnalogOutputStatusVariation::Group42Var1 => {
-                    EventAnalogOutputStatusVariation::Group42Var1
-                }
-                ffi::EventAnalogOutputStatusVariation::Group42Var2 => {
-                    EventAnalogOutputStatusVariation::Group42Var2
-                }
-                ffi::EventAnalogOutputStatusVariation::Group42Var3 => {
-                    EventAnalogOutputStatusVariation::Group42Var3
-                }
-                ffi::EventAnalogOutputStatusVariation::Group42Var4 => {
-                    EventAnalogOutputStatusVariation::Group42Var4
-                }
-                ffi::EventAnalogOutputStatusVariation::Group42Var5 => {
-                    EventAnalogOutputStatusVariation::Group42Var5
-                }
-                ffi::EventAnalogOutputStatusVariation::Group42Var6 => {
-                    EventAnalogOutputStatusVariation::Group42Var6
-                }
-                ffi::EventAnalogOutputStatusVariation::Group42Var7 => {
-                    EventAnalogOutputStatusVariation::Group42Var7
-                }
-                ffi::EventAnalogOutputStatusVariation::Group42Var8 => {
-                    EventAnalogOutputStatusVariation::Group42Var8
-                }
-            },
+            s_var: from.static_variation().into(),
+            e_var: from.event_variation().into(),
             deadband: from.deadband(),
         }
     }

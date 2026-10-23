@@ -12,6 +12,7 @@ use crate::outstation::database::details::range::static_db::{
     StaticDatabase,
 };
 use crate::outstation::database::details::range::traits::StaticVariation;
+use crate::outstation::database::variations::*;
 use crate::outstation::database::ClassZeroConfig;
 
 /// A measurement type, with everything the database associates with it: its event, its
