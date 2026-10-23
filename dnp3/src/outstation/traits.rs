@@ -584,8 +584,51 @@ impl ControlSupport<Group41Var4> for DefaultControlHandler {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::app::attr::{AttrSet, AttrValue};
     use crate::outstation::config::OutstationConfig;
     use crate::outstation::database::{ClassZeroConfig, EventBufferConfig};
+
+    fn database() -> DatabaseHandle {
+        DatabaseHandle::new(
+            OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS,
+            ClassZeroConfig::default(),
+            EventBufferConfig::no_events(),
+        )
+    }
+
+    /// an application that keeps every default
+    struct Defaults;
+
+    impl OutstationApplication for Defaults {}
+
+    #[tokio::test]
+    async fn default_application_answers() {
+        let mut app = Defaults;
+
+        assert_eq!(app.get_processing_delay_ms(), 0);
+        assert_eq!(
+            app.write_absolute_time(Timestamp::new(0)),
+            Err(RequestError::NotSupported)
+        );
+        assert_eq!(app.get_application_iin(), ApplicationIin::default());
+        assert_eq!(app.cold_restart(), None);
+        assert_eq!(app.warm_restart(), None);
+        assert_eq!(
+            app.freeze_counter(
+                FreezeIndices::All,
+                FreezeType::ImmediateFreeze,
+                &mut database()
+            ),
+            Err(RequestError::NotSupported)
+        );
+        assert!(!app.support_write_analog_dead_bands());
+        let attr = Attribute {
+            set: AttrSet::Default,
+            variation: 240,
+            value: AttrValue::VisibleString("name"),
+        };
+        assert!(app.write_device_attr(attr).get().await);
+    }
 
     /// what the handler returns to select and operate, for each control type
     fn statuses(handler: &mut dyn ControlHandler) -> [CommandStatus; 10] {
@@ -600,11 +643,7 @@ mod tests {
             ]
         }
 
-        let mut database = DatabaseHandle::new(
-            OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS,
-            ClassZeroConfig::default(),
-            EventBufferConfig::no_events(),
-        );
+        let mut database = database();
         let db = &mut database;
         let [a, b] = both(handler, Group12Var1::from_op_type(OpType::LatchOn), db);
         let [c, d] = both(handler, Group41Var1::new(1), db);
