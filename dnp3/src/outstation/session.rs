@@ -103,6 +103,11 @@ impl RetryCounter {
             },
         }
     }
+
+    /// allow no further retries
+    fn stop(&mut self) {
+        self.retries = Some(0);
+    }
 }
 
 #[derive(Copy, Clone)]
@@ -332,9 +337,9 @@ struct UnsolicitedWait {
     seq: Sequence,
     /// the confirm of a solicited response sent during the wait, if one asked for it
     solicited: Option<ExpectedConfirm>,
-    /// a DISABLE_UNSOLICITED was processed during the wait, so it ends on timeout without a retry
-    /// (TB2015-002a rule 15, decision 0007)
-    disabled: bool,
+    /// the retries left. A DISABLE_UNSOLICITED processed during the wait stops them, so the wait
+    /// ends on timeout without a retry (TB2015-002a rule 15, decision 0007)
+    retries: RetryCounter,
 }
 
 /// A solicited response's confirm, expected until the confirm timeout. The timeout is checked
@@ -878,8 +883,6 @@ impl OutstationSession {
         // enter unsolicited confirm wait state
         self.info.enter_unsolicited_confirm_wait(seq);
 
-        let mut retry_count = RetryCounter::new(max_retries);
-
         let mut deadline = self.new_confirm_deadline();
 
         // IEEE 1815-2012 Table 6-1 rows 22 and 33 would go on to wait for the solicited confirm
@@ -889,7 +892,7 @@ impl OutstationSession {
         let mut wait = UnsolicitedWait {
             seq,
             solicited: None,
-            disabled: false,
+            retries: RetryCounter::new(max_retries),
         };
 
         loop {
@@ -903,11 +906,10 @@ impl OutstationSession {
                 }
                 UnsolicitedWaitResult::Complete(result) => return Ok(result),
                 UnsolicitedWaitResult::Timeout => {
-                    let mut retry = retry_count.decrement();
+                    let mut retry = wait.retries.decrement();
 
-                    // If a deferred read is pending, or a DISABLE_UNSOLICITED was processed, we
-                    // want to exit
-                    if self.state.deferred_read.is_set() || wait.disabled {
+                    // If a deferred read is pending, we want to exit
+                    if self.state.deferred_read.is_set() {
                         retry = false;
                     }
 
@@ -973,8 +975,11 @@ impl OutstationSession {
         });
 
         // any DISABLE_UNSOLICITED processed, directly or as a broadcast, whatever classes it names
-        wait.disabled |= function == FunctionCode::DisableUnsolicited
-            && (direct || accepted.broadcast == Some(BroadcastAction::Processed));
+        if function == FunctionCode::DisableUnsolicited
+            && (direct || accepted.broadcast == Some(BroadcastAction::Processed))
+        {
+            wait.retries.stop();
+        }
 
         Ok(UnsolicitedWaitResult::ReadNext)
     }
