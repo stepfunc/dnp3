@@ -60,92 +60,18 @@ enum Points {
 /// The variation a READ asks for, and whether it's an event variation
 type Read = (V, bool);
 
-const BINARY: &[Read] = &[
-    (V::Group1Var1, false),
-    (V::Group1Var2, false),
-    (V::Group2Var1, true),
-    (V::Group2Var2, true),
-    (V::Group2Var3, true),
-];
-
-const DOUBLE_BIT: &[Read] = &[
-    (V::Group3Var1, false),
-    (V::Group3Var2, false),
-    (V::Group4Var1, true),
-    (V::Group4Var2, true),
-    (V::Group4Var3, true),
-];
-
-const BINARY_OUTPUT_STATUS: &[Read] = &[
-    (V::Group10Var1, false),
-    (V::Group10Var2, false),
-    (V::Group11Var1, true),
-    (V::Group11Var2, true),
-];
-
-const COUNTER: &[Read] = &[
-    (V::Group20Var1, false),
-    (V::Group20Var2, false),
-    (V::Group20Var5, false),
-    (V::Group20Var6, false),
-    (V::Group22Var1, true),
-    (V::Group22Var2, true),
-    (V::Group22Var5, true),
-    (V::Group22Var6, true),
-];
-
-const FROZEN_COUNTER: &[Read] = &[
-    (V::Group21Var1, false),
-    (V::Group21Var2, false),
-    (V::Group21Var5, false),
-    (V::Group21Var6, false),
-    (V::Group21Var9, false),
-    (V::Group21Var10, false),
-    (V::Group23Var1, true),
-    (V::Group23Var2, true),
-    (V::Group23Var5, true),
-    (V::Group23Var6, true),
-];
-
-const ANALOG: &[Read] = &[
-    (V::Group30Var1, false),
-    (V::Group30Var2, false),
-    (V::Group30Var3, false),
-    (V::Group30Var4, false),
-    (V::Group30Var5, false),
-    (V::Group30Var6, false),
-    (V::Group32Var1, true),
-    (V::Group32Var2, true),
-    (V::Group32Var3, true),
-    (V::Group32Var4, true),
-    (V::Group32Var5, true),
-    (V::Group32Var6, true),
-    (V::Group32Var7, true),
-    (V::Group32Var8, true),
-];
-
-const ANALOG_OUTPUT_STATUS: &[Read] = &[
-    (V::Group40Var1, false),
-    (V::Group40Var2, false),
-    (V::Group40Var3, false),
-    (V::Group40Var4, false),
-    (V::Group42Var1, true),
-    (V::Group42Var2, true),
-    (V::Group42Var3, true),
-    (V::Group42Var4, true),
-    (V::Group42Var5, true),
-    (V::Group42Var6, true),
-    (V::Group42Var7, true),
-    (V::Group42Var8, true),
-];
-
 const OCTET_STRING: &[Read] = &[(V::Group110(0), false), (V::Group111(0), true)];
 
-const DEAD_BAND: &[Read] = &[
-    (V::Group34Var1, false),
-    (V::Group34Var2, false),
-    (V::Group34Var3, false),
-];
+/// The specific variations in a family's static and event READ lists, which start with variation
+/// 0, and whether each is an event variation
+fn specific(static_reads: &[V], event_reads: &[V]) -> Vec<Read> {
+    fn after_v0(reads: &[V]) -> &[V] {
+        reads.split_first().map_or(&[], |(_, rest)| rest)
+    }
+    let statics = after_v0(static_reads).iter().map(|&v| (v, false));
+    let events = after_v0(event_reads).iter().map(|&v| (v, true));
+    statics.chain(events).collect()
+}
 
 // ---------- the outstation writes, the master extracts ----------
 
@@ -676,7 +602,7 @@ proptest! {
         points in points((any::<bool>(), flags())
             .prop_map(|(value, flags)| BinaryInput { value, flags, time: None }), |x, time| x.time = time),
     ) {
-        check(&Points::Binary(points), BINARY)?;
+        check(&Points::Binary(points), &specific(BINARY_INPUT_STATIC_READS, BINARY_INPUT_EVENT_READS))?;
     }
 
     #[test]
@@ -684,7 +610,7 @@ proptest! {
         points in points((double_bit_state(), flags())
             .prop_map(|(value, flags)| DoubleBitBinaryInput { value, flags, time: None }), |x, time| x.time = time),
     ) {
-        check(&Points::DoubleBit(points), DOUBLE_BIT)?;
+        check(&Points::DoubleBit(points), &specific(DOUBLE_BIT_BINARY_INPUT_STATIC_READS, DOUBLE_BIT_BINARY_INPUT_EVENT_READS))?;
     }
 
     #[test]
@@ -692,7 +618,7 @@ proptest! {
         points in points((any::<bool>(), flags())
             .prop_map(|(value, flags)| BinaryOutputStatus { value, flags, time: None }), |x, time| x.time = time),
     ) {
-        check(&Points::BinaryOutputStatus(points), BINARY_OUTPUT_STATUS)?;
+        check(&Points::BinaryOutputStatus(points), &specific(BINARY_OUTPUT_STATUS_STATIC_READS, BINARY_OUTPUT_STATUS_EVENT_READS))?;
     }
 
     #[test]
@@ -700,7 +626,7 @@ proptest! {
         points in points((counter_value(), flags())
             .prop_map(|(value, flags)| Counter { value, flags, time: None }), |x, time| x.time = time),
     ) {
-        check(&Points::Counter(points), COUNTER)?;
+        check(&Points::Counter(points), &specific(COUNTER_STATIC_READS, COUNTER_EVENT_READS))?;
     }
 
     #[test]
@@ -708,7 +634,7 @@ proptest! {
         points in points((counter_value(), flags())
             .prop_map(|(value, flags)| FrozenCounter { value, flags, time: None }), |x, time| x.time = time),
     ) {
-        check(&Points::FrozenCounter(points), FROZEN_COUNTER)?;
+        check(&Points::FrozenCounter(points), &specific(FROZEN_COUNTER_STATIC_READS, FROZEN_COUNTER_EVENT_READS))?;
     }
 
     #[test]
@@ -716,7 +642,7 @@ proptest! {
         points in points((analog_model::value(), flags())
             .prop_map(|(value, flags)| AnalogInput { value, flags, time: None }), |x, time| x.time = time),
     ) {
-        check(&Points::Analog(points), ANALOG)?;
+        check(&Points::Analog(points), &specific(ANALOG_INPUT_STATIC_READS, ANALOG_INPUT_EVENT_READS))?;
     }
 
     #[test]
@@ -724,7 +650,7 @@ proptest! {
         points in points((analog_model::value(), flags())
             .prop_map(|(value, flags)| AnalogOutputStatus { value, flags, time: None }), |x, time| x.time = time),
     ) {
-        check(&Points::AnalogOutputStatus(points), ANALOG_OUTPUT_STATUS)?;
+        check(&Points::AnalogOutputStatus(points), &specific(ANALOG_OUTPUT_STATUS_STATIC_READS, ANALOG_OUTPUT_STATUS_EVENT_READS))?;
     }
 
     #[test]
@@ -739,6 +665,6 @@ proptest! {
     fn analog_input_deadbands_are_extracted_as_written(
         points in points(dead_band_value(), |_, _| {}),
     ) {
-        check(&Points::DeadBand(points), DEAD_BAND)?;
+        check(&Points::DeadBand(points), &specific(ANALOG_INPUT_DEAD_BAND_STATIC_READS, &[]))?;
     }
 }

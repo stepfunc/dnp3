@@ -16,6 +16,7 @@ The code generator creates the following Rust source files:
 - `../src/app/gen/read.rs` - The variations a READ request can carry with each qualifier
 - `../src/app/gen/conversion.rs` - Type conversion implementations
 - `../src/outstation/database/variations.rs` - The static and event variation enums of the outstation's point types
+- `../src/outstation/database/read/target.rs` - What the outstation selects when a READ names each variation
 - `../../ffi/dnp3-schema/src/variation.rs` - The FFI `Variation` enum in the bindings schema
 - `../../ffi/dnp3-ffi/src/variation.rs` - Conversions between the FFI `Variation` enum and `dnp3::app::Variation`
 - `../../ffi/dnp3-schema/src/database/variation.rs` - The FFI outstation variation enums in the bindings schema

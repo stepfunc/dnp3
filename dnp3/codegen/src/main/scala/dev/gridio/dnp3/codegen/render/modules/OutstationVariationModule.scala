@@ -6,7 +6,7 @@
 
 package dev.gridio.dnp3.codegen.render.modules
 
-import dev.gridio.dnp3.codegen.model.{NoTimeTargets, OutstationFamily, RustScope, Variation}
+import dev.gridio.dnp3.codegen.model.{AnyVariation, NoTimeTargets, ObjectGroup, OutstationFamily, RustScope, SizedByVariation, Variation}
 import dev.gridio.dnp3.codegen.render.*
 import dev.gridio.dnp3.codegen.render.given_Conversion_String_RenderString
 
@@ -49,7 +49,60 @@ private def separated(items: List[Iterator[String]]): Iterator[String] = {
 object OutstationVariationModule extends Module {
 
   override def lines(implicit indent: Indentation): Iterator[String] = {
-    separated(OutstationEnum.all.map(e => definition(e)))
+    "#[cfg(test)]".eol ++
+    "use crate::app::Variation;".eol ++
+    space ++
+    separated(OutstationEnum.all.map(e => definition(e))) ++
+    space ++
+    separated(testLists)
+  }
+
+  // the families whose configurations the tests pick variations for
+  private def configured(e: OutstationEnum): Boolean = e.family.stored && e.family.scope == RustScope.Public
+
+  // the lists that tests use as inputs: every variation of a configured enum, and the variations
+  // a READ of each stored family can name
+  private def testLists(implicit indent: Indentation): List[Iterator[String]] = {
+    val all = OutstationEnum.all.filter(configured).map(e => allVariations(e))
+    val reads = OutstationFamily.all.filter(_.stored).flatMap { f =>
+      val name = OutstationEnum.snakeCase(f.name).toUpperCase
+      readList(s"${name}_STATIC_READS", s"static ${f.words} points", f.staticGroup) ::
+        f.eventGroup.toList.map(g => readList(s"${name}_EVENT_READS", s"${f.words} events", g))
+    }
+    all ++ reads
+  }
+
+  // an array at an indentation depth the way rustfmt lays it out: on one line if it is short
+  // enough, otherwise one item per line
+  private def array(depth: Int, prefix: String, items: List[String], suffix: String)(implicit indent: Indentation): Iterator[String] = {
+    val line = s"[${items.mkString(", ")}]"
+    if (line.length <= 60 && 4 * depth + s"$prefix$line$suffix".length <= 100) {
+      s"$prefix$line$suffix".eol
+    } else {
+      s"$prefix[".eol ++ indent(items.iterator.map(i => s"$i,")) ++ s"]$suffix".eol
+    }
+  }
+
+  private def allVariations(e: OutstationEnum)(implicit indent: Indentation): Iterator[String] = {
+    "#[cfg(test)]".eol ++
+    bracket(s"impl ${e.name}") {
+      commented("Every variation, in order").eol ++
+      array(1, "pub(crate) const ALL: &[Self] = &", e.variations.map(v => s"Self::${v.name}"), ";")
+    }
+  }
+
+  private def readList(name: String, words: String, g: ObjectGroup)(implicit indent: Indentation): Iterator[String] = {
+    g.variations.headOption match {
+      case Some(_: AnyVariation) | Some(_: SizedByVariation) =>
+      case _ => throw new Exception(s"${g.name} does not start with its any-variation")
+    }
+    val variations = g.variations.map {
+      case v: SizedByVariation => s"Variation::${g.name}(${v.variation})"
+      case v => s"Variation::${v.name}"
+    }
+    commented(s"The variations a READ of the ${words} can name, variation 0 first").eol ++
+    "#[cfg(test)]".eol ++
+    array(0, s"pub(crate) const $name: &[Variation] = &", variations, ";")
   }
 
   private def noTimeNote(t: NoTimeTargets): List[String] = t.unsynchronized match {
