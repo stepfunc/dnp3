@@ -23,9 +23,13 @@ pub(crate) trait EventVariation<T>: Copy {
     /// the variation the event is written in when this one is selected for it
     ///
     /// Binary and double-bit events with absolute time must have been recorded while synchronized
-    /// (TB2017-003a 5.1.3.1.2), and events recorded without time are reported without time
-    /// (IED certification procedures 3.1 rev 1, 8.14.1), whether the variation is the default or
-    /// the one requested.
+    /// (TB2017-003a 5.1.3.1.2). Events recorded without time are reported in the variation
+    /// without time at the same precision, whether the variation is the default or the one
+    /// requested. The IED certification procedures 3.1 rev 1, 8.14.1 require this for binary
+    /// events; extending it to the other families is our choice, a deliberate departure from
+    /// reporting a requested variation as is (TB2017-003a 5.1.3), so that an event without time
+    /// isn't given an invented time of 0. Other events with time are written as recorded, since
+    /// their timestamps carry no quality.
     fn for_event(self, _event: &T) -> Self {
         self
     }
@@ -109,6 +113,13 @@ impl EventVariation<BinaryOutputStatus> for EventBinaryOutputStatusVariation {
             Self::Group11Var2 => encoder.fixed::<Group11Var2>(),
         }
     }
+
+    fn for_event(self, event: &BinaryOutputStatus) -> Self {
+        match (self, event.time) {
+            (Self::Group11Var2, None) => Self::Group11Var1,
+            (Self::Group11Var1, _) | (Self::Group11Var2, Some(_)) => self,
+        }
+    }
 }
 
 impl EventVariation<Counter> for EventCounterVariation {
@@ -123,6 +134,15 @@ impl EventVariation<Counter> for EventCounterVariation {
             Self::Group22Var6 => encoder.fixed::<Group22Var6>(),
         }
     }
+
+    fn for_event(self, event: &Counter) -> Self {
+        match (self, event.time) {
+            (Self::Group22Var5, None) => Self::Group22Var1,
+            (Self::Group22Var6, None) => Self::Group22Var2,
+            (Self::Group22Var1 | Self::Group22Var2, _)
+            | (Self::Group22Var5 | Self::Group22Var6, Some(_)) => self,
+        }
+    }
 }
 
 impl EventVariation<FrozenCounter> for EventFrozenCounterVariation {
@@ -135,6 +155,15 @@ impl EventVariation<FrozenCounter> for EventFrozenCounterVariation {
             Self::Group23Var2 => encoder.fixed::<Group23Var2>(),
             Self::Group23Var5 => encoder.fixed::<Group23Var5>(),
             Self::Group23Var6 => encoder.fixed::<Group23Var6>(),
+        }
+    }
+
+    fn for_event(self, event: &FrozenCounter) -> Self {
+        match (self, event.time) {
+            (Self::Group23Var5, None) => Self::Group23Var1,
+            (Self::Group23Var6, None) => Self::Group23Var2,
+            (Self::Group23Var1 | Self::Group23Var2, _)
+            | (Self::Group23Var5 | Self::Group23Var6, Some(_)) => self,
         }
     }
 }
@@ -155,6 +184,20 @@ impl EventVariation<AnalogInput> for EventAnalogInputVariation {
             Self::Group32Var8 => encoder.fixed::<Group32Var8>(),
         }
     }
+
+    fn for_event(self, event: &AnalogInput) -> Self {
+        match (self, event.time) {
+            (Self::Group32Var3, None) => Self::Group32Var1,
+            (Self::Group32Var4, None) => Self::Group32Var2,
+            (Self::Group32Var7, None) => Self::Group32Var5,
+            (Self::Group32Var8, None) => Self::Group32Var6,
+            (Self::Group32Var1 | Self::Group32Var2 | Self::Group32Var5 | Self::Group32Var6, _)
+            | (
+                Self::Group32Var3 | Self::Group32Var4 | Self::Group32Var7 | Self::Group32Var8,
+                Some(_),
+            ) => self,
+        }
+    }
 }
 
 impl EventVariation<AnalogOutputStatus> for EventAnalogOutputStatusVariation {
@@ -171,6 +214,20 @@ impl EventVariation<AnalogOutputStatus> for EventAnalogOutputStatusVariation {
             Self::Group42Var6 => encoder.fixed::<Group42Var6>(),
             Self::Group42Var7 => encoder.fixed::<Group42Var7>(),
             Self::Group42Var8 => encoder.fixed::<Group42Var8>(),
+        }
+    }
+
+    fn for_event(self, event: &AnalogOutputStatus) -> Self {
+        match (self, event.time) {
+            (Self::Group42Var3, None) => Self::Group42Var1,
+            (Self::Group42Var4, None) => Self::Group42Var2,
+            (Self::Group42Var7, None) => Self::Group42Var5,
+            (Self::Group42Var8, None) => Self::Group42Var6,
+            (Self::Group42Var1 | Self::Group42Var2 | Self::Group42Var5 | Self::Group42Var6, _)
+            | (
+                Self::Group42Var3 | Self::Group42Var4 | Self::Group42Var7 | Self::Group42Var8,
+                Some(_),
+            ) => self,
         }
     }
 }

@@ -12,9 +12,11 @@
 //! OVER_RANGE; finite values past the f32 range clamp with OVER_RANGE, and NaN and infinities are
 //! kept; 16-bit counters keep the low 16 bits; variations without flags report ONLINE, and a
 //! variation without flags is promoted to the one with them when the flags it would report aren't
-//! just ONLINE; binary and double-bit events without time are reported without time, and with
-//! unsynchronized time relative to an unsynchronized CTO (TB2017-003a, and the 3.1r1 IED
-//! certification procedures 8.14.1, which concern binary inputs)
+//! just ONLINE; events without time are reported in the variation without time at the same
+//! precision (the 3.1r1 IED certification procedures 8.14.1 require this for binary inputs; for
+//! the other families it's our deliberate departure from reporting a requested variation as is,
+//! TB2017-003a 5.1.3), and binary and double-bit events with unsynchronized time relative to an
+//! unsynchronized CTO (TB2017-003a)
 //!
 //! The times of the other variations with absolute time pin the current API convention rather
 //! than a standards-backed oracle: see [`absolute`].
@@ -248,9 +250,10 @@ fn double_bit_flags(flags: Flags, state: DoubleBit) -> Flags {
 ///
 /// This pins the current API convention, not a standards-backed oracle. These objects carry no
 /// synchronization, so the master reports the time as synchronized whatever the outstation
-/// recorded, and a value recorded without time is written with time 0 (a known limitation,
-/// absent time -> 0). Only binary and double-bit events fall back to variations that keep the
-/// absence of time and unsynchronized time; see [`binary`] and [`double_bit`].
+/// recorded. Events recorded without time are reported in the variation without time instead,
+/// so only a static frozen counter recorded without time is written with time 0 (a known
+/// limitation, absent time -> 0). Only binary and double-bit events fall back to a variation
+/// that keeps unsynchronized time; see [`binary`] and [`double_bit`].
 fn absolute(time: Option<Time>) -> Option<Time> {
     let timestamp = match time {
         None => Timestamp::zero(),
@@ -358,6 +361,9 @@ fn binary_output_status(read: V, index: u16, x: &BinaryOutputStatus) -> Reported
             (V::Group10Var1, false, point(Flags::ONLINE, None))
         }
         V::Group10Var1 | V::Group10Var2 => (V::Group10Var2, true, point(flags, None)),
+        V::Group11Var1 | V::Group11Var2 if x.time.is_none() => {
+            (V::Group11Var1, true, point(flags, None))
+        }
         V::Group11Var1 => (read, true, point(flags, None)),
         V::Group11Var2 => (read, true, point(flags, absolute(x.time))),
         _ => panic!("{read} is not a binary output status variation"),
@@ -375,6 +381,8 @@ fn counter(read: V, index: u16, x: &Counter) -> Reported {
         V::Group20Var2 | V::Group20Var6 => (V::Group20Var2, true, point(low, x.flags, None)),
         V::Group22Var1 => (read, true, point(x.value, x.flags, None)),
         V::Group22Var2 => (read, true, point(low, x.flags, None)),
+        V::Group22Var5 if x.time.is_none() => (V::Group22Var1, true, point(x.value, x.flags, None)),
+        V::Group22Var6 if x.time.is_none() => (V::Group22Var2, true, point(low, x.flags, None)),
         V::Group22Var5 => (read, true, point(x.value, x.flags, absolute(x.time))),
         V::Group22Var6 => (read, true, point(low, x.flags, absolute(x.time))),
         _ => panic!("{read} is not a counter variation"),
@@ -391,6 +399,8 @@ fn frozen_counter(read: V, index: u16, x: &FrozenCounter) -> Reported {
         V::Group21Var10 if online => (read, false, point(low, Flags::ONLINE, None)),
         V::Group21Var1 | V::Group21Var9 => (V::Group21Var1, true, point(x.value, x.flags, None)),
         V::Group21Var2 | V::Group21Var10 => (V::Group21Var2, true, point(low, x.flags, None)),
+        V::Group23Var5 if x.time.is_none() => (V::Group23Var1, true, point(x.value, x.flags, None)),
+        V::Group23Var6 if x.time.is_none() => (V::Group23Var2, true, point(low, x.flags, None)),
         V::Group21Var5 | V::Group23Var5 => (read, true, point(x.value, x.flags, absolute(x.time))),
         V::Group21Var6 | V::Group23Var6 => (read, true, point(low, x.flags, absolute(x.time))),
         V::Group23Var1 => (read, true, point(x.value, x.flags, None)),
@@ -399,14 +409,18 @@ fn frozen_counter(read: V, index: u16, x: &FrozenCounter) -> Reported {
     }
 }
 
-/// The value and time an analog event or analog output status event variation reports
-fn analog_event(
-    variation: u8,
-    value: f64,
-    flags: Flags,
-    time: Option<Time>,
-) -> ((Flags, f64), Option<Time>) {
-    match variation {
+/// The variation, value and time an analog event or analog output status event reports when
+/// `read` is selected for it
+fn analog_event(read: V, value: f64, flags: Flags, time: Option<Time>) -> AnalogEvent {
+    let (group, variation) = read.to_group_and_var();
+    let variation = match (variation, time) {
+        (3, None) => 1,
+        (4, None) => 2,
+        (7, None) => 5,
+        (8, None) => 6,
+        (variation, _) => variation,
+    };
+    let (value, time) = match variation {
         1 => (i32_value(value, flags), None),
         2 => (i16_value(value, flags), None),
         3 => (i32_value(value, flags), absolute(time)),
@@ -416,8 +430,14 @@ fn analog_event(
         7 => (f32_value(value, flags), absolute(time)),
         8 => ((flags, value), absolute(time)),
         _ => panic!("no event variation {variation}"),
-    }
+    };
+    let reported =
+        V::lookup(group, variation).unwrap_or_else(|| panic!("no variation g{group}v{variation}"));
+    (reported, value, time)
 }
+
+/// The variation, value with its flags, and time an analog event is reported with
+type AnalogEvent = (V, (Flags, f64), Option<Time>);
 
 fn analog(read: V, index: u16, x: &AnalogInput) -> Reported {
     let point = |(flags, value), time| Value::Analog(AnalogInput { value, flags, time }, index);
@@ -437,8 +457,8 @@ fn analog(read: V, index: u16, x: &AnalogInput) -> Reported {
         | V::Group32Var6
         | V::Group32Var7
         | V::Group32Var8 => {
-            let (value, time) = analog_event(read.to_group_and_var().1, x.value, x.flags, x.time);
-            (read, true, point(value, time))
+            let (variation, value, time) = analog_event(read, x.value, x.flags, x.time);
+            (variation, true, point(value, time))
         }
         _ => panic!("{read} is not an analog input variation"),
     }
@@ -461,8 +481,8 @@ fn analog_output_status(read: V, index: u16, x: &AnalogOutputStatus) -> Reported
         | V::Group42Var6
         | V::Group42Var7
         | V::Group42Var8 => {
-            let (value, time) = analog_event(read.to_group_and_var().1, x.value, x.flags, x.time);
-            (read, true, point(value, time))
+            let (variation, value, time) = analog_event(read, x.value, x.flags, x.time);
+            (variation, true, point(value, time))
         }
         _ => panic!("{read} is not an analog output status variation"),
     }
