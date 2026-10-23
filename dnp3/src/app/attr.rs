@@ -2180,4 +2180,316 @@ mod test {
             );
         }
     }
+
+    mod codec_properties {
+        use super::*;
+        use crate::app::format::write::HeaderWriter;
+        use crate::app::gen::ranged::RangedVariation;
+        use crate::app::parse::options::ParseOptions;
+        use crate::app::parse::parser::{HeaderCollection, ObjectHeader, Width};
+        use crate::app::FunctionCode;
+        use crate::master::Headers;
+        use proptest::prelude::*;
+
+        /// group, variation, qualifier, start and stop
+        const HEADER_LEN: usize = 5;
+
+        /// variations that can't carry a value: 0 doesn't exist, 254 requests every attribute
+        /// and 255 is the list of attribute variations
+        const RESERVED: [u8; 3] = [0, 254, 255];
+
+        /// NaN with several payloads and signs, quiet and signaling, the infinities, both zeros,
+        /// the smallest and largest subnormals, and the finite limits
+        fn special_f32() -> Vec<f32> {
+            vec![
+                f32::NAN,
+                -f32::NAN,
+                f32::from_bits(0x7FC0_0001),
+                f32::from_bits(0x7F80_0001),
+                f32::from_bits(u32::MAX),
+                f32::INFINITY,
+                f32::NEG_INFINITY,
+                0.0,
+                -0.0,
+                f32::from_bits(1),
+                -f32::from_bits(1),
+                f32::from_bits(0x007F_FFFF),
+                f32::MIN_POSITIVE,
+                f32::MAX,
+                f32::MIN,
+            ]
+        }
+
+        fn special_f64() -> Vec<f64> {
+            vec![
+                f64::NAN,
+                -f64::NAN,
+                f64::from_bits(0x7FF8_0000_0000_0001),
+                f64::from_bits(0x7FF0_0000_0000_0001),
+                f64::from_bits(u64::MAX),
+                f64::INFINITY,
+                f64::NEG_INFINITY,
+                0.0,
+                -0.0,
+                f64::from_bits(1),
+                -f64::from_bits(1),
+                f64::from_bits(0x000F_FFFF_FFFF_FFFF),
+                f64::MIN_POSITIVE,
+                f64::MAX,
+                f64::MIN,
+            ]
+        }
+
+        fn bytes() -> impl Strategy<Value = Vec<u8>> {
+            prop_oneof![
+                Just(Vec::new()),
+                prop::collection::vec(any::<u8>(), 0..=300),
+                prop::collection::vec(any::<u8>(), 254..=257),
+            ]
+        }
+
+        fn ascii(len: impl Into<prop::collection::SizeRange>) -> impl Strategy<Value = String> {
+            prop::collection::vec(0x20u8..0x7F, len)
+                .prop_map(|x| x.into_iter().map(char::from).collect())
+        }
+
+        fn string() -> impl Strategy<Value = String> {
+            prop_oneof![
+                Just(String::new()),
+                ascii(0..=300),
+                ascii(254..=257),
+                prop::collection::vec(any::<char>(), 0..=80).prop_map(String::from_iter),
+            ]
+        }
+
+        fn value() -> impl Strategy<Value = OwnedAttrValue> {
+            prop_oneof![
+                string().prop_map(OwnedAttrValue::VisibleString),
+                prop_oneof![
+                    any::<u32>(),
+                    prop::sample::select(vec![0, 255, 256, 65535, 65536, u32::MAX]),
+                ]
+                .prop_map(OwnedAttrValue::UnsignedInt),
+                prop_oneof![
+                    any::<i32>(),
+                    prop::sample::select(vec![
+                        -129,
+                        -128,
+                        127,
+                        128,
+                        -32769,
+                        -32768,
+                        32767,
+                        32768,
+                        i32::MIN,
+                        i32::MAX
+                    ]),
+                ]
+                .prop_map(OwnedAttrValue::SignedInt),
+                prop_oneof![
+                    any::<u32>().prop_map(f32::from_bits),
+                    prop::sample::select(special_f32()),
+                ]
+                .prop_map(|x| OwnedAttrValue::FloatingPoint(FloatType::F32(x))),
+                prop_oneof![
+                    any::<u64>().prop_map(f64::from_bits),
+                    prop::sample::select(special_f64()),
+                ]
+                .prop_map(|x| OwnedAttrValue::FloatingPoint(FloatType::F64(x))),
+                bytes().prop_map(OwnedAttrValue::OctetString),
+                prop_oneof![
+                    0..=Timestamp::MAX_VALUE,
+                    prop::sample::select(vec![0, Timestamp::MAX_VALUE]),
+                ]
+                .prop_map(|x| OwnedAttrValue::Dnp3Time(Timestamp::new(x))),
+                bytes().prop_map(OwnedAttrValue::BitString),
+            ]
+        }
+
+        fn attribute() -> impl Strategy<Value = OwnedAttribute> {
+            (
+                // a private set 0 is written as the default set
+                prop_oneof![
+                    any::<u8>().prop_map(AttrSet::new),
+                    any::<u8>().prop_map(AttrSet::Private),
+                ],
+                prop_oneof![any::<u8>(), prop::sample::select(RESERVED.to_vec())],
+                value(),
+            )
+                .prop_map(|(set, variation, value)| OwnedAttribute::new(set, variation, value))
+        }
+
+        /// the data type code, and the smallest length that holds the value or the length of
+        /// variable data too long to encode
+        fn expected_encoding(value: &OwnedAttrValue) -> (u8, Result<u8, usize>) {
+            let variable = |bytes: &[u8]| u8::try_from(bytes.len()).map_err(|_| bytes.len());
+            match value {
+                OwnedAttrValue::VisibleString(x) => (1, variable(x.as_bytes())),
+                OwnedAttrValue::UnsignedInt(x) => {
+                    let len = if *x <= 0xFF {
+                        1
+                    } else if *x <= 0xFFFF {
+                        2
+                    } else {
+                        4
+                    };
+                    (2, Ok(len))
+                }
+                OwnedAttrValue::SignedInt(x) => {
+                    let len = if (-128..=127).contains(x) {
+                        1
+                    } else if (-32768..=32767).contains(x) {
+                        2
+                    } else {
+                        4
+                    };
+                    (3, Ok(len))
+                }
+                OwnedAttrValue::FloatingPoint(FloatType::F32(_)) => (4, Ok(4)),
+                OwnedAttrValue::FloatingPoint(FloatType::F64(_)) => (4, Ok(8)),
+                OwnedAttrValue::OctetString(x) => (5, variable(x)),
+                OwnedAttrValue::BitString(x) => (6, variable(x)),
+                OwnedAttrValue::Dnp3Time(_) => (7, Ok(6)),
+            }
+        }
+
+        /// the encoded size of the header and the attribute, and its data type and length octets
+        fn encoded_size(len: u8) -> usize {
+            HEADER_LEN + 2 + usize::from(len)
+        }
+
+        /// equal, comparing floats by their bits so that NaN equals itself
+        fn same_value(lhs: &OwnedAttrValue, rhs: &OwnedAttrValue) -> bool {
+            match (lhs, rhs) {
+                (
+                    OwnedAttrValue::FloatingPoint(FloatType::F32(x)),
+                    OwnedAttrValue::FloatingPoint(FloatType::F32(y)),
+                ) => x.to_bits() == y.to_bits(),
+                (
+                    OwnedAttrValue::FloatingPoint(FloatType::F64(x)),
+                    OwnedAttrValue::FloatingPoint(FloatType::F64(y)),
+                ) => x.to_bits() == y.to_bits(),
+                _ => lhs == rhs,
+            }
+        }
+
+        /// writes the attribute as a master request does, returning the result and the bytes
+        /// written
+        fn write(attr: &OwnedAttribute, buffer: &mut [u8]) -> (Result<(), TaskError>, Vec<u8>) {
+            let mut cursor = WriteCursor::new(buffer);
+            let result = Headers::new()
+                .add_attribute(attr.clone())
+                .write(&mut HeaderWriter::new(&mut cursor));
+            (result, cursor.written().to_vec())
+        }
+
+        fn bad_attribute(err: BadAttribute) -> Result<(), TaskError> {
+            Err(TaskError::BadEncoding(BadEncoding::Attribute(err)))
+        }
+
+        /// the only header, a g0 attribute in a one-byte range of the set
+        fn parse_one(function: FunctionCode, bytes: &[u8]) -> Option<OwnedAttribute> {
+            let headers = HeaderCollection::parse(ParseOptions::default(), function, bytes).ok()?;
+            match headers.get_only_header().ok()? {
+                ObjectHeader::Range(Width::One, range, RangedVariation::Group0(attr))
+                    if range.get_start() == u16::from(attr.set.value())
+                        && range.get_count() == 1 =>
+                {
+                    attr.to_owned()
+                }
+                _ => None,
+            }
+        }
+
+        /// the attribute parses back from a response and a WRITE in the smallest encoding, or it
+        /// can't be written, and nothing is written, because of its variation or its length
+        fn check_round_trip(attr: &OwnedAttribute) -> Result<(), TestCaseError> {
+            let (code, len) = expected_encoding(&attr.value);
+            let mut buffer = [0u8; 512];
+            let (result, written) = write(attr, &mut buffer);
+            if RESERVED.contains(&attr.variation) {
+                let err = BadAttribute::BadVariation(attr.variation);
+                prop_assert_eq!(attr.check_encodable(), Err(err));
+                prop_assert_eq!(result, bad_attribute(err));
+                prop_assert_eq!(written, Vec::<u8>::new());
+                return Ok(());
+            }
+            match len {
+                Ok(len) => {
+                    prop_assert_eq!(attr.check_encodable(), Ok(()));
+                    prop_assert_eq!(result, Ok(()));
+                    prop_assert_eq!(written.len(), encoded_size(len));
+                    prop_assert_eq!(&written[HEADER_LEN..HEADER_LEN + 2], &[code, len]);
+                    let expected_set = match attr.set.value() {
+                        0 => AttrSet::Default,
+                        x => AttrSet::Private(x),
+                    };
+                    for function in [FunctionCode::Response, FunctionCode::Write] {
+                        let parsed = parse_one(function, &written);
+                        prop_assert!(
+                            parsed
+                                .as_ref()
+                                .is_some_and(|parsed| parsed.set == expected_set
+                                    && parsed.variation == attr.variation
+                                    && same_value(&parsed.value, &attr.value)),
+                            "{:?} parsed as {:?}",
+                            function,
+                            parsed
+                        );
+                    }
+                }
+                Err(len) => {
+                    let err = BadAttribute::BadLength(len);
+                    prop_assert_eq!(attr.check_encodable(), Err(err));
+                    prop_assert_eq!(result, bad_attribute(err));
+                    prop_assert_eq!(written, Vec::<u8>::new());
+                }
+            }
+            Ok(())
+        }
+
+        #[test]
+        fn special_floats_and_empty_strings_round_trip() {
+            let values = special_f32()
+                .into_iter()
+                .map(|x| OwnedAttrValue::FloatingPoint(FloatType::F32(x)))
+                .chain(
+                    special_f64()
+                        .into_iter()
+                        .map(|x| OwnedAttrValue::FloatingPoint(FloatType::F64(x))),
+                )
+                .chain([
+                    OwnedAttrValue::VisibleString(String::new()),
+                    OwnedAttrValue::OctetString(Vec::new()),
+                    OwnedAttrValue::BitString(Vec::new()),
+                ]);
+            for value in values {
+                for set in [AttrSet::Default, AttrSet::Private(0), AttrSet::Private(255)] {
+                    for variation in [1, var::DEVICE_MANUFACTURER_NAME, 253] {
+                        let attr = OwnedAttribute::new(set, variation, value.clone());
+                        check_round_trip(&attr).unwrap();
+                    }
+                }
+            }
+        }
+
+        proptest! {
+            #![proptest_config(ProptestConfig::with_cases(512))]
+
+            #[test]
+            fn attributes_round_trip_in_the_smallest_encoding(attr in attribute()) {
+                check_round_trip(&attr)?;
+            }
+
+            #[test]
+            fn attributes_need_exactly_their_encoded_size(attr in attribute()) {
+                if let (Ok(()), (_, Ok(len))) = (attr.check_encodable(), expected_encoding(&attr.value)) {
+                    let mut buffer = vec![0u8; encoded_size(len)];
+                    prop_assert_eq!(write(&attr, &mut buffer).0, Ok(()));
+                    let one_short = buffer.split_last_mut().map(|(_, rest)| write(&attr, rest).0);
+                    prop_assert_eq!(one_short, Some(Err(TaskError::WriteError)));
+                }
+            }
+        }
+    }
 }
