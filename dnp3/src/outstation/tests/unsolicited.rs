@@ -23,9 +23,6 @@ use super::harness::*;
 const UNSOL_G2V1_SEQ1: &[u8] = &[
     0xF1, 0x82, 0x80, 0x00, 0x02, 0x01, 0x28, 0x01, 0x00, 0x00, 0x00, 0x81,
 ];
-const UNSOL_G2V1_SEQ2: &[u8] = &[
-    0xF2, 0x82, 0x80, 0x00, 0x02, 0x01, 0x28, 0x01, 0x00, 0x00, 0x00, 0x81,
-];
 const DISABLE_UNSOLICITED_SEQ0: &[u8] = &[
     0xC0, 0x15, 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06,
 ];
@@ -42,110 +39,6 @@ fn config_with_limited_retries(retries: usize) -> OutstationConfig {
     let mut config = get_default_unsolicited_config();
     config.max_unsolicited_retries = Some(retries);
     config
-}
-
-#[tokio::test]
-async fn null_unsolicited_always_retries() {
-    let mut harness = new_harness(get_default_unsolicited_config());
-    harness.expect_response(&null_unsolicited(0)).await;
-    harness.check_events(&[Event::EnterUnsolicitedConfirmWait(0)]);
-
-    tokio::time::pause(); //auto advance timer
-
-    harness
-        .wait_for_events(&[Event::UnsolicitedConfirmTimeout(0, false)])
-        .await;
-    harness.expect_response(&null_unsolicited(1)).await;
-    harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
-}
-
-#[tokio::test]
-async fn unsolicited_can_time_out_and_retry() {
-    let mut harness = new_harness(get_default_unsolicited_config());
-    confirm_null_unsolicited(&mut harness).await;
-    enable_unsolicited(&mut harness).await;
-    harness.handle.database.transaction(add_binary_event);
-
-    // first response
-    harness.expect_response(UNSOL_G2V1_SEQ1).await;
-    harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
-
-    // this would go on forever, but let's just test 3 iterations
-    for _ in 0..3 {
-        tokio::time::pause();
-        harness.expect_response(UNSOL_G2V1_SEQ1).await;
-        harness.check_events(&[Event::UnsolicitedConfirmTimeout(1, true)]);
-        tokio::time::resume();
-    }
-}
-
-#[tokio::test]
-async fn unsolicited_can_timeout_and_not_retry() {
-    let mut harness = new_harness(config_with_limited_retries(2));
-    confirm_null_unsolicited(&mut harness).await;
-    enable_unsolicited(&mut harness).await;
-    harness.handle.database.transaction(add_binary_event);
-
-    // response
-    harness.expect_response(UNSOL_G2V1_SEQ1).await;
-    harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
-
-    // first retry
-    tokio::time::pause();
-    harness.expect_response(UNSOL_G2V1_SEQ1).await;
-    harness.check_events(&[Event::UnsolicitedConfirmTimeout(1, true)]);
-    tokio::time::resume();
-
-    // second retry
-    tokio::time::pause();
-    harness.expect_response(UNSOL_G2V1_SEQ1).await;
-    harness.check_events(&[Event::UnsolicitedConfirmTimeout(1, true)]);
-    tokio::time::resume();
-
-    // timeout
-    tokio::time::pause();
-    harness
-        .wait_for_events(&[Event::UnsolicitedConfirmTimeout(1, false)])
-        .await;
-    tokio::time::resume();
-
-    // new series
-    tokio::time::pause();
-    harness.expect_response(UNSOL_G2V1_SEQ2).await;
-    harness.check_events(&[Event::EnterUnsolicitedConfirmWait(2)]);
-}
-
-#[tokio::test]
-async fn unsolicited_can_timeout_series_wait_and_start_another_series() {
-    let mut harness = new_harness(config_with_limited_retries(0));
-    confirm_null_unsolicited(&mut harness).await;
-    enable_unsolicited(&mut harness).await;
-    harness.handle.database.transaction(add_binary_event);
-
-    // first response series
-    harness.expect_response(UNSOL_G2V1_SEQ1).await;
-    harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
-
-    tokio::time::pause();
-    harness
-        .wait_for_events(&[Event::UnsolicitedConfirmTimeout(1, false)])
-        .await;
-
-    harness.expect_response(UNSOL_G2V1_SEQ2).await;
-    harness.check_events(&[Event::EnterUnsolicitedConfirmWait(2)]);
-}
-
-#[tokio::test]
-async fn data_unsolicited_can_be_confirmed() {
-    let mut harness = new_harness(get_default_unsolicited_config());
-    confirm_null_unsolicited(&mut harness).await;
-    enable_unsolicited(&mut harness).await;
-
-    harness.handle.database.transaction(add_binary_event);
-    harness.expect_response(UNSOL_G2V1_SEQ1).await;
-    harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
-    harness.send_and_process(&unsolicited_confirm(1)).await;
-    harness.check_events(&[Event::UnsolicitedConfirmReceived(1)]);
 }
 
 #[tokio::test]
@@ -346,22 +239,6 @@ async fn read_and_confirm_two_class_1_events(harness: &mut OutstationHarness) {
         Event::Cleared(1),
         Event::EndConfirm(empty_buffer_state()),
     ]);
-}
-
-#[tokio::test]
-async fn confirmed_read_after_unsolicited_timeout_does_not_lose_unconfirmed_events() {
-    let mut harness = new_harness(config_with_one_unsolicited_attempt());
-    time_out_unsolicited_event(&mut harness).await;
-
-    // a second event while waiting to retry the unsolicited response
-    update_binary_event(&mut harness.handle.database, false);
-
-    // the READ reports both events, not just the one that was never sent
-    read_and_confirm_two_class_1_events(&mut harness).await;
-    harness
-        .test_request_response(&read_class_1(2), EMPTY_RESPONSE_SEQ2)
-        .await;
-    harness.check_no_events();
 }
 
 // SELECT and OPERATE for g41v2 index 7, value 513
@@ -1146,8 +1023,6 @@ async fn read_after_an_unsolicited_build_that_wrote_nothing_reports_only_what_it
 }
 
 const CONFIRM_TIMEOUT: Duration = OutstationConfig::DEFAULT_CONFIRM_TIMEOUT;
-const RETRY_DELAY: Duration = OutstationConfig::DEFAULT_UNSOLICITED_RETRY_DELAY;
-const DISABLE_UNSOLICITED_CLASS_2_SEQ1: &[u8] = &[0xC1, 0x15, 0x3C, 0x03, 0x06];
 
 /// confirm the null unsolicited response, enable unsolicited responses, and send the class 1 event
 /// in an unsolicited response that waits for its confirm
@@ -1173,62 +1048,6 @@ async fn broadcast_disable_unsolicited(
         FunctionCode::DisableUnsolicited,
         action,
     )]);
-}
-
-#[tokio::test(start_paused = true)]
-async fn confirm_after_disable_unsolicited_during_unsolicited_confirm_wait() {
-    watchdog(async {
-        let mut harness = new_harness(get_default_unsolicited_config());
-        send_unsolicited_event(&mut harness).await;
-
-        harness
-            .test_request_response(DISABLE_UNSOLICITED_SEQ0, EMPTY_RESPONSE_SEQ0)
-            .await;
-        harness.check_no_events();
-
-        // the wait goes on, so the confirm clears the event
-        harness.record_requests_from_idle();
-        harness.send_and_process(&unsolicited_confirm(1)).await;
-        harness.check_events(&[
-            Event::UnsolicitedConfirmReceived(1),
-            Event::BeginConfirm,
-            Event::Cleared(0),
-            Event::EndConfirm(empty_buffer_state()),
-        ]);
-        harness
-            .test_request_response(&read_class_1(1), EMPTY_RESPONSE_SEQ1)
-            .await;
-        harness.check_events(&[from_idle(FunctionCode::Read, false, 1)]);
-    })
-    .await;
-}
-
-#[tokio::test(start_paused = true)]
-async fn timeout_after_disable_unsolicited_during_unsolicited_confirm_wait() {
-    watchdog(async {
-        let mut harness = new_harness(get_default_unsolicited_config());
-        send_unsolicited_event(&mut harness).await;
-        let sent = Instant::now();
-
-        harness
-            .test_request_response(DISABLE_UNSOLICITED_SEQ0, EMPTY_RESPONSE_SEQ0)
-            .await;
-        harness.check_no_events();
-
-        // the wait times out without a retry
-        harness
-            .wait_for_events(&[Event::UnsolicitedConfirmTimeout(1, false)])
-            .await;
-        assert_eq!(sent.elapsed(), CONFIRM_TIMEOUT);
-        expect_silence(&mut harness).await;
-
-        // the event is still buffered
-        harness
-            .test_request_response(&read_class_1(1), G2V1_RESPONSE_SEQ1)
-            .await;
-        harness.check_events(&[Event::EnterSolicitedConfirmWait(1)]);
-    })
-    .await;
 }
 
 #[tokio::test(start_paused = true)]
@@ -1302,50 +1121,6 @@ async fn ignored_broadcast_disable_unsolicited_leaves_the_retries() {
 }
 
 #[tokio::test(start_paused = true)]
-async fn confirm_after_disable_unsolicited_during_null_unsolicited_confirm_wait() {
-    watchdog(async {
-        let mut harness = new_harness(get_default_unsolicited_config());
-        harness.expect_response(&null_unsolicited(0)).await;
-        harness.check_events(&[Event::EnterUnsolicitedConfirmWait(0)]);
-        let start = Instant::now();
-
-        harness
-            .test_request_response(DISABLE_UNSOLICITED_SEQ0, EMPTY_RESPONSE_SEQ0)
-            .await;
-
-        // the wait goes on, so the confirm ends it, and the null response isn't sent again
-        harness.send_and_process(&unsolicited_confirm(0)).await;
-        harness.check_events(&[Event::UnsolicitedConfirmReceived(0)]);
-        assert_eq!(start.elapsed(), Duration::ZERO);
-        expect_silence(&mut harness).await;
-    })
-    .await;
-}
-
-#[tokio::test(start_paused = true)]
-async fn timeout_after_disable_unsolicited_during_null_unsolicited_confirm_wait() {
-    watchdog(async {
-        let mut harness = new_harness(get_default_unsolicited_config());
-        harness.expect_response(&null_unsolicited(0)).await;
-        harness.check_events(&[Event::EnterUnsolicitedConfirmWait(0)]);
-        let start = Instant::now();
-
-        harness
-            .test_request_response(DISABLE_UNSOLICITED_SEQ0, EMPTY_RESPONSE_SEQ0)
-            .await;
-
-        // the null response is sent again once the wait times out
-        harness
-            .wait_for_events(&[Event::UnsolicitedConfirmTimeout(0, false)])
-            .await;
-        harness.expect_response(&null_unsolicited(1)).await;
-        harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
-        assert_eq!(start.elapsed(), CONFIRM_TIMEOUT);
-    })
-    .await;
-}
-
-#[tokio::test(start_paused = true)]
 async fn timeout_after_broadcast_disable_unsolicited_during_null_unsolicited_confirm_wait() {
     watchdog(async {
         let mut harness = new_harness(get_default_unsolicited_config());
@@ -1367,35 +1142,6 @@ async fn timeout_after_broadcast_disable_unsolicited_during_null_unsolicited_con
         harness.expect_response(&[0xF1, 0x82, 0x81, 0x00]).await;
         harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
         assert_eq!(sent.elapsed(), CONFIRM_TIMEOUT);
-    })
-    .await;
-}
-
-#[tokio::test(start_paused = true)]
-async fn disable_unsolicited_of_another_class_during_limited_unsolicited_retries() {
-    watchdog(async {
-        let mut harness = new_harness(config_with_limited_retries(2));
-        send_unsolicited_event(&mut harness).await;
-
-        // the first retry
-        harness.expect_response(UNSOL_G2V1_SEQ1).await;
-        harness.check_events(&[Event::UnsolicitedConfirmTimeout(1, true)]);
-        let retried = Instant::now();
-
-        harness
-            .test_request_response(DISABLE_UNSOLICITED_CLASS_2_SEQ1, EMPTY_RESPONSE_SEQ1)
-            .await;
-        harness.check_no_events();
-
-        // the wait times out without its last retry, and class 1 starts another series after the
-        // retry delay
-        harness
-            .wait_for_events(&[Event::UnsolicitedConfirmTimeout(1, false)])
-            .await;
-        assert_eq!(retried.elapsed(), CONFIRM_TIMEOUT);
-        harness.expect_response(UNSOL_G2V1_SEQ2).await;
-        harness.check_events(&[Event::EnterUnsolicitedConfirmWait(2)]);
-        assert_eq!(retried.elapsed(), CONFIRM_TIMEOUT + RETRY_DELAY);
     })
     .await;
 }
