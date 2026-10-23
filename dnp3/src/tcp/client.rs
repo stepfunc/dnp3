@@ -14,12 +14,20 @@ use crate::util::session::{run_connection, Connection, Session};
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
-use tokio::net::TcpSocket;
+use tokio::net::{TcpSocket, TcpStream};
 
 #[cfg(test)]
-use tests::lookup_host;
+use tests::{connect, lookup_host};
 #[cfg(not(test))]
 use tokio::net::lookup_host;
+
+#[cfg(not(test))]
+fn connect(
+    socket: TcpSocket,
+    addr: SocketAddr,
+) -> impl std::future::Future<Output = std::io::Result<TcpStream>> {
+    socket.connect(addr)
+}
 
 pub(crate) struct ClientTask {
     session: Session,
@@ -146,7 +154,7 @@ impl ClientTask {
         addr: SocketAddr,
         timeout: Option<Duration>,
     ) -> Option<PhysLayer> {
-        let fut = socket.connect(addr);
+        let fut = connect(socket, addr);
         let result = match timeout {
             None => fut.await,
             Some(timeout) => match tokio::time::timeout(timeout, fut).await {
@@ -253,6 +261,21 @@ mod tests {
             None => tokio::net::lookup_host(host).await?.collect(),
         };
         Ok(addrs.into_iter())
+    }
+
+    /// an address the test connect never reaches, so only a timeout ends an attempt to it
+    const BLACK_HOLE: SocketAddr = SocketAddr::new(
+        std::net::IpAddr::V4(std::net::Ipv4Addr::new(192, 0, 2, 1)),
+        20000,
+    );
+
+    /// [`TcpSocket::connect`], except for [`BLACK_HOLE`]
+    pub(super) async fn connect(socket: TcpSocket, addr: SocketAddr) -> std::io::Result<TcpStream> {
+        if addr == BLACK_HOLE {
+            std::future::pending().await
+        } else {
+            socket.connect(addr).await
+        }
     }
 
     #[derive(Debug, PartialEq, Eq)]
@@ -426,6 +449,32 @@ mod tests {
 
     fn hostname(host: &str) -> ConnectionInfo {
         ConnectionInfo::new(Endpoint::hostname(host.to_string()))
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn connect_timeout_moves_on_to_the_next_endpoint() {
+        watchdog(async {
+            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let addr = listener.local_addr().unwrap();
+            let mut black_hole = ConnectionInfo::new(Endpoint::address(BLACK_HOLE));
+            black_hole.set_timeout(Duration::from_secs(3));
+            let attempts = vec![black_hole, ConnectionInfo::new(Endpoint::address(addr))];
+            let (mut task, mut rx) = client_task_with(attempts, PostConnectionHandler::Tcp);
+
+            let start = tokio::time::Instant::now();
+            assert_eq!(connected_to(task.connect().await), Ok((addr, None)));
+            assert_eq!(start.elapsed(), Duration::from_secs(3));
+            assert_eq!(
+                events(&mut rx),
+                [
+                    Event::Connecting(BLACK_HOLE, None),
+                    Event::ConnectFailed(BLACK_HOLE, None),
+                    Event::Connecting(addr, None),
+                    Event::Connected(addr, None),
+                ]
+            );
+        })
+        .await;
     }
 
     #[tokio::test]
