@@ -29,9 +29,9 @@ use super::harness::{create_association_with_handler, TestHarness};
 use crate::util::test_support::watchdog;
 
 const SYSTEM_TIME: Timestamp = Timestamp::new(1_700_000_000_000);
-const NEED_TIME: Iin = Iin::new(Iin1::new(0x10), Iin2::new(0x00));
+pub(super) const NEED_TIME: Iin = Iin::new(Iin1::new(0x10), Iin2::new(0x00));
 
-struct FixedTime;
+pub(super) struct FixedTime;
 
 impl AssociationHandler for FixedTime {
     fn get_current_time(&self) -> Option<Timestamp> {
@@ -68,7 +68,7 @@ fn empty_request(function: FunctionCode, seq: Sequence) -> Vec<u8> {
     cursor.written().to_vec()
 }
 
-fn record_current_time(seq: Sequence) -> Vec<u8> {
+pub(super) fn record_current_time(seq: Sequence) -> Vec<u8> {
     empty_request(FunctionCode::RecordCurrentTime, seq)
 }
 
@@ -76,7 +76,7 @@ fn delay_measure(seq: Sequence) -> Vec<u8> {
     empty_request(FunctionCode::DelayMeasure, seq)
 }
 
-fn write_last_recorded_time(seq: Sequence) -> Vec<u8> {
+pub(super) fn write_last_recorded_time(seq: Sequence) -> Vec<u8> {
     let mut buffer = [0; 32];
     let mut cursor = WriteCursor::new(&mut buffer);
     let mut writer =
@@ -236,27 +236,6 @@ async fn auto_time_sync_retries_after_the_backoff_when_the_outstation_still_need
 
         complete_lan_procedure(&mut harness, &mut seq).await;
         TestHarness::assert_elapsed(failed, Duration::from_secs(1));
-
-        assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
-    })
-    .await;
-}
-
-#[tokio::test]
-async fn auto_time_sync_retries_after_the_backoff_on_timeout() {
-    watchdog(async {
-        let mut harness = harness(Some(TimeSyncProcedure::Lan)).await;
-        let mut seq = Sequence::default();
-
-        report_need_time(&mut harness, Sequence::default()).await;
-        harness
-            .expect_write(record_current_time(seq.increment()))
-            .await;
-        let sent = Instant::now();
-
-        // the response timeout, then the minimum retry delay
-        complete_lan_procedure(&mut harness, &mut seq).await;
-        TestHarness::assert_elapsed(sent, Duration::from_secs(2));
 
         assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
     })
