@@ -965,6 +965,9 @@ impl AssociationMap {
 }
 
 #[cfg(test)]
+mod scheduler_tests;
+
+#[cfg(test)]
 mod retry_tests {
     use super::*;
 
