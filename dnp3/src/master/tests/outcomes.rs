@@ -15,6 +15,7 @@ use std::time::Duration;
 use tokio::task::JoinHandle;
 use tokio::time::Instant;
 
+use crate::app::attr::{var, AttrSet, BadAttribute, OwnedAttrValue, OwnedAttribute};
 use crate::app::control::{Group12Var1, OpType};
 use crate::app::{
     ControlField, FileStatus, FileType, FunctionCode, Group70Var2, Group70Var6, Group70Var7, Iin,
@@ -41,7 +42,7 @@ use crate::master::tests::harness::{
 };
 use crate::master::{
     AssociationError, AssociationHandle, AssociationHandler, AssociationInformation, AuthKey,
-    BlockNumber, Classes, CommandBuilder, CommandError, CommandHeaders, CommandMode,
+    BadEncoding, BlockNumber, Classes, CommandBuilder, CommandError, CommandHeaders, CommandMode,
     CommandSupport, DeadBandHeader, DirReadConfig, FileCredentials, FileError, FileHandle,
     FileMode, FileReadConfig, HeaderInfo, Headers, MasterChannel, MasterChannelType, OpenFile,
     PollError, ReadHandler, ReadRequest, ReadType, TaskError, TaskType, TimeSyncError,
@@ -1581,6 +1582,37 @@ async fn automatic_tasks_fail_with_shutdown_when_the_master_shuts_down() {
     watchdog(async {
         interrupt_auto_task(false, false).await;
         interrupt_auto_task(true, false).await;
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn writing_an_attribute_whose_variation_cannot_carry_a_value_sends_nothing() {
+    watchdog(async {
+        tokio::time::pause();
+        let mut harness = create_association(AssociationConfig::quiet()).await;
+
+        for variation in [
+            0,
+            var::ALL_ATTRIBUTES_REQUEST,
+            var::LIST_OF_ATTRIBUTE_VARIATIONS,
+        ] {
+            let headers = Headers::new().add_attribute(OwnedAttribute::new(
+                AttrSet::Default,
+                variation,
+                OwnedAttrValue::UnsignedInt(0),
+            ));
+            assert_eq!(
+                harness
+                    .association
+                    .send_and_expect_empty_response(FunctionCode::Write, headers)
+                    .await,
+                Err(WriteError::Task(TaskError::BadEncoding(
+                    BadEncoding::Attribute(BadAttribute::BadVariation(variation))
+                )))
+            );
+            harness.assert_no_events();
+        }
     })
     .await;
 }
