@@ -22,6 +22,10 @@
 //!
 //! A CONFIRM keeps the selection: Table 4-2 classes it as a confirmation, not a request, so it
 //! isn't the "next request" of Rule 4. So does a fragment that isn't a valid request (FIR=0).
+//!
+//! Besides single requests, a run sends a SELECT, one request or clock advance, and the OPERATE
+//! that matches the SELECT, so each ruling on whether a request ends the selection is followed by
+//! the OPERATE that shows it.
 
 #![expect(
     clippy::arithmetic_side_effects,
@@ -226,6 +230,7 @@ enum Request {
     DirectOperateNoAck(usize, u8),
     /// READ class 0
     Read(u8),
+    DelayMeasure(u8),
     /// a SELECT, OPERATE or READ whose objects end early
     Malformed(FunctionCode, u8),
     UnknownFunction(u8),
@@ -254,6 +259,7 @@ impl Request {
                 control(FunctionCode::DirectOperateNoResponse, set, seq)
             }
             Request::Read(seq) => read_class_0(seq).to_vec(),
+            Request::DelayMeasure(seq) => delay_measure(seq).to_vec(),
             Request::Malformed(FunctionCode::Read, seq) => vec![0xC0 | seq, 0x01, 60],
             Request::Malformed(function, seq) => {
                 vec![0xC0 | seq, function.as_u8(), 41, 2, 0x17, 0x01, 0x07, 0x01]
@@ -272,6 +278,7 @@ impl Request {
             | Request::DirectOperate(_, seq)
             | Request::DirectOperateNoAck(_, seq)
             | Request::Read(seq)
+            | Request::DelayMeasure(seq)
             | Request::Malformed(_, seq)
             | Request::UnknownFunction(seq)
             | Request::Confirm { seq, .. }
@@ -488,6 +495,12 @@ impl Model {
                 vec![outcome]
             }
             Request::Read(seq) => vec![Outcome::response(response_header(seq, 0))],
+            // g52v2: the clock is paused, so no time passes while the outstation processes it
+            Request::DelayMeasure(seq) => {
+                let mut response = response_header(seq, 0);
+                response.extend_from_slice(&[52, 2, 0x07, 0x01, 0x00, 0x00]);
+                vec![Outcome::response(response)]
+            }
             // decision 0003: answered with IIN2.2 (TB2016-001 4.5.11), even a SELECT with the
             // selection's sequence number
             Request::Malformed(_, seq) => vec![Outcome::response(response_header(seq, 0x04))],
@@ -591,6 +604,7 @@ impl Model {
                 Request::DirectOperateNoAck(self.resolve_set(set), self.resolve_seq(seq))
             }
             RequestOp::Read(seq) => Request::Read(self.resolve_seq(seq)),
+            RequestOp::DelayMeasure(seq) => Request::DelayMeasure(self.resolve_seq(seq)),
             RequestOp::Malformed(function, seq) => {
                 Request::Malformed(function, self.resolve_seq(seq))
             }
@@ -630,6 +644,7 @@ enum RequestOp {
     DirectOperate(SetChoice, SeqChoice),
     DirectOperateNoAck(SetChoice, SeqChoice),
     Read(SeqChoice),
+    DelayMeasure(SeqChoice),
     Malformed(FunctionCode, SeqChoice),
     UnknownFunction(SeqChoice),
     Confirm(bool, SeqChoice),
@@ -653,6 +668,18 @@ enum Op {
     Advance(Advance),
     /// the status the control handler returns for [`STATUS_INDEX`] from now on
     SetHandlerStatus(CommandStatus),
+    /// a SELECT, then `Between`, then the OPERATE that matches the SELECT, which shows whether
+    /// `Between` ended the selection or kept it
+    SelectThenOperate(SetChoice, Between),
+}
+
+/// what [`Op::SelectThenOperate`] puts between its SELECT and OPERATE
+#[derive(Copy, Clone, Debug)]
+enum Between {
+    Request(RequestOp),
+    /// the SELECT again
+    Repeat,
+    Advance(Advance),
 }
 
 /// sequence numbers weighted towards `likely`
@@ -694,6 +721,7 @@ fn request_op() -> impl Strategy<Value = RequestOp> {
         1 => (set_choice(), next())
             .prop_map(|(set, seq)| RequestOp::DirectOperateNoAck(set, seq)),
         2 => next().prop_map(RequestOp::Read),
+        1 => next().prop_map(RequestOp::DelayMeasure),
         2 => (
             prop_oneof![
                 Just(FunctionCode::Select),
@@ -720,6 +748,42 @@ fn advance() -> impl Strategy<Value = Advance> {
     ]
 }
 
+/// each request or advance that keeps or ends a selection about equally often
+fn between() -> impl Strategy<Value = Between> {
+    let request = |op| Just(Between::Request(op));
+    let any_set = || (0..SETS.len()).prop_map(SetChoice::Fixed);
+    let malformed = prop_oneof![
+        Just(FunctionCode::Select),
+        Just(FunctionCode::Operate),
+        Just(FunctionCode::Read)
+    ];
+    prop_oneof![
+        // keep it
+        1 => request(RequestOp::Confirm(false, SeqChoice::Selected)),
+        1 => request(RequestOp::Confirm(true, SeqChoice::Selected)),
+        1 => request(RequestOp::NotFirst(SeqChoice::Next)),
+        1 => Just(Between::Repeat),
+        // discarded, or a retry if the objects are the same
+        1 => any_set()
+            .prop_map(|set| Between::Request(RequestOp::Select(set, SeqChoice::Selected))),
+        2 => advance().prop_map(Between::Advance),
+        // end it
+        1 => any_set().prop_map(|set| Between::Request(RequestOp::Select(set, SeqChoice::Next))),
+        1 => (set_choice(), seq_choice(SeqChoice::AfterSelected))
+            .prop_map(|(set, seq)| Between::Request(RequestOp::Operate(set, seq))),
+        1 => set_choice()
+            .prop_map(|set| Between::Request(RequestOp::DirectOperate(set, SeqChoice::Next))),
+        1 => set_choice().prop_map(|set| {
+            Between::Request(RequestOp::DirectOperateNoAck(set, SeqChoice::Next))
+        }),
+        1 => request(RequestOp::Read(SeqChoice::Next)),
+        1 => request(RequestOp::DelayMeasure(SeqChoice::Next)),
+        1 => request(RequestOp::UnknownFunction(SeqChoice::Next)),
+        3 => (malformed, prop_oneof![Just(SeqChoice::Selected), Just(SeqChoice::Next)])
+            .prop_map(|(function, seq)| Between::Request(RequestOp::Malformed(function, seq))),
+    ]
+}
+
 fn op() -> impl Strategy<Value = Op> {
     prop_oneof![
         24 => request_op().prop_map(Op::Request),
@@ -731,6 +795,8 @@ fn op() -> impl Strategy<Value = Op> {
             Just(CommandStatus::NotAuthorized),
         ]
         .prop_map(Op::SetHandlerStatus),
+        6 => (set_choice(), between())
+            .prop_map(|(set, between)| Op::SelectThenOperate(set, between)),
     ]
 }
 
@@ -756,77 +822,117 @@ fn config(select_timeout_ms: u64) -> OutstationConfig {
     config
 }
 
-async fn check_model(select_timeout_ms: u64, ops: Vec<Op>) {
-    let mut harness = new_harness(config(select_timeout_ms));
-    let start = Instant::now();
-    let mut model = Model::new(select_timeout_ms);
-    let mut last = None;
+/// the outstation under test and the model it is checked against
+struct Run {
+    harness: OutstationHarness,
+    start: Instant,
+    model: Model,
+    /// the last request sent
+    last: Option<Request>,
+}
 
-    for op in ops {
-        let request = match op {
-            Op::Request(op) => model.resolve(op),
-            Op::Repeat => match last {
-                Some(request) => request,
-                None => continue,
-            },
-            Op::Advance(advance) => {
-                let ms = model.advance(advance);
-                tokio::time::advance(Duration::from_millis(ms)).await;
-                // no timer is running: nothing is sent and the clock moved by exactly `ms`
-                harness.expect_no_response();
-                harness.check_no_events();
-                assert_eq!(start.elapsed(), Duration::from_millis(model.now_ms));
-                continue;
-            }
+impl Run {
+    fn new(select_timeout_ms: u64) -> Self {
+        Self {
+            harness: new_harness(config(select_timeout_ms)),
+            start: Instant::now(),
+            model: Model::new(select_timeout_ms),
+            last: None,
+        }
+    }
+
+    async fn apply(&mut self, op: Op) {
+        match op {
+            Op::Request(op) => self.send(self.model.resolve(op)).await,
+            Op::Repeat => self.repeat().await,
+            Op::Advance(advance) => self.advance(advance).await,
             Op::SetHandlerStatus(status) => {
-                harness.set_control_status(STATUS_INDEX, status);
-                model.handler_status = status;
-                continue;
+                self.harness.set_control_status(STATUS_INDEX, status);
+                self.model.handler_status = status;
             }
-        };
-        last = Some(request);
+            Op::SelectThenOperate(set, between) => {
+                let set = self.model.resolve_set(set);
+                let seq = self.model.resolve_seq(SeqChoice::Next);
+                self.send(Request::Select(set, seq)).await;
+                match between {
+                    Between::Request(op) => self.send(self.model.resolve(op)).await,
+                    Between::Repeat => self.repeat().await,
+                    Between::Advance(advance) => self.advance(advance).await,
+                }
+                self.send(Request::Operate(set, next_seq(seq))).await;
+            }
+        }
+    }
+
+    async fn repeat(&mut self) {
+        if let Some(request) = self.last {
+            self.send(request).await;
+        }
+    }
+
+    async fn advance(&mut self, advance: Advance) {
+        let ms = self.model.advance(advance);
+        tokio::time::advance(Duration::from_millis(ms)).await;
+        // no timer is running: nothing is sent and the clock moved by exactly `ms`
+        self.harness.expect_no_response();
+        self.harness.check_no_events();
+        assert_eq!(
+            self.start.elapsed(),
+            Duration::from_millis(self.model.now_ms)
+        );
+    }
+
+    async fn send(&mut self, request: Request) {
+        self.last = Some(request);
 
         // the outstation has answered once this returns (see `pop_response`)
-        harness.send_and_process(&request.bytes()).await;
+        self.harness.send_and_process(&request.bytes()).await;
         let mut events = Vec::new();
-        while let Some(event) = harness.poll_event() {
+        while let Some(event) = self.harness.poll_event() {
             events.push(event);
         }
         let mut responses = Vec::new();
-        while let Some(response) = harness.pop_response() {
+        while let Some(response) = self.harness.pop_response() {
             responses.push(response);
         }
         assert!(
             responses.len() <= 1,
             "{request:?} at {} ms: more than one response: {responses:02X?}",
-            model.now_ms
+            self.model.now_ms
         );
         let actual = Outcome {
             response: responses.pop(),
             events,
         };
 
-        let alternatives = model.step(request);
+        let alternatives = self.model.step(request);
         match alternatives
             .iter()
             .position(|(outcome, _)| *outcome == actual)
         {
-            Some(position) => model = alternatives[position].1.clone(),
+            Some(position) => self.model = alternatives[position].1.clone(),
             None => {
                 let expected: Vec<&Outcome> =
                     alternatives.iter().map(|(outcome, _)| outcome).collect();
                 panic!(
                     "{request:?} at {} ms: got {actual:?}, expected one of {expected:?}",
-                    model.now_ms
+                    self.model.now_ms
                 )
             }
         }
     }
+}
+
+async fn check_model(select_timeout_ms: u64, ops: Vec<Op>) {
+    let mut run = Run::new(select_timeout_ms);
+    for op in ops {
+        run.apply(op).await;
+    }
 
     // and nothing follows the last request
     tokio::task::yield_now().await;
-    harness.expect_no_response();
-    harness.check_no_events();
+    run.harness.expect_no_response();
+    run.harness.check_no_events();
 }
 
 proptest! {
@@ -839,6 +945,23 @@ proptest! {
     ) {
         run_paused(check_model(select_timeout_ms, ops));
     }
+}
+
+/// Rule 3: a SELECT that fails ends the selection it replaces, which the generator rarely
+/// reaches because the handler has to fail first
+#[test]
+fn failed_select_ends_the_previous_selection() {
+    let ops = vec![
+        Op::SetHandlerStatus(CommandStatus::HardwareError),
+        Op::SelectThenOperate(
+            SetChoice::Fixed(0),
+            Between::Request(RequestOp::Select(
+                SetChoice::Fixed(FAILING_FIRST),
+                SeqChoice::Next,
+            )),
+        ),
+    ];
+    run_paused(check_model(1000, ops));
 }
 
 /// The model rejects an OPERATE that executes after a READ ended its selection
