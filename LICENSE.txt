@@ -1,13 +1,14 @@
 ﻿LICENSE AGREEMENT
 
-BY DOWNLOADING THE LICENSED SOFTWARE FROM THE DEVELOPMENT PLATFORM, DEVELOPER
-IS AGREEING TO BE BOUND BY THE TERMS OF THIS LICENSE AGREEMENT (THIS "AGREEMENT").
-THEREFORE, IT IS IMPORTANT THAT YOU READ THIS AGREEMENT BEFORE DOWNLOADING THE
-SOFTWARE. IF DEVELOPER DOES NOT AGREE TO THE TERMS OF THIS AGREEMENT, THEN
-DEVELOPER MAY NOT DOWNLOAD OR USE THE LICENSED SOFTWARE. IF YOU ARE DOWNLOADING
-THIS LICENSED SOFTWARE ON BEHALF OF AN ENTITY OR OTHER PERSON, THEN YOU REPRESENT
-THAT YOU ARE AUTHORIZED TO BIND SUCH ENTITY OR OTHER PERSON TO THE TERMS OF THIS
-AGREEMENT.
+Agreement version: [owner-approved publication date and revision identifier]
+
+READ THIS AGREEMENT BEFORE ACCESSING, DOWNLOADING, OR USING THE LICENSED SOFTWARE.
+BY ACCESSING, DOWNLOADING, OR USING THE LICENSED SOFTWARE AFTER RECEIVING NOTICE
+OF THIS AGREEMENT AND AN OPPORTUNITY TO REVIEW IT, YOU AGREE TO ITS TERMS. IF YOU
+DO NOT AGREE, DO NOT ACCESS, DOWNLOAD, OR USE THE LICENSED SOFTWARE EXCEPT AS
+PERMITTED BY APPLICABLE LAW. IF YOU ACT ON BEHALF OF AN ENTITY OR OTHER PERSON,
+YOU REPRESENT THAT YOU ARE AUTHORIZED TO BIND THAT ENTITY OR PERSON. READING THIS
+AGREEMENT ALONE DOES NOT CONSTITUTE ACCEPTANCE.
 
 This Agreement sets forth the terms and conditions under which the parties agree
 that Developer may use the Licensed Software for the non-commercial and
@@ -22,19 +23,25 @@ it is agreed as follows:
 or hardware and related documentation with which the Developer is considering
 integrating with the Licensed Software.
 
-1.2. "Developer" shall mean the person or entity downloading the Licensed Software
-or on whose behalf the Licensed Software is downloaded.
+1.2. "Developer" shall mean the person or entity accessing, downloading, or using
+the Licensed Software, directly or through an automated tool or service, or on
+whose behalf such activity occurs.
 
-1.3. "Development Platform" shall mean GitHub (github.com), crates.io, or other
-software development platform or package registry identified by Company where the
-Licensed Software can be downloaded.
+1.3. "Development Platform" shall mean GitHub, crates.io, NuGet.org, Maven
+Central, Company's websites, and other software development platforms, package
+registries, or documentation hosting services identified by Company through which
+Company makes the Licensed Software available.
 
-1.4. "Effective Date" shall mean the date that the Licensed Software is downloaded
-from the Development Platform.
+1.4. "Effective Date" shall mean the date Developer first accepts this version of
+this Agreement.
 
-1.5. "Licensed Software" shall mean the Company proprietary software product, in
-both source and object code, that Developer downloads from the Development Platform
-that performs a communication function.
+1.5. "Licensed Software" shall mean Company's proprietary communication software
+product made available under this Agreement, in source or object code form,
+including libraries, executable binaries, and Company-provided documentation,
+guides, generated API documentation, examples, tests, and other accompanying
+materials, whether accessed or obtained together or separately. Third-party
+materials identified as subject to separate license terms remain governed by those
+terms.
 
 1.6. "Purpose" shall mean the effort to integrate the Licensed Software with the
 Developer Application(s) for non-commercial and non-production purposes, including,
@@ -51,19 +58,28 @@ permitted as provided in Section 2.7, subject to Section 2.6.
 
 2.1. Delivery of Licensed Software
 
-The Licensed Software is downloaded from the Development Platform.
+Company makes the Licensed Software available for access or download through the
+Development Platform.
 
 2.2. License Grant
 
 Company grants Developer a personal, perpetual, revocable, limited, non-exclusive,
-non-sublicensable, non-transferable license to access, use, download and/or install
-the Licensed Software only for use in accordance with the Purpose, and subject to
-all the terms of this Agreement. Company reserves the right at any time to alter
-features or other characteristics of any version of the Licensed Software. Unless
-and until the parties enter into a subsequent agreement under Section 2.4 that
-provides to the contrary, Developer shall not distribute or sublicense any portion
-of the Licensed Software. Developer may not publish or disseminate any benchmarking
-results of Licensed Software performance.
+non-sublicensable, non-transferable license to access, use, download and/or
+install the Licensed Software only for use in accordance with the Purpose, and
+subject to all the terms of this Agreement. Company reserves the right at any time
+to alter features or other characteristics of any version of the Licensed
+Software. Unless and until the parties enter into a subsequent agreement under
+Section 2.4 that provides to the contrary, Developer shall not distribute or
+sublicense any portion of the Licensed Software. Notwithstanding the preceding
+sentence, Developer may provide portions of the Licensed Software to a service
+provider solely to process them on Developer's behalf for activities otherwise
+permitted under this Agreement, provided the provider's applicable terms or
+written agreement limit use to that processing and prohibit model training and use
+for Other Implementations. This permission does not authorize public disclosure or
+grant the provider any independent right to use the Licensed Software. Developer
+remains responsible for compliance with this Agreement in using the service.
+Developer may not publish or disseminate any benchmarking results of Licensed
+Software performance.
 
 2.3. Non-Commercial and Non-Production Use
 
@@ -99,58 +115,91 @@ but has no obligation to do so, and may cancel such support at any time.
 
 2.6. No Use of the Licensed Software to Create Other Implementations
 
-"Other Implementation" shall mean any software, firmware, hardware design,
-specification, or other implementation of a communication protocol implemented by
-the Licensed Software, other than (a) the Licensed Software itself, including
-modifications made for the Purpose, and (b) a Developer Application to the extent
-it uses the Licensed Software as a component without reproducing or replacing it.
-An Other Implementation is subject to this Section regardless of whether it is
-commercial or non-commercial, open source or proprietary, distributed or private,
-or competitive with the Licensed Software.
+"Other Implementation" shall mean any implementation of all or any part of a
+communication protocol implemented by the Licensed Software, including software,
+firmware, hardware designs, and specifications for such implementations, other
+than (a) the Licensed Software itself, including modifications within that
+implementation made in accordance with the Purpose or Company's applicable written
+authorization, and (b) a Developer Application solely to the extent its relevant
+protocol functionality is provided by the Licensed Software as a component.
+Compiling, linking, embedding, or wrapping the Licensed Software for an otherwise
+permitted use does not by itself create an Other Implementation. These exclusions
+do not extend to a separate implementation merely because it is included in the
+same application, uses the Licensed Software for other functionality, or is
+described as a modification, adapter, or fork. An Other Implementation is subject
+to this Section regardless of whether it is commercial or non-commercial, open
+source or proprietary, distributed or private, or competitive with the Licensed
+Software.
 
-Except pursuant to Company's prior express written authorization or a separate
-applicable written agreement with Company, Developer shall not, and the license
-granted in Section 2.2 does not permit Developer to, use the Licensed Software, in
-source or object code form, or its documentation, tests, or other materials, to
-design, develop, specify, test, validate, or improve any Other Implementation,
-whether manually, using automated tools, or using artificial intelligence systems.
-Without limiting the foregoing, Developer shall not:
+Except to the extent Company's prior express written authorization or a separate
+applicable written agreement with Company expressly permits the activity,
+Developer shall not, and the license granted in Section 2.2 does not permit
+Developer to, use the Licensed Software to design, develop, specify, test,
+validate, or improve any Other Implementation, whether manually, using automated
+tools, or using artificial intelligence systems. Without limiting the foregoing,
+Developer shall not:
 
 (a) translate, port, adapt, reconstruct, or generate code from any portion of the
 Licensed Software for use in an Other Implementation;
 
 (b) analyze, extract, summarize, index, or distill requirements, behaviors, state
 machines, algorithms, edge-case handling, test cases, or design decisions from the
-Licensed Software for use in an Other Implementation, including by providing the
-Licensed Software or any portion of it to an artificial intelligence system for
-that purpose;
+Licensed Software for use in designing, developing, specifying, testing,
+validating, or improving an Other Implementation, including by creating or using
+notes, specifications, datasets, embeddings, retrieval indexes, prompts, or
+artificial intelligence context for that purpose, or by providing any portion of
+the Licensed Software to another person, tool, service, or artificial intelligence
+system for that purpose;
 
 (c) execute the Licensed Software, or any software or binary built from it, as a
-reference, oracle, test peer, or source of expected results for developing or
-testing an Other Implementation; or
+reference, oracle, test peer, or source of expected results to design, develop,
+specify, test, validate, or improve an Other Implementation, including through
+captured outputs, recordings, traces, or results of such execution; or
 
 (d) train, fine-tune, or distill any artificial intelligence or machine learning
 model using the Licensed Software.
 
-To the extent any Other Implementation or other material reproduces or adapts
-copyright-protected expression from the Licensed Software, it is not an authorized
-derivative work under this Agreement, and Developer is not granted permission to
-prepare, use, or distribute it. The fact that an artificial intelligence system or
-automated tool performs the copying, adaptation, or translation does not enlarge
-the license granted hereunder. The restrictions in this Section apply whether or
-not a particular Other Implementation qualifies as a derivative work under
-copyright law, to the extent permitted by applicable law.
+To the extent an Other Implementation or other material created through an
+activity prohibited by this Section reproduces or adapts copyright-protected
+expression from the Licensed Software, this Agreement grants no permission for
+that reproduction or adaptation, including the preparation, use, or distribution
+of any resulting derivative work. Any such derivative work is unauthorized under
+this Agreement. Functional equivalence alone does not establish that a work is a
+derivative work under copyright law. Use of an artificial intelligence system or
+automated tool does not enlarge the license granted hereunder. The restrictions in
+this Section are contractual obligations and limitations on the license grant and
+apply whether or not a resulting work qualifies as a derivative work, to the
+extent permitted by applicable law.
 
 2.7. Permitted Evaluation and Integration
 
-Section 2.6 does not restrict (a) using artificial intelligence systems or other
-tools to evaluate, configure, integrate, test, debug, or conduct authorized
-security research on the Licensed Software as part of a Developer Application in
-accordance with the Purpose; (b) operating a Developer Application that includes
-the Licensed Software to communicate with third-party devices or software, other
-than for a purpose prohibited by Section 2.6; (c) any implementation developed
-independently without any use of the Licensed Software; or (d) any activity that
-applicable law does not permit Company to restrict.
+Subject to the other terms of this Agreement, Section 2.6 does not restrict:
+
+(a) using existing artificial intelligence systems or other tools to evaluate the
+Licensed Software for integration into a Developer Application, understand its
+source code, APIs, documentation, examples, or configuration, or configure,
+integrate, test, debug, or conduct authorized security research on the Licensed
+Software in accordance with the Purpose;
+
+(b) operating or testing a Developer Application that includes the Licensed
+Software to communicate with third-party devices or software, provided the
+activity does not use the Licensed Software to design, develop, specify, test,
+validate, or improve an Other Implementation;
+
+(c) independently designing, developing, specifying, testing, validating, or
+improving an implementation without using the Licensed Software or materials or
+results derived from it. An implementation's independent origin does not permit
+subsequent use prohibited by Section 2.6;
+
+(d) maintaining or improving the Licensed Software on Company's behalf or under
+Company's applicable written authorization, within the scope of that
+authorization; or
+
+(e) any activity that applicable law does not permit Company to restrict.
+
+Except as provided in a separate applicable written agreement or authorization
+from Company, this Section does not expand the Purpose or authorize commercial
+use, production use, distribution, or sublicensing.
 
 3. OWNERSHIP
 
@@ -181,20 +230,23 @@ restrictions in Section 2.6.
 
 4.2. Obligations on Termination
 
-All rights and licenses granted under this Agreement to Developer shall terminate
-upon termination of this Agreement. Developer shall cease making any use of the
-applicable Licensed Software or other material provided by Company in connection
-therewith and destroy them and all copies and modifications thereof, and also
-including any copies of code embedded in the Developer Application, any material
-created in violation of Section 2.6, and any related materials in its possession. Developer shall certify in writing to Company that no
-further use of such Licensed Software or any copies, modifications or other
-derivative works of any and all portions thereof is being made by Developer.
+All rights and licenses granted to Developer under this Agreement terminate upon
+termination. Developer shall cease using and destroy the Licensed Software and all
+copies and modifications in Developer's possession or control, including copies
+embedded in a Developer Application. Developer shall also cease using and destroy
+materials created through activities prohibited by Section 2.6, to the extent
+within Developer's possession or control. Developer shall certify compliance with
+these obligations in writing to Company. Materials required to be preserved by
+applicable law or binding legal process may be retained solely for that purpose
+and shall not otherwise be used, except as required by applicable law.
 
 4.3. Survival
 
 Any provisions of this Agreement that, in order to fulfill the purposes of such
 provisions, need to survive the termination or expiration of this Agreement,
 shall be deemed to survive for as long as necessary to fulfill such purposes.
+Sections 2.6 and 2.7 survive termination with respect to Licensed Software
+obtained under this Agreement and materials or results derived from it.
 
 5. WARRANTY DISCLAIMER
 
@@ -234,9 +286,14 @@ at Developer’s expense.
 
 7.1. Entire Agreement
 
-The terms contained herein constitute the entire agreement between the parties
-with respect to the subject matter hereof and shall supersede all prior
-communications and agreements, either oral or written.
+This Agreement constitutes the entire agreement concerning use of the Licensed
+Software under the license granted herein and supersedes prior communications
+concerning that license. It does not supersede or amend a separate written
+agreement or express written authorization from Company applicable to Developer's
+use of the Licensed Software. In the event of a conflict, that separate agreement
+or authorization controls to the extent of its applicable scope. Publication or
+acceptance of this version does not by itself amend the terms governing copies
+previously obtained under an earlier agreement.
  
 7.2. Equitable Relief
 
@@ -263,7 +320,7 @@ conveniens.
 
 Notices shall be deemed to have been received upon verified receipt.
 
-7.6. No Waiver
+7.6. Amendments and No Waiver
 
 No modification or amendment hereto, nor any waiver of any rights, shall be effective
 unless assented to in writing by the party to be charged. The waiver of any breach or

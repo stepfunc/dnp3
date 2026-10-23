@@ -50,11 +50,16 @@ Please inquire about commercial licensing on our website:
 
 ### AI-assisted development
 
-AI coding assistants are welcome for evaluating, integrating, testing, and building applications
-with this library. The license does not permit using this library, its source, documentation,
-tests, or binaries, to create, specify, or test any other implementation of the protocol, whether
-commercial or open source, including by using AI to extract requirements or port code. See
-[`LICENSE.txt`](https://github.com/stepfunc/dnp3/blob/main/LICENSE.txt) and [`AGENTS.md`](https://github.com/stepfunc/dnp3/blob/main/AGENTS.md).
+Subject to the applicable license, AI assistants are welcome for evaluating, integrating, debugging,
+and testing this library and for authorized maintenance. Section 2.6 prohibits using the library,
+its source, documentation, tests, binaries, or derived materials to design, develop, specify, test,
+validate, or improve any other implementation of a protocol it implements, including through
+requirement extraction or use as a reference, oracle, or test peer. This applies regardless of
+commercial, open-source, private, or competitive status, subject to the exceptions in the agreement.
+This summary does not amend the license. See
+[`LICENSE.txt`](https://github.com/stepfunc/dnp3/blob/main/LICENSE.txt) and
+[`AGENTS.md`](https://github.com/stepfunc/dnp3/blob/main/AGENTS.md).
+
 ## Bindings
 
 Bindings in C, C++, Java, and .NET Core are available for this library. See the
