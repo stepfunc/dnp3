@@ -419,6 +419,26 @@ impl ReadHeader {
         ReadHeader::LimitedCount16(TwoByteLimitedCountScan::new(variation, count))
     }
 
+    fn variation(self) -> Variation {
+        match self {
+            ReadHeader::Range8(scan) => scan.variation,
+            ReadHeader::Range16(scan) => scan.variation,
+            ReadHeader::AllObjects(scan) => scan.variation,
+            ReadHeader::LimitedCount8(scan) => scan.variation,
+            ReadHeader::LimitedCount16(scan) => scan.variation,
+        }
+    }
+
+    /// The variation must name an object: `Group0(0)` writes g0v0, which names none
+    fn validate(self) -> Result<(), BadEncoding> {
+        let variation = self.variation();
+        let (group, var) = variation.to_group_and_var();
+        match Variation::lookup(group, var) {
+            Some(_) => Ok(()),
+            None => Err(BadEncoding::UndefinedVariation(variation)),
+        }
+    }
+
     pub(crate) fn format(self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
         match self {
             ReadHeader::Range8(scan) => scan.write(writer),
@@ -462,7 +482,8 @@ impl Header {
 
     fn validate(&self) -> Result<(), BadEncoding> {
         match self {
-            Header::Read(_) | Header::TimeAndInterval(_) => Ok(()),
+            Header::Read(x) => x.validate(),
+            Header::TimeAndInterval(_) => Ok(()),
             Header::Attribute(x) => x.check_encodable().map_err(BadEncoding::Attribute),
         }
     }
@@ -618,17 +639,23 @@ impl ReadRequest {
         Self::MultipleHeader(headers.to_vec())
     }
 
-    pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
+    pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
         match self {
-            ReadRequest::SingleHeader(req) => req.format(writer),
-            ReadRequest::ClassScan(req) => req.write(writer),
+            ReadRequest::SingleHeader(req) => {
+                req.validate().map_err(TaskError::BadEncoding)?;
+                req.format(writer)?;
+            }
+            ReadRequest::ClassScan(req) => req.write(writer)?,
             ReadRequest::MultipleHeader(reqs) => {
+                for req in reqs {
+                    req.validate().map_err(TaskError::BadEncoding)?;
+                }
                 for req in reqs {
                     req.format(writer)?;
                 }
-                Ok(())
             }
         }
+        Ok(())
     }
 }
 

@@ -10,7 +10,7 @@ use std::time::Duration;
 use crate::app::format::write::HeaderWriter;
 use crate::app::Shutdown;
 use crate::master::association::Next;
-use crate::master::error::PollError;
+use crate::master::error::{PollError, TaskError};
 use crate::master::handler::AssociationHandle;
 use crate::master::request::ReadRequest;
 
@@ -166,7 +166,7 @@ impl Poll {
         self.next = now.checked_add(self.period);
     }
 
-    pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
+    pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
         self.request.format(writer)
     }
 

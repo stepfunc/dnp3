@@ -44,7 +44,7 @@ impl SingleReadTask {
         }
     }
 
-    pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
+    pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
         self.request.format(writer)
     }
 
