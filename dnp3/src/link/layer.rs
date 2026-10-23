@@ -1096,4 +1096,526 @@ mod test {
             ACK_FROM_MASTER,
         );
     }
+
+    mod properties {
+        use super::*;
+        use proptest::prelude::*;
+        use std::net::{Ipv4Addr, SocketAddr};
+
+        /// the peers that send frames, any of which can own the secondary state
+        const PEERS: [EndpointAddress; 3] = [
+            EndpointAddress::raw(10),
+            EndpointAddress::raw(11),
+            EndpointAddress::raw(12),
+        ];
+
+        /// an endpoint address that isn't the layer's own
+        const OTHER: EndpointAddress = EndpointAddress::raw(2);
+
+        fn local(role: LinkRole) -> EndpointAddress {
+            match role {
+                LinkRole::Master => MASTER,
+                LinkRole::Outstation { .. } => OUTSTATION,
+            }
+        }
+
+        fn is_master(role: LinkRole) -> bool {
+            matches!(role, LinkRole::Master)
+        }
+
+        #[derive(Copy, Clone, Debug)]
+        enum Destination {
+            /// the layer's own address
+            Local,
+            Other(AnyAddress),
+        }
+
+        #[derive(Copy, Clone, Debug)]
+        struct Frame {
+            /// sent by the same type of endpoint as the layer
+            same_type: bool,
+            func: Function,
+            fcb: bool,
+            fcv: bool,
+            destination: Destination,
+            source: AnyAddress,
+            addr: PhysAddr,
+        }
+
+        impl Frame {
+            fn header(&self, role: LinkRole) -> Header {
+                let control = ControlField {
+                    func: self.func,
+                    master: is_master(role) == self.same_type,
+                    fcb: self.fcb,
+                    fcv: self.fcv,
+                };
+                let destination = match self.destination {
+                    Destination::Local => local(role).wrap(),
+                    Destination::Other(x) => x,
+                };
+                Header::new(control, destination, self.source)
+            }
+        }
+
+        #[derive(Copy, Clone, Debug)]
+        enum Op {
+            Frame(Frame),
+            /// the session ended, so the layer is reset before the next one
+            EndSession,
+        }
+
+        /// The link secondary state, with the policy that one peer owns it: the peer whose reset was
+        /// last accepted, until the session ends
+        #[derive(Copy, Clone, Debug, PartialEq)]
+        enum Model {
+            NotReset,
+            Reset {
+                owner: EndpointAddress,
+                expected_fcb: bool,
+            },
+        }
+
+        /// What the layer did with a frame
+        #[derive(Clone, Debug, PartialEq)]
+        struct Outcome {
+            info: Option<FrameInfo>,
+            reply: Option<(EndpointAddress, Function)>,
+            ignored: Vec<Ignored>,
+        }
+
+        /// What the layer must do with a frame
+        #[derive(Clone, Debug)]
+        struct Expected {
+            info: Option<FrameInfo>,
+            reply: Option<(EndpointAddress, Function)>,
+            /// every reason that applies to a frame the layer must ignore; it reports one of them
+            reasons: Vec<Ignored>,
+        }
+
+        impl Expected {
+            fn silent() -> Self {
+                Self {
+                    info: None,
+                    reply: None,
+                    reasons: Vec::new(),
+                }
+            }
+
+            fn ignored(reasons: Vec<Ignored>) -> Self {
+                Self {
+                    info: None,
+                    reply: None,
+                    reasons,
+                }
+            }
+
+            fn accepts(&self, actual: &Outcome) -> bool {
+                let ignored = match actual.ignored[..] {
+                    [] => self.reasons.is_empty(),
+                    [reason] => self.reasons.contains(&reason),
+                    _ => false,
+                };
+                ignored && actual.info == self.info && actual.reply == self.reply
+            }
+        }
+
+        impl Model {
+            fn step(&mut self, role: LinkRole, header: Header, addr: PhysAddr) -> Expected {
+                let control = header.control;
+                // a frame from an endpoint of the same type is dropped without a reason
+                if control.master == is_master(role) {
+                    return Expected::silent();
+                }
+
+                let mut reasons = Vec::new();
+                let source = match header.source {
+                    AnyAddress::Endpoint(x) => Some(x),
+                    other => {
+                        reasons.push(Ignored::UnknownSource(other));
+                        None
+                    }
+                };
+
+                let is_user_data = matches!(
+                    control.func,
+                    Function::PriUnconfirmedUserData | Function::PriConfirmedUserData
+                );
+                let mut broadcast = None;
+                match (header.destination, role) {
+                    (AnyAddress::Endpoint(x), _) if x == local(role) => {}
+                    (AnyAddress::Endpoint(x), _) => reasons.push(Ignored::OtherDestination(x)),
+                    (
+                        AnyAddress::SelfAddress,
+                        LinkRole::Outstation {
+                            self_address: Feature::Enabled,
+                        },
+                    ) => {}
+                    (AnyAddress::SelfAddress, _) => reasons.push(Ignored::SelfAddress),
+                    (AnyAddress::Reserved(x), _) => reasons.push(Ignored::ReservedDestination(x)),
+                    (AnyAddress::Broadcast(_), LinkRole::Master) => {
+                        reasons.push(Ignored::BroadcastToMaster)
+                    }
+                    (AnyAddress::Broadcast(mode), LinkRole::Outstation { .. }) => {
+                        broadcast = Some(mode);
+                        if !is_user_data {
+                            reasons.push(Ignored::BroadcastFunction(control.func));
+                        }
+                    }
+                }
+
+                match (control.func, control.fcv) {
+                    (Function::PriUnconfirmedUserData, true) => {
+                        reasons.push(Ignored::UnconfirmedWithFcv)
+                    }
+                    (Function::PriResetLinkStates, true) => reasons.push(Ignored::ResetWithFcv),
+                    (Function::PriConfirmedUserData, false) => {
+                        reasons.push(Ignored::ConfirmedWithoutFcv)
+                    }
+                    (Function::PriRequestLinkStatus, true) => {
+                        reasons.push(Ignored::LinkStatusWithFcv)
+                    }
+                    (
+                        Function::PriUnconfirmedUserData
+                        | Function::PriResetLinkStates
+                        | Function::PriConfirmedUserData
+                        | Function::PriRequestLinkStatus
+                        | Function::SecLinkStatus,
+                        _,
+                    ) => {}
+                    (
+                        function @ (Function::PriTestLinkStates
+                        | Function::SecAck
+                        | Function::SecNack
+                        | Function::SecNotSupported
+                        | Function::Unknown(_)),
+                        _,
+                    ) => reasons.push(Ignored::Function(function)),
+                }
+
+                let Some(source) = source.filter(|_| reasons.is_empty()) else {
+                    return Expected::ignored(reasons);
+                };
+                let info = |frame_type| Some(FrameInfo::new(source, broadcast, frame_type, addr));
+
+                match control.func {
+                    Function::PriUnconfirmedUserData => Expected {
+                        info: info(FrameType::Data),
+                        reply: None,
+                        reasons,
+                    },
+                    Function::PriResetLinkStates => {
+                        *self = Model::Reset {
+                            owner: source,
+                            expected_fcb: true,
+                        };
+                        Expected {
+                            info: None,
+                            reply: Some((source, Function::SecAck)),
+                            reasons,
+                        }
+                    }
+                    Function::PriConfirmedUserData => match *self {
+                        Model::Reset {
+                            owner,
+                            expected_fcb,
+                        } if owner == source => {
+                            let reply = match broadcast {
+                                None => Some((source, Function::SecAck)),
+                                Some(_) => None,
+                            };
+                            if control.fcb == expected_fcb {
+                                *self = Model::Reset {
+                                    owner,
+                                    expected_fcb: !expected_fcb,
+                                };
+                                Expected {
+                                    info: info(FrameType::Data),
+                                    reply,
+                                    reasons,
+                                }
+                            } else {
+                                Expected {
+                                    info: None,
+                                    reply,
+                                    reasons: vec![Ignored::RepeatedFcb],
+                                }
+                            }
+                        }
+                        Model::NotReset | Model::Reset { .. } => {
+                            Expected::ignored(vec![Ignored::NotReset])
+                        }
+                    },
+                    Function::PriRequestLinkStatus => Expected {
+                        info: info(FrameType::LinkStatusRequest),
+                        reply: Some((source, Function::SecLinkStatus)),
+                        reasons,
+                    },
+                    Function::SecLinkStatus => Expected {
+                        info: info(FrameType::LinkStatusResponse),
+                        reply: None,
+                        reasons,
+                    },
+                    Function::PriTestLinkStates
+                    | Function::SecAck
+                    | Function::SecNack
+                    | Function::SecNotSupported
+                    | Function::Unknown(_) => Expected::ignored(reasons),
+                }
+            }
+        }
+
+        /// process a frame, checking that a reply's header carries the layer's DIR bit and address
+        fn outcome(
+            layer: &mut Layer,
+            role: LinkRole,
+            header: Header,
+            addr: PhysAddr,
+        ) -> Result<Outcome, TestCaseError> {
+            let mut ignored = Vec::new();
+            let (info, reply) = layer.process_header(header, addr, |x| ignored.push(x));
+            let reply = reply.map(|reply| (reply.address, reply.function, layer.get_header(reply)));
+            if let Some((destination, function, header)) = reply {
+                prop_assert_eq!(
+                    header,
+                    Header::new(
+                        ControlField::new(is_master(role), function),
+                        destination.wrap(),
+                        local(role).wrap(),
+                    )
+                );
+            }
+            Ok(Outcome {
+                info,
+                reply: reply.map(|(destination, function, _)| (destination, function)),
+                ignored,
+            })
+        }
+
+        fn role() -> impl Strategy<Value = LinkRole> {
+            prop::sample::select(vec![
+                LinkRole::Master,
+                LinkRole::Outstation {
+                    self_address: Feature::Disabled,
+                },
+                LinkRole::Outstation {
+                    self_address: Feature::Enabled,
+                },
+            ])
+        }
+
+        /// a peer, favoring the first so it often sends again after its own reset
+        fn peer() -> impl Strategy<Value = EndpointAddress> {
+            let [a, b, c] = PEERS;
+            prop_oneof![
+                3 => Just(a),
+                1 => Just(b),
+                1 => Just(c),
+            ]
+        }
+
+        fn broadcast() -> impl Strategy<Value = AnyAddress> {
+            prop::sample::select(BROADCASTS.to_vec()).prop_map(AnyAddress::Broadcast)
+        }
+
+        fn reserved() -> impl Strategy<Value = AnyAddress> {
+            prop::sample::select(RESERVED.to_vec()).prop_map(AnyAddress::Reserved)
+        }
+
+        fn source() -> impl Strategy<Value = AnyAddress> {
+            prop_oneof![
+                24 => peer().prop_map(|x| x.wrap()),
+                1 => Just(AnyAddress::SelfAddress),
+                1 => broadcast(),
+                1 => reserved(),
+            ]
+        }
+
+        fn destination() -> impl Strategy<Value = Destination> {
+            prop_oneof![
+                16 => Just(Destination::Local),
+                2 => Just(Destination::Other(AnyAddress::SelfAddress)),
+                3 => broadcast().prop_map(Destination::Other),
+                1 => reserved().prop_map(Destination::Other),
+                1 => prop_oneof![Just(OTHER), peer()].prop_map(|x| Destination::Other(x.wrap())),
+            ]
+        }
+
+        fn function() -> impl Strategy<Value = Function> {
+            prop_oneof![
+                6 => Just(Function::PriResetLinkStates),
+                12 => Just(Function::PriConfirmedUserData),
+                2 => Just(Function::PriUnconfirmedUserData),
+                2 => Just(Function::PriRequestLinkStatus),
+                1 => Just(Function::SecLinkStatus),
+                1 => prop::sample::select(IGNORED_FUNCTIONS.to_vec()),
+            ]
+        }
+
+        fn phys_addr() -> impl Strategy<Value = PhysAddr> {
+            prop_oneof![
+                Just(PhysAddr::None),
+                Just(PhysAddr::Udp(SocketAddr::from((
+                    Ipv4Addr::LOCALHOST,
+                    20000
+                )))),
+            ]
+        }
+
+        /// a function and an FCV bit that is mostly, but not always, the one the function needs
+        fn function_and_fcv() -> impl Strategy<Value = (Function, bool)> {
+            (function(), prop::bool::weighted(0.15)).prop_map(|(func, wrong)| {
+                let needed = matches!(func, Function::PriConfirmedUserData);
+                (func, needed != wrong)
+            })
+        }
+
+        /// a frame, mostly from the other type of endpoint, with arbitrary FCB
+        fn op() -> impl Strategy<Value = Op> {
+            let frame = (
+                prop::bool::weighted(0.1),
+                function_and_fcv(),
+                any::<bool>(),
+                destination(),
+                source(),
+                phys_addr(),
+            )
+                .prop_map(
+                    |(same_type, (func, fcv), fcb, destination, source, addr)| Frame {
+                        same_type,
+                        func,
+                        fcb,
+                        fcv,
+                        destination,
+                        source,
+                        addr,
+                    },
+                )
+                .prop_map(Op::Frame);
+            prop_oneof![
+                30 => frame,
+                1 => Just(Op::EndSession),
+            ]
+        }
+
+        proptest! {
+            #![proptest_config(ProptestConfig::with_cases(128))]
+
+            /// Delivery, replies and ignore reasons follow a model in which the peer whose reset
+            /// was last accepted owns the secondary state and its FCB, and frames that fail any
+            /// check leave the state unchanged
+            #[test]
+            fn frames_follow_the_one_owner_secondary_state_model(
+                role in role(),
+                ops in prop::collection::vec(op(), 1..=64),
+            ) {
+                let mut layer = Layer::new(LinkModes::test(), 2048, role, local(role));
+                let mut model = Model::NotReset;
+                for (step, op) in ops.into_iter().enumerate() {
+                    match op {
+                        Op::Frame(frame) => {
+                            let (header, addr) = (frame.header(role), frame.addr);
+                            let expected = model.step(role, header, addr);
+                            let actual = outcome(&mut layer, role, header, addr)?;
+                            prop_assert!(
+                                expected.accepts(&actual),
+                                "step {}: {:?}\nexpected {:?}\nactual {:?}",
+                                step,
+                                header,
+                                expected,
+                                actual
+                            );
+                        }
+                        Op::EndSession => {
+                            layer.reset();
+                            model = Model::NotReset;
+                        }
+                    }
+                }
+            }
+        }
+
+        fn confirmed_from(role: LinkRole, source: EndpointAddress, fcb: bool) -> Header {
+            from(source, confirmed(!is_master(role), fcb, local(role).wrap()))
+        }
+
+        fn reset_from(role: LinkRole, source: EndpointAddress) -> Header {
+            from(
+                source,
+                header(
+                    !is_master(role),
+                    Function::PriResetLinkStates,
+                    local(role).wrap(),
+                ),
+            )
+        }
+
+        /// The model rejects data from a peer that no longer owns the link and a redelivered
+        /// repeat, and leaves the state alone for a frame that fails a check
+        #[test]
+        fn model_rejects_a_second_owner_and_a_redelivered_repeat() {
+            let role = LinkRole::Outstation {
+                self_address: Feature::Disabled,
+            };
+            let [a, b, _] = PEERS;
+            let mut model = Model::NotReset;
+            for source in [a, b] {
+                let expected = model.step(role, reset_from(role, source), PhysAddr::None);
+                assert_eq!(expected.reply, Some((source, Function::SecAck)));
+            }
+
+            // `a` reset the link earlier, but `b` owns it now
+            let expected = model.step(role, confirmed_from(role, a, true), PhysAddr::None);
+            let delivered = Outcome {
+                info: Some(data_from(a, None)),
+                reply: Some((a, Function::SecAck)),
+                ignored: Vec::new(),
+            };
+            assert!(!expected.accepts(&delivered));
+            assert!(expected.accepts(&Outcome {
+                info: None,
+                reply: None,
+                ignored: vec![Ignored::NotReset],
+            }));
+
+            // the owner's repeat is acked but not delivered again
+            let expected = model.step(role, confirmed_from(role, b, true), PhysAddr::None);
+            assert!(expected.accepts(&Outcome {
+                info: Some(data_from(b, None)),
+                reply: Some((b, Function::SecAck)),
+                ignored: Vec::new(),
+            }));
+            let expected = model.step(role, confirmed_from(role, b, true), PhysAddr::None);
+            assert!(!expected.accepts(&Outcome {
+                info: Some(data_from(b, None)),
+                reply: Some((b, Function::SecAck)),
+                ignored: Vec::new(),
+            }));
+            assert!(expected.accepts(&Outcome {
+                info: None,
+                reply: Some((b, Function::SecAck)),
+                ignored: vec![Ignored::RepeatedFcb],
+            }));
+
+            // a frame failing two checks may report either
+            let mut header = reset_from(role, a);
+            header.control.fcv = true;
+            header.destination = OTHER.wrap();
+            let expected = model.step(role, header, PhysAddr::None);
+            for reason in [Ignored::ResetWithFcv, Ignored::OtherDestination(OTHER)] {
+                assert!(expected.accepts(&Outcome {
+                    info: None,
+                    reply: None,
+                    ignored: vec![reason],
+                }));
+            }
+            assert_eq!(
+                model,
+                Model::Reset {
+                    owner: b,
+                    expected_fcb: false
+                }
+            );
+        }
+    }
 }
