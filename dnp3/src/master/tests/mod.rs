@@ -18,6 +18,7 @@ mod restart;
 mod scheduling;
 mod shared_link;
 mod startup;
+mod task_model;
 mod time_sync;
 mod unsolicited;
 
