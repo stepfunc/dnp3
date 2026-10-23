@@ -26,12 +26,16 @@ mod request;
 pub(crate) mod convert;
 pub(crate) mod extract;
 #[cfg(test)]
+pub(crate) mod extract_recorder;
+#[cfg(test)]
 mod header_info_tests;
 pub(crate) mod messages;
 pub(crate) mod poll;
 pub(crate) mod promise;
 pub(crate) mod task;
 pub(crate) mod tasks;
+#[cfg(test)]
+mod write_extract_tests;
 
 #[cfg(test)]
 mod tests;
