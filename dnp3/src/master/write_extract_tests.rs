@@ -34,8 +34,7 @@ use crate::app::measurement::*;
 use crate::app::parse::options::ParseOptions;
 use crate::app::parse::parser::HeaderCollection;
 use crate::app::{FunctionCode, Iin2, QualifierCode, Timestamp, Variation as V};
-use crate::master::extract::{extract_measurements_inner, ProcessableResponse};
-use crate::master::extract_recorder::{Recorder, Value};
+use crate::master::extract_recorder::{extract, Value};
 use crate::master::HeaderInfo;
 use crate::outstation::database::*;
 use crate::outstation::OutstationConfig;
@@ -213,15 +212,9 @@ fn write_and_extract(points: &Points, (variation, event): Read) -> Vec<(HeaderIn
     let mut cursor = WriteCursor::new(&mut buffer);
     assert!(handle.write_response_headers(&mut cursor).complete);
 
-    let objects = ProcessableResponse::new(HeaderCollection::parse(
-        ParseOptions::default(),
-        FunctionCode::Response,
-        cursor.written(),
-    ))
-    .unwrap();
-    let mut recorder = Recorder::default();
-    extract_measurements_inner(objects, &mut recorder);
-    recorder.values
+    let (result, recorder) = extract(cursor.written());
+    result.unwrap();
+    recorder.values().collect()
 }
 
 // ---------- the reference projection ----------

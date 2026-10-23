@@ -61,7 +61,7 @@ pub(crate) struct Delivered {
 
 impl Delivered {
     /// Add a header whose values were passed to the handler
-    fn add(&mut self, header: &ObjectHeader) {
+    pub(crate) fn add(&mut self, header: &ObjectHeader) {
         if header.has_objects() {
             self.values = true;
             self.events |= is_event(header);
@@ -203,222 +203,31 @@ pub(crate) fn extract_header<H: ReadHandler + ?Sized>(
 mod test {
     use crate::app::attr::*;
     use crate::app::control::CommandStatus;
-    use crate::app::parse::options::ParseOptions;
-    use crate::app::parse::parser::HeaderCollection;
     use crate::app::*;
+    use crate::master::extract_recorder::{extract, Call, Kind, Recorder, Value};
     use crate::master::test_objects::{RELATIVE_TIME_EVENT, TRUNCATED_ANALOG_EVENT};
-    use crate::master::{HeaderInfo, ReadHandler};
+    use crate::master::HeaderInfo;
 
     use super::*;
 
-    fn header() -> ResponseHeader {
-        ResponseHeader::new(
-            ControlField::from(0xC0),
-            ResponseFunction::Response,
-            Iin::default(),
-        )
+    /// Each callback and its values, without the information of its header
+    fn callbacks(recorder: Recorder) -> Vec<(Kind, Vec<Value>)> {
+        recorder
+            .calls
+            .into_iter()
+            .map(|call| (call.kind, call.values))
+            .collect()
     }
 
-    #[derive(Clone, Debug, PartialEq)]
-    enum Known {
-        String(StringAttr, String),
-        UInt(UIntAttr, u32),
-        Bool(BoolAttr, bool),
-        List(VariationListAttr, Vec<AttrItem>),
-        Float(FloatAttr, FloatType),
-        Octets(OctetStringAttr, Vec<u8>),
-        Time(TimeAttr, Timestamp),
-    }
-
-    #[derive(Debug, PartialEq)]
-    enum Header {
-        Binary(Vec<(BinaryInput, u16)>),
-        FrozenAnalog(Vec<(FrozenAnalogInput, u16)>),
-        AnalogDeadBand(Vec<(AnalogInputDeadBand, u16)>),
-        KnownAttr(Known),
-        UnknownAttr(AttrSet, u8, String),
-        BinaryCommandEvent(Vec<(BinaryOutputCommandEvent, u16)>),
-        AnalogCommandEvent(Vec<(AnalogOutputCommandEvent, u16)>),
-        G102(Vec<(UnsignedInteger, u16)>),
-        AbsTime(Timestamp),
-    }
-
-    #[derive(Default)]
-    struct MockHandler {
-        received: Vec<Header>,
-        infos: Vec<HeaderInfo>,
-    }
-
-    impl MockHandler {
-        fn new() -> Self {
-            Default::default()
-        }
-
-        fn pop(&mut self) -> Vec<Header> {
-            let mut received = Default::default();
-            std::mem::swap(&mut received, &mut self.received);
-            received
-        }
-    }
-
-    impl ReadHandler for MockHandler {
-        fn begin_fragment(
-            &mut self,
-            _read_type: ReadType,
-            _header: ResponseHeader,
-        ) -> MaybeAsync<()> {
-            MaybeAsync::ready(())
-        }
-        fn end_fragment(
-            &mut self,
-            _read_type: ReadType,
-            _header: ResponseHeader,
-        ) -> MaybeAsync<()> {
-            MaybeAsync::ready(())
-        }
-
-        fn handle_binary_input(
-            &mut self,
-            info: HeaderInfo,
-            x: &mut dyn Iterator<Item = (BinaryInput, u16)>,
-        ) {
-            self.infos.push(info);
-            self.received.push(Header::Binary(x.collect()));
-        }
-
-        fn handle_double_bit_binary_input(
-            &mut self,
-            _info: HeaderInfo,
-            _x: &mut dyn Iterator<Item = (DoubleBitBinaryInput, u16)>,
-        ) {
-            panic!("not used by these tests")
-        }
-
-        fn handle_binary_output_status(
-            &mut self,
-            _info: HeaderInfo,
-            _x: &mut dyn Iterator<Item = (BinaryOutputStatus, u16)>,
-        ) {
-            panic!("not used by these tests")
-        }
-
-        fn handle_counter(
-            &mut self,
-            _info: HeaderInfo,
-            _x: &mut dyn Iterator<Item = (Counter, u16)>,
-        ) {
-            panic!("not used by these tests")
-        }
-
-        fn handle_frozen_counter(
-            &mut self,
-            _info: HeaderInfo,
-            _x: &mut dyn Iterator<Item = (FrozenCounter, u16)>,
-        ) {
-            panic!("not used by these tests")
-        }
-
-        fn handle_analog_input(
-            &mut self,
-            _info: HeaderInfo,
-            _x: &mut dyn Iterator<Item = (AnalogInput, u16)>,
-        ) {
-            panic!("not used by these tests")
-        }
-
-        fn handle_frozen_analog_input(
-            &mut self,
-            _info: HeaderInfo,
-            x: &mut dyn Iterator<Item = (FrozenAnalogInput, u16)>,
-        ) {
-            self.received.push(Header::FrozenAnalog(x.collect()))
-        }
-
-        fn handle_analog_input_dead_band(
-            &mut self,
-            _info: HeaderInfo,
-            iter: &mut dyn Iterator<Item = (AnalogInputDeadBand, u16)>,
-        ) {
-            self.received.push(Header::AnalogDeadBand(iter.collect()))
-        }
-
-        fn handle_analog_output_status(
-            &mut self,
-            _info: HeaderInfo,
-            _x: &mut dyn Iterator<Item = (AnalogOutputStatus, u16)>,
-        ) {
-            panic!("not used by these tests")
-        }
-
-        fn handle_binary_output_command_event(
-            &mut self,
-            _info: HeaderInfo,
-            x: &mut dyn Iterator<Item = (BinaryOutputCommandEvent, u16)>,
-        ) {
-            self.received.push(Header::BinaryCommandEvent(x.collect()))
-        }
-
-        fn handle_analog_output_command_event(
-            &mut self,
-            _info: HeaderInfo,
-            x: &mut dyn Iterator<Item = (AnalogOutputCommandEvent, u16)>,
-        ) {
-            self.received.push(Header::AnalogCommandEvent(x.collect()))
-        }
-
-        fn handle_unsigned_integer(
-            &mut self,
-            _info: HeaderInfo,
-            x: &mut dyn Iterator<Item = (UnsignedInteger, u16)>,
-        ) {
-            self.received.push(Header::G102(x.collect()))
-        }
-
-        fn handle_octet_string(
-            &mut self,
-            _info: HeaderInfo,
-            _x: &mut dyn Iterator<Item = (&[u8], u16)>,
-        ) {
-            panic!("not used by these tests")
-        }
-
-        fn handle_device_attribute(&mut self, _info: HeaderInfo, attr: AnyAttribute) {
-            match attr {
-                AnyAttribute::Other(x) => {
-                    let value = x.value.expect_vstr().unwrap();
-                    self.received
-                        .push(Header::UnknownAttr(x.set, x.variation, value.to_string()));
-                }
-                AnyAttribute::Known(x) => {
-                    let known = match x {
-                        KnownAttribute::AttributeList(x, items) => {
-                            Known::List(x, items.iter().collect())
-                        }
-                        KnownAttribute::String(x, v) => Known::String(x, v.to_string()),
-                        KnownAttribute::UInt(x, v) => Known::UInt(x, v),
-                        KnownAttribute::Bool(x, v) => Known::Bool(x, v),
-                        KnownAttribute::Float(x, v) => Known::Float(x, v),
-                        KnownAttribute::OctetString(x, v) => Known::Octets(x, v.to_vec()),
-                        KnownAttribute::DNP3Time(x, v) => Known::Time(x, v),
-                    };
-                    self.received.push(Header::KnownAttr(known));
-                }
-            }
-        }
-
-        fn handle_abs_time(&mut self, info: HeaderInfo, time: Timestamp) {
-            self.infos.push(info);
-            self.received.push(Header::AbsTime(time));
-        }
+    /// The callbacks for response objects that the master can process
+    fn extract_valid(objects: &[u8]) -> Vec<(Kind, Vec<Value>)> {
+        let (result, recorder) = extract(objects);
+        result.unwrap();
+        callbacks(recorder)
     }
 
     fn validate(objects: &[u8]) -> Result<(), InvalidResponse> {
-        ProcessableResponse::new(HeaderCollection::parse(
-            ParseOptions::default(),
-            FunctionCode::Response,
-            objects,
-        ))
-        .map(|_| ())
+        extract(objects).0.map(|_| ())
     }
 
     #[test]
@@ -451,19 +260,15 @@ mod test {
 
     #[test]
     fn can_calculate_maximum_timestamp() {
-        let mut handler = MockHandler::new();
-        let objects = ProcessableResponse::new(HeaderCollection::parse(
-            ParseOptions::default(),
-            FunctionCode::Response,
+        let calls = extract_valid(
             // g50v1      count: 1  --------- time: 0xFFFFFE ----------
             &[
                 0x33, 0x01, 0x07, 0x01, 0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x02, 0x03, 0x17, 0x01,
                 0x07, 0x01, 0x01, 0x00,
             ],
-        ))
-        .unwrap();
+        );
 
-        let expected: (BinaryInput, u16) = (
+        let expected = Value::Binary(
             BinaryInput {
                 value: false,
                 flags: Flags::ONLINE,
@@ -472,25 +277,20 @@ mod test {
             0x07,
         );
 
-        extract_measurements_inner(objects, &mut handler);
-        assert_eq!(&handler.pop(), &[Header::Binary(vec![expected])]);
+        assert_eq!(calls, [(Kind::BinaryInput, vec![expected])]);
     }
 
     #[test]
     fn cto_overflow_of_u48_yields_invalid_time() {
-        let mut handler = MockHandler::new();
-        let objects = ProcessableResponse::new(HeaderCollection::parse(
-            ParseOptions::default(),
-            FunctionCode::Response,
+        let calls = extract_valid(
             // g50v1      count: 1  --------- time: 0xFFFFFE ----------
             &[
                 0x33, 0x01, 0x07, 0x01, 0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x02, 0x03, 0x17, 0x01,
                 0x07, 0x01, 0x02, 0x00,
             ],
-        ))
-        .unwrap();
+        );
 
-        let expected: (BinaryInput, u16) = (
+        let expected = Value::Binary(
             BinaryInput {
                 value: false,
                 flags: Flags::ONLINE,
@@ -499,24 +299,17 @@ mod test {
             0x07,
         );
 
-        extract_measurements_inner(objects, &mut handler);
-        assert_eq!(&handler.pop(), &[Header::Binary(vec![expected])]);
+        assert_eq!(calls, [(Kind::BinaryInput, vec![expected])]);
     }
 
     #[test]
     fn handles_frozen_analog_event() {
-        let mut handler = MockHandler::new();
-        let objects = ProcessableResponse::new(HeaderCollection::parse(
-            ParseOptions::default(),
-            FunctionCode::Response,
-            &[
-                33, 3, 0x17, 0x01, 0x07, 0x01, 0xDE, 0xAD, 0xCA, 0xFE, 0x01, 0x02, 0x03, 0x04,
-                0x05, 0x06,
-            ],
-        ))
-        .unwrap();
+        let calls = extract_valid(&[
+            33, 3, 0x17, 0x01, 0x07, 0x01, 0xDE, 0xAD, 0xCA, 0xFE, 0x01, 0x02, 0x03, 0x04, 0x05,
+            0x06,
+        ]);
 
-        let expected: (FrozenAnalogInput, u16) = (
+        let expected = Value::FrozenAnalog(
             FrozenAnalogInput {
                 value: i32::from_le_bytes([0xDE, 0xAD, 0xCA, 0xFE]).into(),
                 flags: Flags::ONLINE,
@@ -525,40 +318,26 @@ mod test {
             0x07,
         );
 
-        extract_measurements_inner(objects, &mut handler);
-        assert_eq!(&handler.pop(), &[Header::FrozenAnalog(vec![expected])]);
+        assert_eq!(calls, [(Kind::FrozenAnalogInput, vec![expected])]);
     }
 
     #[test]
     fn handles_analog_input_dead_band() {
-        let mut handler = MockHandler::new();
-        let objects = ProcessableResponse::new(HeaderCollection::parse(
-            ParseOptions::default(),
-            FunctionCode::Response,
-            &[0x22, 1, 0x00, 0x01, 0x02, 0xCA, 0xFE, 0xDE, 0xAD],
-        ))
-        .unwrap();
+        let calls = extract_valid(&[0x22, 1, 0x00, 0x01, 0x02, 0xCA, 0xFE, 0xDE, 0xAD]);
 
         let items = vec![
-            (AnalogInputDeadBand::U16(0xFECA), 0x01),
-            (AnalogInputDeadBand::U16(0xADDE), 0x02),
+            Value::AnalogDeadBand(AnalogInputDeadBand::U16(0xFECA), 0x01),
+            Value::AnalogDeadBand(AnalogInputDeadBand::U16(0xADDE), 0x02),
         ];
 
-        extract_measurements_inner(objects, &mut handler);
-        assert_eq!(&handler.pop(), &[Header::AnalogDeadBand(items)]);
+        assert_eq!(calls, [(Kind::AnalogInputDeadBand, items)]);
     }
 
     #[test]
     fn handles_static_frozen_analog() {
-        let mut handler = MockHandler::new();
-        let objects = ProcessableResponse::new(HeaderCollection::parse(
-            ParseOptions::default(),
-            FunctionCode::Response,
-            &[31, 2, 0x00, 0x07, 0x07, 0x01, 0xCA, 0xFE],
-        ))
-        .unwrap();
+        let calls = extract_valid(&[31, 2, 0x00, 0x07, 0x07, 0x01, 0xCA, 0xFE]);
 
-        let expected: (FrozenAnalogInput, u16) = (
+        let expected = Value::FrozenAnalog(
             FrozenAnalogInput {
                 value: i16::from_le_bytes([0xCA, 0xFE]).into(),
                 flags: Flags::ONLINE,
@@ -567,230 +346,211 @@ mod test {
             0x07,
         );
 
-        extract_measurements_inner(objects, &mut handler);
-        assert_eq!(&handler.pop(), &[Header::FrozenAnalog(vec![expected])]);
+        assert_eq!(calls, [(Kind::FrozenAnalogInput, vec![expected])]);
     }
 
     #[test]
     fn handles_device_attrs() {
-        let mut handler = MockHandler::new();
-        let objects = ProcessableResponse::new(HeaderCollection::parse(
-            ParseOptions::default(),
-            FunctionCode::Response,
-            &[
-                // group 0 var 252 - default set == 0 - one byte count and prefix
-                0, 252, 0x17, 0x01, 0x00, 0x01, 0x04, b'A', b'C', b'M', b'E',
-                // group 0 var 217 - default set == 0 - one byte start/stop
-                0, 217, 0x00, 0x00, 0x00, 0x02, 0x02, 0xFE, 0xCA,
-                // group 0 var 42 - private set == 7 - one byte count and prefix
-                0, 42, 0x17, 0x01, 0x07, 0x01, 0x03, b'F', b'O', b'O',
-            ],
-        ))
-        .unwrap();
+        let calls = extract_valid(&[
+            // group 0 var 252 - default set == 0 - one byte count and prefix
+            0, 252, 0x17, 0x01, 0x00, 0x01, 0x04, b'A', b'C', b'M', b'E',
+            // group 0 var 217 - default set == 0 - one byte start/stop
+            0, 217, 0x00, 0x00, 0x00, 0x02, 0x02, 0xFE, 0xCA,
+            // group 0 var 42 - private set == 7 - one byte count and prefix
+            0, 42, 0x17, 0x01, 0x07, 0x01, 0x03, b'F', b'O', b'O',
+        ]);
 
-        extract_measurements_inner(objects, &mut handler);
-
-        let h1 = Header::KnownAttr(Known::String(
-            StringAttr::DeviceManufacturersName,
-            "ACME".to_string(),
+        let h1 = Value::KnownAttribute(StringAttr::DeviceManufacturersName.with_value("ACME"));
+        let h2 = Value::KnownAttribute(UIntAttr::LocalTimingAccuracy.with_value(0xCAFE));
+        let h3 = Value::Attribute(OwnedAttribute::new(
+            AttrSet::Private(7),
+            42,
+            OwnedAttrValue::VisibleString("FOO".to_string()),
         ));
-        let h2 = Header::KnownAttr(Known::UInt(UIntAttr::LocalTimingAccuracy, 0xCAFE));
-        let h3 = Header::UnknownAttr(AttrSet::Private(7), 42, "FOO".to_string());
-        assert_eq!(&handler.pop(), &[h1, h2, h3]);
+        assert_eq!(
+            calls,
+            [
+                (Kind::DeviceAttribute, vec![h1]),
+                (Kind::DeviceAttribute, vec![h2]),
+                (Kind::DeviceAttribute, vec![h3]),
+            ]
+        );
     }
 
     #[test]
     fn handles_g13v1_and_g13v2() {
-        let mut handler = MockHandler::new();
-        let objects = ProcessableResponse::new(HeaderCollection::parse(
-            ParseOptions::default(),
-            FunctionCode::UnsolicitedResponse,
-            &[
-                13, // g13v1
-                1,
-                0x17,
-                0x01,        // count == 1
-                0x07,        // index 7,
-                0b1000_0011, // command_state = true, status == FORMAT_ERROR
-                13,          // g13v2
-                2,
-                0x17,
-                0x01,        // count == 1
-                0xFF,        // index 255
-                0b0000_0000, // command_state = false, status == SUCCESS
-                // timestamp 48
-                0xAA,
-                0xBB,
-                0xCC,
-                0xDD,
-                0xEE,
-                0xFF,
-            ],
-        ))
-        .unwrap();
-
-        extract_measurements_inner(objects, &mut handler);
+        let calls = extract_valid(&[
+            13, // g13v1
+            1,
+            0x17,
+            0x01,        // count == 1
+            0x07,        // index 7,
+            0b1000_0011, // command_state = true, status == FORMAT_ERROR
+            13,          // g13v2
+            2,
+            0x17,
+            0x01,        // count == 1
+            0xFF,        // index 255
+            0b0000_0000, // command_state = false, status == SUCCESS
+            // timestamp 48
+            0xAA,
+            0xBB,
+            0xCC,
+            0xDD,
+            0xEE,
+            0xFF,
+        ]);
 
         assert_eq!(
-            &handler.pop(),
-            &[
-                Header::BinaryCommandEvent(vec![(
-                    BinaryOutputCommandEvent {
-                        commanded_state: true,
-                        status: CommandStatus::FormatError,
-                        time: None,
-                    },
-                    7
-                )]),
-                Header::BinaryCommandEvent(vec![(
-                    BinaryOutputCommandEvent {
-                        commanded_state: false,
-                        status: CommandStatus::Success,
-                        time: Some(Time::Synchronized(Timestamp::new(0xFFEEDDCCBBAA))),
-                    },
-                    255
-                )])
+            calls,
+            [
+                (
+                    Kind::BinaryOutputCommandEvent,
+                    vec![Value::BinaryCommandEvent(
+                        BinaryOutputCommandEvent {
+                            commanded_state: true,
+                            status: CommandStatus::FormatError,
+                            time: None,
+                        },
+                        7
+                    )]
+                ),
+                (
+                    Kind::BinaryOutputCommandEvent,
+                    vec![Value::BinaryCommandEvent(
+                        BinaryOutputCommandEvent {
+                            commanded_state: false,
+                            status: CommandStatus::Success,
+                            time: Some(Time::Synchronized(Timestamp::new(0xFFEEDDCCBBAA))),
+                        },
+                        255
+                    )]
+                )
             ]
         );
     }
 
     #[test]
     fn handles_g43_object() {
-        let mut handler = MockHandler::new();
-        let objects = ProcessableResponse::new(HeaderCollection::parse(
-            ParseOptions::default(),
-            FunctionCode::UnsolicitedResponse,
-            &[
-                43, // g43v2
-                2, 0x17, 0x01, // count == 1
-                0x07, // index 7,
-                0x08, // status  == Too many ops
-                0xFE, 0xCA,
-            ],
-        ))
-        .unwrap();
-
-        extract_measurements_inner(objects, &mut handler);
+        let calls = extract_valid(&[
+            43, // g43v2
+            2, 0x17, 0x01, // count == 1
+            0x07, // index 7,
+            0x08, // status  == Too many ops
+            0xFE, 0xCA,
+        ]);
 
         assert_eq!(
-            &handler.pop(),
-            &[Header::AnalogCommandEvent(vec![(
-                AnalogOutputCommandEvent {
-                    status: CommandStatus::TooManyOps,
-                    commanded_value: AnalogCommandValue::I16(0xCAFEu16.cast_signed()),
-                    time: None,
-                },
-                7
-            )])]
+            calls,
+            [(
+                Kind::AnalogOutputCommandEvent,
+                vec![Value::AnalogCommandEvent(
+                    AnalogOutputCommandEvent {
+                        status: CommandStatus::TooManyOps,
+                        commanded_value: AnalogCommandValue::I16(0xCAFEu16.cast_signed()),
+                        time: None,
+                    },
+                    7
+                )]
+            )]
         );
     }
 
     #[test]
     fn handles_g102v1() {
-        let mut handler = MockHandler::new();
-        let objects = ProcessableResponse::new(HeaderCollection::parse(
-            ParseOptions::default(),
-            FunctionCode::UnsolicitedResponse,
-            &[
-                102, // g43v2
-                1, 0x00, // 1 byte start/stop
-                0x07, // index 7,
-                0x08, // index 8
-                0xFE, 0xCA,
-            ],
-        ))
-        .unwrap();
-
-        extract_measurements_inner(objects, &mut handler);
+        let calls = extract_valid(&[
+            102, // g43v2
+            1, 0x00, // 1 byte start/stop
+            0x07, // index 7,
+            0x08, // index 8
+            0xFE, 0xCA,
+        ]);
 
         assert_eq!(
-            &handler.pop(),
-            &[Header::G102(vec![
-                (UnsignedInteger { value: 0xFE }, 7),
-                (UnsignedInteger { value: 0xCA }, 8)
-            ])]
+            calls,
+            [(
+                Kind::UnsignedInteger,
+                vec![
+                    Value::UnsignedInteger(UnsignedInteger { value: 0xFE }, 7),
+                    Value::UnsignedInteger(UnsignedInteger { value: 0xCA }, 8)
+                ]
+            )]
         );
     }
 
-    fn extract(input: &[u8]) -> (bool, MockHandler) {
-        let mut handler = MockHandler::new();
-        let objects = ProcessableResponse::new(HeaderCollection::parse(
-            ParseOptions::default(),
-            FunctionCode::Response,
-            input,
-        ))
-        .unwrap();
-        let delivered = extract_measurements_inner(objects, &mut handler).values;
-        (delivered, handler)
-    }
-
-    fn binary(value: bool, time: Option<Time>, index: u16) -> (BinaryInput, u16) {
+    fn binary(value: bool, time: Option<Time>, index: u16) -> Value {
         let flags = if value {
             Flags::new(0x81)
         } else {
             Flags::ONLINE
         };
-        (BinaryInput { value, flags, time }, index)
+        Value::Binary(BinaryInput { value, flags, time }, index)
+    }
+
+    fn call(info: HeaderInfo, kind: Kind, values: Vec<Value>) -> Call {
+        Call { kind, info, values }
     }
 
     #[test]
     fn extracts_ranges_at_both_widths() {
-        let (delivered, mut handler) = extract(&[
+        let (result, recorder) = extract(&[
             // g1v2, 1-byte start/stop [7, 8]
             0x01, 0x02, 0x00, 0x07, 0x08, 0x81, 0x01, //
             // g1v2, 2-byte start/stop [256, 257]
             0x01, 0x02, 0x01, 0x00, 0x01, 0x01, 0x01, 0x01, 0x81,
         ]);
 
-        assert!(delivered);
+        assert!(result.unwrap().values);
         assert_eq!(
-            handler.infos,
+            recorder.calls,
             [
-                HeaderInfo::new(Variation::Group1Var2, QualifierCode::Range8, false, true),
-                HeaderInfo::new(Variation::Group1Var2, QualifierCode::Range16, false, true),
-            ]
-        );
-        assert_eq!(
-            handler.pop(),
-            [
-                Header::Binary(vec![binary(true, None, 7), binary(false, None, 8)]),
-                Header::Binary(vec![binary(false, None, 256), binary(true, None, 257)]),
+                call(
+                    HeaderInfo::new(Variation::Group1Var2, QualifierCode::Range8, false, true),
+                    Kind::BinaryInput,
+                    vec![binary(true, None, 7), binary(false, None, 8)]
+                ),
+                call(
+                    HeaderInfo::new(Variation::Group1Var2, QualifierCode::Range16, false, true),
+                    Kind::BinaryInput,
+                    vec![binary(false, None, 256), binary(true, None, 257)]
+                ),
             ]
         );
     }
 
     #[test]
     fn extracts_count_and_prefix_at_both_widths() {
-        let (delivered, mut handler) = extract(&[
+        let (result, recorder) = extract(&[
             // g2v1, 1-byte count and prefix, index 5
             0x02, 0x01, 0x17, 0x01, 0x05, 0x81, //
             // g2v1, 2-byte count and prefix, index 261
             0x02, 0x01, 0x28, 0x01, 0x00, 0x05, 0x01, 0x01,
         ]);
 
-        assert!(delivered);
+        assert!(result.unwrap().values);
         assert_eq!(
-            handler.infos,
+            recorder.calls,
             [
-                HeaderInfo::new(
-                    Variation::Group2Var1,
-                    QualifierCode::CountAndPrefix8,
-                    true,
-                    true
+                call(
+                    HeaderInfo::new(
+                        Variation::Group2Var1,
+                        QualifierCode::CountAndPrefix8,
+                        true,
+                        true
+                    ),
+                    Kind::BinaryInput,
+                    vec![binary(true, None, 5)]
                 ),
-                HeaderInfo::new(
-                    Variation::Group2Var1,
-                    QualifierCode::CountAndPrefix16,
-                    true,
-                    true
+                call(
+                    HeaderInfo::new(
+                        Variation::Group2Var1,
+                        QualifierCode::CountAndPrefix16,
+                        true,
+                        true
+                    ),
+                    Kind::BinaryInput,
+                    vec![binary(false, None, 261)]
                 ),
-            ]
-        );
-        assert_eq!(
-            handler.pop(),
-            [
-                Header::Binary(vec![binary(true, None, 5)]),
-                Header::Binary(vec![binary(false, None, 261)]),
             ]
         );
     }
@@ -801,34 +561,35 @@ mod test {
             [0x02, 0x01, 0x17, 0x00].as_slice(),
             [0x02, 0x01, 0x28, 0x00, 0x00].as_slice(),
         ] {
-            let (delivered, mut handler) = extract(input);
-            assert!(!delivered);
-            assert_eq!(handler.pop(), [Header::Binary(vec![])]);
+            let (result, recorder) = extract(input);
+            assert!(!result.unwrap().values);
+            assert_eq!(callbacks(recorder), [(Kind::BinaryInput, vec![])]);
         }
     }
 
     #[test]
     fn abs_time_is_extracted_at_both_widths() {
-        let (delivered, mut handler) = extract(&[
+        let (result, recorder) = extract(&[
             // g50v1, 1-byte count of 1
             0x32, 0x01, 0x07, 0x01, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, //
             // g50v1, 2-byte count of 1
             0x32, 0x01, 0x08, 0x01, 0x00, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16,
         ]);
 
-        assert!(delivered);
+        assert!(result.unwrap().values);
         assert_eq!(
-            handler.infos,
+            recorder.calls,
             [
-                HeaderInfo::new(Variation::Group50Var1, QualifierCode::Count8, false, false),
-                HeaderInfo::new(Variation::Group50Var1, QualifierCode::Count16, false, false),
-            ]
-        );
-        assert_eq!(
-            handler.pop(),
-            [
-                Header::AbsTime(Timestamp::new(0x060504030201)),
-                Header::AbsTime(Timestamp::new(0x161514131211)),
+                call(
+                    HeaderInfo::new(Variation::Group50Var1, QualifierCode::Count8, false, false),
+                    Kind::AbsTime,
+                    vec![Value::AbsTime(Timestamp::new(0x060504030201))]
+                ),
+                call(
+                    HeaderInfo::new(Variation::Group50Var1, QualifierCode::Count16, false, false),
+                    Kind::AbsTime,
+                    vec![Value::AbsTime(Timestamp::new(0x161514131211))]
+                ),
             ]
         );
     }
@@ -849,9 +610,9 @@ mod test {
             ]
             .as_slice(),
         ] {
-            let (delivered, mut handler) = extract(input);
-            assert!(!delivered);
-            assert_eq!(handler.pop(), []);
+            let (result, recorder) = extract(input);
+            assert!(!result.unwrap().values);
+            assert_eq!(recorder.calls, []);
         }
     }
 }

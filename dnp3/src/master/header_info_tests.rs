@@ -7,36 +7,14 @@
 //! Pins the header information that master extraction passes to a `ReadHandler` for every
 //! response header: the callback, and the variation, qualifier, event and flags of `HeaderInfo`
 
-use crate::app::attr::{AnyAttribute, AttrSet};
-use crate::app::measurement as m;
 use crate::app::parse::header_identity_tests::accepted_headers;
 use crate::app::parse::options::ParseOptions;
-use crate::app::parse::parser::HeaderCollection;
-use crate::app::{FunctionCode, QualifierCode, Timestamp, Variation};
-use crate::master::extract::{extract_measurements_inner, Delivered, ProcessableResponse};
-use crate::master::{HeaderInfo, ReadHandler};
+use crate::app::{FunctionCode, QualifierCode, Variation};
+use crate::master::extract::Delivered;
+use crate::master::extract_recorder::{extract_with_options, Kind, Value};
+use crate::master::HeaderInfo;
 
 use QualifierCode as Q;
-
-/// The callbacks of a `ReadHandler` that carry values
-#[derive(Copy, Clone, Debug, PartialEq)]
-enum Kind {
-    BinaryInput,
-    DoubleBitBinaryInput,
-    BinaryOutputStatus,
-    Counter,
-    FrozenCounter,
-    AnalogInput,
-    FrozenAnalogInput,
-    AnalogInputDeadBand,
-    AnalogOutputStatus,
-    AnalogOutputCommandEvent,
-    BinaryOutputCommandEvent,
-    UnsignedInteger,
-    OctetString,
-    DeviceAttribute,
-    AbsTime,
-}
 
 /// One callback: its kind, header information and the indices of its values
 #[derive(Clone, Debug, PartialEq)]
@@ -46,149 +24,26 @@ struct Call {
     indices: Vec<u16>,
 }
 
-#[derive(Default)]
-struct Recorder {
-    calls: Vec<Call>,
-}
-
-impl Recorder {
-    fn push<T>(&mut self, kind: Kind, info: HeaderInfo, iter: &mut dyn Iterator<Item = (T, u16)>) {
-        let indices = iter.map(|(_, index)| index).collect();
-        self.calls.push(Call {
-            kind,
-            info,
-            indices,
-        });
-    }
-}
-
-impl ReadHandler for Recorder {
-    fn handle_binary_input(
-        &mut self,
-        info: HeaderInfo,
-        iter: &mut dyn Iterator<Item = (m::BinaryInput, u16)>,
-    ) {
-        self.push(Kind::BinaryInput, info, iter)
-    }
-
-    fn handle_double_bit_binary_input(
-        &mut self,
-        info: HeaderInfo,
-        iter: &mut dyn Iterator<Item = (m::DoubleBitBinaryInput, u16)>,
-    ) {
-        self.push(Kind::DoubleBitBinaryInput, info, iter)
-    }
-
-    fn handle_binary_output_status(
-        &mut self,
-        info: HeaderInfo,
-        iter: &mut dyn Iterator<Item = (m::BinaryOutputStatus, u16)>,
-    ) {
-        self.push(Kind::BinaryOutputStatus, info, iter)
-    }
-
-    fn handle_counter(
-        &mut self,
-        info: HeaderInfo,
-        iter: &mut dyn Iterator<Item = (m::Counter, u16)>,
-    ) {
-        self.push(Kind::Counter, info, iter)
-    }
-
-    fn handle_frozen_counter(
-        &mut self,
-        info: HeaderInfo,
-        iter: &mut dyn Iterator<Item = (m::FrozenCounter, u16)>,
-    ) {
-        self.push(Kind::FrozenCounter, info, iter)
-    }
-
-    fn handle_analog_input(
-        &mut self,
-        info: HeaderInfo,
-        iter: &mut dyn Iterator<Item = (m::AnalogInput, u16)>,
-    ) {
-        self.push(Kind::AnalogInput, info, iter)
-    }
-
-    fn handle_frozen_analog_input(
-        &mut self,
-        info: HeaderInfo,
-        iter: &mut dyn Iterator<Item = (m::FrozenAnalogInput, u16)>,
-    ) {
-        self.push(Kind::FrozenAnalogInput, info, iter)
-    }
-
-    fn handle_analog_input_dead_band(
-        &mut self,
-        info: HeaderInfo,
-        iter: &mut dyn Iterator<Item = (m::AnalogInputDeadBand, u16)>,
-    ) {
-        self.push(Kind::AnalogInputDeadBand, info, iter)
-    }
-
-    fn handle_analog_output_status(
-        &mut self,
-        info: HeaderInfo,
-        iter: &mut dyn Iterator<Item = (m::AnalogOutputStatus, u16)>,
-    ) {
-        self.push(Kind::AnalogOutputStatus, info, iter)
-    }
-
-    fn handle_analog_output_command_event(
-        &mut self,
-        info: HeaderInfo,
-        iter: &mut dyn Iterator<Item = (m::AnalogOutputCommandEvent, u16)>,
-    ) {
-        self.push(Kind::AnalogOutputCommandEvent, info, iter)
-    }
-
-    fn handle_binary_output_command_event(
-        &mut self,
-        info: HeaderInfo,
-        iter: &mut dyn Iterator<Item = (m::BinaryOutputCommandEvent, u16)>,
-    ) {
-        self.push(Kind::BinaryOutputCommandEvent, info, iter)
-    }
-
-    fn handle_unsigned_integer(
-        &mut self,
-        info: HeaderInfo,
-        iter: &mut dyn Iterator<Item = (m::UnsignedInteger, u16)>,
-    ) {
-        self.push(Kind::UnsignedInteger, info, iter)
-    }
-
-    fn handle_octet_string<'a>(
-        &mut self,
-        info: HeaderInfo,
-        iter: &'a mut dyn Iterator<Item = (&'a [u8], u16)>,
-    ) {
-        self.push(Kind::OctetString, info, iter)
-    }
-
-    fn handle_device_attribute(&mut self, info: HeaderInfo, attr: AnyAttribute) {
-        let set = match attr {
-            AnyAttribute::Other(x) => x.set,
-            AnyAttribute::Known(_) => AttrSet::Default,
-        };
-        let index = match set {
-            AttrSet::Default => 0,
-            AttrSet::Private(x) => x.into(),
-        };
-        self.calls.push(Call {
-            kind: Kind::DeviceAttribute,
-            info,
-            indices: vec![index],
-        });
-    }
-
-    fn handle_abs_time(&mut self, info: HeaderInfo, _time: Timestamp) {
-        self.calls.push(Call {
-            kind: Kind::AbsTime,
-            info,
-            indices: Vec::new(),
-        });
+/// The index of a point, or the set of an attribute
+fn index(value: &Value) -> Option<u16> {
+    match value {
+        Value::Binary(_, i)
+        | Value::DoubleBit(_, i)
+        | Value::BinaryOutputStatus(_, i)
+        | Value::Counter(_, i)
+        | Value::FrozenCounter(_, i)
+        | Value::Analog(_, i)
+        | Value::FrozenAnalog(_, i)
+        | Value::AnalogDeadBand(_, i)
+        | Value::AnalogOutputStatus(_, i)
+        | Value::BinaryCommandEvent(_, i)
+        | Value::AnalogCommandEvent(_, i)
+        | Value::UnsignedInteger(_, i)
+        | Value::OctetString(_, i) => Some(*i),
+        Value::Attribute(x) | Value::KnownAttribute(x) => Some(x.set.value().into()),
+        Value::AttributeList(set, _, _) => Some(set.value().into()),
+        Value::KnownAttributeList(..) => Some(0),
+        Value::AbsTime(_) => None,
     }
 }
 
@@ -197,15 +52,17 @@ const CTO: [u8; 10] = [51, 1, 0x07, 1, 1, 2, 3, 4, 5, 6];
 
 /// The calls, and what extraction reports it delivered, for response objects
 fn extract(options: ParseOptions, objects: &[u8]) -> (Vec<Call>, Delivered) {
-    let objects = ProcessableResponse::new(HeaderCollection::parse(
-        options,
-        FunctionCode::Response,
-        objects,
-    ))
-    .unwrap();
-    let mut recorder = Recorder::default();
-    let delivered = extract_measurements_inner(objects, &mut recorder);
-    (recorder.calls, delivered)
+    let (result, recorder) = extract_with_options(options, objects);
+    let calls = recorder
+        .calls
+        .into_iter()
+        .map(|call| Call {
+            kind: call.kind,
+            info: call.info,
+            indices: call.values.iter().filter_map(index).collect(),
+        })
+        .collect();
+    (calls, result.unwrap())
 }
 
 /// The qualifiers of a variation that master extraction passes to the handler

@@ -11,18 +11,14 @@
 use proptest::prelude::*;
 
 use crate::app::measurement::*;
-use crate::app::parse::options::ParseOptions;
-use crate::app::parse::parser::HeaderCollection;
-use crate::app::{FunctionCode, QualifierCode, Timestamp, Variation};
-use crate::master::extract::{
-    extract_header, extract_measurements_inner, Delivered, Extracted, InvalidResponse,
-    ProcessableResponse,
-};
+use crate::app::{QualifierCode, Timestamp, Variation};
+use crate::master::extract::{Delivered, InvalidResponse};
+use crate::master::extract_recorder::{extract, extract_each_header, Call, Kind, Value};
 use crate::master::test_objects::{
     CTOS_WITH_A_COUNT_OTHER_THAN_ONE, OTHER_RELATIVE_TIME_EVENTS, RELATIVE_TIME_EVENT,
     SYNCHRONIZED_CTO,
 };
-use crate::master::{HeaderInfo, ReadHandler};
+use crate::master::HeaderInfo;
 
 /// One object header of a generated response fragment
 #[derive(Clone, Debug)]
@@ -45,50 +41,6 @@ enum Spec {
     Binary { start: u8, flags: Vec<u8> },
     /// g30v1 with a 1-byte start and stop: the flags and value of each point
     Analog { start: u8, values: Vec<(u8, i32)> },
-}
-
-/// What the handler was passed
-#[derive(Clone, Debug, PartialEq)]
-enum Call {
-    Binary(HeaderInfo, Vec<(BinaryInput, u16)>),
-    DoubleBit(HeaderInfo, Vec<(DoubleBitBinaryInput, u16)>),
-    Analog(HeaderInfo, Vec<(AnalogInput, u16)>),
-    AbsTime(HeaderInfo, Timestamp),
-}
-
-#[derive(Default)]
-struct Recorder {
-    calls: Vec<Call>,
-}
-
-impl ReadHandler for Recorder {
-    fn handle_binary_input(
-        &mut self,
-        info: HeaderInfo,
-        iter: &mut dyn Iterator<Item = (BinaryInput, u16)>,
-    ) {
-        self.calls.push(Call::Binary(info, iter.collect()));
-    }
-
-    fn handle_double_bit_binary_input(
-        &mut self,
-        info: HeaderInfo,
-        iter: &mut dyn Iterator<Item = (DoubleBitBinaryInput, u16)>,
-    ) {
-        self.calls.push(Call::DoubleBit(info, iter.collect()));
-    }
-
-    fn handle_analog_input(
-        &mut self,
-        info: HeaderInfo,
-        iter: &mut dyn Iterator<Item = (AnalogInput, u16)>,
-    ) {
-        self.calls.push(Call::Analog(info, iter.collect()));
-    }
-
-    fn handle_abs_time(&mut self, info: HeaderInfo, time: Timestamp) {
-        self.calls.push(Call::AbsTime(info, time));
-    }
 }
 
 fn write_count(bytes: &mut Vec<u8>, wide: bool, count: usize) {
@@ -274,25 +226,27 @@ fn model(specs: &[Spec]) -> Expected {
                     (Flags::new(*flags), relative(cto, *offset), index)
                 });
                 calls.push(if *is_double_bit {
-                    Call::DoubleBit(
+                    Call {
+                        kind: Kind::DoubleBitBinaryInput,
                         info,
-                        points
+                        values: points
                             .map(|(flags, time, index)| {
                                 let value = double_bit(flags.value);
-                                (DoubleBitBinaryInput { value, flags, time }, index)
+                                Value::DoubleBit(DoubleBitBinaryInput { value, flags, time }, index)
                             })
                             .collect(),
-                    )
+                    }
                 } else {
-                    Call::Binary(
+                    Call {
+                        kind: Kind::BinaryInput,
                         info,
-                        points
+                        values: points
                             .map(|(flags, time, index)| {
                                 let value = flags.value & 0x80 != 0;
-                                (BinaryInput { value, flags, time }, index)
+                                Value::Binary(BinaryInput { value, flags, time }, index)
                             })
                             .collect(),
-                    )
+                    }
                 });
             }
             // only an absolute time with exactly one time is passed to the handler
@@ -304,7 +258,11 @@ fn model(specs: &[Spec]) -> Expected {
                         false,
                         false,
                     );
-                    calls.push(Call::AbsTime(info, Timestamp::new(*time)));
+                    calls.push(Call {
+                        kind: Kind::AbsTime,
+                        info,
+                        values: vec![Value::AbsTime(Timestamp::new(*time))],
+                    });
                     delivered.values = true;
                 }
             }
@@ -312,36 +270,38 @@ fn model(specs: &[Spec]) -> Expected {
                 let info =
                     HeaderInfo::new(Variation::Group1Var2, QualifierCode::Range8, false, true);
                 let points = flags.iter().zip(range_indices(*start, flags.len()));
-                calls.push(Call::Binary(
+                calls.push(Call {
+                    kind: Kind::BinaryInput,
                     info,
-                    points
+                    values: points
                         .map(|(flags, index)| {
                             let value = flags & 0x80 != 0;
                             let flags = Flags::new(*flags);
                             let time = None;
-                            (BinaryInput { value, flags, time }, index)
+                            Value::Binary(BinaryInput { value, flags, time }, index)
                         })
                         .collect(),
-                ));
+                });
                 delivered.values = true;
             }
             Spec::Analog { start, values } => {
                 let info =
                     HeaderInfo::new(Variation::Group30Var1, QualifierCode::Range8, false, true);
                 let points = values.iter().zip(range_indices(*start, values.len()));
-                calls.push(Call::Analog(
+                calls.push(Call {
+                    kind: Kind::AnalogInput,
                     info,
-                    points
+                    values: points
                         .map(|((flags, value), index)| {
                             let value = AnalogInput {
                                 value: (*value).into(),
                                 flags: Flags::new(*flags),
                                 time: None,
                             };
-                            (value, index)
+                            Value::Analog(value, index)
                         })
                         .collect(),
-                ));
+                });
                 delivered.values = true;
             }
         }
@@ -356,31 +316,10 @@ fn model(specs: &[Spec]) -> Expected {
 /// Check the fragment, and extract each of its headers in turn whatever the result, as
 /// `extract_measurements_inner` does once the check passes
 fn run(objects: &[u8]) -> Expected {
-    let parse =
-        || HeaderCollection::parse(ParseOptions::default(), FunctionCode::Response, objects);
+    let (delivered, recorder) = extract_each_header(objects);
 
-    let mut recorder = Recorder::default();
-    let mut delivered = Delivered::default();
-    let mut cto = None;
-    for header in parse().unwrap().iter() {
-        match extract_header(&header, cto, &mut recorder) {
-            Extracted::Handled => {
-                if header.has_objects() {
-                    delivered.values = true;
-                    delivered.events |= matches!(
-                        header.variation(),
-                        Variation::Group2Var3 | Variation::Group4Var3
-                    );
-                }
-            }
-            Extracted::Cto(x) => cto = x,
-            Extracted::Ignored => {}
-        }
-    }
-
-    let check = ProcessableResponse::new(parse()).map(|objects| {
-        let mut processed = Recorder::default();
-        let reported = extract_measurements_inner(objects, &mut processed);
+    let (check, processed) = extract(objects);
+    let check = check.map(|reported| {
         assert_eq!(processed.calls, recorder.calls);
         assert_eq!(reported, delivered);
     });
