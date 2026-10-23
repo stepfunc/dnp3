@@ -14,7 +14,7 @@ use dnp3::outstation::*;
 use dnp3::tcp::*;
 
 use clap::Parser;
-use dnp3::app::control::{CommandStatus, Group12Var1, OpType};
+use dnp3::app::control::{Group12Var1, OpType};
 
 fn config(num_values: usize) -> TestConfig {
     TestConfig {
@@ -154,11 +154,15 @@ impl TestHarness {
                         )
                         .await
                         .unwrap_err();
-                    assert_eq!(
-                        err,
-                        CommandError::Response(CommandResponseError::BadStatus(
-                            CommandStatus::NotSupported
-                        ))
+                    // the outstation answers NOT_SUPPORTED with IIN2.2, which the master
+                    // reports before the command status
+                    assert!(
+                        matches!(
+                            err,
+                            CommandError::Task(TaskError::RejectedByIin2(iin))
+                                if iin.iin2 == Iin2::PARAMETER_ERROR
+                        ),
+                        "{err:?}"
                     );
                     iterations += 1;
                     if start.elapsed() >= duration {
