@@ -389,7 +389,7 @@ impl SessionTask {
 
 type HeaderBytes = [u8; link::constant::LINK_HEADER_LENGTH];
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 struct LinkIdentity {
     source: u16,
     destination: u16,
@@ -709,6 +709,70 @@ mod tests {
     async fn header_with_bad_length_is_not_identified() {
         // length 4 with a matching CRC
         rejects_identification([0x05, 0x64, 0x04, 0xC0, 0x01, 0x00, 0x00, 0x04, 0x0E, 0x94]).await;
+    }
+
+    /// identifies the link on a pipe while the peer writes `parts`, pausing after each one, then
+    /// closes its end
+    async fn identify_from(parts: &[&[u8]]) -> (std::io::Result<LinkIdentity>, PhysLayer) {
+        let (mut peer, stream) = tokio::io::duplex(64);
+        let mut phys = PhysLayer::duplex(stream);
+        let write = async move {
+            for part in parts {
+                peer.write_all(part).await.unwrap();
+                tokio::time::sleep(Duration::from_millis(1)).await;
+            }
+        };
+        let ((), result) = tokio::join!(
+            write,
+            read_link_identity(&mut phys, PhysDecodeLevel::Nothing)
+        );
+        (result, phys)
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_header_split_across_reads_is_identified_like_one_read() {
+        watchdog(async {
+            let (whole, _) = identify_from(&[&LINK_STATUS_REQUEST]).await;
+            let (split, _) =
+                identify_from(&[&LINK_STATUS_REQUEST[..4], &LINK_STATUS_REQUEST[4..]]).await;
+            let whole = whole.unwrap();
+            assert_eq!(
+                whole,
+                LinkIdentity {
+                    source: 1024,
+                    destination: 1,
+                    header_bytes: LINK_STATUS_REQUEST,
+                }
+            );
+            assert_eq!(split.unwrap(), whole);
+        })
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_peer_closing_mid_header_is_not_identified() {
+        watchdog(async {
+            let (result, _) = identify_from(&[&LINK_STATUS_REQUEST[..4]]).await;
+            assert_eq!(result.unwrap_err().kind(), ErrorKind::UnexpectedEof);
+        })
+        .await;
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn bytes_after_the_header_are_left_for_the_session() {
+        watchdog(async {
+            let trailing = [0xAA, 0xBB, 0xCC];
+            let (result, mut phys) =
+                identify_from(&[&[LINK_STATUS_REQUEST.as_slice(), &trailing].concat()]).await;
+            assert_eq!(result.unwrap().header_bytes, LINK_STATUS_REQUEST);
+            let mut buffer = [0; 16];
+            let (count, _) = phys
+                .read(&mut buffer, PhysDecodeLevel::Nothing)
+                .await
+                .unwrap();
+            assert_eq!(buffer.get(..count), Some(trailing.as_slice()));
+        })
+        .await;
     }
 
     #[tokio::test]
