@@ -1628,6 +1628,7 @@ fn repeated_read_restarts_the_solicited_confirm_timeout() {
         Op::Repeat,
         // past the first deadline
         Op::Advance(AdvanceChoice::Millis(800)),
+        Op::Advance(AdvanceChoice::BeforeDeadline),
         Op::Advance(AdvanceChoice::AtDeadline),
     ];
     run_paused(check_model(solicited_only(), ops));
