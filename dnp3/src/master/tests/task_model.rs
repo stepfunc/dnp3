@@ -425,19 +425,6 @@ struct Allowed {
     ending: Option<Ending>,
 }
 
-/// Whether the restart IIN bit of the outstation must be acted on
-#[derive(Copy, Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-enum RestartSeen {
-    /// nothing reported it, or only fragments the master ignores: another outstation's, or a
-    /// response to another request
-    Never,
-    /// only a solicited fragment that breaks the FIR, FIN or CON rules reported it: the master
-    /// rejects it before looking at its IIN or objects, and either is right
-    Maybe,
-    /// a response the master processed reported it, even if it then rejected the response
-    Must,
-}
-
 enum State {
     Read {
         first: bool,
@@ -465,7 +452,10 @@ struct Model {
     /// the sequence number of the association's next request
     next_seq: u8,
     state: State,
-    restart: RestartSeen,
+    /// a fragment the master processed reported the restart IIN bit, even if the master then
+    /// rejected the fragment. Fragments it ignores don't count: another outstation's, a response
+    /// to another request, or a solicited fragment that breaks the FIR, FIN or CON rules
+    restart: bool,
     /// the last unsolicited fragment accepted from the outstation and from the other one
     accepted: [Option<Vec<u8>>; 2],
     /// the last unsolicited fragment sent from each source
@@ -508,7 +498,7 @@ impl Model {
             now: 0,
             next_seq: 1,
             state,
-            restart: RestartSeen::Never,
+            restart: false,
             accepted: [None, None],
             sent: [None, None, None],
             obs,
@@ -528,10 +518,8 @@ impl Model {
         }
     }
 
-    fn saw_restart(&mut self, restart: bool, seen: RestartSeen) {
-        if restart {
-            self.restart = self.restart.max(seen);
-        }
+    fn saw_restart(&mut self, restart: bool) {
+        self.restart |= restart;
     }
 
     fn end(&mut self, ends: Vec<End>) {
@@ -575,48 +563,42 @@ impl Model {
             return vec![Allowed { obs, ending: None }];
         }
         // the restart is cleared once the task ends
-        let clear_restart: &[bool] = match self.restart {
-            RestartSeen::Never => &[false],
-            RestartSeen::Maybe => &[false, true],
-            RestartSeen::Must => &[true],
+        let clear = self.restart;
+        // the next request continues from the task's last sequence number
+        let (task_type, function) = if clear {
+            (TaskType::ClearRestartBit, FunctionCode::Write)
+        } else {
+            (TaskType::UserRead, FunctionCode::Read)
         };
         let mut allowed = vec![];
         for end in ends {
-            for clear in clear_restart {
-                let mut obs = obs.clone();
-                obs.info.push(end.event(self.task));
-                // the next request continues from the task's last sequence number
-                let (task_type, function) = if *clear {
-                    (TaskType::ClearRestartBit, FunctionCode::Write)
-                } else {
-                    (TaskType::UserRead, FunctionCode::Read)
-                };
-                let next = StepObs {
-                    writes: vec![Write::Request(function, self.next_seq)],
-                    info: vec![AssocInfoEvent::TaskStart(
-                        task_type,
-                        function,
-                        Sequence::new(self.next_seq),
-                    )],
-                    ..StepObs::default()
-                };
-                // clearing the restart starts at once, and the read waits for its response
-                let probe = if *clear {
-                    obs.writes.extend(next.writes);
-                    obs.info.extend(next.info);
-                    StepObs::default()
-                } else {
-                    next
-                };
-                allowed.push(Allowed {
-                    obs,
-                    ending: Some(Ending {
-                        end,
-                        time: self.end_time,
-                        probe,
-                    }),
-                });
-            }
+            let mut obs = obs.clone();
+            obs.info.push(end.event(self.task));
+            let next = StepObs {
+                writes: vec![Write::Request(function, self.next_seq)],
+                info: vec![AssocInfoEvent::TaskStart(
+                    task_type,
+                    function,
+                    Sequence::new(self.next_seq),
+                )],
+                ..StepObs::default()
+            };
+            // clearing the restart starts at once, and the read waits for its response
+            let probe = if clear {
+                obs.writes.extend(next.writes);
+                obs.info.extend(next.info);
+                StepObs::default()
+            } else {
+                next
+            };
+            allowed.push(Allowed {
+                obs,
+                ending: Some(Ending {
+                    end,
+                    time: self.end_time,
+                    probe,
+                }),
+            });
         }
         allowed
     }
@@ -670,7 +652,7 @@ impl Model {
 
         // the IIN of an unsolicited response from an association is acted on even if the response
         // is a duplicate, comes before the startup integrity scan, or has objects it can't process
-        self.saw_restart(restart, RestartSeen::Must);
+        self.saw_restart(restart);
         if unsolicited.source == Source::Outstation
             && !(self.task.accepts_unsolicited_data() || null)
         {
@@ -701,8 +683,6 @@ impl Model {
                 self.obs.other.extend(
                     delivery(ReadType::Unsolicited, measurement)
                         .into_iter()
-                        // the other association's handler only records analog inputs
-                        .filter(|event| *event != ReadEvent::BinaryInput)
                         .map(Entry::Read),
                 );
             }
@@ -789,13 +769,12 @@ impl Model {
             broken.push(End::Failure(TaskError::NonFinWithoutCon));
         }
         if !broken.is_empty() {
-            self.saw_restart(answer.restart, RestartSeen::Maybe);
             self.end(broken);
             return;
         }
 
         // the IIN of the response is acted on even if its objects are rejected
-        self.saw_restart(answer.restart, RestartSeen::Must);
+        self.saw_restart(answer.restart);
         let measurement = match answer.objects.content() {
             Content::Valid(measurement) => measurement,
             Content::Malformed => {
@@ -859,7 +838,6 @@ impl Model {
             return;
         };
         if !(fir && answer.fin) {
-            self.saw_restart(answer.restart, RestartSeen::Maybe);
             self.end(vec![End::Failure(TaskError::MultiFragmentResponse)]);
             return;
         }
@@ -871,7 +849,7 @@ impl Model {
             self.obs.writes.push(Write::Confirm(seq));
         }
         // the IIN of the response is acted on even if the response is rejected
-        self.saw_restart(answer.restart, RestartSeen::Must);
+        self.saw_restart(answer.restart);
 
         let mut ends = vec![];
         let rejected = answer.iin2 & BAD_REQUEST_ERRORS != 0;
