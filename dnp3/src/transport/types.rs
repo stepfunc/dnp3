@@ -24,13 +24,11 @@ impl FragmentInfo {
     }
 }
 
-#[derive(Debug)]
 pub(crate) struct Fragment<'a> {
     pub(crate) info: FragmentInfo,
     pub(crate) data: &'a [u8],
 }
 
-#[derive(Debug)]
 pub(crate) enum TransportData<'a> {
     Fragment(Fragment<'a>),
     LinkLayerMessage(LinkLayerMessage),
