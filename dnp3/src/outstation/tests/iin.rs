@@ -18,7 +18,6 @@ const RESPONSE_WITH_OVERFLOW: &[u8] = &[
     0xE0, 0x81, 0x80, 0x08, 0x02, 0x01, 0x28, 0x05, 0x00, 0x00, 0x00, 0x81, 0x00, 0x00, 0x01, 0x00,
     0x00, 0x81, 0x00, 0x00, 0x01, 0x00, 0x00, 0x81,
 ];
-const EMPTY_RESPONSE: &[u8] = &[0xC0, 0x81, 0x80, 0x00];
 
 #[tokio::test]
 async fn incomplete_request() {
@@ -120,7 +119,7 @@ async fn buffer_overflow() {
     // Send confirmation, check that overflow bit is NOT set
     harness.send_and_process(&confirm(0)).await;
     harness
-        .test_request_response(READ_CLASS_123, EMPTY_RESPONSE)
+        .test_request_response(READ_CLASS_123, &empty_response(0, 0))
         .await;
 }
 
@@ -240,8 +239,6 @@ async fn class_bits_and_buffer_state_follow_the_events_across_reads_and_confirms
         .await;
 }
 
-const EMPTY_RESPONSE_OBJECT_UNKNOWN: &[u8] = &[0xC0, 0x81, 0x80, 0x02];
-const EMPTY_RESPONSE_PARAM_ERROR: &[u8] = &[0xC0, 0x81, 0x80, 0x04];
 const WRITE_ABSOLUTE_TIME: &[u8] = &[
     0xC0, 0x02, 50, 1, 0x07, 1, 0xC0, 0x24, 0x0E, 0xDA, 0x77, 0x01,
 ];
@@ -251,7 +248,10 @@ async fn read_of_object_that_cannot_be_read_sets_object_unknown() {
     let mut harness = new_harness(get_default_config());
 
     harness
-        .test_request_response(&[0xC0, 0x01, 13, 1, 0x06], EMPTY_RESPONSE_OBJECT_UNKNOWN)
+        .test_request_response(
+            &[0xC0, 0x01, 13, 1, 0x06],
+            &empty_response(0, iin2::OBJECT_UNKNOWN),
+        )
         .await;
 }
 
@@ -262,7 +262,7 @@ async fn read_with_qualifier_not_supported_for_the_object_sets_parameter_error()
     harness
         .test_request_response(
             &[0xC0, 0x01, 2, 1, 0x17, 1, 0, 0x01],
-            EMPTY_RESPONSE_PARAM_ERROR,
+            &empty_response(0, iin2::PARAMETER_ERROR),
         )
         .await;
 }
@@ -274,7 +274,7 @@ async fn write_of_object_that_cannot_be_written_sets_object_unknown() {
     harness
         .test_request_response(
             &[0xC0, 0x02, 1, 2, 0x00, 0, 0, 0x01],
-            EMPTY_RESPONSE_OBJECT_UNKNOWN,
+            &empty_response(0, iin2::OBJECT_UNKNOWN),
         )
         .await;
 
@@ -292,7 +292,10 @@ async fn write_with_qualifier_not_supported_for_the_object_sets_parameter_error(
     let mut harness = new_harness(get_default_config());
 
     harness
-        .test_request_response(&[0xC0, 0x02, 0, 240, 0x06], EMPTY_RESPONSE_PARAM_ERROR)
+        .test_request_response(
+            &[0xC0, 0x02, 0, 240, 0x06],
+            &empty_response(0, iin2::PARAMETER_ERROR),
+        )
         .await;
 }
 
@@ -346,7 +349,7 @@ async fn write_of_counted_event_objects_is_malformed() {
     harness
         .test_request_response(
             &[0xC0, 0x02, 32, 2, 0x07, 2, 80, 1, 0x00, 7, 7, 0x00],
-            EMPTY_RESPONSE_PARAM_ERROR,
+            &empty_response(0, iin2::PARAMETER_ERROR),
         )
         .await;
     harness.check_no_events();
@@ -358,7 +361,10 @@ async fn write_of_counted_event_objects_without_data_is_malformed() {
 
     // g32v1 with a 1-byte and a 2-byte count of 1, and no object data
     harness
-        .test_request_response(&[0xC0, 0x02, 32, 1, 0x07, 1], EMPTY_RESPONSE_PARAM_ERROR)
+        .test_request_response(
+            &[0xC0, 0x02, 32, 1, 0x07, 1],
+            &empty_response(0, iin2::PARAMETER_ERROR),
+        )
         .await;
     harness
         .test_request_response(&[0xC1, 0x02, 32, 1, 0x08, 1, 0], &[0xC1, 0x81, 0x80, 0x04])
@@ -383,7 +389,7 @@ async fn non_read_with_a_count_of_objects_that_carry_no_data_is_malformed() {
                 ]
                 .concat();
                 harness
-                    .test_request_response(&request, &[0xC0 | seq, 0x81, 0x80, 0x04])
+                    .test_request_response(&request, &empty_response(seq, iin2::PARAMETER_ERROR))
                     .await;
                 seq = seq.wrapping_add(1) & 0x0F;
             }
@@ -398,16 +404,22 @@ async fn requests_the_application_declines_set_object_unknown() {
     harness.application_data.lock().unwrap().request_error = Some(RequestError::NotSupported);
 
     harness
-        .test_request_response(WRITE_ABSOLUTE_TIME, EMPTY_RESPONSE_OBJECT_UNKNOWN)
+        .test_request_response(
+            WRITE_ABSOLUTE_TIME,
+            &empty_response(0, iin2::OBJECT_UNKNOWN),
+        )
         .await;
     harness
         .test_request_response(
             &[0xC0, 0x02, 34, 1, 0x17, 1, 0, 0xCA, 0xFE],
-            EMPTY_RESPONSE_OBJECT_UNKNOWN,
+            &empty_response(0, iin2::OBJECT_UNKNOWN),
         )
         .await;
     harness
-        .test_request_response(&[0xC0, 0x07, 20, 0, 0x06], EMPTY_RESPONSE_OBJECT_UNKNOWN)
+        .test_request_response(
+            &[0xC0, 0x07, 20, 0, 0x06],
+            &empty_response(0, iin2::OBJECT_UNKNOWN),
+        )
         .await;
 
     harness.check_no_events();
@@ -429,7 +441,7 @@ async fn fragments_that_are_not_valid_requests_get_no_response() {
 
     // a valid request is still answered
     harness
-        .test_request_response(&read_class_0(0), EMPTY_RESPONSE)
+        .test_request_response(&read_class_0(0), &empty_response(0, 0))
         .await;
 }
 
@@ -458,7 +470,7 @@ async fn read_with_two_byte_count_and_prefix_sets_parameter_error() {
     harness
         .test_request_response(
             &[0xC0, 0x01, 2, 1, 0x28, 1, 0, 0, 0, 0x01],
-            EMPTY_RESPONSE_PARAM_ERROR,
+            &empty_response(0, iin2::PARAMETER_ERROR),
         )
         .await;
 }
@@ -471,7 +483,7 @@ async fn read_with_free_format_qualifier_sets_object_unknown() {
     harness
         .test_request_response(
             &[0xC0, 0x01, 70, 5, 0x5B, 1, 8, 0, 1, 2, 3, 4, 5, 6, 7, 8],
-            EMPTY_RESPONSE_OBJECT_UNKNOWN,
+            &empty_response(0, iin2::OBJECT_UNKNOWN),
         )
         .await;
 }
@@ -482,7 +494,10 @@ async fn write_of_g34_with_all_objects_sets_parameter_error() {
 
     // g34v1 is writable, but not with all objects
     harness
-        .test_request_response(&[0xC0, 0x02, 0x22, 0x01, 0x06], EMPTY_RESPONSE_PARAM_ERROR)
+        .test_request_response(
+            &[0xC0, 0x02, 0x22, 0x01, 0x06],
+            &empty_response(0, iin2::PARAMETER_ERROR),
+        )
         .await;
 
     harness.check_no_events();
@@ -555,7 +570,7 @@ async fn application_iin_flags_are_reported_in_solicited_responses() {
         // and none once the application clears them
         harness.application_data.lock().unwrap().application_iin = ApplicationIin::default();
         harness
-            .test_request_response(&read_class_0(seq), &[0xC0 | seq, 0x81, 0x80, 0x00])
+            .test_request_response(&read_class_0(seq), &empty_response(seq, 0))
             .await;
         harness.check_no_events();
     })
@@ -587,7 +602,10 @@ async fn request_errors_of_the_application_set_parameter_error() {
 
         // WRITE of the absolute time, then IMMEDIATE_FREEZE of all counters
         harness
-            .test_request_response(WRITE_ABSOLUTE_TIME, EMPTY_RESPONSE_PARAM_ERROR)
+            .test_request_response(
+                WRITE_ABSOLUTE_TIME,
+                &empty_response(0, iin2::PARAMETER_ERROR),
+            )
             .await;
         harness
             .test_request_response(&[0xC1, 0x07, 20, 0, 0x06], &[0xC1, 0x81, 0x80, 0x04])
@@ -627,7 +645,7 @@ async fn requests_whose_objects_do_not_parse_set_parameter_error() {
             let mut bytes = vec![0xC0 | seq];
             bytes.extend_from_slice(request);
             harness
-                .test_request_response(&bytes, &[0xC0 | seq, 0x81, 0x80, 0x04])
+                .test_request_response(&bytes, &empty_response(seq, iin2::PARAMETER_ERROR))
                 .await;
         }
 

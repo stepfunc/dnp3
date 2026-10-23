@@ -43,6 +43,68 @@ pub(crate) const ENABLE_UNSOLICITED_SEQ_0: &[u8] = &[
     0xC0, 0x14, 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06,
 ];
 
+/// ENABLE_UNSOLICITED for class 2 only
+pub(crate) const ENABLE_UNSOLICITED_CLASS_2_SEQ_0: &[u8] = &[0xC0, 0x14, 0x3C, 0x03, 0x06];
+
+/// bits of IIN1
+pub(crate) mod iin1 {
+    /// IIN1.0, all stations
+    pub(crate) const BROADCAST: u8 = 0x01;
+    /// IIN1.1, class 1 events
+    pub(crate) const CLASS_1: u8 = 0x02;
+    /// IIN1.2, class 2 events
+    pub(crate) const CLASS_2: u8 = 0x04;
+    /// IIN1.7, device restart
+    pub(crate) const RESTART: u8 = 0x80;
+}
+
+/// bits of IIN2
+pub(crate) mod iin2 {
+    /// IIN2.0, function code not supported
+    pub(crate) const NO_FUNC_CODE_SUPPORT: u8 = 0x01;
+    /// IIN2.1, object unknown
+    pub(crate) const OBJECT_UNKNOWN: u8 = 0x02;
+    /// IIN2.2, parameter error
+    pub(crate) const PARAMETER_ERROR: u8 = 0x04;
+    /// IIN2.3, event buffer overflow
+    pub(crate) const EVENT_BUFFER_OVERFLOW: u8 = 0x08;
+}
+
+/// the header of a solicited response with the application control field `control` (FIR, FIN,
+/// CON and the sequence number)
+pub(crate) const fn response_header(control: u8, iin1: u8, iin2: u8) -> [u8; 4] {
+    [control, 0x81, iin1, iin2]
+}
+
+/// the header of a solicited response with FIR and FIN, and CON if `con`
+pub(crate) const fn solicited(seq: u8, con: bool, iin1: u8, iin2: u8) -> [u8; 4] {
+    let con = if con { 0x20 } else { 0x00 };
+    response_header(0xC0 | con | seq, iin1, iin2)
+}
+
+/// a solicited response without objects or CON, whose IIN1 has only the restart bit
+pub(crate) const fn empty_response(seq: u8, iin2: u8) -> [u8; 4] {
+    solicited(seq, false, iin1::RESTART, iin2)
+}
+
+/// a response header followed by `objects`
+pub(crate) fn with_objects(header: [u8; 4], objects: &[u8]) -> Vec<u8> {
+    let mut bytes = header.to_vec();
+    bytes.extend_from_slice(objects);
+    bytes
+}
+
+/// DISABLE_UNSOLICITED of the classes 1, 2 and 3 that `classes` names
+pub(crate) fn disable_unsolicited(seq: u8, classes: [bool; 3]) -> Vec<u8> {
+    let mut bytes = vec![0xC0 | seq, 0x15];
+    for (variation, named) in [2, 3, 4].into_iter().zip(classes) {
+        if named {
+            bytes.extend_from_slice(&[60, variation, 0x06]);
+        }
+    }
+    bytes
+}
+
 /// a null unsolicited response with the restart IIN
 pub(crate) const fn null_unsolicited(seq: u8) -> [u8; 4] {
     [0xF0 | seq, 0x82, 0x80, 0x00]

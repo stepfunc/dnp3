@@ -6,12 +6,16 @@
 
 //! Setup steps and expected values that tests in several files share
 
+use std::time::Duration;
+
 use crate::app::measurement::{BinaryInput, Flags, Time};
+use crate::outstation::config::OutstationConfig;
 use crate::outstation::database::{
     Add, BinaryInputConfig, Database, EventClass, Update, UpdateOptions,
 };
 use crate::outstation::tests::harness::{
-    null_unsolicited, unsolicited_confirm, Event, OutstationHarness, ENABLE_UNSOLICITED_SEQ_0,
+    empty_response, null_unsolicited, unsolicited_confirm, Event, OutstationHarness,
+    ENABLE_UNSOLICITED_SEQ_0,
 };
 use crate::outstation::{BufferState, ClassCount, TypeCount};
 
@@ -26,8 +30,22 @@ pub(crate) async fn confirm_null_unsolicited(harness: &mut OutstationHarness) {
 /// enable unsolicited responses for classes 1, 2 and 3, answered with the restart IIN
 pub(crate) async fn enable_unsolicited(harness: &mut OutstationHarness) {
     harness
-        .test_request_response(ENABLE_UNSOLICITED_SEQ_0, &[0xC0, 0x81, 0x80, 0x00])
+        .test_request_response(ENABLE_UNSOLICITED_SEQ_0, &empty_response(0, 0))
         .await;
+}
+
+/// run the outstation for `duration` of paused time and check that it sends nothing and makes no
+/// callbacks
+pub(crate) async fn expect_silence(harness: &mut OutstationHarness, duration: Duration) {
+    tokio::time::sleep(duration).await;
+    harness.expect_no_response();
+    harness.check_no_events();
+}
+
+/// `config` without link status requests, which would break silences and the model's timeline
+pub(crate) fn without_keep_alive(mut config: OutstationConfig) -> OutstationConfig {
+    config.keep_alive_timeout = None;
+    config
 }
 
 /// class 1 binary input 0, updated to true with an event

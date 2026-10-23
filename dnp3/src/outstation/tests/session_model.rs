@@ -72,10 +72,6 @@ use crate::util::test_support::watchdog;
 /// points of each kind, at indices 0 to 3
 const POINTS: u16 = 4;
 
-const IIN1_RESTART: u8 = 0x80;
-const IIN2_NO_FUNC_CODE_SUPPORT: u8 = 0x01;
-const IIN2_EVENT_BUFFER_OVERFLOW: u8 = 0x08;
-
 /// the flags of every event
 const ONLINE: u8 = 0x01;
 
@@ -638,14 +634,14 @@ impl Model {
     /// the IIN of a response built now: the events not in this or an earlier unconfirmed response,
     /// the restart and the overflow
     fn iin(&self, iin2: u8) -> [u8; 2] {
-        let mut iin1 = if self.restart { IIN1_RESTART } else { 0 };
+        let mut iin1 = if self.restart { iin1::RESTART } else { 0 };
         for event in &self.events {
             if event.state != EventState::Written {
                 iin1 |= 0x02 << event.class;
             }
         }
         let overflow = if self.overflow {
-            IIN2_EVENT_BUFFER_OVERFLOW
+            iin2::EVENT_BUFFER_OVERFLOW
         } else {
             0
         };
@@ -706,7 +702,7 @@ impl Model {
         let [iin1, iin2] = self.iin(0);
         assert_eq!(
             bytes[..4],
-            [control, 0x81, iin1, iin2],
+            response_header(control, iin1, iin2),
             "{}: solicited response header: {bytes:02X?}",
             self.context
         );
@@ -724,8 +720,7 @@ impl Model {
 
     fn respond(&mut self, seq: u8, iin2: u8, objects: &[u8], what: &str) {
         let [iin1, iin2] = self.iin(iin2);
-        let mut expected = vec![0xC0 | seq, 0x81, iin1, iin2];
-        expected.extend_from_slice(objects);
+        let expected = with_objects(solicited(seq, false, iin1, iin2), objects);
         self.expect_write(&expected, what);
         self.last_solicited = Some(expected);
     }
@@ -785,7 +780,7 @@ impl Model {
                 if !self.setup.unsolicited {
                     self.respond(
                         seq,
-                        IIN2_NO_FUNC_CODE_SUPPORT,
+                        iin2::NO_FUNC_CODE_SUPPORT,
                         &[],
                         "unsupported ENABLE/DISABLE response",
                     );
@@ -1325,13 +1320,12 @@ fn setup() -> impl Strategy<Value = Setup> {
 }
 
 fn config(setup: Setup) -> OutstationConfig {
-    let mut config = get_default_unsolicited_config();
+    let mut config = without_keep_alive(get_default_unsolicited_config());
     config.features.unsolicited = if setup.unsolicited {
         Feature::Enabled
     } else {
         Feature::Disabled
     };
-    config.keep_alive_timeout = None;
     config.confirm_timeout = Timeout::from_millis(setup.confirm_ms).unwrap();
     config.unsolicited_retry_delay = Duration::from_millis(setup.retry_ms);
     config.max_unsolicited_retries = setup.max_retries;

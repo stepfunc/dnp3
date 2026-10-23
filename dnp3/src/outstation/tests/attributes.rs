@@ -80,7 +80,7 @@ async fn attribute_values_of_255_bytes_are_defined_and_read_back() {
         .unwrap();
     });
 
-    let mut response = vec![0xC0, 0x81, 0x80, 0x00];
+    let mut response = empty_response(0, 0).to_vec();
     response.extend(encode_string(var::DEVICE_SERIAL_NUMBER, &serial));
     // g0v1, set 1, octet string, 255 bytes
     response.extend([0x00, 0x01, 0x00, 0x01, 0x01, 0x05, 0xFF]);
@@ -179,7 +179,7 @@ async fn reads_extended_list_of_attribute_variations() {
         .database
         .transaction(|db| define_uint_attrs(db, 1, 200));
 
-    let mut response = vec![0xC0, 0x81, 0x80, 0x00];
+    let mut response = empty_response(0, 0).to_vec();
     response.extend(encode_uint_attr_list(1, 200));
 
     harness
@@ -197,7 +197,7 @@ async fn reads_maximum_list_of_attribute_variations() {
         .database
         .transaction(|db| define_uint_attrs(db, 1, 253));
 
-    let mut response = vec![0xC0, 0x81, 0x80, 0x00];
+    let mut response = empty_response(0, 0).to_vec();
     response.extend(encode_uint_attr_list(1, 253));
 
     harness
@@ -257,7 +257,7 @@ async fn attribute_defined_in_private_set_zero_is_read_from_the_default_set() {
         0x00,
         0x00,
     ];
-    let mut response = vec![0xC0, 0x81, 0x80, 0x00];
+    let mut response = empty_response(0, 0).to_vec();
     response.extend(encode_string(var::DEVICE_SERIAL_NUMBER, "serial"));
 
     harness.test_request_response(request, &response).await;
@@ -315,12 +315,12 @@ async fn writes_attribute_with_one_and_two_byte_ranges() {
     for (seq, (write, value)) in writes.into_iter().zip(["one", "two"]).enumerate() {
         let seq: u8 = (2 * seq).try_into().unwrap();
         harness
-            .test_request_response(write, &[0xC0 | seq, 0x81, 0x80, 0x00])
+            .test_request_response(write, &empty_response(seq, 0))
             .await;
 
         let mut read = vec![0xC0 | (seq + 1)];
         read.extend(READ_LOCATION);
-        let mut response = vec![0xC0 | (seq + 1), 0x81, 0x80, 0x00];
+        let mut response = empty_response(seq + 1, 0).to_vec();
         response.extend(encode_string(var::USER_ASSIGNED_LOCATION, value));
         harness.test_request_response(&read, &response).await;
     }
@@ -355,15 +355,10 @@ fn read_attr(seq: u8, set: u8, variation: u8) -> Vec<u8> {
 
 /// the response to a READ of one attribute, with the restart IIN
 fn attr_response(seq: u8, set: u8, variation: u8, data_type: u8, value: &[u8]) -> Vec<u8> {
-    let mut bytes = vec![0xC0 | seq, 0x81, 0x80, 0x00];
+    let mut bytes = empty_response(seq, 0).to_vec();
     bytes.extend(attr_header(set, variation));
     bytes.extend(attr_value(data_type, value));
     bytes
-}
-
-/// an empty response with the restart IIN and `iin2`
-fn empty_response(seq: u8, iin2: u8) -> [u8; 4] {
-    [0xC0 | seq, 0x81, 0x80, iin2]
 }
 
 // attribute data type codes
@@ -374,10 +369,6 @@ const FLT: u8 = 4;
 const OSTR: u8 = 5;
 const BSTR: u8 = 6;
 const TIME: u8 = 7;
-
-const IIN2_NONE: u8 = 0x00;
-const IIN2_OBJECT_UNKNOWN: u8 = 0x02;
-const IIN2_PARAMETER_ERROR: u8 = 0x04;
 
 /// the default set holds a writable location "old" and a read-only config version "1.0.0"
 fn define_default_set(harness: &mut OutstationHarness) {
@@ -421,7 +412,7 @@ async fn write_of_attribute_that_is_not_writable_sets_object_unknown_and_keeps_t
         harness
             .test_request_response(
                 &write_attr(0, 0, var::CONFIG_VERSION, VSTR, b"2.0.0"),
-                &empty_response(0, IIN2_OBJECT_UNKNOWN),
+                &empty_response(0, iin2::OBJECT_UNKNOWN),
             )
             .await;
         harness.check_no_events();
@@ -440,7 +431,7 @@ async fn write_of_attribute_in_undefined_set_sets_parameter_error() {
         harness
             .test_request_response(
                 &write_attr(0, 5, 1, VSTR, b"new"),
-                &empty_response(0, IIN2_PARAMETER_ERROR),
+                &empty_response(0, iin2::PARAMETER_ERROR),
             )
             .await;
         harness.check_no_events();
@@ -459,7 +450,7 @@ async fn write_of_undefined_attribute_in_defined_set_sets_object_unknown() {
         harness
             .test_request_response(
                 &write_attr(0, 0, var::USER_ASSIGNED_ID, VSTR, b"new"),
-                &empty_response(0, IIN2_OBJECT_UNKNOWN),
+                &empty_response(0, iin2::OBJECT_UNKNOWN),
             )
             .await;
         harness.check_no_events();
@@ -479,7 +470,7 @@ async fn write_of_attribute_with_the_wrong_type_sets_parameter_error_and_keeps_t
         harness
             .test_request_response(
                 &write_attr(0, 0, var::USER_ASSIGNED_LOCATION, UINT, &[7]),
-                &empty_response(0, IIN2_PARAMETER_ERROR),
+                &empty_response(0, iin2::PARAMETER_ERROR),
             )
             .await;
         harness.check_no_events();
@@ -500,11 +491,7 @@ async fn write_location_with_application_answer(accept: bool, defer: bool) -> Ou
         data.defer_attr_writes = defer;
     }
 
-    let iin2 = if accept {
-        IIN2_NONE
-    } else {
-        IIN2_PARAMETER_ERROR
-    };
+    let iin2 = if accept { 0 } else { iin2::PARAMETER_ERROR };
     harness
         .test_request_response(
             &write_attr(0, 0, var::USER_ASSIGNED_LOCATION, VSTR, b"new"),
@@ -634,7 +621,7 @@ async fn writes_of_every_attribute_type_are_stored_and_read_back_in_the_smallest
             harness
                 .test_request_response(
                     &write_attr(seq, 1, variation, data_type, written),
-                    &empty_response(seq, IIN2_NONE),
+                    &empty_response(seq, 0),
                 )
                 .await;
             harness.check_events(&[Event::WriteDeviceAttr(AttrSet::Private(1), variation)]);

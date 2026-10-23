@@ -9,10 +9,8 @@ use crate::outstation::traits::RestartDelay;
 use crate::util::test_support::watchdog;
 
 const CLEAR_RESTART_IIN: &[u8] = &[0xC0, 0x02, 80, 1, 0x00, 7, 7, 0x00];
-const RESPONSE_NO_RESTART_IIN: &[u8] = &[0xC0, 0x81, 0x00, 0x00];
 const COLD_RESTART: &[u8] = &[0xC0, 13];
 const WARM_RESTART: &[u8] = &[0xC0, 14];
-const RESPONSE_NO_FUNCTION_SUPPORT: &[u8] = &[0xC0, 0x81, 0x80, 0x01];
 const RESPONSE_TIME_DELAY_FINE: &[u8] =
     &[0xC0, 0x81, 0x80, 0x00, 0x34, 0x02, 0x07, 0x01, 0xFE, 0xCA];
 const RESPONSE_TIME_DELAY_COARSE: &[u8] =
@@ -22,7 +20,7 @@ const RESPONSE_TIME_DELAY_COARSE: &[u8] =
 async fn can_clear_the_restart_iin_bit() {
     let mut harness = new_harness(get_default_config());
     harness
-        .test_request_response(CLEAR_RESTART_IIN, RESPONSE_NO_RESTART_IIN)
+        .test_request_response(CLEAR_RESTART_IIN, &solicited(0, false, 0, 0))
         .await;
     harness.check_events(&[Event::ClearRestartIIN])
 }
@@ -31,7 +29,7 @@ async fn can_clear_the_restart_iin_bit() {
 async fn handles_cold_restart_when_not_supported() {
     let mut harness = new_harness(get_default_config());
     harness
-        .test_request_response(COLD_RESTART, RESPONSE_NO_FUNCTION_SUPPORT)
+        .test_request_response(COLD_RESTART, &empty_response(0, iin2::NO_FUNC_CODE_SUPPORT))
         .await;
     harness.check_events(&[Event::ColdRestart(None)])
 }
@@ -61,7 +59,7 @@ async fn handles_cold_restart_when_supported_via_time_delay_coarse() {
 async fn handles_warm_restart_when_not_supported() {
     let mut harness = new_harness(get_default_config());
     harness
-        .test_request_response(WARM_RESTART, RESPONSE_NO_FUNCTION_SUPPORT)
+        .test_request_response(WARM_RESTART, &empty_response(0, iin2::NO_FUNC_CODE_SUPPORT))
         .await;
     harness.check_events(&[Event::WarmRestart(None)])
 }

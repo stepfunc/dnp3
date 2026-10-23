@@ -18,18 +18,6 @@ use crate::util::test_support::watchdog;
 
 use super::harness::*;
 
-const RESTART: u8 = 0x80;
-const BROADCAST: u8 = 0x01;
-const CLASS_1: u8 = 0x02;
-
-/// the binary event as g2v1
-const G2V1_EVENT: &[u8] = &[0x02, 0x01, 0x28, 0x01, 0x00, 0x00, 0x00, 0x81];
-
-/// DISABLE_UNSOLICITED of classes 1, 2 and 3 with sequence 1
-const DISABLE_UNSOLICITED_SEQ_1: &[u8] = &[
-    0xC1, 0x15, 0x3C, 0x02, 0x06, 0x3C, 0x03, 0x06, 0x3C, 0x04, 0x06,
-];
-
 /// send `request` to the broadcast address that doesn't require a confirm
 async fn send_broadcast(harness: &mut OutstationHarness, request: &[u8]) {
     harness.set_broadcast(Some(BroadcastConfirmMode::NotRequired));
@@ -43,7 +31,7 @@ async fn expect_broadcast_iin(harness: &mut OutstationHarness, seq: u8, iin1: u8
     harness
         .test_request_response(
             &record_current_time(seq),
-            &[0xC0 | seq, 0x81, BROADCAST | iin1, 0x00],
+            &solicited(seq, false, iin1::BROADCAST | iin1, 0),
         )
         .await;
     harness.check_no_events();
@@ -73,7 +61,7 @@ const CASES: &[Case] = &[
             Event::WriteAbsoluteTime(Timestamp::new(0x0177_DA0E_24C0)),
             processed(FunctionCode::Write),
         ],
-        iin1: RESTART,
+        iin1: iin1::RESTART,
     },
     // WRITE of IIN1.7 = 0, which clears the restart IIN
     Case {
@@ -90,7 +78,7 @@ const CASES: &[Case] = &[
             Event::Freeze(FreezeIndices::All, FreezeType::ImmediateFreeze),
             processed(FunctionCode::ImmediateFreezeNoResponse),
         ],
-        iin1: RESTART,
+        iin1: iin1::RESTART,
     },
     // FREEZE_CLEAR_NR of counters 0 to 10
     Case {
@@ -100,7 +88,7 @@ const CASES: &[Case] = &[
             Event::Freeze(FreezeIndices::Range(0, 10), FreezeType::FreezeAndClear),
             processed(FunctionCode::FreezeClearNoResponse),
         ],
-        iin1: RESTART,
+        iin1: iin1::RESTART,
     },
     // FREEZE_AT_TIME_NR of all counters
     Case {
@@ -119,7 +107,7 @@ const CASES: &[Case] = &[
             ),
             processed(FunctionCode::FreezeAtTimeNoResponse),
         ],
-        iin1: RESTART,
+        iin1: iin1::RESTART,
     },
     // IMMEDIATE_FREEZE_NR whose object header is cut short
     Case {
@@ -129,7 +117,7 @@ const CASES: &[Case] = &[
             FunctionCode::ImmediateFreezeNoResponse,
             BroadcastAction::BadObjectHeaders,
         )],
-        iin1: RESTART,
+        iin1: iin1::RESTART,
     },
     // IMMEDIATE_FREEZE_NR of all counters, with broadcast support disabled
     Case {
@@ -139,7 +127,7 @@ const CASES: &[Case] = &[
             FunctionCode::ImmediateFreezeNoResponse,
             BroadcastAction::IgnoredByConfiguration,
         )],
-        iin1: RESTART,
+        iin1: iin1::RESTART,
     },
 ];
 
@@ -172,7 +160,11 @@ async fn broadcast_enable_unsolicited_enables_the_classes() {
 
         harness.handle.database.transaction(add_binary_event);
         harness
-            .expect_response(&unsolicited(1, RESTART | BROADCAST, G2V1_EVENT))
+            .expect_response(&unsolicited(
+                1,
+                iin1::RESTART | iin1::BROADCAST,
+                &g2v1_events(0..1),
+            ))
             .await;
         harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
     })
@@ -186,14 +178,14 @@ async fn broadcast_disable_unsolicited_disables_the_classes() {
         confirm_null_unsolicited(&mut harness).await;
         enable_unsolicited(&mut harness).await;
 
-        send_broadcast(&mut harness, DISABLE_UNSOLICITED_SEQ_1).await;
+        send_broadcast(&mut harness, &disable_unsolicited(1, [true; 3])).await;
         harness.check_events(&[processed(FunctionCode::DisableUnsolicited)]);
 
         harness.handle.database.transaction(add_binary_event);
         tokio::time::sleep(Duration::from_secs(30)).await;
         harness.check_no_events();
 
-        expect_broadcast_iin(&mut harness, 2, RESTART | CLASS_1).await;
+        expect_broadcast_iin(&mut harness, 2, iin1::RESTART | iin1::CLASS_1).await;
     })
     .await;
 }

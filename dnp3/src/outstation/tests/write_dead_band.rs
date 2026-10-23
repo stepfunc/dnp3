@@ -7,8 +7,6 @@
 use crate::outstation::database::{Add, AnalogInputConfig, EventClass};
 use crate::outstation::tests::harness::*;
 
-const EMPTY_RESPONSE: &[u8] = &[0xC0, 0x81, 0x80, 0x00];
-
 #[tokio::test]
 async fn write_g34_var1() {
     let mut harness = new_harness(get_default_config());
@@ -21,7 +19,7 @@ async fn write_g34_var1() {
     harness
         .test_request_response(
             &[0xC0, 0x02, 0x22, 0x01, 0x17, 0x01, 0x03, 0xCA, 0xFE],
-            EMPTY_RESPONSE,
+            &empty_response(0, 0),
         )
         .await;
 
@@ -70,7 +68,7 @@ async fn write_g34_var3_accepts_infinity() {
     let mut harness = harness_with_analog_input();
 
     harness
-        .test_request_response(&write_g34_var3(f32::INFINITY), EMPTY_RESPONSE)
+        .test_request_response(&write_g34_var3(f32::INFINITY), &empty_response(0, 0))
         .await;
 
     harness.check_events(&[
@@ -91,7 +89,7 @@ async fn write_g34_var3_accepts_a_positive_subnormal_value() {
     let subnormal = f32::from_bits(1);
 
     harness
-        .test_request_response(&write_g34_var3(subnormal), EMPTY_RESPONSE)
+        .test_request_response(&write_g34_var3(subnormal), &empty_response(0, 0))
         .await;
 
     harness.check_events(&[
@@ -109,7 +107,7 @@ async fn write_g34_var3_stores_negative_values_as_zero() {
         let mut harness = harness_with_deadband(2.5);
 
         harness
-            .test_request_response(&write_g34_var3(value), EMPTY_RESPONSE)
+            .test_request_response(&write_g34_var3(value), &empty_response(0, 0))
             .await;
 
         harness.check_events(&[
@@ -146,7 +144,7 @@ async fn write_g34_var2() {
             &[
                 0xC0, 0x02, 0x22, 0x02, 0x17, 0x01, 0x03, 0x01, 0x02, 0x03, 0x04,
             ],
-            EMPTY_RESPONSE,
+            &empty_response(0, 0),
         )
         .await;
 
@@ -177,7 +175,9 @@ async fn write_g34_with_two_byte_count_and_prefix() {
     let values = [f64::from(0xFECAu16), f64::from(0x04030201u32), 2.5];
 
     for (request, value) in requests.into_iter().zip(values) {
-        harness.test_request_response(request, EMPTY_RESPONSE).await;
+        harness
+            .test_request_response(request, &empty_response(0, 0))
+            .await;
 
         harness.check_events(&[
             Event::BeginWriteDeadBands,
@@ -253,7 +253,7 @@ async fn write_g34_with_every_subset_level_4_qualifier() {
             });
 
             harness
-                .test_request_response(&request, EMPTY_RESPONSE)
+                .test_request_response(&request, &empty_response(0, 0))
                 .await;
 
             harness.check_events(&[

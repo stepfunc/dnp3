@@ -16,7 +16,6 @@ use crate::outstation::config::OutstationConfig;
 use crate::outstation::database::*;
 use crate::outstation::tests::harness::*;
 
-const EMPTY_RESPONSE_SEQ0: &[u8] = &[0xC0, 0x81, 0x80, 0x00];
 const UNSOL_G2V1_SEQ1: &[u8] = &[
     0xF1, 0x82, 0x80, 0x00, 0x02, 0x01, 0x28, 0x01, 0x00, 0x00, 0x00, 0x81,
 ];
@@ -31,9 +30,6 @@ const READ_CLASS_0: &[u8] = &[0x3C, 0x01, 0x06];
 const READ_CLASS_1: &[u8] = &[0x3C, 0x02, 0x06];
 /// g0v254 (all attributes), 8-bit start/stop, set 0
 const READ_ALL_ATTRIBUTES_SET_0: &[u8] = &[0x00, 0xFE, 0x00, 0x00, 0x00];
-
-const IIN2_NONE: u8 = 0x00;
-const IIN2_PARAMETER_ERROR: u8 = 0x04;
 
 fn config_with_max_read_headers(max: Option<u16>) -> OutstationConfig {
     let mut config = get_default_config();
@@ -60,7 +56,7 @@ fn add_binary_0(database: &mut Database) {
 
 /// the response to a READ of binary input 0 that reports it `reported` times
 fn binary_0_response(reported: usize, iin2: u8) -> Vec<u8> {
-    let mut response = vec![0xC0, 0x81, 0x80, iin2];
+    let mut response = empty_response(0, iin2).to_vec();
     for _ in 0..reported {
         response.extend_from_slice(BINARY_0_VALUE);
     }
@@ -81,7 +77,7 @@ async fn test_binary_0_reads(config: OutstationConfig, count: usize, reported: u
 #[tokio::test]
 async fn read_with_the_default_header_limit_has_no_error() {
     let max = usize::from(OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS);
-    test_binary_0_reads(config_with_max_read_headers(None), max, max, IIN2_NONE).await;
+    test_binary_0_reads(config_with_max_read_headers(None), max, max, 0).await;
 }
 
 #[tokio::test]
@@ -91,19 +87,19 @@ async fn read_past_the_default_header_limit_sets_parameter_error() {
         config_with_max_read_headers(None),
         max + 1,
         max,
-        IIN2_PARAMETER_ERROR,
+        iin2::PARAMETER_ERROR,
     )
     .await;
 }
 
 #[tokio::test]
 async fn read_header_limit_follows_the_configured_value() {
-    test_binary_0_reads(config_with_max_read_headers(Some(100)), 100, 100, IIN2_NONE).await;
+    test_binary_0_reads(config_with_max_read_headers(Some(100)), 100, 100, 0).await;
     test_binary_0_reads(
         config_with_max_read_headers(Some(100)),
         101,
         100,
-        IIN2_PARAMETER_ERROR,
+        iin2::PARAMETER_ERROR,
     )
     .await;
 }
@@ -111,12 +107,12 @@ async fn read_header_limit_follows_the_configured_value() {
 #[tokio::test]
 async fn read_header_limit_below_the_default_uses_the_default() {
     let max = usize::from(OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS);
-    test_binary_0_reads(config_with_max_read_headers(Some(10)), max, max, IIN2_NONE).await;
+    test_binary_0_reads(config_with_max_read_headers(Some(10)), max, max, 0).await;
     test_binary_0_reads(
         config_with_max_read_headers(Some(10)),
         max + 1,
         max,
-        IIN2_PARAMETER_ERROR,
+        iin2::PARAMETER_ERROR,
     )
     .await;
 }
@@ -138,8 +134,8 @@ async fn class_0_read_iin2(count: usize) -> u8 {
 #[tokio::test]
 async fn class_0_read_uses_a_static_selection_per_installed_type() {
     // two installed types, so 32 class 0 headers use all 64 static selections
-    assert_eq!(class_0_read_iin2(32).await, IIN2_NONE);
-    assert_eq!(class_0_read_iin2(33).await, IIN2_PARAMETER_ERROR);
+    assert_eq!(class_0_read_iin2(32).await, 0);
+    assert_eq!(class_0_read_iin2(33).await, iin2::PARAMETER_ERROR);
 }
 
 #[tokio::test]
@@ -147,7 +143,7 @@ async fn read_of_event_classes_past_the_header_limit_has_no_error() {
     let mut harness = new_harness(get_default_config());
     let count = usize::from(OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS) + 1;
     harness
-        .test_request_response(&read_request(READ_CLASS_1, count), EMPTY_RESPONSE_SEQ0)
+        .test_request_response(&read_request(READ_CLASS_1, count), &empty_response(0, 0))
         .await;
 }
 
@@ -160,7 +156,7 @@ async fn deferred_read_iin2(max_read_headers: Option<u16>, header: &[u8], count:
     harness.expect_response(&null_unsolicited(0)).await;
     harness.send_and_process(&unsolicited_confirm(0)).await;
     harness
-        .test_request_response(ENABLE_UNSOLICITED_SEQ_0, EMPTY_RESPONSE_SEQ0)
+        .test_request_response(ENABLE_UNSOLICITED_SEQ_0, &empty_response(0, 0))
         .await;
     harness.handle.database.transaction(add_binary_event);
     harness.expect_response(UNSOL_G2V1_SEQ1).await;
@@ -186,35 +182,26 @@ async fn deferred_read_iin2(max_read_headers: Option<u16>, header: &[u8], count:
 #[tokio::test]
 async fn deferred_read_with_the_default_header_limit_has_no_error() {
     let max = usize::from(OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS);
-    assert_eq!(
-        deferred_read_iin2(None, READ_BINARY_0, max).await,
-        IIN2_NONE
-    );
+    assert_eq!(deferred_read_iin2(None, READ_BINARY_0, max).await, 0);
 }
 
 #[tokio::test]
 async fn deferred_read_with_the_configured_header_limit_has_no_error() {
-    assert_eq!(
-        deferred_read_iin2(Some(100), READ_BINARY_0, 100).await,
-        IIN2_NONE
-    );
+    assert_eq!(deferred_read_iin2(Some(100), READ_BINARY_0, 100).await, 0);
 }
 
 #[tokio::test]
 async fn deferred_read_past_the_configured_header_limit_sets_parameter_error() {
     assert_eq!(
         deferred_read_iin2(Some(100), READ_BINARY_0, 101).await,
-        IIN2_PARAMETER_ERROR
+        iin2::PARAMETER_ERROR
     );
 }
 
 #[tokio::test]
 async fn deferred_read_header_limit_below_the_default_uses_the_default() {
     let max = usize::from(OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS);
-    assert_eq!(
-        deferred_read_iin2(Some(10), READ_BINARY_0, max).await,
-        IIN2_NONE
-    );
+    assert_eq!(deferred_read_iin2(Some(10), READ_BINARY_0, max).await, 0);
 }
 
 #[tokio::test]
@@ -222,14 +209,14 @@ async fn deferred_read_past_the_default_when_configured_below_it_sets_parameter_
     let max = usize::from(OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS);
     assert_eq!(
         deferred_read_iin2(Some(10), READ_BINARY_0, max + 1).await,
-        IIN2_PARAMETER_ERROR
+        iin2::PARAMETER_ERROR
     );
 }
 
 #[tokio::test]
 async fn deferred_read_of_event_classes_at_the_header_limit_has_no_error() {
     let max = usize::from(OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS);
-    assert_eq!(deferred_read_iin2(None, READ_CLASS_1, max).await, IIN2_NONE);
+    assert_eq!(deferred_read_iin2(None, READ_CLASS_1, max).await, 0);
 }
 
 #[tokio::test]
@@ -237,7 +224,7 @@ async fn deferred_read_header_limit_counts_event_class_headers() {
     let max = usize::from(OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS);
     assert_eq!(
         deferred_read_iin2(None, READ_CLASS_1, max + 1).await,
-        IIN2_PARAMETER_ERROR
+        iin2::PARAMETER_ERROR
     );
 }
 
@@ -256,7 +243,7 @@ const SERIAL_NUMBER: &[u8] = &[0x00, 0xF8, 0x00, 0x00, 0x00, 0x01, 0x01, b'S'];
 async fn test_attribute_reads(config: OutstationConfig, count: usize, reported: usize, iin2: u8) {
     let mut harness = new_harness(config);
     harness.handle.database.transaction(define_serial_number);
-    let mut response = vec![0xC0, 0x81, 0x80, iin2];
+    let mut response = empty_response(0, iin2).to_vec();
     for _ in 0..reported {
         response.extend_from_slice(SERIAL_NUMBER);
     }
@@ -267,12 +254,12 @@ async fn test_attribute_reads(config: OutstationConfig, count: usize, reported: 
 
 #[tokio::test]
 async fn read_of_32_attribute_selections_has_no_error() {
-    test_attribute_reads(get_default_config(), 32, 32, IIN2_NONE).await;
+    test_attribute_reads(get_default_config(), 32, 32, 0).await;
 }
 
 #[tokio::test]
 async fn read_of_33_attribute_selections_sets_parameter_error() {
-    test_attribute_reads(get_default_config(), 33, 32, IIN2_PARAMETER_ERROR).await;
+    test_attribute_reads(get_default_config(), 33, 32, iin2::PARAMETER_ERROR).await;
 }
 
 #[tokio::test]
@@ -281,7 +268,7 @@ async fn attribute_selection_limit_does_not_follow_the_header_limit() {
         config_with_max_read_headers(Some(100)),
         33,
         32,
-        IIN2_PARAMETER_ERROR,
+        iin2::PARAMETER_ERROR,
     )
     .await;
 }
@@ -336,7 +323,7 @@ async fn static_values_that_exactly_fill_a_fragment_are_sent_in_one() {
         .database
         .transaction(add_binary_inputs(count));
 
-    let mut response = vec![0xC0, 0x81, 0x80, 0x00];
+    let mut response = empty_response(0, 0).to_vec();
     response.extend(g1v2_restart_values(0, count));
     assert_eq!(response.len(), <BufferSize>::MIN);
     harness
@@ -399,7 +386,7 @@ async fn attributes_that_exactly_fill_a_fragment_are_sent_in_one() {
         .database
         .transaction(define_two_strings(&serial, &product));
 
-    let mut response = vec![0xC0, 0x81, 0x80, 0x00];
+    let mut response = empty_response(0, 0).to_vec();
     response.extend(encode_string(var::DEVICE_SERIAL_NUMBER, &serial));
     response.extend(encode_string(var::PRODUCT_NAME_AND_MODEL, &product));
     assert_eq!(response.len(), <BufferSize>::MIN);

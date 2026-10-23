@@ -11,8 +11,6 @@ use crate::outstation::tests::harness::*;
 
 const EMPTY_READ: &[u8] = &[0xC0, 0x01];
 const READ_CLASS_123: &[u8] = &[0xC0, 0x01, 60, 2, 0x06, 60, 3, 0x06, 60, 4, 0x06];
-const EMPTY_RESPONSE: &[u8] = &[0xC0, 0x81, 0x80, 0x00];
-const EMPTY_RESPONSE_WITH_PENDING_EVENTS: &[u8] = &[0xC0, 0x81, 0x82, 0x00];
 const BINARY_EVENT_RESPONSE: &[u8] = &[
     0xE0, 0x81, 0x80, 0x00, 0x02, 0x01, 0x28, 0x01, 0x00, 0x00, 0x00, 0x81,
 ];
@@ -45,7 +43,7 @@ fn create_five_binary_inputs_with_odd_indices_true(database: &mut Database) {
 async fn empty_read_yields_empty_response() {
     let mut harness = new_harness(get_default_config());
     harness
-        .test_request_response(EMPTY_READ, EMPTY_RESPONSE)
+        .test_request_response(EMPTY_READ, &empty_response(0, 0))
         .await;
 }
 
@@ -161,7 +159,10 @@ async fn re_arms_unconfirmed_events_after_link_drop() {
     // the unconfirmed event is re-armed: advertised as pending in the class IIN, but NOT
     // dumped into this unrelated (empty) read
     harness
-        .test_request_response(EMPTY_READ, EMPTY_RESPONSE_WITH_PENDING_EVENTS)
+        .test_request_response(
+            EMPTY_READ,
+            &solicited(0, false, iin1::RESTART | iin1::CLASS_1, 0),
+        )
         .await;
 
     // ...and re-reported when its class is read
@@ -208,12 +209,12 @@ async fn discards_unselected_events_on_demand_after_link_drop() {
 
     // no pending events advertised in the class IIN...
     harness
-        .test_request_response(EMPTY_READ, EMPTY_RESPONSE)
+        .test_request_response(EMPTY_READ, &empty_response(0, 0))
         .await;
 
     // ...and nothing re-reported when its class is read
     harness
-        .test_request_response(READ_CLASS_123, EMPTY_RESPONSE)
+        .test_request_response(READ_CLASS_123, &empty_response(0, 0))
         .await;
     harness.check_no_events();
 }

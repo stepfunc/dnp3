@@ -10,16 +10,12 @@ use crate::outstation::tests::harness::*;
 use crate::outstation::{FreezeIndices, FreezeInterval, FreezeType};
 use crate::util::test_support::watchdog;
 
-const EMPTY_RESPONSE: &[u8] = &[0xC0, 0x81, 0x80, 0x00];
-const EMPTY_RESPONSE_PARAM_ERROR: &[u8] = &[0xC0, 0x81, 0x80, 0x04];
-const EMPTY_RESPONSE_OBJECT_UNKNOWN: &[u8] = &[0xC0, 0x81, 0x80, 0x02];
-
 #[tokio::test]
 async fn immediate_freeze_all_counters() {
     let mut harness = new_harness(get_default_config());
 
     harness
-        .test_request_response(&[0xC0, 0x07, 20, 0, 0x06], EMPTY_RESPONSE)
+        .test_request_response(&[0xC0, 0x07, 20, 0, 0x06], &empty_response(0, 0))
         .await;
 
     harness.check_events(&[Event::Freeze(
@@ -33,7 +29,7 @@ async fn immediate_freeze_range_of_counters() {
     let mut harness = new_harness(get_default_config());
 
     harness
-        .test_request_response(&[0xC0, 0x07, 20, 0, 0x00, 0, 10], EMPTY_RESPONSE)
+        .test_request_response(&[0xC0, 0x07, 20, 0, 0x00, 0, 10], &empty_response(0, 0))
         .await;
 
     harness.check_events(&[Event::Freeze(
@@ -73,7 +69,7 @@ async fn freeze_and_clear_all_counters() {
     let mut harness = new_harness(get_default_config());
 
     harness
-        .test_request_response(&[0xC0, 0x09, 20, 0, 0x06], EMPTY_RESPONSE)
+        .test_request_response(&[0xC0, 0x09, 20, 0, 0x06], &empty_response(0, 0))
         .await;
 
     harness.check_events(&[Event::Freeze(
@@ -87,7 +83,7 @@ async fn freeze_and_clear_range_of_counters() {
     let mut harness = new_harness(get_default_config());
 
     harness
-        .test_request_response(&[0xC0, 0x09, 20, 0, 0x00, 0, 10], EMPTY_RESPONSE)
+        .test_request_response(&[0xC0, 0x09, 20, 0, 0x00, 0, 10], &empty_response(0, 0))
         .await;
 
     harness.check_events(&[Event::Freeze(
@@ -129,7 +125,7 @@ async fn freeze_invalid_object() {
     harness
         .test_request_response(
             &[0xC0, 0x07, 22, 0, 0x06, 20, 0, 0x06],
-            EMPTY_RESPONSE_OBJECT_UNKNOWN,
+            &empty_response(0, iin2::OBJECT_UNKNOWN),
         )
         .await;
 
@@ -144,7 +140,10 @@ async fn freeze_at_time_without_g50v1() {
     let mut harness = new_harness(get_default_config());
 
     harness
-        .test_request_response(&[0xC0, 0x0B, 20, 0, 0x06], EMPTY_RESPONSE_PARAM_ERROR)
+        .test_request_response(
+            &[0xC0, 0x0B, 20, 0, 0x06],
+            &empty_response(0, iin2::PARAMETER_ERROR),
+        )
         .await;
 
     harness.check_no_events();
@@ -160,7 +159,7 @@ async fn freeze_at_time() {
                 0xC0, 0x0B, 0x32, 0x02, 0x07, 0x01, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0xAA, 0xBB,
                 0xCC, 0xDD, 20, 0, 0x06,
             ],
-            EMPTY_RESPONSE,
+            &empty_response(0, 0),
         )
         .await;
 
@@ -202,7 +201,7 @@ async fn immediate_freeze_two_byte_range_of_counters() {
     harness
         .test_request_response(
             &[0xC0, 0x07, 20, 0, 0x01, 0x00, 0x01, 0x10, 0x01],
-            EMPTY_RESPONSE,
+            &empty_response(0, 0),
         )
         .await;
 
@@ -223,7 +222,7 @@ async fn freeze_at_time_with_two_byte_count() {
                 0xC0, 0x0B, 0x32, 0x02, 0x08, 0x01, 0x00, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0xAA,
                 0xBB, 0xCC, 0xDD, 20, 0, 0x00, 3, 4,
             ],
-            EMPTY_RESPONSE,
+            &empty_response(0, 0),
         )
         .await;
 
@@ -273,7 +272,7 @@ async fn freeze_at_time_with_two_time_and_interval_objects_sets_parameter_error(
                     0xCC, 0xDD, 0xFF, 0x00, 0x00, 0x00, 0x00, 0x00, 0xAA, 0xBB, 0xCC, 0xDD, 20, 0,
                     0x06,
                 ],
-                EMPTY_RESPONSE_PARAM_ERROR,
+                &empty_response(0, iin2::PARAMETER_ERROR),
             )
             .await;
 

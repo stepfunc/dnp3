@@ -93,11 +93,6 @@ async fn operate_is_accepted_at_the_select_timeout_and_rejected_one_millisecond_
 /// long enough for any timer the outstation could have set to expire many times over
 const LONG_IDLE: Duration = Duration::from_secs(4 * 60 * 60);
 
-fn without_keep_alive(mut config: OutstationConfig) -> OutstationConfig {
-    config.keep_alive_timeout = None;
-    config
-}
-
 #[tokio::test(start_paused = true)]
 async fn outstation_without_keep_alive_sends_nothing_while_idle_and_still_answers() {
     watchdog(async {
