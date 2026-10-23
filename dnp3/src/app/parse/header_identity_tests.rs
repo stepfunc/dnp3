@@ -4,9 +4,9 @@
 // Text and data mining rights, including for AI training, are reserved under
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
-//! Pins the identity of object headers outside a READ request: which variations each qualifier
-//! accepts, the variation and qualifier of each parsed header, and the error for each header the
-//! parser rejects or that is truncated
+//! Pins the identity of object headers: which variations each qualifier accepts, in a READ request
+//! and outside one, the variation and qualifier of each parsed header, and the error for each
+//! header the parser rejects or that is truncated
 //!
 //! Each header names one object (a range of index 0, or a count of 1) and its payload is found by
 //! trying zero-filled payloads of increasing length, so the probe needs no table of object sizes.
@@ -169,7 +169,8 @@ fn probe(
     Probe::Rejected(last)
 }
 
-/// The variations of each group, outside groups 0, 110 and 111, that an all-objects header accepts
+/// The variations of each group, outside groups 0, 110 and 111, that an all-objects header accepts,
+/// in a READ or outside one
 const ALL_OBJECTS: &[(u8, &[u8])] = &[
     (1, &[0, 1, 2]),
     (2, &[0, 1, 2, 3]),
@@ -195,7 +196,7 @@ const ALL_OBJECTS: &[(u8, &[u8])] = &[
     (102, &[0, 1]),
 ];
 
-/// The same for a range header of either width
+/// The same for a range header of either width, in a READ or outside one
 const RANGE: &[(u8, &[u8])] = &[
     (1, &[0, 1, 2]),
     (3, &[0, 1, 2]),
@@ -210,7 +211,7 @@ const RANGE: &[(u8, &[u8])] = &[
     (102, &[0, 1]),
 ];
 
-/// The same for a count header of either width
+/// The same for a count header of either width outside a READ
 const COUNT: &[(u8, &[u8])] = &[(50, &[1, 2, 3, 4]), (51, &[1, 2]), (52, &[1, 2])];
 
 /// The variations that a READ counts but that have no objects to follow a count outside a READ:
@@ -376,6 +377,79 @@ fn headers_in_one_fragment_each_carry_their_variation_and_qualifier() {
             let expected: Vec<(Variation, QualifierCode)> =
                 accepted.iter().map(|(v, q, _)| (*v, *q)).collect();
             assert_eq!(actual, expected);
+        }
+    }
+}
+
+/// The same for a count header of either width in a READ, which has no objects to follow the count
+const READ_COUNT: &[(u8, &[u8])] = &[
+    (2, &[0, 1, 2, 3]),
+    (4, &[0, 1, 2, 3]),
+    (11, &[0, 1, 2]),
+    (13, &[1, 2]),
+    (22, &[0, 1, 2, 5, 6]),
+    (23, &[0, 1, 2, 5, 6]),
+    (32, &[0, 1, 2, 3, 4, 5, 6, 7, 8]),
+    (33, &[0, 1, 2, 3, 4, 5, 6, 7, 8]),
+    (42, &[0, 1, 2, 3, 4, 5, 6, 7, 8]),
+    (43, &[1, 2, 3, 4, 5, 6, 7, 8]),
+    (50, &[1, 2, 3, 4]),
+    (51, &[1, 2]),
+    (52, &[1, 2]),
+    (60, &[2, 3, 4]),
+];
+
+/// The kinds of qualifier in a READ, which accept different variations
+#[derive(Clone, Copy, Debug)]
+pub(crate) enum ReadKind {
+    AllObjects,
+    Range,
+    Count,
+}
+
+/// The qualifiers of headers in a READ, with their kind
+const READ_QUALIFIERS: [(QualifierCode, ReadKind); 5] = [
+    (Q::AllObjects, ReadKind::AllObjects),
+    (Q::Range8, ReadKind::Range),
+    (Q::Range16, ReadKind::Range),
+    (Q::Count8, ReadKind::Count),
+    (Q::Count16, ReadKind::Count),
+];
+
+/// true if a READ accepts the variation with this kind of qualifier, written out independently of
+/// the parser
+pub(crate) fn read_accepts(kind: ReadKind, variation: Variation) -> bool {
+    let (group, var) = variation.to_group_and_var();
+    let table = match (kind, group) {
+        (ReadKind::Count, 0) => return false,
+        (_, 0) => return true,
+        (ReadKind::AllObjects, 110 | 111) | (ReadKind::Range, 110) => return var == 0,
+        (ReadKind::Count, 111) => return true,
+        (_, 110 | 111) => return false,
+        (ReadKind::AllObjects, _) => ALL_OBJECTS,
+        (ReadKind::Range, _) => RANGE,
+        (ReadKind::Count, _) => READ_COUNT,
+    };
+    table
+        .iter()
+        .any(|(g, vars)| *g == group && vars.contains(&var))
+}
+
+#[test]
+fn each_read_qualifier_accepts_these_variations() {
+    for options in OPTIONS {
+        for (qualifier, kind) in READ_QUALIFIERS {
+            for variation in Variation::all() {
+                let bytes = prefix(variation, qualifier);
+                let actual = HeaderCollection::parse(options, FunctionCode::Read, &bytes)
+                    .map(|headers| headers.iter().count());
+                let expected = if read_accepts(kind, variation) {
+                    Ok(1)
+                } else {
+                    Err(E::InvalidQualifierForVariation(variation, qualifier))
+                };
+                assert_eq!(actual, expected, "{options:?} {variation:?} {qualifier:?}");
+            }
         }
     }
 }

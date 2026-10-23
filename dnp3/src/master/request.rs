@@ -1288,6 +1288,7 @@ mod tests {
     mod round_trip {
         use super::*;
         use crate::app::gen::count::CountVariation;
+        use crate::app::parse::header_identity_tests::{read_accepts, ReadKind};
         use crate::app::parse::parser::{ReadQualifier, Width};
         use crate::app::{ObjectParseError, QualifierCode};
 
@@ -1404,97 +1405,14 @@ mod tests {
             parsed
         }
 
-        /// The kinds of READ qualifier, which accept different variations
-        #[derive(Clone, Copy, Debug)]
-        enum Kind {
-            AllObjects,
-            Range,
-            Count,
-        }
-
         impl Qualifier {
-            fn kind(self) -> Kind {
+            fn kind(self) -> ReadKind {
                 match self {
-                    Qualifier::AllObjects => Kind::AllObjects,
-                    Qualifier::Range8(..) | Qualifier::Range16(..) => Kind::Range,
-                    Qualifier::Count8(_) | Qualifier::Count16(_) => Kind::Count,
+                    Qualifier::AllObjects => ReadKind::AllObjects,
+                    Qualifier::Range8(..) | Qualifier::Range16(..) => ReadKind::Range,
+                    Qualifier::Count8(_) | Qualifier::Count16(_) => ReadKind::Count,
                 }
             }
-        }
-
-        // The variations of each group that a READ accepts with each kind of qualifier, written
-        // out independently of the parser. Groups 0, 110 and 111 are in `read_accepts`.
-        const ALL_OBJECTS: &[(u8, &[u8])] = &[
-            (1, &[0, 1, 2]),
-            (2, &[0, 1, 2, 3]),
-            (3, &[0, 1, 2]),
-            (4, &[0, 1, 2, 3]),
-            (10, &[0, 1, 2]),
-            (11, &[0, 1, 2]),
-            (13, &[1, 2]),
-            (20, &[0, 1, 2, 5, 6]),
-            (21, &[0, 1, 2, 5, 6, 9, 10]),
-            (22, &[0, 1, 2, 5, 6]),
-            (23, &[0, 1, 2, 5, 6]),
-            (30, &[0, 1, 2, 3, 4, 5, 6]),
-            (31, &[0, 1, 2, 3, 4, 5, 6, 7, 8]),
-            (32, &[0, 1, 2, 3, 4, 5, 6, 7, 8]),
-            (33, &[0, 1, 2, 3, 4, 5, 6, 7, 8]),
-            (34, &[0, 1, 2, 3]),
-            (40, &[0, 1, 2, 3, 4]),
-            (42, &[0, 1, 2, 3, 4, 5, 6, 7, 8]),
-            (43, &[1, 2, 3, 4, 5, 6, 7, 8]),
-            (60, &[1, 2, 3, 4]),
-            (80, &[1]),
-            (102, &[0, 1]),
-        ];
-
-        const RANGE: &[(u8, &[u8])] = &[
-            (1, &[0, 1, 2]),
-            (3, &[0, 1, 2]),
-            (10, &[0, 1, 2]),
-            (20, &[0, 1, 2, 5, 6]),
-            (21, &[0, 1, 2, 5, 6, 9, 10]),
-            (30, &[0, 1, 2, 3, 4, 5, 6]),
-            (31, &[0, 1, 2, 3, 4, 5, 6, 7, 8]),
-            (34, &[0, 1, 2, 3]),
-            (40, &[0, 1, 2, 3, 4]),
-            (80, &[1]),
-            (102, &[0, 1]),
-        ];
-
-        const COUNT: &[(u8, &[u8])] = &[
-            (2, &[0, 1, 2, 3]),
-            (4, &[0, 1, 2, 3]),
-            (11, &[0, 1, 2]),
-            (13, &[1, 2]),
-            (22, &[0, 1, 2, 5, 6]),
-            (23, &[0, 1, 2, 5, 6]),
-            (32, &[0, 1, 2, 3, 4, 5, 6, 7, 8]),
-            (33, &[0, 1, 2, 3, 4, 5, 6, 7, 8]),
-            (42, &[0, 1, 2, 3, 4, 5, 6, 7, 8]),
-            (43, &[1, 2, 3, 4, 5, 6, 7, 8]),
-            (50, &[1, 2, 3, 4]),
-            (51, &[1, 2]),
-            (52, &[1, 2]),
-            (60, &[2, 3, 4]),
-        ];
-
-        /// true if a READ accepts the defined variation with this kind of qualifier
-        fn read_accepts(kind: Kind, (group, var): (u8, u8)) -> bool {
-            let table = match (kind, group) {
-                (Kind::Count, 0) => return false,
-                (_, 0) => return true,
-                (Kind::AllObjects, 110 | 111) | (Kind::Range, 110) => return var == 0,
-                (Kind::Count, 111) => return true,
-                (_, 110 | 111) => return false,
-                (Kind::AllObjects, _) => ALL_OBJECTS,
-                (Kind::Range, _) => RANGE,
-                (Kind::Count, _) => COUNT,
-            };
-            table
-                .iter()
-                .any(|(g, vars)| *g == group && vars.contains(&var))
         }
 
         /// what the outstation should parse from the header alone
@@ -1502,7 +1420,7 @@ mod tests {
             let ((group, var), qualifier) = *header;
             match Variation::lookup(group, var) {
                 None => Err(ObjectParseError::UnknownGroupVariation(group, var)),
-                Some(_) if read_accepts(qualifier.kind(), (group, var)) => Ok(*header),
+                Some(variation) if read_accepts(qualifier.kind(), variation) => Ok(*header),
                 Some(variation) => Err(ObjectParseError::InvalidQualifierForVariation(
                     variation,
                     qualifier.code(),
@@ -1523,9 +1441,9 @@ mod tests {
         }
 
         /// a variation a READ accepts with this kind of qualifier, or less often, one it doesn't
-        fn variation(kind: Kind) -> impl Strategy<Value = Variation> {
+        fn variation(kind: ReadKind) -> impl Strategy<Value = Variation> {
             let (accepted, rejected): (Vec<Variation>, Vec<Variation>) =
-                Variation::all().partition(|v| read_accepts(kind, v.to_group_and_var()));
+                Variation::all().partition(|v| read_accepts(kind, *v));
             prop_oneof![
                 3 => one_of(accepted),
                 1 => one_of(rejected),
@@ -1558,15 +1476,15 @@ mod tests {
 
         fn read_header() -> impl Strategy<Value = ReadHeader> {
             prop_oneof![
-                (variation(Kind::Range), range(u8::MAX))
+                (variation(ReadKind::Range), range(u8::MAX))
                     .prop_map(|(v, (start, stop))| { ReadHeader::one_byte_range(v, start, stop) }),
-                (variation(Kind::Range), range(u16::MAX))
+                (variation(ReadKind::Range), range(u16::MAX))
                     .prop_map(|(v, (start, stop))| { ReadHeader::two_byte_range(v, start, stop) }),
-                variation(Kind::AllObjects).prop_map(ReadHeader::all_objects),
-                (variation(Kind::Count), count(vec![0, 1, u8::MAX]))
+                variation(ReadKind::AllObjects).prop_map(ReadHeader::all_objects),
+                (variation(ReadKind::Count), count(vec![0, 1, u8::MAX]))
                     .prop_map(|(v, count)| ReadHeader::one_byte_limited_count(v, count)),
                 (
-                    variation(Kind::Count),
+                    variation(ReadKind::Count),
                     count(vec![0, 1, 255, 256, u16::MAX])
                 )
                     .prop_map(|(v, count)| ReadHeader::two_byte_limited_count(v, count)),
