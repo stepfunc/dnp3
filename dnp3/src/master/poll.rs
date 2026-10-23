@@ -22,6 +22,8 @@ pub(crate) struct Poll {
     period: Duration,
     /// Next instant to send the request (`None` if it was just created)
     next: Option<Instant>,
+    /// How many times the poll was demanded, so a run can tell if it was demanded meanwhile
+    demands: u64,
 }
 
 /// Map of all the polls of an association
@@ -101,9 +103,13 @@ impl PollMap {
         }
     }
 
-    pub(crate) fn complete(&mut self, id: u64) {
-        if let Some(x) = self.polls.get_mut(&id) {
-            x.reset_next()
+    /// Schedule the poll after `run` completes: one period later, or at once if it was demanded
+    /// while it ran
+    pub(crate) fn complete(&mut self, run: &Poll) {
+        if let Some(x) = self.polls.get_mut(&run.id) {
+            if x.demands == run.demands {
+                x.reset_next()
+            }
         }
     }
 
@@ -134,6 +140,7 @@ impl Poll {
             request,
             period,
             next: Instant::now().checked_add(period),
+            demands: 0,
         }
     }
 
@@ -144,6 +151,7 @@ impl Poll {
             request,
             period,
             next: None,
+            demands: 0,
         }
     }
 
@@ -158,6 +166,7 @@ impl Poll {
 
     pub(crate) fn demand(&mut self) {
         self.next = Some(Instant::now());
+        self.demands = self.demands.wrapping_add(1);
     }
 
     pub(crate) fn reset_next(&mut self) {
@@ -232,6 +241,8 @@ impl PollHandle {
     }
 
     /// Flag the poll for immediate execution prior to its period elapsing
+    ///
+    /// If the poll is running, it runs again as soon as that run completes.
     pub async fn demand(&mut self) -> Result<(), Shutdown> {
         self.association
             .send_poll_message(PollMsg::Demand(self.id))

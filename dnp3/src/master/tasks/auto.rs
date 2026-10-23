@@ -77,6 +77,13 @@ impl ResponseTask for AutoTask {
             tracing::warn!("ignoring object headers in reply to {}", self.description());
         }
 
+        if matches!(self, AutoTask::ClearRestartBit)
+            && response.header.iin.iin1.get_device_restart()
+        {
+            tracing::warn!("device failed to clear restart IIN bit");
+            return Err(TaskError::UnexpectedResponseHeaders);
+        }
+
         Ok(Step::Done(response.header.iin))
     }
 

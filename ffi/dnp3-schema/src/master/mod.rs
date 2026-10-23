@@ -365,6 +365,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
             doc("Demand the immediate execution of a poll previously created with {class:master_channel.add_poll()}.")
                 .details("This method returns immediately. The result will be sent to the registered {interface:read_handler}.")
                 .details("This method resets the internal timer of the poll.")
+                .details("If the poll is running, it runs again as soon as that run completes.")
         )?
         .build()?;
 
@@ -1078,6 +1079,10 @@ fn define_association_information(
     let task_error = lib
         .define_enum("task_error")?
         .add_task_errors()?
+        .push(
+            "system_time_not_available",
+            "the master had no system time to synchronize the outstation with, because {interface:association_handler.get_current_time()} returned an invalid timestamp",
+        )?
         .doc("Task error used in {interface:association_information}")?
         .build()?;
 

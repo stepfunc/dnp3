@@ -11,7 +11,7 @@ use crate::master::error::{TaskError, TimeSyncError};
 use crate::master::promise::Promise;
 use crate::master::request::TimeSyncProcedure;
 use crate::master::tasks::empty_response::expect_empty;
-use crate::master::tasks::{AppTask, NonReadTask, ResponseTask, Step, Task};
+use crate::master::tasks::{AppTask, NonReadTask, RequestError, ResponseTask, Step, Task};
 use crate::master::TaskType;
 
 use tokio::time::Instant;
@@ -86,12 +86,24 @@ impl PendingTimeSync {
         match state {
             Some(state) => Some(TimeSyncTask::new(state, self.requester)),
             None => {
-                self.requester.complete(
-                    Some(association),
-                    Err(TimeSyncError::SystemTimeNotAvailable),
-                );
+                let err = TimeSyncError::SystemTimeNotAvailable;
+                if matches!(self.requester, Requester::Auto) {
+                    let seq = association.seq();
+                    association.notify_task_start(TaskType::TimeSync, self.first_function(), seq);
+                    association.notify_task_fail(TaskType::TimeSync, err.task_error());
+                }
+                self.requester.complete(Some(association), Err(err));
                 None
             }
+        }
+    }
+
+    /// The function of the first request
+    fn first_function(&self) -> FunctionCode {
+        match self.procedure {
+            TimeSyncProcedure::NonLan => FunctionCode::DelayMeasure,
+            TimeSyncProcedure::Lan => FunctionCode::RecordCurrentTime,
+            TimeSyncProcedure::DirectWriteAbsTime => FunctionCode::Write,
         }
     }
 
@@ -580,7 +592,7 @@ mod tests {
                 send_measure_delay_response(task, &mut association)
                     .await
                     .err(),
-                Some(TaskError::UnexpectedResponseHeaders)
+                Some(TaskError::SystemTimeNotAvailable)
             );
             assert_eq!(
                 rx.try_recv().unwrap(),

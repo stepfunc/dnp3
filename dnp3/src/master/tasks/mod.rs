@@ -6,7 +6,7 @@ use crate::app::FunctionCode;
 use crate::app::ResponseHeader;
 use crate::master::association::Association;
 use crate::master::error::TaskError;
-use crate::master::extract::{extract_measurements, ProcessableResponse};
+use crate::master::extract::{extract_measurements, Delivered, ProcessableResponse};
 use crate::master::poll::Poll;
 use crate::master::promise::Promise;
 use crate::master::request::{Classes, EventClasses};
@@ -250,8 +250,8 @@ impl RequestError for TimeSyncError {
             TimeSyncError::ClockRollback
             | TimeSyncError::BadOutstationTimeDelay(_)
             | TimeSyncError::Overflow
-            | TimeSyncError::StillNeedsTime
-            | TimeSyncError::SystemTimeNotAvailable => TaskError::UnexpectedResponseHeaders,
+            | TimeSyncError::StillNeedsTime => TaskError::UnexpectedResponseHeaders,
+            TimeSyncError::SystemTimeNotAvailable => TaskError::SystemTimeNotAvailable,
             #[expect(
                 deprecated,
                 reason = "the match must cover every variant until removal"
@@ -445,13 +445,13 @@ impl ReadTask {
         Task::App(AppTask::Read(self))
     }
 
-    /// Pass the response's measurements to the handler, returning true if any were delivered
+    /// Pass the response's measurements to the handler, returning what was delivered
     pub(crate) async fn process_response(
         &mut self,
         association: &mut Association,
         header: ResponseHeader,
         objects: ProcessableResponse<'_>,
-    ) -> bool {
+    ) -> Delivered {
         let read_type = self.read_type();
         match self {
             ReadTask::SingleRead(SingleReadTask {
@@ -485,11 +485,18 @@ impl ReadTask {
         }
     }
 
-    pub(crate) fn complete(self, association: &mut Association) {
+    /// Complete the read, given whether it returned events without an IIN2 request error
+    pub(crate) fn complete(
+        self,
+        association: &mut Association,
+        events_without_request_errors: bool,
+    ) {
         match self {
             ReadTask::StartupIntegrity(_) => association.on_integrity_scan_complete(),
-            ReadTask::PeriodicPoll(poll) => association.complete_poll(poll.id),
-            ReadTask::EventScan(_) => association.on_event_scan_complete(),
+            ReadTask::PeriodicPoll(poll) => association.complete_poll(&poll),
+            ReadTask::EventScan(_) => {
+                association.on_event_scan_complete(events_without_request_errors)
+            }
             ReadTask::SingleRead(task) => task.on_complete(),
         }
     }
@@ -517,7 +524,8 @@ impl ReadTask {
                 | TaskError::WriteError
                 | TaskError::BadEncoding(_)
                 | TaskError::NoSuchAssociation(_)
-                | TaskError::NoConnection => ReadFailureLog::Warn(err),
+                | TaskError::NoConnection
+                | TaskError::SystemTimeNotAvailable => ReadFailureLog::Warn(err),
             },
         }
     }
@@ -546,7 +554,7 @@ impl ReadTask {
             }
             ReadTask::PeriodicPoll(poll) => {
                 if let Some(association) = association {
-                    association.complete_poll(poll.id);
+                    association.complete_poll(&poll);
                 }
             }
             ReadTask::EventScan(_) => {

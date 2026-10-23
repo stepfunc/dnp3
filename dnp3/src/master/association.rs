@@ -11,10 +11,10 @@ use crate::app::{Iin, ResponseHeader};
 use crate::app::{Sequence, Timeout};
 use crate::link::EndpointAddress;
 use crate::master::error::{AssociationError, TaskError, TimeSyncError};
-use crate::master::extract::{extract_measurements, ProcessableResponse};
+use crate::master::extract::{extract_measurements, Delivered, ProcessableResponse};
 use crate::master::handler::AssociationHandler;
 use crate::master::messages::AssociationMsgType;
-use crate::master::poll::{PollHandle, PollMap, PollMsg};
+use crate::master::poll::{Poll, PollHandle, PollMap, PollMsg};
 #[cfg(feature = "unstable")]
 use crate::master::request::ReadRequest;
 use crate::master::request::{Classes, EventClasses, TimeSyncProcedure};
@@ -161,6 +161,11 @@ impl AutoTaskState {
         !self.is_idle()
     }
 
+    /// True if the task failed and is waiting to retry
+    fn has_failed(&self) -> bool {
+        matches!(self, Self::Failed(..))
+    }
+
     /// Create a `Next<QueuedTask>`, given the time it is `now`
     fn create_next_task(
         &self,
@@ -194,6 +199,11 @@ impl AutoTaskState {
     /// The task was accomplished
     fn done(&mut self) {
         *self = Self::Idle;
+    }
+
+    /// The task was accomplished, but needs to run again
+    fn again(&mut self) {
+        *self = Self::Pending;
     }
 
     /// The task failed and needs rescheduling
@@ -252,6 +262,24 @@ impl TaskStates {
         self.enabled_unsolicited.demand();
     }
 
+    /// True if the outstation reported a restart that isn't cleared yet.
+    ///
+    /// The integrity scan and `ENABLE_UNSOLICITED` only start once the restart is cleared, so if
+    /// this is true when one of them completes, the outstation restarted while it ran, and the
+    /// post-restart sequence starts over.
+    fn restarted(&self) -> bool {
+        self.clear_restart_iin.is_pending()
+    }
+
+    fn on_success(&mut self, task: &AutoTask) {
+        match task {
+            AutoTask::EnableUnsolicited(_) if self.restarted() => self.enabled_unsolicited.again(),
+            AutoTask::ClearRestartBit
+            | AutoTask::EnableUnsolicited(_)
+            | AutoTask::DisableUnsolicited(_) => self.state_mut(task).done(),
+        }
+    }
+
     fn next(
         &self,
         now: Instant,
@@ -272,6 +300,15 @@ impl TaskStates {
             });
         }
 
+        // the time sync goes before the integrity scan (IEEE 1815-2012 5.1.1.1.2 and 5.1.1.2),
+        // unless it failed: then it retries after the scan once its backoff ends, and doesn't
+        // hold up anything while it waits
+        if !self.time_sync.has_failed() {
+            if let Some(task) = self.time_sync_if_due(now, config) {
+                return Next::Now(task);
+            }
+        }
+
         if config.startup_integrity_classes.any() && self.integrity_scan.is_pending() {
             return self.integrity_scan.create_next_task(now, || {
                 Task::App(AppTask::Read(ReadTask::StartupIntegrity(
@@ -281,12 +318,8 @@ impl TaskStates {
             });
         }
 
-        if self.time_sync.is_pending() {
-            if let Some(procedure) = config.auto_time_sync {
-                return self
-                    .time_sync
-                    .create_next_task(now, || PendingTimeSync::auto(procedure).into());
-            }
+        if let Some(task) = self.time_sync_if_due(now, config) {
+            return Next::Now(task);
         }
 
         if config.enable_unsol_classes.any() && self.enabled_unsolicited.is_pending() {
@@ -297,7 +330,7 @@ impl TaskStates {
             });
         }
 
-        let events_to_scan = association.events_available & config.event_scan_on_events_available;
+        let events_to_scan = association.events_to_scan();
         if events_to_scan.any() {
             return self
                 .event_scan
@@ -305,6 +338,27 @@ impl TaskStates {
         }
 
         Next::None
+    }
+
+    /// The automatic time sync, if it's enabled and due now
+    fn time_sync_if_due(&self, now: Instant, config: &AssociationConfig) -> Option<QueuedTask> {
+        let procedure = config.auto_time_sync?;
+        match self
+            .time_sync
+            .create_next_task(now, || PendingTimeSync::auto(procedure).into())
+        {
+            Next::Now(task) => Some(task),
+            Next::NotBefore(_) | Next::None => None,
+        }
+    }
+
+    /// When the automatic time sync retries, if it failed and is waiting for its backoff to end
+    fn time_sync_retry(&self, now: Instant, config: &AssociationConfig) -> Option<Instant> {
+        config.auto_time_sync?;
+        match self.time_sync {
+            AutoTaskState::Failed(_, next) if now < next => Some(next),
+            AutoTaskState::Idle | AutoTaskState::Pending | AutoTaskState::Failed(..) => None,
+        }
     }
 }
 
@@ -483,8 +537,8 @@ impl Association {
         self.assoc_handler.get_current_time()
     }
 
-    pub(crate) fn complete_poll(&mut self, id: u64) {
-        self.polls.complete(id)
+    pub(crate) fn complete_poll(&mut self, run: &Poll) {
+        self.polls.complete(run)
     }
 
     pub(crate) fn seq(&self) -> Sequence {
@@ -513,8 +567,7 @@ impl Association {
         self.events_available.class1 = iin.iin1.get_class_1_events();
         self.events_available.class2 = iin.iin1.get_class_2_events();
         self.events_available.class3 = iin.iin1.get_class_3_events();
-        let classes_to_scan = self.events_available & self.config.event_scan_on_events_available;
-        if classes_to_scan.any() && self.auto_tasks.event_scan.demand() {
+        if self.events_to_scan().any() && self.auto_tasks.event_scan.demand() {
             tracing::info!("scheduled auto event scan");
         }
     }
@@ -540,16 +593,33 @@ impl Association {
     }
 
     pub(crate) fn on_integrity_scan_complete(&mut self) {
-        self.auto_tasks.integrity_scan.done();
-        self.startup_integrity_done = true;
+        if self.auto_tasks.restarted() {
+            self.auto_tasks.integrity_scan.again();
+        } else {
+            self.auto_tasks.integrity_scan.done();
+            self.startup_integrity_done = true;
+        }
     }
 
     pub(crate) fn on_integrity_scan_failure(&mut self) {
         self.auto_tasks.integrity_scan.failure(&self.config);
     }
 
-    pub(crate) fn on_event_scan_complete(&mut self) {
-        self.auto_tasks.event_scan.done();
+    /// The classes with events available that the automatic event scan reads
+    fn events_to_scan(&self) -> EventClasses {
+        self.events_available & self.config.event_scan_on_events_available
+    }
+
+    /// Complete the event scan, given whether it returned events without an IIN2 request error
+    pub(crate) fn on_event_scan_complete(&mut self, events_without_request_errors: bool) {
+        // the scan's own response can report that more events remain. It only runs again at once
+        // if it read some and the outstation didn't reject it, so an outstation that keeps
+        // reporting events without returning any can't make the master scan back to back
+        if events_without_request_errors && self.events_to_scan().any() {
+            self.auto_tasks.event_scan.again();
+        } else {
+            self.auto_tasks.event_scan.done();
+        }
     }
 
     pub(crate) fn on_event_scan_failure(&mut self) {
@@ -557,7 +627,7 @@ impl Association {
     }
 
     pub(crate) fn on_auto_task_success(&mut self, task: &AutoTask) {
-        self.auto_tasks.state_mut(task).done();
+        self.auto_tasks.on_success(task);
     }
 
     pub(crate) fn on_auto_task_failure(&mut self, task: &AutoTask) {
@@ -637,7 +707,7 @@ impl Association {
         read_type: ReadType,
         header: ResponseHeader,
         objects: ProcessableResponse<'_>,
-    ) -> bool {
+    ) -> Delivered {
         extract_measurements(read_type, header, objects, self.read_handler.as_mut()).await
     }
 
@@ -706,6 +776,15 @@ impl Association {
     }
 
     fn get_next_task(&self, now: Instant) -> Next<QueuedTask> {
+        let next = self.get_next_scheduled_task(now);
+        // a failed time sync waiting for its retry doesn't hold up the rest of the association
+        match self.auto_tasks.time_sync_retry(now, &self.config) {
+            Some(retry) => next.or_not_before(retry),
+            None => next,
+        }
+    }
+
+    fn get_next_scheduled_task(&self, now: Instant) -> Next<QueuedTask> {
         // Check for automatic tasks
         let next_auto_task = self.auto_tasks.next(now, &self.config, self);
 
@@ -741,6 +820,17 @@ pub(crate) enum Next<T> {
     None,
     Now(T),
     NotBefore(Instant),
+}
+
+impl<T> Next<T> {
+    /// Also wait for `deadline`, if nothing is ready now
+    fn or_not_before(self, deadline: Instant) -> Self {
+        match self {
+            Self::Now(x) => Self::Now(x),
+            Self::NotBefore(next) => Self::NotBefore(Instant::min(next, deadline)),
+            Self::None => Self::NotBefore(deadline),
+        }
+    }
 }
 
 pub(crate) struct AssociationMap {
