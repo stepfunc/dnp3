@@ -1060,7 +1060,22 @@ mod tests {
 
         #[test]
         fn edge_values_match_the_model() {
-            for value in neighbors().into_iter().chain(specials()) {
+            // fractions, values just past the integer limits, and values far past each range
+            let fixed = [
+                -1.9,
+                0.5,
+                -40000.0,
+                40000.0,
+                -32768.5,
+                32767.5,
+                -2147483648.5,
+                2147483647.5,
+                -1e12,
+                1e12,
+                f64::MIN,
+                f64::MAX,
+            ];
+            for value in neighbors().into_iter().chain(specials()).chain(fixed) {
                 check_all(value, Flags::ONLINE);
             }
         }
