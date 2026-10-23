@@ -6,6 +6,8 @@
 
 use std::str::Utf8Error;
 
+#[cfg(test)]
+mod codec_tests;
 mod g70v2;
 mod g70v3;
 mod g70v4;
