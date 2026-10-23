@@ -162,8 +162,8 @@ impl AutoTaskState {
         matches!(self, Self::Idle)
     }
 
-    /// Check if task is pending for execution or waiting
-    fn is_pending(&self) -> bool {
+    /// True if the task still has to run: now, or after a failure once its backoff ends
+    fn is_active(&self) -> bool {
         !self.is_idle()
     }
 
@@ -228,6 +228,13 @@ impl AutoTaskState {
     }
 }
 
+/// An automatic task that only starts once the outstation's restart is cleared
+#[derive(Copy, Clone)]
+enum AfterRestart {
+    IntegrityScan,
+    EnableUnsolicited,
+}
+
 #[derive(Debug)]
 pub(crate) struct TaskStates {
     disable_unsolicited: AutoTaskState,
@@ -268,21 +275,33 @@ impl TaskStates {
         self.enabled_unsolicited.demand();
     }
 
-    /// True if the outstation reported a restart that isn't cleared yet.
+    /// Complete the integrity scan or `ENABLE_UNSOLICITED`, returning true if the run counts.
     ///
-    /// The integrity scan and `ENABLE_UNSOLICITED` only start once the restart is cleared, so if
-    /// this is true when one of them completes, the outstation restarted while it ran, and the
-    /// post-restart sequence starts over.
-    fn restarted(&self) -> bool {
-        self.clear_restart_iin.is_pending()
+    /// Both only start once the outstation's restart is cleared, so if it reports a restart that
+    /// isn't cleared yet when one of them completes, it restarted while the task ran: the run is
+    /// void, and the task runs again as part of the post-restart sequence.
+    fn complete_after_restart(&mut self, task: AfterRestart) -> bool {
+        let restarted = self.clear_restart_iin.is_active();
+        let state = match task {
+            AfterRestart::IntegrityScan => &mut self.integrity_scan,
+            AfterRestart::EnableUnsolicited => &mut self.enabled_unsolicited,
+        };
+        if restarted {
+            state.again();
+        } else {
+            state.done();
+        }
+        !restarted
     }
 
     fn on_success(&mut self, task: &AutoTask) {
         match task {
-            AutoTask::EnableUnsolicited(_) if self.restarted() => self.enabled_unsolicited.again(),
-            AutoTask::ClearRestartBit
-            | AutoTask::EnableUnsolicited(_)
-            | AutoTask::DisableUnsolicited(_) => self.state_mut(task).done(),
+            AutoTask::EnableUnsolicited(_) => {
+                self.complete_after_restart(AfterRestart::EnableUnsolicited);
+            }
+            AutoTask::ClearRestartBit | AutoTask::DisableUnsolicited(_) => {
+                self.state_mut(task).done()
+            }
         }
     }
 
@@ -292,13 +311,13 @@ impl TaskStates {
         config: &AssociationConfig,
         association: &Association,
     ) -> Next<QueuedTask> {
-        if self.clear_restart_iin.is_pending() {
+        if self.clear_restart_iin.is_active() {
             return self
                 .clear_restart_iin
                 .create_next_task(now, || AutoTask::ClearRestartBit.wrap().into());
         }
 
-        if config.disable_unsol_classes.any() && self.disable_unsolicited.is_pending() {
+        if config.disable_unsol_classes.any() && self.disable_unsolicited.is_active() {
             return self.disable_unsolicited.create_next_task(now, || {
                 AutoTask::DisableUnsolicited(config.disable_unsol_classes)
                     .wrap()
@@ -315,7 +334,7 @@ impl TaskStates {
             }
         }
 
-        if config.startup_integrity_classes.any() && self.integrity_scan.is_pending() {
+        if config.startup_integrity_classes.any() && self.integrity_scan.is_active() {
             return self.integrity_scan.create_next_task(now, || {
                 Task::App(AppTask::Read(ReadTask::StartupIntegrity(
                     config.startup_integrity_classes,
@@ -328,7 +347,7 @@ impl TaskStates {
             return Next::Now(task);
         }
 
-        if config.enable_unsol_classes.any() && self.enabled_unsolicited.is_pending() {
+        if config.enable_unsol_classes.any() && self.enabled_unsolicited.is_active() {
             return self.enabled_unsolicited.create_next_task(now, || {
                 AutoTask::EnableUnsolicited(config.enable_unsol_classes)
                     .wrap()
@@ -599,10 +618,10 @@ impl Association {
     }
 
     pub(crate) fn on_integrity_scan_complete(&mut self) {
-        if self.auto_tasks.restarted() {
-            self.auto_tasks.integrity_scan.again();
-        } else {
-            self.auto_tasks.integrity_scan.done();
+        if self
+            .auto_tasks
+            .complete_after_restart(AfterRestart::IntegrityScan)
+        {
             self.startup_integrity_done = true;
         }
     }
