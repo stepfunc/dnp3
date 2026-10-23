@@ -388,37 +388,18 @@ mod test {
         )
     }
 
-    fn confirmed(from_master: bool, fcb: bool, destination: AnyAddress) -> Header {
-        let mut header = header(from_master, Function::PriConfirmedUserData, destination);
-        header.control.fcv = true;
-        header.control.fcb = fcb;
-        header
-    }
-
     struct Processed {
         info: Option<FrameInfo>,
         reply: Option<Vec<u8>>,
-        ignored: Vec<Ignored>,
-    }
-
-    impl Processed {
-        fn is_silent(&self) -> bool {
-            self.info.is_none() && self.reply.is_none() && self.ignored.is_empty()
-        }
     }
 
     fn process(layer: &mut Layer, header: Header) -> Processed {
-        let mut ignored = Vec::new();
-        let (info, reply) = layer.process_header(header, PhysAddr::None, |x| ignored.push(x));
+        let (info, reply) = layer.process_header(header, PhysAddr::None, |_| {});
         let reply = reply.map(|reply| {
             let header = layer.get_header(reply);
             Layer::format_reply(header).to_vec()
         });
-        Processed {
-            info,
-            reply,
-            ignored,
-        }
+        Processed { info, reply }
     }
 
     fn data_from(source: EndpointAddress, broadcast: Option<BroadcastConfirmMode>) -> FrameInfo {
@@ -427,16 +408,6 @@ mod test {
 
     fn link_status_request_from(source: EndpointAddress) -> FrameInfo {
         FrameInfo::new(source, None, FrameType::LinkStatusRequest, PhysAddr::None)
-    }
-
-    /// the primary functions a peer can send, each with its FCV bit set as required
-    fn requests(from_master: bool, destination: AnyAddress) -> [Header; 4] {
-        [
-            header(from_master, Function::PriUnconfirmedUserData, destination),
-            header(from_master, Function::PriResetLinkStates, destination),
-            confirmed(from_master, true, destination),
-            header(from_master, Function::PriRequestLinkStatus, destination),
-        ]
     }
 
     #[test]
@@ -489,556 +460,8 @@ mod test {
         assert_eq!(processed.reply.as_deref(), Some(&ACK_FROM_MASTER[..]));
     }
 
-    /// confirmed user data is ignored until the link is reset, then acked, with repeats dropped
-    fn confirmed_user_data_is_acked_after_reset(
-        mut layer: Layer,
-        from_master: bool,
-        local: EndpointAddress,
-        source: EndpointAddress,
-        ack: [u8; 10],
-    ) {
-        let processed = process(&mut layer, confirmed(from_master, true, local.wrap()));
-        assert_eq!(processed.info, None);
-        assert_eq!(processed.reply, None);
-        assert!(matches!(processed.ignored[..], [Ignored::NotReset]));
-
-        let processed = process(
-            &mut layer,
-            header(from_master, Function::PriResetLinkStates, local.wrap()),
-        );
-        assert_eq!(processed.reply.as_deref(), Some(&ack[..]));
-
-        let processed = process(&mut layer, confirmed(from_master, true, local.wrap()));
-        assert_eq!(processed.info, Some(data_from(source, None)));
-        assert_eq!(processed.reply.as_deref(), Some(&ack[..]));
-        assert!(processed.ignored.is_empty());
-
-        let processed = process(&mut layer, confirmed(from_master, true, local.wrap()));
-        assert_eq!(processed.info, None);
-        assert_eq!(processed.reply.as_deref(), Some(&ack[..]));
-        assert!(matches!(processed.ignored[..], [Ignored::RepeatedFcb]));
-
-        let processed = process(&mut layer, confirmed(from_master, false, local.wrap()));
-        assert_eq!(processed.info, Some(data_from(source, None)));
-        assert_eq!(processed.reply.as_deref(), Some(&ack[..]));
-
-        // resetting the layer between sessions requires a new link reset
-        layer.reset();
-        let processed = process(&mut layer, confirmed(from_master, true, local.wrap()));
-        assert!(matches!(processed.ignored[..], [Ignored::NotReset]));
-    }
-
-    #[test]
-    fn outstation_acks_confirmed_user_data_after_reset() {
-        confirmed_user_data_is_acked_after_reset(
-            outstation(Feature::Disabled),
-            true,
-            OUTSTATION,
-            MASTER,
-            ACK_FROM_OUTSTATION,
-        );
-    }
-
-    #[test]
-    fn master_acks_confirmed_user_data_after_reset() {
-        confirmed_user_data_is_acked_after_reset(
-            master(),
-            false,
-            MASTER,
-            OUTSTATION,
-            ACK_FROM_MASTER,
-        );
-    }
-
-    /// `header` sent from `source` instead of the default address of its role
-    fn from(source: EndpointAddress, mut header: Header) -> Header {
-        header.source = source.wrap();
-        header
-    }
-
-    /// the ACK a layer with `local` address sends to `destination`
-    fn ack(from_master: bool, local: EndpointAddress, destination: EndpointAddress) -> Vec<u8> {
-        let header = Header::new(
-            ControlField::new(!from_master, Function::SecAck),
-            destination.wrap(),
-            local.wrap(),
-        );
-        header_bytes(header, super::super::constant::MIN_HEADER_LENGTH_VALUE).to_vec()
-    }
-
-    /// the secondary state belongs to the peer that last reset the link: confirmed user data from
-    /// any other source is ignored without an ACK and leaves the owner's FCB unchanged
-    fn secondary_state_is_owned_by_one_peer(
-        mut layer: Layer,
-        from_master: bool,
-        local: EndpointAddress,
-        a: EndpointAddress,
-        b: EndpointAddress,
-    ) {
-        let reset = |source| {
-            from(
-                source,
-                header(from_master, Function::PriResetLinkStates, local.wrap()),
-            )
-        };
-        let confirmed = |source, fcb| from(source, confirmed(from_master, fcb, local.wrap()));
-        let ack = |destination| Some(ack(from_master, local, destination));
-
-        let processed = process(&mut layer, reset(a));
-        assert_eq!(processed.reply, ack(a));
-
-        let processed = process(&mut layer, confirmed(a, true));
-        assert_eq!(processed.info, Some(data_from(a, None)));
-        assert_eq!(processed.reply, ack(a));
-
-        // the other peer never reset the link, whatever FCB it sends, and each of its frames
-        // leaves the owner's next expected FCB unchanged
-        for fcb in [false, true] {
-            let processed = process(&mut layer, confirmed(b, fcb));
-            assert_eq!(processed.info, None);
-            assert_eq!(processed.reply, None);
-            assert!(matches!(processed.ignored[..], [Ignored::NotReset]));
-
-            let processed = process(&mut layer, confirmed(a, fcb));
-            assert_eq!(processed.info, Some(data_from(a, None)));
-            assert_eq!(processed.reply, ack(a));
-            assert!(processed.ignored.is_empty());
-        }
-
-        // the owner's duplicate is acked without being delivered again
-        let processed = process(&mut layer, confirmed(a, true));
-        assert_eq!(processed.info, None);
-        assert_eq!(processed.reply, ack(a));
-        assert!(matches!(processed.ignored[..], [Ignored::RepeatedFcb]));
-
-        // a reset from the other peer transfers ownership
-        let processed = process(&mut layer, reset(b));
-        assert_eq!(processed.info, None);
-        assert_eq!(processed.reply, ack(b));
-
-        let processed = process(&mut layer, confirmed(a, true));
-        assert_eq!(processed.info, None);
-        assert_eq!(processed.reply, None);
-        assert!(matches!(processed.ignored[..], [Ignored::NotReset]));
-
-        let processed = process(&mut layer, confirmed(b, true));
-        assert_eq!(processed.info, Some(data_from(b, None)));
-        assert_eq!(processed.reply, ack(b));
-        assert!(processed.ignored.is_empty());
-
-        let processed = process(&mut layer, confirmed(b, true));
-        assert_eq!(processed.info, None);
-        assert_eq!(processed.reply, ack(b));
-        assert!(matches!(processed.ignored[..], [Ignored::RepeatedFcb]));
-    }
-
-    #[test]
-    fn outstation_secondary_state_is_owned_by_one_master() {
-        secondary_state_is_owned_by_one_peer(
-            outstation(Feature::Disabled),
-            true,
-            OUTSTATION,
-            MASTER,
-            EndpointAddress::raw(2),
-        );
-    }
-
-    #[test]
-    fn master_secondary_state_is_owned_by_one_outstation() {
-        secondary_state_is_owned_by_one_peer(
-            master(),
-            false,
-            MASTER,
-            OUTSTATION,
-            EndpointAddress::raw(1025),
-        );
-    }
-
-    #[test]
-    fn outstation_passes_up_unconfirmed_user_data_without_reply() {
-        let mut layer = outstation(Feature::Disabled);
-        let processed = process(
-            &mut layer,
-            header(true, Function::PriUnconfirmedUserData, OUTSTATION.wrap()),
-        );
-        assert_eq!(processed.info, Some(data_from(MASTER, None)));
-        assert_eq!(processed.reply, None);
-    }
-
-    #[test]
-    fn master_passes_up_unconfirmed_user_data_without_reply() {
-        let mut layer = master();
-        let processed = process(
-            &mut layer,
-            header(false, Function::PriUnconfirmedUserData, MASTER.wrap()),
-        );
-        assert_eq!(processed.info, Some(data_from(OUTSTATION, None)));
-        assert_eq!(processed.reply, None);
-    }
-
-    #[test]
-    fn both_roles_pass_up_link_status_responses_without_reply() {
-        let processed = process(
-            &mut master(),
-            header(false, Function::SecLinkStatus, MASTER.wrap()),
-        );
-        assert_eq!(
-            processed.info,
-            Some(FrameInfo::new(
-                OUTSTATION,
-                None,
-                FrameType::LinkStatusResponse,
-                PhysAddr::None
-            ))
-        );
-        assert_eq!(processed.reply, None);
-
-        let processed = process(
-            &mut outstation(Feature::Disabled),
-            header(true, Function::SecLinkStatus, OUTSTATION.wrap()),
-        );
-        assert_eq!(
-            processed.info,
-            Some(FrameInfo::new(
-                MASTER,
-                None,
-                FrameType::LinkStatusResponse,
-                PhysAddr::None
-            ))
-        );
-        assert_eq!(processed.reply, None);
-    }
-
-    #[test]
-    fn master_silently_ignores_frames_from_masters() {
-        for destination in [MASTER.wrap(), AnyAddress::SelfAddress] {
-            for header in requests(true, destination) {
-                assert!(process(&mut master(), header).is_silent());
-            }
-        }
-    }
-
-    #[test]
-    fn outstation_silently_ignores_frames_from_outstations() {
-        for self_address in [Feature::Disabled, Feature::Enabled] {
-            for destination in [OUTSTATION.wrap(), AnyAddress::SelfAddress] {
-                for header in requests(false, destination) {
-                    assert!(process(&mut outstation(self_address), header).is_silent());
-                }
-            }
-        }
-    }
-
-    #[test]
-    fn outstation_with_self_address_accepts_user_data_sent_to_self_address() {
-        let mut layer = outstation(Feature::Enabled);
-        let processed = process(
-            &mut layer,
-            header(
-                true,
-                Function::PriUnconfirmedUserData,
-                AnyAddress::SelfAddress,
-            ),
-        );
-        assert_eq!(processed.info, Some(data_from(MASTER, None)));
-        assert_eq!(processed.reply, None);
-        assert!(processed.ignored.is_empty());
-    }
-
-    #[test]
-    fn outstation_with_self_address_answers_link_status_request_from_its_own_address() {
-        let mut layer = outstation(Feature::Enabled);
-        let processed = process(
-            &mut layer,
-            header(
-                true,
-                Function::PriRequestLinkStatus,
-                AnyAddress::SelfAddress,
-            ),
-        );
-        assert_eq!(processed.info, Some(link_status_request_from(MASTER)));
-        assert_eq!(
-            processed.reply.as_deref(),
-            Some(&LINK_STATUS_FROM_OUTSTATION[..])
-        );
-    }
-
-    #[test]
-    fn outstation_with_self_address_acks_confirmed_user_data_sent_to_self_address() {
-        let mut layer = outstation(Feature::Enabled);
-        let processed = process(
-            &mut layer,
-            header(true, Function::PriResetLinkStates, AnyAddress::SelfAddress),
-        );
-        assert_eq!(processed.reply.as_deref(), Some(&ACK_FROM_OUTSTATION[..]));
-        let processed = process(&mut layer, confirmed(true, true, AnyAddress::SelfAddress));
-        assert_eq!(processed.info, Some(data_from(MASTER, None)));
-        assert_eq!(processed.reply.as_deref(), Some(&ACK_FROM_OUTSTATION[..]));
-    }
-
-    #[test]
-    fn outstation_with_self_address_still_accepts_its_own_address() {
-        let mut layer = outstation(Feature::Enabled);
-        let processed = process(
-            &mut layer,
-            header(true, Function::PriUnconfirmedUserData, OUTSTATION.wrap()),
-        );
-        assert_eq!(processed.info, Some(data_from(MASTER, None)));
-    }
-
-    #[test]
-    fn outstation_without_self_address_ignores_frames_sent_to_self_address() {
-        let mut layer = outstation(Feature::Disabled);
-        // reset first, so confirmed user data would otherwise be accepted
-        process(
-            &mut layer,
-            header(true, Function::PriResetLinkStates, OUTSTATION.wrap()),
-        );
-        for header in requests(true, AnyAddress::SelfAddress) {
-            let processed = process(&mut layer, header);
-            assert_eq!(processed.info, None);
-            assert_eq!(processed.reply, None);
-            assert!(matches!(processed.ignored[..], [Ignored::SelfAddress]));
-        }
-    }
-
-    #[test]
-    fn master_ignores_frames_sent_to_self_address() {
-        let mut layer = master();
-        // reset first, so confirmed user data would otherwise be accepted
-        process(
-            &mut layer,
-            header(false, Function::PriResetLinkStates, MASTER.wrap()),
-        );
-        for header in requests(false, AnyAddress::SelfAddress) {
-            let processed = process(&mut layer, header);
-            assert_eq!(processed.info, None);
-            assert_eq!(processed.reply, None);
-            assert!(matches!(processed.ignored[..], [Ignored::SelfAddress]));
-        }
-    }
-
-    #[test]
-    fn both_roles_ignore_self_address_as_source() {
-        let mut from_outstation = header(false, Function::PriUnconfirmedUserData, MASTER.wrap());
-        from_outstation.source = AnyAddress::SelfAddress;
-        assert!(matches!(
-            process(&mut master(), from_outstation).ignored[..],
-            [Ignored::UnknownSource(AnyAddress::SelfAddress)]
-        ));
-
-        let mut from_master = header(true, Function::PriUnconfirmedUserData, OUTSTATION.wrap());
-        from_master.source = AnyAddress::SelfAddress;
-        assert!(matches!(
-            process(&mut outstation(Feature::Enabled), from_master).ignored[..],
-            [Ignored::UnknownSource(AnyAddress::SelfAddress)]
-        ));
-    }
-
-    #[test]
-    fn master_ignores_broadcasts() {
-        let mut layer = master();
-        process(
-            &mut layer,
-            header(false, Function::PriResetLinkStates, MASTER.wrap()),
-        );
-        for mode in BROADCASTS {
-            for header in requests(false, AnyAddress::Broadcast(mode)) {
-                let processed = process(&mut layer, header);
-                assert_eq!(processed.info, None);
-                assert_eq!(processed.reply, None);
-                assert!(matches!(
-                    processed.ignored[..],
-                    [Ignored::BroadcastToMaster]
-                ));
-            }
-        }
-    }
-
-    #[test]
-    fn outstation_accepts_broadcast_user_data_without_reply() {
-        for self_address in [Feature::Disabled, Feature::Enabled] {
-            let mut layer = outstation(self_address);
-            process(
-                &mut layer,
-                header(true, Function::PriResetLinkStates, OUTSTATION.wrap()),
-            );
-            let mut fcb = true;
-            for mode in BROADCASTS {
-                let destination = AnyAddress::Broadcast(mode);
-                let processed = process(
-                    &mut layer,
-                    header(true, Function::PriUnconfirmedUserData, destination),
-                );
-                assert_eq!(processed.info, Some(data_from(MASTER, Some(mode))));
-                assert_eq!(processed.reply, None);
-
-                let processed = process(&mut layer, confirmed(true, fcb, destination));
-                assert_eq!(processed.info, Some(data_from(MASTER, Some(mode))));
-                assert_eq!(processed.reply, None);
-                fcb = !fcb;
-
-                for function in [Function::PriResetLinkStates, Function::PriRequestLinkStatus] {
-                    let processed = process(&mut layer, header(true, function, destination));
-                    assert_eq!(processed.info, None);
-                    assert_eq!(processed.reply, None);
-                    assert!(matches!(
-                        processed.ignored[..],
-                        [Ignored::BroadcastFunction(f)] if f == function
-                    ));
-                }
-            }
-        }
-    }
-
-    /// reset the link and accept confirmed user data with FCB set, so the next FCB the link
-    /// expects is clear
-    fn reset_and_accept_one(
-        layer: &mut Layer,
-        from_master: bool,
-        local: EndpointAddress,
-        source: EndpointAddress,
-    ) {
-        process(
-            layer,
-            header(from_master, Function::PriResetLinkStates, local.wrap()),
-        );
-        let processed = process(layer, confirmed(from_master, true, local.wrap()));
-        assert_eq!(processed.info, Some(data_from(source, None)));
-    }
-
-    /// the next confirmed user data, with FCB clear, is delivered and acked
-    fn assert_next_fcb_is_clear(
-        layer: &mut Layer,
-        from_master: bool,
-        local: EndpointAddress,
-        source: EndpointAddress,
-        ack: [u8; 10],
-    ) {
-        let processed = process(layer, confirmed(from_master, false, local.wrap()));
-        assert_eq!(processed.info, Some(data_from(source, None)));
-        assert_eq!(processed.reply.as_deref(), Some(&ack[..]));
-        assert!(processed.ignored.is_empty());
-    }
-
-    /// each primary function with its FCV bit the wrong way round, and why it's ignored
-    fn wrong_fcv(from_master: bool, destination: AnyAddress) -> [(Header, Ignored); 4] {
-        let with_fcv = |function| {
-            let mut header = header(from_master, function, destination);
-            header.control.fcv = true;
-            header
-        };
-        // the FCB the link expects next, so only the FCV bit can stop it
-        let mut confirmed_without_fcv = confirmed(from_master, false, destination);
-        confirmed_without_fcv.control.fcv = false;
-        [
-            (
-                with_fcv(Function::PriUnconfirmedUserData),
-                Ignored::UnconfirmedWithFcv,
-            ),
-            (
-                with_fcv(Function::PriResetLinkStates),
-                Ignored::ResetWithFcv,
-            ),
-            (confirmed_without_fcv, Ignored::ConfirmedWithoutFcv),
-            (
-                with_fcv(Function::PriRequestLinkStatus),
-                Ignored::LinkStatusWithFcv,
-            ),
-        ]
-    }
-
-    /// frames with the wrong FCV bit are ignored without a reply, and leave the secondary state
-    /// as it was
-    fn frames_with_the_wrong_fcv_bit_are_ignored(
-        mut layer: Layer,
-        from_master: bool,
-        local: EndpointAddress,
-        source: EndpointAddress,
-        ack: [u8; 10],
-    ) {
-        reset_and_accept_one(&mut layer, from_master, local, source);
-        for (header, reason) in wrong_fcv(from_master, local.wrap()) {
-            let processed = process(&mut layer, header);
-            assert_eq!(processed.info, None);
-            assert_eq!(processed.reply, None);
-            assert_eq!(processed.ignored, [reason]);
-        }
-        assert_next_fcb_is_clear(&mut layer, from_master, local, source, ack);
-    }
-
-    #[test]
-    fn outstation_ignores_frames_with_the_wrong_fcv_bit() {
-        frames_with_the_wrong_fcv_bit_are_ignored(
-            outstation(Feature::Disabled),
-            true,
-            OUTSTATION,
-            MASTER,
-            ACK_FROM_OUTSTATION,
-        );
-    }
-
-    #[test]
-    fn master_ignores_frames_with_the_wrong_fcv_bit() {
-        frames_with_the_wrong_fcv_bit_are_ignored(
-            master(),
-            false,
-            MASTER,
-            OUTSTATION,
-            ACK_FROM_MASTER,
-        );
-    }
-
     /// the lowest and highest reserved addresses
     const RESERVED: [u16; 2] = [0xFFF0, 0xFFFB];
-
-    /// frames sent to a reserved address are ignored without a reply, and leave the secondary
-    /// state as it was
-    fn frames_to_reserved_addresses_are_ignored(
-        mut layer: Layer,
-        from_master: bool,
-        local: EndpointAddress,
-        source: EndpointAddress,
-        ack: [u8; 10],
-    ) {
-        reset_and_accept_one(&mut layer, from_master, local, source);
-        for address in RESERVED {
-            let mut headers = requests(from_master, AnyAddress::from(address));
-            // the FCB the link expects next, so only the address can stop it
-            headers[2].control.fcb = false;
-            for header in headers {
-                let processed = process(&mut layer, header);
-                assert_eq!(processed.info, None);
-                assert_eq!(processed.reply, None);
-                assert_eq!(processed.ignored, [Ignored::ReservedDestination(address)]);
-            }
-        }
-        assert_next_fcb_is_clear(&mut layer, from_master, local, source, ack);
-    }
-
-    #[test]
-    fn outstation_ignores_frames_to_reserved_addresses() {
-        for self_address in [Feature::Disabled, Feature::Enabled] {
-            frames_to_reserved_addresses_are_ignored(
-                outstation(self_address),
-                true,
-                OUTSTATION,
-                MASTER,
-                ACK_FROM_OUTSTATION,
-            );
-        }
-    }
-
-    #[test]
-    fn master_ignores_frames_to_reserved_addresses() {
-        frames_to_reserved_addresses_are_ignored(
-            master(),
-            false,
-            MASTER,
-            OUTSTATION,
-            ACK_FROM_MASTER,
-        );
-    }
 
     /// the functions the link layer never acts on: test link states, the secondary functions
     /// other than link status, and unknown primary and secondary codes
@@ -1050,52 +473,6 @@ mod test {
         Function::Unknown(0x41),
         Function::Unknown(0x0E),
     ];
-
-    /// frames with a function the link layer doesn't act on are ignored without a reply, whatever
-    /// their FCB and FCV bits, and leave the secondary state as it was
-    fn frames_with_ignored_functions_are_ignored(
-        mut layer: Layer,
-        from_master: bool,
-        local: EndpointAddress,
-        source: EndpointAddress,
-        ack: [u8; 10],
-    ) {
-        reset_and_accept_one(&mut layer, from_master, local, source);
-        for function in IGNORED_FUNCTIONS {
-            for (fcb, fcv) in [(false, false), (false, true), (true, true)] {
-                let mut header = header(from_master, function, local.wrap());
-                header.control.fcb = fcb;
-                header.control.fcv = fcv;
-                let processed = process(&mut layer, header);
-                assert_eq!(processed.info, None);
-                assert_eq!(processed.reply, None);
-                assert_eq!(processed.ignored, [Ignored::Function(function)]);
-            }
-        }
-        assert_next_fcb_is_clear(&mut layer, from_master, local, source, ack);
-    }
-
-    #[test]
-    fn outstation_ignores_frames_with_functions_it_does_not_act_on() {
-        frames_with_ignored_functions_are_ignored(
-            outstation(Feature::Disabled),
-            true,
-            OUTSTATION,
-            MASTER,
-            ACK_FROM_OUTSTATION,
-        );
-    }
-
-    #[test]
-    fn master_ignores_frames_with_functions_it_does_not_act_on() {
-        frames_with_ignored_functions_are_ignored(
-            master(),
-            false,
-            MASTER,
-            OUTSTATION,
-            ACK_FROM_MASTER,
-        );
-    }
 
     mod properties {
         use super::*;
@@ -1112,6 +489,16 @@ mod test {
         /// an endpoint address that isn't the layer's own
         const OTHER: EndpointAddress = EndpointAddress::raw(2);
 
+        const ROLES: [LinkRole; 3] = [
+            LinkRole::Master,
+            LinkRole::Outstation {
+                self_address: Feature::Disabled,
+            },
+            LinkRole::Outstation {
+                self_address: Feature::Enabled,
+            },
+        ];
+
         fn local(role: LinkRole) -> EndpointAddress {
             match role {
                 LinkRole::Master => MASTER,
@@ -1121,6 +508,11 @@ mod test {
 
         fn is_master(role: LinkRole) -> bool {
             matches!(role, LinkRole::Master)
+        }
+
+        /// whether a frame with `func` must have its FCV bit set
+        fn needs_fcv(func: Function) -> bool {
+            matches!(func, Function::PriConfirmedUserData)
         }
 
         #[derive(Copy, Clone, Debug)]
@@ -1143,6 +535,46 @@ mod test {
         }
 
         impl Frame {
+            /// `func` from `peer` to the layer's own address, with FCB clear and the FCV bit the
+            /// function needs
+            fn new(func: Function, peer: EndpointAddress) -> Self {
+                Self {
+                    same_type: false,
+                    func,
+                    fcb: false,
+                    fcv: needs_fcv(func),
+                    destination: Destination::Local,
+                    source: peer.wrap(),
+                    addr: PhysAddr::None,
+                }
+            }
+
+            fn to(self, destination: AnyAddress) -> Self {
+                Self {
+                    destination: Destination::Other(destination),
+                    ..self
+                }
+            }
+
+            fn from(self, source: AnyAddress) -> Self {
+                Self { source, ..self }
+            }
+
+            fn fcb(self, fcb: bool) -> Self {
+                Self { fcb, ..self }
+            }
+
+            fn fcv(self, fcv: bool) -> Self {
+                Self { fcv, ..self }
+            }
+
+            fn same_type(self) -> Self {
+                Self {
+                    same_type: true,
+                    ..self
+                }
+            }
+
             fn header(&self, role: LinkRole) -> Header {
                 let control = ControlField {
                     func: self.func,
@@ -1393,15 +825,7 @@ mod test {
         }
 
         fn role() -> impl Strategy<Value = LinkRole> {
-            prop::sample::select(vec![
-                LinkRole::Master,
-                LinkRole::Outstation {
-                    self_address: Feature::Disabled,
-                },
-                LinkRole::Outstation {
-                    self_address: Feature::Enabled,
-                },
-            ])
+            prop::sample::select(ROLES.to_vec())
         }
 
         /// a peer, favoring the first so it often sends again after its own reset
@@ -1464,10 +888,8 @@ mod test {
 
         /// a function and an FCV bit that is mostly, but not always, the one the function needs
         fn function_and_fcv() -> impl Strategy<Value = (Function, bool)> {
-            (function(), prop::bool::weighted(0.15)).prop_map(|(func, wrong)| {
-                let needed = matches!(func, Function::PriConfirmedUserData);
-                (func, needed != wrong)
-            })
+            (function(), prop::bool::weighted(0.15))
+                .prop_map(|(func, wrong)| (func, needs_fcv(func) != wrong))
         }
 
         /// a frame, mostly from the other type of endpoint, with arbitrary FCB
@@ -1498,6 +920,34 @@ mod test {
             ]
         }
 
+        /// Run `ops` through a layer with `role`, checking each frame's outcome against the model
+        fn check(role: LinkRole, ops: impl IntoIterator<Item = Op>) -> Result<(), TestCaseError> {
+            let mut layer = Layer::new(LinkModes::test(), 2048, role, local(role));
+            let mut model = Model::NotReset;
+            for (step, op) in ops.into_iter().enumerate() {
+                match op {
+                    Op::Frame(frame) => {
+                        let (header, addr) = (frame.header(role), frame.addr);
+                        let expected = model.step(role, header, addr);
+                        let actual = outcome(&mut layer, role, header, addr)?;
+                        prop_assert!(
+                            expected.accepts(&actual),
+                            "step {}: {:?}\nexpected {:?}\nactual {:?}",
+                            step,
+                            header,
+                            expected,
+                            actual
+                        );
+                    }
+                    Op::EndSession => {
+                        layer.reset();
+                        model = Model::NotReset;
+                    }
+                }
+            }
+            Ok(())
+        }
+
         proptest! {
             #![proptest_config(ProptestConfig::with_cases(128))]
 
@@ -1509,45 +959,188 @@ mod test {
                 role in role(),
                 ops in prop::collection::vec(op(), 1..=64),
             ) {
-                let mut layer = Layer::new(LinkModes::test(), 2048, role, local(role));
-                let mut model = Model::NotReset;
-                for (step, op) in ops.into_iter().enumerate() {
-                    match op {
-                        Op::Frame(frame) => {
-                            let (header, addr) = (frame.header(role), frame.addr);
-                            let expected = model.step(role, header, addr);
-                            let actual = outcome(&mut layer, role, header, addr)?;
-                            prop_assert!(
-                                expected.accepts(&actual),
-                                "step {}: {:?}\nexpected {:?}\nactual {:?}",
-                                step,
-                                header,
-                                expected,
-                                actual
-                            );
-                        }
-                        Op::EndSession => {
-                            layer.reset();
-                            model = Model::NotReset;
-                        }
-                    }
+                check(role, ops)?;
+            }
+        }
+
+        /// Run `ops` through a layer of each role, checking each frame's outcome against the model
+        fn check_each_role(ops: &[Op]) {
+            for role in ROLES {
+                if let Err(err) = check(role, ops.iter().copied()) {
+                    panic!("{role:?}: {err}");
                 }
             }
         }
 
+        /// the primary functions a peer sends
+        const REQUESTS: [Function; 4] = [
+            Function::PriUnconfirmedUserData,
+            Function::PriResetLinkStates,
+            Function::PriConfirmedUserData,
+            Function::PriRequestLinkStatus,
+        ];
+
+        fn reset(peer: EndpointAddress) -> Op {
+            Op::Frame(Frame::new(Function::PriResetLinkStates, peer))
+        }
+
+        fn confirmed_data(peer: EndpointAddress, fcb: bool) -> Op {
+            Op::Frame(Frame::new(Function::PriConfirmedUserData, peer).fcb(fcb))
+        }
+
+        /// `frames` after the first peer resets the link and sends one confirmed frame, then the
+        /// next confirmed frame it sends, so a frame that changed the secondary state shows in
+        /// that last one
+        fn between_owner_frames(frames: impl IntoIterator<Item = Frame>) -> Vec<Op> {
+            let [a, _, _] = PEERS;
+            let mut ops = vec![reset(a), confirmed_data(a, true)];
+            ops.extend(frames.into_iter().map(Op::Frame));
+            ops.push(confirmed_data(a, false));
+            ops
+        }
+
+        /// Confirmed user data is ignored until the link is reset, then delivered and acked once
+        /// per FCB toggle, and needs a new reset after the session ends
+        #[test]
+        fn confirmed_user_data_is_delivered_after_reset() {
+            let [a, _, _] = PEERS;
+            check_each_role(&[
+                confirmed_data(a, true),
+                reset(a),
+                confirmed_data(a, true),
+                confirmed_data(a, true),
+                confirmed_data(a, false),
+                Op::EndSession,
+                confirmed_data(a, true),
+            ]);
+        }
+
+        /// Only the peer that last reset the link may send confirmed user data, and another
+        /// peer's frames leave the owner's FCB unchanged
+        #[test]
+        fn secondary_state_is_owned_by_the_last_peer_to_reset_it() {
+            let [a, b, _] = PEERS;
+            check_each_role(&[
+                reset(a),
+                confirmed_data(a, true),
+                confirmed_data(b, false),
+                confirmed_data(a, false),
+                confirmed_data(b, true),
+                confirmed_data(a, true),
+                confirmed_data(a, true),
+                reset(b),
+                confirmed_data(a, true),
+                confirmed_data(b, true),
+                confirmed_data(b, true),
+            ]);
+        }
+
+        /// Unconfirmed user data, link status requests and link status responses are passed up
+        #[test]
+        fn user_data_and_link_status_are_passed_up() {
+            let [a, _, _] = PEERS;
+            check_each_role(
+                &[
+                    Function::PriUnconfirmedUserData,
+                    Function::PriRequestLinkStatus,
+                    Function::SecLinkStatus,
+                ]
+                .map(|func| Op::Frame(Frame::new(func, a))),
+            );
+        }
+
+        /// Frames from the same type of endpoint are dropped without a reason
+        #[test]
+        fn frames_from_the_same_type_of_endpoint_are_dropped() {
+            let [a, _, _] = PEERS;
+            let frames = REQUESTS.map(|func| Frame::new(func, a).same_type());
+            check_each_role(&between_owner_frames(
+                frames
+                    .into_iter()
+                    .chain(frames.map(|x| x.to(AnyAddress::SelfAddress))),
+            ));
+        }
+
+        /// Only an outstation with the feature enabled accepts frames sent to the self address,
+        /// and it answers from its own address
+        #[test]
+        fn frames_sent_to_the_self_address() {
+            let [a, _, _] = PEERS;
+            check_each_role(&between_owner_frames(
+                [
+                    Frame::new(Function::PriUnconfirmedUserData, a),
+                    Frame::new(Function::PriConfirmedUserData, a),
+                    Frame::new(Function::PriRequestLinkStatus, a),
+                    Frame::new(Function::PriResetLinkStates, a),
+                    Frame::new(Function::PriConfirmedUserData, a).fcb(true),
+                ]
+                .map(|x| x.to(AnyAddress::SelfAddress)),
+            ));
+        }
+
+        #[test]
+        fn frames_from_the_self_address_are_ignored() {
+            let [a, _, _] = PEERS;
+            check_each_role(&between_owner_frames(
+                REQUESTS.map(|func| Frame::new(func, a).from(AnyAddress::SelfAddress)),
+            ));
+        }
+
+        /// A master ignores broadcasts; an outstation passes up broadcast user data with its mode
+        /// and without a reply, even when confirmed, and ignores other broadcast functions
+        #[test]
+        fn broadcasts() {
+            let [a, _, _] = PEERS;
+            let mut fcb = false;
+            let frames = BROADCASTS.map(|mode| {
+                let frames = REQUESTS
+                    .map(|func| Frame::new(func, a).fcb(fcb).to(AnyAddress::Broadcast(mode)));
+                fcb = !fcb;
+                frames
+            });
+            check_each_role(&between_owner_frames(frames.into_iter().flatten()));
+        }
+
+        #[test]
+        fn frames_with_the_wrong_fcv_bit_are_ignored() {
+            let [a, _, _] = PEERS;
+            check_each_role(&between_owner_frames(
+                REQUESTS.map(|func| Frame::new(func, a).fcv(!needs_fcv(func))),
+            ));
+        }
+
+        #[test]
+        fn frames_to_reserved_addresses_are_ignored() {
+            let [a, _, _] = PEERS;
+            for address in RESERVED {
+                assert_eq!(AnyAddress::from(address), AnyAddress::Reserved(address));
+            }
+            check_each_role(&between_owner_frames(RESERVED.into_iter().flat_map(
+                |address| REQUESTS.map(|func| Frame::new(func, a).to(AnyAddress::from(address))),
+            )));
+        }
+
+        /// Frames with a function the link layer doesn't act on are ignored whatever their FCB and
+        /// FCV bits
+        #[test]
+        fn frames_with_functions_the_layer_does_not_act_on_are_ignored() {
+            let [a, _, _] = PEERS;
+            check_each_role(&between_owner_frames(
+                IGNORED_FUNCTIONS.into_iter().flat_map(|func| {
+                    [(false, false), (false, true), (true, true)]
+                        .map(|(fcb, fcv)| Frame::new(func, a).fcb(fcb).fcv(fcv))
+                }),
+            ));
+        }
+
         fn confirmed_from(role: LinkRole, source: EndpointAddress, fcb: bool) -> Header {
-            from(source, confirmed(!is_master(role), fcb, local(role).wrap()))
+            Frame::new(Function::PriConfirmedUserData, source)
+                .fcb(fcb)
+                .header(role)
         }
 
         fn reset_from(role: LinkRole, source: EndpointAddress) -> Header {
-            from(
-                source,
-                header(
-                    !is_master(role),
-                    Function::PriResetLinkStates,
-                    local(role).wrap(),
-                ),
-            )
+            Frame::new(Function::PriResetLinkStates, source).header(role)
         }
 
         /// The model rejects data from a peer that no longer owns the link and a redelivered
