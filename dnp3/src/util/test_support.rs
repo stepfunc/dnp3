@@ -2,6 +2,9 @@
 
 use std::fmt::Debug;
 use std::future::Future;
+use std::io::Write;
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 
 use tokio::sync::mpsc;
@@ -86,25 +89,67 @@ pub(crate) mod tls {
 /// How long a test may run in wall-clock time before [`watchdog`] fails it
 const WATCHDOG: Duration = Duration::from_secs(30);
 
+/// How long a test may take to fail after [`WATCHDOG`] expires before the process is aborted
+const ABORT_GRACE: Duration = Duration::from_secs(5);
+
 /// Run a test body, failing it if it takes longer than [`WATCHDOG`] of wall-clock time
 ///
 /// A paused clock can't bound a test: it only advances to pending timers, so a test waiting for
 /// something that never happens would hang. A thread outside the runtime measures real time, and
 /// it isn't a timer, so it doesn't change when a paused clock advances.
+///
+/// The test fails by panicking when the runtime next polls it. A test that never yields, such as
+/// one busy-looping on a current-thread runtime, is never polled again, so the thread aborts the
+/// process if the test still hasn't finished [`ABORT_GRACE`] after the watchdog expired.
 pub(crate) async fn watchdog(test: impl Future<Output = ()>) {
+    let name = std::thread::current()
+        .name()
+        .unwrap_or("<unnamed>")
+        .to_owned();
     let (expired_tx, expired_rx) = tokio::sync::oneshot::channel::<()>();
     let (done_tx, done_rx) = std::sync::mpsc::channel::<()>();
+    let settled = Arc::new(AtomicBool::new(false));
+    let _finished = Finished {
+        settled: settled.clone(),
+        _wake: done_tx,
+    };
     std::thread::spawn(move || {
-        if let Err(std::sync::mpsc::RecvTimeoutError::Timeout) = done_rx.recv_timeout(WATCHDOG) {
+        use std::sync::mpsc::RecvTimeoutError;
+        if let Err(RecvTimeoutError::Timeout) = done_rx.recv_timeout(WATCHDOG) {
             // the test may have finished meanwhile and dropped the receiver
             let _: Result<(), ()> = expired_tx.send(());
+            if let Err(RecvTimeoutError::Timeout) = done_rx.recv_timeout(ABORT_GRACE) {
+                // the test may finish after the timeout, so only abort if it hasn't settled first
+                if settled.swap(true, Ordering::SeqCst) {
+                    return;
+                }
+                // the test harness captures eprintln!, and the capture is lost when aborting
+                drop(writeln!(
+                    std::io::stderr(),
+                    "test {name} didn't finish within {WATCHDOG:?} of wall-clock time, \
+                     and didn't yield to fail within {ABORT_GRACE:?} more; aborting"
+                ));
+                std::process::abort();
+            }
         }
     });
     tokio::select! {
         _ = test => {}
         _ = expired_rx => panic!("the test didn't finish within {WATCHDOG:?} of wall-clock time"),
     }
-    drop(done_tx);
+}
+
+/// Settles a [`watchdog`] when the test finishes, panics or is dropped, so the watchdog thread
+/// can't abort the process afterwards, then wakes the thread by dropping the sender
+struct Finished {
+    settled: Arc<AtomicBool>,
+    _wake: std::sync::mpsc::Sender<()>,
+}
+
+impl Drop for Finished {
+    fn drop(&mut self) {
+        self.settled.store(true, Ordering::SeqCst);
+    }
 }
 
 struct TimedListener<T>(mpsc::UnboundedSender<(Instant, T)>);
