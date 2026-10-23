@@ -30,7 +30,7 @@ use crate::master::tests::outcomes::{
     Entry, FixedTime, Kind, Log, Reply, MALFORMED, OTHER, OUTSTATION, UNKNOWN,
 };
 use crate::master::{Classes, CommandError, CommandResponseError, ReadType, TaskError, TaskType};
-use crate::util::test_support::watchdog;
+use crate::util::test_support::run_paused;
 
 /// The response timeout the harness configures, in milliseconds
 const TIMEOUT: u64 = 1000;
@@ -1090,20 +1090,6 @@ async fn execute(task: Task, steps: &[Step]) -> Run {
     }
 }
 
-/// Run one case on its own paused runtime, under the watchdog
-fn run(task: Task, steps: &[Step]) -> Run {
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .start_paused(true)
-        .build()
-        .unwrap();
-    let mut run = None;
-    runtime.block_on(watchdog(async {
-        run = Some(execute(task, steps).await);
-    }));
-    run.unwrap()
-}
-
 fn source() -> impl Strategy<Value = Source> {
     prop_oneof![
         8 => Just(Source::Outstation),
@@ -1265,7 +1251,7 @@ proptest! {
         task in prop_oneof![Just(Task::User(Kind::Read)), Just(Task::StartupIntegrity)],
         steps in steps(true),
     ) {
-        run(task, &steps).check()?;
+        run_paused(execute(task, &steps)).check()?;
     }
 }
 
@@ -1288,7 +1274,7 @@ proptest! {
         ]),
         steps in steps(false),
     ) {
-        run(Task::User(kind), &steps).check()?;
+        run_paused(execute(Task::User(kind), &steps)).check()?;
     }
 }
 
@@ -1317,7 +1303,7 @@ fn read_with_a_rejected_fragment() -> Vec<Step> {
 #[test]
 fn the_model_accepts_the_master_and_rejects_known_wrong_outcomes() {
     let task = Task::User(Kind::Read);
-    let mut run = run(task, &read_with_a_rejected_fragment());
+    let mut run = run_paused(execute(task, &read_with_a_rejected_fragment()));
     run.check().unwrap();
 
     // the model's expectation, written out
@@ -1401,7 +1387,7 @@ fn a_startup_integrity_scan_times_out_one_response_timeout_after_its_last_fragme
         }),
         wait: FINAL_WAIT,
     };
-    let run = run(Task::StartupIntegrity, &[first]);
+    let run = run_paused(execute(Task::StartupIntegrity, &[first]));
     run.check().unwrap();
 
     let failed =
@@ -1443,7 +1429,7 @@ fn the_model_rejects_a_missing_confirm_of_a_control_response() {
         }),
         wait: TICK,
     };
-    let mut run = run(task, &[response]);
+    let mut run = run_paused(execute(task, &[response]));
     run.check().unwrap();
     assert_eq!(run.observed[1].writes, vec![Write::Confirm(0)]);
     assert_eq!(run.reply, ReplyObs::Done(Reply::Command(Ok(())), TICK));

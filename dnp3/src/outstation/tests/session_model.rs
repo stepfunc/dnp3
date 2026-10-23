@@ -52,7 +52,6 @@
 )]
 
 use std::collections::VecDeque;
-use std::future::Future;
 use std::ops::Range;
 
 use proptest::prelude::*;
@@ -67,7 +66,7 @@ use crate::outstation::database::{
 };
 use crate::outstation::tests::harness::*;
 use crate::outstation::{BufferState, ClassCount, TypeCount};
-use crate::util::test_support::watchdog;
+use crate::util::test_support::run_paused;
 
 /// points of each kind, at indices 0 to 3
 const POINTS: u16 = 4;
@@ -228,13 +227,6 @@ struct Request {
 impl Request {
     fn bytes(&self) -> Vec<u8> {
         let control = 0xC0 | self.seq;
-        let classes = |code: u8, classes: &[bool; 3]| {
-            let mut bytes = vec![control, code];
-            for (class, _) in (0u8..).zip(classes).filter(|(_, named)| **named) {
-                bytes.extend([60, class + 2, 0x06]);
-            }
-            bytes
-        };
         match &self.function {
             Function::Read(headers) => {
                 let mut bytes = vec![control, 0x01];
@@ -243,10 +235,18 @@ impl Request {
                 }
                 bytes
             }
-            Function::DelayMeasure => vec![control, 0x17],
+            Function::DelayMeasure => delay_measure(self.seq).to_vec(),
             Function::ClearRestart => vec![control, 0x02, 80, 1, 0x00, 7, 7, 0x00],
-            Function::EnableUnsolicited(named) => classes(0x14, named),
-            Function::DisableUnsolicited(named) => classes(0x15, named),
+            Function::EnableUnsolicited(named) => {
+                let mut bytes = vec![control, 0x14];
+                for (class, _) in (0u8..).zip(named).filter(|(_, named)| **named) {
+                    bytes.extend([60, class + 2, 0x06]);
+                }
+                bytes
+            }
+            Function::DisableUnsolicited(named) => {
+                super::harness::disable_unsolicited(self.seq, *named)
+            }
         }
     }
 }
@@ -309,13 +309,6 @@ enum Input {
     Advance(u64),
     /// the connection drops and a new one starts
     Reconnect,
-}
-
-impl Input {
-    fn confirm_bytes(uns: bool, seq: u8) -> [u8; 2] {
-        let control = if uns { 0xD0 } else { 0xC0 };
-        [control | seq, 0x00]
-    }
 }
 
 /// what the model predicts for an input, besides the responses
@@ -1369,16 +1362,6 @@ fn update(db: &mut Database, kind: Kind, index: u16, id: u64) -> UpdateInfo {
     }
 }
 
-/// Run a test on a current-thread runtime with the clock paused, under a [`watchdog`]
-fn run_paused(test: impl Future<Output = ()>) {
-    tokio::runtime::Builder::new_current_thread()
-        .enable_time()
-        .start_paused(true)
-        .build()
-        .unwrap()
-        .block_on(watchdog(test))
-}
-
 /// Give the input to the outstation, and check what it did against the model
 async fn step(
     mut harness: OutstationHarness,
@@ -1397,10 +1380,9 @@ async fn step(
             });
         }
         Input::Request(request) => harness.send_and_process(&request.bytes()).await,
-        Input::Confirm { uns, seq } => {
-            harness
-                .send_and_process(&Input::confirm_bytes(*uns, *seq))
-                .await
+        Input::Confirm { uns: false, seq } => harness.send_and_process(&confirm(*seq)).await,
+        Input::Confirm { uns: true, seq } => {
+            harness.send_and_process(&unsolicited_confirm(*seq)).await
         }
         // the paused clock moves to each timer due on the way, so the outstation handles each one
         // at its deadline
@@ -1420,14 +1402,8 @@ async fn step(
     }
 
     // every response and callback since the last input: the model accepts no more than it expects
-    let mut writes = Vec::new();
-    while let Some(bytes) = harness.pop_response() {
-        writes.push(bytes);
-    }
-    let mut callbacks = Vec::new();
-    while let Some(event) = harness.poll_event() {
-        callbacks.push(event);
-    }
+    let writes = harness.drain_responses();
+    let callbacks = harness.drain_events();
 
     let outcome = model.apply(&input, writes);
     assert_eq!(callbacks, outcome.callbacks, "{}: callbacks", model.context);

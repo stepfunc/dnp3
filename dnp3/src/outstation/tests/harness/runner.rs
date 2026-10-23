@@ -123,6 +123,11 @@ impl<S> Harness<S> {
         self.events.poll()
     }
 
+    /// Every event already reported, without waiting for more
+    pub(crate) fn drain_events(&mut self) -> Vec<Event> {
+        std::iter::from_fn(|| self.events.poll()).collect()
+    }
+
     pub(crate) fn check_no_events(&mut self) {
         if let Some(x) = self.events.poll() {
             panic!("expected no events, but next event is: {x:?}")
@@ -187,6 +192,11 @@ impl Harness<Connected> {
             sfio_tokio_mock_io::Event::Write(bytes) => Some(bytes),
             x => panic!("Expected write but got: {x:?}"),
         }
+    }
+
+    /// Every response the outstation already sent, as [`Self::pop_response`] describes
+    pub(crate) fn drain_responses(&mut self) -> Vec<Vec<u8>> {
+        std::iter::from_fn(|| self.pop_response()).collect()
     }
 
     pub(crate) fn expect_no_response(&mut self) {

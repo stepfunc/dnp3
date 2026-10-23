@@ -32,8 +32,6 @@
     reason = "the model adds small sequence numbers and millisecond counts"
 )]
 
-use std::future::Future;
-
 use proptest::prelude::*;
 use tokio::time::{Duration, Instant};
 
@@ -44,7 +42,7 @@ use crate::app::{FunctionCode, Timeout};
 use crate::outstation::config::OutstationConfig;
 use crate::outstation::tests::harness::*;
 use crate::outstation::traits::OperateType;
-use crate::util::test_support::watchdog;
+use crate::util::test_support::run_paused;
 
 /// the index whose control handler status the tests change
 const STATUS_INDEX: u16 = 3;
@@ -816,16 +814,6 @@ fn select_timeout_ms() -> impl Strategy<Value = u64> {
     prop_oneof![Just(1u64), Just(2), Just(50), Just(1000), Just(5000),]
 }
 
-/// Run a test on a current-thread runtime with the clock paused, under a [`watchdog`]
-fn run_paused(test: impl Future<Output = ()>) {
-    tokio::runtime::Builder::new_current_thread()
-        .enable_time()
-        .start_paused(true)
-        .build()
-        .unwrap()
-        .block_on(watchdog(test))
-}
-
 fn config(select_timeout_ms: u64) -> OutstationConfig {
     let mut config = without_keep_alive(get_default_config());
     config.select_timeout = Timeout::from_millis(select_timeout_ms).unwrap();
@@ -900,14 +888,8 @@ impl Run {
 
         // the outstation has answered once this returns (see `pop_response`)
         self.harness.send_and_process(&request.bytes()).await;
-        let mut events = Vec::new();
-        while let Some(event) = self.harness.poll_event() {
-            events.push(event);
-        }
-        let mut responses = Vec::new();
-        while let Some(response) = self.harness.pop_response() {
-            responses.push(response);
-        }
+        let events = self.harness.drain_events();
+        let mut responses = self.harness.drain_responses();
         assert!(
             responses.len() <= 1,
             "{request:?} at {} ms: more than one response: {responses:02X?}",
