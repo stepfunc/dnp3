@@ -1761,15 +1761,6 @@ mod test {
         assert!(cursor.is_empty());
     }
 
-    #[test]
-    fn rejects_three_byte_unsigned_int() {
-        let mut cursor = ReadCursor::new(&[UNSIGNED_INT, 0x03, 42, 00, 00]);
-        assert_eq!(
-            AttrValue::parse(&mut cursor),
-            Err(AttrParseError::BadIntegerLength(3))
-        );
-    }
-
     fn parse_signed(bytes: &[u8]) -> i32 {
         let mut cursor = ReadCursor::new(bytes);
         let value = match AttrValue::parse(&mut cursor).unwrap() {
@@ -1806,15 +1797,6 @@ mod test {
     }
 
     #[test]
-    fn rejects_three_byte_signed_int() {
-        let mut cursor = ReadCursor::new(&[SIGNED_INT, 0x03, 42, 00, 00]);
-        assert_eq!(
-            AttrValue::parse(&mut cursor),
-            Err(AttrParseError::BadIntegerLength(3))
-        );
-    }
-
-    #[test]
     fn integers_support_only_lengths_one_two_and_four() {
         // user decision D5: other lengths are rejected, even with enough payload bytes
         let payload = [0u8; 255];
@@ -1834,53 +1816,13 @@ mod test {
                     ),
                 }
             }
-        }
-    }
-
-    #[test]
-    fn signed_int_round_trips_at_every_encoding_size() {
-        for value in [
-            -129,
-            -128,
-            -1,
-            0,
-            1,
-            126,
-            127,
-            128,
-            -32769,
-            -32768,
-            32766,
-            32767,
-            32768,
-            i32::MIN,
-            i32::MAX,
-        ] {
-            let mut buffer = [0u8; 8];
-            let mut cursor = WriteCursor::new(&mut buffer);
-            assert!(OwnedAttrValue::SignedInt(value).write(&mut cursor).is_ok());
-            let written = cursor.written().to_vec();
-            assert_eq!(parse_signed(&written), value, "round trip of {value}");
-        }
-    }
-
-    #[test]
-    fn signed_int_uses_the_smallest_encoding() {
-        for (value, size) in [
-            (-128, 1),
-            (127, 1),
-            (-129, 2),
-            (128, 2),
-            (-32768, 2),
-            (32767, 2),
-            (-32769, 4),
-            (32768, 4),
-        ] {
-            let mut buffer = [0u8; 8];
-            let mut cursor = WriteCursor::new(&mut buffer);
-            assert!(OwnedAttrValue::SignedInt(value).write(&mut cursor).is_ok());
-            // the data type and the length precede the value
-            assert_eq!(cursor.written().len(), 2 + size, "encoding of {value}");
+            // a non-zero payload is rejected the same way
+            let input = [data_type, 0x03, 42, 00, 00];
+            let mut cursor = ReadCursor::new(&input);
+            assert_eq!(
+                AttrValue::parse(&mut cursor),
+                Err(AttrParseError::BadIntegerLength(3))
+            );
         }
     }
 
@@ -2195,31 +2137,6 @@ mod test {
         }
     }
 
-    #[test]
-    fn only_variations_that_carry_a_value_are_encodable() {
-        let attr = |variation, value| OwnedAttribute::new(AttrSet::Default, variation, value);
-        let small = || OwnedAttrValue::UnsignedInt(0);
-        let long = || OwnedAttrValue::VisibleString("a".repeat(256));
-
-        for variation in [
-            0,
-            var::ALL_ATTRIBUTES_REQUEST,
-            var::LIST_OF_ATTRIBUTE_VARIATIONS,
-        ] {
-            let expected = Err(BadAttribute::BadVariation(variation));
-            assert_eq!(attr(variation, small()).check_encodable(), expected);
-            assert_eq!(attr(variation, long()).check_encodable(), expected);
-        }
-
-        for variation in [1, var::DEVICE_MANUFACTURER_NAME, 253] {
-            assert_eq!(attr(variation, small()).check_encodable(), Ok(()));
-            assert_eq!(
-                attr(variation, long()).check_encodable(),
-                Err(BadAttribute::BadLength(256))
-            );
-        }
-    }
-
     mod codec_properties {
         use super::*;
         use crate::app::format::write::HeaderWriter;
@@ -2507,12 +2424,15 @@ mod test {
                         .map(OwnedAttrValue::UnsignedInt),
                 )
                 .chain(signed_edges().into_iter().map(OwnedAttrValue::SignedInt))
+                // around zero, and one below the one and two byte limits
+                .chain([-1, 0, 1, 126, 32766].map(OwnedAttrValue::SignedInt))
                 .chain([
                     OwnedAttrValue::VisibleString(String::new()),
                     OwnedAttrValue::OctetString(Vec::new()),
                     OwnedAttrValue::BitString(Vec::new()),
                     OwnedAttrValue::VisibleString("x".repeat(255)),
                     OwnedAttrValue::VisibleString("x".repeat(256)),
+                    OwnedAttrValue::VisibleString("a".repeat(256)),
                     OwnedAttrValue::OctetString(vec![0xAA; 256]),
                 ]);
             let variations = [1, var::DEVICE_MANUFACTURER_NAME, 253]
