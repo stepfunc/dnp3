@@ -17,14 +17,11 @@ use crate::link::header::BroadcastConfirmMode;
 use crate::outstation::config::Feature;
 use crate::outstation::tests::harness::*;
 use crate::outstation::traits::{BroadcastAction, OperateType};
-use crate::util::test_support::watchdog;
 
 // select, seq == 0, g41v2 - count == 1, index == 7, value = 513, status == SUCCESS,
 const SELECT_SEQ0_G41V2: &[u8] = &[0xC0, 0x03, 41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, 0x00];
 // operate, seq == 1, g41v2 - count == 1, index == 7, value = 513, status == SUCCESS
 const OPERATE_SEQ1_G41V2: &[u8] = &[0xC1, 0x04, 41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, 0x00];
-// operate, seq == 1, g41v2 - count == 1, index == 8, value = 513, status == SUCCESS
-const OPERATE_SEQ1_G41V2_INDEX_8: &[u8] = &[0xC1, 0x04, 41, 2, 0x17, 0x01, 0x08, 0x01, 0x02, 0x00];
 // operate, seq == 2, g41v2 - count == 1, index == 7, value = 513, status == SUCCESS
 const OPERATE_SEQ2_G41V2: &[u8] = &[0xC2, 0x04, 41, 2, 0x17, 0x01, 0x07, 0x01, 0x02, 0x00];
 // direct operate, seq == 0, g41v2 - count == 1, index == 7, value = 513, status == SUCCESS
@@ -36,17 +33,9 @@ const DIRECT_OPERATE_NO_ACK_SEQ0_G41V2: &[u8] =
 const RESPONSE_SEQ0_G41V2_SUCCESS: &[u8] = &[
     0xC0, 0x81, 0x80, 0x00, 41, 2, 0x17, 0x1, 0x07, 0x01, 0x02, 0x00,
 ];
-// response, seq == 1, restart IIN + echo of request headers
-const RESPONSE_SEQ1_G41V2_SUCCESS: &[u8] = &[
-    0xC1, 0x81, 0x80, 0x00, 41, 2, 0x17, 0x1, 0x07, 0x01, 0x02, 0x00,
-];
 // response, seq == 2, restart IIN + echo of request headers but with status == NO_SELECT
 const RESPONSE_SEQ2_G41V2_NO_SELECT: &[u8] = &[
     0xC2, 0x81, 0x80, 0x00, 41, 2, 0x17, 0x1, 0x07, 0x01, 0x02, 0x02,
-];
-// response, seq == 1, restart IIN + echo of request headers, index == 8, status == 2 (NO_SELECT)
-const RESPONSE_SEQ1_G41V2_INDEX8_NO_SELECT: &[u8] = &[
-    0xC1, 0x81, 0x80, 0x00, 41, 2, 0x17, 0x1, 0x08, 0x01, 0x02, 0x02,
 ];
 // response, seq == 1, restart IIN + echo of request headers but with STATUS == 1 (TIMEOUT)
 const RESPONSE_SEQ1_G41V2_SELECT_TIMEOUT: &[u8] = &[
@@ -465,253 +454,16 @@ async fn control_limit_holds_past_65535_controls_in_a_select_or_direct_operate()
     }
 }
 
-// Which requests end a selection, following IEEE 1815-2012 4.4.4 Rule 4 and Table 4-9
-
-// response, seq == 1, restart IIN + echo of request headers but with status == NO_SELECT
-const RESPONSE_SEQ1_G41V2_NO_SELECT: &[u8] = &[
-    0xC1, 0x81, 0x80, 0x00, 41, 2, 0x17, 0x1, 0x07, 0x01, 0x02, 0x02,
-];
-
-async fn select(harness: &mut OutstationHarness) {
-    harness
-        .test_request_response(SELECT_SEQ0_G41V2, RESPONSE_SEQ0_G41V2_SUCCESS)
-        .await;
-    harness.check_events(&selected());
-}
-
-async fn operate_succeeds(harness: &mut OutstationHarness) {
-    harness
-        .test_request_response(OPERATE_SEQ1_G41V2, RESPONSE_SEQ1_G41V2_SUCCESS)
-        .await;
-    harness.check_events(&operated(OperateType::SelectBeforeOperate));
-}
-
-async fn operate_gets_no_select(harness: &mut OutstationHarness) {
-    harness
-        .test_request_response(OPERATE_SEQ1_G41V2, RESPONSE_SEQ1_G41V2_NO_SELECT)
-        .await;
-    harness.check_no_events();
-}
-
-/// a request between SELECT and OPERATE, with the response it gets, ends the selection
-async fn request_ends_selection(request: &[u8], response: &[u8]) {
-    let mut harness = new_harness(get_default_config());
-    select(&mut harness).await;
-    harness.test_request_response(request, response).await;
-    operate_gets_no_select(&mut harness).await;
-}
-
-#[tokio::test]
-async fn solicited_confirm_between_select_and_operate_keeps_the_selection() {
-    let mut harness = new_harness(get_default_config());
-    select(&mut harness).await;
-    harness.send_and_process(&confirm(0)).await;
-    harness.expect_no_response();
-    operate_succeeds(&mut harness).await;
-}
-
-#[tokio::test]
-async fn unsolicited_confirm_between_select_and_operate_keeps_the_selection() {
-    let mut harness = new_harness(get_default_config());
-    select(&mut harness).await;
-    harness.send_and_process(&unsolicited_confirm(0)).await;
-    harness.expect_no_response();
-    operate_succeeds(&mut harness).await;
-}
-
-#[tokio::test]
-async fn invalid_fragment_between_select_and_operate_keeps_the_selection() {
-    let mut harness = new_harness(get_default_config());
-    select(&mut harness).await;
-    // FIR = 0, discarded without a response
-    harness.send_and_process(&[0x40, 0x01, 60, 1, 0x06]).await;
-    harness.expect_no_response();
-    operate_succeeds(&mut harness).await;
-}
-
-#[tokio::test]
-async fn select_with_the_same_sequence_and_different_objects_is_discarded() {
-    let mut harness = new_harness(get_default_config());
-    select(&mut harness).await;
-    // index 8 instead of 7
-    harness
-        .send_and_process(&[0xC0, 0x03, 41, 2, 0x17, 0x01, 0x08, 0x01, 0x02, 0x00])
-        .await;
-    harness.expect_no_response();
-    harness.check_no_events();
-    operate_succeeds(&mut harness).await;
-}
-
-#[tokio::test]
-async fn read_ends_the_selection() {
-    request_ends_selection(&read_class_0(5), &[0xC5, 0x81, 0x80, 0x00]).await;
-}
-
-#[tokio::test]
-async fn delay_measure_ends_the_selection() {
-    request_ends_selection(
-        &delay_measure(5),
-        &[0xC5, 0x81, 0x80, 0x00, 0x34, 0x02, 0x07, 0x01, 0x00, 0x00],
-    )
-    .await;
-}
-
-#[tokio::test]
-async fn malformed_request_ends_the_selection() {
-    request_ends_selection(&[0xC5, 0x01, 60], &[0xC5, 0x81, 0x80, 0x04]).await;
-}
-
-/// decision 0003: a malformed SELECT reusing the selection's sequence number is a new request
-/// answered with IIN2.2, not the discarded SELECT of IEEE 1815-2012 Table 4-9
-#[tokio::test]
-async fn malformed_select_with_the_selections_seq_ends_the_selection() {
-    watchdog(async {
-        // SELECT_SEQ0_G41V2 without its status byte
-        let malformed_select = [0xC0, 0x03, 41, 2, 0x17, 0x01, 0x07, 0x01, 0x02];
-        request_ends_selection(&malformed_select, &parameter_error_response(0)).await;
-    })
-    .await;
-}
-
-#[tokio::test]
-async fn unknown_function_code_ends_the_selection() {
-    request_ends_selection(&[0xC5, 0x70], &[0xC5, 0x81, 0x80, 0x01]).await;
-}
-
-#[tokio::test]
-async fn direct_operate_ends_the_selection_and_its_retry_does_not_restore_it() {
-    let mut harness = new_harness(get_default_config());
-    select(&mut harness).await;
-
-    let direct_operate = g41v2_request(5, FunctionCode::DirectOperate, 1);
-    let response = g41v2_response(5, 1, 0);
-    harness
-        .test_request_response(&direct_operate, &response)
-        .await;
-    harness.check_events(&g41v2_operate_events(1, OperateType::DirectOperate));
-
-    // the retry repeats the response without operating again
-    harness
-        .test_request_response(&direct_operate, &response)
-        .await;
-    harness.check_no_events();
-
-    operate_gets_no_select(&mut harness).await;
-}
-
-#[tokio::test]
-async fn direct_operate_no_ack_ends_the_selection() {
-    let mut harness = new_harness(get_default_config());
-    select(&mut harness).await;
-    harness
-        .send_and_process(&g41v2_request(5, FunctionCode::DirectOperateNoResponse, 1))
-        .await;
-    harness.expect_no_response();
-    harness.check_events(&g41v2_operate_events(1, OperateType::DirectOperateNoAck));
-    operate_gets_no_select(&mut harness).await;
-}
-
-#[tokio::test]
-async fn rejected_operate_ends_the_selection() {
-    let mut harness = new_harness(get_default_config());
-    select(&mut harness).await;
-    harness
-        .test_request_response(
-            OPERATE_SEQ1_G41V2_INDEX_8,
-            RESPONSE_SEQ1_G41V2_INDEX8_NO_SELECT,
-        )
-        .await;
-    harness.check_no_events();
-    // a corrected OPERATE no longer has a selection
-    operate_gets_no_select(&mut harness).await;
-}
-
-#[tokio::test]
-async fn operate_uses_the_selection_once() {
-    let mut harness = new_harness(get_default_config());
-    select(&mut harness).await;
-    operate_succeeds(&mut harness).await;
-    // the retry of the OPERATE repeats its response without operating again
-    harness
-        .test_request_response(OPERATE_SEQ1_G41V2, RESPONSE_SEQ1_G41V2_SUCCESS)
-        .await;
-    harness.check_no_events();
-}
-
-#[tokio::test]
-async fn operate_without_a_select_gets_no_select() {
-    let mut harness = new_harness(get_default_config());
-    operate_gets_no_select(&mut harness).await;
-}
-
-#[tokio::test]
-async fn select_replaces_the_previous_selection() {
-    let mut harness = new_harness(get_default_config());
-    select(&mut harness).await;
-    harness
-        .test_request_response(
-            &g41v2_request(5, FunctionCode::Select, 1),
-            &g41v2_response(5, 1, 0),
-        )
-        .await;
-    harness.check_events(&g41v2_select_events(1));
-    // the OPERATE that follows the first SELECT no longer matches
-    operate_gets_no_select(&mut harness).await;
-}
-
-#[tokio::test]
-async fn operate_follows_the_latest_select() {
-    let mut harness = new_harness(get_default_config());
-    select(&mut harness).await;
-    harness
-        .test_request_response(
-            &g41v2_request(5, FunctionCode::Select, 1),
-            &g41v2_response(5, 1, 0),
-        )
-        .await;
-    harness.check_events(&g41v2_select_events(1));
-    harness
-        .test_request_response(
-            &g41v2_request(6, FunctionCode::Operate, 1),
-            &g41v2_response(6, 1, 0),
-        )
-        .await;
-    harness.check_events(&g41v2_operate_events(1, OperateType::SelectBeforeOperate));
-}
-
-#[tokio::test]
-async fn select_after_direct_operates_can_be_operated() {
-    let mut harness = new_harness(get_default_config());
-    harness
-        .test_request_response(
-            &g41v2_request(4, FunctionCode::DirectOperate, 1),
-            &g41v2_response(4, 1, 0),
-        )
-        .await;
-    harness.check_events(&g41v2_operate_events(1, OperateType::DirectOperate));
-    harness
-        .send_and_process(&g41v2_request(5, FunctionCode::DirectOperateNoResponse, 1))
-        .await;
-    harness.expect_no_response();
-    harness.check_events(&g41v2_operate_events(1, OperateType::DirectOperateNoAck));
-    select(&mut harness).await;
-    operate_succeeds(&mut harness).await;
-}
-
-#[tokio::test]
-async fn select_repeated_after_its_operate_selects_again() {
-    let mut harness = new_harness(get_default_config());
-    select(&mut harness).await;
-    operate_succeeds(&mut harness).await;
-    // no longer a retry, since the OPERATE came between them
-    select(&mut harness).await;
-    operate_succeeds(&mut harness).await;
-}
+// Which requests end or keep a selection is in select_operate_model.rs, apart from a broadcast,
+// which that model doesn't send
 
 #[tokio::test]
 async fn broadcast_direct_operate_no_ack_ends_the_selection() {
     let mut harness = new_harness(get_default_config());
-    select(&mut harness).await;
+    harness
+        .test_request_response(SELECT_SEQ0_G41V2, RESPONSE_SEQ0_G41V2_SUCCESS)
+        .await;
+    harness.check_events(&selected());
     harness.set_broadcast(Some(BroadcastConfirmMode::Optional));
     harness
         .send_and_process(&g41v2_request(5, FunctionCode::DirectOperateNoResponse, 1))
