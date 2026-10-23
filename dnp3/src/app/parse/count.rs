@@ -135,4 +135,52 @@ mod tests {
         let mut cursor = ReadCursor::new(&data);
         CountSequence::<u16>::parse(2, &mut cursor).unwrap_err();
     }
+
+    mod property {
+        use super::*;
+        use crate::app::variations::Group50Var1;
+        use crate::app::Timestamp;
+
+        use proptest::prelude::*;
+
+        proptest! {
+            #![proptest_config(ProptestConfig::with_cases(256))]
+
+            /// A count sequence reads exactly its objects and yields each once, then stays
+            /// exhausted; one byte less is an error
+            #[test]
+            fn count_sequence_yields_each_object_once(
+                times in prop::collection::vec(0..=Timestamp::MAX_VALUE, 0..40),
+                trailing in prop::collection::vec(any::<u8>(), 0..4),
+            ) {
+                let objects: Vec<u8> = times.iter().flat_map(|x| x.to_le_bytes()[..6].to_vec()).collect();
+                let values: Vec<Group50Var1> = times
+                    .iter()
+                    .map(|x| Group50Var1 { time: Timestamp::new(*x) })
+                    .collect();
+                let bytes = [objects.as_slice(), &trailing].concat();
+                let count = u16::try_from(values.len()).unwrap();
+
+                let mut cursor = ReadCursor::new(&bytes);
+                let seq = CountSequence::<Group50Var1>::parse(count, &mut cursor).unwrap();
+                prop_assert_eq!(cursor.remaining(), trailing.len());
+                let mut iter = seq.iter();
+                prop_assert_eq!(iter.size_hint(), (values.len(), Some(values.len())));
+                prop_assert_eq!(iter.by_ref().collect::<Vec<_>>(), values.clone());
+                prop_assert_eq!(iter.next(), None);
+                prop_assert_eq!(iter.next(), None);
+                prop_assert_eq!(iter.size_hint(), (0, Some(0)));
+                let single = match values.as_slice() {
+                    [x] => Some(*x),
+                    _ => None,
+                };
+                prop_assert_eq!(seq.single(), single);
+
+                if let Some(short) = objects.len().checked_sub(1) {
+                    CountSequence::<Group50Var1>::parse(count, &mut ReadCursor::new(&objects[..short]))
+                        .unwrap_err();
+                }
+            }
+        }
+    }
 }
