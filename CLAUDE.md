@@ -23,7 +23,7 @@ written license terms and authorizations govern.
 - Check lints: `cargo clippy --all-targets --features serialization,unstable -- -D warnings`. CI also clippies `dnp3` with `--no-default-features` plus each feature alone, and with `tls-aws-lc` in place of `tls` (`linting` and `features` jobs in `.github/workflows/ci.yml`)
 - MSRV check: `cargo +1.88.0 check --locked --workspace --all-targets` (the `msrv` CI job)
 - Docs: `cargo doc -p dnp3 --no-deps`; the guide is Docusaurus under `guide/` (`npm ci && npm run build`)
-- Bindings: `cargo build --release -p dnp3-ffi -p dnp3-ffi-java`, then `cargo run --bin dnp3-bindings -- --c` (or `--dotnet`, `--java`). This generates into `ffi/bindings/` and runs the binding tests; `--no-tests` skips them
+- Bindings: `cargo build --release -p dnp3-ffi-c -p dnp3-ffi-java`, then `cargo run --bin dnp3-bindings -- --c` (or `--dotnet`, `--java`). This generates into `ffi/bindings/` and runs the binding tests; `--no-tests` skips them
 - No-panic check: `RUSTFLAGS="--cfg dnp3_no_panic" CARGO_PROFILE_RELEASE_LTO=thin CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 cargo test -p dnp3 --lib --release --no-run` (use a separate `CARGO_TARGET_DIR`). A link error names a function marked `no_panic` that the optimizer couldn't prove panic-free; see `dnp3/src/no_panic_check.rs`. The `no-panic` CI job pins its toolchain, since a newer one can fail the link without a code change
 
 ## Conformance Tests

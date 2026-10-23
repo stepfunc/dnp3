@@ -60,7 +60,7 @@ jobs:
           toolchain: stable
           components: clippy
       - name: Build the workspace with the features
-        run: cargo build --release -p dnp3 -p dnp3-ffi -p dnp3-ffi-java ${{ matrix.feature-args }}
+        run: cargo build --release -p dnp3 -p dnp3-ffi-c -p dnp3-ffi-java ${{ matrix.feature-args }}
       - name: Clippy the core crate and its tests with the features
         run: cargo clippy -p dnp3 --all-targets ${{ matrix.feature-args }} -- -D warnings
   # Check the workspace with the minimum supported Rust version declared in Cargo.toml
@@ -135,7 +135,7 @@ jobs:
       - name: Install doxygen 1.9.5
         run: wget -q https://github.com/stepfunc/ci-files/raw/main/doxygen/doxygen-1.9.5.linux.bin.tar.gz -O- | sudo tar --strip-components=1 -C /usr -xz doxygen-1.9.5
       - name: Build FFI and JNI
-        run: cargo build --release -p dnp3-ffi -p dnp3-ffi-java
+        run: cargo build --release -p dnp3-ffi-c -p dnp3-ffi-java
       - name: Build Rustdoc
         run: cargo doc -p dnp3 --no-deps
       - name: C bindings
@@ -163,8 +163,7 @@ jobs:
   bindings-windows:
     if: startsWith(github.ref, 'refs/tags/')
     # Release tags build the shipped libraries with one codegen unit and thin LTO (smaller and faster,
-    # but slower to build); other runs keep cargo's release defaults. Symbols are not stripped. LTO
-    # doesn't reach dnp3-ffi yet: its rlib crate type stops cargo from applying it
+    # but slower to build); other runs keep cargo's release defaults. Symbols are not stripped
     env:
       CARGO_PROFILE_RELEASE_LTO: ${{ startsWith(github.ref, 'refs/tags/') && 'thin' || 'false' }}
       CARGO_PROFILE_RELEASE_CODEGEN_UNITS: ${{ startsWith(github.ref, 'refs/tags/') && '1' || '16' }}
@@ -193,7 +192,7 @@ jobs:
         run: mkdir ffi-modules\${{ matrix.target }}
       - name: Build FFI
         shell: bash
-        run: bash .github/scripts/build-evidence.sh evidence/ffi/${{ matrix.target }} cargo -p dnp3-ffi --target ${{ matrix.target }} --no-default-features --features serial,tls-aws-lc
+        run: bash .github/scripts/build-evidence.sh evidence/ffi/${{ matrix.target }} cargo -p dnp3-ffi-c --target ${{ matrix.target }} --no-default-features --features serial,tls-aws-lc
       - name: Build JNI
         shell: bash
         run: bash .github/scripts/build-evidence.sh evidence/java/${{ matrix.target }} cargo -p dnp3-ffi-java --target ${{ matrix.target }} --no-default-features --features serial,tls-aws-lc
@@ -227,8 +226,7 @@ jobs:
   bindings-macos:
     if: startsWith(github.ref, 'refs/tags/')
     # Release tags build the shipped libraries with one codegen unit and thin LTO (smaller and faster,
-    # but slower to build); other runs keep cargo's release defaults. Symbols are not stripped. LTO
-    # doesn't reach dnp3-ffi yet: its rlib crate type stops cargo from applying it
+    # but slower to build); other runs keep cargo's release defaults. Symbols are not stripped
     env:
       CARGO_PROFILE_RELEASE_LTO: ${{ startsWith(github.ref, 'refs/tags/') && 'thin' || 'false' }}
       CARGO_PROFILE_RELEASE_CODEGEN_UNITS: ${{ startsWith(github.ref, 'refs/tags/') && '1' || '16' }}
@@ -249,7 +247,7 @@ jobs:
       - name: Create FFI modules dir
         run: mkdir -p ffi-modules/${{ matrix.target }}
       - name: Build FFI
-        run: bash .github/scripts/build-evidence.sh evidence/ffi/${{ matrix.target }} cargo -p dnp3-ffi --target ${{ matrix.target }} --no-default-features --features serial,tls-aws-lc
+        run: bash .github/scripts/build-evidence.sh evidence/ffi/${{ matrix.target }} cargo -p dnp3-ffi-c --target ${{ matrix.target }} --no-default-features --features serial,tls-aws-lc
       - name: Build JNI
         run: bash .github/scripts/build-evidence.sh evidence/java/${{ matrix.target }} cargo -p dnp3-ffi-java --target ${{ matrix.target }} --no-default-features --features serial,tls-aws-lc
       - name: Copy the FFI and JNI libs
@@ -273,8 +271,7 @@ jobs:
   # Cross-compilation for Linux to produce portable C and JNI libraries
   bindings-linux:
     # Release tags build the shipped libraries with one codegen unit and thin LTO (smaller and faster,
-    # but slower to build); other runs keep cargo's release defaults. Symbols are not stripped. LTO
-    # doesn't reach dnp3-ffi yet: its rlib crate type stops cargo from applying it
+    # but slower to build); other runs keep cargo's release defaults. Symbols are not stripped
     env:
       CARGO_PROFILE_RELEASE_LTO: ${{ startsWith(github.ref, 'refs/tags/') && 'thin' || 'false' }}
       CARGO_PROFILE_RELEASE_CODEGEN_UNITS: ${{ startsWith(github.ref, 'refs/tags/') && '1' || '16' }}
@@ -317,7 +314,7 @@ jobs:
       - name: Create FFI modules dir
         run: mkdir -p ffi-modules/${{ matrix.cases.target }}
       - name: Build FFI
-        run: bash .github/scripts/build-evidence.sh evidence/ffi/${{ matrix.cases.target }} cross -p dnp3-ffi --target ${{ matrix.cases.target }} --no-default-features --features serial,${{ matrix.cases.features }}
+        run: bash .github/scripts/build-evidence.sh evidence/ffi/${{ matrix.cases.target }} cross -p dnp3-ffi-c --target ${{ matrix.cases.target }} --no-default-features --features serial,${{ matrix.cases.features }}
       - name: Build JNI
         run: bash .github/scripts/build-evidence.sh evidence/java/${{ matrix.cases.target }} cross -p dnp3-ffi-java --target ${{ matrix.cases.target }} --no-default-features --features serial,${{ matrix.cases.features }}
       - name: Copy the FFI and JNI libs
@@ -384,10 +381,10 @@ jobs:
         run: |
           cargo metadata --format-version 1 --all-features --locked > metadata.json
           COMMON="-m metadata.json -c allowed.json"
-          bom-tools licenses -e evidence/ffi --root-package dnp3-ffi $COMMON > third-party-licenses.txt
+          bom-tools licenses -e evidence/ffi --root-package dnp3-ffi-c $COMMON > third-party-licenses.txt
           bom-tools licenses -e evidence/java --root-package dnp3-ffi-java $COMMON > third-party-licenses-java.txt
           mkdir sboms
-          bom-tools sbom -e evidence/ffi --root-package dnp3-ffi $COMMON --lockfile Cargo.lock > sboms/dnp3-ffi.cdx.json
+          bom-tools sbom -e evidence/ffi --root-package dnp3-ffi-c $COMMON --lockfile Cargo.lock > sboms/dnp3-ffi.cdx.json
           bom-tools sbom -e evidence/java --root-package dnp3-ffi-java $COMMON --lockfile Cargo.lock > sboms/dnp3-ffi-java.cdx.json
       - name: Upload SBOMs
         uses: actions/upload-artifact@v7

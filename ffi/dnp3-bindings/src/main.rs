@@ -13,10 +13,10 @@ fn main() {
         .init();
 
     let builder_settings = oo_bindgen::cli::BindingBuilderSettings {
-        ffi_target_name: "dnp3-ffi",
+        ffi_target_name: "dnp3-ffi-c",
         jni_target_name: "dnp3-ffi-java",
         ffi_name: "dnp3_ffi",
-        ffi_path: Path::new("ffi/dnp3-ffi").into(),
+        ffi_path: Path::new("ffi/dnp3-ffi-c").into(),
         java_group_id: "io.stepfunc",
         destination_path: Path::new("ffi/bindings").into(),
         library: std::rc::Rc::new(dnp3_schema::build_lib().unwrap()),

@@ -26,6 +26,7 @@ cd "$(dirname "$0")"
 FILES=(
   dnp3/Cargo.toml
   ffi/dnp3-ffi/Cargo.toml
+  ffi/dnp3-ffi-c/Cargo.toml
   ffi/dnp3-ffi-java/Cargo.toml
   ffi/dnp3-schema/Cargo.toml
   ffi/dnp3-bindings/Cargo.toml
@@ -63,7 +64,7 @@ for f in "${FILES[@]}"; do
 done
 
 echo "refreshing Cargo.lock"
-cargo update -p dnp3 -p dnp3-ffi -p dnp3-ffi-java -p dnp3-schema -p dnp3-bindings --precise "$NEW"
+cargo update -p dnp3 -p dnp3-ffi -p dnp3-ffi-c -p dnp3-ffi-java -p dnp3-schema -p dnp3-bindings --precise "$NEW"
 
 echo "verifying no '$OLD' references remain in the bumped files"
 stray=()

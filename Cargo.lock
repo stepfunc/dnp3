@@ -474,6 +474,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "dnp3-ffi-c"
+version = "1.8.0-M1"
+dependencies = [
+ "dnp3-ffi",
+]
+
+[[package]]
 name = "dnp3-ffi-java"
 version = "1.8.0-M1"
 dependencies = [

@@ -9,6 +9,7 @@ members = [
     "examples/perf",
     "ffi/dnp3-schema",
     "ffi/dnp3-ffi",
+    "ffi/dnp3-ffi-c",
     "ffi/dnp3-bindings",
     "ffi/dnp3-ffi-java",
 ]
