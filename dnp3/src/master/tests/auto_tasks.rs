@@ -16,7 +16,8 @@ use crate::master::tests::harness::AssocInfoEvent;
 use crate::master::{Classes, TaskError, TaskType, TimeSyncProcedure};
 
 use super::harness::requests::*;
-use super::harness::{create_association, TestHarness};
+use super::harness::{create_association, create_association_with_handler, TestHarness};
+use super::time_sync::{record_current_time, write_last_recorded_time, FixedTime, NEED_TIME};
 use crate::util::test_support::watchdog;
 
 const BUFFER_OVERFLOW: Iin = Iin::new(Iin1::new(0x00), Iin2::new(0x08));
@@ -285,19 +286,20 @@ async fn rejected_enable_unsolicited_with_restart_iin_is_repeated_after_the_rest
 const TIMEOUT_AND_FIRST_RETRY: Duration = Duration::from_secs(2);
 
 /// Let `request` go unanswered, then expect the master to send `retry` exactly `after` the
-/// original request
+/// original request, which was sent at the returned instant
 async fn expect_retry_after(
     harness: &mut TestHarness,
     request: Vec<u8>,
     retry: Vec<u8>,
     after: Duration,
-) {
+) -> Instant {
     expect_write_soon(harness, request).await;
     let sent = Instant::now();
     tokio::time::timeout(Duration::from_secs(60), harness.expect_write(retry))
         .await
         .expect("the master did not retry the request");
     TestHarness::assert_elapsed(sent, after);
+    sent
 }
 
 async fn assert_no_write_for(harness: &mut TestHarness, duration: Duration) {
@@ -305,85 +307,103 @@ async fn assert_no_write_for(harness: &mut TestHarness, duration: Duration) {
     assert_eq!(next.ok(), None);
 }
 
-#[tokio::test]
-async fn startup_integrity_scan_retries_after_the_backoff_on_timeout() {
-    watchdog(async {
-        tokio::time::pause();
-        let config = AssociationConfig {
-            startup_integrity_classes: Classes::all(),
-            ..AssociationConfig::quiet()
-        };
-        let mut seq = Sequence::default();
-        let mut harness = create_association(config).await;
-
-        expect_retry_after(
-            &mut harness,
-            integrity_poll_request(seq.increment()),
-            integrity_poll_request(seq),
-            TIMEOUT_AND_FIRST_RETRY,
-        )
-        .await;
-        harness.process_response(empty_response(seq)).await;
-
-        assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
-    })
-    .await;
+/// An auto task whose first request goes unanswered
+struct RetryCase {
+    config: AssociationConfig,
+    /// IIN reported in an unsolicited null response to start the task, when the config alone
+    /// doesn't
+    trigger: Option<Iin>,
+    /// The request that times out and is retried
+    request: fn(Sequence) -> Vec<u8>,
+    /// The requests that complete the task after the retry is answered
+    then: &'static [fn(Sequence) -> Vec<u8>],
 }
 
-#[tokio::test]
-async fn event_scan_retries_after_the_backoff_on_timeout() {
-    watchdog(async {
-        tokio::time::pause();
-        let config = AssociationConfig {
-            event_scan_on_events_available: EventClasses::all(),
-            ..AssociationConfig::quiet()
-        };
-        let mut seq = Sequence::default();
-        let mut harness = create_association(config).await;
+fn class_1_scan_request(seq: Sequence) -> Vec<u8> {
+    class_scan_request(
+        Classes::new(false, EventClasses::new(true, false, false)),
+        seq,
+    )
+}
 
-        harness
-            .read_and_expect_write(
-                unsol_null_custom_iin(Sequence::default(), CLASS_1_EVENTS),
-                unsol_confirm(Sequence::default()),
+fn retry_cases() -> [RetryCase; 4] {
+    [
+        RetryCase {
+            config: AssociationConfig {
+                startup_integrity_classes: Classes::all(),
+                ..AssociationConfig::quiet()
+            },
+            trigger: None,
+            request: integrity_poll_request,
+            then: &[],
+        },
+        RetryCase {
+            config: AssociationConfig {
+                event_scan_on_events_available: EventClasses::all(),
+                ..AssociationConfig::quiet()
+            },
+            trigger: Some(CLASS_1_EVENTS),
+            request: class_1_scan_request,
+            then: &[],
+        },
+        RetryCase {
+            config: AssociationConfig {
+                enable_unsol_classes: EventClasses::all(),
+                ..AssociationConfig::quiet()
+            },
+            trigger: None,
+            request: enable_unsol_request,
+            then: &[],
+        },
+        RetryCase {
+            config: AssociationConfig {
+                auto_time_sync: Some(TimeSyncProcedure::Lan),
+                ..AssociationConfig::quiet()
+            },
+            trigger: Some(NEED_TIME),
+            request: record_current_time,
+            then: &[write_last_recorded_time],
+        },
+    ]
+}
+
+#[tokio::test(start_paused = true)]
+async fn auto_tasks_retry_after_the_backoff_on_timeout() {
+    watchdog(async {
+        for case in retry_cases() {
+            let mut seq = Sequence::default();
+            let mut harness =
+                create_association_with_handler(case.config, Box::new(FixedTime)).await;
+
+            if let Some(iin) = case.trigger {
+                harness
+                    .read_and_expect_write(
+                        unsol_null_custom_iin(Sequence::default(), iin),
+                        unsol_confirm(Sequence::default()),
+                    )
+                    .await;
+            }
+
+            let sent = expect_retry_after(
+                &mut harness,
+                (case.request)(seq.increment()),
+                (case.request)(seq),
+                TIMEOUT_AND_FIRST_RETRY,
             )
             .await;
+            harness
+                .process_response(empty_response(seq.increment()))
+                .await;
+            for request in case.then {
+                harness
+                    .expect_write_and_respond(request(seq), empty_response(seq.increment()))
+                    .await;
+            }
+            // the rest of the task follows the retry without delay
+            TestHarness::assert_elapsed(sent, TIMEOUT_AND_FIRST_RETRY);
 
-        let class1 = Classes::new(false, EventClasses::new(true, false, false));
-        expect_retry_after(
-            &mut harness,
-            class_scan_request(class1, seq.increment()),
-            class_scan_request(class1, seq),
-            TIMEOUT_AND_FIRST_RETRY,
-        )
-        .await;
-        harness.process_response(empty_response(seq)).await;
-
-        assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
-    })
-    .await;
-}
-
-#[tokio::test]
-async fn enable_unsolicited_retries_after_the_backoff_on_timeout() {
-    watchdog(async {
-        tokio::time::pause();
-        let config = AssociationConfig {
-            enable_unsol_classes: EventClasses::all(),
-            ..AssociationConfig::quiet()
-        };
-        let mut seq = Sequence::default();
-        let mut harness = create_association(config).await;
-
-        expect_retry_after(
-            &mut harness,
-            enable_unsol_request(seq.increment()),
-            enable_unsol_request(seq),
-            TIMEOUT_AND_FIRST_RETRY,
-        )
-        .await;
-        harness.process_response(empty_response(seq)).await;
-
-        assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+            assert_no_write_for(&mut harness, Duration::from_secs(60)).await;
+        }
     })
     .await;
 }
