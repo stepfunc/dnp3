@@ -390,6 +390,9 @@ fn run(objects: &[u8]) -> Expected {
 
 fn time() -> impl Strategy<Value = u64> {
     prop_oneof![
+        // one below the maximum and the maximum, from which offsets 0 to 2 reach it or overflow it
+        Just(Timestamp::MAX_VALUE - 1),
+        Just(Timestamp::MAX_VALUE),
         0..=0xFFFFu64,
         0xFFFF_FFFE_FFFFu64..=Timestamp::MAX_VALUE,
         0..=Timestamp::MAX_VALUE,
@@ -397,7 +400,7 @@ fn time() -> impl Strategy<Value = u64> {
 }
 
 fn offset() -> impl Strategy<Value = u16> {
-    prop_oneof![Just(0), Just(u16::MAX), any::<u16>()]
+    prop_oneof![Just(0), Just(1), Just(2), Just(u16::MAX), any::<u16>()]
 }
 
 fn spec() -> impl Strategy<Value = Spec> {
