@@ -380,8 +380,26 @@ mod test {
             }
         }
 
+        /// 0.1.2.3 in each of its forms and the IPv6 addresses that aren't IPv4-mapped, drawn half
+        /// the time so that filters naming a native IPv6 address, or one address in two forms,
+        /// are common
+        fn forms_of_one_address() -> Vec<IpAddr> {
+            let v4 = Ipv4Addr::new(0, 1, 2, 3);
+            vec![
+                IpAddr::V4(v4),
+                IpAddr::V6(v4.to_ipv6_mapped()),
+                IpAddr::V6(v4.to_ipv6_compatible()),
+                ip("::ffff:0:0.1.2.3"),
+                IpAddr::V6(Ipv6Addr::LOCALHOST),
+                ip("2001:db8::1"),
+            ]
+        }
+
         fn address() -> impl Strategy<Value = IpAddr> {
-            prop::sample::select(universe())
+            prop_oneof![
+                prop::sample::select(universe()),
+                prop::sample::select(forms_of_one_address()),
+            ]
         }
 
         fn wildcard_octet() -> impl Strategy<Value = Option<u8>> {
@@ -390,11 +408,13 @@ mod test {
 
         fn filter() -> impl Strategy<Value = AddressFilter> {
             prop_oneof![
-                Just(AddressFilter::Any),
-                address().prop_map(AddressFilter::Exact),
-                prop::collection::vec(address(), 0..4)
+                1 => Just(AddressFilter::Any),
+                1 => address().prop_map(AddressFilter::Exact),
+                1 => prop::collection::vec(address(), 0..4)
                     .prop_map(|x| AddressFilter::AnyOf(x.into_iter().collect())),
-                (
+                // twice as often, so that pairs of wildcards overlapping only through each
+                // other's wildcard octets are common
+                2 => (
                     wildcard_octet(),
                     wildcard_octet(),
                     wildcard_octet(),
