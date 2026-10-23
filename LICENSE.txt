@@ -75,11 +75,11 @@ sentence, Developer may provide portions of the Licensed Software to a service
 provider solely to process them on Developer's behalf for activities otherwise
 permitted under this Agreement, provided the provider's applicable terms or
 written agreement limit use to that processing and prohibit model training and use
-for Other Implementations. This permission does not authorize public disclosure or
-grant the provider any independent right to use the Licensed Software. Developer
-remains responsible for compliance with this Agreement in using the service.
-Developer may not publish or disseminate any benchmarking results of Licensed
-Software performance.
+for any Other Implementation as defined in Section 2.6. This permission does not
+authorize public disclosure or grant the provider any independent right to use the
+Licensed Software. Developer remains responsible for compliance with this
+Agreement in using the service. Developer may not publish or disseminate any
+benchmarking results of Licensed Software performance.
 
 2.3. Non-Commercial and Non-Production Use
 
