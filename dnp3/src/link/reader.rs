@@ -818,4 +818,271 @@ mod tests {
             );
         }
     }
+
+    mod chunking {
+        use super::*;
+        use crate::link::format::{format_data_frame, format_header_only, Payload};
+        use crate::link::header::{AnyAddress, ControlField};
+
+        use proptest::prelude::*;
+
+        /// a frame's control byte, destination, source and payload, as raw values
+        type RawFrame = (u8, u16, u16, Vec<u8>);
+
+        fn raw((header, payload): Frame) -> RawFrame {
+            (
+                header.control.to_u8(),
+                header.destination.value(),
+                header.source.value(),
+                payload,
+            )
+        }
+
+        #[derive(Clone, Debug)]
+        struct GeneratedFrame {
+            control: u8,
+            destination: u16,
+            source: u16,
+            /// the transport header and application data, if the frame carries data
+            data: Option<(u8, Vec<u8>)>,
+        }
+
+        impl GeneratedFrame {
+            fn encode(&self) -> Vec<u8> {
+                let header = Header::new(
+                    ControlField::from(self.control),
+                    AnyAddress::from(self.destination),
+                    AnyAddress::from(self.source),
+                );
+                let mut buffer = [0; link::constant::MAX_LINK_FRAME_LENGTH];
+                let mut cursor = WriteCursor::new(&mut buffer);
+                let frame = match &self.data {
+                    None => format_header_only(header, &mut cursor),
+                    Some((transport, data)) => {
+                        format_data_frame(header, Payload::new(*transport, data), &mut cursor)
+                    }
+                };
+                frame.unwrap().frame.to_vec()
+            }
+
+            fn raw(&self) -> RawFrame {
+                let payload = match &self.data {
+                    None => Vec::new(),
+                    Some((transport, data)) => [&[*transport], data.as_slice()].concat(),
+                };
+                (self.control, self.destination, self.source, payload)
+            }
+        }
+
+        fn generated_frame() -> impl Strategy<Value = GeneratedFrame> {
+            let data_length = prop_oneof![
+                3 => 0..=link::constant::MAX_APP_BYTES_PER_FRAME,
+                1 => Just(link::constant::MAX_APP_BYTES_PER_FRAME),
+            ];
+            let data = prop::option::of((
+                any::<u8>(),
+                data_length.prop_flat_map(|n| prop::collection::vec(any::<u8>(), n)),
+            ));
+            (any::<u8>(), any::<u16>(), any::<u16>(), data).prop_map(
+                |(control, destination, source, data)| GeneratedFrame {
+                    control,
+                    destination,
+                    source,
+                    data,
+                },
+            )
+        }
+
+        /// a valid frame after the generated ones, so that what follows a corruption is observable
+        fn sentinel() -> GeneratedFrame {
+            GeneratedFrame {
+                control: 0x00,
+                destination: 1024,
+                source: 1,
+                data: None,
+            }
+        }
+
+        /// One changed byte of one frame, by the error it causes
+        #[derive(Clone, Debug)]
+        enum Corruption {
+            /// XOR the first start byte, or the second
+            Start { second: bool, xor: u8 },
+            /// a length below the minimum of 5
+            Length(u8),
+            /// XOR a byte of the control, address or CRC fields
+            Header { byte: prop::sample::Index, xor: u8 },
+            /// XOR a byte after the header, in a frame that carries data
+            Body { byte: prop::sample::Index, xor: u8 },
+        }
+
+        fn corruption() -> impl Strategy<Value = (prop::sample::Index, Corruption)> {
+            let xor = || 1..=u8::MAX;
+            let corruption = prop_oneof![
+                (any::<bool>(), xor()).prop_map(|(second, xor)| Corruption::Start { second, xor }),
+                (0..5u8).prop_map(Corruption::Length),
+                (any::<prop::sample::Index>(), xor())
+                    .prop_map(|(byte, xor)| Corruption::Header { byte, xor }),
+                (any::<prop::sample::Index>(), xor())
+                    .prop_map(|(byte, xor)| Corruption::Body { byte, xor }),
+            ];
+            (any::<prop::sample::Index>(), corruption)
+        }
+
+        /// Change one byte of a frame, chosen among the frames with data for a body corruption,
+        /// and return the frame's position and the error the change causes: the CRCs detect any
+        /// change of one byte in the header or a block
+        fn corrupt(
+            encoded: &mut [Vec<u8>],
+            frame: prop::sample::Index,
+            corruption: &Corruption,
+        ) -> Option<(usize, FrameError)> {
+            let with_data: Vec<usize> = (0..encoded.len())
+                .filter(|position| encoded[*position].len() > link::constant::LINK_HEADER_LENGTH)
+                .collect();
+            let position = match corruption {
+                Corruption::Body { .. } if with_data.is_empty() => return None,
+                Corruption::Body { .. } => with_data[frame.index(with_data.len())],
+                _ => frame.index(encoded.len()),
+            };
+            let bytes = &mut encoded[position];
+            let error = match *corruption {
+                Corruption::Start { second, xor } => {
+                    let offset = usize::from(second);
+                    bytes[offset] ^= xor;
+                    if second {
+                        FrameError::UnexpectedStart2(bytes[offset])
+                    } else {
+                        FrameError::UnexpectedStart1(bytes[offset])
+                    }
+                }
+                Corruption::Length(length) => {
+                    bytes[2] = length;
+                    FrameError::BadLength(length)
+                }
+                Corruption::Header { byte, xor } => {
+                    bytes[3..link::constant::LINK_HEADER_LENGTH][byte.index(7)] ^= xor;
+                    FrameError::BadHeaderCrc
+                }
+                Corruption::Body { byte, xor } => {
+                    let body = &mut bytes[link::constant::LINK_HEADER_LENGTH..];
+                    body[byte.index(body.len())] ^= xor;
+                    FrameError::BadBodyCrc
+                }
+            };
+            Some((position, error))
+        }
+
+        /// The frames a parser reads from all of `input` at once, and the error that stopped it,
+        /// if any
+        fn scan(mode: LinkErrorMode, input: &[u8]) -> (Vec<RawFrame>, Option<LinkError>) {
+            let mut parser = Parser::new(mode);
+            let mut cursor = ReadCursor::new(input);
+            let mut payload = FramePayload::new();
+            let mut frames = Vec::new();
+            loop {
+                match parser.parse(&mut cursor, &mut payload) {
+                    Ok(Some(header)) => frames.push(raw((header, payload.get().to_vec()))),
+                    Ok(None) => return (frames, None),
+                    Err(err) => return (frames, Some(err.into())),
+                }
+            }
+        }
+
+        /// The frames a stream reader reads from `input` when each read returns at most the next
+        /// of `reads` bytes, cycling through them, and the error that stopped it, if any
+        fn receive_in_reads(
+            modes: LinkModes,
+            fragment_size: usize,
+            input: &[u8],
+            reads: &[usize],
+        ) -> (Vec<RawFrame>, Option<LinkError>) {
+            let mut reader = Reader::new(modes, fragment_size);
+            let mut payload = FramePayload::new();
+            let mut frames = Vec::new();
+            let mut rest = input;
+            let mut error = None;
+            for read in reads.iter().cycle() {
+                if rest.is_empty() {
+                    break;
+                }
+                let space = reader.write_space().unwrap().len();
+                assert_ne!(space, 0);
+                let (chunk, tail) = rest.split_at(space.min(*read).min(rest.len()));
+                if let Err(err) = feed(&mut reader, &mut payload, chunk, &mut frames) {
+                    error = Some(err);
+                    break;
+                }
+                rest = tail;
+            }
+            (frames.into_iter().map(raw).collect(), error)
+        }
+
+        /// A frame whose data holds a whole frame in its first block: with its own start byte
+        /// changed, Discard mode finds the inner frame while it looks for the next one
+        #[test]
+        fn discard_mode_reads_a_frame_inside_the_data_of_a_corrupt_frame() {
+            let outer = GeneratedFrame {
+                control: 0xC4,
+                destination: 1,
+                source: 1024,
+                data: Some((0xC0, [ACK.bytes, &[0; 5]].concat())),
+            };
+            let mut corrupt = outer.encode();
+            corrupt[0] ^= 0xFF;
+            let input = [&corrupt, RESET_LINK.bytes].concat();
+            for chunks in chunkings(&input) {
+                assert_eq!(
+                    receive(LinkModes::stream(LinkErrorMode::Discard), &chunks),
+                    (vec![frame(&ACK), frame(&RESET_LINK)], None),
+                    "read as {chunks:02X?}"
+                );
+            }
+        }
+
+        proptest! {
+            #![proptest_config(ProptestConfig::with_cases(256))]
+
+            /// However a stream arrives, a stream reader reads the same frames from it as a parser
+            /// given all of it at once. Without changes, those are the frames written to it. With
+            /// one changed byte, Close mode closes the reader with the error for that byte after
+            /// the frames before it, and Discard mode reads the frames before it first.
+            #[test]
+            fn stream_reader_reads_the_written_frames_however_they_arrive(
+                frames in prop::collection::vec(generated_frame(), 1..12),
+                corruption in prop::option::weighted(0.75, corruption()),
+                fragment_size in prop::sample::select(vec![
+                    link::constant::MAX_APP_BYTES_PER_FRAME,
+                    2048,
+                ]),
+                reads in prop::collection::vec(1..=300usize, 1..16),
+            ) {
+                let mut encoded: Vec<Vec<u8>> = frames.iter().map(GeneratedFrame::encode).collect();
+                let corrupted = corruption
+                    .and_then(|(frame, corruption)| corrupt(&mut encoded, frame, &corruption));
+                let input = [encoded.concat(), sentinel().encode()].concat();
+                let clean: Vec<RawFrame> = frames.iter().map(GeneratedFrame::raw).collect();
+
+                for mode in [LinkErrorMode::Discard, LinkErrorMode::Close] {
+                    let received =
+                        receive_in_reads(LinkModes::stream(mode), fragment_size, &input, &reads);
+                    prop_assert_eq!(&received, &scan(mode, &input), "{:?}", mode);
+                    match (corrupted, mode) {
+                        (None, _) => {
+                            let expected = [clean.clone(), vec![sentinel().raw()]].concat();
+                            prop_assert_eq!(received, (expected, None), "{:?}", mode);
+                        }
+                        (Some((position, err)), LinkErrorMode::Close) => {
+                            let expected = clean[..position].to_vec();
+                            prop_assert_eq!(received, (expected, Some(LinkError::BadFrame(err))));
+                        }
+                        (Some((position, _)), LinkErrorMode::Discard) => {
+                            prop_assert!(received.0.starts_with(&clean[..position]));
+                            prop_assert_eq!(received.1, None);
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
