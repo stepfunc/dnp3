@@ -43,6 +43,7 @@ use crate::app::parse::parser::ParsedFragment;
 use crate::app::{ControlField, Iin1, Iin2, ResponseFunction};
 use crate::link::error::LinkError;
 use crate::master::request::ReadRequest;
+use crate::master::task::ReadOutcome;
 use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::NonReadTask;
 use crate::util::phys::PhysAddr;
@@ -827,10 +828,18 @@ impl System {
             Task::LinkStatus(promise) => promise.complete(Ok(())),
             Task::App(AppTask::Read(read)) => {
                 association.process_iin(iin);
-                if iin.has_bad_request_error() && read.fails_without_data() {
-                    read.on_task_error(Some(association), TaskError::RejectedByIin2(iin));
-                } else {
-                    read.complete(association, answer.events && !iin.has_bad_request_error());
+                // a response with events delivers their values
+                let mut outcome = ReadOutcome::default();
+                outcome.add(
+                    iin,
+                    Delivered {
+                        values: answer.events,
+                        events: answer.events,
+                    },
+                );
+                match outcome.result(&read) {
+                    Ok(()) => read.complete(association, outcome.events_without_request_errors()),
+                    Err(err) => read.on_task_error(Some(association), err),
                 }
             }
             Task::App(AppTask::NonRead(task)) => {
