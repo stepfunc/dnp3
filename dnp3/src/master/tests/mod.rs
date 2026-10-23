@@ -13,6 +13,7 @@ mod link_frames;
 mod outcomes;
 mod read_errors;
 mod read_types;
+mod reconnect;
 mod restart;
 mod scheduling;
 mod shared_link;

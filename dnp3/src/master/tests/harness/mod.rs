@@ -6,6 +6,7 @@
 
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
+use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
 
 use crate::app::measurement::AnalogInputDeadBand;
@@ -36,15 +37,49 @@ pub(crate) async fn create_association(config: AssociationConfig) -> TestHarness
 }
 
 pub(crate) async fn create_association_with_handler(
+    config: AssociationConfig,
+    assoc_handler: Box<dyn AssociationHandler>,
+) -> TestHarness {
+    create(config, assoc_handler, false).await
+}
+
+/// Like [`create_association`], but [`TestHarness::run_again`] can run the master again after a run
+/// ends
+pub(crate) async fn create_rerunnable_association(config: AssociationConfig) -> TestHarness {
+    create(config, Box::new(DefaultAssociationHandler), true).await
+}
+
+/// Run the master on a new mock I/O, first waiting while it's disabled as the channel does. When
+/// the run ends, the master goes to `keep`, if any
+fn spawn_run(
+    mut task: MasterTask<MockTransport>,
+    keep: Option<oneshot::Sender<MasterTask<MockTransport>>>,
+) -> (JoinHandle<RunError>, sfio_tokio_mock_io::Handle) {
+    let (io, io_handle) = sfio_tokio_mock_io::mock();
+    let mut io = PhysLayer::mock(io);
+    let run = tokio::spawn(async move {
+        while task.enabled() == Enabled::No {
+            if let Err(reason) = task.process_next_message().await {
+                return RunError::Stop(reason);
+            }
+        }
+        let err = task.run(&mut io).await;
+        if let Some(keep) = keep {
+            // a harness that was dropped won't run it again
+            drop(keep.send(task));
+        }
+        err
+    });
+    (run, io_handle)
+}
+
+async fn create(
     mut config: AssociationConfig,
     assoc_handler: Box<dyn AssociationHandler>,
+    rerunnable: bool,
 ) -> TestHarness {
     // use a 1-second timeout for all tests
     config.response_timeout = Timeout::from_secs(1).unwrap();
-
-    let (io, io_handle) = sfio_tokio_mock_io::mock();
-
-    let mut io = PhysLayer::mock(io);
 
     let outstation_address = EndpointAddress::try_new(1024).unwrap();
 
@@ -75,7 +110,13 @@ pub(crate) async fn create_association_with_handler(
     ));
 
     let rx_info = task.rx_frame_info();
-    let master_task = tokio::spawn(async move { task.run(&mut io).await });
+    let (keep, stopped) = if rerunnable {
+        let (keep, stopped) = oneshot::channel();
+        (Some(keep), Some(stopped))
+    } else {
+        (None, None)
+    };
+    let (master_task, io_handle) = spawn_run(task, keep);
 
     // Create the association
     let handler = CountHandler::new();
@@ -103,6 +144,7 @@ pub(crate) async fn create_association_with_handler(
         read_events,
         io: io_handle,
         rx_info,
+        stopped,
     }
 }
 
@@ -271,6 +313,8 @@ pub(crate) struct TestHarness {
     pub(crate) read_events: ReadEventQueue,
     pub(crate) io: sfio_tokio_mock_io::Handle,
     rx_info: RxFrameInfo,
+    /// the master once its run ends, if the harness is rerunnable
+    stopped: Option<oneshot::Receiver<MasterTask<MockTransport>>>,
 }
 
 impl TestHarness {
@@ -282,6 +326,19 @@ impl TestHarness {
             FrameType::Data,
             PhysAddr::None,
         ));
+    }
+
+    /// Wait for the master's run to end and run it again on a new mock I/O, as the channel does when
+    /// it reconnects or is enabled again, returning the error that ended the run. Requires a harness
+    /// from [`create_rerunnable_association`]
+    pub(crate) async fn run_again(&mut self) -> RunError {
+        let err = (&mut self.task).await.unwrap();
+        let stopped = self.stopped.take().expect("the harness isn't rerunnable");
+        let task = stopped.await.unwrap();
+        let (keep, stopped) = oneshot::channel();
+        (self.task, self.io) = spawn_run(task, Some(keep));
+        self.stopped = Some(stopped);
+        err
     }
 
     pub(crate) async fn expect_write(&mut self, expected: Vec<u8>) {
