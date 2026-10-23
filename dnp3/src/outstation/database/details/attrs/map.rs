@@ -323,6 +323,41 @@ mod test {
     }
 
     #[test]
+    fn cannot_define_or_get_reserved_variations() {
+        let small = || OwnedAttrValue::UnsignedInt(0);
+        let long = || OwnedAttrValue::VisibleString("a".repeat(256));
+
+        for set in [AttrSet::Default, AttrSet::Private(1)] {
+            for variation in [
+                0,
+                var::ALL_ATTRIBUTES_REQUEST,
+                var::LIST_OF_ATTRIBUTE_VARIATIONS,
+            ] {
+                let mut map = SetMap::default();
+                // the reserved check comes before the type and length checks
+                for value in [small(), long()] {
+                    let attr = OwnedAttribute::new(set, variation, value);
+                    assert_eq!(
+                        map.define(AttrProp::default(), attr),
+                        Err(AttrDefError::ReservedVariation(variation))
+                    );
+                }
+                assert_eq!(
+                    map.get(set, variation).unwrap_err(),
+                    AttrError::ReservedVariation(variation)
+                );
+            }
+
+            for variation in [1, 253] {
+                let mut map = SetMap::default();
+                let attr = OwnedAttribute::new(set, variation, small());
+                assert_eq!(map.define(AttrProp::default(), attr), Ok(()));
+                assert_eq!(map.get(set, variation).unwrap().value, small());
+            }
+        }
+    }
+
+    #[test]
     fn cannot_define_non_writable_attribute_as_writable() {
         let mut map = SetMap::default();
         let attr = OwnedAttribute::new(
