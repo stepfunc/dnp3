@@ -163,61 +163,34 @@ impl<T> VecList<T> {
 
     /// remove every entry matching the predicate, passing each one to `removed` once it's removed
     ///
-    /// One pass in order: each removed entry is freed where it's found, and the kept entries are
-    /// linked to each other across each run of removed ones.
+    /// Each entry is unlinked where the walk finds it, before `removed` sees it, so a panic in
+    /// either closure leaves the list consistent with the entries removed so far.
     pub(crate) fn remove_all<F, R>(&mut self, mut predicate: F, mut removed: R) -> usize
     where
         F: FnMut(&T) -> bool,
         R: FnMut(&T),
     {
-        let Some(state) = self.state else {
-            return 0;
-        };
-
         let mut count: usize = 0;
-        // the kept entries (first, last, how many), and whether entries were removed after the last
-        let mut head: Option<usize> = None;
-        let mut tail: Option<usize> = None;
-        let mut size: usize = 0;
-        let mut unlinked = false;
-
-        let mut current = Some(state.head);
+        let mut current = self.state.map(|x| x.head);
         while let Some(idx) = current {
-            let Some(entry) = self.storage.get_mut(idx) else {
+            let Some(entry) = self.storage.get(idx) else {
                 break;
             };
-            current = entry.metadata.next;
+            let metadata = entry.metadata;
+            current = metadata.next;
 
-            if predicate(&entry.data) {
-                entry.is_free = true;
-                self.free_stack.push_back(idx);
-                removed(&entry.data);
-                count = count.saturating_add(1);
-                unlinked = true;
-            } else {
-                if unlinked {
-                    entry.metadata.prev = tail;
-                    self.set_next(tail, Some(idx));
-                    unlinked = false;
-                }
-                head = head.or(Some(idx));
-                tail = Some(idx);
-                size = size.saturating_add(1);
+            if !predicate(&entry.data) {
+                continue;
             }
+            if !self.unlink(idx, metadata) {
+                break;
+            }
+            if let Some(entry) = self.storage.get(idx) {
+                removed(&entry.data);
+            }
+            count = count.saturating_add(1);
         }
-
-        self.set_next(tail, None);
-        self.state = match (head, tail) {
-            (Some(head), Some(tail)) => Some(State::new(head, tail, size)),
-            _ => None,
-        };
         count
-    }
-
-    fn set_next(&mut self, entry: Option<usize>, next: Option<usize>) {
-        if let Some(entry) = entry.and_then(|i| self.storage.get_mut(i)) {
-            entry.metadata.next = next;
-        }
     }
 
     /// visit the entries in order, mutably, until the visitor breaks
@@ -268,14 +241,18 @@ impl<T> VecList<T> {
     }
 
     pub(crate) fn remove_at(&mut self, index: Index) -> bool {
-        let Some(current) = self.state else {
-            return false;
-        };
-
         // the entry must be in use, with the same version
         let metadata = match self.storage.get(index.value) {
             Some(x) if !x.is_free && x.metadata.version == index.version => x.metadata,
             _ => return false,
+        };
+        self.unlink(index.value, metadata)
+    }
+
+    /// unlink the in-use entry at `idx`, whose links are `metadata`, and free its slot
+    fn unlink(&mut self, idx: usize, metadata: MetaData) -> bool {
+        let Some(current) = self.state else {
+            return false;
         };
 
         // the removed entry's neighbors determine the new ends
@@ -293,12 +270,12 @@ impl<T> VecList<T> {
             (Some(_), Some(_)) => Some(State::new(current.head, current.tail, size)),
         };
 
-        if let Some(entry) = self.storage.get_mut(index.value) {
+        if let Some(entry) = self.storage.get_mut(idx) {
             entry.is_free = true;
         }
 
         // return this index to the free list
-        self.free_stack.push_back(index.value);
+        self.free_stack.push_back(idx);
 
         if let Some(prev) = metadata.prev.and_then(|i| self.storage.get_mut(i)) {
             prev.metadata.next = metadata.next;
@@ -714,6 +691,30 @@ mod tests {
                 refill(&mut list, &mut model);
                 // and again, with the slots now out of order
                 model.apply(&mut list, Op::RemovePositions(!mask));
+                model.check(&list);
+                refill(&mut list, &mut model);
+            }
+        }
+
+        #[test]
+        fn a_panicking_predicate_leaves_the_earlier_removals_complete() {
+            // panic on the entry at this position, after removing the selected ones before it
+            for (mask, position) in [(0b010101, 3), (0b000111, 3), (0b111111, 5), (0b111110, 0)] {
+                let (mut list, mut model) = full(6);
+                let id = model.live[position].1.id;
+                model.remove_all(&mut list, at_positions(mask), Some(Call::Predicate(id)));
+                model.check(&list);
+                refill(&mut list, &mut model);
+            }
+        }
+
+        #[test]
+        fn a_panicking_callback_leaves_its_entry_removed() {
+            // panic in the callback of the entry at this position, which must be removed already
+            for (mask, position) in [(0b010101, 2), (0b000011, 0), (0b110000, 5), (0b111111, 3)] {
+                let (mut list, mut model) = full(6);
+                let id = model.live[position].1.id;
+                model.remove_all(&mut list, at_positions(mask), Some(Call::Removed(id)));
                 model.check(&list);
                 refill(&mut list, &mut model);
             }
