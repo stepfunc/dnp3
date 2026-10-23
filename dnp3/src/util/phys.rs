@@ -408,10 +408,56 @@ mod reply_tests {
     use std::pin::{pin, Pin};
     use std::task::{Context, Poll, Waker};
 
+    use tokio::io::AsyncReadExt;
+
     use crate::util::test_support::{watchdog, OUTSTATION_REPLY};
 
     fn poll_once<F: Future>(future: Pin<&mut F>) -> Poll<F::Output> {
         future.poll(&mut Context::from_waker(Waker::noop()))
+    }
+
+    fn written(count: usize) -> PendingReply {
+        PendingReply::Write {
+            frame: OUTSTATION_REPLY,
+            addr: PhysAddr::None,
+            written: count,
+        }
+    }
+
+    #[tokio::test]
+    async fn reply_resumes_after_cancelled_partial_writes_to_a_stream() {
+        watchdog(async {
+            // the stream holds 4 bytes, so the 10-byte reply goes out in parts
+            let (local, mut peer) = tokio::io::duplex(4);
+            let mut phys = PhysLayer::duplex(local);
+            phys.queue_reply(OUTSTATION_REPLY, PhysAddr::None, PhysDecodeLevel::Nothing)
+                .unwrap();
+
+            // each attempt writes what fits, and is then cancelled
+            assert!(poll_once(pin!(phys.finish_reply())).is_pending());
+            assert_eq!(phys.reply, written(4));
+            let mut received = [0; 4];
+            peer.read_exact(&mut received).await.unwrap();
+            assert!(poll_once(pin!(phys.finish_reply())).is_pending());
+            assert_eq!(phys.reply, written(8));
+
+            // the next write sends the rest of the reply before its own data
+            let data = [0xAA, 0xBB, 0xCC];
+            let mut rest = [0; 9];
+            let (write, read) = tokio::join!(
+                phys.write(&data, PhysAddr::None, PhysDecodeLevel::Nothing),
+                peer.read_exact(&mut rest)
+            );
+            write.unwrap();
+            read.unwrap();
+
+            assert_eq!(
+                [&received[..], &rest[..]].concat(),
+                [&OUTSTATION_REPLY[..], &data[..]].concat()
+            );
+            assert_eq!(phys.reply, PendingReply::None);
+        })
+        .await;
     }
 
     mod properties {
@@ -710,22 +756,6 @@ mod reply_tests {
             ) {
                 guarded(|| write_after_cancellations(capacity, frame, steps, data))?;
             }
-        }
-
-        /// A stream that takes 4 bytes per write gets the 10-byte reply in three parts, the
-        /// first two cut off by cancellations, and then the data written after it
-        #[test]
-        fn reply_resumes_after_cancelled_partial_writes_to_a_stream() {
-            let writes = VecDeque::from([4, 0, 4, 0]);
-            guarded(|| {
-                resume_after_cancellations(OUTSTATION_REPLY, false, writes, vec![], vec![1, 1])
-            })
-            .unwrap();
-            let steps = vec![Step::Attempt(1), Step::Drain(4), Step::Attempt(1)];
-            guarded(|| {
-                write_after_cancellations(4, OUTSTATION_REPLY, steps, vec![0xAA, 0xBB, 0xCC])
-            })
-            .unwrap();
         }
 
         /// The consistency check rejects a reply that lost track of bytes it wrote, wrote bytes
