@@ -16,9 +16,8 @@ use crate::tcp::{
     ClientConnectionHandler, ClientState, ConnectOptions, EndpointList, PostConnectionHandler,
     SimpleConnectHandler,
 };
-use crate::util::phys::{PhysAddr, PhysLayer};
+use crate::util::phys::{PhysAddr, PhysLayer, Socket};
 use crate::util::session::Enabled;
-use tokio::net::TcpStream;
 use tokio_rustls::rustls::pki_types::ServerName;
 
 use crate::link::reader::LinkModes;
@@ -209,15 +208,15 @@ impl TlsServerConfig {
         })
     }
 
-    pub(crate) async fn handle_connection(
+    pub(crate) async fn handle_connection<S: Socket>(
         &self,
-        socket: TcpStream,
+        socket: S,
     ) -> Result<PhysLayer, HandshakeError> {
         let connector = tokio_rustls::TlsAcceptor::from(self.config.clone());
         // the server accepts one connection at a time, so a handshake that stalls would stop it
         // accepting any others
         let stream = super::handshake(connector.accept(socket)).await?;
-        Ok(PhysLayer::tls(tokio_rustls::TlsStream::from(stream)))
+        Ok(S::into_tls_phys(tokio_rustls::TlsStream::from(stream)))
     }
 }
 
@@ -227,6 +226,7 @@ mod tests {
     use crate::tcp::tls::TLS_HANDSHAKE_TIMEOUT;
     use crate::util::test_support::tls::server_config;
     use crate::util::test_support::watchdog;
+    use tokio::net::TcpStream;
 
     #[tokio::test(start_paused = true)]
     async fn tls_handshake_that_never_starts_times_out() {

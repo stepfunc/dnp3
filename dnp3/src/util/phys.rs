@@ -5,7 +5,40 @@ use std::io::ErrorKind;
 use std::net::SocketAddr;
 
 use crate::udp::layer::UdpLayer;
-use tokio::io::{AsyncReadExt, AsyncWrite, AsyncWriteExt};
+use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
+
+/// A connected stream that a TCP or TLS server session runs over
+///
+/// Production uses only `TcpStream`. Tests also use in-memory pipes, which wake the peer directly,
+/// so that a paused clock doesn't advance while data is in flight.
+pub(crate) trait Socket: AsyncRead + AsyncWrite + Unpin + Send + 'static {
+    /// Enable or disable `TCP_NODELAY`
+    fn set_nodelay(&self, value: bool) -> std::io::Result<()>;
+
+    /// A physical layer that runs a session over this stream
+    fn into_phys(self) -> PhysLayer;
+
+    /// A physical layer that runs a session over TLS on this stream
+    #[cfg(feature = "enable-tls")]
+    fn into_tls_phys(stream: tokio_rustls::TlsStream<Self>) -> PhysLayer
+    where
+        Self: Sized;
+}
+
+impl Socket for tokio::net::TcpStream {
+    fn set_nodelay(&self, value: bool) -> std::io::Result<()> {
+        tokio::net::TcpStream::set_nodelay(self, value)
+    }
+
+    fn into_phys(self) -> PhysLayer {
+        PhysLayer::tcp(self)
+    }
+
+    #[cfg(feature = "enable-tls")]
+    fn into_tls_phys(stream: tokio_rustls::TlsStream<Self>) -> PhysLayer {
+        PhysLayer::tls(stream)
+    }
+}
 
 /// Source or destination at the physical layer from which a link frame was read/written
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

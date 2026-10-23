@@ -6,16 +6,24 @@ use std::time::Duration;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::time::Instant;
 
+use crate::util::phys::Socket;
+
 /// How long a server waits before accepting again after `accept()` fails for a reason other
 /// than the incoming connection itself
 pub(crate) const ACCEPT_ERROR_DELAY: Duration = Duration::from_secs(1);
 
 /// Source of accepted TCP connections
 pub(crate) trait Listen: Send {
-    fn accept(&mut self) -> impl Future<Output = std::io::Result<(TcpStream, SocketAddr)>> + Send;
+    type Stream: Socket;
+
+    fn accept(
+        &mut self,
+    ) -> impl Future<Output = std::io::Result<(Self::Stream, SocketAddr)>> + Send;
 }
 
 impl Listen for TcpListener {
+    type Stream = TcpStream;
+
     fn accept(&mut self) -> impl Future<Output = std::io::Result<(TcpStream, SocketAddr)>> + Send {
         TcpListener::accept(self)
     }
@@ -130,7 +138,7 @@ impl<L: Listen> Acceptor<L> {
     ///
     /// This future is cancel-safe: a pending delay survives cancellation and the next call
     /// waits until its original deadline.
-    pub(crate) async fn accept(&mut self) -> (TcpStream, SocketAddr) {
+    pub(crate) async fn accept(&mut self) -> (L::Stream, SocketAddr) {
         loop {
             if let Some(retry_at) = self.retry_at {
                 tokio::time::sleep_until(retry_at).await;
@@ -218,6 +226,8 @@ pub(crate) mod test_util {
     }
 
     impl Listen for FaultyListener {
+        type Stream = TcpStream;
+
         async fn accept(&mut self) -> std::io::Result<(TcpStream, SocketAddr)> {
             self.attempts.send(Instant::now()).unwrap();
             if let Some((fault, rest)) = self.faults.split_first() {

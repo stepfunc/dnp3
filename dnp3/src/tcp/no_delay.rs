@@ -1,5 +1,7 @@
 use std::sync::atomic::Ordering;
 
+use crate::util::phys::Socket;
+
 static CLIENT_TCP_NO_DELAY: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(true);
 static SERVER_TCP_NO_DELAY: std::sync::atomic::AtomicBool =
@@ -9,11 +11,11 @@ pub(crate) fn configure_client(stream: &tokio::net::TcpStream) {
     configure_no_delay(CLIENT_TCP_NO_DELAY.load(Ordering::Relaxed), stream)
 }
 
-pub(crate) fn configure_server(stream: &tokio::net::TcpStream) {
+pub(crate) fn configure_server<S: Socket>(stream: &S) {
     configure_no_delay(SERVER_TCP_NO_DELAY.load(Ordering::Relaxed), stream)
 }
 
-fn configure_no_delay(value: bool, stream: &tokio::net::TcpStream) {
+fn configure_no_delay<S: Socket>(value: bool, stream: &S) {
     if let Err(err) = stream.set_nodelay(value) {
         tracing::info!("Unable to set TCP_NODELAY to {}: {}", value, err);
     }
@@ -47,4 +49,21 @@ pub fn disable_client_tcp_no_delay() {
 /// globally to preserve API compatibility
 pub fn disable_server_tcp_no_delay() {
     SERVER_TCP_NO_DELAY.store(false, Ordering::Relaxed)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn the_supplied_value_is_set_on_the_socket() {
+        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let stream = tokio::net::TcpStream::connect(listener.local_addr().unwrap())
+            .await
+            .unwrap();
+        for value in [false, true, false] {
+            configure_no_delay(value, &stream);
+            assert_eq!(stream.nodelay().unwrap(), value);
+        }
+    }
 }

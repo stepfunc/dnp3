@@ -5,7 +5,7 @@ use crate::link::reader::LinkModes;
 use crate::link::LinkErrorMode;
 use crate::master::task::MasterTask;
 use crate::master::{MasterChannel, MasterChannelConfig, MasterChannelType};
-use crate::util::phys::PhysLayer;
+use crate::util::phys::{PhysLayer, Socket};
 use crate::util::session::{Enabled, Session};
 use std::future::Future;
 
@@ -17,7 +17,7 @@ use std::io::ErrorKind;
 use std::net::SocketAddr;
 use std::num::NonZeroUsize;
 use std::time::Duration;
-use tokio::net::{TcpListener, TcpStream};
+use tokio::net::TcpListener;
 use tokio::task::JoinSet;
 use tracing::Instrument;
 
@@ -188,8 +188,8 @@ struct AcceptTask<C: ConnectionHandler, L: Listen> {
     link_id_tasks: JoinSet<LinkIdResult>,
 }
 
-enum TaskEvent {
-    Accept(TcpStream, SocketAddr),
+enum TaskEvent<S> {
+    Accept(S, SocketAddr),
     LinkId(LinkIdResult),
 }
 
@@ -220,7 +220,7 @@ impl<C: ConnectionHandler, L: Listen> AcceptTask<C, L> {
         }
     }
 
-    async fn process_event(&mut self, event: TaskEvent) {
+    async fn process_event(&mut self, event: TaskEvent<L::Stream>) {
         match event {
             TaskEvent::Accept(stream, addr) => {
                 tracing::info!("accepted connection from {addr:?}");
@@ -242,7 +242,7 @@ impl<C: ConnectionHandler, L: Listen> AcceptTask<C, L> {
         ret
     }
 
-    async fn next_event(&mut self) -> Result<TaskEvent, Shutdown> {
+    async fn next_event(&mut self) -> Result<TaskEvent<L::Stream>, Shutdown> {
         let can_accept = self.link_id_tasks.len() < self.link_id_config.max_tasks.get();
 
         let accept_connection = async {
@@ -287,8 +287,8 @@ impl<C: ConnectionHandler, L: Listen> AcceptTask<C, L> {
         }
     }
 
-    async fn handle_accept(&mut self, stream: TcpStream, addr: SocketAddr) {
-        let phys = PhysLayer::tcp(stream);
+    async fn handle_accept(&mut self, stream: L::Stream, addr: SocketAddr) {
+        let phys = stream.into_phys();
 
         match self.handler.accept(addr).await {
             Err(Reject) => {
@@ -472,6 +472,7 @@ mod tests {
     use crate::tcp::accept::ACCEPT_ERROR_DELAY;
     use crate::util::test_support::watchdog;
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use tokio::net::TcpStream;
     use tokio::sync::mpsc;
 
     /// request link status from outstation 1024 to master 1

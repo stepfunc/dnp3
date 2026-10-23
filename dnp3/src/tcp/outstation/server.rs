@@ -10,7 +10,7 @@ use crate::tcp::accept::{Acceptor, Listen};
 use crate::tcp::server_task::{NewSession, ServerTask as OutstationServerTask};
 use crate::tcp::{AddressFilter, FilterError, ServerHandle};
 use crate::util::channel::Sender;
-use crate::util::phys::{PhysAddr, PhysLayer};
+use crate::util::phys::{PhysAddr, PhysLayer, Socket};
 use crate::util::session::Enabled;
 use crate::util::shutdown::ShutdownListener;
 use std::net::SocketAddr;
@@ -73,9 +73,9 @@ enum ServerConnectionHandler {
 }
 
 impl ServerConnectionHandler {
-    async fn handle(&self, socket: tokio::net::TcpStream, _addr: SocketAddr) -> Option<PhysLayer> {
+    async fn handle<S: Socket>(&self, socket: S, _addr: SocketAddr) -> Option<PhysLayer> {
         match self {
-            Self::Tcp => Some(PhysLayer::tcp(socket)),
+            Self::Tcp => Some(socket.into_phys()),
             #[cfg(feature = "enable-tls")]
             Self::Tls(config) => match config.handle_connection(socket).await {
                 Ok(phys) => Some(phys),
@@ -355,7 +355,7 @@ impl Server {
         self.process_connection(stream, addr).await;
     }
 
-    async fn process_connection(&mut self, stream: tokio::net::TcpStream, addr: SocketAddr) {
+    async fn process_connection<S: Socket>(&mut self, stream: S, addr: SocketAddr) {
         let id = self.connection_id;
         self.connection_id = self.connection_id.wrapping_add(1);
 
