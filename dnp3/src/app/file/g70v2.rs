@@ -7,11 +7,19 @@ use scursor::{ReadCursor, WriteCursor};
 /// Group 70 Variation 3 - authentication
 ///
 /// This representation is borrowed from the underlying ASDU
-#[derive(Debug, PartialEq, Eq)]
+#[derive(PartialEq, Eq)]
 pub(crate) struct Group70Var2<'a> {
     pub(crate) auth_key: u32,
     pub(crate) user_name: &'a str,
     pub(crate) password: &'a str,
+}
+
+impl std::fmt::Debug for Group70Var2<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Group70Var2")
+            .field("user_name", &self.user_name)
+            .finish_non_exhaustive()
+    }
 }
 
 impl<'a> Group70Var2<'a> {

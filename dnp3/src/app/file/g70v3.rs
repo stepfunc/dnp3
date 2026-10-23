@@ -10,7 +10,7 @@ use scursor::{ReadCursor, WriteCursor};
 /// Group 70 Variation 3 - file command
 ///
 /// This representation is borrowed from the underlying ASDU
-#[derive(Debug, PartialEq, Eq)]
+#[derive(PartialEq, Eq)]
 pub(crate) struct Group70Var3<'a> {
     pub(crate) time_of_creation: Timestamp,
     pub(crate) permissions: Permissions,
@@ -20,6 +20,20 @@ pub(crate) struct Group70Var3<'a> {
     pub(crate) max_block_size: u16,
     pub(crate) request_id: u16,
     pub(crate) file_name: &'a str,
+}
+
+impl std::fmt::Debug for Group70Var3<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Group70Var3")
+            .field("time_of_creation", &self.time_of_creation)
+            .field("permissions", &self.permissions)
+            .field("file_size", &self.file_size)
+            .field("mode", &self.mode)
+            .field("max_block_size", &self.max_block_size)
+            .field("request_id", &self.request_id)
+            .field("file_name", &self.file_name)
+            .finish_non_exhaustive()
+    }
 }
 
 impl<'a> Group70Var3<'a> {
