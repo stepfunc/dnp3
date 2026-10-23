@@ -402,7 +402,7 @@ mod tests {
     #[cfg(feature = "unstable")]
     use crate::app::NullListener;
     use crate::tcp::accept::test_util::{
-        expect_attempt_gaps, Fault, FaultyListener, LOOPBACK, RESET, UNKNOWN,
+        expect_attempt_gaps, Fault, FaultyListener, Peers, LOOPBACK, RESET, UNKNOWN,
     };
     use crate::tcp::accept::ACCEPT_ERROR_DELAY;
     use crate::util::test_support::{watchdog, NullApplication, NullInformation};
@@ -458,14 +458,53 @@ mod tests {
         use super::*;
         use crate::tcp::tls::MinTlsVersion;
         use crate::util::test_support::tls::{cert, server_config};
-        use crate::util::test_support::Timeline;
+        use crate::util::test_support::{
+            Timeline, MASTER_REQUEST, NULL_UNSOLICITED_HEADER, OUTSTATION_REPLY,
+        };
         use std::sync::Arc;
-        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+        use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
         use tokio::net::{TcpListener, TcpStream};
         use tokio_rustls::rustls::pki_types::{IpAddr, ServerName};
 
         const fn secs(x: u64) -> Duration {
             Duration::from_secs(x)
+        }
+
+        /// a TLS server with one outstation, registered with `filter`, that reports its connection
+        /// state
+        fn tls_server(
+            config: OutstationConfig,
+            filter: AddressFilter,
+        ) -> (Server, Timeline<ConnectionState>) {
+            let mut server = Server::new_tls_server(
+                LinkErrorMode::Close,
+                "127.0.0.1:0".parse().unwrap(),
+                server_config(),
+            );
+            let (listener, timeline) = Timeline::new();
+            let (_handle, future) = server
+                .add_outstation_no_spawn(
+                    config,
+                    Box::new(NullApplication),
+                    Box::new(NullInformation),
+                    crate::outstation::DefaultControlHandler::create(),
+                    listener,
+                    filter,
+                )
+                .unwrap();
+            tokio::spawn(future);
+            (server, timeline)
+        }
+
+        /// run the server on a loopback listener, returning the handle that keeps it running, the
+        /// address to connect to and the server's task
+        async fn run_on_loopback(
+            server: Server,
+        ) -> (ServerHandle, SocketAddr, tokio::task::JoinHandle<Shutdown>) {
+            let socket = TcpListener::bind("127.0.0.1:0").await.unwrap();
+            let addr = socket.local_addr().unwrap();
+            let (handle, task) = server.create_task_with(socket, None);
+            (handle, addr, tokio::spawn(task.run()))
         }
 
         /// a TLS server on an OS-assigned port with one outstation that reports its connection state
@@ -484,27 +523,8 @@ mod tests {
             Timeline<ConnectionState>,
             tokio::task::JoinHandle<Shutdown>,
         ) {
-            let mut server = Server::new_tls_server(
-                LinkErrorMode::Close,
-                "127.0.0.1:0".parse().unwrap(),
-                server_config(),
-            );
-            let (listener, timeline) = Timeline::new();
-            let (_handle, future) = server
-                .add_outstation_no_spawn(
-                    outstation_config(),
-                    Box::new(NullApplication),
-                    Box::new(NullInformation),
-                    crate::outstation::DefaultControlHandler::create(),
-                    listener,
-                    filter,
-                )
-                .unwrap();
-            tokio::spawn(future);
-            let socket = TcpListener::bind("127.0.0.1:0").await.unwrap();
-            let addr = socket.local_addr().unwrap();
-            let (handle, task) = server.create_task_with(socket, None);
-            let task = tokio::spawn(task.run());
+            let (server, timeline) = tls_server(outstation_config(), filter);
+            let (handle, addr, task) = run_on_loopback(server).await;
             (handle, addr, timeline, task)
         }
 
@@ -526,7 +546,13 @@ mod tests {
 
         /// complete a TLS handshake with the server as a master holding the expected certificate
         async fn connect_tls(addr: SocketAddr) -> tokio_rustls::client::TlsStream<TcpStream> {
-            let socket = TcpStream::connect(addr).await.unwrap();
+            handshake(TcpStream::connect(addr).await.unwrap()).await
+        }
+
+        /// complete a TLS handshake over `socket` as a master holding the expected certificate
+        async fn handshake<S: AsyncRead + AsyncWrite + Unpin>(
+            socket: S,
+        ) -> tokio_rustls::client::TlsStream<S> {
             tokio_rustls::TlsConnector::from(Arc::new(client_config()))
                 .connect(server_name(), socket)
                 .await
@@ -559,7 +585,7 @@ mod tests {
         }
 
         /// wait for the server to close a connection, discarding anything it sends first
-        async fn assert_closed(socket: &mut TcpStream) {
+        async fn assert_closed<S: AsyncRead + Unpin>(socket: &mut S) {
             let mut buffer = [0; 64];
             while let Ok(1..) = socket.read(&mut buffer).await {}
         }
@@ -567,18 +593,41 @@ mod tests {
         #[tokio::test(start_paused = true)]
         async fn tls_server_closes_a_stalled_handshake_after_the_timeout_and_accepts_the_next() {
             watchdog(async {
-                let (_handle, addr, mut timeline) = spawn_tls_server().await;
+                let (server, mut timeline) = tls_server(outstation_config(), AddressFilter::Any);
+                let (_handle, mut peers) = run_in_memory(server);
                 // a peer that connects and never sends its ClientHello
-                let mut stalled = TcpStream::connect(addr).await.unwrap();
+                let (mut stalled, stalled_addr) = peers.connect(LOOPBACK);
                 assert_closed(&mut stalled).await;
                 assert_eq!(timeline.now(), secs(5));
                 timeline.assert_quiet();
+                // the timeout ran from the accept
+                assert_eq!(peers.accepts(stalled_addr).await.elapsed(), secs(5));
 
-                // a paused clock advances whenever the runtime waits on a socket, so it could expire
-                // the next handshake's timeout before the handshake completes
-                tokio::time::resume();
-                let _session = connect_tls(addr).await;
+                let (socket, _) = peers.connect(LOOPBACK);
+                let _session = handshake(socket).await;
                 timeline.expect_state(ConnectionState::Connected).await;
+            })
+            .await;
+        }
+
+        #[tokio::test]
+        async fn tls_server_runs_an_outstation_session() {
+            watchdog(async {
+                let config = crate::util::test_support::outstation_config(1024, 1);
+                let (server, mut timeline) = tls_server(config, AddressFilter::Any);
+                let (_handle, addr, _task) = run_on_loopback(server).await;
+                let mut session = connect_tls(addr).await;
+                timeline.expect_state(ConnectionState::Connected).await;
+
+                // the outstation's null unsolicited response, then its answer to a request
+                let mut null_unsolicited = [0; 17];
+                session.read_exact(&mut null_unsolicited).await.unwrap();
+                assert_eq!(null_unsolicited[..10], NULL_UNSOLICITED_HEADER);
+                session.write_all(&MASTER_REQUEST).await.unwrap();
+                session.flush().await.unwrap();
+                let mut reply = [0; 10];
+                session.read_exact(&mut reply).await.unwrap();
+                assert_eq!(reply, OUTSTATION_REPLY);
             })
             .await;
         }
@@ -681,14 +730,13 @@ mod tests {
         AddressFilter::Exact(addr.parse().unwrap())
     }
 
-    /// spawn the server on a loopback listener, returning the handle that keeps it running and
-    /// the address to connect to
-    async fn spawn_on_loopback(server: Server) -> (ServerHandle, SocketAddr) {
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let addr = listener.local_addr().unwrap();
+    /// run the server on an in-memory listener, returning the handle that keeps it running and
+    /// the peers that connect to it
+    fn run_in_memory(server: Server) -> (ServerHandle, Peers) {
+        let (listener, peers) = FaultyListener::new(&[]);
         let (handle, task) = server.create_task_with(listener, None);
         tokio::spawn(task.run());
-        (handle, addr)
+        (handle, peers)
     }
 
     #[tokio::test]
@@ -699,9 +747,9 @@ mod tests {
             // registered first, so routing that ignored the filters would pick it
             let mut other = add_outstation(&mut server, exact("192.0.2.1")).unwrap();
             let mut local = add_outstation(&mut server, exact("127.0.0.1")).unwrap();
-            let (_handle, addr) = spawn_on_loopback(server).await;
+            let (_handle, mut peers) = run_in_memory(server);
 
-            let _client = tokio::net::TcpStream::connect(addr).await.unwrap();
+            let _client = peers.connect(LOOPBACK);
             assert_eq!(local.recv().await, Some(ConnectionState::Connected));
             assert_eq!(other.try_recv(), Err(mpsc::error::TryRecvError::Empty));
         })
@@ -712,9 +760,9 @@ mod tests {
     async fn a_connection_no_filter_matches_is_closed() {
         watchdog(async {
             let (server, mut states) = server_with_filter(exact("192.0.2.1"));
-            let (_handle, addr) = spawn_on_loopback(server).await;
+            let (_handle, mut peers) = run_in_memory(server);
 
-            let mut client = tokio::net::TcpStream::connect(addr).await.unwrap();
+            let (mut client, _) = peers.connect(LOOPBACK);
             let mut buffer = [0; 32];
             assert_eq!(
                 tokio::io::AsyncReadExt::read(&mut client, &mut buffer)

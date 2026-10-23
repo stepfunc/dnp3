@@ -223,22 +223,18 @@ impl TlsServerConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tcp::accept::test_util::PIPE;
     use crate::tcp::tls::TLS_HANDSHAKE_TIMEOUT;
     use crate::util::test_support::tls::server_config;
     use crate::util::test_support::watchdog;
-    use tokio::net::TcpStream;
 
     #[tokio::test(start_paused = true)]
     async fn tls_handshake_that_never_starts_times_out() {
         watchdog(async {
             let config = server_config();
 
-            let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
             // a peer that connects and never sends its ClientHello
-            let _peer = TcpStream::connect(listener.local_addr().unwrap())
-                .await
-                .unwrap();
-            let (socket, _) = listener.accept().await.unwrap();
+            let (socket, _peer) = tokio::io::duplex(PIPE);
 
             let start = tokio::time::Instant::now();
             let result = config.handle_connection(socket).await;
