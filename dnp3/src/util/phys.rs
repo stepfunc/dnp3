@@ -261,6 +261,9 @@ impl PhysLayer {
     /// The future can be dropped and called again without losing or repeating any bytes. A reply
     /// that fails to write is abandoned, since the error ends the session.
     pub(crate) async fn finish_reply(&mut self) -> Result<(), std::io::Error> {
+        if matches!(self.reply, PendingReply::None) {
+            return Ok(());
+        }
         let reply = &mut self.reply;
         let result = match &mut self.io {
             PhysIo::Tcp(x) => reply.write_to(x, false).await,
