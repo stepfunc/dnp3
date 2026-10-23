@@ -223,7 +223,7 @@ fn table_covers_every_variation_outside_the_dynamic_groups() {
 fn table_has_one_row_per_variation() {
     for (i, (gv, _)) in ROWS.iter().enumerate() {
         assert!(
-            ROWS.iter().skip(i + 1).all(|(other, _)| other != gv),
+            ROWS.iter().skip(i).skip(1).all(|(other, _)| other != gv),
             "{gv:?}"
         );
     }
