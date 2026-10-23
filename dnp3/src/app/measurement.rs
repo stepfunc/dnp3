@@ -929,6 +929,198 @@ mod tests {
         }
     }
 
+    /// Checks the analog conversions against a model that never converts a float with `as`: it
+    /// predicts the wire value as an `f64`, which every `i16`, `i32` and `f32` converts to exactly
+    mod conversion_properties {
+        use super::*;
+        use proptest::prelude::*;
+
+        /// zero and the bounds of i16, i32 and f32
+        fn limits() -> Vec<f64> {
+            vec![
+                0.0,
+                i16::MIN.into(),
+                i16::MAX.into(),
+                i32::MIN.into(),
+                i32::MAX.into(),
+                f32::MIN.into(),
+                f32::MAX.into(),
+            ]
+        }
+
+        /// half an f32 step past `f32::MAX`, where rounding to f32 gives infinity
+        fn past_f32_max() -> f64 {
+            f64::from(f32::MAX) + 2f64.powi(103)
+        }
+
+        /// every bit pattern, the limits and their neighbors, and the midpoints between adjacent
+        /// f32 values, where rounding has to break a tie
+        fn value() -> impl Strategy<Value = f64> {
+            prop_oneof![
+                any::<u64>().prop_map(f64::from_bits),
+                -1e10f64..1e10,
+                (prop::sample::select(limits()), -2.0f64..2.0)
+                    .prop_map(|(limit, offset)| limit + offset),
+                (prop::sample::select(limits()), -2i8..=2).prop_map(|(limit, offset)| {
+                    match offset {
+                        -2 => limit.next_down(),
+                        2 => limit.next_up(),
+                        offset => limit + f64::from(offset),
+                    }
+                }),
+                prop::sample::select(vec![
+                    past_f32_max(),
+                    past_f32_max().next_down(),
+                    -past_f32_max(),
+                    -past_f32_max().next_down(),
+                    f64::INFINITY,
+                    f64::NEG_INFINITY,
+                    f64::NAN,
+                    -f64::NAN,
+                    -0.0,
+                    f64::from_bits(1),
+                    -f64::from_bits(1),
+                ]),
+                any::<u32>().prop_filter_map("a finite f32 below another", |bits| {
+                    let low = f32::from_bits(bits);
+                    let high = low.next_up();
+                    high.is_finite()
+                        .then(|| (f64::from(low) + f64::from(high)) / 2.0)
+                }),
+            ]
+        }
+
+        /// the wire value as an `f64`, and whether it is over range, for an integer variation
+        fn integer_model(value: f64, min: f64, max: f64) -> (f64, bool) {
+            if value.is_nan() {
+                (0.0, true)
+            } else if value < min {
+                (min, true)
+            } else if value > max {
+                (max, true)
+            } else {
+                (value.trunc(), false)
+            }
+        }
+
+        fn expected_flags(flags: Flags, over_range: bool) -> Flags {
+            if over_range {
+                flags | Flags::OVER_RANGE
+            } else {
+                flags
+            }
+        }
+
+        /// whether a finite `value` within the f32 range rounds to `actual`: the nearest f32, with
+        /// a tie going to the even one, keeping the sign of zero
+        fn rounds_to(value: f64, actual: f32) -> bool {
+            if !actual.is_finite() || actual.is_sign_negative() != value.is_sign_negative() {
+                return false;
+            }
+            // the midpoint of two adjacent f32 values is exact in f64
+            let midpoint = |other: f32| (f64::from(actual) + f64::from(other)) / 2.0;
+            let even = actual.to_bits() & 1 == 0;
+            let within = |bound: f64, past: std::cmp::Ordering| match value.partial_cmp(&bound) {
+                Some(std::cmp::Ordering::Equal) => even,
+                Some(order) => order != past,
+                None => false,
+            };
+            // past f32::MAX or f32::MIN there is no neighbor, and the value is in range
+            let below = actual.next_down();
+            let above = actual.next_up();
+            (!below.is_finite() || within(midpoint(below), std::cmp::Ordering::Less))
+                && (!above.is_finite() || within(midpoint(above), std::cmp::Ordering::Greater))
+        }
+
+        /// whether `to_f32` of `value` with `flags` may give `actual`
+        fn f32_conversion_is_correct(
+            value: f64,
+            flags: Flags,
+            (actual_flags, actual): (Flags, f32),
+        ) -> bool {
+            let f32_max = f64::from(f32::MAX);
+            if value.is_nan() {
+                actual.is_nan() && actual_flags == flags
+            } else if value.is_infinite() {
+                actual.is_infinite()
+                    && actual.is_sign_negative() == value.is_sign_negative()
+                    && actual_flags == flags
+            } else if value.abs() > f32_max {
+                let clamped = if value > 0.0 { f32::MAX } else { f32::MIN };
+                actual.to_bits() == clamped.to_bits() && actual_flags == flags | Flags::OVER_RANGE
+            } else {
+                rounds_to(value, actual) && actual_flags == flags
+            }
+        }
+
+        #[test]
+        fn the_f32_model_rejects_incorrect_conversions() {
+            let flags = Flags::ONLINE;
+            let correct =
+                |value: f64, actual: f32| f32_conversion_is_correct(value, flags, (flags, actual));
+            assert!(correct(1.0, 1.0));
+            assert!(!correct(1.0, 0.0));
+            assert!(!correct(1.0, f32::NAN));
+            assert!(!correct(1.0, 1.0f32.next_up()));
+            assert!(!correct(1.0, 1.0f32.next_down()));
+            assert!(!correct(1.0, f32::INFINITY));
+            assert!(!correct(-1e-300, 0.0));
+            assert!(correct(-1e-300, -0.0));
+            assert!(!correct(f64::NAN, 0.0));
+            assert!(!correct(f64::INFINITY, f32::MAX));
+            // 1 + 2^-24 is halfway between 1, which is even, and the next f32, which is odd
+            let tie = 1.0 + 2f64.powi(-24);
+            assert!(correct(tie, 1.0));
+            assert!(!correct(tie, 1.0f32.next_up()));
+            // halfway between that odd f32 and the next even one
+            let tie = 1.0 + 3.0 * 2f64.powi(-24);
+            assert!(correct(tie, 1.0f32.next_up().next_up()));
+            assert!(!correct(tie, 1.0f32.next_up()));
+            // the flags are part of the result
+            assert!(!f32_conversion_is_correct(
+                1.0,
+                flags,
+                (flags | Flags::OVER_RANGE, 1.0)
+            ));
+            assert!(!f32_conversion_is_correct(
+                f64::MAX,
+                flags,
+                (flags, f32::MAX)
+            ));
+        }
+
+        fn check<T: AnalogConversions>(measurement: T, value: f64, flags: Flags) {
+            let (expected, over_range) = integer_model(value, i16::MIN.into(), i16::MAX.into());
+            let (actual_flags, actual) = measurement.to_i16();
+            assert_eq!(f64::from(actual), expected, "{value}");
+            assert_eq!(actual_flags, expected_flags(flags, over_range), "{value}");
+
+            let (expected, over_range) = integer_model(value, i32::MIN.into(), i32::MAX.into());
+            let (actual_flags, actual) = measurement.to_i32();
+            assert_eq!(f64::from(actual), expected, "{value}");
+            assert_eq!(actual_flags, expected_flags(flags, over_range), "{value}");
+
+            let actual = measurement.to_f32();
+            assert!(
+                f32_conversion_is_correct(value, flags, actual),
+                "{value} -> {actual:?}"
+            );
+        }
+
+        proptest! {
+            #![proptest_config(ProptestConfig::with_cases(1024))]
+
+            #[test]
+            fn analog_conversions_match_the_model(value in value(), flags in any::<u8>()) {
+                let flags = Flags::new(flags);
+                let time = Time::unsynchronized(0);
+                check(AnalogInput::new(value, flags, time), value, flags);
+                check(FrozenAnalogInput::new(value, flags, time), value, flags);
+                check(AnalogOutputStatus::new(value, flags, time), value, flags);
+            }
+        }
+    }
+
     #[test]
     fn octet_string_methods() {
         let octet_string = OctetString::new(&[0, 1, 2, 3, 4]).unwrap();
