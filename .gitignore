@@ -39,3 +39,6 @@ ffi/bindings/java/**/*.iml
 # .NET examples properties
 ffi/bindings/dotnet/examples/master/Properties/
 ffi/bindings/dotnet/examples/outstation/Properties/
+
+# property-test failures become example tests; seed files are not committed
+proptest-regressions/
