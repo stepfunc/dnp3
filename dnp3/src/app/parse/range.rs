@@ -115,29 +115,65 @@ where
     }
 }
 
+/// a start and stop up to 32 indices apart, with the top of the index space more likely
+#[cfg(test)]
+pub(crate) fn start_stop() -> impl proptest::strategy::Strategy<Value = (u16, u16)> {
+    use proptest::prelude::*;
+
+    let start = prop_oneof![any::<u16>(), 65500..=u16::MAX];
+    (start, 0..32u16).prop_map(|(start, len)| (start, start.saturating_add(len)))
+}
+
+/// Asserts that `iter` yields `expected` in order, with an exact size hint before each item,
+/// then stays exhausted
+#[cfg(test)]
+pub(crate) fn assert_yields_exactly<I>(mut iter: I, expected: &[I::Item])
+where
+    I: Iterator,
+    I::Item: PartialEq + std::fmt::Debug,
+{
+    for (left, item) in (1..=expected.len()).rev().zip(expected) {
+        assert_eq!(iter.size_hint(), (left, Some(left)));
+        assert_eq!(iter.next().as_ref(), Some(item));
+    }
+    assert_eq!(iter.size_hint(), (0, Some(0)));
+    assert_eq!(iter.next(), None);
+    assert_eq!(iter.next(), None);
+    assert_eq!(iter.size_hint(), (0, Some(0)));
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    #[test]
-    fn parses_exactly_range_count_items_with_indices() {
-        let data = [0x01, 0x00, 0x02, 0x00, 0x03, 0x00, 0xFF];
-        let mut cursor = ReadCursor::new(&data);
-        let seq = RangedSequence::<u16>::parse(Range::from(10, 12).unwrap(), &mut cursor).unwrap();
-        assert_eq!(cursor.remaining(), 1);
-        let items: Vec<(u16, u16)> = seq.iter().collect();
-        assert_eq!(items, vec![(1, 10), (2, 11), (3, 12)]);
+    use proptest::prelude::*;
+
+    /// The ranged sequence of `values` from `start` to `stop`, followed by `trailing`, reads
+    /// exactly its objects and yields each with its index, then stays exhausted; one byte less is
+    /// an error
+    fn check((start, stop): (u16, u16), values: &[u16], trailing: &[u8]) {
+        let expected: Vec<(u16, u16)> = values.iter().copied().zip(start..=stop).collect();
+        let objects: Vec<u8> = expected.iter().flat_map(|(x, _)| x.to_le_bytes()).collect();
+        let bytes = [objects.as_slice(), trailing].concat();
+        let range = Range::from(start, stop).unwrap();
+
+        let mut cursor = ReadCursor::new(&bytes);
+        let seq = RangedSequence::<u16>::parse(range, &mut cursor).unwrap();
+        assert_eq!(cursor.remaining(), trailing.len());
+        assert_yields_exactly(seq.iter(), &expected);
+
+        let short = &objects[..objects.len().saturating_sub(1)];
+        RangedSequence::<u16>::parse(range, &mut ReadCursor::new(short)).unwrap_err();
     }
 
     #[test]
-    fn parses_at_max_index() {
-        let data = [0x01, 0x00, 0x02, 0x00];
-        let mut cursor = ReadCursor::new(&data);
-        let seq =
-            RangedSequence::<u16>::parse(Range::from(65534, 65535).unwrap(), &mut cursor).unwrap();
-        assert!(cursor.is_empty());
-        let items: Vec<(u16, u16)> = seq.iter().collect();
-        assert_eq!(items, vec![(1, 65534), (2, 65535)]);
+    fn ranged_sequence_examples() {
+        // a trailing byte the sequence leaves unread
+        check((10, 12), &[1, 2, 3], &[0xFF]);
+        // ends at the last index without wrapping
+        check((65534, 65535), &[1, 2], &[]);
+        // two objects, rejected one byte short
+        check((0, 1), &[1, 2], &[]);
     }
 
     #[test]
@@ -156,53 +192,18 @@ mod tests {
         assert_eq!(iter.size_hint(), (0, Some(0)));
     }
 
-    #[test]
-    fn fails_when_data_is_short() {
-        let data = [0x01, 0x00, 0x02];
-        let mut cursor = ReadCursor::new(&data);
-        RangedSequence::<u16>::parse(Range::from(0, 1).unwrap(), &mut cursor).unwrap_err();
-    }
+    proptest! {
+        #![proptest_config(ProptestConfig::with_cases(256))]
 
-    mod property {
-        use super::*;
-
-        use proptest::prelude::*;
-
-        /// a start and stop up to 32 indices apart, with the top of the index space more likely
-        fn start_stop() -> impl Strategy<Value = (u16, u16)> {
-            let start = prop_oneof![any::<u16>(), 65500..=u16::MAX];
-            (start, 0..32u16).prop_map(|(start, len)| (start, start.saturating_add(len)))
-        }
-
-        proptest! {
-            #![proptest_config(ProptestConfig::with_cases(256))]
-
-            /// A ranged sequence reads exactly its objects and yields each with its index, then
-            /// stays exhausted; one byte less is an error
-            #[test]
-            fn ranged_sequence_yields_each_index_once(
-                (start, stop) in start_stop(),
-                values in prop::collection::vec(any::<u16>(), 32),
-                trailing in prop::collection::vec(any::<u8>(), 0..4),
-            ) {
-                let expected: Vec<(u16, u16)> = values.iter().copied().zip(start..=stop).collect();
-                let objects: Vec<u8> = expected.iter().flat_map(|(x, _)| x.to_le_bytes()).collect();
-                let bytes = [objects.as_slice(), &trailing].concat();
-                let range = Range::from(start, stop).unwrap();
-
-                let mut cursor = ReadCursor::new(&bytes);
-                let seq = RangedSequence::<u16>::parse(range, &mut cursor).unwrap();
-                prop_assert_eq!(cursor.remaining(), trailing.len());
-                let mut iter = seq.iter();
-                prop_assert_eq!(iter.size_hint(), (expected.len(), Some(expected.len())));
-                prop_assert_eq!(iter.by_ref().collect::<Vec<_>>(), expected);
-                prop_assert_eq!(iter.next(), None);
-                prop_assert_eq!(iter.next(), None);
-                prop_assert_eq!(iter.size_hint(), (0, Some(0)));
-
-                let short = &objects[..objects.len().saturating_sub(1)];
-                RangedSequence::<u16>::parse(range, &mut ReadCursor::new(short)).unwrap_err();
-            }
+        /// A ranged sequence reads exactly its objects and yields each with its index, then
+        /// stays exhausted; one byte less is an error
+        #[test]
+        fn ranged_sequence_yields_each_index_once(
+            range in start_stop(),
+            values in prop::collection::vec(any::<u16>(), 32),
+            trailing in prop::collection::vec(any::<u8>(), 0..4),
+        ) {
+            check(range, &values, &trailing);
         }
     }
 }
