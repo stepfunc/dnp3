@@ -307,6 +307,16 @@ enum Confirm {
     NewRequest,
 }
 
+/// How the solicited confirm wait ended
+#[derive(Copy, Clone)]
+enum SolicitedWait {
+    /// the response series was confirmed or timed out, or never waited for a confirm
+    Done,
+    /// a new request ended it, retained to be processed from idle at once, before any unsolicited
+    /// response (IEEE 1815-2012 Table 6-1 rows 15 and 18)
+    RequestPending,
+}
+
 /// How the confirm wait for a response ended
 #[derive(Copy, Clone)]
 enum ConfirmOutcome {
@@ -633,9 +643,12 @@ impl OutstationSession {
         out: &mut Responder<T>,
         database: &mut DatabaseHandle,
     ) -> Result<(), RunError> {
-        // handle a request fragment if present
-        self.handle_one_request_from_idle(io, reader, out, database)
-            .await?;
+        // handle a request fragment if present, and each request that ends the solicited confirm
+        // wait its response enters
+        while let SolicitedWait::RequestPending = self
+            .handle_one_request_from_idle(io, reader, out, database)
+            .await?
+        {}
 
         // check to see if we should perform unsolicited
         let next_action = self.check_unsolicited(io, reader, out, database).await?;
@@ -1090,8 +1103,11 @@ impl OutstationSession {
                 .await?;
 
             if let Some(series) = confirm {
-                // enter the solicited confirm wait state
-                self.sol_confirm_wait(io, reader, out, database, series)
+                // enter the solicited confirm wait state. Its outcome is deliberately ignored: a
+                // request that ends it stays retained, and the next idle pass processes it before
+                // any unsolicited response
+                let _: SolicitedWait = self
+                    .sol_confirm_wait(io, reader, out, database, series)
                     .instrument(tracing::info_span!(
                         "SolConfirmWait",
                         "ecsn" = series.ecsn.value()
@@ -1109,7 +1125,7 @@ impl OutstationSession {
         reader: &mut TransportReader<T>,
         out: &mut Responder<T>,
         database: &mut DatabaseHandle,
-    ) -> Result<(), RunError> {
+    ) -> Result<SolicitedWait, RunError> {
         let guard = self.pop_request(reader);
         let confirm = match self.receive(&guard) {
             Intake::Nothing => None,
@@ -1140,17 +1156,17 @@ impl OutstationSession {
         };
         drop(guard);
 
-        if let Some(series) = confirm {
-            // enter the solicited confirm wait state
-            self.sol_confirm_wait(io, reader, out, database, series)
-                .instrument(tracing::info_span!(
-                    "SolConfirmWait",
-                    "ecsn" = series.ecsn.value()
-                ))
-                .await?;
-        }
+        let Some(series) = confirm else {
+            return Ok(SolicitedWait::Done);
+        };
 
-        Ok(())
+        // enter the solicited confirm wait state
+        self.sol_confirm_wait(io, reader, out, database, series)
+            .instrument(tracing::info_span!(
+                "SolConfirmWait",
+                "ecsn" = series.ecsn.value()
+            ))
+            .await
     }
 
     /// Take the master's next fragment. This is where every request enters the session, in any
@@ -2238,7 +2254,7 @@ impl OutstationSession {
         out: &mut Responder<T>,
         database: &mut DatabaseHandle,
         mut series: ResponseSeries,
-    ) -> Result<(), RunError> {
+    ) -> Result<SolicitedWait, RunError> {
         self.info.enter_solicited_confirm_wait(series.ecsn);
 
         loop {
@@ -2254,7 +2270,7 @@ impl OutstationSession {
 
                     if series.fin {
                         // done with response series
-                        return Ok(());
+                        return Ok(SolicitedWait::Done);
                     }
                     // format the next response in the series
                     series.ecsn.increment();
@@ -2269,7 +2285,7 @@ impl OutstationSession {
                         .write_solicited(io, &mut out.writer, respond_to, response, database)
                         .await?;
                     match Self::awaited_confirm(header) {
-                        None => return Ok(()),
+                        None => return Ok(SolicitedWait::Done),
                         Some(next) => {
                             series = next;
                         }
@@ -2279,13 +2295,13 @@ impl OutstationSession {
                     tracing::warn!("confirm timeout");
                     self.end_confirm_wait(database, ConfirmOutcome::Unconfirmed)
                         .await;
-                    return Ok(());
+                    return Ok(SolicitedWait::Done);
                 }
                 Confirm::NewRequest => {
                     tracing::info!("aborting solicited response due to new request");
                     self.end_confirm_wait(database, ConfirmOutcome::Unconfirmed)
                         .await;
-                    return Ok(());
+                    return Ok(SolicitedWait::RequestPending);
                 }
             }
         }
