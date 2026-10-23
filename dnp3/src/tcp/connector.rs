@@ -242,14 +242,14 @@ mod tests {
     }
 
     /// What a connection attempt targets: an address, or a hostname to resolve
-    #[derive(Debug, PartialEq)]
+    #[derive(Clone, Debug, PartialEq)]
     enum Target {
         Address(SocketAddr),
         Hostname(String),
     }
 
     /// The parts of a [`ConnectionInfo`] the handler fills in
-    #[derive(Debug, PartialEq)]
+    #[derive(Clone, Debug, PartialEq)]
     struct Attempt {
         target: Target,
         timeout: Option<Duration>,
@@ -353,6 +353,165 @@ mod tests {
                 ..expected
             };
             assert_eq!(next(handler.as_mut()), Ok(expected));
+        }
+    }
+
+    mod model {
+        use super::*;
+
+        use proptest::prelude::*;
+
+        #[derive(Clone, Debug)]
+        enum Op {
+            Next,
+            Connected,
+            Disconnected,
+        }
+
+        fn op() -> impl Strategy<Value = Op> {
+            prop_oneof![
+                6 => Just(Op::Next),
+                1 => Just(Op::Connected),
+                1 => Just(Op::Disconnected),
+            ]
+        }
+
+        /// short delays, zero, and delays so long that doubling them overflows
+        fn delay() -> impl Strategy<Value = Duration> {
+            prop_oneof![
+                4 => (0u64..=5_000).prop_map(Duration::from_millis),
+                1 => Just(Duration::ZERO),
+                1 => any::<u64>().prop_map(Duration::from_secs),
+                1 => Just(Duration::MAX),
+            ]
+        }
+
+        /// the two bounds of the connect delay, in either order, and both zero more often than
+        /// independent choices would make them
+        fn connect_delays() -> impl Strategy<Value = (Duration, Duration)> {
+            prop_oneof![
+                4 => (delay(), delay()),
+                1 => Just((Duration::ZERO, Duration::ZERO)),
+            ]
+        }
+
+        /// the endpoint at `position` in the list: an address, or a hostname to resolve
+        fn target(position: u8, hostname: bool) -> Target {
+            if hostname {
+                Target::Hostname(format!("outstation{position}.test:20000"))
+            } else {
+                Target::Address(SocketAddr::from(([192, 0, 2, position], 20000)))
+            }
+        }
+
+        fn endpoint_string(target: &Target) -> String {
+            match target {
+                Target::Address(x) => x.to_string(),
+                Target::Hostname(x) => x.clone(),
+            }
+        }
+
+        /// What the handler documents: it tries the endpoints in order, then waits a delay that
+        /// starts at the minimum and doubles up to the maximum before starting over; a connection
+        /// returns it to the main endpoint and the minimum delay
+        struct Model {
+            attempts: Vec<Attempt>,
+            next: usize,
+            min_delay: Duration,
+            max_delay: Duration,
+            last_delay: Option<Duration>,
+        }
+
+        impl Model {
+            #[expect(
+                clippy::arithmetic_side_effects,
+                reason = "the model counts at most four endpoints"
+            )]
+            fn next(&mut self) -> Result<Attempt, Duration> {
+                if let Some(attempt) = self.attempts.get(self.next) {
+                    self.next += 1;
+                    return Ok(attempt.clone());
+                }
+                self.next = 0;
+                let delay = match self.last_delay {
+                    None => self.min_delay,
+                    Some(last) => last.saturating_mul(2).min(self.max_delay),
+                };
+                self.last_delay = Some(delay);
+                Err(delay)
+            }
+
+            fn connected(&mut self) {
+                self.next = 0;
+                self.last_delay = None;
+            }
+        }
+
+        proptest! {
+            #![proptest_config(ProptestConfig::with_cases(256))]
+
+            #[test]
+            fn tries_endpoints_in_order_and_backs_off_like_the_model(
+                hostnames in prop::collection::vec(any::<bool>(), 1..=4),
+                (first_delay, second_delay) in connect_delays(),
+                reconnect_delay in delay(),
+                timeout in prop::option::of(1u64..=60),
+                local_endpoint in any::<bool>(),
+                ops in prop::collection::vec(op(), 0..64),
+            ) {
+                let targets: Vec<Target> = (1..)
+                    .zip(&hostnames)
+                    .map(|(position, hostname)| target(position, *hostname))
+                    .collect();
+                let mut list = EndpointList::single(endpoint_string(&targets[0]));
+                for target in &targets[1..] {
+                    list.add(endpoint_string(target));
+                }
+                let mut options = ConnectOptions::default();
+                if let Some(timeout) = timeout {
+                    options.set_connect_timeout(secs(timeout));
+                }
+                let local_endpoint = local_endpoint.then(|| addr("192.0.2.100:0"));
+                if let Some(local_endpoint) = local_endpoint {
+                    options.set_local_endpoint(local_endpoint);
+                }
+                let mut handler = SimpleConnectHandler::create(
+                    list,
+                    options,
+                    ConnectStrategy::new(first_delay, second_delay, reconnect_delay),
+                );
+
+                let one_millisecond = Duration::from_millis(1);
+                let mut model = Model {
+                    attempts: targets
+                        .into_iter()
+                        .map(|target| Attempt {
+                            target,
+                            timeout: timeout.map(secs),
+                            local_endpoint,
+                        })
+                        .collect(),
+                    next: 0,
+                    min_delay: first_delay.min(second_delay).max(one_millisecond),
+                    max_delay: first_delay.max(second_delay).max(one_millisecond),
+                    last_delay: None,
+                };
+
+                let connected_to = addr("192.0.2.1:20000");
+                for op in ops {
+                    match op {
+                        Op::Next => prop_assert_eq!(next(handler.as_mut()), model.next()),
+                        Op::Connected => {
+                            handler.connected(connected_to, None);
+                            model.connected();
+                        }
+                        Op::Disconnected => prop_assert_eq!(
+                            handler.disconnected(connected_to, None),
+                            reconnect_delay
+                        ),
+                    }
+                }
+            }
         }
     }
 }
