@@ -40,6 +40,22 @@ impl Socket for tokio::net::TcpStream {
     }
 }
 
+#[cfg(test)]
+impl Socket for tokio::io::DuplexStream {
+    fn set_nodelay(&self, _: bool) -> std::io::Result<()> {
+        Ok(())
+    }
+
+    fn into_phys(self) -> PhysLayer {
+        PhysLayer::duplex(self)
+    }
+
+    #[cfg(feature = "enable-tls")]
+    fn into_tls_phys(stream: tokio_rustls::TlsStream<Self>) -> PhysLayer {
+        PhysLayer::new(PhysIo::TlsDuplex(Box::new(stream)))
+    }
+}
+
 /// Source or destination at the physical layer from which a link frame was read/written
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) enum PhysAddr {
@@ -63,6 +79,9 @@ pub(crate) enum PhysIo {
     /// a stream with a bounded buffer, so writes can wait on the peer
     #[cfg(test)]
     Duplex(tokio::io::DuplexStream),
+    /// TLS over a [`Self::Duplex`] stream, flushed like [`Self::Tls`]
+    #[cfg(all(test, feature = "enable-tls"))]
+    TlsDuplex(Box<tokio_rustls::TlsStream<tokio::io::DuplexStream>>),
 }
 
 /// A physical layer, and the link-layer reply it is writing
@@ -156,6 +175,8 @@ impl std::fmt::Debug for PhysLayer {
             PhysIo::Mock(_) => f.write_str("Mock"),
             #[cfg(test)]
             PhysIo::Duplex(_) => f.write_str("Duplex"),
+            #[cfg(all(test, feature = "enable-tls"))]
+            PhysIo::TlsDuplex(_) => f.write_str("TlsDuplex"),
         }
     }
 }
@@ -246,6 +267,8 @@ impl PhysLayer {
             PhysIo::Mock(x) => reply.write_to(x, false).await,
             #[cfg(test)]
             PhysIo::Duplex(x) => reply.write_to(x, false).await,
+            #[cfg(all(test, feature = "enable-tls"))]
+            PhysIo::TlsDuplex(x) => reply.write_to(x.as_mut(), true).await,
         };
         if result.is_err() {
             *reply = PendingReply::None;
@@ -281,6 +304,11 @@ impl PhysLayer {
             }
             #[cfg(test)]
             PhysIo::Duplex(x) => {
+                let count = x.read(buffer).await?;
+                (count, PhysAddr::None)
+            }
+            #[cfg(all(test, feature = "enable-tls"))]
+            PhysIo::TlsDuplex(x) => {
                 let count = x.read(buffer).await?;
                 (count, PhysAddr::None)
             }
@@ -325,6 +353,8 @@ impl PhysLayer {
             PhysIo::Mock(x) => x.write_all(data).await,
             #[cfg(test)]
             PhysIo::Duplex(x) => x.write_all(data).await,
+            #[cfg(all(test, feature = "enable-tls"))]
+            PhysIo::TlsDuplex(x) => write_all_and_flush(x, data).await,
         }
     }
 }
@@ -428,7 +458,10 @@ mod reply_tests {
 #[cfg(test)]
 #[cfg(feature = "enable-tls")]
 mod tls_tests {
-    use super::{write_all_and_flush, PendingReply, PhysAddr, LINK_HEADER_LENGTH};
+    use super::{
+        write_all_and_flush, PendingReply, PhysAddr, PhysDecodeLevel, PhysIo, Socket,
+        LINK_HEADER_LENGTH,
+    };
 
     use std::future::Future;
     use std::net::Ipv4Addr;
@@ -443,6 +476,7 @@ mod tls_tests {
 
     use crate::tcp::tls::MinTlsVersion;
     use crate::util::test_support::tls::cert;
+    use crate::util::test_support::{MASTER_REPLY, OUTSTATION_REPLY};
 
     // small enough that a single frame's ciphertext can't fit
     const DUPLEX_CAPACITY: usize = 64;
@@ -574,5 +608,61 @@ mod tls_tests {
         assert_eq!(received.as_slice(), [&FRAME[..], &frame].concat());
         assert_eq!(reply, PendingReply::None);
         assert!(!client.get_ref().1.wants_write());
+    }
+
+    #[tokio::test]
+    async fn tls_over_a_duplex_flushes_replies_and_writes_through_the_phys_layer() {
+        let (mut client, mut server) = connect().await;
+        // ciphertext the server hasn't read fills the duplex
+        assert!(matches!(
+            poll_once(pin!(client.write_all(&FRAME))),
+            Poll::Ready(Ok(()))
+        ));
+        let mut phys = DuplexStream::into_tls_phys(tokio_rustls::TlsStream::from(client));
+        assert!(matches!(phys.io(), PhysIo::TlsDuplex(_)));
+
+        // the reply is accepted, but can't be flushed until the server reads
+        phys.queue_reply(OUTSTATION_REPLY, PhysAddr::None, PhysDecodeLevel::Nothing)
+            .unwrap();
+        assert!(poll_once(pin!(phys.finish_reply())).is_pending());
+        assert_eq!(phys.reply, PendingReply::Flush);
+
+        let mut received = [0; FRAME.len() + LINK_HEADER_LENGTH];
+        let (reply_result, read_result) = with_timeout(async {
+            tokio::join!(phys.finish_reply(), server.read_exact(&mut received))
+        })
+        .await;
+        reply_result.unwrap();
+        read_result.unwrap();
+        assert_eq!(
+            received.as_slice(),
+            [&FRAME[..], &OUTSTATION_REPLY].concat()
+        );
+        assert_eq!(phys.reply, PendingReply::None);
+
+        // a write whose ciphertext doesn't fit completes once the server has read all of it
+        let mut received = [0; FRAME.len()];
+        let (write_result, read_result) = with_timeout(async {
+            tokio::join!(
+                phys.write(&FRAME, PhysAddr::None, PhysDecodeLevel::Nothing),
+                server.read_exact(&mut received)
+            )
+        })
+        .await;
+        write_result.unwrap();
+        read_result.unwrap();
+        assert_eq!(received, FRAME);
+
+        // reads return the plaintext
+        server.write_all(&MASTER_REPLY).await.unwrap();
+        server.flush().await.unwrap();
+        let mut buffer = [0; LINK_HEADER_LENGTH];
+        let (count, addr) = with_timeout(phys.read(&mut buffer, PhysDecodeLevel::Nothing))
+            .await
+            .unwrap();
+        assert_eq!(
+            (count, addr, buffer),
+            (MASTER_REPLY.len(), PhysAddr::None, MASTER_REPLY)
+        );
     }
 }
