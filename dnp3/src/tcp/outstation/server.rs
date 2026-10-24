@@ -7,7 +7,7 @@
 use crate::app::{Listener, Shutdown};
 use crate::link::reader::LinkModes;
 use crate::link::LinkErrorMode;
-use crate::outstation::task::OutstationTask;
+use crate::outstation::session::task::OutstationTask;
 use crate::outstation::{
     ConnectionState, ControlHandler, OutstationApplication, OutstationConfig, OutstationHandle,
     OutstationInformation,

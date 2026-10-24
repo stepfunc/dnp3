@@ -11,7 +11,7 @@ use crate::link::reader::LinkModes;
 use crate::link::EndpointAddress;
 use crate::outstation::config::{Feature, OutstationConfig};
 use crate::outstation::database::EventBufferConfig;
-use crate::outstation::task::OutstationTask;
+use crate::outstation::session::task::OutstationTask;
 use crate::outstation::tests::harness::{
     event_handlers, ApplicationData, ControlStatuses, Event, EventReceiver, MockControlHandler,
     MockOutstationApplication, MockOutstationInformation,

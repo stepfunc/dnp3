@@ -6,7 +6,7 @@
 
 use crate::app::{Listener, NullListener, RetryStrategy};
 use crate::link::reader::LinkModes;
-use crate::outstation::task::OutstationTask as ProtocolOutstationTask;
+use crate::outstation::session::task::OutstationTask as ProtocolOutstationTask;
 use crate::outstation::{
     ControlHandler, OutstationApplication, OutstationConfig, OutstationHandle,
     OutstationInformation,

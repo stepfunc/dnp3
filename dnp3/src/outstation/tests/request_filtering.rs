@@ -15,7 +15,7 @@ use crate::link::header::{AnyAddress, BroadcastConfirmMode, ControlField, Header
 use crate::link::reader::LinkModes;
 use crate::link::test_data;
 use crate::outstation::config::{Feature, OutstationConfig};
-use crate::outstation::task::OutstationTask;
+use crate::outstation::session::task::OutstationTask;
 use crate::outstation::traits::{BroadcastAction, OperateType};
 use crate::outstation::OutstationHandle;
 use crate::transport::RealTransport;
