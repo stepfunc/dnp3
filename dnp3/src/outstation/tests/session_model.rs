@@ -8,9 +8,9 @@
 //! waits
 //!
 //! The model keeps every buffered event by id and state, the solicited and unsolicited confirm
-//! waits with their deadlines, the unsolicited retry delay, the enabled classes and the restart IIN.
-//! From those it predicts every response the outstation sends after each input, and every
-//! information and confirm callback, in order:
+//! waits with their deadlines, the unsolicited retry delay, the enabled classes, the restart IIN
+//! and the last broadcast. From those it predicts every response the outstation sends after each
+//! input, and every information and confirm callback, in order:
 //! - an update creates an event with the next id, evicting the oldest event of its type, whatever
 //!   its state, when the type is full;
 //! - a response with events carries a non-empty prefix, oldest first, of the events selected for
@@ -36,7 +36,19 @@
 //!   25, TB2015-002a rule 16). A later READ replaces it and any other request discards it. While
 //!   one is held, a timeout ends the wait without a retry. Once the wait ends, by its confirm or a
 //!   timeout, the READ is answered from the events left, before the next unsolicited response, and
-//!   only then becomes the last request a repeat matches.
+//!   only then becomes the last request a repeat matches;
+//! - a request to a broadcast address gets no response, and sets IIN1.0 whether or not it's
+//!   processed (4.5.1). IIN1.0 ends with the first response that carries it, solicited or
+//!   unsolicited, unless the broadcast requires a confirm (Table 4-13; the optional-confirm address
+//!   is taken as the one that doesn't). Then every solicited response asks for a confirm, and
+//!   IIN1.0 ends only when the master confirms a response that carried it for that broadcast. A
+//!   broadcast is otherwise handled as a request without a response: it ends the solicited confirm
+//!   wait, discards a deferred READ and doesn't change what a repeat matches, and a processed
+//!   DISABLE_UNSOLICITED ends the unsolicited retries. IIN1.0 stays across a new connection;
+//! - in the unsolicited confirm wait, a solicited response that asks for a confirm awaits it until
+//!   the next request, the end of the wait or its confirm timeout, and only that confirm in that
+//!   time is processed, without a callback (Table 6-1 rows 20-30, decision 0005). A repeat that
+//!   sends the response again awaits the confirm again.
 //!
 //! The outstation has handled each input when the test looks at what it did, on the guarantee
 //! that `pop_response` describes: the outstation has answered a request once the test sees it read,
@@ -47,20 +59,22 @@
 //! it expects, and checks that the clock agrees with the model's.
 //!
 //! The oracle is independent of the outstation: the model decodes the events in each response
-//! itself, and builds every header, IIN bit and callback it expects from its own state. Some
-//! request bytes, the confirms and some response headers come from the harness builders, which are
-//! test code.
+//! itself, and builds every header, IIN bit and callback it expects from its own state. It numbers
+//! the broadcasts and records which one each response asked a confirm for. Some request bytes, the
+//! confirms and some response headers come from the harness builders, which are test code.
 //!
 //! The inputs are counter and analog events at four points each, READs of classes and types with
 //! and without limits, DELAY_MEASURE, CLEAR_RESTART (a WRITE of IIN1.7), ENABLE and
-//! DISABLE_UNSOLICITED, requests with the last request's sequence number, exact repeats, confirms
-//! (the one awaited, another sequence number, the other kind), clock advances to, just before and
-//! just past the next deadline, and new connections. The setup varies the confirm timeout, the
-//! retry delay and limit, the buffer limits and the fragment sizes. Besides single inputs, runs of
-//! them reach cases that single inputs rarely do:
-//! - a new request or a repeat in the solicited confirm wait, while an unsolicited response is due
-//!   (Table 6-1 rows 15 and 18), including a READ whose response asks for no confirm, which the
-//!   due response follows at once, and one whose confirm the due response waits for;
+//! DISABLE_UNSOLICITED, the same functions to each of the three broadcast addresses, requests with
+//! the last request's sequence number, exact repeats, confirms (the one awaited, another sequence
+//! number, the other kind), clock advances to, just before and just past the next deadline, and new
+//! connections. The setup varies the confirm timeout, the retry delay and limit, the buffer limits,
+//! the fragment sizes and whether broadcasts are processed. Besides single inputs, runs of them
+//! reach cases that single inputs rarely do:
+//! - a new request, a repeat or a broadcast in the solicited confirm wait, while an unsolicited
+//!   response is due (Table 6-1 rows 15 and 18), including a READ whose response asks for no
+//!   confirm, which the due response follows at once, and one whose confirm the due response waits
+//!   for;
 //! - a request and its repeat in the null unsolicited response's confirm wait and in the wait of
 //!   one with events, and a READ held in the null response's wait, answered at its timeout and
 //!   repeated in the next one;
@@ -68,13 +82,22 @@
 //! - a repeated READ that restarts the solicited confirm wait, then a step that ends at or past the
 //!   deadline the READ set, where a wait that wasn't restarted would end, and before the one the
 //!   repeat set, and the timeout at the latter;
-//! - the timeout of an unsolicited confirm wait after a DISABLE_UNSOLICITED, and the next series
-//!   after the retry delay.
+//! - the timeout of an unsolicited confirm wait after a DISABLE_UNSOLICITED, direct or broadcast,
+//!   and the next series after the retry delay, or the next null response, which reports the
+//!   broadcast;
+//! - a broadcast and a request in either order, often in a READ's solicited confirm wait or an
+//!   unsolicited confirm wait, then a wait to the next deadline, a repeat, another request or the
+//!   unsolicited confirm, and a solicited confirm: the confirm awaited in the unsolicited confirm
+//!   wait, one after its timeout, one with another sequence number, one of an earlier response,
+//!   and one after the wait ended.
 //!
-//! Not modelled: broadcast requests and IIN1.0, controls and select-before-operate, malformed and
+//! Not modelled: broadcast functions other than these (whose effects `broadcast.rs` checks) and
+//! broadcasts whose objects don't parse, controls and select-before-operate, malformed and
 //! unknown-function requests, class 0 and static data, other event types and variations, and link
-//! status requests (keep-alive is off). The fixed op lists below pin wire bytes and callback order
-//! for cases the property reaches, and each also stands alone as a deterministic test.
+//! status requests (keep-alive is off). A solicited confirm in the unsolicited confirm wait after
+//! the response's confirm timeout, or with another sequence number, is rare; examples pin those.
+//! The fixed op lists below pin wire bytes and callback order for cases the property reaches, and
+//! each also stands alone as a deterministic test.
 
 #![expect(
     clippy::arithmetic_side_effects,
@@ -88,13 +111,15 @@ use proptest::prelude::*;
 use tokio::time::{Duration, Instant};
 
 use crate::app::measurement::{AnalogInput, Counter, Flags, Time};
-use crate::app::{BufferSize, Timeout};
+use crate::app::{BufferSize, FunctionCode, Timeout};
+use crate::link::header::BroadcastConfirmMode;
 use crate::outstation::config::{Feature, OutstationConfig};
 use crate::outstation::database::{
     Add, AnalogInputConfig, CounterConfig, Database, EventBufferConfig, EventClass, Update,
     UpdateInfo, UpdateOptions,
 };
 use crate::outstation::tests::harness::*;
+use crate::outstation::traits::BroadcastAction;
 use crate::outstation::{BufferState, ClassCount, TypeCount};
 use crate::util::test_support::run_paused;
 
@@ -248,6 +273,18 @@ enum Function {
     DisableUnsolicited([bool; 3]),
 }
 
+impl Function {
+    fn code(&self) -> FunctionCode {
+        match self {
+            Function::Read(_) => FunctionCode::Read,
+            Function::DelayMeasure => FunctionCode::DelayMeasure,
+            Function::ClearRestart => FunctionCode::Write,
+            Function::EnableUnsolicited(_) => FunctionCode::EnableUnsolicited,
+            Function::DisableUnsolicited(_) => FunctionCode::DisableUnsolicited,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq)]
 struct Request {
     seq: u8,
@@ -285,6 +322,8 @@ impl Request {
 #[derive(Copy, Clone, Debug)]
 struct Setup {
     unsolicited: bool,
+    /// broadcast requests are processed
+    broadcast: bool,
     max_retries: Option<usize>,
     confirm_ms: u64,
     retry_ms: u64,
@@ -302,6 +341,8 @@ enum Wait {
         ecsn: u8,
         fin: bool,
         deadline: u64,
+        /// the broadcast the response asked a confirm for
+        reported: Option<u64>,
     },
     Unsolicited {
         seq: u8,
@@ -311,7 +352,19 @@ enum Wait {
         deadline: u64,
         /// a DISABLE_UNSOLICITED was processed during the wait
         disabled: bool,
+        /// the broadcast the response asked a confirm for
+        reported: Option<u64>,
+        /// the confirm awaited of a solicited response sent during the wait
+        solicited: Option<Awaited>,
     },
+}
+
+/// the confirm of a solicited response sent during the unsolicited confirm wait
+#[derive(Copy, Clone, Debug)]
+struct Awaited {
+    ecsn: u8,
+    deadline: u64,
+    reported: Option<u64>,
 }
 
 #[derive(Copy, Clone, Debug)]
@@ -332,6 +385,7 @@ enum Input {
         ids: Range<u64>,
     },
     Request(Request),
+    Broadcast(BroadcastConfirmMode, Request),
     Confirm {
         uns: bool,
         seq: u8,
@@ -365,6 +419,12 @@ struct Model {
     last_valid: Option<Request>,
     /// the solicited response sent last
     last_solicited: Option<Vec<u8>>,
+    /// the broadcast that response asked a confirm for
+    last_reported: Option<u64>,
+    /// the last broadcast received, while it's reported with IIN1.0: whether it requires a
+    /// confirm, and its number
+    broadcast: Option<(bool, u64)>,
+    broadcasts: u64,
     /// the READ received during the unsolicited confirm wait, answered when the wait ends
     deferred: Option<(u8, Vec<ReadHeader>)>,
     /// the unsolicited response sent last
@@ -401,6 +461,9 @@ impl Model {
             last_request: None,
             last_valid: None,
             last_solicited: None,
+            last_reported: None,
+            broadcast: None,
+            broadcasts: 0,
             deferred: None,
             last_unsolicited: None,
             writes: VecDeque::new(),
@@ -426,6 +489,17 @@ impl Model {
                     seq,
                     function: function.clone(),
                 }))
+            }
+            Op::Broadcast(mode, function) => {
+                let seq = self.next_request_seq;
+                self.next_request_seq = next_seq(seq);
+                Some(Input::Broadcast(
+                    *mode,
+                    Request {
+                        seq,
+                        function: function.clone(),
+                    },
+                ))
             }
             Op::SameSeq(function) => Some(Input::Request(Request {
                 seq: self.last_request.as_ref()?.seq,
@@ -513,6 +587,7 @@ impl Model {
                 self.last_request = Some(request.clone());
                 self.request(request.clone());
             }
+            Input::Broadcast(mode, request) => self.broadcast(*mode, &request.function),
             Input::Confirm { uns, seq } => self.confirm(*uns, *seq),
             Input::Advance(ms) => self.advance(*ms),
             Input::Reconnect => self.reconnect(),
@@ -671,6 +746,40 @@ impl Model {
         [iin1, iin2 | overflow]
     }
 
+    /// The IIN of a response built now, with IIN1.0 while a broadcast is reported (4.5.1, Table
+    /// 4-13). A broadcast that requires a confirm makes the response ask for one, and is reported
+    /// until the master confirms a response that asked for it; any other ends with this response.
+    /// Returns the broadcast this response asks a confirm for.
+    fn response_iin(&mut self, iin2: u8) -> ([u8; 2], Option<u64>) {
+        let [mut iin1, iin2] = self.iin(iin2);
+        let mut reported = None;
+        if let Some((mandatory, id)) = self.broadcast {
+            iin1 |= iin1::BROADCAST;
+            if mandatory {
+                reported = Some(id);
+            } else {
+                self.broadcast = None;
+            }
+        }
+        ([iin1, iin2], reported)
+    }
+
+    /// the master confirmed a response that asked a confirm for the broadcast `reported`
+    fn confirmed(&mut self, reported: Option<u64>) {
+        if reported.is_some() && self.broadcast.map(|(_, id)| id) == reported {
+            self.broadcast = None;
+        }
+    }
+
+    fn solicited_wait(&self, ecsn: u8, fin: bool, reported: Option<u64>) -> Wait {
+        Wait::Solicited {
+            ecsn,
+            fin,
+            deadline: self.now + self.setup.confirm_ms,
+            reported,
+        }
+    }
+
     /// Check a response that carries the selected events, the oldest first, and mark the ones it
     /// carries written. Returns the response, how many events it carries and whether those are all
     /// of them.
@@ -715,14 +824,14 @@ impl Model {
     fn solicited_fragment(&mut self, fir: bool, seq: u8) -> Wait {
         let (bytes, count, fin) =
             self.event_response(self.setup.solicited_size, "solicited response");
-        let con = count > 0 || !fin;
+        let ([iin1, iin2], reported) = self.response_iin(0);
+        let con = count > 0 || !fin || reported.is_some();
         let mut control = seq;
         for (bit, set) in [(0x80, fir), (0x40, fin), (0x20, con)] {
             if set {
                 control |= bit;
             }
         }
-        let [iin1, iin2] = self.iin(0);
         assert_eq!(
             bytes[..4],
             response_header(control, iin1, iin2),
@@ -730,27 +839,39 @@ impl Model {
             self.context
         );
         self.last_solicited = Some(bytes);
+        self.last_reported = reported;
         if con {
-            Wait::Solicited {
-                ecsn: seq,
-                fin,
-                deadline: self.now + self.setup.confirm_ms,
-            }
+            self.solicited_wait(seq, fin, reported)
         } else {
             Wait::Idle
         }
     }
 
-    fn respond(&mut self, seq: u8, iin2: u8, objects: &[u8], what: &str) {
-        let [iin1, iin2] = self.iin(iin2);
-        let expected = with_objects(solicited(seq, false, iin1, iin2), objects);
+    /// Check the response to a request other than a READ. Returns the wait for its confirm, if it
+    /// asks for one.
+    fn respond(&mut self, seq: u8, iin2: u8, objects: &[u8], what: &str) -> Wait {
+        let ([iin1, iin2], reported) = self.response_iin(iin2);
+        let expected = with_objects(solicited(seq, reported.is_some(), iin1, iin2), objects);
         self.expect_write(&expected, what);
         self.last_solicited = Some(expected);
+        self.last_reported = reported;
+        self.repeated_wait(seq)
+    }
+
+    /// the wait for the confirm of the response stored for a request other than a READ, if it asks
+    /// for one, which a repeat of the request also waits for (decision 0005)
+    fn repeated_wait(&self, seq: u8) -> Wait {
+        match self.last_reported {
+            Some(_) => self.solicited_wait(seq, true, self.last_reported),
+            None => Wait::Idle,
+        }
     }
 
     // ---- the session ----
 
-    fn read(&mut self, seq: u8, headers: &[ReadHeader]) {
+    /// Check the first fragment of the response to a READ. Returns the wait for its confirm, if it
+    /// asks for one.
+    fn read(&mut self, seq: u8, headers: &[ReadHeader]) -> Wait {
         // each READ starts its selection from a reset
         self.reset();
         for header in headers {
@@ -768,17 +889,34 @@ impl Model {
                 }
             }
         }
-        self.wait = self.solicited_fragment(true, seq);
-        if let Wait::Solicited { .. } = self.wait {
-            self.callbacks.push(Event::EnterSolicitedConfirmWait(seq));
+        self.solicited_fragment(true, seq)
+    }
+
+    /// Enter the wait for the confirm of a solicited response, if it asks for one
+    fn enter(&mut self, wait: Wait) {
+        if let Wait::Solicited { ecsn, .. } = wait {
+            self.callbacks.push(Event::EnterSolicitedConfirmWait(ecsn));
+        }
+        self.wait = wait;
+    }
+
+    fn enable_unsolicited(&mut self, enable: bool, named: [bool; 3]) {
+        for (enabled, named) in self.classes.iter_mut().zip(named) {
+            if named {
+                *enabled = enable;
+            }
+        }
+        if let Wait::Unsolicited { disabled, .. } = &mut self.wait {
+            *disabled |= !enable;
         }
     }
 
-    /// Answer a request in idle or in the unsolicited confirm wait
-    fn accept(&mut self, request: Request) {
+    /// Answer a request in idle or in the unsolicited confirm wait. Returns the wait for the
+    /// answer's confirm, if it asks for one.
+    fn accept(&mut self, request: Request) -> Wait {
         let seq = request.seq;
         let repeat = self.last_valid.as_ref() == Some(&request);
-        match &request.function {
+        let wait = match &request.function {
             // a repeated READ is answered as a new one
             Function::Read(headers) => self.read(seq, headers),
             _ if repeat => {
@@ -786,6 +924,7 @@ impl Model {
                     panic!("{}: a repeat with no stored response", self.context)
                 };
                 self.expect_write(&response, "repeated response");
+                self.repeated_wait(seq)
             }
             Function::DelayMeasure => self.respond(
                 seq,
@@ -796,7 +935,7 @@ impl Model {
             Function::ClearRestart => {
                 self.restart = false;
                 self.callbacks.push(Event::ClearRestartIIN);
-                self.respond(seq, 0, &[], "WRITE response");
+                self.respond(seq, 0, &[], "WRITE response")
             }
             Function::EnableUnsolicited(named) | Function::DisableUnsolicited(named) => {
                 let enable = matches!(request.function, Function::EnableUnsolicited(_));
@@ -806,70 +945,132 @@ impl Model {
                         iin2::NO_FUNC_CODE_SUPPORT,
                         &[],
                         "unsupported ENABLE/DISABLE response",
-                    );
+                    )
                 } else {
-                    for (enabled, named) in self.classes.iter_mut().zip(named) {
-                        if *named {
-                            *enabled = enable;
-                        }
-                    }
-                    if let Wait::Unsolicited { disabled, .. } = &mut self.wait {
-                        *disabled |= !enable;
-                    }
-                    self.respond(seq, 0, &[], "ENABLE/DISABLE response");
+                    self.enable_unsolicited(enable, *named);
+                    self.respond(seq, 0, &[], "ENABLE/DISABLE response")
                 }
             }
-        }
+        };
         self.last_valid = Some(request);
+        wait
+    }
+
+    /// Table 6-1 rows 15 and 18: a new request ends the solicited confirm wait, returning its
+    /// events to the buffer
+    fn end_solicited_wait_for_a_new_request(&mut self) {
+        if let Wait::Solicited { .. } = self.wait {
+            self.callbacks.push(Event::SolicitedConfirmWaitNewRequest);
+            self.reset();
+            self.wait = Wait::Idle;
+        }
     }
 
     fn request(&mut self, request: Request) {
         match self.wait {
-            Wait::Idle => {
-                self.accept(request);
+            Wait::Solicited {
+                ecsn,
+                fin,
+                reported,
+                ..
+            } if self.last_valid.as_ref() == Some(&request)
+                && matches!(request.function, Function::Read(_)) =>
+            {
+                // a repeated READ: the same fragment again, and the wait starts over
+                let Some(response) = self.last_solicited.clone() else {
+                    panic!("{}: a solicited wait with no response", self.context)
+                };
+                self.expect_write(&response, "repeated READ response");
+                self.wait = self.solicited_wait(ecsn, fin, reported);
+            }
+            // processed at once, before an unsolicited response
+            Wait::Idle | Wait::Solicited { .. } => {
+                self.end_solicited_wait_for_a_new_request();
+                let wait = self.accept(request);
+                self.enter(wait);
                 self.run_idle();
             }
-            Wait::Solicited { ecsn, fin, .. } => {
-                if self.last_valid.as_ref() == Some(&request) {
-                    // a repeated READ: the same fragment again, and the wait starts over
-                    let Some(response) = self.last_solicited.clone() else {
-                        panic!("{}: a solicited wait with no response", self.context)
-                    };
-                    self.expect_write(&response, "repeated READ response");
-                    self.wait = Wait::Solicited {
-                        ecsn,
-                        fin,
-                        deadline: self.now + self.setup.confirm_ms,
-                    };
-                } else {
-                    // Table 6-1 rows 15 and 18: a new request ends the wait and is processed at
-                    // once, before an unsolicited response
-                    self.callbacks.push(Event::SolicitedConfirmWaitNewRequest);
-                    self.reset();
-                    self.wait = Wait::Idle;
-                    self.accept(request);
-                    self.run_idle();
+            // Table 6-1 rows 24-29: a READ waits for the end of the unsolicited confirm wait, any
+            // other request discards it. Any request ends the wait for a solicited confirm, and an
+            // answer that asks for one starts it again (decision 0005)
+            Wait::Unsolicited { .. } => {
+                let awaited = match request {
+                    Request {
+                        seq,
+                        function: Function::Read(headers),
+                    } => {
+                        self.deferred = Some((seq, headers));
+                        None
+                    }
+                    request => {
+                        self.deferred = None;
+                        match self.accept(request) {
+                            Wait::Solicited {
+                                ecsn,
+                                deadline,
+                                reported,
+                                ..
+                            } => Some(Awaited {
+                                ecsn,
+                                deadline,
+                                reported,
+                            }),
+                            _ => None,
+                        }
+                    }
+                };
+                if let Wait::Unsolicited { solicited, .. } = &mut self.wait {
+                    *solicited = awaited;
                 }
             }
-            // Table 6-1 row 25: a READ waits for the end of the unsolicited confirm wait, any other
-            // request discards it
-            Wait::Unsolicited { .. } => match request {
-                Request {
-                    seq,
-                    function: Function::Read(headers),
-                } => self.deferred = Some((seq, headers)),
-                request => {
-                    self.deferred = None;
-                    self.accept(request);
-                }
-            },
         }
+    }
+
+    /// A broadcast gets no response, and sets IIN1.0 whether or not it's processed (4.5.1). It's
+    /// handled as a new request that isn't answered: it ends the solicited confirm wait, and in
+    /// the unsolicited confirm wait it discards a deferred READ and ends the wait for a solicited
+    /// confirm. It doesn't change what a repeat matches. Processed, a DISABLE_UNSOLICITED in the
+    /// unsolicited confirm wait ends its retries like any other.
+    fn broadcast(&mut self, mode: BroadcastConfirmMode, function: &Function) {
+        self.end_solicited_wait_for_a_new_request();
+        if let Wait::Unsolicited { solicited, .. } = &mut self.wait {
+            *solicited = None;
+            self.deferred = None;
+        }
+        self.broadcasts += 1;
+        self.broadcast = Some((mode == BroadcastConfirmMode::Mandatory, self.broadcasts));
+        let action = match function {
+            _ if !self.setup.broadcast => BroadcastAction::IgnoredByConfiguration,
+            Function::ClearRestart => {
+                self.restart = false;
+                self.callbacks.push(Event::ClearRestartIIN);
+                BroadcastAction::Processed
+            }
+            Function::EnableUnsolicited(named) | Function::DisableUnsolicited(named) => {
+                if self.setup.unsolicited {
+                    let enable = matches!(function, Function::EnableUnsolicited(_));
+                    self.enable_unsolicited(enable, *named);
+                }
+                BroadcastAction::Processed
+            }
+            Function::Read(_) | Function::DelayMeasure => {
+                BroadcastAction::UnsupportedFunction(function.code())
+            }
+        };
+        self.callbacks
+            .push(Event::BroadcastReceived(function.code(), action));
+        self.run_idle();
     }
 
     fn confirm(&mut self, uns: bool, seq: u8) {
         match self.wait {
             Wait::Idle => {}
-            Wait::Solicited { ecsn, fin, .. } => {
+            Wait::Solicited {
+                ecsn,
+                fin,
+                reported,
+                ..
+            } => {
                 if uns {
                     self.callbacks.push(Event::UnexpectedConfirm(true, seq));
                 } else if seq != ecsn {
@@ -877,6 +1078,7 @@ impl Model {
                         .push(Event::WrongSolicitedConfirmSeq(ecsn, seq));
                 } else {
                     self.callbacks.push(Event::SolicitedConfirmReceived(ecsn));
+                    self.confirmed(reported);
                     self.clear_written();
                     self.wait = if fin {
                         Wait::Idle
@@ -889,26 +1091,42 @@ impl Model {
             Wait::Unsolicited {
                 seq: expected,
                 null,
+                reported,
+                solicited,
                 ..
             } => {
-                // anything but the confirm of the unsolicited response is ignored
                 if uns && seq == expected {
                     self.callbacks.push(Event::UnsolicitedConfirmReceived(seq));
+                    self.confirmed(reported);
                     if !null {
                         self.clear_written();
                     }
                     self.unsolicited = UnsolicitedState::Ready(None);
                     self.end_unsolicited_wait();
+                } else if !uns {
+                    // Table 6-1 rows 20, 21 and 30: only the confirm awaited, before its timeout,
+                    // without a callback. Once it's late it's no longer awaited
+                    let now = self.now;
+                    let awaited = solicited.filter(|awaited| now < awaited.deadline);
+                    if let Some(awaited) = awaited.filter(|awaited| awaited.ecsn == seq) {
+                        self.confirmed(awaited.reported);
+                    }
+                    if let Wait::Unsolicited { solicited, .. } = &mut self.wait {
+                        *solicited = awaited.filter(|awaited| awaited.ecsn != seq);
+                    }
                 }
+                // anything else is ignored
             }
         }
     }
 
-    /// End the unsolicited confirm wait, answering a READ received during it before anything else
+    /// End the unsolicited confirm wait, and the wait for a solicited confirm in it, answering a
+    /// READ received during it before anything else
     fn end_unsolicited_wait(&mut self) {
         self.wait = Wait::Idle;
         if let Some((seq, headers)) = self.deferred.take() {
-            self.read(seq, &headers);
+            let wait = self.read(seq, &headers);
+            self.enter(wait);
             self.last_valid = Some(Request {
                 seq,
                 function: Function::Read(headers),
@@ -926,10 +1144,10 @@ impl Model {
         match self.unsolicited {
             UnsolicitedState::NullRequired => {
                 let seq = self.take_unsolicited_seq();
-                let [iin1, iin2] = self.iin(0);
+                let ([iin1, iin2], reported) = self.response_iin(0);
                 let response = vec![0xF0 | seq, 0x82, iin1, iin2];
                 self.expect_write(&response, "null unsolicited response");
-                self.enter_unsolicited_wait(seq, true, Some(0), response);
+                self.enter_unsolicited_wait(seq, true, Some(0), response, reported);
             }
             UnsolicitedState::Ready(retry_at) => {
                 if retry_at.is_some_and(|retry_at| self.now < retry_at)
@@ -953,14 +1171,14 @@ impl Model {
                 let (bytes, _, _) =
                     self.event_response(self.setup.unsolicited_size, "unsolicited response");
                 let seq = self.take_unsolicited_seq();
-                let [iin1, iin2] = self.iin(0);
+                let ([iin1, iin2], reported) = self.response_iin(0);
                 assert_eq!(
                     bytes[..4],
                     [0xF0 | seq, 0x82, iin1, iin2],
                     "{}: unsolicited response header: {bytes:02X?}",
                     self.context
                 );
-                self.enter_unsolicited_wait(seq, false, self.setup.max_retries, bytes);
+                self.enter_unsolicited_wait(seq, false, self.setup.max_retries, bytes, reported);
             }
         }
     }
@@ -977,6 +1195,7 @@ impl Model {
         null: bool,
         retries: Option<usize>,
         response: Vec<u8>,
+        reported: Option<u64>,
     ) {
         self.callbacks.push(Event::EnterUnsolicitedConfirmWait(seq));
         self.last_unsolicited = Some(response);
@@ -986,6 +1205,8 @@ impl Model {
             retries,
             deadline: self.now + self.setup.confirm_ms,
             disabled: false,
+            reported,
+            solicited: None,
         };
     }
 
@@ -1029,13 +1250,17 @@ impl Model {
                         panic!("{}: an unsolicited wait with no response", self.context)
                     };
                     self.expect_write(&response, "unsolicited retry");
-                    self.wait = Wait::Unsolicited {
-                        seq,
-                        null,
-                        retries,
-                        deadline: self.now + self.setup.confirm_ms,
-                        disabled,
-                    };
+                    // the same wait goes on, with its wait for a solicited confirm
+                    let now = self.now;
+                    if let Wait::Unsolicited {
+                        retries: left,
+                        deadline,
+                        ..
+                    } = &mut self.wait
+                    {
+                        *left = retries;
+                        *deadline = now + self.setup.confirm_ms;
+                    }
                 } else {
                     self.reset();
                     self.unsolicited = if null {
@@ -1050,13 +1275,14 @@ impl Model {
     }
 
     /// A new connection forgets the last request, a deferred READ and the stored responses, and
-    /// returns every event to the buffer. The unsolicited state, the enabled classes and the restart
-    /// IIN stay.
+    /// returns every event to the buffer. The unsolicited state, the enabled classes, the restart
+    /// IIN and the broadcast IIN stay.
     fn reconnect(&mut self) {
         self.reset();
         self.last_valid = None;
         self.deferred = None;
         self.last_solicited = None;
+        self.last_reported = None;
         self.last_unsolicited = None;
         self.wait = Wait::Idle;
         self.run_idle();
@@ -1100,6 +1326,8 @@ enum Op {
     },
     /// a request with the next sequence number
     Request(Function),
+    /// a request to a broadcast address, with the next sequence number
+    Broadcast(BroadcastConfirmMode, Function),
     /// a request with the last request's sequence number
     SameSeq(Function),
     /// send the last request's bytes again
@@ -1181,6 +1409,18 @@ fn function(reads: u32, enables: u32) -> impl Strategy<Value = Function> {
     ]
 }
 
+fn broadcast_mode() -> impl Strategy<Value = BroadcastConfirmMode> {
+    prop_oneof![
+        1 => Just(BroadcastConfirmMode::NotRequired),
+        1 => Just(BroadcastConfirmMode::Optional),
+        2 => Just(BroadcastConfirmMode::Mandatory),
+    ]
+}
+
+fn broadcast_op() -> impl Strategy<Value = Op> {
+    (broadcast_mode(), function(1, 1)).prop_map(|(mode, function)| Op::Broadcast(mode, function))
+}
+
 fn read_op() -> impl Strategy<Value = Op> {
     read_function().prop_map(Op::Request)
 }
@@ -1203,6 +1443,7 @@ fn op() -> impl Strategy<Value = Op> {
         4 => confirm_choice().prop_map(Op::SolicitedConfirm),
         4 => confirm_choice().prop_map(Op::UnsolicitedConfirm),
         2 => Just(Op::Repeat),
+        1 => broadcast_op(),
         4 => advance_choice().prop_map(Op::Advance),
         2 => Just(Op::Reconnect),
     ]
@@ -1249,8 +1490,9 @@ fn due_in_the_solicited_wait() -> impl Strategy<Value = Vec<Op>> {
                 ]
             });
             let next = prop_oneof![
-                3 => request_op().prop_map(|request| vec![request]),
-                1 => read,
+                6 => request_op().prop_map(|request| vec![request]),
+                2 => read,
+                1 => broadcast_op().prop_map(|broadcast| vec![broadcast]),
             ];
             next.prop_map(move |next| {
                 let mut ops = vec![
@@ -1283,7 +1525,7 @@ fn repeat_in_the_unsolicited_wait() -> impl Strategy<Value = Vec<Op>> {
         confirm_choice().prop_map(Op::SolicitedConfirm),
         Just(Op::Advance(AdvanceChoice::AtDeadline)),
     ]);
-    (update_op(), function(1, 1), any::<bool>(), between).prop_map(
+    (update_op(), function(2, 1), any::<bool>(), between).prop_map(
         |(update, function, update_first, between)| {
             let mut ops = vec![update, Op::Request(function)];
             if !update_first {
@@ -1331,17 +1573,69 @@ fn timeout_of_a_restarted_wait() -> impl Strategy<Value = Vec<Op>> {
     })
 }
 
-/// An update, a DISABLE_UNSOLICITED and waits to the next two deadlines: the timeout of an
-/// unsolicited confirm wait after a DISABLE, and the next series after the retry delay
+/// An update, a DISABLE_UNSOLICITED, perhaps to a broadcast address, and waits to the next two
+/// deadlines: the timeout of an unsolicited confirm wait after a DISABLE, and the next series after
+/// the retry delay. After the null response's wait, the next null response reports a broadcast
 fn timeout_after_disable() -> impl Strategy<Value = Vec<Op>> {
-    (update_op(), classes()).prop_map(|(update, classes)| {
+    let disable = (prop::option::of(broadcast_mode()), classes()).prop_map(|(mode, classes)| {
+        let disable = Function::DisableUnsolicited(classes);
+        match mode {
+            Some(mode) => Op::Broadcast(mode, disable),
+            None => Op::Request(disable),
+        }
+    });
+    (update_op(), disable).prop_map(|(update, disable)| {
         vec![
             update,
-            Op::Request(Function::DisableUnsolicited(classes)),
+            disable,
             Op::Advance(AdvanceChoice::AtDeadline),
             Op::Advance(AdvanceChoice::AtDeadline),
         ]
     })
+}
+
+/// Events, perhaps a READ of them, a broadcast and any request in either order, perhaps another
+/// input, and a solicited confirm. The broadcast often arrives in the READ's solicited confirm wait
+/// or in an unsolicited confirm wait, where a response other than a READ's asks for a confirm to
+/// report a mandatory broadcast. The input between is a wait to the next deadline, which ends the
+/// solicited confirm wait, or retries the unsolicited response and makes the solicited confirm
+/// late; a repeat, which asks for the confirm again or, after the broadcast, is the response
+/// without IIN1.0; another request; or the unsolicited confirm, after which the solicited confirm
+/// isn't awaited
+fn broadcast_and_a_request() -> impl Strategy<Value = Vec<Op>> {
+    let start = prop_oneof![
+        update_op().prop_map(|update| vec![update]),
+        (update_op(), read_op()).prop_map(|(update, read)| vec![update, read]),
+    ];
+    let between = prop::option::weighted(
+        0.75,
+        prop_oneof![
+            2 => Just(Op::Advance(AdvanceChoice::AtDeadline)),
+            1 => Just(Op::Repeat),
+            1 => request_op(),
+            1 => Just(Op::UnsolicitedConfirm(ConfirmChoice::Expected)),
+        ],
+    );
+    (
+        start,
+        broadcast_op(),
+        function(1, 1),
+        any::<bool>(),
+        between,
+        confirm_choice(),
+    )
+        .prop_map(
+            |(mut ops, broadcast, function, broadcast_first, between, confirm)| {
+                let mut pair = [broadcast, Op::Request(function)];
+                if !broadcast_first {
+                    pair.reverse();
+                }
+                ops.extend(pair);
+                ops.extend(between);
+                ops.push(Op::SolicitedConfirm(confirm));
+                ops
+            },
+        )
 }
 
 /// Single ops, and runs of ops that reach states single ops rarely do
@@ -1349,11 +1643,12 @@ fn ops() -> impl Strategy<Value = Vec<Op>> {
     let run = prop_oneof![
         16 => op().prop_map(|op| vec![op]),
         2 => request_after_read_and_update(),
-        5 => due_in_the_solicited_wait(),
+        7 => due_in_the_solicited_wait(),
         1 => repeat_of_a_later_fragment(),
         1 => timeout_of_a_restarted_wait(),
         1 => timeout_after_disable(),
-        3 => repeat_in_the_unsolicited_wait(),
+        4 => repeat_in_the_unsolicited_wait(),
+        2 => broadcast_and_a_request(),
     ];
     prop::collection::vec(run, 1..40).prop_map(|runs| runs.concat())
 }
@@ -1364,6 +1659,7 @@ fn setup() -> impl Strategy<Value = Setup> {
     let size = || prop_oneof![Just(BufferSize::<249, 2048>::MIN), Just(2048)];
     (
         prop::bool::weighted(0.75),
+        prop::bool::weighted(0.9),
         prop_oneof![Just(None), (0usize..3).prop_map(Some)],
         prop_oneof![Just(1u64), 2u64..3000],
         0u64..3000,
@@ -1375,6 +1671,7 @@ fn setup() -> impl Strategy<Value = Setup> {
         .prop_map(
             |(
                 unsolicited,
+                broadcast,
                 max_retries,
                 confirm_ms,
                 retry_ms,
@@ -1384,6 +1681,7 @@ fn setup() -> impl Strategy<Value = Setup> {
                 unsolicited_size,
             )| Setup {
                 unsolicited,
+                broadcast,
                 max_retries,
                 confirm_ms,
                 // distinct from the confirm timeout, so that the two can't be confused
@@ -1403,6 +1701,11 @@ fn setup() -> impl Strategy<Value = Setup> {
 fn config(setup: Setup) -> OutstationConfig {
     let mut config = without_keep_alive(get_default_unsolicited_config());
     config.features.unsolicited = if setup.unsolicited {
+        Feature::Enabled
+    } else {
+        Feature::Disabled
+    };
+    config.features.broadcast = if setup.broadcast {
         Feature::Enabled
     } else {
         Feature::Disabled
@@ -1468,6 +1771,11 @@ async fn step(
             });
         }
         Input::Request(request) => harness.send_and_process(&request.bytes()).await,
+        Input::Broadcast(mode, request) => {
+            harness.set_broadcast(Some(*mode));
+            harness.send_and_process(&request.bytes()).await;
+            harness.set_broadcast(None);
+        }
         Input::Confirm { uns: false, seq } => harness.send_and_process(&confirm(*seq)).await,
         Input::Confirm { uns: true, seq } => {
             harness.send_and_process(&unsolicited_confirm(*seq)).await
@@ -1479,7 +1787,7 @@ async fn step(
     }
     match input {
         // the outstation has answered once `send_and_process` returns (see `pop_response`)
-        Input::Request(_) | Input::Confirm { .. } => {}
+        Input::Request(_) | Input::Broadcast(..) | Input::Confirm { .. } => {}
         // the outstation was woken, by its start, the database or a timer due when the sleep ended,
         // but hasn't run. A yield lets every task already woken run before this one (see
         // `tokio::task::yield_now`), and the outstation handles the wake-up in that one poll, as
@@ -1520,9 +1828,12 @@ async fn check_model(setup: Setup, ops: Vec<Op>) {
 
     // Every event left is reported and confirmed exactly once. The drain adds no events, and the
     // model requires each response to carry some of the events selected for it, so every confirm
-    // deletes at least one event but two: the first may confirm a response whose events were all
-    // evicted before the drain, and one may confirm the null response, which a deferred READ's
-    // answer can hold back until then. The DISABLE and the READ make two more inputs.
+    // deletes at least one event but two. The first may confirm a response whose events were all
+    // evicted before the drain, or one that asked for a confirm only to report a broadcast. The
+    // other may confirm the null response, which a deferred READ's answer can hold back until then,
+    // or the DISABLE's response, which asks for a confirm to report a broadcast; not both, as the
+    // deferred READ's answer reports the broadcast and its confirm ends it. The DISABLE and the READ
+    // make two more inputs.
     let limit = model.events.len() + 4;
     for _ in 0..limit {
         let Some(op) = model.drain_op() else {
@@ -1560,6 +1871,7 @@ proptest! {
 fn due_in_the_solicited_wait_case(request: Op) -> (Setup, Vec<Op>) {
     let setup = Setup {
         unsolicited: true,
+        broadcast: true,
         max_retries: Some(0),
         confirm_ms: 2047,
         retry_ms: 2,
@@ -1613,6 +1925,7 @@ fn new_non_read_in_the_solicited_wait_comes_before_a_due_unsolicited_response() 
 fn solicited_only() -> Setup {
     Setup {
         unsolicited: false,
+        broadcast: true,
         max_retries: None,
         confirm_ms: 1000,
         retry_ms: 5000,
@@ -1697,6 +2010,7 @@ fn repeated_read_restarts_the_solicited_confirm_timeout() {
 fn unsolicited_with_retries(max_retries: Option<usize>) -> Setup {
     Setup {
         unsolicited: true,
+        broadcast: true,
         max_retries,
         confirm_ms: 2000,
         retry_ms: 11000,
