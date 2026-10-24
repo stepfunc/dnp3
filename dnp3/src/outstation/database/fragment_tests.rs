@@ -26,11 +26,10 @@
 //! Only objects that fit in an empty fragment by themselves are generated, and only selections
 //! that fit in the largest fragment, so that the reference is written whole. Besides general
 //! content, the generator weights runs of relative-time events that share CTOs across fragment
-//! boundaries, change synchronization or step past what a CTO can reach, and analog deadbands
-//! (group 34) that span fragments. Not reached in every run: an event earlier than the CTO of the
-//! header in progress, a binary or double-bit event with an unsynchronized time asked for in
-//! absolute time (g2v2, g4v2), and a plain event header or an attribute set split across
-//! fragments.
+//! boundaries, change synchronization or step past what a CTO can reach, including unsynchronized
+//! events of points that default to absolute time (g2v2, g4v2), and analog deadbands (group 34)
+//! that span fragments. Not reached in every run: an event earlier than the CTO of the header in
+//! progress, and a plain event header or an attribute set split across fragments.
 
 use std::collections::BTreeSet;
 
@@ -864,22 +863,25 @@ fn general_spec() -> impl Strategy<Value = Spec> {
 }
 
 /// Binary and double-bit events with relative time, close enough in time that runs of them share
-/// a CTO, and enough of them to straddle fragment boundaries
+/// a CTO, and enough of them to straddle fragment boundaries. Some points default to absolute time,
+/// in which their unsynchronized events are written with relative time.
 fn relative_time_spec() -> impl Strategy<Value = Spec> {
-    let point = (any::<bool>(), INDICES).prop_map(|(double_bit, index)| Point {
-        kind: if double_bit {
-            Kind::DoubleBit
-        } else {
-            Kind::Binary
-        },
-        index,
-        class: Some(EventClass::Class1),
-        static_variation: Pick(0),
-        // g2v3 or g4v3
-        event_variation: Pick(2),
-        deadband: 0.0,
-        value: sample_at(None, 0, 0x01),
-    });
+    // g2v3 or g4v3, sometimes g2v2 or g4v2
+    let variation = prop_oneof![3 => Just(Pick(2)), 1 => Just(Pick(1))];
+    let point =
+        (any::<bool>(), INDICES, variation).prop_map(|(double_bit, index, variation)| Point {
+            kind: if double_bit {
+                Kind::DoubleBit
+            } else {
+                Kind::Binary
+            },
+            index,
+            class: Some(EventClass::Class1),
+            static_variation: Pick(0),
+            event_variation: variation,
+            deadband: 0.0,
+            value: sample_at(None, 0, 0x01),
+        });
     // mostly steps a CTO reaches, sometimes past it, and sometimes a change of synchronization
     let step = (
         prop_oneof![8 => 0u64..2000, 1 => 60_000u64..70_000],
