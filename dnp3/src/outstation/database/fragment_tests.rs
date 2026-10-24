@@ -11,12 +11,25 @@
 //! master would confirm each fragment. Every fragment fits and parses, and keeps each relative-time
 //! event with its CTO; the series completes within a bound; and what master extraction reports
 //! across the fragments equals what it reports when the same selection is written into the
-//! largest fragment. In that run, each selected item is reported once, in order.
+//! largest fragment. In that run, each selected item is reported once, in order, and each event
+//! that carries a time carries the time recorded for its change (so one recorded without a time
+//! carries none). A binary or double-bit event keeps its synchronization too, since an
+//! unsynchronized time is written relative to a CTO that says so; the master reports the other
+//! kinds' times as synchronized, so only their timestamps are compared.
+//!
+//! The comparison with the whole response is differential, so a mistake both sides make isn't
+//! caught by it. Two parts are independent of the writer: a selection model gives the identity and
+//! order of the items, and the changes give the event times. Other values (states, flags, counts,
+//! numbers, strings, attributes) are only compared whole against fragmented; the READ examples pin
+//! them.
 //!
 //! Only objects that fit in an empty fragment by themselves are generated, and only selections
 //! that fit in the largest fragment, so that the reference is written whole. Besides general
 //! content, the generator weights runs of relative-time events that share CTOs across fragment
-//! boundaries, and analog deadbands (group 34) that span fragments.
+//! boundaries, change synchronization or step past what a CTO can reach, including unsynchronized
+//! events of points that default to absolute time (g2v2, g4v2), and analog deadbands (group 34)
+//! that span fragments. Not reached in every run: an event earlier than the CTO of the header in
+//! progress, and a plain event header or an attribute set split across fragments.
 
 use std::collections::BTreeSet;
 
@@ -510,8 +523,9 @@ fn select_range(indices: &BTreeSet<u16>, range: Range) -> Vec<u16> {
 }
 
 /// Each item the READ selects, in the order the response reports them: events in the order they
-/// were created, then static points by header, then attributes by header
-fn selection(spec: &Spec) -> Vec<Item> {
+/// were created, then static points by header, then attributes by header. Also the time recorded
+/// for each selected event, in the same order.
+fn selection(spec: &Spec) -> (Vec<Item>, Vec<Option<Time>>) {
     let added = spec.added();
     let indices = |kind: Kind| -> BTreeSet<u16> {
         added
@@ -520,12 +534,12 @@ fn selection(spec: &Spec) -> Vec<Item> {
             .map(|x| x.index)
             .collect()
     };
-    let mut events: Vec<(&Point, bool)> = spec
+    let mut events: Vec<(&Point, Option<Time>, bool)> = spec
         .changes
         .iter()
-        .map(|x| *x.point.get(&added))
-        .filter(|x| x.class.is_some())
-        .map(|x| (x, false))
+        .map(|x| (*x.point.get(&added), x.value.time))
+        .filter(|(x, _)| x.class.is_some())
+        .map(|(x, time)| (x, time, false))
         .collect();
     let mut sets: BTreeSet<(u8, u8)> = BTreeSet::new();
     for attr in &spec.attrs {
@@ -538,9 +552,9 @@ fn selection(spec: &Spec) -> Vec<Item> {
     for read in &spec.reads {
         let mut select_events = |matches: &dyn Fn(&Point) -> bool, limit: Option<u8>| {
             let limit = limit.map_or(usize::MAX, usize::from);
-            for (_, selected) in events
+            for (_, _, selected) in events
                 .iter_mut()
-                .filter(|(x, selected)| !selected && matches(x))
+                .filter(|(x, _, selected)| !selected && matches(x))
                 .take(limit)
             {
                 *selected = true;
@@ -593,13 +607,61 @@ fn selection(spec: &Spec) -> Vec<Item> {
         }
     }
 
-    events
+    events.retain(|(.., selected)| *selected);
+    let times = events.iter().map(|(_, time, _)| *time).collect();
+    let items = events
         .into_iter()
-        .filter(|(_, selected)| *selected)
-        .map(|(x, _)| Item::Event(x.kind, x.index))
+        .map(|(x, ..)| Item::Event(x.kind, x.index))
         .chain(statics)
         .chain(attrs)
-        .collect()
+        .collect();
+    (items, times)
+}
+
+/// The time a reported value carries, if any
+fn reported_time(value: &Value) -> Option<Time> {
+    match value {
+        Value::Binary(x, _) => x.time,
+        Value::DoubleBit(x, _) => x.time,
+        Value::BinaryOutputStatus(x, _) => x.time,
+        Value::Counter(x, _) => x.time,
+        Value::FrozenCounter(x, _) => x.time,
+        Value::Analog(x, _) => x.time,
+        Value::AnalogOutputStatus(x, _) => x.time,
+        Value::FrozenAnalog(x, _) => x.time,
+        Value::BinaryCommandEvent(x, _) => x.time,
+        Value::AnalogCommandEvent(x, _) => x.time,
+        Value::AnalogDeadBand(..)
+        | Value::UnsignedInteger(..)
+        | Value::OctetString(..)
+        | Value::Attribute(_)
+        | Value::AttributeList(..)
+        | Value::KnownAttribute(_)
+        | Value::KnownAttributeList(..)
+        | Value::AbsTime(_) => None,
+    }
+}
+
+/// Each reported event that carries a time carries the time recorded for it (`recorded`, in the
+/// order of the events): all of it for a binary or double-bit event, and the timestamp for the
+/// others
+fn check_event_times(
+    reported: &[(HeaderInfo, Value)],
+    recorded: &[Option<Time>],
+) -> Result<(), TestCaseError> {
+    let events: Vec<_> = reported.iter().filter(|(info, _)| info.is_event).collect();
+    prop_assert_eq!(events.len(), recorded.len());
+    for ((_, value), recorded) in events.into_iter().zip(recorded) {
+        let Some(time) = reported_time(value) else {
+            continue;
+        };
+        if matches!(value, Value::Binary(..) | Value::DoubleBit(..)) {
+            prop_assert_eq!(Some(time), *recorded);
+        } else {
+            prop_assert_eq!(Some(time.timestamp()), recorded.map(|x| x.timestamp()));
+        }
+    }
+    Ok(())
 }
 
 /// More bytes than the items can take to encode, each with a header of its own, and a CTO for
@@ -801,22 +863,25 @@ fn general_spec() -> impl Strategy<Value = Spec> {
 }
 
 /// Binary and double-bit events with relative time, close enough in time that runs of them share
-/// a CTO, and enough of them to straddle fragment boundaries
+/// a CTO, and enough of them to straddle fragment boundaries. Some points default to absolute time,
+/// in which their unsynchronized events are written with relative time.
 fn relative_time_spec() -> impl Strategy<Value = Spec> {
-    let point = (any::<bool>(), INDICES).prop_map(|(double_bit, index)| Point {
-        kind: if double_bit {
-            Kind::DoubleBit
-        } else {
-            Kind::Binary
-        },
-        index,
-        class: Some(EventClass::Class1),
-        static_variation: Pick(0),
-        // g2v3 or g4v3
-        event_variation: Pick(2),
-        deadband: 0.0,
-        value: sample_at(None, 0, 0x01),
-    });
+    // g2v3 or g4v3, sometimes g2v2 or g4v2
+    let variation = prop_oneof![3 => Just(Pick(2)), 1 => Just(Pick(1))];
+    let point =
+        (any::<bool>(), INDICES, variation).prop_map(|(double_bit, index, variation)| Point {
+            kind: if double_bit {
+                Kind::DoubleBit
+            } else {
+                Kind::Binary
+            },
+            index,
+            class: Some(EventClass::Class1),
+            static_variation: Pick(0),
+            event_variation: variation,
+            deadband: 0.0,
+            value: sample_at(None, 0, 0x01),
+        });
     // mostly steps a CTO reaches, sometimes past it, and sometimes a change of synchronization
     let step = (
         prop_oneof![8 => 0u64..2000, 1 => 60_000u64..70_000],
@@ -921,7 +986,7 @@ proptest! {
 
     #[test]
     fn fragmenting_does_not_change_what_the_master_sees(spec in spec()) {
-        let items = selection(&spec);
+        let (items, event_times) = selection(&spec);
         // each fragment makes progress, so the series completes within this many
         let max_fragments = items.len().saturating_add(spec.reads.len()).saturating_add(2);
 
@@ -929,6 +994,7 @@ proptest! {
         prop_assume!(encoded_bound(&items) <= LARGEST - ResponseHeader::LENGTH);
         let whole = write_fragments(&spec, LARGEST, 1);
         prop_assert_eq!(whole.iter().map(item).collect::<Option<Vec<_>>>(), Some(items));
+        check_event_times(&whole, &event_times)?;
 
         let fragmented = write_fragments(&spec, spec.size, max_fragments);
         prop_assert_eq!(fragmented, whole);
