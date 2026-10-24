@@ -6,6 +6,22 @@
 
 //! Request bytes from `CommandBuilder` and the comparison of each echo, for every command type
 //! and index width
+//!
+//! The oracle is a hand encoding of each command; the outstation's parser reads the bytes back as
+//! a second check.
+//!
+//! `commands_are_written_and_parsed_back` generates 0 to 11 commands of all five types, at either
+//! index width and any index, sometimes finishing the header before a command. Floats are any bit
+//! pattern, with NaN, the infinities and the zeros more likely; control codes include `Unknown`
+//! values that alias a named one, and codes whose fields don't fit their bits.
+//! `echo_matches_only_when_unchanged` generates 1 to 11 commands with codes that fit, and an echo
+//! with at most one change: a byte of an object, a status, or a missing or repeated object or
+//! header.
+//!
+//! Not generated, so left to the examples in this file: the single-header constructors
+//! (`single_header_u8` and `single_header_u16`), `finish_header` twice in a row, an echo with more
+//! than one change, and an echo with another command type or index width. An echo that doesn't
+//! parse isn't compared here; the command tasks of `task_model.rs` fail on it.
 
 use scursor::WriteCursor;
 
@@ -802,6 +818,27 @@ mod property {
     #[test]
     fn empty_builder_writes_no_headers() {
         check_written_and_parsed_back(&[]);
+    }
+
+    /// A control code whose fields don't fit their bits, in a header after a valid one, makes the
+    /// master write nothing
+    #[test]
+    fn later_invalid_header_leaves_the_cursor_untouched() {
+        let crob = |op_type| Value::G12V1 {
+            code: ControlCode::from_op_type(op_type),
+            count: 1,
+            on_time: 1000,
+            off_time: 1000,
+        };
+        let invalid = OpType::Unknown(0x11);
+        assert_eq!(code_byte(ControlCode::from_op_type(invalid)), None);
+        check_written_and_parsed_back(&[
+            Add::new(crob(OpType::LatchOn), Width::One, 1),
+            Add {
+                finish: true,
+                ..Add::new(crob(invalid), Width::One, 2)
+            },
+        ]);
     }
 
     #[test]

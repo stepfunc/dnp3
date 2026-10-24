@@ -1118,7 +1118,6 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::app::control::{ControlCode, OpType};
     use crate::app::parse::options::ParseOptions;
     use crate::app::FunctionCode;
     use scursor::WriteCursor;
@@ -1141,26 +1140,6 @@ mod tests {
             CommandHeaders::single(sent.clone()).compare(headers),
             expected
         );
-    }
-
-    #[test]
-    fn later_invalid_header_leaves_the_cursor_untouched() {
-        let code = ControlCode::from_op_type(OpType::Unknown(0x11));
-        let mut builder = CommandBuilder::new();
-        builder.add_u8(Group12Var1::from_op_type(OpType::LatchOn), 1);
-        builder.finish_header();
-        builder.add_u8(Group12Var1::from_code(code), 2);
-        let headers = builder.build();
-
-        let mut buffer = [0u8; 64];
-        let mut cursor = WriteCursor::new(&mut buffer);
-        cursor.write_u8(0xAA).unwrap();
-
-        assert_eq!(
-            headers.write(&mut HeaderWriter::new(&mut cursor)),
-            Err(TaskError::BadEncoding(BadEncoding::ControlCode(code)))
-        );
-        assert_eq!(cursor.written(), &[0xAA]);
     }
 
     const OTHER_NAN_F32: f32 = f32::from_bits(0x7FC0_0001);
@@ -1323,6 +1302,25 @@ mod tests {
     }
 
     mod round_trip {
+        //! READ requests and generic request headers as the master writes them, against oracles
+        //! that share no code with it: a hand encoding of each header (`model_request`,
+        //! `model_header`, `Qualifier::bytes`, `freeze_bytes`), and for which headers the
+        //! outstation accepts, the READ table `read_accepts` in
+        //! `app/parse/header_identity_tests.rs`, written apart from the parser. The outstation's
+        //! parser reads the bytes back as a second check.
+        //!
+        //! Generated: for each qualifier kind, variations a READ accepts with it, less often ones
+        //! it doesn't, and rarely g0v0, in any header position, with groups 0, 110 and 111 no more
+        //! likely than the others; one and two-byte ranges, with single indices and the ends more
+        //! likely; one and two-byte counts, with 0, 1, 255 and the maximum more likely; single and
+        //! multiple headers (up to five), class scans of any classes, and device attribute reads;
+        //! generic headers of up to five READ headers and g50v2 freeze times, with a time and
+        //! interval of 0 or any value.
+        //!
+        //! Not generated: a group and variation that isn't a `Variation`, attribute headers among
+        //! generic headers (see `app/attr.rs` and the attribute example above), and requests
+        //! longer than the write buffer.
+
         use super::*;
         use crate::app::gen::count::CountVariation;
         use crate::app::parse::header_identity_tests::{read_accepts, ReadKind};
@@ -1477,13 +1475,15 @@ mod tests {
             ]
         }
 
-        /// a variation a READ accepts with this kind of qualifier, or less often, one it doesn't
+        /// a variation a READ accepts with this kind of qualifier, less often one it doesn't, and
+        /// rarely g0v0, which names no object, so the master can't write it
         fn variation(kind: ReadKind) -> impl Strategy<Value = Variation> {
             let (accepted, rejected): (Vec<Variation>, Vec<Variation>) =
                 Variation::all().partition(|v| read_accepts(kind, *v));
             prop_oneof![
-                3 => one_of(accepted),
-                1 => one_of(rejected),
+                12 => one_of(accepted),
+                4 => one_of(rejected),
+                1 => Just(Variation::Group0(0)),
             ]
         }
 
@@ -1615,8 +1615,8 @@ mod tests {
 
             /// A READ request is written as its headers, and the outstation parses each header
             /// back to what was written, alone or together, unless a READ doesn't accept the
-            /// variation with that qualifier. A request with a header for g0v0, which names no
-            /// object, writes nothing
+            /// variation with that qualifier. A request with a header for g0v0 in any position,
+            /// which names no object, fails and writes nothing
             #[test]
             fn read_requests_parse_to_the_headers_written(request in read_request()) {
                 let mut buffer = [0; 256];
@@ -1649,13 +1649,30 @@ mod tests {
             }
 
             /// Generic request headers are written as the READ headers and g50v2 freeze times
-            /// they hold, in order, and each g50v2 parses back to its time and interval
+            /// they hold, in order, and each g50v2 parses back to its time and interval. Headers
+            /// with a READ of g0v0 in any position fail and write nothing. Attribute headers aren't
+            /// generated: `app/attr.rs` tests their values, and
+            /// `attribute_with_a_variation_that_cannot_carry_a_value_leaves_the_cursor_untouched`
+            /// the header
             #[test]
             fn headers_are_written_in_order(items in prop::collection::vec(item(), 0..6)) {
                 let headers = items.iter().fold(Headers::new(), add);
                 let mut buffer = [0; 256];
                 let mut cursor = WriteCursor::new(&mut buffer);
-                headers.write(&mut HeaderWriter::new(&mut cursor)).unwrap();
+                let result = headers.write(&mut HeaderWriter::new(&mut cursor));
+                let g0v0 = Variation::Group0(0);
+                if items
+                    .iter()
+                    .any(|item| matches!(item, Item::Read(header) if header.variation() == g0v0))
+                {
+                    prop_assert_eq!(
+                        result,
+                        Err(TaskError::BadEncoding(BadEncoding::UndefinedVariation(g0v0)))
+                    );
+                    prop_assert_eq!(cursor.written(), &[0u8; 0]);
+                    return Ok(());
+                }
+                prop_assert_eq!(result, Ok(()));
                 let expected: Vec<u8> = items
                     .iter()
                     .flat_map(|item| match *item {

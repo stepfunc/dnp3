@@ -6,7 +6,18 @@
 
 //! A model of how the master checks and extracts objects whose time is relative to a common time
 //! of occurrence (CTO): which responses it can process, the time of each relative-time object,
-//! and what extraction reports it delivered
+//! and what extraction reports it delivered. The model computes times on its own (CTO plus
+//! offset, invalid past 48 bits) and shares no code with extraction.
+//!
+//! Generated: any order of CTOs (synchronized or not, counts 0 to 2, both widths), g2v3 and g4v3
+//! (0 to 3 objects, both widths), g50v1 (counts 0 to 2, both widths), and g1v2 and g30v1 ranges
+//! with a one-byte start and stop, with times at the 48-bit boundary. Not generated: bytes that
+//! fail to parse (see the malformed tests in `extract.rs`), two-byte ranges, time delays (g52)
+//! and other count-and-prefix variations.
+//!
+//! The fixed cases pin the responses the read and unsolicited tests share, and a synchronized
+//! CTO plus an offset that reaches the maximum time exactly, which the property reaches in most
+//! runs but not every run.
 
 use proptest::prelude::*;
 
@@ -459,4 +470,49 @@ fn fixed_responses_follow_the_cto_model() {
             Ok(()),
         );
     }
+}
+
+/// A synchronized CTO one below the maximum time plus an offset of 1 reaches the maximum time
+#[test]
+fn synchronized_cto_plus_offset_reaches_the_maximum_timestamp() {
+    let specs = [
+        cto(true, false, &[0xFFFF_FFFF_FFFE]),
+        Spec::Relative {
+            double_bit: false,
+            wide: false,
+            objects: vec![(7, 0x01, 1)],
+        },
+    ];
+    expect_fixed(
+        &specs,
+        &[
+            // g51v1, a 1-byte count of 1, time 0xFFFF_FFFF_FFFE
+            &[0x33, 0x01, 0x07, 0x01, 0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF],
+            // g2v3, a 1-byte count and prefix: index 7, flags 0x01, relative time 1
+            &[0x02, 0x03, 0x17, 0x01, 0x07, 0x01, 0x01, 0x00],
+        ],
+        Ok(()),
+    );
+    let time = Some(Time::Synchronized(Timestamp::max()));
+    let info = HeaderInfo::new(
+        Variation::Group2Var3,
+        QualifierCode::CountAndPrefix8,
+        true,
+        true,
+    );
+    assert_eq!(
+        model(&specs).calls,
+        [Call {
+            kind: Kind::BinaryInput,
+            info,
+            values: vec![Value::Binary(
+                BinaryInput {
+                    value: false,
+                    flags: Flags::ONLINE,
+                    time,
+                },
+                7
+            )],
+        }]
+    );
 }
