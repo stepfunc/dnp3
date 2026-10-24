@@ -819,6 +819,28 @@ mod tests {
         }
     }
 
+    /// Property: however a stream arrives, a stream reader reads the same frames from it, and
+    /// stops with the same error, as a parser given all of it at once. Without changes, those are
+    /// the frames written to it. With one changed byte, Close mode fails with the error for that
+    /// byte after the frames before it, and Discard mode reads the frames before it first.
+    ///
+    /// The frames are written with the production formatter, so the clean case checks encoding
+    /// and parsing as a round trip against the generator's own fields; the frames in `test_data`
+    /// pin the bytes. The error each changed byte must cause comes from the kind of change
+    /// (the CRCs detect any one-byte change), independently of the parser. What Discard mode reads
+    /// after the change is compared only with a one-shot parse by the same `Parser`, which still
+    /// catches a reader that skips differently once a frame is split across reads.
+    ///
+    /// The generator writes 1 to 11 frames with any control byte and addresses, with or without
+    /// data of up to the most a frame carries (weighted toward the most), then a valid sentinel
+    /// frame, so that what follows a change is observable. Three cases in four change one byte of
+    /// one frame: a start byte, the length (to less than 5), a byte of the header or its CRC, or a
+    /// byte of the body. The reader is sized for fragments of one frame's data or of 2048 bytes,
+    /// and reads take 1 to 300 bytes in a repeating pattern, so frames split across reads and a
+    /// buffer that fills with part of a frame are common. Not generated: bytes inserted or removed
+    /// between frames, truncated frames, a length that is valid but wrong, and datagram mode; the
+    /// `corruptions()` table, the truncated-frame examples and the datagram and UDP examples above
+    /// cover those.
     mod chunking {
         use super::*;
         use crate::link::format::{format_data_frame, format_header_only, Payload};

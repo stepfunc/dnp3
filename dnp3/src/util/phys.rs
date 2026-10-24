@@ -458,6 +458,32 @@ mod reply_tests {
         .await;
     }
 
+    /// Properties of writing a link reply that a cancelled call left unfinished:
+    ///
+    /// - `a_reply_resumes_where_a_cancelled_write_stopped`: writing a reply to a stream that takes
+    ///   it in arbitrary parts and stalls writes and flushes, with each call dropped after an
+    ///   arbitrary number of polls, sends every byte once and in order, and a stream that needs
+    ///   it is flushed after the last byte.
+    /// - `a_write_follows_the_whole_reply`: however often finishing a reply to a duplex with
+    ///   little room is cancelled, a following write sends the rest of the reply and then its own
+    ///   data, and leaves no reply pending.
+    ///
+    /// Both oracles are independent. The first checks after every call that the stream holds
+    /// exactly the bytes the reply counts as written (`consistent`, itself checked by
+    /// `consistency_rejects_lost_repeated_and_unflushed_bytes`); the second compares what the
+    /// peer received with the frame followed by the data.
+    ///
+    /// The first draws any frame, whether the stream must be flushed, writes that accept nothing,
+    /// one byte, a few, about the frame's length or more, mostly stalling after progress, up to 5
+    /// flushes that mostly stall, and up to 11 calls, each polled up to 4 times and mostly once. It
+    /// is built to reach a call dropped before any byte, in the middle of the frame and while
+    /// flushing, and a flush resumed by the last call. The second draws a duplex of 1 to 12 bytes,
+    /// up to 15 steps that each either poll `finish_reply` up to 3 times or let the peer read up
+    /// to 12 bytes, and a write of 1 to 20 bytes, so the reply is untouched, partly written or
+    /// done when the write starts. A duplex isn't flushed, so only the first reaches a pending
+    /// flush, which `reply_resumes_a_cancelled_flush` also pins over TLS. Datagram replies, which
+    /// carry a physical address, aren't generated. Each case runs under the watchdog, since a
+    /// call that loops forever inside one poll would otherwise hang the test.
     mod properties {
         use super::*;
         use crate::link::constant::LINK_HEADER_LENGTH;

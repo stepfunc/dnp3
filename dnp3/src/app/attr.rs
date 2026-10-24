@@ -2127,8 +2127,10 @@ mod test {
         //!   smallest length that `expected_encoding` predicts, and parses back from a response and
         //!   a WRITE with the same set (0 as the default set), variation and value, floats compared
         //!   by their bits.
-        //! - `attributes_need_exactly_their_encoded_size`: an encodable attribute fits a buffer of
-        //!   exactly its encoded size and fails with `WriteError` one byte short.
+        //! - `attributes_need_exactly_their_encoded_size`: an attribute production accepts as
+        //!   encodable (`check_encodable` succeeds) fits a buffer of exactly its encoded size and
+        //!   fails with `WriteError` one byte short. A false rejection skips the case; the
+        //!   round-trip property checks acceptance.
         //!
         //! The code, the length and the errors come from `expected_encoding`, independently of the
         //! writer. The value bytes are checked only by parsing them back, so a mistake made in both
@@ -2140,8 +2142,8 @@ mod test {
         //! and the values just past them; floats from any bits or the special values; strings and
         //! byte strings up to 300 bytes, around the 255 byte limit, and strings of any characters;
         //! the set from any value, plus the default set and a private set 0 on their own; and a
-        //! reserved variation in about an eighth of the cases. It can't produce attribute lists, which a
-        //! master never writes; those are only parsed and have their own examples.
+        //! reserved variation in about an eighth of the cases. It can't produce attribute lists,
+        //! which a master never writes; those are only parsed and have their own examples.
         //! `edge_values_round_trip` runs every width limit, the special floats, the default and
         //! private 0 sets and the reserved variations deterministically.
 

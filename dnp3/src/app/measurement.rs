@@ -978,8 +978,26 @@ mod tests {
         assert_eq!(low_16_bits(0x1234_5678), 0x5678);
     }
 
-    /// Checks the analog conversions against a model that never converts a float with `as`: it
-    /// predicts the wire value as an `f64`, which every `i16`, `i32` and `f32` converts to exactly
+    /// Property: for an analog input, a frozen analog input and an analog output status with any
+    /// value and flags, `to_i16` and `to_i32` give 0 for NaN, clamp values past the range and
+    /// truncate the rest toward zero; `to_f32` keeps NaN and the infinities, clamps finite values
+    /// past the f32 range, and rounds the rest to the nearest f32, ties to even, keeping the sign
+    /// of zero. The flags are kept, with OVER_RANGE added exactly when the value was NaN (for the
+    /// integers) or clamped.
+    ///
+    /// The oracle is independent: [`analog_model`] predicts the wire value as an `f64`, which
+    /// every `i16`, `i32` and `f32` converts to exactly, and never converts a float with `as`; the
+    /// f32 rounding check `rounds_to` has its own test. Master extraction's property in
+    /// `master/write_extract_tests.rs` shares the integer model, so a mistake in it would hide
+    /// from both.
+    ///
+    /// The generator draws every f64 bit pattern, values within 2 of each limit, the limits and
+    /// their neighbors, NaN of both signs, the infinities, -0.0, subnormals, the values on both
+    /// sides of rounding past `f32::MAX`, and the midpoints between adjacent f32 values, where
+    /// rounding breaks a tie, with any flags byte. An exact limit is one choice among many, so
+    /// `edge_values_match_the_model` runs every edge in each run. The three types are every
+    /// implementation of `AnalogConversions`; which conversion each variation uses is left to
+    /// master extraction's property.
     mod conversion_properties {
         use super::*;
         use proptest::prelude::*;

@@ -23,9 +23,26 @@
 //! A CONFIRM keeps the selection: Table 4-2 classes it as a confirmation, not a request, so it
 //! isn't the "next request" of Rule 4. So does a fragment that isn't a valid request (FIR=0).
 //!
-//! Besides single requests, a run sends a SELECT, one request or clock advance, and the OPERATE
-//! that matches the SELECT, so each ruling on whether a request ends the selection is followed by
-//! the OPERATE that shows it.
+//! The oracle is independent of the outstation: the model encodes its own objects and expected
+//! echoes, and offers each alternative the standard allows. The callback values it expects are
+//! built with the public `CommandStatus` and `ControlCode` types.
+//!
+//! The requests are SELECT, OPERATE, DIRECT_OPERATE (with and without an acknowledgment), READ,
+//! DELAY_MEASURE, malformed SELECT, OPERATE and READ requests, an unknown function, both kinds of
+//! CONFIRM and a fragment without FIR. Their objects come from eleven sets: a first set, sets that
+//! each differ from it in one way (value, index, qualifier, status, a second object, the order of
+//! two), a CROB and two sets whose object at one index fails once the handler's status changes, and
+//! an object at index 0. Sequence numbers are mostly the expected one and otherwise the
+//! selection's, the next one or any, including the wrap from 15 to 0. Clock advances land just
+//! before, at and just after the select timeout, and the setup varies the timeout. Besides single
+//! requests, a run sends a SELECT, one request or clock advance, and the OPERATE that matches the
+//! SELECT, so each ruling on whether a request ends the selection is followed by the OPERATE that
+//! shows it. A failed new SELECT ending the selection comes up in only some runs, so
+//! `failed_select_ends_the_previous_selection` pins it.
+//!
+//! Not modelled: broadcast controls, select-before-operate during the solicited and unsolicited
+//! confirm waits, control responses that don't fit, and the control limit; the examples in
+//! `controls.rs`, `request_intake.rs` and `unsolicited.rs` pin those.
 
 #![expect(
     clippy::arithmetic_side_effects,

@@ -60,6 +60,7 @@ written license terms and authorizations govern.
 - New tests that drive a session or wait on mock I/O run inside `crate::util::test_support::watchdog`: a 30 s wall-clock timeout fails the test when polled; if it cannot finish, the process aborts after another 5 s
 - Avoid comments that merely repeat the lint policy; document necessary invariants and give lint exceptions a narrow `#[expect(..., reason = "...")]`
 - Don't add test infrastructure where none exists (e.g. `dnp3-ffi` has no tests) without asking
+- `TESTING.md` indexes the property tests (claim, oracle, budget), which layer owns which assertions, the known gaps and how to measure a property; a PR that adds or changes a property updates its module doc and its row there
 
 ## Reference Documents
 - The private repository `stepfunc/protocol-reference`, checked out next to this one at `../protocol-reference`, holds the protocol source documents. The DNP3 ones are under `protocols/dnp3/`: IEEE 1815-2012 and related standards, the DNP Users Group technical bulletins, and the IED certification test procedures. Some documents (1815-2012 and the 2.7 and 3.1r1 test procedures) have searchable Markdown extractions; the bulletins are PDFs with an index of what each one changes. It also records our interpretation decisions

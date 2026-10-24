@@ -272,6 +272,23 @@ mod tests {
         })
     }
 
+    /// Property: a `SimpleConnectHandler` gives the endpoints of its list in order, each with the
+    /// configured connect timeout and local endpoint, then a delay before it starts over that
+    /// begins at the minimum and doubles, saturating, up to the maximum. A connection returns it
+    /// to the first endpoint and the minimum delay, and a disconnection always gives the
+    /// reconnect delay.
+    ///
+    /// The oracle is an independent model of what the handler documents. It takes the minimum
+    /// and maximum of the two configured delays, with the 1 ms floor of `RetryStrategy`, and
+    /// doubles with its own saturating arithmetic, so it also checks `ExponentialBackOff`.
+    ///
+    /// The generator draws 1 to 4 endpoints, each an address or a hostname; delays of up to 5 s,
+    /// zero, any number of seconds or `Duration::MAX`, in either order and both zero more often;
+    /// a connect timeout and a local endpoint half the time each; and up to 63 operations, mostly
+    /// asking for the next attempt. It is built to reach a list tried several times over, a delay
+    /// held at the maximum, doubling that overflows, and connections in the middle of the list
+    /// and after a delay. Not covered: what the client does with an attempt (resolving hostnames,
+    /// connecting and the connect timeout), which the examples in `tcp/client.rs` pin.
     mod model {
         use super::*;
 
