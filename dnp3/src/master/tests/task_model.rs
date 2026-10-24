@@ -5,7 +5,25 @@
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
 //! One task against a generated stream of answers and noise, checked step by step against a model
-//! of what the master writes, reports and delivers, and how the task ends
+//! of what the master writes, reports and delivers, and how the task ends. The model is written
+//! from the rules rather than from `task.rs`, so it is an independent oracle. It predicts exactly
+//! one outcome for every step: where a fragment breaks several rules, it expects the one error the
+//! master reports. A read fragment fails for a FIR rule before the FIN and CON rule, and the
+//! response of any other task for a request error before objects that don't parse.
+//!
+//! `read_tasks_match_the_model` covers a user read and the startup integrity scan;
+//! `non_read_tasks_match_the_model` covers controls (direct and select-before-operate), cold
+//! restart, the empty-response and deadband writes, and the five single-request file tasks. The
+//! answers mix sequence numbers, FIR, FIN, CON, the restart and request-error bits and a few kinds
+//! of objects, with unsolicited responses from the outstation, another outstation and an unknown
+//! address, malformed fragments, API calls and silence in between.
+//!
+//! Not covered: time synchronization and directory reads, which take several requests. Several
+//! outcomes are reached in only part of the runs, such as a select-before-operate that succeeds,
+//! unsolicited duplicates, a read fragment that breaks both a FIR rule and the FIN and CON rule,
+//! and a response that is both rejected and malformed. So the per-kind tables in `outcomes.rs`
+//! and the duplicate pins in `unsolicited.rs` stay, and fixed cases below pin which of the two
+//! broken rules a read reports and that a rejection wins over malformed objects.
 //!
 //! Every input is followed by a wait on the paused clock, which lets the master process it. Waits
 //! are multiples of [`TICK`] and the response timeout isn't, so no input arrives at the instant a
@@ -401,9 +419,9 @@ struct Ending {
     probe: StepObs,
 }
 
-/// One allowed outcome of a step: what's observed, and how the task ended in it, if it did
+/// The expected outcome of a step: what's observed, and how the task ended in it, if it did
 #[derive(Clone, Debug)]
-struct Allowed {
+struct Expected {
     obs: StepObs,
     ending: Option<Ending>,
 }
@@ -444,8 +462,8 @@ struct Model {
     /// the last unsolicited fragment sent from each source
     sent: [Option<Unsolicited>; 3],
     obs: StepObs,
-    /// the ways the task may have ended in this step, and when
-    ends: Vec<End>,
+    /// how the task ended in this step, if it did, and when
+    end: Option<End>,
     end_time: u64,
 }
 
@@ -485,7 +503,7 @@ impl Model {
             accepted: [None, None],
             sent: [None, None, None],
             obs,
-            ends: vec![],
+            end: None,
             end_time: 0,
         }
     }
@@ -505,9 +523,9 @@ impl Model {
         self.restart |= restart;
     }
 
-    fn end(&mut self, ends: Vec<End>) {
+    fn end(&mut self, end: End) {
         self.state = State::Done;
-        self.ends = ends;
+        self.end = Some(end);
         self.end_time = self.now;
     }
 
@@ -532,19 +550,18 @@ impl Model {
         if let Some(deadline) = self.deadline() {
             if deadline <= until {
                 self.now = deadline;
-                self.end(vec![End::Failure(TaskError::ResponseTimeout)]);
+                self.end(End::Failure(TaskError::ResponseTimeout));
             }
         }
         self.now = until;
     }
 
-    /// The allowed outcomes of the step that just ended
-    fn take_step(&mut self) -> Vec<Allowed> {
-        let obs = std::mem::take(&mut self.obs);
-        let ends = std::mem::take(&mut self.ends);
-        if ends.is_empty() {
-            return vec![Allowed { obs, ending: None }];
-        }
+    /// The expected outcome of the step that just ended
+    fn take_step(&mut self) -> Expected {
+        let mut obs = std::mem::take(&mut self.obs);
+        let Some(end) = self.end.take() else {
+            return Expected { obs, ending: None };
+        };
         // the restart is cleared once the task ends
         let clear = self.restart;
         // the next request continues from the task's last sequence number
@@ -553,37 +570,32 @@ impl Model {
         } else {
             (TaskType::UserRead, FunctionCode::Read)
         };
-        let mut allowed = vec![];
-        for end in ends {
-            let mut obs = obs.clone();
-            obs.info.push(end.event(self.task));
-            let next = StepObs {
-                writes: vec![Write::Request(function, self.next_seq)],
-                info: vec![AssocInfoEvent::TaskStart(
-                    task_type,
-                    function,
-                    Sequence::new(self.next_seq),
-                )],
-                ..StepObs::default()
-            };
-            // clearing the restart starts at once, and the read waits for its response
-            let probe = if clear {
-                obs.writes.extend(next.writes);
-                obs.info.extend(next.info);
-                StepObs::default()
-            } else {
-                next
-            };
-            allowed.push(Allowed {
-                obs,
-                ending: Some(Ending {
-                    end,
-                    time: self.end_time,
-                    probe,
-                }),
-            });
+        obs.info.push(end.event(self.task));
+        let next = StepObs {
+            writes: vec![Write::Request(function, self.next_seq)],
+            info: vec![AssocInfoEvent::TaskStart(
+                task_type,
+                function,
+                Sequence::new(self.next_seq),
+            )],
+            ..StepObs::default()
+        };
+        // clearing the restart starts at once, and the read waits for its response
+        let probe = if clear {
+            obs.writes.extend(next.writes);
+            obs.info.extend(next.info);
+            StepObs::default()
+        } else {
+            next
+        };
+        Expected {
+            obs,
+            ending: Some(Ending {
+                end,
+                time: self.end_time,
+                probe,
+            }),
         }
-        allowed
     }
 
     /// Apply an input, returning the fragment to send and where it comes from. `request` is the
@@ -594,7 +606,7 @@ impl Model {
             Input::Malformed(source, which) => {
                 self.obs.reads = 1;
                 if source == Source::Outstation {
-                    self.end(vec![End::Failure(TaskError::Transport)]);
+                    self.end(End::Failure(TaskError::Transport));
                 }
                 let bytes = MALFORMED.get(which).copied().unwrap_or_default();
                 Some((source.address(), bytes.to_vec()))
@@ -735,19 +747,18 @@ impl Model {
         let State::Read { first, .. } = self.state else {
             return;
         };
-        // any rule the fragment breaks may be the one reported
-        let mut broken = vec![];
-        if fir && !first {
-            broken.push(End::Failure(TaskError::UnexpectedFir));
-        }
-        if !fir && first {
-            broken.push(End::Failure(TaskError::NeverReceivedFir));
-        }
-        if !answer.fin && !answer.con {
-            broken.push(End::Failure(TaskError::NonFinWithoutCon));
-        }
-        if !broken.is_empty() {
-            self.end(broken);
+        // a fragment that breaks a FIR rule and the FIN and CON rule fails for the FIR rule
+        let broken = if fir && !first {
+            Some(TaskError::UnexpectedFir)
+        } else if !fir && first {
+            Some(TaskError::NeverReceivedFir)
+        } else if !answer.fin && !answer.con {
+            Some(TaskError::NonFinWithoutCon)
+        } else {
+            None
+        };
+        if let Some(err) = broken {
+            self.end(End::Failure(err));
             return;
         }
 
@@ -756,13 +767,13 @@ impl Model {
         let measurement = match answer.objects.content() {
             Content::Valid(measurement) => measurement,
             Content::Malformed => {
-                self.end(vec![End::Failure(TaskError::MalformedResponse(
+                self.end(End::Failure(TaskError::MalformedResponse(
                     ObjectParseError::InsufficientBytes,
-                ))]);
+                )));
                 return;
             }
             Content::RelativeWithoutCto => {
-                self.end(vec![End::Failure(TaskError::UnexpectedResponseHeaders)]);
+                self.end(End::Failure(TaskError::UnexpectedResponseHeaders));
                 return;
             }
         };
@@ -801,7 +812,7 @@ impl Model {
                     Iin2::new(*errors),
                 )))
             };
-            self.end(vec![end]);
+            self.end(end);
         } else {
             // the next fragment has the next sequence number, and its own response timeout
             *first = false;
@@ -816,7 +827,7 @@ impl Model {
             return;
         };
         if !(fir && answer.fin) {
-            self.end(vec![End::Failure(TaskError::MultiFragmentResponse)]);
+            self.end(End::Failure(TaskError::MultiFragmentResponse));
             return;
         }
 
@@ -829,24 +840,19 @@ impl Model {
         // the IIN of the response is acted on even if the response is rejected
         self.saw_restart(answer.restart);
 
-        let mut ends = vec![];
-        let rejected = answer.iin2 & BAD_REQUEST_ERRORS != 0;
-        if rejected {
-            ends.push(End::Failure(TaskError::RejectedByIin2(Iin::new(
+        // a rejected response is reported as such, even if its objects can't be parsed
+        let end = if answer.iin2 & BAD_REQUEST_ERRORS != 0 {
+            End::Failure(TaskError::RejectedByIin2(Iin::new(
                 Iin1::new(iin1),
                 Iin2::new(answer.iin2),
-            ))));
-        }
-        // a rejected response is reported as such, unless its objects can't be parsed either
-        if !rejected || malformed {
+            )))
+        } else {
             match reaction {
-                Reaction::Malformed => ends.push(End::Failure(TaskError::MalformedResponse(
+                Reaction::Malformed => End::Failure(TaskError::MalformedResponse(
                     ObjectParseError::InsufficientBytes,
-                ))),
-                Reaction::Unexpected if self.task.is_command() => ends.push(End::CommandMismatch),
-                Reaction::Unexpected => {
-                    ends.push(End::Failure(TaskError::UnexpectedResponseHeaders))
-                }
+                )),
+                Reaction::Unexpected if self.task.is_command() => End::CommandMismatch,
+                Reaction::Unexpected => End::Failure(TaskError::UnexpectedResponseHeaders),
                 Reaction::Correct => {
                     let selected =
                         matches!(self.task, Task::User(Kind::SelectBeforeOperate)) && !operating;
@@ -864,11 +870,11 @@ impl Model {
                         self.next_seq = next_seq(seq);
                         return;
                     }
-                    ends.push(End::Success(seq));
+                    End::Success(seq)
                 }
             }
-        }
-        self.end(ends);
+        };
+        self.end(end);
     }
 }
 
@@ -895,10 +901,10 @@ enum ReplyObs {
     Done(Reply, u64),
 }
 
-/// A case run against the master, with the model's allowed outcomes for every step
+/// A case run against the master, with the model's expected outcome for every step
 struct Run {
     task: Task,
-    allowed: Vec<Vec<Allowed>>,
+    expected: Vec<Expected>,
     observed: Vec<StepObs>,
     reply: ReplyObs,
     /// what the master did after a read was requested through the API, once the task ended
@@ -907,21 +913,11 @@ struct Run {
 
 impl Run {
     fn check(&self) -> Result<(), TestCaseError> {
-        prop_assert_eq!(self.allowed.len(), self.observed.len());
-        let mut ending = None;
-        for (step, (allowed, observed)) in self.allowed.iter().zip(&self.observed).enumerate() {
-            let matched = allowed.iter().find(|allowed| allowed.obs == *observed);
-            let Some(matched) = matched else {
-                return Err(TestCaseError::fail(format!(
-                    "step {step}: observed {observed:#?}\nallowed {allowed:#?}"
-                )));
-            };
-            if let Some(matched) = &matched.ending {
-                prop_assert!(ending.is_none(), "step {}: the task ended twice", step);
-                ending = Some(matched);
-            }
+        prop_assert_eq!(self.expected.len(), self.observed.len());
+        for (step, (expected, observed)) in self.expected.iter().zip(&self.observed).enumerate() {
+            prop_assert_eq!(&expected.obs, observed, "step {}", step);
         }
-        let Some(ending) = ending else {
+        let Some(ending) = self.expected.iter().find_map(|step| step.ending.as_ref()) else {
             return Err(TestCaseError::fail("the task never ended"));
         };
         let expected = match self.task {
@@ -1005,12 +1001,12 @@ async fn execute(task: Task, steps: &[Step]) -> Run {
 
     let mut model = Model::new(task);
     let mut last_request = vec![];
-    let mut allowed = vec![];
+    let mut expected = vec![];
     let mut observed = vec![];
 
     model.advance(TICK);
     wait(TICK).await;
-    allowed.push(model.take_step());
+    expected.push(model.take_step());
     observed.push(observe(&mut harness, &other, &mut last_request));
 
     let silence = Step {
@@ -1035,13 +1031,13 @@ async fn execute(task: Task, steps: &[Step]) -> Run {
         if let Some(before) = model.before_deadline(ms) {
             model.advance(before);
             wait(before).await;
-            allowed.push(model.take_step());
+            expected.push(model.take_step());
             observed.push(observe(&mut harness, &other, &mut last_request));
             ms = ms.saturating_sub(before);
         }
         model.advance(ms);
         wait(ms).await;
-        allowed.push(model.take_step());
+        expected.push(model.take_step());
         observed.push(observe(&mut harness, &other, &mut last_request));
     }
 
@@ -1061,7 +1057,7 @@ async fn execute(task: Task, steps: &[Step]) -> Run {
     };
     Run {
         task,
-        allowed,
+        expected,
         observed,
         reply,
         probe,
@@ -1285,13 +1281,9 @@ fn the_model_accepts_the_master_and_rejects_known_wrong_outcomes() {
     run.check().unwrap();
 
     // the model's expectation, written out
-    let only = |allowed: &[Allowed]| {
-        assert_eq!(allowed.len(), 1);
-        allowed[0].obs.clone()
-    };
     let read = ReadType::SinglePoll;
     assert_eq!(
-        only(&run.allowed[1]),
+        run.expected[1].obs,
         StepObs {
             writes: vec![Write::Confirm(0)],
             reads: 1,
@@ -1304,7 +1296,7 @@ fn the_model_accepts_the_master_and_rejects_known_wrong_outcomes() {
         }
     );
     assert_eq!(
-        only(&run.allowed[2]),
+        run.expected[2].obs,
         StepObs {
             writes: vec![Write::Confirm(1)],
             reads: 1,
@@ -1347,6 +1339,88 @@ fn the_model_accepts_the_master_and_rejects_known_wrong_outcomes() {
     let rejected = TaskError::RejectedByIin2(Iin::new(Iin1::new(0), Iin2::new(0x02)));
     run.observed[2].info = vec![AssocInfoEvent::TaskFailure(TaskType::UserRead, rejected)];
     run.reply = ReplyObs::Done(Reply::Read(Err(rejected)), 2 * TICK);
+    run.check().unwrap_err();
+}
+
+#[test]
+fn a_read_fragment_breaking_a_fir_rule_and_the_fin_con_rule_fails_for_the_fir_rule() {
+    let task = Task::User(Kind::Read);
+    // the first fragment, without FIR, FIN or CON
+    let fragment = Step {
+        input: Input::Answer(Answer {
+            source: Source::Outstation,
+            seq: SeqChoice::Expected,
+            fir: Fir::Flipped,
+            fin: false,
+            con: false,
+            restart: false,
+            iin2: 0,
+            objects: Objects::AnalogEvent,
+        }),
+        wait: TICK,
+    };
+    let mut run = run_paused(execute(task, &[fragment]));
+    run.check().unwrap();
+
+    let failed = |err| AssocInfoEvent::TaskFailure(TaskType::UserRead, err);
+    assert_eq!(
+        run.observed[1],
+        StepObs {
+            reads: 1,
+            info: vec![failed(TaskError::NeverReceivedFir)],
+            ..StepObs::default()
+        }
+    );
+    assert_eq!(
+        run.reply,
+        ReplyObs::Done(Reply::Read(Err(TaskError::NeverReceivedFir)), TICK)
+    );
+
+    // failing it for the FIN and CON rule instead
+    run.observed[1].info = vec![failed(TaskError::NonFinWithoutCon)];
+    run.reply = ReplyObs::Done(Reply::Read(Err(TaskError::NonFinWithoutCon)), TICK);
+    run.check().unwrap_err();
+}
+
+#[test]
+fn a_rejected_response_with_malformed_objects_fails_as_rejected() {
+    let task = Task::User(Kind::ColdRestart);
+    // the response reports an unknown object, and its objects don't parse
+    let response = Step {
+        input: Input::Answer(Answer {
+            source: Source::Outstation,
+            seq: SeqChoice::Expected,
+            fir: Fir::Proper,
+            fin: true,
+            con: false,
+            restart: false,
+            iin2: 0x02,
+            objects: Objects::Malformed,
+        }),
+        wait: TICK,
+    };
+    let mut run = run_paused(execute(task, &[response]));
+    run.check().unwrap();
+
+    let rejected = TaskError::RejectedByIin2(Iin::new(Iin1::new(0), Iin2::new(0x02)));
+    let failed = |err| AssocInfoEvent::TaskFailure(TaskType::Restart, err);
+    assert_eq!(
+        run.observed[1],
+        StepObs {
+            reads: 1,
+            info: vec![failed(rejected)],
+            ..StepObs::default()
+        }
+    );
+    assert_eq!(
+        run.reply,
+        ReplyObs::Done(Reply::Restart(Err(rejected)), TICK)
+    );
+
+    // failing it for the malformed objects instead
+    let malformed = TaskError::MalformedResponse(ObjectParseError::InsufficientBytes);
+    run.observed[1].info = vec![failed(malformed)];
+    run.reply = ReplyObs::Done(Reply::Restart(Err(malformed)), TICK);
     run.check().unwrap_err();
 }
 
