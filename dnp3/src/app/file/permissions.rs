@@ -59,6 +59,14 @@ impl PermissionSet {
         }
         x
     }
+
+    fn from_value(x: u16) -> Self {
+        Self {
+            execute: x & 0b001 != 0,
+            write: x & 0b010 != 0,
+            read: x & 0b100 != 0,
+        }
+    }
 }
 
 /// Permissions for world, group, and owner
@@ -93,31 +101,7 @@ impl std::fmt::Display for Permissions {
     }
 }
 
-#[derive(Copy, Clone)]
-struct Mask(u16);
-
-impl Mask {
-    const fn bit(bit: u8) -> Self {
-        Self(1 << bit)
-    }
-    fn is_set(self, value: u16) -> bool {
-        self.0 & value != 0
-    }
-}
-
 impl Permissions {
-    const WE: Mask = Mask::bit(0);
-    const WW: Mask = Mask::bit(1);
-    const WR: Mask = Mask::bit(2);
-
-    const GE: Mask = Mask::bit(3);
-    const GW: Mask = Mask::bit(4);
-    const GR: Mask = Mask::bit(5);
-
-    const OE: Mask = Mask::bit(6);
-    const OW: Mask = Mask::bit(7);
-    const OR: Mask = Mask::bit(8);
-
     fn value(self) -> u16 {
         self.world.value() | (self.group.value() << 3) | (self.owner.value() << 6)
     }
@@ -127,23 +111,11 @@ impl Permissions {
     }
 
     pub(crate) fn read(cursor: &mut ReadCursor) -> Result<Self, scursor::ReadError> {
-        let bits = cursor.read_u16_le()?;
+        let value = cursor.read_u16_le()?;
         Ok(Self {
-            world: PermissionSet {
-                execute: Self::WE.is_set(bits),
-                write: Self::WW.is_set(bits),
-                read: Self::WR.is_set(bits),
-            },
-            group: PermissionSet {
-                execute: Self::GE.is_set(bits),
-                write: Self::GW.is_set(bits),
-                read: Self::GR.is_set(bits),
-            },
-            owner: PermissionSet {
-                execute: Self::OE.is_set(bits),
-                write: Self::OW.is_set(bits),
-                read: Self::OR.is_set(bits),
-            },
+            world: PermissionSet::from_value(value),
+            group: PermissionSet::from_value(value >> 3),
+            owner: PermissionSet::from_value(value >> 6),
         })
     }
 }
@@ -174,6 +146,31 @@ mod test {
             Permissions::same(PermissionSet::read_only()),
             &[0b00100100, 1],
         );
+    }
+
+    /// world `r--`, group `-w-` and owner `--x`, so no two classes can trade places
+    const EACH_CLASS_DIFFERENT: Permissions = Permissions {
+        world: PermissionSet {
+            execute: false,
+            write: false,
+            read: true,
+        },
+        group: PermissionSet {
+            execute: false,
+            write: true,
+            read: false,
+        },
+        owner: PermissionSet {
+            execute: true,
+            write: false,
+            read: false,
+        },
+    };
+
+    #[test]
+    fn each_class_has_its_own_bits() {
+        test_permission_writing(EACH_CLASS_DIFFERENT, &[0b0101_0100, 0x00]);
+        test_permission_parsing(&[0b0101_0100, 0x00], EACH_CLASS_DIFFERENT);
     }
 
     #[test]

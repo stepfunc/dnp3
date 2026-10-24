@@ -11,7 +11,8 @@
 //!
 //! The oracle is the round trip. It catches a reader and a writer that disagree, but not a layout
 //! mistake made in both, such as two fields swapped in both directions: each object's
-//! `encodes_known_bytes` pins its layout. The g70v6 and g70v8 writers exist only for these tests.
+//! `encodes_known_bytes` pins its layout, and `permissions.rs` pins which bits belong to which
+//! permission class. The g70v6 and g70v8 writers exist only for these tests.
 //!
 //! The amount a field changes by is one less a quarter of the time and one more a quarter of the
 //! time, so a check made from one side only (`>` for `!=`) fails quickly. Strings are printable
