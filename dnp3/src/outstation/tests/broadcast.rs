@@ -5,9 +5,9 @@
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
 //! What the functions an outstation accepts in a broadcast request do. A broadcast never gets a
-//! response, but sets IIN1.0 in the next one.
-
-use std::time::Duration;
+//! response, but sets IIN1.0 in the next one. When IIN1.0 ends, broadcasts in the confirm waits and
+//! broadcast ENABLE and DISABLE_UNSOLICITED are checked by the session property in
+//! `session_model.rs`.
 
 use crate::app::{FunctionCode, Timestamp};
 use crate::link::header::BroadcastConfirmMode;
@@ -145,47 +145,6 @@ async fn broadcast_requests_have_their_effect_without_a_response() {
 
             expect_broadcast_iin(&mut harness, 1, case.iin1).await;
         }
-    })
-    .await;
-}
-
-#[tokio::test(start_paused = true)]
-async fn broadcast_enable_unsolicited_enables_the_classes() {
-    watchdog(async {
-        let mut harness = new_harness(get_default_unsolicited_config());
-        confirm_null_unsolicited(&mut harness).await;
-
-        send_broadcast(&mut harness, ENABLE_UNSOLICITED_SEQ_0).await;
-        harness.check_events(&[processed(FunctionCode::EnableUnsolicited)]);
-
-        harness.handle.database.transaction(add_binary_event);
-        harness
-            .expect_response(&unsolicited(
-                1,
-                iin1::RESTART | iin1::BROADCAST,
-                &g2v1_events(0..1),
-            ))
-            .await;
-        harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
-    })
-    .await;
-}
-
-#[tokio::test(start_paused = true)]
-async fn broadcast_disable_unsolicited_disables_the_classes() {
-    watchdog(async {
-        let mut harness = new_harness(get_default_unsolicited_config());
-        confirm_null_unsolicited(&mut harness).await;
-        enable_unsolicited(&mut harness).await;
-
-        send_broadcast(&mut harness, &disable_unsolicited(1, [true; 3])).await;
-        harness.check_events(&[processed(FunctionCode::DisableUnsolicited)]);
-
-        harness.handle.database.transaction(add_binary_event);
-        tokio::time::sleep(Duration::from_secs(30)).await;
-        harness.check_no_events();
-
-        expect_broadcast_iin(&mut harness, 2, iin1::RESTART | iin1::CLASS_1).await;
     })
     .await;
 }
