@@ -122,6 +122,21 @@ impl<P: Packed> Iterator for PackedIterator<'_, P> {
 
 #[cfg(test)]
 mod tests {
+    //! Property: a packed bit or double-bit sequence over a range of 1 to 32 indices, read from
+    //! 12 random bytes, reads one byte per eight bits or four double bits, rounded up, yields each
+    //! value from the least significant bits of each byte with its index and an exact size hint,
+    //! stays exhausted, and fails one byte short.
+    //!
+    //! The oracle is independent of `Packed`: the test unpacks each byte with literal masks
+    //! (`bits`, `double_bits`) and takes the indices from the range.
+    //!
+    //! The range starts anywhere half the time and in the last 36 indices the other half, so
+    //! ranges that end at the last index are common, and its length is uniform, so most cross a
+    //! byte. Ranges longer than 32 and ranges with the start after the stop aren't generated
+    //! (`header_identity_tests` rejects the latter for every variation). A start of 0 is rare, so
+    //! `packed_sequences_of_each_length` runs every length from index 0, and the examples pin
+    //! hand-written bytes, including each double-bit state.
+
     use super::*;
     use crate::app::parse::range::{assert_yields_exactly, start_stop};
 

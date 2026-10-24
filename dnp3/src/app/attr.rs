@@ -2140,8 +2140,8 @@ mod test {
         //! and the values just past them; floats from any bits or the special values; strings and
         //! byte strings up to 300 bytes, around the 255 byte limit, and strings of any characters;
         //! the set from any value, plus the default set and a private set 0 on their own; and a
-        //! reserved variation in about an eighth of the cases. It can't produce attribute lists, which a
-        //! master never writes; those are only parsed and have their own examples.
+        //! reserved variation in about an eighth of the cases. It can't produce attribute lists,
+        //! which a master never writes; those are only parsed and have their own examples.
         //! `edge_values_round_trip` runs every width limit, the special floats, the default and
         //! private 0 sets and the reserved variations deterministically.
 

@@ -463,6 +463,29 @@ mod test {
         Function::Unknown(0x0E),
     ];
 
+    /// Property: for a master and an outstation with and without self-address support, frame by
+    /// frame through up to 64 frames and session ends, what `process_header` delivers, the reply
+    /// it asks for and the reason it ignores a frame follow a model in which the peer whose reset
+    /// was last accepted owns the secondary state and its FCB, until the session ends. Frames that
+    /// fail any check leave the state unchanged, and a reply's header carries the layer's DIR bit
+    /// and its own address.
+    ///
+    /// The model is written from the rules and is independent of the layer. Where several
+    /// reasons to ignore a frame apply, it accepts any one of them, so which one the layer
+    /// reports, which is only logged, isn't pinned. The expected reply header is built with
+    /// `ControlField::new`; the four reply examples above pin the reply bytes.
+    ///
+    /// The generator draws three peers, favoring the first so it often sends again after its own
+    /// reset; functions weighted toward reset and confirmed user data, plus every function the
+    /// layer never acts on; an FCV bit that is wrong for the function now and then and any FCB;
+    /// destinations that are mostly the layer's own address, and otherwise the self address, a
+    /// broadcast address, the reserved bounds or another endpoint; sources that are mostly a peer
+    /// and otherwise the self, broadcast or reserved addresses; a frame from the same type of
+    /// endpoint now and then; and a UDP source address or none. It is built to reach ownership
+    /// passing between peers, repeated FCBs (acknowledged, not delivered), confirmed broadcasts
+    /// and every ignore reason. The fixed op lists below run particular histories through the
+    /// same model. Not exercised: `Layer::read`, which reads frames and queues the replies through
+    /// the physical layer (the transport reader and `util/phys.rs` tests cover it).
     mod properties {
         use super::*;
         use proptest::prelude::*;

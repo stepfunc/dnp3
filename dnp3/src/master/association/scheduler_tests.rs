@@ -24,6 +24,24 @@
 //! - a poll runs one period after it's added or after its last run ends, at once when demanded,
 //!   and again as soon as a run ends if it was demanded during the run;
 //! - when nothing is ready, the channel sleeps until the earliest time something becomes ready.
+//!
+//! A fairness bound is checked as well: an association with ready work waits at most one pick per
+//! association ahead of it in line with ready work of the same kind (user or automatic).
+//!
+//! The model is written from the guide, not from `association.rs`, and shares no code with the
+//! scheduler; examples at the end of this file check the model's own rules. The harness completes
+//! each task as the session does, through the tasks' own completion calls, so that plumbing is
+//! part of what is tested rather than of the oracle.
+//!
+//! The generator starts 1 to 3 associations (up to 6 as more are added) and runs up to 40
+//! operations: steps with an answer or a timeout, events between and during tasks, sleeping to
+//! the deadline the scheduler asked for, reconnecting, and adding and removing associations. The
+//! configurations cover every automatic task, with and without a local clock, keep-alives off, at
+//! zero or at a few seconds, and short and long retry bounds; each IIN bit is set now and then.
+//! Not generated: user tasks other than a class scan read, time synchronization procedures that
+//! take more than one request, a full user request queue, and associations started after they
+//! are added. A failed task ahead of a failed time sync whose retry is earlier comes up in only
+//! some runs, so `sleeps_past_a_failed_time_sync_held_up_by_a_failed_integrity_scan` pins it.
 
 #![expect(
     clippy::arithmetic_side_effects,

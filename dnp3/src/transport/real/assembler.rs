@@ -668,14 +668,14 @@ mod tests {
     /// by hand, which the model must give and the assembler must then match. The property adds
     /// longer sequences and interleavings.
     ///
-    /// A case is 1-8 plans, each a valid series of 1-5 segments of up to 4 bytes (or a total
-    /// forced to 0, the 8-byte maximum or one past it; the sequence number often wraps), one
-    /// perturbation (repeat, changed repeat, drop, skipped sequence number, other source or
-    /// address, truncate, insert, interrupt) and a peek, pop or reset tail. Changed repeats are weighted, and most
-    /// segments carry data, so that the row 9 cases a repeat must tell apart (the same header
-    /// and length with other bytes, a shorter matching suffix) come up in most runs alongside
-    /// the empty-segment cases. Known gap: a series conflicting only in broadcast mode is
-    /// unreachable, since a broadcast segment never continues a series.
+    /// A case is 1-8 plans, each a valid series of 1-5 segments of up to 4 bytes (or a total forced
+    /// to 0, the 8-byte maximum or one past it; the sequence number often wraps), one perturbation
+    /// (repeat, changed repeat, drop, skipped sequence number, other source or address, truncate,
+    /// insert, interrupt) and a peek, pop or reset tail. Changed repeats are weighted, and most
+    /// segments carry data, so that the row 9 cases a repeat must tell apart (the same header and
+    /// length with other bytes, a shorter matching suffix) come up in most runs alongside the
+    /// empty-segment cases. Known gap: a series conflicting only in broadcast mode is unreachable,
+    /// since a broadcast segment never continues a series.
     #[expect(
         clippy::arithmetic_side_effects,
         reason = "the model adds small lengths, positions and sequence numbers"

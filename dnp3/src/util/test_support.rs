@@ -4,7 +4,9 @@
 // Text and data mining rights, including for AI training, are reserved under
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
-//! Frames and listeners shared by the tests of the TCP, TLS, serial and UDP channels
+//! Test support shared across the crate: the configuration every property runs with
+//! ([`proptest_config`]), the wall-clock watchdog and the paused runtime, polling a future once,
+//! link frames, outstation and TLS configurations, and timelines of the states a listener reports
 
 use std::fmt::Debug;
 use std::future::Future;

@@ -81,6 +81,18 @@ where
 
 #[cfg(test)]
 mod tests {
+    //! Property: a count sequence of 0 to 39 g50v1 objects, followed by 0 to 3 trailing bytes,
+    //! reads exactly its objects, yields each once with an exact size hint, stays exhausted, has a
+    //! single value only for a count of one, and fails one byte short.
+    //!
+    //! The oracle is independent of the `Group50Var1` reader: the test encodes the six low bytes
+    //! of each timestamp itself.
+    //!
+    //! Counts of 0 and 1 are each drawn an eighth of the time, so both are common with and without
+    //! trailing bytes; timestamps are any 48-bit value. Only 6-byte objects and counts below 40
+    //! are generated: the sequence is generic over `FixedSize`, so other sizes exercise the same
+    //! code. The examples pin hand-written bytes for counts of 0 to 3.
+
     use super::*;
     use crate::app::parse::range::assert_yields_exactly;
     use crate::app::variations::Group50Var1;

@@ -16,7 +16,7 @@
 //!
 //! The amount a field changes by is one less a quarter of the time and one more a quarter of the
 //! time, so a check made from one side only (`>` for `!=`) fails quickly. Strings are printable
-//! ASCII up to 64 bytes or up to 16 arbitrary characters, so empty and non-ASCII strings are
+//! ASCII of up to 63 bytes or up to 15 arbitrary characters, so empty and non-ASCII strings are
 //! common; other fields are any value, so the g70v7 file type is rarely `Directory` or `File`
 //! (their wire values are pinned in `mod.rs`). g70v5 has no field to corrupt. The properties
 //! don't produce bytes left over inside the declared length or a truncated object, and the user
