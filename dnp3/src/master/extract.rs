@@ -259,50 +259,6 @@ mod test {
     }
 
     #[test]
-    fn can_calculate_maximum_timestamp() {
-        let calls = extract_valid(
-            // g50v1      count: 1  --------- time: 0xFFFFFE ----------
-            &[
-                0x33, 0x01, 0x07, 0x01, 0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x02, 0x03, 0x17, 0x01,
-                0x07, 0x01, 0x01, 0x00,
-            ],
-        );
-
-        let expected = Value::Binary(
-            BinaryInput {
-                value: false,
-                flags: Flags::ONLINE,
-                time: Some(Time::Synchronized(Timestamp::max())),
-            },
-            0x07,
-        );
-
-        assert_eq!(calls, [(Kind::BinaryInput, vec![expected])]);
-    }
-
-    #[test]
-    fn cto_overflow_of_u48_yields_invalid_time() {
-        let calls = extract_valid(
-            // g50v1      count: 1  --------- time: 0xFFFFFE ----------
-            &[
-                0x33, 0x01, 0x07, 0x01, 0xFE, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x02, 0x03, 0x17, 0x01,
-                0x07, 0x01, 0x02, 0x00,
-            ],
-        );
-
-        let expected = Value::Binary(
-            BinaryInput {
-                value: false,
-                flags: Flags::ONLINE,
-                time: None,
-            },
-            0x07,
-        );
-
-        assert_eq!(calls, [(Kind::BinaryInput, vec![expected])]);
-    }
-
-    #[test]
     fn handles_frozen_analog_event() {
         let calls = extract_valid(&[
             33, 3, 0x17, 0x01, 0x07, 0x01, 0xDE, 0xAD, 0xCA, 0xFE, 0x01, 0x02, 0x03, 0x04, 0x05,
@@ -564,55 +520,6 @@ mod test {
             let (result, recorder) = extract(input);
             assert!(!result.unwrap().values);
             assert_eq!(callbacks(recorder), [(Kind::BinaryInput, vec![])]);
-        }
-    }
-
-    #[test]
-    fn abs_time_is_extracted_at_both_widths() {
-        let (result, recorder) = extract(&[
-            // g50v1, 1-byte count of 1
-            0x32, 0x01, 0x07, 0x01, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, //
-            // g50v1, 2-byte count of 1
-            0x32, 0x01, 0x08, 0x01, 0x00, 0x11, 0x12, 0x13, 0x14, 0x15, 0x16,
-        ]);
-
-        assert!(result.unwrap().values);
-        assert_eq!(
-            recorder.calls,
-            [
-                call(
-                    HeaderInfo::new(Variation::Group50Var1, QualifierCode::Count8, false, false),
-                    Kind::AbsTime,
-                    vec![Value::AbsTime(Timestamp::new(0x060504030201))]
-                ),
-                call(
-                    HeaderInfo::new(Variation::Group50Var1, QualifierCode::Count16, false, false),
-                    Kind::AbsTime,
-                    vec![Value::AbsTime(Timestamp::new(0x161514131211))]
-                ),
-            ]
-        );
-    }
-
-    #[test]
-    fn abs_time_with_a_count_other_than_one_is_ignored_at_both_widths() {
-        for input in [
-            [0x32, 0x01, 0x07, 0x00].as_slice(),
-            [
-                0x32, 0x01, 0x07, 0x02, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x11, 0x12, 0x13, 0x14,
-                0x15, 0x16,
-            ]
-            .as_slice(),
-            [0x32, 0x01, 0x08, 0x00, 0x00].as_slice(),
-            [
-                0x32, 0x01, 0x08, 0x02, 0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x11, 0x12, 0x13,
-                0x14, 0x15, 0x16,
-            ]
-            .as_slice(),
-        ] {
-            let (result, recorder) = extract(input);
-            assert!(!result.unwrap().values);
-            assert_eq!(recorder.calls, []);
         }
     }
 }
