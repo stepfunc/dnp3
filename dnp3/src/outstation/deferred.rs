@@ -5,11 +5,10 @@
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
 use crate::app::parse::parser::HeaderCollection;
+use crate::app::Iin2;
 use crate::app::Sequence;
-use crate::app::{FunctionCode, Iin2};
-use crate::outstation::database::read::ReadHeader;
+use crate::outstation::database::read::{ReadHeader, ReadHeaders};
 use crate::outstation::database::DatabaseHandle;
-use crate::outstation::target::Selector;
 use crate::transport::FragmentInfo;
 use crate::util::bounded::{BoundedQueue, Full};
 use crate::util::skipped::Skipped;
@@ -69,23 +68,17 @@ impl DeferredRead {
         self.headers.clear();
 
         let mut iin2 = Iin2::default();
-        let mut selector = Selector::new(FunctionCode::Read);
         let mut over_capacity = Skipped::new();
+        let mut headers = ReadHeaders::new(&headers);
 
-        for h in headers.iter() {
-            let (variation, qualifier) = (h.variation(), h.qualifier());
-            match ReadHeader::parse(h, &mut selector) {
-                Ok(r) => {
-                    if let Err(Full) = self.headers.try_push(r) {
-                        over_capacity.add((variation, qualifier));
-                        iin2 |= Iin2::PARAMETER_ERROR;
-                    }
-                }
-                Err(err) => iin2 |= err,
+        for (header, read_with) in headers.by_ref() {
+            if let Err(Full) = self.headers.try_push(header) {
+                over_capacity.add(read_with);
+                iin2 |= Iin2::PARAMETER_ERROR;
             }
         }
 
-        selector.log();
+        iin2 |= headers.finish();
         if let Some(((variation, qualifier), count)) = over_capacity.first() {
             tracing::warn!(
                 "insufficient capacity ({}) for READ header: {variation} - {qualifier}{count}",
