@@ -2294,34 +2294,38 @@ fn unsolicited_response_reports_a_broadcast() {
     }
 }
 
-/// A broadcast in the null unsolicited response's confirm wait discards a READ held there. The null
-/// response didn't report the broadcast, so its confirm leaves it to the next solicited response:
-/// the answer to a READ received after the broadcast, at that confirm, or to the next request
+/// A broadcast in the null unsolicited response's confirm wait, processed or not, discards a READ
+/// held there. The null response didn't report the broadcast, so its confirm leaves it to the next
+/// solicited response: the answer to a READ received after the broadcast, at that confirm, or to
+/// the next request
 #[test]
 fn broadcast_in_the_null_unsolicited_confirm_wait_is_reported_after_its_confirm() {
     let read = || Op::Request(Function::Read(vec![ReadHeader::Class(0, None)]));
-    for mode in BROADCAST_MODES {
-        for read_after in [false, true] {
-            let mut ops = vec![read(), Op::Broadcast(mode, Function::DelayMeasure)];
-            if read_after {
-                ops.push(read());
+    // processed, and an unsupported function
+    for function in [Function::ClearRestart, Function::DelayMeasure] {
+        for mode in BROADCAST_MODES {
+            for read_after in [false, true] {
+                let mut ops = vec![read(), Op::Broadcast(mode, function.clone())];
+                if read_after {
+                    ops.push(read());
+                }
+                ops.extend([
+                    Op::UnsolicitedConfirm(ConfirmChoice::Expected),
+                    Op::SolicitedConfirm(ConfirmChoice::Expected),
+                    probe(),
+                    Op::SolicitedConfirm(ConfirmChoice::Expected),
+                    probe(),
+                ]);
+                run_paused(check_model(unsolicited_with_retries(None), ops));
             }
-            ops.extend([
-                Op::UnsolicitedConfirm(ConfirmChoice::Expected),
-                Op::SolicitedConfirm(ConfirmChoice::Expected),
-                probe(),
-                Op::SolicitedConfirm(ConfirmChoice::Expected),
-                probe(),
-            ]);
-            run_paused(check_model(unsolicited_with_retries(None), ops));
         }
     }
 }
 
 /// In the unsolicited confirm wait, a solicited response that reports a broadcast that requires a
 /// confirm awaits that confirm until its confirm timeout. A confirm after that doesn't end the
-/// broadcast (Table 6-1 row 30), and a repeat of the request sends the response again, which awaits
-/// the confirm again (row 28)
+/// broadcast (Table 6-1 row 30), so the next response reports it again, and a repeat of the request
+/// sends the response again, which awaits the confirm again (row 28)
 #[test]
 fn solicited_confirm_in_the_unsolicited_confirm_wait_after_its_timeout() {
     let start = [
@@ -2335,33 +2339,46 @@ fn solicited_confirm_in_the_unsolicited_confirm_wait_after_its_timeout() {
         ],
     ]
     .concat();
-    let late = vec![Op::SolicitedConfirm(ConfirmChoice::Expected), probe()];
-    for next in [late, vec![Op::Repeat]] {
-        let ops = [
-            start.clone(),
-            next,
-            vec![
-                Op::SolicitedConfirm(ConfirmChoice::Expected),
-                Op::UnsolicitedConfirm(ConfirmChoice::Expected),
-                probe(),
-            ],
-        ]
-        .concat();
+    let late = vec![
+        Op::SolicitedConfirm(ConfirmChoice::Expected),
+        Op::UnsolicitedConfirm(ConfirmChoice::Expected),
+        probe(),
+        Op::SolicitedConfirm(ConfirmChoice::Expected),
+        probe(),
+    ];
+    let repeat = vec![
+        Op::Repeat,
+        Op::SolicitedConfirm(ConfirmChoice::Expected),
+        Op::UnsolicitedConfirm(ConfirmChoice::Expected),
+        probe(),
+    ];
+    for next in [late, repeat] {
+        let ops = [start.clone(), next].concat();
         run_paused(check_model(unsolicited_with_retries(None), ops));
     }
 }
 
-/// In the null unsolicited response's confirm wait, only the confirm awaited ends a broadcast that
-/// requires one. A confirm with another sequence number doesn't, and the wait for the one awaited
-/// goes on (Table 6-1 row 21). Nor does the confirm of an earlier response, once a request has
-/// ended the wait for it, whether the request is answered (row 26) or a READ held until the
-/// unsolicited confirm wait ends (row 25)
+/// In the unsolicited confirm wait, only the confirm awaited ends a broadcast that requires one,
+/// and the next response reports a broadcast that a confirm didn't end:
+/// - a confirm with another sequence number doesn't, and the wait for the one awaited goes on
+///   (Table 6-1 row 21);
+/// - nor does the confirm of an earlier response, once a request has ended the wait for it, whether
+///   the request is answered (row 26) or a READ held until the unsolicited confirm wait ends (row
+///   25);
+/// - nor the confirm of a response that reported it before the unsolicited confirm wait started;
+/// - nor a confirm before any response reported it;
+/// - nor, in idle, the confirm awaited in an unsolicited confirm wait that has ended (rows 22 and
+///   33 are skipped)
 #[test]
 fn only_the_awaited_solicited_confirm_in_the_unsolicited_confirm_wait_ends_a_broadcast() {
+    let mandatory = || Op::Broadcast(BroadcastConfirmMode::Mandatory, Function::ClearRestart);
     let other_seq = || Op::SolicitedConfirm(ConfirmChoice::Offset(1));
     let earlier = || Op::SolicitedConfirm(ConfirmChoice::Offset(15));
+    // the last request's sequence number, outside the solicited confirm wait
     let expected = || Op::SolicitedConfirm(ConfirmChoice::Expected);
+    let unsolicited_confirm = || Op::UnsolicitedConfirm(ConfirmChoice::Expected);
     let answered = vec![
+        mandatory(),
         probe(),
         other_seq(),
         probe(),
@@ -2372,16 +2389,98 @@ fn only_the_awaited_solicited_confirm_in_the_unsolicited_confirm_wait_ends_a_bro
         probe(),
     ];
     let held = vec![
+        mandatory(),
         probe(),
         class_1_read(),
         earlier(),
-        Op::UnsolicitedConfirm(ConfirmChoice::Expected),
+        unsolicited_confirm(),
         expected(),
         probe(),
     ];
-    for next in [answered, held] {
-        let broadcast = Op::Broadcast(BroadcastConfirmMode::Mandatory, Function::ClearRestart);
-        let ops = [vec![broadcast], next].concat();
+    let reported_before_the_wait = vec![
+        unsolicited_confirm(),
+        Op::Request(Function::EnableUnsolicited([true; 3])),
+        mandatory(),
+        // its solicited confirm wait times out
+        probe(),
+        Op::Advance(AdvanceChoice::AtDeadline),
+        // an unsolicited response that reports the broadcast too
+        class_1_events(1),
+        expected(),
+        probe(),
+        expected(),
+        unsolicited_confirm(),
+        probe(),
+    ];
+    let before_any_report = vec![
+        mandatory(),
+        expected(),
+        probe(),
+        expected(),
+        unsolicited_confirm(),
+        probe(),
+    ];
+    let after_the_wait = vec![
+        mandatory(),
+        probe(),
+        unsolicited_confirm(),
+        expected(),
+        probe(),
+        expected(),
+        probe(),
+    ];
+    for ops in [
+        answered,
+        held,
+        reported_before_the_wait,
+        before_any_report,
+        after_the_wait,
+    ] {
+        run_paused(check_model(unsolicited_with_retries(None), ops));
+    }
+}
+
+/// A broadcast DISABLE_UNSOLICITED, processed:
+/// - in idle, the classes it names send no unsolicited response for a later event, which the next
+///   response reports with the broadcast;
+/// - in the confirm wait of an unsolicited response with an event, the wait times out without a
+///   retry and no other series starts; a READ then reports the event with the broadcast;
+/// - in the null response's wait, the wait times out and the next null response, sent at once,
+///   reports the broadcast
+#[test]
+fn broadcast_disable_unsolicited_stops_unsolicited_responses() {
+    let disable = || {
+        Op::Broadcast(
+            BroadcastConfirmMode::NotRequired,
+            Function::DisableUnsolicited([true; 3]),
+        )
+    };
+    let idle = vec![
+        Op::UnsolicitedConfirm(ConfirmChoice::Expected),
+        Op::Request(Function::EnableUnsolicited([true; 3])),
+        disable(),
+        class_1_events(1),
+        Op::Advance(SILENCE),
+        probe(),
+    ];
+    let data = [
+        unsolicited_class_1_event(),
+        vec![disable()],
+        to_the_deadline(),
+        vec![
+            Op::Advance(SILENCE),
+            class_1_read(),
+            Op::SolicitedConfirm(ConfirmChoice::Expected),
+        ],
+    ]
+    .concat();
+    let null = [
+        vec![disable()],
+        to_the_deadline(),
+        vec![Op::UnsolicitedConfirm(ConfirmChoice::Expected), probe()],
+    ]
+    .concat();
+    for ops in [idle, data, null] {
         run_paused(check_model(unsolicited_with_retries(None), ops));
     }
 }
