@@ -39,6 +39,7 @@ use proptest::prelude::*;
 use scursor::WriteCursor;
 
 use crate::app::measurement::*;
+use crate::app::MaybeAsync;
 use crate::master::EventClasses;
 use crate::outstation::database::config::*;
 use crate::outstation::database::details::WriteProgress;
@@ -265,15 +266,23 @@ fn no_types() -> TypeCount {
     }
 }
 
-/// records the ids of cleared events in order
+/// records the ids of cleared events in order; the buffer never begins or ends a confirm itself
 #[derive(Default)]
 struct Cleared {
     ids: Vec<u64>,
 }
 
 impl OutstationApplication for Cleared {
+    fn begin_confirm(&mut self) {
+        panic!("unexpected begin_confirm")
+    }
+
     fn event_cleared(&mut self, id: u64) {
         self.ids.push(id);
+    }
+
+    fn end_confirm(&mut self, _state: BufferState) -> MaybeAsync<()> {
+        panic!("unexpected end_confirm")
     }
 }
 
@@ -283,6 +292,11 @@ fn write_bytes(buffer: &mut EventBuffer, size: usize) -> ((usize, WriteProgress)
     let mut cursor = WriteCursor::new(backing.as_mut_slice());
     let result = buffer.write_events(&mut cursor);
     (result, cursor.written().to_vec())
+}
+
+/// write the selected events into a cursor of `size` bytes
+fn write(buffer: &mut EventBuffer, size: usize) -> (usize, WriteProgress) {
+    write_bytes(buffer, size).0
 }
 
 /// clear the written events, returning their ids in order
@@ -723,4 +737,81 @@ fn event_classes_combine_and_class_counts_are_empty_only_at_zero() {
         *class_count_mut(&mut count, class) = 1;
         assert!(!count.is_empty());
     }
+}
+
+/// Class reads written into small fragments, one of them led by a common time object: the
+/// property doesn't generate CTO variations
+#[test]
+fn can_select_events_by_class_and_write_some() {
+    let mut buffer = EventBuffer::new(EventBufferConfig::all_types(3));
+    let time = Time::synchronized(0);
+    assert_eq!(
+        buffer.insert(
+            1,
+            EventClass::Class1,
+            &BinaryInput::new(true, Flags::ONLINE, time),
+            EventBinaryInputVariation::Group2Var1,
+        ),
+        Ok(0)
+    );
+    assert_eq!(
+        buffer.insert(
+            2,
+            EventClass::Class2,
+            &Counter::new(23, Flags::ONLINE, time),
+            EventCounterVariation::Group22Var2,
+        ),
+        Ok(1)
+    );
+    assert_eq!(
+        buffer.insert(
+            3,
+            EventClass::Class3,
+            &DoubleBitBinaryInput::new(DoubleBit::DeterminedOn, Flags::ONLINE, time),
+            EventDoubleBitBinaryInputVariation::Group4Var3,
+        ),
+        Ok(2)
+    );
+    assert_eq!(
+        buffer.insert(
+            4,
+            EventClass::Class2,
+            &BinaryInput::new(true, Flags::ONLINE, Time::synchronized(1234)),
+            EventBinaryInputVariation::Group2Var1,
+        ),
+        Ok(3)
+    );
+    assert_eq!(
+        buffer.insert(
+            5,
+            EventClass::Class1,
+            &AnalogInput::new(42.0, Flags::ONLINE, time),
+            EventAnalogInputVariation::Group32Var1,
+        ),
+        Ok(4)
+    );
+
+    // the class 2 events stay unselected
+    assert_eq!(
+        buffer.select_by_class(EventClass::Class1 | EventClass::Class3, None),
+        3
+    );
+
+    // the g2v1 event fits, but not the CTO, header and g4v3 event after it
+    assert_eq!(write(&mut buffer, 24), (1, WriteProgress::Partial));
+    assert_eq!(buffer.unwritten_classes(), EventClasses::all());
+    assert_eq!(clear(&mut buffer), [0]);
+    assert_eq!(buffer.unwritten_classes(), EventClasses::all());
+
+    // the CTO and the g4v3 event fit, but not the g32v1 event after them
+    assert_eq!(write(&mut buffer, 24), (1, WriteProgress::Partial));
+    assert_eq!(
+        buffer.unwritten_classes(),
+        EventClass::Class1 | EventClass::Class2
+    );
+    assert_eq!(clear(&mut buffer), [2]);
+    assert_eq!(
+        buffer.unwritten_classes(),
+        EventClass::Class1 | EventClass::Class2
+    );
 }
