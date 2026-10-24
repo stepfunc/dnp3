@@ -2408,9 +2408,10 @@ fn only_the_awaited_solicited_confirm_in_the_unsolicited_confirm_wait_ends_a_bro
         class_1_events(1),
         expected(),
         probe(),
+        // the awaited confirm ends the broadcast, which the unsolicited response also reported
         expected(),
-        unsolicited_confirm(),
         probe(),
+        unsolicited_confirm(),
     ];
     let before_any_report = vec![
         mandatory(),
