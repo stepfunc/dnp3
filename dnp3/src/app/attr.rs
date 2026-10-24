@@ -2118,6 +2118,33 @@ mod test {
     }
 
     mod codec_properties {
+        //! Properties of the attribute codec, as a master WRITE builds it and as the outstation's
+        //! response writer (the same `HeaderWriter::write_attribute`) encodes values:
+        //!
+        //! - `attributes_round_trip_in_the_smallest_encoding`: a reserved variation (0, 254, 255)
+        //!   or a value longer than 255 bytes is rejected, as `check_encodable` predicts, before
+        //!   anything is written; any other attribute is written with the data type code and the
+        //!   smallest length that `expected_encoding` predicts, and parses back from a response and
+        //!   a WRITE with the same set (0 as the default set), variation and value, floats compared
+        //!   by their bits.
+        //! - `attributes_need_exactly_their_encoded_size`: an encodable attribute fits a buffer of
+        //!   exactly its encoded size and fails with `WriteError` one byte short.
+        //!
+        //! The code, the length and the errors come from `expected_encoding`, independently of the
+        //! writer. The value bytes are checked only by parsing them back, so a mistake made in both
+        //! the writer and the parser (byte order, sign extension) is left to the `parses_*`
+        //! examples, which use hand-written bytes.
+        //!
+        //! The generator draws each data type, the integers twice as often: integers from the whole
+        //! range, from the one and two byte widths, and half the time from the limits of each width
+        //! and the values just past them; floats from any bits or the special values; strings and
+        //! byte strings up to 300 bytes, around the 255 byte limit, and strings of any characters;
+        //! the set from any value, plus the default set and a private set 0 on their own; and a
+        //! reserved variation in about an eighth of the cases. It can't produce attribute lists, which a
+        //! master never writes; those are only parsed and have their own examples.
+        //! `edge_values_round_trip` runs every width limit, the special floats, the default and
+        //! private 0 sets and the reserved variations deterministically.
+
         use super::*;
         use crate::app::format::write::HeaderWriter;
         use crate::app::gen::ranged::RangedVariation;
@@ -2219,41 +2246,69 @@ mod test {
             ]
         }
 
+        /// any value, values of the one and two byte widths, and half the time a width limit
+        fn unsigned() -> impl Strategy<Value = u32> {
+            prop_oneof![
+                1 => any::<u32>(),
+                1 => 0..=0xFFu32,
+                1 => 0..=0xFFFFu32,
+                3 => prop::sample::select(unsigned_edges()),
+            ]
+        }
+
+        /// the same for signed values
+        fn signed() -> impl Strategy<Value = i32> {
+            prop_oneof![
+                1 => any::<i32>(),
+                1 => -128..=127i32,
+                1 => -32768..=32767i32,
+                3 => prop::sample::select(signed_edges()),
+            ]
+        }
+
+        /// each data type, the integers twice as often since each has three widths and their
+        /// limits to reach
         fn value() -> impl Strategy<Value = OwnedAttrValue> {
             prop_oneof![
-                string().prop_map(OwnedAttrValue::VisibleString),
-                prop_oneof![any::<u32>(), prop::sample::select(unsigned_edges())]
-                    .prop_map(OwnedAttrValue::UnsignedInt),
-                prop_oneof![any::<i32>(), prop::sample::select(signed_edges())]
-                    .prop_map(OwnedAttrValue::SignedInt),
-                prop_oneof![
+                1 => string().prop_map(OwnedAttrValue::VisibleString),
+                2 => unsigned().prop_map(OwnedAttrValue::UnsignedInt),
+                2 => signed().prop_map(OwnedAttrValue::SignedInt),
+                1 => prop_oneof![
                     any::<u32>().prop_map(f32::from_bits),
                     prop::sample::select(special_f32()),
                 ]
                 .prop_map(|x| OwnedAttrValue::FloatingPoint(FloatType::F32(x))),
-                prop_oneof![
+                1 => prop_oneof![
                     any::<u64>().prop_map(f64::from_bits),
                     prop::sample::select(special_f64()),
                 ]
                 .prop_map(|x| OwnedAttrValue::FloatingPoint(FloatType::F64(x))),
-                bytes().prop_map(OwnedAttrValue::OctetString),
-                prop_oneof![
+                1 => bytes().prop_map(OwnedAttrValue::OctetString),
+                1 => prop_oneof![
                     0..=Timestamp::MAX_VALUE,
                     prop::sample::select(vec![0, Timestamp::MAX_VALUE]),
                 ]
                 .prop_map(|x| OwnedAttrValue::Dnp3Time(Timestamp::new(x))),
-                bytes().prop_map(OwnedAttrValue::BitString),
+                1 => bytes().prop_map(OwnedAttrValue::BitString),
             ]
         }
 
         fn attribute() -> impl Strategy<Value = OwnedAttribute> {
             (
-                // a private set 0 is written as the default set
+                // set 0 is drawn on its own, both as the default set and as a private set 0,
+                // which is written as the default set
                 prop_oneof![
-                    any::<u8>().prop_map(AttrSet::new),
-                    any::<u8>().prop_map(AttrSet::Private),
+                    4 => any::<u8>().prop_map(AttrSet::new),
+                    4 => any::<u8>().prop_map(AttrSet::Private),
+                    1 => Just(AttrSet::Default),
+                    1 => Just(AttrSet::Private(0)),
                 ],
-                prop_oneof![any::<u8>(), prop::sample::select(RESERVED.to_vec())],
+                // a reserved variation is rejected before the value is looked at, so an eighth
+                // of the cases is enough
+                prop_oneof![
+                    7 => any::<u8>(),
+                    1 => prop::sample::select(RESERVED.to_vec()),
+                ],
                 value(),
             )
                 .prop_map(|(set, variation, value)| OwnedAttribute::new(set, variation, value))
