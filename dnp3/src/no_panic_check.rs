@@ -28,7 +28,6 @@ use crate::link::reader::{LinkModes, Reader, Step};
 use crate::link::{EndpointAddress, LinkErrorMode, LinkRole};
 use crate::master::extract::{extract_header, Extracted, ProcessableResponse};
 use crate::master::{HeaderInfo, ReadHandler};
-use crate::outstation::Feature;
 use crate::transport::real::assembler::Assembler;
 use crate::transport::real::header::Header;
 use crate::util::phys::PhysAddr;
@@ -235,12 +234,10 @@ fn link_headers(data: &[u8]) {
         LinkRole::Master
     } else if config & 0x02 == 0 {
         LinkRole::Outstation {
-            self_address: Feature::Disabled,
+            self_address: false,
         }
     } else {
-        LinkRole::Outstation {
-            self_address: Feature::Enabled,
-        }
+        LinkRole::Outstation { self_address: true }
     };
     let mut layer = Layer::new(
         LinkModes::stream(LinkErrorMode::Discard),

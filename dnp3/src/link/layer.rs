@@ -15,7 +15,6 @@ use crate::link::header::{
 use crate::link::parser::FramePayload;
 use crate::link::reader::LinkModes;
 use crate::link::{EndpointAddress, LinkRole};
-use crate::outstation::Feature;
 use crate::util::phys::{PhysAddr, PhysLayer};
 
 /// The secondary station state, owned by the peer that last reset the link
@@ -207,15 +206,13 @@ impl Layer {
                 }
             }
             AnyAddress::SelfAddress => match self.role {
-                LinkRole::Outstation {
-                    self_address: Feature::Enabled,
-                } => {
+                LinkRole::Outstation { self_address: true } => {
                     // just pretend like it was sent to us
                     None
                 }
                 LinkRole::Master
                 | LinkRole::Outstation {
-                    self_address: Feature::Disabled,
+                    self_address: false,
                 } => {
                     ignore(Ignored::SelfAddress);
                     return (None, None);
@@ -364,7 +361,7 @@ mod test {
         Layer::new(LinkModes::test(), 2048, LinkRole::Master, MASTER)
     }
 
-    fn outstation(self_address: Feature) -> Layer {
+    fn outstation(self_address: bool) -> Layer {
         Layer::new(
             LinkModes::test(),
             2048,
@@ -407,7 +404,7 @@ mod test {
 
     #[test]
     fn outstation_replies_to_link_status_request() {
-        let mut layer = outstation(Feature::Disabled);
+        let mut layer = outstation(false);
         let processed = process(
             &mut layer,
             header(true, Function::PriRequestLinkStatus, OUTSTATION.wrap()),
@@ -418,7 +415,7 @@ mod test {
 
     #[test]
     fn outstation_acks_reset_link_states() {
-        let mut layer = outstation(Feature::Disabled);
+        let mut layer = outstation(false);
         let processed = process(
             &mut layer,
             header(true, Function::PriResetLinkStates, OUTSTATION.wrap()),
@@ -504,11 +501,9 @@ mod test {
         const ROLES: [LinkRole; 3] = [
             LinkRole::Master,
             LinkRole::Outstation {
-                self_address: Feature::Disabled,
+                self_address: false,
             },
-            LinkRole::Outstation {
-                self_address: Feature::Enabled,
-            },
+            LinkRole::Outstation { self_address: true },
         ];
 
         fn local(role: LinkRole) -> EndpointAddress {
@@ -689,12 +684,7 @@ mod test {
                 match (header.destination, role) {
                     (AnyAddress::Endpoint(x), _) if x == local(role) => {}
                     (AnyAddress::Endpoint(x), _) => reasons.push(Ignored::OtherDestination(x)),
-                    (
-                        AnyAddress::SelfAddress,
-                        LinkRole::Outstation {
-                            self_address: Feature::Enabled,
-                        },
-                    ) => {}
+                    (AnyAddress::SelfAddress, LinkRole::Outstation { self_address: true }) => {}
                     (AnyAddress::SelfAddress, _) => reasons.push(Ignored::SelfAddress),
                     (AnyAddress::Reserved(x), _) => reasons.push(Ignored::ReservedDestination(x)),
                     (AnyAddress::Broadcast(_), LinkRole::Master) => {
@@ -1160,7 +1150,7 @@ mod test {
         #[test]
         fn model_rejects_a_second_owner_and_a_redelivered_repeat() {
             let role = LinkRole::Outstation {
-                self_address: Feature::Disabled,
+                self_address: false,
             };
             let [a, b, _] = PEERS;
             let mut model = Model::NotReset;

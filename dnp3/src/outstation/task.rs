@@ -110,7 +110,7 @@ impl<T: Transport> OutstationTask<T> {
         let (reader, writer) = crate::transport::create_transport_layer(
             link_modes,
             crate::link::LinkRole::Outstation {
-                self_address: config.features.self_address,
+                self_address: config.features.self_address == Feature::Enabled,
             },
             config.outstation_address,
             config.rx_buffer_size.value(),
