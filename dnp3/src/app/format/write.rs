@@ -235,6 +235,22 @@ mod test {
     }
 
     #[test]
+    fn formats_clear_restart_write() {
+        let mut buffer = [0; 8];
+        let mut cursor = WriteCursor::new(&mut buffer);
+        start_request(
+            ControlField::request(Sequence::new(1)),
+            FunctionCode::Write,
+            &mut cursor,
+        )
+        .unwrap()
+        .write_clear_restart()
+        .unwrap();
+
+        assert_eq!(cursor.written(), [0xC1, 0x02, 80, 1, 0, 7, 7, 0]);
+    }
+
+    #[test]
     fn writes_free_format() {
         let mut buffer: [u8; 100] = [0; 100];
         let mut cursor = WriteCursor::new(&mut buffer);
