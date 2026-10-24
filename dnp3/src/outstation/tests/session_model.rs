@@ -59,7 +59,11 @@
 //! retry delay and limit, the buffer limits and the fragment sizes. Besides single inputs, runs of
 //! them reach cases that single inputs rarely do:
 //! - a new request or a repeat in the solicited confirm wait, while an unsolicited response is due
-//!   (Table 6-1 rows 15 and 18);
+//!   (Table 6-1 rows 15 and 18), including a READ whose response asks for no confirm, which the
+//!   due response follows at once, and one whose confirm the due response waits for;
+//! - a request and its repeat in the null unsolicited response's confirm wait and in the wait of
+//!   one with events, and a READ held in the null response's wait, answered at its timeout and
+//!   repeated in the next one;
 //! - a repeat of a later fragment of a series, and of a middle one;
 //! - a repeated READ that restarts the solicited confirm wait, then a step that ends at or past the
 //!   deadline the READ set, where a wait that wasn't restarted would end, and before the one the
@@ -1213,28 +1217,81 @@ fn request_after_read_and_update() -> impl Strategy<Value = Vec<Op>> {
 
 /// The confirm of the null unsolicited response, unsolicited responses enabled for every class but
 /// one, events in that class and a READ of them, which enters the solicited confirm wait, then an
-/// event in an enabled class, due as an unsolicited response, and any request
+/// event in an enabled class, due as an unsolicited response, and either any request or a READ and
+/// the confirm of its response (Table 6-1 row 15). That READ names the third class, which holds no
+/// events unless earlier inputs left some, or some of the three: the first READ's, the due event's
+/// and the third. When it carries no events, its response asks for no confirm and the due response
+/// follows at once; otherwise the due response waits for the confirm
 fn due_in_the_solicited_wait() -> impl Strategy<Value = Vec<Op>> {
-    (kind(), 0..POINTS, 1u64..5, kind(), 0..POINTS, request_op()).prop_map(
-        |(kind, index, count, due_kind, due_index, request)| {
+    (kind(), 0..POINTS, 1u64..5, kind(), 0..POINTS).prop_flat_map(
+        |(kind, index, count, due_kind, due_index)| {
             let class = kind.class(index);
             // the first point from `due_index` on in another class
             let due_index = (0..POINTS)
                 .map(|offset| (due_index + offset) % POINTS)
                 .find(|index| due_kind.class(*index) != class)
                 .unwrap_or(due_index);
-            vec![
-                Op::UnsolicitedConfirm(ConfirmChoice::Expected),
-                Op::Request(Function::EnableUnsolicited([0, 1, 2].map(|c| c != class))),
-                Op::Update { kind, index, count },
-                Op::Request(Function::Read(vec![ReadHeader::Class(class, None)])),
-                Op::Update {
-                    kind: due_kind,
-                    index: due_index,
-                    count: 1,
-                },
-                request,
-            ]
+            let due_class = due_kind.class(due_index);
+            let third = (0..3)
+                .find(|c| *c != class && *c != due_class)
+                .unwrap_or(class);
+            let named = prop_oneof![Just([false, false, true]), classes()];
+            let read = named.prop_map(move |named| {
+                let headers = [class, due_class, third]
+                    .into_iter()
+                    .zip(named)
+                    .filter(|(_, named)| *named)
+                    .map(|(class, _)| ReadHeader::Class(class, None))
+                    .collect();
+                vec![
+                    Op::Request(Function::Read(headers)),
+                    Op::SolicitedConfirm(ConfirmChoice::Expected),
+                ]
+            });
+            let next = prop_oneof![
+                3 => request_op().prop_map(|request| vec![request]),
+                1 => read,
+            ];
+            next.prop_map(move |next| {
+                let mut ops = vec![
+                    Op::UnsolicitedConfirm(ConfirmChoice::Expected),
+                    Op::Request(Function::EnableUnsolicited([0, 1, 2].map(|c| c != class))),
+                    Op::Update { kind, index, count },
+                    Op::Request(Function::Read(vec![ReadHeader::Class(class, None)])),
+                    Op::Update {
+                        kind: due_kind,
+                        index: due_index,
+                        count: 1,
+                    },
+                ];
+                ops.extend(next);
+                ops
+            })
+        },
+    )
+}
+
+/// An update and any request, in either order, perhaps a solicited confirm or a wait to the next
+/// deadline, and a repeat of the request. The request or its repeat often arrives in the null
+/// unsolicited response's confirm wait, or in the wait of an unsolicited response that the update
+/// started. There the repeat of a request other than a READ gets the stored response, and a READ
+/// waits for the end of the wait. A READ held in the null response's wait is answered at its
+/// timeout, and its repeat may arrive in the next null response's wait. A confirm before the
+/// repeat, which in idle confirms nothing, doesn't change what the repeat matches
+fn repeat_in_the_unsolicited_wait() -> impl Strategy<Value = Vec<Op>> {
+    let between = prop::option::of(prop_oneof![
+        confirm_choice().prop_map(Op::SolicitedConfirm),
+        Just(Op::Advance(AdvanceChoice::AtDeadline)),
+    ]);
+    (update_op(), function(1, 1), any::<bool>(), between).prop_map(
+        |(update, function, update_first, between)| {
+            let mut ops = vec![update, Op::Request(function)];
+            if !update_first {
+                ops.reverse();
+            }
+            ops.extend(between);
+            ops.push(Op::Repeat);
+            ops
         },
     )
 }
@@ -1292,10 +1349,11 @@ fn ops() -> impl Strategy<Value = Vec<Op>> {
     let run = prop_oneof![
         16 => op().prop_map(|op| vec![op]),
         2 => request_after_read_and_update(),
-        3 => due_in_the_solicited_wait(),
+        5 => due_in_the_solicited_wait(),
         1 => repeat_of_a_later_fragment(),
         1 => timeout_of_a_restarted_wait(),
         1 => timeout_after_disable(),
+        3 => repeat_in_the_unsolicited_wait(),
     ];
     prop::collection::vec(run, 1..40).prop_map(|runs| runs.concat())
 }
