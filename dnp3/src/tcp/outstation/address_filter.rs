@@ -48,7 +48,7 @@ impl FromStr for WildcardIPv4 {
 }
 
 impl WildcardIPv4 {
-    pub(crate) fn matches(&self, addr: std::net::IpAddr) -> bool {
+    fn matches(&self, addr: std::net::Ipv4Addr) -> bool {
         fn bm(b: u8, other: Option<u8>) -> bool {
             match other {
                 Some(x) => b == x,
@@ -56,13 +56,8 @@ impl WildcardIPv4 {
             }
         }
 
-        match addr.to_canonical() {
-            std::net::IpAddr::V4(x) => {
-                let [b3, b2, b1, b0] = x.octets();
-                bm(b3, self.b3) && bm(b2, self.b2) && bm(b1, self.b1) && bm(b0, self.b0)
-            }
-            std::net::IpAddr::V6(_) => false,
-        }
+        let [b3, b2, b1, b0] = addr.octets();
+        bm(b3, self.b3) && bm(b2, self.b2) && bm(b1, self.b1) && bm(b0, self.b0)
     }
 
     pub(crate) fn conflicts_with(&self, other: &WildcardIPv4) -> bool {
@@ -115,26 +110,23 @@ impl AddressFilter {
                 }
                 std::net::IpAddr::V6(_) => set.contains(&addr),
             },
-            AddressFilter::WildcardIpv4(wc) => wc.matches(addr),
+            AddressFilter::WildcardIpv4(wc) => match addr {
+                std::net::IpAddr::V4(x) => wc.matches(x),
+                std::net::IpAddr::V6(_) => false,
+            },
         }
     }
 
+    /// Whether some address matches both filters
+    ///
+    /// Every arm names both orders, so swapping the filters selects the same arm, and every named
+    /// address is checked with [`AddressFilter::matches`], which canonicalizes it.
     pub(crate) fn conflicts_with(&self, other: &AddressFilter) -> bool {
-        match self {
-            AddressFilter::Any => match other {
-                AddressFilter::AnyOf(set) => !set.is_empty(),
-                AddressFilter::Any | AddressFilter::Exact(_) | AddressFilter::WildcardIpv4(_) => {
-                    true
-                }
-            },
-            AddressFilter::Exact(x) => other.matches(*x),
-            AddressFilter::AnyOf(set) => set.iter().any(|x| other.matches(*x)),
-            AddressFilter::WildcardIpv4(wc) => match other {
-                AddressFilter::Any => true,
-                AddressFilter::Exact(x) => wc.matches(*x),
-                AddressFilter::AnyOf(set) => set.iter().any(|x| wc.matches(*x)),
-                AddressFilter::WildcardIpv4(wc2) => wc.conflicts_with(wc2),
-            },
+        match (self, other) {
+            (Self::Exact(x), f) | (f, Self::Exact(x)) => f.matches(*x),
+            (Self::AnyOf(set), f) | (f, Self::AnyOf(set)) => set.iter().any(|x| f.matches(*x)),
+            (Self::Any, _) | (_, Self::Any) => true,
+            (Self::WildcardIpv4(a), Self::WildcardIpv4(b)) => a.conflicts_with(b),
         }
     }
 }
