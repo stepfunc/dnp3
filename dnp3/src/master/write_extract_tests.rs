@@ -9,20 +9,29 @@
 //! database's values, written independently of the production conversions
 //!
 //! The reference conversions: integers clamp to their range with OVER_RANGE, and NaN is 0 with
-//! OVER_RANGE (the model in [`analog_model`], shared with the conversion properties); finite values past the f32 range clamp with OVER_RANGE, and NaN and infinities are
-//! kept; 16-bit counters keep the low 16 bits; variations without flags report ONLINE, and a
-//! variation without flags is promoted to the one with them when the flags it would report aren't
-//! just ONLINE; events without time are reported in the variation without time at the same
-//! precision (the 3.1r1 IED certification procedures 8.14.1 require this for binary inputs; for
-//! the other families it's our deliberate departure from reporting a requested variation as is,
-//! TB2017-003a 5.1.3), and binary and double-bit events with unsynchronized time relative to an
-//! unsynchronized CTO (TB2017-003a)
+//! OVER_RANGE (the model in [`analog_model`], shared with the conversion properties, so a mistake
+//! there would hide from both); finite values past the f32 range clamp with OVER_RANGE, and NaN
+//! and infinities are kept; 16-bit counters keep the low 16 bits; variations without flags report
+//! ONLINE, and a variation without flags is promoted to the one with them when the flags it would
+//! report aren't just ONLINE; events without time are reported in the variation without time at
+//! the same precision (the 3.1r1 IED certification procedures 8.14.1 require this for binary
+//! inputs; for the other families it's our deliberate departure from reporting a requested
+//! variation as is, TB2017-003a 5.1.3), and binary and double-bit events with unsynchronized time
+//! relative to an unsynchronized CTO (TB2017-003a)
 //!
 //! The times of the other variations with absolute time pin the current API convention rather
 //! than a standards-backed oracle: see [`absolute`].
 //!
 //! Event times are generated in sequence, so that events share a CTO with offsets from 0 to its
 //! reach of 65,535 and just past it, change synchronization, and step backward.
+//!
+//! Flags are ONLINE, ONLINE with bit 6, bit 7 or both (the bits that carry the state of a
+//! double-bit point, of which a binary point uses bit 7), or any byte, so that the promotion of
+//! g1v1, g3v1 and g10v1 meets both sides of its rule: the state bits alone keep the variation
+//! without flags, and any other bit promotes it.
+//!
+//! Not generated: READs other than all objects, responses of more than one fragment, and events
+//! in classes 2 and 3.
 
 use std::collections::BTreeSet;
 use std::fmt::Debug;
@@ -501,8 +510,14 @@ enum Quality {
     Absent,
 }
 
+/// ONLINE alone, ONLINE with the bits that carry the state of a binary or double-bit point, or
+/// any byte
 fn flags() -> impl Strategy<Value = Flags> {
-    prop_oneof![Just(Flags::ONLINE), any::<u8>().prop_map(Flags::new)]
+    prop_oneof![
+        Just(Flags::ONLINE),
+        prop::sample::select(vec![0x41, 0x81, 0xC1]).prop_map(Flags::new),
+        any::<u8>().prop_map(Flags::new),
+    ]
 }
 
 /// Times in the order events are created, each a step from the one before: mostly by 0, 1,
