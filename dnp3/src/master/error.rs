@@ -20,7 +20,7 @@ use tokio::sync::oneshot::error::RecvError;
 use crate::app::attr::BadAttribute;
 use crate::app::parse::parser::SingleHeaderError;
 use crate::master::MasterChannelType;
-use crate::util::session::{RunError, StopReason};
+use crate::util::lifecycle::{RunError, StopReason};
 
 /// Errors that can occur when adding an association
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

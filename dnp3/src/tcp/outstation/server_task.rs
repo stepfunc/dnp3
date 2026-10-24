@@ -10,8 +10,8 @@ use crate::app::{Listener, Shutdown};
 use crate::outstation::task::OutstationTask;
 use crate::outstation::ConnectionState;
 use crate::util::channel::{request_channel, Receiver, Sender};
+use crate::util::lifecycle::{Enabled, RunError, StopReason};
 use crate::util::phys::PhysLayer;
-use crate::util::session::{Enabled, RunError, StopReason};
 
 /// message that gets sent to OutstationTaskAdapter when
 /// it needs to switch to a new session

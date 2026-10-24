@@ -23,7 +23,7 @@ use crate::master::{
     DirReadConfig, FileAction, FileCredentials, FileError, FileMode, FileReadConfig, TaskError,
     TaskType,
 };
-use crate::util::session::{RunError, StopReason};
+use crate::util::lifecycle::{RunError, StopReason};
 use crate::util::test_support::watchdog;
 
 const HANDLE: u32 = 0xDEADCAFE;

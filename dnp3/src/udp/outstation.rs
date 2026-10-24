@@ -15,8 +15,9 @@ use crate::outstation::{
 use crate::udp::layer::UdpFactory;
 use crate::udp::task::UdpTask;
 use crate::udp::UdpSocketMode;
+use crate::util::lifecycle::Enabled;
 use crate::util::phys::PhysAddr;
-use crate::util::session::{Enabled, Session};
+use crate::util::session::Session;
 use std::net::SocketAddr;
 use tracing::Instrument;
 

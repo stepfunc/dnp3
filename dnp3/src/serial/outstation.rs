@@ -13,8 +13,9 @@ use crate::outstation::{
 };
 use crate::serial::task::SerialTask;
 use crate::serial::{PortState, SerialSettings};
+use crate::util::lifecycle::Enabled;
 use crate::util::phys::{PhysAddr, PhysLayer};
-use crate::util::session::{Enabled, Session};
+use crate::util::session::Session;
 use tracing::Instrument;
 
 /// A fully configured serial outstation that has not yet opened its serial port.
@@ -68,7 +69,7 @@ impl OneShotSerialOutstationTask {
 
     pub(crate) async fn run(mut self) {
         let mut io = PhysLayer::serial(self.serial);
-        let _: crate::util::session::RunError = self.task.run(&mut io).await;
+        let _: crate::util::lifecycle::RunError = self.task.run(&mut io).await;
     }
 }
 

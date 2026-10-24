@@ -16,8 +16,9 @@ use crate::tcp::{
     ClientConnectionHandler, ClientState, ConnectOptions, EndpointList, PostConnectionHandler,
     SimpleConnectHandler,
 };
+use crate::util::lifecycle::Enabled;
 use crate::util::phys::PhysAddr;
-use crate::util::session::{Enabled, Session};
+use crate::util::session::Session;
 
 /// Spawn a TCP client task onto the `Tokio` runtime. The task runs until the returned handle is dropped.
 ///

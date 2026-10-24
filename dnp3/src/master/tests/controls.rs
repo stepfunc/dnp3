@@ -31,7 +31,7 @@ use crate::master::{
     CommandSupport, MasterChannel, MasterChannelConfig, MasterChannelType, ReadRequest, TaskError,
     TaskType,
 };
-use crate::util::session::{Enabled, RunError};
+use crate::util::lifecycle::{Enabled, RunError};
 use crate::util::test_support::watchdog;
 
 const NO_ACK: FunctionCode = FunctionCode::DirectOperateNoResponse;

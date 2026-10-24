@@ -47,7 +47,7 @@ use crate::util::phys::PhysLayer;
 use crate::app::parse::bit::BitSequence;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
-use crate::util::session::{Enabled, RunError, StopReason};
+use crate::util::lifecycle::{Enabled, RunError, StopReason};
 use crate::util::skipped::Skipped;
 
 #[derive(Copy, Clone)]

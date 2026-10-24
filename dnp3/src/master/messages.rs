@@ -14,7 +14,7 @@ use crate::master::promise::Promise;
 use crate::master::tasks::QueuedTask;
 use crate::master::{AssociationConfig, AssociationHandler, AssociationInformation, ReadHandler};
 use crate::transport::FragmentAddr;
-use crate::util::session::Enabled;
+use crate::util::lifecycle::Enabled;
 
 /// Messages sent from the handles to the master task via an mpsc.
 pub(crate) enum Message {

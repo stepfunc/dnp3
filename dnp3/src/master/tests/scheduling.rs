@@ -59,8 +59,8 @@ use crate::master::{
     AssociationHandle, Classes, EventClasses, MasterChannel, MasterChannelConfig,
     MasterChannelType, PollHandle, ReadRequest, TaskError,
 };
+use crate::util::lifecycle::Enabled;
 use crate::util::phys::PhysLayer;
-use crate::util::session::Enabled;
 use crate::util::test_support::watchdog;
 
 /// Two outstations on one link

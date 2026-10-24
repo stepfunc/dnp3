@@ -24,8 +24,9 @@ use crate::transport::FragmentAddr;
 use crate::udp::layer::UdpFactory;
 use crate::udp::task::UdpTask;
 use crate::util::channel::Receiver;
+use crate::util::lifecycle::Enabled;
 use crate::util::phys::PhysAddr;
-use crate::util::session::{Enabled, Session};
+use crate::util::session::Session;
 use tokio::time::Instant;
 
 /// Builder for configuring a stream-based master task (TCP, TLS, serial)

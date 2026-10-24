@@ -19,8 +19,8 @@ use crate::outstation::task::OutstationTask;
 use crate::outstation::traits::{BroadcastAction, OperateType};
 use crate::outstation::OutstationHandle;
 use crate::transport::RealTransport;
+use crate::util::lifecycle::{Enabled, RunError};
 use crate::util::phys::{PhysAddr, PhysLayer};
-use crate::util::session::{Enabled, RunError};
 
 use super::harness::*;
 
