@@ -11,6 +11,12 @@
 //! Each header names one object (a range of index 0, or a count of 1) and its payload is found by
 //! trying zero-filled payloads of increasing length, so the probe needs no table of object sizes.
 //! Attributes and file objects, which zeros don't encode, get a valid encoding instead.
+//!
+//! Outside a READ, each header is probed once per test binary (`probes`): the acceptance test
+//! checks every result against the tables, and the tests that need the accepted encodings
+//! (`accepted_headers`, also used by the master's and the outstation's header tests) reuse them.
+
+use std::sync::OnceLock;
 
 use crate::app::attr::AttrParseError;
 use crate::app::parse::options::ParseOptions;
@@ -39,18 +45,23 @@ const FUNCTIONS: [FunctionCode; 3] = [
     FunctionCode::DirectOperate,
 ];
 
-/// Requests whose all-objects headers the probes also check
-const ALL_OBJECTS_FUNCTIONS: [FunctionCode; 2] = [
+/// The functions of the headers that the probes check: `FUNCTIONS` with each qualifier, then two
+/// requests whose all-objects headers the probes also check
+const PROBED_FUNCTIONS: [FunctionCode; 5] = [
+    FunctionCode::Response,
+    FunctionCode::Write,
+    FunctionCode::DirectOperate,
     FunctionCode::ImmediateFreeze,
     FunctionCode::EnableUnsolicited,
 ];
 
-/// The function and qualifier of each header that the probes check
-fn probed() -> impl Iterator<Item = (FunctionCode, QualifierCode)> {
-    FUNCTIONS
-        .into_iter()
-        .flat_map(|function| QUALIFIERS.map(|qualifier| (function, qualifier)))
-        .chain(ALL_OBJECTS_FUNCTIONS.map(|function| (function, Q::AllObjects)))
+/// The qualifiers of the headers that the probes check for a function of `PROBED_FUNCTIONS`
+fn probed_qualifiers(function: FunctionCode) -> &'static [QualifierCode] {
+    if FUNCTIONS.contains(&function) {
+        &QUALIFIERS
+    } else {
+        &[Q::AllObjects]
+    }
 }
 
 /// The longest zero-filled payload a probe tries: an index of 2 bytes and a 255 byte octet string
@@ -303,58 +314,77 @@ const OPTIONS: [ParseOptions; 2] = [
     },
 ];
 
-/// Every header the parser accepts outside a READ, with the variation and qualifier it encodes
+/// The probe of each header outside a READ for one of `OPTIONS` and of `PROBED_FUNCTIONS`, each
+/// qualifier of `probed_qualifiers` with each variation, run once per test binary
+fn probes(
+    options: ParseOptions,
+    function: FunctionCode,
+) -> &'static [(Variation, QualifierCode, Probe)] {
+    type Cell = OnceLock<Vec<(Variation, QualifierCode, Probe)>>;
+    static PROBES: [[Cell; PROBED_FUNCTIONS.len()]; OPTIONS.len()] =
+        [const { [const { Cell::new() }; PROBED_FUNCTIONS.len()] }; OPTIONS.len()];
+    let options_index = OPTIONS.iter().position(|o| *o == options).unwrap();
+    let function_index = PROBED_FUNCTIONS
+        .iter()
+        .position(|f| *f == function)
+        .unwrap();
+    PROBES[options_index][function_index].get_or_init(|| {
+        let mut probes = Vec::new();
+        for qualifier in probed_qualifiers(function) {
+            for variation in Variation::all() {
+                let probe = probe(options, function, variation, *qualifier);
+                probes.push((variation, *qualifier, probe));
+            }
+        }
+        probes
+    })
+}
+
+/// Every header the parser accepts outside a READ, with the variation and qualifier it encodes,
+/// for a function of `FUNCTIONS`
 pub(crate) fn accepted_headers(
     options: ParseOptions,
     function: FunctionCode,
 ) -> Vec<(Variation, QualifierCode, Vec<u8>)> {
-    let mut headers = Vec::new();
-    for qualifier in QUALIFIERS {
-        for variation in Variation::all() {
-            if let Probe::Accepted(bytes) = probe(options, function, variation, qualifier) {
-                headers.push((variation, qualifier, bytes));
-            }
-        }
-    }
-    headers
+    assert!(
+        FUNCTIONS.contains(&function),
+        "{function:?} isn't probed with every qualifier"
+    );
+    probes(options, function)
+        .iter()
+        .filter_map(|(variation, qualifier, probe)| match probe {
+            Probe::Accepted(bytes) => Some((*variation, *qualifier, bytes.clone())),
+            Probe::Rejected(_) => None,
+        })
+        .collect()
 }
 
 #[test]
 fn each_qualifier_accepts_these_variations_outside_read() {
     for options in OPTIONS {
-        for (function, qualifier) in probed() {
-            for variation in Variation::all() {
-                let actual = match probe(options, function, variation, qualifier) {
+        for function in PROBED_FUNCTIONS {
+            for (variation, qualifier, probe) in probes(options, function) {
+                let actual = match probe {
                     Probe::Accepted(_) => Ok(()),
-                    Probe::Rejected(err) => Err(err),
+                    Probe::Rejected(err) => Err(*err),
                 };
                 assert_eq!(
                     actual,
-                    expected(options, variation, qualifier),
+                    expected(options, *variation, *qualifier),
                     "{options:?} {function:?} {variation:?} {qualifier:?}"
                 );
-            }
-        }
-    }
-}
-
-#[test]
-fn each_parsed_header_carries_its_variation_and_qualifier() {
-    for options in OPTIONS {
-        for (function, qualifier) in probed() {
-            for variation in Variation::all() {
-                let Probe::Accepted(bytes) = probe(options, function, variation, qualifier) else {
-                    continue;
-                };
-                let headers = HeaderCollection::parse(options, function, &bytes).unwrap();
-                let header = headers.get_only_header().unwrap();
-                assert_eq!(header.variation(), variation);
-                assert_eq!(header.qualifier(), qualifier);
-                assert!(!matches!(header, ObjectHeader::Read(..)));
-                assert_eq!(
-                    header.count().is_some(),
-                    matches!(qualifier, Q::Count8 | Q::Count16)
-                );
+                // each accepted header carries its variation and qualifier
+                if let Probe::Accepted(bytes) = probe {
+                    let headers = HeaderCollection::parse(options, function, bytes).unwrap();
+                    let header = headers.get_only_header().unwrap();
+                    assert_eq!(header.variation(), *variation);
+                    assert_eq!(header.qualifier(), *qualifier);
+                    assert!(!matches!(header, ObjectHeader::Read(..)));
+                    assert_eq!(
+                        header.count().is_some(),
+                        matches!(qualifier, Q::Count8 | Q::Count16)
+                    );
+                }
             }
         }
     }
@@ -441,40 +471,27 @@ fn each_read_qualifier_accepts_these_variations() {
         for (qualifier, kind) in READ_QUALIFIERS {
             for variation in Variation::all() {
                 let bytes = prefix(variation, qualifier);
-                let actual = HeaderCollection::parse(options, FunctionCode::Read, &bytes)
-                    .map(|headers| headers.iter().count());
+                let parsed = HeaderCollection::parse(options, FunctionCode::Read, &bytes);
+                let actual = parsed
+                    .as_ref()
+                    .map(|headers| headers.iter().count())
+                    .map_err(|err| *err);
                 let expected = if read_accepts(kind, variation) {
                     Ok(1)
                 } else {
                     Err(E::InvalidQualifierForVariation(variation, qualifier))
                 };
                 assert_eq!(actual, expected, "{options:?} {variation:?} {qualifier:?}");
+                // each accepted header carries its variation and qualifier, and no count
+                if let Ok(headers) = parsed {
+                    let header = headers.get_only_header().unwrap();
+                    assert_eq!(header.variation(), variation);
+                    assert_eq!(header.qualifier(), qualifier);
+                    assert!(header.count().is_none());
+                }
             }
         }
     }
-}
-
-#[test]
-fn each_read_header_carries_its_variation_and_qualifier() {
-    let qualifiers = [Q::AllObjects, Q::Range8, Q::Range16, Q::Count8, Q::Count16];
-    let mut accepted = 0;
-    for qualifier in qualifiers {
-        for variation in Variation::all() {
-            let bytes = prefix(variation, qualifier);
-            let parsed =
-                HeaderCollection::parse(ParseOptions::default(), FunctionCode::Read, &bytes);
-            if let Ok(headers) = parsed {
-                let header = headers.get_only_header().unwrap();
-                assert_eq!(header.variation(), variation);
-                assert_eq!(header.qualifier(), qualifier);
-                assert!(header.count().is_none());
-                accepted += 1;
-            }
-        }
-    }
-    // the number of variation and qualifier pairs that a READ accepts, counting each variation
-    // of groups 0, 110 and 111
-    assert_eq!(accepted, 1628);
 }
 
 #[test]

@@ -1732,68 +1732,48 @@ mod test {
     }
 
     #[test]
-    fn parses_one_byte_unsigned_int() {
-        let mut cursor = ReadCursor::new(&[UNSIGNED_INT, 0x01, 42]);
-        assert_eq!(
-            AttrValue::parse(&mut cursor).unwrap(),
-            AttrValue::UnsignedInt(42)
-        );
-        assert!(cursor.is_empty());
-    }
-
-    #[test]
-    fn parses_two_byte_unsigned_int() {
-        let mut cursor = ReadCursor::new(&[UNSIGNED_INT, 0x02, 42, 00]);
-        assert_eq!(
-            AttrValue::parse(&mut cursor).unwrap(),
-            AttrValue::UnsignedInt(42)
-        );
-        assert!(cursor.is_empty());
-    }
-
-    #[test]
-    fn parses_four_byte_unsigned_int() {
-        let mut cursor = ReadCursor::new(&[UNSIGNED_INT, 0x04, 42, 00, 00, 00]);
-        assert_eq!(
-            AttrValue::parse(&mut cursor).unwrap(),
-            AttrValue::UnsignedInt(42)
-        );
-        assert!(cursor.is_empty());
-    }
-
-    fn parse_signed(bytes: &[u8]) -> i32 {
-        let mut cursor = ReadCursor::new(bytes);
-        let value = match AttrValue::parse(&mut cursor).unwrap() {
-            AttrValue::SignedInt(x) => x,
-            other => panic!("unexpected value: {other:?}"),
-        };
-        assert!(cursor.is_empty());
-        value
-    }
-
-    #[test]
-    fn parses_one_byte_signed_int() {
-        assert_eq!(parse_signed(&[SIGNED_INT, 0x01, 0xFF]), -1);
-        assert_eq!(parse_signed(&[SIGNED_INT, 0x01, 0x80]), -128);
-        assert_eq!(parse_signed(&[SIGNED_INT, 0x01, 0x7F]), 127);
-    }
-
-    #[test]
-    fn parses_two_byte_signed_int() {
-        assert_eq!(parse_signed(&[SIGNED_INT, 0x02, 0xFF, 0xFF]), -1);
-        assert_eq!(parse_signed(&[SIGNED_INT, 0x02, 0x00, 0x80]), -32768);
-    }
-
-    #[test]
-    fn parses_four_byte_signed_int() {
-        assert_eq!(
-            parse_signed(&[SIGNED_INT, 0x04, 0xFF, 0xFF, 0xFF, 0xFF]),
-            -1
-        );
-        assert_eq!(
-            parse_signed(&[SIGNED_INT, 0x04, 0x00, 0x00, 0x00, 0x80]),
-            i32::MIN
-        );
+    fn parses_integers_of_each_width_little_endian() {
+        // distinct bytes in each multibyte value pin the byte order
+        let cases: &[(&[u8], AttrValue)] = &[
+            (&[UNSIGNED_INT, 0x01, 0x2A], AttrValue::UnsignedInt(0x2A)),
+            (
+                &[UNSIGNED_INT, 0x02, 0x34, 0x12],
+                AttrValue::UnsignedInt(0x1234),
+            ),
+            (
+                &[UNSIGNED_INT, 0x04, 0x78, 0x56, 0x34, 0x12],
+                AttrValue::UnsignedInt(0x1234_5678),
+            ),
+            (&[SIGNED_INT, 0x01, 0xFF], AttrValue::SignedInt(-1)),
+            (&[SIGNED_INT, 0x01, 0x80], AttrValue::SignedInt(-128)),
+            (&[SIGNED_INT, 0x01, 0x7F], AttrValue::SignedInt(127)),
+            (&[SIGNED_INT, 0x02, 0xFF, 0xFF], AttrValue::SignedInt(-1)),
+            (
+                &[SIGNED_INT, 0x02, 0x00, 0x80],
+                AttrValue::SignedInt(-32768),
+            ),
+            (
+                &[SIGNED_INT, 0x02, 0xCC, 0xED],
+                AttrValue::SignedInt(-0x1234),
+            ),
+            (
+                &[SIGNED_INT, 0x04, 0xFF, 0xFF, 0xFF, 0xFF],
+                AttrValue::SignedInt(-1),
+            ),
+            (
+                &[SIGNED_INT, 0x04, 0x00, 0x00, 0x00, 0x80],
+                AttrValue::SignedInt(i32::MIN),
+            ),
+            (
+                &[SIGNED_INT, 0x04, 0x88, 0xA9, 0xCB, 0xED],
+                AttrValue::SignedInt(-0x1234_5678),
+            ),
+        ];
+        for (bytes, expected) in cases {
+            let mut cursor = ReadCursor::new(bytes);
+            assert_eq!(AttrValue::parse(&mut cursor), Ok(*expected), "{bytes:02X?}");
+            assert!(cursor.is_empty());
+        }
     }
 
     #[test]

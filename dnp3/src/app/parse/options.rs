@@ -6,7 +6,7 @@
 
 use std::sync::atomic::Ordering;
 
-#[derive(Copy, Clone, Debug, Default)]
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
 pub(crate) struct ParseOptions {
     pub(crate) parse_zero_length_strings: bool,
 }
