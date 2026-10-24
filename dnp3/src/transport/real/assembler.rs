@@ -333,32 +333,28 @@ mod tests {
         }
 
         /// returns true if the segment completed a fragment
-        fn segment(&mut self, info: FrameInfo, fir: bool, fin: bool, seq: u8, data: &[u8]) -> bool {
+        fn segment(&mut self, fir: bool, fin: bool, seq: u8, data: &[u8]) -> bool {
             let header = crate::link::test_data::segment(fir, fin, seq);
             let discards = &mut self.discards;
             self.assembler
-                .assemble(info, header, data, |d| discards.push(d));
+                .assemble(info(), header, data, |d| discards.push(d));
             self.assembler.peek().is_some()
         }
 
         fn first(&mut self, seq: u8, data: &[u8]) -> bool {
-            self.segment(info(), true, false, seq, data)
+            self.segment(true, false, seq, data)
         }
 
         fn middle(&mut self, seq: u8, data: &[u8]) -> bool {
-            self.segment(info(), false, false, seq, data)
+            self.segment(false, false, seq, data)
         }
 
         fn last(&mut self, seq: u8, data: &[u8]) -> bool {
-            self.segment(info(), false, true, seq, data)
+            self.segment(false, true, seq, data)
         }
 
         fn single(&mut self, seq: u8, data: &[u8]) -> bool {
-            self.segment(info(), true, true, seq, data)
-        }
-
-        fn peek(&self) -> Option<Vec<u8>> {
-            self.assembler.peek().map(|fragment| fragment.data.to_vec())
+            self.segment(true, true, seq, data)
         }
 
         /// takes the discard reasons reported since the last call
@@ -661,292 +657,16 @@ mod tests {
         h.assert_recovers(5);
     }
 
-    #[test]
-    fn repeated_final_segment_after_the_fragment_is_taken_is_discarded() {
-        let mut h = Harness::new();
-        assert!(!h.first(0, &[1]));
-        assert!(h.last(1, &[2]));
-        assert_eq!(h.pop(), Some(vec![1, 2]));
-        assert!(!h.last(1, &[2]));
-        assert_eq!(h.pop(), None);
-    }
-
-    #[test]
-    fn repeated_single_segment_is_passed_up_again() {
-        let mut h = Harness::new();
-        assert!(h.single(0, &[1]));
-        assert_eq!(h.pop(), Some(vec![1]));
-        assert!(h.single(0, &[1]));
-        assert_eq!(h.pop(), Some(vec![1]));
-    }
-
-    #[test]
-    fn segment_from_another_source_abandons_the_series() {
-        let mut h = Harness::new();
-        assert!(!h.first(0, &[1]));
-        assert!(!h.segment(from(2), false, true, 1, &[2]));
-        assert!(!h.last(1, &[2]));
-        assert_eq!(h.pop(), None);
-        h.assert_recovers(2);
-    }
-
-    #[test]
-    fn identical_repeat_from_another_source_abandons_the_series() {
-        let mut h = Harness::new();
-        assert!(!h.first(0, &[1]));
-        assert!(!h.middle(1, &[2]));
-        assert!(!h.segment(from(2), false, false, 1, &[2]));
-        assert!(!h.last(2, &[3]));
-        assert_eq!(h.pop(), None);
-    }
-
-    #[test]
-    fn segment_from_another_physical_address_abandons_the_series() {
-        let mut h = Harness::new();
-        let mut other = info();
-        other.phys_addr = PhysAddr::Udp("127.0.0.1:20000".parse().unwrap());
-        assert!(!h.first(0, &[1]));
-        assert!(!h.segment(other, false, true, 1, &[2]));
-        assert!(!h.last(1, &[3]));
-        assert_eq!(h.pop(), None);
-    }
-
-    #[test]
-    fn first_segment_from_another_source_starts_a_new_series() {
-        let mut h = Harness::new();
-        assert!(!h.first(0, &[1]));
-        assert!(!h.segment(from(2), true, false, 7, &[2]));
-        assert!(h.segment(from(2), false, true, 8, &[3]));
-        let fragment = h.assembler.pop().unwrap();
-        assert_eq!(fragment.info.addr.link, EndpointAddress::raw(2));
-        assert_eq!(fragment.data, &[2, 3]);
-    }
-
-    #[test]
-    fn broadcast_single_segment_is_passed_up_with_its_mode() {
-        let mut h = Harness::new();
-        assert!(h.segment(broadcast(), true, true, 0, &[1]));
-        let fragment = h.assembler.pop().unwrap();
-        assert_eq!(
-            fragment.info.broadcast,
-            Some(BroadcastConfirmMode::Mandatory)
-        );
-        assert_eq!(fragment.data, &[1]);
-    }
-
-    #[test]
-    fn broadcast_series_is_ignored() {
-        let mut h = Harness::new();
-        assert!(!h.segment(broadcast(), true, false, 0, &[1]));
-        assert!(!h.segment(broadcast(), false, true, 1, &[2]));
-        assert_eq!(h.pop(), None);
-        h.assert_recovers(2);
-    }
-
-    #[test]
-    fn broadcast_first_segment_abandons_a_series_in_progress() {
-        let mut h = Harness::new();
-        assert!(!h.first(0, &[1]));
-        assert!(!h.segment(broadcast(), true, false, 5, &[9]));
-        assert!(!h.last(1, &[2]));
-        assert_eq!(h.pop(), None);
-    }
-
-    #[test]
-    fn broadcast_continuation_leaves_a_series_in_progress() {
-        let mut h = Harness::new();
-        assert!(!h.first(0, &[1]));
-        assert!(!h.segment(broadcast(), false, true, 1, &[9]));
-        assert!(h.last(1, &[2]));
-        assert_eq!(h.pop(), Some(vec![1, 2]));
-    }
-
-    #[test]
-    fn broadcast_single_segment_replaces_a_series_in_progress() {
-        let mut h = Harness::new();
-        assert!(!h.first(0, &[1]));
-        assert!(h.segment(broadcast(), true, true, 5, &[9]));
-        assert_eq!(h.pop(), Some(vec![9]));
-        assert!(!h.last(1, &[2]));
-    }
-
-    #[test]
-    fn peek_leaves_the_fragment_and_pop_takes_it_once() {
-        let mut h = Harness::new();
-        assert!(h.single(0, &[1]));
-        assert_eq!(h.assembler.peek().map(|f| f.data.to_vec()), Some(vec![1]));
-        assert_eq!(h.assembler.peek().map(|f| f.data.to_vec()), Some(vec![1]));
-        assert_eq!(h.pop(), Some(vec![1]));
-        assert!(h.assembler.peek().is_none());
-        assert_eq!(h.pop(), None);
-    }
-
-    #[test]
-    fn reset_discards_a_series_in_progress() {
-        let mut h = Harness::new();
-        assert!(!h.first(0, &[1]));
-        h.assembler.reset();
-        assert!(!h.last(1, &[2]));
-        assert_eq!(h.pop(), None);
-        h.assert_recovers(2);
-    }
-
-    #[test]
-    fn new_series_reports_the_bytes_it_drops() {
-        let mut h = Harness::new();
-        assert!(!h.first(0, &[1, 2]));
-        assert!(!h.middle(1, &[3]));
-        assert!(h.discards().is_empty());
-        assert!(!h.first(5, &[4]));
-        assert_eq!(
-            h.discards(),
-            [Discard::NewSeries {
-                len: 3,
-                source: EndpointAddress::raw(1)
-            }]
-        );
-        assert!(h.last(6, &[5]));
-        assert_eq!(h.pop(), Some(vec![4, 5]));
-        assert!(h.discards().is_empty());
-    }
-
-    #[test]
-    fn new_series_reports_an_empty_series_it_drops() {
-        let mut h = Harness::new();
-        assert!(!h.first(0, &[]));
-        assert!(!h.first(1, &[1]));
-        assert_eq!(
-            h.discards(),
-            [Discard::NewSeries {
-                len: 0,
-                source: EndpointAddress::raw(1)
-            }]
-        );
-    }
-
-    #[test]
-    fn segments_are_ignored_while_a_fragment_waits_to_be_taken() {
-        let mut h = Harness::new();
-        assert!(h.single(0, &[1, 2]));
-        assert!(h.first(1, &[3]));
-        assert!(h.single(2, &[4]));
-        assert!(h.middle(3, &[5]));
-        assert!(h.last(4, &[6]));
-        assert!(h.first(5, &[7; MAX + 1]));
-        assert!(h.segment(broadcast(), true, true, 6, &[8]));
-        assert!(h.segment(broadcast(), false, true, 7, &[9]));
-        assert_eq!(h.discards(), [Discard::Pending; 7]);
-        assert_eq!(h.pop(), Some(vec![1, 2]));
-        h.assert_recovers(8);
-    }
-
-    #[test]
-    fn series_after_a_taken_fragment_starts_empty() {
-        let mut h = Harness::new();
-        assert!(h.single(0, &[1; MAX]));
-        assert_eq!(h.pop(), Some(vec![1; MAX]));
-        assert!(!h.first(1, &[2; MAX - 1]));
-        assert!(h.last(2, &[3]));
-        let mut expected = vec![2; MAX - 1];
-        expected.push(3);
-        assert_eq!(h.pop(), Some(expected));
-        assert!(h.discards().is_empty());
-    }
-
-    #[test]
-    fn series_after_a_reset_starts_empty() {
-        let mut h = Harness::new();
-        assert!(!h.first(0, &[1; MAX - 1]));
-        h.assembler.reset();
-        assert!(!h.first(1, &[2; MAX - 1]));
-        assert!(h.discards().is_empty());
-        assert!(h.last(2, &[3]));
-        assert_eq!(h.pop().map(|x| x.len()), Some(MAX));
-    }
-
-    #[test]
-    fn reset_after_a_completed_fragment_recovers() {
-        let mut h = Harness::new();
-        assert!(h.single(0, &[1; MAX]));
-        h.assembler.reset();
-        assert_eq!(h.peek(), None);
-        assert_eq!(h.pop(), None);
-        h.assert_recovers(1);
-    }
-
-    #[test]
-    fn series_after_an_abandoned_series_starts_empty() {
-        let mut h = Harness::new();
-        assert!(!h.first(0, &[1; MAX - 1]));
-        assert!(!h.middle(2, &[2]));
-        assert!(!h.first(3, &[3; MAX]));
-        assert!(h.last(4, &[]));
-        assert_eq!(h.pop(), Some(vec![3; MAX]));
-    }
-
-    #[test]
-    fn segment_discards_report_their_reasons() {
-        let mut h = Harness::new();
-        assert!(!h.first(0, &[1]));
-        assert!(!h.middle(1, &[2, 3]));
-        assert!(!h.middle(1, &[2, 3]));
-        assert_eq!(h.discards(), [Discard::Repeat { seq: 1 }]);
-        assert!(!h.middle(1, &[2, 4]));
-        assert_eq!(h.discards(), [Discard::DifferentRepeat { seq: 1 }]);
-
-        assert!(!h.first(10, &[1]));
-        assert!(!h.middle(12, &[2]));
-        assert_eq!(
-            h.discards(),
-            [Discard::UnexpectedSeq {
-                expected: 11,
-                received: 12
-            }]
-        );
-
-        assert!(!h.first(20, &[1; MAX - 1]));
-        assert!(!h.middle(21, &[2, 3]));
-        assert_eq!(h.discards(), [Discard::Overflow { len: 2 }]);
-
-        assert!(!h.first(30, &[1]));
-        assert!(!h.segment(from(2), false, true, 31, &[2]));
-        assert_eq!(
-            h.discards(),
-            [Discard::ConflictingAddress {
-                previous: from(1),
-                received: from(2)
-            }]
-        );
-
-        assert!(!h.segment(broadcast(), true, false, 40, &[1]));
-        assert_eq!(
-            h.discards(),
-            [Discard::BroadcastSeries {
-                fir: true,
-                fin: false
-            }]
-        );
-        h.assert_recovers(41);
-        assert!(h.discards().is_empty());
-    }
-
-    #[test]
-    fn repeat_of_the_first_segment_without_fir_abandons_the_series() {
-        let mut h = Harness::new();
-        assert!(!h.first(0, &[1]));
-        assert!(!h.middle(0, &[1]));
-        assert_eq!(h.discards(), [Discard::DifferentRepeat { seq: 0 }]);
-        assert!(!h.last(1, &[2]));
-        assert_eq!(h.pop(), None);
-    }
-
     /// The assembler against a model written from the reception rules and the documented
     /// extensions, over streams of valid series with one perturbation each
     ///
     /// After every operation the assembler's outcome, discard reasons and waiting fragment must
     /// match the model's. The model is an independent oracle, itself checked against
     /// hand-derived outcomes by `model_follows_the_reception_rules`. The TB2013-003 row tests
-    /// above stay as the bulletin's table; the property adds longer sequences and interleavings.
+    /// above stay as the bulletin's table, and fixed operation lists here pin the documented
+    /// extensions and the peek, pop and reset helpers: each gives the outcome of every operation
+    /// by hand, which the model must give and the assembler must then match. The property adds
+    /// longer sequences and interleavings.
     ///
     /// A case is 1-8 plans, each a valid series of 1-5 segments of up to 4 bytes (or a total
     /// forced to 0, the 8-byte maximum or one past it; the sequence number often wraps), one
@@ -1345,11 +1065,9 @@ mod tests {
         }
 
         fn infos() -> Vec<FrameInfo> {
-            let mut udp = info();
-            udp.phys_addr = PhysAddr::Udp("127.0.0.1:20000".parse().unwrap());
             let mut optional = broadcast();
             optional.broadcast = Some(BroadcastConfirmMode::Optional);
-            vec![info(), from(2), udp, broadcast(), optional]
+            vec![info(), from(2), udp(), broadcast(), optional]
         }
 
         fn frame_info() -> impl Strategy<Value = FrameInfo> {
@@ -1533,12 +1251,350 @@ mod tests {
                 (Op::Reset, Outcome::Reset),
                 (Op::Peek, Outcome::Peeked(None)),
             ];
+            follows(&cases);
+        }
+
+        /// the model gives each hand-derived outcome, and the assembler agrees with the model
+        /// after every operation, so the assembler gives them too
+        fn follows(cases: &[(Op, Outcome)]) {
             let mut model = Model::new();
-            for (op, outcome) in &cases {
+            for (op, outcome) in cases {
                 assert_eq!(&model.apply(op), outcome, "{op:?}");
             }
-            let ops: Vec<Op> = cases.into_iter().map(|(op, _)| op).collect();
+            let ops: Vec<Op> = cases.iter().map(|(op, _)| op.clone()).collect();
             check(&ops).unwrap();
+        }
+
+        // Fixed operation lists for the documented extensions and the peek, pop and reset
+        // helpers, each outcome derived by hand
+
+        const SOURCE: EndpointAddress = EndpointAddress::raw(1);
+        /// a segment that leaves no fragment waiting and discards nothing
+        const INCOMPLETE: Outcome = Outcome::Assembled(false, Vec::new());
+        /// a segment that completes a fragment and discards nothing
+        const COMPLETE: Outcome = Outcome::Assembled(true, Vec::new());
+        const POPPED_NOTHING: Outcome = Outcome::Popped(None);
+
+        fn first(seq: u8, data: &[u8]) -> Op {
+            seg(info(), true, false, seq, data)
+        }
+
+        fn middle(seq: u8, data: &[u8]) -> Op {
+            seg(info(), false, false, seq, data)
+        }
+
+        fn last(seq: u8, data: &[u8]) -> Op {
+            seg(info(), false, true, seq, data)
+        }
+
+        fn single(seq: u8, data: &[u8]) -> Op {
+            seg(info(), true, true, seq, data)
+        }
+
+        /// a segment that completes nothing and is discarded, or discards the series
+        fn discarded(reason: Discard) -> Outcome {
+            Outcome::Assembled(false, vec![reason])
+        }
+
+        fn no_series() -> Outcome {
+            discarded(Discard::NoSeries { source: SOURCE })
+        }
+
+        fn new_series(len: usize) -> Discard {
+            Discard::NewSeries {
+                len,
+                source: SOURCE,
+            }
+        }
+
+        fn conflict(received: FrameInfo) -> Outcome {
+            discarded(Discard::ConflictingAddress {
+                previous: info(),
+                received,
+            })
+        }
+
+        fn broadcast_series(fir: bool, fin: bool) -> Discard {
+            Discard::BroadcastSeries { fir, fin }
+        }
+
+        fn unexpected(expected: u8, received: u8) -> Outcome {
+            discarded(Discard::UnexpectedSeq { expected, received })
+        }
+
+        fn popped(info: FrameInfo, data: &[u8]) -> Outcome {
+            Outcome::Popped(completed(info, data))
+        }
+
+        fn udp() -> FrameInfo {
+            let mut udp = info();
+            udp.phys_addr = PhysAddr::Udp("127.0.0.1:20000".parse().unwrap());
+            udp
+        }
+
+        #[test]
+        fn repeated_final_segment_after_the_fragment_is_taken_is_discarded() {
+            follows(&[
+                (first(0, &[1]), INCOMPLETE),
+                (last(1, &[2]), COMPLETE),
+                (Op::Pop, popped(info(), &[1, 2])),
+                (last(1, &[2]), no_series()),
+                (Op::Pop, POPPED_NOTHING),
+            ]);
+        }
+
+        #[test]
+        fn repeated_single_segment_is_passed_up_again() {
+            follows(&[
+                (single(0, &[1]), COMPLETE),
+                (Op::Pop, popped(info(), &[1])),
+                (single(0, &[1]), COMPLETE),
+                (Op::Pop, popped(info(), &[1])),
+            ]);
+        }
+
+        #[test]
+        fn segment_from_another_source_abandons_the_series() {
+            follows(&[
+                (first(0, &[1]), INCOMPLETE),
+                (seg(from(2), false, true, 1, &[2]), conflict(from(2))),
+                (last(1, &[2]), no_series()),
+                (Op::Pop, POPPED_NOTHING),
+                (single(2, &[0xEE]), COMPLETE),
+                (Op::Pop, popped(info(), &[0xEE])),
+            ]);
+        }
+
+        #[test]
+        fn identical_repeat_from_another_source_abandons_the_series() {
+            follows(&[
+                (first(0, &[1]), INCOMPLETE),
+                (middle(1, &[2]), INCOMPLETE),
+                (seg(from(2), false, false, 1, &[2]), conflict(from(2))),
+                (last(2, &[3]), no_series()),
+                (Op::Pop, POPPED_NOTHING),
+            ]);
+        }
+
+        #[test]
+        fn segment_from_another_physical_address_abandons_the_series() {
+            follows(&[
+                (first(0, &[1]), INCOMPLETE),
+                (seg(udp(), false, true, 1, &[2]), conflict(udp())),
+                (last(1, &[3]), no_series()),
+                (Op::Pop, POPPED_NOTHING),
+            ]);
+        }
+
+        #[test]
+        fn first_segment_from_another_source_starts_a_new_series() {
+            follows(&[
+                (first(0, &[1]), INCOMPLETE),
+                (seg(from(2), true, false, 7, &[2]), discarded(new_series(1))),
+                (seg(from(2), false, true, 8, &[3]), COMPLETE),
+                (Op::Pop, popped(from(2), &[2, 3])),
+            ]);
+        }
+
+        #[test]
+        fn broadcast_single_segment_is_passed_up_with_its_mode() {
+            follows(&[
+                (seg(broadcast(), true, true, 0, &[1]), COMPLETE),
+                (Op::Pop, popped(broadcast(), &[1])),
+            ]);
+        }
+
+        #[test]
+        fn broadcast_series_is_ignored() {
+            let fir_only = broadcast_series(true, false);
+            let fin_only = broadcast_series(false, true);
+            follows(&[
+                (seg(broadcast(), true, false, 0, &[1]), discarded(fir_only)),
+                (seg(broadcast(), false, true, 1, &[2]), discarded(fin_only)),
+                (Op::Pop, POPPED_NOTHING),
+                (single(2, &[0xEE]), COMPLETE),
+                (Op::Pop, popped(info(), &[0xEE])),
+            ]);
+        }
+
+        #[test]
+        fn broadcast_first_segment_abandons_a_series_in_progress() {
+            let fir_only = broadcast_series(true, false);
+            follows(&[
+                (first(0, &[1]), INCOMPLETE),
+                (
+                    seg(broadcast(), true, false, 5, &[9]),
+                    Outcome::Assembled(false, vec![new_series(1), fir_only]),
+                ),
+                (last(1, &[2]), no_series()),
+                (Op::Pop, POPPED_NOTHING),
+            ]);
+        }
+
+        #[test]
+        fn broadcast_continuation_leaves_a_series_in_progress() {
+            let fin_only = broadcast_series(false, true);
+            follows(&[
+                (first(0, &[1]), INCOMPLETE),
+                (seg(broadcast(), false, true, 1, &[9]), discarded(fin_only)),
+                (last(1, &[2]), COMPLETE),
+                (Op::Pop, popped(info(), &[1, 2])),
+            ]);
+        }
+
+        #[test]
+        fn broadcast_single_segment_replaces_a_series_in_progress() {
+            follows(&[
+                (first(0, &[1]), INCOMPLETE),
+                (
+                    seg(broadcast(), true, true, 5, &[9]),
+                    Outcome::Assembled(true, vec![new_series(1)]),
+                ),
+                (Op::Pop, popped(broadcast(), &[9])),
+                (last(1, &[2]), no_series()),
+            ]);
+        }
+
+        #[test]
+        fn peek_leaves_the_fragment_and_pop_takes_it_once() {
+            follows(&[
+                (single(0, &[1]), COMPLETE),
+                (Op::Peek, Outcome::Peeked(completed(info(), &[1]))),
+                (Op::Peek, Outcome::Peeked(completed(info(), &[1]))),
+                (Op::Pop, popped(info(), &[1])),
+                (Op::Peek, Outcome::Peeked(None)),
+                (Op::Pop, POPPED_NOTHING),
+            ]);
+        }
+
+        #[test]
+        fn reset_discards_a_series_in_progress() {
+            follows(&[
+                (first(0, &[1]), INCOMPLETE),
+                (Op::Reset, Outcome::Reset),
+                (last(1, &[2]), no_series()),
+                (Op::Pop, POPPED_NOTHING),
+                (single(2, &[0xEE]), COMPLETE),
+                (Op::Pop, popped(info(), &[0xEE])),
+            ]);
+        }
+
+        #[test]
+        fn new_series_reports_the_bytes_it_drops() {
+            follows(&[
+                (first(0, &[1, 2]), INCOMPLETE),
+                (middle(1, &[3]), INCOMPLETE),
+                (first(5, &[4]), discarded(new_series(3))),
+                (last(6, &[5]), COMPLETE),
+                (Op::Pop, popped(info(), &[4, 5])),
+            ]);
+        }
+
+        #[test]
+        fn new_series_reports_an_empty_series_it_drops() {
+            follows(&[
+                (first(0, &[]), INCOMPLETE),
+                (first(1, &[1]), discarded(new_series(0))),
+            ]);
+        }
+
+        #[test]
+        fn segments_are_ignored_while_a_fragment_waits_to_be_taken() {
+            let pending = || Outcome::Assembled(true, vec![Discard::Pending]);
+            follows(&[
+                (single(0, &[1, 2]), COMPLETE),
+                (first(1, &[3]), pending()),
+                (single(2, &[4]), pending()),
+                (middle(3, &[5]), pending()),
+                (last(4, &[6]), pending()),
+                (first(5, &[7; MAX + 1]), pending()),
+                (seg(broadcast(), true, true, 6, &[8]), pending()),
+                (seg(broadcast(), false, true, 7, &[9]), pending()),
+                (Op::Pop, popped(info(), &[1, 2])),
+                (single(8, &[0xEE]), COMPLETE),
+                (Op::Pop, popped(info(), &[0xEE])),
+            ]);
+        }
+
+        #[test]
+        fn series_after_a_taken_fragment_starts_empty() {
+            follows(&[
+                (single(0, &[1; MAX]), COMPLETE),
+                (Op::Pop, popped(info(), &[1; MAX])),
+                (first(1, &[2; MAX - 1]), INCOMPLETE),
+                (last(2, &[3]), COMPLETE),
+                (Op::Pop, popped(info(), &[2, 2, 2, 2, 2, 2, 2, 3])),
+            ]);
+        }
+
+        #[test]
+        fn series_after_a_reset_starts_empty() {
+            follows(&[
+                (first(0, &[1; MAX - 1]), INCOMPLETE),
+                (Op::Reset, Outcome::Reset),
+                (first(1, &[2; MAX - 1]), INCOMPLETE),
+                (last(2, &[3]), COMPLETE),
+                (Op::Pop, popped(info(), &[2, 2, 2, 2, 2, 2, 2, 3])),
+            ]);
+        }
+
+        #[test]
+        fn reset_after_a_completed_fragment_recovers() {
+            follows(&[
+                (single(0, &[1; MAX]), COMPLETE),
+                (Op::Reset, Outcome::Reset),
+                (Op::Peek, Outcome::Peeked(None)),
+                (Op::Pop, POPPED_NOTHING),
+                (single(1, &[0xEE]), COMPLETE),
+                (Op::Pop, popped(info(), &[0xEE])),
+            ]);
+        }
+
+        #[test]
+        fn series_after_an_abandoned_series_starts_empty() {
+            follows(&[
+                (first(0, &[1; MAX - 1]), INCOMPLETE),
+                (middle(2, &[2]), unexpected(1, 2)),
+                (first(3, &[3; MAX]), INCOMPLETE),
+                (last(4, &[]), COMPLETE),
+                (Op::Pop, popped(info(), &[3; MAX])),
+            ]);
+        }
+
+        #[test]
+        fn segment_discards_report_their_reasons() {
+            let fir_only = broadcast_series(true, false);
+            follows(&[
+                (first(0, &[1]), INCOMPLETE),
+                (middle(1, &[2, 3]), INCOMPLETE),
+                (middle(1, &[2, 3]), discarded(Discard::Repeat { seq: 1 })),
+                (
+                    middle(1, &[2, 4]),
+                    discarded(Discard::DifferentRepeat { seq: 1 }),
+                ),
+                (first(10, &[1]), INCOMPLETE),
+                (middle(12, &[2]), unexpected(11, 12)),
+                (first(20, &[1; MAX - 1]), INCOMPLETE),
+                (middle(21, &[2, 3]), discarded(Discard::Overflow { len: 2 })),
+                (first(30, &[1]), INCOMPLETE),
+                (seg(from(2), false, true, 31, &[2]), conflict(from(2))),
+                (seg(broadcast(), true, false, 40, &[1]), discarded(fir_only)),
+                (single(41, &[0xEE]), COMPLETE),
+                (Op::Pop, popped(info(), &[0xEE])),
+            ]);
+        }
+
+        #[test]
+        fn repeat_of_the_first_segment_without_fir_abandons_the_series() {
+            follows(&[
+                (first(0, &[1]), INCOMPLETE),
+                (
+                    middle(0, &[1]),
+                    discarded(Discard::DifferentRepeat { seq: 0 }),
+                ),
+                (last(1, &[2]), no_series()),
+                (Op::Pop, POPPED_NOTHING),
+            ]);
         }
 
         proptest! {
