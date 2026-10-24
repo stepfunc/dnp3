@@ -41,5 +41,6 @@
     <modules>
         <module>dnp3</module>
         <module>examples</module>
+        <module>dnp3-tests</module>
     </modules>
 </project>
