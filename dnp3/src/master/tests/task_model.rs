@@ -20,9 +20,10 @@
 //!
 //! Not covered: time synchronization and directory reads, which take several requests. Several
 //! outcomes are reached in only part of the runs, such as a select-before-operate that succeeds,
-//! unsolicited duplicates, and a fragment that breaks both a FIR rule and the FIN and CON rule.
-//! So the per-kind tables in `outcomes.rs` and the duplicate pins in `unsolicited.rs` stay, and a
-//! fixed case below pins which of the two broken rules a read reports.
+//! unsolicited duplicates, a read fragment that breaks both a FIR rule and the FIN and CON rule,
+//! and a response that is both rejected and malformed. So the per-kind tables in `outcomes.rs`
+//! and the duplicate pins in `unsolicited.rs` stay, and fixed cases below pin which of the two
+//! broken rules a read reports and that a rejection wins over malformed objects.
 //!
 //! Every input is followed by a wait on the paused clock, which lets the master process it. Waits
 //! are multiples of [`TICK`] and the response timeout isn't, so no input arrives at the instant a
@@ -1378,6 +1379,48 @@ fn a_read_fragment_breaking_a_fir_rule_and_the_fin_con_rule_fails_for_the_fir_ru
     // failing it for the FIN and CON rule instead
     run.observed[1].info = vec![failed(TaskError::NonFinWithoutCon)];
     run.reply = ReplyObs::Done(Reply::Read(Err(TaskError::NonFinWithoutCon)), TICK);
+    run.check().unwrap_err();
+}
+
+#[test]
+fn a_rejected_response_with_malformed_objects_fails_as_rejected() {
+    let task = Task::User(Kind::ColdRestart);
+    // the response reports an unknown object, and its objects don't parse
+    let response = Step {
+        input: Input::Answer(Answer {
+            source: Source::Outstation,
+            seq: SeqChoice::Expected,
+            fir: Fir::Proper,
+            fin: true,
+            con: false,
+            restart: false,
+            iin2: 0x02,
+            objects: Objects::Malformed,
+        }),
+        wait: TICK,
+    };
+    let mut run = run_paused(execute(task, &[response]));
+    run.check().unwrap();
+
+    let rejected = TaskError::RejectedByIin2(Iin::new(Iin1::new(0), Iin2::new(0x02)));
+    let failed = |err| AssocInfoEvent::TaskFailure(TaskType::Restart, err);
+    assert_eq!(
+        run.observed[1],
+        StepObs {
+            reads: 1,
+            info: vec![failed(rejected)],
+            ..StepObs::default()
+        }
+    );
+    assert_eq!(
+        run.reply,
+        ReplyObs::Done(Reply::Restart(Err(rejected)), TICK)
+    );
+
+    // failing it for the malformed objects instead
+    let malformed = TaskError::MalformedResponse(ObjectParseError::InsufficientBytes);
+    run.observed[1].info = vec![failed(malformed)];
+    run.reply = ReplyObs::Done(Reply::Restart(Err(malformed)), TICK);
     run.check().unwrap_err();
 }
 
