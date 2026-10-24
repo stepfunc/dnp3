@@ -23,12 +23,6 @@ use crate::util::test_support::watchdog;
 
 use super::harness::*;
 
-const MODES: [BroadcastConfirmMode; 3] = [
-    BroadcastConfirmMode::NotRequired,
-    BroadcastConfirmMode::Optional,
-    BroadcastConfirmMode::Mandatory,
-];
-
 const fn unknown_function(seq: u8) -> [u8; 2] {
     [0xC0 | seq, 0x70]
 }
@@ -282,72 +276,7 @@ async fn repeated_non_read_in_the_solicited_confirm_wait_ends_it_and_waits_again
 }
 
 // ---------- broadcasts ----------
-
-#[tokio::test]
-async fn broadcast_in_the_solicited_confirm_wait_ends_it_and_sets_the_broadcast_iin() {
-    for mode in MODES {
-        let mut harness = new_harness(get_default_config());
-        enter_solicited_confirm_wait(&mut harness).await;
-
-        broadcast(&mut harness, mode, 1).await;
-        harness.expect_no_response();
-        harness.check_events(&[Event::SolicitedConfirmWaitNewRequest, BROADCAST_PROCESSED]);
-
-        // the unconfirmed event is pending again
-        let iin1 = iin1::RESTART | iin1::BROADCAST | iin1::CLASS_1;
-        if mode == BroadcastConfirmMode::Mandatory {
-            harness
-                .test_request_response(&record_current_time(2), &solicited(2, true, iin1, 0))
-                .await;
-            harness.check_events(&[Event::EnterSolicitedConfirmWait(2)]);
-            harness.send_and_process(&confirm(2)).await;
-            harness.check_events(&[
-                Event::SolicitedConfirmReceived(2),
-                Event::BeginConfirm,
-                Event::EndConfirm(class_1_binaries(1)),
-            ]);
-        } else {
-            harness
-                .test_request_response(&record_current_time(2), &solicited(2, false, iin1, 0))
-                .await;
-            harness.check_no_events();
-        }
-
-        probe(&mut harness, 3, iin1::RESTART | iin1::CLASS_1).await;
-    }
-}
-
-/// Table 6-1 row 24: a broadcast discards the deferred READ
-#[tokio::test]
-async fn broadcast_in_the_unsolicited_confirm_wait_discards_the_deferred_read() {
-    for mode in MODES {
-        let mut harness = new_harness(get_default_unsolicited_config());
-        enter_unsolicited_confirm_wait(&mut harness).await;
-
-        harness.send_and_process(&read_class_0(1)).await;
-        harness.expect_no_response();
-
-        broadcast(&mut harness, mode, 2).await;
-        harness.expect_no_response();
-        harness.check_events(&[BROADCAST_PROCESSED]);
-
-        harness.send_and_process(&unsolicited_confirm(0)).await;
-        harness.check_events(&[Event::UnsolicitedConfirmReceived(0)]);
-        harness.expect_no_response();
-
-        let con = mode == BroadcastConfirmMode::Mandatory;
-        harness
-            .test_request_response(
-                &record_current_time(3),
-                &solicited(3, con, iin1::RESTART | iin1::BROADCAST, 0),
-            )
-            .await;
-        if con {
-            harness.check_events(&[Event::EnterSolicitedConfirmWait(3)]);
-        }
-        harness.check_no_events();
-    }
-}
+// mandatory broadcasts reported by the requests the session property doesn't model
 
 #[tokio::test]
 async fn unknown_function_reply_in_idle_reports_a_mandatory_broadcast_without_waiting_for_its_confirm(
@@ -435,92 +364,6 @@ async fn malformed_request_in_the_unsolicited_confirm_wait_reports_a_mandatory_b
     probe(&mut harness, 2, iin1::RESTART).await;
 }
 
-/// a broadcast that doesn't require a confirm ends with the first response that reports it, even
-/// an unsolicited one
-#[tokio::test]
-async fn unsolicited_response_consumes_a_broadcast_that_does_not_require_a_confirm() {
-    for mode in [
-        BroadcastConfirmMode::NotRequired,
-        BroadcastConfirmMode::Optional,
-    ] {
-        let mut harness = new_harness(get_default_unsolicited_config());
-        confirm_null_unsolicited(&mut harness).await;
-        enable_unsolicited(&mut harness).await;
-
-        broadcast(&mut harness, mode, 1).await;
-        harness.check_events(&[BROADCAST_PROCESSED]);
-
-        harness.handle.database.transaction(add_binary_event);
-        let unsolicited = unsolicited(1, iin1::RESTART | iin1::BROADCAST, &g2v1_events(0..1));
-        harness.expect_response(&unsolicited).await;
-        harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
-
-        probe(&mut harness, 2, iin1::RESTART).await;
-    }
-}
-
-#[tokio::test(start_paused = true)]
-async fn unconfirmed_unsolicited_response_leaves_a_mandatory_broadcast_to_report() {
-    let mut config = get_default_unsolicited_config();
-    config.max_unsolicited_retries = Some(0);
-    let mut harness = new_harness(config);
-    confirm_null_unsolicited(&mut harness).await;
-    enable_unsolicited(&mut harness).await;
-
-    broadcast(&mut harness, BroadcastConfirmMode::Mandatory, 1).await;
-    harness.check_events(&[BROADCAST_PROCESSED]);
-
-    harness.handle.database.transaction(add_binary_event);
-    let unsolicited = unsolicited(1, iin1::RESTART | iin1::BROADCAST, &g2v1_events(0..1));
-    harness.expect_response(&unsolicited).await;
-    harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
-    harness
-        .wait_for_events(&[Event::UnsolicitedConfirmTimeout(1, false)])
-        .await;
-
-    harness
-        .test_request_response(
-            &record_current_time(2),
-            &solicited(2, true, iin1::RESTART | iin1::BROADCAST | iin1::CLASS_1, 0),
-        )
-        .await;
-    harness.check_events(&[Event::EnterSolicitedConfirmWait(2)]);
-    harness.send_and_process(&confirm(2)).await;
-    harness.check_events(&[
-        Event::SolicitedConfirmReceived(2),
-        Event::BeginConfirm,
-        Event::EndConfirm(class_1_binaries(1)),
-    ]);
-    probe(&mut harness, 3, iin1::RESTART | iin1::CLASS_1).await;
-}
-
-/// a deferred READ is answered as from idle, and its response reports a mandatory broadcast
-#[tokio::test]
-async fn deferred_read_reports_a_mandatory_broadcast_and_waits_for_its_confirm() {
-    let mut harness = new_harness(get_default_unsolicited_config());
-    enter_unsolicited_confirm_wait(&mut harness).await;
-
-    harness.send_and_process(&read_class_0(1)).await;
-    harness.expect_no_response();
-
-    // the READ was deferred before the broadcast
-    broadcast(&mut harness, BroadcastConfirmMode::Mandatory, 2).await;
-    harness.check_events(&[BROADCAST_PROCESSED]);
-    harness.send_and_process(&read_class_0(3)).await;
-    harness.expect_no_response();
-
-    harness.send_and_process(&unsolicited_confirm(0)).await;
-    harness
-        .expect_response(&solicited(3, true, iin1::RESTART | iin1::BROADCAST, 0))
-        .await;
-    harness.check_events(&[
-        Event::UnsolicitedConfirmReceived(0),
-        Event::EnterSolicitedConfirmWait(3),
-    ]);
-    confirm_solicited(&mut harness, 3).await;
-    probe(&mut harness, 4, iin1::RESTART).await;
-}
-
 // ---------- confirms ----------
 
 #[tokio::test]
@@ -584,102 +427,6 @@ async fn solicited_confirm_of_an_unknown_function_reply_in_the_unsolicited_confi
     harness.check_no_events();
 
     probe(&mut harness, 3, iin1::RESTART).await;
-}
-
-/// A solicited confirm in the unsolicited confirm wait, after the response's confirm timeout,
-/// doesn't clear the mandatory broadcast it reported (Table 6-1 row 30)
-#[tokio::test(start_paused = true)]
-async fn late_solicited_confirm_in_the_unsolicited_confirm_wait_does_not_clear_a_reported_broadcast(
-) {
-    let mut harness = new_harness(get_default_unsolicited_config());
-    confirm_null_unsolicited(&mut harness).await;
-    enable_unsolicited(&mut harness).await;
-
-    harness.handle.database.transaction(add_binary_event);
-    let unsolicited = unsolicited(1, iin1::RESTART, &g2v1_events(0..1));
-    harness.expect_response(&unsolicited).await;
-    harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
-
-    broadcast(&mut harness, BroadcastConfirmMode::Mandatory, 1).await;
-    harness.check_events(&[BROADCAST_PROCESSED]);
-    harness
-        .test_request_response(
-            &record_current_time(2),
-            &solicited(2, true, iin1::RESTART | iin1::BROADCAST, 0),
-        )
-        .await;
-
-    // the unsolicited response is retried, still in the same wait
-    harness.expect_response(&unsolicited).await;
-    harness.check_events(&[Event::UnsolicitedConfirmTimeout(1, true)]);
-    tokio::time::advance(Duration::from_secs(1)).await;
-
-    harness.send_and_process(&confirm(2)).await;
-    harness.expect_no_response();
-    harness.check_no_events();
-
-    harness.send_and_process(&unsolicited_confirm(1)).await;
-    harness.check_events(&[
-        Event::UnsolicitedConfirmReceived(1),
-        Event::BeginConfirm,
-        Event::Cleared(0),
-        Event::EndConfirm(empty_buffer_state()),
-    ]);
-
-    harness
-        .test_request_response(
-            &record_current_time(3),
-            &solicited(3, true, iin1::RESTART | iin1::BROADCAST, 0),
-        )
-        .await;
-    harness.check_events(&[Event::EnterSolicitedConfirmWait(3)]);
-    confirm_solicited(&mut harness, 3).await;
-    probe(&mut harness, 4, iin1::RESTART).await;
-}
-
-/// A solicited response asks for a confirm and its wait times out; a solicited confirm in the
-/// unsolicited confirm wait that follows doesn't clear the mandatory broadcast
-#[tokio::test(start_paused = true)]
-async fn solicited_confirm_in_the_unsolicited_confirm_wait_does_not_clear_a_broadcast_reported_before_it(
-) {
-    let mut harness = new_harness(get_default_unsolicited_config());
-    confirm_null_unsolicited(&mut harness).await;
-    enable_unsolicited(&mut harness).await;
-
-    broadcast(&mut harness, BroadcastConfirmMode::Mandatory, 1).await;
-    harness.check_events(&[BROADCAST_PROCESSED]);
-    harness
-        .test_request_response(
-            &record_current_time(2),
-            &solicited(2, true, iin1::RESTART | iin1::BROADCAST, 0),
-        )
-        .await;
-    harness.check_events(&[Event::EnterSolicitedConfirmWait(2)]);
-    harness
-        .wait_for_events(&[Event::SolicitedConfirmTimeout(2)])
-        .await;
-
-    harness.handle.database.transaction(add_binary_event);
-    let unsolicited = unsolicited(1, iin1::RESTART | iin1::BROADCAST, &g2v1_events(0..1));
-    harness.expect_response(&unsolicited).await;
-    harness.check_events(&[Event::EnterUnsolicitedConfirmWait(1)]);
-
-    harness.send_and_process(&confirm(2)).await;
-    harness.expect_no_response();
-    harness.check_no_events();
-
-    // still reported, and the confirm of the response that reports it now clears it
-    harness
-        .test_request_response(
-            &record_current_time(3),
-            &solicited(3, true, iin1::RESTART | iin1::BROADCAST, 0),
-        )
-        .await;
-    harness.send_and_process(&confirm(3)).await;
-    harness.expect_no_response();
-    harness.check_no_events();
-
-    probe(&mut harness, 4, iin1::RESTART).await;
 }
 
 // ---------- SELECT and OPERATE ----------
