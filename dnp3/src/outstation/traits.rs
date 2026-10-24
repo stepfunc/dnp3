@@ -9,8 +9,9 @@ use crate::app::variations::Group50Var2;
 use crate::app::RequestHeader;
 use crate::app::Sequence;
 use crate::app::{control::*, Timestamp};
-use crate::app::{FunctionCode, MaybeAsync};
+use crate::app::{FunctionCode, Iin, Iin1, Iin2, MaybeAsync};
 use crate::outstation::database::DatabaseHandle;
+use std::ops::{BitOr, BitOrAssign};
 
 /// Application-controlled IIN bits
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Default)]
@@ -41,6 +42,45 @@ pub enum RequestError {
     ParameterError,
     /// outstation does not support this operation for the requested object (IIN2.1 OBJECT_UNKNOWN)
     NotSupported,
+}
+
+impl BitOr<ApplicationIin> for Iin {
+    type Output = Self;
+
+    fn bitor(mut self, rhs: ApplicationIin) -> Self::Output {
+        if rhs.need_time {
+            self |= Iin1::NEED_TIME;
+        }
+
+        if rhs.local_control {
+            self |= Iin1::LOCAL_CONTROL;
+        }
+
+        if rhs.device_trouble {
+            self |= Iin1::DEVICE_TROUBLE;
+        }
+
+        if rhs.config_corrupt {
+            self |= Iin2::CONFIG_CORRUPT;
+        }
+
+        self
+    }
+}
+
+impl BitOrAssign<ApplicationIin> for Iin {
+    fn bitor_assign(&mut self, rhs: ApplicationIin) {
+        *self = *self | rhs;
+    }
+}
+
+impl From<RequestError> for Iin2 {
+    fn from(from: RequestError) -> Self {
+        match from {
+            RequestError::ParameterError => Iin2::PARAMETER_ERROR,
+            RequestError::NotSupported => Iin2::OBJECT_UNKNOWN,
+        }
+    }
 }
 
 /// Outstation connection state for connection-oriented transports, e.g. TCP
