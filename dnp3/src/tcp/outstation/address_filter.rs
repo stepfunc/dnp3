@@ -280,11 +280,12 @@ mod test {
     /// - `filters_conflict_when_an_address_matches_both`: `conflicts_with` is true, in both orders,
     ///   exactly when a search of the universe with the model finds an address both filters match.
     ///
-    /// Filters of every kind are generated, AnyOf with up to three addresses and wildcards fixing
-    /// octets from 0 to 2. Half the conflict pairs are a filter and one naming its addresses in
-    /// their other form (native IPv4 and IPv4-mapped swap; a wildcard becomes an IPv4-mapped
-    /// address it matches), plus up to two other addresses, so filters that overlap only through
-    /// the two forms of an address are common for every kind.
+    /// Filters of every kind are generated, AnyOf with up to three addresses (up to five in a
+    /// restated filter) and wildcards fixing octets from 0 to 2. Half the conflict pairs are a
+    /// filter and one naming its addresses in their other form (native IPv4 and IPv4-mapped swap;
+    /// a wildcard becomes an IPv4-mapped address it matches; Any becomes an AnyOf of the other
+    /// addresses), plus up to two other addresses, so filters that overlap only through the two
+    /// forms of an address are common for Exact, AnyOf and wildcard filters.
     ///
     /// Known gaps: the universe stands in for all addresses, so octets above 3 and other IPv6
     /// addresses are not drawn, and the IPv4-compatible and IPv4-translated forms (which are not
