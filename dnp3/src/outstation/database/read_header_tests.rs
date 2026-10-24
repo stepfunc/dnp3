@@ -139,6 +139,36 @@ fn read(objects: &[u8]) -> Outcome {
     Outcome::Read(iin2, cursor.written().to_vec())
 }
 
+#[test]
+fn new_read_discards_attributes_left_by_an_unfinished_response() {
+    let mut handle = DatabaseHandle::new(
+        OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS,
+        ClassZeroConfig::default(),
+        EventBufferConfig::all_types(10),
+    );
+    handle.transaction(setup);
+    let headers =
+        HeaderCollection::parse(ParseOptions::default(), FunctionCode::Read, &[0, 254, 6]).unwrap();
+    assert_eq!(handle.select(&headers), NONE);
+
+    // Only the serial-number attribute fits; the private-set attribute remains selected.
+    let mut buffer = [0; 8];
+    let mut cursor = WriteCursor::new(&mut buffer);
+    let info = handle.write_response_headers(&mut cursor);
+    assert!(!info.complete);
+    assert!(!info.has_events);
+    assert_eq!(cursor.written(), [0, 248, 0, 0, 0, 1, 1, b'S']);
+
+    let headers =
+        HeaderCollection::parse(ParseOptions::default(), FunctionCode::Read, &[]).unwrap();
+    assert_eq!(handle.select(&headers), NONE);
+    let mut cursor = WriteCursor::new(&mut buffer);
+    let info = handle.write_response_headers(&mut cursor);
+    assert!(info.complete);
+    assert!(!info.has_events);
+    assert!(cursor.written().is_empty());
+}
+
 fn variation(group: u8, var: u8) -> Variation {
     Variation::parse(&mut ReadCursor::new(&[group, var])).unwrap()
 }
