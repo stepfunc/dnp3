@@ -144,6 +144,14 @@ where
 
 #[cfg(test)]
 mod tests {
+    //! Property: a ranged sequence of u16 values over 1 to 32 indices (half of them near the top of
+    //! the index space), followed by 0 to 3 trailing bytes, reads exactly its objects, yields each
+    //! value with its index and an exact size hint, stays exhausted, and fails one byte short. The
+    //! test encodes the values and their indices itself, independently of the parser. Ranges
+    //! with the start after the stop aren't generated; `header_identity_tests` rejects them for
+    //! every variation. The examples fix a start of 0, which the generator rarely draws, the last
+    //! index, and trailing bytes.
+
     use super::*;
 
     use proptest::prelude::*;
@@ -172,24 +180,8 @@ mod tests {
         check((10, 12), &[1, 2, 3], &[0xFF]);
         // ends at the last index without wrapping
         check((65534, 65535), &[1, 2], &[]);
-        // two objects, rejected one byte short
+        // two objects from index 0, with the size hint counting down, rejected one byte short
         check((0, 1), &[1, 2], &[]);
-    }
-
-    #[test]
-    fn size_hint_counts_down_and_iterator_stays_exhausted() {
-        let data = [0x01, 0x00, 0x02, 0x00];
-        let mut cursor = ReadCursor::new(&data);
-        let seq = RangedSequence::<u16>::parse(Range::from(0, 1).unwrap(), &mut cursor).unwrap();
-        let mut iter = seq.iter();
-        assert_eq!(iter.size_hint(), (2, Some(2)));
-        assert_eq!(iter.next(), Some((1, 0)));
-        assert_eq!(iter.size_hint(), (1, Some(1)));
-        assert_eq!(iter.next(), Some((2, 1)));
-        assert_eq!(iter.size_hint(), (0, Some(0)));
-        assert_eq!(iter.next(), None);
-        assert_eq!(iter.next(), None);
-        assert_eq!(iter.size_hint(), (0, Some(0)));
     }
 
     proptest! {
