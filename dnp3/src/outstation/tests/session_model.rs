@@ -45,6 +45,32 @@
 //! test sleeps, which lets the paused clock fire the outstation's timers on the way, in order.
 //! After each input the test takes every response and callback, so the model accepts no more than
 //! it expects, and checks that the clock agrees with the model's.
+//!
+//! The oracle is independent of the outstation: the model decodes the events in each response
+//! itself, and builds every header, IIN bit and callback it expects from its own state. Some
+//! request bytes, the confirms and some response headers come from the harness builders, which are
+//! test code.
+//!
+//! The inputs are counter and analog events at four points each, READs of classes and types with
+//! and without limits, DELAY_MEASURE, CLEAR_RESTART (a WRITE of IIN1.7), ENABLE and
+//! DISABLE_UNSOLICITED, requests with the last request's sequence number, exact repeats, confirms
+//! (the one awaited, another sequence number, the other kind), clock advances to, just before and
+//! just past the next deadline, and new connections. The setup varies the confirm timeout, the
+//! retry delay and limit, the buffer limits and the fragment sizes. Besides single inputs, runs of
+//! them reach cases that single inputs rarely do:
+//! - a new request or a repeat in the solicited confirm wait, while an unsolicited response is due
+//!   (Table 6-1 rows 15 and 18);
+//! - a repeat of a later fragment of a series, and of a middle one;
+//! - a repeated READ that restarts the solicited confirm wait, then a step that ends at or past the
+//!   deadline the READ set, where a wait that wasn't restarted would end, and before the one the
+//!   repeat set, and the timeout at the latter;
+//! - the timeout of an unsolicited confirm wait after a DISABLE_UNSOLICITED, and the next series
+//!   after the retry delay.
+//!
+//! Not modelled: broadcast requests and IIN1.0, controls and select-before-operate, malformed and
+//! unknown-function requests, class 0 and static data, other event types and variations, and link
+//! status requests (keep-alive is off). The fixed op lists below pin wire bytes and callback order
+//! for cases the property reaches, and each also stands alone as a deterministic test.
 
 #![expect(
     clippy::arithmetic_side_effects,
@@ -1227,8 +1253,11 @@ fn repeat_of_a_later_fragment() -> impl Strategy<Value = Vec<Op>> {
     })
 }
 
-/// A READ, a wait shorter than the confirm timeout, a repeat of the READ and a wait to the next
-/// deadline: the timeout of the solicited confirm wait the repeat restarted
+/// A READ, a wait shorter than the confirm timeout, a repeat of the READ, then waits to 1 ms before
+/// the next deadline and to it. When the repeat restarts the READ's solicited confirm wait after
+/// some time has passed, the first of those waits reaches or passes the deadline the READ set,
+/// where a wait that wasn't restarted would end, and the second ends the wait at the deadline the
+/// repeat set
 fn timeout_of_a_restarted_wait() -> impl Strategy<Value = Vec<Op>> {
     let advance = prop_oneof![
         Just(AdvanceChoice::BeforeDeadline),
@@ -1239,6 +1268,7 @@ fn timeout_of_a_restarted_wait() -> impl Strategy<Value = Vec<Op>> {
             read,
             Op::Advance(advance),
             Op::Repeat,
+            Op::Advance(AdvanceChoice::BeforeDeadline),
             Op::Advance(AdvanceChoice::AtDeadline),
         ]
     })
