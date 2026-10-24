@@ -752,6 +752,15 @@ mod tests {
         assert!(!infinite.exceeded(f64::INFINITY, 1.0));
     }
 
+    #[test]
+    fn float_deadband_treats_signed_zeros_as_the_same_value() {
+        for deadband in [0.0, -0.0, 1.0] {
+            let deadband = Deadband::analog(deadband).unwrap();
+            assert!(!deadband.exceeded(0.0, -0.0));
+            assert!(!deadband.exceeded(-0.0, 0.0));
+        }
+    }
+
     /// Deadband laws. The float deadband is symmetric, never exceeded by the same value, never
     /// exceeded by a larger deadband when a smaller one isn't, and exact at its limits: a zero
     /// deadband reports every change of value, an infinite one only a change to or from NaN, and
@@ -770,9 +779,9 @@ mod tests {
     /// and large deadbands alike.
     ///
     /// Known gaps: special float pairs come from drawing two special values, so a NaN and an
-    /// infinity, or opposite infinities, aren't drawn in every run;
-    /// `float_deadband_treats_nan_as_a_value` pins both. A change between 0.0 and -0.0 isn't
-    /// drawn in every run either, and no example pins it.
+    /// infinity, opposite infinities, or 0.0 and -0.0 aren't drawn in every run;
+    /// `float_deadband_treats_nan_as_a_value` pins the first two and
+    /// `float_deadband_treats_signed_zeros_as_the_same_value` the last.
     mod deadband_properties {
         use super::*;
         use proptest::prelude::*;
