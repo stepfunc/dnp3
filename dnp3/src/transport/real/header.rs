@@ -39,3 +39,28 @@ impl Header {
         acc | self.seq.value()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn writes_fir_fin_and_sequence_as_on_the_wire() {
+        assert_eq!(Header::new(false, true, Sequence::new(5)).to_u8(), 0x45);
+        assert_eq!(Header::new(true, false, Sequence::new(63)).to_u8(), 0xBF);
+        assert_eq!(Header::new(true, true, Sequence::new(0)).to_u8(), 0xC0);
+        assert_eq!(Header::new(false, false, Sequence::new(42)).to_u8(), 0x2A);
+    }
+
+    #[test]
+    fn reads_fir_fin_and_sequence_as_on_the_wire() {
+        let fields = |x: u8| {
+            let header = Header::from_u8(x);
+            (header.fin, header.fir, header.seq.value())
+        };
+        assert_eq!(fields(0x85), (true, false, 5));
+        assert_eq!(fields(0x7F), (false, true, 63));
+        assert_eq!(fields(0xC0), (true, true, 0));
+        assert_eq!(fields(0x2A), (false, false, 42));
+    }
+}
