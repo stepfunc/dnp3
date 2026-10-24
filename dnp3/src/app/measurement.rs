@@ -1106,7 +1106,7 @@ mod tests {
         }
 
         proptest! {
-            #![proptest_config(ProptestConfig::with_cases(1024))]
+            #![proptest_config(crate::util::test_support::proptest_config(1024))]
 
             #[test]
             fn analog_conversions_match_the_model(value in analog_model::value(), flags in any::<u8>()) {

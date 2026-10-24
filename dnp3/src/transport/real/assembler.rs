@@ -1527,7 +1527,7 @@ mod tests {
         }
 
         proptest! {
-            #![proptest_config(ProptestConfig::with_cases(128))]
+            #![proptest_config(crate::util::test_support::proptest_config(128))]
 
             #[test]
             fn assembler_follows_the_model(plans in prop::collection::vec(plan(), 1..=8)) {

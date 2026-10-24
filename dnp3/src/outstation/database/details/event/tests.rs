@@ -1028,6 +1028,8 @@ fn config() -> impl Strategy<Value = EventBufferConfig> {
 }
 
 proptest! {
+    #![proptest_config(crate::util::test_support::proptest_config(256))]
+
     #[test]
     fn behaves_like_a_list_with_per_type_limits(
         config in config(),

@@ -1456,7 +1456,7 @@ async fn check_model(setup: Setup, ops: Vec<Op>) {
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(128))]
+    #![proptest_config(crate::util::test_support::proptest_config(128))]
 
     #[test]
     fn session_follows_the_event_and_confirm_model(

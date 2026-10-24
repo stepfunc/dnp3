@@ -646,7 +646,7 @@ mod reply_tests {
         }
 
         proptest! {
-            #![proptest_config(ProptestConfig::with_cases(256))]
+            #![proptest_config(crate::util::test_support::proptest_config(256))]
 
             /// Writing a reply to a stream that takes it in arbitrary parts, with each call
             /// cancelled after an arbitrary number of polls, sends every byte once and in order,
@@ -741,7 +741,7 @@ mod reply_tests {
         }
 
         proptest! {
-            #![proptest_config(ProptestConfig::with_cases(128))]
+            #![proptest_config(crate::util::test_support::proptest_config(128))]
 
             /// However often finishing a reply to a stream with little room is cancelled, a
             /// following write sends the rest of the reply before its own data

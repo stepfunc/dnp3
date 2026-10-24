@@ -391,7 +391,7 @@ mod test {
         }
 
         proptest! {
-            #![proptest_config(ProptestConfig::with_cases(256))]
+            #![proptest_config(crate::util::test_support::proptest_config(256))]
 
             #[test]
             fn a_filter_matches_the_canonical_addresses_it_names(filter in filter()) {

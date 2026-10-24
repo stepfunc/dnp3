@@ -126,7 +126,7 @@ mod tests {
     }
 
     proptest! {
-        #![proptest_config(ProptestConfig::with_cases(256))]
+        #![proptest_config(crate::util::test_support::proptest_config(256))]
 
         /// A count sequence reads exactly its objects and yields each once, then stays
         /// exhausted; one byte less is an error

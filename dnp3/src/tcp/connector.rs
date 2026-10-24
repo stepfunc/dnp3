@@ -364,7 +364,7 @@ mod tests {
         }
 
         proptest! {
-            #![proptest_config(ProptestConfig::with_cases(256))]
+            #![proptest_config(crate::util::test_support::proptest_config(256))]
 
             #[test]
             fn tries_endpoints_in_order_and_backs_off_like_the_model(

@@ -191,7 +191,7 @@ mod tests {
     }
 
     proptest! {
-        #![proptest_config(ProptestConfig::with_cases(256))]
+        #![proptest_config(crate::util::test_support::proptest_config(256))]
 
         /// Packed bits and double bits are read from the least significant bits of each
         /// byte, in as many bytes as the values need

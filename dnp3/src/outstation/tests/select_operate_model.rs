@@ -939,7 +939,7 @@ async fn check_model(select_timeout_ms: u64, ops: Vec<Op>) {
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(128))]
+    #![proptest_config(crate::util::test_support::proptest_config(128))]
 
     #[test]
     fn select_and_operate_follow_table_4_9(

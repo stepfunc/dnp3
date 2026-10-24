@@ -721,6 +721,8 @@ mod tests {
         }
 
         proptest! {
+            #![proptest_config(crate::util::test_support::proptest_config(256))]
+
             #[test]
             fn behaves_like_a_bounded_queue(
                 capacity in 0usize..8,

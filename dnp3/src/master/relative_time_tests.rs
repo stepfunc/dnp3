@@ -375,7 +375,7 @@ fn spec() -> impl Strategy<Value = Spec> {
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(512))]
+    #![proptest_config(crate::util::test_support::proptest_config(512))]
 
     #[test]
     fn relative_time_follows_the_cto_model(specs in prop::collection::vec(spec(), 0..8)) {

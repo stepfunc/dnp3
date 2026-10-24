@@ -778,7 +778,7 @@ mod tests {
         }
 
         proptest! {
-            #![proptest_config(ProptestConfig::with_cases(128))]
+            #![proptest_config(crate::util::test_support::proptest_config(128))]
 
             #[test]
             fn reader_delivers_what_the_writer_wrote(case in case()) {

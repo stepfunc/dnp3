@@ -104,7 +104,7 @@ fn with_u16(bytes: &[u8], offset: usize, value: u16) -> Vec<u8> {
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(256))]
+    #![proptest_config(crate::util::test_support::proptest_config(256))]
 
     #[test]
     fn g70v2_round_trips_and_rejects_bad_encodings(

@@ -938,7 +938,7 @@ mod test {
         }
 
         proptest! {
-            #![proptest_config(ProptestConfig::with_cases(128))]
+            #![proptest_config(crate::util::test_support::proptest_config(128))]
 
             /// Delivery, replies and ignore reasons follow a model in which the peer whose reset
             /// was last accepted owns the secondary state and its FCB, and frames that fail any
