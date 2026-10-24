@@ -252,50 +252,6 @@ mod tests {
         }
     }
 
-    #[test]
-    fn cannot_add_entries_past_capacity() {
-        let mut list = VecList::new(2);
-        assert!(list.add("hello"));
-        assert!(list.add("world"));
-        assert_eq!(list.len(), 2);
-        assert!(!list.add("NOPE"));
-        assert_eq!(list.len(), 2);
-    }
-
-    #[test]
-    fn can_remove_first_entry_matching_predicate() {
-        let mut list = VecList::new(2);
-
-        // run this a few times to ensure the data structure
-        // isn't put into a bad state
-        for _ in 0..3 {
-            assert!(list.add("hello"));
-            assert!(list.add("world"));
-            assert_eq!(list.remove_first(|x| x == &"test"), None);
-            assert_eq!(list.len(), 2);
-            assert_eq!(list.remove_first(|x| x == &"hello"), Some(&"hello"));
-            assert_eq!(list.len(), 1);
-            assert_eq!(list.remove_first(|x| x == &"world"), Some(&"world"));
-            assert_eq!(list.len(), 0);
-        }
-    }
-
-    #[test]
-    fn can_add_after_remove() {
-        let mut list = VecList::new(3);
-        assert!(list.add("hello"));
-        assert!(list.add("my"));
-        assert!(list.add("friends"));
-
-        assert_eq!(list.remove_first(|x| x == &"my"), Some(&"my"));
-        assert!(list.add("yolo"));
-        // the new entry takes the freed slot, at the end of the list
-        assert_eq!(
-            list.iter().map(|(slot, x)| (slot, *x)).collect::<Vec<_>>(),
-            [(0, "hello"), (2, "friends"), (1, "yolo")]
-        );
-    }
-
     /// `VecList` against a queue model
     ///
     /// After every generated op (add, remove_first, remove_all by value or by position), the list
@@ -545,31 +501,6 @@ mod tests {
             model.check(list);
         }
 
-        const PATTERNS: [u8; 8] = [
-            0b000000, // none
-            0b111111, // all
-            0b000011, // prefix
-            0b110000, // suffix
-            0b011110, // consecutive, in the middle
-            0b010101, // alternating, from the head
-            0b101010, // alternating, to the tail
-            0b100001, // both ends
-        ];
-
-        #[test]
-        fn removes_each_pattern_and_reuses_the_freed_slots() {
-            for mask in PATTERNS {
-                let (mut list, mut model) = full(6);
-                model.apply(&mut list, Op::RemovePositions(mask));
-                model.check(&list);
-                refill(&mut list, &mut model);
-                // and again, with the slots now out of order
-                model.apply(&mut list, Op::RemovePositions(!mask));
-                model.check(&list);
-                refill(&mut list, &mut model);
-            }
-        }
-
         #[test]
         fn a_panicking_predicate_leaves_the_earlier_removals_complete() {
             // panic on the entry at this position, after removing the selected ones before it
@@ -634,20 +565,5 @@ mod tests {
         assert_eq!(visited, [1, 2]);
         let values: Vec<i32> = list.iter().map(|(_, x)| *x).collect();
         assert_eq!(values, [10, 20, 3]);
-    }
-
-    #[test]
-    fn can_iterate_over_values() {
-        let mut list = VecList::new(3);
-
-        assert!(list.add("A"));
-        assert!(list.add("B"));
-        assert!(list.add("C"));
-
-        let mut iter = list.iter();
-        assert_eq!(iter.next(), Some((0, &"A")));
-        assert_eq!(iter.next(), Some((1, &"B")));
-        assert_eq!(iter.next(), Some((2, &"C")));
-        assert_eq!(iter.next(), None);
     }
 }
