@@ -4,9 +4,22 @@
 // Text and data mining rights, including for AI training, are reserved under
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
-//! Property tests of the group 70 free-format codecs: every object written in a free-format
-//! header parses back unchanged, and a wrong offset or a string that isn't UTF-8 makes the whole
-//! header a bad encoding
+//! Property tests of the group 70 free-format codecs, one per variation: an object written in a
+//! free-format header parses back unchanged; changing a field that must agree with the layout
+//! (the g70v2 offsets and user name length, the g70v3 and g70v7 file name offset) by a nonzero
+//! amount, or replacing a byte of a string with 0xFF, makes the whole header a bad encoding.
+//!
+//! The oracle is the round trip. It catches a reader and a writer that disagree, but not a layout
+//! mistake made in both, such as two fields swapped in both directions: each object's
+//! `encodes_known_bytes` pins its layout. The g70v6 and g70v8 writers exist only for these tests.
+//!
+//! The amount a field changes by is one less a quarter of the time and one more a quarter of the
+//! time, so a check made from one side only (`>` for `!=`) fails quickly. Strings are printable
+//! ASCII up to 64 bytes or up to 16 arbitrary characters, so empty and non-ASCII strings are
+//! common; other fields are any value, so the g70v7 file type is rarely `Directory` or `File`
+//! (their wire values are pinned in `mod.rs`). g70v5 has no field to corrupt. The properties
+//! don't produce bytes left over inside the declared length or a truncated object, and the user
+//! name never overflows the g70v2 password offset; `parser.rs` and the example below cover those.
 
 #![expect(
     clippy::arithmetic_side_effects,
@@ -95,10 +108,16 @@ fn with_invalid_utf8(bytes: &[u8], start: usize, string: &str, index: Index) -> 
     Some(bytes)
 }
 
-/// the encoding with the u16 field at `offset` in the object set to `value`
-fn with_u16(bytes: &[u8], offset: usize, value: u16) -> Vec<u8> {
+/// a nonzero amount to add to a u16 field: -1 (as `u16::MAX`) and +1 a quarter of the time each
+fn wrong_by() -> impl Strategy<Value = u16> {
+    prop_oneof![1 => Just(u16::MAX), 1 => Just(1), 2 => 1..=u16::MAX]
+}
+
+/// the encoding with `delta` added (wrapping) to the u16 field at `offset` in the object
+fn with_u16_moved(bytes: &[u8], offset: usize, delta: u16) -> Vec<u8> {
     let mut bytes = bytes.to_vec();
     let start = HEADER_LEN + offset;
+    let value = u16::from_le_bytes([bytes[start], bytes[start + 1]]).wrapping_add(delta);
     bytes[start..start + 2].copy_from_slice(&value.to_le_bytes());
     bytes
 }
@@ -112,7 +131,7 @@ proptest! {
         user_name in string(),
         password in string(),
         offset_field in 0usize..3,
-        offset_value in any::<u16>(),
+        delta in wrong_by(),
         corrupt in any::<Index>(),
     ) {
         let object = Group70Var2 {
@@ -126,9 +145,7 @@ proptest! {
         );
 
         // the user name offset, the user name length and the password offset must agree
-        let field = offset_field * 2;
-        prop_assume!(offset_value.to_le_bytes() != bytes[HEADER_LEN + field..HEADER_LEN + field + 2]);
-        prop_assert!(is_bad_encoding(&with_u16(&bytes, field, offset_value)));
+        prop_assert!(is_bad_encoding(&with_u16_moved(&bytes, offset_field * 2, delta)));
 
         let user_name_bad = with_invalid_utf8(&bytes, 12, &user_name, corrupt);
         let password_bad = with_invalid_utf8(&bytes, 12 + user_name.len(), &password, corrupt);
@@ -147,7 +164,7 @@ proptest! {
         max_block_size in any::<u16>(),
         request_id in any::<u16>(),
         file_name in string(),
-        offset in any::<u16>().prop_filter("a wrong offset", |x| *x != 26),
+        delta in wrong_by(),
         corrupt in any::<Index>(),
     ) {
         let object = Group70Var3 {
@@ -164,7 +181,7 @@ proptest! {
         prop_assert!(
             matches!(parse(&bytes), Ok(Some(FreeFormatVariation::Group70Var3(x))) if x == object)
         );
-        prop_assert!(is_bad_encoding(&with_u16(&bytes, 0, offset)));
+        prop_assert!(is_bad_encoding(&with_u16_moved(&bytes, 0, delta)));
         if let Some(bad) = with_invalid_utf8(&bytes, 26, &file_name, corrupt) {
             prop_assert!(is_bad_encoding(&bad));
         }
@@ -245,7 +262,7 @@ proptest! {
         permissions in permissions(),
         request_id in any::<u16>(),
         file_name in string(),
-        offset in any::<u16>().prop_filter("a wrong offset", |x| *x != 20),
+        delta in wrong_by(),
         corrupt in any::<Index>(),
     ) {
         let object = Group70Var7 {
@@ -260,7 +277,7 @@ proptest! {
         prop_assert!(
             matches!(parse(&bytes), Ok(Some(FreeFormatVariation::Group70Var7(x))) if x == object)
         );
-        prop_assert!(is_bad_encoding(&with_u16(&bytes, 0, offset)));
+        prop_assert!(is_bad_encoding(&with_u16_moved(&bytes, 0, delta)));
         if let Some(bad) = with_invalid_utf8(&bytes, 20, &file_name, corrupt) {
             prop_assert!(is_bad_encoding(&bad));
         }
