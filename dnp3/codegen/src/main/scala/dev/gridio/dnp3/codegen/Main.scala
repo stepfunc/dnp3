@@ -44,6 +44,8 @@ object Main {
     (PrefixedVariationModule, implPath.resolve("prefixed.rs")),
     (ReadQualifierModule, implPath.resolve("read.rs")),
     (ConversionsModule, implPath.resolve("conversion.rs")),
+    // master-specific delivery of parsed objects
+    (MasterExtractModule, FileSystems.getDefault.getPath("../src/master/extract/generated.rs")),
     // the outstation's static and event variation enums
     (OutstationVariationModule, databasePath.resolve("variations.rs")),
     // what the outstation selects when a READ names each variation

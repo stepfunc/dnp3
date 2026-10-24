@@ -14,6 +14,9 @@ use crate::master::{HeaderInfo, ReadHandler};
 use crate::master::{ReadType, TaskError};
 use crate::util::skipped::Skipped;
 
+#[rustfmt::skip]
+mod generated;
+
 /// Extract measurements from a processable response, sinking them into
 /// something that implements `MeasurementHandler`
 pub(crate) async fn extract_measurements(

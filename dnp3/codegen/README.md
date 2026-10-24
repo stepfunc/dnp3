@@ -15,6 +15,7 @@ The code generator creates the following Rust source files:
 - `../src/app/gen/prefixed.rs` - Prefixed variations (with size prefix)
 - `../src/app/gen/read.rs` - The variations a READ request can carry with each qualifier
 - `../src/app/gen/conversion.rs` - Type conversion implementations
+- `../src/master/extract/generated.rs` - Master read-handler delivery of parsed objects
 - `../src/outstation/database/variations.rs` - The static and event variation enums of the outstation's point types
 - `../src/outstation/database/read/target.rs` - What the outstation selects when a READ names each variation
 - `../../ffi/dnp3-schema/src/variation.rs` - The FFI `Variation` enum in the bindings schema
