@@ -196,15 +196,6 @@ mod test {
 
     use super::*;
 
-    fn read_integrity(seq: Sequence, cursor: &mut WriteCursor) -> Result<(), scursor::WriteError> {
-        let mut writer = start_request(ControlField::request(seq), FunctionCode::Read, cursor)?;
-        writer.write_all_objects_header(Variation::Group60Var2)?;
-        writer.write_all_objects_header(Variation::Group60Var3)?;
-        writer.write_all_objects_header(Variation::Group60Var4)?;
-        writer.write_all_objects_header(Variation::Group60Var1)?;
-        Ok(())
-    }
-
     #[test]
     fn prefixed_items_fail_when_the_count_overflows_the_index_type() {
         let items: Vec<(crate::app::variations::Group41Var2, u8)> = (0..=u8::MAX)
@@ -228,7 +219,14 @@ mod test {
     fn formats_integrity_poll() {
         let mut buffer: [u8; 100] = [0; 100];
         let mut cursor = WriteCursor::new(&mut buffer);
-        read_integrity(Sequence::new(0x01), &mut cursor).unwrap();
+        start_request(
+            ControlField::request(Sequence::new(0x01)),
+            FunctionCode::Read,
+            &mut cursor,
+        )
+        .unwrap()
+        .write_class1230()
+        .unwrap();
 
         assert_eq!(
             cursor.written(),
