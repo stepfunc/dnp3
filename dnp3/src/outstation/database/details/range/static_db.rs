@@ -823,7 +823,7 @@ mod tests {
         }
 
         proptest! {
-            #![proptest_config(ProptestConfig::with_cases(512))]
+            #![proptest_config(crate::util::test_support::proptest_config(512))]
 
             #[test]
             fn float_deadband_is_symmetric_and_never_exceeded_by_the_same_value(

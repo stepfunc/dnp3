@@ -595,7 +595,7 @@ fn double_bit_state() -> impl Strategy<Value = DoubleBit> {
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(64))]
+    #![proptest_config(crate::util::test_support::proptest_config(64))]
 
     #[test]
     fn binary_inputs_are_extracted_as_written(

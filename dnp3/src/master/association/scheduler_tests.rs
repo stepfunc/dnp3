@@ -1175,7 +1175,7 @@ fn case() -> impl Strategy<Value = Case> {
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(256))]
+    #![proptest_config(crate::util::test_support::proptest_config(256))]
 
     #[test]
     fn next_task_follows_the_scheduling_model(case in case()) {

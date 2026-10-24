@@ -193,7 +193,7 @@ mod tests {
     }
 
     proptest! {
-        #![proptest_config(ProptestConfig::with_cases(256))]
+        #![proptest_config(crate::util::test_support::proptest_config(256))]
 
         /// A ranged sequence reads exactly its objects and yields each with its index, then
         /// stays exhausted; one byte less is an error

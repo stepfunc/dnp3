@@ -774,7 +774,7 @@ mod property {
     }
 
     proptest! {
-        #![proptest_config(ProptestConfig::with_cases(512))]
+        #![proptest_config(crate::util::test_support::proptest_config(512))]
 
         #[test]
         fn commands_are_written_and_parsed_back(adds in prop::collection::vec(add(2), 0..12)) {

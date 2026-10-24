@@ -917,7 +917,7 @@ fn spec() -> impl Strategy<Value = Spec> {
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(128))]
+    #![proptest_config(crate::util::test_support::proptest_config(128))]
 
     #[test]
     fn fragmenting_does_not_change_what_the_master_sees(spec in spec()) {

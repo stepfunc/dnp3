@@ -1222,7 +1222,7 @@ fn steps(read: bool) -> impl Strategy<Value = Vec<Step>> {
 
 proptest! {
     // more cases than the other tasks, since few of them read several fragments
-    #![proptest_config(ProptestConfig::with_cases(128))]
+    #![proptest_config(crate::util::test_support::proptest_config(128))]
 
     #[test]
     fn read_tasks_match_the_model(
@@ -1234,7 +1234,7 @@ proptest! {
 }
 
 proptest! {
-    #![proptest_config(ProptestConfig::with_cases(64))]
+    #![proptest_config(crate::util::test_support::proptest_config(64))]
 
     #[test]
     fn non_read_tasks_match_the_model(

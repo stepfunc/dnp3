@@ -2449,7 +2449,7 @@ mod test {
         }
 
         proptest! {
-            #![proptest_config(ProptestConfig::with_cases(512))]
+            #![proptest_config(crate::util::test_support::proptest_config(512))]
 
             #[test]
             fn attributes_round_trip_in_the_smallest_encoding(attr in attribute()) {

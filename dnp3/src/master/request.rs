@@ -1611,7 +1611,7 @@ mod tests {
         }
 
         proptest! {
-            #![proptest_config(ProptestConfig::with_cases(512))]
+            #![proptest_config(crate::util::test_support::proptest_config(512))]
 
             /// A READ request is written as its headers, and the outstation parses each header
             /// back to what was written, alone or together, unless a READ doesn't accept the

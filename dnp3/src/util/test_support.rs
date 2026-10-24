@@ -134,6 +134,28 @@ pub(crate) mod tls {
     }
 }
 
+/// The configuration of a property that runs `cases` cases
+///
+/// Every `proptest!` block in the crate uses this, so the number a property passes is its budget
+/// (unless `PROPTEST_CASES` is set, which proptest applies to every property).
+///
+/// Ordinary runs keep proptest's failure persistence: a failing property saves its seed under
+/// `dnp3/proptest-regressions/` (never committed), and later runs replay that seed before any new
+/// case until the file is deleted. A failure a property finds becomes an example test.
+///
+/// Setting proptest's `PROPTEST_DISABLE_FAILURE_PERSISTENCE` (to any value) turns persistence off:
+/// saved seeds are neither replayed nor written. Runs that measure a property, such as counting how
+/// often it reaches a case or whether it catches a mutation, set it and leave `PROPTEST_CASES`
+/// unset, because a saved seed, perhaps found under another mutation, would otherwise be replayed
+/// before any new case and make the property look stronger than it is.
+///
+/// ```text
+/// PROPTEST_DISABLE_FAILURE_PERSISTENCE=1 cargo test -p dnp3 --lib -- <property>
+/// ```
+pub(crate) fn proptest_config(cases: u32) -> proptest::test_runner::Config {
+    proptest::test_runner::Config::with_cases(cases)
+}
+
 /// Poll a future once with a waker that does nothing
 pub(crate) fn poll_once<F: Future>(future: Pin<&mut F>) -> Poll<F::Output> {
     future.poll(&mut Context::from_waker(Waker::noop()))

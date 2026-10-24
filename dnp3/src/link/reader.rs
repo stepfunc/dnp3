@@ -1041,7 +1041,7 @@ mod tests {
         }
 
         proptest! {
-            #![proptest_config(ProptestConfig::with_cases(256))]
+            #![proptest_config(crate::util::test_support::proptest_config(256))]
 
             /// However a stream arrives, a stream reader reads the same frames from it as a parser
             /// given all of it at once. Without changes, those are the frames written to it. With
