@@ -265,8 +265,9 @@ mod pty {
 
             drop(controller);
             link.remove();
-            timeline.expect(secs(0), PortState::Wait(secs(2))).await;
+            // A replacement is already available, so a failed open can't supply the retry wait.
             controller = link.connect();
+            timeline.expect(secs(0), PortState::Wait(secs(2))).await;
             timeline.expect(secs(2), PortState::Open).await;
             drop(channel);
             timeline.expect(secs(2), PortState::Shutdown).await;
