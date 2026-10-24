@@ -723,17 +723,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn integer_deadband_measures_the_change_in_either_direction() {
-        let deadband = Deadband::new(5u32);
-        assert!(!deadband.exceeded(10, 15));
-        assert!(!deadband.exceeded(15, 10));
-        assert!(deadband.exceeded(10, 16));
-        assert!(deadband.exceeded(16, 10));
-        assert!(deadband.exceeded(0, u32::MAX));
-        assert!(deadband.exceeded(u32::MAX, 0));
-    }
-
-    #[test]
     fn float_deadband_treats_nan_as_a_value() {
         const OTHER_NAN: f64 = f64::from_bits(0x7FF8_0000_0000_0001);
         let deadband = Deadband::analog(1.0).unwrap();
@@ -763,6 +752,36 @@ mod tests {
         assert!(!infinite.exceeded(f64::INFINITY, 1.0));
     }
 
+    #[test]
+    fn float_deadband_treats_signed_zeros_as_the_same_value() {
+        for deadband in [0.0, -0.0, 1.0] {
+            let deadband = Deadband::analog(deadband).unwrap();
+            assert!(!deadband.exceeded(0.0, -0.0));
+            assert!(!deadband.exceeded(-0.0, 0.0));
+        }
+    }
+
+    /// Deadband laws. The float deadband is symmetric, never exceeded by the same value, never
+    /// exceeded by a larger deadband when a smaller one isn't, and exact at its limits: a zero
+    /// deadband reports every change of value, an infinite one only a change to or from NaN, and
+    /// a finite deadband equal to the distance isn't exceeded while the next smaller one is. An
+    /// analog event is a change of flags or an exceeded deadband. The integer deadband is
+    /// exceeded exactly when the distance, computed in u64, is larger.
+    ///
+    /// Oracles: value equality by `partial_cmp`, and u64 arithmetic for the integer deadband,
+    /// are independent of the code. The finite float boundary takes the distance from the same
+    /// subtraction the code uses, so it checks the comparison, not the distance.
+    ///
+    /// Generators: float pairs are any bits, special values, small values, or a value and a
+    /// nearby one; deadbands are special values, small ones or any valid one. Integer cases are
+    /// two independent values (often 0 or `u32::MAX`), or two values exactly the deadband apart,
+    /// one closer or one further, in either order, so the boundary on each side is drawn at small
+    /// and large deadbands alike.
+    ///
+    /// Known gaps: special float pairs come from drawing two special values, so a NaN and an
+    /// infinity, opposite infinities, or 0.0 and -0.0 aren't drawn in every run;
+    /// `float_deadband_treats_nan_as_a_value` pins the first two and
+    /// `float_deadband_treats_signed_zeros_as_the_same_value` the last.
     mod deadband_properties {
         use super::*;
         use proptest::prelude::*;
@@ -813,6 +832,35 @@ mod tests {
             ]
         }
 
+        fn integer_value() -> impl Strategy<Value = u32> {
+            prop_oneof![any::<u32>(), Just(0), Just(u32::MAX)]
+        }
+
+        fn integer_deadband() -> impl Strategy<Value = u32> {
+            prop_oneof![any::<u32>(), 0u32..8]
+        }
+
+        /// two values and a deadband; half the time the values are the deadband apart, or one
+        /// closer or one further, in either order
+        fn integer_case() -> impl Strategy<Value = (u32, u32, u32)> {
+            prop_oneof![
+                (integer_value(), integer_value(), integer_deadband()),
+                (any::<u32>(), integer_deadband(), -1i32..=1, any::<bool>()).prop_map(
+                    |(start, deadband, step, down)| {
+                        let distance = deadband.saturating_add_signed(step);
+                        // exactly `distance` apart, moved down from the top if needed
+                        let high = start.saturating_add(distance);
+                        let low = high.saturating_sub(distance);
+                        if down {
+                            (high, low, deadband)
+                        } else {
+                            (low, high, deadband)
+                        }
+                    }
+                ),
+            ]
+        }
+
         fn exceeded(a: f64, b: f64, deadband: f64) -> bool {
             Deadband::analog(deadband).unwrap().exceeded(a, b)
         }
@@ -860,6 +908,13 @@ mod tests {
                     prop_assert!(exceeded(a, b, deadband));
                 }
                 prop_assert_eq!(exceeded(a, b, f64::INFINITY), one_nan);
+                // a finite deadband equal to the distance isn't exceeded, and the next smaller
+                // one is
+                let distance = (a - b).abs();
+                if distance.is_finite() && distance > 0.0 {
+                    prop_assert!(!exceeded(a, b, distance));
+                    prop_assert!(exceeded(a, b, distance.next_down()));
+                }
             }
 
             #[test]
@@ -884,11 +939,7 @@ mod tests {
             }
 
             #[test]
-            fn integer_deadband_matches_the_distance(
-                a in any::<u32>(),
-                b in prop_oneof![any::<u32>(), Just(0), Just(u32::MAX)],
-                deadband in prop_oneof![any::<u32>(), 0u32..8],
-            ) {
+            fn integer_deadband_matches_the_distance((a, b, deadband) in integer_case()) {
                 // the larger value is past the smaller one plus the deadband
                 let (low, high) = if a <= b { (a, b) } else { (b, a) };
                 let limit = u64::from(low).checked_add(u64::from(deadband));
