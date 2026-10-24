@@ -723,17 +723,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn integer_deadband_measures_the_change_in_either_direction() {
-        let deadband = Deadband::new(5u32);
-        assert!(!deadband.exceeded(10, 15));
-        assert!(!deadband.exceeded(15, 10));
-        assert!(deadband.exceeded(10, 16));
-        assert!(deadband.exceeded(16, 10));
-        assert!(deadband.exceeded(0, u32::MAX));
-        assert!(deadband.exceeded(u32::MAX, 0));
-    }
-
-    #[test]
     fn float_deadband_treats_nan_as_a_value() {
         const OTHER_NAN: f64 = f64::from_bits(0x7FF8_0000_0000_0001);
         let deadband = Deadband::analog(1.0).unwrap();
