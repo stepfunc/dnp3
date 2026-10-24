@@ -2127,8 +2127,10 @@ mod test {
         //!   smallest length that `expected_encoding` predicts, and parses back from a response and
         //!   a WRITE with the same set (0 as the default set), variation and value, floats compared
         //!   by their bits.
-        //! - `attributes_need_exactly_their_encoded_size`: an encodable attribute fits a buffer of
-        //!   exactly its encoded size and fails with `WriteError` one byte short.
+        //! - `attributes_need_exactly_their_encoded_size`: an attribute production accepts as
+        //!   encodable (`check_encodable` succeeds) fits a buffer of exactly its encoded size and
+        //!   fails with `WriteError` one byte short. A false rejection skips the case; the
+        //!   round-trip property checks acceptance.
         //!
         //! The code, the length and the errors come from `expected_encoding`, independently of the
         //! writer. The value bytes are checked only by parsing them back, so a mistake made in both

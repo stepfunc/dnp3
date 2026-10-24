@@ -51,7 +51,7 @@ Paths are relative to `dnp3/src`.
 | `count_sequence_yields_each_object_once` | `app/parse/count.rs` | Count sequences: bytes read, each object once, a single value only for a count of one | Independent (test encodes the objects) | 256 |
 | `ranged_sequence_yields_each_index_once` | `app/parse/range.rs` | Ranged sequences: bytes read, each value with its index, one byte short fails | Independent (test encodes the values) | 256 |
 | `attributes_round_trip_in_the_smallest_encoding` | `app/attr.rs` | Reserved variations and long values are rejected unwritten; others use the smallest encoding and parse back | Independent for type code, length and errors; round trip for values | 512 |
-| `attributes_need_exactly_their_encoded_size` | `app/attr.rs` | An attribute fits exactly its encoded size and fails one byte short | Independent (size model) | 512 |
+| `attributes_need_exactly_their_encoded_size` | `app/attr.rs` | An attribute production accepts as encodable fits exactly its encoded size and fails one byte short | Independent size model, applied only where production's `check_encodable` succeeds (the round-trip property checks acceptance) | 512 |
 | `analog_conversions_match_the_model` | `app/measurement.rs` | i16, i32 and f32 conversions of the analog types, and OVER_RANGE | Independent (model without `as`) | 1024 |
 | `g70v2_round_trips_and_rejects_bad_encodings` | `app/file/codec_tests.rs` | g70v2 parses back; wrong offsets or lengths and bad UTF-8 are bad encodings | Round trip, independent corruptions | 256 |
 | `g70v3_round_trips_and_rejects_bad_encodings` | `app/file/codec_tests.rs` | g70v3 the same, with its file name offset | Round trip, independent corruptions | 256 |
@@ -197,12 +197,15 @@ assertions to the test that replaces it.
 A property passing says nothing about how often it reaches the cases it is meant to reach, or
 whether it would catch a bug in them. To measure that:
 
-- **Reach.** Add temporary counters where the model or oracle sees each case, run the property many
+- **Where.** Work in a separate worktree, never in the checkout you develop in, and measure before
+  and after a change to the property or its generator.
+- **Reach.** Add temporary counters where the model or oracle sees each case, run the property 200
   times at its own budget with fresh seeds, and record in how many runs each counter never fired.
   Don't commit the counters.
 - **Mutations.** Hand-pick two or three changes to the code the property claims to check, each a
-  plausible bug in a case it should reach. Apply one at a time and run the property alone several
-  times, each under `timeout 120`; a timeout counts as caught.
+  plausible bug in a case it should reach. Apply one at a time and run the property alone 20 times,
+  each under `timeout 120`; a timeout counts as caught. Report how many of the 20 runs caught it,
+  before and after.
 - **Settings.** Set `PROPTEST_DISABLE_FAILURE_PERSISTENCE=1` and leave `PROPTEST_CASES` unset, so
   that the property runs at its own budget and a seed saved by an earlier failure, perhaps under
   another mutation, is neither replayed nor written:
