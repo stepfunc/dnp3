@@ -12,7 +12,7 @@ pub use traits::*;
 use crate::app::Shutdown;
 use crate::decode::DecodeLevel;
 use crate::outstation::database::{Database, DatabaseHandle};
-use crate::outstation::task::{ConfigurationChange, OutstationMessage};
+use crate::outstation::session::task::{ConfigurationChange, OutstationMessage};
 use crate::util::channel::Sender;
 
 /// database API to add/remove/update values
@@ -21,18 +21,12 @@ pub mod database;
 mod config;
 /// functionality for processing control requests
 pub(crate) mod control;
-/// handling of deferred read requests
-pub(crate) mod deferred;
-/// outstation response storage
-pub(crate) mod response;
 #[cfg(feature = "unstable")]
 mod runner;
 /// outstation session
 pub(crate) mod session;
 /// the headers each function supports
 pub(crate) mod target;
-/// async outstation task
-pub(crate) mod task;
 mod traits;
 
 #[cfg(test)]

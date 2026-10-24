@@ -16,7 +16,7 @@ use std::time::Duration;
 
 enum SessionType {
     Master(Box<crate::master::task::MasterTask>),
-    Outstation(Box<crate::outstation::task::OutstationTask>),
+    Outstation(Box<crate::outstation::session::task::OutstationTask>),
 }
 
 /// Wrapper around a specific type of session (master or outstation)
@@ -34,7 +34,7 @@ impl Session {
         }
     }
 
-    pub(crate) fn outstation(task: crate::outstation::task::OutstationTask) -> Self {
+    pub(crate) fn outstation(task: crate::outstation::session::task::OutstationTask) -> Self {
         Self {
             inner: SessionType::Outstation(Box::new(task)),
         }

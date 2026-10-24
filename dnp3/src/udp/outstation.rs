@@ -7,7 +7,7 @@
 use crate::app::Timeout;
 use crate::link::reader::LinkModes;
 use crate::link::{LinkErrorMode, LinkReadMode};
-use crate::outstation::task::OutstationTask;
+use crate::outstation::session::task::OutstationTask;
 use crate::outstation::{
     ControlHandler, OutstationApplication, OutstationConfig, OutstationHandle,
     OutstationInformation,

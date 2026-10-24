@@ -12,7 +12,7 @@ use tokio_rustls::rustls;
 
 use crate::app::{ConnectStrategy, Listener};
 use crate::link::LinkErrorMode;
-use crate::outstation::task::OutstationTask;
+use crate::outstation::session::task::OutstationTask;
 use crate::outstation::{
     ControlHandler, OutstationApplication, OutstationConfig, OutstationHandle,
     OutstationInformation,

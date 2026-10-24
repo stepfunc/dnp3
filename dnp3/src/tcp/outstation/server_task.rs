@@ -7,7 +7,7 @@
 use tracing::Instrument;
 
 use crate::app::{Listener, Shutdown};
-use crate::outstation::task::OutstationTask;
+use crate::outstation::session::task::OutstationTask;
 use crate::outstation::ConnectionState;
 use crate::util::channel::{request_channel, Receiver, Sender};
 use crate::util::lifecycle::{Enabled, RunError, StopReason};
