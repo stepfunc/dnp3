@@ -216,13 +216,14 @@ mod test {
         AddressFilter::AnyOf(addrs.iter().map(|x| ip(x)).collect())
     }
 
-    /// filters written with the IPv4 form of 192.168.0.1 and with its IPv4-mapped IPv6 form
+    /// filters written with the IPv4 form of 192.168.0.1 and with its IPv4-mapped IPv6 form; the
+    /// two AnyOf filters share no other address, so they overlap only through the two forms
     fn filters_for_192_168_0_1() -> [AddressFilter; 5] {
         [
             AddressFilter::Exact(ip("192.168.0.1")),
             AddressFilter::Exact(ip("::ffff:192.168.0.1")),
             any_of(&["10.0.0.1", "192.168.0.1"]),
-            any_of(&["10.0.0.1", "::ffff:192.168.0.1"]),
+            any_of(&["10.0.0.2", "::ffff:192.168.0.1"]),
             AddressFilter::WildcardIpv4("192.168.0.*".parse().unwrap()),
         ]
     }
@@ -279,6 +280,23 @@ mod test {
         }
     }
 
+    /// Filter matching and conflicts against a model that decodes the IPv4-mapped prefix from the
+    /// octets, independent of `to_canonical`
+    ///
+    /// - `a_filter_matches_the_canonical_addresses_it_names`: `matches` agrees with the model on
+    ///   every address of the universe, and an IPv4 address and its IPv4-mapped form match alike.
+    /// - `filters_conflict_when_an_address_matches_both`: `conflicts_with` is true, in both orders,
+    ///   exactly when a search of the universe with the model finds an address both filters match.
+    ///
+    /// Filters of every kind are generated, AnyOf with up to three addresses and wildcards fixing
+    /// octets from 0 to 2. Half the conflict pairs are a filter and one naming its addresses in
+    /// their other form (native IPv4 and IPv4-mapped swap; a wildcard becomes an IPv4-mapped
+    /// address it matches), plus up to two other addresses, so filters that overlap only through
+    /// the two forms of an address are common for every kind.
+    ///
+    /// Known gaps: the universe stands in for all addresses, so octets above 3 and other IPv6
+    /// addresses are not drawn, and the IPv4-compatible and IPv4-translated forms (which are not
+    /// IPv4-mapped) only appear for 0.1.2.3.
     mod properties {
         use super::*;
         use proptest::prelude::*;
@@ -390,6 +408,59 @@ mod test {
             ]
         }
 
+        /// the same address in its other form: native IPv4 and IPv4-mapped swap, others stay
+        fn other_form(addr: IpAddr) -> IpAddr {
+            match addr {
+                IpAddr::V4(x) => IpAddr::V6(x.to_ipv6_mapped()),
+                IpAddr::V6(x) => x.to_ipv4_mapped().map_or(addr, IpAddr::V4),
+            }
+        }
+
+        /// A filter naming the addresses `filter` names in their other form, plus `extra`
+        ///
+        /// A wildcard names the IPv4-mapped form of the address it matches with its wildcard
+        /// octets taken from `fill`. Any names no particular address, so it gets an AnyOf of
+        /// `extra` alone, which is empty a third of the time.
+        fn restated(filter: &AddressFilter, extra: Vec<IpAddr>, fill: [u8; 4]) -> AddressFilter {
+            let named = match filter {
+                AddressFilter::Any => return AddressFilter::AnyOf(extra.into_iter().collect()),
+                AddressFilter::AnyOf(set) => {
+                    let named = set.iter().map(|x| other_form(*x));
+                    return AddressFilter::AnyOf(named.chain(extra).collect());
+                }
+                AddressFilter::Exact(x) => other_form(*x),
+                AddressFilter::WildcardIpv4(wc) => {
+                    let [b3, b2, b1, b0] = fill;
+                    let v4 = Ipv4Addr::new(
+                        wc.b3.unwrap_or(b3),
+                        wc.b2.unwrap_or(b2),
+                        wc.b1.unwrap_or(b1),
+                        wc.b0.unwrap_or(b0),
+                    );
+                    IpAddr::V6(v4.to_ipv6_mapped())
+                }
+            };
+            if extra.is_empty() {
+                AddressFilter::Exact(named)
+            } else {
+                AddressFilter::AnyOf(std::iter::once(named).chain(extra).collect())
+            }
+        }
+
+        /// two independent filters half the time, otherwise a filter and [`restated`] of it
+        fn pair() -> impl Strategy<Value = (AddressFilter, AddressFilter)> {
+            let restated_pair = (
+                filter(),
+                prop::collection::vec(address(), 0..3),
+                prop::array::uniform4(prop::sample::select(OCTETS.to_vec())),
+            )
+                .prop_map(|(lhs, extra, fill)| {
+                    let rhs = restated(&lhs, extra, fill);
+                    (lhs, rhs)
+                });
+            prop_oneof![(filter(), filter()), restated_pair]
+        }
+
         proptest! {
             #![proptest_config(crate::util::test_support::proptest_config(256))]
 
@@ -413,7 +484,7 @@ mod test {
             }
 
             #[test]
-            fn filters_conflict_when_an_address_matches_both(lhs in filter(), rhs in filter()) {
+            fn filters_conflict_when_an_address_matches_both((lhs, rhs) in pair()) {
                 let witness = universe()
                     .into_iter()
                     .find(|addr| model_matches(&lhs, *addr) && model_matches(&rhs, *addr));
