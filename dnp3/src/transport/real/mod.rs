@@ -13,6 +13,8 @@ pub(crate) mod display;
 pub(crate) mod header;
 pub(crate) mod reader;
 pub(crate) mod sequence;
+#[cfg(test)]
+mod test_support;
 pub(crate) mod writer;
 
 pub(crate) mod constants {
@@ -44,52 +46,17 @@ impl Transport for RealTransport {
 mod tests {
     use std::time::Duration;
 
+    use super::test_support::*;
     use super::*;
     use crate::decode::DecodeLevel;
-    use crate::link::header::{AnyAddress, ControlField};
+    use crate::link::header::AnyAddress;
     use crate::link::test_data;
     use crate::outstation::Feature;
-    use crate::transport::{
-        FragmentAddr, LinkLayerMessageType, TransportData, TransportRead, TransportWrite,
-    };
+    use crate::transport::{FragmentAddr, TransportData, TransportRead, TransportWrite};
     use crate::util::phys::{PhysAddr, PhysLayer};
 
-    const MASTER: EndpointAddress = EndpointAddress::raw(1);
-    const OUTSTATION: EndpointAddress = EndpointAddress::raw(1024);
-
-    // link function codes, including the PRM bit
-    const UNCONFIRMED_USER_DATA: u8 = 0x44;
-    const REQUEST_LINK_STATUS: u8 = 0x49;
-    const LINK_STATUS: u8 = 0x0B;
-
-    fn master() -> (reader::Reader, writer::Writer) {
-        RealTransport::new(LinkModes::test(), LinkRole::Master, MASTER, 2048)
-    }
-
-    fn outstation(self_address: Feature) -> (reader::Reader, writer::Writer) {
-        RealTransport::new(
-            LinkModes::test(),
-            LinkRole::Outstation { self_address },
-            OUTSTATION,
-            2048,
-        )
-    }
-
-    fn link_header(
-        from_master: bool,
-        function: u8,
-        destination: AnyAddress,
-        source: EndpointAddress,
-    ) -> crate::link::header::Header {
-        crate::link::header::Header::new(
-            ControlField::from(if from_master { 0x80 } else { 0 } | function),
-            destination,
-            source.wrap(),
-        )
-    }
-
     /// a data frame carrying a whole fragment in one segment
-    fn segment(
+    fn fragment_frame(
         from_master: bool,
         destination: AnyAddress,
         source: EndpointAddress,
@@ -100,98 +67,6 @@ mod tests {
         test_data::data_frame(header, test_data::segment(true, true, seq), data)
     }
 
-    fn header_only(
-        from_master: bool,
-        function: u8,
-        destination: AnyAddress,
-        source: EndpointAddress,
-    ) -> Vec<u8> {
-        test_data::header_only(link_header(from_master, function, destination, source))
-    }
-
-    /// the bytes written to the mock since the last call
-    fn drain_writes(handle: &mut sfio_tokio_mock_io::Handle) -> Vec<Vec<u8>> {
-        let mut writes = Vec::new();
-        while let Some(event) = handle.pop_event() {
-            if let sfio_tokio_mock_io::Event::Write(x) = event {
-                writes.push(x);
-            }
-        }
-        writes
-    }
-
-    #[derive(Debug, PartialEq)]
-    enum Item {
-        Fragment(Vec<u8>),
-        LinkStatusRequest(EndpointAddress),
-        LinkStatusResponse(EndpointAddress),
-    }
-
-    struct Harness {
-        reader: reader::Reader,
-        writer: writer::Writer,
-        io: PhysLayer,
-        handle: sfio_tokio_mock_io::Handle,
-    }
-
-    impl Harness {
-        fn new((reader, writer): (reader::Reader, writer::Writer)) -> Self {
-            let (io, handle) = sfio_tokio_mock_io::mock();
-            Self {
-                reader,
-                writer,
-                io: PhysLayer::mock(io),
-                handle,
-            }
-        }
-
-        /// queue the frames, then read until something is available
-        async fn read(&mut self, frames: &[Vec<u8>]) -> Option<Item> {
-            self.handle.read(&frames.concat());
-            tokio::time::timeout(
-                Duration::from_secs(1),
-                self.reader.read(&mut self.io, DecodeLevel::nothing()),
-            )
-            .await
-            .ok()?
-            .unwrap();
-            self.reader.pop().map(|data| match data {
-                TransportData::Fragment(x) => Item::Fragment(x.data.to_vec()),
-                TransportData::LinkLayerMessage(x) => match x.message {
-                    LinkLayerMessageType::LinkStatusRequest => Item::LinkStatusRequest(x.source),
-                    LinkLayerMessageType::LinkStatusResponse => Item::LinkStatusResponse(x.source),
-                },
-            })
-        }
-
-        async fn write(&mut self, destination: EndpointAddress, fragment: &[u8]) {
-            let destination = FragmentAddr {
-                link: destination,
-                phys: PhysAddr::None,
-            };
-            self.writer
-                .write(&mut self.io, DecodeLevel::nothing(), destination, fragment)
-                .await
-                .unwrap();
-        }
-
-        async fn write_link_status_request(&mut self, destination: EndpointAddress) {
-            let destination = FragmentAddr {
-                link: destination,
-                phys: PhysAddr::None,
-            };
-            self.writer
-                .write_link_status_request(&mut self.io, destination, DecodeLevel::nothing())
-                .await
-                .unwrap();
-        }
-
-        /// the bytes written since the last call
-        fn writes(&mut self) -> Vec<Vec<u8>> {
-            drain_writes(&mut self.handle)
-        }
-    }
-
     #[tokio::test(start_paused = true)]
     async fn master_writes_frames_from_the_master() {
         let mut h = Harness::new(master());
@@ -200,7 +75,7 @@ mod tests {
         assert_eq!(
             h.writes(),
             [
-                segment(true, OUTSTATION.wrap(), MASTER, 0, &[1, 2, 3]),
+                fragment_frame(true, OUTSTATION.wrap(), MASTER, 0, &[1, 2, 3]),
                 header_only(true, REQUEST_LINK_STATUS, OUTSTATION.wrap(), MASTER),
             ]
         );
@@ -215,7 +90,7 @@ mod tests {
             assert_eq!(
                 h.writes(),
                 [
-                    segment(false, MASTER.wrap(), OUTSTATION, 0, &[1, 2, 3]),
+                    fragment_frame(false, MASTER.wrap(), OUTSTATION, 0, &[1, 2, 3]),
                     header_only(false, REQUEST_LINK_STATUS, MASTER.wrap(), OUTSTATION),
                 ]
             );
@@ -227,7 +102,7 @@ mod tests {
         let mut h = Harness::new(master());
         let request = header_only(false, REQUEST_LINK_STATUS, MASTER.wrap(), OUTSTATION);
         assert_eq!(
-            h.read(&[request]).await,
+            h.deliver(&[request]).await,
             Some(Item::LinkStatusRequest(OUTSTATION))
         );
         assert_eq!(
@@ -241,7 +116,7 @@ mod tests {
         let mut h = Harness::new(master());
         let response = header_only(false, LINK_STATUS, MASTER.wrap(), OUTSTATION);
         assert_eq!(
-            h.read(&[response]).await,
+            h.deliver(&[response]).await,
             Some(Item::LinkStatusResponse(OUTSTATION))
         );
         assert!(h.writes().is_empty());
@@ -251,49 +126,12 @@ mod tests {
     async fn outstation_without_self_address_ignores_frames_sent_to_self_address() {
         let mut h = Harness::new(outstation(Feature::Disabled));
         let frames = [
-            segment(true, AnyAddress::SelfAddress, MASTER, 0, &[1]),
+            fragment_frame(true, AnyAddress::SelfAddress, MASTER, 0, &[1]),
             header_only(true, REQUEST_LINK_STATUS, AnyAddress::SelfAddress, MASTER),
-            segment(true, OUTSTATION.wrap(), MASTER, 1, &[2]),
+            fragment_frame(true, OUTSTATION.wrap(), MASTER, 1, &[2]),
         ];
-        assert_eq!(h.read(&frames).await, Some(Item::Fragment(vec![2])));
+        assert_eq!(h.deliver(&frames).await, Some(Item::Fragment(vec![2])));
         assert!(h.writes().is_empty());
-    }
-
-    // link function codes with the PRM bit, and the FCB and FCV bits of confirmed user data
-    const RESET_LINK_STATES: u8 = 0x40;
-    const CONFIRMED_USER_DATA_FCB: u8 = 0x73;
-    const ACK: u8 = 0x00;
-
-    /// a data frame from the master to the outstation carrying one segment of a fragment
-    fn master_segment(fir: bool, fin: bool, seq: u8, data: &[u8]) -> Vec<u8> {
-        let header = link_header(true, UNCONFIRMED_USER_DATA, OUTSTATION.wrap(), MASTER);
-        test_data::data_frame(header, test_data::segment(fir, fin, seq), data)
-    }
-
-    #[tokio::test(start_paused = true)]
-    async fn data_frame_without_a_transport_header_is_ignored() {
-        let mut h = Harness::new(outstation(Feature::Disabled));
-        let frames = [
-            master_segment(true, false, 0, &[1]),
-            header_only(true, UNCONFIRMED_USER_DATA, OUTSTATION.wrap(), MASTER),
-            master_segment(false, true, 1, &[2]),
-        ];
-        assert_eq!(h.read(&frames).await, Some(Item::Fragment(vec![1, 2])));
-        assert!(h.writes().is_empty());
-    }
-
-    #[tokio::test(start_paused = true)]
-    async fn confirmed_data_frame_without_a_transport_header_is_acknowledged_and_ignored() {
-        let mut h = Harness::new(outstation(Feature::Disabled));
-        let frames = [
-            header_only(true, RESET_LINK_STATES, OUTSTATION.wrap(), MASTER),
-            master_segment(true, false, 0, &[1]),
-            header_only(true, CONFIRMED_USER_DATA_FCB, OUTSTATION.wrap(), MASTER),
-            master_segment(false, true, 1, &[2]),
-        ];
-        assert_eq!(h.read(&frames).await, Some(Item::Fragment(vec![1, 2])));
-        let ack = header_only(false, ACK, MASTER.wrap(), OUTSTATION);
-        assert_eq!(h.writes(), [ack.clone(), ack]);
     }
 
     /// Fragments written by the transport writer, as the transport reader delivers them after
@@ -668,18 +506,11 @@ mod tests {
         /// the transport headers written (see [`stream`]), what the reader delivered, and what it
         /// wrote back
         fn run(case: &Case) -> (Vec<u8>, Vec<Item>, Vec<Vec<u8>>) {
-            let mut result = None;
-            tokio::runtime::Builder::new_current_thread()
-                .enable_time()
-                .start_paused(true)
-                .build()
-                .unwrap()
-                .block_on(crate::util::test_support::watchdog(async {
-                    let (frames, headers) = stream(case).await;
-                    let (items, writes) = read(case, &frames).await;
-                    result = Some((headers, items, writes));
-                }));
-            result.unwrap()
+            crate::util::test_support::run_paused(async {
+                let (frames, headers) = stream(case).await;
+                let (items, writes) = read(case, &frames).await;
+                (headers, items, writes)
+            })
         }
 
         #[expect(

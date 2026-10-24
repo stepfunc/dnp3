@@ -115,95 +115,13 @@ mod tests {
     use std::time::Duration;
 
     use super::*;
-    use crate::link::test_data::{self, data_frame, header_only};
-
-    const OUTSTATION: EndpointAddress = EndpointAddress::raw(1024);
-    const MASTER: EndpointAddress = EndpointAddress::raw(1);
-
-    fn segment(fir: bool, fin: bool, seq: u8, data: &[u8]) -> Vec<u8> {
-        let header = crate::link::header::Header::unconfirmed_user_data(
-            true,
-            OUTSTATION.wrap(),
-            MASTER.wrap(),
-        );
-        data_frame(header, test_data::segment(fir, fin, seq), data)
-    }
-
-    fn link_status_request() -> Vec<u8> {
-        header_only(crate::link::header::Header::request_link_status(
-            true, OUTSTATION, MASTER,
-        ))
-    }
-
-    struct Harness {
-        reader: Reader,
-        io: PhysLayer,
-        handle: sfio_tokio_mock_io::Handle,
-    }
-
-    impl Harness {
-        fn new() -> Self {
-            let (io, handle) = sfio_tokio_mock_io::mock();
-            Self {
-                reader: Reader::new(
-                    LinkModes::test(),
-                    LinkRole::Outstation {
-                        self_address: crate::outstation::Feature::Disabled,
-                    },
-                    OUTSTATION,
-                    2048,
-                ),
-                io: PhysLayer::mock(io),
-                handle,
-            }
-        }
-
-        fn queue(&mut self, frames: &[Vec<u8>]) {
-            self.handle.read(&frames.concat());
-        }
-
-        /// true if `read` completed instead of waiting for more data
-        async fn read(&mut self) -> bool {
-            tokio::time::timeout(
-                Duration::from_secs(1),
-                self.reader.read(&mut self.io, DecodeLevel::nothing()),
-            )
-            .await
-            .map(|res| res.unwrap())
-            .is_ok()
-        }
-
-        fn pop(&mut self) -> Option<Item> {
-            self.reader.pop().map(Item::from)
-        }
-
-        fn peek(&self) -> Option<Item> {
-            self.reader.peek().map(Item::from)
-        }
-    }
-
-    #[derive(Debug, PartialEq)]
-    enum Item {
-        Fragment(Vec<u8>),
-        LinkStatusRequest,
-        LinkStatusResponse,
-    }
-
-    impl From<TransportData<'_>> for Item {
-        fn from(data: TransportData<'_>) -> Self {
-            match data {
-                TransportData::Fragment(fragment) => Item::Fragment(fragment.data.to_vec()),
-                TransportData::LinkLayerMessage(msg) => match msg.message {
-                    LinkLayerMessageType::LinkStatusRequest => Item::LinkStatusRequest,
-                    LinkLayerMessageType::LinkStatusResponse => Item::LinkStatusResponse,
-                },
-            }
-        }
-    }
+    use crate::link::test_data::{self, data_frame};
+    use crate::outstation::Feature;
+    use crate::transport::real::test_support::*;
 
     #[tokio::test(start_paused = true)]
     async fn returns_a_fragment_assembled_from_several_segments() {
-        let mut h = Harness::new();
+        let mut h = Harness::new(outstation(Feature::Disabled));
         h.queue(&[
             segment(true, false, 0, &[1, 2]),
             segment(false, true, 1, &[3]),
@@ -214,7 +132,7 @@ mod tests {
 
     #[tokio::test(start_paused = true)]
     async fn read_returns_at_once_while_a_fragment_is_pending() {
-        let mut h = Harness::new();
+        let mut h = Harness::new(outstation(Feature::Disabled));
         h.queue(&[segment(true, true, 0, &[1]), segment(true, true, 1, &[2])]);
         assert!(h.read().await);
         assert!(h.read().await);
@@ -225,50 +143,46 @@ mod tests {
 
     #[tokio::test(start_paused = true)]
     async fn read_returns_at_once_while_a_link_layer_message_is_pending() {
-        let mut h = Harness::new();
+        let mut h = Harness::new(outstation(Feature::Disabled));
         h.queue(&[link_status_request()]);
         assert!(h.read().await);
-        assert_eq!(h.peek(), Some(Item::LinkStatusRequest));
+        assert_eq!(h.peek(), Some(Item::LinkStatusRequest(MASTER)));
         // nothing more to read, so a read that doesn't return at once times out
         assert!(h.read().await);
-        assert_eq!(h.pop(), Some(Item::LinkStatusRequest));
+        assert_eq!(h.pop(), Some(Item::LinkStatusRequest(MASTER)));
         assert_eq!(h.pop(), None);
     }
 
     #[tokio::test(start_paused = true)]
     async fn pending_link_layer_message_is_not_overwritten_by_the_next() {
-        let mut h = Harness::new();
-        // DIR set, secondary function 11: link status
-        let link_status = header_only(crate::link::header::Header::new(
-            crate::link::header::ControlField::from(0x8B),
-            OUTSTATION.wrap(),
-            MASTER.wrap(),
-        ));
+        let mut h = Harness::new(outstation(Feature::Disabled));
+        // a link status response with DIR set, as if from the master
+        let link_status = header_only(true, LINK_STATUS, OUTSTATION.wrap(), MASTER);
         h.queue(&[link_status_request(), link_status]);
         assert!(h.read().await);
         assert!(h.read().await);
-        assert_eq!(h.pop(), Some(Item::LinkStatusRequest));
+        assert_eq!(h.pop(), Some(Item::LinkStatusRequest(MASTER)));
         assert!(h.read().await);
-        assert_eq!(h.pop(), Some(Item::LinkStatusResponse));
+        assert_eq!(h.pop(), Some(Item::LinkStatusResponse(MASTER)));
     }
 
     #[tokio::test(start_paused = true)]
     async fn link_layer_message_during_assembly_leaves_the_series() {
-        let mut h = Harness::new();
+        let mut h = Harness::new(outstation(Feature::Disabled));
         h.queue(&[
             segment(true, false, 0, &[1]),
             link_status_request(),
             segment(false, true, 1, &[2]),
         ]);
         assert!(h.read().await);
-        assert_eq!(h.pop(), Some(Item::LinkStatusRequest));
+        assert_eq!(h.pop(), Some(Item::LinkStatusRequest(MASTER)));
         assert!(h.read().await);
         assert_eq!(h.pop(), Some(Item::Fragment(vec![1, 2])));
     }
 
     #[tokio::test(start_paused = true)]
     async fn reset_discards_pending_input() {
-        let mut h = Harness::new();
+        let mut h = Harness::new(outstation(Feature::Disabled));
         h.queue(&[segment(true, false, 0, &[1]), link_status_request()]);
         assert!(h.read().await);
         h.reader.reset();
@@ -278,6 +192,32 @@ mod tests {
         assert_eq!(h.pop(), Some(Item::Fragment(vec![3])));
     }
 
+    #[tokio::test(start_paused = true)]
+    async fn data_frame_without_a_transport_header_is_ignored() {
+        let mut h = Harness::new(outstation(Feature::Disabled));
+        let frames = [
+            segment(true, false, 0, &[1]),
+            header_only(true, UNCONFIRMED_USER_DATA, OUTSTATION.wrap(), MASTER),
+            segment(false, true, 1, &[2]),
+        ];
+        assert_eq!(h.deliver(&frames).await, Some(Item::Fragment(vec![1, 2])));
+        assert!(h.writes().is_empty());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn confirmed_data_frame_without_a_transport_header_is_acknowledged_and_ignored() {
+        let mut h = Harness::new(outstation(Feature::Disabled));
+        let frames = [
+            header_only(true, RESET_LINK_STATES, OUTSTATION.wrap(), MASTER),
+            segment(true, false, 0, &[1]),
+            header_only(true, CONFIRMED_USER_DATA_FCB, OUTSTATION.wrap(), MASTER),
+            segment(false, true, 1, &[2]),
+        ];
+        assert_eq!(h.deliver(&frames).await, Some(Item::Fragment(vec![1, 2])));
+        let ack = header_only(false, ACK, MASTER.wrap(), OUTSTATION);
+        assert_eq!(h.writes(), [ack.clone(), ack]);
+    }
+
     /// reads dropped while the link layer's reply is waiting on the peer
     mod cancel {
         use std::pin::pin;
@@ -285,43 +225,24 @@ mod tests {
         use tokio::io::{AsyncReadExt, AsyncWriteExt, DuplexStream};
 
         use super::*;
-        use crate::link::header::ControlField;
         use crate::transport::{FragmentAddr, TransportWrite};
         use crate::util::phys::PhysAddr;
         use crate::util::test_support::poll_once;
 
         const FRAGMENT: [u8; 1] = [0xAA];
 
-        // link control fields, including the DIR, PRM and FCV bits
-        const RESET_LINK_STATES: u8 = 0xC0;
-        const CONFIRMED_USER_DATA: u8 = 0xD3;
-        const ACK: u8 = 0x00;
-        const LINK_STATUS: u8 = 0x0B;
-
-        fn from_master(control: u8) -> crate::link::header::Header {
-            crate::link::header::Header::new(
-                ControlField::from(control),
-                OUTSTATION.wrap(),
-                MASTER.wrap(),
-            )
-        }
-
         fn reset_link_states() -> Vec<u8> {
-            header_only(from_master(RESET_LINK_STATES))
+            header_only(true, RESET_LINK_STATES, OUTSTATION.wrap(), MASTER)
         }
 
         fn confirmed(fcb: bool) -> Vec<u8> {
-            let mut header = from_master(CONFIRMED_USER_DATA);
+            let mut header = link_header(true, CONFIRMED_USER_DATA, OUTSTATION.wrap(), MASTER);
             header.control.fcb = fcb;
             data_frame(header, test_data::segment(true, true, 0), &FRAGMENT)
         }
 
         fn reply(control: u8) -> Vec<u8> {
-            header_only(crate::link::header::Header::new(
-                ControlField::from(control),
-                MASTER.wrap(),
-                OUTSTATION.wrap(),
-            ))
+            header_only(false, control, MASTER.wrap(), OUTSTATION)
         }
 
         fn ack() -> Vec<u8> {
@@ -363,13 +284,7 @@ mod tests {
 
             /// true if `read` completed instead of waiting for more data
             async fn read(&mut self) -> bool {
-                tokio::time::timeout(
-                    Duration::from_secs(1),
-                    self.reader.read(&mut self.io, DecodeLevel::nothing()),
-                )
-                .await
-                .map(|res| res.unwrap())
-                .is_ok()
+                read(&mut self.reader, &mut self.io).await
             }
 
             /// the next `len` bytes the reader wrote
@@ -459,7 +374,7 @@ mod tests {
             assert!(h.read().await);
             assert_eq!(h.received(10).await, reply(LINK_STATUS));
             assert!(h.nothing_more_received());
-            assert_eq!(h.pop(), Some(Item::LinkStatusRequest));
+            assert_eq!(h.pop(), Some(Item::LinkStatusRequest(MASTER)));
             assert_eq!(h.pop(), None);
         }
 
