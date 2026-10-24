@@ -21,8 +21,6 @@ object PrefixedVariationModule extends Module {
       "use crate::app::parse::prefix::Prefix;".eol ++
       "use crate::app::parse::bytes::*;".eol ++
       "use crate::app::parse::options::ParseOptions;".eol ++
-      "use crate::app::measurement::Time;".eol ++
-      "use crate::master::{ReadHandler, HeaderInfo};".eol ++
       "use crate::app::ObjectParseError;".eol ++
       space ++
       "use scursor::ReadCursor;".eol ++
@@ -78,6 +76,40 @@ object PrefixedVariationModule extends Module {
       }
     }
 
+    def variationMatcher(v: Variation): Iterator[String] = v match {
+      case SpecificAttribute =>
+        "PrefixedVariation::Group0(attr) => Variation::Group0(attr.variation),".eol
+      case _ : SizedByVariation =>
+        s"PrefixedVariation::${v.parent.name}VarX(x, _) => Variation::${v.parent.name}(*x),".eol
+      case _ =>
+        s"PrefixedVariation::${v.name}(_) => Variation::${v.name},".eol
+    }
+
+    bracket("impl<'a, I> PrefixedVariation<'a, I> where I : Index") {
+      bracket("pub(crate) fn parse(v: Variation, count: u16, options: ParseOptions, cursor: &mut ReadCursor<'a>) -> Result<PrefixedVariation<'a, I>, ObjectParseError>") {
+        bracket("match v") {
+          variations.flatMap(parseMatcher) ++ "_ => Err(ObjectParseError::InvalidQualifierForVariation(v, I::COUNT_AND_PREFIX_QUALIFIER)),".eol
+        }
+      } ++ space ++
+        bracket("pub(crate) fn variation(&self) -> Variation") {
+          bracket("match self") {
+            variations.flatMap(variationMatcher)
+          }
+        } ++ space ++
+        "/// True if objects of this variation have a time relative to a common time of occurrence".eol ++
+        bracket("pub(crate) fn has_relative_time(&self) -> bool") {
+          s"matches!(self, ${relativeTimeVariations.mkString(" | ")})".eol
+        } ++ space ++
+        bracket("pub(crate) fn format_objects(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result") {
+          bracket("match self") {
+            variations.flatMap(fmtMatcher).iterator
+          }
+        }
+
+    }
+  }
+
+  def extractionImpl(implicit indent: Indentation): Iterator[String] = {
     def infoMatcher(v: Variation) : Iterator[String] = {
       val isEvent = v.parent.groupType.isEvent;
       v match {
@@ -162,23 +194,6 @@ object PrefixedVariationModule extends Module {
     }
 
     bracket("impl<'a, I> PrefixedVariation<'a, I> where I : Index") {
-      bracket("pub(crate) fn parse(v: Variation, count: u16, options: ParseOptions, cursor: &mut ReadCursor<'a>) -> Result<PrefixedVariation<'a, I>, ObjectParseError>") {
-        bracket("match v") {
-          variations.flatMap(parseMatcher) ++ "_ => Err(ObjectParseError::InvalidQualifierForVariation(v, I::COUNT_AND_PREFIX_QUALIFIER)),".eol
-        }
-      } ++ space ++
-        bracket("pub(crate) fn variation(&self) -> Variation") {
-          "self.get_header_info().variation".eol
-        } ++ space ++
-        "/// True if objects of this variation have a time relative to a common time of occurrence".eol ++
-        bracket("pub(crate) fn has_relative_time(&self) -> bool") {
-          s"matches!(self, ${relativeTimeVariations.mkString(" | ")})".eol
-        } ++ space ++
-        bracket("pub(crate) fn format_objects(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result") {
-          bracket("match self") {
-            variations.flatMap(fmtMatcher).iterator
-          }
-        } ++ space ++
       bracket("pub(crate) fn extract_measurements_to<H: ReadHandler + ?Sized>(&self, cto: Option<Time>, handler: &mut H) -> bool") {
         bracket("match self") {
           variations.flatMap(extractMatcher).iterator

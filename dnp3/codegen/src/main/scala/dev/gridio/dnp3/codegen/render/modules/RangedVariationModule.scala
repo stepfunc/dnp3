@@ -20,7 +20,6 @@ object RangedVariationModule extends Module {
       "use crate::app::parse::parser::*;".eol ++
       "use crate::app::parse::bytes::*;".eol ++
       "use crate::app::parse::bit::{BitSequence, DoubleBitSequence};".eol ++
-      "use crate::master::{ReadHandler, HeaderInfo};".eol ++
       "use crate::app::ObjectParseError;".eol ++
       "use crate::app::parse::options::ParseOptions;".eol ++
       space ++
@@ -108,6 +107,27 @@ object RangedVariationModule extends Module {
       }
     }
 
+    bracket("impl<'a> RangedVariation<'a>") {
+      bracket("pub(crate) fn parse_non_read(v: Variation, qualifier: QualifierCode, range: Range, options: ParseOptions, cursor: &mut ReadCursor<'a>) -> Result<RangedVariation<'a>, ObjectParseError>") {
+        bracket("match v") {
+          variations.flatMap(getNonReadMatcher).iterator ++ "_ => Err(ObjectParseError::InvalidQualifierForVariation(v, qualifier)),".eol
+        }
+      } ++ space ++
+        bracket("pub(crate) fn variation(&self) -> Variation") {
+          bracket("match self") {
+            variations.flatMap(getVariationMatcher).iterator
+          }
+        } ++ space ++
+        bracket("pub(crate) fn format_objects(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result") {
+          bracket("match self") {
+            variations.flatMap(getFmtMatcher).iterator
+          }
+        }
+
+    }
+  }
+
+  def extractionImpl(implicit indent: Indentation): Iterator[String] = {
     def getMeasName(v: Variation): String = {
       v.parent.groupType match {
         case GroupType.StaticBinary => "binary_input"
@@ -168,21 +188,6 @@ object RangedVariationModule extends Module {
     }
     
     bracket("impl<'a> RangedVariation<'a>") {
-      bracket("pub(crate) fn parse_non_read(v: Variation, qualifier: QualifierCode, range: Range, options: ParseOptions, cursor: &mut ReadCursor<'a>) -> Result<RangedVariation<'a>, ObjectParseError>") {
-        bracket("match v") {
-          variations.flatMap(getNonReadMatcher).iterator ++ "_ => Err(ObjectParseError::InvalidQualifierForVariation(v, qualifier)),".eol
-        }
-      } ++ space ++
-        bracket("pub(crate) fn variation(&self) -> Variation") {
-          bracket("match self") {
-            variations.flatMap(getVariationMatcher).iterator
-          }
-        } ++ space ++
-        bracket("pub(crate) fn format_objects(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result") {
-          bracket("match self") {
-            variations.flatMap(getFmtMatcher).iterator
-          }
-        } ++ space ++
         bracket("pub(crate) fn extract_measurements_to<H: ReadHandler + ?Sized>(&self, qualifier: QualifierCode, handler: &mut H) -> bool") {
           bracket("match self") {
             variations.flatMap(getExtractMatcher).iterator

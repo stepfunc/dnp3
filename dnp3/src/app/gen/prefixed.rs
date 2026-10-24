@@ -23,8 +23,6 @@ use crate::app::parse::traits::Index;
 use crate::app::parse::prefix::Prefix;
 use crate::app::parse::bytes::*;
 use crate::app::parse::options::ParseOptions;
-use crate::app::measurement::Time;
-use crate::master::{ReadHandler, HeaderInfo};
 use crate::app::ObjectParseError;
 
 use scursor::ReadCursor;
@@ -221,7 +219,68 @@ impl<'a, I> PrefixedVariation<'a, I> where I : Index {
     }
     
     pub(crate) fn variation(&self) -> Variation {
-        self.get_header_info().variation
+        match self {
+            PrefixedVariation::Group0(attr) => Variation::Group0(attr.variation),
+            PrefixedVariation::Group2Var1(_) => Variation::Group2Var1,
+            PrefixedVariation::Group2Var2(_) => Variation::Group2Var2,
+            PrefixedVariation::Group2Var3(_) => Variation::Group2Var3,
+            PrefixedVariation::Group4Var1(_) => Variation::Group4Var1,
+            PrefixedVariation::Group4Var2(_) => Variation::Group4Var2,
+            PrefixedVariation::Group4Var3(_) => Variation::Group4Var3,
+            PrefixedVariation::Group11Var1(_) => Variation::Group11Var1,
+            PrefixedVariation::Group11Var2(_) => Variation::Group11Var2,
+            PrefixedVariation::Group12Var1(_) => Variation::Group12Var1,
+            PrefixedVariation::Group13Var1(_) => Variation::Group13Var1,
+            PrefixedVariation::Group13Var2(_) => Variation::Group13Var2,
+            PrefixedVariation::Group22Var1(_) => Variation::Group22Var1,
+            PrefixedVariation::Group22Var2(_) => Variation::Group22Var2,
+            PrefixedVariation::Group22Var5(_) => Variation::Group22Var5,
+            PrefixedVariation::Group22Var6(_) => Variation::Group22Var6,
+            PrefixedVariation::Group23Var1(_) => Variation::Group23Var1,
+            PrefixedVariation::Group23Var2(_) => Variation::Group23Var2,
+            PrefixedVariation::Group23Var5(_) => Variation::Group23Var5,
+            PrefixedVariation::Group23Var6(_) => Variation::Group23Var6,
+            PrefixedVariation::Group32Var1(_) => Variation::Group32Var1,
+            PrefixedVariation::Group32Var2(_) => Variation::Group32Var2,
+            PrefixedVariation::Group32Var3(_) => Variation::Group32Var3,
+            PrefixedVariation::Group32Var4(_) => Variation::Group32Var4,
+            PrefixedVariation::Group32Var5(_) => Variation::Group32Var5,
+            PrefixedVariation::Group32Var6(_) => Variation::Group32Var6,
+            PrefixedVariation::Group32Var7(_) => Variation::Group32Var7,
+            PrefixedVariation::Group32Var8(_) => Variation::Group32Var8,
+            PrefixedVariation::Group33Var1(_) => Variation::Group33Var1,
+            PrefixedVariation::Group33Var2(_) => Variation::Group33Var2,
+            PrefixedVariation::Group33Var3(_) => Variation::Group33Var3,
+            PrefixedVariation::Group33Var4(_) => Variation::Group33Var4,
+            PrefixedVariation::Group33Var5(_) => Variation::Group33Var5,
+            PrefixedVariation::Group33Var6(_) => Variation::Group33Var6,
+            PrefixedVariation::Group33Var7(_) => Variation::Group33Var7,
+            PrefixedVariation::Group33Var8(_) => Variation::Group33Var8,
+            PrefixedVariation::Group34Var1(_) => Variation::Group34Var1,
+            PrefixedVariation::Group34Var2(_) => Variation::Group34Var2,
+            PrefixedVariation::Group34Var3(_) => Variation::Group34Var3,
+            PrefixedVariation::Group41Var1(_) => Variation::Group41Var1,
+            PrefixedVariation::Group41Var2(_) => Variation::Group41Var2,
+            PrefixedVariation::Group41Var3(_) => Variation::Group41Var3,
+            PrefixedVariation::Group41Var4(_) => Variation::Group41Var4,
+            PrefixedVariation::Group42Var1(_) => Variation::Group42Var1,
+            PrefixedVariation::Group42Var2(_) => Variation::Group42Var2,
+            PrefixedVariation::Group42Var3(_) => Variation::Group42Var3,
+            PrefixedVariation::Group42Var4(_) => Variation::Group42Var4,
+            PrefixedVariation::Group42Var5(_) => Variation::Group42Var5,
+            PrefixedVariation::Group42Var6(_) => Variation::Group42Var6,
+            PrefixedVariation::Group42Var7(_) => Variation::Group42Var7,
+            PrefixedVariation::Group42Var8(_) => Variation::Group42Var8,
+            PrefixedVariation::Group43Var1(_) => Variation::Group43Var1,
+            PrefixedVariation::Group43Var2(_) => Variation::Group43Var2,
+            PrefixedVariation::Group43Var3(_) => Variation::Group43Var3,
+            PrefixedVariation::Group43Var4(_) => Variation::Group43Var4,
+            PrefixedVariation::Group43Var5(_) => Variation::Group43Var5,
+            PrefixedVariation::Group43Var6(_) => Variation::Group43Var6,
+            PrefixedVariation::Group43Var7(_) => Variation::Group43Var7,
+            PrefixedVariation::Group43Var8(_) => Variation::Group43Var8,
+            PrefixedVariation::Group111VarX(x, _) => Variation::Group111(*x),
+        }
     }
     
     /// True if objects of this variation have a time relative to a common time of occurrence
@@ -291,461 +350,6 @@ impl<'a, I> PrefixedVariation<'a, I> where I : Index {
             PrefixedVariation::Group43Var7(seq) => format_prefixed_items(f, seq.iter()),
             PrefixedVariation::Group43Var8(seq) => format_prefixed_items(f, seq.iter()),
             PrefixedVariation::Group111VarX(_, seq) => format_indexed_items(f, seq.iter().map(|(x, i)| (Bytes::new(x), i))),
-        }
-    }
-    
-    pub(crate) fn extract_measurements_to<H: ReadHandler + ?Sized>(&self, cto: Option<Time>, handler: &mut H) -> bool {
-        match self {
-            PrefixedVariation::Group0(attr) => {
-                let info = self.get_header_info();
-                crate::master::handle_attribute(info.variation, info.qualifier, attr, handler)
-            }
-            PrefixedVariation::Group2Var1(seq) => {
-                handler.handle_binary_input(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group2Var2(seq) => {
-                handler.handle_binary_input(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group2Var3(seq) => {
-                handler.handle_binary_input(
-                    self.get_header_info(),
-                    &mut seq.iter().map( |x| (x.value.to_measurement(cto), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group4Var1(seq) => {
-                handler.handle_double_bit_binary_input(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group4Var2(seq) => {
-                handler.handle_double_bit_binary_input(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group4Var3(seq) => {
-                handler.handle_double_bit_binary_input(
-                    self.get_header_info(),
-                    &mut seq.iter().map( |x| (x.value.to_measurement(cto), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group11Var1(seq) => {
-                handler.handle_binary_output_status(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group11Var2(seq) => {
-                handler.handle_binary_output_status(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group12Var1(_) => {
-                false // command
-            }
-            PrefixedVariation::Group13Var1(seq) => {
-                handler.handle_binary_output_command_event(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group13Var2(seq) => {
-                handler.handle_binary_output_command_event(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group22Var1(seq) => {
-                handler.handle_counter(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group22Var2(seq) => {
-                handler.handle_counter(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group22Var5(seq) => {
-                handler.handle_counter(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group22Var6(seq) => {
-                handler.handle_counter(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group23Var1(seq) => {
-                handler.handle_frozen_counter(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group23Var2(seq) => {
-                handler.handle_frozen_counter(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group23Var5(seq) => {
-                handler.handle_frozen_counter(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group23Var6(seq) => {
-                handler.handle_frozen_counter(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group32Var1(seq) => {
-                handler.handle_analog_input(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group32Var2(seq) => {
-                handler.handle_analog_input(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group32Var3(seq) => {
-                handler.handle_analog_input(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group32Var4(seq) => {
-                handler.handle_analog_input(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group32Var5(seq) => {
-                handler.handle_analog_input(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group32Var6(seq) => {
-                handler.handle_analog_input(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group32Var7(seq) => {
-                handler.handle_analog_input(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group32Var8(seq) => {
-                handler.handle_analog_input(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group33Var1(seq) => {
-                handler.handle_frozen_analog_input(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group33Var2(seq) => {
-                handler.handle_frozen_analog_input(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group33Var3(seq) => {
-                handler.handle_frozen_analog_input(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group33Var4(seq) => {
-                handler.handle_frozen_analog_input(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group33Var5(seq) => {
-                handler.handle_frozen_analog_input(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group33Var6(seq) => {
-                handler.handle_frozen_analog_input(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group33Var7(seq) => {
-                handler.handle_frozen_analog_input(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group33Var8(seq) => {
-                handler.handle_frozen_analog_input(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group34Var1(_) => {
-                false // dead-band
-            }
-            PrefixedVariation::Group34Var2(_) => {
-                false // dead-band
-            }
-            PrefixedVariation::Group34Var3(_) => {
-                false // dead-band
-            }
-            PrefixedVariation::Group41Var1(_) => {
-                false // command
-            }
-            PrefixedVariation::Group41Var2(_) => {
-                false // command
-            }
-            PrefixedVariation::Group41Var3(_) => {
-                false // command
-            }
-            PrefixedVariation::Group41Var4(_) => {
-                false // command
-            }
-            PrefixedVariation::Group42Var1(seq) => {
-                handler.handle_analog_output_status(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group42Var2(seq) => {
-                handler.handle_analog_output_status(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group42Var3(seq) => {
-                handler.handle_analog_output_status(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group42Var4(seq) => {
-                handler.handle_analog_output_status(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group42Var5(seq) => {
-                handler.handle_analog_output_status(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group42Var6(seq) => {
-                handler.handle_analog_output_status(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group42Var7(seq) => {
-                handler.handle_analog_output_status(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group42Var8(seq) => {
-                handler.handle_analog_output_status(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group43Var1(seq) => {
-                handler.handle_analog_output_command_event(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group43Var2(seq) => {
-                handler.handle_analog_output_command_event(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group43Var3(seq) => {
-                handler.handle_analog_output_command_event(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group43Var4(seq) => {
-                handler.handle_analog_output_command_event(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group43Var5(seq) => {
-                handler.handle_analog_output_command_event(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group43Var6(seq) => {
-                handler.handle_analog_output_command_event(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group43Var7(seq) => {
-                handler.handle_analog_output_command_event(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group43Var8(seq) => {
-                handler.handle_analog_output_command_event(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.value.into(), x.index.widen_to_u16()))
-                );
-                true
-            }
-            PrefixedVariation::Group111VarX(_, seq) => {
-                handler.handle_octet_string(
-                    self.get_header_info(),
-                    &mut seq.iter().map(|x| (x.0, x.1.widen_to_u16()))
-                );
-                true
-            }
-        }
-    }
-    
-    pub(crate) fn get_header_info(&self) -> HeaderInfo {
-        match self {
-            PrefixedVariation::Group0(attr) => HeaderInfo::new(Variation::Group0(attr.variation), I::COUNT_AND_PREFIX_QUALIFIER, false, false),
-            PrefixedVariation::Group2Var1(_) => HeaderInfo::new(Variation::Group2Var1, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group2Var2(_) => HeaderInfo::new(Variation::Group2Var2, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group2Var3(_) => HeaderInfo::new(Variation::Group2Var3, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group4Var1(_) => HeaderInfo::new(Variation::Group4Var1, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group4Var2(_) => HeaderInfo::new(Variation::Group4Var2, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group4Var3(_) => HeaderInfo::new(Variation::Group4Var3, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group11Var1(_) => HeaderInfo::new(Variation::Group11Var1, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group11Var2(_) => HeaderInfo::new(Variation::Group11Var2, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group12Var1(_) => HeaderInfo::new(Variation::Group12Var1, I::COUNT_AND_PREFIX_QUALIFIER, false, false),
-            PrefixedVariation::Group13Var1(_) => HeaderInfo::new(Variation::Group13Var1, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group13Var2(_) => HeaderInfo::new(Variation::Group13Var2, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group22Var1(_) => HeaderInfo::new(Variation::Group22Var1, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group22Var2(_) => HeaderInfo::new(Variation::Group22Var2, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group22Var5(_) => HeaderInfo::new(Variation::Group22Var5, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group22Var6(_) => HeaderInfo::new(Variation::Group22Var6, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group23Var1(_) => HeaderInfo::new(Variation::Group23Var1, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group23Var2(_) => HeaderInfo::new(Variation::Group23Var2, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group23Var5(_) => HeaderInfo::new(Variation::Group23Var5, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group23Var6(_) => HeaderInfo::new(Variation::Group23Var6, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group32Var1(_) => HeaderInfo::new(Variation::Group32Var1, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group32Var2(_) => HeaderInfo::new(Variation::Group32Var2, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group32Var3(_) => HeaderInfo::new(Variation::Group32Var3, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group32Var4(_) => HeaderInfo::new(Variation::Group32Var4, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group32Var5(_) => HeaderInfo::new(Variation::Group32Var5, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group32Var6(_) => HeaderInfo::new(Variation::Group32Var6, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group32Var7(_) => HeaderInfo::new(Variation::Group32Var7, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group32Var8(_) => HeaderInfo::new(Variation::Group32Var8, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group33Var1(_) => HeaderInfo::new(Variation::Group33Var1, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group33Var2(_) => HeaderInfo::new(Variation::Group33Var2, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group33Var3(_) => HeaderInfo::new(Variation::Group33Var3, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group33Var4(_) => HeaderInfo::new(Variation::Group33Var4, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group33Var5(_) => HeaderInfo::new(Variation::Group33Var5, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group33Var6(_) => HeaderInfo::new(Variation::Group33Var6, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group33Var7(_) => HeaderInfo::new(Variation::Group33Var7, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group33Var8(_) => HeaderInfo::new(Variation::Group33Var8, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group34Var1(_) => HeaderInfo::new(Variation::Group34Var1, I::COUNT_AND_PREFIX_QUALIFIER, false, false),
-            PrefixedVariation::Group34Var2(_) => HeaderInfo::new(Variation::Group34Var2, I::COUNT_AND_PREFIX_QUALIFIER, false, false),
-            PrefixedVariation::Group34Var3(_) => HeaderInfo::new(Variation::Group34Var3, I::COUNT_AND_PREFIX_QUALIFIER, false, false),
-            PrefixedVariation::Group41Var1(_) => HeaderInfo::new(Variation::Group41Var1, I::COUNT_AND_PREFIX_QUALIFIER, false, false),
-            PrefixedVariation::Group41Var2(_) => HeaderInfo::new(Variation::Group41Var2, I::COUNT_AND_PREFIX_QUALIFIER, false, false),
-            PrefixedVariation::Group41Var3(_) => HeaderInfo::new(Variation::Group41Var3, I::COUNT_AND_PREFIX_QUALIFIER, false, false),
-            PrefixedVariation::Group41Var4(_) => HeaderInfo::new(Variation::Group41Var4, I::COUNT_AND_PREFIX_QUALIFIER, false, false),
-            PrefixedVariation::Group42Var1(_) => HeaderInfo::new(Variation::Group42Var1, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group42Var2(_) => HeaderInfo::new(Variation::Group42Var2, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group42Var3(_) => HeaderInfo::new(Variation::Group42Var3, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group42Var4(_) => HeaderInfo::new(Variation::Group42Var4, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group42Var5(_) => HeaderInfo::new(Variation::Group42Var5, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group42Var6(_) => HeaderInfo::new(Variation::Group42Var6, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group42Var7(_) => HeaderInfo::new(Variation::Group42Var7, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group42Var8(_) => HeaderInfo::new(Variation::Group42Var8, I::COUNT_AND_PREFIX_QUALIFIER, true, true),
-            PrefixedVariation::Group43Var1(_) => HeaderInfo::new(Variation::Group43Var1, I::COUNT_AND_PREFIX_QUALIFIER, true, false),
-            PrefixedVariation::Group43Var2(_) => HeaderInfo::new(Variation::Group43Var2, I::COUNT_AND_PREFIX_QUALIFIER, true, false),
-            PrefixedVariation::Group43Var3(_) => HeaderInfo::new(Variation::Group43Var3, I::COUNT_AND_PREFIX_QUALIFIER, true, false),
-            PrefixedVariation::Group43Var4(_) => HeaderInfo::new(Variation::Group43Var4, I::COUNT_AND_PREFIX_QUALIFIER, true, false),
-            PrefixedVariation::Group43Var5(_) => HeaderInfo::new(Variation::Group43Var5, I::COUNT_AND_PREFIX_QUALIFIER, true, false),
-            PrefixedVariation::Group43Var6(_) => HeaderInfo::new(Variation::Group43Var6, I::COUNT_AND_PREFIX_QUALIFIER, true, false),
-            PrefixedVariation::Group43Var7(_) => HeaderInfo::new(Variation::Group43Var7, I::COUNT_AND_PREFIX_QUALIFIER, true, false),
-            PrefixedVariation::Group43Var8(_) => HeaderInfo::new(Variation::Group43Var8, I::COUNT_AND_PREFIX_QUALIFIER, true, false),
-            PrefixedVariation::Group111VarX(x, _) =>  HeaderInfo::new(Variation::Group111(*x), I::COUNT_AND_PREFIX_QUALIFIER, true, false),
         }
     }
 }
