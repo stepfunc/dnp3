@@ -4,6 +4,37 @@
 // Text and data mining rights, including for AI training, are reserved under
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
+//! The event buffer against a model
+//!
+//! `behaves_like_a_list_with_per_type_limits` checks the buffer against a list of records in
+//! insertion order, each with its type, class and state (unselected, selected or written), and
+//! per-type limits that evict the oldest record of the type, whatever its state. After every
+//! generated op, the buffer's class and type counts, unwritten classes, overflow flag and
+//! per-type presence must match the model's, and so must the op's result: an insert's id, its
+//! eviction (`Overflow { created, discarded }`) or `TypeMaxIsZero`; selection counts; the
+//! written count, progress and bytes; the cleared ids in order; and discard counts. A final
+//! reset, select, write and clear must leave both empty.
+//!
+//! The oracle is independent: the model writes the bytes itself, a header for each run of one
+//! group and variation and then a 2-byte index and the data for each event, with a timestamp
+//! whose bytes all differ, and shares nothing with `EventWriter`.
+//!
+//! The generator uses per-type limits of 0..4, up to 96 ops over the 8 types, any index, class
+//! reads with a limit of 0..4 or none, type reads in the default or a specific variation, and
+//! cursors of 0..48 bytes or 4096. It is built to reach: eviction of an unselected, a selected
+//! and a written record (of the new record's class or another) for every type, and while
+//! overflown; a type with no room; selects cut by a limit, including 0; partial writes where
+//! nothing fits, in a header and at a new header, and writes resuming after them; clears and
+//! discards with other records in flight; overflow persisting and clearing after a clear or a
+//! discard; and a reset of selected or written records followed by a discard. Two cases come up
+//! in only some runs, so fixed traces through the model below cover them: a new header of the
+//! same group in another variation, and every type full at once (which fills the list holding the
+//! records) before an insert evicts.
+//!
+//! Not generated: CTO variations (g2v3, g4v3), events without time, octet strings of other
+//! lengths (see `fragment_tests.rs`, `tests/event_time.rs` and `writer.rs`), and a header count
+//! past `u16::MAX`.
+
 use proptest::prelude::*;
 use scursor::WriteCursor;
 
@@ -221,14 +252,6 @@ fn matches(classes: EventClasses, class: EventClass) -> bool {
     }
 }
 
-fn class_counts(num_class_1: usize, num_class_2: usize, num_class_3: usize) -> ClassCount {
-    ClassCount {
-        num_class_1,
-        num_class_2,
-        num_class_3,
-    }
-}
-
 fn no_types() -> TypeCount {
     TypeCount {
         num_binary_input: 0,
@@ -240,14 +263,6 @@ fn no_types() -> TypeCount {
         num_analog_output_status: 0,
         num_octet_string: 0,
     }
-}
-
-fn types(counts: &[(Kind, usize)]) -> TypeCount {
-    let mut types = no_types();
-    for (kind, count) in counts {
-        *kind.count_mut(&mut types) = *count;
-    }
-    types
 }
 
 /// records the ids of cleared events in order
@@ -270,453 +285,12 @@ fn write_bytes(buffer: &mut EventBuffer, size: usize) -> ((usize, WriteProgress)
     (result, cursor.written().to_vec())
 }
 
-/// write the selected events into a cursor of `size` bytes
-fn write(buffer: &mut EventBuffer, size: usize) -> (usize, WriteProgress) {
-    write_bytes(buffer, size).0
-}
-
 /// clear the written events, returning their ids in order
 fn clear(buffer: &mut EventBuffer) -> Vec<u64> {
     let mut app = Cleared::default();
     let count = buffer.clear_written(&mut app);
     assert_eq!(count, app.ids.len());
     app.ids
-}
-
-/// re-arm, select, write and clear everything, returning the ids of what was left in order
-fn drain(buffer: &mut EventBuffer) -> Vec<u64> {
-    buffer.reset();
-    let selected = buffer.select_by_class(EventClasses::all(), None);
-    assert_eq!(write(buffer, 4096), (selected, WriteProgress::Complete));
-    clear(buffer)
-}
-
-fn binary(buffer: &mut EventBuffer, class: EventClass) -> Result<u64, InsertError> {
-    Kind::Binary.insert(buffer, 0, class)
-}
-
-#[test]
-fn overflow_discards_the_oldest_event_of_the_full_type_only() {
-    let mut config = EventBufferConfig::no_events();
-    config.max_binary = 2;
-    config.max_counter = 1;
-    let mut buffer = EventBuffer::new(config);
-
-    assert_eq!(binary(&mut buffer, EventClass::Class1), Ok(0));
-    assert_eq!(
-        Kind::Counter.insert(&mut buffer, 0, EventClass::Class2),
-        Ok(1)
-    );
-    assert_eq!(binary(&mut buffer, EventClass::Class3), Ok(2));
-    assert!(!buffer.is_overflown());
-
-    assert_eq!(
-        binary(&mut buffer, EventClass::Class1),
-        Err(InsertError::Overflow {
-            created: 3,
-            discarded: 0
-        })
-    );
-    assert!(buffer.is_overflown());
-    assert_eq!(
-        buffer.buffer_state(),
-        BufferState {
-            classes: class_counts(1, 1, 1),
-            types: types(&[(Kind::Binary, 2), (Kind::Counter, 1)]),
-        }
-    );
-
-    // a type with no space doesn't consume an id
-    assert_eq!(
-        Kind::Analog.insert(&mut buffer, 0, EventClass::Class1),
-        Err(InsertError::TypeMaxIsZero)
-    );
-    assert_eq!(
-        binary(&mut buffer, EventClass::Class2),
-        Err(InsertError::Overflow {
-            created: 4,
-            discarded: 2
-        })
-    );
-    assert_eq!(
-        buffer.buffer_state(),
-        BufferState {
-            classes: class_counts(1, 2, 0),
-            types: types(&[(Kind::Binary, 2), (Kind::Counter, 1)]),
-        }
-    );
-
-    // the survivors keep their insertion order
-    assert_eq!(drain(&mut buffer), [1, 3, 4]);
-    assert!(!buffer.is_overflown());
-    assert_eq!(
-        buffer.buffer_state(),
-        BufferState {
-            classes: class_counts(0, 0, 0),
-            types: no_types(),
-        }
-    );
-}
-
-#[test]
-fn overflow_persists_until_no_type_is_full() {
-    let mut config = EventBufferConfig::no_events();
-    config.max_binary = 2;
-    config.max_counter = 1;
-    let mut buffer = EventBuffer::new(config);
-
-    binary(&mut buffer, EventClass::Class1).unwrap();
-    binary(&mut buffer, EventClass::Class1).unwrap();
-    binary(&mut buffer, EventClass::Class1).unwrap_err();
-    Kind::Counter
-        .insert(&mut buffer, 0, EventClass::Class2)
-        .unwrap();
-    assert!(buffer.is_overflown());
-
-    // confirming the binary events leaves the counter type full
-    assert_eq!(Kind::Binary.select(&mut buffer, false, None), 2);
-    assert_eq!(write(&mut buffer, 4096), (2, WriteProgress::Complete));
-    assert!(buffer.is_overflown());
-    assert_eq!(clear(&mut buffer), [1, 2]);
-    assert!(buffer.is_overflown());
-
-    // an empty confirm changes nothing
-    assert!(clear(&mut buffer).is_empty());
-    assert!(buffer.is_overflown());
-
-    // discarding the counter frees its type
-    assert_eq!(
-        buffer.remove_unselected_by_class(EventClass::Class2.into()),
-        class_counts(0, 1, 0)
-    );
-    assert!(!buffer.is_overflown());
-
-    // a type that isn't full doesn't overflow again
-    binary(&mut buffer, EventClass::Class1).unwrap();
-    assert!(!buffer.is_overflown());
-}
-
-#[test]
-fn confirm_clears_exactly_the_written_events() {
-    let mut buffer = EventBuffer::new(EventBufferConfig::all_types(5));
-
-    binary(&mut buffer, EventClass::Class1).unwrap(); // 0
-    Kind::Counter
-        .insert(&mut buffer, 1, EventClass::Class2)
-        .unwrap(); // 1
-    binary(&mut buffer, EventClass::Class3).unwrap(); // 2
-    Kind::Analog
-        .insert(&mut buffer, 2, EventClass::Class1)
-        .unwrap(); // 3
-    binary(&mut buffer, EventClass::Class1).unwrap(); // 4
-
-    assert_eq!(
-        buffer.select_by_class(EventClass::Class1 | EventClass::Class3, None),
-        4
-    );
-
-    // room for the first two binary events only, which share a header
-    assert_eq!(write(&mut buffer, 14), (2, WriteProgress::Partial));
-    assert_eq!(
-        buffer.unwritten_classes(),
-        EventClasses::new(true, true, false)
-    );
-    assert_eq!(clear(&mut buffer), [0, 2]);
-    assert_eq!(
-        buffer.buffer_state(),
-        BufferState {
-            classes: class_counts(2, 1, 0),
-            types: types(&[(Kind::Binary, 1), (Kind::Counter, 1), (Kind::Analog, 1)]),
-        }
-    );
-
-    // the still-selected events can't be selected again, and are written next
-    assert_eq!(buffer.select_by_class(EventClasses::all(), None), 1);
-    assert_eq!(write(&mut buffer, 4096), (3, WriteProgress::Complete));
-    assert_eq!(buffer.unwritten_classes(), EventClasses::none());
-    assert_eq!(clear(&mut buffer), [1, 3, 4]);
-    assert_eq!(
-        buffer.buffer_state(),
-        BufferState {
-            classes: class_counts(0, 0, 0),
-            types: no_types(),
-        }
-    );
-}
-
-#[test]
-fn written_counts_accumulate_across_fragments_until_the_confirm() {
-    let mut buffer = EventBuffer::new(EventBufferConfig::all_types(5));
-
-    for class in [EventClass::Class1, EventClass::Class2, EventClass::Class3] {
-        binary(&mut buffer, class).unwrap();
-    }
-    Kind::Counter
-        .insert(&mut buffer, 0, EventClass::Class1)
-        .unwrap();
-
-    assert_eq!(buffer.select_by_class(EventClasses::all(), None), 4);
-
-    // one binary event per fragment, each written without a confirm in between
-    assert_eq!(write(&mut buffer, 10), (1, WriteProgress::Partial));
-    assert_eq!(buffer.unwritten_classes(), EventClasses::all());
-    assert_eq!(write(&mut buffer, 10), (1, WriteProgress::Partial));
-    assert_eq!(
-        buffer.unwritten_classes(),
-        EventClasses::new(true, false, true)
-    );
-    assert_eq!(write(&mut buffer, 10), (1, WriteProgress::Partial));
-    assert_eq!(
-        buffer.unwritten_classes(),
-        EventClasses::new(true, false, false)
-    );
-    assert_eq!(write(&mut buffer, 0), (0, WriteProgress::Partial));
-    assert_eq!(write(&mut buffer, 4096), (1, WriteProgress::Complete));
-    assert_eq!(buffer.unwritten_classes(), EventClasses::none());
-    assert_eq!(write(&mut buffer, 4096), (0, WriteProgress::Complete));
-
-    assert_eq!(clear(&mut buffer), [0, 1, 2, 3]);
-    assert_eq!(buffer.unwritten_classes(), EventClasses::none());
-    assert_eq!(buffer.buffer_state().classes, class_counts(0, 0, 0));
-}
-
-#[test]
-fn evicting_a_written_event_leaves_the_other_written_events_to_the_confirm() {
-    let mut config = EventBufferConfig::no_events();
-    config.max_binary = 2;
-    let mut buffer = EventBuffer::new(config);
-
-    binary(&mut buffer, EventClass::Class1).unwrap();
-    binary(&mut buffer, EventClass::Class2).unwrap();
-    assert_eq!(buffer.select_by_class(EventClasses::all(), None), 2);
-    assert_eq!(write(&mut buffer, 4096), (2, WriteProgress::Complete));
-    assert_eq!(buffer.unwritten_classes(), EventClasses::none());
-
-    // the oldest written event is discarded before the confirm
-    assert_eq!(
-        binary(&mut buffer, EventClass::Class3),
-        Err(InsertError::Overflow {
-            created: 2,
-            discarded: 0
-        })
-    );
-    assert_eq!(buffer.unwritten_classes(), EventClass::Class3.into());
-    assert_eq!(
-        buffer.buffer_state(),
-        BufferState {
-            classes: class_counts(0, 1, 1),
-            types: types(&[(Kind::Binary, 2)]),
-        }
-    );
-
-    // the confirm clears the remaining written event, and the new one stays unwritten
-    assert_eq!(clear(&mut buffer), [1]);
-    assert!(!buffer.is_overflown());
-    assert_eq!(buffer.unwritten_classes(), EventClass::Class3.into());
-    assert_eq!(
-        buffer.buffer_state(),
-        BufferState {
-            classes: class_counts(0, 0, 1),
-            types: types(&[(Kind::Binary, 1)]),
-        }
-    );
-    assert_eq!(drain(&mut buffer), [2]);
-}
-
-#[test]
-fn evicting_every_written_event_leaves_nothing_to_confirm() {
-    let mut config = EventBufferConfig::no_events();
-    config.max_binary = 2;
-    let mut buffer = EventBuffer::new(config);
-
-    binary(&mut buffer, EventClass::Class1).unwrap();
-    binary(&mut buffer, EventClass::Class1).unwrap();
-    assert_eq!(buffer.select_by_class(EventClasses::all(), None), 2);
-    assert_eq!(write(&mut buffer, 4096), (2, WriteProgress::Complete));
-
-    binary(&mut buffer, EventClass::Class2).unwrap_err();
-    binary(&mut buffer, EventClass::Class2).unwrap_err();
-    assert_eq!(buffer.unwritten_classes(), EventClass::Class2.into());
-    assert_eq!(buffer.buffer_state().classes, class_counts(0, 2, 0));
-
-    assert!(clear(&mut buffer).is_empty());
-    // both binary slots are still occupied
-    assert!(buffer.is_overflown());
-    assert_eq!(buffer.unwritten_classes(), EventClass::Class2.into());
-    assert_eq!(drain(&mut buffer), [2, 3]);
-}
-
-#[test]
-fn reset_rearms_selected_and_written_events_after_an_unconfirmed_series() {
-    let mut buffer = EventBuffer::new(EventBufferConfig::all_types(5));
-
-    binary(&mut buffer, EventClass::Class1).unwrap();
-    Kind::Counter
-        .insert(&mut buffer, 0, EventClass::Class2)
-        .unwrap();
-    binary(&mut buffer, EventClass::Class1).unwrap();
-
-    // an unsolicited series writes some of the events and is never confirmed
-    assert_eq!(buffer.select_by_class(EventClasses::all(), None), 3);
-    assert_eq!(write(&mut buffer, 10), (1, WriteProgress::Partial));
-    assert_eq!(
-        buffer.unwritten_classes(),
-        EventClasses::new(true, true, false)
-    );
-
-    buffer.reset();
-    assert_eq!(
-        buffer.unwritten_classes(),
-        EventClasses::new(true, true, false)
-    );
-    // nothing is written any more, so a confirm clears nothing
-    assert!(clear(&mut buffer).is_empty());
-    assert_eq!(buffer.buffer_state().classes, class_counts(2, 1, 0));
-
-    // a READ of class 1 reselects both class 1 events, including the written one
-    assert_eq!(buffer.select_by_class(EventClass::Class1.into(), None), 2);
-    assert_eq!(write(&mut buffer, 4096), (2, WriteProgress::Complete));
-    assert_eq!(buffer.unwritten_classes(), EventClass::Class2.into());
-    assert_eq!(clear(&mut buffer), [0, 2]);
-    assert_eq!(drain(&mut buffer), [1]);
-}
-
-#[test]
-fn reset_after_a_partial_write_and_new_events_keeps_insertion_order() {
-    let mut buffer = EventBuffer::new(EventBufferConfig::all_types(5));
-
-    binary(&mut buffer, EventClass::Class1).unwrap();
-    binary(&mut buffer, EventClass::Class1).unwrap();
-    assert_eq!(buffer.select_by_class(EventClasses::all(), None), 2);
-    assert_eq!(write(&mut buffer, 10), (1, WriteProgress::Partial));
-
-    binary(&mut buffer, EventClass::Class1).unwrap();
-    buffer.reset();
-
-    // the limit takes the oldest events
-    assert_eq!(
-        buffer.select_by_class(EventClass::Class1.into(), Some(2)),
-        2
-    );
-    assert_eq!(write(&mut buffer, 4096), (2, WriteProgress::Complete));
-    assert_eq!(clear(&mut buffer), [0, 1]);
-    assert_eq!(drain(&mut buffer), [2]);
-}
-
-#[test]
-fn each_type_holds_exactly_its_configured_maximum() {
-    let config = EventBufferConfig::new(1, 2, 3, 0, 1, 2, 3, 2);
-    let mut buffer = EventBuffer::new(config);
-
-    let mut expected = no_types();
-    let mut next: u64 = 0;
-    // fill every type, leaving the whole buffer full
-    for kind in KINDS {
-        for _ in 0..kind.max(&config) {
-            assert_eq!(kind.insert(&mut buffer, 0, EventClass::Class1), Ok(next));
-            next = next.wrapping_add(1);
-        }
-        *kind.count_mut(&mut expected) = kind.max(&config);
-        assert!(!buffer.is_overflown());
-    }
-    assert_eq!(buffer.buffer_state().types, expected);
-    assert!(!Kind::Counter.has_events(&buffer));
-
-    // one more of each type replaces that type's oldest event
-    let mut kept: Vec<u64> = Vec::new();
-    let mut replacements: Vec<u64> = Vec::new();
-    let mut oldest: u64 = 0;
-    for kind in KINDS {
-        let max = u64::try_from(kind.max(&config)).unwrap();
-        let result = kind.insert(&mut buffer, 0, EventClass::Class2);
-        if max == 0 {
-            assert_eq!(result, Err(InsertError::TypeMaxIsZero));
-            continue;
-        }
-        assert_eq!(
-            result,
-            Err(InsertError::Overflow {
-                created: next,
-                discarded: oldest,
-            })
-        );
-        assert!(buffer.is_overflown());
-        kept.extend((1..max).map(|offset| oldest.wrapping_add(offset)));
-        replacements.push(next);
-        next = next.wrapping_add(1);
-        oldest = oldest.wrapping_add(max);
-    }
-    assert_eq!(buffer.buffer_state().types, expected);
-
-    // the events still in place keep their order, followed by the replacements
-    kept.extend(replacements);
-    assert_eq!(drain(&mut buffer), kept);
-    assert!(!buffer.is_overflown());
-}
-
-#[test]
-fn type_reads_select_only_their_type_with_limits() {
-    let mut buffer = EventBuffer::new(EventBufferConfig::all_types(5));
-
-    binary(&mut buffer, EventClass::Class1).unwrap(); // 0
-    Kind::Analog
-        .insert(&mut buffer, 0, EventClass::Class1)
-        .unwrap(); // 1
-    binary(&mut buffer, EventClass::Class2).unwrap(); // 2
-    binary(&mut buffer, EventClass::Class3).unwrap(); // 3
-
-    assert_eq!(Kind::Binary.select(&mut buffer, true, Some(2)), 2);
-    // the analog event and the third binary event are still unselected
-    assert_eq!(Kind::Counter.select(&mut buffer, false, None), 0);
-    assert_eq!(write(&mut buffer, 4096), (2, WriteProgress::Complete));
-    assert_eq!(
-        buffer.unwritten_classes(),
-        EventClasses::new(true, false, true)
-    );
-    assert_eq!(clear(&mut buffer), [0, 2]);
-
-    assert_eq!(Kind::Binary.select(&mut buffer, false, None), 1);
-    assert_eq!(Kind::Analog.select(&mut buffer, false, None), 1);
-    assert_eq!(write(&mut buffer, 4096), (2, WriteProgress::Complete));
-    assert_eq!(clear(&mut buffer), [1, 3]);
-}
-
-#[test]
-fn discard_updates_class_and_type_counts() {
-    let mut buffer = EventBuffer::new(EventBufferConfig::all_types(5));
-
-    binary(&mut buffer, EventClass::Class1).unwrap(); // 0
-    Kind::Counter
-        .insert(&mut buffer, 0, EventClass::Class2)
-        .unwrap(); // 1
-    Kind::OctetString
-        .insert(&mut buffer, 0, EventClass::Class2)
-        .unwrap(); // 2
-    binary(&mut buffer, EventClass::Class3).unwrap(); // 3
-
-    // the first binary event is in flight
-    assert_eq!(buffer.select_by_class(EventClass::Class1.into(), None), 1);
-
-    assert_eq!(
-        buffer.remove_unselected_by_class(EventClass::Class1 | EventClass::Class2),
-        class_counts(0, 2, 0)
-    );
-    assert_eq!(
-        buffer.buffer_state(),
-        BufferState {
-            classes: class_counts(1, 0, 1),
-            types: types(&[(Kind::Binary, 2)]),
-        }
-    );
-    assert!(!Kind::Counter.has_events(&buffer));
-    assert!(!Kind::OctetString.has_events(&buffer));
-    assert!(Kind::Binary.has_events(&buffer));
-    assert_eq!(
-        buffer.unwritten_classes(),
-        EventClass::Class1 | EventClass::Class3
-    );
-
-    assert_eq!(drain(&mut buffer), [0, 3]);
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -1054,5 +628,99 @@ proptest! {
             model.check(&buffer);
         }
         assert!(model.records.is_empty());
+    }
+}
+
+/// A type READ that selects one binary event in the default variation and the next one in g2v2
+/// writes a new header of the same group for the second, each event with its index and the second
+/// with its time, and the confirm clears both in order. The property reaches a change of variation
+/// within a group in only some runs.
+#[test]
+fn a_type_read_changes_the_variation_within_a_group() {
+    let config = EventBufferConfig::all_types(3);
+    let mut buffer = EventBuffer::new(config);
+    let mut model = Model::new(config);
+    model.check(&buffer);
+    for op in [
+        Op::Insert(Kind::Binary, 1, EventClass::Class1),
+        Op::Insert(Kind::Counter, 2, EventClass::Class2),
+        Op::Insert(Kind::DoubleBitBinary, 3, EventClass::Class3),
+        Op::Insert(Kind::Binary, 4, EventClass::Class2),
+        Op::Insert(Kind::Analog, 5, EventClass::Class1),
+        // the first binary event in the default variation, then the other one in g2v2
+        Op::SelectType(Kind::Binary, false, Some(1)),
+        Op::SelectType(Kind::Binary, true, None),
+    ] {
+        model.apply(&mut buffer, op);
+        model.check(&buffer);
+    }
+
+    let written = write_bytes(&mut buffer, 64);
+    assert_eq!(
+        written,
+        (
+            (2, WriteProgress::Complete),
+            vec![
+                // g2v1, count 1, index 1
+                2, 1, 0x28, 0x01, 0x00, 0x01, 0x00, 0x81,
+                // g2v2, count 1, index 4, with the 48-bit time
+                2, 2, 0x28, 0x01, 0x00, 0x04, 0x00, 0x81, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06,
+            ]
+        )
+    );
+    assert_eq!(model.write(64), written);
+    model.check(&buffer);
+
+    let cleared = clear(&mut buffer);
+    assert_eq!(cleared, [0, 3]);
+    assert_eq!(model.clear_written(), cleared);
+    model.check(&buffer);
+}
+
+/// Every type full at once, which fills the list that holds the records, then one more event of
+/// each type, which must evict the oldest event of that type to make room. The property fills
+/// every type at once in only some runs.
+#[test]
+fn each_type_holds_exactly_its_configured_maximum() {
+    let config = EventBufferConfig::new(1, 2, 3, 0, 1, 2, 3, 2);
+    let mut buffer = EventBuffer::new(config);
+    let mut model = Model::new(config);
+    model.check(&buffer);
+
+    let fill = KINDS.into_iter().flat_map(|kind| {
+        std::iter::repeat_n(Op::Insert(kind, 0, EventClass::Class1), kind.max(&config))
+    });
+    let one_more = KINDS
+        .into_iter()
+        .map(|kind| Op::Insert(kind, 0, EventClass::Class2));
+    let drain = [
+        Op::Reset,
+        Op::SelectClasses(EventClasses::all()),
+        Op::Write(4096),
+        Op::ClearWritten,
+    ];
+    for op in fill.chain(one_more).chain(drain) {
+        model.apply(&mut buffer, op);
+        model.check(&buffer);
+    }
+    assert!(model.records.is_empty());
+}
+
+#[test]
+fn event_classes_combine_and_class_counts_are_empty_only_at_zero() {
+    assert_eq!(
+        EventClass::Class1 | EventClass::Class3,
+        EventClasses::new(true, false, true)
+    );
+    assert_eq!(
+        EventClasses::new(true, false, false) | EventClasses::new(false, true, true),
+        EventClasses::all()
+    );
+
+    assert!(ClassCount::default().is_empty());
+    for class in CLASSES {
+        let mut count = ClassCount::default();
+        *class_count_mut(&mut count, class) = 1;
+        assert!(!count.is_empty());
     }
 }
