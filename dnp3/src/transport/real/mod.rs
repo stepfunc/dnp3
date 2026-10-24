@@ -51,7 +51,6 @@ mod tests {
     use crate::decode::DecodeLevel;
     use crate::link::header::AnyAddress;
     use crate::link::test_data;
-    use crate::outstation::Feature;
     use crate::transport::{FragmentAddr, TransportData, TransportRead, TransportWrite};
     use crate::util::phys::{PhysAddr, PhysLayer};
 
@@ -83,7 +82,7 @@ mod tests {
 
     #[tokio::test(start_paused = true)]
     async fn outstation_writes_frames_from_the_outstation() {
-        for self_address in [Feature::Disabled, Feature::Enabled] {
+        for self_address in [false, true] {
             let mut h = Harness::new(outstation(self_address));
             h.write(MASTER, &[1, 2, 3]).await;
             h.write_link_status_request(MASTER).await;
@@ -124,7 +123,7 @@ mod tests {
 
     #[tokio::test(start_paused = true)]
     async fn outstation_without_self_address_ignores_frames_sent_to_self_address() {
-        let mut h = Harness::new(outstation(Feature::Disabled));
+        let mut h = Harness::new(outstation(false));
         let frames = [
             fragment_frame(true, AnyAddress::SelfAddress, MASTER, 0, &[1]),
             header_only(true, REQUEST_LINK_STATUS, AnyAddress::SelfAddress, MASTER),
@@ -385,7 +384,7 @@ mod tests {
                 LinkRole::Master
             } else {
                 LinkRole::Outstation {
-                    self_address: Feature::Disabled,
+                    self_address: false,
                 }
             }
         }

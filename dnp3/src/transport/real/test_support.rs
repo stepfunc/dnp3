@@ -13,7 +13,6 @@ use crate::link::header::{AnyAddress, ControlField, Header};
 use crate::link::reader::LinkModes;
 use crate::link::test_data;
 use crate::link::{EndpointAddress, LinkRole};
-use crate::outstation::Feature;
 use crate::transport::real::reader::Reader;
 use crate::transport::real::writer::Writer;
 use crate::transport::real::RealTransport;
@@ -39,7 +38,7 @@ pub(super) fn master() -> (Reader, Writer) {
     RealTransport::new(LinkModes::test(), LinkRole::Master, MASTER, 2048)
 }
 
-pub(super) fn outstation(self_address: Feature) -> (Reader, Writer) {
+pub(super) fn outstation(self_address: bool) -> (Reader, Writer) {
     RealTransport::new(
         LinkModes::test(),
         LinkRole::Outstation { self_address },

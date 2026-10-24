@@ -5,7 +5,6 @@
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
 use crate::link::header::AnyAddress;
-use crate::outstation::Feature;
 
 mod crc;
 pub(crate) mod display;
@@ -25,7 +24,7 @@ pub(crate) enum LinkRole {
     Master,
     /// an outstation, which also accepts frames sent to the self address when `self_address` is enabled
     Outstation {
-        self_address: Feature,
+        self_address: bool,
     },
 }
 

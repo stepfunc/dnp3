@@ -116,12 +116,11 @@ mod tests {
 
     use super::*;
     use crate::link::test_data::{self, data_frame};
-    use crate::outstation::Feature;
     use crate::transport::real::test_support::*;
 
     #[tokio::test(start_paused = true)]
     async fn returns_a_fragment_assembled_from_several_segments() {
-        let mut h = Harness::new(outstation(Feature::Disabled));
+        let mut h = Harness::new(outstation(false));
         h.queue(&[
             segment(true, false, 0, &[1, 2]),
             segment(false, true, 1, &[3]),
@@ -132,7 +131,7 @@ mod tests {
 
     #[tokio::test(start_paused = true)]
     async fn read_returns_at_once_while_a_fragment_is_pending() {
-        let mut h = Harness::new(outstation(Feature::Disabled));
+        let mut h = Harness::new(outstation(false));
         h.queue(&[segment(true, true, 0, &[1]), segment(true, true, 1, &[2])]);
         assert!(h.read().await);
         assert!(h.read().await);
@@ -143,7 +142,7 @@ mod tests {
 
     #[tokio::test(start_paused = true)]
     async fn read_returns_at_once_while_a_link_layer_message_is_pending() {
-        let mut h = Harness::new(outstation(Feature::Disabled));
+        let mut h = Harness::new(outstation(false));
         h.queue(&[link_status_request()]);
         assert!(h.read().await);
         assert_eq!(h.peek(), Some(Item::LinkStatusRequest(MASTER)));
@@ -155,7 +154,7 @@ mod tests {
 
     #[tokio::test(start_paused = true)]
     async fn pending_link_layer_message_is_not_overwritten_by_the_next() {
-        let mut h = Harness::new(outstation(Feature::Disabled));
+        let mut h = Harness::new(outstation(false));
         // a link status response with DIR set, as if from the master
         let link_status = header_only(true, LINK_STATUS, OUTSTATION.wrap(), MASTER);
         h.queue(&[link_status_request(), link_status]);
@@ -168,7 +167,7 @@ mod tests {
 
     #[tokio::test(start_paused = true)]
     async fn link_layer_message_during_assembly_leaves_the_series() {
-        let mut h = Harness::new(outstation(Feature::Disabled));
+        let mut h = Harness::new(outstation(false));
         h.queue(&[
             segment(true, false, 0, &[1]),
             link_status_request(),
@@ -182,7 +181,7 @@ mod tests {
 
     #[tokio::test(start_paused = true)]
     async fn reset_discards_pending_input() {
-        let mut h = Harness::new(outstation(Feature::Disabled));
+        let mut h = Harness::new(outstation(false));
         h.queue(&[segment(true, false, 0, &[1]), link_status_request()]);
         assert!(h.read().await);
         h.reader.reset();
@@ -194,7 +193,7 @@ mod tests {
 
     #[tokio::test(start_paused = true)]
     async fn data_frame_without_a_transport_header_is_ignored() {
-        let mut h = Harness::new(outstation(Feature::Disabled));
+        let mut h = Harness::new(outstation(false));
         let frames = [
             segment(true, false, 0, &[1]),
             header_only(true, UNCONFIRMED_USER_DATA, OUTSTATION.wrap(), MASTER),
@@ -206,7 +205,7 @@ mod tests {
 
     #[tokio::test(start_paused = true)]
     async fn confirmed_data_frame_without_a_transport_header_is_acknowledged_and_ignored() {
-        let mut h = Harness::new(outstation(Feature::Disabled));
+        let mut h = Harness::new(outstation(false));
         let frames = [
             header_only(true, RESET_LINK_STATES, OUTSTATION.wrap(), MASTER),
             segment(true, false, 0, &[1]),
@@ -263,7 +262,7 @@ mod tests {
                     reader: Reader::new(
                         LinkModes::test(),
                         LinkRole::Outstation {
-                            self_address: crate::outstation::Feature::Disabled,
+                            self_address: false,
                         },
                         OUTSTATION,
                         2048,
@@ -387,7 +386,7 @@ mod tests {
 
             let mut writer = crate::transport::real::writer::Writer::new(
                 LinkRole::Outstation {
-                    self_address: crate::outstation::Feature::Disabled,
+                    self_address: false,
                 },
                 OUTSTATION,
             );
