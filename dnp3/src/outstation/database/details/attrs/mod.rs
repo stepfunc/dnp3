@@ -137,35 +137,38 @@ impl Selection {
     fn write_all(&mut self, cursor: &mut WriteCursor, map: &SetMap) -> WriteProgress {
         while let Some(item) = self.selected.front_mut() {
             let (set, var) = item.current();
-
-            // is it a variation list?
-            if var == crate::app::attr::var::LIST_OF_ATTRIBUTE_VARIATIONS {
-                if let Some(vars) = map.variations(set) {
-                    if Self::write_attr_list(set, cursor, vars).is_err() {
-                        return WriteProgress::Partial;
-                    }
-                }
-            } else {
-                // check if it exists in the user map
-                if let Ok(attr) = map.get(set, var) {
-                    if let Err(err) =
-                        Self::tx(cursor, |cur| HeaderWriter::new(cur).write_attribute(attr))
-                    {
-                        match err {
-                            AttrWriteError::Cursor => return WriteProgress::Partial,
-                            AttrWriteError::BadAttribute(err) => {
-                                tracing::error!("Unable to write attribute: {}", err);
-                            }
-                        }
-                    }
-                }
+            if Self::write_one(set, var, cursor, map) == WriteProgress::Partial {
+                return WriteProgress::Partial;
             }
-
             if item.advance() {
                 self.selected.pop_front();
             }
         }
         WriteProgress::Complete
+    }
+
+    fn write_one(set: AttrSet, var: u8, cursor: &mut WriteCursor, map: &SetMap) -> WriteProgress {
+        if var == crate::app::attr::var::LIST_OF_ATTRIBUTE_VARIATIONS {
+            let Some(vars) = map.variations(set) else {
+                return WriteProgress::Complete;
+            };
+            return match Self::write_attr_list(set, cursor, vars) {
+                Ok(()) => WriteProgress::Complete,
+                Err(_) => WriteProgress::Partial,
+            };
+        }
+
+        let Ok(attr) = map.get(set, var) else {
+            return WriteProgress::Complete;
+        };
+        match Self::tx(cursor, |cur| HeaderWriter::new(cur).write_attribute(attr)) {
+            Ok(()) => WriteProgress::Complete,
+            Err(AttrWriteError::Cursor) => WriteProgress::Partial,
+            Err(AttrWriteError::BadAttribute(err)) => {
+                tracing::error!("Unable to write attribute: {}", err);
+                WriteProgress::Complete
+            }
+        }
     }
 
     fn clear(&mut self) {
