@@ -22,7 +22,7 @@ use crate::master::tests::harness::{
     create_rerunnable_association, AssocInfoEvent, ReadEvent, TestHarness,
 };
 use crate::master::{ReadType, TaskType};
-use crate::util::session::{RunError, StopReason};
+use crate::util::lifecycle::{RunError, StopReason};
 use crate::util::test_support::watchdog;
 
 /// How the first run ends

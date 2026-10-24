@@ -49,7 +49,7 @@ use crate::master::{
     PollError, ReadHandler, ReadRequest, ReadType, TaskError, TaskType, TimeSyncError,
     TimeSyncProcedure, WriteError,
 };
-use crate::util::session::{RunError, StopReason};
+use crate::util::lifecycle::{RunError, StopReason};
 use crate::util::test_support::watchdog;
 
 pub(super) const OUTSTATION: EndpointAddress = EndpointAddress::raw(1024);

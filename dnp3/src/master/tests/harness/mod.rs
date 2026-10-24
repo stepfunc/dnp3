@@ -26,8 +26,8 @@ use crate::master::{
 };
 use crate::transport::mock::reader::RxFrameInfo;
 use crate::transport::mock::MockTransport;
+use crate::util::lifecycle::{Enabled, RunError};
 use crate::util::phys::{PhysAddr, PhysLayer};
-use crate::util::session::{Enabled, RunError};
 
 pub(crate) mod requests;
 

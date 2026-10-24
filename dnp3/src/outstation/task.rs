@@ -13,8 +13,8 @@ use crate::outstation::session::{OutstationSession, Responder};
 use crate::outstation::traits::{ControlHandler, OutstationApplication, OutstationInformation};
 use crate::outstation::OutstationHandle;
 use crate::transport::{FragmentAddr, RealTransport, Transport, TransportReader};
+use crate::util::lifecycle::{Enabled, RunError, StopReason};
 use crate::util::phys::{PhysAddr, PhysLayer};
-use crate::util::session::{Enabled, RunError, StopReason};
 
 pub(crate) enum ConfigurationChange {
     SetDecodeLevel(DecodeLevel),

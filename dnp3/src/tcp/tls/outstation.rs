@@ -22,8 +22,8 @@ use crate::tcp::{
     ClientConnectionHandler, ClientState, ConnectOptions, EndpointList, PostConnectionHandler,
     SimpleConnectHandler,
 };
+use crate::util::lifecycle::Enabled;
 use crate::util::phys::{PhysAddr, PhysLayer, Socket};
-use crate::util::session::Enabled;
 use tokio_rustls::rustls::pki_types::ServerName;
 
 use crate::link::reader::LinkModes;

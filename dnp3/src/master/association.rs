@@ -31,7 +31,7 @@ use crate::master::{AssociationInformation, ReadHandler, ReadType, TaskType};
 
 use crate::master::promise::Promise;
 use crate::transport::FragmentAddr;
-use crate::util::session::RunError;
+use crate::util::lifecycle::RunError;
 use tokio::time::Instant;
 
 use crate::util::deadline::deadline;

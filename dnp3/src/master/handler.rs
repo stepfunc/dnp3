@@ -38,8 +38,8 @@ use crate::master::{
 };
 use crate::transport::FragmentAddr;
 use crate::util::channel::Sender;
+use crate::util::lifecycle::Enabled;
 use crate::util::phys::PhysAddr;
-use crate::util::session::Enabled;
 
 /// Master channels may be Udp or of a "stream" type such as TCP
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

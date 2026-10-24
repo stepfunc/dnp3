@@ -29,7 +29,7 @@ use crate::util::phys::PhysLayer;
 
 use crate::app::parse::options::ParseOptions;
 use crate::link::reader::LinkModes;
-use crate::util::session::{Enabled, RunError, StopReason};
+use crate::util::lifecycle::{Enabled, RunError, StopReason};
 use tokio::time::Instant;
 
 /// combines the session with transport stuff
