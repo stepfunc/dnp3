@@ -298,6 +298,23 @@ mod tests {
 
     /// Fragments written by the transport writer, as the transport reader delivers them after
     /// segments are repeated, dropped or interleaved with another source's series
+    ///
+    /// The writer writes a fragment, then a one-byte sentinel; one edit changes the frames
+    /// between them, and the reader gets the result through the link layer. Two oracles, both
+    /// independent of the code under test: [`expected`] predicts what the reader delivers from
+    /// the transport rules alone, and [`headers`] gives the transport header of every segment
+    /// the writer wrote for the fragment and the sentinel from literal FIR (0x40), FIN (0x80) and
+    /// sequence values. The writer and the assembler share the header encoding and the sequence
+    /// arithmetic, so the delivery model alone can't see a mistake made the same way on both
+    /// sides; the literal headers can.
+    ///
+    /// The generator covers both directions, three distinct addresses, a first sequence number
+    /// often near the wrap (so it wraps within the fragment), fragments of 1 to 2048 bytes plus
+    /// the segment and buffer boundaries (one segment, two, nine, one past the reader's buffer),
+    /// and each edit at the first, middle, last or any segment. Known limits: unconfirmed user
+    /// data only, one remote, no physical addresses or broadcasts (the assembler's property
+    /// covers those), and the headers of the changed repeat and of the other source's fragment,
+    /// written by separate writers, aren't checked.
     mod properties {
         use proptest::prelude::*;
         use proptest::sample::Index;
@@ -307,6 +324,8 @@ mod tests {
         use crate::link::header::BroadcastConfirmMode;
 
         const RX_BUFFER_SIZE: usize = 2048;
+        /// the transport header is the first byte after the 10-byte link header
+        const TRANSPORT_HEADER: usize = 10;
         /// written after the edited fragment, so the reader always has something to deliver
         const SENTINEL: [u8; 1] = [0xAA];
 
@@ -388,6 +407,27 @@ mod tests {
         /// the number of segments that carry `len` bytes
         fn segments(len: usize) -> usize {
             len.div_ceil(MAX_APP_BYTES_PER_FRAME)
+        }
+
+        /// The transport headers of the fragment's segments and of the sentinel, from the wire
+        /// encoding alone: FIR (0x40) on the first segment of each, FIN (0x80) on the last, and a
+        /// sequence number that counts up from `first_seq` modulo 64
+        #[expect(
+            clippy::arithmetic_side_effects,
+            reason = "a few segments past a sequence number below 64"
+        )]
+        fn headers(case: &Case) -> Vec<u8> {
+            let count = segments(case.fragment.len());
+            let seq = |i: usize| u8::try_from((usize::from(case.first_seq) + i) % 64).unwrap();
+            let mut headers: Vec<u8> = (0..count)
+                .map(|i| {
+                    let fir = if i == 0 { 0x40 } else { 0 };
+                    let fin = if i + 1 == count { 0x80 } else { 0 };
+                    fir | fin | seq(i)
+                })
+                .collect();
+            headers.push(0xC0 | seq(count));
+            headers
         }
 
         /// Where the edit goes, once the number of segments is known
@@ -537,8 +577,9 @@ mod tests {
             frames
         }
 
-        /// the edited frames the reader receives, and the number of segments of the fragment
-        async fn stream(case: &Case) -> (Vec<Vec<u8>>, usize) {
+        /// the edited frames the reader receives, and the transport headers the writer wrote for
+        /// the fragment's segments and the sentinel
+        async fn stream(case: &Case) -> (Vec<Vec<u8>>, Vec<u8>) {
             let role = writer_role(case.master_writes);
             // single-segment fragments advance the writer's sequence number to `first_seq`
             let mut fragments: Vec<&[u8]> = vec![&[0]; usize::from(case.first_seq)];
@@ -548,6 +589,11 @@ mod tests {
             let sentinel = written.pop().unwrap();
             let mut frames = written.pop().unwrap();
             let segments = frames.len();
+            let headers = frames
+                .iter()
+                .chain(&sentinel)
+                .map(|x| x[TRANSPORT_HEADER])
+                .collect();
 
             match resolve(&case.edit, segments) {
                 Resolved::None => {}
@@ -576,7 +622,7 @@ mod tests {
                 }
             }
             frames.extend(sentinel);
-            (frames, segments)
+            (frames, headers)
         }
 
         /// everything the reader delivers from the frames, and what it wrote back
@@ -619,8 +665,9 @@ mod tests {
             (items, drain_writes(&mut handle))
         }
 
-        /// the number of segments written, what the reader delivered, and what it wrote back
-        fn run(case: &Case) -> (usize, Vec<Item>, Vec<Vec<u8>>) {
+        /// the transport headers written (see [`stream`]), what the reader delivered, and what it
+        /// wrote back
+        fn run(case: &Case) -> (Vec<u8>, Vec<Item>, Vec<Vec<u8>>) {
             let mut result = None;
             tokio::runtime::Builder::new_current_thread()
                 .enable_time()
@@ -628,9 +675,9 @@ mod tests {
                 .build()
                 .unwrap()
                 .block_on(crate::util::test_support::watchdog(async {
-                    let (frames, segments) = stream(case).await;
+                    let (frames, headers) = stream(case).await;
                     let (items, writes) = read(case, &frames).await;
-                    result = Some((segments, items, writes));
+                    result = Some((headers, items, writes));
                 }));
             result.unwrap()
         }
@@ -731,6 +778,10 @@ mod tests {
                 )
         }
 
+        /// the transport headers of [`example`]: FIR with sequence 62, 63, FIN with 0, then the
+        /// sentinel with FIR, FIN and 1
+        const EXAMPLE_HEADERS: [u8; 4] = [0x7E, 0x3F, 0x80, 0xC1];
+
         /// a three-segment fragment from the master whose sequence numbers wrap
         fn example(edit: Edit) -> Case {
             Case {
@@ -758,7 +809,10 @@ mod tests {
                 Item::fragment(MASTER, &SENTINEL),
             ];
             assert_eq!(super::properties::expected(&case), expected);
-            assert_eq!(run(&case), (3, expected.into(), Vec::new()));
+            assert_eq!(
+                run(&case),
+                (EXAMPLE_HEADERS.into(), expected.into(), Vec::new())
+            );
         }
 
         #[test]
@@ -766,7 +820,10 @@ mod tests {
             let case = example(Edit::Drop(Position::Middle));
             let expected = [Item::fragment(MASTER, &SENTINEL)];
             assert_eq!(super::properties::expected(&case), expected);
-            assert_eq!(run(&case), (3, expected.into(), Vec::new()));
+            assert_eq!(
+                run(&case),
+                (EXAMPLE_HEADERS.into(), expected.into(), Vec::new())
+            );
         }
 
         #[test]
@@ -774,7 +831,10 @@ mod tests {
             let case = example(Edit::ChangedRepeat(Position::Middle));
             let expected = [Item::fragment(MASTER, &SENTINEL)];
             assert_eq!(super::properties::expected(&case), expected);
-            assert_eq!(run(&case), (3, expected.into(), Vec::new()));
+            assert_eq!(
+                run(&case),
+                (EXAMPLE_HEADERS.into(), expected.into(), Vec::new())
+            );
         }
 
         proptest! {
@@ -782,8 +842,8 @@ mod tests {
 
             #[test]
             fn reader_delivers_what_the_writer_wrote(case in case()) {
-                let (segments, delivered, writes) = run(&case);
-                prop_assert_eq!(segments, self::segments(case.fragment.len()));
+                let (headers, delivered, writes) = run(&case);
+                prop_assert_eq!(headers, self::headers(&case));
                 prop_assert_eq!(delivered, expected(&case));
                 // unconfirmed user data gets no reply
                 prop_assert!(writes.is_empty());

@@ -942,6 +942,20 @@ mod tests {
 
     /// The assembler against a model written from the reception rules and the documented
     /// extensions, over streams of valid series with one perturbation each
+    ///
+    /// After every operation the assembler's outcome, discard reasons and waiting fragment must
+    /// match the model's. The model is an independent oracle, itself checked against
+    /// hand-derived outcomes by `model_follows_the_reception_rules`. The TB2013-003 row tests
+    /// above stay as the bulletin's table; the property adds longer sequences and interleavings.
+    ///
+    /// A case is 1-8 plans, each a valid series of 1-5 segments of up to 4 bytes (or a total
+    /// forced to 0, the 8-byte maximum or one past it; the sequence number often wraps), one
+    /// perturbation (repeat, changed repeat, drop, skipped sequence number, other source or
+    /// address, truncate, insert, interrupt) and a peek, pop or reset tail. Changed repeats are weighted, and most
+    /// segments carry data, so that the row 9 cases a repeat must tell apart (the same header
+    /// and length with other bytes, a shorter matching suffix) come up in most runs alongside
+    /// the empty-segment cases. Known gap: a series conflicting only in broadcast mode is
+    /// unreachable, since a broadcast segment never continues a series.
     #[expect(
         clippy::arithmetic_side_effects,
         reason = "the model adds small lengths, positions and sequence numbers"
@@ -1356,11 +1370,11 @@ mod tests {
 
         fn change() -> impl Strategy<Value = Change> {
             prop_oneof![
-                Just(Change::Byte),
-                Just(Change::Longer),
-                Just(Change::Suffix),
-                Just(Change::Fin),
-                Just(Change::Fir),
+                2 => Just(Change::Byte),
+                1 => Just(Change::Longer),
+                2 => Just(Change::Suffix),
+                1 => Just(Change::Fin),
+                1 => Just(Change::Fir),
             ]
         }
 
@@ -1386,7 +1400,7 @@ mod tests {
             prop_oneof![
                 2 => Just(Perturbation::None),
                 2 => i().prop_map(Perturbation::Repeat),
-                3 => (i(), change()).prop_map(|(i, x)| Perturbation::ChangedRepeat(i, x)),
+                6 => (i(), change()).prop_map(|(i, x)| Perturbation::ChangedRepeat(i, x)),
                 1 => i().prop_map(Perturbation::Drop),
                 1 => i().prop_map(Perturbation::SkipSeq),
                 2 => (i(), prop::sample::select(infos()))
@@ -1412,7 +1426,8 @@ mod tests {
             (
                 frame_info(),
                 seq(),
-                prop::collection::vec(prop_oneof![0usize..=4, Just(0)], 1..=5),
+                // a changed repeat of an empty segment is a length change
+                prop::collection::vec(prop_oneof![1 => Just(0), 3 => 0usize..=4], 1..=5),
                 prop_oneof![
                     4 => Just(None),
                     1 => Just(Some(0)),
