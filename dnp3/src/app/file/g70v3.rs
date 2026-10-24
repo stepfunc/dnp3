@@ -145,17 +145,16 @@ mod test {
     };
 
     const DATA: &[u8] = &[
-        26, // filename string offset - always 12
-        0, 11, // filename string size
-        0, 0xFF, //  time of creation
-        0xEE, 0xDD, 0xCC, 0xBB, 0xAA, 0b01010101, // permissions
-        0b00000001, 0xFE, // authentication key
-        0xCA, 0xAD, 0xDE, 0xDD, // file size
-        0xCC, 0xBB, 0xAA, 3, // mode
-        00, 42, // max block size
-        00, 0xFF, // request id
-        0xEE, b's', // filename
-        b'e', b'c', b'r', b'e', b't', b's', b'.', b't', b'x', b't',
+        26, 0, // filename string offset - always 26
+        11, 0, // filename string size
+        0xFF, 0xEE, 0xDD, 0xCC, 0xBB, 0xAA, // time of creation
+        0b01010101, 0b00000001, // permissions
+        0xFE, 0xCA, 0xAD, 0xDE, // authentication key
+        0xDD, 0xCC, 0xBB, 0xAA, // file size
+        3, 0, // mode
+        42, 0, // max block size
+        0xFF, 0xEE, // request id
+        b's', b'e', b'c', b'r', b'e', b't', b's', b'.', b't', b'x', b't', // filename
     ];
 
     #[test]

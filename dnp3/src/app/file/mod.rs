@@ -210,6 +210,7 @@ impl From<Utf8Error> for ReadError {
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::app::enum_tests::check_wire_table;
 
     const FILE_STATUS: &[(FileStatus, u8)] = &[
         (FileStatus::Success, 0),
@@ -231,24 +232,24 @@ mod test {
     ];
 
     #[test]
-    fn file_status_round_trips_every_value() {
-        for byte in 0..=u8::MAX {
-            assert_eq!(FileStatus::new(byte).to_u8(), byte);
-        }
+    fn file_status_values_match_the_table() {
+        check_wire_table(
+            FILE_STATUS,
+            0..=u8::MAX,
+            FileStatus::new,
+            FileStatus::to_u8,
+            FileStatus::Other,
+        );
     }
 
     #[test]
-    fn file_status_values_match_the_table() {
-        for &(status, value) in FILE_STATUS {
-            assert_eq!(FileStatus::new(value), status, "{value}");
-            assert_eq!(status.to_u8(), value, "{status:?}");
-        }
-
-        // every value missing from the table is captured as other
-        for byte in 0..=u8::MAX {
-            if !FILE_STATUS.iter().any(|&(_, value)| value == byte) {
-                assert_eq!(FileStatus::new(byte), FileStatus::Other(byte));
-            }
-        }
+    fn file_type_values_match_the_table() {
+        check_wire_table(
+            &[(FileType::Directory, 0), (FileType::File, 1)],
+            0..=u16::MAX,
+            FileType::new,
+            FileType::to_u16,
+            FileType::Other,
+        );
     }
 }
