@@ -1477,13 +1477,15 @@ mod tests {
             ]
         }
 
-        /// a variation a READ accepts with this kind of qualifier, or less often, one it doesn't
+        /// a variation a READ accepts with this kind of qualifier, less often one it doesn't, and
+        /// rarely g0v0, which names no object, so the master can't write it
         fn variation(kind: ReadKind) -> impl Strategy<Value = Variation> {
             let (accepted, rejected): (Vec<Variation>, Vec<Variation>) =
                 Variation::all().partition(|v| read_accepts(kind, *v));
             prop_oneof![
-                3 => one_of(accepted),
-                1 => one_of(rejected),
+                12 => one_of(accepted),
+                4 => one_of(rejected),
+                1 => Just(Variation::Group0(0)),
             ]
         }
 
@@ -1615,8 +1617,8 @@ mod tests {
 
             /// A READ request is written as its headers, and the outstation parses each header
             /// back to what was written, alone or together, unless a READ doesn't accept the
-            /// variation with that qualifier. A request with a header for g0v0, which names no
-            /// object, writes nothing
+            /// variation with that qualifier. A request with a header for g0v0 in any position,
+            /// which names no object, fails and writes nothing
             #[test]
             fn read_requests_parse_to_the_headers_written(request in read_request()) {
                 let mut buffer = [0; 256];
@@ -1649,13 +1651,30 @@ mod tests {
             }
 
             /// Generic request headers are written as the READ headers and g50v2 freeze times
-            /// they hold, in order, and each g50v2 parses back to its time and interval
+            /// they hold, in order, and each g50v2 parses back to its time and interval. Headers
+            /// with a READ of g0v0 in any position fail and write nothing. Attribute headers aren't
+            /// generated: `app/attr.rs` tests their values, and
+            /// `attribute_with_a_variation_that_cannot_carry_a_value_leaves_the_cursor_untouched`
+            /// the header
             #[test]
             fn headers_are_written_in_order(items in prop::collection::vec(item(), 0..6)) {
                 let headers = items.iter().fold(Headers::new(), add);
                 let mut buffer = [0; 256];
                 let mut cursor = WriteCursor::new(&mut buffer);
-                headers.write(&mut HeaderWriter::new(&mut cursor)).unwrap();
+                let result = headers.write(&mut HeaderWriter::new(&mut cursor));
+                let g0v0 = Variation::Group0(0);
+                if items
+                    .iter()
+                    .any(|item| matches!(item, Item::Read(header) if header.variation() == g0v0))
+                {
+                    prop_assert_eq!(
+                        result,
+                        Err(TaskError::BadEncoding(BadEncoding::UndefinedVariation(g0v0)))
+                    );
+                    prop_assert_eq!(cursor.written(), &[0u8; 0]);
+                    return Ok(());
+                }
+                prop_assert_eq!(result, Ok(()));
                 let expected: Vec<u8> = items
                     .iter()
                     .flat_map(|item| match *item {
