@@ -333,23 +333,7 @@ jobs:
           path: evidence
   # Run the bindings' smoke tests (C, C++, .NET, Java) against libraries built like the shipped ones
   bindings-test:
-    env:
-      CARGO_PROFILE_RELEASE_LTO: thin
-      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 1
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-      - name: Build the C and Java libraries
-        run: cargo build --release --locked -p dnp3-ffi-c -p dnp3-ffi-java
-      - name: Test C and C++ bindings
-        run: cargo run --bin dnp3-bindings -- --c
-      - name: Test .NET bindings
-        run: cargo run --bin dnp3-bindings -- --dotnet
-      - name: Test Java bindings
-        run: cargo run --bin dnp3-bindings -- --java
+    uses: ./.github/workflows/bindings-test.yml
   # Paused on PRs during the 1.8.0 refactor series; release tags still build them. Restore before 1.8.0
   guide:
     if: startsWith(github.ref, 'refs/tags/')
