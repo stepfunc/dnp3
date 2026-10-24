@@ -7,6 +7,7 @@
 use crate::app::parse::range::Range;
 use crate::app::parse::traits::Index;
 use crate::app::{ObjectParseError, Timestamp};
+#[cfg(test)]
 use crate::master::{BadEncoding, TaskError};
 use scursor::{ReadCursor, ReadError, WriteCursor, WriteError};
 use std::fmt::{Display, Formatter};
@@ -1501,15 +1502,6 @@ impl<'a> Attribute<'a> {
             variation,
             value,
         })
-    }
-}
-
-impl From<AttrWriteError> for TaskError {
-    fn from(value: AttrWriteError) -> Self {
-        match value {
-            AttrWriteError::Cursor => TaskError::WriteError,
-            AttrWriteError::BadAttribute(x) => TaskError::BadEncoding(BadEncoding::Attribute(x)),
-        }
     }
 }
 

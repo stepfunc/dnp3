@@ -9,7 +9,6 @@ use std::ops::{Add, BitOr, BitOrAssign};
 
 use crate::app::sequence::Sequence;
 use crate::app::FunctionCode;
-use crate::outstation::{ApplicationIin, RequestError};
 use crate::util::bit::bits::*;
 use crate::util::bit::{format_bitfield, Bitfield};
 
@@ -372,45 +371,6 @@ impl BitOr<Iin2> for Iin {
 impl BitOrAssign<Iin2> for Iin {
     fn bitor_assign(&mut self, rhs: Iin2) {
         *self = *self | rhs;
-    }
-}
-
-impl BitOr<ApplicationIin> for Iin {
-    type Output = Self;
-
-    fn bitor(mut self, rhs: ApplicationIin) -> Self::Output {
-        if rhs.need_time {
-            self |= Iin1::NEED_TIME;
-        }
-
-        if rhs.local_control {
-            self |= Iin1::LOCAL_CONTROL;
-        }
-
-        if rhs.device_trouble {
-            self |= Iin1::DEVICE_TROUBLE;
-        }
-
-        if rhs.config_corrupt {
-            self |= Iin2::CONFIG_CORRUPT;
-        }
-
-        self
-    }
-}
-
-impl BitOrAssign<ApplicationIin> for Iin {
-    fn bitor_assign(&mut self, rhs: ApplicationIin) {
-        *self = *self | rhs;
-    }
-}
-
-impl From<RequestError> for Iin2 {
-    fn from(from: RequestError) -> Self {
-        match from {
-            RequestError::ParameterError => Iin2::PARAMETER_ERROR,
-            RequestError::NotSupported => Iin2::OBJECT_UNKNOWN,
-        }
     }
 }
 

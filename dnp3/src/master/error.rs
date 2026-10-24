@@ -17,7 +17,7 @@ use crate::transport::TransportResponseError;
 use tokio::sync::mpsc::error::SendError;
 use tokio::sync::oneshot::error::RecvError;
 
-use crate::app::attr::BadAttribute;
+use crate::app::attr::{AttrWriteError, BadAttribute};
 use crate::app::parse::parser::SingleHeaderError;
 use crate::master::MasterChannelType;
 use crate::util::session::{RunError, StopReason};
@@ -317,6 +317,15 @@ impl std::fmt::Display for WriteError {
             WriteError::Task(err) => write!(f, "{err}"),
             #[expect(deprecated, reason = "Display must cover every variant until removal")]
             WriteError::IinError(iin2) => write!(f, "outstation indicated an error: {iin2}"),
+        }
+    }
+}
+
+impl From<AttrWriteError> for TaskError {
+    fn from(value: AttrWriteError) -> Self {
+        match value {
+            AttrWriteError::Cursor => TaskError::WriteError,
+            AttrWriteError::BadAttribute(x) => TaskError::BadEncoding(BadEncoding::Attribute(x)),
         }
     }
 }
