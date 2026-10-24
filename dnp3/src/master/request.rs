@@ -1302,6 +1302,25 @@ mod tests {
     }
 
     mod round_trip {
+        //! READ requests and generic request headers as the master writes them, against oracles
+        //! that share no code with it: a hand encoding of each header (`model_request`,
+        //! `model_header`, `Qualifier::bytes`, `freeze_bytes`), and for which headers the
+        //! outstation accepts, the READ table `read_accepts` in
+        //! `app/parse/header_identity_tests.rs`, written apart from the parser. The outstation's
+        //! parser reads the bytes back as a second check.
+        //!
+        //! Generated: for each qualifier kind, variations a READ accepts with it, less often ones
+        //! it doesn't, and rarely g0v0, in any header position, with groups 0, 110 and 111 no more
+        //! likely than the others; one and two-byte ranges, with single indices and the ends more
+        //! likely; one and two-byte counts, with 0, 1, 255 and the maximum more likely; single and
+        //! multiple headers (up to five), class scans of any classes, and device attribute reads;
+        //! generic headers of up to five READ headers and g50v2 freeze times, with a time and
+        //! interval of 0 or any value.
+        //!
+        //! Not generated: a group and variation that isn't a `Variation`, attribute headers among
+        //! generic headers (see `app/attr.rs` and the attribute example above), and requests
+        //! longer than the write buffer.
+
         use super::*;
         use crate::app::gen::count::CountVariation;
         use crate::app::parse::header_identity_tests::{read_accepts, ReadKind};
