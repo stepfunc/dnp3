@@ -4,7 +4,8 @@
 // Text and data mining rights, including for AI training, are reserved under
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
-//! Wire values of the generated enums in `app_enums.rs` and `control_enums.rs`
+//! Wire values of the generated enums in `app_enums.rs` and `control_enums.rs`, and the table
+//! check that the enums with a catch-all variant share
 
 use crate::app::control::CommandStatus;
 use crate::app::FunctionCode;
@@ -68,26 +69,40 @@ const FUNCTION_CODES: &[(FunctionCode, u8)] = &[
     (FunctionCode::UnsolicitedResponse, 130),
 ];
 
-#[test]
-fn command_status_round_trips_every_value() {
-    for byte in 0..=u8::MAX {
-        assert_eq!(CommandStatus::from(byte).as_u8(), byte);
+/// Check an enum's wire values against its table in both directions, that every value missing
+/// from the table converts to the catch-all variant, and that every value converts back to itself
+pub(crate) fn check_wire_table<E, V>(
+    table: &[(E, V)],
+    every_value: impl IntoIterator<Item = V>,
+    from_value: impl Fn(V) -> E,
+    to_value: impl Fn(E) -> V,
+    catch_all: impl Fn(V) -> E,
+) where
+    E: Copy + PartialEq + std::fmt::Debug,
+    V: Copy + PartialEq + std::fmt::Debug,
+{
+    for &(variant, value) in table {
+        assert_eq!(from_value(value), variant, "{value:?}");
+        assert_eq!(to_value(variant), value, "{variant:?}");
+    }
+
+    for value in every_value {
+        assert_eq!(to_value(from_value(value)), value);
+        if !table.iter().any(|&(_, x)| x == value) {
+            assert_eq!(from_value(value), catch_all(value));
+        }
     }
 }
 
 #[test]
 fn command_status_values_match_the_table() {
-    for &(status, value) in COMMAND_STATUS {
-        assert_eq!(CommandStatus::from(value), status, "{value}");
-        assert_eq!(status.as_u8(), value, "{status:?}");
-    }
-
-    // every value missing from the table is captured as unknown
-    for byte in 0..=u8::MAX {
-        if !COMMAND_STATUS.iter().any(|&(_, value)| value == byte) {
-            assert_eq!(CommandStatus::from(byte), CommandStatus::Unknown(byte));
-        }
-    }
+    check_wire_table(
+        COMMAND_STATUS,
+        0..=u8::MAX,
+        CommandStatus::from,
+        CommandStatus::as_u8,
+        CommandStatus::Unknown,
+    );
 }
 
 #[test]
