@@ -244,10 +244,16 @@ mod records {
         }
 
         /// append an unselected record
+        ///
+        /// The list always has room for it. Its capacity is the sum of the type maxima, and
+        /// `EventBuffer::insert` pushes a record only when its type holds fewer than its maximum,
+        /// after evicting the type's oldest record if the type was full, so the other types
+        /// can't fill the list. If the list were full anyway, the record would be dropped and the
+        /// counts left as they are, still matching the list.
         pub(super) fn push(&mut self, record: EventRecord) {
             let event_type = record.event.event_type();
             let class = record.class;
-            if self.list.add(record).is_some() {
+            if self.list.add(record) {
                 increment(event_type.count_mut(&mut self.total.types));
                 increment(class_count_mut(&mut self.total.classes, class));
             }
