@@ -9,6 +9,7 @@ use std::fmt::Formatter;
 use std::ops::RangeBounds;
 
 use crate::app::measurement::*;
+use crate::app::parse::range::Range;
 use crate::app::Iin2;
 use crate::outstation::config::OutstationConfig;
 use crate::outstation::database::details::family::Family;
@@ -30,10 +31,20 @@ where
     fn is_event(&self, new: &T, old: &T) -> bool;
 }
 
+/// A range of point indices, `start` through `stop` inclusive, never empty
 #[derive(Copy, Clone)]
 pub(crate) struct IndexRange {
     start: u16,
     stop: u16,
+}
+
+impl From<Range> for IndexRange {
+    fn from(range: Range) -> Self {
+        Self {
+            start: range.get_start(),
+            stop: range.get_stop(),
+        }
+    }
 }
 
 impl std::fmt::Display for IndexRange {
@@ -43,8 +54,14 @@ impl std::fmt::Display for IndexRange {
 }
 
 impl IndexRange {
-    pub(crate) fn new(start: u16, stop: u16) -> Self {
-        Self { start, stop }
+    /// The range from `start` through `stop`, or `None` if `start > stop`
+    fn new(start: u16, stop: u16) -> Option<Self> {
+        (start <= stop).then_some(Self { start, stop })
+    }
+
+    /// The rest of the range from `index`, or `None` if `index` is past its end
+    fn resume_at(self, index: u16) -> Option<Self> {
+        Self::new(index, self.stop)
     }
 
     pub(crate) fn to_attr_set(self) -> Option<AttrSet> {
@@ -55,7 +72,7 @@ impl IndexRange {
         self.start.try_into().ok().map(AttrSet::new)
     }
 
-    /// number of indices in the range, or 0 if start > stop
+    /// number of indices in the range
     fn len(&self) -> usize {
         usize::from(self.stop)
             .saturating_add(1)
@@ -180,7 +197,7 @@ where
     fn full_range(&self) -> Option<IndexRange> {
         let start = *self.inner.first_key_value()?.0;
         let stop = *self.inner.last_key_value()?.0;
-        Some(IndexRange::new(start, stop))
+        IndexRange::new(start, stop)
     }
 
     fn get_mut(&mut self, index: u16) -> Option<&mut Point<T>> {
@@ -197,11 +214,6 @@ where
             return Err(Iin2::OBJECT_UNKNOWN);
         }
 
-        // BTreeMap::range panics if start > stop
-        if range.len() == 0 {
-            return Err(Iin2::PARAMETER_ERROR);
-        }
-
         match self.inner.range(range).count() {
             0 => Err(Iin2::PARAMETER_ERROR),
             installed if installed < range.len() => Ok(Iin2::PARAMETER_ERROR),
@@ -214,10 +226,7 @@ where
         range: IndexRange,
         variation: Option<T::StaticVariation>,
     ) -> VariationRange {
-        for (_index, point) in self
-            .inner
-            .range_mut((Bound::Included(&range.start), Bound::Included(&range.stop)))
-        {
+        for (_index, point) in self.inner.range_mut(range) {
             // for every point in the range, we copy the current value into a distinct 'selected' cell
             // when writing the response(s) we use the selected value
             // this allows the outstation to send consistent snapshot of the values when a multi-fragment response is required
@@ -451,8 +460,12 @@ impl StaticDatabase {
                 .get_write_info(&item.selected);
 
             if writer.write(cursor, *index, &item.selected, info).is_err() {
-                // ran out of space, tell calling code to resume at this index
-                return Err(T::selection(variation).with(IndexRange::new(*index, range.stop)));
+                // ran out of space, tell calling code to resume at this index, which the
+                // range always includes
+                return match range.resume_at(*index) {
+                    Some(rest) => Err(T::selection(variation).with(rest)),
+                    None => Ok(()),
+                };
             }
         }
 
@@ -476,11 +489,15 @@ impl StaticDatabase {
                 .write(cursor, *index, &item.config.detector.deadband, info)
                 .is_err()
             {
-                // ran out of space, tell calling code to resume at this index
-                return Err(VariationRange::new(
-                    IndexRange::new(*index, range.stop),
-                    SpecificVariation::AnalogDeadBand(variation),
-                ));
+                // ran out of space, tell calling code to resume at this index, which the
+                // range always includes
+                return match range.resume_at(*index) {
+                    Some(rest) => Err(VariationRange::new(
+                        rest,
+                        SpecificVariation::AnalogDeadBand(variation),
+                    )),
+                    None => Ok(()),
+                };
             }
         }
 
@@ -1400,7 +1417,7 @@ mod tests {
 
         // no points of the type
         assert_eq!(
-            db.binary.check_range(IndexRange::new(0, 0)),
+            db.binary.check_range(IndexRange::new(0, 0).unwrap()),
             Err(Iin2::OBJECT_UNKNOWN)
         );
 
@@ -1410,29 +1427,37 @@ mod tests {
 
         // every index installed
         assert_eq!(
-            db.binary.check_range(IndexRange::new(0, 2)),
+            db.binary.check_range(IndexRange::new(0, 2).unwrap()),
             Ok(Iin2::default())
         );
         // missing index in the middle
         assert_eq!(
-            db.binary.check_range(IndexRange::new(2, 4)),
+            db.binary.check_range(IndexRange::new(2, 4).unwrap()),
             Ok(Iin2::PARAMETER_ERROR)
         );
         // past the last point
         assert_eq!(
-            db.binary.check_range(IndexRange::new(4, 5)),
+            db.binary.check_range(IndexRange::new(4, 5).unwrap()),
             Ok(Iin2::PARAMETER_ERROR)
         );
         // no installed index
         assert_eq!(
-            db.binary.check_range(IndexRange::new(5, 10)),
+            db.binary.check_range(IndexRange::new(5, 10).unwrap()),
             Err(Iin2::PARAMETER_ERROR)
         );
-        // start > stop
-        assert_eq!(
-            db.binary.check_range(IndexRange::new(2, 1)),
-            Err(Iin2::PARAMETER_ERROR)
-        );
+    }
+
+    #[test]
+    fn index_range_is_never_empty() {
+        let bounds = |range: Option<IndexRange>| range.map(|range| (range.start, range.stop));
+
+        assert_eq!(bounds(IndexRange::new(2, 1)), None);
+        assert_eq!(bounds(IndexRange::new(1, 1)), Some((1, 1)));
+
+        let range = IndexRange::new(1, 4).unwrap();
+        assert_eq!(bounds(range.resume_at(3)), Some((3, 4)));
+        assert_eq!(bounds(range.resume_at(4)), Some((4, 4)));
+        assert_eq!(bounds(range.resume_at(5)), None);
     }
 
     #[test]
@@ -1443,7 +1468,7 @@ mod tests {
             assert!(db.add(index, binary_config(StaticBinaryInputVariation::Group1Var2)));
         }
 
-        let full = IndexRange::new(0, u16::MAX);
+        let full = IndexRange::new(0, u16::MAX).unwrap();
         assert_eq!(full.len(), 65536);
         assert_eq!(db.binary.check_range(full), Ok(Iin2::default()));
 
@@ -1460,7 +1485,10 @@ mod tests {
             Iin2::OBJECT_UNKNOWN
         );
         assert_eq!(
-            db.select(StaticTarget::Counter(None), Some(IndexRange::new(0, 0))),
+            db.select(
+                StaticTarget::Counter(None),
+                Some(IndexRange::new(0, 0).unwrap())
+            ),
             Iin2::OBJECT_UNKNOWN
         );
         assert_eq!(
@@ -1470,7 +1498,7 @@ mod tests {
         assert_eq!(
             db.select(
                 StaticTarget::AnalogInputDeadBand(None),
-                Some(IndexRange::new(0, 0))
+                Some(IndexRange::new(0, 0).unwrap())
             ),
             Iin2::OBJECT_UNKNOWN
         );
@@ -1490,7 +1518,10 @@ mod tests {
         assert!(db.add(0, counter_config(StaticCounterVariation::Group20Var1)));
 
         assert_eq!(
-            db.select(StaticTarget::Counter(None), Some(IndexRange::new(1, 2))),
+            db.select(
+                StaticTarget::Counter(None),
+                Some(IndexRange::new(1, 2).unwrap())
+            ),
             Iin2::PARAMETER_ERROR
         );
         assert_eq!(db.selection_count(), 0);
@@ -1503,7 +1534,7 @@ mod tests {
         assert!(db.add(0, counter_config(StaticCounterVariation::Group20Var1)));
 
         // every index installed, so only running out of selections sets IIN2.2
-        let range = Some(IndexRange::new(0, 0));
+        let range = Some(IndexRange::new(0, 0).unwrap());
         for _ in 0..db.selection_capacity() {
             assert_eq!(
                 db.select(StaticTarget::Counter(None), range),
@@ -1523,7 +1554,10 @@ mod tests {
         assert!(db.add(0, counter_config(StaticCounterVariation::Group20Var1)));
 
         assert_eq!(
-            db.select(StaticTarget::Counter(None), Some(IndexRange::new(0, 1))),
+            db.select(
+                StaticTarget::Counter(None),
+                Some(IndexRange::new(0, 1).unwrap())
+            ),
             Iin2::PARAMETER_ERROR
         );
         assert_eq!(
@@ -1549,7 +1583,7 @@ mod tests {
     }
 
     fn selections_until_parameter_error(db: &mut StaticDatabase) -> usize {
-        let range = Some(IndexRange::new(0, 0));
+        let range = Some(IndexRange::new(0, 0).unwrap());
         std::iter::from_fn(|| {
             (db.select(StaticTarget::Counter(None), range) == Iin2::default()).then_some(())
         })

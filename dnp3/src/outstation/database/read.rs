@@ -4,9 +4,8 @@
 // Text and data mining rights, including for AI training, are reserved under
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
-use crate::app::parse::parser::{ObjectHeader, ReadQualifier};
-use crate::app::parse::range::Range;
-use crate::app::{Iin2, Variation};
+use crate::app::parse::parser::{HeaderCollection, HeaderIterator, ObjectHeader, ReadQualifier};
+use crate::app::{FunctionCode, Iin2, QualifierCode, Variation};
 use crate::outstation::database::details::range::static_db::IndexRange;
 use crate::outstation::database::variations::*;
 use crate::outstation::database::EventClass;
@@ -86,13 +85,53 @@ enum ReadTarget {
 
 impl ReadHeader {
     /// What a header in a READ request selects, or the error for one that READ doesn't support
-    pub(crate) fn parse(header: ObjectHeader, selector: &mut Selector) -> Result<ReadHeader, Iin2> {
+    fn parse(header: ObjectHeader, selector: &mut Selector) -> Result<ReadHeader, Iin2> {
         selector.select::<ReadTarget>(header)
     }
 }
 
-fn index_range(range: Range) -> IndexRange {
-    IndexRange::new(range.get_start(), range.get_stop())
+/// What each header of a READ request that READ supports selects, in request order, with the
+/// variation and qualifier it was read with
+///
+/// The headers that READ doesn't support are skipped. [`ReadHeaders::finish`] gives their error
+/// and logs them once for the request.
+pub(crate) struct ReadHeaders<'a> {
+    headers: HeaderIterator<'a>,
+    selector: Selector,
+    unsupported: Iin2,
+}
+
+impl<'a> ReadHeaders<'a> {
+    pub(crate) fn new(headers: &HeaderCollection<'a>) -> Self {
+        Self {
+            headers: headers.iter(),
+            selector: Selector::new(FunctionCode::Read),
+            unsupported: Iin2::default(),
+        }
+    }
+
+    /// The error IIN2 bits of every header in the request that READ doesn't support, which this
+    /// logs
+    pub(crate) fn finish(mut self) -> Iin2 {
+        self.by_ref().for_each(drop);
+        self.selector.log();
+        self.unsupported
+    }
+}
+
+impl Iterator for ReadHeaders<'_> {
+    type Item = (ReadHeader, (Variation, QualifierCode));
+
+    fn next(&mut self) -> Option<Self::Item> {
+        for header in self.headers.by_ref() {
+            let read_with = (header.variation(), header.qualifier());
+            match ReadHeader::parse(header, &mut self.selector) {
+                Ok(read) => return Some((read, read_with)),
+                Err(err) => self.unsupported |= err,
+            }
+        }
+        None
+    }
 }
 
 impl Target for ReadTarget {
@@ -114,7 +153,7 @@ impl Target for ReadTarget {
                 Some(ReadHeader::Static(target, None))
             }
             (Self::Static(target), ReadQualifier::Range(_, range)) => {
-                Some(ReadHeader::Static(target, Some(index_range(range))))
+                Some(ReadHeader::Static(target, Some(range.into())))
             }
             (Self::Event(target), ReadQualifier::AllObjects) => {
                 Some(ReadHeader::Event(target, None))
@@ -125,9 +164,9 @@ impl Target for ReadTarget {
             (Self::Attr(var), ReadQualifier::AllObjects) => {
                 Some(ReadHeader::Attr(AttrHeader::All(var)))
             }
-            (Self::Attr(var), ReadQualifier::Range(_, range)) => Some(ReadHeader::Attr(
-                AttrHeader::Specific(var, index_range(range)),
-            )),
+            (Self::Attr(var), ReadQualifier::Range(_, range)) => {
+                Some(ReadHeader::Attr(AttrHeader::Specific(var, range.into())))
+            }
             (Self::Class0, ReadQualifier::Range(_, _) | ReadQualifier::Count(_, _))
             | (Self::Static(_), ReadQualifier::Count(_, _))
             | (Self::Event(_), ReadQualifier::Range(_, _))

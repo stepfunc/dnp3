@@ -218,8 +218,9 @@ impl BroadcastIin {
         }
     }
 
-    /// The master confirmed a response of this kind. Returns true if that ended the IIN1.0.
-    fn confirmed(&mut self, kind: ResponseKind) -> bool {
+    /// The master confirmed a response of this kind, which ends the IIN1.0 if such a response
+    /// reported it
+    fn confirmed(&mut self, kind: ResponseKind) {
         let reported = self.0.is_some_and(|pending| match kind {
             ResponseKind::Solicited => pending.solicited_reported,
             ResponseKind::Unsolicited => pending.unsolicited_reported,
@@ -227,7 +228,6 @@ impl BroadcastIin {
         if reported {
             self.0 = None;
         }
-        reported
     }
 }
 
