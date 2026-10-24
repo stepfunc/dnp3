@@ -5,7 +5,6 @@
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
 use crate::app::parse::parser::{ObjectHeader, ReadQualifier};
-use crate::app::parse::range::Range;
 use crate::app::{Iin2, Variation};
 use crate::outstation::database::details::range::static_db::IndexRange;
 use crate::outstation::database::variations::*;
@@ -91,10 +90,6 @@ impl ReadHeader {
     }
 }
 
-fn index_range(range: Range) -> IndexRange {
-    IndexRange::new(range.get_start(), range.get_stop())
-}
-
 impl Target for ReadTarget {
     type Header<'a> = ReadHeader;
 
@@ -114,7 +109,7 @@ impl Target for ReadTarget {
                 Some(ReadHeader::Static(target, None))
             }
             (Self::Static(target), ReadQualifier::Range(_, range)) => {
-                Some(ReadHeader::Static(target, Some(index_range(range))))
+                Some(ReadHeader::Static(target, Some(range.into())))
             }
             (Self::Event(target), ReadQualifier::AllObjects) => {
                 Some(ReadHeader::Event(target, None))
@@ -125,9 +120,9 @@ impl Target for ReadTarget {
             (Self::Attr(var), ReadQualifier::AllObjects) => {
                 Some(ReadHeader::Attr(AttrHeader::All(var)))
             }
-            (Self::Attr(var), ReadQualifier::Range(_, range)) => Some(ReadHeader::Attr(
-                AttrHeader::Specific(var, index_range(range)),
-            )),
+            (Self::Attr(var), ReadQualifier::Range(_, range)) => {
+                Some(ReadHeader::Attr(AttrHeader::Specific(var, range.into())))
+            }
             (Self::Class0, ReadQualifier::Range(_, _) | ReadQualifier::Count(_, _))
             | (Self::Static(_), ReadQualifier::Count(_, _))
             | (Self::Event(_), ReadQualifier::Range(_, _))
