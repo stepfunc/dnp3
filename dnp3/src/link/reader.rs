@@ -10,7 +10,7 @@ use crate::link::error::{LinkError, LogicError};
 use crate::link::header::Header;
 use crate::link::parser::{FramePayload, Parser};
 use crate::link::{LinkErrorMode, LinkReadMode};
-use crate::util::phys::{PhysAddr, PhysLayer};
+use crate::phys::{PhysAddr, PhysLayer};
 
 use crate::link;
 use scursor::{ReadCursor, WriteCursor};
@@ -296,7 +296,7 @@ mod tests {
     use crate::link::test_data::{
         TestFrame, ACK, CONFIRM_USER_DATA, MULTI_BLOCK_USER_DATA, RESET_LINK, UNCONFIRMED_USER_DATA,
     };
-    use crate::udp::layer::UdpLayer;
+    use crate::phys::udp::UdpLayer;
 
     #[test]
     fn read_buffer_rejects_advances_past_its_bounds() {

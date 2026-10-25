@@ -11,9 +11,9 @@ use crate::link::reader::LinkModes;
 use crate::link::LinkErrorMode;
 use crate::master::task::MasterTask;
 use crate::master::{MasterChannel, MasterChannelConfig, MasterChannelType};
+use crate::phys::{PhysLayer, Socket};
 use crate::session::Session;
 use crate::util::lifecycle::Enabled;
-use crate::util::phys::{PhysLayer, Socket};
 use std::future::Future;
 
 use crate::app::parse::options::ParseOptions;

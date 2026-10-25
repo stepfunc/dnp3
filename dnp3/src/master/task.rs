@@ -19,13 +19,13 @@ use crate::master::messages::{MasterMsg, Message};
 use crate::master::tasks::command_no_ack::CommandNoAckTask;
 use crate::master::tasks::{AppTask, AssociationTask, NonReadTask, ReadTask, RequestWriter, Task};
 use crate::master::{Association, MasterChannelConfig};
+use crate::phys::PhysLayer;
 use crate::transport::{
     FragmentAddr, LinkLayerMessage, LinkLayerMessageType, RealTransport, Transport,
     TransportReader, TransportResponse, TransportResponseError, TransportWriter,
 };
 use crate::util::buffer::Buffer;
 use crate::util::channel::Receiver;
-use crate::util::phys::PhysLayer;
 
 use crate::app::parse::options::ParseOptions;
 use crate::link::reader::LinkModes;

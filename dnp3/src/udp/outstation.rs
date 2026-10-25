@@ -12,12 +12,12 @@ use crate::outstation::{
     ControlHandler, OutstationApplication, OutstationConfig, OutstationHandle,
     OutstationInformation,
 };
+use crate::phys::PhysAddr;
 use crate::session::Session;
-use crate::udp::layer::UdpFactory;
+use crate::udp::factory::UdpFactory;
 use crate::udp::task::UdpTask;
 use crate::udp::UdpSocketMode;
 use crate::util::lifecycle::Enabled;
-use crate::util::phys::PhysAddr;
 use std::net::SocketAddr;
 use tracing::Instrument;
 

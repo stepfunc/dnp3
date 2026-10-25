@@ -8,8 +8,8 @@ use crate::app::parse::options::ParseOptions;
 use crate::app::parse::parser::{FragmentDisplay, ParsedFragment};
 use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
+use crate::phys::PhysLayer;
 use crate::transport::{FragmentAddr, Transport, TransportWrite};
-use crate::util::phys::PhysLayer;
 
 pub(crate) struct TransportWriter<T: Transport> {
     inner: T::Writer,

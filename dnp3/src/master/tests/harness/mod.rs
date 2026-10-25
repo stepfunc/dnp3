@@ -24,10 +24,10 @@ use crate::master::{AssociationHandle, MasterChannel, ReadHandler, ReadType};
 use crate::master::{
     AssociationHandler, AssociationInformation, HeaderInfo, MasterChannelConfig, MasterChannelType,
 };
+use crate::phys::{PhysAddr, PhysLayer};
 use crate::transport::mock::reader::RxFrameInfo;
 use crate::transport::mock::MockTransport;
 use crate::util::lifecycle::{Enabled, RunError};
-use crate::util::phys::{PhysAddr, PhysLayer};
 
 pub(crate) mod requests;
 

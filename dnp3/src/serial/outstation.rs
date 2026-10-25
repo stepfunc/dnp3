@@ -11,11 +11,11 @@ use crate::outstation::{
     ControlHandler, OutstationApplication, OutstationConfig, OutstationHandle,
     OutstationInformation,
 };
+use crate::phys::{PhysAddr, PhysLayer};
 use crate::serial::task::SerialTask;
 use crate::serial::{PortState, SerialSettings};
 use crate::session::Session;
 use crate::util::lifecycle::Enabled;
-use crate::util::phys::{PhysAddr, PhysLayer};
 use tracing::Instrument;
 
 /// A fully configured serial outstation that has not yet opened its serial port.

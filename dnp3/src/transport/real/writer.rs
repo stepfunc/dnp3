@@ -8,10 +8,10 @@ use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
 use crate::link::format::{format_data_frame, format_header_only, Payload};
 use crate::link::{EndpointAddress, LinkRole};
+use crate::phys::PhysLayer;
 use crate::transport::real::display::SegmentDisplay;
 use crate::transport::real::header::Header;
 use crate::transport::real::sequence::Sequence;
-use crate::util::phys::PhysLayer;
 
 use crate::transport::{FragmentAddr, TransportWrite};
 use scursor::WriteCursor;

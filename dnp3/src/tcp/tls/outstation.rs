@@ -17,13 +17,13 @@ use crate::outstation::{
     ControlHandler, OutstationApplication, OutstationConfig, OutstationHandle,
     OutstationInformation,
 };
+use crate::phys::{PhysAddr, PhysLayer, Socket};
 use crate::tcp::tls::{CertificateMode, HandshakeError, MinTlsVersion, TlsClientConfig, TlsError};
 use crate::tcp::{
     ClientConnectionHandler, ClientState, ConnectOptions, EndpointList, PostConnectionHandler,
     SimpleConnectHandler,
 };
 use crate::util::lifecycle::Enabled;
-use crate::util::phys::{PhysAddr, PhysLayer, Socket};
 use tokio_rustls::rustls::pki_types::ServerName;
 
 use crate::link::reader::LinkModes;

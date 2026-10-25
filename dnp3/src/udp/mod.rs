@@ -4,7 +4,7 @@
 // Text and data mining rights, including for AI training, are reserved under
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
-pub(crate) mod layer;
+pub(crate) mod factory;
 mod master;
 mod outstation;
 pub(crate) mod task;

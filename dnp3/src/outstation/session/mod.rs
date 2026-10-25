@@ -48,13 +48,13 @@ use crate::outstation::control::select::SelectState;
 use crate::outstation::database::{DatabaseHandle, EventClass};
 use crate::outstation::target::{DeadBands, FreezeTarget, Selector, WriteHeader, WriteTarget};
 use crate::outstation::traits::*;
+use crate::phys::PhysLayer;
 use crate::transport::{
     FragmentAddr, FragmentInfo, RequestGuard, Transport, TransportReader, TransportRequest,
     TransportRequestError, TransportWriter,
 };
 use crate::util::channel::Receiver;
 use crate::util::deadline::deadline;
-use crate::util::phys::PhysLayer;
 
 use crate::app::parse::bit::BitSequence;
 use crate::app::parse::prefix::Prefix;

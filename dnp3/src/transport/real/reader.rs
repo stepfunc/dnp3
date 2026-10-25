@@ -10,11 +10,11 @@ use crate::link::header::FrameType;
 use crate::link::parser::FramePayload;
 use crate::link::reader::LinkModes;
 use crate::link::{EndpointAddress, LinkRole};
+use crate::phys::PhysLayer;
 use crate::transport::real::assembler::{Assembler, Discard};
 use crate::transport::real::display::SegmentDisplay;
 use crate::transport::real::header::Header;
 use crate::transport::{LinkLayerMessage, LinkLayerMessageType, TransportData, TransportRead};
-use crate::util::phys::PhysLayer;
 
 pub(crate) struct Reader {
     link: crate::link::layer::Layer,
@@ -224,8 +224,8 @@ mod tests {
         use tokio::io::{AsyncReadExt, AsyncWriteExt, DuplexStream};
 
         use super::*;
+        use crate::phys::PhysAddr;
         use crate::transport::{FragmentAddr, TransportWrite};
-        use crate::util::phys::PhysAddr;
         use crate::util::test_support::poll_once;
 
         const FRAGMENT: [u8; 1] = [0xAA];

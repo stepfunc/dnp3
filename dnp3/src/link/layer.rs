@@ -15,7 +15,7 @@ use crate::link::header::{
 use crate::link::parser::FramePayload;
 use crate::link::reader::LinkModes;
 use crate::link::{EndpointAddress, LinkRole};
-use crate::util::phys::{PhysAddr, PhysLayer};
+use crate::phys::{PhysAddr, PhysLayer};
 
 /// The secondary station state, owned by the peer that last reset the link
 enum SecondaryState {
@@ -482,7 +482,7 @@ mod test {
     /// passing between peers, repeated FCBs (acknowledged, not delivered), confirmed broadcasts
     /// and every ignore reason. The fixed op lists below run particular histories through the
     /// same model. Not exercised: `Layer::read`, which reads frames and queues the replies through
-    /// the physical layer (the transport reader and `util/phys.rs` tests cover it).
+    /// the physical layer (the transport reader and `phys/mod.rs` tests cover it).
     mod properties {
         use super::*;
         use proptest::prelude::*;

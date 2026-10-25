@@ -28,9 +28,9 @@ use crate::link::reader::{LinkModes, Reader, Step};
 use crate::link::{EndpointAddress, LinkErrorMode, LinkRole};
 use crate::master::extract::{extract_header, Extracted, ProcessableResponse};
 use crate::master::{HeaderInfo, ReadHandler};
+use crate::phys::PhysAddr;
 use crate::transport::real::assembler::Assembler;
 use crate::transport::real::header::Header;
-use crate::util::phys::PhysAddr;
 
 fn input() -> Vec<u8> {
     match std::env::var_os("DNP3_NO_PANIC_INPUT") {

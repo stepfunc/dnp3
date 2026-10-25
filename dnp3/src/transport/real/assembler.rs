@@ -293,7 +293,7 @@ mod tests {
     use super::*;
     use crate::link::header::{BroadcastConfirmMode, FrameType};
     use crate::link::EndpointAddress;
-    use crate::util::phys::PhysAddr;
+    use crate::phys::PhysAddr;
 
     const MAX: usize = 8;
 

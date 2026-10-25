@@ -51,8 +51,8 @@ mod tests {
     use crate::decode::DecodeLevel;
     use crate::link::header::AnyAddress;
     use crate::link::test_data;
+    use crate::phys::{PhysAddr, PhysLayer};
     use crate::transport::{FragmentAddr, TransportData, TransportRead, TransportWrite};
-    use crate::util::phys::{PhysAddr, PhysLayer};
 
     /// a data frame carrying a whole fragment in one segment
     fn fragment_frame(

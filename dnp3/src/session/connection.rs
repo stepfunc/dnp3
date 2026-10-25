@@ -12,8 +12,8 @@ use std::time::Duration;
 
 use super::Session;
 use crate::link::error::LinkError;
+use crate::phys::PhysLayer;
 use crate::util::lifecycle::{Enabled, RunError, StopReason};
-use crate::util::phys::PhysLayer;
 
 /// The transport-specific parts of a channel that opens a physical layer, runs a [`Session`] on
 /// it, and retries when either fails

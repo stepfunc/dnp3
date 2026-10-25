@@ -10,10 +10,10 @@ use crate::app::HeaderParseError;
 use crate::decode::{AppDecodeLevel, DecodeLevel};
 use crate::link::error::LinkError;
 use crate::link::EndpointAddress;
+use crate::phys::PhysLayer;
 use crate::transport::{
     RealTransport, Transport, TransportData, TransportRead, TransportRequest, TransportResponse,
 };
-use crate::util::phys::PhysLayer;
 
 pub(crate) struct TransportReader<T: Transport> {
     parse_options: ParseOptions,

@@ -5,7 +5,7 @@
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
 use crate::link::EndpointAddress;
-use crate::util::phys::PhysAddr;
+use crate::phys::PhysAddr;
 
 use super::function::Function;
 

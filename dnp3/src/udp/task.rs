@@ -8,10 +8,10 @@ use std::time::Duration;
 
 use crate::app::Timeout;
 use crate::link::error::LinkError;
+use crate::phys::PhysLayer;
 use crate::session::connection::{run_connection, Connection};
 use crate::session::Session;
-use crate::udp::layer::UdpFactory;
-use crate::util::phys::PhysLayer;
+use crate::udp::factory::UdpFactory;
 
 pub(crate) struct UdpTask {
     pub(crate) session: Session,

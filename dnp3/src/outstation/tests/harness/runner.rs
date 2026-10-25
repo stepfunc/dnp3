@@ -17,10 +17,10 @@ use crate::outstation::tests::harness::{
     MockOutstationApplication, MockOutstationInformation,
 };
 use crate::outstation::OutstationHandle;
+use crate::phys::{PhysAddr, PhysLayer};
 use crate::transport::mock::reader::RxFrameInfo;
 use crate::transport::mock::MockTransport;
 use crate::util::lifecycle::{Enabled, RunError};
-use crate::util::phys::{PhysAddr, PhysLayer};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use tokio::task::JoinHandle;

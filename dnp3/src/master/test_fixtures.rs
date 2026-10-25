@@ -10,8 +10,8 @@ use crate::app::Timestamp;
 use crate::link::EndpointAddress;
 use crate::master::association::{Association, AssociationConfig};
 use crate::master::{AssociationHandler, AssociationInformation, ReadHandler};
+use crate::phys::PhysAddr;
 use crate::transport::FragmentAddr;
-use crate::util::phys::PhysAddr;
 
 /// A handler that ignores every callback and has no system time
 pub(crate) struct NullHandler;

@@ -6,12 +6,12 @@
 
 use crate::app::Listener;
 use crate::link::error::LinkError;
+use crate::phys::PhysLayer;
 use crate::session::connection::{run_connection, Connection};
 use crate::session::Session;
 use crate::tcp::{
     ClientConnectionHandler, ClientState, ConnectionInfo, EndpointInner, PostConnectionHandler,
 };
-use crate::util::phys::PhysLayer;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
