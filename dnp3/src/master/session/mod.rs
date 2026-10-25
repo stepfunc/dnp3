@@ -4,7 +4,13 @@
 // Text and data mining rights, including for AI training, are reserved under
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
-//! Master session orchestration and its private task, request, and response handling.
+//! Master session I/O orchestration and protocol handling.
+//!
+//! [`MasterTask`] owns the transport resources and coordinates task execution, reads, and
+//! deadlines. [`MasterHandler`] owns association and application state, handles API messages,
+//! and processes and formats application fragments. Handler methods receive a reader or writer
+//! when they need one. Keeping the handler separate from transport storage lets it process a
+//! response and send a confirmation while that response still borrows the reader's buffer.
 
 mod link;
 mod messages;
@@ -43,7 +49,8 @@ use crate::link::reader::LinkModes;
 use crate::util::lifecycle::{Enabled, RunError, StopReason};
 use tokio::time::Instant;
 
-struct MasterSession {
+/// Protocol state and message handling, borrowed independently of the task's transport storage.
+struct MasterHandler {
     enabled: Enabled,
     decode_level: DecodeLevel,
     associations: AssociationMap,
@@ -110,7 +117,7 @@ async fn sleep_until(deadline: Option<Instant>) {
     }
 }
 
-impl MasterSession {
+impl MasterHandler {
     fn new(
         initial_state: Enabled,
         decode_level: DecodeLevel,
@@ -174,7 +181,7 @@ impl<T: Transport> MasterTask<T> {
     /// Run the master until an error or shutdown occurs.
     async fn run_session(&mut self, io: &mut PhysLayer) -> RunError {
         loop {
-            let result = match self.session.get_next_task() {
+            let result = match self.handler.get_next_task() {
                 Next::Now(task) => {
                     let id = task.details.get_id();
                     let address = task.dest.link.raw_value();
@@ -186,10 +193,10 @@ impl<T: Transport> MasterTask<T> {
             };
 
             if let Err(err) = result {
-                self.session.reset(err);
+                self.handler.reset(err);
 
                 if RunError::Stop(StopReason::Shutdown) == err {
-                    self.session.messages.close_and_drain();
+                    self.handler.messages.close_and_drain();
                 }
 
                 return err;
@@ -202,10 +209,10 @@ impl<T: Transport> MasterTask<T> {
     /// Returns an error only if shutdown or link layer error occurred.
     async fn idle(&mut self, until: Option<Instant>, io: &mut PhysLayer) -> Result<(), RunError> {
         loop {
-            match self.session.next_event(io, &mut self.reader, until).await? {
+            match self.handler.next_event(io, &mut self.reader, until).await? {
                 Event::Fragment(source, response) => {
                     return self
-                        .session
+                        .handler
                         .handle_fragment_while_idle(io, &mut self.writer, source, response)
                         .await
                 }
@@ -231,7 +238,7 @@ impl<T: Transport> MasterTask<T> {
                 let task_type = t.as_task_type();
                 let function = t.function();
 
-                if let Ok(assoc) = self.session.associations.get_mut(task.dest.link) {
+                if let Ok(assoc) = self.handler.associations.get_mut(task.dest.link) {
                     assoc.notify_task_start(task_type, function, assoc.seq());
                 }
 
@@ -241,13 +248,13 @@ impl<T: Transport> MasterTask<T> {
                         std::pin::pin!(self.run_non_read_task(io, task.dest, t)).await
                     }
                     AppTask::NoResponse(t) => {
-                        self.session
+                        self.handler
                             .run_no_response_task(io, task.dest, t, &mut self.writer)
                             .await
                     }
                 };
 
-                if let Ok(assoc) = self.session.associations.get_mut(task.dest.link) {
+                if let Ok(assoc) = self.handler.associations.get_mut(task.dest.link) {
                     match res {
                         Ok(seq) => {
                             assoc.notify_task_success(task_type, function, seq);

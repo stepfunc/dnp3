@@ -6,7 +6,7 @@
 
 use super::*;
 
-impl MasterSession {
+impl MasterHandler {
     pub(super) fn notify_link_activity(&mut self, source: EndpointAddress) {
         if let Ok(association) = self.associations.get_mut(source) {
             association.on_link_activity();
@@ -23,14 +23,14 @@ impl<T: Transport> MasterTask<T> {
         // Send link status request
         tracing::info!("sending link status request (for {})", destination.link);
         self.writer
-            .send_link_status_request(io, self.session.decode_level, destination)
+            .send_link_status_request(io, self.handler.decode_level, destination)
             .await?;
 
-        let deadline = Deadline::from_now(self.session.associations.get_timeout(destination.link)?);
+        let deadline = Deadline::from_now(self.handler.associations.get_timeout(destination.link)?);
 
         loop {
             match self
-                .session
+                .handler
                 .next_event(io, &mut self.reader, Some(deadline.at))
                 .await?
             {
@@ -40,7 +40,7 @@ impl<T: Transport> MasterTask<T> {
                     message: LinkLayerMessageType::LinkStatusResponse,
                 }) if source == destination.link => return Ok(()),
                 Event::Fragment(source, response) => {
-                    self.session
+                    self.handler
                         .handle_fragment_while_idle(io, &mut self.writer, source, response)
                         .await?;
                     if source.link == destination.link {

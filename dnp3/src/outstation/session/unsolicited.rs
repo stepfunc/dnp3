@@ -6,7 +6,7 @@
 
 use super::*;
 
-impl OutstationSession {
+impl OutstationHandler {
     pub(super) fn write_unsolicited_data<'a>(
         &mut self,
         unsol: &'a mut ResponseSlot,
@@ -41,23 +41,23 @@ impl<T: Transport> OutstationTask<T> {
         &mut self,
         io: &mut PhysLayer,
     ) -> Result<NextIdleAction, RunError> {
-        if self.session.config.unsolicited.is_disabled() {
+        if self.handler.config.unsolicited.is_disabled() {
             return Ok(NextIdleAction::SleepUntilEvent);
         }
 
-        match self.session.state.unsolicited {
+        match self.handler.state.unsolicited {
             UnsolicitedState::NullRequired => {
                 // perform NULL unsolicited
                 match self.perform_null_unsolicited(io).await? {
                     ConfirmOutcome::Unconfirmed => {
-                        self.session
+                        self.handler
                             .end_confirm_wait(&mut self.database, ConfirmOutcome::Unconfirmed)
                             .await;
-                        self.session.state.unsolicited = UnsolicitedState::NullRequired;
+                        self.handler.state.unsolicited = UnsolicitedState::NullRequired;
                         Ok(NextIdleAction::NoSleep)
                     }
                     ConfirmOutcome::Confirmed => {
-                        self.session.state.unsolicited = UnsolicitedState::Ready(None);
+                        self.handler.state.unsolicited = UnsolicitedState::Ready(None);
                         Ok(NextIdleAction::NoSleep)
                     }
                 }
@@ -74,17 +74,17 @@ impl<T: Transport> OutstationTask<T> {
                     // there was nothing to send
                     return Ok(NextIdleAction::SleepUntilEvent);
                 };
-                self.session
+                self.handler
                     .end_confirm_wait(&mut self.database, outcome)
                     .await;
                 match outcome {
                     ConfirmOutcome::Unconfirmed => {
-                        let retry_at = self.session.new_unsolicited_retry_deadline();
-                        self.session.state.unsolicited = UnsolicitedState::Ready(Some(retry_at));
+                        let retry_at = self.handler.new_unsolicited_retry_deadline();
+                        self.handler.state.unsolicited = UnsolicitedState::Ready(Some(retry_at));
                         Ok(NextIdleAction::SleepUntil(retry_at))
                     }
                     ConfirmOutcome::Confirmed => {
-                        self.session.state.unsolicited = UnsolicitedState::Ready(None);
+                        self.handler.state.unsolicited = UnsolicitedState::Ready(None);
                         Ok(NextIdleAction::NoSleep)
                     }
                 }
@@ -97,12 +97,12 @@ impl<T: Transport> OutstationTask<T> {
         io: &mut PhysLayer,
     ) -> Result<ConfirmOutcome, RunError> {
         let header = ResponseHeader::new(
-            ControlField::unsolicited_response(self.session.state.unsolicited_seq.increment()),
+            ControlField::unsolicited_response(self.handler.state.unsolicited_seq.increment()),
             ResponseFunction::UnsolicitedResponse,
             Iin::default(),
         );
         let seq = self
-            .session
+            .handler
             .write_unsolicited(
                 io,
                 &mut self.responder.writer,
@@ -120,24 +120,24 @@ impl<T: Transport> OutstationTask<T> {
         &mut self,
         io: &mut PhysLayer,
     ) -> Result<Option<ConfirmOutcome>, RunError> {
-        if !self.session.state.enabled_unsolicited_classes.any() {
+        if !self.handler.state.enabled_unsolicited_classes.any() {
             return Ok(None);
         }
 
         let Some(response) = self
-            .session
+            .handler
             .write_unsolicited_data(&mut self.responder.unsol, &mut self.database)
         else {
             return Ok(None);
         };
         let seq = self
-            .session
+            .handler
             .write_unsolicited(io, &mut self.responder.writer, response, &self.database)
             .await?
             .control
             .seq;
         let result = self
-            .unsolicited_confirm_wait(seq, self.session.config.max_unsolicited_retries, io)
+            .unsolicited_confirm_wait(seq, self.handler.config.max_unsolicited_retries, io)
             .await?;
         Ok(Some(result))
     }

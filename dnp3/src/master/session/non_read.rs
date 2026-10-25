@@ -11,7 +11,7 @@ enum NextStep {
     Complete(Sequence),
 }
 
-impl MasterSession {
+impl MasterHandler {
     pub(super) async fn run_no_response_task<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
@@ -61,7 +61,7 @@ impl<T: Transport> MasterTask<T> {
     ) -> Result<NextStep, TaskError> {
         let err = 'failed: {
             let seq = match self
-                .session
+                .handler
                 .send_request(io, dest, &task, &mut self.writer)
                 .await
             {
@@ -69,14 +69,14 @@ impl<T: Transport> MasterTask<T> {
                 Err(err) => break 'failed err,
             };
 
-            let deadline = match self.session.associations.get_timeout(dest.link) {
+            let deadline = match self.handler.associations.get_timeout(dest.link) {
                 Ok(timeout) => Deadline::from_now(timeout),
                 Err(err) => break 'failed err,
             };
 
             loop {
                 let (source, response) = match self
-                    .session
+                    .handler
                     .next_event(io, &mut self.reader, Some(deadline.at))
                     .await
                 {
@@ -93,7 +93,7 @@ impl<T: Transport> MasterTask<T> {
                 };
 
                 let response = match self
-                    .session
+                    .handler
                     .filter_solicited(io, &mut self.writer, dest, seq, source, response)
                     .await
                 {
@@ -107,14 +107,14 @@ impl<T: Transport> MasterTask<T> {
                 }
 
                 // a response for a removed association isn't processed, so it isn't confirmed
-                if let Err(err) = self.session.associations.get_mut(dest.link) {
+                if let Err(err) = self.handler.associations.get_mut(dest.link) {
                     break 'failed err.into();
                 }
 
                 // confirm before handling the response, so the confirm precedes any next request
                 if response.header.control.con && response.objects.is_ok() {
                     if let Err(err) = self
-                        .session
+                        .handler
                         .send_confirm(io, dest, ControlField::request(seq), &mut self.writer)
                         .await
                     {
@@ -122,7 +122,7 @@ impl<T: Transport> MasterTask<T> {
                     }
                 }
 
-                let association = match self.session.associations.get_mut(dest.link) {
+                let association = match self.handler.associations.get_mut(dest.link) {
                     Ok(association) => association,
                     Err(err) => break 'failed err.into(),
                 };
@@ -139,7 +139,7 @@ impl<T: Transport> MasterTask<T> {
             }
         };
 
-        task.on_task_error(self.session.associations.get_mut(dest.link).ok(), err);
+        task.on_task_error(self.handler.associations.get_mut(dest.link).ok(), err);
         Err(err)
     }
 }

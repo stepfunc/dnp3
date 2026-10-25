@@ -6,7 +6,7 @@
 
 use super::*;
 
-impl OutstationSession {
+impl OutstationHandler {
     pub(super) async fn process_broadcast(
         &mut self,
         database: &mut DatabaseHandle,
