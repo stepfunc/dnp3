@@ -11,7 +11,7 @@ use super::association::{Association, AssociationMap};
 use super::handler::{AssociationHandle, MasterChannel, MasterChannelConfig, MasterChannelType};
 use super::poll::PollHandle;
 use super::request::ReadRequest;
-use super::task::MasterTask as InnerMasterTask;
+use super::session::task::MasterTask as InnerMasterTask;
 use super::{
     AssociationConfig, AssociationError, AssociationHandler, AssociationInformation, ReadHandler,
 };

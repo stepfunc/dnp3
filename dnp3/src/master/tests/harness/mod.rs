@@ -18,7 +18,7 @@ use crate::link::header::{FrameInfo, FrameType};
 use crate::link::reader::LinkModes;
 use crate::link::{EndpointAddress, LinkErrorMode};
 use crate::master::association::{AssociationConfig, AssociationMap};
-use crate::master::task::MasterTask;
+use crate::master::session::task::MasterTask;
 use crate::master::test_fixtures::null;
 use crate::master::{AssociationHandle, MasterChannel, ReadHandler, ReadType};
 use crate::master::{

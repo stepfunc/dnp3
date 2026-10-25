@@ -16,7 +16,7 @@ use crate::util::lifecycle::{Enabled, RunError, StopReason};
 use std::time::Duration;
 
 enum SessionType {
-    Master(Box<crate::master::task::MasterTask>),
+    Master(Box<crate::master::session::task::MasterTask>),
     Outstation(Box<crate::outstation::session::task::OutstationTask>),
 }
 
@@ -29,7 +29,7 @@ pub(crate) struct Session {
 }
 
 impl Session {
-    pub(crate) fn master(task: crate::master::task::MasterTask) -> Self {
+    pub(crate) fn master(task: crate::master::session::task::MasterTask) -> Self {
         Self {
             inner: SessionType::Master(Box::new(task)),
         }
@@ -108,7 +108,7 @@ impl Session {
 mod tests {
     use super::*;
     use crate::link::reader::LinkModes;
-    use crate::master::task::MasterTask;
+    use crate::master::session::task::MasterTask;
     use crate::master::{MasterChannel, MasterChannelConfig, MasterChannelType};
 
     #[tokio::test]

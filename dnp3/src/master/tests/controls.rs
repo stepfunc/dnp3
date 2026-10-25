@@ -19,7 +19,7 @@ use crate::link::reader::LinkModes;
 use crate::link::{EndpointAddress, LinkError, LinkErrorMode};
 use crate::master::association::{AssociationConfig, AssociationMap};
 use crate::master::promise::Promise;
-use crate::master::task::MasterTask;
+use crate::master::session::task::MasterTask;
 use crate::master::tasks::command_no_ack::CommandNoAckTask;
 use crate::master::tasks::read::SingleReadTask;
 use crate::master::test_fixtures::{association, null};

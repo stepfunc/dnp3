@@ -330,7 +330,7 @@ mod tests {
     use crate::decode::PhysDecodeLevel;
     use crate::link::reader::LinkModes;
     use crate::link::{EndpointAddress, LinkErrorMode};
-    use crate::master::task::MasterTask;
+    use crate::master::session::task::MasterTask;
     use crate::master::MasterChannelConfig;
     use crate::phys::PhysLayer;
     use crate::session::Session;

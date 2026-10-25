@@ -10,7 +10,7 @@ use tracing::Instrument;
 
 use crate::app::{Listener, RetryStrategy};
 use crate::link::reader::LinkModes;
-use crate::master::task::MasterTask;
+use crate::master::session::task::MasterTask;
 use crate::master::*;
 use crate::serial::{PortState, SerialSettings};
 use crate::session::Session;
