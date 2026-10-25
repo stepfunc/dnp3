@@ -51,103 +51,7 @@ enum ReadResponseAction {
     Complete,
 }
 
-impl MasterSession {
-    pub(super) async fn run_read_task<T: Transport>(
-        &mut self,
-        io: &mut PhysLayer,
-        dest: FragmentAddr,
-        mut task: ReadTask,
-        writer: &mut TransportWriter<T>,
-        reader: &mut TransportReader<T>,
-    ) -> Result<Sequence, TaskError> {
-        let result = self
-            .execute_read_task(io, dest, &mut task, writer, reader)
-            .await;
-
-        let association = self.associations.get_mut(dest.link).ok();
-
-        match result {
-            Ok((seq, events_without_request_errors)) => {
-                if let Some(association) = association {
-                    task.complete(association, events_without_request_errors);
-                } else {
-                    task.on_task_error(None, TaskError::NoSuchAssociation(dest.link));
-                }
-                Ok(seq)
-            }
-            Err(err) => {
-                task.on_task_error(association, err);
-                Err(err)
-            }
-        }
-    }
-
-    /// Run a read, returning the sequence of the last response and whether the read returned
-    /// events without an IIN2 request error
-    async fn execute_read_task<T: Transport>(
-        &mut self,
-        io: &mut PhysLayer,
-        dest: FragmentAddr,
-        task: &mut ReadTask,
-        writer: &mut TransportWriter<T>,
-        reader: &mut TransportReader<T>,
-    ) -> Result<(Sequence, bool), TaskError> {
-        let mut seq = self.send_request(io, dest, task, writer).await?;
-        let mut is_first = true;
-        let mut outcome = ReadOutcome::default();
-
-        // read responses until we get a FIN or an error occurs
-        loop {
-            let deadline = Deadline::from_now(self.associations.get_timeout(dest.link)?);
-
-            let action = loop {
-                let (source, response) =
-                    match self.next_event(io, reader, Some(deadline.at)).await? {
-                        Event::Timeout => return Err(deadline.expired()),
-                        Event::Malformed(source, err) => {
-                            if fails_task(source, dest) {
-                                return Err(err.into());
-                            }
-                            continue;
-                        }
-                        Event::Fragment(source, response) => (source, response),
-                        Event::Message | Event::LinkLayer(_) | Event::Nothing => continue,
-                    };
-
-                if let Some(response) = self
-                    .filter_solicited(io, writer, dest, seq, source, response)
-                    .await?
-                {
-                    break self
-                        .process_read_response(
-                            dest,
-                            is_first,
-                            seq,
-                            task,
-                            &mut outcome,
-                            io,
-                            writer,
-                            response,
-                        )
-                        .await?;
-                }
-            };
-
-            match action {
-                // read task complete
-                ReadResponseAction::Complete => {
-                    outcome.result(task)?;
-                    return Ok((seq, outcome.events_without_request_errors()));
-                }
-                // read another response
-                ReadResponseAction::ReadNext => {
-                    is_first = false;
-                    seq = self.associations.get_mut(dest.link)?.increment_seq();
-                }
-            }
-        }
-    }
-
+impl MasterHandler {
     #[expect(
         clippy::too_many_arguments,
         reason = "processing a read response needs the request, the response and the session state"
@@ -195,6 +99,110 @@ impl MasterSession {
             Ok(ReadResponseAction::Complete)
         } else {
             Ok(ReadResponseAction::ReadNext)
+        }
+    }
+}
+
+impl<T: Transport> MasterTask<T> {
+    pub(super) async fn run_read_task(
+        &mut self,
+        io: &mut PhysLayer,
+        dest: FragmentAddr,
+        mut task: ReadTask,
+    ) -> Result<Sequence, TaskError> {
+        let result = self.execute_read_task(io, dest, &mut task).await;
+
+        let association = self.handler.associations.get_mut(dest.link).ok();
+
+        match result {
+            Ok((seq, events_without_request_errors)) => {
+                if let Some(association) = association {
+                    task.complete(association, events_without_request_errors);
+                } else {
+                    task.on_task_error(None, TaskError::NoSuchAssociation(dest.link));
+                }
+                Ok(seq)
+            }
+            Err(err) => {
+                task.on_task_error(association, err);
+                Err(err)
+            }
+        }
+    }
+
+    /// Run a read, returning the sequence of the last response and whether the read returned
+    /// events without an IIN2 request error
+    async fn execute_read_task(
+        &mut self,
+        io: &mut PhysLayer,
+        dest: FragmentAddr,
+        task: &mut ReadTask,
+    ) -> Result<(Sequence, bool), TaskError> {
+        let mut seq = self
+            .handler
+            .send_request(io, dest, task, &mut self.writer)
+            .await?;
+        let mut is_first = true;
+        let mut outcome = ReadOutcome::default();
+
+        // read responses until we get a FIN or an error occurs
+        loop {
+            let deadline = Deadline::from_now(self.handler.associations.get_timeout(dest.link)?);
+
+            let action = loop {
+                let (source, response) = match self
+                    .handler
+                    .next_event(io, &mut self.reader, Some(deadline.at))
+                    .await?
+                {
+                    Event::Timeout => return Err(deadline.expired()),
+                    Event::Malformed(source, err) => {
+                        if fails_task(source, dest) {
+                            return Err(err.into());
+                        }
+                        continue;
+                    }
+                    Event::Fragment(source, response) => (source, response),
+                    Event::Message | Event::LinkLayer(_) | Event::Nothing => continue,
+                };
+
+                if let Some(response) = self
+                    .handler
+                    .filter_solicited(io, &mut self.writer, dest, seq, source, response)
+                    .await?
+                {
+                    break self
+                        .handler
+                        .process_read_response(
+                            dest,
+                            is_first,
+                            seq,
+                            task,
+                            &mut outcome,
+                            io,
+                            &mut self.writer,
+                            response,
+                        )
+                        .await?;
+                }
+            };
+
+            match action {
+                // read task complete
+                ReadResponseAction::Complete => {
+                    outcome.result(task)?;
+                    return Ok((seq, outcome.events_without_request_errors()));
+                }
+                // read another response
+                ReadResponseAction::ReadNext => {
+                    is_first = false;
+                    seq = self
+                        .handler
+                        .associations
+                        .get_mut(dest.link)?
+                        .increment_seq();
+                }
+            }
         }
     }
 }

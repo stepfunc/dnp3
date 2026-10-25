@@ -6,7 +6,7 @@
 
 use super::*;
 
-impl MasterSession {
+impl MasterHandler {
     /// Send a CONFIRM with this control field: solicited or unsolicited, and its sequence
     pub(super) async fn send_confirm<T: Transport>(
         &mut self,

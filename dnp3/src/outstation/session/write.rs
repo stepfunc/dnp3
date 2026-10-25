@@ -6,7 +6,7 @@
 
 use super::*;
 
-impl OutstationSession {
+impl OutstationHandler {
     pub(super) async fn handle_write(
         &mut self,
         seq: Sequence,

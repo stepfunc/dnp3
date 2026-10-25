@@ -6,31 +6,42 @@
 
 use super::*;
 
-impl MasterSession {
-    pub(super) async fn run_link_status_task<T: Transport>(
+impl MasterHandler {
+    pub(super) fn notify_link_activity(&mut self, source: EndpointAddress) {
+        if let Ok(association) = self.associations.get_mut(source) {
+            association.on_link_activity();
+        }
+    }
+}
+
+impl<T: Transport> MasterTask<T> {
+    pub(super) async fn run_link_status_task(
         &mut self,
         io: &mut PhysLayer,
         destination: FragmentAddr,
-        writer: &mut TransportWriter<T>,
-        reader: &mut TransportReader<T>,
     ) -> Result<(), TaskError> {
         // Send link status request
         tracing::info!("sending link status request (for {})", destination.link);
-        writer
-            .send_link_status_request(io, self.decode_level, destination)
+        self.writer
+            .send_link_status_request(io, self.handler.decode_level, destination)
             .await?;
 
-        let deadline = Deadline::from_now(self.associations.get_timeout(destination.link)?);
+        let deadline = Deadline::from_now(self.handler.associations.get_timeout(destination.link)?);
 
         loop {
-            match self.next_event(io, reader, Some(deadline.at)).await? {
+            match self
+                .handler
+                .next_event(io, &mut self.reader, Some(deadline.at))
+                .await?
+            {
                 Event::Timeout => return Err(deadline.expired()),
                 Event::LinkLayer(LinkLayerMessage {
                     source,
                     message: LinkLayerMessageType::LinkStatusResponse,
                 }) if source == destination.link => return Ok(()),
                 Event::Fragment(source, response) => {
-                    self.handle_fragment_while_idle(io, writer, source, response)
+                    self.handler
+                        .handle_fragment_while_idle(io, &mut self.writer, source, response)
                         .await?;
                     if source.link == destination.link {
                         return Err(TaskError::UnexpectedResponseHeaders);
@@ -43,12 +54,6 @@ impl MasterSession {
                 }
                 Event::LinkLayer(_) | Event::Message | Event::Nothing => {}
             }
-        }
-    }
-
-    pub(super) fn notify_link_activity(&mut self, source: EndpointAddress) {
-        if let Ok(association) = self.associations.get_mut(source) {
-            association.on_link_activity();
         }
     }
 }

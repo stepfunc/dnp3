@@ -6,54 +6,7 @@
 
 use super::*;
 
-impl OutstationSession {
-    pub(super) async fn handle_one_request_from_idle<T: Transport>(
-        &mut self,
-        io: &mut PhysLayer,
-        reader: &mut TransportReader<T>,
-        out: &mut Responder<T>,
-        database: &mut DatabaseHandle,
-    ) -> Result<SolicitedWait, RunError> {
-        let guard = self.pop_request(reader);
-        let confirm = match self.receive(&guard) {
-            Intake::Nothing => None,
-            Intake::UnknownFunction(from, seq) => {
-                self.answer_unknown_function(io, &mut out.writer, from, seq, database)
-                    .await?;
-                None
-            }
-            Intake::Confirm(_, header) => {
-                self.info.process_request_from_idle(header);
-                let kind = if header.control.uns {
-                    "unsolicited"
-                } else {
-                    "solicited"
-                };
-                tracing::warn!(
-                    "ignoring {kind} CONFIRM from idle state with seq: {}",
-                    header.control.seq.value()
-                );
-                None
-            }
-            Intake::Request(received) => {
-                let selection = self.take_selection(&received.fragment);
-                self.info.process_request_from_idle(received.request.header);
-                self.accept(io, out, database, received, selection, Reads::Answer)
-                    .await?
-                    .confirm
-            }
-        };
-        drop(guard);
-
-        let Some(series) = confirm else {
-            return Ok(SolicitedWait::Done);
-        };
-
-        // enter the solicited confirm wait state
-        self.sol_confirm_wait(io, reader, out, database, series)
-            .await
-    }
-
+impl OutstationHandler {
     /// Take the master's next fragment. This is where every request enters the session, in any
     /// state: any fragment from the master is link activity, and a request is classified once,
     /// against the last valid request and the selection.
@@ -315,39 +268,6 @@ impl OutstationSession {
         }
     }
 
-    pub(super) async fn handle_deferred_read<T: Transport>(
-        &mut self,
-        io: &mut PhysLayer,
-        reader: &mut TransportReader<T>,
-        out: &mut Responder<T>,
-        database: &mut DatabaseHandle,
-    ) -> Result<SolicitedWait, RunError> {
-        let Some(x) = self.state.deferred_read.select(database) else {
-            return Ok(SolicitedWait::Done);
-        };
-
-        tracing::info!("handling deferred READ request");
-        let response = Self::format_read_response(&mut out.sol, database, true, x.seq, x.iin2);
-        let confirm = self
-            .respond(
-                io,
-                &mut out.writer,
-                x.info.addr,
-                LastValidRequest::new(x.seq, x.hash),
-                response,
-                database,
-            )
-            .await?;
-
-        let Some(series) = confirm else {
-            return Ok(SolicitedWait::Done);
-        };
-
-        // enter the solicited confirm wait state
-        self.sol_confirm_wait(io, reader, out, database, series)
-            .await
-    }
-
     pub(super) fn format_first_read_response<'a>(
         sol: &'a mut ResponseSlot,
         database: &mut DatabaseHandle,
@@ -399,5 +319,103 @@ impl From<ObjectParseError> for Iin2 {
             ObjectParseError::BadEncoding => Iin2::PARAMETER_ERROR,
             ObjectParseError::UnsupportedFreeFormatCount(_) => Iin2::PARAMETER_ERROR,
         }
+    }
+}
+
+impl<T: Transport> OutstationTask<T> {
+    pub(super) async fn handle_one_request_from_idle(
+        &mut self,
+        io: &mut PhysLayer,
+    ) -> Result<SolicitedWait, RunError> {
+        let guard = self.handler.pop_request(&mut self.reader);
+        let confirm = match self.handler.receive(&guard) {
+            Intake::Nothing => None,
+            Intake::UnknownFunction(from, seq) => {
+                self.handler
+                    .answer_unknown_function(
+                        io,
+                        &mut self.responder.writer,
+                        from,
+                        seq,
+                        &self.database,
+                    )
+                    .await?;
+                None
+            }
+            Intake::Confirm(_, header) => {
+                self.handler.info.process_request_from_idle(header);
+                let kind = if header.control.uns {
+                    "unsolicited"
+                } else {
+                    "solicited"
+                };
+                tracing::warn!(
+                    "ignoring {kind} CONFIRM from idle state with seq: {}",
+                    header.control.seq.value()
+                );
+                None
+            }
+            Intake::Request(received) => {
+                let selection = self.handler.take_selection(&received.fragment);
+                self.handler
+                    .info
+                    .process_request_from_idle(received.request.header);
+                self.handler
+                    .accept(
+                        io,
+                        &mut self.responder,
+                        &mut self.database,
+                        received,
+                        selection,
+                        Reads::Answer,
+                    )
+                    .await?
+                    .confirm
+            }
+        };
+        drop(guard);
+
+        let Some(series) = confirm else {
+            return Ok(SolicitedWait::Done);
+        };
+
+        // enter the solicited confirm wait state
+        self.sol_confirm_wait(io, series).await
+    }
+
+    pub(super) async fn handle_deferred_read(
+        &mut self,
+        io: &mut PhysLayer,
+    ) -> Result<SolicitedWait, RunError> {
+        let Some(x) = self.handler.state.deferred_read.select(&self.database) else {
+            return Ok(SolicitedWait::Done);
+        };
+
+        tracing::info!("handling deferred READ request");
+        let response = OutstationHandler::format_read_response(
+            &mut self.responder.sol,
+            &mut self.database,
+            true,
+            x.seq,
+            x.iin2,
+        );
+        let confirm = self
+            .handler
+            .respond(
+                io,
+                &mut self.responder.writer,
+                x.info.addr,
+                LastValidRequest::new(x.seq, x.hash),
+                response,
+                &self.database,
+            )
+            .await?;
+
+        let Some(series) = confirm else {
+            return Ok(SolicitedWait::Done);
+        };
+
+        // enter the solicited confirm wait state
+        self.sol_confirm_wait(io, series).await
     }
 }

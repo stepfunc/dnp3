@@ -9,7 +9,7 @@ use crate::link::reader::LinkModes;
 use crate::link::EndpointAddress;
 use crate::outstation::config::*;
 use crate::outstation::database::DatabaseHandle;
-use crate::outstation::session::{OutstationSession, Responder};
+use crate::outstation::session::{OutstationHandler, Responder};
 use crate::outstation::traits::{ControlHandler, OutstationApplication, OutstationInformation};
 use crate::outstation::OutstationHandle;
 use crate::phys::{PhysAddr, PhysLayer};
@@ -33,11 +33,15 @@ pub(crate) enum OutstationMessage {
     Configuration(ConfigurationChange),
 }
 
+/// Owns I/O resources and response slots, and orchestrates outstation reads and confirm waits.
+///
+/// Keeping protocol state and processing on the separate handler field lets them run while an
+/// incoming fragment borrows the reader or a prepared response borrows its slot.
 pub(crate) struct OutstationTask<T: Transport = RealTransport> {
-    session: OutstationSession,
-    reader: TransportReader<T>,
-    responder: Responder<T>,
-    database: DatabaseHandle,
+    pub(super) handler: OutstationHandler,
+    pub(super) reader: TransportReader<T>,
+    pub(super) responder: Responder<T>,
+    pub(super) database: DatabaseHandle,
 }
 
 /// RAII guard that re-arms per-connection state on session teardown.
@@ -51,7 +55,7 @@ impl<T: Transport> Drop for SessionTeardown<'_, T> {
         self.task.database.reset();
         self.task.reader.reset();
         self.task.responder.reset();
-        self.task.session.reset_session_state();
+        self.task.handler.reset_session_state();
     }
 }
 
@@ -120,7 +124,7 @@ impl<T: Transport> OutstationTask<T> {
             phys: phys_addr,
         };
         let task = Self {
-            session: OutstationSession::new(
+            handler: OutstationHandler::new(
                 initial_state,
                 rx,
                 destination,
@@ -143,11 +147,11 @@ impl<T: Transport> OutstationTask<T> {
     }
 
     pub(crate) fn enabled(&self) -> Enabled {
-        self.session.enabled()
+        self.handler.enabled()
     }
 
     pub(crate) fn change_master_address(&mut self, address: EndpointAddress) {
-        self.session.change_master_address(address);
+        self.handler.change_master_address(address);
     }
 
     /// run the outstation task asynchronously until a `RunError` occurs
@@ -157,18 +161,11 @@ impl<T: Transport> OutstationTask<T> {
     pub(crate) async fn run(&mut self, io: &mut PhysLayer) -> RunError {
         let guard = SessionTeardown { task: self };
         let task = &mut *guard.task; // reborrow so Drop can reset after the run future releases its borrows
-        task.session
-            .run(
-                io,
-                &mut task.reader,
-                &mut task.responder,
-                &mut task.database,
-            )
-            .await
+        task.run_session(io).await
     }
 
     /// process received outstation messages while idle without a session
     pub(crate) async fn process_next_message(&mut self) -> Result<(), StopReason> {
-        self.session.process_next_message().await
+        self.handler.process_next_message().await
     }
 }
