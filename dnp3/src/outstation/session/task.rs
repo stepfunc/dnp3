@@ -33,11 +33,15 @@ pub(crate) enum OutstationMessage {
     Configuration(ConfigurationChange),
 }
 
+/// Owns I/O resources and response slots, and coordinates the outstation session.
+///
+/// Keeping state handlers on the separate session field lets them run while an incoming
+/// fragment borrows the reader or a prepared response borrows its slot.
 pub(crate) struct OutstationTask<T: Transport = RealTransport> {
-    session: OutstationSession,
-    reader: TransportReader<T>,
-    responder: Responder<T>,
-    database: DatabaseHandle,
+    pub(super) session: OutstationSession,
+    pub(super) reader: TransportReader<T>,
+    pub(super) responder: Responder<T>,
+    pub(super) database: DatabaseHandle,
 }
 
 /// RAII guard that re-arms per-connection state on session teardown.
@@ -157,14 +161,7 @@ impl<T: Transport> OutstationTask<T> {
     pub(crate) async fn run(&mut self, io: &mut PhysLayer) -> RunError {
         let guard = SessionTeardown { task: self };
         let task = &mut *guard.task; // reborrow so Drop can reset after the run future releases its borrows
-        task.session
-            .run(
-                io,
-                &mut task.reader,
-                &mut task.responder,
-                &mut task.database,
-            )
-            .await
+        task.run_session(io).await
     }
 
     /// process received outstation messages while idle without a session

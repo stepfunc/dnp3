@@ -30,22 +30,21 @@ impl MasterSession {
             }
         }
     }
+}
 
-    pub(super) async fn run_non_read_task<T: Transport>(
+impl<T: Transport> MasterTask<T> {
+    pub(super) async fn run_non_read_task(
         &mut self,
         io: &mut PhysLayer,
         dest: FragmentAddr,
         task: NonReadTask,
-        writer: &mut TransportWriter<T>,
-        reader: &mut TransportReader<T>,
     ) -> Result<Sequence, TaskError> {
         let mut next = NextStep::Continue(task);
 
         loop {
             next = match next {
                 NextStep::Continue(task) => {
-                    std::pin::pin!(self.run_single_non_read_task(io, dest, task, writer, reader))
-                        .await?
+                    std::pin::pin!(self.run_single_non_read_task(io, dest, task)).await?
                 }
                 NextStep::Complete(seq) => {
                     return Ok(seq);
@@ -54,27 +53,32 @@ impl MasterSession {
         }
     }
 
-    async fn run_single_non_read_task<T: Transport>(
+    async fn run_single_non_read_task(
         &mut self,
         io: &mut PhysLayer,
         dest: FragmentAddr,
         task: NonReadTask,
-        writer: &mut TransportWriter<T>,
-        reader: &mut TransportReader<T>,
     ) -> Result<NextStep, TaskError> {
         let err = 'failed: {
-            let seq = match self.send_request(io, dest, &task, writer).await {
+            let seq = match self
+                .session
+                .send_request(io, dest, &task, &mut self.writer)
+                .await
+            {
                 Ok(seq) => seq,
                 Err(err) => break 'failed err,
             };
 
-            let deadline = match self.associations.get_timeout(dest.link) {
+            let deadline = match self.session.associations.get_timeout(dest.link) {
                 Ok(timeout) => Deadline::from_now(timeout),
                 Err(err) => break 'failed err,
             };
 
             loop {
-                let (source, response) = match self.next_event(io, reader, Some(deadline.at)).await
+                let (source, response) = match self
+                    .session
+                    .next_event(io, &mut self.reader, Some(deadline.at))
+                    .await
                 {
                     Err(err) => break 'failed err.into(),
                     Ok(Event::Timeout) => break 'failed deadline.expired(),
@@ -89,7 +93,8 @@ impl MasterSession {
                 };
 
                 let response = match self
-                    .filter_solicited(io, writer, dest, seq, source, response)
+                    .session
+                    .filter_solicited(io, &mut self.writer, dest, seq, source, response)
                     .await
                 {
                     Err(err) => break 'failed err.into(),
@@ -102,21 +107,22 @@ impl MasterSession {
                 }
 
                 // a response for a removed association isn't processed, so it isn't confirmed
-                if let Err(err) = self.associations.get_mut(dest.link) {
+                if let Err(err) = self.session.associations.get_mut(dest.link) {
                     break 'failed err.into();
                 }
 
                 // confirm before handling the response, so the confirm precedes any next request
                 if response.header.control.con && response.objects.is_ok() {
                     if let Err(err) = self
-                        .send_confirm(io, dest, ControlField::request(seq), writer)
+                        .session
+                        .send_confirm(io, dest, ControlField::request(seq), &mut self.writer)
                         .await
                     {
                         break 'failed err.into();
                     }
                 }
 
-                let association = match self.associations.get_mut(dest.link) {
+                let association = match self.session.associations.get_mut(dest.link) {
                     Ok(association) => association,
                     Err(err) => break 'failed err.into(),
                 };
@@ -133,7 +139,7 @@ impl MasterSession {
             }
         };
 
-        task.on_task_error(self.associations.get_mut(dest.link).ok(), err);
+        task.on_task_error(self.session.associations.get_mut(dest.link).ok(), err);
         Err(err)
     }
 }

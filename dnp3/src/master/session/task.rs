@@ -6,11 +6,14 @@
 
 use super::*;
 
-/// combines the session with transport stuff
+/// Owns the transport resources and coordinates the master session.
+///
+/// State handlers live on the separate session field so they can run while a fragment borrows
+/// the reader.
 pub(crate) struct MasterTask<T: Transport = RealTransport> {
-    session: MasterSession,
-    reader: TransportReader<T>,
-    writer: TransportWriter<T>,
+    pub(super) session: MasterSession,
+    pub(super) reader: TransportReader<T>,
+    pub(super) writer: TransportWriter<T>,
 }
 
 impl MasterTask {
@@ -98,10 +101,7 @@ impl<T: Transport> MasterTask<T> {
     }
 
     pub(crate) async fn run(&mut self, io: &mut PhysLayer) -> RunError {
-        let ret = self
-            .session
-            .run(io, &mut self.writer, &mut self.reader)
-            .await;
+        let ret = self.run_session(io).await;
 
         self.writer.reset();
         self.reader.reset();

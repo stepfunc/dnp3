@@ -14,6 +14,7 @@ mod request;
 mod response;
 pub(crate) mod task;
 
+use self::task::MasterTask;
 use tracing::Instrument;
 
 use crate::app::format::write;
@@ -126,63 +127,6 @@ impl MasterSession {
         }
     }
 
-    /// Run the master until an error or shutdown occurs.
-    async fn run<T: Transport>(
-        &mut self,
-        io: &mut PhysLayer,
-        writer: &mut TransportWriter<T>,
-        reader: &mut TransportReader<T>,
-    ) -> RunError {
-        loop {
-            let result = match self.get_next_task() {
-                Next::Now(task) => {
-                    let id = task.details.get_id();
-                    let address = task.dest.link.raw_value();
-                    let span = tracing::info_span!("task", "type" = ?id, "dest" = address);
-                    std::pin::pin!(self.run_task(io, task, writer, reader).instrument(span)).await
-                }
-                Next::NotBefore(time) => self.idle(Some(time), io, writer, reader).await,
-                Next::None => self.idle(None, io, writer, reader).await,
-            };
-
-            if let Err(err) = result {
-                self.reset(err);
-
-                if RunError::Stop(StopReason::Shutdown) == err {
-                    self.messages.close_and_drain();
-                }
-
-                return err;
-            }
-        }
-    }
-
-    /// Wait until a message is received, a response is received, or we reach the time, if any.
-    ///
-    /// Returns an error only if shutdown or link layer error occurred.
-    async fn idle<T: Transport>(
-        &mut self,
-        until: Option<Instant>,
-        io: &mut PhysLayer,
-        writer: &mut TransportWriter<T>,
-        reader: &mut TransportReader<T>,
-    ) -> Result<(), RunError> {
-        loop {
-            match self.next_event(io, reader, until).await? {
-                Event::Fragment(source, response) => {
-                    return self
-                        .handle_fragment_while_idle(io, writer, source, response)
-                        .await
-                }
-                Event::LinkLayer(_) => {}
-                // we need to recheck the tasks
-                Event::Timeout | Event::Message | Event::Malformed(..) | Event::Nothing => {
-                    return Ok(())
-                }
-            }
-        }
-    }
-
     /// Wait for the next event: an API message, something read from the transport, or the deadline
     ///
     /// Returns an error only if shutdown or link layer error occurred.
@@ -221,37 +165,89 @@ impl MasterSession {
         self.associations.reset(err);
     }
 
+    fn get_next_task(&mut self) -> Next<AssociationTask> {
+        self.associations.next_task()
+    }
+}
+
+impl<T: Transport> MasterTask<T> {
+    /// Run the master until an error or shutdown occurs.
+    async fn run_session(&mut self, io: &mut PhysLayer) -> RunError {
+        loop {
+            let result = match self.session.get_next_task() {
+                Next::Now(task) => {
+                    let id = task.details.get_id();
+                    let address = task.dest.link.raw_value();
+                    let span = tracing::info_span!("task", "type" = ?id, "dest" = address);
+                    std::pin::pin!(self.run_task(io, task).instrument(span)).await
+                }
+                Next::NotBefore(time) => self.idle(Some(time), io).await,
+                Next::None => self.idle(None, io).await,
+            };
+
+            if let Err(err) = result {
+                self.session.reset(err);
+
+                if RunError::Stop(StopReason::Shutdown) == err {
+                    self.session.messages.close_and_drain();
+                }
+
+                return err;
+            }
+        }
+    }
+
+    /// Wait until a message is received, a response is received, or we reach the time, if any.
+    ///
+    /// Returns an error only if shutdown or link layer error occurred.
+    async fn idle(&mut self, until: Option<Instant>, io: &mut PhysLayer) -> Result<(), RunError> {
+        loop {
+            match self.session.next_event(io, &mut self.reader, until).await? {
+                Event::Fragment(source, response) => {
+                    return self
+                        .session
+                        .handle_fragment_while_idle(io, &mut self.writer, source, response)
+                        .await
+                }
+                Event::LinkLayer(_) => {}
+                // we need to recheck the tasks
+                Event::Timeout | Event::Message | Event::Malformed(..) | Event::Nothing => {
+                    return Ok(())
+                }
+            }
+        }
+    }
+
     /// Run a specific task.
     ///
     /// Returns an error only if shutdown or link layer error occurred.
-    async fn run_task<T: Transport>(
+    async fn run_task(
         &mut self,
         io: &mut PhysLayer,
         task: AssociationTask,
-        writer: &mut TransportWriter<T>,
-        reader: &mut TransportReader<T>,
     ) -> Result<(), RunError> {
         let result = match task.details {
             Task::App(t) => {
                 let task_type = t.as_task_type();
                 let function = t.function();
 
-                if let Ok(assoc) = self.associations.get_mut(task.dest.link) {
+                if let Ok(assoc) = self.session.associations.get_mut(task.dest.link) {
                     assoc.notify_task_start(task_type, function, assoc.seq());
                 }
 
                 let res: Result<Sequence, TaskError> = match t {
-                    AppTask::Read(t) => self.run_read_task(io, task.dest, t, writer, reader).await,
+                    AppTask::Read(t) => self.run_read_task(io, task.dest, t).await,
                     AppTask::NonRead(t) => {
-                        std::pin::pin!(self.run_non_read_task(io, task.dest, t, writer, reader))
-                            .await
+                        std::pin::pin!(self.run_non_read_task(io, task.dest, t)).await
                     }
                     AppTask::NoResponse(t) => {
-                        self.run_no_response_task(io, task.dest, t, writer).await
+                        self.session
+                            .run_no_response_task(io, task.dest, t, &mut self.writer)
+                            .await
                     }
                 };
 
-                if let Ok(assoc) = self.associations.get_mut(task.dest.link) {
+                if let Ok(assoc) = self.session.associations.get_mut(task.dest.link) {
                     match res {
                         Ok(seq) => {
                             assoc.notify_task_success(task_type, function, seq);
@@ -265,9 +261,7 @@ impl MasterSession {
                 res.map(|_| ())
             }
             Task::LinkStatus(promise) => {
-                let res = self
-                    .run_link_status_task(io, task.dest, writer, reader)
-                    .await;
+                let res = self.run_link_status_task(io, task.dest).await;
                 promise.complete(res);
                 res
             }
@@ -297,9 +291,5 @@ impl MasterSession {
                 | TaskError::SystemTimeNotAvailable => Ok(()),
             },
         }
-    }
-
-    fn get_next_task(&mut self) -> Next<AssociationTask> {
-        self.associations.next_task()
     }
 }

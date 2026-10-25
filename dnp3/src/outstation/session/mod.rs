@@ -24,7 +24,7 @@ use tracing::Instrument;
 use xxhash_rust::xxh64::xxh64;
 
 use self::response::{Prepared, ResponseSlot, Staged};
-use self::task::{ConfigurationChange, OutstationMessage};
+use self::task::{ConfigurationChange, OutstationMessage, OutstationTask};
 use crate::app::attr::Attribute;
 use crate::app::control::CommandStatus;
 use crate::app::format::write::HeaderWriter;
@@ -172,22 +172,6 @@ impl OutstationSession {
         }
     }
 
-    pub(crate) async fn run<T: Transport>(
-        &mut self,
-        io: &mut PhysLayer,
-        reader: &mut TransportReader<T>,
-        out: &mut Responder<T>,
-        database: &mut DatabaseHandle,
-    ) -> RunError {
-        loop {
-            if let Err(err) = self.run_idle_state(io, reader, out, database).await {
-                // teardown (including self.state.reset()) is handled by SessionTeardown
-                // in OutstationTask::run, so it also covers a cancelled run future
-                return err;
-            }
-        }
-    }
-
     pub(crate) fn change_master_address(&mut self, address: EndpointAddress) {
         self.destination.link = address;
     }
@@ -204,55 +188,6 @@ impl OutstationSession {
     /// used when the there is no running IO to process outstation messages
     pub(crate) async fn process_next_message(&mut self) -> Result<(), StopReason> {
         self.handle_next_message().await
-    }
-
-    async fn run_idle_state<T: Transport>(
-        &mut self,
-        io: &mut PhysLayer,
-        reader: &mut TransportReader<T>,
-        out: &mut Responder<T>,
-        database: &mut DatabaseHandle,
-    ) -> Result<(), RunError> {
-        // handle a request fragment if present, and each request that ends the solicited confirm
-        // wait its response enters
-        while let SolicitedWait::RequestPending = self
-            .handle_one_request_from_idle(io, reader, out, database)
-            .await?
-        {}
-
-        // check to see if we should perform unsolicited
-        let next_action = self.check_unsolicited(io, reader, out, database).await?;
-
-        // handle a deferred read request if it was produced during unsolicited. A request that
-        // ends its solicited confirm wait is processed by the next pass, before any unsolicited
-        // response
-        if let SolicitedWait::RequestPending =
-            self.handle_deferred_read(io, reader, out, database).await?
-        {
-            return Ok(());
-        }
-
-        // check to see if we should perform a link status check
-        self.check_link_status(io, &mut out.writer).await?;
-
-        let next_action = next_action.select_earliest(self.next_link_status);
-
-        // wait for an event
-        tokio::select! {
-            frame_read = reader.read(io, self.config.decode_level) => {
-                // make sure an I/O error didn't occur, ending the session
-                frame_read?;
-            }
-            _ = database.wait_for_change() => {
-                // wake for unsolicited here
-            }
-            res = self.sleep_until(next_action) => {
-                res?
-                // just wake up
-            }
-        }
-
-        Ok(())
     }
 
     async fn check_link_status<T: Transport>(
@@ -367,5 +302,57 @@ impl OutstationSession {
             .config
             .keep_alive_timeout
             .map(|timeout| deadline(tokio::time::Instant::now(), timeout));
+    }
+}
+
+impl<T: Transport> OutstationTask<T> {
+    async fn run_session(&mut self, io: &mut PhysLayer) -> RunError {
+        loop {
+            if let Err(err) = self.run_idle_state(io).await {
+                // teardown (including self.session.state.reset()) is handled by SessionTeardown
+                // in OutstationTask::run, so it also covers a cancelled run future
+                return err;
+            }
+        }
+    }
+
+    async fn run_idle_state(&mut self, io: &mut PhysLayer) -> Result<(), RunError> {
+        // handle a request fragment if present, and each request that ends the solicited confirm
+        // wait its response enters
+        while let SolicitedWait::RequestPending = self.handle_one_request_from_idle(io).await? {}
+
+        // check to see if we should perform unsolicited
+        let next_action = self.check_unsolicited(io).await?;
+
+        // handle a deferred read request if it was produced during unsolicited. A request that
+        // ends its solicited confirm wait is processed by the next pass, before any unsolicited
+        // response
+        if let SolicitedWait::RequestPending = self.handle_deferred_read(io).await? {
+            return Ok(());
+        }
+
+        // check to see if we should perform a link status check
+        self.session
+            .check_link_status(io, &mut self.responder.writer)
+            .await?;
+
+        let next_action = next_action.select_earliest(self.session.next_link_status);
+
+        // wait for an event
+        tokio::select! {
+            frame_read = self.reader.read(io, self.session.config.decode_level) => {
+                // make sure an I/O error didn't occur, ending the session
+                frame_read?;
+            }
+            _ = self.database.wait_for_change() => {
+                // wake for unsolicited here
+            }
+            res = self.session.sleep_until(next_action) => {
+                res?
+                // just wake up
+            }
+        }
+
+        Ok(())
     }
 }
