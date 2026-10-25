@@ -10,8 +10,9 @@ use std::time::Duration;
 use crate::app::{ExponentialBackOff, Listener, RetryStrategy};
 use crate::link::error::LinkError;
 use crate::serial::{PortState, SerialSettings};
+use crate::session::connection::{run_connection, Connection};
+use crate::session::Session;
 use crate::util::phys::PhysLayer;
-use crate::util::session::{run_connection, Connection, Session};
 
 pub(crate) struct SerialTask {
     path: String,

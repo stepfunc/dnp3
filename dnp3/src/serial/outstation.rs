@@ -13,9 +13,9 @@ use crate::outstation::{
 };
 use crate::serial::task::SerialTask;
 use crate::serial::{PortState, SerialSettings};
+use crate::session::Session;
 use crate::util::lifecycle::Enabled;
 use crate::util::phys::{PhysAddr, PhysLayer};
-use crate::util::session::Session;
 use tracing::Instrument;
 
 /// A fully configured serial outstation that has not yet opened its serial port.

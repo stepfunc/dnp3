@@ -13,7 +13,6 @@ pub(crate) mod decode;
 pub(crate) mod float;
 pub(crate) mod lifecycle;
 pub(crate) mod phys;
-pub(crate) mod session;
 pub(crate) mod shutdown;
 pub(crate) mod skipped;
 #[cfg(test)]

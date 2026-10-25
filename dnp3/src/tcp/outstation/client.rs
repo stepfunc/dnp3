@@ -11,6 +11,7 @@ use crate::link::reader::LinkModes;
 use crate::link::LinkErrorMode;
 use crate::outstation::session::task::OutstationTask;
 use crate::outstation::*;
+use crate::session::Session;
 use crate::tcp::client::ClientTask;
 use crate::tcp::{
     ClientConnectionHandler, ClientState, ConnectOptions, EndpointList, PostConnectionHandler,
@@ -18,7 +19,6 @@ use crate::tcp::{
 };
 use crate::util::lifecycle::Enabled;
 use crate::util::phys::PhysAddr;
-use crate::util::session::Session;
 
 /// Spawn a TCP client task onto the `Tokio` runtime. The task runs until the returned handle is dropped.
 ///

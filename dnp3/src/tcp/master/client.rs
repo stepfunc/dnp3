@@ -11,11 +11,11 @@ use crate::link::reader::LinkModes;
 use crate::link::LinkErrorMode;
 use crate::master::task::MasterTask;
 use crate::master::{MasterChannel, MasterChannelConfig, MasterChannelType};
+use crate::session::Session;
 use crate::tcp::client::ClientTask;
 use crate::tcp::{ClientConnectionHandler, EndpointList, SimpleConnectHandler};
 use crate::tcp::{ClientState, ConnectOptions, PostConnectionHandler};
 use crate::util::lifecycle::Enabled;
-use crate::util::session::Session;
 
 /// Spawn a task onto the `Tokio` runtime. The task runs until the returned handle, and any
 /// `AssociationHandle` created from it is dropped.
