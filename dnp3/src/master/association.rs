@@ -213,14 +213,14 @@ impl AutoTaskState {
     }
 
     /// The task failed and needs rescheduling
-    fn failure(&mut self, config: &AssociationConfig) {
+    fn failure(&mut self, retry_strategy: RetryStrategy) {
         *self = match self {
             Self::Failed(backoff, _) => {
                 let delay = backoff.on_failure();
                 Self::Failed(backoff.clone(), deadline(Instant::now(), delay))
             }
             Self::Idle | Self::Pending => {
-                let mut backoff = ExponentialBackOff::new(config.auto_tasks_retry_strategy);
+                let mut backoff = ExponentialBackOff::new(retry_strategy);
                 let delay = backoff.on_failure();
                 Self::Failed(backoff, deadline(Instant::now(), delay))
             }
@@ -310,7 +310,7 @@ impl TaskStates {
         &self,
         now: Instant,
         config: &AssociationConfig,
-        association: &Association,
+        events_to_scan: EventClasses,
     ) -> (Next<QueuedTask>, Option<Instant>) {
         if self.clear_restart_iin.is_active() {
             return (
@@ -368,7 +368,6 @@ impl TaskStates {
             );
         }
 
-        let events_to_scan = association.events_to_scan();
         if events_to_scan.any() {
             return (
                 self.event_scan
@@ -642,7 +641,9 @@ impl Association {
     }
 
     pub(crate) fn on_integrity_scan_failure(&mut self) {
-        self.auto_tasks.integrity_scan.failure(&self.config);
+        self.auto_tasks
+            .integrity_scan
+            .failure(self.config.auto_tasks_retry_strategy);
     }
 
     /// The classes with events available that the automatic event scan reads
@@ -663,7 +664,9 @@ impl Association {
     }
 
     pub(crate) fn on_event_scan_failure(&mut self) {
-        self.auto_tasks.event_scan.failure(&self.config);
+        self.auto_tasks
+            .event_scan
+            .failure(self.config.auto_tasks_retry_strategy);
     }
 
     pub(crate) fn on_auto_task_success(&mut self, task: &AutoTask) {
@@ -671,7 +674,9 @@ impl Association {
     }
 
     pub(crate) fn on_auto_task_failure(&mut self, task: &AutoTask) {
-        self.auto_tasks.state_mut(task).failure(&self.config);
+        self.auto_tasks
+            .state_mut(task)
+            .failure(self.config.auto_tasks_retry_strategy);
     }
 
     pub(crate) fn on_time_sync_success(&mut self) {
@@ -680,7 +685,9 @@ impl Association {
 
     pub(crate) fn on_time_sync_failure(&mut self, err: TimeSyncError) {
         tracing::warn!("auto time sync failed: {}", err);
-        self.auto_tasks.time_sync.failure(&self.config);
+        self.auto_tasks
+            .time_sync
+            .failure(self.config.auto_tasks_retry_strategy);
     }
 
     pub(crate) fn on_link_activity(&mut self) {
@@ -816,7 +823,9 @@ impl Association {
     }
 
     fn get_next_task(&self, now: Instant) -> Next<QueuedTask> {
-        let (next, time_sync_retry) = self.auto_tasks.next(now, &self.config, self);
+        let (next, time_sync_retry) =
+            self.auto_tasks
+                .next(now, &self.config, self.events_to_scan());
         // the automatic tasks must complete before polls and link status requests
         let next = match next {
             Next::None => self.next_poll_or_keep_alive(now),
@@ -1014,7 +1023,7 @@ mod retry_tests {
         let mut state = AutoTaskState::Pending;
         // the first failure, then a retry whose delay would double past the maximum
         for _ in 0..2 {
-            state.failure(&config);
+            state.failure(config.auto_tasks_retry_strategy);
             assert!(matches!(
                 state.create_next_task(now, unreachable_task),
                 Next::NotBefore(x) if x == deadline(now, Duration::MAX)
