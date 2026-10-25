@@ -70,6 +70,7 @@ pub mod tcp;
 /// Entry points and types for UDP
 pub mod udp;
 
+pub(crate) mod session;
 pub(crate) mod transport;
 pub(crate) mod util;
 

@@ -8,10 +8,10 @@ use crate::link::reader::LinkModes;
 use crate::link::{LinkErrorMode, LinkReadMode};
 use crate::master::task::MasterTask;
 use crate::master::{MasterChannel, MasterChannelConfig, MasterChannelType};
+use crate::session::Session;
 use crate::udp::layer::UdpFactory;
 use crate::udp::task::UdpTask;
 use crate::util::lifecycle::Enabled;
-use crate::util::session::Session;
 
 use crate::app::Timeout;
 use std::net::SocketAddr;

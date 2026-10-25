@@ -18,6 +18,7 @@ use super::{
 use crate::app::{Listener, Timeout};
 use crate::link::reader::LinkModes;
 use crate::link::{EndpointAddress, LinkErrorMode, LinkReadMode};
+use crate::session::Session;
 use crate::tcp::client::ClientTask;
 use crate::tcp::{ClientConnectionHandler, ClientState, PostConnectionHandler};
 use crate::transport::FragmentAddr;
@@ -26,7 +27,6 @@ use crate::udp::task::UdpTask;
 use crate::util::channel::Receiver;
 use crate::util::lifecycle::Enabled;
 use crate::util::phys::PhysAddr;
-use crate::util::session::Session;
 use tokio::time::Instant;
 
 /// Builder for configuring a stream-based master task (TCP, TLS, serial)

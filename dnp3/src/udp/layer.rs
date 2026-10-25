@@ -369,8 +369,8 @@ mod tests {
     use crate::link::{EndpointAddress, LinkErrorMode};
     use crate::master::task::MasterTask;
     use crate::master::MasterChannelConfig;
+    use crate::session::Session;
     use crate::util::lifecycle::Enabled;
-    use crate::util::session::Session;
     use crate::util::test_support::{MASTER_REPLY, OUTSTATION_REQUEST};
     use std::time::Duration;
 
