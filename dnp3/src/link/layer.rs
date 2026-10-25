@@ -172,172 +172,179 @@ impl Layer {
     pub(crate) fn format_reply(header: Header) -> [u8; super::constant::LINK_HEADER_LENGTH] {
         header_bytes(header, super::constant::MIN_HEADER_LENGTH_VALUE)
     }
+}
 
-    /// Process a frame's header, passing the reason to `ignore` whenever the frame is ignored
-    pub(crate) fn process_header<F: FnMut(Ignored)>(
-        &mut self,
-        header: Header,
-        addr: PhysAddr,
-        mut ignore: F,
-    ) -> (Option<FrameInfo>, Option<Reply>) {
-        // ignore frames sent from the same endpoint type
-        if header.control.master == self.role.dir_bit() {
-            //  we don't log this
-            return (None, None);
-        }
+mod header_processing {
+    use super::*;
 
-        // validate the source address
-        let source: EndpointAddress = match header.source {
-            AnyAddress::Endpoint(x) => x,
-            AnyAddress::Reserved(_) | AnyAddress::Broadcast(_) | AnyAddress::SelfAddress => {
-                ignore(Ignored::UnknownSource(header.source));
+    impl Layer {
+        /// Process a frame's header, passing the reason to `ignore` whenever the frame is ignored
+        pub(crate) fn process_header<F: FnMut(Ignored)>(
+            &mut self,
+            header: Header,
+            addr: PhysAddr,
+            mut ignore: F,
+        ) -> (Option<FrameInfo>, Option<Reply>) {
+            // ignore frames sent from the same endpoint type
+            if header.control.master == self.role.dir_bit() {
+                // we don't log this
                 return (None, None);
             }
-        };
 
-        // validate the destination address
-        let broadcast: Option<BroadcastConfirmMode> = match header.destination {
-            AnyAddress::Endpoint(x) => {
-                if x == self.local_address {
-                    None
-                } else {
-                    ignore(Ignored::OtherDestination(x));
-                    return (None, None);
-                }
-            }
-            AnyAddress::SelfAddress => match self.role {
-                LinkRole::Outstation { self_address: true } => {
-                    // just pretend like it was sent to us
-                    None
-                }
-                LinkRole::Master
-                | LinkRole::Outstation {
-                    self_address: false,
-                } => {
-                    ignore(Ignored::SelfAddress);
-                    return (None, None);
-                }
-            },
-            AnyAddress::Reserved(x) => {
-                ignore(Ignored::ReservedDestination(x));
-                return (None, None);
-            }
-            AnyAddress::Broadcast(mode) => match self.role {
-                LinkRole::Master => {
-                    ignore(Ignored::BroadcastToMaster);
-                    return (None, None);
-                }
-                LinkRole::Outstation { .. } => Some(mode),
-            },
-        };
-
-        // broadcasts may only accept user data
-        if broadcast.is_some()
-            && !matches!(
-                header.control.func,
-                Function::PriUnconfirmedUserData | Function::PriConfirmedUserData
-            )
-        {
-            ignore(Ignored::BroadcastFunction(header.control.func));
-            return (None, None);
-        }
-
-        match header.control.func {
-            Function::PriUnconfirmedUserData => {
-                if header.control.fcv {
-                    ignore(Ignored::UnconfirmedWithFcv);
-                    return (None, None);
-                }
-
-                (
-                    Some(FrameInfo::new(source, broadcast, FrameType::Data, addr)),
-                    None,
-                )
-            }
-            Function::PriResetLinkStates => {
-                if header.control.fcv {
-                    ignore(Ignored::ResetWithFcv);
-                    return (None, None);
-                }
-
-                self.secondary_state = SecondaryState::Reset {
-                    source,
-                    expected_fcb: true,
+            let (source, broadcast) =
+                match validate_addresses(self.role, self.local_address, header) {
+                    Ok(addresses) => addresses,
+                    Err(reason) => {
+                        ignore(reason);
+                        return (None, None);
+                    }
                 };
-                (None, Some(Reply::new(source, Function::SecAck)))
+
+            // broadcasts may only accept user data
+            if broadcast.is_some()
+                && !matches!(
+                    header.control.func,
+                    Function::PriUnconfirmedUserData | Function::PriConfirmedUserData
+                )
+            {
+                ignore(Ignored::BroadcastFunction(header.control.func));
+                return (None, None);
             }
-            Function::PriConfirmedUserData => {
-                if !header.control.fcv {
-                    ignore(Ignored::ConfirmedWithoutFcv);
-                    return (None, None);
-                }
 
-                match self.secondary_state {
-                    SecondaryState::Reset {
-                        source: owner,
-                        expected_fcb: expected,
-                    } if owner == source => {
-                        let response = if broadcast.is_none() {
-                            Some(Reply::new(source, Function::SecAck))
-                        } else {
-                            // Do not answer if it's a broadcast
-                            None
-                        };
-
-                        if header.control.fcb == expected {
-                            self.secondary_state = SecondaryState::Reset {
-                                source,
-                                expected_fcb: !expected,
-                            };
-                            (
-                                Some(FrameInfo::new(source, broadcast, FrameType::Data, addr)),
-                                response,
-                            )
-                        } else {
-                            ignore(Ignored::RepeatedFcb);
-                            (None, response)
-                        }
+            match header.control.func {
+                Function::PriUnconfirmedUserData => {
+                    if header.control.fcv {
+                        ignore(Ignored::UnconfirmedWithFcv);
+                        return (None, None);
                     }
-                    SecondaryState::NotReset | SecondaryState::Reset { .. } => {
-                        ignore(Ignored::NotReset);
-                        (None, None)
-                    }
-                }
-            }
-            Function::PriRequestLinkStatus => {
-                if header.control.fcv {
-                    ignore(Ignored::LinkStatusWithFcv);
-                    return (None, None);
-                }
 
-                (
+                    (
+                        Some(FrameInfo::new(source, broadcast, FrameType::Data, addr)),
+                        None,
+                    )
+                }
+                Function::PriResetLinkStates => {
+                    if header.control.fcv {
+                        ignore(Ignored::ResetWithFcv);
+                        return (None, None);
+                    }
+
+                    self.secondary_state = SecondaryState::Reset {
+                        source,
+                        expected_fcb: true,
+                    };
+                    (None, Some(Reply::new(source, Function::SecAck)))
+                }
+                Function::PriConfirmedUserData => process_confirmed_data(
+                    &mut self.secondary_state,
+                    header.control,
+                    FrameInfo::new(source, broadcast, FrameType::Data, addr),
+                    &mut ignore,
+                ),
+                Function::PriRequestLinkStatus => {
+                    if header.control.fcv {
+                        ignore(Ignored::LinkStatusWithFcv);
+                        return (None, None);
+                    }
+
+                    (
+                        Some(FrameInfo::new(
+                            source,
+                            broadcast,
+                            FrameType::LinkStatusRequest,
+                            addr,
+                        )),
+                        Some(Reply::new(source, Function::SecLinkStatus)),
+                    )
+                }
+                Function::SecLinkStatus => (
                     Some(FrameInfo::new(
                         source,
                         broadcast,
-                        FrameType::LinkStatusRequest,
+                        FrameType::LinkStatusResponse,
                         addr,
                     )),
-                    Some(Reply::new(source, Function::SecLinkStatus)),
-                )
-            }
-            Function::SecLinkStatus => (
-                Some(FrameInfo::new(
-                    source,
-                    broadcast,
-                    FrameType::LinkStatusResponse,
-                    addr,
-                )),
-                None,
-            ),
-            function @ (Function::PriTestLinkStates
-            | Function::SecAck
-            | Function::SecNack
-            | Function::SecNotSupported
-            | Function::Unknown(_)) => {
-                ignore(Ignored::Function(function));
-                (None, None)
+                    None,
+                ),
+                function @ (Function::PriTestLinkStates
+                | Function::SecAck
+                | Function::SecNack
+                | Function::SecNotSupported
+                | Function::Unknown(_)) => {
+                    ignore(Ignored::Function(function));
+                    (None, None)
+                }
             }
         }
+    }
+
+    fn validate_addresses(
+        role: LinkRole,
+        local_address: EndpointAddress,
+        header: Header,
+    ) -> Result<(EndpointAddress, Option<BroadcastConfirmMode>), Ignored> {
+        let source = match header.source {
+            AnyAddress::Endpoint(source) => source,
+            AnyAddress::Reserved(_) | AnyAddress::Broadcast(_) | AnyAddress::SelfAddress => {
+                return Err(Ignored::UnknownSource(header.source));
+            }
+        };
+
+        let broadcast = match (role, header.destination) {
+            (_, AnyAddress::Endpoint(destination)) if destination == local_address => None,
+            (_, AnyAddress::Endpoint(destination)) => {
+                return Err(Ignored::OtherDestination(destination));
+            }
+            (LinkRole::Outstation { self_address: true }, AnyAddress::SelfAddress) => None,
+            (_, AnyAddress::SelfAddress) => return Err(Ignored::SelfAddress),
+            (_, AnyAddress::Reserved(destination)) => {
+                return Err(Ignored::ReservedDestination(destination));
+            }
+            (LinkRole::Master, AnyAddress::Broadcast(_)) => return Err(Ignored::BroadcastToMaster),
+            (LinkRole::Outstation { .. }, AnyAddress::Broadcast(mode)) => Some(mode),
+        };
+
+        Ok((source, broadcast))
+    }
+
+    fn process_confirmed_data<F: FnMut(Ignored)>(
+        state: &mut SecondaryState,
+        control: ControlField,
+        info: FrameInfo,
+        ignore: &mut F,
+    ) -> (Option<FrameInfo>, Option<Reply>) {
+        if !control.fcv {
+            ignore(Ignored::ConfirmedWithoutFcv);
+            return (None, None);
+        }
+
+        let expected = match *state {
+            SecondaryState::Reset {
+                source,
+                expected_fcb,
+            } if source == info.source => expected_fcb,
+            SecondaryState::NotReset | SecondaryState::Reset { .. } => {
+                ignore(Ignored::NotReset);
+                return (None, None);
+            }
+        };
+
+        let reply = if info.broadcast.is_none() {
+            Some(Reply::new(info.source, Function::SecAck))
+        } else {
+            None
+        };
+
+        if control.fcb != expected {
+            ignore(Ignored::RepeatedFcb);
+            return (None, reply);
+        }
+
+        *state = SecondaryState::Reset {
+            source: info.source,
+            expected_fcb: !expected,
+        };
+        (Some(info), reply)
     }
 }
 
