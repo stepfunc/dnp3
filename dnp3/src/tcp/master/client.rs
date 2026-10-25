@@ -9,7 +9,7 @@ use tracing::Instrument;
 use crate::app::{ConnectStrategy, Listener};
 use crate::link::reader::LinkModes;
 use crate::link::LinkErrorMode;
-use crate::master::task::MasterTask;
+use crate::master::session::task::MasterTask;
 use crate::master::{MasterChannel, MasterChannelConfig, MasterChannelType};
 use crate::session::Session;
 use crate::tcp::client::ClientTask;

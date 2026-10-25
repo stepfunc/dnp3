@@ -9,7 +9,7 @@ use crate::decode::PhysDecodeLevel;
 use crate::link;
 use crate::link::reader::LinkModes;
 use crate::link::LinkErrorMode;
-use crate::master::task::MasterTask;
+use crate::master::session::task::MasterTask;
 use crate::master::{MasterChannel, MasterChannelConfig, MasterChannelType};
 use crate::phys::{PhysLayer, Socket};
 use crate::session::Session;

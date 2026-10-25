@@ -61,7 +61,7 @@ use crate::app::parse::parser::ParsedFragment;
 use crate::app::{ControlField, Iin1, Iin2, ResponseFunction};
 use crate::link::error::LinkError;
 use crate::master::request::ReadRequest;
-use crate::master::task::ReadOutcome;
+use crate::master::session::read::ReadOutcome;
 use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::NonReadTask;
 use crate::master::test_fixtures::association;

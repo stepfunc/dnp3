@@ -19,7 +19,7 @@ use crate::link::reader::LinkModes;
 use crate::link::test_data;
 use crate::link::{EndpointAddress, LinkErrorMode};
 use crate::master::association::AssociationConfig;
-use crate::master::task::MasterTask;
+use crate::master::session::task::MasterTask;
 use crate::master::test_fixtures::null;
 use crate::master::tests::harness::requests::{empty_response, unsol_null, unsol_with_data};
 use crate::master::tests::harness::{

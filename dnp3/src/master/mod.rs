@@ -34,7 +34,7 @@ pub(crate) mod poll;
 pub(crate) mod promise;
 #[cfg(test)]
 mod relative_time_tests;
-pub(crate) mod task;
+pub(crate) mod session;
 pub(crate) mod tasks;
 #[cfg(test)]
 mod test_fixtures;
