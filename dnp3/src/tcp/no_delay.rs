@@ -6,7 +6,7 @@
 
 use std::sync::atomic::Ordering;
 
-use crate::util::phys::Socket;
+use crate::phys::Socket;
 
 static CLIENT_TCP_NO_DELAY: std::sync::atomic::AtomicBool =
     std::sync::atomic::AtomicBool::new(true);

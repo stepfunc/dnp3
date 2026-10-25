@@ -9,9 +9,9 @@ use tracing::Instrument;
 use crate::app::{Listener, Shutdown};
 use crate::outstation::session::task::OutstationTask;
 use crate::outstation::ConnectionState;
+use crate::phys::PhysLayer;
 use crate::util::channel::{request_channel, Receiver, Sender};
 use crate::util::lifecycle::{Enabled, RunError, StopReason};
-use crate::util::phys::PhysLayer;
 
 /// message that gets sent to OutstationTaskAdapter when
 /// it needs to switch to a new session

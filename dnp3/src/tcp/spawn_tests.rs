@@ -15,8 +15,8 @@ use crate::decode::PhysDecodeLevel;
 use crate::link::{EndpointAddress, LinkErrorMode};
 use crate::master::{MasterChannel, MasterChannelConfig};
 use crate::outstation::{DefaultControlHandler, OutstationConfig};
+use crate::phys::{PhysAddr, PhysLayer};
 use crate::tcp::{ClientState, ConnectOptions, EndpointList};
-use crate::util::phys::{PhysAddr, PhysLayer};
 use crate::util::test_support::{
     NullApplication, NullInformation, Timeline, MASTER_REPLY, MASTER_REQUEST,
     NULL_UNSOLICITED_HEADER, OUTSTATION_REPLY, OUTSTATION_REQUEST,
@@ -276,8 +276,8 @@ async fn outstation_tcp_client_uses_the_master_address_its_connection_handler_se
 mod tls {
     use super::*;
     use crate::outstation::OutstationHandle;
+    use crate::phys::PhysIo;
     use crate::tcp::tls::MinTlsVersion;
-    use crate::util::phys::PhysIo;
     use crate::util::test_support::tls::{client_config, server_config};
 
     async fn accept_tls(peer: &Peer) -> PhysLayer {

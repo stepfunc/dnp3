@@ -12,12 +12,12 @@ use std::sync::Arc;
 use crate::app::{ConnectStrategy, Listener};
 use crate::link::LinkErrorMode;
 use crate::master::{MasterChannel, MasterChannelConfig};
+use crate::phys::{PhysLayer, Socket};
 use crate::tcp::tls::{CertificateMode, HandshakeError, MinTlsVersion, TlsError};
 use crate::tcp::{
     spawn_master_client, ClientConnectionHandler, ClientState, ConnectOptions, SimpleConnectHandler,
 };
 use crate::tcp::{EndpointList, PostConnectionHandler};
-use crate::util::phys::{PhysLayer, Socket};
 
 use tokio_rustls::rustls;
 use tokio_rustls::rustls::pki_types::{IpAddr, ServerName};

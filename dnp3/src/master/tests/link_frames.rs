@@ -30,8 +30,8 @@ use crate::master::{
     AssociationHandle, AssociationInformation, Classes, MasterChannel, MasterChannelConfig,
     MasterChannelType, ReadRequest, ReadType, TaskError, TaskType,
 };
+use crate::phys::PhysLayer;
 use crate::util::lifecycle::{Enabled, RunError};
-use crate::util::phys::PhysLayer;
 use crate::util::test_support::watchdog;
 
 pub(super) const MASTER: EndpointAddress = EndpointAddress::raw(1);

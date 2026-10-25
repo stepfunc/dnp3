@@ -9,7 +9,7 @@ use crate::link::{LinkErrorMode, LinkReadMode};
 use crate::master::task::MasterTask;
 use crate::master::{MasterChannel, MasterChannelConfig, MasterChannelType};
 use crate::session::Session;
-use crate::udp::layer::UdpFactory;
+use crate::udp::factory::UdpFactory;
 use crate::udp::task::UdpTask;
 use crate::util::lifecycle::Enabled;
 

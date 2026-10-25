@@ -4,13 +4,19 @@
 // Text and data mining rights, including for AI training, are reserved under
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
+//! Physical I/O, queued link replies, and datagram handling.
+
+mod addr;
+pub(crate) mod udp;
+
+pub(crate) use addr::PhysAddr;
+
 use crate::decode::PhysDecodeLevel;
 use crate::link::constant::LINK_HEADER_LENGTH;
 use crate::link::error::LogicError;
 use std::io::ErrorKind;
-use std::net::SocketAddr;
 
-use crate::udp::layer::UdpLayer;
+use self::udp::UdpLayer;
 use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
 /// A connected stream that a TCP or TLS server session runs over
@@ -60,15 +66,6 @@ impl Socket for tokio::io::DuplexStream {
     fn into_tls_phys(stream: tokio_rustls::TlsStream<Self>) -> PhysLayer {
         PhysLayer::new(PhysIo::TlsDuplex(Box::new(stream)))
     }
-}
-
-/// Source or destination at the physical layer from which a link frame was read/written
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub(crate) enum PhysAddr {
-    /// The default type used for everything other than UDP
-    None,
-    /// Frames carried over UDP come to/from a SocketAddr
-    Udp(SocketAddr),
 }
 
 /// The physical layers a session can run over

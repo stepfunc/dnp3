@@ -8,7 +8,7 @@ use crate::app::parse::parser::{Request, Response};
 use crate::app::{HeaderParseError, RequestValidationError, ResponseValidationError, Sequence};
 use crate::link::header::BroadcastConfirmMode;
 use crate::link::EndpointAddress;
-use crate::util::phys::PhysAddr;
+use crate::phys::PhysAddr;
 
 #[derive(Debug, Copy, Clone)]
 pub(crate) struct FragmentAddr {

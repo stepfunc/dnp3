@@ -6,8 +6,8 @@
 
 use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
+use crate::phys::PhysLayer;
 use crate::transport::{FragmentAddr, TransportWrite};
-use crate::util::phys::PhysLayer;
 
 /// Written in place of a link status request, which the mock transport has no link layer to frame
 pub(crate) const LINK_STATUS_REQUEST: &[u8] = b"link status request";

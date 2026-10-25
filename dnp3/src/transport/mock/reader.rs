@@ -9,9 +9,9 @@ use std::sync::{Arc, Mutex};
 use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
 use crate::link::header::FrameInfo;
+use crate::phys::{PhysAddr, PhysLayer};
 use crate::transport::{Fragment, FragmentAddr, FragmentInfo, TransportData, TransportRead};
 use crate::util::buffer::Buffer;
-use crate::util::phys::{PhysAddr, PhysLayer};
 
 /// The frame info the reader gives each fragment, which a test can change while a session runs
 #[derive(Clone, Default)]

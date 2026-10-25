@@ -12,12 +12,12 @@ use crate::outstation::{
     ConnectionState, ControlHandler, OutstationApplication, OutstationConfig, OutstationHandle,
     OutstationInformation,
 };
+use crate::phys::{PhysAddr, PhysLayer, Socket};
 use crate::tcp::accept::{Acceptor, Listen};
 use crate::tcp::server_task::{NewSession, ServerTask as OutstationServerTask};
 use crate::tcp::{AddressFilter, FilterError, ServerHandle};
 use crate::util::channel::Sender;
 use crate::util::lifecycle::Enabled;
-use crate::util::phys::{PhysAddr, PhysLayer, Socket};
 use crate::util::shutdown::ShutdownListener;
 use std::net::SocketAddr;
 use tracing::Instrument;

@@ -4,7 +4,7 @@
 // Text and data mining rights, including for AI training, are reserved under
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
-use crate::util::phys::{PhysAddr, PhysLayer};
+use super::addr::PhysAddr;
 use std::io::ErrorKind;
 use std::net::SocketAddr;
 
@@ -18,45 +18,8 @@ enum UdpType {
     Scripted(scripted::ScriptedSocket),
 }
 
-enum UdpFactoryType {
-    Bound {
-        local: SocketAddr,
-    },
-    Connected {
-        local: SocketAddr,
-        remote: SocketAddr,
-    },
-}
-
-pub(crate) struct UdpFactory(UdpFactoryType);
-
-impl UdpFactory {
-    pub(crate) fn bound(local: SocketAddr) -> Self {
-        Self(UdpFactoryType::Bound { local })
-    }
-
-    pub(crate) fn connected(local: SocketAddr, remote: SocketAddr) -> Self {
-        Self(UdpFactoryType::Connected { local, remote })
-    }
-}
-
-impl UdpFactory {
-    pub(crate) async fn open(&self) -> std::io::Result<PhysLayer> {
-        match self.0 {
-            UdpFactoryType::Bound { local } => {
-                let layer = UdpLayer::bind(local).await?;
-                Ok(PhysLayer::udp(layer))
-            }
-            UdpFactoryType::Connected { local, remote } => {
-                let layer = UdpLayer::connect(local, remote).await?;
-                Ok(PhysLayer::udp(layer))
-            }
-        }
-    }
-}
-
 impl UdpLayer {
-    async fn bind(local: SocketAddr) -> std::io::Result<Self> {
+    pub(crate) async fn bind(local: SocketAddr) -> std::io::Result<Self> {
         let socket = tokio::net::UdpSocket::bind(local).await?;
         Ok(Self::bound(socket))
     }
@@ -67,7 +30,7 @@ impl UdpLayer {
         }
     }
 
-    async fn connect(local: SocketAddr, remote: SocketAddr) -> std::io::Result<Self> {
+    pub(crate) async fn connect(local: SocketAddr, remote: SocketAddr) -> std::io::Result<Self> {
         let socket = tokio::net::UdpSocket::bind(local).await?;
         socket.connect(remote).await?;
         Ok(UdpLayer {
@@ -240,7 +203,7 @@ fn is_destination_error(err: &std::io::Error) -> bool {
 #[cfg(test)]
 mod scripted {
     use super::{destination, UdpLayer, UdpType};
-    use crate::util::phys::PhysAddr;
+    use crate::phys::PhysAddr;
     use std::collections::VecDeque;
     use std::io::ErrorKind;
     use std::net::SocketAddr;
@@ -369,6 +332,7 @@ mod tests {
     use crate::link::{EndpointAddress, LinkErrorMode};
     use crate::master::task::MasterTask;
     use crate::master::MasterChannelConfig;
+    use crate::phys::PhysLayer;
     use crate::session::Session;
     use crate::util::lifecycle::Enabled;
     use crate::util::test_support::{MASTER_REPLY, OUTSTATION_REQUEST};

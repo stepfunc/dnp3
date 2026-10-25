@@ -14,7 +14,7 @@ use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
 use crate::link::reader::LinkModes;
 use crate::link::{EndpointAddress, LinkRole};
-use crate::util::phys::PhysLayer;
+use crate::phys::PhysLayer;
 
 #[cfg(test)]
 pub(crate) mod mock;

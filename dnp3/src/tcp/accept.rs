@@ -12,7 +12,7 @@ use std::time::Duration;
 use tokio::net::{TcpListener, TcpStream};
 use tokio::time::Instant;
 
-use crate::util::phys::Socket;
+use crate::phys::Socket;
 
 /// How long a server waits before accepting again after `accept()` fails for a reason other
 /// than the incoming connection itself

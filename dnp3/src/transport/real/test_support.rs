@@ -13,13 +13,13 @@ use crate::link::header::{AnyAddress, ControlField, Header};
 use crate::link::reader::LinkModes;
 use crate::link::test_data;
 use crate::link::{EndpointAddress, LinkRole};
+use crate::phys::{PhysAddr, PhysLayer};
 use crate::transport::real::reader::Reader;
 use crate::transport::real::writer::Writer;
 use crate::transport::real::RealTransport;
 use crate::transport::{
     FragmentAddr, LinkLayerMessageType, Transport, TransportData, TransportRead, TransportWrite,
 };
-use crate::util::phys::{PhysAddr, PhysLayer};
 
 pub(super) const MASTER: EndpointAddress = EndpointAddress::raw(1);
 pub(super) const OUTSTATION: EndpointAddress = EndpointAddress::raw(1024);

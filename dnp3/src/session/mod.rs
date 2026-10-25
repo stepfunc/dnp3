@@ -10,9 +10,9 @@ pub(crate) mod connection;
 
 use crate::app::Shutdown;
 use crate::link::EndpointAddress;
+use crate::phys::PhysLayer;
 use crate::util::deadline::deadline;
 use crate::util::lifecycle::{Enabled, RunError, StopReason};
-use crate::util::phys::PhysLayer;
 use std::time::Duration;
 
 enum SessionType {

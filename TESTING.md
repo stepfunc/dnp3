@@ -72,8 +72,8 @@ Paths are relative to `dnp3/src`.
 | `tries_endpoints_in_order_and_backs_off_like_the_model` | `tcp/connector.rs` | Endpoint order, connect options, exponential backoff and its reset | Independent model | 256 |
 | `a_filter_matches_the_canonical_addresses_it_names` | `tcp/outstation/address_filter.rs` | Address filters match like a model, IPv4 and IPv4-mapped alike | Independent model | 256 |
 | `filters_conflict_when_an_address_matches_both` | `tcp/outstation/address_filter.rs` | Two filters conflict, in both orders, exactly when an address matches both | Independent (search with the model) | 256 |
-| `a_reply_resumes_where_a_cancelled_write_stopped` | `util/phys.rs` | A cancelled reply write resumes without losing or repeating bytes, and flushes after the last | Independent (consistency check) | 256 |
-| `a_write_follows_the_whole_reply` | `util/phys.rs` | A write after cancelled reply attempts sends the rest of the reply, then its data | Independent | 128 |
+| `a_reply_resumes_where_a_cancelled_write_stopped` | `phys/mod.rs` | A cancelled reply write resumes without losing or repeating bytes, and flushes after the last | Independent (consistency check) | 256 |
+| `a_write_follows_the_whole_reply` | `phys/mod.rs` | A write after cancelled reply attempts sends the rest of the reply, then its data | Independent | 128 |
 
 ### Master
 

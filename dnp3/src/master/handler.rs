@@ -36,10 +36,10 @@ use crate::master::{
     AuthKey, BlockNumber, DeadBandHeader, DirReadConfig, FileCredentials, FileError, FileHandle,
     FileInfo, FileMode, FileReadConfig, FileReader, Headers, OpenFile, ReadHandler, WriteError,
 };
+use crate::phys::PhysAddr;
 use crate::transport::FragmentAddr;
 use crate::util::channel::Sender;
 use crate::util::lifecycle::Enabled;
-use crate::util::phys::PhysAddr;
 
 /// Master channels may be Udp or of a "stream" type such as TCP
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
