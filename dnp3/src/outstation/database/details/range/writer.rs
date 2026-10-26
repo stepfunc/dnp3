@@ -39,7 +39,7 @@ struct BitState<T>
 where
     T: BitConverter,
 {
-    /// the position of next item within the current byte [0,7]
+    /// the position of next item within the current byte (0 through 7)
     bit_pos: u8,
     /// accumulated value of the current byte
     acc: u8,

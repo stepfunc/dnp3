@@ -289,7 +289,7 @@ impl AssociationHandle {
 
     /// Perform an asynchronous READ request
     ///
-    /// If successful, the [ReadHandler](ReadHandler) will process the received measurement data
+    /// If successful, the [ReadHandler] will process the received measurement data
     pub async fn read(&mut self, request: ReadRequest) -> Result<(), TaskError> {
         let (promise, rx) = Promise::one_shot();
         let task = SingleReadTask::new(request, promise);
@@ -315,7 +315,7 @@ impl AssociationHandle {
 
     /// Perform an asynchronous READ request with a custom read handler
     ///
-    /// If successful, the custom [ReadHandler](ReadHandler) will process the received measurement data
+    /// If successful, the custom [ReadHandler] will process the received measurement data
     pub async fn read_with_handler(
         &mut self,
         request: ReadRequest,
@@ -329,7 +329,7 @@ impl AssociationHandle {
 
     /// Perform an asynchronous operate request
     ///
-    /// The actual function code used depends on the value of the [CommandMode](CommandMode).
+    /// The actual function code used depends on the value of the [CommandMode].
     pub async fn operate(
         &mut self,
         mode: CommandMode,
@@ -356,14 +356,14 @@ impl AssociationHandle {
 
     /// Perform a WARM_RESTART operation
     ///
-    /// Returns the delay from the outstation's response as a [Duration](Duration)
+    /// Returns the delay from the outstation's response as a [Duration]
     pub async fn warm_restart(&mut self) -> Result<Duration, TaskError> {
         self.restart(RestartType::WarmRestart).await
     }
 
     /// Perform a COLD_RESTART operation
     ///
-    /// Returns the delay from the outstation's response as a [Duration](Duration)
+    /// Returns the delay from the outstation's response as a [Duration]
     pub async fn cold_restart(&mut self) -> Result<Duration, TaskError> {
         self.restart(RestartType::ColdRestart).await
     }
