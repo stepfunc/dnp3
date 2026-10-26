@@ -25,6 +25,8 @@ const CLASS_1: &[u8] = &[0x3C, 0x02, 0x06];
 const CLASS_0: &[u8] = &[0x3C, 0x01, 0x06];
 /// g0v254 (all attributes) of every set
 const ALL_ATTRIBUTES: &[u8] = &[0x00, 0xFE, 0x06];
+/// g110v0 (all static octet strings)
+const ALL_STATIC_OCTET_STRINGS: &[u8] = &[110, 0, 0x06];
 
 /// binary flags: ONLINE and state true
 const BINARY_TRUE: u8 = 0x81;
@@ -130,6 +132,77 @@ fn define_serial_number(value: &str) -> impl FnMut(&mut Database) {
         )
         .unwrap();
     }
+}
+
+fn add_oversize_octet_string(db: &mut Database) {
+    assert!(db.add(0, None, OctetStringConfig));
+    db.update(
+        0,
+        &OctetString::new(&[7; 255]).unwrap(),
+        UpdateOptions::no_event(),
+    );
+}
+
+#[tokio::test]
+async fn unreadable_octet_string_ends_read_without_confirm() {
+    crate::util::test_support::watchdog(async {
+        let mut harness = new_harness(config_with_buffer(<BufferSize>::MIN));
+        harness
+            .handle
+            .database
+            .transaction(add_oversize_octet_string);
+
+        harness
+            .test_request_response(
+                &read(&[ALL_STATIC_OCTET_STRINGS]),
+                &empty_response(0, iin2::PARAMETER_ERROR),
+            )
+            .await;
+        harness.check_no_events();
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn unreadable_octet_string_ends_later_fragment_without_confirm() {
+    crate::util::test_support::watchdog(async {
+        let mut harness = new_harness(config_with_buffer(<BufferSize>::MIN));
+        harness.handle.database.transaction(|db| {
+            db.add(0, None, BinaryInputConfig::default());
+            add_oversize_octet_string(db);
+        });
+
+        let binary = g1v2(0, 0);
+        harness
+            .send_and_process(&read(&[&binary, ALL_STATIC_OCTET_STRINGS]))
+            .await;
+        harness
+            .expect_response(&response(
+                FIR_CON,
+                iin1::RESTART,
+                &[&g1v2_values(0, &[RESTART])],
+            ))
+            .await;
+        harness.check_events(&[Event::EnterSolicitedConfirmWait(0)]);
+
+        confirm(&mut harness, 0, 0..0, empty_buffer_state()).await;
+        harness
+            .expect_response(&response_header(
+                FIN_SEQ_1,
+                iin1::RESTART,
+                iin2::PARAMETER_ERROR,
+            ))
+            .await;
+        harness.check_no_events();
+
+        harness
+            .test_request_response(
+                &read(&[&binary]),
+                &response(FIR_FIN, iin1::RESTART, &[&g1v2_values(0, &[RESTART])]),
+            )
+            .await;
+    })
+    .await;
 }
 
 fn class_1_counter() -> BufferState {

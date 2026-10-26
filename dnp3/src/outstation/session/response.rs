@@ -39,6 +39,10 @@ pub(crate) struct Staged<'a> {
 }
 
 impl<'a> Staged<'a> {
+    pub(crate) fn has_objects(&self) -> bool {
+        self.slot.len > ResponseHeader::LENGTH
+    }
+
     pub(crate) fn with_header(self, header: ResponseHeader) -> Prepared<'a> {
         Prepared {
             slot: self.slot,

@@ -287,6 +287,15 @@ impl OutstationSession {
     ) -> Prepared<'a> {
         let (result, staged) = sol.build(|cursor| Ok(database.write_response_headers(cursor)));
         let header = match result {
+            Ok(info) if !info.complete && !staged.has_objects() => {
+                tracing::error!("unable to make progress writing a READ response");
+                database.reset();
+                ResponseHeader::new(
+                    ControlField::response(seq, fir, true, false),
+                    ResponseFunction::Response,
+                    Iin::default() | Iin2::PARAMETER_ERROR,
+                )
+            }
             Ok(info) => ResponseHeader::new(
                 ControlField::response(seq, fir, info.complete, info.need_confirm()),
                 ResponseFunction::Response,
