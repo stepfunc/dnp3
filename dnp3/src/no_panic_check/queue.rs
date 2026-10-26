@@ -4,10 +4,10 @@
 // Text and data mining rights, including for AI training, are reserved under
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
-//! Links every operation of [`BoundedQueue`], on a queue whose capacity and history the
-//! compiler can't know, so that a push, pop, front access, iteration or clear can't panic. The
-//! READ selections that hold their own element types in the queue are checked where they are
-//! used.
+//! Links the operations of a [`BoundedQueue`] of `u16`, whose capacity and history the compiler
+//! can't know, so that a push, pop, front access, iteration or clear can't panic. The queue is
+//! built outside the check. The READ selections that queue their own element types aren't
+//! checked here.
 
 use std::hint::black_box;
 

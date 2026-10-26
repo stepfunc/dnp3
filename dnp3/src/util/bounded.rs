@@ -163,10 +163,15 @@ mod tests {
 
     /// `BoundedQueue` against a `VecDeque` model capped at the same `max`
     ///
-    /// After every operation the queue must hold the model's items in order, with the same
-    /// length and front, and `try_push` must fail exactly when the model is full. The
+    /// After construction and every operation the queue must hold the model's items in order,
+    /// with the same length and front, `try_push` must fail exactly when the model is full, and
+    /// a slot must be occupied exactly when it is one of the `len` slots from `head`. The
     /// generator uses capacities 0 to 8 and up to 64 operations, weighted toward pushes so the
     /// queue fills and wraps, with pops, front mutation and clears between them.
+    #[expect(
+        clippy::arithmetic_side_effects,
+        reason = "the model computes ring positions"
+    )]
     mod model {
         use std::collections::VecDeque;
 
@@ -192,17 +197,28 @@ mod tests {
             ]
         }
 
+        /// every slot is occupied exactly when it is one of the `len` slots from `head`
+        fn check_slots(queue: &BoundedQueue<u8>) -> Result<(), TestCaseError> {
+            let max = queue.slots.len();
+            for (slot, item) in queue.slots.iter().enumerate() {
+                let offset = (slot + max - queue.head) % max;
+                prop_assert_eq!(item.is_some(), offset < queue.len, "slot {}", slot);
+            }
+            Ok(())
+        }
+
         proptest! {
             #![proptest_config(proptest_config(256))]
 
             #[test]
             fn behaves_like_a_capped_vec_deque(
                 max in 0usize..=8,
-                ops in proptest::collection::vec(op(), 0..64),
+                ops in proptest::collection::vec(op(), 0..=64),
             ) {
                 let mut queue = BoundedQueue::new(max);
                 let mut model: VecDeque<u8> = VecDeque::new();
                 prop_assert_eq!(queue.max(), max);
+                check_slots(&queue)?;
                 for op in ops {
                     match op {
                         Op::Push(x) => {
@@ -234,6 +250,7 @@ mod tests {
                         queue.iter().copied().collect::<Vec<_>>(),
                         model.iter().copied().collect::<Vec<_>>()
                     );
+                    check_slots(&queue)?;
                 }
             }
         }
