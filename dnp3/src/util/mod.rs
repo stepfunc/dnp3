@@ -26,6 +26,17 @@ pub(crate) fn chunks<T, const N: usize>(items: &[T]) -> impl Iterator<Item = &[T
         .chain((!rest.is_empty()).then_some(rest))
 }
 
+/// `x / N`, rounded up
+#[expect(
+    clippy::disallowed_methods,
+    reason = "the const block rejects N == 0 at compile time"
+)]
+#[expect(clippy::disallowed_macros, reason = "the assert runs at compile time")]
+pub(crate) const fn div_ceil<const N: usize>(x: usize) -> usize {
+    const { assert!(N > 0, "N must be nonzero") };
+    x.div_ceil(N)
+}
+
 /// signals a bad write operation
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct BadWrite;

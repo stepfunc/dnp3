@@ -20,7 +20,8 @@ use scursor::{ReadCursor, WriteCursor};
 /// The largest read for a fragment size: the frames that carry a fragment of this size
 const fn max_read_size(fragment_size: usize) -> usize {
     // the link frames needed to carry a fragment of this size, and at least one
-    let num_frames = fragment_size.div_ceil(link::constant::MAX_APP_BYTES_PER_FRAME);
+    let num_frames =
+        crate::util::div_ceil::<{ link::constant::MAX_APP_BYTES_PER_FRAME }>(fragment_size);
     let num_frames = if num_frames == 0 { 1 } else { num_frames };
 
     // we add 1 to this number for transports like UDP to detect under-sized reads

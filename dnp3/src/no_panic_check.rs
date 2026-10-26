@@ -310,7 +310,9 @@ fn link_reader(data: &[u8]) {
     let mut payload = FramePayload::new();
     let mut data = chunks;
     while let [length, rest @ ..] = data {
-        let (chunk, next) = rest.split_at(usize::from(*length).min(rest.len()));
+        let (chunk, next) = rest
+            .split_at_checked(usize::from(*length).min(rest.len()))
+            .unwrap_or((rest, &[]));
         std::hint::black_box(link_receive(&mut reader, datagram_socket, chunk));
         std::hint::black_box(link_frames(&mut reader, &mut payload));
         data = next;
@@ -322,7 +324,9 @@ fn link_reader(data: &[u8]) {
 fn segments(mut data: &[u8]) {
     let mut assembler = Assembler::new(std::hint::black_box(2048));
     while let [length, source, flags, rest @ ..] = data {
-        let (segment, next) = rest.split_at(usize::from(*length).min(rest.len()));
+        let (segment, next) = rest
+            .split_at_checked(usize::from(*length).min(rest.len()))
+            .unwrap_or((rest, &[]));
         let broadcast = match flags % 4 {
             0 => Some(BroadcastConfirmMode::Optional),
             1 => Some(BroadcastConfirmMode::Mandatory),

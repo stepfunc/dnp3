@@ -3,10 +3,11 @@ allow-expect-in-tests = true
 allow-panic-in-tests = true
 allow-indexing-slicing-in-tests = true
 
-# std methods that panic when an argument is out of range, which the panic lints in lib.rs don't
-# see. Each reason names a form that can't panic. A primitive's inherent methods are spelled
-# `slice::`, `str::` or `u8::`: a spelling clippy can't resolve is ignored without a warning, so a
-# new entry has to be shown to fire on a call.
+# std methods that panic when an argument is out of range, or that add or multiply without the
+# overflow check the arithmetic lint asks for, which the panic lints in lib.rs don't see. Each
+# reason names a form that can't panic. A primitive's inherent methods are spelled `slice::`,
+# `str::` or `u8::`: some spellings clippy can't resolve are ignored without a warning, so a new
+# entry has to be shown to fire on a call.
 #
 # Not listed, on purpose:
 # - allocation (`Vec::push`, `with_capacity`, `to_vec`, `format!`, ...): its failures (an
@@ -15,8 +16,8 @@ allow-indexing-slicing-in-tests = true
 #   link check
 # - tokio's runtime precondition (`tokio::spawn`, `Handle::current`, timers and I/O outside a
 #   runtime): a program that breaks it panics on its first use, every time
-# - lock poisoning: `lock_handler`'s `expect`, under its own `#[expect]`, only panics after another
-#   thread already panicked holding the lock
+# - lock poisoning: the database lock's `expect`, under its own `#[expect]`, only panics after
+#   another thread already panicked holding the lock
 # - methods that already return an `Option` or `Result` for a bad argument, such as
 #   `VecDeque::remove` and `swap_remove_back`
 disallowed-methods = [
@@ -83,38 +84,46 @@ disallowed-methods = [
     { path = "std::time::Duration::div_f64", reason = "panics on a negative, non-finite or overflowing result: use integer checked_div" },
     # iterators
     { path = "std::iter::Iterator::step_by", reason = "panics on a step of 0: step by a NonZero, or filter by position" },
-    # integers: the logarithms panic on 0 (and on a base below 2), the Euclidean division on a 0
-    # divisor (and on MIN / -1)
+    { path = "std::iter::Iterator::sum", reason = "adds without an overflow check, so it panics on overflow when overflow checks are on: fold with checked_add or saturating_add" },
+    { path = "std::iter::Iterator::product", reason = "multiplies without an overflow check, so it panics on overflow when overflow checks are on: fold with checked_mul or saturating_mul" },
+    # integers: the logarithms panic on 0 (and on a base below 2), the Euclidean and rounded-up
+    # division on a 0 divisor (and on MIN / -1)
     { path = "u8::ilog", reason = "use checked_ilog" },
     { path = "u8::ilog2", reason = "use checked_ilog2" },
     { path = "u8::ilog10", reason = "use checked_ilog10" },
     { path = "u8::div_euclid", reason = "use checked_div_euclid" },
     { path = "u8::rem_euclid", reason = "use checked_rem_euclid" },
+    { path = "u8::div_ceil", reason = "use util::div_ceil, which rejects a 0 divisor at compile time" },
     { path = "u16::ilog", reason = "use checked_ilog" },
     { path = "u16::ilog2", reason = "use checked_ilog2" },
     { path = "u16::ilog10", reason = "use checked_ilog10" },
     { path = "u16::div_euclid", reason = "use checked_div_euclid" },
     { path = "u16::rem_euclid", reason = "use checked_rem_euclid" },
+    { path = "u16::div_ceil", reason = "use util::div_ceil, which rejects a 0 divisor at compile time" },
     { path = "u32::ilog", reason = "use checked_ilog" },
     { path = "u32::ilog2", reason = "use checked_ilog2" },
     { path = "u32::ilog10", reason = "use checked_ilog10" },
     { path = "u32::div_euclid", reason = "use checked_div_euclid" },
     { path = "u32::rem_euclid", reason = "use checked_rem_euclid" },
+    { path = "u32::div_ceil", reason = "use util::div_ceil, which rejects a 0 divisor at compile time" },
     { path = "u64::ilog", reason = "use checked_ilog" },
     { path = "u64::ilog2", reason = "use checked_ilog2" },
     { path = "u64::ilog10", reason = "use checked_ilog10" },
     { path = "u64::div_euclid", reason = "use checked_div_euclid" },
     { path = "u64::rem_euclid", reason = "use checked_rem_euclid" },
+    { path = "u64::div_ceil", reason = "use util::div_ceil, which rejects a 0 divisor at compile time" },
     { path = "u128::ilog", reason = "use checked_ilog" },
     { path = "u128::ilog2", reason = "use checked_ilog2" },
     { path = "u128::ilog10", reason = "use checked_ilog10" },
     { path = "u128::div_euclid", reason = "use checked_div_euclid" },
     { path = "u128::rem_euclid", reason = "use checked_rem_euclid" },
+    { path = "u128::div_ceil", reason = "use util::div_ceil, which rejects a 0 divisor at compile time" },
     { path = "usize::ilog", reason = "use checked_ilog" },
     { path = "usize::ilog2", reason = "use checked_ilog2" },
     { path = "usize::ilog10", reason = "use checked_ilog10" },
     { path = "usize::div_euclid", reason = "use checked_div_euclid" },
     { path = "usize::rem_euclid", reason = "use checked_rem_euclid" },
+    { path = "usize::div_ceil", reason = "use util::div_ceil, which rejects a 0 divisor at compile time" },
     { path = "i8::ilog", reason = "use checked_ilog" },
     { path = "i8::ilog2", reason = "use checked_ilog2" },
     { path = "i8::ilog10", reason = "use checked_ilog10" },
@@ -145,4 +154,21 @@ disallowed-methods = [
     { path = "isize::ilog10", reason = "use checked_ilog10" },
     { path = "isize::div_euclid", reason = "use checked_div_euclid" },
     { path = "isize::rem_euclid", reason = "use checked_rem_euclid" },
+]
+
+# std macros that panic: `lib.rs` denies these outside of test builds, where they check results. A
+# check that runs at compile time, in a `const` block, can't panic at runtime and takes a narrow
+# `#[expect]`
+disallowed-macros = [
+    { path = "std::assert", reason = "panics: make the state unrepresentable, or return an error" },
+    { path = "std::assert_eq", reason = "panics: make the state unrepresentable, or return an error" },
+    { path = "std::assert_ne", reason = "panics: make the state unrepresentable, or return an error" },
+    { path = "std::debug_assert", reason = "panics in builds with debug assertions: make the state unrepresentable, or return an error" },
+    { path = "std::debug_assert_eq", reason = "panics in builds with debug assertions: make the state unrepresentable, or return an error" },
+    { path = "std::debug_assert_ne", reason = "panics in builds with debug assertions: make the state unrepresentable, or return an error" },
+]
+
+# std types whose methods panic on their state rather than an argument
+disallowed-types = [
+    { path = "std::cell::RefCell", reason = "a conflicting borrow panics: use Cell, or restructure so the borrow checker proves exclusive access" },
 ]

@@ -205,7 +205,9 @@ impl EventBufferConfig {
     }
 
     fn max_events(&self) -> usize {
-        EventType::ALL.into_iter().map(|t| t.max(self)).sum()
+        EventType::ALL
+            .into_iter()
+            .fold(0, |sum, t| sum.saturating_add(t.max(self)))
     }
 }
 

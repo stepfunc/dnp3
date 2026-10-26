@@ -205,7 +205,7 @@ impl Parser {
     )]
     fn calc_trailer_length(data_length: u8) -> usize {
         let data_length = usize::from(data_length);
-        let blocks = data_length.div_ceil(constant::MAX_BLOCK_SIZE);
+        let blocks = crate::util::div_ceil::<{ constant::MAX_BLOCK_SIZE }>(data_length);
         data_length + blocks * constant::CRC_LENGTH
     }
 

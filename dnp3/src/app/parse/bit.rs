@@ -11,11 +11,11 @@ use crate::util::bit::Bitfield;
 use scursor::{ReadCursor, ReadError};
 
 fn num_bytes_for_bits(count: usize) -> usize {
-    count.div_ceil(8)
+    crate::util::div_ceil::<8>(count)
 }
 
 fn num_bytes_for_double_bits(count: usize) -> usize {
-    count.div_ceil(4)
+    crate::util::div_ceil::<4>(count)
 }
 
 /// A value packed several to a byte, least significant bits first
@@ -170,7 +170,7 @@ mod tests {
             .flat_map(|byte| unpacked(*byte))
             .zip(start..=stop)
             .collect();
-        let used = expected.len().div_ceil(N);
+        let used = crate::util::div_ceil::<N>(expected.len());
 
         let range = Range::from(start, stop).unwrap();
         let mut cursor = ReadCursor::new(bytes);

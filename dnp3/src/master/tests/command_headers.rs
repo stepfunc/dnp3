@@ -684,7 +684,9 @@ mod property {
 
     /// the object at `object` among all the objects of the headers
     fn object_at(echo: &mut [EncodedHeader], object: usize) -> &mut (Vec<u8>, u8) {
-        let num_objects: usize = echo.iter().map(|(_, _, objects)| objects.len()).sum();
+        let num_objects = echo.iter().fold(0, |sum: usize, (_, _, objects)| {
+            sum.saturating_add(objects.len())
+        });
         echo.iter_mut()
             .flat_map(|(_, _, objects)| objects.iter_mut())
             .nth(wrap(object, num_objects))
