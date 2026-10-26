@@ -493,7 +493,7 @@ pub trait ControlHandler:
     }
 }
 
-/// Struct with a default implementation of [ControlHandler](crate::outstation::ControlHandler)
+/// Struct with a default implementation of [ControlHandler]
 /// that returns that same `CommandStatus` for every operation.
 #[derive(Copy, Clone, Debug)]
 pub struct DefaultControlHandler {
@@ -501,13 +501,13 @@ pub struct DefaultControlHandler {
 }
 
 impl DefaultControlHandler {
-    /// create a boxed implementation of [ControlHandler](crate::outstation::ControlHandler) that
+    /// create a boxed implementation of [ControlHandler] that
     /// returns [NotSupported](crate::app::control::CommandStatus::NotSupported) for every request.
     pub fn create() -> Box<dyn ControlHandler> {
         Self::with_status(CommandStatus::NotSupported)
     }
 
-    /// create a boxed implementation of [ControlHandler](crate::outstation::ControlHandler) that
+    /// create a boxed implementation of [ControlHandler] that
     /// returns the specified CommandStatus.
     pub fn with_status(status: CommandStatus) -> Box<dyn ControlHandler> {
         Box::new(DefaultControlHandler { status })

@@ -841,7 +841,7 @@ impl CommandHeaders {
     }
 }
 
-/// Builder object used to create a [CommandHeaders](CommandHeaders)
+/// Builder object used to create a [CommandHeaders]
 #[derive(Clone)]
 pub struct CommandBuilder {
     headers: Vec<CommandHeader>,
