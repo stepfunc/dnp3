@@ -32,6 +32,9 @@ where
 }
 
 /// A range of point indices, `start` through `stop` inclusive, never empty
+///
+/// Its constructors keep `start <= stop`: [`IndexRange::new`] checks it, and a [`Range`] is
+/// already checked when it's parsed
 #[derive(Copy, Clone)]
 pub(crate) struct IndexRange {
     start: u16,
@@ -75,7 +78,7 @@ impl IndexRange {
     /// The entries of `map` in this range
     #[expect(
         clippy::disallowed_methods,
-        reason = "an IndexRange has start <= stop, so the bounds are in order"
+        reason = "IndexRange's constructors keep start <= stop, so the bounds are in order"
     )]
     fn entries<V>(self, map: &BTreeMap<u16, V>) -> btree_map::Range<'_, u16, V> {
         map.range(self)
@@ -84,7 +87,7 @@ impl IndexRange {
     /// The entries of `map` in this range, mutably
     #[expect(
         clippy::disallowed_methods,
-        reason = "an IndexRange has start <= stop, so the bounds are in order"
+        reason = "IndexRange's constructors keep start <= stop, so the bounds are in order"
     )]
     fn entries_mut<V>(self, map: &mut BTreeMap<u16, V>) -> btree_map::RangeMut<'_, u16, V> {
         map.range_mut(self)
