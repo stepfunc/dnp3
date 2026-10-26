@@ -21,7 +21,7 @@ the cases it is built to reach, and its known gaps. The commands to build, test 
   extraction, the transport assembler, the link frame reader and the link layer's header processing
   so that the build fails unless the optimizer removes every path to a panic. Its `encode` module
   does the same for the encoders of everything the master sends and the link and transport framing,
-  given any value and output buffer; its module doc lists what is and isn't checked. CI links both
+  given any value and an output buffer of up to 16 MiB; its module doc lists what is and isn't checked. CI links both
   with arithmetic overflow checks off and on, in release with thin LTO, one codegen unit, default
   features and a pinned toolchain. It proves only that no panic is reachable; the tests above pin
   what is decoded and encoded.

@@ -97,6 +97,26 @@ mod tests {
     }
 
     #[tokio::test(start_paused = true)]
+    async fn writes_nothing_for_an_empty_fragment_and_keeps_the_sequence() {
+        let mut h = Harness::new(master());
+        h.write(OUTSTATION, &[]).await;
+        h.write(OUTSTATION, &[1, 2, 3]).await;
+        let writes = h.writes();
+        assert_eq!(
+            writes,
+            [fragment_frame(
+                true,
+                OUTSTATION.wrap(),
+                MASTER,
+                0,
+                &[1, 2, 3]
+            )]
+        );
+        // FIR, FIN and sequence 0
+        assert_eq!(writes[0].get(10), Some(&0xC0));
+    }
+
+    #[tokio::test(start_paused = true)]
     async fn master_answers_link_status_requests() {
         let mut h = Harness::new(master());
         let request = header_only(false, REQUEST_LINK_STATUS, MASTER.wrap(), OUTSTATION);

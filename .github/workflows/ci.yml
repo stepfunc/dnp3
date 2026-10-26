@@ -104,11 +104,11 @@ jobs:
           toolchain: ${{ matrix.rust }}
       - name: Run Rust unit tests
         run: cargo test --features unstable
-  # Check that the parsers can't panic for any input, and the encoders for any value and output
-  # buffer (dnp3/src/no_panic_check.rs), with arithmetic overflow checks off as in release and
-  # on as in debug. The proof comes from the optimizer, so the toolchain is pinned: a new one
-  # can lose an optimization and fail the link without any change to the code. Raise it
-  # deliberately.
+  # Check that the parsers can't panic for any input, and the encoders for any value and an
+  # output buffer up to 16 MiB (dnp3/src/no_panic_check.rs), with arithmetic overflow checks off
+  # as in release and on as in debug. The proof comes from the optimizer, so the toolchain is
+  # pinned: a new one can lose an optimization and fail the link without any change to the code.
+  # Raise it deliberately.
   no-panic:
     runs-on: ubuntu-latest
     steps:

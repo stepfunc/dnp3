@@ -135,7 +135,7 @@ impl Source<'_> {
         (0..len).map(|_| item(self)).collect()
     }
 
-    /// an output buffer of any length the encoders could be given
+    /// an output buffer of 0 bytes to 16 MiB
     fn buffer(&mut self) -> Vec<u8> {
         vec![0; self.len()]
     }
@@ -167,6 +167,7 @@ fn link_frame(header: LinkHeader, payload: Option<Payload>, buffer: &mut [u8]) {
         None => format_header_only(header, &mut cursor),
     };
     used(result);
+    used(cursor.written());
 }
 
 /// the segments of `fragment`, split and marked as `Writer::write` does
@@ -185,15 +186,9 @@ fn transport_segments(
         let last = chunks.peek().is_none();
         let mut cursor = WriteCursor::new(buffer);
         let position = Position { first, last };
-        used(format_segment(
-            role,
-            local,
-            destination,
-            seq,
-            position,
-            chunk,
-            &mut cursor,
-        ));
+        let result = format_segment(role, local, destination, seq, position, chunk, &mut cursor);
+        used(result);
+        used(cursor.written());
         first = false;
     }
     used(seq.value());
@@ -385,8 +380,15 @@ fn control_code(source: &mut Source) -> ControlCode {
     }
 }
 
+/// a status with any value, including the undefined values that alias a defined one, which
+/// `CommandStatus::from` never produces
 fn status(source: &mut Source) -> CommandStatus {
-    CommandStatus::from(source.u8())
+    let value = source.u8();
+    if source.bool() {
+        CommandStatus::from(value)
+    } else {
+        CommandStatus::Unknown(value)
+    }
 }
 
 /// add `command` with an 8 or 16-bit index
