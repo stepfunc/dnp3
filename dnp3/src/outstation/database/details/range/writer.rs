@@ -5,18 +5,27 @@
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
 use crate::app::measurement::DoubleBit;
+use crate::app::parse::traits::FixedSizeVariation;
 use crate::app::variations::Variation;
 use crate::app::QualifierCode;
 use crate::outstation::database::details::range::traits::{
-    FixedWriteFn, ToBit, ToDoubleBit, WriteInfo, WriteType,
+    StaticEncoder, StaticVariation, ToBit, ToDoubleBit, ToOctets,
 };
 
+use crate::app::measurement::ToVariation;
 use crate::util::BadWrite;
 use scursor::{WriteCursor, WriteError};
 
-trait BitConverter {
+/// A value packed into the bytes of a header, `NUM_BITS` at a time
+trait BitConverter: Copy {
     const NUM_BITS: u8;
     fn to_mask(&self) -> u8;
+
+    /// the packing of a header of these values
+    fn packing(state: BitState<Self>) -> Packing;
+
+    /// the bit state of a header packed with these values, if it is
+    fn state(packing: &Packing) -> Option<BitState<Self>>;
 }
 
 impl BitConverter for bool {
@@ -24,6 +33,17 @@ impl BitConverter for bool {
 
     fn to_mask(&self) -> u8 {
         u8::from(*self)
+    }
+
+    fn packing(state: BitState<Self>) -> Packing {
+        Packing::Bits(state)
+    }
+
+    fn state(packing: &Packing) -> Option<BitState<Self>> {
+        match packing {
+            Packing::Bits(state) => Some(*state),
+            Packing::Fixed | Packing::DoubleBits(_) => None,
+        }
     }
 }
 
@@ -33,8 +53,20 @@ impl BitConverter for DoubleBit {
     fn to_mask(&self) -> u8 {
         self.to_byte()
     }
+
+    fn packing(state: BitState<Self>) -> Packing {
+        Packing::DoubleBits(state)
+    }
+
+    fn state(packing: &Packing) -> Option<BitState<Self>> {
+        match packing {
+            Packing::DoubleBits(state) => Some(*state),
+            Packing::Fixed | Packing::Bits(_) => None,
+        }
+    }
 }
 
+#[derive(Copy, Clone)]
 struct BitState<T>
 where
     T: BitConverter,
@@ -76,60 +108,74 @@ where
     }
 }
 
-enum TypeState<T> {
-    Fixed(FixedWriteFn<T>),
-    Bit(ToBit<T>, BitState<bool>),
-    DoubleBit(ToDoubleBit<T>, BitState<DoubleBit>),
+/// How the values of a header are laid out
+#[derive(Copy, Clone)]
+enum Packing {
+    /// one object per value
+    Fixed,
+    Bits(BitState<bool>),
+    DoubleBits(BitState<DoubleBit>),
 }
 
-struct HeaderState<T> {
+#[derive(Copy, Clone)]
+struct HeaderState {
     /// last index value written
     index: u16,
     /// immutable position of the u16 stop field within the cursor
     stop_pos: usize,
-    /// header type specific state
-    state: TypeState<T>,
+    /// how the header's values are laid out so far
+    packing: Packing,
 }
 
-impl<T> HeaderState<T> {
-    fn new(index: u16, stop_pos: usize, state: TypeState<T>) -> HeaderState<T> {
+impl HeaderState {
+    fn new(index: u16, stop_pos: usize, packing: Packing) -> HeaderState {
         Self {
             index,
             stop_pos,
-            state,
+            packing,
         }
     }
 }
 
-//#[derive(Debug)]
-enum State<T> {
+enum State {
     Start,
-    Header(Variation, HeaderState<T>),
+    Header(Variation, HeaderState),
     Full,
 }
 
-pub(crate) struct RangeWriter<T> {
-    state: State<T>,
+/// Writes the values of a range of points as 16-bit start and stop headers, starting a new
+/// header when the variation changes or an index is skipped
+pub(crate) struct RangeWriter {
+    state: State,
 }
 
-impl<T> RangeWriter<T> {
+impl RangeWriter {
     pub(crate) fn new() -> Self {
         Self {
             state: State::Start,
         }
     }
 
-    pub(crate) fn write(
+    /// Write `value` at `index` in `variation`, failing once a value doesn't fit
+    pub(crate) fn write<T, V>(
         &mut self,
         cursor: &mut WriteCursor,
         index: u16,
         value: &T,
-        info: WriteInfo<T>,
-    ) -> Result<(), BadWrite> {
-        match self.try_write(cursor, index, value, info) {
+        variation: V,
+    ) -> Result<(), BadWrite>
+    where
+        V: StaticVariation<T>,
+    {
+        let next = variation.encode(Value {
+            writer: self,
+            cursor,
+            index,
+            value,
+        });
+        match next {
             Ok(state) => {
                 self.state = state;
-                //println!("state is {:?}", self.state);
                 Ok(())
             }
             Err(_) => {
@@ -139,132 +185,148 @@ impl<T> RangeWriter<T> {
         }
     }
 
-    fn try_write(
-        &self,
-        cursor: &mut WriteCursor,
-        index: u16,
-        value: &T,
-        info: WriteInfo<T>,
-    ) -> Result<State<T>, BadWrite> {
-        let variation = info.variation();
-        let state = match &self.state {
-            State::Full => return Err(BadWrite),
-            State::Start => Self::start_header(cursor, index, value, info)?,
-            State::Header(variation, header) => {
-                if *variation == info.variation() && is_consecutive(header.index, index) {
-                    Self::write_next_value(cursor, header, index, value)?
+    /// The header to continue for `index` in `variation`, or `None` to start one
+    fn current(&self, variation: Variation, index: u16) -> Result<Option<HeaderState>, BadWrite> {
+        match &self.state {
+            State::Full => Err(BadWrite),
+            State::Start => Ok(None),
+            State::Header(current, header) => {
+                if *current == variation && is_consecutive(header.index, index) {
+                    Ok(Some(*header))
                 } else {
-                    Self::start_header(cursor, index, value, info)?
+                    Ok(None)
                 }
-            }
-        };
-
-        Ok(State::Header(variation, state))
-    }
-
-    fn start_header(
-        cursor: &mut WriteCursor,
-        index: u16,
-        value: &T,
-        info: WriteInfo<T>,
-    ) -> Result<HeaderState<T>, BadWrite> {
-        let ret = cursor.transaction(|cur| {
-            let stop_pos = write_header(cur, info.variation(), index)?;
-            Ok(HeaderState::new(
-                index,
-                stop_pos,
-                info.write_type().write_first_value(cur, value)?,
-            ))
-        })?;
-        Ok(ret)
-    }
-
-    fn write_next_value(
-        cursor: &mut WriteCursor,
-        header: &HeaderState<T>,
-        index: u16,
-        value: &T,
-    ) -> Result<HeaderState<T>, WriteError> {
-        let ret = cursor.transaction(|cur| {
-            let next_state = header.state.write_next_value(cur, value)?;
-            // update the stop field
-            cur.at_pos(header.stop_pos, |cur| cur.write_u16_le(index))?;
-            Ok(HeaderState::new(index, header.stop_pos, next_state))
-        })?;
-        Ok(ret)
-    }
-}
-
-impl<T> TypeState<T> {
-    fn write_next_value(
-        &self,
-        cursor: &mut WriteCursor,
-        value: &T,
-    ) -> Result<TypeState<T>, WriteError> {
-        let state = match self {
-            TypeState::Fixed(func) => {
-                (func)(cursor, value)?;
-                TypeState::Fixed(*func)
-            }
-            TypeState::Bit(conv, bs) => {
-                let bit = conv(value);
-                match bs.next(bit) {
-                    Some(bs) => {
-                        cursor.at_pos(bs.byte_pos, |c| c.write_u8(bs.acc))?;
-                        TypeState::Bit(*conv, bs)
-                    }
-                    None => {
-                        let pos = cursor.position();
-                        let acc = bit.to_mask();
-                        cursor.write_u8(acc)?;
-                        TypeState::Bit(*conv, BitState::new(acc, pos))
-                    }
-                }
-            }
-            TypeState::DoubleBit(conv, bs) => {
-                let bits = conv(value);
-                match bs.next(bits) {
-                    Some(bs) => {
-                        cursor.at_pos(bs.byte_pos, |c| c.write_u8(bs.acc))?;
-                        TypeState::DoubleBit(*conv, bs)
-                    }
-                    None => {
-                        let pos = cursor.position();
-                        let acc = bits.to_mask();
-                        cursor.write_u8(acc)?;
-                        TypeState::DoubleBit(*conv, BitState::new(acc, pos))
-                    }
-                }
-            }
-        };
-        Ok(state)
-    }
-}
-
-impl<T> WriteType<T> {
-    fn write_first_value(
-        &self,
-        cursor: &mut WriteCursor,
-        value: &T,
-    ) -> Result<TypeState<T>, WriteError> {
-        match self {
-            WriteType::Fixed(write) => {
-                (write)(cursor, value)?;
-                Ok(TypeState::Fixed(*write))
-            }
-            WriteType::Bits(conv) => {
-                let pos = cursor.position();
-                let byte = (conv)(value).to_mask();
-                cursor.write_u8(byte)?;
-                Ok(TypeState::Bit(*conv, BitState::new(byte, pos)))
-            }
-            WriteType::DoubleBits(conv) => {
-                let pos = cursor.position();
-                let byte = (conv)(value).to_mask();
-                cursor.write_u8(byte)?;
-                Ok(TypeState::DoubleBit(*conv, BitState::new(byte, pos)))
             }
         }
+    }
+
+    /// write one object, by `write`, at `index`
+    fn write_object(
+        &self,
+        cursor: &mut WriteCursor,
+        index: u16,
+        variation: Variation,
+        write: impl FnOnce(&mut WriteCursor) -> Result<(), WriteError>,
+    ) -> Result<State, BadWrite> {
+        let header = match self.current(variation, index)? {
+            Some(header) if matches!(header.packing, Packing::Fixed) => {
+                cursor.transaction(|cur| {
+                    write(cur)?;
+                    // update the stop field
+                    cur.at_pos(header.stop_pos, |cur| cur.write_u16_le(index))?;
+                    Ok(HeaderState::new(index, header.stop_pos, Packing::Fixed))
+                })?
+            }
+            _ => cursor.transaction(|cur| {
+                let stop_pos = write_header(cur, variation, index)?;
+                write(cur)?;
+                Ok(HeaderState::new(index, stop_pos, Packing::Fixed))
+            })?,
+        };
+        Ok(State::Header(variation, header))
+    }
+
+    /// pack `value` at `index` into the current byte, or a new one
+    fn write_packed<B>(
+        &self,
+        cursor: &mut WriteCursor,
+        index: u16,
+        variation: Variation,
+        value: B,
+    ) -> Result<State, BadWrite>
+    where
+        B: BitConverter,
+    {
+        let continued = self
+            .current(variation, index)?
+            .and_then(|header| B::state(&header.packing).map(|state| (header, state)));
+        let header = match continued {
+            Some((header, state)) => cursor.transaction(|cur| {
+                let state = match state.next(value) {
+                    Some(state) => {
+                        cur.at_pos(state.byte_pos, |c| c.write_u8(state.acc))?;
+                        state
+                    }
+                    None => {
+                        let pos = cur.position();
+                        let acc = value.to_mask();
+                        cur.write_u8(acc)?;
+                        BitState::new(acc, pos)
+                    }
+                };
+                // update the stop field
+                cur.at_pos(header.stop_pos, |cur| cur.write_u16_le(index))?;
+                Ok(HeaderState::new(index, header.stop_pos, B::packing(state)))
+            })?,
+            None => cursor.transaction(|cur| {
+                let stop_pos = write_header(cur, variation, index)?;
+                let pos = cur.position();
+                let acc = value.to_mask();
+                cur.write_u8(acc)?;
+                Ok(HeaderState::new(
+                    index,
+                    stop_pos,
+                    B::packing(BitState::new(acc, pos)),
+                ))
+            })?,
+        };
+        Ok(State::Header(variation, header))
+    }
+}
+
+/// Writes one value through the encoding its variation chooses
+struct Value<'a, 'b, 'c, T> {
+    writer: &'a RangeWriter,
+    cursor: &'a mut WriteCursor<'b>,
+    index: u16,
+    value: &'c T,
+}
+
+impl<T> StaticEncoder<T> for Value<'_, '_, '_, T> {
+    type Output = Result<State, BadWrite>;
+
+    fn fixed<V>(self) -> Self::Output
+    where
+        V: FixedSizeVariation,
+        T: ToVariation<V>,
+    {
+        let value = self.value;
+        self.writer
+            .write_object(self.cursor, self.index, V::VARIATION, |cur| {
+                value.to_variation().write(cur)
+            })
+    }
+
+    fn bits(self, variation: Variation) -> Self::Output
+    where
+        T: ToBit,
+    {
+        self.writer
+            .write_packed(self.cursor, self.index, variation, self.value.to_bit())
+    }
+
+    fn double_bits(self, variation: Variation) -> Self::Output
+    where
+        T: ToDoubleBit,
+    {
+        self.writer.write_packed(
+            self.cursor,
+            self.index,
+            variation,
+            self.value.to_double_bit(),
+        )
+    }
+
+    fn octet_string(self) -> Self::Output
+    where
+        T: ToOctets,
+    {
+        let bytes = self.value.to_octets();
+        let len = u8::try_from(bytes.len()).map_err(|_| BadWrite)?;
+        self.writer
+            .write_object(self.cursor, self.index, Variation::Group110(len), |cur| {
+                cur.write_bytes(bytes)
+            })
     }
 }
 
@@ -288,7 +350,6 @@ fn write_header(
 #[cfg(test)]
 mod tests {
     use crate::app::measurement::*;
-    use crate::outstation::database::details::range::traits::StaticVariation;
     use crate::outstation::database::variations::*;
 
     use super::*;
@@ -308,7 +369,7 @@ mod tests {
 
         let mut writer = RangeWriter::new();
 
-        let g1v1 = StaticBinaryInputVariation::Group1Var1.get_write_info(&binary(false));
+        let g1v1 = StaticBinaryInputVariation::Group1Var1;
 
         fn is_odd(index: u16) -> bool {
             index % 2 == 1
@@ -355,8 +416,7 @@ mod tests {
             }
         }
 
-        let g3v1 = StaticDoubleBitBinaryInputVariation::Group3Var1
-            .get_write_info(&double_bit(DoubleBit::DeterminedOff));
+        let g3v1 = StaticDoubleBitBinaryInputVariation::Group3Var1;
 
         for index in 1..=5 {
             let value = double_bit(db_modulo(index));
@@ -399,8 +459,7 @@ mod tests {
             }
         }
 
-        let g3v1 = StaticDoubleBitBinaryInputVariation::Group3Var1
-            .get_write_info(&double_bit(DoubleBit::DeterminedOff));
+        let g3v1 = StaticDoubleBitBinaryInputVariation::Group3Var1;
 
         for index in 1..=9 {
             let value = double_bit(db_modulo(index));
@@ -437,7 +496,7 @@ mod tests {
         let mut cursor = WriteCursor::new(buffer.as_mut());
         let mut writer = RangeWriter::new();
 
-        let g1v2 = StaticBinaryInputVariation::Group1Var2.get_write_info(&binary(false));
+        let g1v2 = StaticBinaryInputVariation::Group1Var2;
 
         writer.write(&mut cursor, 2, &binary(true), g1v2).unwrap();
         writer.write(&mut cursor, 2, &binary(true), g1v2).unwrap();
@@ -460,12 +519,12 @@ mod tests {
         let mut buffer = [0u8; 64];
         let mut cursor = WriteCursor::new(buffer.as_mut());
 
-        let g1v2 = StaticBinaryInputVariation::Group1Var2.get_write_info(&binary(false));
+        let g1v2 = StaticBinaryInputVariation::Group1Var2;
         let mut writer = RangeWriter::new();
         writer.write(&mut cursor, 65535, &binary(true), g1v2).unwrap();
         writer.write(&mut cursor, 0, &binary(true), g1v2).unwrap();
 
-        let g1v1 = StaticBinaryInputVariation::Group1Var1.get_write_info(&binary(false));
+        let g1v1 = StaticBinaryInputVariation::Group1Var1;
         let mut writer = RangeWriter::new();
         writer.write(&mut cursor, 65535, &binary(true), g1v1).unwrap();
         writer.write(&mut cursor, 0, &binary(true), g1v1).unwrap();
@@ -490,7 +549,7 @@ mod tests {
         let mut cursor = WriteCursor::new(buffer.as_mut());
         let mut writer = RangeWriter::new();
 
-        let g1v2 = StaticBinaryInputVariation::Group1Var2.get_write_info(&binary(false));
+        let g1v2 = StaticBinaryInputVariation::Group1Var2;
 
         writer.write(&mut cursor, 1, &binary(true), g1v2).unwrap();
         writer.write(&mut cursor, 3, &binary(true), g1v2).unwrap();

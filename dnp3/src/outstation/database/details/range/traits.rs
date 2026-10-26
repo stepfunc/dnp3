@@ -5,106 +5,76 @@
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
 use crate::app::measurement::*;
-use crate::app::parse::traits::{FixedSize, FixedSizeVariation};
+use crate::app::parse::traits::FixedSizeVariation;
 use crate::app::variations::*;
 use crate::outstation::database::config::*;
 use crate::outstation::database::variations::*;
 use crate::util::bit::bits::{BIT_6, BIT_7};
 use crate::util::float::{f64_to_f32, f64_to_u16, f64_to_u32};
 
-use scursor::{WriteCursor, WriteError};
-
-pub(crate) type FixedWriteFn<T> = fn(&mut WriteCursor, &T) -> Result<(), WriteError>;
-pub(crate) type ToBit<T> = fn(&T) -> bool;
-pub(crate) type ToDoubleBit<T> = fn(&T) -> DoubleBit;
-
-#[derive(Copy, Clone)]
-pub(crate) enum WriteType<T> {
-    Fixed(FixedWriteFn<T>),
-    Bits(ToBit<T>),
-    DoubleBits(ToDoubleBit<T>),
+/// A measurement written as one bit of a packed variation
+pub(crate) trait ToBit {
+    fn to_bit(&self) -> bool;
 }
 
-/// How a static value is encoded: the variation in the header and how to write each value.
-///
-/// It's only built by the constructors below, which take the variation from the encoding, so
-/// the two can't disagree.
-#[derive(Copy, Clone)]
-pub(crate) struct WriteInfo<T> {
-    variation: Variation,
-    write_type: WriteType<T>,
+/// A measurement written as two bits of a packed variation
+pub(crate) trait ToDoubleBit {
+    fn to_double_bit(&self) -> DoubleBit;
 }
 
-impl<T> WriteInfo<T> {
+impl ToBit for BinaryInput {
+    fn to_bit(&self) -> bool {
+        self.value
+    }
+}
+
+impl ToBit for BinaryOutputStatus {
+    fn to_bit(&self) -> bool {
+        self.value
+    }
+}
+
+/// A measurement written as the bytes of an octet string
+pub(crate) trait ToOctets {
+    fn to_octets(&self) -> &[u8];
+}
+
+impl ToOctets for OctetString {
+    fn to_octets(&self) -> &[u8] {
+        self.value()
+    }
+}
+
+impl ToDoubleBit for DoubleBitBinaryInput {
+    fn to_double_bit(&self) -> DoubleBit {
+        self.value
+    }
+}
+
+/// Writes a static value in the encoding its variation chooses
+pub(crate) trait StaticEncoder<T> {
+    type Output;
+
     /// a fixed-size variation
-    fn fixed<V>() -> Self
+    fn fixed<V>(self) -> Self::Output
     where
         V: FixedSizeVariation,
-        T: ToVariation<V>,
-    {
-        fn write<T, V>(cursor: &mut WriteCursor, value: &T) -> Result<(), WriteError>
-        where
-            V: FixedSize,
-            T: ToVariation<V>,
-        {
-            value.to_variation().write(cursor)
-        }
-        Self {
-            variation: V::VARIATION,
-            write_type: WriteType::Fixed(write::<T, V>),
-        }
-    }
+        T: ToVariation<V>;
 
-    pub(crate) fn variation(&self) -> Variation {
-        self.variation
-    }
+    /// a packed variation of one bit per value
+    fn bits(self, variation: Variation) -> Self::Output
+    where
+        T: ToBit;
 
-    pub(crate) fn write_type(&self) -> &WriteType<T> {
-        &self.write_type
-    }
-}
+    /// a packed variation of two bits per value
+    fn double_bits(self, variation: Variation) -> Self::Output
+    where
+        T: ToDoubleBit;
 
-impl WriteInfo<BinaryInput> {
-    /// g1v1, the packed state of each input
-    fn packed() -> Self {
-        Self {
-            variation: Variation::Group1Var1,
-            write_type: WriteType::Bits(|v| v.value),
-        }
-    }
-}
-
-impl WriteInfo<DoubleBitBinaryInput> {
-    /// g3v1, the packed state of each input
-    fn packed() -> Self {
-        Self {
-            variation: Variation::Group3Var1,
-            write_type: WriteType::DoubleBits(|v| v.value),
-        }
-    }
-}
-
-impl WriteInfo<BinaryOutputStatus> {
-    /// g10v1, the packed state of each output
-    fn packed() -> Self {
-        Self {
-            variation: Variation::Group10Var1,
-            write_type: WriteType::Bits(|v| v.value),
-        }
-    }
-}
-
-impl WriteInfo<OctetString> {
-    /// g110, whose variation is the length of the octet string
-    fn octet_string(value: &OctetString) -> Self {
-        fn write(cursor: &mut WriteCursor, value: &OctetString) -> Result<(), WriteError> {
-            cursor.write_bytes(value.value())
-        }
-        Self {
-            variation: Variation::Group110(value.len()),
-            write_type: WriteType::Fixed(write),
-        }
-    }
+    /// an octet string, whose variation is its length
+    fn octet_string(self) -> Self::Output
+    where
+        T: ToOctets;
 }
 
 pub(crate) trait StaticVariation<T>: Copy + PartialEq {
@@ -115,7 +85,13 @@ pub(crate) trait StaticVariation<T>: Copy + PartialEq {
         *self
     }
 
-    fn get_write_info(&self, value: &T) -> WriteInfo<T>;
+    /// apply the encoder to the encoding of this variation
+    ///
+    /// Each variation names its encoding once: the type a fixed-size variation is written as,
+    /// or the wire variation of a packed one.
+    fn encode<E>(self, encoder: E) -> E::Output
+    where
+        E: StaticEncoder<T>;
 }
 
 impl StaticVariation<BinaryInput> for StaticBinaryInputVariation {
@@ -131,10 +107,13 @@ impl StaticVariation<BinaryInput> for StaticBinaryInputVariation {
         }
     }
 
-    fn get_write_info(&self, _value: &BinaryInput) -> WriteInfo<BinaryInput> {
+    fn encode<E>(self, encoder: E) -> E::Output
+    where
+        E: StaticEncoder<BinaryInput>,
+    {
         match self {
-            Self::Group1Var1 => WriteInfo::<BinaryInput>::packed(),
-            Self::Group1Var2 => WriteInfo::fixed::<Group1Var2>(),
+            Self::Group1Var1 => encoder.bits(Variation::Group1Var1),
+            Self::Group1Var2 => encoder.fixed::<Group1Var2>(),
         }
     }
 }
@@ -152,10 +131,13 @@ impl StaticVariation<DoubleBitBinaryInput> for StaticDoubleBitBinaryInputVariati
         }
     }
 
-    fn get_write_info(&self, _value: &DoubleBitBinaryInput) -> WriteInfo<DoubleBitBinaryInput> {
+    fn encode<E>(self, encoder: E) -> E::Output
+    where
+        E: StaticEncoder<DoubleBitBinaryInput>,
+    {
         match self {
-            Self::Group3Var1 => WriteInfo::<DoubleBitBinaryInput>::packed(),
-            Self::Group3Var2 => WriteInfo::fixed::<Group3Var2>(),
+            Self::Group3Var1 => encoder.double_bits(Variation::Group3Var1),
+            Self::Group3Var2 => encoder.fixed::<Group3Var2>(),
         }
     }
 }
@@ -173,10 +155,13 @@ impl StaticVariation<BinaryOutputStatus> for StaticBinaryOutputStatusVariation {
         }
     }
 
-    fn get_write_info(&self, _value: &BinaryOutputStatus) -> WriteInfo<BinaryOutputStatus> {
+    fn encode<E>(self, encoder: E) -> E::Output
+    where
+        E: StaticEncoder<BinaryOutputStatus>,
+    {
         match self {
-            Self::Group10Var1 => WriteInfo::<BinaryOutputStatus>::packed(),
-            Self::Group10Var2 => WriteInfo::fixed::<Group10Var2>(),
+            Self::Group10Var1 => encoder.bits(Variation::Group10Var1),
+            Self::Group10Var2 => encoder.fixed::<Group10Var2>(),
         }
     }
 }
@@ -194,22 +179,28 @@ impl StaticVariation<Counter> for StaticCounterVariation {
         }
     }
 
-    fn get_write_info(&self, _value: &Counter) -> WriteInfo<Counter> {
+    fn encode<E>(self, encoder: E) -> E::Output
+    where
+        E: StaticEncoder<Counter>,
+    {
         match self {
-            StaticCounterVariation::Group20Var1 => WriteInfo::fixed::<Group20Var1>(),
-            StaticCounterVariation::Group20Var2 => WriteInfo::fixed::<Group20Var2>(),
-            StaticCounterVariation::Group20Var5 => WriteInfo::fixed::<Group20Var5>(),
-            StaticCounterVariation::Group20Var6 => WriteInfo::fixed::<Group20Var6>(),
+            StaticCounterVariation::Group20Var1 => encoder.fixed::<Group20Var1>(),
+            StaticCounterVariation::Group20Var2 => encoder.fixed::<Group20Var2>(),
+            StaticCounterVariation::Group20Var5 => encoder.fixed::<Group20Var5>(),
+            StaticCounterVariation::Group20Var6 => encoder.fixed::<Group20Var6>(),
         }
     }
 }
 
-impl AnalogInputDeadBandVariation {
-    pub(crate) fn get_write_info(&self) -> WriteInfo<f64> {
+impl StaticVariation<f64> for AnalogInputDeadBandVariation {
+    fn encode<E>(self, encoder: E) -> E::Output
+    where
+        E: StaticEncoder<f64>,
+    {
         match self {
-            AnalogInputDeadBandVariation::Group34Var1 => WriteInfo::fixed::<Group34Var1>(),
-            AnalogInputDeadBandVariation::Group34Var2 => WriteInfo::fixed::<Group34Var2>(),
-            AnalogInputDeadBandVariation::Group34Var3 => WriteInfo::fixed::<Group34Var3>(),
+            AnalogInputDeadBandVariation::Group34Var1 => encoder.fixed::<Group34Var1>(),
+            AnalogInputDeadBandVariation::Group34Var2 => encoder.fixed::<Group34Var2>(),
+            AnalogInputDeadBandVariation::Group34Var3 => encoder.fixed::<Group34Var3>(),
         }
     }
 }
@@ -259,14 +250,17 @@ impl StaticVariation<FrozenCounter> for StaticFrozenCounterVariation {
         }
     }
 
-    fn get_write_info(&self, _value: &FrozenCounter) -> WriteInfo<FrozenCounter> {
+    fn encode<E>(self, encoder: E) -> E::Output
+    where
+        E: StaticEncoder<FrozenCounter>,
+    {
         match self {
-            StaticFrozenCounterVariation::Group21Var1 => WriteInfo::fixed::<Group21Var1>(),
-            StaticFrozenCounterVariation::Group21Var2 => WriteInfo::fixed::<Group21Var2>(),
-            StaticFrozenCounterVariation::Group21Var5 => WriteInfo::fixed::<Group21Var5>(),
-            StaticFrozenCounterVariation::Group21Var6 => WriteInfo::fixed::<Group21Var6>(),
-            StaticFrozenCounterVariation::Group21Var9 => WriteInfo::fixed::<Group21Var9>(),
-            StaticFrozenCounterVariation::Group21Var10 => WriteInfo::fixed::<Group21Var10>(),
+            StaticFrozenCounterVariation::Group21Var1 => encoder.fixed::<Group21Var1>(),
+            StaticFrozenCounterVariation::Group21Var2 => encoder.fixed::<Group21Var2>(),
+            StaticFrozenCounterVariation::Group21Var5 => encoder.fixed::<Group21Var5>(),
+            StaticFrozenCounterVariation::Group21Var6 => encoder.fixed::<Group21Var6>(),
+            StaticFrozenCounterVariation::Group21Var9 => encoder.fixed::<Group21Var9>(),
+            StaticFrozenCounterVariation::Group21Var10 => encoder.fixed::<Group21Var10>(),
         }
     }
 }
@@ -287,32 +281,41 @@ impl StaticVariation<AnalogInput> for StaticAnalogInputVariation {
         }
     }
 
-    fn get_write_info(&self, _value: &AnalogInput) -> WriteInfo<AnalogInput> {
+    fn encode<E>(self, encoder: E) -> E::Output
+    where
+        E: StaticEncoder<AnalogInput>,
+    {
         match self {
-            StaticAnalogInputVariation::Group30Var1 => WriteInfo::fixed::<Group30Var1>(),
-            StaticAnalogInputVariation::Group30Var2 => WriteInfo::fixed::<Group30Var2>(),
-            StaticAnalogInputVariation::Group30Var3 => WriteInfo::fixed::<Group30Var3>(),
-            StaticAnalogInputVariation::Group30Var4 => WriteInfo::fixed::<Group30Var4>(),
-            StaticAnalogInputVariation::Group30Var5 => WriteInfo::fixed::<Group30Var5>(),
-            StaticAnalogInputVariation::Group30Var6 => WriteInfo::fixed::<Group30Var6>(),
+            StaticAnalogInputVariation::Group30Var1 => encoder.fixed::<Group30Var1>(),
+            StaticAnalogInputVariation::Group30Var2 => encoder.fixed::<Group30Var2>(),
+            StaticAnalogInputVariation::Group30Var3 => encoder.fixed::<Group30Var3>(),
+            StaticAnalogInputVariation::Group30Var4 => encoder.fixed::<Group30Var4>(),
+            StaticAnalogInputVariation::Group30Var5 => encoder.fixed::<Group30Var5>(),
+            StaticAnalogInputVariation::Group30Var6 => encoder.fixed::<Group30Var6>(),
         }
     }
 }
 
 impl StaticVariation<AnalogOutputStatus> for StaticAnalogOutputStatusVariation {
-    fn get_write_info(&self, _value: &AnalogOutputStatus) -> WriteInfo<AnalogOutputStatus> {
+    fn encode<E>(self, encoder: E) -> E::Output
+    where
+        E: StaticEncoder<AnalogOutputStatus>,
+    {
         match self {
-            StaticAnalogOutputStatusVariation::Group40Var1 => WriteInfo::fixed::<Group40Var1>(),
-            StaticAnalogOutputStatusVariation::Group40Var2 => WriteInfo::fixed::<Group40Var2>(),
-            StaticAnalogOutputStatusVariation::Group40Var3 => WriteInfo::fixed::<Group40Var3>(),
-            StaticAnalogOutputStatusVariation::Group40Var4 => WriteInfo::fixed::<Group40Var4>(),
+            StaticAnalogOutputStatusVariation::Group40Var1 => encoder.fixed::<Group40Var1>(),
+            StaticAnalogOutputStatusVariation::Group40Var2 => encoder.fixed::<Group40Var2>(),
+            StaticAnalogOutputStatusVariation::Group40Var3 => encoder.fixed::<Group40Var3>(),
+            StaticAnalogOutputStatusVariation::Group40Var4 => encoder.fixed::<Group40Var4>(),
         }
     }
 }
 
 impl StaticVariation<OctetString> for StaticOctetStringVariation {
-    fn get_write_info(&self, value: &OctetString) -> WriteInfo<OctetString> {
-        WriteInfo::octet_string(value)
+    fn encode<E>(self, encoder: E) -> E::Output
+    where
+        E: StaticEncoder<OctetString>,
+    {
+        encoder.octet_string()
     }
 }
 
