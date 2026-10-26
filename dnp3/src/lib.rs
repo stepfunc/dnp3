@@ -9,12 +9,20 @@
     test,
     expect(dead_code, reason = "some crate items are only used outside of tests")
 )]
-// deny explicit panic constructs, indexing, unchecked arithmetic, as conversions and std methods
-// that panic on their arguments (listed in clippy.toml); clippy.toml allows unwrap, expect, panic
-// and indexing in test code, and test modules that need arithmetic say so
+// the asserts that panic (listed in clippy.toml) are denied outside of test builds, and check
+// results in them
+#![cfg_attr(not(test), deny(clippy::disallowed_macros))]
+#![cfg_attr(
+    test,
+    expect(clippy::disallowed_macros, reason = "tests check results with asserts")
+)]
+// deny explicit panic constructs, indexing, unchecked arithmetic, as conversions and the std
+// methods and types that can panic (listed in clippy.toml); clippy.toml allows unwrap, expect,
+// panic and indexing in test code, and test modules that need arithmetic say so
 #![deny(
     clippy::unwrap_used,
     clippy::disallowed_methods,
+    clippy::disallowed_types,
     clippy::expect_used,
     clippy::indexing_slicing,
     clippy::arithmetic_side_effects,

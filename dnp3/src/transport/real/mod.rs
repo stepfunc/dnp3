@@ -244,7 +244,7 @@ mod tests {
 
         /// the number of segments that carry `len` bytes
         fn segments(len: usize) -> usize {
-            len.div_ceil(MAX_APP_BYTES_PER_FRAME)
+            crate::util::div_ceil::<MAX_APP_BYTES_PER_FRAME>(len)
         }
 
         /// The transport headers of the fragment's segments and of the sentinel, from the wire

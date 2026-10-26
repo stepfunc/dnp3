@@ -276,7 +276,7 @@ mod tests {
     mod model {
         use super::*;
 
-        use std::cell::RefCell;
+        use std::cell::Cell;
         use std::panic::{catch_unwind, AssertUnwindSafe};
 
         use proptest::prelude::*;
@@ -403,18 +403,23 @@ mod tests {
                     }
                 }
 
-                let calls = RefCell::new(Vec::new());
+                let calls = Cell::new(Vec::new());
+                let record = |call| {
+                    let mut log = calls.take();
+                    log.push(call);
+                    calls.set(log);
+                };
                 let result = catch_unwind(AssertUnwindSafe(|| {
                     list.remove_all(
                         |x| {
-                            calls.borrow_mut().push(Call::Predicate(x.id));
+                            record(Call::Predicate(x.id));
                             if panic_at == Some(Call::Predicate(x.id)) {
                                 panic!("predicate panics");
                             }
                             selected.contains(&x.id)
                         },
                         |x| {
-                            calls.borrow_mut().push(Call::Removed(x.id));
+                            record(Call::Removed(x.id));
                             if panic_at == Some(Call::Removed(x.id)) {
                                 panic!("callback panics");
                             }
