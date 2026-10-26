@@ -284,7 +284,7 @@ mod test {
             Selection::write_attr_list(AttrSet::Private(3), &mut cursor, items.clone()).unwrap();
 
             // g0v255, 1-byte start/stop range of the set
-            let (header, value) = cursor.written().split_at(5);
+            let (header, value) = cursor.written().split_at_checked(5).unwrap();
             assert_eq!(header, [0x00, 0xFF, 0x00, 0x03, 0x03]);
 
             let mut reader = ReadCursor::new(value);

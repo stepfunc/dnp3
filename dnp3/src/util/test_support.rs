@@ -297,3 +297,21 @@ impl<T: Debug + PartialEq + Send + Sync + 'static> Timeline<T> {
         self.start.elapsed()
     }
 }
+
+/// Put `new` before the item at `index`, like `Vec::splice(index..index, new)`
+pub(crate) fn insert_at<T>(items: &mut Vec<T>, index: usize, new: impl IntoIterator<Item = T>) {
+    assert!(index <= items.len(), "index {index} is past the end");
+    let mut old = std::mem::take(items).into_iter();
+    items.extend(old.by_ref().take(index));
+    items.extend(new);
+    items.extend(old);
+}
+
+/// Remove and return the item at `index`, like `Vec::remove`
+pub(crate) fn remove_at<T>(items: &mut Vec<T>, index: usize) -> T {
+    let mut old = std::mem::take(items).into_iter();
+    items.extend(old.by_ref().take(index));
+    let removed = old.next().expect("index is in range");
+    items.extend(old);
+    removed
+}

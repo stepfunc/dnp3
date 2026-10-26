@@ -17,6 +17,15 @@ pub(crate) mod skipped;
 #[cfg(test)]
 pub(crate) mod test_support;
 
+/// The `N`-item chunks of `items`, then the shorter rest if there is one
+pub(crate) fn chunks<T, const N: usize>(items: &[T]) -> impl Iterator<Item = &[T]> {
+    let (whole, rest) = items.as_chunks::<N>();
+    whole
+        .iter()
+        .map(<[T; N]>::as_slice)
+        .chain((!rest.is_empty()).then_some(rest))
+}
+
 /// signals a bad write operation
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) struct BadWrite;

@@ -123,7 +123,7 @@ use crate::outstation::database::{
 use crate::outstation::tests::harness::*;
 use crate::outstation::traits::BroadcastAction;
 use crate::outstation::{BufferState, ClassCount, TypeCount};
-use crate::util::test_support::run_paused;
+use crate::util::test_support::{remove_at, run_paused};
 
 /// points of each kind, at indices 0 to 3
 const POINTS: u16 = 4;
@@ -636,7 +636,7 @@ impl Model {
             self.next_id += 1;
             let discarded = if self.type_count(kind) >= self.max(kind) {
                 let oldest = self.events.iter().position(|event| event.kind == kind);
-                oldest.map(|position| self.events.remove(position).id)
+                oldest.map(|position| remove_at(&mut self.events, position).id)
             } else {
                 None
             };

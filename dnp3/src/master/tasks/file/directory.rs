@@ -142,7 +142,7 @@ mod tests {
             entry.write(&mut cursor).unwrap();
         }
         // the second block starts inside the second entry
-        let (first, second) = cursor.written().split_at(30);
+        let (first, second) = cursor.written().split_at_checked(30).unwrap();
 
         let (promise, mut rx) = Promise::one_shot();
         let mut reader = DirectoryReader::new(promise);

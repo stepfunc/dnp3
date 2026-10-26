@@ -686,6 +686,7 @@ mod tests {
 
         use super::*;
         use crate::transport::real::sequence::Sequence;
+        use crate::util::test_support::{insert_at, remove_at};
 
         #[derive(Clone, Debug, PartialEq)]
         struct Segment {
@@ -945,7 +946,7 @@ mod tests {
                     Self::Longer => segment.data.push(0),
                     Self::Suffix if segment.data.is_empty() => segment.data.push(0),
                     Self::Suffix => {
-                        segment.data.remove(0);
+                        remove_at(&mut segment.data, 0);
                     }
                     Self::Fin => segment.fin = !segment.fin,
                     Self::Fir => segment.fir = !segment.fir,
@@ -1033,16 +1034,17 @@ mod tests {
                     Perturbation::None | Perturbation::Interrupt(..) => {}
                     Perturbation::Repeat(i) => {
                         let i = i.index(len);
-                        segments.insert(i + 1, segments[i].clone());
+                        let repeated = segments[i].clone();
+                        insert_at(&mut segments, i + 1, [repeated]);
                     }
                     Perturbation::ChangedRepeat(i, change) => {
                         let i = i.index(len);
                         let mut segment = segments[i].clone();
                         change.apply(&mut segment);
-                        segments.insert(i + 1, segment);
+                        insert_at(&mut segments, i + 1, [segment]);
                     }
                     Perturbation::Drop(i) => {
-                        segments.remove(i.index(len));
+                        remove_at(&mut segments, i.index(len));
                     }
                     Perturbation::SkipSeq(i) => {
                         for segment in &mut segments[i.index(len)..] {
@@ -1052,12 +1054,13 @@ mod tests {
                     Perturbation::OtherInfo(i, info) => segments[i.index(len)].info = *info,
                     Perturbation::Truncate(i) => segments.truncate(i.index(len)),
                     Perturbation::Insert(i, segment) => {
-                        segments.insert(i.index(len + 1), segment.clone())
+                        insert_at(&mut segments, i.index(len + 1), [segment.clone()])
                     }
                 }
                 let mut ops: Vec<Op> = segments.into_iter().map(Op::Segment).collect();
                 if let Perturbation::Interrupt(i, op) = &self.perturbation {
-                    ops.insert(i.index(ops.len() + 1), op.clone());
+                    let at = i.index(ops.len() + 1);
+                    insert_at(&mut ops, at, [op.clone()]);
                 }
                 ops.extend(self.tail.iter().cloned());
                 ops

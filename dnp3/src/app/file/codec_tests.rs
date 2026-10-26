@@ -119,7 +119,9 @@ fn with_u16_moved(bytes: &[u8], offset: usize, delta: u16) -> Vec<u8> {
     let mut bytes = bytes.to_vec();
     let start = HEADER_LEN + offset;
     let value = u16::from_le_bytes([bytes[start], bytes[start + 1]]).wrapping_add(delta);
-    bytes[start..start + 2].copy_from_slice(&value.to_le_bytes());
+    for (dest, src) in bytes[start..start + 2].iter_mut().zip(value.to_le_bytes()) {
+        *dest = src;
+    }
     bytes
 }
 

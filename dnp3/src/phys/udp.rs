@@ -296,7 +296,9 @@ mod scripted {
             };
             let (data, source) = received?;
             let count = data.len().min(buffer.len());
-            buffer[..count].copy_from_slice(&data[..count]);
+            for (dest, src) in buffer.iter_mut().zip(&data) {
+                *dest = *src;
+            }
             let source = match self.connected {
                 None => PhysAddr::Udp(source),
                 Some(_) => PhysAddr::None,

@@ -159,6 +159,7 @@ mod tests {
         use super::*;
         use crate::link::constant::MAX_APP_BYTES_PER_FRAME;
         use crate::link::header::BroadcastConfirmMode;
+        use crate::util::test_support::{insert_at, remove_at};
 
         const RX_BUFFER_SIZE: usize = 2048;
         /// the transport header is the first byte after the 10-byte link header
@@ -434,17 +435,20 @@ mod tests {
 
             match resolve(&case.edit, segments) {
                 Resolved::None => {}
-                Resolved::Repeat(i) => frames.insert(i, frames[i].clone()),
+                Resolved::Repeat(i) => {
+                    let repeated = frames[i].clone();
+                    insert_at(&mut frames, i, [repeated]);
+                }
                 Resolved::ChangedRepeat(i) => {
                     let changed = changed(&case.fragment, i);
                     let mut fragments: Vec<&[u8]> = vec![&[0]; usize::from(case.first_seq)];
                     fragments.push(&changed);
                     let mut written = write(role, case.local, case.remote, &fragments).await;
                     let changed = written.pop().unwrap();
-                    frames.insert(i.saturating_add(1), changed[i].clone());
+                    insert_at(&mut frames, i.saturating_add(1), [changed[i].clone()]);
                 }
                 Resolved::Drop(i) => {
-                    frames.remove(i);
+                    remove_at(&mut frames, i);
                 }
                 Resolved::Foreign {
                     at,
@@ -455,7 +459,7 @@ mod tests {
                     let mut foreign = write(role, case.foreign, case.remote, &[fragment]).await;
                     let mut foreign = foreign.pop().unwrap();
                     foreign.truncate(count);
-                    frames.splice(at..at, foreign);
+                    insert_at(&mut frames, at, foreign);
                 }
             }
             frames.extend(sentinel);

@@ -518,7 +518,11 @@ fn item((info, value): &(HeaderInfo, Value)) -> Option<Item> {
 fn select_range(indices: &BTreeSet<u16>, range: Range) -> Vec<u16> {
     match range {
         Range::All => indices.iter().copied().collect(),
-        Range::Some(start, stop, _) => indices.range(start..=stop).copied().collect(),
+        Range::Some(start, stop, _) => indices
+            .iter()
+            .copied()
+            .filter(|i| (start..=stop).contains(i))
+            .collect(),
     }
 }
 

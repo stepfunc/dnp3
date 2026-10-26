@@ -162,7 +162,7 @@ pub(crate) struct ReadEventQueue(Arc<Mutex<Vec<ReadEvent>>>);
 impl ReadEventQueue {
     pub(crate) fn pop(&mut self) -> Vec<ReadEvent> {
         let mut guard = self.0.lock().unwrap();
-        guard.drain(..).collect()
+        std::mem::take(&mut *guard)
     }
 
     /// How many of the callbacks received since the last [`Self::pop`] are `event`, leaving them
@@ -265,7 +265,7 @@ pub(crate) struct AssocInfoEventQueue(Arc<Mutex<Vec<AssocInfoEvent>>>);
 impl AssocInfoEventQueue {
     pub(crate) fn pop(&mut self) -> Vec<AssocInfoEvent> {
         let mut guard = self.0.lock().unwrap();
-        guard.drain(..).collect()
+        std::mem::take(&mut *guard)
     }
 }
 
