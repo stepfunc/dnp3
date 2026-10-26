@@ -4,14 +4,17 @@
 // Text and data mining rights, including for AI training, are reserved under
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
-//! Outstation session I/O orchestration and protocol handling.
+//! Outstation I/O orchestration and protocol session handling.
 //!
-//! [`OutstationTask`](crate::outstation::session::task::OutstationTask) owns the reader, responder, and database handle, and coordinates request
-//! intake, confirm waits, and unsolicited responses. [`OutstationHandler`](crate::outstation::session::OutstationHandler) owns protocol state
-//! and application callbacks, and processes requests and formats responses. Handler methods
-//! receive transport or response storage when needed. Keeping these fields separate lets a
-//! handler run while an incoming fragment borrows the reader or a prepared response borrows
+//! [`OutstationTask`] owns the reader, responder, and database handle, and coordinates request
+//! intake, confirm waits, and unsolicited responses. [`OutstationSession`] owns protocol state
+//! and application callbacks, and processes requests and formats responses. Session methods
+//! receive transport or response storage when needed. Keeping these fields separate lets the
+//! session run while an incoming fragment borrows the reader or a prepared response borrows
 //! its slot.
+//!
+//! [`OutstationTask`]: crate::outstation::session::task::OutstationTask
+//! [`OutstationSession`]: crate::outstation::session::OutstationSession
 
 mod broadcast;
 mod confirm;
@@ -115,7 +118,7 @@ impl From<OutstationConfig> for SessionConfig {
 
 /// What the session answers the master with: the transport writer, and a slot for each kind of
 /// response, which keeps the response published last to send again. The slots live outside the
-/// handler, so a response prepared in one can be held while the handler processes its request.
+/// session, so a response prepared in one can be held while the session processes its request.
 pub(crate) struct Responder<T: Transport> {
     writer: TransportWriter<T>,
     /// the response to the last valid request, if it had one
@@ -141,7 +144,7 @@ impl<T: Transport> Responder<T> {
 }
 
 /// Protocol state and request handling, borrowed independently of receive and response storage.
-pub(crate) struct OutstationHandler {
+pub(crate) struct OutstationSession {
     enabled: Enabled,
     messages: Receiver<OutstationMessage>,
     config: SessionConfig,
@@ -153,7 +156,7 @@ pub(crate) struct OutstationHandler {
     next_link_status: Option<tokio::time::Instant>,
 }
 
-impl OutstationHandler {
+impl OutstationSession {
     pub(crate) fn new(
         initial_state: Enabled,
         messages: Receiver<OutstationMessage>,
@@ -317,7 +320,7 @@ impl<T: Transport> OutstationTask<T> {
     async fn run_session(&mut self, io: &mut PhysLayer) -> RunError {
         loop {
             if let Err(err) = self.run_idle_state(io).await {
-                // teardown (including self.handler.state.reset()) is handled by SessionTeardown
+                // teardown (including self.session.state.reset()) is handled by SessionTeardown
                 // in OutstationTask::run, so it also covers a cancelled run future
                 return err;
             }
@@ -340,22 +343,22 @@ impl<T: Transport> OutstationTask<T> {
         }
 
         // check to see if we should perform a link status check
-        self.handler
+        self.session
             .check_link_status(io, &mut self.responder.writer)
             .await?;
 
-        let next_action = next_action.select_earliest(self.handler.next_link_status);
+        let next_action = next_action.select_earliest(self.session.next_link_status);
 
         // wait for an event
         tokio::select! {
-            frame_read = self.reader.read(io, self.handler.config.decode_level) => {
+            frame_read = self.reader.read(io, self.session.config.decode_level) => {
                 // make sure an I/O error didn't occur, ending the session
                 frame_read?;
             }
             _ = self.database.wait_for_change() => {
                 // wake for unsolicited here
             }
-            res = self.handler.sleep_until(next_action) => {
+            res = self.session.sleep_until(next_action) => {
                 res?
                 // just wake up
             }

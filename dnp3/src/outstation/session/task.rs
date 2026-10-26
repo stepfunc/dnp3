@@ -9,7 +9,7 @@ use crate::link::reader::LinkModes;
 use crate::link::EndpointAddress;
 use crate::outstation::config::*;
 use crate::outstation::database::DatabaseHandle;
-use crate::outstation::session::{OutstationHandler, Responder};
+use crate::outstation::session::{OutstationSession, Responder};
 use crate::outstation::traits::{ControlHandler, OutstationApplication, OutstationInformation};
 use crate::outstation::OutstationHandle;
 use crate::phys::{PhysAddr, PhysLayer};
@@ -35,10 +35,10 @@ pub(crate) enum OutstationMessage {
 
 /// Owns I/O resources and response slots, and orchestrates outstation reads and confirm waits.
 ///
-/// Keeping protocol state and processing on the separate handler field lets them run while an
+/// Keeping protocol state and processing on the separate session field lets them run while an
 /// incoming fragment borrows the reader or a prepared response borrows its slot.
 pub(crate) struct OutstationTask<T: Transport = RealTransport> {
-    pub(super) handler: OutstationHandler,
+    pub(super) session: OutstationSession,
     pub(super) reader: TransportReader<T>,
     pub(super) responder: Responder<T>,
     pub(super) database: DatabaseHandle,
@@ -55,7 +55,7 @@ impl<T: Transport> Drop for SessionTeardown<'_, T> {
         self.task.database.reset();
         self.task.reader.reset();
         self.task.responder.reset();
-        self.task.handler.reset_session_state();
+        self.task.session.reset_session_state();
     }
 }
 
@@ -124,7 +124,7 @@ impl<T: Transport> OutstationTask<T> {
             phys: phys_addr,
         };
         let task = Self {
-            handler: OutstationHandler::new(
+            session: OutstationSession::new(
                 initial_state,
                 rx,
                 destination,
@@ -147,11 +147,11 @@ impl<T: Transport> OutstationTask<T> {
     }
 
     pub(crate) fn enabled(&self) -> Enabled {
-        self.handler.enabled()
+        self.session.enabled()
     }
 
     pub(crate) fn change_master_address(&mut self, address: EndpointAddress) {
-        self.handler.change_master_address(address);
+        self.session.change_master_address(address);
     }
 
     /// run the outstation task asynchronously until a `RunError` occurs
@@ -166,6 +166,6 @@ impl<T: Transport> OutstationTask<T> {
 
     /// process received outstation messages while idle without a session
     pub(crate) async fn process_next_message(&mut self) -> Result<(), StopReason> {
-        self.handler.process_next_message().await
+        self.session.process_next_message().await
     }
 }

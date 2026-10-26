@@ -6,7 +6,7 @@
 
 use super::*;
 
-impl MasterHandler {
+impl MasterSession {
     /// Pass on a solicited response from `destination` with sequence `seq`. Unsolicited responses
     /// are processed and confirmed here, and responses from other sources or with other sequence
     /// numbers are ignored.

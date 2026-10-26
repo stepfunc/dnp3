@@ -8,10 +8,10 @@ use super::*;
 
 /// Owns transport resources and orchestrates master I/O, task execution, and deadlines.
 ///
-/// Protocol state and processing live on the separate handler field so they can run while a
+/// Protocol state and processing live on the separate session field so they can run while a
 /// fragment borrows the reader.
 pub(crate) struct MasterTask<T: Transport = RealTransport> {
-    pub(super) handler: MasterHandler,
+    pub(super) session: MasterSession,
     pub(super) reader: TransportReader<T>,
     pub(super) writer: TransportWriter<T>,
 }
@@ -71,7 +71,7 @@ impl<T: Transport> MasterTask<T> {
         config: MasterChannelConfig,
         messages: Receiver<Message>,
     ) -> Self {
-        let handler = MasterHandler::new(
+        let session = MasterSession::new(
             enabled,
             config.decode_level,
             config.tx_buffer_size,
@@ -85,19 +85,19 @@ impl<T: Transport> MasterTask<T> {
             config.rx_buffer_size.value(),
         );
         Self {
-            handler,
+            session,
             reader,
             writer,
         }
     }
 
     pub(crate) fn enabled(&self) -> Enabled {
-        self.handler.enabled
+        self.session.enabled
     }
 
     #[cfg(feature = "unstable")]
     pub(crate) fn start(&mut self, now: Instant) {
-        self.handler.associations.start(now);
+        self.session.associations.start(now);
     }
 
     pub(crate) async fn run(&mut self, io: &mut PhysLayer) -> RunError {
@@ -110,6 +110,6 @@ impl<T: Transport> MasterTask<T> {
     }
 
     pub(crate) async fn process_next_message(&mut self) -> Result<(), StopReason> {
-        self.handler.process_next_message().await
+        self.session.process_next_message().await
     }
 }

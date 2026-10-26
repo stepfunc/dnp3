@@ -6,7 +6,7 @@
 
 use super::*;
 
-impl OutstationHandler {
+impl OutstationSession {
     pub(super) async fn handle_non_read<'a>(
         &mut self,
         sol: &'a mut ResponseSlot,

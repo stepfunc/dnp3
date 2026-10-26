@@ -51,7 +51,7 @@ enum ReadResponseAction {
     Complete,
 }
 
-impl MasterHandler {
+impl MasterSession {
     #[expect(
         clippy::too_many_arguments,
         reason = "processing a read response needs the request, the response and the session state"
@@ -112,7 +112,7 @@ impl<T: Transport> MasterTask<T> {
     ) -> Result<Sequence, TaskError> {
         let result = self.execute_read_task(io, dest, &mut task).await;
 
-        let association = self.handler.associations.get_mut(dest.link).ok();
+        let association = self.session.associations.get_mut(dest.link).ok();
 
         match result {
             Ok((seq, events_without_request_errors)) => {
@@ -139,7 +139,7 @@ impl<T: Transport> MasterTask<T> {
         task: &mut ReadTask,
     ) -> Result<(Sequence, bool), TaskError> {
         let mut seq = self
-            .handler
+            .session
             .send_request(io, dest, task, &mut self.writer)
             .await?;
         let mut is_first = true;
@@ -147,11 +147,11 @@ impl<T: Transport> MasterTask<T> {
 
         // read responses until we get a FIN or an error occurs
         loop {
-            let deadline = Deadline::from_now(self.handler.associations.get_timeout(dest.link)?);
+            let deadline = Deadline::from_now(self.session.associations.get_timeout(dest.link)?);
 
             let action = loop {
                 let (source, response) = match self
-                    .handler
+                    .session
                     .next_event(io, &mut self.reader, Some(deadline.at))
                     .await?
                 {
@@ -167,12 +167,12 @@ impl<T: Transport> MasterTask<T> {
                 };
 
                 if let Some(response) = self
-                    .handler
+                    .session
                     .filter_solicited(io, &mut self.writer, dest, seq, source, response)
                     .await?
                 {
                     break self
-                        .handler
+                        .session
                         .process_read_response(
                             dest,
                             is_first,
@@ -197,7 +197,7 @@ impl<T: Transport> MasterTask<T> {
                 ReadResponseAction::ReadNext => {
                     is_first = false;
                     seq = self
-                        .handler
+                        .session
                         .associations
                         .get_mut(dest.link)?
                         .increment_seq();

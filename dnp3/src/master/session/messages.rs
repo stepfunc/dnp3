@@ -6,7 +6,7 @@
 
 use super::*;
 
-impl MasterHandler {
+impl MasterSession {
     pub(crate) async fn process_next_message(&mut self) -> Result<(), StopReason> {
         self.process_message(false).await
     }

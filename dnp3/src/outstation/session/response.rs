@@ -131,7 +131,7 @@ impl ResponseSlot {
     }
 }
 
-impl OutstationHandler {
+impl OutstationSession {
     /// Answer a request that becomes the last valid request, publishing its response. Returns the
     /// confirm that the response waits for.
     pub(super) async fn respond<T: Transport>(
