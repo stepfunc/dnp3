@@ -12,9 +12,10 @@
 //!
 //! Built by the `no-panic` CI job with `--cfg dnp3_no_panic`, in release with LTO and one
 //! codegen unit, which the optimizer needs to see through calls into other crates. The
-//! [`encode`] module does the same for the encoders.
+//! [`encode`] module does the same for the encoders, and [`queue`] for the bounded queue.
 
 mod encode;
+mod queue;
 
 use scursor::ReadCursor;
 
@@ -40,6 +41,71 @@ fn input() -> Vec<u8> {
     match std::env::var_os("DNP3_NO_PANIC_INPUT") {
         Some(path) => std::fs::read(path).unwrap_or_default(),
         None => Vec::new(),
+    }
+}
+
+/// Values drawn from the input in order, zero once it runs out
+struct Source<'a>(&'a [u8]);
+
+impl Source<'_> {
+    fn u8(&mut self) -> u8 {
+        match self.0 {
+            [first, rest @ ..] => {
+                self.0 = rest;
+                *first
+            }
+            [] => 0,
+        }
+    }
+
+    fn bool(&mut self) -> bool {
+        self.u8() & 0x01 != 0
+    }
+
+    fn u16(&mut self) -> u16 {
+        u16::from_le_bytes([self.u8(), self.u8()])
+    }
+
+    fn u32(&mut self) -> u32 {
+        u32::from_le_bytes([self.u8(), self.u8(), self.u8(), self.u8()])
+    }
+
+    fn u64(&mut self) -> u64 {
+        u64::from_le_bytes([
+            self.u8(),
+            self.u8(),
+            self.u8(),
+            self.u8(),
+            self.u8(),
+            self.u8(),
+            self.u8(),
+            self.u8(),
+        ])
+    }
+
+    /// a length from 0 to 16 MiB
+    fn len(&mut self) -> usize {
+        let len = u32::from_le_bytes([self.u8(), self.u8(), self.u8(), 0]);
+        usize::try_from(len).unwrap_or(0)
+    }
+
+    fn bytes(&mut self) -> Vec<u8> {
+        let len = self.len();
+        (0..len).map(|_| self.u8()).collect()
+    }
+
+    fn string(&mut self) -> String {
+        String::from_utf8_lossy(&self.bytes()).into_owned()
+    }
+
+    fn many<T>(&mut self, mut item: impl FnMut(&mut Self) -> T) -> Vec<T> {
+        let len = self.len();
+        (0..len).map(|_| item(self)).collect()
+    }
+
+    /// an output buffer of 0 bytes to 16 MiB
+    fn buffer(&mut self) -> Vec<u8> {
+        vec![0; self.len()]
     }
 }
 
