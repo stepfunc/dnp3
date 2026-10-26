@@ -21,8 +21,9 @@ the cases it is built to reach, and its known gaps. The commands to build, test 
   extraction, the transport assembler, the link frame reader and the link layer's header processing
   so that the build fails unless the optimizer removes every path to a panic. Its `encode` module
   does the same for the encoders of everything the master sends and the link and transport framing,
-  given any value and an output buffer of up to 16 MiB; its module doc lists what is and isn't checked. CI links both
-  with arithmetic overflow checks off and on, in release with thin LTO, one codegen unit, default
+  given any value and an output buffer of up to 16 MiB, and its `queue` module for every operation
+  on the bounded queue; their module docs list what is and isn't checked. CI links it with
+  arithmetic overflow checks off and on, in release with thin LTO, one codegen unit, default
   features and a pinned toolchain. It proves only that no panic is reachable; the tests above pin
   what is decoded and encoded.
 - **Binding smoke tests.** The C, C++, .NET and Java bindings each run an outstation and a master in
@@ -106,6 +107,7 @@ Paths are relative to `dnp3/src`.
 
 | Property | File | Claim | Oracle | Cases |
 |---|---|---|---|---|
+| `behaves_like_a_capped_vec_deque` | `util/bounded.rs` | The bounded queue that holds READ selections keeps FIFO order, its length and front, and refuses a push exactly when full, across the end of its ring | Independent model (`VecDeque`) | 256 |
 | `behaves_like_a_bounded_queue` | `outstation/database/details/event/list.rs` | The event list keeps insertion order, its ends and size, and `remove_all`'s call order | Independent model | 256 |
 | `behaves_like_a_list_with_per_type_limits` | `outstation/database/details/event/tests.rs` | The event buffer's counts, classes, overflow, selection, written bytes and cleared ids | Independent model with its own encoder | 256 |
 | `float_deadband_is_symmetric_and_never_exceeded_by_the_same_value` | `outstation/database/details/range/static_db.rs` | The float deadband is symmetric and a value never exceeds it against itself | Relation | 512 |
