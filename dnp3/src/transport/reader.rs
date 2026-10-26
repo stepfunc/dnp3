@@ -22,8 +22,12 @@ pub(crate) struct TransportReader<T: Transport> {
     inner: T::Reader,
 }
 
+/// Keeps the current request available while it is handled.
+///
+/// Dropping the guard consumes the request, including when the handling future is cancelled.
+/// Calling [`Self::retain`] leaves it queued for the next session state to process.
 pub(crate) struct RequestGuard<'a, T: Transport> {
-    canceled: bool,
+    consume_on_drop: bool,
     master_address: Option<EndpointAddress>,
     level: AppDecodeLevel,
     reader: &'a mut TransportReader<T>,
@@ -36,7 +40,7 @@ impl<'a, T: Transport> RequestGuard<'a, T> {
         level: AppDecodeLevel,
     ) -> Self {
         RequestGuard {
-            canceled: false,
+            consume_on_drop: true,
             master_address,
             level,
             reader,
@@ -44,7 +48,7 @@ impl<'a, T: Transport> RequestGuard<'a, T> {
     }
 
     pub(crate) fn retain(&mut self) {
-        self.canceled = true;
+        self.consume_on_drop = false;
         self.reader.retained = true;
     }
 
@@ -56,7 +60,7 @@ impl<'a, T: Transport> RequestGuard<'a, T> {
 
 impl<T: Transport> Drop for RequestGuard<'_, T> {
     fn drop(&mut self) {
-        if !self.canceled {
+        if self.consume_on_drop {
             self.reader.pop()
         }
     }
