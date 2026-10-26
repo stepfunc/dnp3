@@ -19,7 +19,12 @@ the cases it is built to reach, and its known gaps. The commands to build, test 
 - **Properties.** Generated cases checked against an oracle with `proptest`, indexed below.
 - **No-panic check.** `dnp3/src/no_panic_check.rs` links the application parsers, master
   extraction, the transport assembler, the link frame reader and the link layer's header processing
-  so that the build fails unless the optimizer removes every path to a panic.
+  so that the build fails unless the optimizer removes every path to a panic. Its `encode` module
+  does the same for the encoders of everything the master sends and the link and transport framing,
+  given any value and an output buffer of up to 16 MiB; its module doc lists what is and isn't checked. CI links both
+  with arithmetic overflow checks off and on, in release with thin LTO, one codegen unit, default
+  features and a pinned toolchain. It proves only that no panic is reachable; the tests above pin
+  what is decoded and encoded.
 - **Binding smoke tests.** The C, C++, .NET and Java bindings each run an outstation and a master in
   one process over TCP loopback and check a class 0 read and a direct operate, against libraries
   built like the shipped ones.

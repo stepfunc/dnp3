@@ -104,9 +104,11 @@ jobs:
           toolchain: ${{ matrix.rust }}
       - name: Run Rust unit tests
         run: cargo test --features unstable
-  # Check that the parsers can't panic for any input (dnp3/src/no_panic_check.rs). The proof
-  # comes from the optimizer, so the toolchain is pinned: a new one can lose an optimization
-  # and fail the link without any change to the code. Raise it deliberately.
+  # Check that the parsers can't panic for any input, and the encoders for any value and an
+  # output buffer up to 16 MiB (dnp3/src/no_panic_check.rs), with arithmetic overflow checks off
+  # as in release and on as in debug. The proof comes from the optimizer, so the toolchain is
+  # pinned: a new one can lose an optimization and fail the link without any change to the code.
+  # Raise it deliberately.
   no-panic:
     runs-on: ubuntu-latest
     steps:
@@ -116,12 +118,19 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: "1.99"
-      - name: Link the parsers with the no-panic check
+      - name: Link the parsers and encoders with the no-panic check
         run: cargo test -p dnp3 --lib --release --no-run
         env:
           RUSTFLAGS: --cfg dnp3_no_panic
           CARGO_PROFILE_RELEASE_LTO: thin
           CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "1"
+      - name: Link them again with overflow checks on
+        run: cargo test -p dnp3 --lib --release --no-run
+        env:
+          RUSTFLAGS: --cfg dnp3_no_panic
+          CARGO_PROFILE_RELEASE_LTO: thin
+          CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "1"
+          CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS: "true"
   # Build API documentation packages
   # Paused on PRs during the 1.8.0 refactor series; release tags still build them. Restore before 1.8.0
   documentation:

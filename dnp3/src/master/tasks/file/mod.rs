@@ -8,8 +8,12 @@ use crate::app::format::write::HeaderWriter;
 use crate::app::format::WriteError;
 use crate::app::parse::free_format::FreeFormatVariation;
 use crate::app::parse::parser::ObjectHeader;
-use crate::app::{FileStatus, Group70Var2, Group70Var3, Group70Var4, Permissions, Timestamp};
-use crate::master::{AuthKey, FileCredentials, FileError, FileHandle, FileMode, OpenFile};
+use crate::app::{
+    FileStatus, Group70Var2, Group70Var3, Group70Var4, Group70Var5, Permissions, Timestamp,
+};
+use crate::master::{
+    AuthKey, BlockNumber, FileCredentials, FileError, FileHandle, FileMode, OpenFile,
+};
 
 pub(crate) mod authenticate;
 pub(crate) mod close;
@@ -25,7 +29,7 @@ pub(crate) struct Filename(pub(crate) String);
 // we can just be cute and write Step Function (SF) on the wire.
 pub(crate) const REQUEST_ID: u16 = u16::from_le_bytes(*b"SF");
 
-pub(super) fn write_auth(
+pub(crate) fn write_auth(
     credentials: &FileCredentials,
     writer: &mut HeaderWriter,
 ) -> Result<(), WriteError> {
@@ -37,7 +41,7 @@ pub(super) fn write_auth(
     writer.write_free_format(&obj)
 }
 
-pub(super) fn write_open(
+pub(crate) fn write_open(
     file_name: &str,
     auth_key: AuthKey,
     permissions: Permissions,
@@ -59,7 +63,21 @@ pub(super) fn write_open(
     writer.write_free_format(&obj)
 }
 
-pub(super) fn write_close(handle: FileHandle, writer: &mut HeaderWriter) -> Result<(), WriteError> {
+/// a READ of `block`, with no data
+pub(crate) fn write_read(
+    handle: FileHandle,
+    block: BlockNumber,
+    writer: &mut HeaderWriter,
+) -> Result<(), WriteError> {
+    let obj = Group70Var5 {
+        file_handle: handle.into(),
+        block_number: block.wire_value(),
+        file_data: &[],
+    };
+    writer.write_free_format(&obj)
+}
+
+pub(crate) fn write_close(handle: FileHandle, writer: &mut HeaderWriter) -> Result<(), WriteError> {
     let obj = Group70Var4 {
         file_handle: handle.into(),
         file_size: 0,

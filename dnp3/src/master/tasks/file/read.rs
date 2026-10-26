@@ -245,7 +245,7 @@ impl ResponseTask for FileReadTask {
                 self.settings.config.max_block_size,
                 writer,
             ),
-            State::Read(rs) => write_read(*rs, writer),
+            State::Read(rs) => write_read(rs.handle, rs.block, writer),
             State::Close(handle, _) => write_close(*handle, writer),
         };
         Ok(result?)
@@ -326,13 +326,4 @@ fn closed_early(err: FileError, closed: Result<(), FileError>) -> Result<(), Fil
         | FileError::BadBlockNum
         | FileError::TaskError(_) => Err(err),
     }
-}
-
-fn write_read(rs: ReadState, writer: &mut HeaderWriter) -> Result<(), WriteError> {
-    let obj = Group70Var5 {
-        file_handle: rs.handle.into(),
-        block_number: rs.block.wire_value(),
-        file_data: &[],
-    };
-    writer.write_free_format(&obj)
 }
