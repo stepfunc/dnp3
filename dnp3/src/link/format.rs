@@ -104,7 +104,7 @@ fn format_frame<'a>(
         cursor.write_u16_le(calc_crc(cursor.written_since(begin_first_block)?))?;
 
         // write the remaining blocks
-        for block in remainder.chunks(constant::MAX_BLOCK_SIZE) {
+        for block in crate::util::chunks::<_, { constant::MAX_BLOCK_SIZE }>(remainder) {
             let start_block = cursor.position();
             cursor.write_bytes(block)?;
             cursor.write_u16_le(calc_crc(cursor.written_since(start_block)?))?;

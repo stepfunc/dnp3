@@ -4,7 +4,7 @@
 // Text and data mining rights, including for AI training, are reserved under
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
-use std::collections::{BTreeMap, Bound};
+use std::collections::{btree_map, BTreeMap, Bound};
 use std::fmt::Formatter;
 use std::ops::RangeBounds;
 
@@ -70,6 +70,24 @@ impl IndexRange {
         }
 
         self.start.try_into().ok().map(AttrSet::new)
+    }
+
+    /// The entries of `map` in this range
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "an IndexRange has start <= stop, so the bounds are in order"
+    )]
+    fn entries<V>(self, map: &BTreeMap<u16, V>) -> btree_map::Range<'_, u16, V> {
+        map.range(self)
+    }
+
+    /// The entries of `map` in this range, mutably
+    #[expect(
+        clippy::disallowed_methods,
+        reason = "an IndexRange has start <= stop, so the bounds are in order"
+    )]
+    fn entries_mut<V>(self, map: &mut BTreeMap<u16, V>) -> btree_map::RangeMut<'_, u16, V> {
+        map.range_mut(self)
     }
 
     /// number of indices in the range
@@ -214,7 +232,7 @@ where
             return Err(Iin2::OBJECT_UNKNOWN);
         }
 
-        match self.inner.range(range).count() {
+        match range.entries(&self.inner).count() {
             0 => Err(Iin2::PARAMETER_ERROR),
             installed if installed < range.len() => Ok(Iin2::PARAMETER_ERROR),
             _ => Ok(Iin2::default()),
@@ -226,7 +244,7 @@ where
         range: IndexRange,
         variation: Option<T::StaticVariation>,
     ) -> VariationRange {
-        for (_index, point) in self.inner.range_mut(range) {
+        for (_index, point) in range.entries_mut(&mut self.inner) {
             // for every point in the range, we copy the current value into a distinct 'selected' cell
             // when writing the response(s) we use the selected value
             // this allows the outstation to send consistent snapshot of the values when a multi-fragment response is required
@@ -452,7 +470,7 @@ impl StaticDatabase {
         T: Family,
     {
         let mut writer = RangeWriter::new();
-        for (index, item) in self.get_map::<T>().inner.range(range) {
+        for (index, item) in range.entries(&self.get_map::<T>().inner) {
             // first determine what variation should be written
             let info = variation
                 .unwrap_or(item.config.s_var)
@@ -479,7 +497,7 @@ impl StaticDatabase {
         variation: Option<AnalogInputDeadBandVariation>,
     ) -> Result<(), VariationRange> {
         let mut writer = RangeWriter::new();
-        for (index, item) in self.analog.inner.range(range) {
+        for (index, item) in range.entries(&self.analog.inner) {
             // first determine what variation should be written
             let var = variation.unwrap_or(AnalogInputDeadBandVariation::Group34Var3);
 

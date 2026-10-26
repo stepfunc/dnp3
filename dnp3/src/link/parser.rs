@@ -213,7 +213,7 @@ impl Parser {
     fn read_body(trailer: &[u8], payload: &mut FramePayload) -> Result<(), ParseError> {
         payload.clear();
 
-        for block in trailer.chunks(constant::MAX_BLOCK_SIZE_WITH_CRC) {
+        for block in crate::util::chunks::<_, { constant::MAX_BLOCK_SIZE_WITH_CRC }>(trailer) {
             // a block holds at least one byte of data before its CRC
             let Some(data_len) = block.len().checked_sub(2).filter(|n| *n > 0) else {
                 return Err(LogicError::BadSize.into());

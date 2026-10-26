@@ -1101,8 +1101,12 @@ fn a_selection_operates_once_for_the_latest_select() {
 #[test]
 fn model_rejects_an_operate_after_a_read() {
     let model = Model::new(1000);
-    let (_, model) = model.step(Request::Select(0, 0)).remove(0);
-    let (_, model) = model.step(Request::Read(1)).remove(0);
+    let (_, model) = model
+        .step(Request::Select(0, 0))
+        .into_iter()
+        .next()
+        .unwrap();
+    let (_, model) = model.step(Request::Read(1)).into_iter().next().unwrap();
     let alternatives = model.step(Request::Operate(0, 1));
 
     let executed = Outcome {
@@ -1130,7 +1134,11 @@ fn model_decides_the_select_timeout_off_the_boundary() {
 
     let outcomes = |advance| {
         let model = Model::new(1000);
-        let (_, mut model) = model.step(Request::Select(0, 0)).remove(0);
+        let (_, mut model) = model
+            .step(Request::Select(0, 0))
+            .into_iter()
+            .next()
+            .unwrap();
         model.advance(advance);
         model
             .step(Request::Operate(0, 1))

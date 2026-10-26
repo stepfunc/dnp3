@@ -4,6 +4,8 @@
 // Text and data mining rights, including for AI training, are reserved under
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
+use std::cell::Cell;
+
 use crate::decode::DecodeLevel;
 use crate::link::display::LinkDisplay;
 use crate::link::error::{LinkError, LogicError};
@@ -109,7 +111,12 @@ impl ReadBuffer {
         if self.begin > self.end || self.end > self.buffer.len() {
             return Err(LogicError::BadSize);
         }
-        self.buffer.copy_within(self.begin..self.end, 0);
+        // front to back, so each byte is read before the copy overwrites it
+        let cells = Cell::from_mut(&mut *self.buffer).as_slice_of_cells();
+        let unread = cells.get(self.begin..self.end).unwrap_or_default();
+        for (dest, src) in cells.iter().zip(unread) {
+            dest.set(src.get());
+        }
         self.end = self.num_bytes_unread();
         self.begin = 0;
         Ok(())
@@ -434,11 +441,10 @@ mod tests {
 
     /// read `chunk` into the reader
     fn load(reader: &mut Reader, chunk: &[u8]) -> Result<(), LogicError> {
-        reader
-            .write_space()?
-            .get_mut(..chunk.len())
-            .unwrap()
-            .copy_from_slice(chunk);
+        let space = reader.write_space()?.get_mut(..chunk.len()).unwrap();
+        for (dest, src) in space.iter_mut().zip(chunk) {
+            *dest = *src;
+        }
         reader.wrote(chunk.len())
     }
 
@@ -535,11 +541,11 @@ mod tests {
     fn chunkings(input: &[u8]) -> Vec<Vec<&[u8]>> {
         let mut chunkings: Vec<Vec<&[u8]>> = (0..=input.len())
             .map(|n| {
-                let (first, second) = input.split_at(n);
+                let (first, second) = input.split_at_checked(n).unwrap();
                 vec![first, second]
             })
             .collect();
-        chunkings.push(input.chunks(1).collect());
+        chunkings.push(input.iter().map(std::slice::from_ref).collect());
         chunkings
     }
 
@@ -680,7 +686,7 @@ mod tests {
         let (mut io, local) = bound().await;
         let (sender, addr) = sender().await;
         let (full, full_frame) = full_frame(0xAA);
-        let (start, end) = full.split_at(283);
+        let (start, end) = full.split_at_checked(283).unwrap();
         sender
             .send_to(&[ACK.bytes, start].concat(), local)
             .await
@@ -720,8 +726,8 @@ mod tests {
         let (sender, addr) = sender().await;
         let (first, first_frame) = full_frame(0xAA);
         let (second, second_frame) = full_frame(0xBB);
-        let (first_start, first_end) = first.split_at(283);
-        let (second_start, second_end) = second.split_at(283);
+        let (first_start, first_end) = first.split_at_checked(283).unwrap();
+        let (second_start, second_end) = second.split_at_checked(283).unwrap();
         let datagrams = [
             [ACK.bytes, first_start].concat(),
             [first_end, second_start].concat(),
@@ -771,7 +777,7 @@ mod tests {
             }
             let space = reader.write_space().unwrap().len();
             assert_ne!(space, 0);
-            let (chunk, tail) = rest.split_at(space.min(rest.len()));
+            let (chunk, tail) = rest.split_at_checked(space.min(rest.len())).unwrap();
             feed(&mut reader, &mut payload, chunk, &mut frames).unwrap();
             rest = tail;
         }
@@ -1030,7 +1036,9 @@ mod tests {
                 }
                 let space = reader.write_space().unwrap().len();
                 assert_ne!(space, 0);
-                let (chunk, tail) = rest.split_at(space.min(*read).min(rest.len()));
+                let (chunk, tail) = rest
+                    .split_at_checked(space.min(*read).min(rest.len()))
+                    .unwrap();
                 if let Err(err) = feed(&mut reader, &mut payload, chunk, &mut frames) {
                     error = Some(err);
                     break;

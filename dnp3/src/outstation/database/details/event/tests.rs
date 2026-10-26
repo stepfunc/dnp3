@@ -46,6 +46,7 @@ use crate::outstation::database::details::WriteProgress;
 use crate::outstation::database::variations::*;
 use crate::outstation::database::{EventBufferConfig, EventClass};
 use crate::outstation::{BufferState, ClassCount, OutstationApplication, TypeCount};
+use crate::util::test_support::remove_at;
 
 use super::buffer::{EventBuffer, InsertError};
 
@@ -365,7 +366,7 @@ impl Model {
 
         let result = if self.count(kind) == max {
             let position = self.records.iter().position(|r| r.kind == kind).unwrap();
-            let discarded = self.records.remove(position);
+            let discarded = remove_at(&mut self.records, position);
             self.overflown = true;
             Err(InsertError::Overflow {
                 created: id,
@@ -439,7 +440,12 @@ impl Model {
                     (position, 1)
                 }
             };
-            bytes[position..position + 2].copy_from_slice(&num.to_le_bytes());
+            for (dest, src) in bytes[position..position + 2]
+                .iter_mut()
+                .zip(num.to_le_bytes())
+            {
+                *dest = src;
+            }
             header = Some((group, variation, position, num));
 
             bytes.extend(record.index.to_le_bytes());

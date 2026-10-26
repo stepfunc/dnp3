@@ -233,7 +233,7 @@ impl Reaction {
 
     fn bytes(self, kind: Kind, request: &[u8]) -> Vec<u8> {
         match self {
-            Reaction::Correct => kind.first_response(request).split_off(4),
+            Reaction::Correct => kind.first_response(request)[4..].to_vec(),
             // a task that expects objects gets none, and one that expects none gets a time delay
             Reaction::Unexpected => match kind {
                 Kind::EmptyResponse | Kind::DeadBands | Kind::TimeSync => {

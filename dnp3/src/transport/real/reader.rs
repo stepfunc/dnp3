@@ -324,7 +324,7 @@ mod tests {
         ) {
             let mut h = Duplex::cancel_ack(capacity, resets).await;
             let acks = ack().repeat(resets.saturating_add(1));
-            let (full, rest) = acks.split_at(capacity);
+            let (full, rest) = acks.split_at_checked(capacity).unwrap();
 
             assert_eq!(h.received(full.len()).await, full);
             assert!(h.read().await);
@@ -350,7 +350,7 @@ mod tests {
             // the master times out waiting for the ACK and repeats the frame
             h.send(&confirmed(true)).await;
             let acks = ack().repeat(3);
-            let (full, rest) = acks.split_at(15);
+            let (full, rest) = acks.split_at_checked(15).unwrap();
 
             assert_eq!(h.received(full.len()).await, full);
             assert!(h.read().await);
@@ -381,7 +381,7 @@ mod tests {
         async fn writer_finishes_a_cancelled_reply_before_writing() {
             let mut h = Duplex::cancel_ack(15, 1).await;
             let acks = ack().repeat(2);
-            let (full, rest) = acks.split_at(15);
+            let (full, rest) = acks.split_at_checked(15).unwrap();
             assert_eq!(h.received(full.len()).await, full);
 
             let mut writer = crate::transport::real::writer::Writer::new(

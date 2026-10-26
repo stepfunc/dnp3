@@ -542,9 +542,11 @@ mod tests {
                 Ok((addr, Some(host.clone())))
             );
             let host = Some(host);
-            let mut events = events(&mut rx);
+            let events = events(&mut rx);
             // localhost may also resolve to ::1, which refuses the connection, and try it first
-            let last = events.split_off(events.len().saturating_sub(2));
+            let (events, last) = events
+                .split_at_checked(events.len().saturating_sub(2))
+                .unwrap();
             assert_eq!(
                 last,
                 [
@@ -552,7 +554,9 @@ mod tests {
                     Event::Connected(addr, host.clone())
                 ]
             );
-            for pair in events.chunks(2) {
+            let (pairs, rest) = events.as_chunks::<2>();
+            assert!(rest.is_empty(), "unexpected events {rest:?}");
+            for pair in pairs {
                 let [Event::Connecting(x, h1), Event::ConnectFailed(y, h2)] = pair else {
                     panic!("unexpected events {pair:?}");
                 };

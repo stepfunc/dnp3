@@ -2,3 +2,147 @@ allow-unwrap-in-tests = true
 allow-expect-in-tests = true
 allow-panic-in-tests = true
 allow-indexing-slicing-in-tests = true
+
+# std methods that panic when an argument is out of range, which the panic lints in lib.rs don't
+# see. Each reason names a form that can't panic. A primitive's inherent methods are spelled
+# `slice::`, `str::` or `u8::`: a spelling clippy can't resolve is ignored without a warning, so a
+# new entry has to be shown to fire on a call.
+#
+# Not listed, on purpose:
+# - allocation (`Vec::push`, `with_capacity`, `to_vec`, `format!`, ...): its failures (an
+#   allocation that fails aborts, a capacity overflow panics) are outside this list's scope;
+#   in the functions the no-panic proof covers, a reachable capacity-overflow panic fails the
+#   link check
+# - tokio's runtime precondition (`tokio::spawn`, `Handle::current`, timers and I/O outside a
+#   runtime): a program that breaks it panics on its first use, every time
+# - lock poisoning: `lock_handler`'s `expect`, under its own `#[expect]`, only panics after another
+#   thread already panicked holding the lock
+# - methods that already return an `Option` or `Result` for a bad argument, such as
+#   `VecDeque::remove` and `swap_remove_back`
+disallowed-methods = [
+    # slices, including arrays, `Vec` and `Box<[T]>` through deref
+    { path = "slice::copy_from_slice", reason = "panics if the lengths differ: zip the two slices, or copy between arrays of one length" },
+    { path = "slice::clone_from_slice", reason = "panics if the lengths differ: zip the two slices" },
+    { path = "slice::swap_with_slice", reason = "panics if the lengths differ: zip the two slices" },
+    { path = "slice::copy_within", reason = "panics on a range outside the slice: copy with checked ranges" },
+    { path = "slice::split_at", reason = "panics if mid > len: use split_at_checked" },
+    { path = "slice::split_at_mut", reason = "panics if mid > len: use split_at_mut_checked" },
+    { path = "slice::swap", reason = "panics on an index out of bounds: use get_disjoint_mut" },
+    { path = "slice::rotate_left", reason = "panics if mid > len: check mid, or use split_at_mut_checked" },
+    { path = "slice::rotate_right", reason = "panics if k > len: check k, or use split_at_mut_checked" },
+    { path = "slice::chunks", reason = "panics on a chunk size of 0: use as_chunks::<N>()" },
+    { path = "slice::chunks_mut", reason = "panics on a chunk size of 0: use as_chunks_mut::<N>()" },
+    { path = "slice::chunks_exact", reason = "panics on a chunk size of 0: use as_chunks::<N>()" },
+    { path = "slice::chunks_exact_mut", reason = "panics on a chunk size of 0: use as_chunks_mut::<N>()" },
+    { path = "slice::rchunks", reason = "panics on a chunk size of 0: use as_rchunks::<N>()" },
+    { path = "slice::rchunks_mut", reason = "panics on a chunk size of 0: use as_rchunks_mut::<N>()" },
+    { path = "slice::rchunks_exact", reason = "panics on a chunk size of 0: use as_rchunks::<N>()" },
+    { path = "slice::rchunks_exact_mut", reason = "panics on a chunk size of 0: use as_rchunks_mut::<N>()" },
+    { path = "slice::windows", reason = "panics on a window size of 0: zip the slice with its own tail" },
+    { path = "slice::select_nth_unstable", reason = "panics if index >= len: check the index first" },
+    { path = "slice::select_nth_unstable_by", reason = "panics if index >= len: check the index first" },
+    { path = "slice::select_nth_unstable_by_key", reason = "panics if index >= len: check the index first" },
+    # strings
+    { path = "str::split_at", reason = "panics off a char boundary or past the end: use split_at_checked" },
+    { path = "str::split_at_mut", reason = "panics off a char boundary or past the end: use split_at_mut_checked" },
+    { path = "std::string::String::remove", reason = "panics off a char boundary or past the end: check with is_char_boundary, or use pop" },
+    { path = "std::string::String::insert", reason = "panics off a char boundary or past the end: check with is_char_boundary, or use push" },
+    { path = "std::string::String::insert_str", reason = "panics off a char boundary or past the end: check with is_char_boundary, or use push_str" },
+    { path = "std::string::String::drain", reason = "panics on a range off a char boundary or past the end: check the range with is_char_boundary" },
+    { path = "std::string::String::split_off", reason = "panics off a char boundary or past the end: check with is_char_boundary" },
+    { path = "std::string::String::replace_range", reason = "panics on a range off a char boundary or past the end: check the range with is_char_boundary" },
+    { path = "std::string::String::truncate", reason = "panics off a char boundary: check with is_char_boundary" },
+    # Vec
+    { path = "std::vec::Vec::remove", reason = "panics if index >= len: use pop, or check the index" },
+    { path = "std::vec::Vec::insert", reason = "panics if index > len: use push, or check the index" },
+    { path = "std::vec::Vec::swap_remove", reason = "panics if index >= len: use pop, or check the index" },
+    { path = "std::vec::Vec::drain", reason = "panics on a range past the end: use clear, or check the range" },
+    { path = "std::vec::Vec::split_off", reason = "panics if at > len: check the index" },
+    { path = "std::vec::Vec::splice", reason = "panics on a range past the end: check the range" },
+    { path = "std::vec::Vec::extend_from_within", reason = "panics on a range past the end: check the range" },
+    # VecDeque (`remove` returns an Option)
+    { path = "std::collections::VecDeque::insert", reason = "panics if index > len: use push_back, or check the index" },
+    { path = "std::collections::VecDeque::drain", reason = "panics on a range past the end: use clear, or check the range" },
+    { path = "std::collections::VecDeque::split_off", reason = "panics if at > len: check the index" },
+    { path = "std::collections::VecDeque::swap", reason = "panics on an index out of bounds: check the indices" },
+    { path = "std::collections::VecDeque::rotate_left", reason = "panics if n > len: check n" },
+    { path = "std::collections::VecDeque::rotate_right", reason = "panics if n > len: check n" },
+    { path = "std::collections::VecDeque::range", reason = "panics on a range past the end: check the range" },
+    { path = "std::collections::VecDeque::range_mut", reason = "panics on a range past the end: check the range" },
+    # ordered collections
+    { path = "std::collections::BTreeMap::range", reason = "panics if start > end, or on an empty excluded range: check the bounds" },
+    { path = "std::collections::BTreeMap::range_mut", reason = "panics if start > end, or on an empty excluded range: check the bounds" },
+    { path = "std::collections::BTreeSet::range", reason = "panics if start > end, or on an empty excluded range: check the bounds" },
+    # Duration
+    { path = "std::time::Duration::new", reason = "panics if the nanoseconds carry past u64::MAX seconds: use from_secs, from_millis or from_nanos" },
+    { path = "std::time::Duration::from_secs_f32", reason = "panics on a negative, non-finite or too large value: use try_from_secs_f32" },
+    { path = "std::time::Duration::from_secs_f64", reason = "panics on a negative, non-finite or too large value: use try_from_secs_f64" },
+    { path = "std::time::Duration::mul_f32", reason = "panics on a negative, non-finite or overflowing result: use integer checked_mul" },
+    { path = "std::time::Duration::mul_f64", reason = "panics on a negative, non-finite or overflowing result: use integer checked_mul" },
+    { path = "std::time::Duration::div_f32", reason = "panics on a negative, non-finite or overflowing result: use integer checked_div" },
+    { path = "std::time::Duration::div_f64", reason = "panics on a negative, non-finite or overflowing result: use integer checked_div" },
+    # iterators
+    { path = "std::iter::Iterator::step_by", reason = "panics on a step of 0: step by a NonZero, or filter by position" },
+    # integers: the logarithms panic on 0 (and on a base below 2), the Euclidean division on a 0
+    # divisor (and on MIN / -1)
+    { path = "u8::ilog", reason = "use checked_ilog" },
+    { path = "u8::ilog2", reason = "use checked_ilog2" },
+    { path = "u8::ilog10", reason = "use checked_ilog10" },
+    { path = "u8::div_euclid", reason = "use checked_div_euclid" },
+    { path = "u8::rem_euclid", reason = "use checked_rem_euclid" },
+    { path = "u16::ilog", reason = "use checked_ilog" },
+    { path = "u16::ilog2", reason = "use checked_ilog2" },
+    { path = "u16::ilog10", reason = "use checked_ilog10" },
+    { path = "u16::div_euclid", reason = "use checked_div_euclid" },
+    { path = "u16::rem_euclid", reason = "use checked_rem_euclid" },
+    { path = "u32::ilog", reason = "use checked_ilog" },
+    { path = "u32::ilog2", reason = "use checked_ilog2" },
+    { path = "u32::ilog10", reason = "use checked_ilog10" },
+    { path = "u32::div_euclid", reason = "use checked_div_euclid" },
+    { path = "u32::rem_euclid", reason = "use checked_rem_euclid" },
+    { path = "u64::ilog", reason = "use checked_ilog" },
+    { path = "u64::ilog2", reason = "use checked_ilog2" },
+    { path = "u64::ilog10", reason = "use checked_ilog10" },
+    { path = "u64::div_euclid", reason = "use checked_div_euclid" },
+    { path = "u64::rem_euclid", reason = "use checked_rem_euclid" },
+    { path = "u128::ilog", reason = "use checked_ilog" },
+    { path = "u128::ilog2", reason = "use checked_ilog2" },
+    { path = "u128::ilog10", reason = "use checked_ilog10" },
+    { path = "u128::div_euclid", reason = "use checked_div_euclid" },
+    { path = "u128::rem_euclid", reason = "use checked_rem_euclid" },
+    { path = "usize::ilog", reason = "use checked_ilog" },
+    { path = "usize::ilog2", reason = "use checked_ilog2" },
+    { path = "usize::ilog10", reason = "use checked_ilog10" },
+    { path = "usize::div_euclid", reason = "use checked_div_euclid" },
+    { path = "usize::rem_euclid", reason = "use checked_rem_euclid" },
+    { path = "i8::ilog", reason = "use checked_ilog" },
+    { path = "i8::ilog2", reason = "use checked_ilog2" },
+    { path = "i8::ilog10", reason = "use checked_ilog10" },
+    { path = "i8::div_euclid", reason = "use checked_div_euclid" },
+    { path = "i8::rem_euclid", reason = "use checked_rem_euclid" },
+    { path = "i16::ilog", reason = "use checked_ilog" },
+    { path = "i16::ilog2", reason = "use checked_ilog2" },
+    { path = "i16::ilog10", reason = "use checked_ilog10" },
+    { path = "i16::div_euclid", reason = "use checked_div_euclid" },
+    { path = "i16::rem_euclid", reason = "use checked_rem_euclid" },
+    { path = "i32::ilog", reason = "use checked_ilog" },
+    { path = "i32::ilog2", reason = "use checked_ilog2" },
+    { path = "i32::ilog10", reason = "use checked_ilog10" },
+    { path = "i32::div_euclid", reason = "use checked_div_euclid" },
+    { path = "i32::rem_euclid", reason = "use checked_rem_euclid" },
+    { path = "i64::ilog", reason = "use checked_ilog" },
+    { path = "i64::ilog2", reason = "use checked_ilog2" },
+    { path = "i64::ilog10", reason = "use checked_ilog10" },
+    { path = "i64::div_euclid", reason = "use checked_div_euclid" },
+    { path = "i64::rem_euclid", reason = "use checked_rem_euclid" },
+    { path = "i128::ilog", reason = "use checked_ilog" },
+    { path = "i128::ilog2", reason = "use checked_ilog2" },
+    { path = "i128::ilog10", reason = "use checked_ilog10" },
+    { path = "i128::div_euclid", reason = "use checked_div_euclid" },
+    { path = "i128::rem_euclid", reason = "use checked_rem_euclid" },
+    { path = "isize::ilog", reason = "use checked_ilog" },
+    { path = "isize::ilog2", reason = "use checked_ilog2" },
+    { path = "isize::ilog10", reason = "use checked_ilog10" },
+    { path = "isize::div_euclid", reason = "use checked_div_euclid" },
+    { path = "isize::rem_euclid", reason = "use checked_rem_euclid" },
+]
