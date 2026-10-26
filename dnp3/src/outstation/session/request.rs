@@ -6,7 +6,7 @@
 
 use super::*;
 
-impl OutstationHandler {
+impl OutstationSession {
     /// Take the master's next fragment. This is where every request enters the session, in any
     /// state: any fragment from the master is link activity, and a request is classified once,
     /// against the last valid request and the selection.
@@ -327,11 +327,11 @@ impl<T: Transport> OutstationTask<T> {
         &mut self,
         io: &mut PhysLayer,
     ) -> Result<SolicitedWait, RunError> {
-        let guard = self.handler.pop_request(&mut self.reader);
-        let confirm = match self.handler.receive(&guard) {
+        let guard = self.session.pop_request(&mut self.reader);
+        let confirm = match self.session.receive(&guard) {
             Intake::Nothing => None,
             Intake::UnknownFunction(from, seq) => {
-                self.handler
+                self.session
                     .answer_unknown_function(
                         io,
                         &mut self.responder.writer,
@@ -343,7 +343,7 @@ impl<T: Transport> OutstationTask<T> {
                 None
             }
             Intake::Confirm(_, header) => {
-                self.handler.info.process_request_from_idle(header);
+                self.session.info.process_request_from_idle(header);
                 let kind = if header.control.uns {
                     "unsolicited"
                 } else {
@@ -356,11 +356,11 @@ impl<T: Transport> OutstationTask<T> {
                 None
             }
             Intake::Request(received) => {
-                let selection = self.handler.take_selection(&received.fragment);
-                self.handler
+                let selection = self.session.take_selection(&received.fragment);
+                self.session
                     .info
                     .process_request_from_idle(received.request.header);
-                self.handler
+                self.session
                     .accept(
                         io,
                         &mut self.responder,
@@ -387,12 +387,12 @@ impl<T: Transport> OutstationTask<T> {
         &mut self,
         io: &mut PhysLayer,
     ) -> Result<SolicitedWait, RunError> {
-        let Some(x) = self.handler.state.deferred_read.select(&self.database) else {
+        let Some(x) = self.session.state.deferred_read.select(&self.database) else {
             return Ok(SolicitedWait::Done);
         };
 
         tracing::info!("handling deferred READ request");
-        let response = OutstationHandler::format_read_response(
+        let response = OutstationSession::format_read_response(
             &mut self.responder.sol,
             &mut self.database,
             true,
@@ -400,7 +400,7 @@ impl<T: Transport> OutstationTask<T> {
             x.iin2,
         );
         let confirm = self
-            .handler
+            .session
             .respond(
                 io,
                 &mut self.responder.writer,

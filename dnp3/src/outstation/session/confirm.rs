@@ -6,7 +6,7 @@
 
 use super::*;
 
-impl OutstationHandler {
+impl OutstationSession {
     pub(super) fn expect_sol_confirm<T: Transport>(
         &mut self,
         ecsn: Sequence,
@@ -118,17 +118,17 @@ impl<T: Transport> OutstationTask<T> {
         io: &mut PhysLayer,
         mut series: ResponseSeries,
     ) -> Result<SolicitedWait, RunError> {
-        self.handler.info.enter_solicited_confirm_wait(series.ecsn);
+        self.session.info.enter_solicited_confirm_wait(series.ecsn);
 
         loop {
             match self.wait_for_sol_confirm(io, series.ecsn).await? {
                 Confirm::Yes(respond_to) => {
-                    self.handler
+                    self.session
                         .state
                         .broadcast
                         .confirmed(ResponseKind::Solicited);
 
-                    self.handler
+                    self.session
                         .end_confirm_wait(&mut self.database, ConfirmOutcome::Confirmed)
                         .await;
 
@@ -138,7 +138,7 @@ impl<T: Transport> OutstationTask<T> {
                     }
                     // format the next response in the series
                     series.ecsn.increment();
-                    let response = OutstationHandler::format_read_response(
+                    let response = OutstationSession::format_read_response(
                         &mut self.responder.sol,
                         &mut self.database,
                         false,
@@ -146,7 +146,7 @@ impl<T: Transport> OutstationTask<T> {
                         Iin2::default(),
                     );
                     let header = self
-                        .handler
+                        .session
                         .write_solicited(
                             io,
                             &mut self.responder.writer,
@@ -155,7 +155,7 @@ impl<T: Transport> OutstationTask<T> {
                             &self.database,
                         )
                         .await?;
-                    match OutstationHandler::awaited_confirm(header) {
+                    match OutstationSession::awaited_confirm(header) {
                         None => return Ok(SolicitedWait::Done),
                         Some(next) => {
                             series = next;
@@ -164,14 +164,14 @@ impl<T: Transport> OutstationTask<T> {
                 }
                 Confirm::Timeout => {
                     tracing::warn!("confirm timeout");
-                    self.handler
+                    self.session
                         .end_confirm_wait(&mut self.database, ConfirmOutcome::Unconfirmed)
                         .await;
                     return Ok(SolicitedWait::Done);
                 }
                 Confirm::NewRequest => {
                     tracing::info!("aborting solicited response due to new request");
-                    self.handler
+                    self.session
                         .end_confirm_wait(&mut self.database, ConfirmOutcome::Unconfirmed)
                         .await;
                     return Ok(SolicitedWait::RequestPending);
@@ -185,41 +185,41 @@ impl<T: Transport> OutstationTask<T> {
         io: &mut PhysLayer,
         ecsn: Sequence,
     ) -> Result<Confirm, RunError> {
-        let mut deadline = self.handler.new_confirm_deadline();
+        let mut deadline = self.session.new_confirm_deadline();
         loop {
             match self
-                .handler
+                .session
                 .read_until(io, &mut self.reader, deadline)
                 .await?
             {
                 TimeoutStatus::Yes => {
-                    self.handler.info.solicited_confirm_timeout(ecsn);
+                    self.session.info.solicited_confirm_timeout(ecsn);
                     return Ok(Confirm::Timeout);
                 }
                 // process data
                 TimeoutStatus::No => {
-                    let mut guard = self.handler.pop_request(&mut self.reader);
-                    match self.handler.expect_sol_confirm(ecsn, &guard) {
+                    let mut guard = self.session.pop_request(&mut self.reader);
+                    match self.session.expect_sol_confirm(ecsn, &guard) {
                         ConfirmAction::ContinueWait => {
                             // we ignored whatever the request was and logged it elsewhere
                             // just go back to the loop and read another fragment
                         }
                         ConfirmAction::Confirmed(respond_to) => {
-                            self.handler.info.solicited_confirm_received(ecsn);
+                            self.session.info.solicited_confirm_received(ecsn);
                             return Ok(Confirm::Yes(respond_to));
                         }
                         ConfirmAction::NewRequest => {
-                            self.handler.info.solicited_confirm_wait_new_request();
+                            self.session.info.solicited_confirm_wait_new_request();
                             // retain the fragment so that it can be processed from the idle state
                             guard.retain();
                             return Ok(Confirm::NewRequest);
                         }
                         ConfirmAction::EchoLastResponse(respond_to) => {
-                            self.handler
+                            self.session
                                 .repeat_solicited(io, respond_to, &mut self.responder)
                                 .await?;
                             // per the spec, we restart the confirm timer
-                            deadline = self.handler.new_confirm_deadline();
+                            deadline = self.session.new_confirm_deadline();
                         }
                     }
                 }
@@ -236,9 +236,9 @@ impl<T: Transport> OutstationTask<T> {
         io: &mut PhysLayer,
     ) -> Result<ConfirmOutcome, RunError> {
         // enter unsolicited confirm wait state
-        self.handler.info.enter_unsolicited_confirm_wait(seq);
+        self.session.info.enter_unsolicited_confirm_wait(seq);
 
-        let mut deadline = self.handler.new_confirm_deadline();
+        let mut deadline = self.session.new_confirm_deadline();
 
         // IEEE 1815-2012 Table 6-1 rows 22 and 33 would go on to wait for the solicited confirm
         // after the unsolicited response's wait ends. This wait never does: confirming a
@@ -264,23 +264,23 @@ impl<T: Transport> OutstationTask<T> {
                     let mut retry = wait.retries.decrement();
 
                     // If a deferred read is pending, we want to exit
-                    if self.handler.state.deferred_read.is_set() {
+                    if self.session.state.deferred_read.is_set() {
                         retry = false;
                     }
 
-                    self.handler.info.unsolicited_confirm_timeout(seq, retry);
+                    self.session.info.unsolicited_confirm_timeout(seq, retry);
 
                     if !retry {
                         return Ok(ConfirmOutcome::Unconfirmed);
                     }
 
                     // perform a retry
-                    self.handler
+                    self.session
                         .repeat_unsolicited(io, &mut self.responder)
                         .await?;
 
                     // update the deadline
-                    deadline = self.handler.new_confirm_deadline();
+                    deadline = self.session.new_confirm_deadline();
                 }
             }
         }
@@ -293,22 +293,22 @@ impl<T: Transport> OutstationTask<T> {
         io: &mut PhysLayer,
     ) -> Result<UnsolicitedWaitResult, RunError> {
         if let TimeoutStatus::Yes = self
-            .handler
+            .session
             .read_until(io, &mut self.reader, deadline)
             .await?
         {
             return Ok(UnsolicitedWaitResult::Timeout);
         }
 
-        let guard = self.handler.pop_request(&mut self.reader);
-        let received = match self.handler.receive(&guard) {
+        let guard = self.session.pop_request(&mut self.reader);
+        let received = match self.session.receive(&guard) {
             Intake::Nothing => return Ok(UnsolicitedWaitResult::ReadNext),
             Intake::UnknownFunction(from, seq) => {
                 // like a new request, it ends the wait for a solicited confirm, as it ends the
                 // solicited confirm wait. Its IIN2.0 answer isn't the response to a valid request,
                 // so the outstation doesn't wait for that answer's confirm
                 wait.solicited = None;
-                self.handler
+                self.session
                     .answer_unknown_function(
                         io,
                         &mut self.responder.writer,
@@ -320,19 +320,19 @@ impl<T: Transport> OutstationTask<T> {
                 return Ok(UnsolicitedWaitResult::ReadNext);
             }
             Intake::Confirm(_, header) => {
-                return Ok(self.handler.confirm_in_unsolicited_wait(wait, header));
+                return Ok(self.session.confirm_in_unsolicited_wait(wait, header));
             }
             Intake::Request(received) => received,
         };
 
-        let selection = self.handler.take_selection(&received.fragment);
+        let selection = self.session.take_selection(&received.fragment);
         let function = received.request.header.function;
         let direct = matches!(received.fragment, FragmentType::NewNonRead(..));
 
         // Table 6-1 rows 24-29: a request ends the wait for a solicited confirm, and an answer that
         // asks for one starts it again
         let accepted = self
-            .handler
+            .session
             .accept(
                 io,
                 &mut self.responder,
@@ -344,7 +344,7 @@ impl<T: Transport> OutstationTask<T> {
             .await?;
         wait.solicited = accepted.confirm.map(|series| ExpectedConfirm {
             ecsn: series.ecsn,
-            deadline: self.handler.new_confirm_deadline(),
+            deadline: self.session.new_confirm_deadline(),
         });
 
         // any DISABLE_UNSOLICITED processed, directly or as a broadcast, whatever classes it names

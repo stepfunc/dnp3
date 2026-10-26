@@ -240,7 +240,7 @@ pub(super) struct ExpectedConfirm {
     pub(super) deadline: tokio::time::Instant,
 }
 
-/// What [`OutstationHandler::accept`](crate::outstation::session::OutstationHandler::accept) did with a request
+/// What [`OutstationSession::accept`](crate::outstation::session::OutstationSession::accept) did with a request
 #[derive(Copy, Clone)]
 pub(super) struct Accepted {
     /// the confirm that the answer waits for
@@ -279,7 +279,7 @@ impl FragmentType<'_> {
     }
 }
 
-/// A fragment from the master, after [`OutstationHandler::receive`](crate::outstation::session::OutstationHandler::receive) filtered and classified it
+/// A fragment from the master, after [`OutstationSession::receive`](crate::outstation::session::OutstationSession::receive) filtered and classified it
 pub(super) enum Intake<'a> {
     /// nothing to answer: no fragment, a link-layer message, a fragment that isn't a valid
     /// request, or a SELECT that the selection discards
