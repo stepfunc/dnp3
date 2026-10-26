@@ -591,6 +591,21 @@ fn analog_input_dead_band_variations() {
     assert_eq!(respond(setup, &[34, 3, 0x00, 3, 3]), ok(&[34, 3, 1, 3, 0, 3, 0, 0, 16, 122, 68]));
 }
 
+#[test]
+#[rustfmt::skip]
+fn analog_input_dead_bands_round_half_away_from_zero_and_clamp_to_single_precision() {
+    let half = |db: &mut Database| {
+        db.add(INDEX, None, AnalogInputConfig { deadband: 2.5, ..Default::default() });
+    };
+    assert_eq!(respond(half, &[34, 1, 0x06]), ok(&[34, 1, 1, 3, 0, 3, 0, 3, 0]));
+    assert_eq!(respond(half, &[34, 2, 0x06]), ok(&[34, 2, 1, 3, 0, 3, 0, 3, 0, 0, 0]));
+    // a finite deadband past the f32 range is the largest f32
+    let huge = |db: &mut Database| {
+        db.add(INDEX, None, AnalogInputConfig { deadband: 1e300, ..Default::default() });
+    };
+    assert_eq!(respond(huge, &[34, 3, 0x06]), ok(&[34, 3, 1, 3, 0, 3, 0, 255, 255, 127, 127]));
+}
+
 // ---------- dispatch by type ----------
 
 /// one measurement family, as the tests below drive it
@@ -1364,6 +1379,180 @@ fn packed_bits_start_a_new_header_at_a_gap_in_the_indices() {
             6, 0, 10
         ])
     );
+}
+
+// ---------- static range boundaries ----------
+
+/// the fragments of `size` bytes that answer a READ, the last of which completes it
+fn read_in_fragments(handle: &mut DatabaseHandle, objects: &[u8], size: usize) -> Vec<Vec<u8>> {
+    let fragments = read_fragments(handle, objects, size);
+    assert_eq!(fragments.last().map(|(_, complete)| *complete), Some(true));
+    fragments.into_iter().map(|(bytes, _)| bytes).collect()
+}
+
+/// a database of binary inputs, double-bit inputs and binary output statuses at each index,
+/// each with the given flags and state, and the static variations the configs default to
+fn packed_points(points: &[(u16, Flags, bool, DoubleBit)]) -> DatabaseHandle {
+    let handle = new_handle();
+    handle.transaction(|db| {
+        for &(index, flags, value, double) in points {
+            db.add(index, None, BinaryInputConfig::default());
+            db.add(index, None, DoubleBitBinaryInputConfig::default());
+            db.add(index, None, BinaryOutputStatusConfig::default());
+            let options = UpdateOptions::no_event();
+            db.update(index, &BinaryInput::new(value, flags, time()), options);
+            db.update(
+                index,
+                &DoubleBitBinaryInput::new(double, flags, time()),
+                options,
+            );
+            db.update(
+                index,
+                &BinaryOutputStatus::new(value, flags, time()),
+                options,
+            );
+        }
+    });
+    handle
+}
+
+/// ONLINE points from index 0 with alternating bits and double bits off, on, indeterminate and
+/// intermediate in turn
+fn online_points(count: u16) -> DatabaseHandle {
+    let doubles = [
+        DoubleBit::DeterminedOff,
+        DoubleBit::DeterminedOn,
+        DoubleBit::Indeterminate,
+        DoubleBit::Intermediate,
+    ];
+    let points: Vec<_> = (0..count)
+        .map(|index| {
+            let double = doubles[usize::from(index % 4)];
+            (index, Flags::ONLINE, index % 2 == 0, double)
+        })
+        .collect();
+    packed_points(&points)
+}
+
+#[test]
+#[rustfmt::skip]
+fn a_packed_value_joins_the_last_byte_of_a_full_fragment() {
+    // each header and its one byte fill the 8 byte fragment, and the next values share the byte
+    let mut handle = online_points(3);
+    assert_eq!(read_in_fragments(&mut handle, &[1, 0, 0x06], 8), [vec![1, 1, 1, 0, 0, 2, 0, 5]]);
+    assert_eq!(read_in_fragments(&mut handle, &[10, 0, 0x06], 8), [vec![10, 1, 1, 0, 0, 2, 0, 5]]);
+    let mut handle = online_points(4);
+    assert_eq!(read_in_fragments(&mut handle, &[3, 0, 0x06], 8), [vec![3, 1, 1, 0, 0, 3, 0, 57]]);
+}
+
+#[test]
+#[rustfmt::skip]
+fn a_packed_range_continues_in_the_next_fragment_from_bit_zero() {
+    // the value that needs another byte ends the fragment, which keeps the previous stop index,
+    // and starts a new header in the next
+    let mut handle = online_points(9);
+    assert_eq!(
+        read_in_fragments(&mut handle, &[1, 0, 0x06], 8),
+        [vec![1, 1, 1, 0, 0, 7, 0, 85], vec![1, 1, 1, 8, 0, 8, 0, 1]]
+    );
+    assert_eq!(
+        read_in_fragments(&mut handle, &[10, 0, 0x06], 8),
+        [vec![10, 1, 1, 0, 0, 7, 0, 85], vec![10, 1, 1, 8, 0, 8, 0, 1]]
+    );
+    let mut handle = online_points(5);
+    assert_eq!(
+        read_in_fragments(&mut handle, &[3, 0, 0x06], 8),
+        [vec![3, 1, 1, 0, 0, 3, 0, 57], vec![3, 1, 1, 4, 0, 4, 0, 1]]
+    );
+}
+
+#[test]
+#[rustfmt::skip]
+fn a_promoted_header_that_does_not_fit_is_retried_and_the_range_keeps_its_variation() {
+    // index 1 has flags other than ONLINE, so it needs a header with flags. In 8 byte fragments
+    // the header doesn't fit after index 0's; in 15 the header fits but its value doesn't, so
+    // the header is rolled back. Either way the next fragment writes it, and index 2 is packed
+    // again
+    let flags = Flags::ONLINE | Flags::COMM_LOST;
+    let mut handle = packed_points(&[
+        (0, Flags::ONLINE, true, DoubleBit::DeterminedOff),
+        (1, flags, false, DoubleBit::DeterminedOn),
+        (2, Flags::ONLINE, true, DoubleBit::DeterminedOff),
+    ]);
+    for size in [8, 15] {
+        for request in [[1, 0, 0x06], [1, 1, 0x06]] {
+            assert_eq!(
+                read_in_fragments(&mut handle, &request, size),
+                [vec![1, 1, 1, 0, 0, 0, 0, 1], vec![1, 2, 1, 1, 0, 1, 0, 5], vec![1, 1, 1, 2, 0, 2, 0, 1]]
+            );
+        }
+        assert_eq!(
+            read_in_fragments(&mut handle, &[10, 0, 0x06], size),
+            [vec![10, 1, 1, 0, 0, 0, 0, 1], vec![10, 2, 1, 1, 0, 1, 0, 5], vec![10, 1, 1, 2, 0, 2, 0, 1]]
+        );
+        assert_eq!(
+            read_in_fragments(&mut handle, &[3, 0, 0x06], size),
+            [vec![3, 1, 1, 0, 0, 0, 0, 1], vec![3, 2, 1, 1, 0, 1, 0, 133], vec![3, 1, 1, 2, 0, 2, 0, 1]]
+        );
+    }
+}
+
+#[test]
+#[rustfmt::skip]
+fn a_requested_packed_variation_outlasts_a_default_with_flags() {
+    // the points default to the variations with flags, but the READ asks for the packed ones,
+    // which the range keeps after a promoted point and across fragments
+    let mut handle = new_handle();
+    handle.transaction(|db| {
+        let config = BinaryInputConfig { s_var: StaticBinaryInputVariation::Group1Var2, ..Default::default() };
+        for index in 0..3 {
+            db.add(index, None, config);
+        }
+        let flags = Flags::ONLINE | Flags::COMM_LOST;
+        db.update(0, &BinaryInput::new(true, Flags::ONLINE, time()), UpdateOptions::no_event());
+        db.update(1, &BinaryInput::new(false, flags, time()), UpdateOptions::no_event());
+        db.update(2, &BinaryInput::new(true, Flags::ONLINE, time()), UpdateOptions::no_event());
+    });
+    assert_eq!(
+        read_in_fragments(&mut handle, &[1, 1, 0x06], 8),
+        [vec![1, 1, 1, 0, 0, 0, 0, 1], vec![1, 2, 1, 1, 0, 1, 0, 5], vec![1, 1, 1, 2, 0, 2, 0, 1]]
+    );
+}
+
+#[test]
+#[rustfmt::skip]
+fn packed_ranges_reach_the_last_index() {
+    let mut handle = packed_points(&[
+        (0, Flags::ONLINE, true, DoubleBit::DeterminedOn),
+        (65534, Flags::ONLINE, false, DoubleBit::DeterminedOff),
+        (65535, Flags::ONLINE, true, DoubleBit::DeterminedOn),
+    ]);
+    assert_eq!(
+        read(&mut handle, &[1, 1, 0x01, 254, 255, 255, 255]),
+        ok(&[1, 1, 1, 254, 255, 255, 255, 2])
+    );
+    assert_eq!(
+        read(&mut handle, &[3, 1, 0x01, 254, 255, 255, 255]),
+        ok(&[3, 1, 1, 254, 255, 255, 255, 9])
+    );
+    // a header for index 0 after one for 65535 (the writer's 65535 -> 0 check is pinned in
+    // range/writer.rs)
+    assert_eq!(
+        read(&mut handle, &[10, 1, 0x01, 255, 255, 255, 255, 10, 1, 0x00, 0, 0]),
+        ok(&[10, 1, 1, 255, 255, 255, 255, 1, 10, 1, 1, 0, 0, 0, 0, 1])
+    );
+}
+
+#[test]
+#[rustfmt::skip]
+fn packed_variations_ignore_the_state_bits_stored_in_the_flags() {
+    // the state bits set in the flags (bit 7, and bit 6 too for double bits) don't promote,
+    // and the packed value comes from the state
+    let mut handle = packed_points(&[(INDEX, Flags::new(0x81), false, DoubleBit::Intermediate)]);
+    assert_eq!(read(&mut handle, &[1, 0, 0x06]), ok(&[1, 1, 1, 3, 0, 3, 0, 0]));
+    assert_eq!(read(&mut handle, &[10, 0, 0x06]), ok(&[10, 1, 1, 3, 0, 3, 0, 0]));
+    let mut handle = packed_points(&[(INDEX, Flags::new(0xC1), false, DoubleBit::Intermediate)]);
+    assert_eq!(read(&mut handle, &[3, 0, 0x06]), ok(&[3, 1, 1, 3, 0, 3, 0, 0]));
 }
 
 // ---------- CTO ----------

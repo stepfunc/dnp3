@@ -456,6 +456,35 @@ mod tests {
 
     #[test]
     #[rustfmt::skip]
+    fn index_zero_does_not_follow_the_last_index() {
+        let mut buffer = [0u8; 64];
+        let mut cursor = WriteCursor::new(buffer.as_mut());
+
+        let g1v2 = StaticBinaryInputVariation::Group1Var2.get_write_info(&binary(false));
+        let mut writer = RangeWriter::new();
+        writer.write(&mut cursor, 65535, &binary(true), g1v2).unwrap();
+        writer.write(&mut cursor, 0, &binary(true), g1v2).unwrap();
+
+        let g1v1 = StaticBinaryInputVariation::Group1Var1.get_write_info(&binary(false));
+        let mut writer = RangeWriter::new();
+        writer.write(&mut cursor, 65535, &binary(true), g1v1).unwrap();
+        writer.write(&mut cursor, 0, &binary(true), g1v1).unwrap();
+
+        assert_eq!(
+            cursor.written(),
+            [
+                // g1v2 at 65535, then a new header at 0
+                1, 2, 0x01, 255, 255, 255, 255, 0x81,
+                1, 2, 0x01, 0, 0, 0, 0, 0x81,
+                // g1v1 the same
+                1, 1, 0x01, 255, 255, 255, 255, 0x01,
+                1, 1, 0x01, 0, 0, 0, 0, 0x01,
+            ]
+        )
+    }
+
+    #[test]
+    #[rustfmt::skip]
     fn switches_headers_with_non_consecutive_indices() {
         let mut buffer = [0u8; 64];
         let mut cursor = WriteCursor::new(buffer.as_mut());
