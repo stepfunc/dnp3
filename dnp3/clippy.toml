@@ -4,9 +4,10 @@ allow-panic-in-tests = true
 allow-indexing-slicing-in-tests = true
 
 # std methods that panic when an argument is out of range, or that add or multiply without the
-# overflow check the arithmetic lint asks for, which the panic lints in lib.rs don't see. Each reason names a form that can't panic. A primitive's inherent methods are spelled
-# `slice::`, `str::` or `u8::`: a spelling clippy can't resolve is ignored without a warning, so a
-# new entry has to be shown to fire on a call.
+# overflow check the arithmetic lint asks for, which the panic lints in lib.rs don't see. Each
+# reason names a form that can't panic. A primitive's inherent methods are spelled `slice::`,
+# `str::` or `u8::`: some spellings clippy can't resolve are ignored without a warning, so a new
+# entry has to be shown to fire on a call.
 #
 # Not listed, on purpose:
 # - allocation (`Vec::push`, `with_capacity`, `to_vec`, `format!`, ...): its failures (an
@@ -169,5 +170,5 @@ disallowed-macros = [
 
 # std types whose methods panic on their state rather than an argument
 disallowed-types = [
-    { path = "std::cell::RefCell", reason = "a second borrow panics: use Cell, or restructure so the borrow checker proves exclusive access" },
+    { path = "std::cell::RefCell", reason = "a conflicting borrow panics: use Cell, or restructure so the borrow checker proves exclusive access" },
 ]
