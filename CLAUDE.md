@@ -24,7 +24,7 @@ written license terms and authorizations govern.
 - MSRV check: `cargo +1.88.0 check --locked --workspace --all-targets` (the `msrv` CI job)
 - Docs: `cargo doc -p dnp3 --no-deps`; the guide is Docusaurus under `guide/` (`npm ci && npm run build`)
 - Bindings: `cargo build --release -p dnp3-ffi-c -p dnp3-ffi-java`, then `cargo run --bin dnp3-bindings -- --c` (or `--dotnet`, `--java`). This generates into `ffi/bindings/` and runs the binding tests; `--no-tests` skips them
-- No-panic check: `RUSTFLAGS="--cfg dnp3_no_panic" CARGO_PROFILE_RELEASE_LTO=thin CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 cargo test -p dnp3 --lib --release --no-run` (use a separate `CARGO_TARGET_DIR`). A link error names a function marked `no_panic` that the optimizer couldn't prove panic-free; see `dnp3/src/no_panic_check.rs`. The `no-panic` CI job pins its toolchain, since a newer one can fail the link without a code change
+- No-panic check: `RUSTFLAGS="--cfg dnp3_no_panic" CARGO_PROFILE_RELEASE_LTO=thin CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 cargo test -p dnp3 --lib --release --no-run` (use a separate `CARGO_TARGET_DIR`); CI links it again with `CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS=true`. A link error names a function marked `no_panic` that the optimizer couldn't prove panic-free; see `dnp3/src/no_panic_check.rs`. The `no-panic` CI job pins its toolchain, since a newer one can fail the link without a code change
 
 ## Conformance Tests
 - `.github/workflows/conformance.yml` runs the DNP3 IED certification procedures against the outstation with dnp3c (about 12 minutes). It runs on release tags (gating publishing), weekly on `main`, on demand (`gh workflow run conformance.yml --ref <branch>`), and on PRs labeled `conformance`

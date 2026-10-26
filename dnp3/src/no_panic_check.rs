@@ -11,7 +11,10 @@
 //! from one of them.
 //!
 //! Built by the `no-panic` CI job with `--cfg dnp3_no_panic`, in release with LTO and one
-//! codegen unit, which the optimizer needs to see through calls into other crates
+//! codegen unit, which the optimizer needs to see through calls into other crates. The
+//! [`encode`] module does the same for the encoders.
+
+mod encode;
 
 use scursor::ReadCursor;
 
@@ -32,6 +35,7 @@ use crate::phys::PhysAddr;
 use crate::transport::real::assembler::Assembler;
 use crate::transport::real::header::Header;
 
+/// the bytes of the file named by `DNP3_NO_PANIC_INPUT`, which the compiler can't know
 fn input() -> Vec<u8> {
     match std::env::var_os("DNP3_NO_PANIC_INPUT") {
         Some(path) => std::fs::read(path).unwrap_or_default(),

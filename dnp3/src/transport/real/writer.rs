@@ -6,7 +6,7 @@
 
 use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
-use crate::link::format::{format_data_frame, format_header_only, Payload};
+use crate::link::format::{format_data_frame, format_header_only, FrameData, Payload};
 use crate::link::{EndpointAddress, LinkRole};
 use crate::phys::PhysLayer;
 use crate::transport::real::display::SegmentDisplay;
@@ -34,6 +34,34 @@ impl Writer {
     }
 }
 
+/// where a segment falls in its fragment
+#[derive(Copy, Clone)]
+pub(crate) struct Position {
+    pub(crate) first: bool,
+    pub(crate) last: bool,
+}
+
+/// Format one segment of a fragment as an unconfirmed user data frame from `local` to
+/// `destination`, taking the next sequence number from `seq`
+pub(crate) fn format_segment<'a>(
+    role: LinkRole,
+    local: EndpointAddress,
+    destination: EndpointAddress,
+    seq: &mut Sequence,
+    position: Position,
+    chunk: &[u8],
+    cursor: &'a mut WriteCursor,
+) -> Result<(Header, FrameData<'a>), LinkError> {
+    let header = Header::new(position.last, position.first, seq.increment());
+    let link_header = crate::link::header::Header::unconfirmed_user_data(
+        role.dir_bit(),
+        destination.wrap(),
+        local.wrap(),
+    );
+    let data = format_data_frame(link_header, Payload::new(header.to_u8(), chunk), cursor)?;
+    Ok((header, data))
+}
+
 impl TransportWrite for Writer {
     fn reset(&mut self) {
         self.seq.reset();
@@ -54,7 +82,15 @@ impl TransportWrite for Writer {
         while let Some(chunk) = chunks.next() {
             let mut cursor = WriteCursor::new(&mut self.buffer);
             let last = chunks.peek().is_none();
-            let header = Header::new(last, first, self.seq.increment());
+            let (header, data) = format_segment(
+                self.role,
+                self.local_address,
+                destination.link,
+                &mut self.seq,
+                Position { first, last },
+                chunk,
+                &mut cursor,
+            )?;
             first = false;
             if level.transport.enabled() {
                 tracing::info!(
@@ -62,16 +98,6 @@ impl TransportWrite for Writer {
                     SegmentDisplay::new(header, chunk, level.transport)
                 );
             }
-            let link_header = crate::link::header::Header::unconfirmed_user_data(
-                self.role.dir_bit(),
-                destination.link.wrap(),
-                self.local_address.wrap(),
-            );
-            let data = format_data_frame(
-                link_header,
-                Payload::new(header.to_u8(), chunk),
-                &mut cursor,
-            )?;
             if level.link.enabled() {
                 tracing::info!("LINK TX - {}", data.to_link_display(level.link));
             }
