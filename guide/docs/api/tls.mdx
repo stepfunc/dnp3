@@ -30,7 +30,7 @@ audited, and already used with DNP3 in production.
 ## Supported Features
 
 - TLS v1.2 and v1.3
-- The cipher suites, key exchange groups, and signature schemes are the rustls defaults for the selected cryptography provider ([ring](https://crates.io/crates/ring) or [aws-lc-rs](https://crates.io/crates/aws-lc-rs)).
+- The cipher suites, key exchange groups, and signature schemes are the rustls defaults for the cryptography provider: [ring](https://crates.io/crates/ring) or [aws-lc-rs](https://crates.io/crates/aws-lc-rs) in Rust, selected by the `tls` or `tls-aws-lc` feature, and aws-lc-rs in the prebuilt bindings on every platform.
 - Client and server name validation through the Subject Alternative Name (SAN) extension or the Common Name.
 - Self-signed certificates (with a special configuration).
 
