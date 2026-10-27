@@ -12,10 +12,96 @@ import org.joou.UByte;
 import org.joou.UShort;
 
 import java.io.BufferedReader;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.HashMap;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BlockingQueue;
+
+public class MasterTcpServerExample {
+    public static void main(String[] args) throws Exception {
+
+        Logging.configure(new LoggingConfig(), new ConsoleLogger());
+        final Runtime runtime = new Runtime(new RuntimeConfig());
+
+        try {
+            run(runtime);
+        } finally {
+            runtime.shutdown();
+        }
+    }
+
+    private static void run(Runtime runtime) throws IOException, InterruptedException {
+        final BlockingQueue<StartRequest> queue = new ArrayBlockingQueue<>(16);
+        final ConnectionHandler handler = new ConnectionHandler(queue);
+
+        try (MasterServer server = MasterServer.createTcpServer(runtime, "127.0.0.1:20000", new LinkIdConfig(), handler)) {
+            // the channels are started on another thread, so this one can read the console
+            final Thread starter = new Thread(() -> startChannels(queue));
+            starter.setDaemon(true);
+            starter.start();
+
+            try {
+                readConsole();
+            } finally {
+                // stop the starter thread before the runtime shuts down
+                starter.interrupt();
+                starter.join();
+            }
+        }
+    }
+
+    private static void readConsole() throws IOException {
+        final BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
+        // exit on "x" or at the end of input
+        while (true) {
+            final String line = reader.readLine();
+            if (line == null || line.equals("x")) {
+                return;
+            }
+        }
+    }
+
+    private static void startChannels(BlockingQueue<StartRequest> queue) {
+        final HashMap<UShort, MasterChannel> channels = new HashMap<>();
+        try {
+            while (true) {
+                startChannel(queue.take(), channels);
+            }
+        }
+        catch (InterruptedException ignored) {
+
+        }
+    }
+
+    private static void startChannel(StartRequest request, HashMap<UShort, MasterChannel> channels) {
+        System.out.println("Accept with source == " + request.source + " destination == " + request.destination);
+        try {
+            request.channel.addAssociation(
+                    request.source,
+                    new AssociationConfig(
+                            EventClasses.all(),
+                            EventClasses.all(),
+                            Classes.all(),
+                            EventClasses.none()
+                    ),
+                    new NullReadHandler(),
+                    new NullAssocHandler(),
+                    new NullAssocInfo()
+            );
+            request.channel.enable();
+        } catch (ParamException ex) {
+            // for example, the source isn't a valid outstation address
+            System.out.println("channel setup failed: " + ex.getMessage());
+            request.channel.shutdown();
+            return;
+        }
+        final MasterChannel previous = channels.put(request.source, request.channel);
+        if(previous != null) {
+            previous.shutdown();
+        }
+    }
+}
 
 class StartRequest {
     final MasterChannel channel;
@@ -57,52 +143,12 @@ class ConnectionHandler implements io.stepfunc.dnp3.ConnectionHandler {
 
     @Override
     public void startWithLinkId(String remoteAddr, UShort source, UShort destination, MasterChannel channel) {
-        try {
-            //  We defer the handling of connections to the main loop...
-            //  We can't call any of the methods on channel like addAssociation b/c this callback is from Tokio
-            this.queue.put(new StartRequest(channel, destination, source));
+        //  We defer the handling of connections to the starter thread...
+        //  We can't call any of the methods on channel like addAssociation b/c this callback is from Tokio
+        //  Never block this callback: if the queue is full, drop the connection
+        if (!this.queue.offer(new StartRequest(channel, destination, source))) {
+            channel.shutdown();
         }
-        catch (InterruptedException ignored) {
-            
-        }
-    }
-}
-
-public class MasterTcpServerExample {
-    public static void main(String[] args) throws Exception {
-
-        Logging.configure(new LoggingConfig(), new ConsoleLogger());
-        final Runtime runtime = new Runtime(new RuntimeConfig());
-
-        final BlockingQueue<StartRequest> queue = new ArrayBlockingQueue<>(16);
-        final ConnectionHandler handler = new ConnectionHandler(queue);
-        final HashMap<UShort, MasterChannel> channels = new HashMap<>();
-
-        try (MasterServer server = MasterServer.createTcpServer(runtime, "127.0.0.1:20000", new LinkIdConfig(), handler)) {
-            final BufferedReader reader = new BufferedReader(new InputStreamReader(System.in));
-            while(true) {
-                final StartRequest request = queue.take();
-                System.out.println("Accept with source == " + request.source + " destination == " + request.destination);
-                final MasterChannel previous = channels.put(request.source, request.channel);
-                if(previous != null) {
-                    previous.shutdown();
-                }
-                request.channel.addAssociation(
-                        request.source,
-                        new AssociationConfig(
-                                EventClasses.all(),
-                                EventClasses.all(),
-                                Classes.all(),
-                                EventClasses.none()
-                        ),
-                        new NullReadHandler(),
-                        new NullAssocHandler(),
-                        new NullAssocInfo()
-                );
-                request.channel.enable();
-            }
-        }
-
     }
 }
 
