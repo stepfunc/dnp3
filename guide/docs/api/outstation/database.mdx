@@ -26,7 +26,7 @@ Structure any common update code to operate on the `Database` type and not depen
 
 ## Adding Points
 
-Initialize points before the outstation exposes measurement data. This is typically done at creation, but you can add points to a running outstation. Each measurement type has unique configuration:
+Initialize points before the outstation exposes measurement data. This is typically done at creation, but you can add points to a running outstation. A point added while the outstation is sending a READ response isn't part of that response; a later READ that selects it reports it. Each measurement type has unique configuration:
 
 * An optional event class assignment for the point
 * Default static and event variations for the type
@@ -141,8 +141,9 @@ Since the point may not be defined, the getters can fail. If you try to retrieve
 Most applications don't need to remove points, but the option is there in case you want to remove points from a running outstation. There is a type-specific function for removing every point type given its index.
 
 :::note
-Removing a point stops the outstation from reporting static data for that point. However, it does NOT remove any queued events for that point from
-the event buffer. Those events will remain in the event buffer until they are reported and cleared by confirmation.
+Removing a point stops the outstation from reporting static data for that point, including the objects of a READ response in progress that
+aren't yet written into a fragment. However, it does NOT remove any queued events for that point from the event buffer. Those events will remain in the event buffer
+until they are reported and cleared by confirmation.
 :::
 
 ## Defining Device Attributes

@@ -29,6 +29,8 @@ pub(crate) mod details;
 mod family_tests;
 #[cfg(test)]
 mod fragment_tests;
+#[cfg(test)]
+mod membership_tests;
 /// read headers
 pub(crate) mod read;
 #[cfg(test)]
@@ -285,6 +287,9 @@ pub trait Add<T> {
     ///
     /// Returns false, leaving the database unchanged, if a point of this type already exists
     /// at the index or the configuration is invalid (e.g. a NaN or negative analog deadband)
+    ///
+    /// A point added after a READ selected its range isn't part of that response, even if the
+    /// response has fragments still to send. A later READ that selects the point reports it.
     fn add(&mut self, index: u16, class: Option<EventClass>, config: T) -> bool;
 }
 
@@ -294,6 +299,9 @@ pub trait Remove<T> {
     ///
     /// Note: this remove the static value and configuration only. Any previously
     /// buffered events will be reported normally
+    ///
+    /// A point removed while a READ response that selected it is being sent is left out of the
+    /// static objects not yet written into a fragment.
     fn remove(&mut self, index: u16) -> bool;
 }
 

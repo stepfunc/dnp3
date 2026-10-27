@@ -2125,3 +2125,179 @@ fn a_full_header_count_starts_a_new_header() {
         [2, 1, 0x28, 0x02, 0x00, 0x17, 0x02, 0x01, 0x18, 0x02, 0x81]
     );
 }
+
+/// select the object headers of a READ, starting a new selection
+fn select(handle: &mut DatabaseHandle, objects: &[u8]) -> Iin2 {
+    let headers = HeaderCollection::parse(
+        ParseOptions::parse_everything(),
+        FunctionCode::Read,
+        objects,
+    )
+    .unwrap();
+    handle.reset();
+    handle.select(&headers)
+}
+
+/// write the next fragment of the selection into `size` bytes, returning whether it completed
+/// the response and the bytes
+fn fragment(handle: &mut DatabaseHandle, size: usize) -> (bool, Vec<u8>) {
+    let mut buffer = vec![0u8; size];
+    let mut cursor = WriteCursor::new(&mut buffer);
+    let info = handle.write_response_headers(&mut cursor);
+    (info.complete, cursor.written().to_vec())
+}
+
+fn online_binary(value: bool) -> BinaryInput {
+    BinaryInput::new(value, Flags::ONLINE, time())
+}
+
+fn add_binary(db: &mut Database, index: u16, value: bool) {
+    let config = BinaryInputConfig::new(
+        StaticBinaryInputVariation::Group1Var2,
+        EventBinaryInputVariation::Group2Var1,
+    );
+    assert!(db.add(index, None, config));
+    db.update(index, &online_binary(value), UpdateOptions::no_event());
+}
+
+/// binary inputs 0, 2 and 4, on and online, all selected, with the first fragment holding only
+/// index 0
+fn binaries_after_first_fragment() -> DatabaseHandle {
+    let mut handle = new_handle();
+    handle.transaction(|db| {
+        for index in [0, 2, 4] {
+            add_binary(db, index, true);
+        }
+    });
+    assert_eq!(select(&mut handle, &[1, 0, 6]), NONE);
+    assert_eq!(
+        fragment(&mut handle, 8),
+        (false, vec![1, 2, 1, 0, 0, 0, 0, 0x81])
+    );
+    handle
+}
+
+#[test]
+fn point_added_between_fragments_is_not_in_the_response() {
+    let mut handle = binaries_after_first_fragment();
+    handle.transaction(|db| {
+        add_binary(db, 3, true);
+        // a selected point keeps the value it had when selected
+        db.update(2, &online_binary(false), UpdateOptions::no_event());
+    });
+    // index 3 is skipped, so 2 and 4 are no longer consecutive
+    assert_eq!(
+        fragment(&mut handle, 4096),
+        (
+            true,
+            vec![1, 2, 1, 2, 0, 2, 0, 0x81, 1, 2, 1, 4, 0, 4, 0, 0x81]
+        )
+    );
+
+    // the next READ reports it, with every current value
+    assert_eq!(
+        read(&mut handle, &[1, 0, 6]),
+        ok(&[1, 2, 1, 0, 0, 0, 0, 0x81, 1, 2, 1, 2, 0, 4, 0, 0x01, 0x81, 0x81])
+    );
+}
+
+#[test]
+fn point_removed_between_fragments_is_left_out() {
+    let mut handle = binaries_after_first_fragment();
+    handle.transaction(|db| assert!(Remove::<BinaryInput>::remove(db, 4)));
+    assert_eq!(
+        fragment(&mut handle, 4096),
+        (true, vec![1, 2, 1, 2, 0, 2, 0, 0x81])
+    );
+
+    // removing every point still to be written completes the response with nothing more
+    let mut handle = binaries_after_first_fragment();
+    handle.transaction(|db| {
+        assert!(Remove::<BinaryInput>::remove(db, 2));
+        assert!(Remove::<BinaryInput>::remove(db, 4));
+    });
+    assert_eq!(fragment(&mut handle, 4096), (true, vec![]));
+}
+
+#[test]
+fn point_removed_and_added_again_between_fragments_is_not_in_the_response() {
+    let mut handle = binaries_after_first_fragment();
+    handle.transaction(|db| {
+        assert!(Remove::<BinaryInput>::remove(db, 2));
+        add_binary(db, 2, false);
+    });
+    assert_eq!(
+        fragment(&mut handle, 4096),
+        (true, vec![1, 2, 1, 4, 0, 4, 0, 0x81])
+    );
+
+    // a READ that abandons an unfinished response reports the point as it is now
+    let mut handle = binaries_after_first_fragment();
+    handle.transaction(|db| {
+        assert!(Remove::<BinaryInput>::remove(db, 2));
+        add_binary(db, 2, false);
+    });
+    assert_eq!(
+        read(&mut handle, &[1, 0, 6]),
+        ok(&[1, 2, 1, 0, 0, 0, 0, 0x81, 1, 2, 1, 2, 0, 2, 0, 0x01, 1, 2, 1, 4, 0, 4, 0, 0x81])
+    );
+}
+
+fn add_analog(db: &mut Database, index: u16, value: f64, deadband: f64) {
+    let config = AnalogInputConfig::new(
+        StaticAnalogInputVariation::Group30Var2,
+        EventAnalogInputVariation::Group32Var1,
+        deadband,
+    );
+    assert!(db.add(index, None, config));
+    db.update(
+        index,
+        &AnalogInput::new(value, Flags::ONLINE, time()),
+        UpdateOptions::no_event(),
+    );
+}
+
+#[test]
+fn analog_added_between_fragments_is_not_in_a_dead_band_response() {
+    // g34v1 of all analog inputs, and of indices 0 to 4, where 1 and 3 aren't installed (IIN2.2)
+    for (objects, iin2) in [
+        (&[34, 1, 6][..], NONE),
+        (&[34, 1, 1, 0, 0, 4, 0], Iin2::PARAMETER_ERROR),
+    ] {
+        let mut handle = new_handle();
+        handle.transaction(|db| {
+            add_analog(db, 0, 1.0, 5.0);
+            add_analog(db, 2, 1.0, 7.0);
+            add_analog(db, 4, 1.0, 8.0);
+        });
+        assert_eq!(select(&mut handle, objects), iin2);
+        assert_eq!(
+            fragment(&mut handle, 9),
+            (false, vec![34, 1, 1, 0, 0, 0, 0, 5, 0])
+        );
+        // inside the range still to be written
+        handle.transaction(|db| add_analog(db, 3, 1.0, 9.0));
+        assert_eq!(
+            fragment(&mut handle, 4096),
+            (
+                true,
+                vec![34, 1, 1, 2, 0, 2, 0, 7, 0, 34, 1, 1, 4, 0, 4, 0, 8, 0]
+            )
+        );
+    }
+}
+
+#[test]
+fn dead_band_header_before_value_headers_keeps_the_value_snapshot() {
+    // g34v1, then g30v0 and class 0 over the same analog input in one READ
+    let (iin2, bytes) = respond(
+        |db| add_analog(db, 0, 42.0, 5.0),
+        &[34, 1, 6, 30, 0, 6, 60, 1, 6],
+    );
+    assert_eq!(iin2, NONE);
+    let value = [30, 2, 1, 0, 0, 0, 0, 0x01, 42, 0];
+    let mut expected = vec![34, 1, 1, 0, 0, 0, 0, 5, 0];
+    expected.extend(value);
+    expected.extend(value);
+    assert_eq!(bytes, expected);
+}

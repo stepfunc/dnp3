@@ -120,6 +120,7 @@ Paths are relative to `dnp3/src`.
 | `analog_event_when_flags_differ_or_the_deadband_is_exceeded` | `outstation/database/details/range/static_db.rs` | An analog event is a change of flags or an exceeded deadband | Independent for flags; the deadband part uses the production check | 512 |
 | `integer_deadband_matches_the_distance` | `outstation/database/details/range/static_db.rs` | The integer deadband is exceeded exactly when the distance is larger | Independent (u64 arithmetic) | 512 |
 | `fragmenting_does_not_change_what_the_master_sees` | `outstation/database/fragment_tests.rs` | A READ response written in fragments reports what one large fragment reports, items in order, events with their times | Differential for values; independent for items, order and times | 128 |
+| `a_response_reports_the_points_its_read_selected` | `outstation/database/membership_tests.rs` | With points added, removed and updated between fragments, a READ response reports the static points it selected, in order, with their values when selected, leaving out points removed before their turn and never reporting a point added after the selection | Independent model | 256 |
 | `select_and_operate_follow_table_4_9` | `outstation/tests/select_operate_model.rs` | Select-before-operate responses and control callbacks (IEEE 1815-2012 4.4.4.3, Table 4-9) | Independent model | 128 |
 | `session_follows_the_event_and_confirm_model` | `outstation/tests/session_model.rs` | Every response, IIN bit and callback for events, confirms, repeats, unsolicited responses and broadcasts | Independent model | 128 |
 
@@ -198,6 +199,8 @@ assertions to the test that replaces it.
 - **Deadbands:** pairs of special floats come up only in some runs; examples pin them.
 - **Fragmenting:** values are compared only against the whole response, and only objects that fit
   an empty fragment are generated.
+- **Points changing between fragments:** binary inputs (g1v2, in ranges and class 0) and analog
+  deadbands (g34v1) only; no events, attributes, other point types or variations.
 - **Select-before-operate:** no broadcast controls, no select-before-operate during the confirm
   waits, no responses that don't fit, no control limit.
 - **Outstation session:** no controls, malformed or unknown requests, class 0 or static data, other
