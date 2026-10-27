@@ -1131,6 +1131,40 @@ fn define_outstation_application(
 ) -> BackTraced<AsynchronousInterface> {
     let restart_delay = define_restart_delay(lib)?;
 
+    let point_type = lib
+        .define_enum("point_type")?
+        .push(
+            "binary_input",
+            "Binary inputs (group 1), whose events are group 2",
+        )?
+        .push(
+            "double_bit_binary_input",
+            "Double-bit binary inputs (group 3), whose events are group 4",
+        )?
+        .push(
+            "binary_output_status",
+            "Binary output status (group 10), whose events are group 11",
+        )?
+        .push("counter", "Counters (group 20), whose events are group 22")?
+        .push(
+            "frozen_counter",
+            "Frozen counters (group 21), whose events are group 23",
+        )?
+        .push(
+            "analog_input",
+            "Analog inputs (group 30), whose events are group 32",
+        )?
+        .push(
+            "analog_output_status",
+            "Analog output status (group 40), whose events are group 42",
+        )?
+        .push(
+            "octet_string",
+            "Octet strings (group 110), whose events are group 111",
+        )?
+        .doc("A type of static point whose events an ASSIGN_CLASS request assigns to a class")?
+        .build()?;
+
     let write_time_result = lib.define_enum("write_time_result")?
         .push("ok", "The write time operation succeeded.")?
         .push("parameter_error", "The request parameters are nonsensical.")?
@@ -1246,6 +1280,40 @@ fn define_outstation_application(
         .begin_callback("end_write_analog_dead_bands",
                         doc("Called when the outstation completes processing a header to write analog dead-bands")
                             .details("Multiple dead-bands changes can be accumulated in calls to {interface:outstation_application.write_analog_dead_band()} and then be processed as a batch in this method.")
+             )?
+            .returns_nothing_by_default()?
+            .end_callback()?
+        .begin_callback("support_assign_class",
+                        doc("Controls outstation support for ASSIGN_CLASS requests, which change the class of the events that points generate")
+                            .details("Returning false answers them with IIN2.0 NO_FUNC_CODE_SUPPORT.")
+                            .details("The outstation applies an accepted request to its database itself, and only to events generated afterwards: buffered events keep their class. It then reports the request with a single call to {interface:outstation_application.begin_assign_class()}, a call to {interface:outstation_application.assign_class_all()} or {interface:outstation_application.assign_class_range()} for each point header in request order, and a single call to {interface:outstation_application.end_assign_class()}. A request with any error changes nothing and makes none of these calls.")
+             )?
+            .returns_with_default(PrimitiveValue::Bool(true), "True if the outstation should process ASSIGN_CLASS requests")?
+            .end_callback()?
+        .begin_callback("begin_assign_class", "Called before the point headers of an accepted ASSIGN_CLASS request are reported")?
+            .returns_nothing_by_default()?
+            .end_callback()?
+        .begin_callback("assign_class_all",
+                        doc("Called for a point header of an accepted ASSIGN_CLASS request that names every point of a type")
+                            .details("Every point header is reported, even when headers name the same points, which are then in more than one call; the last header that names a point sets its class. The calls come after the whole request has been applied to the database, outside its lock, and report it: they can't reject it. This callback allows application code to persist the assignment; an outstation that doesn't reverts to its configured classes when it restarts. Replaying the calls in order reproduces the assignment.")
+            )?
+            .param("point_type", point_type.clone(), "Type of the points")?
+            .param("point_class", shared.event_class.clone(), "Class the header assigns the points' events to, or none")?
+            .returns_nothing_by_default()?
+            .end_callback()?
+        .begin_callback("assign_class_range",
+                        doc("Called for a point header of an accepted ASSIGN_CLASS request that names a range of points of a type")
+                            .details("See {interface:outstation_application.assign_class_all()}.")
+            )?
+            .param("point_type", point_type, "Type of the points")?
+            .param("start", Primitive::U16, "First index of the range")?
+            .param("stop", Primitive::U16, "Last index of the range, inclusive")?
+            .param("point_class", shared.event_class.clone(), "Class the header assigns the points' events to, or none")?
+            .returns_nothing_by_default()?
+            .end_callback()?
+        .begin_callback("end_assign_class",
+                        doc("Called after the point headers of an accepted ASSIGN_CLASS request are reported")
+                            .details("Assignments accumulated in the calls before it can be persisted as a batch in this method.")
              )?
             .returns_nothing_by_default()?
             .end_callback()?

@@ -22,6 +22,7 @@ pub(crate) struct SharedDefinitions {
     pub endpoint_list: ClassHandle,
     pub connect_strategy: FunctionArgStructHandle,
     pub event_classes: FunctionArgStructHandle,
+    pub event_class: EnumHandle,
     pub class_count: UniversalStructHandle,
     pub tls_client_config: FunctionArgStructHandle,
     pub levels: DecodeLevels,
@@ -337,6 +338,14 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> 
         endpoint_list,
         connect_strategy,
         event_classes: define_event_classes(lib)?,
+        event_class: lib
+            .define_enum("event_class")?
+            .push("none", "Does not generate events")?
+            .push("class1", "Class 1 event")?
+            .push("class2", "Class 2 event")?
+            .push("class3", "Class 3 event")?
+            .doc("Event class")?
+            .build()?,
         class_count: define_class_count(lib)?,
         tls_client_config: tls.tls_client_config,
         levels,

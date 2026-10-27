@@ -118,6 +118,12 @@ impl OutstationSession {
             FunctionCode::DisableUnsolicited => Some(
                 sol.empty(self.handle_enable_or_disable_unsolicited(false, seq, object_headers)),
             ),
+            FunctionCode::AssignClass => Some(
+                sol.empty(
+                    self.handle_assign_class(database, seq, object_headers)
+                        .await,
+                ),
+            ),
 
             _ => {
                 tracing::warn!("unsupported function code: {:?}", function);
@@ -244,6 +250,38 @@ impl OutstationSession {
         selector.log();
 
         ResponseHeader::solicited(seq, Iin::default() | iin2)
+    }
+
+    /// Apply an ASSIGN_CLASS request to the database, then report it to the application
+    pub(super) async fn handle_assign_class(
+        &mut self,
+        database: &mut DatabaseHandle,
+        seq: Sequence,
+        object_headers: HeaderCollection<'_>,
+    ) -> ResponseHeader {
+        if !self.application.support_assign_class() {
+            tracing::warn!("received ASSIGN_CLASS request, but the application doesn't support it");
+            return ResponseHeader::solicited(seq, Iin::default() | Iin2::NO_FUNC_CODE_SUPPORT);
+        }
+        // an assignment set needs at least a class header
+        if object_headers.is_empty() {
+            tracing::warn!("ASSIGN_CLASS request has no object headers");
+            return ResponseHeader::solicited(seq, Iin::default() | Iin2::PARAMETER_ERROR);
+        }
+        if let Err(iin2) = database.transaction(|db| db.inner.assign_classes(&object_headers)) {
+            return ResponseHeader::solicited(seq, Iin::default() | iin2);
+        }
+
+        self.application.begin_assign_class();
+        for assignment in Assignments::new(&object_headers).flatten() {
+            self.application.assign_class(
+                assignment.point_type,
+                assignment.indices,
+                assignment.class,
+            );
+        }
+        self.application.end_assign_class().get().await;
+        ResponseHeader::solicited(seq, Iin::default())
     }
 
     pub(super) fn handle_freeze(

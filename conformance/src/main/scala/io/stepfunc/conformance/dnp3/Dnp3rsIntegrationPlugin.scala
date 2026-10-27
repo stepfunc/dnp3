@@ -876,6 +876,7 @@ class Dnp3IntegrationPlugin extends IntegrationPlugin {
     // Create the database
     this.trackingDatabase = new TrackingDatabase(app, this.outstation, config.testDatabaseConfig, this.controlHandler)
     app.onWriteStringAttribute = trackingDatabase.writeStringAttribute
+    app.onAssignClass = trackingDatabase.assignClass
 
     // Start the server
     this.server.bind()

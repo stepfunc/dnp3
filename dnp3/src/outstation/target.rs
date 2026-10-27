@@ -17,7 +17,7 @@ use crate::app::parse::traits::FixedSizeVariation;
 use crate::app::variations::{Group34Var1, Group34Var2, Group34Var3, Group50Var1, Group50Var3};
 use crate::app::{FunctionCode, Iin2, QualifierCode, Variation};
 use crate::outstation::database::EventClass;
-use crate::outstation::FreezeIndices;
+use crate::outstation::{FreezeIndices, PointIndices, PointType};
 use crate::util::skipped::{Count, Skipped};
 
 /// What a function does with the objects of a variation, whatever their qualifier
@@ -217,6 +217,61 @@ impl Target for FreezeTarget {
             ObjectHeader::AllObjects(_) => Some(FreezeIndices::All),
             ObjectHeader::Range(_, range, RangedVariation::Group20Var0) => {
                 Some(FreezeIndices::Range(range.get_start(), range.get_stop()))
+            }
+            _ => None,
+        }
+    }
+}
+
+/// What an ASSIGN_CLASS header of a variation names: the class of the assignment set it starts
+/// (`None` for no events, g60v1), or a type of point (IEEE 1815-2012 Table 4-12)
+#[derive(Copy, Clone)]
+pub(crate) enum AssignClassTarget {
+    Class(Option<EventClass>),
+    Points(PointType),
+}
+
+/// A header of an ASSIGN_CLASS request
+pub(crate) enum AssignClassHeader {
+    /// a class object header, which starts an assignment set
+    Class(Option<EventClass>),
+    /// the points of a type that the assignment set applies to
+    Points(PointType, PointIndices),
+}
+
+impl Target for AssignClassTarget {
+    type Header<'a> = AssignClassHeader;
+
+    fn get(variation: Variation) -> Option<Self> {
+        let target = match variation {
+            Variation::Group60Var1 => Self::Class(None),
+            Variation::Group60Var2 => Self::Class(Some(EventClass::Class1)),
+            Variation::Group60Var3 => Self::Class(Some(EventClass::Class2)),
+            Variation::Group60Var4 => Self::Class(Some(EventClass::Class3)),
+            Variation::Group1Var0 => Self::Points(PointType::BinaryInput),
+            Variation::Group3Var0 => Self::Points(PointType::DoubleBitBinaryInput),
+            Variation::Group10Var0 => Self::Points(PointType::BinaryOutputStatus),
+            Variation::Group20Var0 => Self::Points(PointType::Counter),
+            Variation::Group21Var0 => Self::Points(PointType::FrozenCounter),
+            Variation::Group30Var0 => Self::Points(PointType::AnalogInput),
+            Variation::Group40Var0 => Self::Points(PointType::AnalogOutputStatus),
+            Variation::Group110(0) => Self::Points(PointType::OctetString),
+            _ => return None,
+        };
+        Some(target)
+    }
+
+    fn with(self, header: ObjectHeader<'_>) -> Option<AssignClassHeader> {
+        match (self, header) {
+            (Self::Class(class), ObjectHeader::AllObjects(_)) => {
+                Some(AssignClassHeader::Class(class))
+            }
+            (Self::Points(point_type), ObjectHeader::AllObjects(_)) => {
+                Some(AssignClassHeader::Points(point_type, PointIndices::All))
+            }
+            (Self::Points(point_type), ObjectHeader::Range(_, range, _)) => {
+                let indices = PointIndices::Range(range.get_start(), range.get_stop());
+                Some(AssignClassHeader::Points(point_type, indices))
             }
             _ => None,
         }

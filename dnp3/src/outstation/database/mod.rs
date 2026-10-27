@@ -22,6 +22,8 @@ use crate::app::attr::{AttrProp, AttrSet, BadAttribute, OwnedAttribute, TypeErro
 use crate::outstation::{ClassCount, OutstationApplication};
 use scursor::WriteCursor;
 
+/// the assignments of an ASSIGN_CLASS request
+pub(crate) mod assign;
 #[cfg(test)]
 mod budget_tests;
 mod config;

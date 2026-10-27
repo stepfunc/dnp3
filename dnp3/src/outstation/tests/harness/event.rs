@@ -5,8 +5,9 @@
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
 use crate::app::variations::{Group12Var1, Group41Var1, Group41Var2, Group41Var3, Group41Var4};
+use crate::outstation::database::EventClass;
 use crate::outstation::traits::{BroadcastAction, OperateType, RestartDelay};
-use crate::outstation::{BufferState, FreezeIndices, FreezeType};
+use crate::outstation::{BufferState, FreezeIndices, FreezeType, PointIndices, PointType};
 
 use crate::app::attr::AttrSet;
 use crate::app::{ControlField, FunctionCode, RequestHeader, Sequence, Timestamp};
@@ -79,6 +80,9 @@ pub(crate) enum Event {
     BeginWriteDeadBands,
     WriteDeadBand(u16, f64),
     EndWriteDeadBands,
+    BeginAssignClass,
+    AssignClass(PointType, PointIndices, Option<EventClass>),
+    EndAssignClass,
     /// the application was asked to validate the WRITE of the attribute (set, variation)
     WriteDeviceAttr(AttrSet, u8),
     BeginConfirm,

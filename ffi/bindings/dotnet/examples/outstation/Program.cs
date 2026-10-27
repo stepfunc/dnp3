@@ -71,6 +71,19 @@ class ExampleOutstation
 
         void IOutstationApplication.EndWriteAnalogDeadBands() {}
 
+        bool IOutstationApplication.SupportAssignClass()
+        {
+            return true;
+        }
+
+        void IOutstationApplication.BeginAssignClass() {}
+
+        void IOutstationApplication.AssignClassAll(PointType pointType, EventClass pointClass) {}
+
+        void IOutstationApplication.AssignClassRange(PointType pointType, ushort start, ushort stop, EventClass pointClass) {}
+
+        void IOutstationApplication.EndAssignClass() {}
+
         bool IOutstationApplication.WriteStringAttr(byte set, byte variation, StringAttr attrType, string value)
         {
             // Allow writing any string attributes that have been defined as writable

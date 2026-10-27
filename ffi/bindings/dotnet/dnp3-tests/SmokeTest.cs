@@ -49,6 +49,11 @@ namespace dnp3_tests
             public void BeginWriteAnalogDeadBands() { }
             public void WriteAnalogDeadBand(ushort index, double deadBand) { }
             public void EndWriteAnalogDeadBands() { }
+            public bool SupportAssignClass() => true;
+            public void BeginAssignClass() { }
+            public void AssignClassAll(PointType pointType, EventClass pointClass) { }
+            public void AssignClassRange(PointType pointType, ushort start, ushort stop, EventClass pointClass) { }
+            public void EndAssignClass() { }
             public bool WriteStringAttr(byte set, byte variation, StringAttr attrType, string value) => false;
             public bool WriteFloatAttr(byte set, byte variation, FloatAttr attrType, float value) => false;
             public bool WriteDoubleAttr(byte set, byte variation, FloatAttr attrType, double value) => false;
