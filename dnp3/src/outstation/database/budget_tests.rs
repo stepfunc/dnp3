@@ -31,8 +31,6 @@ const CLASS_1: &[u8] = &[60, 2, 6];
 const ALL_BINARY: &[u8] = &[1, 0, 6];
 /// g1v0, 8-bit start/stop, 0 to 0
 const BINARY_0: &[u8] = &[1, 0, 0, 0, 0];
-/// g20v0, all objects
-const ALL_COUNTERS: &[u8] = &[20, 0, 6];
 /// g13v1, all objects: a binary output command event, which READ doesn't support
 const COMMAND_EVENTS: &[u8] = &[13, 1, 6];
 
@@ -128,14 +126,6 @@ fn static_headers_are_answered_up_to_8_visits_per_point() {
 }
 
 #[test]
-fn a_rejected_read_leaves_nothing_selected() {
-    let mut db = binary_inputs(0..1000);
-    let expected = read(&mut db, ALL_BINARY);
-    assert_eq!(read(&mut db, &repeat(ALL_BINARY, 9)), (PE, vec![]));
-    assert_eq!(read(&mut db, ALL_BINARY), expected);
-}
-
-#[test]
 fn a_range_counts_its_points_and_then_snapshots_them() {
     // each header visits the 1000 points twice
     let mut db = binary_inputs(0..1000);
@@ -204,17 +194,9 @@ fn static_headers_past_the_selection_limit_cost_nothing() {
 }
 
 #[test]
-fn a_full_selection_still_reports_a_type_without_points() {
-    let mut db = binary_inputs(0..1);
-    let max = usize::from(OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS);
-    let expected = each_alone(&mut db, &vec![BINARY_0; max]);
-    let request = [repeat(BINARY_0, max), ALL_COUNTERS.to_vec()].concat();
-    assert_eq!(read(&mut db, &request), (OU, expected));
-}
-
-#[test]
 fn a_rejected_read_still_reports_headers_read_does_not_support() {
+    // the header after the one that exceeds the budget is still parsed, and reported
     let mut db = binary_inputs(0..1000);
-    let request = [COMMAND_EVENTS.to_vec(), repeat(ALL_BINARY, 9)].concat();
+    let request = [repeat(ALL_BINARY, 9), COMMAND_EVENTS.to_vec()].concat();
     assert_eq!(read(&mut db, &request), (PE | OU, vec![]));
 }

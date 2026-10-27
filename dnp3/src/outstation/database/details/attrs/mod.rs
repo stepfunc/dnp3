@@ -233,32 +233,23 @@ impl AttrHandler {
     pub(crate) fn select<L: ReadLog>(&mut self, header: AttrHeader) -> (Iin2, Visits) {
         match header {
             AttrHeader::All(var) => {
-                match var {
-                    255 => {
-                        // list of variations for every set
-                        let mut iin2 = Iin2::default();
-                        let mut visits = Visits::NONE;
-                        for set in self.map.sets() {
-                            iin2 |= self.selection.push::<L>(Selected::single(set, 255));
-                            visits.increment();
-                        }
-                        (iin2, visits)
-                    }
-                    254 => {
-                        // all attributes in every set
-                        let mut iin2 = Iin2::default();
-                        let mut visits = Visits::NONE;
-                        for set in self.map.sets() {
-                            iin2 |= self.selection.push::<L>(Selected::all(set));
-                            visits.increment();
-                        }
-                        (iin2, visits)
-                    }
+                let selected: fn(AttrSet) -> Selected = match var {
+                    // list of variations for every set
+                    255 => |set| Selected::single(set, 255),
+                    // all attributes in every set
+                    254 => Selected::all,
                     _ => {
                         L::attr_variation_with_all_objects(var);
-                        (Iin2::PARAMETER_ERROR, Visits::NONE)
+                        return (Iin2::PARAMETER_ERROR, Visits::NONE);
                     }
+                };
+                let mut iin2 = Iin2::default();
+                let mut visits = Visits::NONE;
+                for set in self.map.sets() {
+                    iin2 |= self.selection.push::<L>(selected(set));
+                    visits.increment();
                 }
+                (iin2, visits)
             }
             AttrHeader::Specific(var, range) => {
                 let set = match range.to_attr_set() {

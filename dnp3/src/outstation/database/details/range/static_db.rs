@@ -271,10 +271,6 @@ where
         (T::selection(variation).with(range), visits)
     }
 
-    fn select_all(&mut self) -> Option<(VariationRange, Visits)> {
-        self.select_all_with_variation(None)
-    }
-
     fn select_all_with_variation(
         &mut self,
         variation: Option<T::StaticVariation>,
@@ -660,31 +656,18 @@ impl StaticDatabase {
         T::points_mut(self)
     }
 
-    /// Select every point of a type that class 0 includes, unless it has none, with the points
-    /// visited
+    /// Select every point of a type that class 0 includes, as a header for all of them does,
+    /// with the points visited
     ///
-    /// With the selection full, a type that has points gets IIN2.2 without visiting them
+    /// Class 0 skips a type that has no points, rather than setting IIN2.1
     fn select_class_zero_type<T>(&mut self) -> (Iin2, Visits)
     where
         T: Family,
     {
-        if !T::in_class_zero(&self.class_zero) {
+        if !T::in_class_zero(&self.class_zero) || !self.has_points::<T>() {
             return (Iin2::default(), Visits::NONE);
         }
-
-        let is_full = self.selected.is_full();
-        let map = T::points_mut(self);
-        if map.is_empty() {
-            return (Iin2::default(), Visits::NONE);
-        }
-        if is_full {
-            return (Iin2::PARAMETER_ERROR, Visits::NONE);
-        }
-
-        match map.select_all() {
-            None => (Iin2::default(), Visits::NONE),
-            Some((full_range, visits)) => (self.push_selection(full_range), visits),
-        }
+        self.select_by_type::<T>(None, None)
     }
 
     pub(crate) fn select_class_zero(&mut self) -> (Iin2, Visits) {
@@ -1688,6 +1671,61 @@ mod tests {
             db.select(StaticTarget::Counter(None), range),
             (Iin2::PARAMETER_ERROR, Visits::NONE)
         );
+        // but a type without points still sets IIN2.1
+        assert_eq!(
+            db.select(StaticTarget::Binary(None), None),
+            (Iin2::OBJECT_UNKNOWN, Visits::NONE)
+        );
+    }
+
+    #[test]
+    fn dead_band_selection_visits_each_point_it_marks() {
+        let mut db = StaticDatabase::default();
+        for index in 0..3 {
+            assert!(db.add(
+                index,
+                analog_config(StaticAnalogInputVariation::Group30Var1)
+            ));
+        }
+
+        // all of them are marked; a range is counted and then marked
+        assert_eq!(
+            db.select(StaticTarget::AnalogInputDeadBand(None), None),
+            (Iin2::default(), Visits::new(3))
+        );
+        assert_eq!(
+            db.select(
+                StaticTarget::AnalogInputDeadBand(None),
+                Some(IndexRange::new(0, 2).unwrap())
+            ),
+            (Iin2::default(), Visits::new(6))
+        );
+    }
+
+    #[test]
+    fn class_zero_with_one_selection_left_selects_the_first_type_with_points() {
+        // populations differ, so the visits show which type was selected
+        let mut db = StaticDatabase::default();
+        for index in 0..3 {
+            assert!(db.add(index, binary_config(StaticBinaryInputVariation::Group1Var2)));
+        }
+        for index in 0..5 {
+            assert!(db.add(index, counter_config(StaticCounterVariation::Group20Var1)));
+        }
+        let range = Some(IndexRange::new(0, 0).unwrap());
+        for _ in 1..db.selection_capacity() {
+            assert_eq!(
+                db.select(StaticTarget::Counter(None), range).0,
+                Iin2::default()
+            );
+        }
+
+        // the binary inputs take the last selection, and the counters don't fit, unvisited
+        assert_eq!(
+            db.select_class_zero(),
+            (Iin2::PARAMETER_ERROR, Visits::new(3))
+        );
+        assert_eq!(db.selection_count(), db.selection_capacity());
     }
 
     #[test]

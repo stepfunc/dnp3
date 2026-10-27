@@ -381,29 +381,30 @@ impl Model {
         F: Fn(&Record) -> bool,
     {
         let limit = limit.unwrap_or(usize::MAX);
-        let positions: Vec<usize> = self
+        let len = self.records.len();
+        let mut count: usize = 0;
+        let mut last = None;
+        for (position, record) in self
             .records
-            .iter()
+            .iter_mut()
             .enumerate()
             .filter(|(_, r)| r.state == State::Unselected && matches(r))
-            .map(|(position, _)| position)
             .take(limit)
-            .collect();
-        for position in &positions {
-            let record = &mut self.records[*position];
+        {
             record.state = State::Selected;
             record.specific = specific;
+            count = count.saturating_add(1);
+            last = Some(position);
         }
-        let len = self.records.len();
-        let visits = if positions.len() < limit {
+        let visits = if count < limit {
             len
         } else {
-            match positions.last() {
+            match last {
                 Some(last) => last.saturating_add(2).min(len),
                 None => len.min(1),
             }
         };
-        (positions.len(), Visits::new(visits))
+        (count, Visits::new(visits))
     }
 
     /// write the selected records in order while they fit in `capacity` bytes, returning the

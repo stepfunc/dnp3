@@ -94,13 +94,13 @@ impl Database {
         let mut budget = self.read_budget();
         let mut iin2 = Iin2::default();
         for header in headers {
-            let (pool, selected, visits) = self.select_by_header::<L>(header);
+            let (pool, (header_iin2, visits)) = self.select_by_header::<L>(header);
             if let Err(over) = budget.charge(pool, visits) {
                 L::read_over_budget(over);
                 self.reset();
                 return Iin2::PARAMETER_ERROR;
             }
-            iin2 |= selected;
+            iin2 |= header_iin2;
         }
         iin2
     }
@@ -124,16 +124,15 @@ impl Database {
 
     /// Select what a header asks for, with the pool its work counts against and the records it
     /// visited
-    fn select_by_header<L: ReadLog>(&mut self, header: ReadHeader) -> (Pool, Iin2, Visits) {
-        let (pool, (iin2, visits)) = match header {
+    fn select_by_header<L: ReadLog>(&mut self, header: ReadHeader) -> (Pool, (Iin2, Visits)) {
+        match header {
             ReadHeader::Class0 => (Pool::Static, self.static_db.select_class_zero()),
             ReadHeader::Static(target, range) => {
                 (Pool::Static, self.static_db.select(target, range))
             }
             ReadHeader::Event(target, limit) => (Pool::Event, self.select_events(target, limit)),
             ReadHeader::Attr(header) => (Pool::Static, self.attrs.select::<L>(header)),
-        };
-        (pool, iin2, visits)
+        }
     }
 
     /// Select the events a header asks for, with the records visited

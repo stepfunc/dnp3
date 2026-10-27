@@ -129,12 +129,9 @@ nothing don't use up the READ limit. A READ that arrives while the outstation wa
 as pending, and holding it counts each header that parses, event headers included. Device attributes have their own
 fixed limit of selections per READ.
 
-These limits bound memory, not the work of selecting what a READ reports, since a header can select every point or every
-event again. The outstation also counts the points, events and attribute sets a READ's selection visits. Static points
-and attribute sets may be visited 8 times each per READ, and the event buffer's slots 16 times each, but never less than
-4096 times for either. A READ that exceeds either is answered with IIN2.2 and no objects. This allows any reasonable
-request, even a redundant one such as reading class 0 twice, and stops requests that repeat database-wide headers
-hundreds of times. It isn't configurable.
+These limits bound memory. The outstation also budgets the work of selecting what a READ reports, scaled to the size of
+its database, so that a request repeating headers that select every point or event is answered with IIN2.2 and no
+objects instead of consuming the CPU. The budget allows any reasonable request, even a redundant one.
 
 ## Protocol validation
 
