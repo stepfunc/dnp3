@@ -166,10 +166,7 @@ that doesn't save them returns to its configured values when it restarts.
 | Event classes | `beginAssignClass`, one call per point header, `endAssignClass` | Processed unless `supportAssignClass` returns false |
 | Device attributes | One call per attribute written | Only for attributes you define as writable |
 
-Deadbands and event classes come in batches that you can save at once in the end callback: one batch per request for event
-classes, and one per group of deadbands in the request. An event class
-assignment applies only to events generated afterwards, and a request with any error changes nothing. Headers that list
-individual point indices aren't supported.
+Save each batch in its end callback. A new event class applies only to events created afterwards.
 
 An attribute write callback can reject a value, for example one out of range, by returning false. The outstation itself
 rejects writes to attributes that aren't defined or writable, or whose type doesn't match.
@@ -229,6 +226,5 @@ The example master can `WRITE` the User Defined Location attribute of the exampl
 
 ## Event confirmations
 
-When the master confirms a response, the outstation calls `beginConfirm`, then `eventCleared` for each event it removes
-from its buffer, with the ID that the update which created the event returned, then `endConfirm` with the number of events left in each class. Most applications don't need these. They
-help when the source of the events wants to know which ones have been delivered.
+When the master confirms events, `eventCleared` reports each one delivered, by the ID its update returned. Most applications don't need
+this; it helps when the source of the events wants to know which ones have been delivered.

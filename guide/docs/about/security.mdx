@@ -41,15 +41,9 @@ vulnerability. CI runs `clippy` on the library with these lints denied:
 * arithmetic that can overflow, underflow or divide by zero
 * `panic!`, `unreachable!`, `todo!` and `unimplemented!`
 * slicing a string at a position that may not be a character boundary
+* `as` conversions, which can truncate or change sign without warning
 
-Tests may unwrap, panic and index. In the library itself, an exception is allowed only where input can't reach it:
-
-* the invariant that makes it safe is local and trivially true, such as indexing a 256-entry CRC table with a byte, or
-* it can only fire after another panic has already happened, such as expecting that the database's mutex isn't
-  poisoned.
-
-Each exception carries a narrow `#[expect]` with a stated reason, and `#[allow]` is denied, so an exception can't go
-unnoticed.
+Tests may unwrap and index. In the library, the few exceptions are places input can't reach, and each one states why.
 
 ## Proven panic freedom
 
@@ -132,11 +126,8 @@ flowchart TB
 </TabItem>
 </Tabs>
 
-The green steps are proven panic-free. The asynchronous session code and I/O around them aren't part of the proof,
-shown in gray, and neither is the outstation's processing of requests, apart from how it maps the headers of a READ to
-what they select. Where the outstation walks or searches the maps that store its static points and attributes, to
-select and write the ones a READ reports or to find the point an update changes, only the encoding of their values is
-proven, not the walk. Your own handlers are code we can't check.
+The green steps are proven panic-free. The gray ones are covered by the lints but not the proof, and your own handlers
+are code we can't check.
 
 <details>
 <summary>How the proof works</summary>
@@ -144,8 +135,8 @@ proven, not the walk. Your own handlers are code we can't check.
 The proof uses the [no-panic](https://github.com/dtolnay/no-panic) technique. Each function on the green path is
 compiled so that a reachable panic leaves a reference to a symbol that doesn't exist, and the optimizer removes the
 reference only if it can prove that no path to a panic exists. A test harness calls the functions with input read at
-run time, so the optimizer can't specialize them to known values, and with output buffers of any size from empty to
-16 MiB, far larger than a fragment. If the test binary links, these functions can't panic.
+run time, so the optimizer can't specialize them to known values, and with output buffers of every size from empty to
+far larger than a fragment. If the test binary links, these functions can't panic.
 
 Where a step calls code the library doesn't own, such as logging, the harness passes a stand-in, so the proof covers the
 step around the call but not the call itself. CI links the test binary twice, the second time with overflow checks on,
@@ -158,8 +149,7 @@ broke the link.
 </details>
 
 The `no-panic` job in [CI](https://github.com/stepfunc/dnp3/blob/main/.github/workflows/ci.yml) runs this check on
-every pull request and release tag, building the test binary in release mode with link-time optimization on a pinned
-toolchain. The workflow has the exact command.
+every pull request and release tag.
 
 :::note What the proof doesn't cover
 The asynchronous session code that schedules the master's tasks and processes the outstation's requests, the
@@ -167,47 +157,18 @@ outstation's walks and searches of its stored static points and attributes, I/O 
 as a `ReadHandler`, an `OutstationApplication` or a `ControlHandler`.
 :::
 
-## Additional compile-time checks
-
-Some lints that don't concern panics are denied because the bugs they catch are silent:
-
-* `as` conversions, which truncate or change sign without warning. Conversions use `From`, or `TryFrom` with the
-  failure handled, except for a few documented conversions from floating point, where `as` is the only option.
-* comparing floating-point numbers for equality, and float literals that lose precision
-* discarding a `Result` or a future without naming its type
-
 ## Bounded resources
 
-The buffers that receive and reassemble DNP3 data are allocated when a session's transport is created, at fixed sizes
-derived from the configured receive fragment size. The outstation also limits how much of a request it processes:
-
-| Setting | Default | Past the limit |
-|---|---|---|
-| `max_read_request_headers` | 64, which is also the minimum | Further selections or headers are ignored, the rest are answered, and the response sets IIN2.2 |
-| `max_controls_per_request` | No limit | Further controls get the `TOO_MANY_OPS` status, or are skipped for requests that don't get a response |
-
-A READ processed right away counts only the static selections it makes, so event headers and headers that select
-nothing don't use up the READ limit. A READ that arrives while the outstation waits for an unsolicited confirm is held
-as pending, and holding it counts each header that parses, event headers included. Device attributes have their own
-fixed limit of selections per READ.
-
-These limits bound memory. Some requests that the standard allows would still take a pathological amount of CPU to
-process, such as a READ or ASSIGN_CLASS that repeats headers naming every point or event many times. The outstation
-enforces a work budget on these requests, scaled to the size of its database, and answers one that exceeds it with
-IIN2.2. Reasonable requests, even redundant ones, stay well within it.
+The buffers that receive DNP3 data are allocated once, at fixed sizes, when a session starts. The outstation caps how
+many READ headers and controls it processes per request (`max_read_request_headers`, `max_controls_per_request`), and
+budgets the work it spends on a READ or ASSIGN_CLASS, scaled to its database, so a pathological request is answered
+with an error instead of consuming the CPU.
 
 ## Protocol validation
 
-The library follows IEEE 1815-2012 as amended by the DNP Users Group technical bulletins. Examples of how it validates
-input:
-
-* An outstation silently discards a fragment that isn't a valid request, such as one with FIR or FIN cleared, and logs a
-  warning.
-* Transport segments are reassembled following the transport reception rules.
-* An outstation answers IIN2.0 for a function code it doesn't support, IIN2.1 for an object it doesn't support, and IIN2.2
-  for malformed object data or a qualifier the object doesn't support.
-* An OPERATE executes only with an active selection, the next sequence number after its SELECT, object headers that match
-  the SELECT's, and no more time elapsed than the selection timeout.
+The library follows IEEE 1815-2012 as amended by the DNP Users Group technical bulletins. Requests and responses that
+don't follow the standard are rejected, or answered with the error it prescribes, and select-before-operate is enforced
+strictly. [Conformance testing](interoperability.mdx#conformance-testing) checks this behavior.
 
 ## TLS
 

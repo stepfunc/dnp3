@@ -13,9 +13,7 @@ are passed to the [ReadHandler](read_handler) when they are received from the ou
 
 ## Reading Attributes
 
-A request to read attributes use the `READ` function code combined with one or more object headers. Each header consists
-of a group 0 variation using the 8-bit start/stop qualifier code (0x00). The point index in the request corresponds to
-the "set" to which the device attribute belongs.
+Read attributes by adding one or more attribute variations to a request, each with its set (0 for the default set).
 
 <Tabs
 groupId="language"

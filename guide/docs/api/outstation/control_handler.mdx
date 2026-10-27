@@ -12,10 +12,10 @@ The `ControlHandler` interface receives control requests. When a request results
 for handling operations atomically or in batches. These two methods are not called if no control callback runs.
 
 Each `select` or `operate` callback returns a `CommandStatus` enum. The outstation response to a control message echoes the request data along with
-the status returned for each control. The library actually builds the response message while making these callbacks. If an `OPERATE` doesn't match a
+the status returned for each control. If an `OPERATE` doesn't match a
 prior `SELECT`, no callbacks are made and the same failure status is returned for every control in the message.
 
-Return `NOT_SUPPORTED` for an index that doesn't exist. When it's the first control in the request that fails, the response also sets IIN2.2 (parameter error).
+Return `NOT_SUPPORTED` for an index that doesn't exist.
 
 ## Handling SELECT
 
