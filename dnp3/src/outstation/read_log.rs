@@ -7,6 +7,7 @@
 use crate::app::attr::BadAttribute;
 use crate::app::{QualifierCode, Variation};
 use crate::outstation::database::details::attrs;
+use crate::outstation::database::details::budget::{self, OverBudget};
 use crate::outstation::database::details::range::static_db::IndexRange;
 use crate::outstation::session::deferred;
 use crate::outstation::target;
@@ -30,6 +31,8 @@ pub(crate) trait ReadLog {
     fn attr_not_encodable(err: BadAttribute);
     /// The first header of a deferred READ that doesn't fit its queue, and how many
     fn deferred_capacity(max: usize, header: (Variation, QualifierCode), count: Count);
+    /// A READ rejected because selecting it visits more records than its budget allows
+    fn read_over_budget(over: OverBudget);
 }
 
 /// Logs each diagnostic with `tracing`
@@ -58,5 +61,9 @@ impl ReadLog for Tracing {
 
     fn deferred_capacity(max: usize, header: (Variation, QualifierCode), count: Count) {
         deferred::log_capacity(max, header, count);
+    }
+
+    fn read_over_budget(over: OverBudget) {
+        budget::log_over_budget(over);
     }
 }

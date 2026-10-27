@@ -18,7 +18,7 @@ use crate::util::BadWrite;
 use super::writer::EventWriter;
 
 use crate::outstation::database::details::family::Family;
-use crate::outstation::database::details::WriteProgress;
+use crate::outstation::database::details::{Visits, WriteProgress};
 use crate::outstation::{BufferState, ClassCount, TypeCount};
 use records::{EventRecord, EventState, Events};
 use scursor::WriteCursor;
@@ -153,7 +153,7 @@ mod records {
     use super::super::writer::EventWriter;
     use super::{class_count_mut, decrement, increment, Event, EventType};
     use crate::master::EventClasses;
-    use crate::outstation::database::details::WriteProgress;
+    use crate::outstation::database::details::{Visits, WriteProgress};
     use crate::outstation::database::EventClass;
     use crate::outstation::{BufferState, ClassCount, TypeCount};
 
@@ -283,14 +283,17 @@ mod records {
             })
         }
 
-        /// select unselected records the selector accepts, oldest first, up to the limit
-        pub(super) fn select<F>(&mut self, limit: Option<usize>, mut selector: F) -> usize
+        /// select unselected records the selector accepts, oldest first, up to the limit,
+        /// returning how many it selected and how many records it visited
+        pub(super) fn select<F>(&mut self, limit: Option<usize>, mut selector: F) -> (usize, Visits)
         where
             F: FnMut(EventClass, &mut Event) -> bool,
         {
             let limit = limit.unwrap_or(usize::MAX);
             let mut count: usize = 0;
+            let mut visits = Visits::NONE;
             self.list.for_each_mut(|record| {
+                visits.increment();
                 if count >= limit {
                     return ControlFlow::Break(());
                 }
@@ -302,7 +305,7 @@ mod records {
                 }
                 ControlFlow::Continue(())
             });
-            count
+            (count, visits)
         }
 
         /// write the selected records in order until the cursor is full, marking them written,
@@ -558,7 +561,17 @@ impl EventBuffer {
         self.events.type_count(T::EVENT_TYPE) > 0
     }
 
-    pub(crate) fn select_by_class(&mut self, classes: EventClasses, limit: Option<usize>) -> usize {
+    /// the number of events the buffer can hold, of every type
+    pub(crate) fn capacity(&self) -> usize {
+        self.config.max_events()
+    }
+
+    /// select events of the classes, returning how many it selected and how many it visited
+    pub(crate) fn select_by_class(
+        &mut self,
+        classes: EventClasses,
+        limit: Option<usize>,
+    ) -> (usize, Visits) {
         self.events.select(limit, |class, event| {
             if classes.matches(class) {
                 event.select_default_variation();
@@ -573,7 +586,7 @@ impl EventBuffer {
         &mut self,
         specific_variation: Option<T::EventVariation>,
         limit: Option<usize>,
-    ) -> usize
+    ) -> (usize, Visits)
     where
         T: Family,
     {
@@ -587,7 +600,7 @@ impl EventBuffer {
         &mut self,
         limit: Option<usize>,
         variation: T::EventVariation,
-    ) -> usize
+    ) -> (usize, Visits)
     where
         T: Family,
     {
@@ -601,7 +614,7 @@ impl EventBuffer {
             })
     }
 
-    fn select_default_variation<T>(&mut self, limit: Option<usize>) -> usize
+    fn select_default_variation<T>(&mut self, limit: Option<usize>) -> (usize, Visits)
     where
         T: Family,
     {

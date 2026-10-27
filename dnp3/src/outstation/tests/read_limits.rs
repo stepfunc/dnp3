@@ -15,6 +15,7 @@ use crate::app::BufferSize;
 use crate::outstation::config::OutstationConfig;
 use crate::outstation::database::*;
 use crate::outstation::tests::harness::*;
+use crate::util::test_support::watchdog;
 
 const UNSOL_G2V1_SEQ1: &[u8] = &[
     0xF1, 0x82, 0x80, 0x00, 0x02, 0x01, 0x28, 0x01, 0x00, 0x00, 0x00, 0x81,
@@ -149,6 +150,18 @@ async fn read_of_event_classes_past_the_header_limit_has_no_error() {
 
 /// IIN2 of a READ of `count` copies of `header` that was deferred by an unsolicited confirm wait
 async fn deferred_read_iin2(max_read_headers: Option<u16>, header: &[u8], count: usize) -> u8 {
+    let response = deferred_read(max_read_headers, |_| {}, header, count).await;
+    response[3]
+}
+
+/// The response to a READ of `count` copies of `header` that was deferred by an unsolicited
+/// confirm wait, after `setup` changes the database
+async fn deferred_read(
+    max_read_headers: Option<u16>,
+    setup: impl FnMut(&mut Database),
+    header: &[u8],
+    count: usize,
+) -> Vec<u8> {
     let mut config = get_default_unsolicited_config();
     config.max_read_request_headers = max_read_headers;
     let mut harness = new_harness(config);
@@ -160,6 +173,7 @@ async fn deferred_read_iin2(max_read_headers: Option<u16>, header: &[u8], count:
         .await;
     harness.handle.database.transaction(add_binary_event);
     harness.expect_response(UNSOL_G2V1_SEQ1).await;
+    harness.handle.database.transaction(setup);
 
     // deferred until the unsolicited confirm wait ends
     harness.send_and_process(&read_request(header, count)).await;
@@ -176,7 +190,7 @@ async fn deferred_read_iin2(max_read_headers: Option<u16>, header: &[u8], count:
         .await;
     let response = harness.expect_write().await;
     assert_eq!(response.get(1), Some(&0x81));
-    response[3]
+    response
 }
 
 #[tokio::test]
@@ -226,6 +240,25 @@ async fn deferred_read_header_limit_counts_event_class_headers() {
         deferred_read_iin2(None, READ_CLASS_1, max + 1).await,
         iin2::PARAMETER_ERROR
     );
+}
+
+#[tokio::test]
+async fn deferred_read_past_the_budget_is_rejected_when_selected() {
+    watchdog(async {
+        // 1001 binary inputs allow 8008 visits: 9 headers that each visit every point exceed it
+        let response = deferred_read(None, add_binary_inputs_from(1, 1000), &[1, 0, 6], 9).await;
+        assert_eq!(&response[3..], &[iin2::PARAMETER_ERROR]);
+    })
+    .await;
+}
+
+/// `count` binary inputs from index `start`, with no events
+fn add_binary_inputs_from(start: u16, count: u16) -> impl FnMut(&mut Database) {
+    move |db| {
+        for index in start..start + count {
+            db.add(index, None, BinaryInputConfig::default());
+        }
+    }
 }
 
 fn define_serial_number(database: &mut Database) {

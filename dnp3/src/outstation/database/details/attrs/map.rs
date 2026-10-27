@@ -256,6 +256,10 @@ impl SetMap {
         self.sets.keys().copied()
     }
 
+    pub(crate) fn set_count(&self) -> usize {
+        self.sets.len()
+    }
+
     fn get_set_mut(&mut self, set: AttrSet) -> Result<&mut VarMap, AttrError> {
         match self.sets.get_mut(&set) {
             None => Err(AttrError::SetNotDefined(set)),

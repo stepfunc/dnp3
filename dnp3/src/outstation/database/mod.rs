@@ -22,6 +22,8 @@ use crate::app::attr::{AttrProp, AttrSet, BadAttribute, OwnedAttribute, TypeErro
 use crate::outstation::{ClassCount, OutstationApplication};
 use scursor::WriteCursor;
 
+#[cfg(test)]
+mod budget_tests;
 mod config;
 /// the database internals, which the outstation and the no-panic harness use
 pub(crate) mod details;

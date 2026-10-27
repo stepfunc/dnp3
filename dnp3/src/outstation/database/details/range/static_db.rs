@@ -15,7 +15,7 @@ use crate::outstation::config::OutstationConfig;
 use crate::outstation::database::details::family::Family;
 use crate::outstation::database::details::range::traits::StaticVariation;
 use crate::outstation::database::details::range::writer::RangeWriter;
-use crate::outstation::database::details::WriteProgress;
+use crate::outstation::database::details::{Visits, WriteProgress};
 use crate::outstation::database::read::StaticTarget;
 use crate::outstation::database::variations::*;
 use crate::outstation::database::{ClassZeroConfig, EventClass, EventMode, UpdateOptions};
@@ -230,46 +230,55 @@ where
         self.inner.get_mut(&index)
     }
 
+    fn is_empty(&self) -> bool {
+        self.inner.is_empty()
+    }
+
     /// IIN2 bits for a read of a specific range of this type, or the error to
-    /// respond with if nothing in the range can be selected (TB2016-001):
+    /// respond with if nothing in the range can be selected (TB2016-001), with the points
+    /// counted:
     ///
     /// * IIN2.1 if there are no points of this type
     /// * IIN2.2 if some or all of the points in the range aren't installed
-    fn check_range(&self, range: IndexRange) -> Result<Iin2, Iin2> {
+    fn check_range(&self, range: IndexRange) -> (Result<Iin2, Iin2>, Visits) {
         if self.inner.is_empty() {
-            return Err(Iin2::OBJECT_UNKNOWN);
+            return (Err(Iin2::OBJECT_UNKNOWN), Visits::NONE);
         }
 
-        match range.entries(&self.inner).count() {
+        let installed = range.entries(&self.inner).count();
+        let result = match installed {
             0 => Err(Iin2::PARAMETER_ERROR),
             installed if installed < range.len() => Ok(Iin2::PARAMETER_ERROR),
             _ => Ok(Iin2::default()),
-        }
+        };
+        (result, Visits::new(installed))
     }
 
     fn select_range_with_variation(
         &mut self,
         range: IndexRange,
         variation: Option<T::StaticVariation>,
-    ) -> VariationRange {
+    ) -> (VariationRange, Visits) {
+        let mut visits = Visits::NONE;
         for (_index, point) in range.entries_mut(&mut self.inner) {
             // for every point in the range, we copy the current value into a distinct 'selected' cell
             // when writing the response(s) we use the selected value
             // this allows the outstation to send consistent snapshot of the values when a multi-fragment response is required
             point.selected = point.current.clone();
             point.was_selected = true;
+            visits.increment();
         }
-        T::selection(variation).with(range)
+        (T::selection(variation).with(range), visits)
     }
 
-    fn select_all(&mut self) -> Option<VariationRange> {
+    fn select_all(&mut self) -> Option<(VariationRange, Visits)> {
         self.select_all_with_variation(None)
     }
 
     fn select_all_with_variation(
         &mut self,
         variation: Option<T::StaticVariation>,
-    ) -> Option<VariationRange> {
+    ) -> Option<(VariationRange, Visits)> {
         let range = self.full_range()?;
 
         // as far at the processing goes, we treat this just like a range scan over all the values
@@ -278,10 +287,13 @@ where
 
     /// mark the points in the range selected without copying their values, for writing
     /// something other than their values
-    fn select_membership(&mut self, range: IndexRange) {
+    fn select_membership(&mut self, range: IndexRange) -> Visits {
+        let mut visits = Visits::NONE;
         for (_index, point) in range.entries_mut(&mut self.inner) {
             point.was_selected = true;
+            visits.increment();
         }
+        visits
     }
 }
 
@@ -348,6 +360,22 @@ impl StaticDatabase {
 
     pub(crate) fn reset(&mut self) {
         self.selected.clear();
+    }
+
+    /// the number of installed points of every type
+    pub(crate) fn point_count(&self) -> usize {
+        [
+            self.binary.inner.len(),
+            self.double_bit_binary.inner.len(),
+            self.binary_output_status.inner.len(),
+            self.counter.inner.len(),
+            self.frozen_counter.inner.len(),
+            self.analog.inner.len(),
+            self.analog_output_status.inner.len(),
+            self.octet_strings.inner.len(),
+        ]
+        .into_iter()
+        .fold(0, usize::saturating_add)
     }
 
     pub(crate) fn add<T>(&mut self, index: u16, config: PointConfig<T>) -> bool
@@ -506,7 +534,15 @@ impl StaticDatabase {
         write_dead_bands(cursor, range, variation, dead_bands)
     }
 
-    pub(crate) fn select(&mut self, target: StaticTarget, range: Option<IndexRange>) -> Iin2 {
+    /// Select the points a static header asks for, with the points visited
+    ///
+    /// A header for a type that has points, while the selection is full, gets IIN2.2 without
+    /// visiting them, since its range couldn't be pushed
+    pub(crate) fn select(
+        &mut self,
+        target: StaticTarget,
+        range: Option<IndexRange>,
+    ) -> (Iin2, Visits) {
         match target {
             StaticTarget::Binary(variation) => self.select_by_type::<BinaryInput>(variation, range),
             StaticTarget::DoubleBitBinary(variation) => {
@@ -526,26 +562,35 @@ impl StaticDatabase {
             StaticTarget::OctetString => self.select_by_type::<OctetString>(None, range),
             StaticTarget::FrozenAnalog(_) => {
                 // we know what it is, but don't support it
-                Iin2::OBJECT_UNKNOWN
+                (Iin2::OBJECT_UNKNOWN, Visits::NONE)
             }
             StaticTarget::AnalogInputDeadBand(var) => {
-                let (range, iin2) = match range {
+                if self.analog.is_empty() {
+                    return (Iin2::OBJECT_UNKNOWN, Visits::NONE);
+                }
+                if self.selected.is_full() {
+                    return (Iin2::PARAMETER_ERROR, Visits::NONE);
+                }
+
+                let (range, iin2, counted) = match range {
                     None => match self.analog.full_range() {
-                        Some(range) => (range, Iin2::default()),
+                        Some(range) => (range, Iin2::default(), Visits::NONE),
                         // no analog inputs
-                        None => return Iin2::OBJECT_UNKNOWN,
+                        None => return (Iin2::OBJECT_UNKNOWN, Visits::NONE),
                     },
                     Some(range) => match self.analog.check_range(range) {
-                        Ok(iin2) => (range, iin2),
-                        Err(iin2) => return iin2,
+                        (Ok(iin2), counted) => (range, iin2, counted),
+                        (Err(iin2), counted) => return (iin2, counted),
                     },
                 };
 
-                self.analog.select_membership(range);
-                iin2 | self.push_selection(VariationRange::new(
-                    range,
-                    SpecificVariation::AnalogDeadBand(var),
-                ))
+                let marked = self.analog.select_membership(range);
+                let iin2 = iin2
+                    | self.push_selection(VariationRange::new(
+                        range,
+                        SpecificVariation::AnalogDeadBand(var),
+                    ));
+                (iin2, counted.plus(marked))
             }
         }
     }
@@ -554,25 +599,36 @@ impl StaticDatabase {
         &mut self,
         variation: Option<T::StaticVariation>,
         range: Option<IndexRange>,
-    ) -> Iin2
+    ) -> (Iin2, Visits)
     where
         T: Family,
     {
+        let is_full = self.selected.is_full();
         let map = T::points_mut(self);
 
-        let (selected, iin2) = match range {
+        if map.is_empty() {
+            return (Iin2::OBJECT_UNKNOWN, Visits::NONE);
+        }
+        if is_full {
+            return (Iin2::PARAMETER_ERROR, Visits::NONE);
+        }
+
+        let (selected, iin2, visits) = match range {
             Some(range) => match map.check_range(range) {
-                Ok(iin2) => (map.select_range_with_variation(range, variation), iin2),
-                Err(iin2) => return iin2,
+                (Ok(iin2), counted) => {
+                    let (selected, snapshot) = map.select_range_with_variation(range, variation);
+                    (selected, iin2, counted.plus(snapshot))
+                }
+                (Err(iin2), counted) => return (iin2, counted),
             },
             None => match map.select_all_with_variation(variation) {
-                Some(selected) => (selected, Iin2::default()),
+                Some((selected, snapshot)) => (selected, Iin2::default(), snapshot),
                 // no points of this type
-                None => return Iin2::OBJECT_UNKNOWN,
+                None => return (Iin2::OBJECT_UNKNOWN, Visits::NONE),
             },
         };
 
-        iin2 | self.push_selection(selected)
+        (iin2 | self.push_selection(selected), visits)
     }
 
     /// true if at least one point of the type is installed
@@ -604,29 +660,48 @@ impl StaticDatabase {
         T::points_mut(self)
     }
 
-    fn select_class_zero_type<T>(&mut self) -> Iin2
+    /// Select every point of a type that class 0 includes, unless it has none, with the points
+    /// visited
+    ///
+    /// With the selection full, a type that has points gets IIN2.2 without visiting them
+    fn select_class_zero_type<T>(&mut self) -> (Iin2, Visits)
     where
         T: Family,
     {
-        if T::in_class_zero(&self.class_zero) {
-            match T::points_mut(self).select_all() {
-                None => Iin2::default(),
-                Some(full_range) => self.push_selection(full_range),
-            }
-        } else {
-            Iin2::default()
+        if !T::in_class_zero(&self.class_zero) {
+            return (Iin2::default(), Visits::NONE);
+        }
+
+        let is_full = self.selected.is_full();
+        let map = T::points_mut(self);
+        if map.is_empty() {
+            return (Iin2::default(), Visits::NONE);
+        }
+        if is_full {
+            return (Iin2::PARAMETER_ERROR, Visits::NONE);
+        }
+
+        match map.select_all() {
+            None => (Iin2::default(), Visits::NONE),
+            Some((full_range, visits)) => (self.push_selection(full_range), visits),
         }
     }
 
-    pub(crate) fn select_class_zero(&mut self) -> Iin2 {
-        self.select_class_zero_type::<BinaryInput>()
-            | self.select_class_zero_type::<DoubleBitBinaryInput>()
-            | self.select_class_zero_type::<BinaryOutputStatus>()
-            | self.select_class_zero_type::<Counter>()
-            | self.select_class_zero_type::<FrozenCounter>()
-            | self.select_class_zero_type::<AnalogInput>()
-            | self.select_class_zero_type::<AnalogOutputStatus>()
-            | self.select_class_zero_type::<OctetString>()
+    pub(crate) fn select_class_zero(&mut self) -> (Iin2, Visits) {
+        [
+            self.select_class_zero_type::<BinaryInput>(),
+            self.select_class_zero_type::<DoubleBitBinaryInput>(),
+            self.select_class_zero_type::<BinaryOutputStatus>(),
+            self.select_class_zero_type::<Counter>(),
+            self.select_class_zero_type::<FrozenCounter>(),
+            self.select_class_zero_type::<AnalogInput>(),
+            self.select_class_zero_type::<AnalogOutputStatus>(),
+            self.select_class_zero_type::<OctetString>(),
+        ]
+        .into_iter()
+        .fold((Iin2::default(), Visits::NONE), |(iin2, visits), (i, v)| {
+            (iin2 | i, visits.plus(v))
+        })
     }
 }
 
@@ -1417,7 +1492,7 @@ mod tests {
                 StaticTarget::Counter(Some(StaticCounterVariation::Group20Var5)),
                 None
             ),
-            Iin2::default()
+            (Iin2::default(), Visits::new(3))
         );
 
         let mut buffer = [0u8; 12]; // can only fit one header at a time
@@ -1478,7 +1553,7 @@ mod tests {
         // no points of the type
         assert_eq!(
             db.binary.check_range(IndexRange::new(0, 0).unwrap()),
-            Err(Iin2::OBJECT_UNKNOWN)
+            (Err(Iin2::OBJECT_UNKNOWN), Visits::NONE)
         );
 
         for index in [0, 1, 2, 4] {
@@ -1488,22 +1563,22 @@ mod tests {
         // every index installed
         assert_eq!(
             db.binary.check_range(IndexRange::new(0, 2).unwrap()),
-            Ok(Iin2::default())
+            (Ok(Iin2::default()), Visits::new(3))
         );
         // missing index in the middle
         assert_eq!(
             db.binary.check_range(IndexRange::new(2, 4).unwrap()),
-            Ok(Iin2::PARAMETER_ERROR)
+            (Ok(Iin2::PARAMETER_ERROR), Visits::new(2))
         );
         // past the last point
         assert_eq!(
             db.binary.check_range(IndexRange::new(4, 5).unwrap()),
-            Ok(Iin2::PARAMETER_ERROR)
+            (Ok(Iin2::PARAMETER_ERROR), Visits::new(1))
         );
         // no installed index
         assert_eq!(
             db.binary.check_range(IndexRange::new(5, 10).unwrap()),
-            Err(Iin2::PARAMETER_ERROR)
+            (Err(Iin2::PARAMETER_ERROR), Visits::NONE)
         );
     }
 
@@ -1530,10 +1605,16 @@ mod tests {
 
         let full = IndexRange::new(0, u16::MAX).unwrap();
         assert_eq!(full.len(), 65536);
-        assert_eq!(db.binary.check_range(full), Ok(Iin2::default()));
+        assert_eq!(
+            db.binary.check_range(full),
+            (Ok(Iin2::default()), Visits::new(65536))
+        );
 
         assert!(db.remove::<BinaryInput>(1000));
-        assert_eq!(db.binary.check_range(full), Ok(Iin2::PARAMETER_ERROR));
+        assert_eq!(
+            db.binary.check_range(full),
+            (Ok(Iin2::PARAMETER_ERROR), Visits::new(65535))
+        );
     }
 
     #[test]
@@ -1542,29 +1623,29 @@ mod tests {
 
         assert_eq!(
             db.select(StaticTarget::Binary(None), None),
-            Iin2::OBJECT_UNKNOWN
+            (Iin2::OBJECT_UNKNOWN, Visits::NONE)
         );
         assert_eq!(
             db.select(
                 StaticTarget::Counter(None),
                 Some(IndexRange::new(0, 0).unwrap())
             ),
-            Iin2::OBJECT_UNKNOWN
+            (Iin2::OBJECT_UNKNOWN, Visits::NONE)
         );
         assert_eq!(
             db.select(StaticTarget::AnalogInputDeadBand(None), None),
-            Iin2::OBJECT_UNKNOWN
+            (Iin2::OBJECT_UNKNOWN, Visits::NONE)
         );
         assert_eq!(
             db.select(
                 StaticTarget::AnalogInputDeadBand(None),
                 Some(IndexRange::new(0, 0).unwrap())
             ),
-            Iin2::OBJECT_UNKNOWN
+            (Iin2::OBJECT_UNKNOWN, Visits::NONE)
         );
         assert_eq!(
             db.select(StaticTarget::FrozenAnalog(None), None),
-            Iin2::OBJECT_UNKNOWN
+            (Iin2::OBJECT_UNKNOWN, Visits::NONE)
         );
 
         // nothing selected
@@ -1582,7 +1663,7 @@ mod tests {
                 StaticTarget::Counter(None),
                 Some(IndexRange::new(1, 2).unwrap())
             ),
-            Iin2::PARAMETER_ERROR
+            (Iin2::PARAMETER_ERROR, Visits::NONE)
         );
         assert_eq!(db.selection_count(), 0);
     }
@@ -1593,17 +1674,19 @@ mod tests {
 
         assert!(db.add(0, counter_config(StaticCounterVariation::Group20Var1)));
 
-        // every index installed, so only running out of selections sets IIN2.2
+        // every index installed, so only running out of selections sets IIN2.2; the point is
+        // counted and then snapshot
         let range = Some(IndexRange::new(0, 0).unwrap());
         for _ in 0..db.selection_capacity() {
             assert_eq!(
                 db.select(StaticTarget::Counter(None), range),
-                Iin2::default()
+                (Iin2::default(), Visits::new(2))
             );
         }
+        // once the selection is full, the point isn't visited
         assert_eq!(
             db.select(StaticTarget::Counter(None), range),
-            Iin2::PARAMETER_ERROR
+            (Iin2::PARAMETER_ERROR, Visits::NONE)
         );
     }
 
@@ -1618,7 +1701,7 @@ mod tests {
                 StaticTarget::Counter(None),
                 Some(IndexRange::new(0, 1).unwrap())
             ),
-            Iin2::PARAMETER_ERROR
+            (Iin2::PARAMETER_ERROR, Visits::new(2))
         );
         assert_eq!(
             write_selection(&mut db),
@@ -1636,16 +1719,17 @@ mod tests {
         assert!(db.add(0, counter_config(StaticCounterVariation::Group20Var1)));
         assert!(db.add(2, counter_config(StaticCounterVariation::Group20Var1)));
 
+        // the snapshot visits only the installed points
         assert_eq!(
             db.select(StaticTarget::Counter(None), None),
-            Iin2::default()
+            (Iin2::default(), Visits::new(2))
         );
     }
 
     fn selections_until_parameter_error(db: &mut StaticDatabase) -> usize {
         let range = Some(IndexRange::new(0, 0).unwrap());
         std::iter::from_fn(|| {
-            (db.select(StaticTarget::Counter(None), range) == Iin2::default()).then_some(())
+            (db.select(StaticTarget::Counter(None), range).0 == Iin2::default()).then_some(())
         })
         .count()
     }

@@ -20,9 +20,11 @@
 //! Checked, and what each covers:
 //!
 //! - [`select`]: `ReadHeaders` over any parsed request (the mapping of each header to what it
-//!   selects, and the error and summary for the ones READ doesn't support), the reset, and event
-//!   selection by class and by type with any count, with its IIN2 bits. It dispatches the event
-//!   headers as `Database::select_read` does
+//!   selects, and the error and summary for the ones READ doesn't support), the reset, the READ
+//!   budget scaled to the database, and event selection by class and by type with any count,
+//!   with its IIN2 bits and the records it visits charged to the budget. It dispatches the event
+//!   headers as `Database::select_read` does, and rejects the READ the same way
+//! - [`budget`]: `ReadBudget` with any sizes, charged any sequence of visits to either pool
 //! - [`respond`]: the event writers for solicited responses, every variation, with and without
 //!   CTO, and the progress that decides whether a fragment continues
 //! - [`unsolicited`]: `select_unsolicited` and `write_events_only`
@@ -68,12 +70,13 @@ use crate::app::{Iin2, QualifierCode, Sequence, Variation};
 use crate::link::EndpointAddress;
 use crate::master::EventClasses;
 use crate::outstation::database::details::attrs::{write_attr_list, write_attribute};
+use crate::outstation::database::details::budget::{OverBudget, Pool, ReadBudget};
 use crate::outstation::database::details::event::buffer::Event;
 use crate::outstation::database::details::family::Family;
 use crate::outstation::database::details::range::static_db::{
     write_dead_bands, write_points, IndexRange, VariationRange,
 };
-use crate::outstation::database::details::WriteProgress;
+use crate::outstation::database::details::{Visits, WriteProgress};
 use crate::outstation::database::read::{ReadHeader, ReadHeaders};
 use crate::outstation::database::*;
 use crate::outstation::read_log::ReadLog;
@@ -111,19 +114,44 @@ impl ReadLog for Quiet {
     fn deferred_capacity(max: usize, header: (Variation, QualifierCode), count: Count) {
         black_box((max, header, count));
     }
+
+    fn read_over_budget(over: OverBudget) {
+        black_box(over);
+    }
 }
 
 #[no_panic::no_panic]
 fn select(db: &mut Database, headers: &HeaderCollection) -> Iin2 {
     db.inner.reset();
+    let mut budget = db.inner.read_budget();
     let mut headers = ReadHeaders::new(headers);
     let mut iin2 = Iin2::default();
     for (header, _read_with) in headers.by_ref() {
         if let ReadHeader::Event(target, limit) = header {
-            iin2 |= db.inner.select_events(target, limit);
+            let (selected, visits) = db.inner.select_events(target, limit);
+            if let Err(over) = budget.charge(Pool::Event, visits) {
+                Quiet::read_over_budget(over);
+                db.inner.reset();
+                iin2 = Iin2::PARAMETER_ERROR;
+                break;
+            }
+            iin2 |= selected;
         }
     }
     iin2 | headers.finish::<Quiet>()
+}
+
+#[no_panic::no_panic]
+fn budget(static_records: usize, event_capacity: usize, charges: &[(bool, usize)]) {
+    let mut budget = ReadBudget::new(static_records, event_capacity);
+    for (is_static, visits) in charges {
+        let pool = if *is_static {
+            Pool::Static
+        } else {
+            Pool::Event
+        };
+        black_box(budget.charge(pool, Visits::new(*visits)).err());
+    }
 }
 
 #[no_panic::no_panic]
@@ -641,7 +669,7 @@ fn responses(source: &mut Source) {
     let mut deferred = DeferredRead::new(source.u16());
     let ops = source.len();
     for _ in 0..ops {
-        match source.u8() % 12 {
+        match source.u8() % 13 {
             0 => add(&mut db, source),
             1 => update(&mut db, source),
             2 => {
@@ -691,7 +719,12 @@ fn responses(source: &mut Source) {
             }
             // a confirm of the events written so far, as between continuation fragments
             10 => confirm(&mut db),
-            _ => discard(&mut db, event_classes(source)),
+            11 => discard(&mut db, event_classes(source)),
+            _ => {
+                let (static_records, event_capacity) = (source.len(), source.len());
+                let charges = source.many(|source| (source.bool(), source.len()));
+                budget(static_records, event_capacity, &charges);
+            }
         }
     }
 }

@@ -36,6 +36,10 @@ impl<T> BoundedQueue<T> {
         self.len
     }
 
+    pub(crate) fn is_full(&self) -> bool {
+        self.len >= self.slots.len()
+    }
+
     /// The slot `offset` places past the head, wrapping at the end, or `None` if there are no
     /// slots
     fn slot(&self, offset: usize) -> Option<usize> {

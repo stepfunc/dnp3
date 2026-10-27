@@ -19,7 +19,8 @@ use crate::app::measurement::{
     DoubleBitBinaryInput, Flags, FrozenCounter, OctetString, Time,
 };
 use crate::outstation::database::details::attrs::map::SetMap;
-use crate::outstation::database::details::WriteProgress;
+use crate::outstation::database::details::budget::{Pool, ReadBudget};
+use crate::outstation::database::details::{Visits, WriteProgress};
 use crate::outstation::read_log::ReadLog;
 use crate::outstation::{BufferState, ClassCount, OutstationApplication};
 use scursor::WriteCursor;
@@ -81,39 +82,70 @@ impl Database {
 
     /// Start the selection for a READ from a reset, so that it never inherits what an earlier
     /// selection left selected or written
+    ///
+    /// A READ whose selection visits more records than its budget allows is rejected after the
+    /// header that exceeds it: the selection is reset, so the response has no objects, and only
+    /// IIN2.2 is returned
     pub(crate) fn select_read<L: ReadLog>(
         &mut self,
         headers: impl Iterator<Item = ReadHeader>,
     ) -> Iin2 {
         self.reset();
+        let mut budget = self.read_budget();
         let mut iin2 = Iin2::default();
         for header in headers {
-            iin2 |= self.select_by_header::<L>(header);
+            let (pool, selected, visits) = self.select_by_header::<L>(header);
+            if let Err(over) = budget.charge(pool, visits) {
+                L::read_over_budget(over);
+                self.reset();
+                return Iin2::PARAMETER_ERROR;
+            }
+            iin2 |= selected;
         }
         iin2
+    }
+
+    /// The budget of a READ, scaled to the points, attribute sets and event capacity
+    pub(crate) fn read_budget(&self) -> ReadBudget {
+        let static_records = self
+            .static_db
+            .point_count()
+            .saturating_add(self.attrs.set_count());
+        ReadBudget::new(static_records, self.event_buffer.capacity())
     }
 
     /// Start the selection of the events in `classes` for an unsolicited response from a reset,
     /// returning how many it selected
     pub(crate) fn select_unsolicited(&mut self, classes: EventClasses) -> usize {
         self.reset();
-        self.event_buffer.select_by_class(classes, None)
+        let (count, _visits) = self.event_buffer.select_by_class(classes, None);
+        count
     }
 
-    fn select_by_header<L: ReadLog>(&mut self, header: ReadHeader) -> Iin2 {
-        match header {
-            ReadHeader::Class0 => self.static_db.select_class_zero(),
-            ReadHeader::Static(target, range) => self.static_db.select(target, range),
-            ReadHeader::Event(target, limit) => self.select_events(target, limit),
-            ReadHeader::Attr(header) => self.attrs.select::<L>(header),
-        }
+    /// Select what a header asks for, with the pool its work counts against and the records it
+    /// visited
+    fn select_by_header<L: ReadLog>(&mut self, header: ReadHeader) -> (Pool, Iin2, Visits) {
+        let (pool, (iin2, visits)) = match header {
+            ReadHeader::Class0 => (Pool::Static, self.static_db.select_class_zero()),
+            ReadHeader::Static(target, range) => {
+                (Pool::Static, self.static_db.select(target, range))
+            }
+            ReadHeader::Event(target, limit) => (Pool::Event, self.select_events(target, limit)),
+            ReadHeader::Attr(header) => (Pool::Static, self.attrs.select::<L>(header)),
+        };
+        (pool, iin2, visits)
     }
 
-    pub(crate) fn select_events(&mut self, target: EventTarget, limit: Option<usize>) -> Iin2 {
+    /// Select the events a header asks for, with the records visited
+    pub(crate) fn select_events(
+        &mut self,
+        target: EventTarget,
+        limit: Option<usize>,
+    ) -> (Iin2, Visits) {
         match target {
             EventTarget::Class(class) => {
-                self.event_buffer.select_by_class(class.into(), limit);
-                Iin2::default()
+                let (_count, visits) = self.event_buffer.select_by_class(class.into(), limit);
+                (Iin2::default(), visits)
             }
             EventTarget::Binary(v) => self.select_events_by_type::<BinaryInput>(v, limit),
             EventTarget::DoubleBitBinary(v) => {
@@ -130,7 +162,7 @@ impl Database {
             }
             EventTarget::OctetString => self.select_events_by_type::<OctetString>(None, limit),
             // we know what it is, but don't support it
-            EventTarget::FrozenAnalog(_) => Iin2::OBJECT_UNKNOWN,
+            EventTarget::FrozenAnalog(_) => (Iin2::OBJECT_UNKNOWN, Visits::NONE),
         }
     }
 
@@ -143,16 +175,17 @@ impl Database {
         &mut self,
         variation: Option<T::EventVariation>,
         limit: Option<usize>,
-    ) -> Iin2
+    ) -> (Iin2, Visits)
     where
         T: Family,
     {
-        self.event_buffer.select_by_type::<T>(variation, limit);
-        if !self.static_db.has_points::<T>() && !self.event_buffer.has_events::<T>() {
+        let (_count, visits) = self.event_buffer.select_by_type::<T>(variation, limit);
+        let iin2 = if !self.static_db.has_points::<T>() && !self.event_buffer.has_events::<T>() {
             Iin2::OBJECT_UNKNOWN
         } else {
             Iin2::default()
-        }
+        };
+        (iin2, visits)
     }
 
     pub(crate) fn discard_unselected_events(&mut self, classes: EventClasses) -> ClassCount {

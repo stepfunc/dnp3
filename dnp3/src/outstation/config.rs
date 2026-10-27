@@ -120,6 +120,10 @@ pub struct OutstationConfig {
     /// Past the limit, further selections or headers are ignored, the rest are answered, and
     /// the response sets the PARAMETER_ERROR IIN bit. Device attributes (group 0) have a
     /// separate, fixed limit of 32 selections per READ.
+    ///
+    /// Independent of this limit, a READ whose selection visits more points, events or attribute
+    /// sets than a fixed multiple of the database is answered with PARAMETER_ERROR and no
+    /// objects.
     #[cfg_attr(feature = "serialization", serde(default))]
     pub max_read_request_headers: Option<u16>,
     /// Maximum number of controls in a single request
