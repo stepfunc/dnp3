@@ -247,7 +247,7 @@ async fn run_tcp_client(
     endpoint: SocketAddr,
     cli: &CliArgs,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let outstation = spawn_outstation_tcp_client(
+    let mut outstation = spawn_outstation_tcp_client(
         LinkErrorMode::Close,
         EndpointList::single(endpoint.to_string()),
         ConnectStrategy::default(),
@@ -260,6 +260,8 @@ async fn run_tcp_client(
     );
 
     initialize_database(&outstation);
+    // a TCP client outstation starts disabled: enable it to start connecting
+    outstation.enable().await?;
     run_outstation(outstation).await
 }
 
