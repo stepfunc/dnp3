@@ -685,6 +685,7 @@ impl OutstationApplication for ExampleOutstationApplication {
             FreezeIndices::All => (0, POINT_COUNT - 1),
             FreezeIndices::Range(start, stop) => (start, stop.min(POINT_COUNT - 1)),
         };
+        tracing::info!("freeze counters {start} to {stop} (clear: {clear})");
         database.transaction(|db| {
             for index in start..=stop {
                 if let Some(counter) = Get::<Counter>::get(db, index) {
