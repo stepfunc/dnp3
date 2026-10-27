@@ -475,12 +475,14 @@ impl StaticDatabase {
         let mut writer = RangeWriter::new();
         for (index, item) in range.entries(&self.get_map::<T>().inner) {
             // first determine what variation should be written
-            let info = variation
+            let selected = variation
                 .unwrap_or(item.config.s_var)
-                .promote(&item.selected)
-                .get_write_info(&item.selected);
+                .promote(&item.selected);
 
-            if writer.write(cursor, *index, &item.selected, info).is_err() {
+            if writer
+                .write(cursor, *index, &item.selected, selected)
+                .is_err()
+            {
                 // ran out of space, tell calling code to resume at this index, which the
                 // range always includes
                 return match range.resume_at(*index) {
@@ -504,10 +506,8 @@ impl StaticDatabase {
             // first determine what variation should be written
             let var = variation.unwrap_or(AnalogInputDeadBandVariation::Group34Var3);
 
-            let info = var.get_write_info();
-
             if writer
-                .write(cursor, *index, &item.config.detector.deadband, info)
+                .write(cursor, *index, &item.config.detector.deadband, var)
                 .is_err()
             {
                 // ran out of space, tell calling code to resume at this index, which the
