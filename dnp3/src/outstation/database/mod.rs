@@ -445,6 +445,7 @@ impl Database {
         class_zero_config: ClassZeroConfig,
         config: EventBufferConfig,
     ) -> Self {
+        warn_output_status_events_outside_class_zero(&class_zero_config, &config);
         Self {
             inner: details::database::Database::new(max_read_selection, class_zero_config, config),
         }
@@ -481,6 +482,25 @@ impl Database {
         attr: OwnedAttribute,
     ) -> Result<(), AttrDefError> {
         self.inner.get_attr_map().define(prop, attr)
+    }
+}
+
+/// Warn about output status types left out of class 0 whose events are still buffered: an
+/// outstation that leaves g10 or g40 out of class 0 must not report g11 or g42 events in class
+/// polls (TB2016-003b, Table 12-49, note i)
+fn warn_output_status_events_outside_class_zero(
+    class_zero: &ClassZeroConfig,
+    events: &EventBufferConfig,
+) {
+    if !class_zero.binary_output_status && events.max_binary_output_status > 0 {
+        tracing::warn!(
+            "binary output status is left out of class 0, but its events (g11) are buffered; set max_binary_output_status to 0"
+        );
+    }
+    if !class_zero.analog_output_status && events.max_analog_output_status > 0 {
+        tracing::warn!(
+            "analog output status is left out of class 0, but its events (g42) are buffered; set max_analog_output_status to 0"
+        );
     }
 }
 

@@ -176,7 +176,7 @@ fn define_binary_output_status_config(
         .end_fields()?
         .add_full_initializer("create")?
         .begin_initializer("init", InitializerType::Normal, "Initialize to defaults")?
-        .default_variant(&static_variation, gv(10, 1))?
+        .default_variant(&static_variation, gv(10, 2))?
         .default_variant(&event_variation, gv(11, 2))?
         .end_initializer()?
         .build()?;
