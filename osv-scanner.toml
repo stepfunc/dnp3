@@ -1,0 +1,14 @@
+# Advisories that OSV reports against Cargo.lock which we reviewed and found don't apply. Each
+# entry says why, and expires so that it is reviewed again.
+
+# block-buffer 0.10.4 (through digest 0.10): the advisory lists every version below 0.12.1, but
+# the mechanism it describes, a cursor stored inline in the block and overwritten before a
+# callback that can panic, isn't in 0.10. There `BlockBuffer` keeps its cursor in a separate
+# `pos` field that `digest_blocks` writes only after `compress` returns, and `ReadBuffer` doesn't
+# exist. The fix (0.12.1) needs the digest 0.11 stack. dnp3 reaches block-buffer only with the
+# `tls` feature, through sfio-rustls-config decrypting a password-protected private key file when
+# a TLS configuration is built, with RustCrypto's compression functions as the callbacks.
+[[IgnoredVulns]]
+id = "GHSA-qwgh-2vcv-g2f7"
+ignoreUntil = 2027-04-30
+reason = "block-buffer 0.10.4 doesn't contain the inline-cursor design the advisory describes; see osv-scanner.toml"
