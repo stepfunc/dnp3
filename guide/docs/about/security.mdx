@@ -5,6 +5,9 @@ sidebar_label: Security
 slug: /security
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 This page describes how the library defends against malformed or malicious input, and which of those defenses are
 proven rather than just enforced. For how to report a vulnerability, and for how we manage dependencies, see the
 [security policy](https://github.com/stepfunc/dnp3/blob/main/SECURITY.md).
@@ -51,42 +54,82 @@ unnoticed.
 ## Proven panic freedom
 
 The lints restrict panics in our own code, but a call into the standard library or a dependency can still panic. So
-CI also proves, at link time, that the following steps can't panic **for any input**, including in the standard
-library and dependency code they call:
+CI also proves, at link time, that the steps that parse what the library receives, and format and frame what it sends,
+can't panic **for any input**, including in the standard library and dependency code they call. Each diagram follows a
+request or response down from the bytes received, through the processing in your role, and back up to the bytes sent:
 
-* receiving: buffering and parsing link frames and replying to them, reassembling transport segments, parsing
-  fragments, object headers and object values, and the master's extraction of every type of measurement
-* sending: formatting every request the master sends, the outstation's event buffer and the events it writes into
-  solicited and unsolicited responses, the encoding of static values and device attributes, and segmenting and framing
-  what is sent
+<Tabs
+groupId="role"
+defaultValue="master"
+values={[
+{label: 'Master', value: 'master'},
+{label: 'Outstation', value: 'outstation'},
+]}>
+<TabItem value="master">
 
 ```mermaid
-flowchart TD
-    bytes(["Bytes from TCP, TLS, UDP or serial"]):::outside
-    reader["Link layer: buffering and parsing frames, and replying to them"]:::proven
-    transport["Transport layer: reassembling segments into fragments"]:::proven
-    app["Application layer: fragments, object headers and object values"]:::proven
-    master["Master: extracting every type of measurement"]:::proven
-    readhandler(["Your ReadHandler"]):::user
-    session["Sessions: scheduling tasks, processing requests, and selecting static points and attributes"]:::outside
-    handlers(["Your OutstationApplication, ControlHandler and other callbacks"]):::user
-    requests["Master: formatting every request"]:::proven
-    events["Outstation: storing events, and selecting and writing them"]:::proven
-    values["Outstation: encoding static values and device attributes"]:::proven
-    framing["Transport and link layers: segmenting and framing what is sent"]:::proven
-    sent(["Bytes to TCP, TLS, UDP or serial"]):::outside
-    bytes --> reader --> transport --> app
-    app --> master --> readhandler
-    app --> session
-    session --- handlers
-    session --> requests --> framing
-    session --> events --> framing
-    session --> values --> framing
-    framing --> sent
+flowchart LR
+    subgraph receiving [Receiving]
+        direction TB
+        rx(["Bytes from TCP, TLS, UDP or serial"]):::outside
+        rlink["Link layer: parsing frames, and replying to them"]:::proven
+        rtransport["Transport layer: reassembling segments into fragments"]:::proven
+        rapp["Application layer: parsing fragments, object headers and object values"]:::proven
+        extract["Extracting every type of measurement"]:::proven
+        rx --> rlink --> rtransport --> rapp --> extract
+    end
+    subgraph sending [Sending]
+        direction BT
+        format["Formatting every request"]:::proven
+        sframe["Transport and link layers: segmenting and framing"]:::proven
+        tx(["Bytes to TCP, TLS, UDP or serial"]):::outside
+        format --> sframe --> tx
+    end
+    session["Session: scheduling tasks, and matching responses to requests"]:::outside
+    handler(["Your ReadHandler"]):::user
+    extract --> handler
+    extract --> session --> format
     classDef proven fill:#d9f2e3,stroke:#1b7f45,color:#0b3d20
     classDef outside fill:#eeeeee,stroke:#888888,color:#333333
     classDef user fill:#ffffff,stroke:#888888,stroke-dasharray:4 4,color:#333333
 ```
+
+</TabItem>
+<TabItem value="outstation">
+
+```mermaid
+flowchart LR
+    subgraph receiving [Receiving]
+        direction TB
+        rx(["Bytes from TCP, TLS, UDP or serial"]):::outside
+        rlink["Link layer: parsing frames, and replying to them"]:::proven
+        rtransport["Transport layer: reassembling segments into fragments"]:::proven
+        rapp["Application layer: parsing fragments, object headers and object values"]:::proven
+        rx --> rlink --> rtransport --> rapp
+    end
+    subgraph sending [Sending]
+        direction BT
+        events["Storing events, and selecting and writing them"]:::proven
+        values["Encoding static values and device attributes"]:::proven
+        sframe["Transport and link layers: segmenting and framing"]:::proven
+        tx(["Bytes to TCP, TLS, UDP or serial"]):::outside
+        events --> sframe
+        values --> sframe
+        sframe --> tx
+    end
+    session["Session: processing requests, and walking the stored static points and attributes"]:::outside
+    handlers(["Your OutstationApplication, ControlHandler and other callbacks"]):::user
+    rapp --> session
+    session --- handlers
+    session --> events
+    session --> values
+    classDef proven fill:#d9f2e3,stroke:#1b7f45,color:#0b3d20
+    classDef outside fill:#eeeeee,stroke:#888888,color:#333333
+    classDef user fill:#ffffff,stroke:#888888,stroke-dasharray:4 4,color:#333333
+```
+
+</TabItem>
+</Tabs>
 
 The green steps are proven panic-free. The asynchronous session code and I/O around them aren't part of the proof,
 shown in gray, and neither is the outstation's processing of requests, apart from how it maps the headers of a READ to
@@ -152,10 +195,10 @@ nothing don't use up the READ limit. A READ that arrives while the outstation wa
 as pending, and holding it counts each header that parses, event headers included. Device attributes have their own
 fixed limit of selections per READ.
 
-These limits bound memory. The outstation also budgets the work of selecting what a READ reports, and of applying an
-ASSIGN_CLASS request, scaled to the size of its database, so that a request repeating headers that name every point or
-event is answered with IIN2.2 instead of consuming the CPU. The budget allows any reasonable request, even a redundant
-one.
+These limits bound memory. Some requests that the standard allows would still take a pathological amount of CPU to
+process, such as a READ or ASSIGN_CLASS that repeats headers naming every point or event many times. The outstation
+enforces a work budget on these requests, scaled to the size of its database, and answers one that exceeds it with
+IIN2.2. Reasonable requests, even redundant ones, stay well within it.
 
 ## Protocol validation
 
