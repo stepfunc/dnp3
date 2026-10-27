@@ -11,7 +11,7 @@ use crate::app::format::write::HeaderWriter;
 use crate::app::{Iin2, QualifierCode, Variation};
 use crate::outstation::database::details::attrs::map::SetMap;
 use crate::outstation::database::details::range::static_db::IndexRange;
-use crate::outstation::database::details::WriteProgress;
+use crate::outstation::database::details::{Visits, WriteProgress};
 use crate::outstation::database::read::AttrHeader;
 use crate::outstation::read_log::ReadLog;
 use crate::util::bounded::{BoundedQueue, Full};
@@ -222,46 +222,52 @@ impl AttrHandler {
         self.selection.clear();
     }
 
-    pub(crate) fn select<L: ReadLog>(&mut self, header: AttrHeader) -> Iin2 {
+    /// the number of attribute sets defined
+    pub(crate) fn set_count(&self) -> usize {
+        self.map.set_count()
+    }
+
+    /// Select the attributes a header asks for, with the sets visited
+    ///
+    /// Only the all objects variations visit the sets; a specific set is looked up
+    pub(crate) fn select<L: ReadLog>(&mut self, header: AttrHeader) -> (Iin2, Visits) {
         match header {
             AttrHeader::All(var) => {
-                match var {
-                    255 => {
-                        // list of variations for every set
-                        let mut iin2 = Iin2::default();
-                        for set in self.map.sets() {
-                            iin2 |= self.selection.push::<L>(Selected::single(set, 255));
-                        }
-                        iin2
-                    }
-                    254 => {
-                        // all attributes in every set
-                        self.map.sets().fold(Iin2::default(), |iin, set| {
-                            iin | self.selection.push::<L>(Selected::all(set))
-                        })
-                    }
+                let selected: fn(AttrSet) -> Selected = match var {
+                    // list of variations for every set
+                    255 => |set| Selected::single(set, 255),
+                    // all attributes in every set
+                    254 => Selected::all,
                     _ => {
                         L::attr_variation_with_all_objects(var);
-                        Iin2::PARAMETER_ERROR
+                        return (Iin2::PARAMETER_ERROR, Visits::NONE);
                     }
+                };
+                let mut iin2 = Iin2::default();
+                let mut visits = Visits::NONE;
+                for set in self.map.sets() {
+                    iin2 |= self.selection.push::<L>(selected(set));
+                    visits.increment();
                 }
+                (iin2, visits)
             }
             AttrHeader::Specific(var, range) => {
                 let set = match range.to_attr_set() {
                     Some(x) => x,
                     None => {
                         L::attr_range_unsupported(range);
-                        return Iin2::PARAMETER_ERROR;
+                        return (Iin2::PARAMETER_ERROR, Visits::NONE);
                     }
                 };
-                match var {
+                let iin2 = match var {
                     254 => self.selection.push::<L>(Selected::all(set)),
                     255 => self.selection.push::<L>(Selected::single(set, 255)),
                     _ => match self.map.get(set, var) {
                         Ok(_) => self.selection.push::<L>(Selected::single(set, var)),
                         Err(err) => err.into(),
                     },
-                }
+                };
+                (iin2, Visits::NONE)
             }
         }
     }
@@ -353,9 +359,10 @@ mod test {
         )
         .unwrap();
 
+        // every attribute is in set 0
         assert_eq!(
             handler.select::<Tracing>(AttrHeader::All(254)),
-            Iin2::default()
+            (Iin2::default(), Visits::new(1))
         );
 
         let mut buffer = [0; 64];

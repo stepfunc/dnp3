@@ -129,6 +129,10 @@ nothing don't use up the READ limit. A READ that arrives while the outstation wa
 as pending, and holding it counts each header that parses, event headers included. Device attributes have their own
 fixed limit of selections per READ.
 
+These limits bound memory. The outstation also budgets the work of selecting what a READ reports, scaled to the size of
+its database, so that a request repeating headers that select every point or event is answered with IIN2.2 and no
+objects instead of consuming the CPU. The budget allows any reasonable request, even a redundant one.
+
 ## Protocol validation
 
 The library follows IEEE 1815-2012 as amended by the DNP Users Group technical bulletins. Examples of how it validates

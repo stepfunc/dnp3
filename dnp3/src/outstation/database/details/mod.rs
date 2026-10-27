@@ -5,6 +5,7 @@
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
 pub(crate) mod attrs;
+pub(crate) mod budget;
 pub(crate) mod database;
 pub(crate) mod event;
 pub(crate) mod family;
@@ -26,5 +27,30 @@ impl WriteProgress {
             Self::Complete => next(),
             Self::Partial => Self::Partial,
         }
+    }
+}
+
+/// How many records a selection step visited: static points, event records or attribute sets
+#[derive(Copy, Clone, Debug, Default, PartialEq, Eq)]
+pub(crate) struct Visits(usize);
+
+impl Visits {
+    pub(crate) const NONE: Self = Self(0);
+
+    pub(crate) fn new(count: usize) -> Self {
+        Self(count)
+    }
+
+    pub(crate) fn count(self) -> usize {
+        self.0
+    }
+
+    pub(crate) fn plus(self, other: Self) -> Self {
+        Self(self.0.saturating_add(other.0))
+    }
+
+    /// one more record visited
+    pub(crate) fn increment(&mut self) {
+        self.0 = self.0.saturating_add(1);
     }
 }

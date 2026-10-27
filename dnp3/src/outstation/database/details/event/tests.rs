@@ -11,7 +11,9 @@
 //! per-type limits that evict the oldest record of the type, whatever its state. After every
 //! generated op, the buffer's class and type counts, unwritten classes, overflow flag and
 //! per-type presence must match the model's, and so must the op's result: an insert's id, its
-//! eviction (`Overflow { created, discarded }`) or `TypeMaxIsZero`; selection counts; the
+//! eviction (`Overflow { created, discarded }`) or `TypeMaxIsZero`; selection counts and the
+//! records each selection visits (all of them, or through the record after the one that
+//! reaches its limit, which READ budgets count); the
 //! written count, progress and bytes; the cleared ids in order; and discard counts. A final
 //! reset, select, write and clear must leave both empty.
 //!
@@ -41,7 +43,7 @@ use scursor::WriteCursor;
 use crate::app::measurement::*;
 use crate::master::EventClasses;
 use crate::outstation::database::config::*;
-use crate::outstation::database::details::WriteProgress;
+use crate::outstation::database::details::{Visits, WriteProgress};
 use crate::outstation::database::variations::*;
 use crate::outstation::database::{EventBufferConfig, EventClass};
 use crate::outstation::{BufferState, ClassCount, TypeCount};
@@ -176,7 +178,12 @@ impl Kind {
     }
 
     /// select the events of this type, in the default variation or a specific one
-    fn select(self, buffer: &mut EventBuffer, specific: bool, limit: Option<usize>) -> usize {
+    fn select(
+        self,
+        buffer: &mut EventBuffer,
+        specific: bool,
+        limit: Option<usize>,
+    ) -> (usize, Visits) {
         match self {
             Kind::Binary => buffer.select_by_type::<BinaryInput>(
                 specific.then_some(EventBinaryInputVariation::Group2Var2),
@@ -366,22 +373,38 @@ impl Model {
         result
     }
 
-    fn select<F>(&mut self, limit: Option<usize>, specific: bool, matches: F) -> usize
+    /// select the matching unselected records, returning how many and the records visited:
+    /// every record, unless the limit is reached first, which stops at the record after the
+    /// last one selected (or the first record, for a limit of 0)
+    fn select<F>(&mut self, limit: Option<usize>, specific: bool, matches: F) -> (usize, Visits)
     where
         F: Fn(&Record) -> bool,
     {
+        let limit = limit.unwrap_or(usize::MAX);
+        let len = self.records.len();
         let mut count: usize = 0;
-        for record in self
+        let mut last = None;
+        for (position, record) in self
             .records
             .iter_mut()
-            .filter(|r| r.state == State::Unselected && matches(r))
-            .take(limit.unwrap_or(usize::MAX))
+            .enumerate()
+            .filter(|(_, r)| r.state == State::Unselected && matches(r))
+            .take(limit)
         {
             record.state = State::Selected;
             record.specific = specific;
             count = count.saturating_add(1);
+            last = Some(position);
         }
-        count
+        let visits = if count < limit {
+            len
+        } else {
+            match last {
+                Some(last) => last.saturating_add(2).min(len),
+                None => len.min(1),
+            }
+        };
+        (count, Visits::new(visits))
     }
 
     /// write the selected records in order while they fit in `capacity` bytes, returning the
@@ -779,7 +802,7 @@ fn can_select_events_by_class_and_write_some() {
     // the class 2 events stay unselected
     assert_eq!(
         buffer.select_by_class(EventClass::Class1 | EventClass::Class3, None),
-        3
+        (3, Visits::new(5))
     );
 
     // the g2v1 event fits, but not the CTO, header and g4v3 event after it

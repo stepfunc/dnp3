@@ -113,7 +113,7 @@ Paths are relative to `dnp3/src`.
 |---|---|---|---|---|
 | `behaves_like_a_capped_vec_deque` | `util/bounded.rs` | The bounded queue that holds READ selections keeps FIFO order, its length and front, and refuses a push exactly when full, across the end of its ring | Independent model (`VecDeque`) | 256 |
 | `behaves_like_a_bounded_queue` | `outstation/database/details/event/list.rs` | The event list keeps insertion order, its ends and size, and `remove_all`'s call order, with each of its fixed slots live or free exactly once | Independent model | 256 |
-| `behaves_like_a_list_with_per_type_limits` | `outstation/database/details/event/tests.rs` | The event buffer's counts, classes, overflow, selection, written bytes and cleared ids | Independent model with its own encoder | 256 |
+| `behaves_like_a_list_with_per_type_limits` | `outstation/database/details/event/tests.rs` | The event buffer's counts, classes, overflow, selection and the records it visits, written bytes and cleared ids | Independent model with its own encoder | 256 |
 | `float_deadband_is_symmetric_and_never_exceeded_by_the_same_value` | `outstation/database/details/range/static_db.rs` | The float deadband is symmetric and a value never exceeds it against itself | Relation | 512 |
 | `a_larger_float_deadband_never_adds_an_event` | `outstation/database/details/range/static_db.rs` | A larger float deadband never reports a change a smaller one doesn't | Relation | 512 |
 | `float_deadband_limits_are_exact` | `outstation/database/details/range/static_db.rs` | Zero, infinite and boundary float deadbands | Independent, except the boundary distance | 512 |
