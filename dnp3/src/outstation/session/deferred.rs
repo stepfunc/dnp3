@@ -5,13 +5,14 @@
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
 use crate::app::parse::parser::HeaderCollection;
-use crate::app::Iin2;
 use crate::app::Sequence;
+use crate::app::{Iin2, QualifierCode, Variation};
 use crate::outstation::database::read::{ReadHeader, ReadHeaders};
 use crate::outstation::database::DatabaseHandle;
+use crate::outstation::read_log::{ReadLog, Tracing};
 use crate::transport::FragmentInfo;
 use crate::util::bounded::{BoundedQueue, Full};
-use crate::util::skipped::Skipped;
+use crate::util::skipped::{Count, Skipped};
 
 #[derive(Copy, Clone)]
 pub(crate) struct DeferredInfo {
@@ -64,6 +65,7 @@ impl DeferredRead {
         seq: Sequence,
         info: FragmentInfo,
         headers: HeaderCollection,
+        log: impl ReadLog,
     ) {
         self.headers.clear();
 
@@ -78,12 +80,9 @@ impl DeferredRead {
             }
         }
 
-        iin2 |= headers.finish();
-        if let Some(((variation, qualifier), count)) = over_capacity.first() {
-            tracing::warn!(
-                "insufficient capacity ({}) for READ header: {variation} - {qualifier}{count}",
-                self.headers.max(),
-            );
+        iin2 |= headers.finish(log);
+        if let Some((header, count)) = over_capacity.first() {
+            log.deferred_capacity(self.headers.max(), header, count);
         }
 
         self.info = Some(DeferredInfo::new(hash, seq, info, iin2));
@@ -93,11 +92,22 @@ impl DeferredRead {
         match self.info {
             None => None,
             Some(x) => {
-                let iin2 =
-                    database.transaction(|db| db.inner.select_read(self.headers.iter().copied()));
+                let iin2 = database
+                    .transaction(|db| db.inner.select_read(self.headers.iter().copied(), Tracing));
                 self.clear();
                 Some(x.merge(iin2))
             }
         }
     }
+}
+
+/// Log the first header of a deferred READ that doesn't fit its queue, and how many
+pub(crate) fn log_capacity(
+    max: usize,
+    (variation, qualifier): (Variation, QualifierCode),
+    count: Count,
+) {
+    tracing::warn!(
+        "insufficient capacity ({max}) for READ header: {variation} - {qualifier}{count}"
+    );
 }

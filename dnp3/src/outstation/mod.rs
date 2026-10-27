@@ -21,6 +21,8 @@ pub mod database;
 mod config;
 /// functionality for processing control requests
 pub(crate) mod control;
+/// the diagnostics of a READ
+pub(crate) mod read_log;
 #[cfg(feature = "unstable")]
 mod runner;
 /// outstation session

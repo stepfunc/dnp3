@@ -20,6 +20,7 @@ use crate::app::measurement::{
 };
 use crate::outstation::database::details::attrs::map::SetMap;
 use crate::outstation::database::details::WriteProgress;
+use crate::outstation::read_log::ReadLog;
 use crate::outstation::{BufferState, ClassCount, OutstationApplication};
 use scursor::WriteCursor;
 
@@ -74,11 +75,15 @@ impl Database {
 
     /// Start the selection for a READ from a reset, so that it never inherits what an earlier
     /// selection left selected or written
-    pub(crate) fn select_read(&mut self, headers: impl Iterator<Item = ReadHeader>) -> Iin2 {
+    pub(crate) fn select_read(
+        &mut self,
+        headers: impl Iterator<Item = ReadHeader>,
+        log: impl ReadLog,
+    ) -> Iin2 {
         self.reset();
         let mut iin2 = Iin2::default();
         for header in headers {
-            iin2 |= self.select_by_header(header);
+            iin2 |= self.select_by_header(header, log);
         }
         iin2
     }
@@ -90,16 +95,16 @@ impl Database {
         self.event_buffer.select_by_class(classes, None)
     }
 
-    fn select_by_header(&mut self, header: ReadHeader) -> Iin2 {
+    fn select_by_header(&mut self, header: ReadHeader, log: impl ReadLog) -> Iin2 {
         match header {
             ReadHeader::Class0 => self.static_db.select_class_zero(),
             ReadHeader::Static(target, range) => self.static_db.select(target, range),
             ReadHeader::Event(target, limit) => self.select_events(target, limit),
-            ReadHeader::Attr(header) => self.attrs.select(header),
+            ReadHeader::Attr(header) => self.attrs.select(header, log),
         }
     }
 
-    fn select_events(&mut self, target: EventTarget, limit: Option<usize>) -> Iin2 {
+    pub(crate) fn select_events(&mut self, target: EventTarget, limit: Option<usize>) -> Iin2 {
         match target {
             EventTarget::Class(class) => {
                 self.event_buffer.select_by_class(class.into(), limit);
@@ -246,16 +251,25 @@ impl Database {
 
     /// write events, then static data, then attributes, each only once the part before it is
     /// complete
-    pub(crate) fn write_response_headers(&mut self, cursor: &mut WriteCursor) -> ResponseInfo {
-        let (num_events, progress) = self.event_buffer.write_events(cursor);
+    pub(crate) fn write_response_headers(
+        &mut self,
+        cursor: &mut WriteCursor,
+        log: impl ReadLog,
+    ) -> ResponseInfo {
+        let (num_events, progress) = self.write_events(cursor);
         let progress = progress
             .then(|| self.static_db.write(cursor))
-            .then(|| self.attrs.write(cursor));
+            .then(|| self.attrs.write(cursor, log));
 
         ResponseInfo {
             has_events: num_events > 0,
             complete: progress == WriteProgress::Complete,
         }
+    }
+
+    /// write the selected events, returning how many and whether they all fit
+    pub(crate) fn write_events(&mut self, cursor: &mut WriteCursor) -> (usize, WriteProgress) {
+        self.event_buffer.write_events(cursor)
     }
 
     pub(crate) fn write_events_only(&mut self, cursor: &mut WriteCursor) -> usize {

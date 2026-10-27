@@ -58,7 +58,7 @@ impl std::fmt::Display for IndexRange {
 
 impl IndexRange {
     /// The range from `start` through `stop`, or `None` if `start > stop`
-    fn new(start: u16, stop: u16) -> Option<Self> {
+    pub(crate) fn new(start: u16, stop: u16) -> Option<Self> {
         (start <= stop).then_some(Self { start, stop })
     }
 
@@ -472,27 +472,10 @@ impl StaticDatabase {
     where
         T: Family,
     {
-        let mut writer = RangeWriter::new();
-        for (index, item) in range.entries(&self.get_map::<T>().inner) {
-            // first determine what variation should be written
-            let selected = variation
-                .unwrap_or(item.config.s_var)
-                .promote(&item.selected);
-
-            if writer
-                .write(cursor, *index, &item.selected, selected)
-                .is_err()
-            {
-                // ran out of space, tell calling code to resume at this index, which the
-                // range always includes
-                return match range.resume_at(*index) {
-                    Some(rest) => Err(T::selection(variation).with(rest)),
-                    None => Ok(()),
-                };
-            }
-        }
-
-        Ok(())
+        let points = range
+            .entries(&self.get_map::<T>().inner)
+            .map(|(index, point)| (*index, &point.selected, point.config.s_var));
+        write_points(cursor, range, variation, points)
     }
 
     fn write_analog_dead_bands(
@@ -501,28 +484,10 @@ impl StaticDatabase {
         range: IndexRange,
         variation: Option<AnalogInputDeadBandVariation>,
     ) -> Result<(), VariationRange> {
-        let mut writer = RangeWriter::new();
-        for (index, item) in range.entries(&self.analog.inner) {
-            // first determine what variation should be written
-            let var = variation.unwrap_or(AnalogInputDeadBandVariation::Group34Var3);
-
-            if writer
-                .write(cursor, *index, &item.config.detector.deadband, var)
-                .is_err()
-            {
-                // ran out of space, tell calling code to resume at this index, which the
-                // range always includes
-                return match range.resume_at(*index) {
-                    Some(rest) => Err(VariationRange::new(
-                        rest,
-                        SpecificVariation::AnalogDeadBand(variation),
-                    )),
-                    None => Ok(()),
-                };
-            }
-        }
-
-        Ok(())
+        let dead_bands = range
+            .entries(&self.analog.inner)
+            .map(|(index, point)| (*index, &point.config.detector.deadband));
+        write_dead_bands(cursor, range, variation, dead_bands)
     }
 
     pub(crate) fn select(&mut self, target: StaticTarget, range: Option<IndexRange>) -> Iin2 {
@@ -754,6 +719,63 @@ impl EventDetector<OctetString> for OctetStringDetector {
     fn is_event(&self, new: &OctetString, old: &OctetString) -> bool {
         new.value() != old.value()
     }
+}
+
+/// Write the selected `points` of a `range`, each as the requested variation or its own
+/// default, promoted for its value, or the rest of the range to resume at if one doesn't fit
+pub(crate) fn write_points<'a, T>(
+    cursor: &mut WriteCursor,
+    range: IndexRange,
+    variation: Option<T::StaticVariation>,
+    points: impl Iterator<Item = (u16, &'a T, T::StaticVariation)>,
+) -> Result<(), VariationRange>
+where
+    T: Family + 'a,
+{
+    let mut writer = RangeWriter::new();
+    for (index, value, default) in points {
+        // first determine what variation should be written
+        let selected = variation.unwrap_or(default).promote(value);
+
+        if writer.write(cursor, index, value, selected).is_err() {
+            // ran out of space, tell calling code to resume at this index, which the
+            // range always includes
+            return match range.resume_at(index) {
+                Some(rest) => Err(T::selection(variation).with(rest)),
+                None => Ok(()),
+            };
+        }
+    }
+
+    Ok(())
+}
+
+/// Write the analog input dead-bands of a `range`, as the requested variation or g34v3, or the
+/// rest of the range to resume at if one doesn't fit
+pub(crate) fn write_dead_bands<'a>(
+    cursor: &mut WriteCursor,
+    range: IndexRange,
+    variation: Option<AnalogInputDeadBandVariation>,
+    dead_bands: impl Iterator<Item = (u16, &'a f64)>,
+) -> Result<(), VariationRange> {
+    let mut writer = RangeWriter::new();
+    // first determine what variation should be written
+    let var = variation.unwrap_or(AnalogInputDeadBandVariation::Group34Var3);
+    for (index, dead_band) in dead_bands {
+        if writer.write(cursor, index, dead_band, var).is_err() {
+            // ran out of space, tell calling code to resume at this index, which the
+            // range always includes
+            return match range.resume_at(index) {
+                Some(rest) => Err(VariationRange::new(
+                    rest,
+                    SpecificVariation::AnalogDeadBand(variation),
+                )),
+                None => Ok(()),
+            };
+        }
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

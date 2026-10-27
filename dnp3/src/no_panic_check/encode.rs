@@ -268,7 +268,7 @@ fn attr_value(source: &mut Source) -> OwnedAttrValue {
     }
 }
 
-fn attribute(source: &mut Source) -> OwnedAttribute {
+pub(super) fn attribute(source: &mut Source) -> OwnedAttribute {
     let set = if source.bool() {
         AttrSet::Default
     } else {

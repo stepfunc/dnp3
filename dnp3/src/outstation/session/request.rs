@@ -5,6 +5,7 @@
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
 use super::*;
+use crate::outstation::read_log::Tracing;
 
 impl OutstationSession {
     /// Take the master's next fragment. This is where every request enters the session, in any
@@ -166,7 +167,9 @@ impl OutstationSession {
                         .await
                     }
                     Reads::Defer => {
-                        self.state.deferred_read.set(hash, seq, info, objects);
+                        self.state
+                            .deferred_read
+                            .set(hash, seq, info, objects, Tracing);
                         Ok(None)
                     }
                 }

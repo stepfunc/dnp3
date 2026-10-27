@@ -4,12 +4,16 @@
 // Text and data mining rights, including for AI training, are reserved under
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
-use crate::app::attr::{AttrDataType, AttrItem, AttrSet, AttrWriteError};
+use crate::app::attr::{
+    AttrDataType, AttrItem, AttrSet, AttrWriteError, BadAttribute, OwnedAttribute,
+};
 use crate::app::format::write::HeaderWriter;
 use crate::app::{Iin2, QualifierCode, Variation};
 use crate::outstation::database::details::attrs::map::SetMap;
+use crate::outstation::database::details::range::static_db::IndexRange;
 use crate::outstation::database::details::WriteProgress;
 use crate::outstation::database::read::AttrHeader;
+use crate::outstation::read_log::ReadLog;
 use crate::util::bounded::{BoundedQueue, Full};
 use scursor::WriteCursor;
 
@@ -82,62 +86,25 @@ fn get_list_encoding(num_items: usize) -> Option<(u8, AttrDataType)> {
 }
 
 impl Selection {
-    fn push(&mut self, s: Selected) -> Iin2 {
+    fn push(&mut self, s: Selected, log: impl ReadLog) -> Iin2 {
         match self.selected.try_push(s) {
             Ok(()) => Iin2::default(),
             Err(Full) => {
-                tracing::warn!(
-                    "READ exceeds max attribute headers ({}) per request",
-                    self.selected.max()
-                );
+                log.attr_selection_full(self.selected.max());
                 Iin2::PARAMETER_ERROR
             }
         }
     }
 
-    /// Run `f`, rolling the cursor back to its starting position if it fails
-    fn tx<E, F>(cursor: &mut WriteCursor, f: F) -> Result<(), E>
-    where
-        E: From<scursor::WriteError>,
-        F: FnOnce(&mut WriteCursor) -> Result<(), E>,
-    {
-        let start = cursor.position();
-        let res = f(cursor);
-        if res.is_err() {
-            cursor.seek_to(start)?
-        }
-        res
-    }
-
-    fn write_attr_list(
-        set: AttrSet,
+    fn write_all(
+        &mut self,
         cursor: &mut WriteCursor,
-        items: impl ExactSizeIterator<Item = AttrItem>,
-    ) -> Result<(), scursor::WriteError> {
-        if let Some((len, dt)) = get_list_encoding(items.len()) {
-            // we're committed to writing now
-            return Self::tx(cursor, |cur| {
-                HeaderWriter::new(cur).write_range_only(
-                    Variation::Group0(255),
-                    set.value(),
-                    set.value(),
-                )?;
-                cur.write_u8(dt.into())?;
-                cur.write_u8(len)?;
-                for item in items {
-                    cur.write_u8(item.variation)?;
-                    cur.write_u8(item.properties.into())?;
-                }
-                Ok(())
-            });
-        }
-        Ok(())
-    }
-
-    fn write_all(&mut self, cursor: &mut WriteCursor, map: &SetMap) -> WriteProgress {
+        map: &SetMap,
+        log: impl ReadLog,
+    ) -> WriteProgress {
         while let Some(item) = self.selected.front_mut() {
             let (set, var) = item.current();
-            if Self::write_one(set, var, cursor, map) == WriteProgress::Partial {
+            if Self::write_one(set, var, cursor, map, log) == WriteProgress::Partial {
                 return WriteProgress::Partial;
             }
             if item.advance() {
@@ -147,32 +114,88 @@ impl Selection {
         WriteProgress::Complete
     }
 
-    fn write_one(set: AttrSet, var: u8, cursor: &mut WriteCursor, map: &SetMap) -> WriteProgress {
+    fn write_one(
+        set: AttrSet,
+        var: u8,
+        cursor: &mut WriteCursor,
+        map: &SetMap,
+        log: impl ReadLog,
+    ) -> WriteProgress {
         if var == crate::app::attr::var::LIST_OF_ATTRIBUTE_VARIATIONS {
             let Some(vars) = map.variations(set) else {
                 return WriteProgress::Complete;
             };
-            return match Self::write_attr_list(set, cursor, vars) {
-                Ok(()) => WriteProgress::Complete,
-                Err(_) => WriteProgress::Partial,
-            };
+            return write_attr_list(set, cursor, vars);
         }
 
         let Ok(attr) = map.get(set, var) else {
             return WriteProgress::Complete;
         };
-        match Self::tx(cursor, |cur| HeaderWriter::new(cur).write_attribute(attr)) {
-            Ok(()) => WriteProgress::Complete,
-            Err(AttrWriteError::Cursor) => WriteProgress::Partial,
-            Err(AttrWriteError::BadAttribute(err)) => {
-                tracing::error!("Unable to write attribute: {}", err);
-                WriteProgress::Complete
-            }
-        }
+        write_attribute(cursor, attr, log)
     }
 
     fn clear(&mut self) {
         self.selected.clear();
+    }
+}
+
+/// Run `f`, rolling the cursor back to its starting position if it fails
+fn tx<E, F>(cursor: &mut WriteCursor, f: F) -> Result<(), E>
+where
+    E: From<scursor::WriteError>,
+    F: FnOnce(&mut WriteCursor) -> Result<(), E>,
+{
+    let start = cursor.position();
+    let res = f(cursor);
+    if res.is_err() {
+        cursor.seek_to(start)?
+    }
+    res
+}
+
+/// Write the list of attribute variations of a set (g0v255), whole or not at all
+pub(crate) fn write_attr_list(
+    set: AttrSet,
+    cursor: &mut WriteCursor,
+    items: impl ExactSizeIterator<Item = AttrItem>,
+) -> WriteProgress {
+    let Some((len, dt)) = get_list_encoding(items.len()) else {
+        return WriteProgress::Complete;
+    };
+    // we're committed to writing now
+    let written: Result<(), scursor::WriteError> = tx(cursor, |cur| {
+        HeaderWriter::new(cur).write_range_only(
+            Variation::Group0(255),
+            set.value(),
+            set.value(),
+        )?;
+        cur.write_u8(dt.into())?;
+        cur.write_u8(len)?;
+        for item in items {
+            cur.write_u8(item.variation)?;
+            cur.write_u8(item.properties.into())?;
+        }
+        Ok(())
+    });
+    match written {
+        Ok(()) => WriteProgress::Complete,
+        Err(_) => WriteProgress::Partial,
+    }
+}
+
+/// Write an attribute, whole or not at all, skipping one that can't be encoded
+pub(crate) fn write_attribute(
+    cursor: &mut WriteCursor,
+    attr: &OwnedAttribute,
+    log: impl ReadLog,
+) -> WriteProgress {
+    match tx(cursor, |cur| HeaderWriter::new(cur).write_attribute(attr)) {
+        Ok(()) => WriteProgress::Complete,
+        Err(AttrWriteError::Cursor) => WriteProgress::Partial,
+        Err(AttrWriteError::BadAttribute(err)) => {
+            log.attr_not_encodable(err);
+            WriteProgress::Complete
+        }
     }
 }
 
@@ -198,15 +221,15 @@ impl AttrHandler {
         &mut self.map
     }
 
-    pub(crate) fn write(&mut self, cursor: &mut WriteCursor) -> WriteProgress {
-        self.selection.write_all(cursor, &self.map)
+    pub(crate) fn write(&mut self, cursor: &mut WriteCursor, log: impl ReadLog) -> WriteProgress {
+        self.selection.write_all(cursor, &self.map, log)
     }
 
     pub(crate) fn reset(&mut self) {
         self.selection.clear();
     }
 
-    pub(crate) fn select(&mut self, header: AttrHeader) -> Iin2 {
+    pub(crate) fn select(&mut self, header: AttrHeader, log: impl ReadLog) -> Iin2 {
         match header {
             AttrHeader::All(var) => {
                 match var {
@@ -214,21 +237,18 @@ impl AttrHandler {
                         // list of variations for every set
                         let mut iin2 = Iin2::default();
                         for set in self.map.sets() {
-                            iin2 |= self.selection.push(Selected::single(set, 255));
+                            iin2 |= self.selection.push(Selected::single(set, 255), log);
                         }
                         iin2
                     }
                     254 => {
                         // all attributes in every set
                         self.map.sets().fold(Iin2::default(), |iin, set| {
-                            iin | self.selection.push(Selected::all(set))
+                            iin | self.selection.push(Selected::all(set), log)
                         })
                     }
                     _ => {
-                        tracing::warn!(
-                            "Attribute variation {var} may not be used with {}",
-                            QualifierCode::AllObjects
-                        );
+                        log.attr_variation_with_all_objects(var);
                         Iin2::PARAMETER_ERROR
                     }
                 }
@@ -237,15 +257,15 @@ impl AttrHandler {
                 let set = match range.to_attr_set() {
                     Some(x) => x,
                     None => {
-                        tracing::warn!("Attribute READ not supported with range: {range}");
+                        log.attr_range_unsupported(range);
                         return Iin2::PARAMETER_ERROR;
                     }
                 };
                 match var {
-                    254 => self.selection.push(Selected::all(set)),
-                    255 => self.selection.push(Selected::single(set, 255)),
+                    254 => self.selection.push(Selected::all(set), log),
+                    255 => self.selection.push(Selected::single(set, 255), log),
                     _ => match self.map.get(set, var) {
-                        Ok(_) => self.selection.push(Selected::single(set, var)),
+                        Ok(_) => self.selection.push(Selected::single(set, var), log),
                         Err(err) => err.into(),
                     },
                 }
@@ -254,10 +274,30 @@ impl AttrHandler {
     }
 }
 
+pub(crate) fn log_selection_full(max: usize) {
+    tracing::warn!("READ exceeds max attribute headers ({max}) per request");
+}
+
+pub(crate) fn log_variation_with_all_objects(var: u8) {
+    tracing::warn!(
+        "Attribute variation {var} may not be used with {}",
+        QualifierCode::AllObjects
+    );
+}
+
+pub(crate) fn log_range_unsupported(range: IndexRange) {
+    tracing::warn!("Attribute READ not supported with range: {range}");
+}
+
+pub(crate) fn log_not_encodable(err: BadAttribute) {
+    tracing::error!("Unable to write attribute: {}", err);
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
     use crate::app::attr::{var, AttrProp, AttrValue, StringAttr};
+    use crate::outstation::read_log::Tracing;
     use scursor::ReadCursor;
 
     fn encode_string(variation: u8, value: &str) -> Vec<u8> {
@@ -281,7 +321,10 @@ mod test {
 
             let mut buffer = [0; 520];
             let mut cursor = WriteCursor::new(&mut buffer);
-            Selection::write_attr_list(AttrSet::Private(3), &mut cursor, items.clone()).unwrap();
+            assert_eq!(
+                write_attr_list(AttrSet::Private(3), &mut cursor, items.clone()),
+                WriteProgress::Complete
+            );
 
             // g0v255, 1-byte start/stop range of the set
             let (header, value) = cursor.written().split_at_checked(5).unwrap();
@@ -317,11 +360,14 @@ mod test {
         )
         .unwrap();
 
-        assert_eq!(handler.select(AttrHeader::All(254)), Iin2::default());
+        assert_eq!(
+            handler.select(AttrHeader::All(254), Tracing),
+            Iin2::default()
+        );
 
         let mut buffer = [0; 64];
         let mut cursor = WriteCursor::new(&mut buffer);
-        assert_eq!(handler.write(&mut cursor), WriteProgress::Complete);
+        assert_eq!(handler.write(&mut cursor, Tracing), WriteProgress::Complete);
 
         let mut expected = encode_string(var::DEVICE_SERIAL_NUMBER, "serial");
         expected.extend(encode_string(var::PRODUCT_NAME_AND_MODEL, "product"));
