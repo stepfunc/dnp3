@@ -4,18 +4,18 @@
 // Text and data mining rights, including for AI training, are reserved under
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
-//! Links the outstation's selection and writing of READ responses and unsolicited responses,
-//! with a database, requests and output buffers the compiler can't know.
+//! Links the outstation's event buffer, and its selection and writing of READ responses and
+//! unsolicited responses, with a database, requests and output buffers the compiler can't know.
 //!
 //! The database is built from the input outside the checked functions: points of every type,
 //! static and event variation and class, and updates with any value, flags, time and event
-//! mode, which fill the event buffer and can overflow it. Any sequence of the operations below
-//! follows, so each one sees the state the earlier ones left, including events still selected
-//! for a continuation fragment and confirmed events removed between fragments. Output buffers
-//! are input-sized from 0 bytes to 16 MiB. Diagnostics go to `Quiet`, which hands their
+//! mode. Any sequence of the operations below follows, so each one sees the state the earlier
+//! ones left: events inserted until their type overflows, events still selected for a
+//! continuation fragment, and confirmed or discarded events removed between fragments. Output
+//! buffers are input-sized from 0 bytes to 16 MiB. Diagnostics go to `Quiet`, which hands their
 //! arguments to `black_box`, so the check covers what the diagnostics reached by these wrappers
-//! report but not `tracing`. The check proves only that no panic is reachable: the existing tests pin the bytes
-//! and the selection.
+//! report but not `tracing`. The check proves only that no panic is reachable: the existing
+//! tests pin the bytes and the selection.
 //!
 //! Checked, and what each covers:
 //!
@@ -26,6 +26,12 @@
 //! - [`respond`]: the event writers for solicited responses, every variation, with and without
 //!   CTO, and the progress that decides whether a fragment continues
 //! - [`unsolicited`]: `select_unsolicited` and `write_events_only`
+//! - [`insert`]: `EventBuffer::insert` for every fixed-size type and `insert_event` for octet
+//!   strings, whose bytes are allocated outside the check: the per-type maximum, eviction of the
+//!   oldest event of a full type, and the event list's slots
+//! - [`confirm`]: `clear_written`, which removes the written events after a confirm and passes
+//!   each id on, and recomputes the overflow
+//! - [`discard`]: `remove_unselected_by_class`
 //! - [`static_points`]: `write_points` for every static type and `write_dead_bands`, with any
 //!   points, default and requested variations, and range: the choice and promotion of each
 //!   point's variation, every static encoder, packing of bits and double bits, and the range to
@@ -44,10 +50,11 @@
 //! the push of each selected range), `StaticDatabase::write`'s walk and its loop over the
 //! selected ranges, attribute selection and the attribute writer's loop over the selection.
 //! Also not checked: `select_read`, `write_response_headers` and `DeferredRead::select` as
-//! wholes, since they reach those maps; the database mutex and its notification; inserting and
-//! removing events (removal runs between checked operations, not in one); the session's
-//! assembly of READ responses and its logging; clocks; the application, information and control
-//! callbacks; the transport and I/O; and the `Tracing` log.
+//! wholes, since they reach those maps, and `Database::update`, which finds the point in its map
+//! before inserting the event; allocating an octet string event's bytes; the database mutex and
+//! its notification; the session's assembly of READ responses and its logging; clocks; the
+//! application, information and control callbacks; the transport and I/O; and the `Tracing`
+//! log.
 
 use std::hint::black_box;
 
@@ -61,6 +68,7 @@ use crate::app::{Iin2, QualifierCode, Sequence, Variation};
 use crate::link::EndpointAddress;
 use crate::master::EventClasses;
 use crate::outstation::database::details::attrs::{write_attr_list, write_attribute};
+use crate::outstation::database::details::event::buffer::Event;
 use crate::outstation::database::details::family::Family;
 use crate::outstation::database::details::range::static_db::{
     write_dead_bands, write_points, IndexRange, VariationRange,
@@ -70,7 +78,6 @@ use crate::outstation::database::read::{ReadHeader, ReadHeaders};
 use crate::outstation::database::*;
 use crate::outstation::read_log::ReadLog;
 use crate::outstation::session::deferred::DeferredRead;
-use crate::outstation::OutstationApplication;
 use crate::phys::PhysAddr;
 use crate::transport::{FragmentAddr, FragmentInfo};
 use crate::util::skipped::Count;
@@ -222,6 +229,55 @@ fn unsolicited(db: &mut Database, classes: EventClasses, buffer: &mut [u8]) {
     black_box(cursor.written());
 }
 
+/// A value of one type and the default event variation to record it in
+enum NewEvent {
+    Binary(BinaryInput, EventBinaryInputVariation),
+    DoubleBitBinary(DoubleBitBinaryInput, EventDoubleBitBinaryInputVariation),
+    BinaryOutputStatus(BinaryOutputStatus, EventBinaryOutputStatusVariation),
+    Counter(Counter, EventCounterVariation),
+    FrozenCounter(FrozenCounter, EventFrozenCounterVariation),
+    Analog(AnalogInput, EventAnalogInputVariation),
+    AnalogOutputStatus(AnalogOutputStatus, EventAnalogOutputStatusVariation),
+    /// created outside the check, since its bytes are allocated
+    OctetString(Event),
+}
+
+#[no_panic::no_panic]
+fn insert(db: &mut Database, index: u16, class: EventClass, event: NewEvent) {
+    let buffer = db.inner.event_buffer();
+    let result = match event {
+        NewEvent::Binary(value, variation) => buffer.insert(index, class, &value, variation),
+        NewEvent::DoubleBitBinary(value, variation) => {
+            buffer.insert(index, class, &value, variation)
+        }
+        NewEvent::BinaryOutputStatus(value, variation) => {
+            buffer.insert(index, class, &value, variation)
+        }
+        NewEvent::Counter(value, variation) => buffer.insert(index, class, &value, variation),
+        NewEvent::FrozenCounter(value, variation) => buffer.insert(index, class, &value, variation),
+        NewEvent::Analog(value, variation) => buffer.insert(index, class, &value, variation),
+        NewEvent::AnalogOutputStatus(value, variation) => {
+            buffer.insert(index, class, &value, variation)
+        }
+        NewEvent::OctetString(event) => buffer.insert_event(index, class, event),
+    };
+    black_box(result.is_ok());
+    black_box(result.err());
+}
+
+#[no_panic::no_panic]
+fn confirm(db: &mut Database) {
+    let count = db.inner.event_buffer().clear_written(|id| {
+        black_box(id);
+    });
+    black_box(count);
+}
+
+#[no_panic::no_panic]
+fn discard(db: &mut Database, classes: EventClasses) {
+    black_box(db.inner.event_buffer().remove_unselected_by_class(classes));
+}
+
 #[no_panic::no_panic]
 fn defer(
     deferred: &mut DeferredRead,
@@ -233,11 +289,6 @@ fn defer(
     deferred.set(hash, seq, info, headers, Quiet);
     black_box(deferred.is_set());
 }
-
-/// An application that takes every default
-struct Application;
-
-impl OutstationApplication for Application {}
 
 fn class(source: &mut Source) -> Option<EventClass> {
     source.pick(&[
@@ -506,6 +557,42 @@ fn points(source: &mut Source) -> Points {
     }
 }
 
+fn new_event(source: &mut Source) -> Option<NewEvent> {
+    let event = match source.u8() % 8 {
+        0 => NewEvent::Binary(
+            binary_input(source),
+            source.pick(EventBinaryInputVariation::ALL),
+        ),
+        1 => NewEvent::DoubleBitBinary(
+            double_bit_binary_input(source),
+            source.pick(EventDoubleBitBinaryInputVariation::ALL),
+        ),
+        2 => NewEvent::BinaryOutputStatus(
+            binary_output_status(source),
+            source.pick(EventBinaryOutputStatusVariation::ALL),
+        ),
+        3 => NewEvent::Counter(counter(source), source.pick(EventCounterVariation::ALL)),
+        4 => NewEvent::FrozenCounter(
+            frozen_counter(source),
+            source.pick(EventFrozenCounterVariation::ALL),
+        ),
+        5 => NewEvent::Analog(
+            analog_input(source),
+            source.pick(EventAnalogInputVariation::ALL),
+        ),
+        6 => NewEvent::AnalogOutputStatus(
+            analog_output_status(source),
+            source.pick(EventAnalogOutputStatusVariation::ALL),
+        ),
+        _ => NewEvent::OctetString(octet_string(source)?.create_event(EventOctetStringVariation)),
+    };
+    Some(event)
+}
+
+fn event_class(source: &mut Source) -> EventClass {
+    source.pick(&[EventClass::Class1, EventClass::Class2, EventClass::Class3])
+}
+
 fn fragment_info(source: &mut Source) -> FragmentInfo {
     let addr = FragmentAddr {
         link: EndpointAddress::raw(source.u16()),
@@ -555,7 +642,7 @@ fn responses(source: &mut Source) {
     let mut deferred = DeferredRead::new(source.u16());
     let ops = source.len();
     for _ in 0..ops {
-        match source.u8() % 10 {
+        match source.u8() % 12 {
             0 => add(&mut db, source),
             1 => update(&mut db, source),
             2 => {
@@ -597,10 +684,15 @@ fn responses(source: &mut Source) {
                 }
             }
             8 => deferred.clear(),
-            // a confirm of the events written so far, as between continuation fragments
-            _ => {
-                black_box(db.inner.clear_written_events(&mut Application));
+            9 => {
+                let (index, class) = (source.u16(), event_class(source));
+                if let Some(event) = new_event(source) {
+                    insert(&mut db, index, class, event);
+                }
             }
+            // a confirm of the events written so far, as between continuation fragments
+            10 => confirm(&mut db),
+            _ => discard(&mut db, event_classes(source)),
         }
     }
 }
