@@ -1256,7 +1256,7 @@ fn all_types(db: &mut Database) {
 const CLASS_0_HEADERS: [&[u8]; 8] = [
     &[1, 1, 1, 3, 0, 3, 0, 1],
     &[3, 1, 1, 3, 0, 3, 0, 2],
-    &[10, 1, 1, 3, 0, 3, 0, 1],
+    &[10, 2, 1, 3, 0, 3, 0, 129],
     &[20, 1, 1, 3, 0, 3, 0, 1, 1, 0, 0, 0],
     &[21, 1, 1, 3, 0, 3, 0, 1, 1, 0, 0, 0],
     &[30, 1, 1, 3, 0, 3, 0, 1, 1, 0, 0, 0],
@@ -1346,7 +1346,7 @@ fn packed_binary_output_status_promotes_points_with_flags_other_than_online() {
     let mut handle = new_handle();
     handle.transaction(|db| {
         for index in 0..10 {
-            db.add(index, None, BinaryOutputStatusConfig::default());
+            db.add(index, None, packed_binary_output_status());
             let value = BinaryOutputStatus::new(index % 3 == 0, Flags::ONLINE, time());
             db.update(index, &value, UpdateOptions::no_event());
         }
@@ -1390,15 +1390,23 @@ fn read_in_fragments(handle: &mut DatabaseHandle, objects: &[u8], size: usize) -
     fragments.into_iter().map(|(bytes, _)| bytes).collect()
 }
 
+/// binary output status as packed bits (g10v1), which isn't the default
+fn packed_binary_output_status() -> BinaryOutputStatusConfig {
+    BinaryOutputStatusConfig {
+        s_var: StaticBinaryOutputStatusVariation::Group10Var1,
+        ..Default::default()
+    }
+}
+
 /// a database of binary inputs, double-bit inputs and binary output statuses at each index,
-/// each with the given flags and state, and the static variations the configs default to
+/// each with the given flags and state, in their packed static variations (g1v1, g3v1, g10v1)
 fn packed_points(points: &[(u16, Flags, bool, DoubleBit)]) -> DatabaseHandle {
     let handle = new_handle();
     handle.transaction(|db| {
         for &(index, flags, value, double) in points {
             db.add(index, None, BinaryInputConfig::default());
             db.add(index, None, DoubleBitBinaryInputConfig::default());
-            db.add(index, None, BinaryOutputStatusConfig::default());
+            db.add(index, None, packed_binary_output_status());
             let options = UpdateOptions::no_event();
             db.update(index, &BinaryInput::new(value, flags, time()), options);
             db.update(

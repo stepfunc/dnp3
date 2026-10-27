@@ -238,7 +238,7 @@ impl Default for DoubleBitBinaryInputConfig {
 impl Default for BinaryOutputStatusConfig {
     fn default() -> Self {
         Self::new(
-            StaticBinaryOutputStatusVariation::Group10Var1,
+            StaticBinaryOutputStatusVariation::Group10Var2,
             EventBinaryOutputStatusVariation::Group11Var2,
         )
     }
