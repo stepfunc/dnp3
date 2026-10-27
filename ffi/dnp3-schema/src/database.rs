@@ -414,14 +414,7 @@ pub(crate) fn define_database(
 ) -> BackTraced<ClassHandle> {
     let database = lib.declare_class("database")?;
 
-    let event_class = lib
-        .define_enum("event_class")?
-        .push("none", "Does not generate events")?
-        .push("class1", "Class 1 event")?
-        .push("class2", "Class 2 event")?
-        .push("class3", "Class 3 event")?
-        .doc("Event class")?
-        .build()?;
+    let event_class = shared_def.event_class.clone();
 
     let update_info = define_update_info(lib)?;
     let update_options = define_update_options(lib)?;

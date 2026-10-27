@@ -8,7 +8,7 @@ use crate::attr::FfiAttrValue;
 use dnp3::app::attr::{AnyAttribute, Attribute, FloatType};
 use dnp3::app::control::*;
 use dnp3::app::*;
-use dnp3::outstation::database::DatabaseHandle;
+use dnp3::outstation::database::{DatabaseHandle, EventClass};
 use dnp3::outstation::*;
 use std::ffi::CString;
 
@@ -119,6 +119,41 @@ impl OutstationApplication for ffi::OutstationApplication {
 
     fn end_write_analog_dead_bands(&mut self) -> MaybeAsync<()> {
         ffi::OutstationApplication::end_write_analog_dead_bands(self);
+        MaybeAsync::ready(())
+    }
+
+    fn support_assign_class(&mut self) -> bool {
+        ffi::OutstationApplication::support_assign_class(self).unwrap_or(true)
+    }
+
+    fn begin_assign_class(&mut self) {
+        ffi::OutstationApplication::begin_assign_class(self)
+    }
+
+    fn assign_class(
+        &mut self,
+        point_type: PointType,
+        indices: PointIndices,
+        class: Option<EventClass>,
+    ) {
+        let point_class = event_class(class);
+        let point_type = point_type.into();
+        match indices {
+            PointIndices::All => {
+                ffi::OutstationApplication::assign_class_all(self, point_type, point_class)
+            }
+            PointIndices::Range(start, stop) => ffi::OutstationApplication::assign_class_range(
+                self,
+                point_type,
+                start,
+                stop,
+                point_class,
+            ),
+        }
+    }
+
+    fn end_assign_class(&mut self) -> MaybeAsync<()> {
+        ffi::OutstationApplication::end_assign_class(self);
         MaybeAsync::ready(())
     }
 
@@ -687,6 +722,30 @@ impl From<ffi::CommandStatus> for CommandStatus {
             ffi::CommandStatus::DownstreamFail => Self::DownstreamFail,
             ffi::CommandStatus::NonParticipating => Self::NonParticipating,
             ffi::CommandStatus::Unknown => Self::Unknown(0),
+        }
+    }
+}
+
+fn event_class(class: Option<EventClass>) -> ffi::EventClass {
+    match class {
+        None => ffi::EventClass::None,
+        Some(EventClass::Class1) => ffi::EventClass::Class1,
+        Some(EventClass::Class2) => ffi::EventClass::Class2,
+        Some(EventClass::Class3) => ffi::EventClass::Class3,
+    }
+}
+
+impl From<PointType> for ffi::PointType {
+    fn from(value: PointType) -> Self {
+        match value {
+            PointType::BinaryInput => Self::BinaryInput,
+            PointType::DoubleBitBinaryInput => Self::DoubleBitBinaryInput,
+            PointType::BinaryOutputStatus => Self::BinaryOutputStatus,
+            PointType::Counter => Self::Counter,
+            PointType::FrozenCounter => Self::FrozenCounter,
+            PointType::AnalogInput => Self::AnalogInput,
+            PointType::AnalogOutputStatus => Self::AnalogOutputStatus,
+            PointType::OctetString => Self::OctetString,
         }
     }
 }
