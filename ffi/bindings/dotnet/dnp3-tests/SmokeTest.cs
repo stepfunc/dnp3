@@ -141,6 +141,7 @@ namespace dnp3_tests
             public void HandleBinaryOutputCommandEvent(HeaderInfo info, ICollection<BinaryOutputCommandEvent> values) { }
             public void HandleAnalogOutputCommandEvent(HeaderInfo info, ICollection<AnalogOutputCommandEvent> values) { }
             public void HandleUnsignedInteger(HeaderInfo info, ICollection<UnsignedInteger> values) { }
+            public void HandleAnalogInputDeadBand(HeaderInfo info, ICollection<AnalogInputDeadBand> values) { }
             public void HandleOctetString(HeaderInfo info, ICollection<OctetString> values) { }
             public void HandleAbsTime(HeaderInfo info, Timestamp time) { }
             public void HandleStringAttr(HeaderInfo info, StringAttr attr, byte set, byte variation, string value) { }

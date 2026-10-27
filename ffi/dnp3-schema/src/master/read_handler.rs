@@ -244,6 +244,22 @@ pub(crate) fn define(
         )?
         .returns_nothing_by_default()?
         .end_callback()?
+        .begin_callback(
+            "handle_analog_input_dead_band",
+            "Handle analog input deadbands (g34)",
+        )?
+        .param(
+            "info",
+            header_info.clone(),
+            "Group/variation and qualifier information",
+        )?
+        .param(
+            "values",
+            shared_def.analog_input_dead_band_it.clone(),
+            iterator_doc,
+        )?
+        .returns_nothing_by_default()?
+        .end_callback()?
         .begin_callback("handle_octet_string", "Handle octet string data")?
         .param(
             "info",
