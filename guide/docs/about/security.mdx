@@ -139,12 +139,13 @@ one.
 The library follows IEEE 1815-2012 as amended by the DNP Users Group technical bulletins. Examples of how it validates
 input:
 
-| Behavior | Follows |
-|---|---|
-| An outstation silently discards a fragment that isn't a valid request, such as one with FIR or FIN cleared, and logs a warning | IEEE 1815-2012 clause 6 |
-| Transport segments are reassembled following the transport reception rules | TB2013-003 |
-| IIN2.0 for a function code the outstation doesn't support, IIN2.1 for an object it doesn't support, and IIN2.2 for malformed object data or a qualifier the object doesn't support | TB2016-001 |
-| An OPERATE executes only with an active selection, the next sequence number after its SELECT, object headers that match the SELECT's, and no more time elapsed than the selection timeout, and the selection is kept or ended as the table specifies | IEEE 1815-2012 4.4.4, Table 4-9 |
+* An outstation silently discards a fragment that isn't a valid request, such as one with FIR or FIN cleared, and logs a
+  warning.
+* Transport segments are reassembled following the transport reception rules.
+* An outstation answers IIN2.0 for a function code it doesn't support, IIN2.1 for an object it doesn't support, and IIN2.2
+  for malformed object data or a qualifier the object doesn't support.
+* An OPERATE executes only with an active selection, the next sequence number after its SELECT, object headers that match
+  the SELECT's, and no more time elapsed than the selection timeout.
 
 ## TLS
 

@@ -391,8 +391,7 @@ pub enum OperateType {
 /// select, operate, direct operate, or direct operate no-ack a control point
 ///
 /// Return [`CommandStatus::NotSupported`] for an index that doesn't exist. When it's the first
-/// control in the request that fails, the response also sets IIN2.2 (parameter error), which
-/// TB2016-001 requires for an index that isn't installed.
+/// control in the request that fails, the response also sets IIN2.2 (parameter error).
 ///
 /// The outstation answers a g41v3 or g41v4 control whose value is NaN or infinite with
 /// [`CommandStatus::NotSupported`] itself, without calling this trait.
@@ -478,8 +477,6 @@ pub enum FreezeIndices {
 }
 
 /// This object maps to the fields of g50v2
-///
-/// There is a table on page 57 of 1815-2012 that describes these 4 permutations
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum FreezeInterval {
     /// Freeze once immediately

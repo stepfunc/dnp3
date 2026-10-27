@@ -189,7 +189,7 @@ fn define_attr_item_struct(lib: &mut LibraryBuilder) -> BackTraced<UniversalStru
         .define_universal_struct(attr_prop)?
         .doc(
             doc("Attribute properties returned in Group0Var255").details(
-                "In 1815-2012 this only includes a field indicating if the property can be written",
+                "DNP3 defines only a field indicating whether the property can be written",
             ),
         )?
         .add(
@@ -287,7 +287,7 @@ fn define_int_attr(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
         .define_enum("int_attr")?
         .doc(
             doc("Enumeration of all the default integer attributes")
-                .details("In 1815-2012 all integer attributes are mapped to boolean values"),
+                .details("DNP3 maps all integer attributes to boolean values"),
         )?
         .add_unknown()?
         .build()?;

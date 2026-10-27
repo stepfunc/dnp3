@@ -1229,7 +1229,7 @@ fn define_outstation_application(
             .end_callback()?
         .begin_callback("freeze_counters_all_at_time",
                         doc("Freeze all the counters at a requested time and interval")
-                            .details("Refer to the table on page 57 of IEEE 1815-2012 to interpret the time and interval parameters correctly")
+                            .details("A time and interval of 0 freeze once immediately; a time with an interval of 0 freezes once at that time; an interval with a time of 0 freezes periodically, relative to the beginning of the current hour; and both freeze periodically, relative to the time.")
              )?
             .param("database_handle",database_handle.declaration(), "Database handle")?
             .param("time", Primitive::U64, "48-bit DNP3 timestamp in milliseconds since epoch UTC")?
@@ -1245,7 +1245,7 @@ fn define_outstation_application(
             .end_callback()?
         .begin_callback("freeze_counters_range_at_time",
                         doc("Freeze a range of counters at a requested time and interval")
-                            .details("Refer to the table on page 57 of IEEE 1815-2012 to interpret the time and interval parameters correctly")
+                            .details("A time and interval of 0 freeze once immediately; a time with an interval of 0 freezes once at that time; an interval with a time of 0 freezes periodically, relative to the beginning of the current hour; and both freeze periodically, relative to the time.")
              )?
             .param("start", Primitive::U16, "Start index to freeze (inclusive)")?
             .param("stop", Primitive::U16, "Stop index to freeze (inclusive)")?
@@ -1531,7 +1531,7 @@ fn define_control_handler(
             "control_handler",
             doc("Callbacks for handling controls")
                 .details(
-                    "Return {enum:command_status.not_supported} for an index that doesn't exist. When it's the first control in the request that fails, the response also sets IIN2.2 (parameter error), which TB2016-001 requires for an index that isn't installed.",
+                    "Return {enum:command_status.not_supported} for an index that doesn't exist. When it's the first control in the request that fails, the response also sets IIN2.2 (parameter error).",
                 )
                 .details(
                     "The outstation answers a g41v3 or g41v4 control whose value is NaN or infinite with {enum:command_status.not_supported} itself, without calling this interface.",
