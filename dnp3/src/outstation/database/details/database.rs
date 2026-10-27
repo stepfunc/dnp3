@@ -43,6 +43,12 @@ impl Database {
         }
     }
 
+    /// the event buffer, which the no-panic check drives directly
+    #[cfg(all(test, dnp3_no_panic))]
+    pub(crate) fn event_buffer(&mut self) -> &mut EventBuffer {
+        &mut self.event_buffer
+    }
+
     pub(crate) fn get_attr_map(&mut self) -> &mut SetMap {
         self.attrs.get_attr_map()
     }
@@ -61,7 +67,7 @@ impl Database {
         &mut self,
         app: &mut dyn OutstationApplication,
     ) -> BufferState {
-        self.event_buffer.clear_written(app);
+        self.event_buffer.clear_written(|id| app.event_cleared(id));
         self.event_buffer.buffer_state()
     }
 

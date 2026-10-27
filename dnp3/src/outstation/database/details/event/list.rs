@@ -4,7 +4,6 @@
 // Text and data mining rights, including for AI training, are reserved under
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
-use std::collections::VecDeque;
 use std::ops::ControlFlow;
 
 #[derive(Copy, Clone)]
@@ -26,6 +25,12 @@ impl<T> Entry<T> {
             metadata: MetaData { prev, next: None },
         }
     }
+}
+
+/// A slot of the list: an entry, or a link in the chain of free slots
+enum Slot<T> {
+    Free { next: Option<usize> },
+    Used(Entry<T>),
 }
 
 #[derive(Copy, Clone)]
@@ -53,20 +58,24 @@ impl State {
     }
 }
 
+/// A doubly linked list in a fixed number of slots, allocated when it's created
 pub(crate) struct VecList<T> {
-    // the maximum number of entries, which `storage.capacity()` may exceed
-    capacity: usize,
-    storage: Vec<Entry<T>>,
-    free_stack: VecDeque<usize>,
+    slots: Box<[Slot<T>]>,
+    // the first free slot, from which the others are chained
+    free: Option<usize>,
     state: Option<State>,
 }
 
 impl<T> VecList<T> {
     pub(crate) fn new(capacity: usize) -> Self {
+        let slots = (0..capacity)
+            .map(|idx| Slot::Free {
+                next: idx.checked_add(1).filter(|next| *next < capacity),
+            })
+            .collect();
         Self {
-            capacity,
-            storage: Vec::with_capacity(capacity),
-            free_stack: VecDeque::with_capacity(capacity),
+            slots,
+            free: (capacity > 0).then_some(0),
             state: None,
         }
     }
@@ -76,7 +85,7 @@ impl<T> VecList<T> {
     }
 
     pub(crate) fn is_full(&self) -> bool {
-        self.len() == self.capacity
+        self.len() == self.slots.len()
     }
 
     /// append an entry, returning false if the list is full
@@ -85,11 +94,9 @@ impl<T> VecList<T> {
         if self.is_full() {
             return false;
         }
-
-        // reuse a free slot, or add one
-        let reused = self.free_stack.front().copied();
-        let idx = reused.unwrap_or(self.storage.len());
-
+        let Some(idx) = self.free else {
+            return false;
+        };
         let state = match self.state {
             Some(current) => current.append(idx),
             None => Some(State::single(idx)),
@@ -97,44 +104,38 @@ impl<T> VecList<T> {
         let Some(state) = state else {
             return false;
         };
-        let entry = Entry::last(item, self.state.map(|x| x.tail));
+        let prev = self.state.map(|x| x.tail);
 
-        match reused {
-            Some(idx) => {
-                let Some(slot) = self.storage.get_mut(idx) else {
-                    return false;
-                };
-                *slot = entry;
-                self.free_stack.pop_front();
-            }
-            None => self.storage.push(entry),
-        }
+        // take the first free slot
+        let Some(slot) = self.slots.get_mut(idx) else {
+            return false;
+        };
+        let Slot::Free { next } = *slot else {
+            return false;
+        };
+        self.free = next;
+        *slot = Slot::Used(Entry::last(item, prev));
 
         // link the previous tail to the new one
-        if let Some(tail) = self.state.and_then(|x| self.storage.get_mut(x.tail)) {
+        if let Some(tail) = prev.and_then(|i| self.entry_mut(i)) {
             tail.metadata.next = Some(idx);
         }
         self.state = Some(state);
         true
     }
 
-    /// remove the first entry matching the predicate, returning its data, which stays in the free
-    /// slot until reused
-    pub(crate) fn remove_first<F>(&mut self, predicate: F) -> Option<&T>
+    /// remove the first entry matching the predicate, returning its data
+    pub(crate) fn remove_first<F>(&mut self, predicate: F) -> Option<T>
     where
         F: Fn(&T) -> bool,
     {
         let mut current = self.state.map(|x| x.head);
         while let Some(idx) = current {
-            let entry = self.storage.get(idx)?;
-            let metadata = entry.metadata;
+            let entry = self.entry(idx)?;
             if predicate(&entry.data) {
-                if !self.unlink(idx, metadata) {
-                    return None;
-                }
-                return self.storage.get(idx).map(|x| &x.data);
+                return self.unlink(idx);
             }
-            current = metadata.next;
+            current = entry.metadata.next;
         }
         None
     }
@@ -151,21 +152,18 @@ impl<T> VecList<T> {
         let mut count: usize = 0;
         let mut current = self.state.map(|x| x.head);
         while let Some(idx) = current {
-            let Some(entry) = self.storage.get(idx) else {
+            let Some(entry) = self.entry(idx) else {
                 break;
             };
-            let metadata = entry.metadata;
-            current = metadata.next;
+            current = entry.metadata.next;
 
             if !predicate(&entry.data) {
                 continue;
             }
-            if !self.unlink(idx, metadata) {
+            let Some(data) = self.unlink(idx) else {
                 break;
-            }
-            if let Some(entry) = self.storage.get(idx) {
-                removed(&entry.data);
-            }
+            };
+            removed(&data);
             count = count.saturating_add(1);
         }
         count
@@ -177,7 +175,7 @@ impl<T> VecList<T> {
         F: FnMut(&mut T) -> ControlFlow<()>,
     {
         let mut current = self.state.map(|x| x.head);
-        while let Some(entry) = current.and_then(|idx| self.storage.get_mut(idx)) {
+        while let Some(entry) = current.and_then(|idx| self.entry_mut(idx)) {
             if visit(&mut entry.data).is_break() {
                 return;
             }
@@ -185,16 +183,38 @@ impl<T> VecList<T> {
         }
     }
 
-    /// unlink the in-use entry at `idx`, whose links are `metadata`, and free its slot
-    fn unlink(&mut self, idx: usize, metadata: MetaData) -> bool {
-        let Some(current) = self.state else {
-            return false;
+    fn entry(&self, idx: usize) -> Option<&Entry<T>> {
+        match self.slots.get(idx)? {
+            Slot::Used(entry) => Some(entry),
+            Slot::Free { .. } => None,
+        }
+    }
+
+    fn entry_mut(&mut self, idx: usize) -> Option<&mut Entry<T>> {
+        match self.slots.get_mut(idx)? {
+            Slot::Used(entry) => Some(entry),
+            Slot::Free { .. } => None,
+        }
+    }
+
+    /// unlink the entry at `idx` and free its slot, returning its data
+    fn unlink(&mut self, idx: usize) -> Option<T> {
+        let current = self.state?;
+        let size = current.size.checked_sub(1)?;
+
+        // free the slot, at the front of the free chain
+        let slot = self.slots.get_mut(idx)?;
+        let entry = match std::mem::replace(slot, Slot::Free { next: self.free }) {
+            Slot::Used(entry) => entry,
+            free @ Slot::Free { .. } => {
+                *slot = free;
+                return None;
+            }
         };
+        self.free = Some(idx);
 
         // the removed entry's neighbors determine the new ends
-        let Some(size) = current.size.checked_sub(1) else {
-            return false;
-        };
+        let metadata = entry.metadata;
         let state = match (metadata.prev, metadata.next) {
             // it was the only entry
             (None, None) => None,
@@ -206,19 +226,16 @@ impl<T> VecList<T> {
             (Some(_), Some(_)) => Some(State::new(current.head, current.tail, size)),
         };
 
-        // return this index to the free list
-        self.free_stack.push_back(idx);
-
-        if let Some(prev) = metadata.prev.and_then(|i| self.storage.get_mut(i)) {
+        if let Some(prev) = metadata.prev.and_then(|i| self.entry_mut(i)) {
             prev.metadata.next = metadata.next;
         }
 
-        if let Some(next) = metadata.next.and_then(|i| self.storage.get_mut(i)) {
+        if let Some(next) = metadata.next.and_then(|i| self.entry_mut(i)) {
             next.metadata.prev = metadata.prev;
         }
 
         self.state = state;
-        true
+        Some(entry.data)
     }
 }
 
@@ -237,7 +254,7 @@ mod tests {
 
         fn next(&mut self) -> Option<Self::Item> {
             let idx = self.current?;
-            let entry = self.list.storage.get(idx)?;
+            let entry = self.list.entry(idx)?;
             self.current = entry.metadata.next;
             Some((idx, &entry.data))
         }
@@ -259,9 +276,9 @@ mod tests {
     /// slots, with the model's ends, size and fullness. `remove_all` must call its closures in
     /// walk order, unlinking each entry before `removed` sees it.
     ///
-    /// The model is independent of the list. It looks inside only to check that the storage never
-    /// grows past the capacity and that each slot is either live or free, never both; which free
-    /// slot is reused first is the list's choice.
+    /// The model is independent of the list. It looks inside only to check that the list has the
+    /// capacity it was created with, and that each slot is either live, on the links, or free, on
+    /// the chain of free slots, exactly once; which free slot is reused first is the list's choice.
     ///
     /// The generator uses capacities 0..8, up to 64 ops, values from a small range so that
     /// predicates match several entries, and position masks for remove_all. It is built to reach
@@ -277,6 +294,7 @@ mod tests {
         use super::*;
 
         use std::cell::Cell;
+        use std::collections::VecDeque;
         use std::panic::{catch_unwind, AssertUnwindSafe};
 
         use proptest::prelude::*;
@@ -330,9 +348,9 @@ mod tests {
         }
 
         impl Model {
-            fn new(list: &VecList<Item>) -> Self {
+            fn new(capacity: usize) -> Self {
                 Self {
-                    capacity: list.capacity,
+                    capacity,
                     next_id: 0,
                     live: VecDeque::new(),
                 }
@@ -354,7 +372,7 @@ mod tests {
                         }
                     }
                     Op::RemoveFirst(value) => {
-                        let result = list.remove_first(|x| x.value == value).copied();
+                        let result = list.remove_first(|x| x.value == value);
                         match self.live.iter().position(|x| x.value == value) {
                             Some(position) => assert_eq!(result, self.live.remove(position)),
                             None => assert_eq!(result, None),
@@ -458,7 +476,7 @@ mod tests {
                     if backward.len() > self.live.len() {
                         break;
                     }
-                    let entry = &list.storage[idx];
+                    let entry = list.entry(idx).unwrap();
                     backward.push((idx, entry.data));
                     current = entry.metadata.prev;
                 }
@@ -472,23 +490,34 @@ mod tests {
                 };
                 assert_eq!(list.state.map(|s| (s.head, s.tail, s.size)), expected);
 
-                // the storage never grows past the capacity, and every slot in it is either live
-                // or free, never both
-                assert!(list.storage.len() <= self.capacity);
-                let mut slots: Vec<usize> = forward
-                    .iter()
-                    .map(|(slot, _)| *slot)
-                    .chain(list.free_stack.iter().copied())
-                    .collect();
+                // the list has the capacity it was created with, and every slot is either live or
+                // free, never both: the chain of free slots, bounded so that a cycle fails here
+                // instead of hanging, holds only free slots, and with the live ones covers each
+                // slot once
+                assert_eq!(list.slots.len(), self.capacity);
+                let mut free = Vec::new();
+                let mut current = list.free;
+                while let Some(idx) = current {
+                    assert!(free.len() < self.capacity, "the free chain has a cycle");
+                    match list.slots.get(idx) {
+                        Some(Slot::Free { next }) => {
+                            free.push(idx);
+                            current = *next;
+                        }
+                        _ => panic!("the free chain reaches slot {idx}, which isn't free"),
+                    }
+                }
+                let mut slots: Vec<usize> =
+                    forward.iter().map(|(slot, _)| *slot).chain(free).collect();
                 slots.sort_unstable();
-                assert_eq!(slots, (0..list.storage.len()).collect::<Vec<_>>());
+                assert_eq!(slots, (0..self.capacity).collect::<Vec<_>>());
             }
         }
 
         // a full list of `capacity` entries
         fn full(capacity: usize) -> (VecList<Item>, Model) {
             let mut list = VecList::new(capacity);
-            let mut model = Model::new(&list);
+            let mut model = Model::new(capacity);
             for value in (0u8..4).cycle().take(capacity) {
                 model.apply(&mut list, Op::Add(value));
                 model.check(&list);
@@ -539,7 +568,7 @@ mod tests {
                 ops in prop::collection::vec(op(), 0..64),
             ) {
                 let mut list = VecList::new(capacity);
-                let mut model = Model::new(&list);
+                let mut model = Model::new(capacity);
                 model.check(&list);
                 for op in ops {
                     model.apply(&mut list, op);

@@ -39,13 +39,12 @@ use proptest::prelude::*;
 use scursor::WriteCursor;
 
 use crate::app::measurement::*;
-use crate::app::MaybeAsync;
 use crate::master::EventClasses;
 use crate::outstation::database::config::*;
 use crate::outstation::database::details::WriteProgress;
 use crate::outstation::database::variations::*;
 use crate::outstation::database::{EventBufferConfig, EventClass};
-use crate::outstation::{BufferState, ClassCount, OutstationApplication, TypeCount};
+use crate::outstation::{BufferState, ClassCount, TypeCount};
 use crate::util::test_support::remove_at;
 
 use super::buffer::{EventBuffer, InsertError};
@@ -267,26 +266,6 @@ fn no_types() -> TypeCount {
     }
 }
 
-/// records the ids of cleared events in order; the buffer never begins or ends a confirm itself
-#[derive(Default)]
-struct Cleared {
-    ids: Vec<u64>,
-}
-
-impl OutstationApplication for Cleared {
-    fn begin_confirm(&mut self) {
-        panic!("unexpected begin_confirm")
-    }
-
-    fn event_cleared(&mut self, id: u64) {
-        self.ids.push(id);
-    }
-
-    fn end_confirm(&mut self, _state: BufferState) -> MaybeAsync<()> {
-        panic!("unexpected end_confirm")
-    }
-}
-
 /// write the selected events into a cursor of `size` bytes, returning the result and the bytes
 fn write_bytes(buffer: &mut EventBuffer, size: usize) -> ((usize, WriteProgress), Vec<u8>) {
     let mut backing = vec![0u8; size];
@@ -302,10 +281,10 @@ fn write(buffer: &mut EventBuffer, size: usize) -> (usize, WriteProgress) {
 
 /// clear the written events, returning their ids in order
 fn clear(buffer: &mut EventBuffer) -> Vec<u64> {
-    let mut app = Cleared::default();
-    let count = buffer.clear_written(&mut app);
-    assert_eq!(count, app.ids.len());
-    app.ids
+    let mut ids = Vec::new();
+    let count = buffer.clear_written(|id| ids.push(id));
+    assert_eq!(count, ids.len());
+    ids
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]

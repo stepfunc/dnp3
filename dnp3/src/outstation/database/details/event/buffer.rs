@@ -19,7 +19,7 @@ use super::writer::EventWriter;
 
 use crate::outstation::database::details::family::Family;
 use crate::outstation::database::details::WriteProgress;
-use crate::outstation::{BufferState, ClassCount, OutstationApplication, TypeCount};
+use crate::outstation::{BufferState, ClassCount, TypeCount};
 use records::{EventRecord, EventState, Events};
 use scursor::WriteCursor;
 
@@ -265,7 +265,7 @@ mod records {
             let record = self
                 .list
                 .remove_first(|r| r.event.event_type() == event_type)?;
-            Self::uncount(&mut self.total, &mut self.written, record);
+            Self::uncount(&mut self.total, &mut self.written, &record);
             Some(record.id)
         }
 
@@ -506,7 +506,22 @@ impl EventBuffer {
     where
         T: Family,
     {
-        let max = T::EVENT_TYPE.max(&self.config);
+        // before creating the event, which allocates for an octet string
+        if T::EVENT_TYPE.max(&self.config) == 0 {
+            return Err(InsertError::TypeMaxIsZero);
+        }
+        self.insert_event(index, class, event.create_event(default_variation))
+    }
+
+    /// insert an event, evicting the oldest of its type if the type is full
+    pub(crate) fn insert_event(
+        &mut self,
+        index: u16,
+        class: EventClass,
+        event: Event,
+    ) -> Result<u64, InsertError> {
+        let event_type = event.event_type();
+        let max = event_type.max(&self.config);
 
         if max == 0 {
             return Err(InsertError::TypeMaxIsZero);
@@ -515,14 +530,13 @@ impl EventBuffer {
         let id = self.next;
         self.next = self.next.wrapping_add(1);
 
-        let discarded = if self.events.type_count(T::EVENT_TYPE) >= max {
-            self.events.remove_oldest(T::EVENT_TYPE)
+        let discarded = if self.events.type_count(event_type) >= max {
+            self.events.remove_oldest(event_type)
         } else {
             None
         };
 
-        let record = EventRecord::new(index, id, class, event.create_event(default_variation));
-        self.events.push(record);
+        self.events.push(EventRecord::new(index, id, class, event));
 
         match discarded {
             Some(discarded) => {
@@ -606,10 +620,11 @@ impl EventBuffer {
         self.events.write(cursor)
     }
 
-    pub(crate) fn clear_written(&mut self, app: &mut dyn OutstationApplication) -> usize {
+    /// remove the written events, passing the id of each one to `cleared`
+    pub(crate) fn clear_written(&mut self, mut cleared: impl FnMut(u64)) -> usize {
         let count = self.events.remove_all(
             |record| record.state() == EventState::Written,
-            |record| app.event_cleared(record.id()),
+            |record| cleared(record.id()),
         );
         self.update_overflow();
         count
