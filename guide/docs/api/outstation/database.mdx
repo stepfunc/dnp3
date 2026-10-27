@@ -26,7 +26,7 @@ Structure any common update code to operate on the `Database` type and not depen
 
 ## Adding Points
 
-Initialize points before the outstation exposes measurement data. This is typically done at creation, but you can add points to a running outstation. A point added while the outstation is sending a READ response isn't part of that response; a later READ that selects it reports it. Each measurement type has unique configuration:
+Initialize points before the outstation exposes measurement data. This is typically done at creation, but you can add points to a running outstation. Each measurement type has unique configuration:
 
 * An optional event class assignment for the point, which a master can change at runtime (see [saving what the master changes](./outstation_application.mdx#saving-what-the-master-changes))
 * Default static and event variations for the type
@@ -40,18 +40,11 @@ value that changes as the outstation receives events.
 See the documentation for each variation to understand its data.
 :::
 
-When you add a point, it is assigned the following default value with `RESTART` flags:
-
-* Binary points are set to `false`
-* Numeric values are set to `0`
-* Double-bit Binary points set to `Indeterminate`
-* Octet Strings are set to the value of `[0x00]`
-
-Update the value after adding the point if you don't want a connecting master to see the points with a `RESTART` flag set.
+A new point starts with a default value, such as 0 or false, and the `RESTART` flag. Update it after adding it if a
+connecting master shouldn't see `RESTART`.
 
 :::tip
-The examples show contiguous point ranges, but discontiguous ranges work efficiently too. The library uses a [BTreeMap](https://doc.rust-lang.org/std/collections/struct.BTreeMap.html) internally regardless of how you define indices.
-A READ of a range that spans missing indices returns the points that exist and sets IIN2.2.
+Point indices don't need to be contiguous.
 :::
 
 <Tabs
@@ -141,8 +134,7 @@ Since the point may not be defined, the getters can fail. If you try to retrieve
 Most applications don't need to remove points, but the option is there in case you want to remove points from a running outstation. There is a type-specific function for removing every point type given its index.
 
 :::note
-Removing a point stops the outstation from reporting static data for that point, including the objects of a READ response in progress that
-aren't yet written into a fragment. However, it does NOT remove any queued events for that point from the event buffer. Those events will remain in the event buffer
+Removing a point stops the outstation from reporting static data for it. However, it does NOT remove any queued events for that point from the event buffer. Those events will remain in the event buffer
 until they are reported and cleared by confirmation.
 :::
 
@@ -152,21 +144,6 @@ Specific attributes from Group 0 may be defined using the database. As you can s
 uses a single method for defining attributes whereas the bindings have different methods for each type of attribute. Only attributes that are defined as writable are eligible
 to receive WRITE callbacks in the [OutstationApplication](application) interface.
 
-### Default Set
-
-The standard predefines a number of attributes belonging to the default set (index == 0). The database will only allow you define values with the correct type for these objects. It
-will also enforce that only certain variations are writable. Writable variations in the default set are:
-
-* Variation 206 - User-assigned secondary operator name
-* Variation 207 - User-assigned primary operator name
-* Variation 244 - User-assigned owner name
-* Variation 245 - User-assigned location
-* Variation 246 - User-assigned ID code/number
-* Variation 247 - User-assigned device name
-
-### Private Sets
-
-Private sets are sets with any index other than 0. Users may assign any attribute values to variations within these sets
-other than the reserved variation numbers 0, 254, and 255.
-
-
+The default set (set 0) holds attributes the standard defines. The database checks their types and lets only the
+user-assigned ones, such as location, owner and device name, be writable. Any other set is private, and you choose its
+variations.

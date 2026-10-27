@@ -8,13 +8,8 @@ slug: /api/runtime
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-Rust's asynchronous programming model is a form of [cooperative multitasking](https://docs.rs/tokio/latest/tokio/task/index.html). Once a task gets to a point where it would typically block, such as reading from a socket, execution is instead released back to an executor so that another task may run. This lets a pool of worker threads inside the executor efficiently execute thousands of asynchronous tasks concurrently without the overhead of per-task call stacks or thread context-switching.
-
-Rust supports asynchronous programming using 'async' functions and 'async/await' syntax. The Rust compiler transforms synchronous-looking code into state machines that are just as efficient as what can be written by hand. Although Rust has this capability built into the compiler, it doesn't include a default runtime to execute the asynchronous programs. Instead, you are free to pick the runtime as an external library.
-
-The DNP3 library runs on top of the [Tokio](https://tokio.rs/) runtime, providing a state-of-the-art scheduler and platform-agnostic networking APIs. The OS-specific mechanisms vary by platform, for example, *epoll* on Linux and *IOCP* on Windows.
-
-Tokio is a modern evolution of libraries like [libuv (C)](https://libuv.org/) and [ASIO (C++)](https://think-async.com/Asio/). It leverages Rust's thread and memory safety to deliver asynchronous programs that are not only incredibly fast, but also correct. This is extremely important since it is quite difficult to write correct asynchronous software in C/C++ due to the need to manually reason object lifetimes in callbacks.
+The library runs on the [Tokio](https://tokio.rs/) asynchronous runtime: a pool of worker threads that runs every master
+and outstation session and calls your callbacks. You create one `Runtime` and share it across sessions.
 
 ## Lifetime
 
@@ -116,19 +111,6 @@ If you cannot ensure a clean shutdown, use `Runtime.set_shutdown_timeout(..)` to
 **Shutting down the runtime using a timeout can leak memory as worker threads that haven't stopped when the timeout occurs are left running. Only
 use this method if you are exiting the process anyway.**
 :::
-
-### Logging
-
-Both the creation and the shutdown of the `Runtime` are logged in the bindings:
-
-```
-Jan 12 16:16:42.004  INFO creating runtime with 24 threads
-
-.......
-
-Jan 12 16:36:53.832  INFO beginning runtime shutdown (no timeout)
-Jan 12 16:36:53.838  INFO runtime shutdown complete
-```
 
 ### Examples
 

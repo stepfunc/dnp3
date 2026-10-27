@@ -69,7 +69,7 @@ flowchart TD
 |------|--------------|
 | Your requests | The error goes back to you. The master doesn't retry. |
 | Polls | The poll runs again one period later. |
-| Automatic tasks | Retried after a delay that grows with each failure, within the retry strategy's bounds. While it waits to be retried, the association's polls wait too. A failed time synchronization is the exception: it retries without holding anything up. A task the outstation rejects isn't retried, except clearing the restart bit and time synchronization, which retry while the outstation still asks for them. |
+| Automatic tasks | Retried after a delay that grows with each failure, within the retry strategy's bounds, unless the outstation rejects it. While one waits, the association's polls wait too. A failed time synchronization doesn't hold anything up. |
 | Keep-alive | Sent again until the outstation answers. It doesn't close the connection. |
 
 The [AssociationInformation](./association_information.mdx) callbacks report the start and outcome of each task except

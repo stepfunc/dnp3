@@ -70,7 +70,7 @@ values={[
 ### EventBufferConfig
 
 
-`EventBufferConfig` controls the number of events buffered for each type. Space is pre-allocated during initialization. When a buffer fills, the oldest event of that type is discarded, even one already sent and awaiting confirmation, and the outstation asserts IIN 2.3 (Event Buffer Overflow).
+`EventBufferConfig` controls the number of events buffered for each type. Space is pre-allocated during initialization. When a buffer fills, the oldest event of that type is discarded and the master is told the buffer overflowed.
 
 There's a tradeoff between preserving events and memory/CPU usage. Consider these factors when sizing buffers:
 
