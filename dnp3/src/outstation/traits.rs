@@ -150,8 +150,6 @@ pub trait OutstationApplication: Sync + Send + 'static {
     /// This parameter should almost always use the default value of zero as only an RTOS
     /// or bare metal system would have access to this level of timing. Modern hardware
     /// can almost always respond in less than 1 millisecond anyway.
-    ///
-    /// For more information, see IEEE-1815 2012, pg. 64
     fn get_processing_delay_ms(&self) -> u16 {
         0
     }
@@ -172,7 +170,7 @@ pub trait OutstationApplication: Sync + Send + 'static {
         ApplicationIin::default()
     }
 
-    /// Request that the outstation perform a cold restart (IEEE-1815 2012, pg. 58)
+    /// Request that the outstation perform a cold restart
     ///
     /// If supported, return Some(RestartDelay) indicating how long the restart
     /// will take to complete
@@ -185,7 +183,7 @@ pub trait OutstationApplication: Sync + Send + 'static {
         None
     }
 
-    /// Request that the outstation perform a warm restart (IEEE-1815 2012, pg. 58)
+    /// Request that the outstation perform a warm restart
     ///
     /// If supported, return Some(RestartDelay) indicating how long the restart
     /// will take to complete

@@ -1203,8 +1203,7 @@ fn define_outstation_application(
     let application = lib.define_interface("outstation_application", "Dynamic information required by the outstation from the user application")?
         .begin_callback("get_processing_delay_ms", doc("Returns the DELAY_MEASUREMENT delay")
             .details("The value returned by this method is used in conjunction with the DELAY_MEASUREMENT function code and returned in a g52v2 time delay object as part of a non-LAN time synchronization procedure.")
-            .details("It represents the processing delay from receiving the request to sending the response. This parameter should almost always use the default value of zero as only an RTOS or bare metal system would have access to this level of timing. Modern hardware can almost always respond in less than 1 millisecond anyway.")
-            .details("For more information, see IEEE-1815 2012, p. 64."))?
+            .details("It represents the processing delay from receiving the request to sending the response. This parameter should almost always use the default value of zero as only an RTOS or bare metal system would have access to this level of timing. Modern hardware can almost always respond in less than 1 millisecond anyway."))?
             .returns(Primitive::U16, "Processing delay, in milliseconds")?
             .end_callback()?
         .begin_callback("write_absolute_time", "Handle a write of the absolute time during time synchronization procedures.")?
@@ -1214,11 +1213,11 @@ fn define_outstation_application(
         .begin_callback("get_application_iin", "Returns the application-controlled IIN bits")?
             .returns(application_iin, "Application IIN bits")?
             .end_callback()?
-        .begin_callback("cold_restart", doc("Request that the outstation perform a cold restart (IEEE-1815 2012, p. 58)")
+        .begin_callback("cold_restart", doc("Request that the outstation perform a cold restart")
             .details("The outstation will not automatically restart. It is the responsibility of the user application to handle this request and take the appropriate action."))?
             .returns(restart_delay.clone(), "The restart delay")?
             .end_callback()?
-        .begin_callback("warm_restart", doc("Request that the outstation perform a warm restart (IEEE-1815 2012, p. 58)")
+        .begin_callback("warm_restart", doc("Request that the outstation perform a warm restart")
             .details("The outstation will not automatically restart. It is the responsibility of the user application to handle this request and take the appropriate action."))?
             .returns(restart_delay, "The restart delay")?
             .end_callback()?

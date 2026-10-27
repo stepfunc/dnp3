@@ -144,8 +144,8 @@ proven, not the walk. Your own handlers are code we can't check.
 The proof uses the [no-panic](https://github.com/dtolnay/no-panic) technique. Each function on the green path is
 compiled so that a reachable panic leaves a reference to a symbol that doesn't exist, and the optimizer removes the
 reference only if it can prove that no path to a panic exists. A test harness calls the functions with input read at
-run time, so the optimizer can't specialize them to known values, and with output buffers of any size, from empty to
-far larger than a fragment. If the test binary links, these functions can't panic.
+run time, so the optimizer can't specialize them to known values, and with output buffers of any size from empty to
+16 MiB, far larger than a fragment. If the test binary links, these functions can't panic.
 
 Where a step calls code the library doesn't own, such as logging, the harness passes a stand-in, so the proof covers the
 step around the call but not the call itself. CI links the test binary twice, the second time with overflow checks on,
