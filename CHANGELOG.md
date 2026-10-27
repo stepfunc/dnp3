@@ -1,6 +1,6 @@
 
 ### 1.8.0-M2 ###
-* :bell: **License update.** The license now prohibits using the library, including its source, documentation, tests and binaries, to design, develop, specify, test or improve any other implementation of the protocol, whether commercial or open source, and reserves text and data mining, including AI training. AI-assisted evaluation and integration remain welcome. Coding agents get the policy from the new `AGENTS.md`. See [#712](https://github.com/stepfunc/dnp3/pull/712).
+* :bell: **License update.** The license now prohibits using the library to build or test other implementations of the protocol, including by mining it with AI tools or using it as an oracle, and reserves AI training. See [#712](https://github.com/stepfunc/dnp3/pull/712).
 * :bell: **The minimum supported Rust version is now 1.88.** See [#502](https://github.com/stepfunc/dnp3/pull/502).
 * :star: The outstation processes ASSIGN_CLASS (function code 22), which subset level 3 requires, by default. `OutstationApplication::support_assign_class` turns it off, and new callbacks report each accepted request so the application can persist it. See [#856](https://github.com/stepfunc/dnp3/pull/856).
 * :shield: Time out TLS handshakes after 5 seconds, in the outstation server and in TLS clients, so a peer that stalls a handshake can't hold up other connections or retries. See [#532](https://github.com/stepfunc/dnp3/pull/532) and [#533](https://github.com/stepfunc/dnp3/pull/533).
