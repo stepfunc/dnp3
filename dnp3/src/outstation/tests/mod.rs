@@ -6,6 +6,8 @@
 
 pub(crate) mod harness;
 
+/// ASSIGN_CLASS: the response, the callbacks and the class of later events
+mod assign_class;
 /// device attributes (group 0)
 mod attributes;
 mod broadcast;

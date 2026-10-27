@@ -1748,6 +1748,79 @@ mod tests {
     }
 
     #[test]
+    fn an_assignment_visits_its_points_to_count_and_change_them() {
+        let mut db = StaticDatabase::default();
+        assert_eq!(
+            db.binary.check_assignment(PointIndices::All),
+            Err(Iin2::OBJECT_UNKNOWN)
+        );
+        for index in [0, 1, 2, 4] {
+            assert!(db.add(index, binary_config(StaticBinaryInputVariation::Group1Var2)));
+        }
+
+        // all of them are changed without counting
+        assert_eq!(
+            db.binary.check_assignment(PointIndices::All),
+            Ok(Visits::new(4))
+        );
+        assert_eq!(
+            db.binary.check_assignment(PointIndices::Range(0, 2)),
+            Ok(Visits::new(6))
+        );
+        // a range with a missing index, or reversed
+        assert_eq!(
+            db.binary.check_assignment(PointIndices::Range(2, 4)),
+            Err(Iin2::PARAMETER_ERROR)
+        );
+        assert_eq!(
+            db.binary.check_assignment(PointIndices::Range(2, 1)),
+            Err(Iin2::PARAMETER_ERROR)
+        );
+    }
+
+    #[test]
+    fn an_assignment_of_the_full_range_of_indices() {
+        let mut db = StaticDatabase::default();
+        for index in 0..=u16::MAX {
+            assert!(db.add(index, binary_config(StaticBinaryInputVariation::Group1Var2)));
+        }
+        assert_eq!(
+            db.binary.check_assignment(PointIndices::Range(0, u16::MAX)),
+            Ok(Visits::new(2 * 65536))
+        );
+    }
+
+    #[test]
+    fn a_later_assignment_replaces_an_earlier_one_where_they_overlap() {
+        let mut db = StaticDatabase::default();
+        for index in 0..4 {
+            assert!(db.add(index, binary_config(StaticBinaryInputVariation::Group1Var2)));
+        }
+        let assign = |indices, class| Assignment {
+            point_type: PointType::BinaryInput,
+            indices,
+            class,
+        };
+        db.assign(assign(PointIndices::Range(0, 2), Some(EventClass::Class2)));
+        db.assign(assign(PointIndices::Range(2, 3), None));
+        let classes: Vec<Option<EventClass>> = db
+            .binary
+            .inner
+            .values()
+            .map(|point| point.config.class)
+            .collect();
+        assert_eq!(
+            classes,
+            [
+                Some(EventClass::Class2),
+                Some(EventClass::Class2),
+                None,
+                None
+            ]
+        );
+    }
+
+    #[test]
     fn dead_band_selection_visits_each_point_it_marks() {
         let mut db = StaticDatabase::default();
         for index in 0..3 {

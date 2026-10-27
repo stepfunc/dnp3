@@ -8,12 +8,12 @@ use std::sync::{Arc, Mutex};
 
 use crate::app::attr::Attribute;
 use crate::app::{MaybeAsync, Timestamp};
-use crate::outstation::database::DatabaseHandle;
+use crate::outstation::database::{DatabaseHandle, EventClass};
 use crate::outstation::tests::harness::{Event, EventSender};
 use crate::outstation::traits::{
     ApplicationIin, OutstationApplication, RequestError, RestartDelay,
 };
-use crate::outstation::{BufferState, FreezeIndices, FreezeType};
+use crate::outstation::{BufferState, FreezeIndices, FreezeType, PointIndices, PointType};
 
 pub(crate) struct MockOutstationApplication {
     events: EventSender,
@@ -31,6 +31,8 @@ pub(crate) struct ApplicationData {
     pub(crate) accept_attr_writes: bool,
     /// answer attribute WRITEs from a future that isn't ready when first polled
     pub(crate) defer_attr_writes: bool,
+    /// whether the application supports ASSIGN_CLASS
+    pub(crate) support_assign_class: bool,
 }
 
 impl ApplicationData {
@@ -42,6 +44,7 @@ impl ApplicationData {
             application_iin: ApplicationIin::default(),
             accept_attr_writes: true,
             defer_attr_writes: false,
+            support_assign_class: true,
         }
     }
 }
@@ -115,6 +118,29 @@ impl OutstationApplication for MockOutstationApplication {
 
     fn end_write_analog_dead_bands(&mut self) -> MaybeAsync<()> {
         self.events.send(Event::EndWriteDeadBands);
+        MaybeAsync::ready(())
+    }
+
+    fn support_assign_class(&mut self) -> bool {
+        self.data().support_assign_class
+    }
+
+    fn begin_assign_class(&mut self) {
+        self.events.send(Event::BeginAssignClass);
+    }
+
+    fn assign_class(
+        &mut self,
+        point_type: PointType,
+        indices: PointIndices,
+        class: Option<EventClass>,
+    ) {
+        self.events
+            .send(Event::AssignClass(point_type, indices, class));
+    }
+
+    fn end_assign_class(&mut self) -> MaybeAsync<()> {
+        self.events.send(Event::EndAssignClass);
         MaybeAsync::ready(())
     }
 
