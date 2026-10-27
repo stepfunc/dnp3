@@ -49,7 +49,11 @@ class TypedEvent[T](val idx: Int, val batch: Int, val eventClass: EventClass, va
 
 class TrackingDatabase(val app: CustomOutstationApplication, val outstation: Outstation, testDatabaseConfig: TestDatabaseConfig, controlHandler: QueuedControlHandler) {
   // Create all the tracking points
-  private val binaryPoints = mutable.SortedMap((for (i <- 0 to 9) yield i -> new BinaryInput(ushort(i), false, new Flags(ubyte(0x01)), Timestamp.invalidTimestamp())): _*)
+  // inputs 0 to 9 are the ones class 1 events change; 10 and 11 start in class 2 for 3.1r1's 8.26.2
+  // (device.ini's class.assign.class2BinaryInputs)
+  private val binaryPoints = mutable.SortedMap((for (i <- 0 to 11) yield i -> new BinaryInput(ushort(i), false, new Flags(ubyte(0x01)), Timestamp.invalidTimestamp())): _*)
+  // the class of each binary input's events, which ASSIGN_CLASS changes; None for no events
+  private val binaryClasses = mutable.Map((for (i <- 0 to 11) yield i -> Option(if (i >= 10) EventClass.Class2 else EventClass.Class1)): _*)
   private val doubleBitPoints = mutable.SortedMap((for (i <- 0 to 9) yield i -> new DoubleBitBinaryInput(ushort(i), DoubleBit.DETERMINED_OFF, new Flags(ubyte(0x41)), Timestamp.invalidTimestamp())): _*)
   private val counters = mutable.SortedMap((for (i <- 0 to 9) yield i -> new Counter(ushort(i), uint(0), new Flags(ubyte(0x01)), Timestamp.invalidTimestamp())): _*)
   private val analogInputs = mutable.SortedMap((for (i <- 0 to 9) yield i -> new AnalogInput(ushort(i), 0.0, new Flags(ubyte(0x01)), Timestamp.invalidTimestamp())): _*)
@@ -93,7 +97,7 @@ class TrackingDatabase(val app: CustomOutstationApplication, val outstation: Out
       binaryConfig.eventVariation = EventBinaryInputVariation.GROUP2_VAR2
 
       this.binaryPoints.values.foreach(e => {
-        db.addBinaryInput(e.index, io.stepfunc.dnp3.EventClass.CLASS1, binaryConfig)
+        db.addBinaryInput(e.index, TrackingDatabase.toFfi(binaryClasses(e.index.intValue)), binaryConfig)
         db.updateBinaryInput(e, updateOptions)
       })
     }
@@ -186,6 +190,14 @@ class TrackingDatabase(val app: CustomOutstationApplication, val outstation: Out
 
   def getAttribute(variation: Int): Option[AttributeValue] = Option(attributes.get(variation))
 
+  // a point header of an accepted ASSIGN_CLASS request: later events of its points take the class.
+  // 8.26.2 assigns only the binary inputs device.ini names, so other types aren't tracked
+  def assignClass(pointType: PointType, range: Option[(Int, Int)], pointClass: io.stepfunc.dnp3.EventClass): Unit =
+    if (pointType == PointType.BINARY_INPUT) this.synchronized {
+      val indices = binaryClasses.keys.filter(i => range.forall { case (start, stop) => i >= start && i <= stop })
+      indices.foreach(i => binaryClasses(i) = TrackingDatabase.fromFfi(pointClass))
+    }
+
   def writeStringAttribute(variation: Int, value: String): Unit =
     attributes.put(variation, AttributeValue.VisibleString(value))
 
@@ -195,8 +207,10 @@ class TrackingDatabase(val app: CustomOutstationApplication, val outstation: Out
     val newPoint = new BinaryInput(ushort(idx), value, new Flags(flags), app.now())
 
     this.binaryPoints(idx) = newPoint
-    val newEvent = new TypedEvent[BinaryInput](idx, eventBatch, EventClass.Class1, newPoint)
-    this.events.append(newEvent)
+    // a point assigned to no class changes without an event, which is logged but not expected
+    val eventClass = this.synchronized(binaryClasses(idx))
+    val newEvent = new TypedEvent[BinaryInput](idx, eventBatch, eventClass.getOrElse(EventClass.All), newPoint)
+    eventClass.foreach(_ => this.events.append(newEvent))
 
     outstation.transaction(db => {
       db.updateBinaryInput(newPoint, UpdateOptions.detectEvent())
@@ -503,5 +517,21 @@ class TrackingDatabase(val app: CustomOutstationApplication, val outstation: Out
       case None =>
     }
     head
+  }
+}
+
+object TrackingDatabase {
+  def toFfi(eventClass: Option[EventClass]): io.stepfunc.dnp3.EventClass = eventClass match {
+    case Some(EventClass.Class1) => io.stepfunc.dnp3.EventClass.CLASS1
+    case Some(EventClass.Class2) => io.stepfunc.dnp3.EventClass.CLASS2
+    case Some(EventClass.Class3) => io.stepfunc.dnp3.EventClass.CLASS3
+    case _ => io.stepfunc.dnp3.EventClass.NONE
+  }
+
+  def fromFfi(eventClass: io.stepfunc.dnp3.EventClass): Option[EventClass] = eventClass match {
+    case io.stepfunc.dnp3.EventClass.CLASS1 => Some(EventClass.Class1)
+    case io.stepfunc.dnp3.EventClass.CLASS2 => Some(EventClass.Class2)
+    case io.stepfunc.dnp3.EventClass.CLASS3 => Some(EventClass.Class3)
+    case _ => None
   }
 }

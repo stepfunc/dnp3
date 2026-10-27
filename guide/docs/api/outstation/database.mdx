@@ -28,7 +28,7 @@ Structure any common update code to operate on the `Database` type and not depen
 
 Initialize points before the outstation exposes measurement data. This is typically done at creation, but you can add points to a running outstation. A point added while the outstation is sending a READ response isn't part of that response; a later READ that selects it reports it. Each measurement type has unique configuration:
 
-* An optional event class assignment for the point
+* An optional event class assignment for the point, which a master can change at runtime (see [class assignment](./outstation_application.mdx#class-assignment))
 * Default static and event variations for the type
 * Dead-bands for analog and counter types that default to zero (other types have no deadband)
 

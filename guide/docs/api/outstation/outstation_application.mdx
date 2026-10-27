@@ -14,6 +14,7 @@ import TabItem from '@theme/TabItem';
 * Processing requests to WRITE the time
 * Processing counter freeze requests
 * Persisting changes to analog dead-bands
+* Persisting the event classes a master assigns
 * Validating and persisting WRITE operations to device attributes
 * Processing cold and warm restart operations
 
@@ -61,6 +62,22 @@ Use the provided `DatabaseHandle` to copy counters to frozen counters. `FreezeTy
 
 Requests to freeze at a particular time and interval are also passed to the application. In Rust, this is the `FreezeType::FreezeAtTime` variant. The bindings
 have separate `freezeCountersAllAtTime` and `freezeCountersRangeAtTime` methods.
+
+## Class Assignment
+
+A master can change the class of the events that points generate with an ASSIGN_CLASS request (IEEE 1815-2012 4.4.14).
+The outstation processes these requests by default. It checks the whole request before changing anything, so a request
+with any error changes nothing. An assignment applies only to events generated afterwards: events already buffered keep
+their class, and a point assigned to no class (g60v1) stops generating events.
+
+After applying a request, the outstation reports it with `beginAssignClass`, then a call for each point header in request
+order, then `endAssignClass`. Rust reports each header to `assign_class` with all of a type's points or a range of them;
+the bindings have separate `assignClassAll` and `assignClassRange` methods. Persist the assignments there and use them
+when you add points at startup; an outstation that doesn't reverts to the configured classes when it restarts, which the
+standard allows. Return false from `supportAssignClass` to answer ASSIGN_CLASS with IIN2.0 instead.
+
+Assigning points to no class with point headers before the first class header (TB2021-001), which also removes them from
+class 0, isn't supported, nor are headers that list individual point indices.
 
 ## Writing Device Attributes
 

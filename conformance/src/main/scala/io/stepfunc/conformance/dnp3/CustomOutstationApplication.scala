@@ -16,6 +16,8 @@ class CustomOutstationApplication extends OutstationApplication {
   @volatile var isLocalControl = false
   // called when the master writes a writable string attribute
   @volatile var onWriteStringAttribute: (Int, String) => Unit = (_, _) => ()
+  // called for each point header of an accepted ASSIGN_CLASS request, with its range, if any
+  @volatile var onAssignClass: (PointType, Option[(Int, Int)], EventClass) => Unit = (_, _, _) => ()
   private val refreshRate: Duration = Duration.ofSeconds(10)
   private var lastTimestamp = Instant.MIN
   private var lastUpdate = Instant.MIN
@@ -39,6 +41,12 @@ class CustomOutstationApplication extends OutstationApplication {
     onWriteStringAttribute(variation.intValue, value)
     true
   }
+
+  override def assignClassAll(pointType: PointType, pointClass: EventClass): Unit =
+    onAssignClass(pointType, None, pointClass)
+
+  override def assignClassRange(pointType: PointType, start: UShort, stop: UShort, pointClass: EventClass): Unit =
+    onAssignClass(pointType, Some((start.intValue, stop.intValue)), pointClass)
 
   // whether the outstation supports cold restart (3.1r1's 8.8.2)
   @volatile var coldRestartSupported = true
