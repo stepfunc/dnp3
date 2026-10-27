@@ -48,13 +48,13 @@ an operation that takes several exchanges, such as a select-before-operate or a 
 channel is free, it picks the next request like this:
 
 ```mermaid
-flowchart TD
-    free[The channel is free] --> user{Does any association have a queued request?}
-    user -- yes --> runUser[Run the oldest request of the first such association in line]
-    user -- no --> auto{Does any association have an automatic task, poll or keep-alive ready to run?}
-    auto -- yes --> runAuto[Run the most important item of the first such association in line]
-    auto -- no --> sleep[Sleep until the next deadline, a new request, or an unsolicited response]
-    runUser --> back[That association moves to the back of the line]
+flowchart LR
+    free([Channel is free]) --> user{Queued request?}
+    user -- yes --> runUser[Run the oldest one]
+    user -- no --> auto{Anything else due?}
+    auto -- yes --> runAuto[Run the most important one]
+    auto -- no --> sleep([Sleep until something is due])
+    runUser --> back[Its association goes to the back]
     runAuto --> back
 ```
 

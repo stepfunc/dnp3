@@ -32,6 +32,7 @@ module.exports = {
         'api/tls',
         {
             Outstation: [
+                'api/outstation/overview',
                 'api/outstation/configuration',
                 {
                     Interfaces: [

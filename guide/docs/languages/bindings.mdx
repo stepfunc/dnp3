@@ -6,7 +6,7 @@ slug: /bindings
 ---
 
 The library is written in Rust, and Rust programs use it directly. Every other language uses bindings generated from a
-single description of the API, so C, C++, C# and Java get the same features and the same documentation, each in the style
+single description of the API, so C, C++, .NET and Java get the same features and the same documentation, each in the style
 of that language.
 
 ## One model, every language
@@ -21,7 +21,7 @@ flowchart LR
     capi["Native library's C API"]
     c["C header"]
     cpp["C++ wrapper"]
-    cs["C# assembly"]
+    cs[".NET assembly"]
     java["Java classes and their JNI glue"]
     model --> gen
     gen --> capi
@@ -44,10 +44,10 @@ flowchart TB
     rust(["Rust application"]):::user
     c(["C application"]):::user
     cpp(["C++ application"]):::user
-    cs(["C# application"]):::user
+    cs([".NET application"]):::user
     java(["Java application"]):::user
     cppw["C++ wrapper"]
-    csa["C# assembly"]
+    csa[".NET assembly"]
     jar["Java classes"]
     capi["Native library: C API"]
     jni["Native library: JNI"]
@@ -70,7 +70,7 @@ flowchart TB
 The guide describes the API with general terms. This is what each one is in your language; the language pages have
 the details. The Rust API is ordinary Rust rather than generated, so its column shows the closest equivalent.
 
-| Term | C | C++ | Java | C# | Rust |
+| Term | C | C++ | Java | .NET | Rust |
 |------|---|-----|------|----|------|
 | Class | Opaque pointer | Move-only class | Class | Class | Struct |
 | Interface | Function pointers | Abstract class | Interface | Interface | Trait |
@@ -79,5 +79,5 @@ the details. The Rust API is ordinary Rust rather than generated, so its column 
 | Async method | Callback | Callback | `CompletionStage<T>` | `Task<T>` | `async fn` |
 | Error | Error code | Exception | Exception | Exception | `Result` |
 
-In C and C++, an iterator is valid only inside the callback that receives it. Java and C# copy the values into a
+In C and C++, an iterator is valid only inside the callback that receives it. Java and .NET copy the values into a
 collection that you can keep.

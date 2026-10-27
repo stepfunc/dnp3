@@ -32,7 +32,7 @@ argument:
 | Outstation | `tcp-server`, `tcp-client`, `udp`, `serial`, `tls-ca`, `tls-self-signed` |
 | Master | `tcp-client`, `udp`, `serial`, `tls-ca`, `tls-self-signed` |
 
-The C, C++, Java and C# examples take one more optional argument: the endpoint to listen on or connect to, or the serial
+The C, C++, Java and .NET examples take one more optional argument: the endpoint to listen on or connect to, or the serial
 port. Everything else, such as the DNP3 addresses, is a constant at the top of each program. The Rust examples take
 options instead; run them with `--help` to list them, for example `cargo run -p example-outstation -- --help`.
 
@@ -47,5 +47,5 @@ The following links redirect to language-specific examples for the current versi
 
 * <a href={`${sitedata.github_url}/tree/${sitedata.version}/examples`}>Rust</a>
 * <a href={`${sitedata.github_url}/tree/${sitedata.version}/ffi/bindings/c`}>C/C++</a>
-* <a href={`${sitedata.github_url}/tree/${sitedata.version}/ffi/bindings/dotnet/examples`}>C#</a>
+* <a href={`${sitedata.github_url}/tree/${sitedata.version}/ffi/bindings/dotnet/examples`}>.NET (C#)</a>
 * <a href={`${sitedata.github_url}/tree/${sitedata.version}/ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples`}>Java</a>
