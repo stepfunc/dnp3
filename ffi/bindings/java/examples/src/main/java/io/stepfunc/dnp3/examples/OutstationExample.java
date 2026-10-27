@@ -145,7 +145,7 @@ public class OutstationExample {
             runtime,
             port,
             new SerialSettings(), // 9600 baud, 8 data bits, 1 stop bit, no parity, no flow control
-            Duration.ofSeconds(5), // try to open the port every 5 seconds
+            Duration.ofSeconds(1), // try to open the port every second
             getOutstationConfig(),
             new ExampleOutstationApplication(),
             new ExampleOutstationInformation(),

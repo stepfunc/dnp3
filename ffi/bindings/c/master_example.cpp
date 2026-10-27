@@ -37,7 +37,7 @@ constexpr const char *SELF_SIGNED_ENTITY_KEY = "./certs/self_signed/entity1_key.
 dnp3::MasterChannel create_tcp_channel(dnp3::Runtime &runtime, const std::string &endpoint);
 dnp3::MasterChannel create_udp_channel(dnp3::Runtime &runtime, const std::string &local_endpoint);
 dnp3::MasterChannel create_serial_channel(dnp3::Runtime &runtime, const std::string &port);
-dnp3::MasterChannel create_tls_channel(dnp3::Runtime &runtime, const std::string &endpoint, const dnp3::TlsClientConfig &tls_config);
+dnp3::MasterChannel create_tls_channel(dnp3::Runtime &runtime, const std::string &endpoint, const dnp3::TlsClientConfig &config);
 dnp3::AssociationId add_association(dnp3::MasterChannel &channel);
 dnp3::AssociationId add_udp_association(dnp3::MasterChannel &channel, const std::string &remote_endpoint);
 void run_channel(dnp3::MasterChannel &channel, dnp3::AssociationId assoc);
@@ -175,7 +175,7 @@ dnp3::MasterChannel create_serial_channel(dnp3::Runtime &runtime, const std::str
     return channel;
 }
 
-dnp3::MasterChannel create_tls_channel(dnp3::Runtime &runtime, const std::string &endpoint, const dnp3::TlsClientConfig &tls_config)
+dnp3::MasterChannel create_tls_channel(dnp3::Runtime &runtime, const std::string &endpoint, const dnp3::TlsClientConfig &config)
 {
     // ANCHOR: create_tls_channel
     dnp3::EndpointList endpoints(endpoint);
@@ -187,7 +187,7 @@ dnp3::MasterChannel create_tls_channel(dnp3::Runtime &runtime, const std::string
         endpoints,
         dnp3::ConnectStrategy(),
         create_client_state_listener(),
-        tls_config
+        config
     );
     // ANCHOR_END: create_tls_channel
     return channel;
@@ -672,7 +672,9 @@ class ReadHandler : public dnp3::ReadHandler {
         std::cout << "[";
         bool first = true;
         while (items.next()) {
-            std::cout << (first ? "" : ", ") << static_cast<unsigned>(items.get().variation);
+            const auto item = items.get();
+            std::cout << (first ? "" : ", ") << static_cast<unsigned>(item.variation)
+                      << (item.properties.is_writable ? " (writable)" : "");
             first = false;
         }
         std::cout << "]" << std::endl;

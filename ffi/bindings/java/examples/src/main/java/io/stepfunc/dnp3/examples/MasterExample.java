@@ -160,7 +160,7 @@ public class MasterExample {
     return channel;
   }
 
-  private static MasterChannel createTlsChannel(Runtime runtime, String endpoint, TlsClientConfig tlsConfig) {
+  private static MasterChannel createTlsChannel(Runtime runtime, String endpoint, TlsClientConfig config) {
     // ANCHOR: create_tls_channel
     MasterChannel channel =
             MasterChannel.createTlsChannel(
@@ -170,7 +170,7 @@ public class MasterExample {
                     new EndpointList(endpoint),
                     new ConnectStrategy(),
                     state -> System.out.println("client state: " + state),
-                    tlsConfig);
+                    config);
     // ANCHOR_END: create_tls_channel
     return channel;
   }
@@ -468,9 +468,14 @@ public class MasterExample {
                 ushort(512)
         ).toCompletableFuture().get();
 
+        List<UByte> line = new ArrayList<>();
+        for (byte b : "hello world\n".getBytes(StandardCharsets.UTF_8)) {
+          line.add(ubyte(b));
+        }
+
         // write the 'hello world' line to the file twice
-        channel.writeFileBlock(association, file.fileHandle, uint(0), false, getFileLine()).toCompletableFuture().get();
-        channel.writeFileBlock(association, file.fileHandle, uint(1), true, getFileLine()).toCompletableFuture().get();
+        channel.writeFileBlock(association, file.fileHandle, uint(0), false, line).toCompletableFuture().get();
+        channel.writeFileBlock(association, file.fileHandle, uint(1), true, line).toCompletableFuture().get();
         channel.closeFile(association, file.fileHandle).toCompletableFuture().get();
         // ANCHOR_END: write_file
         return success;
@@ -509,14 +514,6 @@ public class MasterExample {
     System.out.println("  rf - read the root directory as a file");
     System.out.println("  wf - write hello_world.txt");
     System.out.println("  lsr - check the link status");
-  }
-
-  private static List<UByte> getFileLine() {
-    List<UByte> bytes = new ArrayList<>();
-    for (byte b : "hello world\n".getBytes(StandardCharsets.UTF_8)) {
-      bytes.add(ubyte(b));
-    }
-    return bytes;
   }
 
   private static void printFileInfo(FileInfo info) {
@@ -653,8 +650,8 @@ class ExampleReadHandler implements ReadHandler {
   @Override
   public void handleVariationListAttr(HeaderInfo info, VariationListAttr attr, UByte set, UByte variation, List<AttrItem> value) {
     printHeader("Device attributes", info);
-    List<UByte> variations = new ArrayList<>();
-    value.forEach(item -> variations.add(item.variation));
+    List<String> variations = new ArrayList<>();
+    value.forEach(item -> variations.add(item.variation + (item.properties.isWritable ? " (writable)" : "")));
     printAttribute(set, variation, variations);
   }
 

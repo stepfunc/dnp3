@@ -165,7 +165,7 @@ class ExampleMaster
         return channel;
     }
 
-    private static MasterChannel CreateTlsChannel(Runtime runtime, string endpoint, TlsClientConfig tlsConfig)
+    private static MasterChannel CreateTlsChannel(Runtime runtime, string endpoint, TlsClientConfig config)
     {
         // ANCHOR: create_tls_channel
         var channel = MasterChannel.CreateTlsChannel(
@@ -175,7 +175,7 @@ class ExampleMaster
             new EndpointList(endpoint),
             new ConnectStrategy(),
             new LogListener("client"),
-            tlsConfig
+            config
         );
         // ANCHOR_END: create_tls_channel
         return channel;
@@ -661,7 +661,7 @@ class ExampleMaster
         public void HandleVariationListAttr(HeaderInfo info, VariationListAttr attr, byte set, byte variation, ICollection<AttrItem> value)
         {
             PrintHeader("Device attributes", info);
-            PrintAttribute(set, variation, $"[{string.Join(", ", value.Select(item => item.Variation))}]");
+            PrintAttribute(set, variation, $"[{string.Join(", ", value.Select(item => item.Variation + (item.Properties.IsWritable ? " (writable)" : "")))}]");
         }
 
         public void HandleUintAttr(HeaderInfo info, UintAttr attr, byte set, byte variation, uint value)

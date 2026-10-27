@@ -38,7 +38,7 @@ int run_transport(dnp3_runtime_t *runtime, const char *transport, const char *ar
 dnp3_master_channel_t *create_tcp_channel(dnp3_runtime_t *runtime, const char *endpoint);
 dnp3_master_channel_t *create_udp_channel(dnp3_runtime_t *runtime, const char *local_endpoint);
 dnp3_master_channel_t *create_serial_channel(dnp3_runtime_t *runtime, const char *port);
-dnp3_master_channel_t *create_tls_channel(dnp3_runtime_t *runtime, const char *endpoint, dnp3_tls_client_config_t tls_config);
+dnp3_master_channel_t *create_tls_channel(dnp3_runtime_t *runtime, const char *endpoint, dnp3_tls_client_config_t config);
 dnp3_param_error_t add_association(dnp3_master_channel_t *channel, dnp3_association_id_t *association_id);
 dnp3_param_error_t add_udp_association(dnp3_master_channel_t *channel, const char *remote_endpoint, dnp3_association_id_t *association_id);
 int run_channel(dnp3_master_channel_t *channel, dnp3_association_id_t association_id);
@@ -233,7 +233,7 @@ dnp3_master_channel_t *create_serial_channel(dnp3_runtime_t *runtime, const char
     return channel;
 }
 
-dnp3_master_channel_t *create_tls_channel(dnp3_runtime_t *runtime, const char *endpoint, dnp3_tls_client_config_t tls_config)
+dnp3_master_channel_t *create_tls_channel(dnp3_runtime_t *runtime, const char *endpoint, dnp3_tls_client_config_t config)
 {
     // ANCHOR: create_tls_channel
     dnp3_master_channel_t *channel = NULL;
@@ -245,7 +245,7 @@ dnp3_master_channel_t *create_tls_channel(dnp3_runtime_t *runtime, const char *e
         endpoints,
         dnp3_connect_strategy_init(),
         get_client_state_listener(),
-        tls_config,
+        config,
         &channel
     );
     dnp3_endpoint_list_destroy(endpoints);
@@ -900,7 +900,7 @@ void handle_variation_list_attr(dnp3_header_info_t info, dnp3_variation_list_att
     printf("attribute set=%u variation=%u value=[", set, variation);
     dnp3_attr_item_t *item = dnp3_attr_item_iter_next(items);
     while (item) {
-        printf("%u", item->variation);
+        printf("%u%s", item->variation, item->properties.is_writable ? " (writable)" : "");
         item = dnp3_attr_item_iter_next(items);
         printf("%s", item ? ", " : "");
     }

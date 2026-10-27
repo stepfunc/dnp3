@@ -369,7 +369,7 @@ fn create_serial_channel(
 fn create_tls_channel(
     master_address: EndpointAddress,
     endpoint: SocketAddr,
-    tls_config: TlsClientConfig,
+    config: TlsClientConfig,
 ) -> Result<MasterChannel, Box<dyn std::error::Error>> {
     // ANCHOR: create_tls_channel
     let channel = spawn_master_tls_client(
@@ -378,7 +378,7 @@ fn create_tls_channel(
         EndpointList::new(endpoint.to_string(), &[]),
         ConnectStrategy::default(),
         LogListener::create("client"),
-        tls_config,
+        config,
     );
     // ANCHOR_END: create_tls_channel
     Ok(channel)
@@ -926,8 +926,7 @@ impl ReadHandler for ExampleReadHandler {
         match attr {
             AnyAttribute::Known(attr) => match attr {
                 KnownAttribute::AttributeList(var, list) => {
-                    let items: Vec<u8> = list.iter().map(|item| item.variation).collect();
-                    print_attribute(0, var.variation(), format!("{items:?}"))
+                    print_attribute(0, var.variation(), format_variation_list(list))
                 }
                 KnownAttribute::String(var, value) => print_attribute(0, var.variation(), value),
                 KnownAttribute::Float(var, FloatType::F32(value)) => {
@@ -945,11 +944,19 @@ impl ReadHandler for ExampleReadHandler {
                     print_attribute(0, var.variation(), value.raw_value())
                 }
             },
-            AnyAttribute::Other(attr) => print_attribute(
-                attr.set.value(),
-                attr.variation,
-                format!("{:?}", attr.value),
-            ),
+            AnyAttribute::Other(attr) => {
+                let value = match attr.value {
+                    AttrValue::VisibleString(v) => v.to_string(),
+                    AttrValue::UnsignedInt(v) => v.to_string(),
+                    AttrValue::SignedInt(v) => v.to_string(),
+                    AttrValue::FloatingPoint(FloatType::F32(v)) => v.to_string(),
+                    AttrValue::FloatingPoint(FloatType::F64(v)) => v.to_string(),
+                    AttrValue::OctetString(v) | AttrValue::BitString(v) => format!("{v:02X?}"),
+                    AttrValue::Dnp3Time(v) => v.raw_value().to_string(),
+                    AttrValue::AttrList(list) => format_variation_list(list),
+                };
+                print_attribute(attr.set.value(), attr.variation, value)
+            }
         }
     }
 
@@ -983,6 +990,21 @@ fn format_time(time: Option<Time>) -> String {
         Some(Time::Unsynchronized(t)) => format!("{} (unsynchronized)", t.raw_value()),
         None => "none".to_string(),
     }
+}
+
+fn format_variation_list(list: VariationList) -> String {
+    let items: Vec<String> = list
+        .iter()
+        .map(|item| {
+            let writable = if item.properties.is_writable() {
+                " (writable)"
+            } else {
+                ""
+            };
+            format!("{}{writable}", item.variation)
+        })
+        .collect();
+    format!("[{}]", items.join(", "))
 }
 
 fn print_attribute(set: u8, variation: u8, value: impl std::fmt::Display) {
