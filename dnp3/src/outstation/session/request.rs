@@ -169,7 +169,7 @@ impl OutstationSession {
                     Reads::Defer => {
                         self.state
                             .deferred_read
-                            .set(hash, seq, info, objects, Tracing);
+                            .set::<Tracing>(hash, seq, info, objects);
                         Ok(None)
                     }
                 }

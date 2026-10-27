@@ -85,31 +85,30 @@ use crate::util::skipped::Count;
 use super::Source;
 
 /// Hands each diagnostic's arguments to `black_box` instead of logging them
-#[derive(Copy, Clone)]
 struct Quiet;
 
 impl ReadLog for Quiet {
-    fn unsupported_headers(self, header: (Variation, QualifierCode), count: Count) {
+    fn unsupported_headers(header: (Variation, QualifierCode), count: Count) {
         black_box((header, count));
     }
 
-    fn attr_selection_full(self, max: usize) {
+    fn attr_selection_full(max: usize) {
         black_box(max);
     }
 
-    fn attr_variation_with_all_objects(self, variation: u8) {
+    fn attr_variation_with_all_objects(variation: u8) {
         black_box(variation);
     }
 
-    fn attr_range_unsupported(self, range: IndexRange) {
+    fn attr_range_unsupported(range: IndexRange) {
         black_box(range);
     }
 
-    fn attr_not_encodable(self, err: BadAttribute) {
+    fn attr_not_encodable(err: BadAttribute) {
         black_box(err);
     }
 
-    fn deferred_capacity(self, max: usize, header: (Variation, QualifierCode), count: Count) {
+    fn deferred_capacity(max: usize, header: (Variation, QualifierCode), count: Count) {
         black_box((max, header, count));
     }
 }
@@ -124,7 +123,7 @@ fn select(db: &mut Database, headers: &HeaderCollection) -> Iin2 {
             iin2 |= db.inner.select_events(target, limit);
         }
     }
-    iin2 | headers.finish(Quiet)
+    iin2 | headers.finish::<Quiet>()
 }
 
 #[no_panic::no_panic]
@@ -139,7 +138,7 @@ fn respond(db: &mut Database, buffer: &mut [u8]) {
 fn attributes(set: AttrSet, items: &[AttrItem], attr: &OwnedAttribute, buffer: &mut [u8]) {
     let mut cursor = WriteCursor::new(buffer);
     let list = write_attr_list(set, &mut cursor, items.iter().copied());
-    let attr = write_attribute(&mut cursor, attr, Quiet);
+    let attr = write_attribute::<Quiet>(&mut cursor, attr);
     black_box((
         list == WriteProgress::Complete,
         attr == WriteProgress::Complete,
@@ -286,7 +285,7 @@ fn defer(
     info: FragmentInfo,
     headers: HeaderCollection,
 ) {
-    deferred.set(hash, seq, info, headers, Quiet);
+    deferred.set::<Quiet>(hash, seq, info, headers);
     black_box(deferred.is_set());
 }
 
