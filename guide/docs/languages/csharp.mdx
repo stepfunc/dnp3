@@ -7,7 +7,7 @@ slug: /c_sharp
 
 import useBaseUrl from '@docusaurus/useBaseUrl';
 
-We distribute the C# bindings as a [Nuget package](https://www.nuget.org/packages/dnp3). Internally, the C API is called using [P/Invoke](https://docs.microsoft.com/en-us/dotnet/standard/native-interop/pinvoke)
+We distribute the C# bindings as a [Nuget package](https://www.nuget.org/packages/dnp3). Internally, the C API is called using [P/Invoke](https://learn.microsoft.com/en-us/dotnet/standard/native-interop/pinvoke).
 The bindings are .NET Standard 2.0 compatible and include platform-specific shared libraries that are automatically loaded by the .NET runtime.
 
 Shared libraries for the following platforms are included in the Nuget package:
@@ -28,14 +28,20 @@ are not supported in production.
 ## Supported .NET versions
 
 The library targets .NET Standard 2.0, meaning it supports .NET Core 2.0+, .NET 5+ and .NET Framework 4.6.1+ (although at least 4.7.2 is recommended).
-A complete compatibility table is available on [Microsoft website](https://docs.microsoft.com/en-us/dotnet/standard/net-standard?tabs=net-standard-2-0).
+A complete compatibility table is available on [Microsoft website](https://learn.microsoft.com/en-us/dotnet/standard/net-standard?tabs=net-standard-2-0).
 
 :::info
 On .NET Framework, you need to specify the platform you are targeting. The library currently does not support the `AnyCPU` platform. You need to
 set the platform to either `x64` or `x86` in order for the MSBuild script to properly copy the DLL in the build directory.
 
-For .NET Core and .NET 5, the proper DLL is automatically loaded even with the `AnyCPU` platform.
+For .NET Core and .NET 5+, the proper DLL is automatically loaded even with the `AnyCPU` platform.
 :::
+
+## Dependencies
+
+The package depends on one open source package, which NuGet retrieves:
+
+* [System.Collections.Immutable](https://www.nuget.org/packages/System.Collections.Immutable) - MIT - immutable collections
 
 ## Mapping
 
@@ -60,15 +66,16 @@ Each field has a `With<FieldName>` method that sets the field and returns the st
 
 ### Classes
 
-Abstract classes are mapped to C# classes. They have a private pointer to the underlying native resource. There are two types of generated classes in C#:
-* Generated classes that only have a private finalizer: These are automatically garbage collected, while native resources are deallocated in the class's finalize method. These
-types of classes are typically builder objects such as `CommandSet`, `Request`, and `AddressFilter`.
+Classes are mapped to C# classes. They have a private pointer to the underlying native resource. There are two types of generated classes in C#:
+* Generated classes that only have a private finalizer: These are automatically garbage collected, while native resources are deallocated in the class's finalize method. Most
+are short-lived objects such as `CommandSet`, `Request`, and `AddressFilter`. The exception is `Outstation`: an outstation created as a TCP or TLS client, or on a serial
+port or UDP socket, stops when it's garbage collected, so keep a reference to it for as long as it should run.
 * Generated classes that also provide a public `Shutdown` method: These represent long-lived resources such as `Runtime`, `MasterChannel`, or `OutstationServer`. They map to an asynchronous
 Rust task executing on the Tokio runtime. The `Shutdown` method lets you precisely control when the resource/task will stop. `MasterServer` implements `IDisposable` and provides `Dispose` instead.
 
 ### Asynchronous Methods
 
-Abstract asynchronous methods are transformed into methods that return `Task<T>`. C# Tasks are flexible and can be consumed in different ways:
+Asynchronous methods are transformed into methods that return `Task<T>`. C# Tasks are flexible and can be consumed in different ways:
 
 * Synchronous applications can just call `Task.Result` to block for the value. An exception will be thrown if the task errors.
 * Asynchronous methods can `await` the completion of the task.

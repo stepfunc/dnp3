@@ -91,12 +91,12 @@ Each field has a `with<FieldName>` method that sets the field and returns the st
 
 ### Classes
 
-Abstract classes are also mapped to Java classes. They have a private pointer to the underlying native resource. There are two types of generated classes in Java: 
-* Generated classes that only have a `finalize` method: These are automatically garbage collected, while native resources are deallocated in the class's finalize method. These types of classes are typically builder objects such as `CommandSet`, `Request`, and `AddressFilter`. 
+Classes are mapped to Java classes. They have a private pointer to the underlying native resource. There are two types of generated classes in Java: 
+* Generated classes that only have a `finalize` method: These are automatically garbage collected, while native resources are deallocated in the class's finalize method. Most are short-lived objects such as `CommandSet`, `Request`, and `AddressFilter`. The exception is `Outstation`: an outstation created as a TCP or TLS client, or on a serial port or UDP socket, stops when it's garbage collected, so keep a reference to it for as long as it should run.
 * Generated classes that also provide a public `shutdown()` method to proactively release native resources: These represent long-lived resources such as `Runtime`, `MasterChannel`, or `OutstationServer`. They map to an asynchronous Rust task executing on the Tokio runtime. The `shutdown()` method lets you precisely control when the resource/task will stop. `MasterServer` implements `AutoCloseable` and provides `close()` instead.
 
 
 ### Asynchronous Methods
 
-Abstract asynchronous methods are transformed into methods that return `CompletionStage<T>`. You can then chain and use the object in an asynchronous
+Asynchronous methods are transformed into methods that return `CompletionStage<T>`. You can then chain and use the object in an asynchronous
 workflow, or transform it into a `CompletableFuture<T>` and call `get()`.

@@ -61,7 +61,7 @@ Most of the abstract concepts in the binding generator map directly to C++.
 
 ### Errors
 
-All C API errors are transformed into a C++ exceptions containing the error enum. All exceptions derive from `std::logic_error`.
+All C API errors are transformed into C++ exceptions containing the error enum. All exceptions derive from `std::logic_error`.
 
 Other validations (e.g. checking that a moved class isn't used after the move) also throw `std::logic_error`.
 
