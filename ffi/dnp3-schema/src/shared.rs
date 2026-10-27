@@ -53,6 +53,7 @@ pub(crate) struct SharedDefinitions {
     pub binary_command_event_it: AbstractIteratorHandle,
     pub analog_command_event_it: AbstractIteratorHandle,
     pub unsigned_integer_it: AbstractIteratorHandle,
+    pub analog_input_dead_band_it: AbstractIteratorHandle,
     pub _octet_string: FunctionReturnStructHandle,
     pub octet_string_it: AbstractIteratorHandle,
     pub byte_it: AbstractIteratorHandle,
@@ -310,6 +311,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> 
         define_analog_output_command_iterator(&timestamp_struct, &command_status, lib)?;
 
     let unsigned_integer_it = define_unsigned_integer_iterator(lib)?;
+    let analog_input_dead_band_it = define_analog_input_dead_band_iterator(lib)?;
 
     let (octet_string, octet_string_it, byte_it) = build_octet_string(lib)?;
 
@@ -368,6 +370,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> 
         binary_command_event_it,
         analog_command_event_it,
         unsigned_integer_it,
+        analog_input_dead_band_it,
         _octet_string: octet_string,
         octet_string_it,
         byte_it,
@@ -1055,6 +1058,30 @@ fn define_unsigned_integer_iterator(
         .build()?;
 
     let value_iterator = lib.define_iterator("unsigned_integer_iterator", value_struct.clone())?;
+
+    Ok(value_iterator)
+}
+
+fn define_analog_input_dead_band_iterator(
+    lib: &mut LibraryBuilder,
+) -> BackTraced<AbstractIteratorHandle> {
+    let value_struct_decl = lib.declare_universal_struct("analog_input_dead_band")?;
+    let value_struct = lib
+        .define_universal_struct(value_struct_decl)?
+        .add("index", Primitive::U16, "Index of the analog input")?
+        .add(
+            "value",
+            Primitive::Double,
+            doc("Deadband of the analog input")
+                .details("All the variations of group 34 are mapped to double-precision floats, which hold each exactly; the header information says which variation was read."),
+        )?
+        .doc("Analog input deadband corresponding to group 34")?
+        .end_fields()?
+        .add_full_initializer("init")?
+        .build()?;
+
+    let value_iterator =
+        lib.define_iterator("analog_input_dead_band_iterator", value_struct.clone())?;
 
     Ok(value_iterator)
 }

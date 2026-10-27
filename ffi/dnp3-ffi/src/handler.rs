@@ -196,6 +196,16 @@ impl ReadHandler for ffi::ReadHandler {
         ffi::ReadHandler::handle_unsigned_integer(self, info, &mut iterator);
     }
 
+    fn handle_analog_input_dead_band(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (AnalogInputDeadBand, u16)>,
+    ) {
+        let info = info.into();
+        let mut iterator = AnalogInputDeadBandIterator::new(iter);
+        ffi::ReadHandler::handle_analog_input_dead_band(self, info, &mut iterator);
+    }
+
     fn handle_octet_string<'a>(
         &mut self,
         info: HeaderInfo,
@@ -622,6 +632,24 @@ implement_iterator!(
     UnsignedInteger,
     ffi::UnsignedInteger
 );
+
+implement_iterator!(
+    AnalogInputDeadBandIterator,
+    analog_input_dead_band_iterator_next,
+    AnalogInputDeadBand,
+    ffi::AnalogInputDeadBand
+);
+
+impl ffi::AnalogInputDeadBand {
+    pub(crate) fn new(idx: u16, value: AnalogInputDeadBand) -> Self {
+        let value = match value {
+            AnalogInputDeadBand::U16(x) => x.into(),
+            AnalogInputDeadBand::U32(x) => x.into(),
+            AnalogInputDeadBand::F32(x) => x.into(),
+        };
+        Self { index: idx, value }
+    }
+}
 
 impl ffi::BinaryInput {
     pub(crate) fn new(idx: u16, value: BinaryInput) -> Self {

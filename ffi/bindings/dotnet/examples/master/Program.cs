@@ -183,6 +183,18 @@ class MainClass
             }
         }
 
+        void IReadHandler.HandleAnalogInputDeadBand(HeaderInfo info, ICollection<AnalogInputDeadBand> values)
+        {
+            Console.WriteLine("Analog Input Deadbands:");
+            Console.WriteLine("Qualifier: " + info.Qualifier);
+            Console.WriteLine("Variation: " + info.Variation);
+
+            foreach (var val in values)
+            {
+                Console.WriteLine($"{val.Index}: Value={val.Value}");
+            }
+        }
+
         public void HandleOctetString(HeaderInfo info, ICollection<OctetString> values)
         {
             Console.WriteLine("Octet Strings:");
