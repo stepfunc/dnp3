@@ -1,5 +1,5 @@
 
-### 1.8.0-M2 ###
+### 1.8.0 ###
 * :bell: **License update.** The license now prohibits using the library to build or test other implementations of the protocol, including by mining it with AI tools or using it as an oracle, and reserves AI training. See [#712](https://github.com/stepfunc/dnp3/pull/712).
 * :bell: **The minimum supported Rust version is now 1.88.** See [#502](https://github.com/stepfunc/dnp3/pull/502).
 * :star: The outstation processes ASSIGN_CLASS (function code 22), which subset level 3 requires, by default. `OutstationApplication::support_assign_class` turns it off, and new callbacks report each accepted request so the application can persist it. See [#856](https://github.com/stepfunc/dnp3/pull/856).
@@ -10,6 +10,8 @@
 * :shield: Leave file AUTHENTICATE passwords and auth keys out of decode logging and `Debug` output. See [#520](https://github.com/stepfunc/dnp3/pull/520).
 * :bug: Fix the outstation losing the events of an unsolicited response that was never confirmed. See [#546](https://github.com/stepfunc/dnp3/pull/546).
 * :bug: Fix an outstation READ including events of a class it didn't ask for. See [#634](https://github.com/stepfunc/dnp3/pull/634).
+* :bug: Flush TLS writes so the last frame isn't left buffered when the socket is under backpressure. Affects masters and outstations. See [#462](https://github.com/stepfunc/dnp3/pull/462).
+* :bug: Fix a double free in the bindings when an outstation server fails to bind, for example because the port is already in use. See [#469](https://github.com/stepfunc/dnp3/pull/469).
 * :bell: Outstations answer a read of a point type that has no points with IIN2.1, and a range read that includes missing points with IIN2.2 while still returning the points that exist, as the standard requires. Masters that poll types or ranges the outstation doesn't have will see these errors where they saw none before. See [#487](https://github.com/stepfunc/dnp3/pull/487).
 * :bell: Outstations report a counter, frozen counter or analog input whose flags are anything but ONLINE in a variation with flags, even when the master asked for one without, as the standard requires, so the master sees the point's quality. A response can now mix the requested variation with its flagged counterpart, for example right after startup, when every point carries RESTART. See [#484](https://github.com/stepfunc/dnp3/pull/484).
 * :bell: Binary output status points default to g10v2 instead of g10v1, in Rust and in the bindings. See [#853](https://github.com/stepfunc/dnp3/pull/853).
@@ -25,6 +27,7 @@
 * :bell: Deprecate `WriteError::IinError`, `TimeSyncError::IinError`, `TimeSyncError::SystemTimeNotUnix`, `CommandResponseError::Request` and `ObjectParseError::UnsupportedQualifierCode`, which are never returned. They will be removed in 2.0. See [#556](https://github.com/stepfunc/dnp3/pull/556).
 * :bell: Expected traffic, such as frames for other outstations and repeated segments, is logged at debug instead of warn. See [#685](https://github.com/stepfunc/dnp3/pull/685).
 * :star: The bindings' `ReadHandler` receives analog input deadbands (group 34). See [#854](https://github.com/stepfunc/dnp3/pull/854).
+* :star: Add master support for `DIRECT_OPERATE_NO_ACK` (function code 0x06) in Rust and all bindings. See [#466](https://github.com/stepfunc/dnp3/pull/466).
 * :star: Every public type implements `Debug`, `dnp3::link` exports its error types, and master task errors gain `unsupported_response`, `unsupported_or_bad_response` and `SystemTimeNotAvailable`. See [#519](https://github.com/stepfunc/dnp3/pull/519), [#539](https://github.com/stepfunc/dnp3/pull/539), [#653](https://github.com/stepfunc/dnp3/pull/653) and [#753](https://github.com/stepfunc/dnp3/pull/753).
 * :bell: Many small outstation conformance corrections: the IIN2 bits for unsupported objects and qualifiers, discarding invalid request fragments, answering repeated and unparsable requests, the unsolicited confirm wait, select-before-operate, and analog input deadband qualifiers. See [#522](https://github.com/stepfunc/dnp3/pull/522), [#541](https://github.com/stepfunc/dnp3/pull/541), [#633](https://github.com/stepfunc/dnp3/pull/633), [#529](https://github.com/stepfunc/dnp3/pull/529), [#525](https://github.com/stepfunc/dnp3/pull/525), [#560](https://github.com/stepfunc/dnp3/pull/560), [#561](https://github.com/stepfunc/dnp3/pull/561), [#691](https://github.com/stepfunc/dnp3/pull/691), [#625](https://github.com/stepfunc/dnp3/pull/625), [#573](https://github.com/stepfunc/dnp3/pull/573), [#749](https://github.com/stepfunc/dnp3/pull/749), [#501](https://github.com/stepfunc/dnp3/pull/501), [#530](https://github.com/stepfunc/dnp3/pull/530) and [#648](https://github.com/stepfunc/dnp3/pull/648).
 * :bug: Other outstation fixes. See [#852](https://github.com/stepfunc/dnp3/pull/852), [#504](https://github.com/stepfunc/dnp3/pull/504), [#513](https://github.com/stepfunc/dnp3/pull/513), [#619](https://github.com/stepfunc/dnp3/pull/619), [#644](https://github.com/stepfunc/dnp3/pull/644), [#697](https://github.com/stepfunc/dnp3/pull/697) and [#545](https://github.com/stepfunc/dnp3/pull/545).
@@ -33,11 +36,6 @@
 * :wrench: The prebuilt libraries for the C/C++, .NET and Java bindings are about 20% smaller and faster. See [#798](https://github.com/stepfunc/dnp3/pull/798) and [#799](https://github.com/stepfunc/dnp3/pull/799).
 * :book: Consistent variation descriptions in logging and the bindings' docs, and a guide page on the master's automatic tasks and scheduling. See [#781](https://github.com/stepfunc/dnp3/pull/781), [#787](https://github.com/stepfunc/dnp3/pull/787) and [#700](https://github.com/stepfunc/dnp3/pull/700).
 
-### 1.8.0-M1 ###
-* :bell: **The minimum supported Rust version is now 1.85**, which the updated dependencies require. CI now checks it.
-* :star: Add master support for `DIRECT_OPERATE_NO_ACK` (function code 0x06) in Rust and all bindings. See [#466](https://github.com/stepfunc/dnp3/pull/466).
-* :bug: Fix a double free in the bindings when an outstation server fails to bind, for example because the port is already in use. See [#469](https://github.com/stepfunc/dnp3/pull/469).
-* :bug: Flush TLS writes so the last frame isn't left buffered when the socket is under backpressure. Affects masters and outstations. See [#462](https://github.com/stepfunc/dnp3/pull/462).
 ### 1.7.0 ###
 * :star: Add outstation `ConnectionManager` for fine-grained control of TCP and TLS client connections, including dynamic endpoint selection, custom retry logic, and per-connection master address override. See [#381](https://github.com/stepfunc/dnp3/pull/381), [#406](https://github.com/stepfunc/dnp3/pull/406).
 * :star: Add `DirectWriteAbsTime` time sync procedure for outstations that don't properly implement IEEE-1815 time sync. See [#403](https://github.com/stepfunc/dnp3/pull/403).
