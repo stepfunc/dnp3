@@ -4,14 +4,16 @@
 // Text and data mining rights, including for AI training, are reserved under
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
-//! The work a READ may spend selecting what it reports
+//! The work a request may spend on the database: a READ selecting what it reports, or an
+//! ASSIGN_CLASS reassigning the classes of points
 //!
-//! Selection counts the records it visits, and a READ whose visits exceed an allowance scaled
-//! to the database is rejected. The allowances are generous multiples, so requests that are
+//! Each counts the records it visits, and a request whose visits exceed an allowance scaled to
+//! the database is rejected. The allowances are generous multiples, so requests that are
 //! merely redundant (class 0 twice) are answered, while requests that repeat database-wide
 //! headers hundreds of times are not. Static and event work have separate allowances, so a
 //! large event buffer can't pay for repeated static headers, or the reverse.
 
+use crate::app::FunctionCode;
 use crate::outstation::database::details::Visits;
 
 /// Which allowance the work of a header counts against
@@ -43,7 +45,7 @@ impl Allowance {
             used: 0,
             max: records
                 .saturating_mul(visits_per_record)
-                .max(ReadBudget::MIN_VISITS),
+                .max(WorkBudget::MIN_VISITS),
         }
     }
 
@@ -60,13 +62,13 @@ impl Allowance {
     }
 }
 
-/// The allowances of one READ, and the visits charged against them so far
-pub(crate) struct ReadBudget {
+/// The allowances of one request, and the visits charged against them so far
+pub(crate) struct WorkBudget {
     static_pool: Allowance,
     event_pool: Allowance,
 }
 
-impl ReadBudget {
+impl WorkBudget {
     /// Visits per installed static point or attribute set
     const STATIC_VISITS_PER_RECORD: usize = 8;
     /// Visits per slot of the event buffer
@@ -92,14 +94,14 @@ impl ReadBudget {
     }
 }
 
-pub(crate) fn log_over_budget(over: OverBudget) {
+pub(crate) fn log_over_budget(function: FunctionCode, over: OverBudget) {
     let OverBudget {
         pool,
         visits,
         allowance,
     } = over;
     tracing::warn!(
-        "READ rejected: selecting it visits more than {allowance} {} records ({visits})",
+        "{function:?} rejected: it visits more than {allowance} {} records ({visits})",
         match pool {
             Pool::Static => "static",
             Pool::Event => "event",

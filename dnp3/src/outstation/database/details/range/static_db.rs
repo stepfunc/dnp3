@@ -12,6 +12,7 @@ use crate::app::measurement::*;
 use crate::app::parse::range::Range;
 use crate::app::Iin2;
 use crate::outstation::config::OutstationConfig;
+use crate::outstation::database::assign::Assignment;
 use crate::outstation::database::details::family::Family;
 use crate::outstation::database::details::range::traits::StaticVariation;
 use crate::outstation::database::details::range::writer::RangeWriter;
@@ -19,6 +20,7 @@ use crate::outstation::database::details::{Visits, WriteProgress};
 use crate::outstation::database::read::StaticTarget;
 use crate::outstation::database::variations::*;
 use crate::outstation::database::{ClassZeroConfig, EventClass, EventMode, UpdateOptions};
+use crate::outstation::{PointIndices, PointType};
 
 use crate::app::attr::AttrSet;
 use crate::util::bounded::{BoundedQueue, Full};
@@ -234,6 +236,39 @@ where
         self.inner.is_empty()
     }
 
+    /// The points an assignment to the indices visits, counting them and then changing them, or
+    /// the error for a type without points (IIN2.1) or a range that isn't fully installed
+    /// (IIN2.2)
+    fn check_assignment(&self, indices: PointIndices) -> Result<Visits, Iin2> {
+        if self.inner.is_empty() {
+            return Err(Iin2::OBJECT_UNKNOWN);
+        }
+        match indices {
+            // the count of all of them doesn't walk them
+            PointIndices::All => Ok(Visits::new(self.inner.len())),
+            PointIndices::Range(start, stop) => {
+                let range = IndexRange::new(start, stop).ok_or(Iin2::PARAMETER_ERROR)?;
+                match self.check_range(range) {
+                    (Ok(iin2), counted) if iin2 == Iin2::default() => Ok(counted.plus(counted)),
+                    _ => Err(Iin2::PARAMETER_ERROR),
+                }
+            }
+        }
+    }
+
+    /// Assign the events of the points at the indices to a class, or to none
+    fn assign(&mut self, indices: PointIndices, class: Option<EventClass>) {
+        let range = match indices {
+            PointIndices::All => self.full_range(),
+            PointIndices::Range(start, stop) => IndexRange::new(start, stop),
+        };
+        if let Some(range) = range {
+            for (_index, point) in range.entries_mut(&mut self.inner) {
+                point.config.class = class;
+            }
+        }
+    }
+
     /// IIN2 bits for a read of a specific range of this type, or the error to
     /// respond with if nothing in the range can be selected (TB2016-001), with the points
     /// counted:
@@ -356,6 +391,40 @@ impl StaticDatabase {
 
     pub(crate) fn reset(&mut self) {
         self.selected.clear();
+    }
+
+    /// The points an assignment visits, or its error; see [`PointMap::check_assignment`]
+    pub(crate) fn check_assignment(&self, assignment: Assignment) -> Result<Visits, Iin2> {
+        let indices = assignment.indices;
+        match assignment.point_type {
+            PointType::BinaryInput => self.binary.check_assignment(indices),
+            PointType::DoubleBitBinaryInput => self.double_bit_binary.check_assignment(indices),
+            PointType::BinaryOutputStatus => self.binary_output_status.check_assignment(indices),
+            PointType::Counter => self.counter.check_assignment(indices),
+            PointType::FrozenCounter => self.frozen_counter.check_assignment(indices),
+            PointType::AnalogInput => self.analog.check_assignment(indices),
+            PointType::AnalogOutputStatus => self.analog_output_status.check_assignment(indices),
+            PointType::OctetString => self.octet_strings.check_assignment(indices),
+        }
+    }
+
+    /// Apply an assignment that [`Self::check_assignment`] accepted
+    pub(crate) fn assign(&mut self, assignment: Assignment) {
+        let Assignment {
+            point_type,
+            indices,
+            class,
+        } = assignment;
+        match point_type {
+            PointType::BinaryInput => self.binary.assign(indices, class),
+            PointType::DoubleBitBinaryInput => self.double_bit_binary.assign(indices, class),
+            PointType::BinaryOutputStatus => self.binary_output_status.assign(indices, class),
+            PointType::Counter => self.counter.assign(indices, class),
+            PointType::FrozenCounter => self.frozen_counter.assign(indices, class),
+            PointType::AnalogInput => self.analog.assign(indices, class),
+            PointType::AnalogOutputStatus => self.analog_output_status.assign(indices, class),
+            PointType::OctetString => self.octet_strings.assign(indices, class),
+        }
     }
 
     /// the number of installed points of every type

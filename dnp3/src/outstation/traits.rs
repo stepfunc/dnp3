@@ -10,7 +10,7 @@ use crate::app::RequestHeader;
 use crate::app::Sequence;
 use crate::app::{control::*, Timestamp};
 use crate::app::{FunctionCode, Iin, Iin1, Iin2, MaybeAsync};
-use crate::outstation::database::DatabaseHandle;
+use crate::outstation::database::{DatabaseHandle, EventClass};
 use std::ops::{BitOr, BitOrAssign};
 
 /// Application-controlled IIN bits
@@ -250,6 +250,46 @@ pub trait OutstationApplication: Sync + Send + 'static {
         MaybeAsync::ready(())
     }
 
+    /// Whether the outstation processes ASSIGN_CLASS requests, which change the class of the
+    /// events that points generate. Returning false answers them with IIN2.0
+    /// NO_FUNC_CODE_SUPPORT.
+    ///
+    /// The outstation applies an accepted request to its database itself, and only to events
+    /// generated afterwards: buffered events keep their class. It then reports the request with
+    /// a single call to [`Self::begin_assign_class`], a call to [`Self::assign_class`] for each
+    /// point header in request order, and a single call to [`Self::end_assign_class`]. A request
+    /// with any error changes nothing and makes none of these calls.
+    fn support_assign_class(&mut self) -> bool {
+        true
+    }
+
+    /// Called before the point headers of an accepted ASSIGN_CLASS request are reported
+    fn begin_assign_class(&mut self) {}
+
+    /// Called for each point header of an accepted ASSIGN_CLASS request, in request order, with
+    /// the class its points' events now have, or `None` if they no longer generate events
+    ///
+    /// The database has already been updated. This callback allows application code to persist
+    /// the assignment; an outstation that doesn't reverts to its configured classes when it
+    /// restarts. Replaying the calls in order reproduces the assignment, since a later header
+    /// replaces an earlier one for the points they share.
+    #[expect(
+        unused_variables,
+        reason = "the default implementation ignores its arguments"
+    )]
+    fn assign_class(
+        &mut self,
+        point_type: PointType,
+        indices: PointIndices,
+        class: Option<EventClass>,
+    ) {
+    }
+
+    /// Called after the point headers of an accepted ASSIGN_CLASS request are reported
+    fn end_assign_class(&mut self) -> MaybeAsync<()> {
+        MaybeAsync::ready(())
+    }
+
     /// Called in response to a WRITE request containing a group 0 object to store
     /// the value in non-volatile memory. The attribute is automatically updated in the
     /// in-memory database.
@@ -394,6 +434,36 @@ pub trait ControlSupport<T> {
         op_type: OperateType,
         database: &mut DatabaseHandle,
     ) -> CommandStatus;
+}
+
+/// A type of static point whose events an ASSIGN_CLASS request assigns to a class
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum PointType {
+    /// Binary inputs (g1), whose events are g2
+    BinaryInput,
+    /// Double-bit binary inputs (g3), whose events are g4
+    DoubleBitBinaryInput,
+    /// Binary output status (g10), whose events are g11
+    BinaryOutputStatus,
+    /// Counters (g20), whose events are g22
+    Counter,
+    /// Frozen counters (g21), whose events are g23
+    FrozenCounter,
+    /// Analog inputs (g30), whose events are g32
+    AnalogInput,
+    /// Analog output status (g40), whose events are g42
+    AnalogOutputStatus,
+    /// Octet strings (g110), whose events are g111
+    OctetString,
+}
+
+/// The points of a type that an ASSIGN_CLASS header names
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum PointIndices {
+    /// Every point of the type
+    All,
+    /// The points from the first index through the second
+    Range(u16, u16),
 }
 
 /// Indices used by freeze operations

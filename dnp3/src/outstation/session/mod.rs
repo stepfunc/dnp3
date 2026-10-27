@@ -55,6 +55,7 @@ use crate::outstation::control::collection::{
     ControlCollection, ControlLimit, ControlMode, ControlTransaction,
 };
 use crate::outstation::control::select::SelectState;
+use crate::outstation::database::assign::Assignments;
 use crate::outstation::database::{DatabaseHandle, EventClass};
 use crate::outstation::target::{DeadBands, FreezeTarget, Selector, WriteHeader, WriteTarget};
 use crate::outstation::traits::*;

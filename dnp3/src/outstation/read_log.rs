@@ -64,6 +64,6 @@ impl ReadLog for Tracing {
     }
 
     fn read_over_budget(over: OverBudget) {
-        budget::log_over_budget(over);
+        budget::log_over_budget(crate::app::FunctionCode::Read, over);
     }
 }

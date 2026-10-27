@@ -24,7 +24,7 @@
 //!   budget scaled to the database, and event selection by class and by type with any count,
 //!   with its IIN2 bits and the records it visits charged to the budget. It dispatches the event
 //!   headers as `Database::select_read` does, and rejects the READ the same way
-//! - [`budget`]: `ReadBudget` with any sizes, charged any sequence of visits to either pool
+//! - [`budget`]: `WorkBudget` with any sizes, charged any sequence of visits to either pool
 //! - [`respond`]: the event writers for solicited responses, every variation, with and without
 //!   CTO, and the progress that decides whether a fragment continues
 //! - [`unsolicited`]: `select_unsolicited` and `write_events_only`
@@ -70,7 +70,7 @@ use crate::app::{Iin2, QualifierCode, Sequence, Variation};
 use crate::link::EndpointAddress;
 use crate::master::EventClasses;
 use crate::outstation::database::details::attrs::{write_attr_list, write_attribute};
-use crate::outstation::database::details::budget::{OverBudget, Pool, ReadBudget};
+use crate::outstation::database::details::budget::{OverBudget, Pool, WorkBudget};
 use crate::outstation::database::details::event::buffer::Event;
 use crate::outstation::database::details::family::Family;
 use crate::outstation::database::details::range::static_db::{
@@ -123,7 +123,7 @@ impl ReadLog for Quiet {
 #[no_panic::no_panic]
 fn select(db: &mut Database, headers: &HeaderCollection) -> Iin2 {
     db.inner.reset();
-    let mut budget = db.inner.read_budget();
+    let mut budget = db.inner.work_budget();
     let mut headers = ReadHeaders::new(headers);
     let mut iin2 = Iin2::default();
     for (header, _read_with) in headers.by_ref() {
@@ -143,7 +143,7 @@ fn select(db: &mut Database, headers: &HeaderCollection) -> Iin2 {
 
 #[no_panic::no_panic]
 fn budget(static_records: usize, event_capacity: usize, charges: &[(bool, usize)]) {
-    let mut budget = ReadBudget::new(static_records, event_capacity);
+    let mut budget = WorkBudget::new(static_records, event_capacity);
     for (is_static, visits) in charges {
         let pool = if *is_static {
             Pool::Static

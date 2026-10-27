@@ -18,8 +18,11 @@ use crate::app::measurement::{
     AnalogInput, AnalogOutputStatus, BinaryInput, BinaryOutputStatus, Counter,
     DoubleBitBinaryInput, Flags, FrozenCounter, OctetString, Time,
 };
+use crate::app::parse::parser::HeaderCollection;
+use crate::app::FunctionCode;
+use crate::outstation::database::assign::Assignments;
 use crate::outstation::database::details::attrs::map::SetMap;
-use crate::outstation::database::details::budget::{Pool, ReadBudget};
+use crate::outstation::database::details::budget::{self, Pool, WorkBudget};
 use crate::outstation::database::details::{Visits, WriteProgress};
 use crate::outstation::read_log::ReadLog;
 use crate::outstation::{BufferState, ClassCount, OutstationApplication};
@@ -91,7 +94,7 @@ impl Database {
         headers: impl Iterator<Item = ReadHeader>,
     ) -> Iin2 {
         self.reset();
-        let mut budget = self.read_budget();
+        let mut budget = self.work_budget();
         let mut iin2 = Iin2::default();
         for header in headers {
             let (pool, (header_iin2, visits)) = self.select_by_header::<L>(header);
@@ -105,13 +108,35 @@ impl Database {
         iin2
     }
 
-    /// The budget of a READ, scaled to the points, attribute sets and event capacity
-    pub(crate) fn read_budget(&self) -> ReadBudget {
+    /// The budget of a request, scaled to the points, attribute sets and event capacity
+    pub(crate) fn work_budget(&self) -> WorkBudget {
         let static_records = self
             .static_db
             .point_count()
             .saturating_add(self.attrs.set_count());
-        ReadBudget::new(static_records, self.event_buffer.capacity())
+        WorkBudget::new(static_records, self.event_buffer.capacity())
+    }
+
+    /// Apply an ASSIGN_CLASS request: check every assignment against the installed points and the
+    /// budget first, then change the class of their points, so a request with any error changes
+    /// nothing
+    ///
+    /// Each assignment is charged for counting and changing its points, and for its callback
+    pub(crate) fn assign_classes(&mut self, headers: &HeaderCollection) -> Result<(), Iin2> {
+        let mut budget = self.work_budget();
+        for assignment in Assignments::new(headers) {
+            let visits = self.static_db.check_assignment(assignment?)?;
+            budget
+                .charge(Pool::Static, visits.plus(Visits::new(1)))
+                .map_err(|over| {
+                    budget::log_over_budget(FunctionCode::AssignClass, over);
+                    Iin2::PARAMETER_ERROR
+                })?;
+        }
+        for assignment in Assignments::new(headers).flatten() {
+            self.static_db.assign(assignment);
+        }
+        Ok(())
     }
 
     /// Start the selection of the events in `classes` for an unsolicited response from a reset,

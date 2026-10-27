@@ -69,9 +69,9 @@ async fn object_headers_in_a_request_that_takes_none_set_parameter_error() {
         .test_request_response(&[0xC1, 0x13, 60, 1, 0x06], &[0xC1, 0x81, 0x80, 0x05])
         .await;
 
-    // ASSIGN_CLASS takes objects
+    // ASSIGN_CLASS takes objects: a class header alone is an empty assignment set
     harness
-        .test_request_response(&[0xC2, 0x16, 60, 1, 0x06], &[0xC2, 0x81, 0x80, 0x01])
+        .test_request_response(&[0xC2, 0x16, 60, 1, 0x06], &[0xC2, 0x81, 0x80, 0x00])
         .await;
 }
 
