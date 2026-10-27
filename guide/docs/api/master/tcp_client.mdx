@@ -8,7 +8,7 @@ slug: /api/master/tcp_client
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-A `MasterChannel` presents the same interface regardless of transport. Create a TCP client channel using the runtime, configuration data, and a connection status callback.
+Create a TCP client channel with the runtime, the [channel configuration](./channel_config.mdx), the endpoints to connect to, and a `ClientStateListener`.
 
 <Tabs
 groupId="language"
@@ -62,15 +62,6 @@ The function is called within the context of the Tokio runtime, and is therefore
 </TabItem>
 </Tabs>
 
-## Enabling
-
-A `MasterChannel` won't communicate until you call `enable`. This lets you configure all associations first. Call `disable` to put the channel in an inactive state.
-
-## LinkErrorMode
-
-The `LinkErrorMode` controls what happens if the master detects a framing error at the link-layer. You must choose it when creating the channel. TCP is a lossless transport, so
-`LinkErrorMode::Close` is the usual choice. However, you can treat a TCP channel like a serial port by choosing `LinkErrorMode::Discard`.
-
 ## EndpointList
 
 An `EndpointList` contains remote endpoints the master will try to connect to. It must have at least one entry; additional entries serve as backups. The channel tries each endpoint in order, back to back, until one connects.
@@ -85,7 +76,3 @@ After a successful connection, the next attempt starts again at the first endpoi
 The `ConnectStrategy` controls the rate at which the master retries failed connection attempts. The master uses exponential backoff when attempting to establish
 a connection. Each time every endpoint in the list fails, the master waits before trying the list again. This delay doubles from `minConnectDelay` up to `maxConnectDelay`. If a connection fails after previously connecting, it will
 wait `reconnectDelay` before the next attempt.
-
-## ClientStateListener
-
-The `ClientStateListener` interface has a single callback to inform the application about the state of connection.

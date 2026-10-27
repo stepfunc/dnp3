@@ -1,16 +1,41 @@
 ---
 id: association_handler
-title: AssociationHandler
-sidebar_label: AssociationHandler
+title: Time Synchronization
+sidebar_label: Time Synchronization
 slug: /api/master/association_handler
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-`AssociationHandler` handles per-association callbacks unrelated to measurement data. It contains a single method (`get_current_time`) to retrieve a UTC timestamp for time synchronization.
+An outstation timestamps its events with its own clock, and many outstations rely on the master to set it. The master
+synchronizes the outstation's time automatically when the outstation asks for it, if you configure automatic time
+synchronization in the [AssociationConfig](./association_config.mdx). You can also synchronize it on demand with
+`synchronizeTime` on the `MasterChannel` (`synchronize_time` on the association in Rust), which reports whether it
+succeeded.
 
-Typically, return the system time (synchronized via NTP) in `get_current_time`. You can use a different clock if desired—for example, a data concentrator receiving time from an upstream DNP3 master. The examples below retrieve the system time.
+Either way, the time comes from your [AssociationHandler](#associationhandler).
+
+## Choosing a procedure
+
+| Procedure | Use it for |
+|-----------|------------|
+| LAN | Links with low, steady latency, such as Ethernet |
+| Non-LAN | Serial or other links whose latency is high or varies. The master measures the delay first and corrects for it |
+| Direct write | Only outstations that support neither of the others. It ignores latency, so the time can be off by the delay |
+
+## AssociationHandler
+
+`AssociationHandler` supplies the time the master sends. Its only method, `getCurrentTime` (`get_current_time` in Rust),
+returns the current UTC time.
+
+Typically you return the system time, synchronized by NTP. You can use another clock, for example in a data concentrator
+that receives its time from an upstream DNP3 master.
+
+Return an invalid timestamp from `getCurrentTime` (`None` in Rust) when you don't have a trustworthy time. The sync then
+fails with "system time not available" instead of sending a wrong time.
+
+The examples return the system time:
 
 <Tabs
 groupId="language"
@@ -29,7 +54,7 @@ values={[
 ```
 
 :::note
-Rust's 'AssociationHandler' trait has a default implementation of `get_current_time` that retrieves the system time.
+In Rust, `get_current_time` returns the system time by default, so the example doesn't implement it.
 :::
 
 </TabItem>

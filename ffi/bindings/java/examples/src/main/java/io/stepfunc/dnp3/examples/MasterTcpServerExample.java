@@ -32,6 +32,7 @@ public class MasterTcpServerExample {
     }
 
     private static void run(Runtime runtime) throws IOException, InterruptedException {
+        // ANCHOR: create_master_tcp_server
         final BlockingQueue<StartRequest> queue = new ArrayBlockingQueue<>(16);
         final ConnectionHandler handler = new ConnectionHandler(queue);
 
@@ -40,6 +41,7 @@ public class MasterTcpServerExample {
             final Thread starter = new Thread(() -> startChannels(queue));
             starter.setDaemon(true);
             starter.start();
+        // ANCHOR_END: create_master_tcp_server
 
             try {
                 readConsole();
@@ -74,6 +76,7 @@ public class MasterTcpServerExample {
         }
     }
 
+    // ANCHOR: start_channel
     private static void startChannel(StartRequest request, HashMap<UShort, MasterChannel> channels) {
         System.out.println("Accept with source == " + request.source + " destination == " + request.destination);
         try {
@@ -101,6 +104,7 @@ public class MasterTcpServerExample {
             previous.shutdown();
         }
     }
+    // ANCHOR_END: start_channel
 }
 
 class StartRequest {
@@ -115,6 +119,7 @@ class StartRequest {
     }
 }
 
+// ANCHOR: connection_handler
 class ConnectionHandler implements io.stepfunc.dnp3.ConnectionHandler {
 
     final BlockingQueue<StartRequest> queue;
@@ -151,6 +156,7 @@ class ConnectionHandler implements io.stepfunc.dnp3.ConnectionHandler {
         }
     }
 }
+// ANCHOR_END: connection_handler
 
 class NullReadHandler implements ReadHandler {}
 class NullAssocHandler implements AssociationHandler {

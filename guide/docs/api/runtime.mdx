@@ -8,8 +8,13 @@ slug: /api/runtime
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-The library runs on the [Tokio](https://tokio.rs/) asynchronous runtime: a pool of worker threads that runs every master
-and outstation session and calls your callbacks. You create one `Runtime` and share it across sessions.
+The library runs on [Tokio](https://tokio.rs/), the state-of-the-art asynchronous runtime behind much of Rust's
+networking software. Its work-stealing scheduler runs thousands of lightweight tasks on a small pool of threads, and its
+I/O uses each operating system's most efficient mechanism. Every master channel and outstation session is one of those
+tasks, so a single runtime scales from one session to thousands without a thread per connection.
+
+One `Runtime` runs any mix of masters and outstations. A protocol gateway, for example, can poll its field devices as a
+master and serve its control center as an outstation, all on the same runtime.
 
 ## Lifetime
 

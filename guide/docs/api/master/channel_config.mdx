@@ -1,24 +1,22 @@
 ---
 id: channel_config
-title: MasterChannelConfig
-sidebar_label: MasterChannelConfig
+title: Channel Basics
+sidebar_label: Channel Basics
 slug: /api/master/channel/config
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-The `MasterChannelConfig` struct contains the following generic settings that are common to all communication channels:
+Every `MasterChannel` works the same way once it's created, whatever its transport. This page covers what they share;
+the following pages cover what's specific to each transport.
 
-* Master station address (different addresses may be used for different channels)
-* Initial decoding level
-* Transmit and receive buffer sizes
+## Configuration
 
-:::note
-The timeout for responses is configured for each association individually in `AssociationConfig`. This is useful if the outstation is a gateway service with varying latency. The default response timeout is 5 seconds; you may need to increase it for high-latency communication links.
-:::
-
-The constructor takes the master address and has reasonable defaults for all other settings. You should only need to adjust the default buffer size of 2,048 bytes if an outstation has a non-standard configuration.
+A `MasterChannelConfig` holds the settings every channel has: the master's address (different channels can use
+different addresses), the initial decode level for logging, and the buffer sizes. Increase the receive buffer only if an
+outstation sends larger fragments than usual. The response timeout is set for each association, in its
+[`AssociationConfig`](./association_config.mdx).
 
 <Tabs
 groupId="language"
@@ -67,5 +65,33 @@ values={[
 </TabItem>
 </Tabs>
 
+## Enabling
 
+A channel doesn't communicate until you call `enable`, so you can add its associations and polls first. Call `disable`
+to stop communicating without losing them.
 
+## Lifetime
+
+Keep the channel for as long as it should run. In Java and .NET, a channel shuts down when it's garbage collected, so
+keep a reference to it, and shut it down yourself when you're done. In C and C++, destroying it shuts it down. In Rust,
+it runs until the `MasterChannel` and every `AssociationHandle` created from it are dropped.
+
+## Logging at runtime
+
+`set_decode_level` changes how much of the protocol traffic a running channel logs, for example to debug a site without
+restarting. See [Logging](../logging.mdx).
+
+## Link errors
+
+The `LinkErrorMode` chosen when creating a TCP or TLS channel decides what happens when the master receives a malformed
+link-layer frame. TCP doesn't lose data, so `Close` is the usual choice; `Discard` treats the connection like a serial
+port. Serial channels always discard.
+
+## State listeners
+
+A listener reports the state of the channel's connection or port, for example to show it on a status screen:
+
+| Transport | Listener |
+|-----------|----------|
+| TCP and TLS clients | `ClientStateListener` |
+| Serial | `PortStateListener` |

@@ -1,14 +1,34 @@
 ---
 id: assoc_polls
-title: Periodic Polling
-sidebar_label: Polling
+title: Polls and One-time Reads
+sidebar_label: Polls and One-time Reads
 slug: /api/master/association/polls
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-Add periodic polls before calling `MasterChannel.enable()`, though you can add or remove them at any time. Specify the association, request type, and polling interval.
+A master gets measurement data by reading it from the outstation, either on a schedule with a poll or once with a one-time
+read. Both send the values to the association's [ReadHandler](./read_handler.mdx), unless you pass your own handler for a
+one-time read.
+
+A typical design polls events (Class 1, 2, 3) often and integrity (Class 0, 1, 2, 3) rarely. With unsolicited reporting you
+may need only the occasional integrity poll.
+
+## Read requests
+
+Polls and one-time reads both take a request that says what to read. It's a `ReadRequest` in Rust and a `Request` in the
+bindings, and it can ask for:
+
+* Classes (any of 0, 1, 2, 3)
+* A range of points of a variation
+* All the points of a variation
+* [Device attributes](./attributes.mdx)
+
+## Polls
+
+Add a poll to an association with the request and the period. You usually add polls before calling
+`MasterChannel.enable()`, though you can add or remove them at any time.
 
 <Tabs
 groupId="language"
@@ -58,9 +78,18 @@ values={[
 </TabItem>
 </Tabs>
 
-The `Request` class is a builder type that lets you construct arbitrary READ requests, including:
+In Rust, `add_poll` returns a `PollHandle`: call `demand()` on it to make the poll due at once, or `remove()` to remove it.
+The bindings return a poll id that you pass to `MasterChannel.demandPoll()` and `MasterChannel.removePoll()`.
 
-* Class reads (0,1,2,3)
-* Range reads
-* Reads of all objects of a variation
+See [Scheduling](./scheduling.mdx) for when polls run and how they share the channel with other requests.
 
+## One-time reads
+
+Call `read` to read once. It completes when the outstation's whole response has been received, and the values go to the
+association's `ReadHandler`. In Rust it's a method of the `AssociationHandle`; in the bindings it's a `MasterChannel` method
+that takes the association id.
+
+To send one read's values somewhere else, call `read_with_handler` (`readWithHandler` in the bindings) with a `ReadHandler`
+of your own. That read's values go to the handler you pass instead of the association's.
+
+The [device attributes example](./attributes.mdx#reading-attributes) is a one-time read.

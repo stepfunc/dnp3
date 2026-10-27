@@ -60,21 +60,27 @@ module.exports = {
                         'api/master/channel_config',
                         'api/master/tcp_client',
                         'api/master/tls_client',
+                        'api/master/tcp_server',
                         'api/master/serial_master',
+                        'api/master/udp',
                     ]
                 },
                 {
                     Associations: [
                         'api/master/assoc_create',
-                        {
-                            Components: [
-                                'api/master/assoc_config',
-                                'api/master/read_handler',
-                                'api/master/association_handler',
-                                'api/master/association_information',
-                            ]
-                        },
+                        'api/master/assoc_config',
+                        'api/master/association_handler',
+                        'api/master/association_information',
+                    ]
+                },
+                {
+                    'Reading Data': [
+                        'api/master/read_handler',
                         'api/master/assoc_polls',
+                    ]
+                },
+                {
+                    Requests: [
                         'api/master/assoc_controls',
                         'api/master/attributes',
                         'api/master/file_transfer',

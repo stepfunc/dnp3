@@ -1,27 +1,30 @@
 ---
 id: assoc_other
-title: Other Operations
-sidebar_label: Misc
+title: Other Requests
+sidebar_label: Other Requests
 slug: /api/master/association/other
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-You can perform other miscellaneous operations on an association, including:
+Besides [reads](./association_polls.mdx) and [controls](./controls.mdx), an association can send these requests. In Rust
+they're methods of the `AssociationHandle`; in the bindings they're `MasterChannel` methods that take the association id.
 
-* Performing ad-hoc (i.e., one time) read requests
-* Synchronizing the outstation's time
-* Performing warm/cold restarts
-* Initiating link status requests to an outstation
-
-You can find details about these operations in the language-specific API docs.
+| Request | Why |
+|---------|-----|
+| Time synchronization (`synchronize_time`) | Sets the outstation's clock now, rather than when it asks for the time. See [Time Synchronization](./association_handler.mdx). |
+| Cold or warm restart (`cold_restart`, `warm_restart`) | Restarts the outstation, and returns its estimate of how long the restart takes. |
+| [Freeze counters](#freezing-counters) | Captures the counters' values at the same moment, or on a schedule. |
+| [Write deadbands](#writing-deadbands) (`write_dead_bands`) | Tunes analog event reporting remotely. |
+| Generic request (`send_and_expect_empty_response`) | Sends writes and freezes that have no dedicated method. It succeeds when the outstation answers with no objects and doesn't reject the request. |
+| Link status check (`check_link_status`) | Checks that the outstation's link layer answers. It's for testing: prefer the keep-alive, which the master sends on its own (see [Scheduling](./scheduling.mdx)). |
 
 ## Freezing counters
 
-A master asks the outstation to freeze its counters by sending a request with a freeze function code and the counters it
-applies to. The outstation copies each counter to its frozen counter, and can also clear the counter or freeze it on a
-schedule. The example masters can freeze all the counters at once, freeze and clear them, or freeze them once a day:
+Freeze counters with the generic request, giving it a freeze function code and the counters it applies to. The outstation
+copies each counter to its frozen counter, and can also clear the counter or freeze it on a schedule. The example freezes
+all the counters once a day:
 
 <Tabs
 groupId="language"
@@ -70,3 +73,56 @@ values={[
 </TabItem>
 </Tabs>
 
+## Writing deadbands
+
+A deadband is how much an analog input has to change before the outstation reports an event. Writing deadbands lets you
+tune event reporting without visiting the device. An outstation that should keep them across a restart saves them in its
+[saving callbacks](../outstation/outstation_application.mdx#saving-what-the-master-changes). To check the values, read the
+analog input deadbands back: they arrive at the [ReadHandler](./read_handler.mdx).
+
+<Tabs
+groupId="language"
+defaultValue="Rust"
+values={[
+{label: 'Rust', value: 'Rust'},
+{label: 'C', value: 'C'},
+{label: 'C++', value: 'C++'},
+{label: 'Java', value: 'Java'},
+{label: 'C#', value: 'C#'},
+]}>
+<TabItem value="Rust">
+
+```rust
+{{#include ../examples/master/src/main.rs:write_dead_bands}}
+```
+
+</TabItem>
+<TabItem value="C">
+
+```c
+{{#include ../ffi/bindings/c/master_example.c:write_dead_bands}}
+```
+
+</TabItem>
+<TabItem value="C++">
+
+```cpp
+{{#include ../ffi/bindings/c/master_example.cpp:write_dead_bands}}
+```
+
+</TabItem>
+<TabItem value="Java">
+
+```java
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterExample.java:write_dead_bands}}
+```
+
+</TabItem>
+<TabItem value="C#">
+
+```csharp
+{{#include ../ffi/bindings/dotnet/examples/master/Program.cs:write_dead_bands}}
+```
+
+</TabItem>
+</Tabs>

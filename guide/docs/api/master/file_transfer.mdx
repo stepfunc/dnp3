@@ -8,12 +8,12 @@ slug: /api/master/file_transfer
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-File transfer in DNP3 is defined using objects from Group 70. The Master API allows you to do several operations related
-to file transfer:
+File transfer lets a master retrieve files from an outstation, such as logs and disturbance records, and push files to it,
+such as configuration. The master API supports these operations:
 
 * Get file info - Retrieve information on an individual file or directory
 * Read file - Read a remote file from the outstation asynchronously
-* Read directory listing - Read a directory information from the outstation
+* Read directory listing - Read the contents of a directory from the outstation
 * Write file - Write a file to the outstation, one block at a time
 
 ## Get File Info
@@ -172,8 +172,8 @@ a background file transfer, accumulating the file data over possibly multiple bl
 of `FileInfo` instances.
 
 :::warning
-The default limit for the size of directory file is 2048 bytes. This is a reasonable and safe limit, however, if it's too
-small in your application you can raise this limit using the provided parameter in `DirReadConfig`.
+The master limits the size of a directory listing it accumulates. Raise the maximum size in `DirReadConfig` if listings are
+large.
 :::
 
 <Tabs

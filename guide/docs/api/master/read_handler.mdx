@@ -8,25 +8,50 @@ slug: /api/master/read_handler
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-The `ReadHandler` interface receives measurement values from the outstation. Specify it for each association; it's invoked for both unsolicited responses and READ responses.
+The `ReadHandler` interface receives measurement values from the outstation. Each association has one, which you supply
+when you create it.
 
-For every READ response or unsolicited fragment the master accepts, even one without any objects, `ReadHandler` callbacks are executed in the following order:
+## Where values come from
+
+Everything the association reads goes to its `ReadHandler`, except a read you send with your own handler:
+
+```mermaid
+flowchart LR
+    unsol[Unsolicited responses] --> assoc[The association's ReadHandler]
+    integrity[Integrity scans] --> assoc
+    polls[Polls and event scans] --> assoc
+    reads[One-time reads] --> assoc
+    custom_read[read_with_handler] --> custom[The ReadHandler you pass]
+```
+
+The `begin_fragment` and `end_fragment` callbacks receive a read type that tells you which of these the values came from:
+
+| Read type | Values from |
+|-----------|-------------|
+| `Unsolicited` | Unsolicited responses |
+| `StartupIntegrity` | The integrity scans the master runs on its own: at startup, after the outstation restarts, and after an event buffer overflow |
+| `PeriodicPoll` | Your [polls](./association_polls.mdx), and the automatic event scans |
+| `SinglePoll` | [One-time reads](./association_polls.mdx#one-time-reads), including `read_with_handler` |
+
+See [Scheduling](./scheduling.mdx) for when the master runs integrity and event scans on its own.
+
+## Callbacks
+
+For every READ response or unsolicited fragment the master accepts, even one without any objects, `ReadHandler` callbacks
+are executed in the following order:
 
 1. `ReadHandler::begin_fragment`
 2. `ReadHandler::handle_<TYPE>` for each object header in the message
 3. `ReadHandler::end_fragment`
 
-The begin/end methods provide useful information, including:
-
-* The full header of the response
-* Context regarding what triggered the response, such as unsolicited, startup integrity scan, periodic poll, etc.
+The begin and end methods receive the read type and the full header of the response.
 
 :::tip
 To determine if a measurement is a static value or an event, use the `HeaderInfo::is_event` field.
 :::
 
-Each value has a set of associated flags. You can check the presence of a flag by using the `Flags::value` field and comparing
-it with the constants defined in `Flag`.
+Each value has a set of associated flags. In Rust, check for a flag with `Flags::is_set` and the constants on `Flags`, such
+as `Flags::ONLINE`. In the bindings, compare the `Flags::value` field with the constants defined in `Flag`.
 
 :::tip
 It's common to maintain a list of measurement values in your `ReadHandler` implementation. You can then use the `end_fragment` method as a trigger to publish them.
@@ -34,27 +59,7 @@ Since responses may consist of multiple fragments, you can inspect the `Response
 in a response series.
 :::
 
-Use `AssociationHandle::read_with_handler()` in Rust, or `MasterChannel.readWithHandler(association, ...)` in the bindings, to send a read request with a specific `ReadHandler`. Response data goes to the specified handler instead of the association's default handler.
-
-## Device Attributes
-
-The `ReadHandler` also has callbacks for receiving device attributes (Group 0) from the outstation. The Rust trait uses
-a single method and passes an enum representing the various types of values. The bindings use a distinct method for each
-type of value, i.e. one for strings, another for unsigned integers, etc.
-
-All of the callbacks provide an enum allowing you to determine if the received attribute is from the default set specified by
-DNP.org (i.e. set "0") or a privately defined set. The intent is that you never have to match variations numbers yourself
-unless you are dealing with data from a private set.
-
-:::tip
-The default set includes a number of signed integer attributes that are mapped to boolean values, e.g.:
-
-* Group 0 Variation 231 - Support for analog input events
-
-* Group 0 Variation 237 - Support for binary input events
-
-Instead of providing you with the raw integer, the library converts it to a bool for convenience.
-:::
+The `ReadHandler` also receives [device attributes](./attributes.mdx#receiving-attributes).
 
 ## Examples
 

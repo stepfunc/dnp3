@@ -9,16 +9,13 @@ import sitedata from '../../sitedata.json'
 
 ## Conformance Testing
 
-Every release of the outstation passes the DNP3 IED Certification Procedure published by the DNP Users Group. CI runs
-two revisions of it, using [dnp3c](https://github.com/stepfunc/dnp3c), our implementation of the procedures:
-
-* Revision 3.1 rev 1 (2022), which covers subset levels 1 to 3. We run it at level 3.
-* Revision 2.7 (2016), which covers subset level 2.
+Every release of the outstation passes the DNP3 IED Certification Procedure published by the DNP Users Group, in two
+revisions that CI runs with [dnp3c](https://github.com/stepfunc/dnp3c), our implementation of the procedures:
 
 :::tip Conformance reports for {sitedata.version}
-<div style={{display: 'flex', gap: '0.75rem', flexWrap: 'wrap'}}>
-  <a className="button button--primary button--lg" href={`https://docs.stepfunc.io/dnp3/${sitedata.version}/conformance/3.1r1/L3/report.html`}>Revision 3.1 rev 1 - Subset Level 3</a>
-  <a className="button button--primary button--lg" href={`https://docs.stepfunc.io/dnp3/${sitedata.version}/conformance/2.7/L2/report.html`}>Revision 2.7 - Subset Level 2</a>
+<div style={{display: 'inline-flex', flexDirection: 'column', gap: '0.75rem'}}>
+  <a className="button button--primary button--lg" style={{textDecoration: 'none'}} href={`https://docs.stepfunc.io/dnp3/${sitedata.version}/conformance/3.1r1/L3/report.html`}>Revision 3.1 rev 1 - Subset Level 3</a>
+  <a className="button button--primary button--lg" style={{textDecoration: 'none'}} href={`https://docs.stepfunc.io/dnp3/${sitedata.version}/conformance/2.7/L2/report.html`}>Revision 2.7 - Subset Level 2</a>
 </div>
 :::
 
@@ -45,25 +42,32 @@ DNP3 defines four subset levels of interoperability:
 
 Features like file transfer, datasets, and secure authentication don't belong to any subset level.
 
-### Current Support: Level 3
+### Level 3: complete
 
-The library is Level 3 compliant for both master and outstation, and already supports most of Level 4, along with
-features outside the subset levels:
+The master and the outstation are fully Level 3 compliant, and the outstation passes the
+[certification procedures](#conformance-testing) at Level 3.
 
-| Feature                   | Objects                                                  | Level |
-|---------------------------|----------------------------------------------------------|:-----:|
-| Device attributes         | Group 0                                                  |   4   |
-| Double-bit binary inputs  | Groups 3 and 4                                           |   4   |
-| Floating-point AI/AO      | Float and double variations in groups 30, 32 and 41      |   4   |
-| Analog input deadbands    | Group 34                                                 |   4   |
-| BO/AO events              | Groups 11 and 42                                         |   4   |
-| Event class assignment    | ASSIGN_CLASS                                             |   4   |
-| LAN time synchronization  | Group 50 variation 3                                     |   4   |
-| Self-address support      | Link layer                                               |   4   |
-| Octet strings             | Groups 110 and 111                                       |   -   |
-| Master file transfer      | Group 70: read and write files, file info, directories  |   -   |
+### Level 4: everything but one feature
 
-### Future Support
+The library supports all of Level 4 except outstation command events (binary and analog output command events), which
+are next on our list:
 
-The library will be Level 4 compliant once the outstation supports binary and analog output command events (groups 13
-and 43).
+| Level 4 feature           | Objects                                              |
+|---------------------------|------------------------------------------------------|
+| Device attributes         | Group 0                                              |
+| Double-bit binary inputs  | Groups 3 and 4                                       |
+| Floating-point AI/AO      | Float and double variations in groups 30, 32 and 41  |
+| Analog input deadbands    | Group 34                                             |
+| BO/AO events              | Groups 11 and 42                                     |
+| Event class assignment    | ASSIGN_CLASS                                         |
+| LAN time synchronization  | Group 50 variation 3                                 |
+| Self-address support      | Link layer                                           |
+
+### Beyond Level 4
+
+The library also supports features that no subset level defines:
+
+| Feature                   | Objects                                                  |
+|---------------------------|----------------------------------------------------------|
+| Octet strings             | Groups 110 and 111                                       |
+| Master file transfer      | Group 70: read and write files, file info, directories  |

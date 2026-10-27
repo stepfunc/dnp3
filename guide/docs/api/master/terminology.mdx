@@ -1,35 +1,44 @@
 ---
 id: terminology
-title: Terminology
-sidebar_label: Terminology
+title: Master Overview
+sidebar_label: Overview
 slug: /api/master/terminology
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
-
-Master stations communicate with multiple outstations over multiple communication channels. The following sections describe how to create different channel types, each supporting multiple outstations.
-
-## MasterChannel
-
-Create a `MasterChannel` using generic configuration combined with transport-specific options. All channel instances have the same API regardless of the underlying transport.
-
-## Association
-
-An association is the master's view of its logical connection to one outstation. In this library, you add an association to a `MasterChannel` to enable communication with a particular outstation address. Adding an association to a channel will return an `AssociationId`, which can then be used in conjunction with the channel to perform actions on that outstation.
+A master talks to outstations through **channels**, and to each outstation on a channel through an **association**:
 
 ```mermaid
-graph TD
-A[MasterChannel] --association #1--> B[Outstation #1]
-A --association #2--> C[Outstation #2]
+flowchart LR
+    channel["MasterChannel: one TCP connection, serial port or UDP socket"]
+    channel --> a1["Association: outstation 10"]
+    channel --> a2["Association: outstation 11"]
+    a1 --> parts(["Your ReadHandler, AssociationHandler and AssociationInformation, its configuration and its polls"]):::user
+    classDef user fill:#ffffff,stroke:#888888,stroke-dasharray:4 4,color:#333333
 ```
 
+| To | Use | See |
+|----|-----|-----|
+| Connect to outstations | A `MasterChannel` per TCP or TLS connection, serial port or UDP socket, or a server that accepts outstations that connect in | [Channel basics](./channel_config.mdx), [TCP server](./tcp_server.mdx) |
+| Talk to one outstation | An association, added to the channel with the outstation's address | [Creating associations](./association_create.mdx) |
+| Receive values | Your `ReadHandler` | [ReadHandler](./read_handler.mdx) |
+| Read data | Polls on a schedule, or one-time reads | [Polls and one-time reads](./association_polls.mdx) |
+| Operate outputs | Controls | [Controls](./controls.mdx) |
+| Keep the outstation's clock right | Time synchronization | [Time synchronization](./association_handler.mdx) |
+| Watch communication health | State listeners and `AssociationInformation` | [Channel basics](./channel_config.mdx), [AssociationInformation](./association_information.mdx) |
+| Do anything else | Attributes, files, restarts, freezes, deadbands | [Attributes](./attributes.mdx), [File transfer](./file_transfer.mdx), [Other requests](./association_other.mdx) |
+
+Setting up a master takes four steps: create a channel, add an association for each outstation, add polls to the
+associations, and enable the channel. Until it's enabled, the channel doesn't communicate, so everything can be
+configured first.
+
+## Calling operations
+
+In Rust, adding an association returns an `AssociationHandle`, and you call operations such as reads and controls on it.
+In the bindings, it returns an `AssociationId`, and you pass that to the same operation on the `MasterChannel`. This
+guide names each operation once; the API documentation has both forms.
+
 :::note
-It's typical to just have one association per channel over TCP. However, it's also possible to encounter virtual outstations on a single TCP endpoint. Serial channels are frequently part of a multi-drop network where a single serial channel is used to communicate with multiple independent outstations.
+It's typical to have one association per channel over TCP, but a single TCP endpoint can also host several virtual
+outstations. Serial channels are often part of a multi-drop network, where one serial channel talks to several
+independent outstations.
 :::
-
-
-
-
-
-
