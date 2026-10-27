@@ -15,7 +15,7 @@ proven rather than just enforced. For how to report a vulnerability, and for how
 |---|---|---|
 | [Memory safety](#memory-safety) | `unsafe` code is forbidden in the Rust library | The compiler |
 | [Restricted sources of panics](#restricting-sources-of-panics) | Panic-prone constructs are denied, with documented exceptions | `clippy`, in CI |
-| [Proven panic-free parsing](#proven-panic-free-parsing) | The code that decodes received bytes can't panic, whatever they contain | A link-time check, in CI |
+| [Proven panic freedom](#proven-panic-freedom) | Parsing what is received, and formatting and framing what is sent, can't panic, whatever the input | A link-time check, in CI |
 | [Bounded resources](#bounded-resources) | Fixed buffers, and limits on how much of a request is processed | Tests |
 | [Protocol validation](#protocol-validation) | IEEE 1815-2012 as amended by the technical bulletins | Tests, and [conformance testing](interoperability.mdx#conformance-testing) |
 | [TLS](#tls) | rustls, mutual authentication, and only the trust you configure | rustls |
@@ -48,33 +48,51 @@ Tests may unwrap, panic and index. In the library itself, an exception is allowe
 Each exception carries a narrow `#[expect]` with a stated reason, and `#[allow]` is denied, so an exception can't go
 unnoticed.
 
-## Proven panic-free parsing
+## Proven panic freedom
 
 The lints restrict panics in our own code, but a call into the standard library or a dependency can still panic. So
-CI also proves, at link time, that the steps that decode bytes received from the network can't panic **for any input**.
-These are the steps that work directly on attacker-controlled data:
+CI also proves, at link time, that the following steps can't panic **for any input**, including in the standard
+library and dependency code they call:
+
+* receiving: buffering and parsing link frames and replying to them, reassembling transport segments, parsing
+  fragments, object headers and object values, and the master's extraction of every type of measurement
+* sending: formatting every request the master sends, the outstation's event buffer and the events it writes into
+  solicited and unsolicited responses, the encoding of static values and device attributes, and segmenting and framing
+  what is sent
 
 ```mermaid
 flowchart TD
     bytes(["Bytes from TCP, TLS, UDP or serial"]):::outside
-    reader["Link layer: buffering and parsing frames"]:::proven
-    frames["Link layer: frame headers, and the replies to them"]:::proven
+    reader["Link layer: buffering and parsing frames, and replying to them"]:::proven
     transport["Transport layer: reassembling segments into fragments"]:::proven
     app["Application layer: fragments, object headers and object values"]:::proven
     master["Master: extracting every type of measurement"]:::proven
-    outstation["Outstation: processing requests"]:::outside
-    handler(["Your ReadHandler"]):::user
-    bytes --> reader --> frames --> transport --> app
-    app --> master --> handler
-    app --> outstation
+    readhandler(["Your ReadHandler"]):::user
+    session["Sessions: scheduling tasks, processing requests, and selecting static points and attributes"]:::outside
+    handlers(["Your OutstationApplication, ControlHandler and other callbacks"]):::user
+    requests["Master: formatting every request"]:::proven
+    events["Outstation: storing events, and selecting and writing them"]:::proven
+    values["Outstation: encoding static values and device attributes"]:::proven
+    framing["Transport and link layers: segmenting and framing what is sent"]:::proven
+    sent(["Bytes to TCP, TLS, UDP or serial"]):::outside
+    bytes --> reader --> transport --> app
+    app --> master --> readhandler
+    app --> session
+    session --- handlers
+    session --> requests --> framing
+    session --> events --> framing
+    session --> values --> framing
+    framing --> sent
     classDef proven fill:#d9f2e3,stroke:#1b7f45,color:#0b3d20
     classDef outside fill:#eeeeee,stroke:#888888,color:#333333
     classDef user fill:#ffffff,stroke:#888888,stroke-dasharray:4 4,color:#333333
 ```
 
 The green steps are proven panic-free. The asynchronous session code and I/O around them aren't part of the proof,
-nor is the outstation's processing of the requests they decode, shown in gray. Your own handlers are code we can't
-check.
+shown in gray, and neither is the outstation's processing of requests, apart from how it maps the headers of a READ to
+what they select. Where the outstation walks or searches the maps that store its static points and attributes, to
+select and write the ones a READ reports or to find the point an update changes, only the encoding of their values is
+proven, not the walk. Your own handlers are code we can't check.
 
 <details>
 <summary>How the proof works</summary>
@@ -82,8 +100,12 @@ check.
 The proof uses the [no-panic](https://github.com/dtolnay/no-panic) technique. Each function on the green path is
 compiled so that a reachable panic leaves a reference to a symbol that doesn't exist, and the optimizer removes the
 reference only if it can prove that no path to a panic exists. A test harness calls the functions with input read at
-run time, so the optimizer can't specialize them to known values. If the test binary links, these functions can't
-panic.
+run time, so the optimizer can't specialize them to known values, and with output buffers of any size, from empty to
+far larger than a fragment. If the test binary links, these functions can't panic.
+
+Where a step calls code the library doesn't own, such as logging, the harness passes a stand-in, so the proof covers the
+step around the call but not the call itself. CI links the test binary twice, the second time with overflow checks on,
+so arithmetic overflow can't panic in these steps either.
 
 We confirmed that the check catches real panics by planting ones that only specific input can reach, in each layer,
 and checking that each one failed the link.
@@ -101,8 +123,9 @@ RUSTFLAGS="--cfg dnp3_no_panic" CARGO_PROFILE_RELEASE_LTO=thin CARGO_PROFILE_REL
 :::
 
 :::note What the proof doesn't cover
-The outstation's processing of requests, the asynchronous session code, I/O and logging, and code you supply, such as
-a `ReadHandler` or `ControlHandler`.
+The asynchronous session code that schedules the master's tasks and processes the outstation's requests, the
+outstation's walks and searches of its stored static points and attributes, I/O and logging, and code you supply, such
+as a `ReadHandler`, an `OutstationApplication` or a `ControlHandler`.
 :::
 
 ## Additional compile-time checks
