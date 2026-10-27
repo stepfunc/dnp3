@@ -6,8 +6,9 @@
 # callback that can panic, isn't in 0.10. There `BlockBuffer` keeps its cursor in a separate
 # `pos` field that `digest_blocks` writes only after `compress` returns, and `ReadBuffer` doesn't
 # exist. The fix (0.12.1) needs the digest 0.11 stack. dnp3 reaches block-buffer only with the
-# `tls` feature, through sfio-rustls-config decrypting a password-protected private key file when
-# a TLS configuration is built, with RustCrypto's compression functions as the callbacks.
+# `tls` or `tls-aws-lc` feature, through sfio-rustls-config decrypting a password-protected
+# private key file when a TLS configuration is built, with RustCrypto's compression functions as
+# the callbacks.
 [[IgnoredVulns]]
 id = "GHSA-qwgh-2vcv-g2f7"
 ignoreUntil = 2027-04-30
