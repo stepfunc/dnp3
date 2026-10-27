@@ -156,15 +156,9 @@ and checking that each one failed the link.
 
 </details>
 
-:::tip Run it yourself
-The `no-panic` CI job runs for every pull request and release tag, building the test binary in release mode with
-link-time optimization on a pinned toolchain. To run it locally:
-
-```
-RUSTFLAGS="--cfg dnp3_no_panic" CARGO_PROFILE_RELEASE_LTO=thin CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 \
-  cargo +1.99 test -p dnp3 --lib --release --no-run
-```
-:::
+The `no-panic` job in [CI](https://github.com/stepfunc/dnp3/blob/main/.github/workflows/ci.yml) runs this check on
+every pull request and release tag, building the test binary in release mode with link-time optimization on a pinned
+toolchain. The workflow has the exact command.
 
 :::note What the proof doesn't cover
 The asynchronous session code that schedules the master's tasks and processes the outstation's requests, the
