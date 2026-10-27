@@ -68,3 +68,4 @@ written license terms and authorizations govern.
 - Its rules for maintaining that repository (such as committing straight to `main`) apply only there, not here
 - If it isn't checked out, ask the user for it rather than working from memory of the spec
 - **Keep it private**: the documents are copyrighted. This repository is public, so never copy or upload their PDFs, extractions, screenshots, text, tables, or figures into code, comments, docs, commit messages, issues, PRs, or attachments. Cite by document and clause or test number instead (e.g. "IEEE 1815-2012 4.5.10", "TB2016-001")
+- **Citations stay in code**: cite clauses, tables and bulletins in code comments and crate-private docs. User-facing docs (the guide, `CHANGELOG.md`, rustdoc on public items and the FFI schema's doc strings) describe the behavior plainly without citing them; at most they say the library follows IEEE 1815-2012 as amended by the technical bulletins

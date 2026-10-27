@@ -5,7 +5,8 @@
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
 //! Property test of how a master channel picks its next task (`AssociationMap::next_task`),
-//! against a model written from the scheduling guide (`guide/docs/api/master/scheduling.mdx`).
+//! against a model of the scheduling rules listed below. The guide's scheduling page
+//! (`guide/docs/api/master/scheduling.mdx`) gives users an overview of the same rules.
 //!
 //! The associations run without I/O on a paused clock. Each step asks the scheduler for the next
 //! task and compares it with the model's prediction. The task is then answered, or times out,
@@ -28,7 +29,7 @@
 //! A fairness bound is checked as well: an association with ready work waits at most one pick per
 //! association ahead of it in line with ready work of the same kind (user or automatic).
 //!
-//! The model is written from the guide, not from `association.rs`, and shares no code with the
+//! The model is written from these rules, not from `association.rs`, and shares no code with the
 //! scheduler; examples at the end of this file check the model's own rules. The harness completes
 //! each task as the session does, through the tasks' own completion calls, so that plumbing is
 //! part of what is tested rather than of the oracle.

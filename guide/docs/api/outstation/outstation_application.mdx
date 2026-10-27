@@ -8,94 +8,227 @@ slug: /api/outstation/application
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-`OutstationApplication` provides callbacks for dynamic events and information the outstation requires:
+`OutstationApplication` is how the outstation asks your application for what only it knows, and tells it about changes
+worth saving. Each callback covers one job:
 
-* Internal Indication (IIN) bits
-* Processing requests to WRITE the time
-* Processing counter freeze requests
-* Persisting changes to analog dead-bands
-* Persisting the event classes a master assigns
-* Validating and persisting WRITE operations to device attributes
-* Processing cold and warm restart operations
+| Job | Called when | What your code does |
+|-----|-------------|---------------------|
+| [IIN bits](#iin-bits) | The outstation builds a response | Reports the state of your device |
+| [Time synchronization](#time-synchronization) | The master writes the time | Sets the clock, if it accepts the master's time |
+| [Restarts](#restarts) | The master asks for a cold or warm restart | Usually reports that restarts aren't supported |
+| [Counter freezes](#counter-freezes) | The master freezes counters | Copies counters to frozen counters |
+| [Saving changes](#saving-what-the-master-changes) | The master writes deadbands, event classes or device attributes | Saves them so they survive a restart |
+| [Event confirmations](#event-confirmations) | The master confirms events | Tracks which events were delivered, if it needs to |
 
-## ApplicationIin
+## IIN bits
 
-The outstation calls `OutstationApplication::getApplicationIin()` for every solicited or unsolicited response, merging your `ApplicationIin` bits with internal IIN bits. You control four bits:
+The outstation calls `getApplicationIin()` for every response and merges your bits with the ones it manages itself. You
+control four:
 
-* `needTime`: Outstation requires time synchronization
-* `localControl`: Some output points are in local mode
-* `deviceTrouble`: Device-specific bit that indicates the device has a problem
-* `configCorrupt`: Device configuration is corrupt
+* `needTime`: the outstation needs time synchronization
+* `localControl`: some output points are in local mode
+* `deviceTrouble`: the device has a problem
+* `configCorrupt`: the device configuration is corrupt
 
-## Time Synchronization
+## Time synchronization
 
-DNP3 has two different procedures for synchronizing the outstation's time: `LAN` and `Non-LAN`. You don't need to worry about which procedure the master uses; both procedures will call `OutstationApplication::writeAbsoluteTime(..)`, with a timestamp representing the number of milliseconds since January 1st, 1970, 00:00:00 UTC.
+Whichever procedure the master uses, the outstation calls `writeAbsoluteTime(..)` with the time in milliseconds since
+January 1st, 1970, 00:00:00 UTC.
 
-Outstations that do not support DNP3 time synchronization should return `WriteTimeResult::NOT_SUPPORTED`.  Outstations that receive their time from another
-source, such as NTP or IRIG-B, won't typically accept time synchronization requests from DNP3 unless the other time source is unavailable.
+Set `needTime` when your clock needs synchronizing, typically at an interval that depends on its accuracy, and clear it
+**in** `writeAbsoluteTime(..)`. If the bit is still set in the response, the master assumes the synchronization failed, and
+some masters then write the time over and over.
 
-Outstations may notify the master that they require time synchronization by setting the `ApplicationIin.needTime` bit. Outstations must clear this bit
-immediately in the `writeAbsoluteTime(..)` callback. Otherwise, the master may interpret this as a failure, causing some DNP3 masters to enter an infinite loop of writing the time.
+An outstation that gets its time from another source, such as NTP or IRIG-B, usually rejects the master's time unless that
+source is unavailable. One that doesn't support time synchronization at all returns `NOT_SUPPORTED`.
 
-Typically, an outstation will assert this bit periodically, depending on its internal clock accuracy.
+The example outstations ask for the time when they start, and clear the request when the master writes it:
 
-## Cold and Warm Restart
+<Tabs
+groupId="language"
+defaultValue="Rust"
+values={[
+{label: 'Rust', value: 'Rust'},
+{label: 'C', value: 'C'},
+{label: 'C++', value: 'C++'},
+{label: 'Java', value: 'Java'},
+{label: 'C#', value: 'C#'},
+]}>
+<TabItem value="Rust">
 
-DNP3 requires that compliant outstations be capable of performing a full restart, also known as a "cold restart". Because an attacker could abuse this functionality to
-perform a denial of service, we recommend that you disable this functionality in most products. Software gateways and translators that run on a server shared with other services should never implement this functionality. Return `RestartDelay` with `RestartDelayType::NOT_SUPPORTED` to
-indicate that the operation is not supported so that the timestamp isn't used.
+```rust
+{{#include ../examples/outstation/src/main.rs:time_sync}}
+```
 
-If you must implement this functionality to pass conformance tests or due to customer requirements, callbacks for both cold and warm restart are available. Return
-`RestartDelay` with a time estimate of how long the restart will take in seconds or milliseconds. This delay has no practical use for real-world masters, so don't worry too much about the accuracy of this value.
+</TabItem>
+<TabItem value="C">
 
-## Freeze Requests
+```c
+{{#include ../ffi/bindings/c/outstation_example.c:time_sync}}
+```
 
-`OutstationApplication` contains methods related to freezing counters:
+</TabItem>
+<TabItem value="C++">
 
-* `freezeCountersAll`: Called for freeze operations using the All Points (0x06) qualifier.
-* `freezeCountersRange`: Called for freeze operations using 8-bit (0x00) or 16-bit (0x01) range qualifiers.
+```cpp
+{{#include ../ffi/bindings/c/outstation_example.cpp:time_sync}}
+```
 
-Use the provided `DatabaseHandle` to copy counters to frozen counters. `FreezeType` specifies the operation:
+</TabItem>
+<TabItem value="Java">
 
-* `IMMEDIATE_FREEZE`: Copy the current value of a counter to the associated frozen counter point.
-* `FREEZE_AND_CLEAR`: Copy the current value of a counter to the associated frozen counter point and clear the current value to 0.
+```java
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/OutstationExample.java:time_sync}}
+```
 
-Requests to freeze at a particular time and interval are also passed to the application. In Rust, this is the `FreezeType::FreezeAtTime` variant. The bindings
-have separate `freezeCountersAllAtTime` and `freezeCountersRangeAtTime` methods.
+</TabItem>
+<TabItem value="C#">
 
-## Class Assignment
+```csharp
+{{#include ../ffi/bindings/dotnet/examples/outstation/Program.cs:time_sync}}
+```
 
-A master can change the class of the events that points generate with an ASSIGN_CLASS request.
-The outstation processes these requests by default. It checks the whole request before changing anything, so a request
-with any error changes nothing. An assignment applies only to events generated afterwards: events already buffered keep
-their class, and a point assigned to no class (g60v1) stops generating events.
+</TabItem>
+</Tabs>
 
-After applying a request, the outstation reports it with `beginAssignClass`, then a call for each point header in request
-order, then `endAssignClass`. Rust reports each header to `assign_class` with all of a type's points or a range of them;
-the bindings have separate `assignClassAll` and `assignClassRange` methods. Persist the assignments there and use them
-when you add points at startup; an outstation that doesn't reverts to the configured classes when it restarts, which the
-standard allows. Return false from `supportAssignClass` to answer ASSIGN_CLASS with IIN2.0 instead.
+## Restarts
 
-Assigning points to no class with point headers before the first class header, which also removes them from class 0, isn't
-supported, nor are headers that list individual point indices.
+A master can ask the outstation to restart. Because an attacker could use this to take a device offline, we recommend
+returning not supported from `coldRestart` and `warmRestart` in most products, and always in software gateways that share
+a server with other services. If you must support restarts, for conformance tests or a customer requirement, return an
+estimate of how long the restart takes; masters make little use of it, so it needn't be accurate. The outstation never
+restarts on its own: your application does.
 
-## Writing Device Attributes
+## Counter freezes
 
-When defining an attribute, you may specify that it is writable. When the outstation receives a WRITE request containing
-an attribute it follows this procedure:
+When the master freezes counters, use the `DatabaseHandle` you're given to copy each counter to its frozen counter, and with
+`FREEZE_AND_CLEAR`, also reset the counter to 0. Requests to freeze at a given time and interval are passed to your
+application too.
 
-1. If the attribute set is not defined, or the value is not of the correct type, the outstation returns `IIN2.PARAMETER_ERROR`.
-2. If the set is defined but the attribute is not, the attribute is read-only, or the variation is reserved, the outstation returns `IIN2.OBJECT_UNKNOWN`.
-3. The outstation then calls the appropriate handler to ask user code to validate and persist the new value. Rust has a single callback method
-whereas the bindings have a callback method for each type of attribute. These callbacks may return false to reject the WRITE. For example,
-certain attributes may have allowed ranges or discrete values. If the callback method returns `false` the outstation will
-respond with `IIN2.PARAMETER_ERROR`.
-4. Finally, if the handler returned `true` then the outstation will modify the in-memory value and return an empty response
-without error indications.
+The example outstations support both kinds of immediate freeze, but not freezing at a given time:
+
+<Tabs
+groupId="language"
+defaultValue="Rust"
+values={[
+{label: 'Rust', value: 'Rust'},
+{label: 'C', value: 'C'},
+{label: 'C++', value: 'C++'},
+{label: 'Java', value: 'Java'},
+{label: 'C#', value: 'C#'},
+]}>
+<TabItem value="Rust">
+
+```rust
+{{#include ../examples/outstation/src/main.rs:freeze}}
+```
+
+</TabItem>
+<TabItem value="C">
+
+```c
+{{#include ../ffi/bindings/c/outstation_example.c:freeze}}
+```
+
+</TabItem>
+<TabItem value="C++">
+
+```cpp
+{{#include ../ffi/bindings/c/outstation_example.cpp:freeze}}
+```
+
+</TabItem>
+<TabItem value="Java">
+
+```java
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/OutstationExample.java:freeze}}
+```
+
+</TabItem>
+<TabItem value="C#">
+
+```csharp
+{{#include ../ffi/bindings/dotnet/examples/outstation/Program.cs:freeze}}
+```
+
+</TabItem>
+</Tabs>
+
+## Saving what the master changes
+
+A master can change three kinds of settings in the outstation. The outstation applies each change to its database itself;
+the callbacks let you save it to non-volatile memory and apply it again when you add your points at startup. An outstation
+that doesn't save them returns to its configured values when it restarts.
+
+| Setting | Callbacks | Notes |
+|---------|-----------|-------|
+| Analog input deadbands | `beginWriteAnalogDeadBands`, one call per deadband, `endWriteAnalogDeadBands` | Rejected unless `supportWriteAnalogDeadBands` returns true |
+| Event classes | `beginAssignClass`, one call per point header, `endAssignClass` | Processed unless `supportAssignClass` returns false |
+| Device attributes | One call per attribute written | Only for attributes you define as writable |
+
+Deadbands and event classes come in batches that you can save at once in the end callback: one batch per request for event
+classes, and one per group of deadbands in the request. An event class
+assignment applies only to events generated afterwards, and a request with any error changes nothing. Headers that list
+individual point indices aren't supported.
+
+An attribute write callback can reject a value, for example one out of range, by returning false. The outstation itself
+rejects writes to attributes that aren't defined or writable, or whose type doesn't match.
+
+The example outstations log each batch where a device would save it:
+
+<Tabs
+groupId="language"
+defaultValue="Rust"
+values={[
+{label: 'Rust', value: 'Rust'},
+{label: 'C', value: 'C'},
+{label: 'C++', value: 'C++'},
+{label: 'Java', value: 'Java'},
+{label: 'C#', value: 'C#'},
+]}>
+<TabItem value="Rust">
+
+```rust
+{{#include ../examples/outstation/src/main.rs:save_changes}}
+```
+
+</TabItem>
+<TabItem value="C">
+
+```c
+{{#include ../ffi/bindings/c/outstation_example.c:save_changes}}
+```
+
+</TabItem>
+<TabItem value="C++">
+
+```cpp
+{{#include ../ffi/bindings/c/outstation_example.cpp:save_changes}}
+```
+
+</TabItem>
+<TabItem value="Java">
+
+```java
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/OutstationExample.java:save_changes}}
+```
+
+</TabItem>
+<TabItem value="C#">
+
+```csharp
+{{#include ../ffi/bindings/dotnet/examples/outstation/Program.cs:save_changes}}
+```
+
+</TabItem>
+</Tabs>
 
 :::note
-The example master can `WRITE` the User Defined Location (g0v245) attribute of the example outstation.
+The example master can `WRITE` the User Defined Location attribute of the example outstation.
 :::
 
+## Event confirmations
 
-
+When the master confirms a response, the outstation calls `beginConfirm`, then `eventCleared` for each event it removes
+from its buffer, with the ID that the update which created the event returned, then `endConfirm` with the number of events left in each class. Most applications don't need these. They
+help when the source of the events wants to know which ones have been delivered.

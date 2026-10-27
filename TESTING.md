@@ -89,7 +89,7 @@ Paths are relative to `dnp3/src`.
 
 | Property | File | Claim | Oracle | Cases |
 |---|---|---|---|---|
-| `next_task_follows_the_scheduling_model` | `master/association/scheduler_tests.rs` | The next task and sleep deadline follow the scheduling guide, within a fairness bound | Independent model | 256 |
+| `next_task_follows_the_scheduling_model` | `master/association/scheduler_tests.rs` | The next task and sleep deadline follow the scheduling rules in the module doc, within a fairness bound | Independent model | 256 |
 | `read_tasks_match_the_model` | `master/tests/task_model.rs` | A read or integrity scan against generated answers and noise: requests, callbacks and how it ends | Independent model | 128 |
 | `non_read_tasks_match_the_model` | `master/tests/task_model.rs` | The same for controls, restart, writes and single-request file tasks | Independent model | 64 |
 | `relative_time_follows_the_cto_model` | `master/relative_time_tests.rs` | Which responses with relative times are processed, each time, and what extraction reports | Independent model | 512 |

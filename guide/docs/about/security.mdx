@@ -5,6 +5,9 @@ sidebar_label: Security
 slug: /security
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 This page describes how the library defends against malformed or malicious input, and which of those defenses are
 proven rather than just enforced. For how to report a vulnerability, and for how we manage dependencies, see the
 [security policy](https://github.com/stepfunc/dnp3/blob/main/SECURITY.md).
@@ -15,7 +18,7 @@ proven rather than just enforced. For how to report a vulnerability, and for how
 |---|---|---|
 | [Memory safety](#memory-safety) | `unsafe` code is forbidden in the Rust library | The compiler |
 | [Restricted sources of panics](#restricting-sources-of-panics) | Panic-prone constructs are denied, with documented exceptions | `clippy`, in CI |
-| [Proven panic-free parsing](#proven-panic-free-parsing) | The code that decodes received bytes can't panic, whatever they contain | A link-time check, in CI |
+| [Proven panic freedom](#proven-panic-freedom) | Parsing what is received, and formatting and framing what is sent, can't panic, whatever the input | A link-time check, in CI |
 | [Bounded resources](#bounded-resources) | Fixed buffers, and limits on how much of a request is processed | Tests |
 | [Protocol validation](#protocol-validation) | IEEE 1815-2012 as amended by the technical bulletins | Tests, and [conformance testing](interoperability.mdx#conformance-testing) |
 | [TLS](#tls) | rustls, mutual authentication, and only the trust you configure | rustls |
@@ -48,33 +51,92 @@ Tests may unwrap, panic and index. In the library itself, an exception is allowe
 Each exception carries a narrow `#[expect]` with a stated reason, and `#[allow]` is denied, so an exception can't go
 unnoticed.
 
-## Proven panic-free parsing
+## Proven panic freedom
 
 The lints restrict panics in our own code, but a call into the standard library or a dependency can still panic. So
-CI also proves, at link time, that the steps that decode bytes received from the network can't panic **for any input**.
-These are the steps that work directly on attacker-controlled data:
+CI also proves, at link time, that the steps that parse what the library receives, and format and frame what it sends,
+can't panic **for any input**, including in the standard library and dependency code they call. Each diagram follows a
+request or response down from the bytes received, through the processing in your role, and back up to the bytes sent:
+
+<Tabs
+groupId="role"
+defaultValue="master"
+values={[
+{label: 'Master', value: 'master'},
+{label: 'Outstation', value: 'outstation'},
+]}>
+<TabItem value="master">
 
 ```mermaid
-flowchart TD
-    bytes(["Bytes from TCP, TLS, UDP or serial"]):::outside
-    reader["Link layer: buffering and parsing frames"]:::proven
-    frames["Link layer: frame headers, and the replies to them"]:::proven
-    transport["Transport layer: reassembling segments into fragments"]:::proven
-    app["Application layer: fragments, object headers and object values"]:::proven
-    master["Master: extracting every type of measurement"]:::proven
-    outstation["Outstation: processing requests"]:::outside
+flowchart TB
+    subgraph receiving [Receiving]
+        rx(["Bytes from TCP, TLS, UDP or serial"]):::outside
+        rlink["Link layer: parsing frames, and replying to them"]:::proven
+        rtransport["Transport layer: reassembling segments into fragments"]:::proven
+        rapp["Application layer: parsing fragments, object headers and object values"]:::proven
+    end
+    subgraph sending [Sending]
+        tx(["Bytes to TCP, TLS, UDP or serial"]):::outside
+        slink["Link layer: framing"]:::proven
+        stransport["Transport layer: segmenting fragments"]:::proven
+        sapp["Application layer: formatting every request"]:::proven
+    end
+    session["Session: scheduling tasks, and matching responses to requests"]:::outside
+    extract["Extracting every type of measurement"]:::proven
     handler(["Your ReadHandler"]):::user
-    bytes --> reader --> frames --> transport --> app
-    app --> master --> handler
-    app --> outstation
+    rx --> rlink --> rtransport --> rapp --> session
+    tx <--> slink
+    slink <--> stransport
+    stransport <--> sapp
+    sapp <--> session
+    session --> extract --> handler
+    %% each sending link is listed from the step above to the one below, so the column rises; only its upper arrowhead is drawn
+    linkStyle 4,5,6,7 marker-end:none
     classDef proven fill:#d9f2e3,stroke:#1b7f45,color:#0b3d20
     classDef outside fill:#eeeeee,stroke:#888888,color:#333333
     classDef user fill:#ffffff,stroke:#888888,stroke-dasharray:4 4,color:#333333
 ```
 
+</TabItem>
+<TabItem value="outstation">
+
+```mermaid
+flowchart TB
+    subgraph receiving [Receiving]
+        rx(["Bytes from TCP, TLS, UDP or serial"]):::outside
+        rlink["Link layer: parsing frames, and replying to them"]:::proven
+        rtransport["Transport layer: reassembling segments into fragments"]:::proven
+        rapp["Application layer: parsing fragments, object headers and object values"]:::proven
+    end
+    subgraph sending [Sending]
+        tx(["Bytes to TCP, TLS, UDP or serial"]):::outside
+        slink["Link layer: framing"]:::proven
+        stransport["Transport layer: segmenting fragments"]:::proven
+        sapp["Application layer: writing events, static values and device attributes"]:::proven
+    end
+    session["Session: processing requests, and walking the stored static points and attributes"]:::outside
+    handlers(["Your OutstationApplication, ControlHandler and other callbacks"]):::user
+    rx --> rlink --> rtransport --> rapp --> session
+    tx <--> slink
+    slink <--> stransport
+    stransport <--> sapp
+    sapp <--> session
+    session --- handlers
+    %% each sending link is listed from the step above to the one below, so the column rises; only its upper arrowhead is drawn
+    linkStyle 4,5,6,7 marker-end:none
+    classDef proven fill:#d9f2e3,stroke:#1b7f45,color:#0b3d20
+    classDef outside fill:#eeeeee,stroke:#888888,color:#333333
+    classDef user fill:#ffffff,stroke:#888888,stroke-dasharray:4 4,color:#333333
+```
+
+</TabItem>
+</Tabs>
+
 The green steps are proven panic-free. The asynchronous session code and I/O around them aren't part of the proof,
-nor is the outstation's processing of the requests they decode, shown in gray. Your own handlers are code we can't
-check.
+shown in gray, and neither is the outstation's processing of requests, apart from how it maps the headers of a READ to
+what they select. Where the outstation walks or searches the maps that store its static points and attributes, to
+select and write the ones a READ reports or to find the point an update changes, only the encoding of their values is
+proven, not the walk. Your own handlers are code we can't check.
 
 <details>
 <summary>How the proof works</summary>
@@ -82,27 +144,27 @@ check.
 The proof uses the [no-panic](https://github.com/dtolnay/no-panic) technique. Each function on the green path is
 compiled so that a reachable panic leaves a reference to a symbol that doesn't exist, and the optimizer removes the
 reference only if it can prove that no path to a panic exists. A test harness calls the functions with input read at
-run time, so the optimizer can't specialize them to known values. If the test binary links, these functions can't
-panic.
+run time, so the optimizer can't specialize them to known values, and with output buffers of any size from empty to
+16 MiB, far larger than a fragment. If the test binary links, these functions can't panic.
 
-We confirmed that the check catches real panics by planting ones that only specific input can reach, in each layer,
-and checking that each one failed the link.
+Where a step calls code the library doesn't own, such as logging, the harness passes a stand-in, so the proof covers the
+step around the call but not the call itself. CI links the test binary twice, the second time with overflow checks on,
+so arithmetic overflow can't panic in these steps either.
+
+The check fails closed: if any of these functions could panic, the test binary doesn't link, and the error names the
+function. We verified this in each layer by temporarily adding a panic that only specific input could reach; each one
+broke the link.
 
 </details>
 
-:::tip Run it yourself
-The `no-panic` CI job runs for every pull request and release tag, building the test binary in release mode with
-link-time optimization on a pinned toolchain. To run it locally:
-
-```
-RUSTFLAGS="--cfg dnp3_no_panic" CARGO_PROFILE_RELEASE_LTO=thin CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1 \
-  cargo +1.99 test -p dnp3 --lib --release --no-run
-```
-:::
+The `no-panic` job in [CI](https://github.com/stepfunc/dnp3/blob/main/.github/workflows/ci.yml) runs this check on
+every pull request and release tag, building the test binary in release mode with link-time optimization on a pinned
+toolchain. The workflow has the exact command.
 
 :::note What the proof doesn't cover
-The outstation's processing of requests, the asynchronous session code, I/O and logging, and code you supply, such as
-a `ReadHandler` or `ControlHandler`.
+The asynchronous session code that schedules the master's tasks and processes the outstation's requests, the
+outstation's walks and searches of its stored static points and attributes, I/O and logging, and code you supply, such
+as a `ReadHandler`, an `OutstationApplication` or a `ControlHandler`.
 :::
 
 ## Additional compile-time checks
@@ -129,22 +191,23 @@ nothing don't use up the READ limit. A READ that arrives while the outstation wa
 as pending, and holding it counts each header that parses, event headers included. Device attributes have their own
 fixed limit of selections per READ.
 
-These limits bound memory. The outstation also budgets the work of selecting what a READ reports, and of applying an
-ASSIGN_CLASS request, scaled to the size of its database, so that a request repeating headers that name every point or
-event is answered with IIN2.2 instead of consuming the CPU. The budget allows any reasonable request, even a redundant
-one.
+These limits bound memory. Some requests that the standard allows would still take a pathological amount of CPU to
+process, such as a READ or ASSIGN_CLASS that repeats headers naming every point or event many times. The outstation
+enforces a work budget on these requests, scaled to the size of its database, and answers one that exceeds it with
+IIN2.2. Reasonable requests, even redundant ones, stay well within it.
 
 ## Protocol validation
 
 The library follows IEEE 1815-2012 as amended by the DNP Users Group technical bulletins. Examples of how it validates
 input:
 
-| Behavior | Follows |
-|---|---|
-| An outstation silently discards a fragment that isn't a valid request, such as one with FIR or FIN cleared, and logs a warning | IEEE 1815-2012 clause 6 |
-| Transport segments are reassembled following the transport reception rules | TB2013-003 |
-| IIN2.0 for a function code the outstation doesn't support, IIN2.1 for an object it doesn't support, and IIN2.2 for malformed object data or a qualifier the object doesn't support | TB2016-001 |
-| An OPERATE executes only with an active selection, the next sequence number after its SELECT, object headers that match the SELECT's, and no more time elapsed than the selection timeout, and the selection is kept or ended as the table specifies | IEEE 1815-2012 4.4.4, Table 4-9 |
+* An outstation silently discards a fragment that isn't a valid request, such as one with FIR or FIN cleared, and logs a
+  warning.
+* Transport segments are reassembled following the transport reception rules.
+* An outstation answers IIN2.0 for a function code it doesn't support, IIN2.1 for an object it doesn't support, and IIN2.2
+  for malformed object data or a qualifier the object doesn't support.
+* An OPERATE executes only with an active selection, the next sequence number after its SELECT, object headers that match
+  the SELECT's, and no more time elapsed than the selection timeout.
 
 ## TLS
 

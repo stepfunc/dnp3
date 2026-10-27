@@ -150,8 +150,6 @@ pub trait OutstationApplication: Sync + Send + 'static {
     /// This parameter should almost always use the default value of zero as only an RTOS
     /// or bare metal system would have access to this level of timing. Modern hardware
     /// can almost always respond in less than 1 millisecond anyway.
-    ///
-    /// For more information, see IEEE-1815 2012, pg. 64
     fn get_processing_delay_ms(&self) -> u16 {
         0
     }
@@ -172,7 +170,7 @@ pub trait OutstationApplication: Sync + Send + 'static {
         ApplicationIin::default()
     }
 
-    /// Request that the outstation perform a cold restart (IEEE-1815 2012, pg. 58)
+    /// Request that the outstation perform a cold restart
     ///
     /// If supported, return Some(RestartDelay) indicating how long the restart
     /// will take to complete
@@ -185,7 +183,7 @@ pub trait OutstationApplication: Sync + Send + 'static {
         None
     }
 
-    /// Request that the outstation perform a warm restart (IEEE-1815 2012, pg. 58)
+    /// Request that the outstation perform a warm restart
     ///
     /// If supported, return Some(RestartDelay) indicating how long the restart
     /// will take to complete
@@ -391,8 +389,7 @@ pub enum OperateType {
 /// select, operate, direct operate, or direct operate no-ack a control point
 ///
 /// Return [`CommandStatus::NotSupported`] for an index that doesn't exist. When it's the first
-/// control in the request that fails, the response also sets IIN2.2 (parameter error), which
-/// TB2016-001 requires for an index that isn't installed.
+/// control in the request that fails, the response also sets IIN2.2 (parameter error).
 ///
 /// The outstation answers a g41v3 or g41v4 control whose value is NaN or infinite with
 /// [`CommandStatus::NotSupported`] itself, without calling this trait.
@@ -478,8 +475,6 @@ pub enum FreezeIndices {
 }
 
 /// This object maps to the fields of g50v2
-///
-/// There is a table on page 57 of 1815-2012 that describes these 4 permutations
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum FreezeInterval {
     /// Freeze once immediately

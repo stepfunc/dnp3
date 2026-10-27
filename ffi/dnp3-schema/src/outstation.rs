@@ -1203,8 +1203,7 @@ fn define_outstation_application(
     let application = lib.define_interface("outstation_application", "Dynamic information required by the outstation from the user application")?
         .begin_callback("get_processing_delay_ms", doc("Returns the DELAY_MEASUREMENT delay")
             .details("The value returned by this method is used in conjunction with the DELAY_MEASUREMENT function code and returned in a g52v2 time delay object as part of a non-LAN time synchronization procedure.")
-            .details("It represents the processing delay from receiving the request to sending the response. This parameter should almost always use the default value of zero as only an RTOS or bare metal system would have access to this level of timing. Modern hardware can almost always respond in less than 1 millisecond anyway.")
-            .details("For more information, see IEEE-1815 2012, p. 64."))?
+            .details("It represents the processing delay from receiving the request to sending the response. This parameter should almost always use the default value of zero as only an RTOS or bare metal system would have access to this level of timing. Modern hardware can almost always respond in less than 1 millisecond anyway."))?
             .returns(Primitive::U16, "Processing delay, in milliseconds")?
             .end_callback()?
         .begin_callback("write_absolute_time", "Handle a write of the absolute time during time synchronization procedures.")?
@@ -1214,11 +1213,11 @@ fn define_outstation_application(
         .begin_callback("get_application_iin", "Returns the application-controlled IIN bits")?
             .returns(application_iin, "Application IIN bits")?
             .end_callback()?
-        .begin_callback("cold_restart", doc("Request that the outstation perform a cold restart (IEEE-1815 2012, p. 58)")
+        .begin_callback("cold_restart", doc("Request that the outstation perform a cold restart")
             .details("The outstation will not automatically restart. It is the responsibility of the user application to handle this request and take the appropriate action."))?
             .returns(restart_delay.clone(), "The restart delay")?
             .end_callback()?
-        .begin_callback("warm_restart", doc("Request that the outstation perform a warm restart (IEEE-1815 2012, p. 58)")
+        .begin_callback("warm_restart", doc("Request that the outstation perform a warm restart")
             .details("The outstation will not automatically restart. It is the responsibility of the user application to handle this request and take the appropriate action."))?
             .returns(restart_delay, "The restart delay")?
             .end_callback()?
@@ -1229,7 +1228,7 @@ fn define_outstation_application(
             .end_callback()?
         .begin_callback("freeze_counters_all_at_time",
                         doc("Freeze all the counters at a requested time and interval")
-                            .details("Refer to the table on page 57 of IEEE 1815-2012 to interpret the time and interval parameters correctly")
+                            .details("A time and interval of 0 freeze once immediately; a time with an interval of 0 freezes once at that time; an interval with a time of 0 freezes periodically, relative to the beginning of the current hour; and both freeze periodically, relative to the time.")
              )?
             .param("database_handle",database_handle.declaration(), "Database handle")?
             .param("time", Primitive::U64, "48-bit DNP3 timestamp in milliseconds since epoch UTC")?
@@ -1245,7 +1244,7 @@ fn define_outstation_application(
             .end_callback()?
         .begin_callback("freeze_counters_range_at_time",
                         doc("Freeze a range of counters at a requested time and interval")
-                            .details("Refer to the table on page 57 of IEEE 1815-2012 to interpret the time and interval parameters correctly")
+                            .details("A time and interval of 0 freeze once immediately; a time with an interval of 0 freezes once at that time; an interval with a time of 0 freezes periodically, relative to the beginning of the current hour; and both freeze periodically, relative to the time.")
              )?
             .param("start", Primitive::U16, "Start index to freeze (inclusive)")?
             .param("stop", Primitive::U16, "Stop index to freeze (inclusive)")?
@@ -1531,7 +1530,7 @@ fn define_control_handler(
             "control_handler",
             doc("Callbacks for handling controls")
                 .details(
-                    "Return {enum:command_status.not_supported} for an index that doesn't exist. When it's the first control in the request that fails, the response also sets IIN2.2 (parameter error), which TB2016-001 requires for an index that isn't installed.",
+                    "Return {enum:command_status.not_supported} for an index that doesn't exist. When it's the first control in the request that fails, the response also sets IIN2.2 (parameter error).",
                 )
                 .details(
                     "The outstation answers a g41v3 or g41v4 control whose value is NaN or infinite with {enum:command_status.not_supported} itself, without calling this interface.",

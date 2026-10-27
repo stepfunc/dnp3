@@ -69,3 +69,65 @@ The returned `AssociationId` is just a token. It's required for operations on a 
 ## Removing
 
 Remove associations from a channel by calling `MasterChannel.removeAssociation` and passing in the `AssociationId`. Doing so will stop all operations for that association.
+
+## UDP
+
+A UDP channel isn't connected to one outstation, so each association on it also needs the outstation's address and port.
+Create the channel with the local address and port it listens on, then add each association with its remote endpoint:
+
+<Tabs
+groupId="language"
+defaultValue="Rust"
+values={[
+{label: 'Rust', value: 'Rust'},
+{label: 'C', value: 'C'},
+{label: 'C++', value: 'C++'},
+{label: 'Java', value: 'Java'},
+{label: 'C#', value: 'C#'},
+]}>
+<TabItem value="Rust">
+
+```rust
+{{#include ../examples/master/src/main.rs:create_udp_channel}}
+
+{{#include ../examples/master/src/main.rs:association_create_udp}}
+```
+
+</TabItem>
+<TabItem value="C">
+
+```c
+{{#include ../ffi/bindings/c/master_example.c:create_udp_channel}}
+
+{{#include ../ffi/bindings/c/master_example.c:association_create_udp}}
+```
+
+</TabItem>
+<TabItem value="C++">
+
+```cpp
+{{#include ../ffi/bindings/c/master_example.cpp:create_udp_channel}}
+
+{{#include ../ffi/bindings/c/master_example.cpp:association_create_udp}}
+```
+
+</TabItem>
+<TabItem value="Java">
+
+```java
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterExample.java:create_udp_channel}}
+
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterExample.java:association_create_udp}}
+```
+
+</TabItem>
+<TabItem value="C#">
+
+```csharp
+{{#include ../ffi/bindings/dotnet/examples/master/Program.cs:create_udp_channel}}
+
+{{#include ../ffi/bindings/dotnet/examples/master/Program.cs:association_create_udp}}
+```
+
+</TabItem>
+</Tabs>

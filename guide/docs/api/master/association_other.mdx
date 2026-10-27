@@ -5,6 +5,9 @@ sidebar_label: Misc
 slug: /api/master/association/other
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 You can perform other miscellaneous operations on an association, including:
 
 * Performing ad-hoc (i.e., one time) read requests
@@ -13,4 +16,57 @@ You can perform other miscellaneous operations on an association, including:
 * Initiating link status requests to an outstation
 
 You can find details about these operations in the language-specific API docs.
+
+## Freezing counters
+
+A master asks the outstation to freeze its counters by sending a request with a freeze function code and the counters it
+applies to. The outstation copies each counter to its frozen counter, and can also clear the counter or freeze it on a
+schedule. The example masters can freeze all the counters at once, freeze and clear them, or freeze them once a day:
+
+<Tabs
+groupId="language"
+defaultValue="Rust"
+values={[
+{label: 'Rust', value: 'Rust'},
+{label: 'C', value: 'C'},
+{label: 'C++', value: 'C++'},
+{label: 'Java', value: 'Java'},
+{label: 'C#', value: 'C#'},
+]}>
+<TabItem value="Rust">
+
+```rust
+{{#include ../examples/master/src/main.rs:freeze_at_time}}
+```
+
+</TabItem>
+<TabItem value="C">
+
+```c
+{{#include ../ffi/bindings/c/master_example.c:freeze_at_time}}
+```
+
+</TabItem>
+<TabItem value="C++">
+
+```cpp
+{{#include ../ffi/bindings/c/master_example.cpp:freeze_at_time}}
+```
+
+</TabItem>
+<TabItem value="Java">
+
+```java
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterExample.java:freeze_at_time}}
+```
+
+</TabItem>
+<TabItem value="C#">
+
+```csharp
+{{#include ../ffi/bindings/dotnet/examples/master/Program.cs:freeze_at_time}}
+```
+
+</TabItem>
+</Tabs>
 

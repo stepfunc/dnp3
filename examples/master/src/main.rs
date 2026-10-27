@@ -30,6 +30,75 @@ use std::path::{Path, PathBuf};
 use dnp3_cli_utils::serial::{DataBitsArg, FlowControlArg, ParityArg, StopBitsArg};
 use dnp3_cli_utils::LogLevel;
 
+/*
+  Example program using the master API from within the Tokio runtime.
+
+  The program initializes a master channel based on the command line argument and then enters a loop
+  reading console input allowing the user to perform common tasks interactively.
+*/
+// ANCHOR: runtime_init
+#[tokio::main(flavor = "multi_thread")]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // ANCHOR_END: runtime_init
+
+    // Parse command line arguments
+    let args = CliArgs::parse();
+
+    // ANCHOR: logging
+    // Initialize logging
+    let log_level: tracing::Level = args.log_level.into();
+
+    tracing_subscriber::fmt()
+        .with_max_level(log_level)
+        .with_target(false)
+        .init();
+    // ANCHOR_END: logging
+
+    if args.parse_zero_length_strings {
+        tracing::info!("enabled zero-length octet string parsing");
+        options::parse_zero_length_strings(true);
+    }
+
+    // spawn the master channel based on the command line argument
+    let (mut channel, mut association) = create_channel_and_association(&args).await?;
+
+    // create an event poll
+    // ANCHOR: add_poll
+    let poll = association
+        .add_poll(
+            ReadRequest::ClassScan(Classes::class123()),
+            Duration::from_secs(5),
+        )
+        .await?;
+    // ANCHOR_END: add_poll
+
+    // enable communications
+    channel.enable().await?;
+
+    let mut handler = CliHandler {
+        poll,
+        channel,
+        association,
+    };
+
+    let mut reader = FramedRead::new(tokio::io::stdin(), LinesCodec::new());
+
+    print_help();
+
+    // exit on "x" or at the end of input
+    while let Some(line) = reader.next().await {
+        match line?.as_str() {
+            "x" => return Ok(()),
+            "help" => print_help(),
+            cmd => match handler.run_one_command(cmd).await {
+                Ok(outcome) => println!("{cmd}: {outcome}"),
+                Err(err) => println!("{cmd}: {err}"),
+            },
+        }
+    }
+    Ok(())
+}
+
 #[derive(Debug, Parser)]
 #[command(name = "master")]
 #[command(about = "DNP3 Master example application", long_about = None)]
@@ -159,268 +228,198 @@ enum TransportCommand {
     },
 }
 
-/// read handler that does nothing
-#[derive(Copy, Clone)]
-pub struct ExampleReadHandler;
-
-impl ExampleReadHandler {
-    /// create a boxed instance of the NullReadHandler
-    pub fn boxed() -> Box<dyn ReadHandler> {
-        Box::new(Self {})
+// create the specified channel based on the command line argument
+async fn create_channel_and_association(
+    cli: &CliArgs,
+) -> Result<(MasterChannel, AssociationHandle), Box<dyn std::error::Error>> {
+    match &cli.transport {
+        TransportCommand::TcpClient {
+            endpoint,
+            outstation_address,
+        } => {
+            let mut channel = create_tcp_channel(cli.master_address, *endpoint)?;
+            let assoc = add_association(&mut channel, *outstation_address).await?;
+            Ok((channel, assoc))
+        }
+        TransportCommand::Udp {
+            local_endpoint,
+            remote_endpoint,
+            outstation_address,
+        } => {
+            let mut channel = create_udp_channel(cli.master_address, *local_endpoint)?;
+            let assoc =
+                add_udp_association(&mut channel, *remote_endpoint, *outstation_address).await?;
+            Ok((channel, assoc))
+        }
+        TransportCommand::Serial {
+            port,
+            baud_rate,
+            data_bits,
+            stop_bits,
+            parity,
+            flow_control,
+            outstation_address,
+        } => {
+            let mut channel = create_serial_channel(
+                cli.master_address,
+                port,
+                *baud_rate,
+                *data_bits,
+                *stop_bits,
+                *parity,
+                *flow_control,
+            )?;
+            let assoc = add_association(&mut channel, *outstation_address).await?;
+            Ok((channel, assoc))
+        }
+        TransportCommand::TlsCa {
+            endpoint,
+            domain,
+            ca_cert,
+            entity_cert,
+            entity_key,
+            outstation_address,
+        } => {
+            let mut channel = create_tls_channel(
+                cli.master_address,
+                *endpoint,
+                get_tls_authority_config(domain, ca_cert, entity_cert, entity_key)?,
+            )?;
+            let assoc = add_association(&mut channel, *outstation_address).await?;
+            Ok((channel, assoc))
+        }
+        TransportCommand::TlsSelfSigned {
+            endpoint,
+            peer_cert,
+            entity_cert,
+            entity_key,
+            outstation_address,
+        } => {
+            let mut channel = create_tls_channel(
+                cli.master_address,
+                *endpoint,
+                get_tls_self_signed_config(peer_cert, entity_cert, entity_key)?,
+            )?;
+            let assoc = add_association(&mut channel, *outstation_address).await?;
+            Ok((channel, assoc))
+        }
     }
 }
 
-// ANCHOR: read_handler
-impl ReadHandler for ExampleReadHandler {
-    fn begin_fragment(&mut self, _read_type: ReadType, header: ResponseHeader) -> MaybeAsync<()> {
-        println!(
-            "Beginning fragment (broadcast: {})",
-            header.iin.iin1.get_broadcast()
-        );
-        MaybeAsync::ready(())
-    }
-
-    fn end_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) -> MaybeAsync<()> {
-        println!("End fragment");
-        MaybeAsync::ready(())
-    }
-
-    fn handle_binary_input(
-        &mut self,
-        info: HeaderInfo,
-        iter: &mut dyn Iterator<Item = (BinaryInput, u16)>,
-    ) {
-        println!("Binary Inputs:");
-        println!("Qualifier: {}", info.qualifier);
-        println!("Variation: {}", info.variation);
-
-        for (x, idx) in iter {
-            println!(
-                "BI {}: Value={} Flags={:#04X} Time={:?}",
-                idx, x.value, x.flags.value, x.time
-            );
-        }
-    }
-
-    fn handle_double_bit_binary_input(
-        &mut self,
-        info: HeaderInfo,
-        iter: &mut dyn Iterator<Item = (DoubleBitBinaryInput, u16)>,
-    ) {
-        println!("Double Bit Binary Inputs:");
-        println!("Qualifier: {}", info.qualifier);
-        println!("Variation: {}", info.variation);
-
-        for (x, idx) in iter {
-            println!(
-                "DBBI {}: Value={} Flags={:#04X} Time={:?}",
-                idx, x.value, x.flags.value, x.time
-            );
-        }
-    }
-
-    fn handle_binary_output_status(
-        &mut self,
-        info: HeaderInfo,
-        iter: &mut dyn Iterator<Item = (BinaryOutputStatus, u16)>,
-    ) {
-        println!("Binary Output Statuses:");
-        println!("Qualifier: {}", info.qualifier);
-        println!("Variation: {}", info.variation);
-
-        for (x, idx) in iter {
-            println!(
-                "BOS {}: Value={} Flags={:#04X} Time={:?}",
-                idx, x.value, x.flags.value, x.time
-            );
-        }
-    }
-
-    fn handle_counter(&mut self, info: HeaderInfo, iter: &mut dyn Iterator<Item = (Counter, u16)>) {
-        println!("Counters:");
-        println!("Qualifier: {}", info.qualifier);
-        println!("Variation: {}", info.variation);
-
-        for (x, idx) in iter {
-            println!(
-                "Counter {}: Value={} Flags={:#04X} Time={:?}",
-                idx, x.value, x.flags.value, x.time
-            );
-        }
-    }
-
-    fn handle_frozen_counter(
-        &mut self,
-        info: HeaderInfo,
-        iter: &mut dyn Iterator<Item = (FrozenCounter, u16)>,
-    ) {
-        println!("Frozen Counters:");
-        println!("Qualifier: {}", info.qualifier);
-        println!("Variation: {}", info.variation);
-
-        for (x, idx) in iter {
-            println!(
-                "Frozen Counter {}: Value={} Flags={:#04X} Time={:?}",
-                idx, x.value, x.flags.value, x.time
-            );
-        }
-    }
-
-    fn handle_analog_input(
-        &mut self,
-        info: HeaderInfo,
-        iter: &mut dyn Iterator<Item = (AnalogInput, u16)>,
-    ) {
-        println!("Analog Inputs:");
-        println!("Qualifier: {}", info.qualifier);
-        println!("Variation: {}", info.variation);
-
-        for (x, idx) in iter {
-            println!(
-                "AI {}: Value={} Flags={:#04X} Time={:?}",
-                idx, x.value, x.flags.value, x.time
-            );
-        }
-    }
-
-    fn handle_analog_output_status(
-        &mut self,
-        info: HeaderInfo,
-        iter: &mut dyn Iterator<Item = (AnalogOutputStatus, u16)>,
-    ) {
-        println!("Analog Output Statuses:");
-        println!("Qualifier: {}", info.qualifier);
-        println!("Variation: {}", info.variation);
-
-        for (x, idx) in iter {
-            println!(
-                "AOS {}: Value={} Flags={:#04X} Time={:?}",
-                idx, x.value, x.flags.value, x.time
-            );
-        }
-    }
-
-    fn handle_octet_string(
-        &mut self,
-        info: HeaderInfo,
-        iter: &mut dyn Iterator<Item = (&[u8], u16)>,
-    ) {
-        println!("Octet Strings:");
-        println!("Qualifier: {}", info.qualifier);
-        println!("Variation: {}", info.variation);
-
-        for (x, idx) in iter {
-            println!("Octet String {idx}: Value={x:X?}");
-        }
-    }
-
-    fn handle_device_attribute(&mut self, _info: HeaderInfo, attr: AnyAttribute) {
-        println!("Device attribute: {attr:?}")
-    }
+fn create_tcp_channel(
+    master_address: EndpointAddress,
+    endpoint: SocketAddr,
+) -> Result<MasterChannel, Box<dyn std::error::Error>> {
+    // ANCHOR: create_tcp_channel
+    let channel = spawn_master_tcp_client(
+        LinkErrorMode::Close,
+        get_master_channel_config(master_address)?,
+        EndpointList::new(endpoint.to_string(), &[]),
+        ConnectStrategy::default(),
+        LogListener::create("client"),
+    );
+    // ANCHOR_END: create_tcp_channel
+    Ok(channel)
 }
-// ANCHOR_END: read_handler
 
-// ANCHOR: association_handler
-#[derive(Copy, Clone)]
-struct ExampleAssociationHandler;
-
-impl AssociationHandler for ExampleAssociationHandler {}
-// ANCHOR_END: association_handler
-
-// ANCHOR: association_information
-#[derive(Copy, Clone)]
-struct ExampleAssociationInformation;
-
-impl AssociationInformation for ExampleAssociationInformation {}
-// ANCHOR_END: association_information
-
-// ANCHOR: file_logger
-struct FileLogger;
-
-impl FileReader for FileLogger {
-    fn opened(&mut self, size: u32) -> FileAction {
-        tracing::info!("File opened - size: {size}");
-        FileAction::Continue
-    }
-
-    fn block_received(&mut self, block_num: u32, data: &[u8]) -> MaybeAsync<FileAction> {
-        tracing::info!("Received block {block_num} with size: {}", data.len());
-        MaybeAsync::ready(FileAction::Continue)
-    }
-
-    fn aborted(&mut self, err: FileError) {
-        tracing::info!("File transfer aborted: {}", err);
-    }
-
-    fn completed(&mut self) {
-        tracing::info!("File transfer completed");
-    }
+fn create_udp_channel(
+    master_address: EndpointAddress,
+    local_endpoint: SocketAddr,
+) -> Result<MasterChannel, Box<dyn std::error::Error>> {
+    // ANCHOR: create_udp_channel
+    let channel = spawn_master_udp(
+        local_endpoint,
+        LinkReadMode::Datagram,
+        Timeout::from_secs(5)?,
+        get_master_channel_config(master_address)?,
+    );
+    // ANCHOR_END: create_udp_channel
+    Ok(channel)
 }
-// ANCHOR_END: file_logger
 
-/*
-  Example program using the master API from within the Tokio runtime.
-
-  The program initializes a master channel based on the command line argument and then enters a loop
-  reading console input allowing the user to perform common tasks interactively.
-
-  All the configuration values are hard-coded but can be changed with a recompile.
-*/
-// ANCHOR: runtime_init
-#[tokio::main(flavor = "multi_thread")]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // ANCHOR_END: runtime_init
-
-    // Parse command line arguments
-    let args = CliArgs::parse();
-
-    if args.parse_zero_length_strings {
-        tracing::info!("enabled zero-length octet string parsing");
-        options::parse_zero_length_strings(true);
-    }
-
-    // ANCHOR: logging
-    // Initialize logging
-    let log_level: tracing::Level = args.log_level.into();
-
-    tracing_subscriber::fmt()
-        .with_max_level(log_level)
-        .with_target(false)
-        .init();
-    // ANCHOR_END: logging
-
-    // spawn the master channel based on the command line argument
-    let (mut channel, mut association) = create_channel_and_association(&args).await?;
-
-    // create an event poll
-    // ANCHOR: add_poll
-    let poll = association
-        .add_poll(
-            ReadRequest::ClassScan(Classes::class123()),
-            Duration::from_secs(5),
-        )
-        .await?;
-    // ANCHOR_END: add_poll
-
-    // enable communications
-    channel.enable().await?;
-
-    let mut handler = CliHandler {
-        poll,
-        channel,
-        association,
+fn create_serial_channel(
+    master_address: EndpointAddress,
+    port: &str,
+    baud_rate: u32,
+    data_bits: DataBitsArg,
+    stop_bits: StopBitsArg,
+    parity: ParityArg,
+    flow_control: FlowControlArg,
+) -> Result<MasterChannel, Box<dyn std::error::Error>> {
+    // ANCHOR: create_serial_channel
+    let settings = SerialSettings {
+        baud_rate,
+        data_bits: data_bits.into(),
+        stop_bits: stop_bits.into(),
+        parity: parity.into(),
+        flow_control: flow_control.into(),
     };
 
-    let mut reader = FramedRead::new(tokio::io::stdin(), LinesCodec::new());
+    let channel = spawn_master_serial(
+        get_master_channel_config(master_address)?,
+        port,
+        settings,
+        Duration::from_secs(1),
+        LogListener::create("port"),
+    );
+    // ANCHOR_END: create_serial_channel
+    Ok(channel)
+}
 
-    loop {
-        let cmd = reader.next().await.unwrap()?;
-        if cmd == "x" {
-            return Ok(());
-        } else if let Err(err) = handler.run_one_command(&cmd).await {
-            tracing::error!("Error: {err}");
-        }
-    }
+fn create_tls_channel(
+    master_address: EndpointAddress,
+    endpoint: SocketAddr,
+    config: TlsClientConfig,
+) -> Result<MasterChannel, Box<dyn std::error::Error>> {
+    // ANCHOR: create_tls_channel
+    let channel = spawn_master_tls_client(
+        LinkErrorMode::Close,
+        get_master_channel_config(master_address)?,
+        EndpointList::new(endpoint.to_string(), &[]),
+        ConnectStrategy::default(),
+        LogListener::create("client"),
+        config,
+    );
+    // ANCHOR_END: create_tls_channel
+    Ok(channel)
+}
+
+async fn add_association(
+    channel: &mut MasterChannel,
+    outstation_address: EndpointAddress,
+) -> Result<AssociationHandle, Box<dyn std::error::Error>> {
+    // ANCHOR: association_create
+    let association = channel
+        .add_association(
+            outstation_address,
+            get_association_config(),
+            Box::new(ExampleReadHandler),
+            Box::new(ExampleAssociationHandler),
+            Box::new(ExampleAssociationInformation),
+        )
+        .await?;
+    // ANCHOR_END: association_create
+    Ok(association)
+}
+
+async fn add_udp_association(
+    channel: &mut MasterChannel,
+    remote_endpoint: SocketAddr,
+    outstation_address: EndpointAddress,
+) -> Result<AssociationHandle, Box<dyn std::error::Error>> {
+    // ANCHOR: association_create_udp
+    let association = channel
+        .add_udp_association(
+            outstation_address,
+            remote_endpoint,
+            get_association_config(),
+            Box::new(ExampleReadHandler),
+            Box::new(ExampleAssociationHandler),
+            Box::new(ExampleAssociationInformation),
+        )
+        .await?;
+    // ANCHOR_END: association_create_udp
+    Ok(association)
 }
 
 struct CliHandler {
@@ -430,7 +429,11 @@ struct CliHandler {
 }
 
 impl CliHandler {
-    async fn run_one_command(&mut self, cmd: &str) -> Result<(), Box<dyn std::error::Error>> {
+    /// Run a command and describe its outcome
+    async fn run_one_command(
+        &mut self,
+        cmd: &str,
+    ) -> Result<&'static str, Box<dyn std::error::Error>> {
         match cmd {
             "enable" => {
                 self.channel.enable().await?;
@@ -461,6 +464,14 @@ impl CliHandler {
                     ]))
                     .await?;
             }
+            "rco" => {
+                self.association
+                    .read(ReadRequest::multiple_headers(&[
+                        ReadHeader::all_objects(Variation::Group20Var0),
+                        ReadHeader::all_objects(Variation::Group21Var0),
+                    ]))
+                    .await?;
+            }
             "cmd" => {
                 // ANCHOR: assoc_control
                 self.association
@@ -483,8 +494,9 @@ impl CliHandler {
                     ))
                     .await?;
                 // ANCHOR_END: assoc_control_no_ack
-                tracing::info!("no-ack command sent (not confirmed by the outstation)");
+                // success only means the request was sent: the outstation doesn't answer
             }
+            // the poll runs later, and its data goes to the read handler
             "evt" => self.poll.demand().await?,
             "lts" => {
                 self.association
@@ -518,6 +530,20 @@ impl CliHandler {
                     .send_and_expect_empty_response(FunctionCode::FreezeAtTime, headers)
                     .await?;
                 // ANCHOR_END: freeze_at_time
+            }
+            "ifz" => {
+                // copy every counter to its frozen counter
+                let headers = Headers::new().add_all_objects(Variation::Group20Var0);
+                self.association
+                    .send_and_expect_empty_response(FunctionCode::ImmediateFreeze, headers)
+                    .await?;
+            }
+            "fcl" => {
+                // copy every counter to its frozen counter, then clear the counter
+                let headers = Headers::new().add_all_objects(Variation::Group20Var0);
+                self.association
+                    .send_and_expect_empty_response(FunctionCode::FreezeClear, headers)
+                    .await?;
             }
             "rda" => {
                 // ANCHOR: read_attributes
@@ -615,129 +641,44 @@ impl CliHandler {
                 self.association.close_file(file.file_handle).await?;
                 // ANCHOR_END: write_file
             }
-            "lsr" => {
-                tracing::info!("{:?}", self.association.check_link_status().await);
-            }
-            s => println!("unknown command: {s}"),
+            "lsr" => self.association.check_link_status().await?,
+            _ => return Err("unknown command, type help for a list".into()),
         }
-        Ok(())
+        Ok(match cmd {
+            "rf" => "started (the file reader reports the outcome)",
+            "cna" => "sent",
+            "evt" => "poll demanded",
+            _ => "success",
+        })
     }
 }
 
-// create the specified channel based on the command line argument
-async fn create_channel_and_association(
-    cli: &CliArgs,
-) -> Result<(MasterChannel, AssociationHandle), Box<dyn std::error::Error>> {
-    match &cli.transport {
-        TransportCommand::TcpClient {
-            endpoint,
-            outstation_address,
-        } => {
-            let mut channel = create_tcp_channel(cli.master_address, *endpoint)?;
-            let assoc = add_association(&mut channel, *outstation_address).await?;
-            Ok((channel, assoc))
-        }
-        TransportCommand::Udp {
-            local_endpoint,
-            remote_endpoint,
-            outstation_address,
-        } => {
-            let mut channel = create_udp_channel(cli.master_address, *local_endpoint)?;
-            let assoc =
-                add_udp_association(&mut channel, *remote_endpoint, *outstation_address).await?;
-            Ok((channel, assoc))
-        }
-        TransportCommand::Serial {
-            port,
-            baud_rate,
-            data_bits,
-            stop_bits,
-            parity,
-            flow_control,
-            outstation_address,
-        } => {
-            let mut channel = create_serial_channel(
-                cli.master_address,
-                port,
-                *baud_rate,
-                *data_bits,
-                *stop_bits,
-                *parity,
-                *flow_control,
-            )?;
-            let assoc = add_association(&mut channel, *outstation_address).await?;
-            Ok((channel, assoc))
-        }
-        TransportCommand::TlsCa {
-            endpoint,
-            domain,
-            ca_cert,
-            entity_cert,
-            entity_key,
-            outstation_address,
-        } => {
-            let mut channel = create_tls_channel(
-                cli.master_address,
-                *endpoint,
-                get_tls_authority_config(domain, ca_cert, entity_cert, entity_key)?,
-            )?;
-            let assoc = add_association(&mut channel, *outstation_address).await?;
-            Ok((channel, assoc))
-        }
-        TransportCommand::TlsSelfSigned {
-            endpoint,
-            peer_cert,
-            entity_cert,
-            entity_key,
-            outstation_address,
-        } => {
-            let mut channel = create_tls_channel(
-                cli.master_address,
-                *endpoint,
-                get_tls_self_signed_config(peer_cert, entity_cert, entity_key)?,
-            )?;
-            let assoc = add_association(&mut channel, *outstation_address).await?;
-            Ok((channel, assoc))
-        }
-    }
-}
-
-async fn add_association(
-    channel: &mut MasterChannel,
-    outstation_address: EndpointAddress,
-) -> Result<AssociationHandle, Box<dyn std::error::Error>> {
-    // ANCHOR: association_create
-    let association = channel
-        .add_association(
-            outstation_address,
-            get_association_config(),
-            ExampleReadHandler::boxed(),
-            Box::new(ExampleAssociationHandler),
-            Box::new(ExampleAssociationInformation),
-        )
-        .await?;
-    // ANCHOR_END: association_create
-    Ok(association)
-}
-
-async fn add_udp_association(
-    channel: &mut MasterChannel,
-    remote_endpoint: SocketAddr,
-    outstation_address: EndpointAddress,
-) -> Result<AssociationHandle, Box<dyn std::error::Error>> {
-    // ANCHOR: association_create_udp
-    let association = channel
-        .add_udp_association(
-            outstation_address,
-            remote_endpoint,
-            get_association_config(),
-            ExampleReadHandler::boxed(),
-            Box::new(ExampleAssociationHandler),
-            Box::new(ExampleAssociationInformation),
-        )
-        .await?;
-    // ANCHOR_END: association_create_udp
-    Ok(association)
+fn print_help() {
+    println!("Commands:");
+    println!("  help - print this list");
+    println!("  x - exit");
+    println!("  enable / disable - enable or disable the channel");
+    println!("  dln / dlv - decode nothing / decode object values");
+    println!("  rao - read analog output statuses");
+    println!("  rmo - read binary and analog output statuses");
+    println!("  rco - read counters and frozen counters");
+    println!("  cmd - select and operate binary output 3 (latch on)");
+    println!("  cna - operate binary output 3 without an answer");
+    println!("  evt - demand the event poll");
+    println!("  lts / nts - synchronize the time (LAN / non-LAN)");
+    println!("  wad - write analog input deadbands");
+    println!("  ifz - freeze all counters");
+    println!("  fcl - freeze and clear all counters");
+    println!("  fat - freeze all counters once a day");
+    println!("  rda - read all device attributes");
+    println!("  wda - write the user-assigned location attribute");
+    println!("  ral - read the list of attribute variations");
+    println!("  crt / wrt - cold / warm restart");
+    println!("  rd - read the root directory");
+    println!("  gfi - get information about the root directory");
+    println!("  rf - read the root directory as a file");
+    println!("  wf - write hello_world.txt");
+    println!("  lsr - check the link status");
 }
 
 // ANCHOR: master_channel_config
@@ -804,82 +745,327 @@ fn get_tls_authority_config(
     Ok(config)
 }
 
-fn create_tcp_channel(
-    master_address: EndpointAddress,
-    endpoint: SocketAddr,
-) -> Result<MasterChannel, Box<dyn std::error::Error>> {
-    // ANCHOR: create_master_tcp_channel
-    let channel = spawn_master_tcp_client(
-        LinkErrorMode::Close,
-        get_master_channel_config(master_address)?,
-        EndpointList::new(endpoint.to_string(), &[]),
-        ConnectStrategy::default(),
-        NullListener::create(),
-    );
-    // ANCHOR_END: create_master_tcp_channel
-    Ok(channel)
+// ANCHOR: read_handler
+struct ExampleReadHandler;
+
+impl ReadHandler for ExampleReadHandler {
+    fn begin_fragment(&mut self, read_type: ReadType, header: ResponseHeader) -> MaybeAsync<()> {
+        println!(
+            "begin fragment: {read_type:?} (broadcast: {})",
+            header.iin.iin1.get_broadcast()
+        );
+        MaybeAsync::ready(())
+    }
+
+    fn end_fragment(&mut self, _read_type: ReadType, _header: ResponseHeader) -> MaybeAsync<()> {
+        println!("end fragment");
+        MaybeAsync::ready(())
+    }
+
+    fn handle_binary_input(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (BinaryInput, u16)>,
+    ) {
+        print_header("Binary inputs", info);
+        for (x, idx) in iter {
+            print_point("BI", idx, x.value, x.flags, x.time);
+        }
+    }
+
+    fn handle_double_bit_binary_input(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (DoubleBitBinaryInput, u16)>,
+    ) {
+        print_header("Double-bit binary inputs", info);
+        for (x, idx) in iter {
+            print_point("DBBI", idx, format!("{:?}", x.value), x.flags, x.time);
+        }
+    }
+
+    fn handle_binary_output_status(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (BinaryOutputStatus, u16)>,
+    ) {
+        print_header("Binary output statuses", info);
+        for (x, idx) in iter {
+            print_point("BOS", idx, x.value, x.flags, x.time);
+        }
+    }
+
+    fn handle_counter(&mut self, info: HeaderInfo, iter: &mut dyn Iterator<Item = (Counter, u16)>) {
+        print_header("Counters", info);
+        for (x, idx) in iter {
+            print_point("C", idx, x.value, x.flags, x.time);
+        }
+    }
+
+    fn handle_frozen_counter(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (FrozenCounter, u16)>,
+    ) {
+        print_header("Frozen counters", info);
+        for (x, idx) in iter {
+            print_point("FC", idx, x.value, x.flags, x.time);
+        }
+    }
+
+    fn handle_analog_input(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (AnalogInput, u16)>,
+    ) {
+        print_header("Analog inputs", info);
+        for (x, idx) in iter {
+            print_point("AI", idx, x.value, x.flags, x.time);
+        }
+    }
+
+    fn handle_frozen_analog_input(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (FrozenAnalogInput, u16)>,
+    ) {
+        print_header("Frozen analog inputs", info);
+        for (x, idx) in iter {
+            print_point("FAI", idx, x.value, x.flags, x.time);
+        }
+    }
+
+    fn handle_analog_input_dead_band(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (AnalogInputDeadBand, u16)>,
+    ) {
+        print_header("Analog input deadbands", info);
+        for (x, idx) in iter {
+            let value = match x {
+                AnalogInputDeadBand::U16(v) => f64::from(v),
+                AnalogInputDeadBand::U32(v) => f64::from(v),
+                AnalogInputDeadBand::F32(v) => f64::from(v),
+            };
+            println!("AIDB {idx}: value={value}");
+        }
+    }
+
+    fn handle_analog_output_status(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (AnalogOutputStatus, u16)>,
+    ) {
+        print_header("Analog output statuses", info);
+        for (x, idx) in iter {
+            print_point("AOS", idx, x.value, x.flags, x.time);
+        }
+    }
+
+    fn handle_binary_output_command_event(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (BinaryOutputCommandEvent, u16)>,
+    ) {
+        print_header("Binary output command events", info);
+        for (x, idx) in iter {
+            println!(
+                "BOCE {idx}: commanded state={} status={:?} time={}",
+                x.commanded_state,
+                x.status,
+                format_time(x.time)
+            );
+        }
+    }
+
+    fn handle_analog_output_command_event(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (AnalogOutputCommandEvent, u16)>,
+    ) {
+        print_header("Analog output command events", info);
+        for (x, idx) in iter {
+            let value = match x.commanded_value {
+                AnalogCommandValue::I16(v) => f64::from(v),
+                AnalogCommandValue::I32(v) => f64::from(v),
+                AnalogCommandValue::F32(v) => f64::from(v),
+                AnalogCommandValue::F64(v) => v,
+            };
+            println!(
+                "AOCE {idx}: commanded value={value} status={:?} time={}",
+                x.status,
+                format_time(x.time)
+            );
+        }
+    }
+
+    fn handle_unsigned_integer(
+        &mut self,
+        info: HeaderInfo,
+        iter: &mut dyn Iterator<Item = (UnsignedInteger, u16)>,
+    ) {
+        print_header("Unsigned integers", info);
+        for (x, idx) in iter {
+            println!("UI {idx}: value={}", x.value);
+        }
+    }
+
+    fn handle_octet_string<'a>(
+        &mut self,
+        info: HeaderInfo,
+        iter: &'a mut dyn Iterator<Item = (&'a [u8], u16)>,
+    ) {
+        print_header("Octet strings", info);
+        for (x, idx) in iter {
+            println!("OS {idx}: value={x:02X?}");
+        }
+    }
+
+    fn handle_device_attribute(&mut self, info: HeaderInfo, attr: AnyAttribute) {
+        print_header("Device attributes", info);
+        match attr {
+            AnyAttribute::Known(attr) => match attr {
+                KnownAttribute::AttributeList(var, list) => {
+                    print_attribute(0, var.variation(), format_variation_list(list))
+                }
+                KnownAttribute::String(var, value) => print_attribute(0, var.variation(), value),
+                KnownAttribute::Float(var, FloatType::F32(value)) => {
+                    print_attribute(0, var.variation(), value)
+                }
+                KnownAttribute::Float(var, FloatType::F64(value)) => {
+                    print_attribute(0, var.variation(), value)
+                }
+                KnownAttribute::UInt(var, value) => print_attribute(0, var.variation(), value),
+                KnownAttribute::Bool(var, value) => print_attribute(0, var.variation(), value),
+                KnownAttribute::OctetString(var, value) => {
+                    print_attribute(0, var.variation(), format!("{value:02X?}"))
+                }
+                KnownAttribute::DNP3Time(var, value) => {
+                    print_attribute(0, var.variation(), value.raw_value())
+                }
+            },
+            AnyAttribute::Other(attr) => {
+                let value = match attr.value {
+                    AttrValue::VisibleString(v) => v.to_string(),
+                    AttrValue::UnsignedInt(v) => v.to_string(),
+                    AttrValue::SignedInt(v) => v.to_string(),
+                    AttrValue::FloatingPoint(FloatType::F32(v)) => v.to_string(),
+                    AttrValue::FloatingPoint(FloatType::F64(v)) => v.to_string(),
+                    AttrValue::OctetString(v) | AttrValue::BitString(v) => format!("{v:02X?}"),
+                    AttrValue::Dnp3Time(v) => v.raw_value().to_string(),
+                    AttrValue::AttrList(list) => format_variation_list(list),
+                };
+                print_attribute(attr.set.value(), attr.variation, value)
+            }
+        }
+    }
+
+    fn handle_abs_time(&mut self, info: HeaderInfo, time: Timestamp) {
+        print_header("Absolute time", info);
+        println!("time={}", time.raw_value());
+    }
 }
 
-fn create_udp_channel(
-    master_address: EndpointAddress,
-    local_endpoint: SocketAddr,
-) -> Result<MasterChannel, Box<dyn std::error::Error>> {
-    // ANCHOR: create_master_udp_channel
-    let channel = spawn_master_udp(
-        local_endpoint,
-        LinkReadMode::Datagram,
-        Timeout::from_secs(5)?,
-        get_master_channel_config(master_address)?,
-    );
-    // ANCHOR_END: create_master_udp_channel
-    Ok(channel)
+fn print_header(name: &str, info: HeaderInfo) {
+    println!("{name} ({}, {})", info.qualifier, info.variation);
 }
 
-fn create_serial_channel(
-    master_address: EndpointAddress,
-    port: &str,
-    baud_rate: u32,
-    data_bits: DataBitsArg,
-    stop_bits: StopBitsArg,
-    parity: ParityArg,
-    flow_control: FlowControlArg,
-) -> Result<MasterChannel, Box<dyn std::error::Error>> {
-    // ANCHOR: create_master_serial_channel
-    let settings = SerialSettings {
-        baud_rate,
-        data_bits: data_bits.into(),
-        stop_bits: stop_bits.into(),
-        parity: parity.into(),
-        flow_control: flow_control.into(),
-    };
-
-    let channel = spawn_master_serial(
-        get_master_channel_config(master_address)?,
-        port,
-        settings,
-        Duration::from_secs(1),
-        NullListener::create(),
+fn print_point(
+    name: &str,
+    index: u16,
+    value: impl std::fmt::Display,
+    flags: Flags,
+    time: Option<Time>,
+) {
+    println!(
+        "{name} {index}: value={value} flags=0x{:02X} time={}",
+        flags.value,
+        format_time(time)
     );
-    // ANCHOR_END: create_master_serial_channel
-    Ok(channel)
 }
 
-fn create_tls_channel(
-    master_address: EndpointAddress,
-    endpoint: SocketAddr,
-    tls_config: TlsClientConfig,
-) -> Result<MasterChannel, Box<dyn std::error::Error>> {
-    // ANCHOR: create_master_tls_channel
-    let channel = spawn_master_tls_client(
-        LinkErrorMode::Close,
-        get_master_channel_config(master_address)?,
-        EndpointList::new(endpoint.to_string(), &[]),
-        ConnectStrategy::default(),
-        NullListener::create(),
-        tls_config,
-    );
-    // ANCHOR_END: create_master_tls_channel
-    Ok(channel)
+fn format_time(time: Option<Time>) -> String {
+    match time {
+        Some(Time::Synchronized(t)) => format!("{} (synchronized)", t.raw_value()),
+        Some(Time::Unsynchronized(t)) => format!("{} (unsynchronized)", t.raw_value()),
+        None => "none".to_string(),
+    }
+}
+
+fn format_variation_list(list: VariationList) -> String {
+    let items: Vec<String> = list
+        .iter()
+        .map(|item| {
+            let writable = if item.properties.is_writable() {
+                " (writable)"
+            } else {
+                ""
+            };
+            format!("{}{writable}", item.variation)
+        })
+        .collect();
+    format!("[{}]", items.join(", "))
+}
+
+fn print_attribute(set: u8, variation: u8, value: impl std::fmt::Display) {
+    println!("attribute set={set} variation={variation} value={value}");
+}
+// ANCHOR_END: read_handler
+
+// ANCHOR: association_handler
+#[derive(Copy, Clone)]
+struct ExampleAssociationHandler;
+
+impl AssociationHandler for ExampleAssociationHandler {}
+// ANCHOR_END: association_handler
+
+// ANCHOR: association_information
+#[derive(Copy, Clone)]
+struct ExampleAssociationInformation;
+
+impl AssociationInformation for ExampleAssociationInformation {}
+// ANCHOR_END: association_information
+
+// ANCHOR: file_logger
+struct FileLogger;
+
+impl FileReader for FileLogger {
+    fn opened(&mut self, size: u32) -> FileAction {
+        tracing::info!("File opened - size: {size}");
+        FileAction::Continue
+    }
+
+    fn block_received(&mut self, block_num: u32, data: &[u8]) -> MaybeAsync<FileAction> {
+        tracing::info!("Received block {block_num} with size: {}", data.len());
+        MaybeAsync::ready(FileAction::Continue)
+    }
+
+    fn aborted(&mut self, err: FileError) {
+        println!("rf: aborted: {err}");
+    }
+
+    fn completed(&mut self) {
+        println!("rf: completed");
+    }
+}
+// ANCHOR_END: file_logger
+
+/// Logs each state change of a client connection or serial port
+struct LogListener {
+    name: &'static str,
+}
+
+impl LogListener {
+    fn create<T: std::fmt::Debug>(name: &'static str) -> Box<dyn Listener<T>> {
+        Box::new(Self { name })
+    }
+}
+
+impl<T: std::fmt::Debug> Listener<T> for LogListener {
+    fn update(&mut self, value: T) -> MaybeAsync<()> {
+        tracing::info!("{} state: {value:?}", self.name);
+        MaybeAsync::ready(())
+    }
 }
 
 fn print_file_info(info: FileInfo) {

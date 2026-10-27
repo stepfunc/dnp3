@@ -16,28 +16,32 @@ use dnp3::link::*;
 use dnp3::master::*;
 use dnp3::tcp::*;
 
-/// read handler that does nothing
-#[derive(Copy, Clone)]
-pub struct NullReadHandler;
+#[tokio::main(flavor = "multi_thread")]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    tracing_subscriber::fmt()
+        .with_max_level(tracing::Level::INFO)
+        .with_target(false)
+        .init();
 
-impl NullReadHandler {
-    /// create a boxed instance of the NullReadHandler
-    pub fn boxed() -> Box<dyn ReadHandler> {
-        Box::new(Self {})
+    let _server = spawn_master_tcp_server(
+        "127.0.0.1:20000".parse()?,
+        LinkIdConfig::default().decode_level(PhysDecodeLevel::Data),
+        ConnectionHandler {
+            channels: Default::default(),
+        },
+    )
+    .await?;
+
+    let mut reader = FramedRead::new(tokio::io::stdin(), LinesCodec::new());
+
+    // exit on "x" or at the end of input
+    while let Some(line) = reader.next().await {
+        if line? == "x" {
+            return Ok(());
+        }
     }
+    Ok(())
 }
-
-impl ReadHandler for NullReadHandler {}
-
-#[derive(Copy, Clone)]
-struct NullAssociationHandler;
-
-impl AssociationHandler for NullAssociationHandler {}
-
-#[derive(Copy, Clone)]
-struct NullAssociationInformation;
-
-impl AssociationInformation for NullAssociationInformation {}
 
 struct ConnectionHandler {
     channels: HashMap<u16, MasterChannel>,
@@ -117,28 +121,25 @@ impl dnp3::tcp::ConnectionHandler for ConnectionHandler {
     }
 }
 
-#[tokio::main(flavor = "multi_thread")]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    tracing_subscriber::fmt()
-        .with_max_level(tracing::Level::INFO)
-        .with_target(false)
-        .init();
+/// read handler that does nothing
+#[derive(Copy, Clone)]
+pub struct NullReadHandler;
 
-    let _server = spawn_master_tcp_server(
-        "127.0.0.1:20000".parse()?,
-        LinkIdConfig::default().decode_level(PhysDecodeLevel::Data),
-        ConnectionHandler {
-            channels: Default::default(),
-        },
-    )
-    .await?;
-
-    let mut reader = FramedRead::new(tokio::io::stdin(), LinesCodec::new());
-
-    loop {
-        let cmd = reader.next().await.unwrap()?;
-        if cmd == "x" {
-            return Ok(());
-        }
+impl NullReadHandler {
+    /// create a boxed instance of the NullReadHandler
+    pub fn boxed() -> Box<dyn ReadHandler> {
+        Box::new(Self {})
     }
 }
+
+impl ReadHandler for NullReadHandler {}
+
+#[derive(Copy, Clone)]
+struct NullAssociationHandler;
+
+impl AssociationHandler for NullAssociationHandler {}
+
+#[derive(Copy, Clone)]
+struct NullAssociationInformation;
+
+impl AssociationInformation for NullAssociationInformation {}
