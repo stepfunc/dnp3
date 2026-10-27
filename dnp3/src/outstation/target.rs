@@ -18,7 +18,7 @@ use crate::app::variations::{Group34Var1, Group34Var2, Group34Var3, Group50Var1,
 use crate::app::{FunctionCode, Iin2, QualifierCode, Variation};
 use crate::outstation::database::EventClass;
 use crate::outstation::FreezeIndices;
-use crate::util::skipped::Skipped;
+use crate::util::skipped::{Count, Skipped};
 
 /// What a function does with the objects of a variation, whatever their qualifier
 ///
@@ -72,15 +72,26 @@ impl Selector {
         })
     }
 
+    /// The first header that the function doesn't support and how many, if there were any
+    pub(crate) fn unsupported(&self) -> Option<((Variation, QualifierCode), Count)> {
+        self.unsupported.first()
+    }
+
     /// Log the headers that the function doesn't support, if there were any
     pub(crate) fn log(&self) {
-        if let Some(((variation, qualifier), count)) = self.unsupported.first() {
-            let function = self.function;
-            tracing::warn!(
-                "{function:?} doesn't support {variation} with qualifier {qualifier}{count}"
-            );
+        if let Some((header, count)) = self.unsupported() {
+            log_unsupported(self.function, header, count);
         }
     }
+}
+
+/// Log the first header that a function doesn't support, and how many
+pub(crate) fn log_unsupported(
+    function: FunctionCode,
+    (variation, qualifier): (Variation, QualifierCode),
+    count: Count,
+) {
+    tracing::warn!("{function:?} doesn't support {variation} with qualifier {qualifier}{count}");
 }
 
 /// What a WRITE of a variation writes

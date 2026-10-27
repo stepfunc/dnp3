@@ -19,7 +19,7 @@
 mod broadcast;
 mod confirm;
 mod control;
-mod deferred;
+pub(crate) mod deferred;
 mod non_read;
 mod request;
 pub(crate) mod response;

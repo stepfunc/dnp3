@@ -9,6 +9,7 @@ use crate::app::{FunctionCode, Iin2, QualifierCode, Variation};
 use crate::outstation::database::details::range::static_db::IndexRange;
 use crate::outstation::database::variations::*;
 use crate::outstation::database::EventClass;
+use crate::outstation::read_log::ReadLog;
 use crate::outstation::target::{Selector, Target};
 
 mod target;
@@ -112,9 +113,11 @@ impl<'a> ReadHeaders<'a> {
 
     /// The error IIN2 bits of every header in the request that READ doesn't support, which this
     /// logs
-    pub(crate) fn finish(mut self) -> Iin2 {
+    pub(crate) fn finish(mut self, log: impl ReadLog) -> Iin2 {
         self.by_ref().for_each(drop);
-        self.selector.log();
+        if let Some((header, count)) = self.selector.unsupported() {
+            log.unsupported_headers(header, count);
+        }
         self.unsupported
     }
 }

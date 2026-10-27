@@ -12,10 +12,12 @@
 //!
 //! Built by the `no-panic` CI job with `--cfg dnp3_no_panic`, in release with LTO and one
 //! codegen unit, which the optimizer needs to see through calls into other crates. The
-//! [`encode`] module does the same for the encoders, and [`queue`] for the bounded queue.
+//! [`encode`] module does the same for the encoders, [`queue`] for the bounded queue, and
+//! [`respond`] for the outstation's selection and writing of responses.
 
 mod encode;
 mod queue;
+mod respond;
 
 use scursor::ReadCursor;
 
@@ -101,6 +103,12 @@ impl Source<'_> {
     fn many<T>(&mut self, mut item: impl FnMut(&mut Self) -> T) -> Vec<T> {
         let len = self.len();
         (0..len).map(|_| item(self)).collect()
+    }
+
+    /// one of `all`, which isn't empty
+    fn pick<T: Copy>(&mut self, all: &[T]) -> T {
+        let index = usize::from(self.u8()).checked_rem(all.len()).unwrap_or(0);
+        all[index]
     }
 
     /// an output buffer of 0 bytes to 16 MiB

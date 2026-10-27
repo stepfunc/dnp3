@@ -16,14 +16,15 @@ use crate::app::parse::parser::HeaderCollection;
 use crate::app::Iin2;
 use crate::master::EventClasses;
 use crate::outstation::database::read::ReadHeaders;
+use crate::outstation::read_log::Tracing;
 
 use crate::app::attr::{AttrProp, AttrSet, BadAttribute, OwnedAttribute, TypeError};
 use crate::outstation::{ClassCount, OutstationApplication};
 use scursor::WriteCursor;
 
 mod config;
-/// private internal control only needed by the parent module
-mod details;
+/// the database internals, which the outstation and the no-panic harness use
+pub(crate) mod details;
 #[cfg(test)]
 mod family_tests;
 #[cfg(test)]
@@ -546,13 +547,13 @@ impl DatabaseHandle {
         let mut headers = ReadHeaders::new(headers);
         let selected = self.with_database(|db| {
             db.inner
-                .select_read(headers.by_ref().map(|(header, _read_with)| header))
+                .select_read(headers.by_ref().map(|(header, _read_with)| header), Tracing)
         });
-        selected | headers.finish()
+        selected | headers.finish(Tracing)
     }
 
     pub(crate) fn write_response_headers(&mut self, cursor: &mut WriteCursor) -> ResponseInfo {
-        self.with_database(|db| db.inner.write_response_headers(cursor))
+        self.with_database(|db| db.inner.write_response_headers(cursor, Tracing))
     }
 
     pub(crate) fn write_unsolicited(
