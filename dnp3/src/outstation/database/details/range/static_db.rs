@@ -178,6 +178,10 @@ where
     current: T,
     // value that is frozen during READ requests to be reported
     selected: T,
+    // whether a READ has selected the point since it was added: fragments only write the ranges
+    // of the current READ, which marks every point in them, so a point added after the READ
+    // selected its range isn't part of that response
+    was_selected: bool,
     // last value that produced an event
     last_event: T,
     // configuration
@@ -192,6 +196,7 @@ where
         Self {
             current: T::default(),
             selected: T::default(),
+            was_selected: false,
             last_event: T::default(),
             config,
         }
@@ -252,6 +257,7 @@ where
             // when writing the response(s) we use the selected value
             // this allows the outstation to send consistent snapshot of the values when a multi-fragment response is required
             point.selected = point.current.clone();
+            point.was_selected = true;
         }
         T::selection(variation).with(range)
     }
@@ -268,6 +274,14 @@ where
 
         // as far at the processing goes, we treat this just like a range scan over all the values
         Some(self.select_range_with_variation(range, variation))
+    }
+
+    /// mark the points in the range selected without copying their values, for writing
+    /// something other than their values
+    fn select_membership(&mut self, range: IndexRange) {
+        for (_index, point) in range.entries_mut(&mut self.inner) {
+            point.was_selected = true;
+        }
     }
 }
 
@@ -474,6 +488,7 @@ impl StaticDatabase {
     {
         let points = range
             .entries(&self.get_map::<T>().inner)
+            .filter(|(_, point)| point.was_selected)
             .map(|(index, point)| (*index, &point.selected, point.config.s_var));
         write_points(cursor, range, variation, points)
     }
@@ -486,6 +501,7 @@ impl StaticDatabase {
     ) -> Result<(), VariationRange> {
         let dead_bands = range
             .entries(&self.analog.inner)
+            .filter(|(_, point)| point.was_selected)
             .map(|(index, point)| (*index, &point.config.detector.deadband));
         write_dead_bands(cursor, range, variation, dead_bands)
     }
@@ -525,6 +541,7 @@ impl StaticDatabase {
                     },
                 };
 
+                self.analog.select_membership(range);
                 iin2 | self.push_selection(VariationRange::new(
                     range,
                     SpecificVariation::AnalogDeadBand(var),
