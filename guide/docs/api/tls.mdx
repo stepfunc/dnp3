@@ -8,27 +8,24 @@ slug: /api/tls
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-Masters and outstations can use TLS for encryption and authentication. The library uses [rustls](https://github.com/rustls/rustls),
-a TLS library written in memory-safe Rust, instead of OpenSSL or other system libraries, and it interoperates with other
-TLS implementations.
+Masters and outstations can use TLS for encryption and authentication. The library uses
+[rustls](https://github.com/rustls/rustls) instead of OpenSSL:
 
-Rustls has been [audited](https://github.com/rustls/rustls/raw/main/audit/TLS-01-report.pdf) by a third party and is
-supported by [Prossimo](https://www.memorysafety.org/initiative/rustls/), the memory-safety initiative of the Internet
-Security Research Group. In the project's [2026 benchmarks](https://www.memorysafety.org/blog/26q1-rustls-performance/)
-it was faster than both OpenSSL and BoringSSL in most handshake and throughput tests. With the AWS-LC cryptography
-provider, it also supports the hybrid post-quantum key exchange X25519MLKEM768.
+* **More secure and reliable:** rustls is written in memory-safe Rust, which rules out the buffer overflows and
+  use-after-free bugs behind many of OpenSSL's most serious vulnerabilities, such as Heartbleed, and the crashes they
+  cause. It only implements TLS 1.2 and 1.3 with modern cipher suites, so there are no legacy protocols or weak options
+  to leave enabled by mistake.
+* **The future:** security agencies such as CISA and the NSA urge moving critical software to memory-safe languages, and
+  rustls is backed by the Internet Security Research Group, the organization behind Let's Encrypt, as part of its effort
+  to do that for the internet's infrastructure. With the AWS-LC cryptography provider, it already supports post-quantum
+  key exchange.
 
-# Secure Authentication?
+## Secure Authentication?
 
-DNP3 SAv5 (and v2) has a number of [design](https://www.cs.dartmouth.edu/~sergey/langsec/papers/crain-bratus-bolt-on-dnp3sa.pdf)
-[flaws](https://cms-cdn.selinc.com/assets/Literature/Publications/Technical%20Papers/6910_AllAboutEve_CG_20190131_Web2.pdf?v=20191113-212654) and is not widely adopted.
-The multi-user support in SAv5 was [deprecated](https://rlc.vlinder.ca/blog/2019/10/26/tb2019-001-multi-user-sa) because it did not meet its stated design goals.
-SAv6 aims to reduce the complexity of SAv5, but it has not been standardized yet and there are no full implementations.
-
-:::tip
-We recommend using TLS to secure DNP3 and caution the industry to avoid home-grown solutions such as secure authentication.
-:::
-
+DNP3 Secure Authentication v5 has known [design](https://www.cs.dartmouth.edu/~sergey/langsec/papers/crain-bratus-bolt-on-dnp3sa.pdf) [flaws](https://cms-cdn.selinc.com/assets/Literature/Publications/Technical%20Papers/6910_AllAboutEve_CG_20190131_Web2.pdf?v=20191113-212654) and little adoption, and its successors,
+SAv6 and AMP, reinvent what TLS already provides. We explain why in
+[The Case Against DNP3 SAv6 and AMP](https://stepfunc.io/blog/case-against-dnp3-sav6/). We recommend TLS: it's proven,
+audited, and already used with DNP3 in production.
 
 ## Supported Features
 
