@@ -81,15 +81,14 @@ impl Database {
 
     /// Start the selection for a READ from a reset, so that it never inherits what an earlier
     /// selection left selected or written
-    pub(crate) fn select_read(
+    pub(crate) fn select_read<L: ReadLog>(
         &mut self,
         headers: impl Iterator<Item = ReadHeader>,
-        log: impl ReadLog,
     ) -> Iin2 {
         self.reset();
         let mut iin2 = Iin2::default();
         for header in headers {
-            iin2 |= self.select_by_header(header, log);
+            iin2 |= self.select_by_header::<L>(header);
         }
         iin2
     }
@@ -101,12 +100,12 @@ impl Database {
         self.event_buffer.select_by_class(classes, None)
     }
 
-    fn select_by_header(&mut self, header: ReadHeader, log: impl ReadLog) -> Iin2 {
+    fn select_by_header<L: ReadLog>(&mut self, header: ReadHeader) -> Iin2 {
         match header {
             ReadHeader::Class0 => self.static_db.select_class_zero(),
             ReadHeader::Static(target, range) => self.static_db.select(target, range),
             ReadHeader::Event(target, limit) => self.select_events(target, limit),
-            ReadHeader::Attr(header) => self.attrs.select(header, log),
+            ReadHeader::Attr(header) => self.attrs.select::<L>(header),
         }
     }
 
@@ -257,15 +256,14 @@ impl Database {
 
     /// write events, then static data, then attributes, each only once the part before it is
     /// complete
-    pub(crate) fn write_response_headers(
+    pub(crate) fn write_response_headers<L: ReadLog>(
         &mut self,
         cursor: &mut WriteCursor,
-        log: impl ReadLog,
     ) -> ResponseInfo {
         let (num_events, progress) = self.write_events(cursor);
         let progress = progress
             .then(|| self.static_db.write(cursor))
-            .then(|| self.attrs.write(cursor, log));
+            .then(|| self.attrs.write::<L>(cursor));
 
         ResponseInfo {
             has_events: num_events > 0,

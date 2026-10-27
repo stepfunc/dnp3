@@ -86,25 +86,20 @@ fn get_list_encoding(num_items: usize) -> Option<(u8, AttrDataType)> {
 }
 
 impl Selection {
-    fn push(&mut self, s: Selected, log: impl ReadLog) -> Iin2 {
+    fn push<L: ReadLog>(&mut self, s: Selected) -> Iin2 {
         match self.selected.try_push(s) {
             Ok(()) => Iin2::default(),
             Err(Full) => {
-                log.attr_selection_full(self.selected.max());
+                L::attr_selection_full(self.selected.max());
                 Iin2::PARAMETER_ERROR
             }
         }
     }
 
-    fn write_all(
-        &mut self,
-        cursor: &mut WriteCursor,
-        map: &SetMap,
-        log: impl ReadLog,
-    ) -> WriteProgress {
+    fn write_all<L: ReadLog>(&mut self, cursor: &mut WriteCursor, map: &SetMap) -> WriteProgress {
         while let Some(item) = self.selected.front_mut() {
             let (set, var) = item.current();
-            if Self::write_one(set, var, cursor, map, log) == WriteProgress::Partial {
+            if Self::write_one::<L>(set, var, cursor, map) == WriteProgress::Partial {
                 return WriteProgress::Partial;
             }
             if item.advance() {
@@ -114,12 +109,11 @@ impl Selection {
         WriteProgress::Complete
     }
 
-    fn write_one(
+    fn write_one<L: ReadLog>(
         set: AttrSet,
         var: u8,
         cursor: &mut WriteCursor,
         map: &SetMap,
-        log: impl ReadLog,
     ) -> WriteProgress {
         if var == crate::app::attr::var::LIST_OF_ATTRIBUTE_VARIATIONS {
             let Some(vars) = map.variations(set) else {
@@ -131,7 +125,7 @@ impl Selection {
         let Ok(attr) = map.get(set, var) else {
             return WriteProgress::Complete;
         };
-        write_attribute(cursor, attr, log)
+        write_attribute::<L>(cursor, attr)
     }
 
     fn clear(&mut self) {
@@ -184,16 +178,15 @@ pub(crate) fn write_attr_list(
 }
 
 /// Write an attribute, whole or not at all, skipping one that can't be encoded
-pub(crate) fn write_attribute(
+pub(crate) fn write_attribute<L: ReadLog>(
     cursor: &mut WriteCursor,
     attr: &OwnedAttribute,
-    log: impl ReadLog,
 ) -> WriteProgress {
     match tx(cursor, |cur| HeaderWriter::new(cur).write_attribute(attr)) {
         Ok(()) => WriteProgress::Complete,
         Err(AttrWriteError::Cursor) => WriteProgress::Partial,
         Err(AttrWriteError::BadAttribute(err)) => {
-            log.attr_not_encodable(err);
+            L::attr_not_encodable(err);
             WriteProgress::Complete
         }
     }
@@ -221,15 +214,15 @@ impl AttrHandler {
         &mut self.map
     }
 
-    pub(crate) fn write(&mut self, cursor: &mut WriteCursor, log: impl ReadLog) -> WriteProgress {
-        self.selection.write_all(cursor, &self.map, log)
+    pub(crate) fn write<L: ReadLog>(&mut self, cursor: &mut WriteCursor) -> WriteProgress {
+        self.selection.write_all::<L>(cursor, &self.map)
     }
 
     pub(crate) fn reset(&mut self) {
         self.selection.clear();
     }
 
-    pub(crate) fn select(&mut self, header: AttrHeader, log: impl ReadLog) -> Iin2 {
+    pub(crate) fn select<L: ReadLog>(&mut self, header: AttrHeader) -> Iin2 {
         match header {
             AttrHeader::All(var) => {
                 match var {
@@ -237,18 +230,18 @@ impl AttrHandler {
                         // list of variations for every set
                         let mut iin2 = Iin2::default();
                         for set in self.map.sets() {
-                            iin2 |= self.selection.push(Selected::single(set, 255), log);
+                            iin2 |= self.selection.push::<L>(Selected::single(set, 255));
                         }
                         iin2
                     }
                     254 => {
                         // all attributes in every set
                         self.map.sets().fold(Iin2::default(), |iin, set| {
-                            iin | self.selection.push(Selected::all(set), log)
+                            iin | self.selection.push::<L>(Selected::all(set))
                         })
                     }
                     _ => {
-                        log.attr_variation_with_all_objects(var);
+                        L::attr_variation_with_all_objects(var);
                         Iin2::PARAMETER_ERROR
                     }
                 }
@@ -257,15 +250,15 @@ impl AttrHandler {
                 let set = match range.to_attr_set() {
                     Some(x) => x,
                     None => {
-                        log.attr_range_unsupported(range);
+                        L::attr_range_unsupported(range);
                         return Iin2::PARAMETER_ERROR;
                     }
                 };
                 match var {
-                    254 => self.selection.push(Selected::all(set), log),
-                    255 => self.selection.push(Selected::single(set, 255), log),
+                    254 => self.selection.push::<L>(Selected::all(set)),
+                    255 => self.selection.push::<L>(Selected::single(set, 255)),
                     _ => match self.map.get(set, var) {
-                        Ok(_) => self.selection.push(Selected::single(set, var), log),
+                        Ok(_) => self.selection.push::<L>(Selected::single(set, var)),
                         Err(err) => err.into(),
                     },
                 }
@@ -361,13 +354,16 @@ mod test {
         .unwrap();
 
         assert_eq!(
-            handler.select(AttrHeader::All(254), Tracing),
+            handler.select::<Tracing>(AttrHeader::All(254)),
             Iin2::default()
         );
 
         let mut buffer = [0; 64];
         let mut cursor = WriteCursor::new(&mut buffer);
-        assert_eq!(handler.write(&mut cursor, Tracing), WriteProgress::Complete);
+        assert_eq!(
+            handler.write::<Tracing>(&mut cursor),
+            WriteProgress::Complete
+        );
 
         let mut expected = encode_string(var::DEVICE_SERIAL_NUMBER, "serial");
         expected.extend(encode_string(var::PRODUCT_NAME_AND_MODEL, "product"));

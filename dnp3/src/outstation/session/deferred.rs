@@ -59,13 +59,12 @@ impl DeferredRead {
         self.info.is_some()
     }
 
-    pub(crate) fn set(
+    pub(crate) fn set<L: ReadLog>(
         &mut self,
         hash: u64,
         seq: Sequence,
         info: FragmentInfo,
         headers: HeaderCollection,
-        log: impl ReadLog,
     ) {
         self.headers.clear();
 
@@ -80,9 +79,9 @@ impl DeferredRead {
             }
         }
 
-        iin2 |= headers.finish(log);
+        iin2 |= headers.finish::<L>();
         if let Some((header, count)) = over_capacity.first() {
-            log.deferred_capacity(self.headers.max(), header, count);
+            L::deferred_capacity(self.headers.max(), header, count);
         }
 
         self.info = Some(DeferredInfo::new(hash, seq, info, iin2));
@@ -92,8 +91,10 @@ impl DeferredRead {
         match self.info {
             None => None,
             Some(x) => {
-                let iin2 = database
-                    .transaction(|db| db.inner.select_read(self.headers.iter().copied(), Tracing));
+                let iin2 = database.transaction(|db| {
+                    db.inner
+                        .select_read::<Tracing>(self.headers.iter().copied())
+                });
                 self.clear();
                 Some(x.merge(iin2))
             }

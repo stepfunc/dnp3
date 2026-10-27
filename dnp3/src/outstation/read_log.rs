@@ -14,49 +14,49 @@ use crate::util::skipped::Count;
 
 /// The diagnostics that selecting and writing the response to a READ can log
 ///
-/// Each method takes the typed values of one diagnostic, so that an implementation that logs
-/// nothing formats nothing. [`Tracing`] logs each one from the module that raises it.
-pub(crate) trait ReadLog: Copy {
+/// A type parameter, since an implementation is behavior without data. Each method takes the
+/// typed values of one diagnostic, so that an implementation that logs nothing formats nothing.
+/// [`Tracing`] logs each one from the module that raises it.
+pub(crate) trait ReadLog {
     /// The first header of the request that READ doesn't support, and how many
-    fn unsupported_headers(self, header: (Variation, QualifierCode), count: Count);
+    fn unsupported_headers(header: (Variation, QualifierCode), count: Count);
     /// An attribute selection that exceeds the maximum per request
-    fn attr_selection_full(self, max: usize);
+    fn attr_selection_full(max: usize);
     /// An attribute variation that can't be read with the all objects qualifier
-    fn attr_variation_with_all_objects(self, variation: u8);
+    fn attr_variation_with_all_objects(variation: u8);
     /// An attribute READ with a range that isn't one attribute set
-    fn attr_range_unsupported(self, range: IndexRange);
+    fn attr_range_unsupported(range: IndexRange);
     /// An attribute that can't be encoded, which the response skips
-    fn attr_not_encodable(self, err: BadAttribute);
+    fn attr_not_encodable(err: BadAttribute);
     /// The first header of a deferred READ that doesn't fit its queue, and how many
-    fn deferred_capacity(self, max: usize, header: (Variation, QualifierCode), count: Count);
+    fn deferred_capacity(max: usize, header: (Variation, QualifierCode), count: Count);
 }
 
 /// Logs each diagnostic with `tracing`
-#[derive(Copy, Clone)]
 pub(crate) struct Tracing;
 
 impl ReadLog for Tracing {
-    fn unsupported_headers(self, header: (Variation, QualifierCode), count: Count) {
+    fn unsupported_headers(header: (Variation, QualifierCode), count: Count) {
         target::log_unsupported(crate::app::FunctionCode::Read, header, count);
     }
 
-    fn attr_selection_full(self, max: usize) {
+    fn attr_selection_full(max: usize) {
         attrs::log_selection_full(max);
     }
 
-    fn attr_variation_with_all_objects(self, variation: u8) {
+    fn attr_variation_with_all_objects(variation: u8) {
         attrs::log_variation_with_all_objects(variation);
     }
 
-    fn attr_range_unsupported(self, range: IndexRange) {
+    fn attr_range_unsupported(range: IndexRange) {
         attrs::log_range_unsupported(range);
     }
 
-    fn attr_not_encodable(self, err: BadAttribute) {
+    fn attr_not_encodable(err: BadAttribute) {
         attrs::log_not_encodable(err);
     }
 
-    fn deferred_capacity(self, max: usize, header: (Variation, QualifierCode), count: Count) {
+    fn deferred_capacity(max: usize, header: (Variation, QualifierCode), count: Count) {
         deferred::log_capacity(max, header, count);
     }
 }

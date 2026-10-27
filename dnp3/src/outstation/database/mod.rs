@@ -547,13 +547,13 @@ impl DatabaseHandle {
         let mut headers = ReadHeaders::new(headers);
         let selected = self.with_database(|db| {
             db.inner
-                .select_read(headers.by_ref().map(|(header, _read_with)| header), Tracing)
+                .select_read::<Tracing>(headers.by_ref().map(|(header, _read_with)| header))
         });
-        selected | headers.finish(Tracing)
+        selected | headers.finish::<Tracing>()
     }
 
     pub(crate) fn write_response_headers(&mut self, cursor: &mut WriteCursor) -> ResponseInfo {
-        self.with_database(|db| db.inner.write_response_headers(cursor, Tracing))
+        self.with_database(|db| db.inner.write_response_headers::<Tracing>(cursor))
     }
 
     pub(crate) fn write_unsolicited(

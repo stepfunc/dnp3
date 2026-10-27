@@ -113,10 +113,10 @@ impl<'a> ReadHeaders<'a> {
 
     /// The error IIN2 bits of every header in the request that READ doesn't support, which this
     /// logs
-    pub(crate) fn finish(mut self, log: impl ReadLog) -> Iin2 {
+    pub(crate) fn finish<L: ReadLog>(mut self) -> Iin2 {
         self.by_ref().for_each(drop);
         if let Some((header, count)) = self.selector.unsupported() {
-            log.unsupported_headers(header, count);
+            L::unsupported_headers(header, count);
         }
         self.unsupported
     }
