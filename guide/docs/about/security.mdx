@@ -151,8 +151,9 @@ Where a step calls code the library doesn't own, such as logging, the harness pa
 step around the call but not the call itself. CI links the test binary twice, the second time with overflow checks on,
 so arithmetic overflow can't panic in these steps either.
 
-We confirmed that the check catches real panics by planting ones that only specific input can reach, in each layer,
-and checking that each one failed the link.
+The check fails closed: if any of these functions could panic, the test binary doesn't link, and the error names the
+function. We verified this in each layer by temporarily adding a panic that only specific input could reach; each one
+broke the link.
 
 </details>
 
