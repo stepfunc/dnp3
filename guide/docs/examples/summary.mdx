@@ -21,6 +21,26 @@ code that configures the logging ...
 
 We pull these code blocks from the example programs when we generate this guide. This ensures that all the snippets you encounter when reading the documentation are syntactically valid and up to date.
 
+## Running the examples
+
+Each language has a master and an outstation example that behave the same way and accept the same commands. Run them from
+the root of the repository, so that they find the TLS certificates in `./certs`. Both take the transport as their first
+argument:
+
+| Example | Transports |
+|---------|------------|
+| Outstation | `tcp-server`, `tcp-client`, `udp`, `serial`, `tls-ca`, `tls-self-signed` |
+| Master | `tcp-client`, `udp`, `serial`, `tls-ca`, `tls-self-signed` |
+
+The C, C++, Java and C# examples take one more optional argument: the endpoint to listen on or connect to, or the serial
+port. Everything else, such as the DNP3 addresses, is a constant at the top of each program. The Rust examples take
+options instead; run them with `--help` to list them, for example `cargo run -p example-outstation -- --help`.
+
+To see a master and an outstation talk to each other, start an outstation with `tcp-server` and a master with
+`tcp-client` on the same machine. Then type `help` in either one to list the commands that change the outstation's
+values or send requests from the master. The UDP transport only works on the local machine unless you change the
+endpoints in the program.
+
 ## Links
 
 The following links redirect to language-specific examples for the current version on Github:

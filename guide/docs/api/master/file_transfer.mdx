@@ -14,6 +14,7 @@ to file transfer:
 * Get file info - Retrieve information on an individual file or directory
 * Read file - Read a remote file from the outstation asynchronously
 * Read directory listing - Read a directory information from the outstation
+* Write file - Write a file to the outstation, one block at a time
 
 ## Get File Info
 
@@ -39,7 +40,11 @@ values={[
 <TabItem value="C">
 
 ```c
-// Not demonstrated in this example.
+// Callback interface
+{{#include ../ffi/bindings/c/master_example.c:file_info_callback}}
+
+// asynchronously start the operation
+{{#include ../ffi/bindings/c/master_example.c:get_file_info}}
 ```
 
 </TabItem>
@@ -113,7 +118,11 @@ values={[
 <TabItem value="C">
 
 ```c
-// Not demonstrated in this example.
+// Callback interface
+{{#include ../ffi/bindings/c/master_example.c:file_logger}}
+
+// asynchronously start the operation
+{{#include ../ffi/bindings/c/master_example.c:read_file}}
 ```
 
 </TabItem>
@@ -187,7 +196,11 @@ values={[
 <TabItem value="C">
 
 ```c
-// Not demonstrated in this example.
+// Callback interface
+{{#include ../ffi/bindings/c/master_example.c:read_directory_callback}}
+
+// asynchronously start the operation
+{{#include ../ffi/bindings/c/master_example.c:read_directory}}
 ```
 
 </TabItem>
@@ -213,6 +226,58 @@ values={[
 
 ```csharp
 {{#include ../ffi/bindings/dotnet/examples/master/Program.cs:read_directory}}
+```
+
+</TabItem>
+</Tabs>
+
+## Write a File
+
+Writing a file opens it for writing, writes its data one block at a time, and closes it. The last block is marked as the
+last one, so that the outstation knows the file is complete. The examples write two lines of text to `hello_world.txt`.
+
+<Tabs
+groupId="language"
+defaultValue="Rust"
+values={[
+{label: 'Rust', value: 'Rust'},
+{label: 'C', value: 'C'},
+{label: 'C++', value: 'C++'},
+{label: 'Java', value: 'Java'},
+{label: 'C#', value: 'C#'},
+]}>
+<TabItem value="Rust">
+
+```rust
+{{#include ../examples/master/src/main.rs:write_file}}
+```
+
+</TabItem>
+<TabItem value="C">
+
+```c
+{{#include ../ffi/bindings/c/master_example.c:write_file}}
+```
+
+</TabItem>
+<TabItem value="C++">
+
+```cpp
+{{#include ../ffi/bindings/c/master_example.cpp:write_file}}
+```
+
+</TabItem>
+<TabItem value="Java">
+
+```java
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterExample.java:write_file}}
+```
+
+</TabItem>
+<TabItem value="C#">
+
+```csharp
+{{#include ../ffi/bindings/dotnet/examples/master/Program.cs:write_file}}
 ```
 
 </TabItem>

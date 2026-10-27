@@ -5,6 +5,9 @@ sidebar_label: OutstationApplication
 slug: /api/outstation/application
 ---
 
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
 `OutstationApplication` is how the outstation asks your application for what only it knows, and tells it about changes
 worth saving. Each callback covers one job:
 
@@ -39,6 +42,55 @@ some masters then write the time over and over.
 An outstation that gets its time from another source, such as NTP or IRIG-B, usually rejects the master's time unless that
 source is unavailable. One that doesn't support time synchronization at all returns `NOT_SUPPORTED`.
 
+The example outstations ask for the time when they start, and clear the request when the master writes it:
+
+<Tabs
+groupId="language"
+defaultValue="Rust"
+values={[
+{label: 'Rust', value: 'Rust'},
+{label: 'C', value: 'C'},
+{label: 'C++', value: 'C++'},
+{label: 'Java', value: 'Java'},
+{label: 'C#', value: 'C#'},
+]}>
+<TabItem value="Rust">
+
+```rust
+{{#include ../examples/outstation/src/main.rs:time_sync}}
+```
+
+</TabItem>
+<TabItem value="C">
+
+```c
+{{#include ../ffi/bindings/c/outstation_example.c:time_sync}}
+```
+
+</TabItem>
+<TabItem value="C++">
+
+```cpp
+{{#include ../ffi/bindings/c/outstation_example.cpp:time_sync}}
+```
+
+</TabItem>
+<TabItem value="Java">
+
+```java
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/OutstationExample.java:time_sync}}
+```
+
+</TabItem>
+<TabItem value="C#">
+
+```csharp
+{{#include ../ffi/bindings/dotnet/examples/outstation/Program.cs:time_sync}}
+```
+
+</TabItem>
+</Tabs>
+
 ## Restarts
 
 A master can ask the outstation to restart. Because an attacker could use this to take a device offline, we recommend
@@ -53,6 +105,55 @@ When the master freezes counters, use the `DatabaseHandle` you're given to copy 
 `FREEZE_AND_CLEAR`, also reset the counter to 0. Requests to freeze at a given time and interval are passed to your
 application too.
 
+The example outstations support both kinds of immediate freeze, but not freezing at a given time:
+
+<Tabs
+groupId="language"
+defaultValue="Rust"
+values={[
+{label: 'Rust', value: 'Rust'},
+{label: 'C', value: 'C'},
+{label: 'C++', value: 'C++'},
+{label: 'Java', value: 'Java'},
+{label: 'C#', value: 'C#'},
+]}>
+<TabItem value="Rust">
+
+```rust
+{{#include ../examples/outstation/src/main.rs:freeze}}
+```
+
+</TabItem>
+<TabItem value="C">
+
+```c
+{{#include ../ffi/bindings/c/outstation_example.c:freeze}}
+```
+
+</TabItem>
+<TabItem value="C++">
+
+```cpp
+{{#include ../ffi/bindings/c/outstation_example.cpp:freeze}}
+```
+
+</TabItem>
+<TabItem value="Java">
+
+```java
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/OutstationExample.java:freeze}}
+```
+
+</TabItem>
+<TabItem value="C#">
+
+```csharp
+{{#include ../ffi/bindings/dotnet/examples/outstation/Program.cs:freeze}}
+```
+
+</TabItem>
+</Tabs>
+
 ## Saving what the master changes
 
 A master can change three kinds of settings in the outstation. The outstation applies each change to its database itself;
@@ -65,12 +166,62 @@ that doesn't save them returns to its configured values when it restarts.
 | Event classes | `beginAssignClass`, one call per point header, `endAssignClass` | Processed unless `supportAssignClass` returns false |
 | Device attributes | One call per attribute written | Only for attributes you define as writable |
 
-Deadbands and event classes come in a batch, so you can save the whole request at once in the end callback. An event class
+Deadbands and event classes come in batches that you can save at once in the end callback: one batch per request for event
+classes, and one per group of deadbands in the request. An event class
 assignment applies only to events generated afterwards, and a request with any error changes nothing. Headers that list
 individual point indices aren't supported.
 
 An attribute write callback can reject a value, for example one out of range, by returning false. The outstation itself
 rejects writes to attributes that aren't defined or writable, or whose type doesn't match.
+
+The example outstations log each batch where a device would save it:
+
+<Tabs
+groupId="language"
+defaultValue="Rust"
+values={[
+{label: 'Rust', value: 'Rust'},
+{label: 'C', value: 'C'},
+{label: 'C++', value: 'C++'},
+{label: 'Java', value: 'Java'},
+{label: 'C#', value: 'C#'},
+]}>
+<TabItem value="Rust">
+
+```rust
+{{#include ../examples/outstation/src/main.rs:save_changes}}
+```
+
+</TabItem>
+<TabItem value="C">
+
+```c
+{{#include ../ffi/bindings/c/outstation_example.c:save_changes}}
+```
+
+</TabItem>
+<TabItem value="C++">
+
+```cpp
+{{#include ../ffi/bindings/c/outstation_example.cpp:save_changes}}
+```
+
+</TabItem>
+<TabItem value="Java">
+
+```java
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/OutstationExample.java:save_changes}}
+```
+
+</TabItem>
+<TabItem value="C#">
+
+```csharp
+{{#include ../ffi/bindings/dotnet/examples/outstation/Program.cs:save_changes}}
+```
+
+</TabItem>
+</Tabs>
 
 :::note
 The example master can `WRITE` the User Defined Location attribute of the example outstation.
