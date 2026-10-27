@@ -68,27 +68,30 @@ values={[
 <TabItem value="master">
 
 ```mermaid
-flowchart LR
+flowchart TB
     subgraph receiving [Receiving]
-        direction TB
         rx(["Bytes from TCP, TLS, UDP or serial"]):::outside
         rlink["Link layer: parsing frames, and replying to them"]:::proven
         rtransport["Transport layer: reassembling segments into fragments"]:::proven
         rapp["Application layer: parsing fragments, object headers and object values"]:::proven
-        extract["Extracting every type of measurement"]:::proven
-        rx --> rlink --> rtransport --> rapp --> extract
     end
     subgraph sending [Sending]
-        direction BT
-        format["Formatting every request"]:::proven
-        sframe["Transport and link layers: segmenting and framing"]:::proven
         tx(["Bytes to TCP, TLS, UDP or serial"]):::outside
-        format --> sframe --> tx
+        slink["Link layer: framing"]:::proven
+        stransport["Transport layer: segmenting fragments"]:::proven
+        sapp["Application layer: formatting every request"]:::proven
     end
     session["Session: scheduling tasks, and matching responses to requests"]:::outside
+    extract["Extracting every type of measurement"]:::proven
     handler(["Your ReadHandler"]):::user
-    extract --> handler
-    extract --> session --> format
+    rx --> rlink --> rtransport --> rapp --> session
+    tx <--> slink
+    slink <--> stransport
+    stransport <--> sapp
+    sapp <--> session
+    session --> extract --> handler
+    %% each sending link is listed from the step above to the one below, so the column rises; only its upper arrowhead is drawn
+    linkStyle 4,5,6,7 marker-end:none
     classDef proven fill:#d9f2e3,stroke:#1b7f45,color:#0b3d20
     classDef outside fill:#eeeeee,stroke:#888888,color:#333333
     classDef user fill:#ffffff,stroke:#888888,stroke-dasharray:4 4,color:#333333
@@ -98,31 +101,29 @@ flowchart LR
 <TabItem value="outstation">
 
 ```mermaid
-flowchart LR
+flowchart TB
     subgraph receiving [Receiving]
-        direction TB
         rx(["Bytes from TCP, TLS, UDP or serial"]):::outside
         rlink["Link layer: parsing frames, and replying to them"]:::proven
         rtransport["Transport layer: reassembling segments into fragments"]:::proven
         rapp["Application layer: parsing fragments, object headers and object values"]:::proven
-        rx --> rlink --> rtransport --> rapp
     end
     subgraph sending [Sending]
-        direction BT
-        events["Storing events, and selecting and writing them"]:::proven
-        values["Encoding static values and device attributes"]:::proven
-        sframe["Transport and link layers: segmenting and framing"]:::proven
         tx(["Bytes to TCP, TLS, UDP or serial"]):::outside
-        events --> sframe
-        values --> sframe
-        sframe --> tx
+        slink["Link layer: framing"]:::proven
+        stransport["Transport layer: segmenting fragments"]:::proven
+        sapp["Application layer: writing events, static values and device attributes"]:::proven
     end
     session["Session: processing requests, and walking the stored static points and attributes"]:::outside
     handlers(["Your OutstationApplication, ControlHandler and other callbacks"]):::user
-    rapp --> session
+    rx --> rlink --> rtransport --> rapp --> session
+    tx <--> slink
+    slink <--> stransport
+    stransport <--> sapp
+    sapp <--> session
     session --- handlers
-    session --> events
-    session --> values
+    %% each sending link is listed from the step above to the one below, so the column rises; only its upper arrowhead is drawn
+    linkStyle 4,5,6,7 marker-end:none
     classDef proven fill:#d9f2e3,stroke:#1b7f45,color:#0b3d20
     classDef outside fill:#eeeeee,stroke:#888888,color:#333333
     classDef user fill:#ffffff,stroke:#888888,stroke-dasharray:4 4,color:#333333
