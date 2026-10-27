@@ -245,10 +245,21 @@ async fn a_repeated_request_is_answered_again_without_being_applied_again() {
             .test_request_response(&request, &response(0, RESTART, 0))
             .await;
         harness.drain_events();
+
+        // binary input 0 is added again in class 1, which a repeated request doesn't change
+        harness.handle.database.transaction(|db| {
+            Remove::<BinaryInput>::remove(db, 0);
+        });
+        harness.handle.database.transaction(binary_inputs(1));
         harness
             .test_request_response(&request, &response(0, RESTART, 0))
             .await;
         harness.check_no_events();
+
+        harness.handle.database.transaction(change(0, true));
+        harness
+            .test_request_response(&read_class_3(1), &response(1, RESTART | CLASS_1, 0))
+            .await;
     })
     .await;
 }
@@ -280,29 +291,32 @@ async fn an_assignment_during_an_unsolicited_confirm_wait_leaves_that_response_a
     watchdog(async {
         let mut harness = new_harness(get_default_unsolicited_config());
         confirm_null_unsolicited(&mut harness).await;
-        enable_unsolicited(&mut harness).await;
+        // unsolicited responses for class 1 only
+        harness
+            .test_request_response(&[0xC0, 0x14, 60, 2, 6], &empty_response(0, 0))
+            .await;
         harness.handle.database.transaction(add_binary_event);
         // binary input 0's class 1 event, waiting for its confirm
-        harness
-            .expect_response(&[
-                0xF1, 0x82, 0x80, 0x00, 0x02, 0x01, 0x28, 0x01, 0x00, 0x00, 0x00, 0x81,
-            ])
-            .await;
+        let unsolicited = [
+            0xF1, 0x82, 0x80, 0x00, 0x02, 0x01, 0x28, 0x01, 0x00, 0x00, 0x00, 0x81,
+        ];
+        harness.expect_response(&unsolicited).await;
 
-        // answered right away, and the unsolicited response is still confirmed by its sequence
+        // answered right away, and the unconfirmed response is retried unchanged
         let request = assign_class(1, &[CLASS_2_HEADER, ALL_BINARY]);
         harness
             .test_request_response(&request, &response(1, RESTART, 0))
             .await;
+        tokio::time::pause();
+        harness.expect_response(&unsolicited).await;
         harness.send_and_process(&unsolicited_confirm(1)).await;
         harness.drain_events();
 
-        // the next event, now in class 2, is reported unsolicited as the next sequence
+        // the next event is in class 2, which unsolicited responses don't report
         harness.handle.database.transaction(change(0, false));
+        expect_silence(&mut harness, std::time::Duration::from_secs(10)).await;
         harness
-            .expect_response(&[
-                0xF2, 0x82, 0x80, 0x00, 0x02, 0x01, 0x28, 0x01, 0x00, 0x00, 0x00, 0x01,
-            ])
+            .test_request_response(&read_class_3(2), &response(2, RESTART | CLASS_2, 0))
             .await;
     })
     .await;

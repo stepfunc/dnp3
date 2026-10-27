@@ -1295,20 +1295,20 @@ fn define_outstation_application(
             .end_callback()?
         .begin_callback("assign_class_all",
                         doc("Called for a point header of an accepted ASSIGN_CLASS request that names every point of a type")
-                            .details("The database has already been updated. This callback allows application code to persist the assignment; an outstation that doesn't reverts to its configured classes when it restarts. Replaying the calls in order reproduces the assignment, since a later header replaces an earlier one for the points they share.")
+                            .details("Every point header is reported, even when headers name the same points, which are then in more than one call; the last header that names a point sets its class. The calls come after the whole request has been applied to the database, outside its lock, and report it: they can't reject it. This callback allows application code to persist the assignment; an outstation that doesn't reverts to its configured classes when it restarts. Replaying the calls in order reproduces the assignment.")
             )?
             .param("point_type", point_type.clone(), "Type of the points")?
-            .param("point_class", shared.event_class.clone(), "Class of the events the points now generate, or none")?
+            .param("point_class", shared.event_class.clone(), "Class the header assigns the points' events to, or none")?
             .returns_nothing_by_default()?
             .end_callback()?
         .begin_callback("assign_class_range",
                         doc("Called for a point header of an accepted ASSIGN_CLASS request that names a range of points of a type")
-                            .details("The database has already been updated. See {interface:outstation_application.assign_class_all()}.")
+                            .details("See {interface:outstation_application.assign_class_all()}.")
             )?
             .param("point_type", point_type, "Type of the points")?
             .param("start", Primitive::U16, "First index of the range")?
             .param("stop", Primitive::U16, "Last index of the range, inclusive")?
-            .param("point_class", shared.event_class.clone(), "Class of the events the points now generate, or none")?
+            .param("point_class", shared.event_class.clone(), "Class the header assigns the points' events to, or none")?
             .returns_nothing_by_default()?
             .end_callback()?
         .begin_callback("end_assign_class",

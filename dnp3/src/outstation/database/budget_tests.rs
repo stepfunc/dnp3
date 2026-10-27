@@ -4,12 +4,15 @@
 // Text and data mining rights, including for AI training, are reserved under
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
-//! Pins for the READ budget: the records a READ's selection may visit, 8 per installed static
-//! point or attribute set and 16 per event slot, but never less than 4096 for either
+//! Pins for the work budget: the records a READ's selection may visit, 8 per installed static
+//! point or attribute set and 16 per event slot, but never less than 4096 for either, and the
+//! same static allowance for an ASSIGN_CLASS
 //!
 //! A READ is answered as today while its visits fit, and rejected with IIN2.2 and no objects
 //! after the header that exceeds them. An answered READ of static headers reports the same
-//! objects as reading each header on its own, in order, which is the oracle here.
+//! objects as reading each header on its own, in order, which is the oracle here. An ASSIGN_CLASS
+//! is charged for counting and changing its points, and one visit for its callback, per header,
+//! and one that exceeds the allowance changes nothing.
 
 use scursor::WriteCursor;
 
@@ -199,4 +202,65 @@ fn a_rejected_read_still_reports_headers_read_does_not_support() {
     let mut db = binary_inputs(0..1000);
     let request = [repeat(ALL_BINARY, 9), COMMAND_EVENTS.to_vec()].concat();
     assert_eq!(read(&mut db, &request), (PE | OU, vec![]));
+}
+
+/// apply an ASSIGN_CLASS of the object headers, returning its IIN2: none if it was applied
+fn assign(handle: &mut DatabaseHandle, objects: &[u8]) -> Iin2 {
+    let headers = HeaderCollection::parse(
+        ParseOptions::parse_everything(),
+        FunctionCode::AssignClass,
+        objects,
+    )
+    .unwrap();
+    handle
+        .transaction(|db| db.inner.assign_classes(&headers))
+        .err()
+        .unwrap_or_default()
+}
+
+/// g60v3: class 2
+const ASSIGN_CLASS_2: &[u8] = &[60, 3, 6];
+
+#[test]
+fn assignments_of_all_points_are_charged_up_to_the_allowance() {
+    // 15 points: each header costs 16 (changing them and the callback), so 256 headers reach the
+    // minimum allowance of 4096 exactly
+    let mut db = binary_inputs(0..15);
+    let request = |count| [ASSIGN_CLASS_2, &repeat(ALL_BINARY, count)].concat();
+    assert_eq!(assign(&mut db, &request(256)), NONE);
+    assert_eq!(assign(&mut db, &request(257)), PE);
+}
+
+#[test]
+fn assignments_of_ranges_are_charged_for_counting_and_changing_their_points() {
+    // the 15 points of the range are counted and changed, and its callback is charged: 31 a
+    // header, so 132 fit in 4096 and 133 don't
+    let mut db = binary_inputs(0..15);
+    let range = [1, 0, 0, 0, 14];
+    let request = |count| [ASSIGN_CLASS_2, &repeat(&range, count)].concat();
+    assert_eq!(assign(&mut db, &request(132)), NONE);
+    assert_eq!(assign(&mut db, &request(133)), PE);
+}
+
+#[test]
+fn an_assignment_over_the_allowance_changes_nothing() {
+    let mut db = binary_events(10);
+    let request = [ASSIGN_CLASS_2, &repeat(ALL_BINARY, 2049)].concat();
+    assert_eq!(assign(&mut db, &request), PE);
+
+    // binary input 0's next event is still in class 1, and is in class 2 once an assignment
+    // within the allowance moves it
+    let class_2_after_change = |db: &mut DatabaseHandle, value: bool| {
+        db.transaction(|db| {
+            let value = BinaryInput::new(value, Flags::ONLINE, Time::synchronized(1000));
+            db.update(0, &value, UpdateOptions::detect_event());
+            db.inner.select_unsolicited(EventClass::Class2.into())
+        })
+    };
+    assert_eq!(class_2_after_change(&mut db, true), 0);
+    assert_eq!(
+        assign(&mut db, &[ASSIGN_CLASS_2, ALL_BINARY].concat()),
+        NONE
+    );
+    assert_eq!(class_2_after_change(&mut db, false), 1);
 }

@@ -100,9 +100,11 @@ mod tests {
 
     #[test]
     fn each_point_header_takes_the_class_of_its_set() {
-        // an empty set first, then class 2 for two headers, then no events for one
+        // an empty set first, then class 2 for two headers, an empty set, no events for one, and
+        // a last empty set
         let objects = [
-            60, 2, 6, 60, 3, 6, 1, 0, 6, 30, 0, 0, 1, 2, 60, 1, 6, 20, 0, 1, 0, 0, 9, 0, 60, 4, 6,
+            60, 2, 6, 60, 3, 6, 1, 0, 6, 30, 0, 0, 1, 2, 60, 2, 6, 60, 1, 6, 20, 0, 1, 0, 0, 9, 0,
+            60, 4, 6,
         ];
         assert_eq!(
             assignments(false, &objects),

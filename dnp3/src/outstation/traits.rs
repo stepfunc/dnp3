@@ -267,12 +267,14 @@ pub trait OutstationApplication: Sync + Send + 'static {
     fn begin_assign_class(&mut self) {}
 
     /// Called for each point header of an accepted ASSIGN_CLASS request, in request order, with
-    /// the class its points' events now have, or `None` if they no longer generate events
+    /// the class the header assigns its points' events to, or `None` for no events
     ///
-    /// The database has already been updated. This callback allows application code to persist
-    /// the assignment; an outstation that doesn't reverts to its configured classes when it
-    /// restarts. Replaying the calls in order reproduces the assignment, since a later header
-    /// replaces an earlier one for the points they share.
+    /// Every point header is reported, even when headers name the same points, which are then in
+    /// more than one call; the last header that names a point sets its class. The calls come after
+    /// the whole request has been applied to the database, outside its lock, and report it: they
+    /// can't reject it. This callback allows application code to persist the assignment; an
+    /// outstation that doesn't reverts to its configured classes when it restarts. Replaying the
+    /// calls in order reproduces the assignment.
     #[expect(
         unused_variables,
         reason = "the default implementation ignores its arguments"
