@@ -78,11 +78,11 @@ The release's dependency responsibilities are therefore narrow:
 
 ## CHANGELOG conventions
 
-- Each milestone or release candidate gets its own `### X.Y.Z-Mn ###` or
-  `### X.Y.Z-RCn ###` section while the pre-release cycle is ongoing, so adopters
-  can see the delta between pre-releases.
-- **When cutting the final `X.Y.Z`, collapse all `X.Y.Z-Mn` and `X.Y.Z-RCn` sections
-  into a single `### X.Y.Z ###` section**: merge and de-duplicate the bullets and
-  drop the per-pre-release headers. The final release gets one coherent entry.
-- Bullet prefixes in use: `:star:` feature, `:shield:` security, `:wrench:`
-  tooling/CI, `:book:` docs. Reference the PR/issue number.
+- The upcoming release has one section, headed by its final version (`### X.Y.Z ###`), from the
+  first milestone through the final release. Milestone and release-candidate tags publish it as it
+  stands; there are no per-pre-release sections to collapse.
+- Markers: `:rotating_light:` for a vulnerability with an advisory (the first bullet, led by bold
+  "Security advisory:"), then optionally one bold headline bullet for the release's theme, then by
+  type: `:bell:` behavior or compatibility changes, `:shield:` hardening, `:star:` features,
+  `:bug:` fixes, `:wrench:` tooling and CI, `:book:` docs. Each bullet links its PR or issue,
+  except the headline, which summarizes without links.

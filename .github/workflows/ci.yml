@@ -154,7 +154,7 @@ jobs:
           feature-group: only-explicit-features
           features: default,serialization
           # every change must be at most a minor release; derived from a pre-release version
-          # (1.8.0-M1) the tool would skip every check
+          # (such as X.Y.Z-M3) the tool would skip every check
           release-type: minor
           baseline-rev: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
   # Check that the parsers can't panic for any input, and the encoders, the outstation's event
