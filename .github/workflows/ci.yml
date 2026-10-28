@@ -448,15 +448,15 @@ jobs:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Install Rust from rust-toolchain.toml
         run: rustup toolchain install
       - name: Install bom-tools
         # 0.3.0
         run: cargo install --locked --git https://github.com/stepfunc/bom-tools.git --rev a5c5797217b26f74f5682c0551daaffa501f7fd6
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
       - name: Download compiled FFI
         uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
