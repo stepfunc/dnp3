@@ -33,7 +33,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       - name: Install cargo-binstall
         uses: cargo-bins/cargo-binstall@e00d2c94cc0067b77737821097a62d91c0301baa # v1.21.1
@@ -120,7 +120,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
 
       # Same approach as the audit job: run once, take the verdict from the JSON report, and
       # report a run that produced no valid report as a tool failure, not a finding.

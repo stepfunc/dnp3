@@ -6,6 +6,8 @@ on:
   pull_request:
   # The merge queue runs the required checks on each queued merge result
   merge_group:
+  # Builds everything a tag builds, without publishing
+  workflow_dispatch:
 # Jobs that write with GITHUB_TOKEN ask for it themselves
 permissions:
   contents: read
@@ -24,12 +26,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Install Rust ${{ matrix.rust }}
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ matrix.rust }}
           components: rustfmt, clippy
+      - name: Cache the build
+        uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.event_name == 'pull_request' }}
       - name: Format
         run: cargo fmt --all -- --check
       - name: Clippy
@@ -53,12 +59,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Install Rust
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: stable
           components: clippy
+      - name: Cache the build
+        uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.event_name == 'pull_request' }}
       - name: Build the workspace with the features
         run: cargo build --release -p dnp3 -p dnp3-ffi-c -p dnp3-ffi-java ${{ matrix.feature-args }}
       - name: Clippy the core crate and its tests with the features
@@ -68,7 +78,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Read the minimum supported Rust version
         id: msrv
         # a two-part rust-version means the .0 release, so check exactly that toolchain
@@ -80,30 +90,70 @@ jobs:
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: ${{ steps.msrv.outputs.version }}
+      - name: Cache the build
+        uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.event_name == 'pull_request' }}
       - name: Check the workspace
         run: cargo check --locked --workspace --all-targets
       - name: Check the AWS-LC TLS backend
         run: cargo check --locked -p dnp3 --no-default-features --features tls-aws-lc,serial,serialization,unstable
-  # Run the unit tests on Windows and Linux
+  # Run the unit tests on Linux, and on Windows too in the merge queue, on tags and manual runs
   test:
+    # a test that hangs fails the job instead of holding it for GitHub's six-hour default
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
-        os:
-          - ubuntu-latest
-          - windows-latest
-        rust:
-          - stable
+        os: ${{ fromJSON(github.event_name == 'pull_request' && '["ubuntu-latest"]' || '["ubuntu-latest", "windows-latest"]') }}
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
-      - name: Install Rust ${{ matrix.rust }}
-        uses: dtolnay/rust-toolchain@master
+        uses: actions/checkout@v7
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      - name: Cache the build
+        uses: Swatinem/rust-cache@v2
         with:
-          toolchain: ${{ matrix.rust }}
+          save-if: ${{ github.event_name == 'pull_request' }}
       - name: Run Rust unit tests
         run: cargo test --features unstable
+  # Check that a change keeps the core crate's public API semver compatible with the revision it
+  # merges into. Tag pushes and manual runs have no such revision, so only the checkout runs there.
+  # The toolchain and the checker are pinned so an upstream release can't fail an unchanged PR
+  # (the checker reads rustdoc's JSON, whose format changes with the toolchain); raise them together
+  semver:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Install Rust
+        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+        uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: "1.99"
+      - name: Install cargo-binstall
+        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+        uses: cargo-bins/cargo-binstall@e00d2c94cc0067b77737821097a62d91c0301baa # v1.21.1
+      - name: Install cargo-semver-checks
+        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+        run: cargo binstall cargo-semver-checks@0.51.0 --no-confirm
+      - name: Compare the public API with the base revision
+        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+        uses: obi1kenobi/cargo-semver-checks-action@6b69fcf40e9b5fb17adeb57e4b6ecd020649a239 # v2.9
+        with:
+          rust-toolchain: manual
+          package: dnp3
+          # the features with public API that semver covers: unstable is exempt, and ffi only
+          # serves the FFI crates; tls and tls-aws-lc can't be enabled together
+          feature-group: only-explicit-features
+          features: default,serialization
+          # every change must be at most a minor release; derived from a pre-release version
+          # (1.8.0-M1) the tool would skip every check
+          release-type: minor
+          baseline-rev: ${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
   # Check that the parsers can't panic for any input, and the encoders, the outstation's event
   # buffer and deferred READ storage for any value, database and output buffer up to 16 MiB
   # (dnp3/src/no_panic_check.rs), with arithmetic overflow checks off
@@ -114,11 +164,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Install Rust
         uses: dtolnay/rust-toolchain@master
         with:
           toolchain: "1.99"
+      - name: Cache the build
+        uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.event_name == 'pull_request' }}
       - name: Link the parsers, encoders and responses with the no-panic check
         run: cargo test -p dnp3 --lib --release --no-run
         env:
@@ -132,14 +186,15 @@ jobs:
           CARGO_PROFILE_RELEASE_LTO: thin
           CARGO_PROFILE_RELEASE_CODEGEN_UNITS: "1"
           CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS: "true"
+  # Everything below builds the bindings and their packages: in the merge queue, on tags and on
+  # manual runs, not on a PR's own pushes. A PR's FFI changes are compiled by clippy and bindings-test
   # Build API documentation packages
-  # Paused on PRs during the 1.8.0 refactor series; release tags still build them. Restore before 1.8.0
   documentation:
-    if: startsWith(github.ref, 'refs/tags/')
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Install Rust ${{ matrix.rust }}
         uses: dtolnay/rust-toolchain@stable
       - name: Install doxygen 1.9.5
@@ -169,9 +224,8 @@ jobs:
           name: doc-api
           path: ~/doc
     # Build bindings on Windows x64 [64-bit MSVC (Windows 7+) (x86_64-pc-windows-msvc)] and x86 [32-bit MSVC (Windows 7+) (i686-pc-windows-msvc)]
-  # Paused on PRs during the 1.8.0 refactor series; release tags still build them. Restore before 1.8.0
   bindings-windows:
-    if: startsWith(github.ref, 'refs/tags/')
+    if: github.event_name != 'pull_request'
     # Release tags build the shipped libraries with one codegen unit and thin LTO (smaller and faster,
     # but slower to build); other runs keep cargo's release defaults. Symbols are not stripped
     env:
@@ -188,7 +242,7 @@ jobs:
             test: false
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Install NASM
         run: |
           choco install nasm
@@ -232,9 +286,8 @@ jobs:
         if: ${{ matrix.test }}
         run: cargo run --bin dnp3-bindings -- --java -r ${{ matrix.target }} -a ./target/${{ matrix.target }}/release
   # Build bindings on MacOS [64-bit macOS (10.7+, Lion+) (x86_64-apple-darwin)]
-  # Paused on PRs during the 1.8.0 refactor series; release tags still build them. Restore before 1.8.0
   bindings-macos:
-    if: startsWith(github.ref, 'refs/tags/')
+    if: github.event_name != 'pull_request'
     # Release tags build the shipped libraries with one codegen unit and thin LTO (smaller and faster,
     # but slower to build); other runs keep cargo's release defaults. Symbols are not stripped
     env:
@@ -251,7 +304,7 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Create FFI modules dir
@@ -280,6 +333,7 @@ jobs:
         run: cargo run --bin dnp3-bindings -- --java -r ${{ matrix.target }} -a ./target/${{ matrix.target }}/release
   # Cross-compilation for Linux to produce portable C and JNI libraries
   bindings-linux:
+    if: github.event_name != 'pull_request'
     # Release tags build the shipped libraries with one codegen unit and thin LTO (smaller and faster,
     # but slower to build); other runs keep cargo's release defaults. Symbols are not stripped
     env:
@@ -305,13 +359,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
       - name: Install Rust Cross
-        run: cargo install cross
+        run: cargo install cross --locked --version 0.2.5
       - name: Create FFI modules dir
         run: mkdir -p ffi-modules/${{ matrix.target }}
       - name: Build FFI
@@ -335,13 +389,12 @@ jobs:
   # Run the bindings' smoke tests (C, C++, .NET, Java) against libraries built like the shipped ones
   bindings-test:
     uses: ./.github/workflows/bindings-test.yml
-  # Paused on PRs during the 1.8.0 refactor series; release tags still build them. Restore before 1.8.0
   guide:
-    if: startsWith(github.ref, 'refs/tags/')
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Install dependencies
         working-directory: guide
         run: npm ci
@@ -357,10 +410,9 @@ jobs:
           name: doc-guide
           path: ~/doc
   # Package all the generated bindings
-  # Paused on PRs during the 1.8.0 refactor series; release tags still package. Restore before 1.8.0
   packaging:
     needs: [documentation, guide, bindings-windows, bindings-macos, bindings-linux]
-    if: startsWith(github.ref, 'refs/tags/')
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Install Rust
@@ -368,7 +420,7 @@ jobs:
       - name: Install bom-tools
         run: cargo install --locked --git https://github.com/stepfunc/bom-tools.git --tag 0.3.0
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Download compiled FFI
         uses: actions/download-artifact@v8
         with:
@@ -427,19 +479,24 @@ jobs:
     uses: ./.github/workflows/conformance.yml
   # The check branch protection requires: passes only if every job a PR runs passed
   ci-ok:
-    needs: [linting, msrv, test, no-panic, features, bindings-linux, bindings-test]
+    needs: [linting, features, msrv, test, semver, no-panic, bindings-test, packaging]
     if: always()
     runs-on: ubuntu-latest
     steps:
       - name: Check the CI jobs
+        # packaging, and the documentation and platform builds it needs, run in the merge queue,
+        # on tags and manual runs; on a PR alone it is skipped, and only there is that a pass
+        env:
+          NEEDS: ${{ toJSON(needs) }}
+          EVENT: ${{ github.event_name }}
         run: |
-          echo '${{ toJSON(needs) }}'
-          [ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') || contains(needs.*.result, 'skipped') }}" = "false" ]
+          echo "$NEEDS"
+          echo "$NEEDS" | jq -e --arg event "$EVENT" 'to_entries | all(.value.result == "success" or (.value.result == "skipped" and .key == "packaging" and $event == "pull_request"))'
   # Quality gate to ensure all tests pass before releases
   quality-gate:
-    needs: [linting, msrv, test, features, bindings-test, conformance]
+    needs: [linting, features, msrv, test, semver, no-panic, bindings-test, conformance]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Quality checks passed
         run: echo "✅ All quality checks passed successfully"
@@ -450,14 +507,14 @@ jobs:
   release-crates-io:
     needs: [quality-gate]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     environment: crates-io
     permissions:
       contents: read
       id-token: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
       - name: Check the tag matches the crate version
@@ -499,7 +556,7 @@ jobs:
   release-docs:
     needs: [packaging, quality-gate]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Download documentation artifacts
         uses: actions/download-artifact@v8
@@ -527,7 +584,7 @@ jobs:
           } > index.html
           cat index.html
       - name: Checkout stepfunc/docs
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           repository: stepfunc/docs
           ssh-key: ${{ secrets.SFIO_DOCS_SSH_KEY }}
@@ -565,7 +622,7 @@ jobs:
   release-maven:
     needs: [packaging, quality-gate]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Download Java artifacts
         uses: actions/download-artifact@v8
@@ -654,7 +711,7 @@ jobs:
   release-nuget:
     needs: [packaging, quality-gate]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     environment: nuget
     permissions:
       contents: read
@@ -683,7 +740,7 @@ jobs:
   create-github-release:
     needs: [release-docs, release-maven, release-nuget, release-crates-io]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/')
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     # creates the draft release and uploads its assets
     permissions:
       contents: write
@@ -704,7 +761,7 @@ jobs:
           cd conformance-results
           zip -r ../release/conformance-results.zip .
       - name: Create GitHub release
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           draft: true
           files: |
