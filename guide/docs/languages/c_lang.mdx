@@ -69,20 +69,22 @@ The DNP3_RUST_TARGET variable can also be set via the command line when configur
 
 This call will expose the library target:
 
-- `dnp3` which is the library. When using this target, you must make the DLL or .so file available to your executable. You can automatically copy it to the executable target directory using the following CMake
-  statement:
+- `dnp3` which is the library.
 
-```cmake
-add_custom_command(TARGET my_awesome_project POST_BUILD 
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:dnp3> $<TARGET_FILE_DIR:my_awesome_project>
-)
-```
-
-Finally, declare a dependency on the library for your executable:
+Declare a dependency on the library for your executable:
 
 ```cmake
 add_executable(my_awesome_project main.c)
 target_link_libraries(my_awesome_project PRIVATE dnp3)
+```
+
+You must also make the DLL or .so file available to your executable. You can automatically copy it to the executable
+target directory after the target is declared:
+
+```cmake
+add_custom_command(TARGET my_awesome_project POST_BUILD
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different $<TARGET_FILE:dnp3> $<TARGET_FILE_DIR:my_awesome_project>
+)
 ```
 
 ## Mapping
