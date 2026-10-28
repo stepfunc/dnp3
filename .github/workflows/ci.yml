@@ -223,7 +223,7 @@ jobs:
         with:
           name: doc-api
           path: ~/doc
-    # Build bindings on Windows x64 [64-bit MSVC (Windows 7+) (x86_64-pc-windows-msvc)] and x86 [32-bit MSVC (Windows 7+) (i686-pc-windows-msvc)]
+    # Build bindings on Windows x64 [64-bit MSVC (Windows 10+) (x86_64-pc-windows-msvc)] and x86 [32-bit MSVC (Windows 10+) (i686-pc-windows-msvc)]
   bindings-windows:
     if: github.event_name != 'pull_request'
     # Release tags build the shipped libraries with one codegen unit and thin LTO (smaller and faster,
@@ -236,9 +236,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - target: x86_64-pc-windows-msvc # 64-bit MSVC (Windows 7+)
+          - target: x86_64-pc-windows-msvc # 64-bit MSVC (Windows 10+)
             test: true
-          - target: i686-pc-windows-msvc # 32-bit MSVC (Windows 7+)
+          - target: i686-pc-windows-msvc # 32-bit MSVC (Windows 10+)
             test: false
     steps:
       - name: Checkout
@@ -285,7 +285,7 @@ jobs:
       - name: Test Java
         if: ${{ matrix.test }}
         run: cargo run --bin dnp3-bindings -- --java -r ${{ matrix.target }} -a ./target/${{ matrix.target }}/release
-  # Build bindings on MacOS [64-bit macOS (10.7+, Lion+) (x86_64-apple-darwin)]
+  # Build bindings on macOS: x86_64-apple-darwin (macOS 10.12+) and aarch64-apple-darwin (macOS 11.0+)
   bindings-macos:
     if: github.event_name != 'pull_request'
     # Release tags build the shipped libraries with one codegen unit and thin LTO (smaller and faster,
@@ -347,15 +347,15 @@ jobs:
       fail-fast: false
       matrix:
         target:
-          - x86_64-unknown-linux-gnu # 64-bit Linux (kernel 2.6.32+, glibc 2.11+)
+          - x86_64-unknown-linux-gnu # 64-bit Linux (kernel 3.2+, glibc 2.17+)
           - i686-unknown-linux-gnu # 32-bit Linux (kernel 3.2+, glibc 2.17+)
           - x86_64-unknown-linux-musl # 64-bit Linux with MUSL
-          - arm-unknown-linux-gnueabihf # ARMv6 Linux, hardfloat (kernel 3.2, glibc 2.17)
+          - arm-unknown-linux-gnueabihf # ARMv6 Linux, hardfloat (kernel 3.2+, glibc 2.17+)
           - arm-unknown-linux-musleabihf # ARMv6 Linux with MUSL, hardfloat
-          - aarch64-unknown-linux-gnu # ARM64 Linux (kernel 4.2, glibc 2.17+)
+          - aarch64-unknown-linux-gnu # ARM64 Linux (kernel 4.1+, glibc 2.17+)
           - aarch64-unknown-linux-musl # ARM64 Linux with MUSL
-          - armv7-unknown-linux-gnueabihf # ARMv7 Linux, hardfloat (kernel 3.2, glibc 2.17)
-          - arm-unknown-linux-gnueabi # ARMv6 Linux (kernel 3.2, glibc 2.17)
+          - armv7-unknown-linux-gnueabihf # ARMv7 Linux, hardfloat (kernel 3.2+, glibc 2.17+)
+          - arm-unknown-linux-gnueabi # ARMv6 Linux (kernel 3.2+, glibc 2.17+)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
