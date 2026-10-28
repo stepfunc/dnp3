@@ -3,7 +3,10 @@
 version: 2
 updates:
   - package-ecosystem: github-actions
-    directory: /
+    # the workflows, and the composite actions they call
+    directories:
+      - /
+      - /.github/actions/*
     schedule:
       interval: monthly
     # wait a week after a release before proposing it
