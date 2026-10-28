@@ -612,10 +612,11 @@ jobs:
           # Remove versions superseded under the docs repo's retention policy
           ./scripts/prune.sh
           # Send docs.stepfunc.io/dnp3/ to the guide of the newest full release (not milestones or RCs),
-          # so a maintenance release of an older version doesn't move it back
+          # so a maintenance release of an older version doesn't move it back. It targets the guide's
+          # first page, which every version has (guide/ itself has no page before 1.8.0)
           latest=$(ls ./dnp3 | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -n 1 || true)
           if [[ -n "$latest" ]]; then
-            echo "<!DOCTYPE html><meta charset=\"utf-8\"><title>DNP3 documentation</title><meta http-equiv=\"refresh\" content=\"0; url=./$latest/guide/\"><link rel=\"canonical\" href=\"./$latest/guide/\">" > ./dnp3/index.html
+            echo "<!DOCTYPE html><meta charset=\"utf-8\"><title>DNP3 documentation</title><meta http-equiv=\"refresh\" content=\"0; url=./$latest/guide/docs/guide/\"><link rel=\"canonical\" href=\"./$latest/guide/docs/guide/\">" > ./dnp3/index.html
           fi
           # Check if there are actual changes to commit
           git add -A
