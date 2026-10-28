@@ -5,7 +5,7 @@
     <parent>
         <groupId>io.stepfunc</groupId>
         <artifactId>dnp3-parent</artifactId>
-        <version>1.8.0-RC1</version>
+        <version>1.8.0-RC2</version>
     </parent>
 
     <!-- smoke tests of the Java bindings; never deployed -->
