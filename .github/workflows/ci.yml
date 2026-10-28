@@ -97,6 +97,9 @@ jobs:
         # job builds nothing that ships
         if: github.event_name == 'pull_request' # zizmor: ignore[cache-poisoning]
         uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+        # the action runs rustc and cargo to key the cache, so they must be this toolchain too
+        env:
+          RUSTUP_TOOLCHAIN: ${{ steps.msrv.outputs.version }}
       - name: Check the workspace
         env:
           MSRV: ${{ steps.msrv.outputs.version }}
