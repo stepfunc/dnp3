@@ -84,4 +84,5 @@ The release's dependency responsibilities are therefore narrow:
 - Markers: `:rotating_light:` for a vulnerability with an advisory (the first bullet, led by bold
   "Security advisory:"), then optionally one bold headline bullet for the release's theme, then by
   type: `:bell:` behavior or compatibility changes, `:shield:` hardening, `:star:` features,
-  `:bug:` fixes, `:wrench:` tooling and CI, `:book:` docs. Each bullet links its PR or issue.
+  `:bug:` fixes, `:wrench:` tooling and CI, `:book:` docs. Each bullet links its PR or issue,
+  except the headline, which summarizes without links.
