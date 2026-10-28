@@ -1,6 +1,6 @@
 name: Conformance
 on:
-  # Runs on PRs only when they carry the `conformance` label (see CLAUDE.md)
+  # Runs on PRs only when they carry the `conformance` label
   pull_request:
     types: [opened, synchronize, reopened, labeled]
   # Best effort: GitHub may delay or drop scheduled runs

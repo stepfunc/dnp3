@@ -71,8 +71,7 @@ applicable law does not permit Step Function I/O to restrict.
 
 ## Maintainers
 
-Development instructions for working on this repository (build, test, lint, conformance, and
-reference documents) are in [`CLAUDE.md`](CLAUDE.md).
+Step Function I/O maintainers' development instructions are kept privately.
 
 These instructions guide cooperative coding agents. They do not amend the license or decide whether
 a work is legally derivative. `LICENSE.txt` and any applicable separate written agreement govern.
