@@ -21,7 +21,7 @@ Rust implementation of DNP3 (IEEE 1815) with idiomatic bindings for C, C++, .NET
 # Security
 
 Written in safe Rust, with sources of panics restricted by lints, and the parsing of data received from the network
-proven panic-free at link time. See the [security page](https://docs.stepfunc.io/dnp3/1.8.0-M1/guide/docs/security) of the guide for what is enforced and proven.
+proven panic-free at link time. See the [security page](https://docs.stepfunc.io/dnp3/1.8.0-RC1/guide/docs/security) of the guide for what is enforced and proven.
 
 # Cargo Features
 

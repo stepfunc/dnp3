@@ -1,6 +1,6 @@
 
-### 1.8.0 ###
-* :shield: **Hardened against panics.** Lints deny common sources of panics throughout the core library, and CI now **proves** that important parts of it can't panic for any input. The [security page](https://docs.stepfunc.io/dnp3/1.8.0/guide/docs/security) has the details.
+### 1.8.0-RC1 ###
+* :shield: **Hardened against panics.** Lints deny common sources of panics throughout the core library, and CI now **proves** that important parts of it can't panic for any input. The [security page](https://docs.stepfunc.io/dnp3/1.8.0-RC1/guide/docs/security) has the details.
 * :bell: **License update.** The license now prohibits using the library to build or test other implementations of the protocol, including by mining it with AI tools or using it as an oracle, and reserves AI training. See [#712](https://github.com/stepfunc/dnp3/pull/712).
 * :bell: **The minimum supported Rust version is now 1.88.** See [#502](https://github.com/stepfunc/dnp3/pull/502).
 * :bell: Binary output status points default to g10v2 instead of g10v1, in Rust and in the bindings. See [#853](https://github.com/stepfunc/dnp3/pull/853).
