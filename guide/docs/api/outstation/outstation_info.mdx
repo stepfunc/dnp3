@@ -6,7 +6,8 @@ slug: /api/outstation/information
 ---
 
 `OutstationInformation` tells your application what the outstation's session with the master is doing. The outstation
-doesn't need anything back from it, and every callback does nothing by default, so implement only the ones you want.
+doesn't need anything back from it, and every callback does nothing by default, so implement only the ones you want. In .NET, implement them all
+and leave the ones you don't need empty.
 
 It's how a device can see its own communications: whether a master is talking to it, and whether that master confirms
 what it's sent. That's useful for a "master active" indicator on a front panel or HMI, for communication statistics, and
