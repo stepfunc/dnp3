@@ -5,17 +5,20 @@
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
 module.exports = {
-  someSidebar: {
-    About: [
+  someSidebar: [
+    {About: [
         'about/guide',
         'about/dnp3',
         'about/interop',
         'about/security',
+    ]},
+    'examples/summary',
+    {Project: [
         'about/versioning',
         'about/license',
         'about/dependencies',
-    ],
-    Languages: [
+    ]},
+    {Languages: [
         'languages/bindings',
         {
             Bindings: [
@@ -25,13 +28,14 @@ module.exports = {
                 'languages/c_sharp',
             ]
         }
-    ],
-    API: [
+    ]},
+    {API: [
         'api/logging',
         'api/runtime',
         'api/tls',
         {
             Outstation: [
+                'api/outstation/overview',
                 'api/outstation/configuration',
                 {
                     Interfaces: [
@@ -59,21 +63,27 @@ module.exports = {
                         'api/master/channel_config',
                         'api/master/tcp_client',
                         'api/master/tls_client',
+                        'api/master/tcp_server',
                         'api/master/serial_master',
+                        'api/master/udp',
                     ]
                 },
                 {
                     Associations: [
                         'api/master/assoc_create',
-                        {
-                            Components: [
-                                'api/master/assoc_config',
-                                'api/master/read_handler',
-                                'api/master/association_handler',
-                                'api/master/association_information',
-                            ]
-                        },
+                        'api/master/assoc_config',
+                        'api/master/association_handler',
+                        'api/master/association_information',
+                    ]
+                },
+                {
+                    'Reading data': [
+                        'api/master/read_handler',
                         'api/master/assoc_polls',
+                    ]
+                },
+                {
+                    Requests: [
                         'api/master/assoc_controls',
                         'api/master/attributes',
                         'api/master/file_transfer',
@@ -83,9 +93,6 @@ module.exports = {
                 'api/master/scheduling',
             ]
         }
-    ],
-    Examples: [
-        'examples/summary'
-    ],
-  },
+    ]},
+  ],
 };

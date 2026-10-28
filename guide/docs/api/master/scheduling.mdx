@@ -1,6 +1,6 @@
 ---
 id: scheduling
-title: Automatic Tasks and Scheduling
+title: Automatic tasks and scheduling
 sidebar_label: Scheduling
 slug: /api/master/scheduling
 ---
@@ -21,7 +21,7 @@ Each association has its own automatic tasks, listed here in the order it runs t
 | Clear the restart bit | The outstation reports that it restarted |
 | Disable unsolicited reporting | The association starts communicating |
 | Time synchronization | The outstation asks for the time, if automatic time synchronization is configured |
-| Integrity scan | The association starts communicating, and after the outstation restarts |
+| Integrity scan | The association starts communicating, after the outstation restarts, and after its event buffer overflows, if configured |
 | Enable unsolicited reporting | The association starts communicating, and after the outstation restarts |
 | Event scan | The outstation reports events in a class enabled for automatic event scans |
 | Keep-alive | Nothing has been received from the outstation for the keep-alive timeout, if one is configured |
@@ -48,14 +48,12 @@ an operation that takes several exchanges, such as a select-before-operate or a 
 channel is free, it picks the next request like this:
 
 ```mermaid
-flowchart TD
-    free[The channel is free] --> user{Does any association have a queued request?}
-    user -- yes --> runUser[Run the oldest request of the first such association in line]
-    user -- no --> auto{Does any association have an automatic task, poll or keep-alive ready to run?}
-    auto -- yes --> runAuto[Run the most important item of the first such association in line]
-    auto -- no --> sleep[Sleep until the next deadline, a new request, or an unsolicited response]
-    runUser --> back[That association moves to the back of the line]
-    runAuto --> back
+flowchart LR
+    free([Channel is free]) --> user{Queued request?}
+    user -- yes --> runUser[Run the oldest one]
+    user -- no --> auto{Anything else due?}
+    auto -- yes --> runAuto[Run the most important one]
+    auto -- no --> sleep([Sleep until something is due])
 ```
 
 1. **Your requests come first**, before the automatic tasks and polls of every association.

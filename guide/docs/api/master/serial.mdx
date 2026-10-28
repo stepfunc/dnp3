@@ -12,10 +12,6 @@ Use the `MasterChannel::createSerialChannel` method to create a channel bound to
 
 The master opens the serial port after `MasterChannel.enable()` is called. If the port can't be opened, or fails later, the master reopens it after a fixed retry delay.
 
-:::note
-The `LinkErrorMode` is internally set to `Discard` for serial communication channels.
-:::
-
 <Tabs
 groupId="language"
 defaultValue="Rust"

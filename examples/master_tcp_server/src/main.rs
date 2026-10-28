@@ -23,6 +23,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         .with_target(false)
         .init();
 
+    // ANCHOR: create_master_tcp_server
     let _server = spawn_master_tcp_server(
         "127.0.0.1:20000".parse()?,
         LinkIdConfig::default().decode_level(PhysDecodeLevel::Data),
@@ -31,6 +32,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
     )
     .await?;
+    // ANCHOR_END: create_master_tcp_server
 
     let mut reader = FramedRead::new(tokio::io::stdin(), LinesCodec::new());
 
@@ -48,6 +50,7 @@ struct ConnectionHandler {
 }
 
 impl ConnectionHandler {
+    // ANCHOR: start_channel
     async fn setup_channel(
         channel: &mut MasterChannel,
         source: u16,
@@ -69,8 +72,10 @@ impl ConnectionHandler {
         channel.enable().await?;
         Ok(assoc)
     }
+    // ANCHOR_END: start_channel
 }
 
+// ANCHOR: connection_handler
 impl dnp3::tcp::ConnectionHandler for ConnectionHandler {
     async fn accept(&mut self, _: SocketAddr) -> Result<AcceptAction, Reject> {
         Ok(AcceptAction::GetLinkIdentity)
@@ -120,6 +125,7 @@ impl dnp3::tcp::ConnectionHandler for ConnectionHandler {
         }
     }
 }
+// ANCHOR_END: connection_handler
 
 /// read handler that does nothing
 #[derive(Copy, Clone)]

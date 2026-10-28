@@ -1,7 +1,7 @@
 ---
 id: dependencies
-title: Open Source Dependencies
-sidebar_label: Dependencies and SBOMs
+title: Open source dependencies
+sidebar_label: Dependencies
 slug: /dependencies
 ---
 
@@ -12,7 +12,7 @@ Rust's package manager (`cargo`) makes it easy to work with external dependencie
 
 Our library depends directly on a handful of third-party libraries, but those pull in dozens of their own. Here's how we manage dependencies.
 
-## Dependency Allowlisting
+## Dependency allowlisting
 
 We use a dependency allowlist to ensure that we never incorporate dependencies into our builds unless they are manually approved. When CI packages the bindings,
 it performs the following checks:
@@ -27,14 +27,14 @@ The license report file differs slightly for the Java library as it incorporates
 :::
 
 
-## Software Bill of Materials
+## Software bill of materials
 
 Each release includes a [CycloneDX](https://cyclonedx.org/) SBOM for the prebuilt libraries: `dnp3-ffi.cdx.json` for C/C++ and .NET, and
 `dnp3-ffi-java.cdx.json` for Java. Like the license reports, they're generated from what is actually compiled into each library, for every supported platform,
 and they're included in each binding package and attached to the GitHub release. Rust users depend on the crate through Cargo and can generate an SBOM for
 their own application, which includes the library.
 
-## Proprietary Compatible
+## Proprietary compatible
 
 All dependencies of the library have licenses that are both mutually compatible and compatible with commercial/proprietary products. We don't allow the
 incorporation of strong copyleft licenses such as the GPL. You can see a complete list of allowed dependencies and licenses in <a href={`${sitedata.github_url}/blob/${sitedata.version}/allowed.json`}>allowed.json</a>.

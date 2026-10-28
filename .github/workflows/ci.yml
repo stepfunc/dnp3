@@ -547,6 +547,10 @@ jobs:
           cp -a ../artifacts/conformance-results ./dnp3/${{github.ref_name}}/conformance
           # Remove versions superseded under the docs repo's retention policy
           ./scripts/prune.sh
+          # Send docs.stepfunc.io/dnp3/ to the guide of the latest full release (not milestones or RCs)
+          if [[ "${{github.ref_name}}" != *-* ]]; then
+            echo '<!DOCTYPE html><meta charset="utf-8"><title>DNP3 documentation</title><meta http-equiv="refresh" content="0; url=./${{github.ref_name}}/guide/"><link rel="canonical" href="./${{github.ref_name}}/guide/">' > ./dnp3/index.html
+          fi
           # Check if there are actual changes to commit
           git add -A
           if git diff --staged --quiet; then

@@ -1,6 +1,6 @@
 ---
 id: java
-title: Java Bindings
+title: Java bindings
 sidebar_label: Java
 slug: /java
 ---
@@ -13,22 +13,22 @@ correct native library will automatically load during static initialization. The
 
 Shared libraries for the following platforms are included in the release JAR:
 
-- Windows x64 (Windows 10+)
-- Linux x64 (kernel 3.2+, glibc 2.17+)
-- Linux AArch64 (kernel 4.1+, glibc 2.17+)
-- Linux ARMv6hf (kernel 3.2+, glibc 2.17+)
-- MacOS x64 (MacOS 10.12+)
-- MacOS AArch64 (MacOS 11.0+)
+| Platform | Minimum OS |
+|----------|------------|
+| Windows x64 | Windows 10+ |
+| Linux x64 | kernel 3.2+, glibc 2.17+ |
+| Linux AArch64 | kernel 4.1+, glibc 2.17+ |
+| Linux ARMv6hf | kernel 3.2+, glibc 2.17+ |
+| MacOS x64 | MacOS 10.12+ |
+| MacOS AArch64 | MacOS 11.0+ |
 
 :::warning
 MacOS libraries are included in the package but are not officially supported. They are useful for developers using MacOS, but
 are not supported in production.
 :::
 
-:::tip
 It is also possible to use an external library by specifying its path in the `DNP3_NATIVE_LIB_LOCATION` environment variable. This feature can be useful if your platform
 is not officially supported.
-:::
 
 ## Maven
 
@@ -50,7 +50,7 @@ In addition to the Rust dependencies, the Java bindings depend on one open sourc
 
 This library is not distributed by Step Function I/O directly. It is only declared as a dependency for the package manager to retrieve.
 
-## Unsigned Integers
+## Unsigned integers
 
 Java doesn't support unsigned integers as part of the core language. Instead, the Java code generator uses classes from the `JOOU` library. This ensures that numeric types crossing the Java/JNI boundary are pre-validated within the correct range. User code that creates unsigned integers will need to import symbols from the `JOOU` library.
 
@@ -96,7 +96,7 @@ Classes are mapped to Java classes. They have a private pointer to the underlyin
 * Generated classes that also provide a public `shutdown()` method to proactively release native resources: These represent long-lived resources such as `Runtime`, `MasterChannel`, or `OutstationServer`. They map to an asynchronous Rust task executing on the Tokio runtime. The `shutdown()` method lets you precisely control when the resource/task will stop. `MasterServer` implements `AutoCloseable` and provides `close()` instead.
 
 
-### Asynchronous Methods
+### Asynchronous methods
 
 Asynchronous methods are transformed into methods that return `CompletionStage<T>`. You can then chain and use the object in an asynchronous
 workflow, or transform it into a `CompletableFuture<T>` and call `get()`.

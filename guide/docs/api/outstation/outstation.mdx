@@ -1,6 +1,6 @@
 ---
 id: outstation
-title: Outstation Class
+title: Outstation class
 sidebar_label: Outstation
 slug: /api/outstation/outstation_handle
 ---
@@ -8,17 +8,24 @@ slug: /api/outstation/outstation_handle
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-The `Outstation` class is an asynchronous task that implements the outstation state machine and responds to requests from a single master. It provides transactional access to the `Database` for configuring and modifying values sent to the master (covered in the next section).
+The `Outstation` is the handle you get when you create an outstation on any transport. Behind it, an asynchronous task
+runs the outstation and answers requests from a single master. Your application keeps the handle for as long as the
+outstation runs and uses it to:
 
-This class also lets you modify the `DecodeLevel` of the running outstation, useful for debugging communications in production.
+| Do this | With |
+|---------|------|
+| Update the values the master reads, in transactions | `transaction` (`execute_transaction` in the bindings), see [Database](./database.mdx) |
+| Start or stop communicating | `enable` and `disable` |
+| Change how much of the protocol traffic is logged, for example to debug a site | `set_decode_level` |
 
-:::tip
 The Outstation class has the same interface regardless of which transport-specific method you used to create it. This allows you to treat an Outstation operating
 over TCP or serial identically.
+
+:::caution
+An outstation created as a TCP or TLS client starts disabled: call `enable` once its database is initialized, or it
+never connects. Outstations on every other transport start enabled.
 :::
 
-:::note
 An outstation created on its own, as a TCP or TLS client, on a serial port or over UDP, stops when its `Outstation` is destroyed. In Java and .NET that happens
 when the object is garbage collected, so keep a reference to it for as long as the outstation should run. Outstations added to an `OutstationServer` are kept
 running by the server.
-:::

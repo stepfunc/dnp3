@@ -1,19 +1,20 @@
 ---
 id: attributes
-title: Device Attributes
-sidebar_label: Device Attributes
+title: Device attributes
+sidebar_label: Device attributes
 slug: /api/master/attributes
 ---
 
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-The master API can be used to `READ` and `WRITE` objects from Group 0. Attribute values, including attribute lists (g0v255s),
-are passed to the [ReadHandler](read_handler) when they are received from the outstation.
+Attributes identify the device (vendor, model, firmware and configuration versions), report what it supports, and let you
+set names such as its location. The master can read and write them.
 
-## Reading Attributes
+## Reading attributes
 
-Read attributes by adding one or more attribute variations to a request, each with its set (0 for the default set).
+Read attributes with a [one-time read](./association_polls.mdx#one-time-reads) whose request names one or more attribute
+variations, each with its set (0 for the default set). The example reads all the attributes in the default set.
 
 <Tabs
 groupId="language"
@@ -62,13 +63,29 @@ values={[
 </TabItem>
 </Tabs>
 
-## Writing Attributes
+## Receiving attributes
 
-Attributes can be written one at a time or in batches by constructing a request header and sending it to the outstation. The Rust
+The [ReadHandler](./read_handler.mdx) receives the attributes the outstation returns, including the list of the attributes
+it supports. The Rust trait uses a single method and passes an enum representing the various types of values. The bindings
+use a distinct method for each type of value, i.e. one for strings, another for unsigned integers, etc.
+
+All of the callbacks tell you whether the attribute is from the default set defined by DNP.org (set 0) or a privately
+defined set, and identify the attributes of the default set for you. You only have to match variation numbers yourself for
+attributes from a private set.
+
+:::tip
+The default set includes a number of attributes that report whether the device supports a feature, such as analog input
+events or binary input events. The library delivers these as booleans instead of the raw integers.
+:::
+
+## Writing attributes
+
+Attributes can be written one at a time or in batches by adding them to a request and sending it to the outstation with the
+[generic request](./association_other.mdx) and the `WRITE` function code. The Rust
 API uses a single method to add any type of attribute to the request. The bindings can only write visible string and unsigned integer
 attributes, using a separate method for each type.
 
-The example below demonstrates how to write g0v245 (User-assigned location) to the outstation which is a visible string.
+The example below writes the user-assigned location, a visible string, to the outstation.
 
 <Tabs
 groupId="language"

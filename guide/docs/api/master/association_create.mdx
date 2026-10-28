@@ -1,6 +1,6 @@
 ---
 id: assoc_create
-title: Creating Associations
+title: Creating associations
 sidebar_label: Creating
 slug: /api/master/association/create
 ---
@@ -8,7 +8,16 @@ slug: /api/master/association/create
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-Create associations on a `MasterChannel` by specifying configuration and callback interfaces.
+An association is how the master talks to one outstation on a channel. Add one to a `MasterChannel` with
+`addAssociation` (`add_association` in Rust), and supply:
+
+| What you supply | What it does |
+|-----------------|--------------|
+| Outstation address | Which outstation on the channel the association talks to |
+| [AssociationConfig](./association_config.mdx) | The startup sequence, time synchronization, how the master reacts to the outstation, and timeouts |
+| [ReadHandler](./read_handler.mdx) | Receives every value the outstation reports |
+| [AssociationHandler](./association_handler.mdx) | Supplies the time for time synchronization |
+| [AssociationInformation](./association_information.mdx) | Reports the start and outcome of each task |
 
 <Tabs
 groupId="language"
@@ -25,12 +34,6 @@ values={[
 ```rust
 {{#include ../examples/master/src/main.rs:association_create}}
 ```
-
-:::note
-The Rust API and the binding APIs handle associations in two different ways:
-* Bindings return an association token to use on the channel. 
-* Rust API returns an object that has its own methods for performing operations on the association.
-:::
 
 </TabItem>
 <TabItem value="C">
@@ -64,70 +67,13 @@ The Rust API and the binding APIs handle associations in two different ways:
 </TabItem>
 </Tabs>
 
-The returned `AssociationId` is just a token. It's required for operations on a particular outstation, but you don't need to keep a reference unless you need it later. Garbage collecting the `AssociationId` won't remove the association from the channel.
+Each outstation address can be used once per channel: the master rejects a second association with the same address.
+
+On a UDP channel, use `addUdpAssociation` (`add_udp_association` in Rust), which also takes the outstation's endpoint;
+see [UDP](./udp.mdx).
 
 ## Removing
 
-Remove associations from a channel by calling `MasterChannel.removeAssociation` and passing in the `AssociationId`. Doing so will stop all operations for that association.
-
-## UDP
-
-A UDP channel isn't connected to one outstation, so each association on it also needs the outstation's address and port.
-Create the channel with the local address and port it listens on, then add each association with its remote endpoint:
-
-<Tabs
-groupId="language"
-defaultValue="Rust"
-values={[
-{label: 'Rust', value: 'Rust'},
-{label: 'C', value: 'C'},
-{label: 'C++', value: 'C++'},
-{label: 'Java', value: 'Java'},
-{label: 'C#', value: 'C#'},
-]}>
-<TabItem value="Rust">
-
-```rust
-{{#include ../examples/master/src/main.rs:create_udp_channel}}
-
-{{#include ../examples/master/src/main.rs:association_create_udp}}
-```
-
-</TabItem>
-<TabItem value="C">
-
-```c
-{{#include ../ffi/bindings/c/master_example.c:create_udp_channel}}
-
-{{#include ../ffi/bindings/c/master_example.c:association_create_udp}}
-```
-
-</TabItem>
-<TabItem value="C++">
-
-```cpp
-{{#include ../ffi/bindings/c/master_example.cpp:create_udp_channel}}
-
-{{#include ../ffi/bindings/c/master_example.cpp:association_create_udp}}
-```
-
-</TabItem>
-<TabItem value="Java">
-
-```java
-{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterExample.java:create_udp_channel}}
-
-{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterExample.java:association_create_udp}}
-```
-
-</TabItem>
-<TabItem value="C#">
-
-```csharp
-{{#include ../ffi/bindings/dotnet/examples/master/Program.cs:create_udp_channel}}
-
-{{#include ../ffi/bindings/dotnet/examples/master/Program.cs:association_create_udp}}
-```
-
-</TabItem>
-</Tabs>
+An association stays on the channel until you remove it, even if you discard what `addAssociation` returned. Remove it
+with `removeAssociation` on the `MasterChannel` (in Rust, `remove` on the association or `remove_association` on the
+channel). This stops its polls and automatic tasks, and any of its requests still waiting in the queue fail.

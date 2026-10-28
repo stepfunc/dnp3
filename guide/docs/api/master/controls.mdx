@@ -1,6 +1,6 @@
 ---
 id: assoc_controls
-title: Executing Controls
+title: Executing controls
 sidebar_label: Controls
 slug: /api/master/association/controls
 ---
@@ -10,6 +10,17 @@ import TabItem from '@theme/TabItem';
 
 Construct sequences of binary and analog output headers using a builder class, then send them to a particular outstation using the association id.
 
+## Choosing a mode
+
+`operate` sends the commands in one of two modes, and `operate_no_ack` sends them without asking for a response:
+
+| Mode | Exchanges | Why |
+|------|-----------|-----|
+| Select before operate | 2 | The outstation confirms it will accept exactly this command before it acts. Use it for most breaker and switch controls. |
+| Direct operate | 1 | Speed matters and a mis-operation is tolerable. |
+| [Direct operate without acknowledgement](#direct-operate-without-acknowledgement) | No response | Broadcast-style setpoints, where no response is acceptable. |
+
+## Operate
 
 <Tabs
 groupId="language"
@@ -56,7 +67,6 @@ values={[
 <TabItem value="C#">
 
 ```csharp
-
 {{#include ../ffi/bindings/dotnet/examples/master/Program.cs:assoc_control}}
 ```
 
@@ -65,10 +75,16 @@ values={[
 
 Calling `operate` begins an asynchronous operation that will complete successfully or with an error code.
 
-The request will only succeed if the outstation returns `CommandStatus.Success` for each of the requested controls.
+The master checks that the outstation echoed each command. Success means the outstation accepted it, not that the output
+changed; watch the output status points for that.
 
-Consult the language-specific documentation for the meaning of each error code.
-## Direct Operate Without Acknowledgement
+The operation fails if the outstation returns a status other than `CommandStatus::Success` for any of the commands. In Rust
+the error is `CommandError::Response(CommandResponseError::BadStatus(status))`, carrying the status of the first command
+that failed, and the other `CommandResponseError` values report a response that doesn't echo the request. The bindings
+report `BadStatus` without the status, and `HeaderMismatch` for a response that doesn't echo the request. Consult the
+language-specific documentation for the meaning of each error code.
+
+## Direct operate without acknowledgement
 
 `operate_no_ack` sends the commands using `DIRECT_OPERATE_NO_ACK`. The outstation never responds to this function code, not even to report an error.
 

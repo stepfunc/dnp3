@@ -1,0 +1,219 @@
+---
+id: tcp_server
+title: TCP server
+sidebar_label: TCP server
+slug: /api/master/tcp_server
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+Some outstations, such as devices on cellular modems or behind NAT, connect to the master instead of waiting for it to
+connect. A master TCP server accepts these connections and gives you a `MasterChannel` for each one. Your
+`ConnectionHandler` decides which connections to accept and sets up each channel:
+
+| Callback | Called when | What your code does |
+|----------|-------------|---------------------|
+| [`accept`](#accepting-connections) | An outstation connects | Accepts or rejects it by remote address, or asks to identify it first |
+| [`acceptWithLinkId`](#identifying-the-outstation) | The outstation's first link frame arrives | Accepts or rejects it by source and destination address |
+| [`start`, `startWithLinkId`](#starting-the-channel) | The channel is created | Adds an association and enables the channel |
+
+In Rust, `acceptWithLinkId` is named `accept_link_id`.
+
+## Creating the server
+
+Create the server with the local address to listen on, a `LinkIdConfig` and your `ConnectionHandler`. Creating it fails
+if the address can't be bound, for example because another process is listening on it.
+
+<Tabs
+groupId="language"
+defaultValue="Rust"
+values={[
+{label: 'Rust', value: 'Rust'},
+{label: 'C', value: 'C'},
+{label: 'C++', value: 'C++'},
+{label: 'Java', value: 'Java'},
+{label: 'C#', value: 'C#'},
+]}>
+<TabItem value="Rust">
+
+```rust
+{{#include ../examples/master_tcp_server/src/main.rs:create_master_tcp_server}}
+```
+
+</TabItem>
+<TabItem value="C">
+
+```c
+// There's no C example yet: call dnp3_create_master_tcp_server() with a dnp3_connection_handler_t
+```
+
+</TabItem>
+<TabItem value="C++">
+
+```cpp
+// There's no C++ example yet: call dnp3::MasterServer::create_tcp_server() with a dnp3::ConnectionHandler
+```
+
+</TabItem>
+<TabItem value="Java">
+
+The example also starts the thread that sets up each channel, as [explained below](#starting-the-channel).
+
+```java
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterTcpServerExample.java:create_master_tcp_server}}
+```
+
+</TabItem>
+<TabItem value="C#">
+
+```csharp
+// There's no C# example yet: call MasterServer.CreateTcpServer() with an IConnectionHandler
+```
+
+</TabItem>
+</Tabs>
+
+## Accepting connections
+
+The server calls `accept` with the remote address of each new connection. Your code can:
+
+* accept it, with a [`LinkErrorMode`](./channel_config.mdx#link-errors) and a [channel configuration](./channel_config.mdx).
+  The server then calls `start`.
+* ask the server to [identify the outstation](#identifying-the-outstation) first.
+* reject it, and the server closes the connection.
+
+In the bindings, `accept` receives an `AcceptHandler`: call its `accept(..)` or `getLinkIdentity()` method, or neither to
+reject the connection. In Rust, `accept` returns an `AcceptAction`, or `Err(Reject)`.
+
+Accepting by remote address works when each outstation connects from an address you know in advance.
+
+## Identifying the outstation
+
+Outstations on cellular networks or behind NAT often don't have a fixed or unique address. Instead, the server can wait
+for the outstation's first link frame, usually an unsolicited response, and call `acceptWithLinkId` with its source and
+destination. The source is the outstation's DNP3 address, and the destination is the master address the outstation
+expects, which you can use as the channel's master address.
+
+You accept or reject the connection the same way, and the server then calls `startWithLinkId`. The frame isn't lost: the
+new channel processes it. `LinkIdConfig` sets how long the server waits for the frame, after which it closes the
+connection, and how many connections can wait at once.
+
+<Tabs
+groupId="language"
+defaultValue="Rust"
+values={[
+{label: 'Rust', value: 'Rust'},
+{label: 'C', value: 'C'},
+{label: 'C++', value: 'C++'},
+{label: 'Java', value: 'Java'},
+{label: 'C#', value: 'C#'},
+]}>
+<TabItem value="Rust">
+
+```rust
+{{#include ../examples/master_tcp_server/src/main.rs:connection_handler}}
+```
+
+</TabItem>
+<TabItem value="C">
+
+```c
+// There's no C example yet: implement the callbacks of dnp3_connection_handler_t
+```
+
+</TabItem>
+<TabItem value="C++">
+
+```cpp
+// There's no C++ example yet: implement dnp3::ConnectionHandler
+```
+
+</TabItem>
+<TabItem value="Java">
+
+```java
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterTcpServerExample.java:connection_handler}}
+```
+
+</TabItem>
+<TabItem value="C#">
+
+```csharp
+// There's no C# example yet: implement IConnectionHandler
+```
+
+</TabItem>
+</Tabs>
+
+## Starting the channel
+
+`start` and `startWithLinkId` hand you the new `MasterChannel`. Like any channel, it doesn't communicate until it's
+enabled: [add an association](./association_create.mdx) for the outstation, then call `enable`.
+
+In Rust, these callbacks are async, so you can do this directly in them. In the bindings, adding an association and
+enabling a channel [can't be called from a callback](../runtime.mdx#callbacks), so pass the channel to another thread.
+The Java example puts it on a queue that a starter thread reads.
+
+The server waits for each callback to return before it handles the next connection, so return quickly. If the Java
+example's queue is full, its callback shuts the channel down rather than wait.
+
+<Tabs
+groupId="language"
+defaultValue="Rust"
+values={[
+{label: 'Rust', value: 'Rust'},
+{label: 'C', value: 'C'},
+{label: 'C++', value: 'C++'},
+{label: 'Java', value: 'Java'},
+{label: 'C#', value: 'C#'},
+]}>
+<TabItem value="Rust">
+
+```rust
+{{#include ../examples/master_tcp_server/src/main.rs:start_channel}}
+```
+
+</TabItem>
+<TabItem value="C">
+
+```c
+// There's no C example yet: call dnp3_master_channel_add_association() and dnp3_master_channel_enable() from another thread
+```
+
+</TabItem>
+<TabItem value="C++">
+
+```cpp
+// There's no C++ example yet: call MasterChannel::add_association() and MasterChannel::enable() from another thread
+```
+
+</TabItem>
+<TabItem value="Java">
+
+```java
+{{#include ../ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples/MasterTcpServerExample.java:start_channel}}
+```
+
+</TabItem>
+<TabItem value="C#">
+
+```csharp
+// There's no C# example yet: call MasterChannel.AddAssociation() and MasterChannel.Enable() from another thread
+```
+
+</TabItem>
+</Tabs>
+
+Keep the channel for as long as you want to talk to the outstation. In Rust, dropping the `MasterChannel` and its
+`AssociationHandle`s ends the session; in the bindings, shut the channel down when you're done with it.
+
+The server doesn't track the channels it has created. When an outstation reconnects, it gets a new channel, so shut down
+the old one. Both examples keep their channels in a map keyed by the outstation's address and replace the old entry.
+
+## Shutting down
+
+In Rust, dropping the `ServerHandle` stops the server. In the bindings, shut down the `MasterServer`: `close()` in Java,
+`Dispose()` in C#, its destructor in C++, or `dnp3_master_server_destroy()` in C.
+
+The server then stops accepting connections. Channels it has already created keep running until you shut them down.

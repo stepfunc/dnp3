@@ -1,15 +1,28 @@
 ---
 id: outstation_info
-title: OutstationInformation Interface
+title: OutstationInformation interface
 sidebar_label: OutstationInformation
 slug: /api/outstation/information
 ---
 
-import Tabs from '@theme/Tabs';
-import TabItem from '@theme/TabItem';
+`OutstationInformation` tells your application what the outstation's session with the master is doing. The outstation
+doesn't need anything back from it, and every callback does nothing by default, so implement only the ones you want. In .NET, implement them all
+and leave the ones you don't need empty.
 
-The `OutstationInformation` interface delivers informational callbacks about the state of the outstation. While these callbacks don't provide any information that the outstation needs to operate, they can be used to assess communication health or other optional use cases. Examples include:
+It's how a device can see its own communications: whether a master is talking to it, and whether that master confirms
+what it's sent. That's useful for a "master active" indicator on a front panel or HMI, for communication statistics, and
+for diagnosing a master that reads events but never confirms them.
 
-* The outstation receives a request using a particular function code
-* A solicited or unsolicited confirmation timeout occurs
-* A confirmation arrives after the timeout or in the wrong state
+| What happens | Callbacks | Use it to |
+|--------------|-----------|-----------|
+| The master sends a request | `processRequestFromIdle`<br/>`broadcastReceived` | Know when the master last talked to the outstation, and see broadcast requests |
+| The outstation waits for the master to confirm a response | `enterSolicitedConfirmWait`<br/>`solicitedConfirmReceived`<br/>`solicitedConfirmTimeout`<br/>`solicitedConfirmWaitNewRequest`<br/>`wrongSolicitedConfirmSeq` | Check that the master confirms the events it reads |
+| The outstation sends an unsolicited response | `enterUnsolicitedConfirmWait`<br/>`unsolicitedConfirmed`<br/>`unsolicitedConfirmTimeout` | Spot a master that doesn't confirm unsolicited responses, which keeps events in the buffer and the outstation retrying |
+| Something else happens | `unexpectedConfirm`<br/>`clearRestartIin` | Count unexpected confirms, and know when the master has seen that the outstation restarted |
+
+:::tip
+For a "master active" indicator, record the time in `processRequestFromIdle`, and show the link as down when no
+request arrives within a few of the master's poll periods.
+:::
+
+The callbacks run on the outstation's session, so keep them quick: record what you need and return.

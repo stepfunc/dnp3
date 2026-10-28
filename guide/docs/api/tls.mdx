@@ -20,14 +20,14 @@ Masters and outstations can use TLS for encryption and authentication. The libra
   to do that for the internet's infrastructure. With the AWS-LC cryptography provider, it already supports post-quantum
   key exchange.
 
-## Secure Authentication?
+## Secure authentication?
 
 DNP3 Secure Authentication v5 has known [design](https://www.cs.dartmouth.edu/~sergey/langsec/papers/crain-bratus-bolt-on-dnp3sa.pdf) [flaws](https://cms-cdn.selinc.com/assets/Literature/Publications/Technical%20Papers/6910_AllAboutEve_CG_20190131_Web2.pdf?v=20191113-212654) and little adoption, and its successors,
 SAv6 and AMP, reinvent what TLS already provides. We explain why in
 [The Case Against DNP3 SAv6 and AMP](https://stepfunc.io/blog/case-against-dnp3-sav6/). We recommend TLS: it's proven,
 audited, and already used with DNP3 in production.
 
-## Supported Features
+## Supported features
 
 - TLS v1.2 and v1.3
 - The cipher suites, key exchange groups, and signature schemes are the rustls defaults for the cryptography provider: [ring](https://crates.io/crates/ring) or [aws-lc-rs](https://crates.io/crates/aws-lc-rs) in Rust, selected by the `tls` or `tls-aws-lc` feature, and aws-lc-rs in the prebuilt bindings on every platform.
@@ -44,7 +44,7 @@ describes each field.
 In the bindings, pass an empty string, not `null`, as the password of a private key that isn't encrypted.
 :::
 
-### Name Validation
+### Name validation
 
 In `AuthorityBased` mode, the name is matched against the certificate's Subject Alternative Name (SAN) entries, ignoring
 case, and wildcards are allowed. An IP address is matched against the SAN's IP entries. If the certificate has no SAN,
@@ -55,7 +55,7 @@ New certificates should always include the SAN extension. Performing name verifi
 is still secure, but it is deprecated for new use cases.
 :::
 
-### Private Key Encryption
+### Private key encryption
 
 Private keys are PEM files in PKCS#1 or PKCS#8 format. An encrypted key must be PKCS#8
 (`BEGIN ENCRYPTED PRIVATE KEY`) using scrypt or PBKDF2 with AES-CBC. Legacy SHA-1 and DES/3DES encryption isn't
@@ -66,16 +66,17 @@ Encrypting private keys for use with TLS rarely addresses a meaningful threat mo
 is equivalent to locking your doors and leaving the key under the doormat.
 :::
 
-### Certificate Mode
+### Certificate mode
 
 The `certificate_mode` parameter determines how the presented peer certificate
 is validated.
 
-#### Authority-based
+### Authority-based
 
 The default `AuthorityBased` mode uses the default `rustls` implementation to check the presented chain of certificates
 and verify that the root certificate of the chain is one of those provided in the `peer_cert_path` file.
-#### Self-Signed
+
+### Self-signed
 
 The `SelfSigned` mode validates that:
 
@@ -83,40 +84,69 @@ The `SelfSigned` mode validates that:
 * It is a byte-for-byte match of the one specified in `peer_cert_path`
 * `NotBefore` and `NotAfter` time fields are valid for the current time
 
-### Generating Certificates
+### Generating certificates
 
 The following OpenSSL commands are provided for testing purposes only. Real systems will use some kind of specialized CA software for certificate procurement.
 
-#### Full CA chain
+### Full CA chain
 
 - Generate the root CA certificate:
-```
-openssl req -x509 -newkey rsa:4096 -keyout ./ca_key.pem -out ./ca_cert.pem -subj "/C=US/ST=Oregon/L=Bend/O=Test/CN=DO NOT USE" -nodes -days 3650
-```
+
+  ```bash
+  openssl req \
+    -x509 -newkey rsa:4096 -keyout ./ca_key.pem -out ./ca_cert.pem \
+    -subj "/C=US/ST=Oregon/L=Bend/O=Test/CN=DO NOT USE" -nodes -days 3650
+  ```
 - Generate the master CSR:
-```
-openssl req -new -newkey rsa:4096 -keyout ./master_key.pem -out ./master_csr.pem -subj "/C=US/ST=Oregon/L=Bend/O=Test/CN=DO NOT USE" -addext "subjectAltName=DNS:test.com" -nodes -days 365
-```
+
+  ```bash
+  openssl req \
+    -new -newkey rsa:4096 -keyout ./master_key.pem -out ./master_csr.pem \
+    -subj "/C=US/ST=Oregon/L=Bend/O=Test/CN=DO NOT USE" \
+    -addext "subjectAltName=DNS:test.com" -nodes -days 365
+  ```
 - Generate the master certificate:
-```
-openssl x509 -req -days 365 -in ./master_csr.pem -extfile <(printf "subjectAltName=DNS:test.com") -CA ./ca_cert.pem -CAkey ./ca_key.pem -set_serial 1 -out ./master_cert.pem -sha256
-```
+
+  ```bash
+  openssl x509 \
+    -req -days 365 -in ./master_csr.pem \
+    -extfile <(printf "subjectAltName=DNS:test.com") -CA ./ca_cert.pem \
+    -CAkey ./ca_key.pem -set_serial 1 -out ./master_cert.pem -sha256
+  ```
 - Generate the outstation CSR:
-```
-openssl req -new -newkey rsa:4096 -keyout ./outstation_key.pem -out ./outstation_csr.pem -subj "/C=US/ST=Oregon/L=Bend/O=Test/CN=DO NOT USE" -addext "subjectAltName=DNS:test.com" -nodes -days 365
-```
-- Generate the outstation certificate:
-```
-openssl x509 -req -days 365 -in ./outstation_csr.pem -extfile <(printf "subjectAltName=DNS:test.com") -CA ./ca_cert.pem -CAkey ./ca_key.pem -set_serial 2 -out ./outstation_cert.pem -sha256
-```
 
-#### Self-signed certificate
+  ```bash
+  openssl req \
+    -new -newkey rsa:4096 -keyout ./outstation_key.pem \
+    -out ./outstation_csr.pem \
+    -subj "/C=US/ST=Oregon/L=Bend/O=Test/CN=DO NOT USE" \
+    -addext "subjectAltName=DNS:test.com" -nodes -days 365
+  ```
+- Generate the outstation certificate:
+
+  ```bash
+  openssl x509 \
+    -req -days 365 -in ./outstation_csr.pem \
+    -extfile <(printf "subjectAltName=DNS:test.com") -CA ./ca_cert.pem \
+    -CAkey ./ca_key.pem -set_serial 2 -out ./outstation_cert.pem -sha256
+  ```
+
+### Self-signed certificate
 
 - Generate the master certificate:
-```
-openssl req -x509 -newkey rsa:4096 -keyout ./master_key.pem -out ./master_cert.pem -subj "/C=US/ST=Oregon/L=Bend/O=Test/CN=DO NOT USE" -addext "subjectAltName=DNS:test.com" -nodes -days 365
-```
+
+  ```bash
+  openssl req \
+    -x509 -newkey rsa:4096 -keyout ./master_key.pem -out ./master_cert.pem \
+    -subj "/C=US/ST=Oregon/L=Bend/O=Test/CN=DO NOT USE" \
+    -addext "subjectAltName=DNS:test.com" -nodes -days 365
+  ```
 - Generate the outstation certificate:
-```
-openssl req -x509 -newkey rsa:4096 -keyout ./outstation_key.pem -out ./outstation_cert.pem -subj "/C=US/ST=Oregon/L=Bend/O=Test/CN=DO NOT USE" -addext "subjectAltName=DNS:test.com" -nodes -days 365
-```
+
+  ```bash
+  openssl req \
+    -x509 -newkey rsa:4096 -keyout ./outstation_key.pem \
+    -out ./outstation_cert.pem \
+    -subj "/C=US/ST=Oregon/L=Bend/O=Test/CN=DO NOT USE" \
+    -addext "subjectAltName=DNS:test.com" -nodes -days 365
+  ```

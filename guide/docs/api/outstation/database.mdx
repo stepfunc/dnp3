@@ -24,7 +24,7 @@ Access the database in a transaction two ways:
 Structure any common update code to operate on the `Database` type and not depend on `Outstation` or `DatabaseHandle`.
 :::
 
-## Adding Points
+## Adding points
 
 Initialize points before the outstation exposes measurement data. This is typically done at creation, but you can add points to a running outstation. Each measurement type has unique configuration:
 
@@ -43,9 +43,7 @@ See the documentation for each variation to understand its data.
 A new point starts with a default value, such as 0 or false, and the `RESTART` flag. Update it after adding it if a
 connecting master shouldn't see `RESTART`.
 
-:::tip
 Point indices don't need to be contiguous.
-:::
 
 <Tabs
 groupId="language"
@@ -103,7 +101,7 @@ values={[
 </TabItem>
 </Tabs>
 
-## Updating Points
+## Updating points
 
 You can update a point value in a new transaction or in the same transaction you used to initialize it. This is useful if the outstation
 has local access to values at startup, such as via a local ADC. When initializing point values, it is recommended to use the
@@ -121,15 +119,15 @@ The `UpdateOptions` struct lets you precisely control how a point update is proc
 Use the UpdateOptions to ignore event creation during startup initialization if you don't want to create events for the initial values.
 :::
 
-## Getting Point Values
+## Getting point values
 
 Some applications may wish to use the `Database` as a cache of the most recent value. Each type has a getter method to retrieve the most recently assigned value.
 
 :::note
-Since the point may not be defined, the getters can fail. If you try to retrieve a point that doesn't exist using C++, Java, or C#, an exception will be thrown.
+Since the point may not be defined, the getters can fail. If you try to retrieve a point that doesn't exist using C++, Java, or .NET, an exception will be thrown.
 :::
 
-## Removing Points
+## Removing points
 
 Most applications don't need to remove points, but the option is there in case you want to remove points from a running outstation. There is a type-specific function for removing every point type given its index.
 
@@ -138,7 +136,7 @@ Removing a point stops the outstation from reporting static data for it. However
 until they are reported and cleared by confirmation.
 :::
 
-## Defining Device Attributes
+## Defining device attributes
 
 Specific attributes from Group 0 may be defined using the database. As you can see in the examples above, this should typically be done during database initialization. Rust
 uses a single method for defining attributes whereas the bindings have different methods for each type of attribute. Only attributes that are defined as writable are eligible

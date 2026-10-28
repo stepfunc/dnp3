@@ -8,7 +8,22 @@ slug: /api/master/association_information
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-The `AssociationInformation` interface is a set of informational callbacks useful to assess the health of the connection.
+`AssociationInformation` tells you what the master does with an outstation: every task it runs, whether yours or
+[automatic](./scheduling.mdx), and every unsolicited response it receives. Use it for alarms and metrics. A failing
+automatic task, such as a rejected enable-unsolicited, shows up here before anywhere else.
+
+| Callback | Called when |
+|----------|-------------|
+| `taskStart` | The master starts a task. It receives the task type, function code and sequence number |
+| `taskSuccess` | A task completes successfully |
+| `taskFail` | A task fails. It receives the reason |
+| `unsolicitedResponse` | The master processes an unsolicited response, or receives a repeat of the last one |
+
+Keep-alives and link status checks aren't reported, and neither is a request that fails before it starts, for example
+because the channel isn't connected: only its caller sees that error.
+
+A successful file read task doesn't mean that the transfer succeeded. The [FileReader](./file_transfer.mdx) is the source
+of truth for the transfer.
 
 <Tabs
 groupId="language"
@@ -27,7 +42,7 @@ values={[
 ```
 
 :::note
-Rust's 'AssociationInformation' trait has a default void implementation of all callbacks.
+In Rust, every `AssociationInformation` callback does nothing by default, so you implement only the ones you need.
 :::
 
 </TabItem>
@@ -60,4 +75,3 @@ Rust's 'AssociationInformation' trait has a default void implementation of all c
 
 </TabItem>
 </Tabs>
-

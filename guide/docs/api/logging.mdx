@@ -85,14 +85,14 @@ The bindings use the [tracing_subscriber](https://crates.io/crates/tracing-subsc
 use.
 :::
 
-## Example Output
+## Example output
 
 Logs include contextual metadata so you can:
 
 * Determine which communication session produced the message
 * Understand what state the software was in when the event occurred
 
-```
+```text
 INFO dnp3-master-tcp-client{endpoint="127.0.0.1:20000"}: connected to 127.0.0.1:20000
 INFO dnp3-master-tcp-client{endpoint="127.0.0.1:20000"}:task{type=Function(DisableUnsolicited) dest=1024}: APP TX - ctrl: [fir: true fin: true con: false uns: false seq: 0] func: DisableUnsolicited ... (len = 9)
 INFO dnp3-master-tcp-client{endpoint="127.0.0.1:20000"}:task{type=Function(DisableUnsolicited) dest=1024}: APP RX - ctrl: [fir: true fin: true con: true uns: true seq: 0] func: UnsolicitedResponse iin1: [DEVICE_RESTART] iin2: [] ... (len = 0)
@@ -101,7 +101,7 @@ INFO dnp3-master-tcp-client{endpoint="127.0.0.1:20000"}:task{type=Function(Disab
 INFO dnp3-master-tcp-client{endpoint="127.0.0.1:20000"}:task{type=Function(DisableUnsolicited) dest=1024}: APP RX - ctrl: [fir: true fin: true con: false uns: false seq: 0] func: Response iin1: [DEVICE_RESTART] iin2: [] ... (len = 0)
 ```
 
-## Protocol Decoding
+## Protocol decoding
 
 Configure protocol decoding per communication channel (TCP socket, serial port, etc.) by setting `DecodeLevel` when creating a master or outstation, or adjust it at runtime. This controls decoding for each layer of the protocol stack:
 
@@ -112,15 +112,13 @@ Configure protocol decoding per communication channel (TCP socket, serial port, 
 
 See the language-specific API documentation for enumeration values. Decoding can show individual field values within objects:
 
-```
+```text
 APP TX - ctrl: [fir: true fin: true con: false uns: false seq: 1] func: Write ... (len = 6)
 g80v1 : Internal Indications - Packed format - 1-byte start/stop - [7, 7]
 index: 7 false
 ```
 
-:::note
 Protocol decoding is always output at the *Info* log level. If left enabled, it can be too verbose in a production system. When you're debugging a communication issue, try adjusting the application-layer decoding first to gain visibility into the messages exchanged.
-:::
 
 :::caution
 Application-layer object value decoding redacts the passwords and authentication keys used in file transfer. The transport, link,

@@ -25,12 +25,13 @@ Minor releases are for introducing new functionality in a (mostly) backwards com
 - Rust - API compatible per `semver`
 - C & C++ - API compatible
 - Java - API compatible
-- C# - API compatible with the exception that we may add new methods to interfaces that need to be stubbed out
+- .NET - API compatible with the exception that we may add new methods to interfaces that need to be stubbed out
 
-:::note Why is C# different?
+:::note Why is .NET different?
 C++, Java, Rust, and even C (via NULL) support a way of defining default methods on interfaces. This allows us to extend
-interfaces in minor releases without breaking source compatibility in these languages. Default interfaces were added to
-C# 8.0; however, to target .NET standard 2.0 (which is both .NET Core and .NET Framework compatible) we can only use C# 7.
+interfaces in minor releases without breaking source compatibility in these languages. .NET needs .NET Standard 2.1 for
+default interface methods, which .NET Framework doesn't support, so the bindings target .NET Standard 2.0 and can't use
+them. Version 2.0 will target .NET Standard 2.1 and drop .NET Framework, which removes this exception.
 :::
 
 ### Patch

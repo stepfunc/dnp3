@@ -8,16 +8,19 @@ slug: /api/runtime
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-The library runs on the [Tokio](https://tokio.rs/) asynchronous runtime: a pool of worker threads that runs every master
-and outstation session and calls your callbacks. You create one `Runtime` and share it across sessions.
+The library runs on [Tokio](https://tokio.rs/), the state-of-the-art asynchronous runtime behind much of Rust's
+networking software. Its work-stealing scheduler runs thousands of lightweight tasks on a small pool of threads, and its
+I/O uses each operating system's most efficient mechanism. Every master channel and outstation session is one of those
+tasks, so a single runtime scales from one session to thousands without a thread per connection.
+
+One `Runtime` runs any mix of masters and outstations. A protocol gateway, for example, can poll its field devices as a
+master and serve its control center as an outstation, all on the same runtime.
 
 ## Lifetime
 
 Create a `Runtime` before any communication can take place. It's a shared resource for multiple sessions, typically created just after initializing logging and shut down last when exiting.
 
-:::note
 Rust users can share the runtime with other libraries that also use Tokio. The bindings don't support sharing a runtime.
-:::
 
 ## Examples
 
@@ -72,9 +75,7 @@ values={[
 </TabItem>
 </Tabs>
 
-:::tip
 Set the number of runtime threads to `0` to default to the number of system cores. This provides a safe default that will lead to good multi-core utilization.
-:::
 
 ## Callbacks
 
@@ -90,11 +91,7 @@ Binding methods that wait for the runtime to complete an operation, such as enab
 outstation's decode level, can't be called from within a callback. They fail with the `RUNTIME_CANNOT_BLOCK_WITHIN_ASYNC` parameter error.
 :::
 
-
-
-:::tip
 If you have a case where some blocking is unavoidable, set the number of worker threads to a multiple of the number of system cores, such as 2x or 3x.
-:::
 
 ## Shutdown
 
@@ -108,11 +105,11 @@ that permanently blocks, `shutdown` will cause a deadlock.
 
 If you cannot ensure a clean shutdown, use `Runtime.set_shutdown_timeout(..)` to set an upper time limit. Call this method immediately after creating the Runtime.
 
-**Shutting down the runtime using a timeout can leak memory as worker threads that haven't stopped when the timeout occurs are left running. Only
-use this method if you are exiting the process anyway.**
+**Shutting down the runtime using a timeout can leak memory** as worker threads that haven't stopped when the timeout occurs are left running. Only
+use this method if you are exiting the process anyway.
 :::
 
-### Examples
+### Shutdown examples
 
 <Tabs
 groupId="language"
@@ -126,9 +123,7 @@ values={[
 ]}>
 <TabItem value="Rust">
 
-:::note
 Runtime shutdown is implicit in Rust when tokio::main returns.
-:::
 
 </TabItem>
 <TabItem value="C">
@@ -140,9 +135,7 @@ Runtime shutdown is implicit in Rust when tokio::main returns.
 </TabItem>
 <TabItem value="C++">
 
-:::note
 Runtime shutdown is implicit when the runtime object gets destroyed.
-:::
 
 </TabItem>
 <TabItem value="Java">

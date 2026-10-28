@@ -8,14 +8,21 @@ slug: /api/master/association/config
 import Tabs from '@theme/Tabs';
 import TabItem from '@theme/TabItem';
 
-`AssociationConfig` configures communication with a particular outstation:
+`AssociationConfig` sets how the master works with one outstation. The outstation's address isn't part of it: you pass
+the address separately when you [create the association](./association_create.mdx). The configuration answers these
+questions:
 
-* Timeout for responses on this association
-* Startup handshaking
-* If and how to perform time synchronization
-* Per-association task queue size
+| Decision | Why it matters |
+|----------|----------------|
+| What to read at [startup](#initialization) | The integrity poll gives you the current value of every point, at startup and after the outstation restarts |
+| Whether the outstation reports unsolicited | Which event classes the master turns off and back on at startup. Choose none for an outstation that doesn't report unsolicited, and poll it instead |
+| Whether and how to synchronize time | Whether the master sets the outstation's clock when it asks for the time, and with which procedure. See [Time Synchronization](./association_handler.mdx) |
+| How to react to the outstation's indications | Which event classes the master scans when the outstation reports events, and whether it runs an integrity poll when the outstation's event buffer overflows |
+| How long to wait, and how to retry | How long the master waits for each response, and how it [retries automatic tasks](./scheduling.mdx#when-something-fails) that fail |
+| When to check a quiet link | How long the link can be silent before the master sends a keep-alive, if at all |
+| How many requests can wait | How many of your requests can queue on the association before new ones fail at once |
 
-The outstation address is provided as a separate argument when adding an association to a channel.
+The examples configure an association like this:
 
 <Tabs
 groupId="language"
@@ -66,23 +73,26 @@ values={[
 
 ## Initialization
 
-The DNP3 standard requires that the master perform these actions during initialization before normal polling can occur:
+The master turns unsolicited reporting off, reads everything with an integrity poll, then turns unsolicited reporting back
+on. That way it starts from the current value of every point before changes stream in. If the outstation asks for the time
+and automatic time synchronization is configured, the master synchronizes it before the integrity poll:
 
 ```mermaid
 sequenceDiagram
-    Master->>Outstation: Disable Unsolicited Reporting;
-    Outstation->>Master: Response;
-    opt outstation requests time and automatic time sync is enabled
-        Master->>Outstation: Time synchronization;
-        Outstation->>Master: Response;
+    Master->>Outstation: Disable unsolicited reporting
+    Outstation->>Master: Response
+    opt outstation asks for the time and automatic time sync is configured
+        Master->>Outstation: Time synchronization
+        Outstation->>Master: Response
     end
-    Master->>Outstation: READ Class 1,2,3,0;
-    Note over Master,Outstation: multiple responses/ACK possible here;
-    Master->>Outstation: Enable Unsolicited Reporting;
-    Outstation->>Master: Response;
+    Master->>Outstation: Integrity poll
+    Note over Master,Outstation: possibly several responses
+    Master->>Outstation: Enable unsolicited reporting
+    Outstation->>Master: Response
 ```
 
-If your outstation doesn't support unsolicited reporting, set `AssociationConfig.DisableUnsolClasses` and `AssociationConfig.EnableUnsolClasses` to `EventClasses.None()`. The master will skip unsolicited configuration and only perform the integrity poll.
+The master skips any step whose classes you leave empty. For an outstation that doesn't support unsolicited reporting, set
+the classes to disable and to enable at startup to none, and the master performs only the integrity poll.
 
 ## Scheduling
 

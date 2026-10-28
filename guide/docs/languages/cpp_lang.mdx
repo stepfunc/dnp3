@@ -28,7 +28,7 @@ C -- compile --> F
 ```
 
 
-## CMake Usage
+## CMake usage
 
 The CMake package script includes a `dnp3_cpp` target that automatically links with the C bindings and builds the C++ wrapper code.
 
@@ -83,7 +83,7 @@ The `next()` advances the iterator and returns `true` if a value is available. T
 `std::logic_error` if the end was reached.
 
 :::warning
-The iterator wrapper does **not** copy and accumulate the values like in C# or Java. Therefore, an iterator should **never** be used outside of the callback.
+The iterator wrapper does **not** copy and accumulate the values like in .NET or Java. Therefore, an iterator should **never** be used outside of the callback.
 Frequently, the iterator points to memory on the stack and will result in undefined behavior if it is used after the callback is complete.
 :::
 
