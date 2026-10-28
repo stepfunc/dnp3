@@ -1,0 +1,15 @@
+# Keeps the commit-pinned actions current. Cargo dependencies are covered by the audit and
+# osv-scanner jobs instead.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    # wait a week after a release before proposing it
+    cooldown:
+      default-days: 7
+    groups:
+      actions:
+        patterns:
+          - "*"
