@@ -23,6 +23,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
+      # release-docs in ci.yml checks that each of these writes its report, since the guide links them
       matrix:
         include:
           - revision: "2.7"

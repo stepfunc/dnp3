@@ -570,6 +570,13 @@ jobs:
       - name: Index the conformance test reports
         working-directory: artifacts/conformance-results
         run: |
+          # the guide links to each report conformance.yml runs, so a missing one fails the release
+          for expected in 2.7/L2 3.1r1/L3; do
+            if [ ! -f "$expected/report.html" ]; then
+              echo "::error::missing conformance report $expected/report.html"
+              exit 1
+            fi
+          done
           {
             echo '<!DOCTYPE html>'
             echo '<html><head><meta charset="utf-8"><title>dnp3 conformance test reports</title></head><body>'
