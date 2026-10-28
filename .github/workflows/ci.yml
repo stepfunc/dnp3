@@ -150,12 +150,12 @@ jobs:
       - name: Install Rust from rust-toolchain.toml
         if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
         run: rustup toolchain install
-      - name: Install cargo-binstall
-        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
-        uses: cargo-bins/cargo-binstall@8a2045612414e945291083f820cd50b4d8fc2218 # v1.26.0
       - name: Install cargo-semver-checks
         if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
-        run: cargo binstall cargo-semver-checks@0.51.0 --no-confirm
+        uses: $/.github/actions/cargo-tool
+        with:
+          crate: cargo-semver-checks
+          version: 0.51.0
       - name: Compare the public API with the base revision
         if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
         uses: obi1kenobi/cargo-semver-checks-action@6b69fcf40e9b5fb17adeb57e4b6ecd020649a239 # v2.9
@@ -816,6 +816,7 @@ jobs:
           cd conformance-results
           zip -r ../release/conformance-results.zip .
       - name: Create GitHub release
+        # zizmor: ignore[superfluous-actions] until this step moves to the gh CLI
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           draft: true

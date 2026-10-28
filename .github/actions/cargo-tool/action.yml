@@ -1,0 +1,31 @@
+name: Install a cargo tool
+description: Builds a tool from crates.io at a pinned version with its lockfile, caching the binary
+inputs:
+  crate:
+    description: The crate, whose binary has the same name
+    required: true
+  version:
+    description: The exact version
+    required: true
+runs:
+  using: composite
+  steps:
+    - name: Name the runner image
+      id: image
+      shell: bash
+      run: echo "image=${ImageOS:-$RUNNER_OS}-$RUNNER_ARCH" >> "$GITHUB_OUTPUT"
+    # The key names the exact version and has no restore-keys, so a hit is always this build. A PR
+    # run saves only to its own ref, which no other run restores from
+    - name: Restore the binary
+      id: cache
+      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cargo/bin/${{ inputs.crate }}
+        key: cargo-tool-${{ inputs.crate }}-${{ inputs.version }}-${{ steps.image.outputs.image }}
+    - name: Build it
+      if: steps.cache.outputs.cache-hit != 'true'
+      shell: bash
+      env:
+        CRATE: ${{ inputs.crate }}
+        VERSION: ${{ inputs.version }}
+      run: cargo install --locked "$CRATE" --version "$VERSION"
