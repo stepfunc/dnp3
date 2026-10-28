@@ -26,16 +26,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Install Rust ${{ matrix.rust }}
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
           toolchain: ${{ matrix.rust }}
           components: rustfmt, clippy
       - name: Cache the build
-        uses: Swatinem/rust-cache@v2
-        with:
-          save-if: ${{ github.event_name == 'pull_request' }}
+        # only PR runs cache, so tag and merge-queue builds never restore one a PR wrote, and this
+        # job builds nothing that ships
+        if: github.event_name == 'pull_request' # zizmor: ignore[cache-poisoning]
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - name: Format
         run: cargo fmt --all -- --check
       - name: Clippy
@@ -59,16 +62,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
           toolchain: stable
           components: clippy
       - name: Cache the build
-        uses: Swatinem/rust-cache@v2
-        with:
-          save-if: ${{ github.event_name == 'pull_request' }}
+        # only PR runs cache, so tag and merge-queue builds never restore one a PR wrote, and this
+        # job builds nothing that ships
+        if: github.event_name == 'pull_request' # zizmor: ignore[cache-poisoning]
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - name: Build the workspace with the features
         run: cargo build --release -p dnp3 -p dnp3-ffi-c -p dnp3-ffi-java ${{ matrix.feature-args }}
       - name: Clippy the core crate and its tests with the features
@@ -78,7 +84,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Read the minimum supported Rust version
         id: msrv
         # a two-part rust-version means the .0 release, so check exactly that toolchain
@@ -87,13 +95,14 @@ jobs:
           if [[ "$version" =~ ^[0-9]+\.[0-9]+$ ]]; then version="$version.0"; fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
       - name: Install Rust ${{ steps.msrv.outputs.version }}
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
           toolchain: ${{ steps.msrv.outputs.version }}
       - name: Cache the build
-        uses: Swatinem/rust-cache@v2
-        with:
-          save-if: ${{ github.event_name == 'pull_request' }}
+        # only PR runs cache, so tag and merge-queue builds never restore one a PR wrote, and this
+        # job builds nothing that ships
+        if: github.event_name == 'pull_request' # zizmor: ignore[cache-poisoning]
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - name: Check the workspace
         run: cargo check --locked --workspace --all-targets
       - name: Check the AWS-LC TLS backend
@@ -109,13 +118,18 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-      - name: Cache the build
-        uses: Swatinem/rust-cache@v2
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
-          save-if: ${{ github.event_name == 'pull_request' }}
+          persist-credentials: false
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+        with:
+          toolchain: stable
+      - name: Cache the build
+        # only PR runs cache, so tag and merge-queue builds never restore one a PR wrote, and this
+        # job builds nothing that ships
+        if: github.event_name == 'pull_request' # zizmor: ignore[cache-poisoning]
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - name: Run Rust unit tests
         run: cargo test --workspace --features dnp3/unstable,dnp3/serialization
       - name: Run the core crate's tests with the AWS-LC TLS backend
@@ -129,12 +143,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
           fetch-depth: 0
       - name: Install Rust
         if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
           toolchain: "1.99"
       - name: Install cargo-binstall
@@ -167,15 +182,18 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
           toolchain: "1.99"
       - name: Cache the build
-        uses: Swatinem/rust-cache@v2
-        with:
-          save-if: ${{ github.event_name == 'pull_request' }}
+        # only PR runs cache, so tag and merge-queue builds never restore one a PR wrote, and this
+        # job builds nothing that ships
+        if: github.event_name == 'pull_request' # zizmor: ignore[cache-poisoning]
+        uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
       - name: Link the parsers, encoders and responses with the no-panic check
         run: cargo test -p dnp3 --lib --release --no-run
         env:
@@ -197,11 +215,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Install Rust ${{ matrix.rust }}
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+        with:
+          toolchain: stable
       - name: Install doxygen 1.9.5
-        run: wget -q https://github.com/stepfunc/ci-files/raw/main/doxygen/doxygen-1.9.5.linux.bin.tar.gz -O- | sudo tar --strip-components=1 -C /usr -xz doxygen-1.9.5
+        run: |
+          wget -q https://github.com/stepfunc/ci-files/raw/2440f58201959ddfd6bca2597b48d3948bb08948/doxygen/doxygen-1.9.5.linux.bin.tar.gz -O doxygen.tar.gz
+          echo "3b46471e7d4c3496e194d95042c7e5f738b93debacd22193aacc3df4dfe66267  doxygen.tar.gz" | sha256sum -c -
+          sudo tar --strip-components=1 -C /usr -xzf doxygen.tar.gz doxygen-1.9.5
+          rm doxygen.tar.gz
       - name: Build FFI and JNI
         run: cargo build --release -p dnp3-ffi-c -p dnp3-ffi-java
       - name: Build Rustdoc
@@ -222,7 +248,7 @@ jobs:
           cp -a ffi/bindings/java/dnp3/target/apidocs ~/doc/java
           rm ffi/bindings/c/generated/logo.png ffi/bindings/c/generated/doxygen-awesome.css
       - name: Upload documentation
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: doc-api
           path: ~/doc
@@ -245,13 +271,15 @@ jobs:
             test: false
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Install NASM
         run: |
           choco install nasm
           echo "C:\Program Files\NASM" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
         with:
           toolchain: stable
           targets: ${{ matrix.target }}
@@ -270,12 +298,12 @@ jobs:
           Copy-Item -Path ./target/${{ matrix.target }}/release/dnp3_ffi.dll.lib -Destination ffi-modules/${{ matrix.target }}
           Copy-Item -Path ./target/${{ matrix.target }}/release/dnp3_ffi_java.dll -Destination ffi-modules/${{ matrix.target }}
       - name: Upload compiled FFI modules
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ffi-modules-${{ matrix.target }}
           path: ffi-modules
       - name: Upload build evidence
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: evidence-${{ matrix.target }}
           path: evidence
@@ -307,9 +335,13 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+        with:
+          toolchain: stable
       - name: Create FFI modules dir
         run: mkdir -p ffi-modules/${{ matrix.target }}
       - name: Build FFI
@@ -321,12 +353,12 @@ jobs:
           cp ./target/${{ matrix.target }}/release/libdnp3_ffi.dylib ./ffi-modules/${{ matrix.target }}
           cp ./target/${{ matrix.target }}/release/libdnp3_ffi_java.dylib ./ffi-modules/${{ matrix.target }}
       - name: Upload compiled FFI modules
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ffi-modules-${{ matrix.target }}
           path: ffi-modules
       - name: Upload build evidence
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: evidence-${{ matrix.target }}
           path: evidence
@@ -362,10 +394,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          persist-credentials: false
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+        with:
+          toolchain: stable
           targets: ${{ matrix.target }}
       - name: Install Rust Cross
         run: cargo install cross --locked --version 0.2.5
@@ -380,24 +415,26 @@ jobs:
           cp ./target/${{ matrix.target }}/release/libdnp3_ffi.so ./ffi-modules/${{ matrix.target }}
           cp ./target/${{ matrix.target }}/release/libdnp3_ffi_java.so ./ffi-modules/${{ matrix.target }}
       - name: Upload compiled FFI modules
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: ffi-modules-${{ matrix.target }}
           path: ffi-modules
       - name: Upload build evidence
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: evidence-${{ matrix.target }}
           path: evidence
   # Run the bindings' smoke tests (C, C++, .NET, Java) against libraries built like the shipped ones
   bindings-test:
-    uses: ./.github/workflows/bindings-test.yml
+    uses: $/.github/workflows/bindings-test.yml
   guide:
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Install dependencies
         working-directory: guide
         run: npm ci
@@ -408,7 +445,7 @@ jobs:
          mkdir -p ~/doc/guide
          mv build/* ~/doc/guide
       - name: Upload guide
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: doc-guide
           path: ~/doc
@@ -419,19 +456,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+        with:
+          toolchain: stable
       - name: Install bom-tools
-        run: cargo install --locked --git https://github.com/stepfunc/bom-tools.git --tag 0.3.0
+        # 0.3.0
+        run: cargo install --locked --git https://github.com/stepfunc/bom-tools.git --rev a5c5797217b26f74f5682c0551daaffa501f7fd6
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Download compiled FFI
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: ffi-modules
           pattern: ffi-modules-*
           merge-multiple: true
       - name: Download build evidence
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: evidence
           pattern: evidence-*
@@ -446,7 +488,7 @@ jobs:
           bom-tools sbom -e evidence/ffi --root-package dnp3-ffi-c $COMMON --lockfile Cargo.lock > sboms/dnp3-ffi.cdx.json
           bom-tools sbom -e evidence/java --root-package dnp3-ffi-java $COMMON --lockfile Cargo.lock > sboms/dnp3-ffi-java.cdx.json
       - name: Upload SBOMs
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: sboms
           path: sboms
@@ -457,29 +499,29 @@ jobs:
       - name: Package Java bindings
         run: cargo run --bin dnp3-bindings -- --java --package ./ffi-modules --options ./packaging.json -f third-party-licenses-java.txt -f sboms/dnp3-ffi-java.cdx.json
       - name: Upload C/C++ bindings
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: c-bindings
           path: ffi/bindings/c/generated/*
       - name: Upload .NET bindings
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dotnet-bindings
           path: ffi/bindings/dotnet/nupkg/dnp3*
       - name: Upload Java bindings
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: java-bindings-jar
           path: ffi/bindings/java/dnp3/target/*.jar
       - name: Upload Java pom.xml
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: java-bindings-pom
           path: ffi/bindings/java/dnp3/pom.xml
   # Run the conformance tests for releases; PRs labeled `conformance` run them through conformance.yml itself
   conformance:
     if: startsWith(github.ref, 'refs/tags/')
-    uses: ./.github/workflows/conformance.yml
+    uses: $/.github/workflows/conformance.yml
   # The one roll-up check: branch protection and the merge queue require it, and the release jobs
   # wait on it. It passes only if every job the event runs passed. Packaging (with the
   # documentation and platform builds it needs) is skipped on a PR's own pushes, and conformance
@@ -514,20 +556,24 @@ jobs:
       id-token: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
+        with:
+          toolchain: stable
       - name: Check the tag matches the crate version
         run: |
           VERSION=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "dnp3") | .version')
-          if [ "$VERSION" != "${{github.ref_name}}" ]; then
-            echo "❌ tag ${{github.ref_name}} doesn't match the crate version $VERSION"
+          if [ "$VERSION" != "${GITHUB_REF_NAME}" ]; then
+            echo "❌ tag ${GITHUB_REF_NAME} doesn't match the crate version $VERSION"
             exit 1
           fi
       - name: Check whether this version is already published
         id: published
         run: |
-          VERSION=${{github.ref_name}}
+          VERSION=${GITHUB_REF_NAME}
           STATUS=$(curl -s -o /dev/null -w "%{http_code}" --retry 5 --retry-all-errors \
             -A "stepfunc/dnp3 release workflow" "https://crates.io/api/v1/crates/dnp3/$VERSION")
           case "$STATUS" in
@@ -546,7 +592,7 @@ jobs:
       - name: Authenticate with crates.io
         if: steps.published.outputs.skip != 'true'
         id: auth
-        uses: rust-lang/crates-io-auth-action@v1
+        uses: rust-lang/crates-io-auth-action@3268eb413133e2960fa4ae0e963ca76380c54cd9 # v1.0.6
       - name: Publish to crates.io
         if: steps.published.outputs.skip != 'true'
         run: cargo publish -p dnp3
@@ -559,12 +605,12 @@ jobs:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Download documentation artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: artifacts
           pattern: doc-*
       - name: Download conformance test results
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           # each revision's artifact holds <revision>/L<level>/, so they merge without colliding
           pattern: conformance-results-*
@@ -591,8 +637,10 @@ jobs:
           } > index.html
           cat index.html
       - name: Checkout stepfunc/docs
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          # the push step uses the deploy key this checkout keeps, and this job uploads no artifacts
+          # zizmor: ignore[artipacked]
           repository: stepfunc/docs
           ssh-key: ${{ secrets.SFIO_DOCS_SSH_KEY }}
           path: docs
@@ -604,11 +652,11 @@ jobs:
           # Pull latest changes to avoid conflicts
           git pull
           # Remove and recreate docs directory
-          rm -rf ./dnp3/${{github.ref_name}}
-          mkdir -p ./dnp3/${{github.ref_name}}
-          cp -a ../artifacts/doc-api/* ./dnp3/${{github.ref_name}}
-          cp -a ../artifacts/doc-guide/* ./dnp3/${{github.ref_name}}
-          cp -a ../artifacts/conformance-results ./dnp3/${{github.ref_name}}/conformance
+          rm -rf ./dnp3/${GITHUB_REF_NAME}
+          mkdir -p ./dnp3/${GITHUB_REF_NAME}
+          cp -a ../artifacts/doc-api/* ./dnp3/${GITHUB_REF_NAME}
+          cp -a ../artifacts/doc-guide/* ./dnp3/${GITHUB_REF_NAME}
+          cp -a ../artifacts/conformance-results ./dnp3/${GITHUB_REF_NAME}/conformance
           # Remove versions superseded under the docs repo's retention policy
           ./scripts/prune.sh
           # Send docs.stepfunc.io/dnp3/ to the guide of the newest full release (not milestones or RCs),
@@ -623,7 +671,7 @@ jobs:
           if git diff --staged --quiet; then
             echo "No changes to commit - docs already up to date"
           else
-            git commit -m "[dnp3] release ${{github.ref_name}}"
+            git commit -m "[dnp3] release ${GITHUB_REF_NAME}"
             git push
           fi
   
@@ -633,45 +681,50 @@ jobs:
     if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
     steps:
       - name: Download Java artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: artifacts
           pattern: java-bindings-*
       - name: Import PGP key
         id: import_gpg
-        uses: crazy-max/ghaction-import-gpg@v7
+        uses: crazy-max/ghaction-import-gpg@2dc316deee8e90f13e1a351ab510b4d5bc0c82cd # v7.0.0
         with:
           gpg_private_key: ${{ secrets.SFIO_PGP_PRIVATE_KEY }}
           passphrase: ${{ secrets.SFIO_PGP_PRIVATE_KEY_PASSPHRASE }}
       - name: Deploy Java to Maven Central
         shell: bash
         working-directory: artifacts
+        env:
+          MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_CENTRAL_TOKEN: ${{ secrets.MAVEN_CENTRAL_TOKEN }}
+          GPG_FINGERPRINT: ${{ steps.import_gpg.outputs.fingerprint }}
+          GPG_PASSPHRASE: ${{ secrets.SFIO_PGP_PRIVATE_KEY_PASSPHRASE }}
         run: |
           # Check if artifact already exists or is being published
-          if curl -f -s -o /dev/null "https://repo1.maven.org/maven2/io/stepfunc/dnp3/${{github.ref_name}}/dnp3-${{github.ref_name}}.jar"; then
-            echo "✅ Artifact io.stepfunc:dnp3:${{github.ref_name}} already exists in Maven Central - skipping deployment"
+          if curl -f -s -o /dev/null "https://repo1.maven.org/maven2/io/stepfunc/dnp3/${GITHUB_REF_NAME}/dnp3-${GITHUB_REF_NAME}.jar"; then
+            echo "✅ Artifact io.stepfunc:dnp3:${GITHUB_REF_NAME} already exists in Maven Central - skipping deployment"
           else
             echo "Artifact not found in Maven Central - checking if deployment is in progress..."
             
             # Create base64 encoded token for Authorization header
-            AUTH_TOKEN=$(echo -n "${{ secrets.MAVEN_CENTRAL_USERNAME }}:${{ secrets.MAVEN_CENTRAL_TOKEN }}" | base64 -w 0)
+            AUTH_TOKEN=$(echo -n "$MAVEN_CENTRAL_USERNAME:$MAVEN_CENTRAL_TOKEN" | base64 -w 0)
             
             # Try to upload - if it fails due to duplicate, that means it's already being processed
             echo "Attempting to upload to Central Portal..."
             
             # Create Maven repository structure (starting from groupId)
-            mkdir -p io/stepfunc/dnp3/${{github.ref_name}}
+            mkdir -p io/stepfunc/dnp3/${GITHUB_REF_NAME}
             
             # Copy artifacts to bundle directory
-            cp java-bindings-pom/pom.xml io/stepfunc/dnp3/${{github.ref_name}}/dnp3-${{github.ref_name}}.pom
-            cp java-bindings-jar/dnp3-${{github.ref_name}}.jar io/stepfunc/dnp3/${{github.ref_name}}/
-            cp java-bindings-jar/dnp3-${{github.ref_name}}-sources.jar io/stepfunc/dnp3/${{github.ref_name}}/
-            cp java-bindings-jar/dnp3-${{github.ref_name}}-javadoc.jar io/stepfunc/dnp3/${{github.ref_name}}/
+            cp java-bindings-pom/pom.xml io/stepfunc/dnp3/${GITHUB_REF_NAME}/dnp3-${GITHUB_REF_NAME}.pom
+            cp java-bindings-jar/dnp3-${GITHUB_REF_NAME}.jar io/stepfunc/dnp3/${GITHUB_REF_NAME}/
+            cp java-bindings-jar/dnp3-${GITHUB_REF_NAME}-sources.jar io/stepfunc/dnp3/${GITHUB_REF_NAME}/
+            cp java-bindings-jar/dnp3-${GITHUB_REF_NAME}-javadoc.jar io/stepfunc/dnp3/${GITHUB_REF_NAME}/
             
             # Sign all files
-            cd io/stepfunc/dnp3/${{github.ref_name}}
+            cd io/stepfunc/dnp3/${GITHUB_REF_NAME}
             for file in *.jar *.pom; do
-              gpg --batch --yes --pinentry-mode loopback --local-user "${{ steps.import_gpg.outputs.fingerprint }}" --passphrase "${{ secrets.SFIO_PGP_PRIVATE_KEY_PASSPHRASE }}" --armor --detach-sign "$file"
+              gpg --batch --yes --pinentry-mode loopback --local-user "$GPG_FINGERPRINT" --passphrase "$GPG_PASSPHRASE" --armor --detach-sign "$file"
             done
             
             # Generate checksums
@@ -708,7 +761,7 @@ jobs:
               echo "✅ Upload successful! Deployment ID: $DEPLOYMENT_ID"
               echo "The deployment will be automatically published to Maven Central after validation."
             elif [[ $HTTP_STATUS -eq 400 ]] && [[ "$BODY" =~ "duplicate" || "$BODY" =~ "already exists" || "$BODY" =~ "PUBLISHED" ]]; then
-              echo "✅ Version ${{github.ref_name}} is already uploaded or being processed - skipping deployment"
+              echo "✅ Version ${GITHUB_REF_NAME} is already uploaded or being processed - skipping deployment"
             else
               echo "❌ Upload failed with status $HTTP_STATUS"
               echo "Error details: $BODY"
@@ -726,23 +779,25 @@ jobs:
       id-token: write
     steps:
       - name: Download .NET artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           name: dotnet-bindings
           path: artifacts/dotnet-bindings
       # the temporary API key lasts an hour, so get it just before pushing
       - name: Authenticate with nuget.org
         id: login
-        uses: NuGet/login@v1
+        uses: NuGet/login@8d196754b4036150537f80ac539e15c2f1028841 # v1.2.0
         with:
           user: ${{ secrets.NUGET_USER }}
       - name: Publish NuGet package
         shell: bash
+        env:
+          NUGET_API_KEY: ${{ steps.login.outputs.NUGET_API_KEY }}
         run: |
           # Use --skip-duplicate to make this idempotent
           dotnet nuget push $(find artifacts/dotnet-bindings/dnp3*.nupkg) \
             -s https://api.nuget.org/v3/index.json \
-            -k ${{ steps.login.outputs.NUGET_API_KEY }} \
+            -k "$NUGET_API_KEY" \
             --skip-duplicate
   
   create-github-release:
@@ -754,14 +809,14 @@ jobs:
       contents: write
     steps:
       - name: Download all release artifacts
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           path: artifacts
       - name: Package C Bindings and Conformance Results
         run: |
           mkdir release
           cd artifacts/c-bindings
-          zip -r ../../release/dnp3-${{github.ref_name}}.zip .
+          zip -r ../../release/dnp3-${GITHUB_REF_NAME}.zip .
           # each revision's results are in an artifact of its own, holding <revision>/L<level>/
           cd ../..
           mkdir conformance-results
@@ -769,7 +824,7 @@ jobs:
           cd conformance-results
           zip -r ../release/conformance-results.zip .
       - name: Create GitHub release
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           draft: true
           files: |
