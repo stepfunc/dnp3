@@ -1,0 +1,8 @@
+# The toolchain CI builds, tests and releases with. Raise it each release, and out of cycle for a
+# confirmed miscompilation or a rustc security fix. The no-panic and semver jobs depend on it: a
+# new toolchain can lose an optimization the no-panic link needs, and changes rustdoc's JSON format,
+# which cargo-semver-checks reads.
+[toolchain]
+channel = "1.99.1"
+components = ["rustfmt", "clippy"]
+profile = "minimal"
