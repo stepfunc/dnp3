@@ -85,6 +85,10 @@ still pass (raise the pinned `cargo-semver-checks` with it if rustdoc's JSON
 format changed). Raise it out of cycle only for a confirmed miscompilation or a
 rustc security fix. The `msrv` job checks the declared `rust-version` separately.
 
+CI builds `cargo-audit`, `cargo-semver-checks` and `zizmor` from crates.io at the
+versions its workflows name, which Dependabot doesn't update. Raise them to
+their latest releases at the same time.
+
 ## CHANGELOG conventions
 
 - The upcoming release has one section, headed by its final version (`### X.Y.Z ###`), from the
