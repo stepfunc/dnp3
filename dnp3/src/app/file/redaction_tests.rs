@@ -6,8 +6,8 @@
 
 //! Credential redaction (#520)
 //!
-//! User decision D6 allows these tests, and only these, to format values into text: each one
-//! asserts that a secret is absent from the formatted output and asserts nothing else about it.
+//! These tests, and only these, format values into text: each one asserts that a secret is absent
+//! from the formatted output and asserts nothing else about it.
 
 use crate::app::file::{Group70Var2, Group70Var3};
 use crate::app::format::free_format::FreeFormat;

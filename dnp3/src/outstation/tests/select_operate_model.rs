@@ -17,8 +17,7 @@
 //!
 //! A malformed SELECT with the selection's sequence number isn't the discarded SELECT of Table
 //! 4-9 row 2: a request whose objects don't parse is still a request, answered with IIN2.2, which
-//! replaces the last request and ends the selection (decision 0003 in the protocol reference,
-//! TB2016-001 4.5.11).
+//! replaces the last request and ends the selection (TB2016-001 4.5.11).
 //!
 //! A CONFIRM keeps the selection: Table 4-2 classes it as a confirmation, not a request, so it
 //! isn't the "next request" of Rule 4. So does a fragment that isn't a valid request (FIR=0).
@@ -457,8 +456,7 @@ impl Model {
             _ => {}
         }
 
-        // a repeat of the last request gets its response again, byte for byte (decision 0002),
-        // and only a retry of the selection's SELECT keeps the selection (Table 4-9, row 1)
+        // a repeat of the last request gets its response again, byte for byte, and only a retry of the selection's SELECT keeps the selection (Table 4-9, row 1)
         if let Some(last) = &self.last_request {
             if last.bytes == bytes {
                 if self
@@ -525,8 +523,8 @@ impl Model {
                 response.extend_from_slice(&[52, 2, 0x07, 0x01, 0x00, 0x00]);
                 vec![Outcome::response(response)]
             }
-            // decision 0003: answered with IIN2.2 (TB2016-001 4.5.11), even a SELECT with the
-            // selection's sequence number
+            // answered with IIN2.2 (TB2016-001 4.5.11), even a SELECT with the selection's
+            // sequence number
             Request::Malformed(_, seq) => vec![Outcome::response(
                 empty_response(seq, iin2::PARAMETER_ERROR).to_vec(),
             )],
@@ -1039,7 +1037,7 @@ fn other_requests_end_the_selection() {
         RequestOp::Read(SeqChoice::Fixed(5)),
         RequestOp::DelayMeasure(SeqChoice::Fixed(5)),
         RequestOp::Malformed(FunctionCode::Read, SeqChoice::Fixed(5)),
-        // decision 0003: a new request, not the discarded SELECT of Table 4-9 row 2
+        // a new request, not the discarded SELECT of Table 4-9 row 2
         RequestOp::Malformed(FunctionCode::Select, SeqChoice::Fixed(0)),
         RequestOp::UnknownFunction(SeqChoice::Fixed(5)),
         RequestOp::DirectOperateNoAck(SetChoice::Fixed(INDEX_0), SeqChoice::Fixed(5)),

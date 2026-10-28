@@ -1178,7 +1178,7 @@ mod test {
 
     #[test]
     fn integer_attribute_with_unsupported_length_fails_the_whole_collection() {
-        // user decision D5: only lengths 1, 2 and 4 are supported
+        // only lengths 1, 2 and 4 are supported
         // data type codes: 2 = unsigned integer, 3 = signed integer
         for data_type in [2, 3] {
             // a valid header precedes the bad one

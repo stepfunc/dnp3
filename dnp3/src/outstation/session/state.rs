@@ -228,7 +228,7 @@ pub(super) struct UnsolicitedWait {
     /// the confirm of a solicited response sent during the wait, if one asked for it
     pub(super) solicited: Option<ExpectedConfirm>,
     /// the retries left. A DISABLE_UNSOLICITED processed during the wait stops them, so the wait
-    /// ends on timeout without a retry (TB2015-002a rule 15, decision 0007)
+    /// ends on timeout without a retry (TB2015-002a rule 15)
     pub(super) retries: RetryCounter,
 }
 

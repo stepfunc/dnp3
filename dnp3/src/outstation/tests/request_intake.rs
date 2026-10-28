@@ -83,7 +83,7 @@ async fn probe(harness: &mut OutstationHarness, seq: u8, iin1: u8) {
 
 // ---------- repeats and malformed requests ----------
 
-/// D3: the malformed request replaces the last request, so the request before it is new again
+/// the malformed request replaces the last request, so the request before it is new again
 #[tokio::test]
 async fn malformed_request_in_idle_replaces_the_repeat_history() {
     let mut harness = new_harness(get_default_config());
@@ -158,7 +158,7 @@ async fn malformed_request_in_the_solicited_confirm_wait_ends_it_and_replaces_th
     probe(&mut harness, 5, iin1::RESTART).await;
 }
 
-/// D2: the stored octets, not the IIN the outstation has now
+/// the stored octets, not the IIN the outstation has now
 #[tokio::test]
 async fn repeated_non_read_in_the_unsolicited_confirm_wait_gets_the_stored_octets() {
     let mut harness = new_harness(get_default_unsolicited_config());

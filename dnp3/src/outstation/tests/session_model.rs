@@ -26,8 +26,8 @@
 //! - an unsolicited response is sent again byte for byte on timeout, up to the retry limit, and a
 //!   new series waits for the retry delay. The null response is sent again with a new sequence
 //!   number until it's confirmed. A DISABLE_UNSOLICITED during the wait ends it on timeout without
-//!   a retry (TB2015-002a, decision 0007 in the protocol reference);
-//! - a repeated request other than a READ gets the stored response's bytes (decision 0002), and a
+//!   a retry (TB2015-002a);
+//! - a repeated request other than a READ gets the stored response's bytes, and a
 //!   repeated READ in the solicited confirm wait gets the current fragment's bytes and restarts the
 //!   wait. Elsewhere a repeated READ is answered as a new one, a deliberate deviation. A request
 //!   with the sequence number of the last one but other contents is a new request (Table 6-1 row
@@ -47,7 +47,7 @@
 //!   DISABLE_UNSOLICITED ends the unsolicited retries. IIN1.0 stays across a new connection;
 //! - in the unsolicited confirm wait, a solicited response that asks for a confirm awaits it until
 //!   the next request, the end of the wait or its confirm timeout, and only that confirm in that
-//!   time is processed, without a callback (Table 6-1 rows 20-30, decision 0005). A repeat that
+//!   time is processed, without a callback (Table 6-1 rows 20-30). A repeat that
 //!   sends the response again awaits the confirm again.
 //!
 //! The outstation has handled each input when the test looks at what it did, on the guarantee
@@ -861,7 +861,7 @@ impl Model {
     }
 
     /// the wait for the confirm of the response stored for a request other than a READ, if it asks
-    /// for one, which a repeat of the request also waits for (decision 0005)
+    /// for one, which a repeat of the request also waits for
     fn repeated_wait(&self, seq: u8) -> Wait {
         match self.last_reported {
             Some(_) => self.solicited_wait(seq, true, self.last_reported),
@@ -994,7 +994,7 @@ impl Model {
             }
             // Table 6-1 rows 24-29: a READ waits for the end of the unsolicited confirm wait, any
             // other request discards it. Any request ends the wait for a solicited confirm, and an
-            // answer that asks for one starts it again (decision 0005)
+            // answer that asks for one starts it again
             Wait::Unsolicited { .. } => {
                 let awaited = match request {
                     Request {

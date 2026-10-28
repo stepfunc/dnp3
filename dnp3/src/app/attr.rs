@@ -1770,7 +1770,7 @@ mod test {
 
     #[test]
     fn integers_support_only_lengths_one_two_and_four() {
-        // user decision D5: other lengths are rejected, even with enough payload bytes
+        // other lengths are rejected, even with enough payload bytes
         let payload = [0u8; 255];
         for data_type in [UNSIGNED_INT, SIGNED_INT] {
             for len in 0..=u8::MAX {
