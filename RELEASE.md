@@ -76,6 +76,15 @@ The release's dependency responsibilities are therefore narrow:
   the RC process exists to provide. Subsequent RCs and the final release take
   **security patches only** (targeted `cargo update -p <crate>`).
 
+## Toolchain
+
+`rust-toolchain.toml` pins the Rust toolchain CI builds, tests and releases with.
+Raise it to the current stable with the dependency pass at the first RC or
+milestone of each minor version, and confirm the `no-panic` and `semver` jobs
+still pass (raise the pinned `cargo-semver-checks` with it if rustdoc's JSON
+format changed). Raise it out of cycle only for a confirmed miscompilation or a
+rustc security fix. The `msrv` job checks the declared `rust-version` separately.
+
 ## CHANGELOG conventions
 
 - The upcoming release has one section, headed by its final version (`### X.Y.Z ###`), from the

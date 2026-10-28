@@ -16,6 +16,10 @@ on:
   workflow_dispatch:
 permissions:
   contents: read
+# what the rust-toolchain action set before the jobs installed Rust with rustup
+env:
+  CARGO_INCREMENTAL: 0
+  CARGO_TERM_COLOR: always
 jobs:
   # Run the bindings' smoke tests (C, C++, .NET, Java) against libraries built like the shipped ones
   bindings-test:
@@ -28,10 +32,8 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@683b588c487a69d01f6c6ddf40f036ff682cc2c8 # master
-        with:
-          toolchain: stable
+      - name: Install Rust from rust-toolchain.toml
+        run: rustup toolchain install
       - name: Cache Maven and NuGet packages
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         with:
