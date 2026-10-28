@@ -12,8 +12,8 @@ which you drive interactively from the console.
 
 ## Run an outstation and a master
 
-Clone the repository and, from its root, start an outstation with `tcp-server` and a master with `tcp-client` on the
-same machine. In Rust:
+Clone the repository, check out the tag for this version (<code>{sitedata.version}</code>), and from its root start an
+outstation with `tcp-server` and a master with `tcp-client` on the same machine. In Rust:
 
 ```
 cargo run -p example-outstation -- tcp-server
@@ -24,7 +24,7 @@ Then type `help` in either one to list the commands that change the outstation's
 master.
 
 The C, C++, Java and .NET examples build with each language's usual tools (CMake, Maven, and the .NET SDK) against
-the published library for the same version, so you don't need to build the library from source.
+the published library for the tag's version, so you don't need to build the library from source.
 
 ## Transports and arguments
 
