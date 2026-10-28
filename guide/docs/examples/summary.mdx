@@ -1,31 +1,35 @@
 ---
 id: summary
 title: Example programs
-sidebar_label: Example programs
+sidebar_label: Examples
 slug: /examples/summary
 ---
 
 import sitedata from '../../sitedata.json'
 
-The source repository contains example programs that you can compile and run interactively. Each program demonstrates the usage of various API features by reading console input from the user.
+The quickest way to see the library work is to run its example programs: a master and an outstation in each language,
+which you drive interactively from the console.
 
-As you read through the examples, you may notice blocks of code surrounded by `ANCHOR` tags.
+## Run an outstation and a master
 
-```c
-// ANCHOR: logging
+Clone the repository and, from its root, start an outstation with `tcp-server` and a master with `tcp-client` on the
+same machine. In Rust:
 
-code that configures the logging ...
-
-// ANCHOR_END: logging
+```
+cargo run -p example-outstation -- tcp-server
+cargo run -p example-master -- tcp-client
 ```
 
-We pull these code blocks from the example programs when we generate this guide. This ensures that all the snippets you encounter when reading the documentation are syntactically valid and up to date.
+Then type `help` in either one to list the commands that change the outstation's values or send requests from the
+master.
 
-## Running the examples
+The C, C++, Java and .NET examples build with each language's usual tools (CMake, Maven, and the .NET SDK) against
+the published library for the same version, so you don't need to build the library from source.
 
-Each language has a master and an outstation example that behave the same way and accept the same commands. Run them from
-the root of the repository, so that they find the TLS certificates in `./certs`. Both take the transport as their first
-argument:
+## Transports and arguments
+
+Each language's master and outstation behave the same way and accept the same commands. Run them from the root of the
+repository, so that they find the TLS certificates in `./certs`. Both take the transport as their first argument:
 
 | Example | Transports |
 |---------|------------|
@@ -36,16 +40,18 @@ The C, C++, Java and .NET examples take one more optional argument: the endpoint
 port. Everything else, such as the DNP3 addresses, is a constant at the top of each program. The Rust examples take
 options instead; run them with `--help` to list them, for example `cargo run -p example-outstation -- --help`.
 
-To see a master and an outstation talk to each other, start an outstation with `tcp-server` and a master with
-`tcp-client` on the same machine. Then type `help` in either one to list the commands that change the outstation's
-values or send requests from the master. The UDP transport only works on the local machine unless you change the
-endpoints in the program.
+The UDP transport only works on the local machine unless you change the endpoints in the program.
 
-## Links
+## Source
 
-The following links redirect to language-specific examples for the current version on Github:
+The examples for each language, for this version:
 
-* <a href={`${sitedata.github_url}/tree/${sitedata.version}/examples`}>Rust</a>
-* <a href={`${sitedata.github_url}/tree/${sitedata.version}/ffi/bindings/c`}>C/C++</a>
-* <a href={`${sitedata.github_url}/tree/${sitedata.version}/ffi/bindings/dotnet/examples`}>.NET (C#)</a>
-* <a href={`${sitedata.github_url}/tree/${sitedata.version}/ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples`}>Java</a>
+<div style={{display: 'flex', flexWrap: 'wrap', gap: '0.75rem', marginBottom: 'var(--ifm-paragraph-margin-bottom)'}}>
+  <a className="button button--outline button--primary" style={{textDecoration: 'none'}} href={`${sitedata.github_url}/tree/${sitedata.version}/examples`}>Rust</a>
+  <a className="button button--outline button--primary" style={{textDecoration: 'none'}} href={`${sitedata.github_url}/tree/${sitedata.version}/ffi/bindings/c`}>C and C++</a>
+  <a className="button button--outline button--primary" style={{textDecoration: 'none'}} href={`${sitedata.github_url}/tree/${sitedata.version}/ffi/bindings/java/examples/src/main/java/io/stepfunc/dnp3/examples`}>Java</a>
+  <a className="button button--outline button--primary" style={{textDecoration: 'none'}} href={`${sitedata.github_url}/tree/${sitedata.version}/ffi/bindings/dotnet/examples`}>.NET</a>
+</div>
+
+The code snippets throughout this guide are pulled from these programs when the guide is built, so they always compile
+and stay up to date.

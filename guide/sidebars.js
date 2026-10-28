@@ -5,17 +5,20 @@
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
 module.exports = {
-  someSidebar: {
-    About: [
+  someSidebar: [
+    {About: [
         'about/guide',
         'about/dnp3',
         'about/interop',
         'about/security',
+    ]},
+    'examples/summary',
+    {Project: [
         'about/versioning',
         'about/license',
         'about/dependencies',
-    ],
-    Languages: [
+    ]},
+    {Languages: [
         'languages/bindings',
         {
             Bindings: [
@@ -25,8 +28,8 @@ module.exports = {
                 'languages/c_sharp',
             ]
         }
-    ],
-    API: [
+    ]},
+    {API: [
         'api/logging',
         'api/runtime',
         'api/tls',
@@ -90,9 +93,6 @@ module.exports = {
                 'api/master/scheduling',
             ]
         }
-    ],
-    Examples: [
-        'examples/summary'
-    ],
-  },
+    ]},
+  ],
 };
