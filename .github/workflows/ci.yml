@@ -154,7 +154,7 @@ jobs:
           toolchain: "1.99"
       - name: Install cargo-binstall
         if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
-        uses: cargo-bins/cargo-binstall@e00d2c94cc0067b77737821097a62d91c0301baa # v1.21.1
+        uses: cargo-bins/cargo-binstall@8a2045612414e945291083f820cd50b4d8fc2218 # v1.26.0
       - name: Install cargo-semver-checks
         if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
         run: cargo binstall cargo-semver-checks@0.51.0 --no-confirm
