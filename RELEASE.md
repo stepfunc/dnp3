@@ -49,10 +49,23 @@ crates.io publishing is **irreversible** — a version can never be re-published
 Confirm the version before pushing. (`-Mn` and `-RCn` publish as pre-releases, which
 cargo won't select by default.)
 
-## 3. After CI completes
+## 3. Approve the release jobs
 
-Review and publish the **draft** GitHub release CI created. The publishers are
-idempotent, so re-running the tag's workflow safely retries any that failed.
+Once the tag's checks pass, the publishing jobs wait for a maintainer to approve
+their environments (`crates-io`, `nuget` and `release`) on the run's page. First
+`release-check` confirms the tag matches the crate version and both conformance
+reports exist; then crates.io, NuGet, Maven Central and the docs publish, and
+`release-maven` waits until the version is published on Maven Central. Last,
+`create-github-release` asks for approval again, attests the release files and
+creates the draft release with them.
+
+## 4. After CI completes
+
+Review and publish the **draft** GitHub release CI created (`-Mn` and `-RCn` drafts
+are already marked as pre-releases). The publishers are idempotent, so re-running
+the tag's workflow safely retries any that failed. If only `create-github-release`
+failed, the packages are out without attestations until it's re-run, so re-run it
+from the run's page; it asks for approval again and replaces its own draft.
 
 ## Dependencies
 

@@ -61,6 +61,26 @@ We take supply chain security seriously and have implemented the following measu
 - **Lock file commits**: `Cargo.lock` is committed to ensure reproducible builds
 - **Audit before release**: A release is only tagged once the security scans pass on its release PR
 
+### Build and Release
+
+- **Pinned build tools**: CI pins every GitHub Action to a commit, the Rust toolchain to a version, and builds its
+  other tools from crates.io at fixed versions. The workflows are checked with `zizmor` on every change
+- **Approved publishing**: Releases publish only from tags, and only after a maintainer approves the run
+- **Signed Java artifacts**: The jars on Maven Central carry PGP signatures
+
+### Verifying Release Artifacts
+
+Starting with 1.8.0, each file attached to a GitHub release has a build provenance attestation that records the
+workflow run and commit that built it. Verify a downloaded file with the GitHub CLI:
+
+```bash
+gh attestation verify dnp3-1.8.0.zip --repo stepfunc/dnp3
+```
+
+nuget.org signs each package it accepts, which changes the file, so verify the copy of the NuGet package attached to
+the GitHub release. The crate on crates.io is published by the release tag's workflow through crates.io trusted
+publishing.
+
 ### For Users
 
 To check for vulnerabilities in your deployment:
