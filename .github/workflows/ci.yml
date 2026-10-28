@@ -117,7 +117,10 @@ jobs:
         with:
           save-if: ${{ github.event_name == 'pull_request' }}
       - name: Run Rust unit tests
-        run: cargo test --features unstable
+        run: cargo test --workspace --features dnp3/unstable,dnp3/serialization
+      - name: Run the core crate's tests with the AWS-LC TLS backend
+        if: matrix.os == 'ubuntu-latest'
+        run: cargo test -p dnp3 --no-default-features --features serial,tls-aws-lc,serialization,unstable
   # Check that a change keeps the core crate's public API semver compatible with the revision it
   # merges into. Tag pushes and manual runs have no such revision, so only the checkout runs there.
   # The toolchain and the checker are pinned so an upstream release can't fail an unchanged PR
