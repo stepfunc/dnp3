@@ -63,8 +63,8 @@ We take supply chain security seriously and have implemented the following measu
 
 ### Build and Release
 
-- **Pinned build tools**: CI pins every GitHub Action to a commit, the Rust toolchain to a version, and builds its
-  other tools from crates.io at fixed versions. The workflows are checked with `zizmor` on every change
+- **Pinned build tools**: CI pins every GitHub Action to a commit, the Rust toolchain to a version, and its other
+  tools to fixed versions, commits or checksums. The workflows are checked with `zizmor` on every change
 - **Approved publishing**: Releases publish only from tags, and only after a maintainer approves the run
 - **Signed Java artifacts**: The jars on Maven Central carry PGP signatures
 
