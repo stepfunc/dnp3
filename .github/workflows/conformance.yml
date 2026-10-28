@@ -11,6 +11,15 @@ on:
   workflow_call:
 permissions:
   contents: read
+# A newer push to a PR cancels its older run, as in ci.yml. A PR event the job skips (no
+# `conformance` label, or some other label added) gets a group of its own, so it can't cancel a run
+concurrency:
+  group: >-
+    conformance-${{ (github.event_name == 'pull_request' &&
+    (!contains(github.event.pull_request.labels.*.name, 'conformance') ||
+    (github.event.action == 'labeled' && github.event.label.name != 'conformance')))
+    && github.run_id || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   # Run the conformance tests, for each revision of the test procedures at the subset level it tests
   conformance-run:
