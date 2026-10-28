@@ -1,6 +1,6 @@
 ---
 id: outstation
-title: Outstation Class
+title: Outstation class
 sidebar_label: Outstation
 slug: /api/outstation/outstation_handle
 ---
@@ -18,18 +18,14 @@ outstation runs and uses it to:
 | Start or stop communicating | `enable` and `disable` |
 | Change how much of the protocol traffic is logged, for example to debug a site | `set_decode_level` |
 
-:::tip
 The Outstation class has the same interface regardless of which transport-specific method you used to create it. This allows you to treat an Outstation operating
 over TCP or serial identically.
-:::
 
 :::caution
 An outstation created as a TCP or TLS client starts disabled: call `enable` once its database is initialized, or it
 never connects. Outstations on every other transport start enabled.
 :::
 
-:::note
 An outstation created on its own, as a TCP or TLS client, on a serial port or over UDP, stops when its `Outstation` is destroyed. In Java and .NET that happens
 when the object is garbage collected, so keep a reference to it for as long as the outstation should run. Outstations added to an `OutstationServer` are kept
 running by the server.
-:::

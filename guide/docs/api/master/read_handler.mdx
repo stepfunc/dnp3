@@ -21,7 +21,10 @@ flowchart LR
     integrity[Integrity scans] --> assoc
     polls[Polls and event scans] --> assoc
     reads[One-time reads] --> assoc
-    custom_read[read_with_handler] --> custom[The ReadHandler you pass]
+    subgraph own [A read with its own handler]
+        direction LR
+        custom_read[read_with_handler] --> custom[The ReadHandler you pass]
+    end
 ```
 
 The `begin_fragment` and `end_fragment` callbacks receive a read type that tells you which of these the values came from:
@@ -46,9 +49,7 @@ are executed in the following order:
 
 The begin and end methods receive the read type and the full header of the response.
 
-:::tip
 To determine if a measurement is a static value or an event, use the `HeaderInfo::is_event` field.
-:::
 
 Each value has a set of associated flags. In Rust, check for a flag with `Flags::is_set` and the constants on `Flags`, such
 as `Flags::ONLINE`. In the bindings, compare the `Flags::value` field with the constants defined in `Flag`.
@@ -65,6 +66,9 @@ The `ReadHandler` also receives [device attributes](./attributes.mdx#receiving-a
 
 The example below shows an implementation of a `ReadHandler` that prints every value and device attribute it receives to
 the console.
+
+<details>
+<summary>Show the full example</summary>
 
 <Tabs
 groupId="language"
@@ -112,3 +116,5 @@ values={[
 
 </TabItem>
 </Tabs>
+
+</details>

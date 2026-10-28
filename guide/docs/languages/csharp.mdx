@@ -1,6 +1,6 @@
 ---
 id: c_sharp
-title: .NET Bindings
+title: .NET bindings
 sidebar_label: .NET
 slug: /c_sharp
 ---
@@ -12,13 +12,15 @@ The bindings are .NET Standard 2.0 compatible and include platform-specific shar
 
 Shared libraries for the following platforms are included in the Nuget package:
 
-- Windows x64 (Windows 10+)
-- Windows x86 (Windows 10+)
-- Linux x64 (GLIBC and MUSL variants, kernel 3.2+, glibc 2.17+)
-- Linux AArch64 (GLIBC and MUSL variants, kernel 4.1+, glibc 2.17+)
-- Linux ARMv6hf (GLIBC and MUSL variants, kernel 3.2+, glibc 2.17+)
-- MacOS x64 (MacOS 10.12+)
-- MacOS AArch64 (MacOS 11.0+)
+| Platform | Minimum OS |
+|----------|------------|
+| Windows x64 | Windows 10+ |
+| Windows x86 | Windows 10+ |
+| Linux x64 (GLIBC and MUSL variants) | kernel 3.2+, glibc 2.17+ |
+| Linux AArch64 (GLIBC and MUSL variants) | kernel 4.1+, glibc 2.17+ |
+| Linux ARMv6hf (GLIBC and MUSL variants) | kernel 3.2+, glibc 2.17+ |
+| MacOS x64 | MacOS 10.12+ |
+| MacOS AArch64 | MacOS 11.0+ |
 
 :::warning
 MacOS libraries are included in the package but are not officially supported. They are useful for developers using MacOS, but
@@ -30,12 +32,10 @@ are not supported in production.
 The library targets .NET Standard 2.0, meaning it supports .NET Core 2.0+, .NET 5+ and .NET Framework 4.6.1+ (although at least 4.7.2 is recommended).
 A complete compatibility table is available on [Microsoft website](https://learn.microsoft.com/en-us/dotnet/standard/net-standard?tabs=net-standard-2-0).
 
-:::warning
 Version 2.0 will not support .NET Framework. It will target .NET Standard 2.1, which .NET Framework doesn't implement, so
 that the bindings' interfaces can have default methods. .NET Core 3.0 and later, and .NET 5 and later, will keep working.
-:::
 
-:::info
+:::note
 On .NET Framework, you need to specify the platform you are targeting. The library currently does not support the `AnyCPU` platform. You need to
 set the platform to either `x64` or `x86` in order for the MSBuild script to properly copy the DLL in the build directory.
 
@@ -78,7 +78,7 @@ port or UDP socket, stops when it's garbage collected, so keep a reference to it
 * Generated classes that also provide a public `Shutdown` method: These represent long-lived resources such as `Runtime`, `MasterChannel`, or `OutstationServer`. They map to an asynchronous
 Rust task executing on the Tokio runtime. The `Shutdown` method lets you precisely control when the resource/task will stop. `MasterServer` implements `IDisposable` and provides `Dispose` instead.
 
-### Asynchronous Methods
+### Asynchronous methods
 
 Asynchronous methods are transformed into methods that return `Task<T>`. C# Tasks are flexible and can be consumed in different ways:
 

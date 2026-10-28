@@ -1,6 +1,6 @@
 ---
 id: configuration
-title: Outstation Configuration
+title: Outstation configuration
 sidebar_label: OutstationConfig
 slug: /api/outstation/configuration
 ---
@@ -79,9 +79,7 @@ There's a tradeoff between preserving events and memory/CPU usage. Consider thes
 * How often and for how long the master may be disconnected or otherwise unable to empty the event queues via READ or unsolicited reporting
 * How important it is to preserve events for a particular type. 
 
-:::tip
 Not all events are created equal. For example, it may be important to capture every binary state transition, while missing an analog or counter value might not matter at all.
-:::
 
 <Tabs
 groupId="language"

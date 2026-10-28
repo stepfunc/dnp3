@@ -74,7 +74,7 @@ module.exports = {
                     ]
                 },
                 {
-                    'Reading Data': [
+                    'Reading data': [
                         'api/master/read_handler',
                         'api/master/assoc_polls',
                     ]

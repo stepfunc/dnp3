@@ -60,14 +60,12 @@ set(DNP3_RUST_TARGET x86_64-unknown-linux-gnu)
 find_package(dnp3 REQUIRED)
 ```
 
-:::tip
 The DNP3_RUST_TARGET variable can also be set via the command line when configuring cmake. It just tells the script which library to link.
 
 ```
 > mkdir build; cd build
 > cmake .. -DDNP3_RUST_TARGET=x86_64-unknown-linux-gnu
 ```
-:::
 
 This call will expose the library target:
 
@@ -139,10 +137,8 @@ Always use [C99 struct initialization](https://en.cppreference.com/w/c/language/
 as this will guarantee that fields you don't explicitly initialize are set to NULL.
 :::
 
-:::tip
 The FFI library will interpret NULL function pointers as "not-defined" and will use an intelligent default for this method of
 the interface. The `ctx` value may be NULL as well if your interface is stateless.
-:::
 
 ### Iterators
 
@@ -172,7 +168,7 @@ void my_callback(bool_iterator_t* iter, void* ctx)
 Never use an iterator outside the callback. Frequently, the iterator points to memory on the stack and will result in undefined behavior if it is used after the callback is complete.
 :::
 
-### Error Handling
+### Error handling
 
 C API error handling is performed using error codes. An error code is always an enum value where the first value is equal to zero, indicating success.
 

@@ -1,6 +1,6 @@
 ---
 id: outstation_info
-title: OutstationInformation Interface
+title: OutstationInformation interface
 sidebar_label: OutstationInformation
 slug: /api/outstation/information
 ---
@@ -15,10 +15,10 @@ for diagnosing a master that reads events but never confirms them.
 
 | What happens | Callbacks | Use it to |
 |--------------|-----------|-----------|
-| The master sends a request | `processRequestFromIdle`, `broadcastReceived` | Know when the master last talked to the outstation, and see broadcast requests |
-| The outstation waits for the master to confirm a response | `enterSolicitedConfirmWait`, `solicitedConfirmReceived`, `solicitedConfirmTimeout`, `solicitedConfirmWaitNewRequest`, `wrongSolicitedConfirmSeq` | Check that the master confirms the events it reads |
-| The outstation sends an unsolicited response | `enterUnsolicitedConfirmWait`, `unsolicitedConfirmed`, `unsolicitedConfirmTimeout` | Spot a master that doesn't confirm unsolicited responses, which keeps events in the buffer and the outstation retrying |
-| Something else happens | `unexpectedConfirm`, `clearRestartIin` | Count unexpected confirms, and know when the master has seen that the outstation restarted |
+| The master sends a request | `processRequestFromIdle`<br/>`broadcastReceived` | Know when the master last talked to the outstation, and see broadcast requests |
+| The outstation waits for the master to confirm a response | `enterSolicitedConfirmWait`<br/>`solicitedConfirmReceived`<br/>`solicitedConfirmTimeout`<br/>`solicitedConfirmWaitNewRequest`<br/>`wrongSolicitedConfirmSeq` | Check that the master confirms the events it reads |
+| The outstation sends an unsolicited response | `enterUnsolicitedConfirmWait`<br/>`unsolicitedConfirmed`<br/>`unsolicitedConfirmTimeout` | Spot a master that doesn't confirm unsolicited responses, which keeps events in the buffer and the outstation retrying |
+| Something else happens | `unexpectedConfirm`<br/>`clearRestartIin` | Count unexpected confirms, and know when the master has seen that the outstation restarted |
 
 :::tip
 For a "master active" indicator, record the time in `processRequestFromIdle`, and show the link as down when no

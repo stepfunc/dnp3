@@ -1,6 +1,6 @@
 ---
 id: controls
-title: ControlHandler Interface
+title: ControlHandler interface
 sidebar_label: ControlHandler
 slug: /api/outstation/controls
 ---
@@ -47,10 +47,13 @@ Every call to `DatabaseHandle.transaction` locks and unlocks a mutex. Since DNP3
 efficient way to update feedback points is to do a single transaction in the `ControlHandler.end_fragment` method.
 :::
 
-:::note
 The OperateType enum lets you identify which of the three operate function codes invoked the method. You can probably ignore this value. The specification
 requires all three control methodologies to be supported and result in the same action.
-:::
+
+The example below implements a `ControlHandler` in each language.
+
+<details>
+<summary>Show the full example</summary>
 
 <Tabs
 groupId="language"
@@ -100,4 +103,6 @@ values={[
 
 </TabItem>
 </Tabs>
+
+</details>
 

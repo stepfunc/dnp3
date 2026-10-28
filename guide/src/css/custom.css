@@ -226,3 +226,12 @@ pre.language-text code {
 .footer__logo {
   max-width: 3rem;
 }
+
+/* changelog: the emoji is the bullet */
+.changelog ul {
+  list-style: none;
+  padding-left: 0;
+}
+.changelog li + li {
+  margin-top: 0.4rem;
+}

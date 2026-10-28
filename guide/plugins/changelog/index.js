@@ -12,7 +12,16 @@ module.exports = function (context, options) {
         name: 'changelog',
         async loadContent() {
             const filename = 'CHANGELOG.md';
-            await fs.copyFile(path.resolve(context.siteDir, `../${filename}`), path.resolve(context.siteDir, `docs/${filename}`));
+            const source = await fs.readFile(path.resolve(context.siteDir, `../${filename}`), 'utf8');
+            // remark-emoji has no :book: shortcode and renders :shield: without the emoji variation
+            // selector, so substitute the characters. The wrapper lets CSS style the entries.
+            const body = source
+                .replaceAll(':book:', '\u{1F4D6}')
+                .replaceAll(':shield:', '\u{1F6E1}\u{FE0F}');
+            await fs.writeFile(
+                path.resolve(context.siteDir, `docs/${filename}`),
+                `<div className="changelog">\n\n${body}\n\n</div>\n`,
+            );
         },
     };
 };

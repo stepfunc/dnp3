@@ -7,7 +7,7 @@ slug: /interop
 
 import sitedata from '../../sitedata.json'
 
-## Conformance Testing
+## Conformance testing
 
 Every release of the outstation passes the DNP3 IED Certification Procedure published by the DNP Users Group, in two
 revisions that CI runs with [dnp3c](https://github.com/stepfunc/dnp3c), our implementation of the procedures:
@@ -23,12 +23,10 @@ Both revisions must pass before a release is published, and they also run on a w
 procedures don't apply to this configuration, such as the network and output event tests. We use these procedures to
 augment our own unit and integration tests.
 
-:::note
 The DNP Users Group only certifies outstation devices as conforming to the specification, not libraries. Contact Step
 Function I/O if you would like to engage us to conduct conformance testing for your outstation product.
-:::
 
-## Subset Levels
+## Subset levels
 
 DNP3 defines four subset levels of interoperability:
 

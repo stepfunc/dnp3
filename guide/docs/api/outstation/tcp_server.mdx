@@ -1,7 +1,7 @@
 ---
 id: tcp_server
-title: TCP Server
-sidebar_label: TCP Server
+title: TCP server
+sidebar_label: TCP server
 slug: /api/outstation/tcp_server
 ---
 
@@ -77,11 +77,9 @@ values={[
 </TabItem>
 </Tabs>
 
-:::tip
 `LinkErrorMode` controls what will happen if a malformed link-layer frame is received. Typically, it will close the socket to prevent transmission of corrupted data. However, you can set this value to `Discard` if you want the parser to discard errors and search for the start of the next frame. This behavior is required if you're connecting to a terminal server that bridges TCP to a serial port.
-:::
 
-## Adding Outstations
+## Adding outstations
 
 You can now associate one or more outstations with the `TCPServer`. The `TcpServer::addOutstation` method takes all the components discussed in previous sections, followed by an `AddressFilter`. This filter determines which masters are allowed to associate with a specific outstation.
 If the filter allows the same address(es) as an existing outstation's filter, then `TcpServer::addOutstation` will fail.
@@ -102,9 +100,7 @@ values={[
 {{#include ../examples/outstation/src/main.rs:tcp_server_add_outstation}}
 ```
 
-:::note
 The Rust `add_outstation` method spawns the outstation onto the Tokio runtime, so it must be called from within the runtime. Use `add_outstation_no_spawn` if you want to spawn the returned future yourself.
-:::
 
 </TabItem>
 <TabItem value="C">
@@ -151,9 +147,7 @@ end
 
 If you've already connected a master to the outstation and another matching IP address tries to connect, the existing connection will close. The outstation will then begin a communication session with the new master.
 
-:::tip
 The `AddressFilter` constructor accepts IPv4 wildcards (e.g. 192.168.0.*) which are convenient when you want to allow any master IP in a subnet to connect to the outstation.
-:::
 
 
 ## ConnectionStateListener
@@ -163,7 +157,7 @@ The listener only fires a connected event when it receives an IP address matchin
 another matching connection, the listener will fire a disconnected event before firing a connected event.
 
 
-## Binding the Server
+## Binding the server
 
 Once you've added all the outstations associated with the server, you can then bind the server which will cause it to start accepting connections.
 
@@ -182,10 +176,6 @@ values={[
 ```rust
 {{#include ../examples/outstation/src/main.rs:tcp_server_bind}}
 ```
-
-:::note
-The Rust `bind` method spawns the server onto the Tokio runtime, so it must be called from within the runtime. Use `bind_no_spawn` if you want to spawn the returned future yourself.
-:::
 
 </TabItem>
 <TabItem value="C">
@@ -221,4 +211,6 @@ The Rust `bind` method spawns the server onto the Tokio runtime, so it must be c
 
 :::note
 Binding may fail if the underlying socket bind/listen calls fail, such as when another process is already bound to that port.
+
+The Rust `bind` method spawns the server onto the Tokio runtime, so it must be called from within the runtime. Use `bind_no_spawn` if you want to spawn the returned future yourself.
 :::

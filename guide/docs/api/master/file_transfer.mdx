@@ -1,7 +1,7 @@
 ---
 id: file_transfer
-title: File Transfer
-sidebar_label: File Transfer
+title: File transfer
+sidebar_label: File transfer
 slug: /api/master/file_transfer
 ---
 
@@ -16,7 +16,7 @@ such as configuration. The master API supports these operations:
 * Read directory listing - Read the contents of a directory from the outstation
 * Write file - Write a file to the outstation, one block at a time
 
-## Get File Info
+## Get file info
 
 Information about a single file or directory may be retrieved from outstation using a single method invocation.
 
@@ -75,7 +75,7 @@ values={[
 </TabItem>
 </Tabs>
 
-## Read a File
+## Read a file
 
 File data may be asynchronously read from the outstation using a callback interface. Reading a file consists of multiple
 DNP3 requests. Obtaining an authentication key from the outstation is optional, depending on outstation requirements.
@@ -165,7 +165,7 @@ transfer stops for any other reason, such as an abort in `block_received`, a tim
 outstation to clean up.
 :::
 
-## Read a Directory
+## Read a directory
 
 A directory listing in DNP3 is just a special kind of file with a special encoding. We implement this feature by starting
 a background file transfer, accumulating the file data over possibly multiple blocks, and then parsing it into a collection
@@ -231,7 +231,7 @@ values={[
 </TabItem>
 </Tabs>
 
-## Write a File
+## Write a file
 
 Writing a file opens it for writing, writes its data one block at a time, and closes it. The last block is marked as the
 last one, so that the outstation knows the file is complete. The examples write two lines of text to `hello_world.txt`.
