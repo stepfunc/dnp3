@@ -701,12 +701,15 @@ jobs:
         with:
           path: artifacts
           pattern: java-bindings-*
+      # The secret holds only the signing subkey, with the primary key as a stub, so there's nothing to
+      # unlock here: the signing below passes the passphrase itself
       - name: Import PGP key
         id: import_gpg
-        uses: crazy-max/ghaction-import-gpg@2dc316deee8e90f13e1a351ab510b4d5bc0c82cd # v7.0.0
-        with:
-          gpg_private_key: ${{ secrets.SFIO_PGP_PRIVATE_KEY }}
-          passphrase: ${{ secrets.SFIO_PGP_PRIVATE_KEY_PASSPHRASE }}
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.SFIO_PGP_PRIVATE_KEY }}
+        run: |
+          echo "$GPG_PRIVATE_KEY" | gpg --batch --import
+          echo "fingerprint=$(gpg --list-secret-keys --with-colons | awk -F: '/^fpr/{print $10; exit}')" >> "$GITHUB_OUTPUT"
       # Succeeds only once the version is published on Maven Central, not when the upload is accepted
       - name: Deploy Java to Maven Central
         shell: bash
