@@ -18,9 +18,9 @@ as the outstation runs: you update the points in its database through it, and en
 ```mermaid
 flowchart LR
     config["Configuration"] --> create
-    interfaces(["Your OutstationApplication, ControlHandler and OutstationInformation"]):::user --> create
-    create["Create it on a transport: TCP or TLS server, TCP or TLS client, serial, or UDP"] --> handle["Outstation"]
-    app(["Your application"]):::user -- "update values in transactions" --> handle
+    interfaces(["Your interfaces"]):::user --> create
+    create["Transport"] --> handle["Outstation"]
+    app(["Your application"]):::user -- "transactions" --> handle
     handle --> db[("Database")]
     classDef user fill:#ffffff,stroke:#888888,stroke-dasharray:4 4,color:#333333
 ```

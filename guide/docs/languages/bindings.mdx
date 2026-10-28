@@ -41,17 +41,17 @@ every language. Only the thin layer that you call is different:
 
 ```mermaid
 flowchart TB
-    rust(["Rust application"]):::user
-    c(["C application"]):::user
-    cpp(["C++ application"]):::user
-    cs([".NET application"]):::user
-    java(["Java application"]):::user
+    rust(["Rust app"]):::user
+    c(["C app"]):::user
+    cpp(["C++ app"]):::user
+    cs([".NET app"]):::user
+    java(["Java app"]):::user
     cppw["C++ wrapper"]
     csa[".NET assembly"]
     jar["Java classes"]
     capi["Native library: C API"]
     jni["Native library: JNI"]
-    core["DNP3 library in Rust, on the Tokio runtime"]
+    core["DNP3 library: Rust, on Tokio"]
     cpp --> cppw
     cs --> csa
     java --> jar

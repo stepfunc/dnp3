@@ -54,8 +54,6 @@ flowchart LR
     user -- no --> auto{Anything else due?}
     auto -- yes --> runAuto[Run the most important one]
     auto -- no --> sleep([Sleep until something is due])
-    runUser --> back[Its association goes to the back]
-    runAuto --> back
 ```
 
 1. **Your requests come first**, before the automatic tasks and polls of every association.

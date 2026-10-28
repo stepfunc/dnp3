@@ -9,10 +9,10 @@ A master talks to outstations through **channels**, and to each outstation on a 
 
 ```mermaid
 flowchart LR
-    channel["MasterChannel: one TCP connection, serial port or UDP socket"]
+    channel["MasterChannel"]
     channel --> a1["Association: outstation 10"]
     channel --> a2["Association: outstation 11"]
-    a1 --> parts(["Your ReadHandler, AssociationHandler and AssociationInformation, its configuration and its polls"]):::user
+    a1 --> parts(["Your handlers, configuration and polls"]):::user
     classDef user fill:#ffffff,stroke:#888888,stroke-dasharray:4 4,color:#333333
 ```
 

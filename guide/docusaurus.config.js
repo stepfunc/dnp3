@@ -36,12 +36,28 @@ module.exports = {
         src: 'images/brand/logo.svg',
         href: '/docs/guide'
       },
-      items: [],
+      items: [
+        {
+          type: 'dropdown',
+          label: 'API docs',
+          position: 'right',
+          items: [
+            {label: 'Rust', href: `https://docs.stepfunc.io/dnp3/${sitedata.version}/rust/dnp3/`},
+            {label: 'C', href: `https://docs.stepfunc.io/dnp3/${sitedata.version}/c/dnp3_8h.html`},
+            {label: 'C++', href: `https://docs.stepfunc.io/dnp3/${sitedata.version}/cpp/namespacednp3.html`},
+            {label: 'Java', href: `https://docs.stepfunc.io/dnp3/${sitedata.version}/java/`},
+            {label: '.NET', href: `https://docs.stepfunc.io/dnp3/${sitedata.version}/dotnet/namespacednp3.html`},
+          ],
+        },
+        {label: 'stepfunc.io', href: 'https://stepfunc.io/products/libraries/dnp3/', position: 'right'},
+        {label: 'GitHub', href: sitedata.github_url, position: 'right'},
+      ],
     },
     footer: {
+      style: 'dark',
       logo: {
         alt: 'Step Function',
-        src: 'images/brand/footer-logo.svg',
+        src: 'images/brand/logo.svg',
       },
       links: [
         {
@@ -121,10 +137,18 @@ module.exports = {
           actorTextColor: '#004e98',
           signalColor: '#004e98',
           signalTextColor: '#004e98',
+
+          // Groups (subgraphs)
+          clusterBkg: '#f9f9fa',
+          clusterBorder: '#9db7d5',
         },
+        sequence: {mirrorActors: false},
       },
     },
   },
+  stylesheets: [
+    'https://fonts.googleapis.com/css2?family=Barlow:wght@500;600&display=swap',
+  ],
   presets: [
     [
       '@docusaurus/preset-classic',
