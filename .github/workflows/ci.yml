@@ -813,6 +813,7 @@ jobs:
           cd conformance-results
           zip -r ../release/conformance-results.zip .
       - name: Create GitHub release
+        # zizmor: ignore[superfluous-actions] until this step moves to the gh CLI
         uses: softprops/action-gh-release@efb35369e0ad2afab669f228072c1b0d510eae64 # v3.0.3
         with:
           draft: true

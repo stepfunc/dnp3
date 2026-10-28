@@ -15,20 +15,44 @@ on:
     paths:
       - '**/Cargo.toml'
       - '**/Cargo.lock'
-      - '.github/workflows/security-audit.yml'
+      - '.github/workflows/**'
+      - '.github/dependabot.yml'
       - '.cargo/audit.toml'
   # Run on PRs to test before merging. The job binstalls cargo-audit and reads
   # Cargo.lock, so it's cheap enough to run unfiltered - and an unfiltered
   # trigger is a prerequisite for ever making this a required status check,
   # since a path-filtered workflow reports no status at all.
   pull_request:
-  # audit and osv-scanner are required checks, so they must also run in the merge queue
+  # audit, osv-scanner and zizmor are required checks, so they must also run in the merge queue
   merge_group:
 
 permissions:
   contents: read
 
 jobs:
+  # Static analysis of the workflows themselves: unpinned or known-vulnerable actions, expression
+  # injection, credential persistence and cache poisoning. Inline ignore comments record the
+  # accepted findings.
+  zizmor:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install cargo-binstall
+        uses: cargo-bins/cargo-binstall@e00d2c94cc0067b77737821097a62d91c0301baa # v1.21.1
+
+      - name: Install zizmor
+        run: cargo binstall zizmor@1.31.1 --no-confirm
+
+      - name: Audit the workflows
+        env:
+          # the online audits check each pinned commit and look up advisories against the actions
+          GH_TOKEN: ${{ github.token }}
+        run: zizmor --format github .github
+
   audit:
     runs-on: ubuntu-latest
     steps:
