@@ -1,5 +1,6 @@
 
 ### 1.8.0 ###
+* :rotating_light: **Security advisory:** A specially crafted request can panic the outstation, stopping it until the application recreates it. Every earlier release is affected. See [GHSA-9f93-5j9q-v692](https://github.com/stepfunc/dnp3/security/advisories/GHSA-9f93-5j9q-v692).
 * :shield: **Hardened against panics.** Lints deny common sources of panics throughout the core library, and CI now **proves** that important parts of it can't panic for any input.
 * :bell: **License update.** The license now prohibits using the library to build or test other implementations of the protocol, including by mining it with AI tools or using it as an oracle, and reserves AI training. See [#712](https://github.com/stepfunc/dnp3/pull/712).
 * :bell: **The minimum supported Rust version is now 1.88.** See [#502](https://github.com/stepfunc/dnp3/pull/502).
