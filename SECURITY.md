@@ -39,7 +39,7 @@ To stay up to date:
 
 ## How the Library Is Hardened
 
-The [security page](https://docs.stepfunc.io/dnp3/1.8.0-RC3/guide/docs/security) of the guide describes the engineering measures: memory safety, the lints that restrict
+The [security page](https://docs.stepfunc.io/dnp3/1.8.0/guide/docs/security) of the guide describes the engineering measures: memory safety, the lints that restrict
 sources of panics, the link-time proof that the parsers can't panic, protocol validation and the TLS trust model.
 
 ## Supply Chain Security
