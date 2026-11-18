@@ -15,6 +15,7 @@ on:
     paths:
       - '**/Cargo.toml'
       - '**/Cargo.lock'
+      - 'osv-scanner.toml'
       - '.github/workflows/**'
       - '.github/actions/**'
       - '.github/dependabot.yml'
@@ -154,13 +155,14 @@ jobs:
           persist-credentials: false
 
       # Same approach as the audit job: run once, take the verdict from the JSON report, and
-      # report a run that produced no valid report as a tool failure, not a finding.
+      # report a run that produced no valid report as a tool failure, not a finding. Accepted
+      # advisories are listed, each with its reason, in osv-scanner.toml.
       - name: Run OSV-Scanner on Cargo.lock
         run: |
           set +e
           docker run --rm -v "$PWD:/src" \
             ghcr.io/google/osv-scanner:v2.6.0@sha256:afd838850ac1a0fcc15ff4a041dc9ba11123c3f0d2666217a5f0fcf9222b55fa \
-            scan source --format json -L /src/Cargo.lock > osv.json 2> osv.err
+            scan source --format json --config /src/osv-scanner.toml -L /src/Cargo.lock > osv.json 2> osv.err
           status=$?
           set -e
           cat osv.err

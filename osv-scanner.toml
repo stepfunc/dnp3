@@ -1,0 +1,5 @@
+# Advisories osv-scanner reports that we accept, each with the reason.
+
+[[IgnoredVulns]]
+id = "RUSTSEC-2026-0543"
+reason = "chrono is unmaintained (informational, no vulnerability). It is in the public API through Timestamp::to_datetime_utc, so it is removed in 2.0 (#886)."
