@@ -2,4 +2,4 @@
 
 [[IgnoredVulns]]
 id = "RUSTSEC-2026-0543"
-reason = "chrono is unmaintained (informational, no vulnerability). It is in the public API through Timestamp::to_datetime_utc, so it is removed in 2.0 (#886)."
+reason = "chrono is unmaintained (informational, no vulnerability). dnp3 no longer depends on chrono (#886), but ffi/dnp3-ffi still pulls it in via tracing-subscriber's chrono feature (stepfunc/tracing-ffi#3)."

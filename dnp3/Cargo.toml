@@ -22,7 +22,6 @@ workspace = true
 
 [dependencies]
 tracing = { workspace = true }
-chrono = "0.4"
 tokio = { workspace = true, features = ["net", "sync", "io-util", "io-std", "time", "rt", "rt-multi-thread", "macros"] }
 xxhash-rust = { version = "0.8", features = ["xxh64"] }
 scursor = "0.2.0"
