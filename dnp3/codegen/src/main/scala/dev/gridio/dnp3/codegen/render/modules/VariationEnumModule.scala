@@ -27,6 +27,7 @@ object VariationEnumModule extends Module {
 
       "/// All variations supported by the library".eol ++
       "#[derive(Copy, Clone, Debug, PartialEq, Eq)]".eol ++
+      "#[cfg_attr(not(feature = \"ffi\"), non_exhaustive)]".eol ++
       bracket("pub enum Variation") {
         ObjectGroup.allVariations.iterator.flatMap {
           v => {

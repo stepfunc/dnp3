@@ -12,7 +12,7 @@ import dev.gridio.dnp3.codegen.model.VariationNames._
 
 //analog output events
 object Group43 extends ObjectGroup {
-  def variations: List[Variation] = List(Group43Var1, Group43Var2, Group43Var3, Group43Var4, Group43Var5, Group43Var6, Group43Var7, Group43Var8)
+  def variations: List[Variation] = List(Group43Var0, Group43Var1, Group43Var2, Group43Var3, Group43Var4, Group43Var5, Group43Var6, Group43Var7, Group43Var8)
 
   def group: Byte = 43
 
@@ -20,6 +20,8 @@ object Group43 extends ObjectGroup {
 
   override def groupType: GroupType = GroupType.AnalogOutputCommandEvent
 }
+
+object Group43Var0 extends AnyVariation(Group43, 0)
 
 object Group43Var1 extends FixedSize(Group43, 1, bit32WithoutTime)(commandStatus, value32)
 

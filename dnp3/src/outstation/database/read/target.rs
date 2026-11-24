@@ -169,12 +169,14 @@ pub(super) fn get(variation: Variation) -> Option<ReadTarget> {
         Variation::Group111(0) => Event(EventTarget::OctetString),
         // not readable
         Variation::Group12Var1
+        | Variation::Group13Var0
         | Variation::Group13Var1
         | Variation::Group13Var2
         | Variation::Group41Var1
         | Variation::Group41Var2
         | Variation::Group41Var3
         | Variation::Group41Var4
+        | Variation::Group43Var0
         | Variation::Group43Var1
         | Variation::Group43Var2
         | Variation::Group43Var3
