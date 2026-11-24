@@ -135,7 +135,8 @@ jobs:
         if: matrix.os == 'ubuntu-latest'
         run: cargo test -p dnp3 --no-default-features --features serial,tls-aws-lc,serialization,unstable
   # Check that a change keeps the core crate's public API semver compatible with the revision it
-  # merges into. Tag pushes and manual runs have no such revision, so only the checkout runs there.
+  # merges into. Tag pushes, manual runs, and breaking 2.0 development PRs targeting the 2.0 branch
+  # skip the comparison, so only the checkout runs there.
   # The checker is pinned, like the toolchain in rust-toolchain.toml, so an upstream release can't
   # fail an unchanged PR (the checker reads rustdoc's JSON, whose format changes with the toolchain);
   # raise them together
@@ -148,16 +149,16 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
       - name: Install Rust from rust-toolchain.toml
-        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+        if: (github.event_name == 'pull_request' && github.base_ref != '2.0') || (github.event_name == 'merge_group' && github.event.merge_group.base_ref != 'refs/heads/2.0')
         run: rustup toolchain install
       - name: Install cargo-semver-checks
-        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+        if: (github.event_name == 'pull_request' && github.base_ref != '2.0') || (github.event_name == 'merge_group' && github.event.merge_group.base_ref != 'refs/heads/2.0')
         uses: $/.github/actions/cargo-tool
         with:
           crate: cargo-semver-checks
           version: 0.51.0
       - name: Compare the public API with the base revision
-        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+        if: (github.event_name == 'pull_request' && github.base_ref != '2.0') || (github.event_name == 'merge_group' && github.event.merge_group.base_ref != 'refs/heads/2.0')
         uses: obi1kenobi/cargo-semver-checks-action@6b69fcf40e9b5fb17adeb57e4b6ecd020649a239 # v2.9
         with:
           rust-toolchain: manual
