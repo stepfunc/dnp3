@@ -6,6 +6,8 @@
 
 //! State shared by the session handlers.
 
+use core::time::Duration;
+
 use super::deferred::DeferredRead;
 use crate::app::parse::parser::{HeaderCollection, Request};
 use crate::app::{Iin1, ObjectParseError, RequestHeader, ResponseHeader, Sequence};
@@ -14,6 +16,7 @@ use crate::master::EventClasses;
 use crate::outstation::control::select::SelectState;
 use crate::outstation::traits::BroadcastAction;
 use crate::transport::{FragmentAddr, FragmentInfo};
+use crate::util::clock::MonotonicTime;
 
 #[derive(Copy, Clone)]
 pub(super) enum TimeoutStatus {
@@ -91,7 +94,49 @@ impl LastValidRequest {
 pub(super) enum UnsolicitedState {
     /// need to perform NULL unsolicited
     NullRequired,
-    Ready(Option<tokio::time::Instant>),
+    Ready(Option<MonotonicTime>),
+}
+
+/// Keep-alive (REQUEST_LINK_STATUS) timer state.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(super) enum KeepAlive {
+    Disabled,
+    Enabled {
+        timeout: Duration,
+        next: MonotonicTime,
+    },
+}
+
+impl KeepAlive {
+    pub(super) fn new(timeout: Option<Duration>, now: MonotonicTime) -> Self {
+        match timeout {
+            Some(timeout) => Self::Enabled {
+                timeout,
+                next: now.saturating_add(timeout),
+            },
+            None => Self::Disabled,
+        }
+    }
+
+    pub(super) fn next_deadline(&self) -> Option<MonotonicTime> {
+        match *self {
+            Self::Disabled => None,
+            Self::Enabled { next, .. } => Some(next),
+        }
+    }
+
+    pub(super) fn is_due(&self, now: MonotonicTime) -> bool {
+        match *self {
+            Self::Disabled => false,
+            Self::Enabled { next, .. } => now >= next,
+        }
+    }
+
+    pub(super) fn on_activity(&mut self, now: MonotonicTime) {
+        if let Self::Enabled { timeout, next } = self {
+            *next = now.saturating_add(*timeout);
+        }
+    }
 }
 
 /// a broadcast whose IIN1.0 hasn't been cleared
@@ -169,7 +214,7 @@ pub(super) struct SessionState {
     pub(super) unsolicited: UnsolicitedState,
     pub(super) unsolicited_seq: Sequence,
     pub(super) deferred_read: DeferredRead,
-    pub(super) last_recorded_time: Option<tokio::time::Instant>,
+    pub(super) last_recorded_time: Option<MonotonicTime>,
     pub(super) broadcast: BroadcastIin,
 }
 
@@ -237,7 +282,7 @@ pub(super) struct UnsolicitedWait {
 #[derive(Copy, Clone)]
 pub(super) struct ExpectedConfirm {
     pub(super) ecsn: Sequence,
-    pub(super) deadline: tokio::time::Instant,
+    pub(super) deadline: MonotonicTime,
 }
 
 /// What [`OutstationSession::accept`](crate::outstation::session::OutstationSession::accept) did with a request
@@ -320,20 +365,87 @@ pub(super) enum ConfirmAction {
 pub(super) enum NextIdleAction {
     NoSleep,
     SleepUntilEvent,
-    SleepUntil(tokio::time::Instant),
+    SleepUntil(MonotonicTime),
 }
 
 impl NextIdleAction {
-    pub(super) fn select_earliest(self, instant: Option<tokio::time::Instant>) -> Self {
+    pub(super) fn select_earliest(self, instant: Option<MonotonicTime>) -> Self {
         match instant {
             None => self,
             Some(instant) => match self {
                 NextIdleAction::NoSleep => self,
                 NextIdleAction::SleepUntilEvent => Self::SleepUntil(instant),
                 NextIdleAction::SleepUntil(other) => {
-                    Self::SleepUntil(tokio::time::Instant::min(instant, other))
+                    Self::SleepUntil(MonotonicTime::min(instant, other))
                 }
             },
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn keep_alive_disabled_never_becomes_due() {
+        let t0 = MonotonicTime::from_elapsed(Duration::ZERO);
+        let max = MonotonicTime::from_elapsed(Duration::MAX);
+
+        let mut ka = KeepAlive::new(None, t0);
+        assert_eq!(ka, KeepAlive::Disabled);
+        assert_eq!(ka.next_deadline(), None);
+        assert!(!ka.is_due(t0));
+        assert!(!ka.is_due(max));
+
+        ka.on_activity(MonotonicTime::from_elapsed(Duration::from_secs(10)));
+        assert_eq!(ka, KeepAlive::Disabled);
+        assert_eq!(ka.next_deadline(), None);
+        assert!(!ka.is_due(max));
+    }
+
+    #[test]
+    fn keep_alive_enabled_transitions() {
+        let t0 = MonotonicTime::from_elapsed(Duration::from_secs(5));
+        let timeout = Duration::from_secs(60);
+
+        let mut ka = KeepAlive::new(Some(timeout), t0);
+        let expected_first = MonotonicTime::from_elapsed(Duration::from_secs(65));
+        assert_eq!(ka.next_deadline(), Some(expected_first));
+
+        // not due before the deadline
+        assert!(!ka.is_due(t0));
+        assert!(!ka.is_due(MonotonicTime::from_elapsed(Duration::from_millis(64_999))));
+
+        // due at and after the deadline
+        assert!(ka.is_due(expected_first));
+        assert!(ka.is_due(MonotonicTime::from_elapsed(Duration::from_secs(70))));
+
+        // activity pushes the deadline forward by timeout
+        let activity_at = MonotonicTime::from_elapsed(Duration::from_secs(20));
+        ka.on_activity(activity_at);
+        let expected_second = MonotonicTime::from_elapsed(Duration::from_secs(80));
+        assert_eq!(ka.next_deadline(), Some(expected_second));
+        assert!(!ka.is_due(expected_first));
+        assert!(ka.is_due(expected_second));
+    }
+
+    #[test]
+    fn keep_alive_handles_zero_and_max_timeouts() {
+        let t = MonotonicTime::from_elapsed(Duration::from_secs(10));
+
+        let mut zero = KeepAlive::new(Some(Duration::ZERO), t);
+        assert_eq!(zero.next_deadline(), Some(t));
+        assert!(zero.is_due(t));
+        zero.on_activity(t);
+        assert!(zero.is_due(t));
+
+        let mut max = KeepAlive::new(Some(Duration::MAX), t);
+        let saturated = MonotonicTime::from_elapsed(Duration::MAX);
+        assert_eq!(max.next_deadline(), Some(saturated));
+        assert!(!max.is_due(t));
+        assert!(max.is_due(saturated));
+        max.on_activity(MonotonicTime::from_elapsed(Duration::from_secs(20)));
+        assert_eq!(max.next_deadline(), Some(saturated));
     }
 }

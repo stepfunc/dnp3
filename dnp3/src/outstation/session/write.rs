@@ -125,11 +125,11 @@ impl OutstationSession {
             return Iin2::PARAMETER_ERROR;
         };
 
-        let now = tokio::time::Instant::now();
-        let delay = if let Some(delay) = now.checked_duration_since(last_recorded_time) {
+        let delay = if let Some(delay) = self.clock.now().checked_duration_since(last_recorded_time)
+        {
             delay
         } else {
-            tracing::warn!("clock rollback detected (Tokio error)");
+            tracing::warn!("clock rollback detected");
             return Iin2::PARAMETER_ERROR;
         };
 

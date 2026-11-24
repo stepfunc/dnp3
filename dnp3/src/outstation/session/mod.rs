@@ -65,7 +65,7 @@ use crate::transport::{
     TransportRequestError, TransportWriter,
 };
 use crate::util::channel::Receiver;
-use crate::util::deadline::deadline;
+use crate::util::clock::{MonotonicClock, MonotonicTime, TokioClock};
 
 use crate::app::parse::bit::BitSequence;
 use crate::app::parse::prefix::Prefix;
@@ -75,9 +75,9 @@ use crate::util::skipped::Skipped;
 
 use self::state::{
     Accepted, Confirm, ConfirmAction, ConfirmOutcome, ControlRequest, ExpectedConfirm,
-    FragmentType, Intake, LastValidRequest, NextIdleAction, Reads, Received, ResponseKind,
-    ResponseSeries, RetryCounter, SessionState, SolicitedWait, TimeoutStatus, UnsolicitedState,
-    UnsolicitedWait, UnsolicitedWaitResult,
+    FragmentType, Intake, KeepAlive, LastValidRequest, NextIdleAction, Reads, Received,
+    ResponseKind, ResponseSeries, RetryCounter, SessionState, SolicitedWait, TimeoutStatus,
+    UnsolicitedState, UnsolicitedWait, UnsolicitedWaitResult,
 };
 
 /// The header of a solicited response that reports IIN2.2
@@ -154,7 +154,8 @@ pub(crate) struct OutstationSession {
     application: Box<dyn OutstationApplication>,
     info: Box<dyn OutstationInformation>,
     control_handler: Box<dyn ControlHandler>,
-    next_link_status: Option<tokio::time::Instant>,
+    clock: TokioClock,
+    keep_alive: KeepAlive,
 }
 
 impl OutstationSession {
@@ -167,9 +168,8 @@ impl OutstationSession {
         information: Box<dyn OutstationInformation>,
         control_handler: Box<dyn ControlHandler>,
     ) -> Self {
-        let next_link_status = config
-            .keep_alive_timeout
-            .map(|delay| deadline(tokio::time::Instant::now(), delay));
+        let clock = TokioClock::new();
+        let keep_alive = KeepAlive::new(config.keep_alive_timeout, clock.now());
 
         Self {
             enabled: initial_state,
@@ -179,7 +179,8 @@ impl OutstationSession {
             application,
             info: information,
             control_handler,
-            next_link_status,
+            clock,
+            keep_alive,
             destination,
         }
     }
@@ -206,28 +207,23 @@ impl OutstationSession {
         &mut self,
         io: &mut PhysLayer,
         writer: &mut TransportWriter<T>,
-    ) -> Result<(), RunError> {
-        if let Some(next) = self.next_link_status {
-            // Wait until we need to send the link status
-            if next > tokio::time::Instant::now() {
-                return Ok(());
-            }
-
+    ) -> Result<Option<MonotonicTime>, RunError> {
+        if self.keep_alive.is_due(self.clock.now()) {
             writer
                 .send_link_status_request(io, self.config.decode_level, self.destination)
                 .await?;
 
-            self.on_link_activity();
+            self.keep_alive.on_activity(self.clock.now());
         }
 
-        Ok(())
+        Ok(self.keep_alive.next_deadline())
     }
 
     async fn read_until<T: Transport>(
         &mut self,
         io: &mut PhysLayer,
         reader: &mut TransportReader<T>,
-        deadline: tokio::time::Instant,
+        deadline: MonotonicTime,
     ) -> Result<TimeoutStatus, RunError> {
         let decode_level = self.config.decode_level;
         tokio::select! {
@@ -243,17 +239,29 @@ impl OutstationSession {
     }
 
     async fn sleep_until(&mut self, next_action: NextIdleAction) -> Result<(), RunError> {
-        async fn sleep_only(next_action: NextIdleAction) {
-            match next_action {
-                NextIdleAction::NoSleep => {}
-                NextIdleAction::SleepUntil(x) => tokio::time::sleep_until(x).await,
-                NextIdleAction::SleepUntilEvent => std::future::pending().await,
+        enum Sleep {
+            None,
+            Until(tokio::time::Instant),
+            Pending,
+        }
+
+        let sleep = match next_action {
+            NextIdleAction::NoSleep => Sleep::None,
+            NextIdleAction::SleepUntil(x) => Sleep::Until(self.clock.to_tokio_instant(x)),
+            NextIdleAction::SleepUntilEvent => Sleep::Pending,
+        };
+
+        async fn sleep_only(sleep: &Sleep) {
+            match *sleep {
+                Sleep::None => {}
+                Sleep::Until(x) => tokio::time::sleep_until(x).await,
+                Sleep::Pending => std::future::pending().await,
             }
         }
 
         loop {
             tokio::select! {
-                 _ = sleep_only(next_action) => {
+                 _ = sleep_only(&sleep) => {
                         return Ok(());
                  }
                  res = self.handle_next_message() => {
@@ -308,13 +316,6 @@ impl OutstationSession {
             Feature::Disabled => Some(self.destination.link),
         }
     }
-
-    fn on_link_activity(&mut self) {
-        self.next_link_status = self
-            .config
-            .keep_alive_timeout
-            .map(|timeout| deadline(tokio::time::Instant::now(), timeout));
-    }
 }
 
 impl<T: Transport> OutstationTask<T> {
@@ -344,11 +345,12 @@ impl<T: Transport> OutstationTask<T> {
         }
 
         // check to see if we should perform a link status check
-        self.session
+        let next_keep_alive = self
+            .session
             .check_link_status(io, &mut self.responder.writer)
             .await?;
 
-        let next_action = next_action.select_earliest(self.session.next_link_status);
+        let next_action = next_action.select_earliest(next_keep_alive);
 
         // wait for an event
         tokio::select! {

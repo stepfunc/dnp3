@@ -6,6 +6,7 @@
 
 use crate::app::control::CommandStatus;
 use crate::app::{Sequence, Timeout};
+use crate::util::clock::MonotonicTime;
 
 /// records when a select occurs
 #[derive(Copy, Clone)]
@@ -15,7 +16,7 @@ pub(crate) struct SelectState {
     /// hash of the SELECT request, which recognizes its retry
     request_hash: u64,
     /// time at which the SELECT occurred
-    time: tokio::time::Instant,
+    time: MonotonicTime,
     /// the hash of the object headers
     object_hash: u64,
 }
@@ -24,7 +25,7 @@ impl SelectState {
     pub(crate) fn new(
         seq: Sequence,
         request_hash: u64,
-        time: tokio::time::Instant,
+        time: MonotonicTime,
         object_hash: u64,
     ) -> Self {
         Self {
@@ -45,11 +46,12 @@ impl SelectState {
 
     pub(crate) fn match_operate(
         &self,
+        now: MonotonicTime,
         timeout: Timeout,
         seq: Sequence,
         object_hash: u64,
     ) -> Result<(), CommandStatus> {
-        let elapsed = tokio::time::Instant::now().checked_duration_since(self.time);
+        let elapsed = now.checked_duration_since(self.time);
 
         // check the sequence number
         if self.seq.next() != seq.value() {
