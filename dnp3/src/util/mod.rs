@@ -12,6 +12,7 @@ pub(crate) mod deadline;
 pub(crate) mod decode;
 pub(crate) mod float;
 pub(crate) mod lifecycle;
+pub(crate) mod rfc3339;
 pub(crate) mod shutdown;
 pub(crate) mod skipped;
 #[cfg(test)]
