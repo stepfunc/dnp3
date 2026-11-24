@@ -10,7 +10,6 @@ use crate::app::measurement::DoubleBit;
 use crate::app::variations::Variation;
 use crate::app::QualifierCode;
 
-use chrono::{DateTime, SecondsFormat, TimeZone, Utc};
 use scursor::{WriteCursor, WriteError};
 
 /// Wrapper around a u64 count of milliseconds since Unix epoch UTC
@@ -22,7 +21,6 @@ pub struct Timestamp {
 impl Timestamp {
     /// Maximum allowed DNP3 timestamp value (48-bits)
     pub const MAX_VALUE: u64 = 0x0000_FFFF_FFFF_FFFF;
-    pub(crate) const OUT_OF_RANGE: &'static str = "<out of range>";
 
     /// Create a timestamp from a count of milliseconds since epoch
     pub const fn new(value: u64) -> Self {
@@ -59,12 +57,6 @@ impl Timestamp {
         ))
     }
 
-    /// Attempt to create a `DateTime<Utc>` from a Timestamp
-    pub fn to_datetime_utc(self) -> Option<DateTime<Utc>> {
-        Utc.timestamp_millis_opt(self.value.try_into().ok()?)
-            .single()
-    }
-
     /// Retrieve the raw u64 value
     pub fn raw_value(&self) -> u64 {
         self.value
@@ -87,12 +79,9 @@ impl Timestamp {
     }
 }
 
-impl std::fmt::Display for Timestamp {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self.to_datetime_utc() {
-            Some(x) => write!(f, "{}", x.to_rfc3339_opts(SecondsFormat::Millis, true)),
-            None => f.write_str(Timestamp::OUT_OF_RANGE),
-        }
+impl core::fmt::Display for Timestamp {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        crate::util::rfc3339::format_utc_millis(self.value, f)
     }
 }
 
@@ -169,16 +158,14 @@ mod test {
     use super::*;
 
     #[test]
-    fn conversion_from_timestamp_to_datetime_utc_cannot_overflow() {
-        let timestamp = Timestamp::new(u64::MAX);
-        timestamp.to_datetime_utc();
-    }
-
-    #[test]
-    fn timestamp_display_formatting_works_as_expected() {
+    fn timestamp_display_formats_bounds_and_masks_to_48_bits() {
         assert_eq!(format!("{}", Timestamp::min()), "1970-01-01T00:00:00.000Z");
         assert_eq!(
             format!("{}", Timestamp::max()),
+            "+10889-08-02T05:31:50.655Z"
+        );
+        assert_eq!(
+            format!("{}", Timestamp::new(u64::MAX)),
             "+10889-08-02T05:31:50.655Z"
         );
     }

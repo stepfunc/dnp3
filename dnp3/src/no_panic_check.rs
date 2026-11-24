@@ -13,7 +13,8 @@
 //! Built by the `no-panic` CI job with `--cfg dnp3_no_panic`, in release with LTO and one
 //! codegen unit, which the optimizer needs to see through calls into other crates. The
 //! [`encode`] module does the same for the encoders, [`queue`] for the bounded queue, and
-//! [`respond`] for the outstation's selection and writing of responses.
+//! [`respond`] for the outstation's selection and writing of responses; [`format_rfc3339`]
+//! checks the RFC 3339 UTC timestamp formatter for any `u64` millisecond count.
 
 mod encode;
 mod queue;
@@ -420,6 +421,20 @@ fn segments(mut data: &[u8]) {
         std::hint::black_box(assemble(&mut assembler, info, segment));
         data = next;
     }
+}
+
+/// RFC 3339 UTC formatting for any `u64` millisecond timestamp
+#[no_panic::no_panic]
+fn format_rfc3339(millis: u64) -> usize {
+    let formatted = crate::util::rfc3339::FormattedUtcMillis::new(millis);
+    std::hint::black_box(formatted.as_str()).len()
+}
+
+#[test]
+fn rfc3339_with_unknown_input() {
+    let data = std::hint::black_box(input());
+    let mut source = Source(&data);
+    std::hint::black_box(format_rfc3339(source.u64()));
 }
 
 #[test]
