@@ -91,78 +91,6 @@ impl<C: MonotonicClock> SessionContext<C> {
         }))
     }
 
-    /// Classify a request against the last valid request and update selection state.
-    ///
-    /// Returns `None` if a SELECT repeats the active selection's sequence number with different
-    /// contents (IEEE 1815-2012 Table 4-9). Otherwise ends any active selection, passing it to a
-    /// `NewNonRead` (for OPERATE) unless the request is a retry of the SELECT itself (4.4.4 Rule 4
-    /// and Table 4-9).
-    fn classify<'a>(
-        &mut self,
-        info: FragmentInfo,
-        request: Request<'a>,
-    ) -> Option<FragmentType<'a>> {
-        if let Some(mode) = info.broadcast {
-            self.state.select = None;
-            return Some(FragmentType::Broadcast {
-                mode,
-                objects: request.objects,
-            });
-        }
-
-        let this_hash = xxh64(request.raw_fragment, 0);
-
-        let object_headers = match request.objects {
-            Ok(x) => x,
-            Err(err) => {
-                self.state.select = None;
-                return Some(FragmentType::MalformedRequest(this_hash, err));
-            }
-        };
-
-        let is_repeat = self.state.last_valid_request.is_some_and(|last| {
-            last.seq == request.header.control.seq && last.request_hash == this_hash
-        });
-
-        if request.header.function == FunctionCode::Read {
-            self.state.select = None;
-            return Some(if is_repeat {
-                FragmentType::RepeatRead(this_hash, object_headers)
-            } else {
-                FragmentType::NewRead(this_hash, object_headers)
-            });
-        }
-
-        if is_repeat {
-            // Keep the selection only when this repeat is a retry of the SELECT itself.
-            if !self
-                .state
-                .select
-                .is_some_and(|select| select.request_hash() == this_hash)
-            {
-                self.state.select = None;
-            }
-            return Some(FragmentType::RepeatNonRead);
-        }
-
-        if request.header.function == FunctionCode::Select
-            && self
-                .state
-                .select
-                .is_some_and(|select| select.seq() == request.header.control.seq)
-        {
-            tracing::warn!("discarding SELECT that repeats the selection's sequence number with different contents");
-            return None;
-        }
-
-        let selection = self.state.select.take();
-        Some(FragmentType::NewNonRead {
-            hash: this_hash,
-            objects: object_headers,
-            selection,
-        })
-    }
-
     /// Defer a READ received during `UnsolConfirmWait` so it runs once the wait ends.
     pub(super) fn defer_read(
         &mut self,
@@ -276,6 +204,78 @@ impl<C: MonotonicClock> SessionContext<C> {
             self.publish_read_response(sol, deferred.info.addr, true, deferred.seq, deferred.iin2);
         self.state.last_valid_request = Some(LastValidRequest::new(deferred.seq, deferred.hash));
         Some(tx)
+    }
+
+    /// Classify a request against the last valid request and update selection state.
+    ///
+    /// Returns `None` if a SELECT repeats the active selection's sequence number with different
+    /// contents (IEEE 1815-2012 Table 4-9). Otherwise ends any active selection, passing it to a
+    /// `NewNonRead` (for OPERATE) unless the request is a retry of the SELECT itself (4.4.4 Rule 4
+    /// and Table 4-9).
+    fn classify<'a>(
+        &mut self,
+        info: FragmentInfo,
+        request: Request<'a>,
+    ) -> Option<FragmentType<'a>> {
+        if let Some(mode) = info.broadcast {
+            self.state.select = None;
+            return Some(FragmentType::Broadcast {
+                mode,
+                objects: request.objects,
+            });
+        }
+
+        let this_hash = xxh64(request.raw_fragment, 0);
+
+        let object_headers = match request.objects {
+            Ok(x) => x,
+            Err(err) => {
+                self.state.select = None;
+                return Some(FragmentType::MalformedRequest(this_hash, err));
+            }
+        };
+
+        let is_repeat = self.state.last_valid_request.is_some_and(|last| {
+            last.seq == request.header.control.seq && last.request_hash == this_hash
+        });
+
+        if request.header.function == FunctionCode::Read {
+            self.state.select = None;
+            return Some(if is_repeat {
+                FragmentType::RepeatRead(this_hash, object_headers)
+            } else {
+                FragmentType::NewRead(this_hash, object_headers)
+            });
+        }
+
+        if is_repeat {
+            // Keep the selection only when this repeat is a retry of the SELECT itself.
+            if !self
+                .state
+                .select
+                .is_some_and(|select| select.request_hash() == this_hash)
+            {
+                self.state.select = None;
+            }
+            return Some(FragmentType::RepeatNonRead);
+        }
+
+        if request.header.function == FunctionCode::Select
+            && self
+                .state
+                .select
+                .is_some_and(|select| select.seq() == request.header.control.seq)
+        {
+            tracing::warn!("discarding SELECT that repeats the selection's sequence number with different contents");
+            return None;
+        }
+
+        let selection = self.state.select.take();
+        Some(FragmentType::NewNonRead {
+            hash: this_hash,
+            objects: object_headers,
+            selection,
+        })
     }
 
     fn publish_read_response(
