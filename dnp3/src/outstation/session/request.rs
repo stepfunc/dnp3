@@ -185,7 +185,6 @@ impl<C: MonotonicClock> SessionContext<C> {
         &mut self,
         sol: &mut ResponseSlot,
         received: Received<'_>,
-        db: &mut DatabaseHandle,
     ) -> Answer {
         let Received {
             info,
@@ -202,8 +201,8 @@ impl<C: MonotonicClock> SessionContext<C> {
                 // repeated READ. We deliberately answer it as a new READ instead: the fresh
                 // response carries current values, and events that were never confirmed are still
                 // buffered, so they are reported again.
-                let response = format_first_read_response(sol, db, seq, objects);
-                let tx = self.publish_solicited(info.addr, response, db);
+                let response = format_first_read_response(sol, &mut self.db, seq, objects);
+                let tx = self.publish_solicited(info.addr, response);
                 self.state.last_valid_request = Some(LastValidRequest::new(seq, hash));
                 Answer::Respond(tx)
             }
@@ -211,7 +210,7 @@ impl<C: MonotonicClock> SessionContext<C> {
                 // IEEE 1815-2012 clause 6.1: a request whose objects don't parse is still the last
                 // request, answered with IIN2.
                 let header = ResponseHeader::solicited(seq, Iin::default() | Iin2::from(err));
-                let tx = self.publish_solicited(info.addr, sol.empty(header), db);
+                let tx = self.publish_solicited(info.addr, sol.empty(header));
                 self.state.last_valid_request = Some(LastValidRequest::new(seq, hash));
                 Answer::Respond(tx)
             }
@@ -222,13 +221,11 @@ impl<C: MonotonicClock> SessionContext<C> {
             } => {
                 let last = LastValidRequest::new(seq, hash);
                 let result = self
-                    .handle_non_read(sol, header.function, last, selection, objects, db)
+                    .handle_non_read(sol, header.function, last, selection, objects)
                     .await;
                 self.state.last_valid_request = Some(last);
                 match result {
-                    Some(response) => {
-                        Answer::Respond(self.publish_solicited(info.addr, response, db))
-                    }
+                    Some(response) => Answer::Respond(self.publish_solicited(info.addr, response)),
                     None => {
                         sol.clear();
                         Answer::Silent
@@ -244,7 +241,7 @@ impl<C: MonotonicClock> SessionContext<C> {
                 }
             }
             FragmentType::Broadcast { mode, objects } => {
-                Answer::Broadcast(self.process_broadcast(db, mode, header, objects).await)
+                Answer::Broadcast(self.process_broadcast(mode, header, objects).await)
             }
         }
     }
@@ -256,11 +253,10 @@ impl<C: MonotonicClock> SessionContext<C> {
         &mut self,
         transient: &mut [u8; ResponseHeader::LENGTH],
         seq: Sequence,
-        db: &mut DatabaseHandle,
     ) {
         self.state.deferred_read.clear();
         let iin = Iin::default() | Iin2::NO_FUNC_CODE_SUPPORT;
-        self.build_transient_solicited(transient, ResponseHeader::solicited(seq, iin), db);
+        self.build_transient_solicited(transient, ResponseHeader::solicited(seq, iin));
     }
 
     /// Format and publish the next continuation fragment of a multi-fragment READ series.
@@ -269,22 +265,17 @@ impl<C: MonotonicClock> SessionContext<C> {
         sol: &mut ResponseSlot,
         to: FragmentAddr,
         seq: Sequence,
-        db: &mut DatabaseHandle,
     ) -> SolTx {
-        let response = format_read_response(sol, db, false, seq, Iin2::default());
-        self.publish_solicited(to, response, db)
+        let response = format_read_response(sol, &mut self.db, false, seq, Iin2::default());
+        self.publish_solicited(to, response)
     }
 
     /// If a deferred READ is pending, select it and publish its first response fragment into `sol`.
-    pub(super) fn stage_deferred_read(
-        &mut self,
-        sol: &mut ResponseSlot,
-        db: &mut DatabaseHandle,
-    ) -> Option<SolTx> {
-        let deferred = self.state.deferred_read.select(db)?;
+    pub(super) fn stage_deferred_read(&mut self, sol: &mut ResponseSlot) -> Option<SolTx> {
+        let deferred = self.state.deferred_read.select(&mut self.db)?;
         tracing::info!("handling deferred READ request");
-        let response = format_read_response(sol, db, true, deferred.seq, deferred.iin2);
-        let tx = self.publish_solicited(deferred.info.addr, response, db);
+        let response = format_read_response(sol, &mut self.db, true, deferred.seq, deferred.iin2);
+        let tx = self.publish_solicited(deferred.info.addr, response);
         self.state.last_valid_request = Some(LastValidRequest::new(deferred.seq, deferred.hash));
         Some(tx)
     }

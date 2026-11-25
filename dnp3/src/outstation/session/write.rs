@@ -14,7 +14,6 @@ use crate::app::parse::range::RangedSequence;
 use crate::app::parse::traits::{FixedSizeVariation, Index};
 use crate::app::variations::{Group34Var1, Group34Var2, Group34Var3, Group50Var1, Group50Var3};
 use crate::app::{FunctionCode, Iin, Iin2, ResponseHeader, Sequence};
-use crate::outstation::database::DatabaseHandle;
 use crate::outstation::target::{DeadBands, Selector, WriteHeader, WriteTarget};
 use crate::util::clock::MonotonicClock;
 
@@ -23,7 +22,6 @@ impl<C: MonotonicClock> SessionContext<C> {
         &mut self,
         seq: Sequence,
         object_headers: HeaderCollection<'_>,
-        database: &mut DatabaseHandle,
     ) -> ResponseHeader {
         let mut iin2 = Iin2::default();
         let mut empty = true;
@@ -32,7 +30,7 @@ impl<C: MonotonicClock> SessionContext<C> {
         for header in object_headers.iter() {
             empty = false;
             iin2 |= match selector.select::<WriteTarget>(header) {
-                Ok(header) => self.handle_single_write_header(header, database).await,
+                Ok(header) => self.handle_single_write_header(header).await,
                 Err(iin2) => iin2,
             };
         }
@@ -45,21 +43,17 @@ impl<C: MonotonicClock> SessionContext<C> {
         ResponseHeader::solicited(seq, Iin::default() | iin2)
     }
 
-    async fn handle_single_write_header(
-        &mut self,
-        header: WriteHeader<'_>,
-        db: &mut DatabaseHandle,
-    ) -> Iin2 {
+    async fn handle_single_write_header(&mut self, header: WriteHeader<'_>) -> Iin2 {
         let deadband_iin = match header {
-            WriteHeader::Attr(attr) => return self.handle_write_attr(attr, db).await,
+            WriteHeader::Attr(attr) => return self.handle_write_attr(attr).await,
             WriteHeader::Iin(bits) => return self.handle_write_iin(bits),
             WriteHeader::AbsoluteTime(seq) => return self.handle_write_abs_time(seq),
             WriteHeader::LastRecordedTime(seq) => {
                 return self.handle_write_at_last_recorded_time(seq);
             }
-            WriteHeader::DeadBands16(items) => self.apply_write_dead_bands(items, db),
-            WriteHeader::DeadBands32(items) => self.apply_write_dead_bands(items, db),
-            WriteHeader::DeadBandsFloat(items) => self.apply_write_dead_bands(items, db),
+            WriteHeader::DeadBands16(items) => self.apply_write_dead_bands(items),
+            WriteHeader::DeadBands32(items) => self.apply_write_dead_bands(items),
+            WriteHeader::DeadBandsFloat(items) => self.apply_write_dead_bands(items),
         };
 
         match deadband_iin {
@@ -71,9 +65,12 @@ impl<C: MonotonicClock> SessionContext<C> {
         }
     }
 
-    async fn handle_write_attr(&mut self, attr: Attribute<'_>, db: &mut DatabaseHandle) -> Iin2 {
+    async fn handle_write_attr(&mut self, attr: Attribute<'_>) -> Iin2 {
         // First validate that attribute can be written.
-        if let Err(err) = db.with_database(|db| db.inner.get_attr_map().can_write(attr)) {
+        if let Err(err) = self
+            .db
+            .with_database(|db| db.inner.get_attr_map().can_write(attr))
+        {
             tracing::warn!("Unable to WRITE attribute: {err}");
             return err.into();
         }
@@ -84,7 +81,10 @@ impl<C: MonotonicClock> SessionContext<C> {
         }
 
         // This can't fail today: nothing removes an attribute or changes its type once defined.
-        if let Err(err) = db.with_database(|db| db.inner.get_attr_map().write(attr)) {
+        if let Err(err) = self
+            .db
+            .with_database(|db| db.inner.get_attr_map().write(attr))
+        {
             tracing::error!("Unable to store the WRITE of an attribute: {err}");
             return Iin2::PARAMETER_ERROR;
         }
@@ -160,11 +160,7 @@ impl<C: MonotonicClock> SessionContext<C> {
         }
     }
 
-    fn apply_write_analog_deadbands<I>(
-        &mut self,
-        mut items: I,
-        db: &mut DatabaseHandle,
-    ) -> Option<Iin2>
+    fn apply_write_analog_deadbands<I>(&mut self, mut items: I) -> Option<Iin2>
     where
         I: Iterator<Item = (u16, f64)>,
     {
@@ -174,7 +170,7 @@ impl<C: MonotonicClock> SessionContext<C> {
 
         self.application.begin_write_analog_dead_bands();
 
-        let iin = db.with_database(|db| {
+        let iin = self.db.with_database(|db| {
             let mut iin2 = Iin2::default();
             for (index, deadband) in items.by_ref() {
                 match db.inner.set_analog_deadband(index, deadband) {
@@ -191,21 +187,16 @@ impl<C: MonotonicClock> SessionContext<C> {
     fn apply_write_ranged_analog_deadbands<V>(
         &mut self,
         items: RangedSequence<'_, V>,
-        db: &mut DatabaseHandle,
     ) -> Option<Iin2>
     where
         V: FixedSizeVariation + Into<f64>,
     {
-        self.apply_write_analog_deadbands(
-            items.iter().map(|(value, index)| (index, value.into())),
-            db,
-        )
+        self.apply_write_analog_deadbands(items.iter().map(|(value, index)| (index, value.into())))
     }
 
     fn apply_write_prefixed_analog_deadbands<I, V>(
         &mut self,
         items: CountSequence<'_, Prefix<I, V>>,
-        db: &mut DatabaseHandle,
     ) -> Option<Iin2>
     where
         I: Index,
@@ -215,22 +206,17 @@ impl<C: MonotonicClock> SessionContext<C> {
             items
                 .iter()
                 .map(|x| (x.index.widen_to_u16(), x.value.into())),
-            db,
         )
     }
 
-    fn apply_write_dead_bands<V>(
-        &mut self,
-        items: DeadBands<'_, V>,
-        db: &mut DatabaseHandle,
-    ) -> Option<Iin2>
+    fn apply_write_dead_bands<V>(&mut self, items: DeadBands<'_, V>) -> Option<Iin2>
     where
         V: FixedSizeVariation + Into<f64>,
     {
         match items {
-            DeadBands::Range(seq) => self.apply_write_ranged_analog_deadbands(seq, db),
-            DeadBands::OneBytePrefix(seq) => self.apply_write_prefixed_analog_deadbands(seq, db),
-            DeadBands::TwoBytePrefix(seq) => self.apply_write_prefixed_analog_deadbands(seq, db),
+            DeadBands::Range(seq) => self.apply_write_ranged_analog_deadbands(seq),
+            DeadBands::OneBytePrefix(seq) => self.apply_write_prefixed_analog_deadbands(seq),
+            DeadBands::TwoBytePrefix(seq) => self.apply_write_prefixed_analog_deadbands(seq),
         }
     }
 }

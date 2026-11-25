@@ -8,29 +8,24 @@ use super::context::SessionContext;
 use crate::app::parse::parser::HeaderCollection;
 use crate::app::{FunctionCode, ObjectParseError, RequestHeader};
 use crate::link::header::BroadcastConfirmMode;
-use crate::outstation::database::DatabaseHandle;
 use crate::outstation::traits::{BroadcastAction, FreezeType};
 use crate::util::clock::MonotonicClock;
 
 impl<C: MonotonicClock> SessionContext<C> {
     pub(super) async fn process_broadcast(
         &mut self,
-        database: &mut DatabaseHandle,
         mode: BroadcastConfirmMode,
         header: RequestHeader,
         objects: Result<HeaderCollection<'_>, ObjectParseError>,
     ) -> BroadcastAction {
         self.state.broadcast.received(mode);
-        let action = self
-            .process_broadcast_get_action(database, header, objects)
-            .await;
+        let action = self.process_broadcast_get_action(header, objects).await;
         self.info.broadcast_received(header.function, action);
         action
     }
 
     async fn process_broadcast_get_action(
         &mut self,
-        database: &mut DatabaseHandle,
         header: RequestHeader,
         objects: Result<HeaderCollection<'_>, ObjectParseError>,
     ) -> BroadcastAction {
@@ -57,35 +52,23 @@ impl<C: MonotonicClock> SessionContext<C> {
 
         match header.function {
             FunctionCode::Write => {
-                self.handle_write(seq, objects, database).await;
+                self.handle_write(seq, objects).await;
                 BroadcastAction::Processed
             }
             FunctionCode::DirectOperateNoResponse => {
-                self.handle_direct_operate_no_ack(database, objects).await;
+                self.handle_direct_operate_no_ack(objects).await;
                 BroadcastAction::Processed
             }
             FunctionCode::ImmediateFreezeNoResponse => {
-                self.handle_freeze(
-                    database,
-                    seq,
-                    objects,
-                    header.function,
-                    FreezeType::ImmediateFreeze,
-                );
+                self.handle_freeze(seq, objects, header.function, FreezeType::ImmediateFreeze);
                 BroadcastAction::Processed
             }
             FunctionCode::FreezeClearNoResponse => {
-                self.handle_freeze(
-                    database,
-                    seq,
-                    objects,
-                    header.function,
-                    FreezeType::FreezeAndClear,
-                );
+                self.handle_freeze(seq, objects, header.function, FreezeType::FreezeAndClear);
                 BroadcastAction::Processed
             }
             FunctionCode::FreezeAtTimeNoResponse => {
-                self.handle_freeze_at_time(database, seq, objects, header.function);
+                self.handle_freeze_at_time(seq, objects, header.function);
                 BroadcastAction::Processed
             }
             FunctionCode::RecordCurrentTime => {

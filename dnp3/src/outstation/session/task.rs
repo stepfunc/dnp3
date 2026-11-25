@@ -62,7 +62,7 @@ struct SessionTeardown<'a, T: Transport> {
 impl<T: Transport> Drop for SessionTeardown<'_, T> {
     fn drop(&mut self) {
         // Re-arm, don't clear: unconfirmed events return to Unselected for re-delivery.
-        self.task.core.reset(&mut self.task.database);
+        self.task.core.reset();
         self.task.reader.reset();
         self.task.writer.reset();
     }
@@ -139,6 +139,7 @@ impl<T: Transport> OutstationTask<T> {
         let core = OutstationCore::new(
             &config,
             phys_addr,
+            handle.clone(),
             application,
             information,
             control_handler,
@@ -252,7 +253,7 @@ impl<T: Transport> OutstationTask<T> {
     where
         F: Future<Output = R>,
     {
-        match self.core.poll(&mut self.database) {
+        match self.core.poll() {
             Output::Transmit(tx) => {
                 let level = self.decode_level;
                 let outbound = tx.outbound();
@@ -313,7 +314,7 @@ impl<T: Transport> OutstationTask<T> {
                         // In-flight `handle_input` runs to completion before switching TCP
                         // connections or shutting down.
                         self.core
-                            .handle_input(input, self.decode_level.application, &mut self.database)
+                            .handle_input(input, self.decode_level.application)
                             .await;
                     }
                 }

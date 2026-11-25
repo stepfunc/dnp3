@@ -80,6 +80,7 @@ impl<C: MonotonicClock> OutstationCore<C> {
     pub(super) fn new(
         config: &OutstationConfig,
         phys_addr: PhysAddr,
+        db: DatabaseHandle,
         application: Box<dyn OutstationApplication>,
         information: Box<dyn OutstationInformation>,
         control_handler: Box<dyn ControlHandler>,
@@ -91,6 +92,7 @@ impl<C: MonotonicClock> OutstationCore<C> {
             ctx: SessionContext::new(
                 config,
                 phys_addr,
+                db,
                 application,
                 information,
                 control_handler,
@@ -104,10 +106,10 @@ impl<C: MonotonicClock> OutstationCore<C> {
     }
 
     /// Reset per-connection protocol state and database selection between communication sessions.
-    pub(super) fn reset(&mut self, db: &mut DatabaseHandle) {
+    pub(super) fn reset(&mut self) {
         self.phase.reset();
         self.slots.clear();
-        self.ctx.reset(db);
+        self.ctx.reset();
     }
 
     /// Active confirm-wait tracing span metadata, if the core is waiting for a confirm.
@@ -117,8 +119,8 @@ impl<C: MonotonicClock> OutstationCore<C> {
 
     /// Drive timers and outbound staging, returning either a [`Transmit`] borrow token to write or
     /// the next deadline and database-watch flag to sleep on.
-    pub(super) fn poll(&mut self, db: &mut DatabaseHandle) -> Output<'_, C> {
-        match self.phase.poll(&mut self.slots, &mut self.ctx, db) {
+    pub(super) fn poll(&mut self) -> Output<'_, C> {
+        match self.phase.poll(&mut self.slots, &mut self.ctx) {
             PollOutcome::Wait {
                 deadline,
                 watch_database,
@@ -144,10 +146,9 @@ impl<C: MonotonicClock> OutstationCore<C> {
         &mut self,
         input: TransportData<'_>,
         app_decode_level: AppDecodeLevel,
-        db: &mut DatabaseHandle,
     ) {
         self.phase
-            .input(&mut self.slots, &mut self.ctx, input, app_decode_level, db)
+            .input(&mut self.slots, &mut self.ctx, input, app_decode_level)
             .await;
     }
 }

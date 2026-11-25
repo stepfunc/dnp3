@@ -15,7 +15,7 @@ use crate::app::variations::{Group52Var1, Group52Var2};
 use crate::app::{FunctionCode, Iin, Iin2, ResponseHeader, Sequence};
 use crate::outstation::control::select::SelectState;
 use crate::outstation::database::assign::Assignments;
-use crate::outstation::database::{DatabaseHandle, EventClass};
+use crate::outstation::database::EventClass;
 use crate::outstation::target::{FreezeTarget, Selector};
 use crate::outstation::traits::{FreezeInterval, FreezeType, RestartDelay};
 use crate::util::clock::MonotonicClock;
@@ -29,14 +29,13 @@ impl<C: MonotonicClock> SessionContext<C> {
         request: LastValidRequest,
         selection: Option<SelectState>,
         object_headers: HeaderCollection<'_>,
-        database: &mut DatabaseHandle,
     ) -> Option<Prepared<'a>> {
         let LastValidRequest { seq, request_hash } = request;
         let extra_iin2 = get_iin2(function, object_headers);
 
         let mut response = match function {
             FunctionCode::Write => {
-                let header = self.handle_write(seq, object_headers, database).await;
+                let header = self.handle_write(seq, object_headers).await;
                 sol.empty(header)
             }
             // These functions don't process objects.
@@ -63,7 +62,6 @@ impl<C: MonotonicClock> SessionContext<C> {
                 self.handle_controls(
                     sol,
                     ControlRequest::Select { request_hash },
-                    database,
                     seq,
                     object_headers,
                 )
@@ -73,73 +71,43 @@ impl<C: MonotonicClock> SessionContext<C> {
                 self.handle_controls(
                     sol,
                     ControlRequest::Operate { selection },
-                    database,
                     seq,
                     object_headers,
                 )
                 .await
             }
             FunctionCode::DirectOperate => {
-                self.handle_controls(
-                    sol,
-                    ControlRequest::DirectOperate,
-                    database,
-                    seq,
-                    object_headers,
-                )
-                .await
+                self.handle_controls(sol, ControlRequest::DirectOperate, seq, object_headers)
+                    .await
             }
             FunctionCode::DirectOperateNoResponse => {
-                self.handle_direct_operate_no_ack(database, object_headers)
-                    .await;
+                self.handle_direct_operate_no_ack(object_headers).await;
                 return None;
             }
             FunctionCode::ImmediateFreeze => {
-                let header = self.handle_freeze(
-                    database,
-                    seq,
-                    object_headers,
-                    function,
-                    FreezeType::ImmediateFreeze,
-                );
+                let header =
+                    self.handle_freeze(seq, object_headers, function, FreezeType::ImmediateFreeze);
                 sol.empty(header)
             }
             FunctionCode::ImmediateFreezeNoResponse => {
-                self.handle_freeze(
-                    database,
-                    seq,
-                    object_headers,
-                    function,
-                    FreezeType::ImmediateFreeze,
-                );
+                self.handle_freeze(seq, object_headers, function, FreezeType::ImmediateFreeze);
                 return None;
             }
             FunctionCode::FreezeClear => {
-                let header = self.handle_freeze(
-                    database,
-                    seq,
-                    object_headers,
-                    function,
-                    FreezeType::FreezeAndClear,
-                );
+                let header =
+                    self.handle_freeze(seq, object_headers, function, FreezeType::FreezeAndClear);
                 sol.empty(header)
             }
             FunctionCode::FreezeClearNoResponse => {
-                self.handle_freeze(
-                    database,
-                    seq,
-                    object_headers,
-                    function,
-                    FreezeType::FreezeAndClear,
-                );
+                self.handle_freeze(seq, object_headers, function, FreezeType::FreezeAndClear);
                 return None;
             }
             FunctionCode::FreezeAtTime => {
-                let header = self.handle_freeze_at_time(database, seq, object_headers, function);
+                let header = self.handle_freeze_at_time(seq, object_headers, function);
                 sol.empty(header)
             }
             FunctionCode::FreezeAtTimeNoResponse => {
-                self.handle_freeze_at_time(database, seq, object_headers, function);
+                self.handle_freeze_at_time(seq, object_headers, function);
                 return None;
             }
             FunctionCode::EnableUnsolicited => {
@@ -151,9 +119,7 @@ impl<C: MonotonicClock> SessionContext<C> {
                 sol.empty(header)
             }
             FunctionCode::AssignClass => {
-                let header = self
-                    .handle_assign_class(database, seq, object_headers)
-                    .await;
+                let header = self.handle_assign_class(seq, object_headers).await;
                 sol.empty(header)
             }
             _ => {
@@ -211,7 +177,6 @@ impl<C: MonotonicClock> SessionContext<C> {
     /// Apply an ASSIGN_CLASS request to the database, then report it to the application.
     async fn handle_assign_class(
         &mut self,
-        database: &mut DatabaseHandle,
         seq: Sequence,
         object_headers: HeaderCollection<'_>,
     ) -> ResponseHeader {
@@ -224,7 +189,10 @@ impl<C: MonotonicClock> SessionContext<C> {
             tracing::warn!("ASSIGN_CLASS request has no object headers");
             return ResponseHeader::solicited(seq, Iin::default() | Iin2::PARAMETER_ERROR);
         }
-        if let Err(iin2) = database.with_database(|db| db.inner.assign_classes(&object_headers)) {
+        if let Err(iin2) = self
+            .db
+            .with_database(|db| db.inner.assign_classes(&object_headers))
+        {
             return ResponseHeader::solicited(seq, Iin::default() | iin2);
         }
 
@@ -242,7 +210,6 @@ impl<C: MonotonicClock> SessionContext<C> {
 
     pub(super) fn handle_freeze(
         &mut self,
-        database: &mut DatabaseHandle,
         seq: Sequence,
         object_headers: HeaderCollection,
         function: FunctionCode,
@@ -252,7 +219,7 @@ impl<C: MonotonicClock> SessionContext<C> {
         let mut selector = Selector::new(function);
 
         for header in object_headers.iter() {
-            iin |= self.handle_freeze_header(database, &mut selector, freeze_type, header);
+            iin |= self.handle_freeze_header(&mut selector, freeze_type, header);
         }
         selector.log();
 
@@ -261,7 +228,6 @@ impl<C: MonotonicClock> SessionContext<C> {
 
     pub(super) fn handle_freeze_at_time(
         &mut self,
-        database: &mut DatabaseHandle,
         seq: Sequence,
         object_headers: HeaderCollection,
         function: FunctionCode,
@@ -295,7 +261,6 @@ impl<C: MonotonicClock> SessionContext<C> {
                         }
                         Some(x) => {
                             iin |= self.handle_freeze_header(
-                                database,
                                 &mut selector,
                                 FreezeType::FreezeAtTime(x),
                                 header,
@@ -316,7 +281,6 @@ impl<C: MonotonicClock> SessionContext<C> {
 
     fn handle_freeze_header(
         &mut self,
-        database: &mut DatabaseHandle,
         selector: &mut Selector,
         freeze_type: FreezeType,
         header: ObjectHeader,
@@ -324,7 +288,7 @@ impl<C: MonotonicClock> SessionContext<C> {
         match selector.select::<FreezeTarget>(header) {
             Ok(indices) => self
                 .application
-                .freeze_counter(indices, freeze_type, database)
+                .freeze_counter(indices, freeze_type, &mut self.db)
                 .map_or_else(|err| err.into(), |_| Iin2::default()),
             Err(err) => err,
         }

@@ -13,7 +13,6 @@ use super::state::{
 };
 use crate::app::{FunctionCode, ResponseHeader, Sequence};
 use crate::decode::AppDecodeLevel;
-use crate::outstation::database::DatabaseHandle;
 use crate::outstation::traits::BroadcastAction;
 use crate::transport::{FragmentAddr, TransportData};
 use crate::util::clock::{MonotonicClock, MonotonicTime};
@@ -295,7 +294,6 @@ impl Phase {
         &mut self,
         slots: &mut Slots,
         ctx: &mut SessionContext<C>,
-        db: &mut DatabaseHandle,
     ) -> Active {
         match std::mem::replace(&mut self.state, State::InFlight) {
             State::Waiting(waiting) => Active::Waiting(waiting),
@@ -303,7 +301,7 @@ impl Phase {
             State::InFlight => {
                 tracing::warn!("recovering outstation core after abandoned operation");
                 slots.clear();
-                ctx.reset(db);
+                ctx.reset();
                 Active::Waiting(Waiting::Idle)
             }
         }
@@ -317,9 +315,8 @@ impl Phase {
         &mut self,
         slots: &'a mut Slots,
         ctx: &mut SessionContext<C>,
-        db: &mut DatabaseHandle,
     ) -> PollOutcome<'a> {
-        let waiting = match self.begin(slots, ctx, db).on_poll(slots, ctx, db) {
+        let waiting = match self.begin(slots, ctx).on_poll(slots, ctx) {
             Active::Waiting(waiting) => waiting,
             Active::Staged(staged) => match staged.outbound(slots, ctx.destination) {
                 Some(outbound) => return PollOutcome::Transmit { outbound, staged },
@@ -342,11 +339,10 @@ impl Phase {
         ctx: &mut SessionContext<C>,
         input: TransportData<'_>,
         app_decode_level: AppDecodeLevel,
-        db: &mut DatabaseHandle,
     ) {
-        let active = self.begin(slots, ctx, db);
+        let active = self.begin(slots, ctx);
         let next = match ctx.receive(input, app_decode_level) {
-            Some(intake) => active.on_input(slots, ctx, intake, db).await,
+            Some(intake) => active.on_input(slots, ctx, intake).await,
             None => active,
         };
         self.state = next.into();
@@ -394,12 +390,7 @@ impl Active {
     }
 
     /// Drive timers and outbound staging, leaving any already-staged transmission intact.
-    fn on_poll<C: MonotonicClock>(
-        self,
-        slots: &mut Slots,
-        ctx: &mut SessionContext<C>,
-        db: &mut DatabaseHandle,
-    ) -> Self {
+    fn on_poll<C: MonotonicClock>(self, slots: &mut Slots, ctx: &mut SessionContext<C>) -> Self {
         let waiting = match self {
             Self::Staged(staged) => return Self::Staged(staged),
             Self::Waiting(waiting) => waiting,
@@ -412,18 +403,18 @@ impl Active {
                 }
                 ctx.info.solicited_confirm_timeout(wait.series.ecsn);
                 tracing::warn!("confirm timeout");
-                db.reset();
-                Self::idle_poll(slots, ctx, db)
+                ctx.db.reset();
+                Self::idle_poll(slots, ctx)
             }
 
             Waiting::UnsolConfirmWait(wait) => {
                 if !ctx.clock.has_reached(wait.deadline) {
                     return Self::unsol_wait(wait);
                 }
-                Self::unsol_confirm_timeout(wait, slots, ctx, db)
+                Self::unsol_confirm_timeout(wait, slots, ctx)
             }
 
-            Waiting::Idle => Self::idle_poll(slots, ctx, db),
+            Waiting::Idle => Self::idle_poll(slots, ctx),
         }
     }
 
@@ -433,32 +424,25 @@ impl Active {
         slots: &mut Slots,
         ctx: &mut SessionContext<C>,
         intake: Intake<'_>,
-        db: &mut DatabaseHandle,
     ) -> Self {
         let waiting = match self {
             Self::Waiting(waiting) => waiting,
             Self::Staged(staged) => staged.unstage(),
         };
         match waiting {
-            Waiting::Idle => Self::idle_input(slots, ctx, intake, db).await,
-            Waiting::SolConfirmWait(wait) => {
-                Self::sol_wait_input(wait, slots, ctx, intake, db).await
-            }
+            Waiting::Idle => Self::idle_input(slots, ctx, intake).await,
+            Waiting::SolConfirmWait(wait) => Self::sol_wait_input(wait, slots, ctx, intake).await,
             Waiting::UnsolConfirmWait(wait) => {
-                Self::unsol_wait_input(wait, slots, ctx, intake, db).await
+                Self::unsol_wait_input(wait, slots, ctx, intake).await
             }
         }
     }
 
-    fn idle_poll<C: MonotonicClock>(
-        slots: &mut Slots,
-        ctx: &mut SessionContext<C>,
-        db: &mut DatabaseHandle,
-    ) -> Self {
+    fn idle_poll<C: MonotonicClock>(slots: &mut Slots, ctx: &mut SessionContext<C>) -> Self {
         // Priority order in Idle: deferred READ -> keep-alive -> unsolicited.
         // Keep-alive runs before unsolicited so an unconfirmed NULL unsolicited loop cannot starve
         // link status requests between confirm waits.
-        if let Some(sol) = ctx.stage_deferred_read(&mut slots.sol, db) {
+        if let Some(sol) = ctx.stage_deferred_read(&mut slots.sol) {
             return Self::stage_idle(IdleTx::Solicited(sol));
         }
 
@@ -466,7 +450,7 @@ impl Active {
             return Self::stage_idle(IdleTx::LinkStatus);
         }
 
-        if let Some((seq, kind)) = ctx.stage_unsolicited(&mut slots.unsol, db) {
+        if let Some((seq, kind)) = ctx.stage_unsolicited(&mut slots.unsol) {
             return Self::stage_idle(IdleTx::Unsolicited { seq, kind });
         }
 
@@ -477,14 +461,13 @@ impl Active {
         wait: UnsolConfirmWait,
         slots: &mut Slots,
         ctx: &mut SessionContext<C>,
-        db: &mut DatabaseHandle,
     ) -> Self {
         match wait.kind {
             UnsolicitedWaitKind::Null => {
                 ctx.info.unsolicited_confirm_timeout(wait.seq, false);
-                db.reset();
+                ctx.db.reset();
                 ctx.state.unsolicited = UnsolicitedState::NullRequired;
-                Self::idle_poll(slots, ctx, db)
+                Self::idle_poll(slots, ctx)
             }
             UnsolicitedWaitKind::Events { mut retries } => {
                 let retry = !ctx.state.deferred_read.is_set() && retries.decrement();
@@ -497,11 +480,11 @@ impl Active {
                     return Self::stage_unsol(wait, UnsolTx::Retry);
                 }
 
-                db.reset();
+                ctx.db.reset();
                 ctx.state.unsolicited = UnsolicitedState::Ready {
                     retry_at: Some(ctx.new_unsolicited_retry_deadline()),
                 };
-                Self::idle_poll(slots, ctx, db)
+                Self::idle_poll(slots, ctx)
             }
         }
     }
@@ -510,13 +493,12 @@ impl Active {
         slots: &mut Slots,
         ctx: &mut SessionContext<C>,
         intake: Intake<'_>,
-        db: &mut DatabaseHandle,
     ) -> Self {
         match intake {
             Intake::UnknownFunction(from, seq) => {
                 // Unknown function is not a valid request, so `process_request_from_idle` is not
                 // called.
-                ctx.stage_unknown_function(&mut slots.transient, seq, db);
+                ctx.stage_unknown_function(&mut slots.transient, seq);
                 Self::stage_idle(IdleTx::Transient(from))
             }
             Intake::Confirm(_, header) => {
@@ -534,7 +516,7 @@ impl Active {
             }
             Intake::Request(received) => {
                 ctx.info.process_request_from_idle(received.header);
-                match ctx.accept_request(&mut slots.sol, received, db).await {
+                match ctx.accept_request(&mut slots.sol, received).await {
                     Answer::Respond(sol) => Self::stage_idle(IdleTx::Solicited(sol)),
                     Answer::Silent | Answer::Broadcast(_) => Self::idle(),
                 }
@@ -547,7 +529,6 @@ impl Active {
         slots: &mut Slots,
         ctx: &mut SessionContext<C>,
         intake: Intake<'_>,
-        db: &mut DatabaseHandle,
     ) -> Self {
         match intake {
             Intake::Confirm(from, header) => {
@@ -568,7 +549,7 @@ impl Active {
 
                 ctx.info.solicited_confirm_received(wait.series.ecsn);
                 ctx.state.broadcast.confirmed(ResponseKind::Solicited);
-                ctx.clear_written_events(db).await;
+                ctx.clear_written_events().await;
 
                 if wait.series.fin {
                     return Self::idle();
@@ -577,7 +558,7 @@ impl Active {
                 // Format the next response in the multi-fragment series.
                 let mut next_seq = wait.series.ecsn;
                 next_seq.increment();
-                let sol = ctx.next_read_fragment(&mut slots.sol, from, next_seq, db);
+                let sol = ctx.next_read_fragment(&mut slots.sol, from, next_seq);
                 match sol.awaits {
                     Some(series) => Self::stage_sol(
                         SolConfirmWait {
@@ -597,8 +578,8 @@ impl Active {
             intake @ (Intake::UnknownFunction(..) | Intake::Request(_)) => {
                 ctx.info.solicited_confirm_wait_new_request();
                 tracing::info!("aborting solicited response due to new request");
-                db.reset();
-                Self::idle_input(slots, ctx, intake, db).await
+                ctx.db.reset();
+                Self::idle_input(slots, ctx, intake).await
             }
         }
     }
@@ -608,7 +589,6 @@ impl Active {
         slots: &mut Slots,
         ctx: &mut SessionContext<C>,
         intake: Intake<'_>,
-        db: &mut DatabaseHandle,
     ) -> Self {
         match intake {
             Intake::UnknownFunction(from, seq) => {
@@ -616,7 +596,7 @@ impl Active {
                 // isn't the response to a valid request, so the outstation doesn't wait for its
                 // confirm.
                 wait.solicited = None;
-                ctx.stage_unknown_function(&mut slots.transient, seq, db);
+                ctx.stage_unknown_function(&mut slots.transient, seq);
                 Self::stage_unsol(wait, UnsolTx::Transient(from))
             }
             Intake::Confirm(_, header) => {
@@ -626,7 +606,7 @@ impl Active {
                         ctx.state.broadcast.confirmed(ResponseKind::Unsolicited);
                         ctx.info.unsolicited_confirmed(seq);
                         if matches!(wait.kind, UnsolicitedWaitKind::Events { .. }) {
-                            ctx.clear_written_events(db).await;
+                            ctx.clear_written_events().await;
                         }
                         ctx.state.unsolicited = UnsolicitedState::Ready { retry_at: None };
                         return Self::idle();
@@ -667,7 +647,7 @@ impl Active {
                     return Self::unsol_wait(wait);
                 }
 
-                let answer = ctx.accept_request(&mut slots.sol, received, db).await;
+                let answer = ctx.accept_request(&mut slots.sol, received).await;
 
                 // TB2015-002a rule 15: a direct or processed broadcast DISABLE_UNSOLICITED stops
                 // retries for the active unsolicited wait.

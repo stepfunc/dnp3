@@ -11,7 +11,6 @@ use super::phase::SolTx;
 use super::state::{ResponseKind, ResponseSeries};
 use crate::app::*;
 use crate::outstation::config::OutstationConfig;
-use crate::outstation::database::DatabaseHandle;
 use crate::transport::FragmentAddr;
 use crate::util::clock::MonotonicClock;
 
@@ -176,33 +175,19 @@ pub(super) fn awaited_confirm(header: ResponseHeader) -> Option<ResponseSeries> 
 }
 
 impl<C: MonotonicClock> SessionContext<C> {
-    pub(super) fn publish_solicited(
-        &mut self,
-        to: FragmentAddr,
-        response: Prepared<'_>,
-        database: &mut DatabaseHandle,
-    ) -> SolTx {
-        let header = self.publish(response, ResponseKind::Solicited, database);
+    pub(super) fn publish_solicited(&mut self, to: FragmentAddr, response: Prepared<'_>) -> SolTx {
+        let header = self.publish(response, ResponseKind::Solicited);
         SolTx::new(to, header)
     }
 
-    pub(super) fn publish_unsolicited(
-        &mut self,
-        response: Prepared<'_>,
-        database: &mut DatabaseHandle,
-    ) -> Sequence {
-        self.publish(response, ResponseKind::Unsolicited, database)
+    pub(super) fn publish_unsolicited(&mut self, response: Prepared<'_>) -> Sequence {
+        self.publish(response, ResponseKind::Unsolicited)
             .control
             .seq
     }
 
-    fn publish(
-        &mut self,
-        mut response: Prepared<'_>,
-        kind: ResponseKind,
-        database: &mut DatabaseHandle,
-    ) -> ResponseHeader {
-        self.finish_header(response.header_mut(), kind, database);
+    fn publish(&mut self, mut response: Prepared<'_>, kind: ResponseKind) -> ResponseHeader {
+        self.finish_header(response.header_mut(), kind);
         let header = response.header();
         response.publish();
         header
@@ -213,23 +198,17 @@ impl<C: MonotonicClock> SessionContext<C> {
         &mut self,
         transient: &mut [u8; ResponseHeader::LENGTH],
         mut header: ResponseHeader,
-        database: &mut DatabaseHandle,
     ) {
-        self.finish_header(&mut header, ResponseKind::Solicited, database);
+        self.finish_header(&mut header, ResponseKind::Solicited);
         *transient = header.to_bytes();
     }
 
-    fn finish_header(
-        &mut self,
-        header: &mut ResponseHeader,
-        kind: ResponseKind,
-        database: &mut DatabaseHandle,
-    ) {
-        header.iin |= self.get_response_iin(database);
+    fn finish_header(&mut self, header: &mut ResponseHeader, kind: ResponseKind) {
+        header.iin |= self.get_response_iin();
         self.state.broadcast.report(header, kind);
     }
 
-    fn get_response_iin(&self, database: &mut DatabaseHandle) -> Iin {
+    fn get_response_iin(&self) -> Iin {
         let mut iin = Iin::default();
 
         // Restart IIN bit
@@ -238,7 +217,7 @@ impl<C: MonotonicClock> SessionContext<C> {
         }
 
         // Events available & buffer overflow (short DB lock, released before application callback)
-        let events_info = database.get_events_info();
+        let events_info = self.db.get_events_info();
         if events_info.unwritten_classes.class1 {
             iin |= Iin1::CLASS_1_EVENTS;
         }

@@ -14,7 +14,6 @@ use crate::outstation::control::collection::{
     ControlCollection, ControlLimit, ControlMode, ControlTransaction,
 };
 use crate::outstation::control::select::SelectState;
-use crate::outstation::database::DatabaseHandle;
 use crate::outstation::traits::OperateType;
 use crate::util::clock::MonotonicClock;
 
@@ -23,7 +22,6 @@ impl<C: MonotonicClock> SessionContext<C> {
         &mut self,
         sol: &'a mut ResponseSlot,
         request: ControlRequest,
-        database: &mut DatabaseHandle,
         seq: Sequence,
         object_headers: HeaderCollection<'_>,
     ) -> Prepared<'a> {
@@ -44,7 +42,7 @@ impl<C: MonotonicClock> SessionContext<C> {
         let (result, staged) = match request {
             ControlRequest::Select { request_hash } => {
                 let (result, staged) = self
-                    .execute_controls(sol, database, ControlMode::Select, &controls)
+                    .execute_controls(sol, ControlMode::Select, &controls)
                     .await;
                 if let Ok(CommandStatus::Success) = result {
                     // Sample after the async control callback so the select timeout starts when
@@ -75,7 +73,6 @@ impl<C: MonotonicClock> SessionContext<C> {
                     Ok(()) => {
                         self.execute_controls(
                             sol,
-                            database,
                             ControlMode::Operate(OperateType::SelectBeforeOperate),
                             &controls,
                         )
@@ -86,7 +83,6 @@ impl<C: MonotonicClock> SessionContext<C> {
             ControlRequest::DirectOperate => {
                 self.execute_controls(
                     sol,
-                    database,
                     ControlMode::Operate(OperateType::DirectOperate),
                     &controls,
                 )
@@ -99,14 +95,13 @@ impl<C: MonotonicClock> SessionContext<C> {
 
     pub(super) async fn handle_direct_operate_no_ack(
         &mut self,
-        database: &mut DatabaseHandle,
         object_headers: HeaderCollection<'_>,
     ) {
         let Some(controls) = controls(object_headers) else {
             return;
         };
         let max_controls_per_request = self.config.max_controls_per_request;
-        ControlTransaction::execute(self.control_handler.as_mut(), database, |tx, db| {
+        ControlTransaction::execute(self.control_handler.as_mut(), &mut self.db, |tx, db| {
             controls.operate_no_ack(tx, db, ControlLimit::new(max_controls_per_request))
         })
         .await;
@@ -117,22 +112,25 @@ impl<C: MonotonicClock> SessionContext<C> {
     async fn execute_controls<'a>(
         &mut self,
         sol: &'a mut ResponseSlot,
-        database: &mut DatabaseHandle,
         mode: ControlMode,
         controls: &ControlCollection<'_>,
     ) -> (Result<CommandStatus, scursor::WriteError>, Staged<'a>) {
         let max_controls_per_request = self.config.max_controls_per_request;
-        ControlTransaction::execute(self.control_handler.as_mut(), database, move |tx, db| {
-            sol.build(|cursor| {
-                controls.execute_with_response(
-                    cursor,
-                    mode,
-                    tx,
-                    db,
-                    ControlLimit::new(max_controls_per_request),
-                )
-            })
-        })
+        ControlTransaction::execute(
+            self.control_handler.as_mut(),
+            &mut self.db,
+            move |tx, db| {
+                sol.build(|cursor| {
+                    controls.execute_with_response(
+                        cursor,
+                        mode,
+                        tx,
+                        db,
+                        ControlLimit::new(max_controls_per_request),
+                    )
+                })
+            },
+        )
         .await
     }
 }

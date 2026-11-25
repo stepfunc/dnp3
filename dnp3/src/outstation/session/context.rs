@@ -46,14 +46,15 @@ impl From<&OutstationConfig> for SessionConfig {
     }
 }
 
-/// Protocol state, handlers, and clock owned by [`super::OutstationCore`] separately from its
-/// active [`super::phase::Phase`] and response [`super::response::Slots`].
+/// Protocol state, database handle, handlers, and clock owned by [`super::OutstationCore`]
+/// separately from its active [`super::phase::Phase`] and response [`super::response::Slots`].
 pub(super) struct SessionContext<C: MonotonicClock> {
     pub(super) config: SessionConfig,
     pub(super) parse_options: ParseOptions,
     pub(super) destination: FragmentAddr,
     pub(super) state: SessionState,
     pub(super) keep_alive: KeepAlive,
+    pub(super) db: DatabaseHandle,
     pub(super) application: Box<dyn OutstationApplication>,
     pub(super) info: Box<dyn OutstationInformation>,
     pub(super) control_handler: Box<dyn ControlHandler>,
@@ -64,6 +65,7 @@ impl<C: MonotonicClock> SessionContext<C> {
     pub(super) fn new(
         config: &OutstationConfig,
         phys_addr: PhysAddr,
+        db: DatabaseHandle,
         application: Box<dyn OutstationApplication>,
         information: Box<dyn OutstationInformation>,
         control_handler: Box<dyn ControlHandler>,
@@ -82,6 +84,7 @@ impl<C: MonotonicClock> SessionContext<C> {
             destination,
             state,
             keep_alive: KeepAlive::new(config.keep_alive_timeout, now),
+            db,
             application,
             info: information,
             control_handler,
@@ -89,8 +92,8 @@ impl<C: MonotonicClock> SessionContext<C> {
         }
     }
 
-    pub(super) fn reset(&mut self, db: &mut DatabaseHandle) {
-        db.reset();
+    pub(super) fn reset(&mut self) {
+        self.db.reset();
         self.state.reset();
     }
 
@@ -103,9 +106,11 @@ impl<C: MonotonicClock> SessionContext<C> {
 
     /// Clear written events on confirmation: `begin_confirm` and `end_confirm` run outside the
     /// database lock, while `event_cleared` runs inside it.
-    pub(super) async fn clear_written_events(&mut self, db: &mut DatabaseHandle) {
+    pub(super) async fn clear_written_events(&mut self) {
         self.application.begin_confirm();
-        let state = db.with_database(|db| db.inner.clear_written_events(self.application.as_mut()));
+        let state = self
+            .db
+            .with_database(|db| db.inner.clear_written_events(self.application.as_mut()));
         self.application.end_confirm(state).get().await;
     }
 }
