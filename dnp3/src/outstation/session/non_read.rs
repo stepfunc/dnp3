@@ -188,7 +188,7 @@ impl OutstationSession {
     }
 
     pub(super) fn handle_record_current_time(&mut self, seq: Sequence) -> ResponseHeader {
-        self.state.last_recorded_time = Some(tokio::time::Instant::now());
+        self.state.last_recorded_time = Some(self.clock.now());
         ResponseHeader::solicited(seq, Iin::default())
     }
 

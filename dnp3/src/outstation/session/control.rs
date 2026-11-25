@@ -84,7 +84,7 @@ impl OutstationSession {
             self.state.select = Some(SelectState::new(
                 seq,
                 request_hash,
-                tokio::time::Instant::now(),
+                self.clock.now(),
                 controls.hash(),
             ))
         }
@@ -100,10 +100,11 @@ impl OutstationSession {
         selection: Option<SelectState>,
         controls: ControlCollection<'_>,
     ) -> Prepared<'a> {
+        let now = self.clock.now();
         // the OPERATE has already ended the selection, so it is used at most once
         let matched = selection
             .ok_or(CommandStatus::NoSelect)
-            .and_then(|s| s.match_operate(self.config.select_timeout, seq, controls.hash()));
+            .and_then(|s| s.match_operate(now, self.config.select_timeout, seq, controls.hash()));
 
         // Handle each operate and write the response
         let (result, staged) = match matched {

@@ -28,11 +28,8 @@ impl OutstationSession {
         Some(staged.with_header(header))
     }
 
-    pub(super) fn new_unsolicited_retry_deadline(&self) -> tokio::time::Instant {
-        deadline(
-            tokio::time::Instant::now(),
-            self.config.unsolicited_retry_delay,
-        )
+    pub(super) fn new_unsolicited_retry_deadline(&self) -> MonotonicTime {
+        self.clock.deadline(self.config.unsolicited_retry_delay)
     }
 }
 
@@ -62,13 +59,12 @@ impl<T: Transport> OutstationTask<T> {
                     }
                 }
             }
-            UnsolicitedState::Ready(deadline) => {
-                if let Some(deadline) = deadline {
-                    if tokio::time::Instant::now() < deadline {
-                        return Ok(NextIdleAction::SleepUntil(deadline)); // not ready yet
-                    }
-                }
-
+            UnsolicitedState::Ready(Some(deadline))
+                if !self.session.clock.has_reached(deadline) =>
+            {
+                Ok(NextIdleAction::SleepUntil(deadline)) // not ready yet
+            }
+            UnsolicitedState::Ready(_) => {
                 // perform regular unsolicited
                 let Some(outcome) = self.maybe_perform_unsolicited(io).await? else {
                     // there was nothing to send

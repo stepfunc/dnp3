@@ -15,23 +15,19 @@ impl OutstationSession {
         &mut self,
         guard: &'a RequestGuard<'_, T>,
     ) -> Intake<'a> {
-        let (info, request) = match guard.get() {
-            None => return Intake::Nothing,
-            Some(TransportRequest::LinkLayerMessage) => {
-                self.on_link_activity();
-                return Intake::Nothing;
-            }
-            Some(TransportRequest::Error(from, err)) => {
-                self.on_link_activity();
+        let Some(incoming) = guard.get() else {
+            return Intake::Nothing;
+        };
+        self.keep_alive.on_activity(self.clock.now());
+        let (info, request) = match incoming {
+            TransportRequest::LinkLayerMessage => return Intake::Nothing,
+            TransportRequest::Error(from, err) => {
                 return match Self::error_response_seq(err) {
                     Some(seq) => Intake::UnknownFunction(from, seq),
                     None => Intake::Nothing,
                 };
             }
-            Some(TransportRequest::Request(info, request)) => {
-                self.on_link_activity();
-                (info, request)
-            }
+            TransportRequest::Request(info, request) => (info, request),
         };
 
         if request.header.function == FunctionCode::Confirm {

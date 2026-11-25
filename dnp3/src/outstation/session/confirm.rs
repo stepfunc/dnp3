@@ -66,8 +66,8 @@ impl OutstationSession {
             );
         } else {
             // Table 6-1 rows 20, 21 and 30: only the expected confirm, before its timeout
-            let now = tokio::time::Instant::now();
-            wait.solicited.take_if(|expected| now >= expected.deadline);
+            wait.solicited
+                .take_if(|expected| self.clock.has_reached(expected.deadline));
             if wait
                 .solicited
                 .take_if(|expected| expected.ecsn == seq)
@@ -98,8 +98,8 @@ impl OutstationSession {
         }
     }
 
-    pub(super) fn new_confirm_deadline(&self) -> tokio::time::Instant {
-        self.config.confirm_timeout.deadline_from_now()
+    pub(super) fn new_confirm_deadline(&self) -> MonotonicTime {
+        self.clock.deadline(self.config.confirm_timeout.into())
     }
 }
 
@@ -289,7 +289,7 @@ impl<T: Transport> OutstationTask<T> {
     pub(super) async fn wait_for_unsolicited_confirm(
         &mut self,
         wait: &mut UnsolicitedWait,
-        deadline: tokio::time::Instant,
+        deadline: MonotonicTime,
         io: &mut PhysLayer,
     ) -> Result<UnsolicitedWaitResult, RunError> {
         if let TimeoutStatus::Yes = self
