@@ -929,6 +929,10 @@ mod tests {
         /// a server in `LinkErrorMode::Close` with outstation 1024, which sends nothing until it is
         /// asked, running on an in-memory listener
         fn spawn() -> Fixture {
+            spawn_with_app(Box::new(NullApplication))
+        }
+
+        fn spawn_with_app(application: Box<dyn OutstationApplication>) -> Fixture {
             let mut config = crate::util::test_support::outstation_config(1024, 1);
             config.features.unsolicited = Feature::Disabled;
             let mut server =
@@ -937,7 +941,7 @@ mod tests {
             let (outstation, future) = server
                 .add_outstation_no_spawn(
                     config,
-                    Box::new(NullApplication),
+                    application,
                     Box::new(NullInformation),
                     DefaultControlHandler::create(),
                     listener,
@@ -1088,6 +1092,169 @@ mod tests {
                 fixture.outstation_task.await.unwrap();
                 assert_eq!(fixture.states.now(), START);
                 fixture.states.assert_quiet();
+            })
+            .await;
+        }
+
+        /// Application whose `write_device_attr` signals entry and waits on a gate before
+        /// completing, used to test that an in-flight `handle_input` finishes before TCP
+        /// connection replacement or shutdown.
+        struct GatedAttrApp {
+            started: Option<tokio::sync::oneshot::Sender<()>>,
+            gate: Option<tokio::sync::oneshot::Receiver<bool>>,
+        }
+
+        impl OutstationApplication for GatedAttrApp {
+            fn write_device_attr(
+                &mut self,
+                _attr: crate::app::attr::Attribute,
+            ) -> MaybeAsync<bool> {
+                if let Some(started) = self.started.take() {
+                    let _sent: Result<(), ()> = started.send(());
+                }
+                let gate = self.gate.take();
+                MaybeAsync::asynchronous(async move {
+                    match gate {
+                        Some(rx) => rx.await.unwrap_or(false),
+                        None => true,
+                    }
+                })
+            }
+        }
+
+        fn frame(from_master: bool, seq: u8, app: &[u8]) -> Vec<u8> {
+            use crate::link::header::{AnyAddress, Header};
+            use crate::link::test_data;
+            let (dest, src) = if from_master {
+                (1024u16, 1u16)
+            } else {
+                (1u16, 1024u16)
+            };
+            let header = Header::unconfirmed_user_data(
+                from_master,
+                AnyAddress::from(dest),
+                AnyAddress::from(src),
+            );
+            test_data::data_frame(header, test_data::segment(true, true, seq), app)
+        }
+
+        fn write_attr_frame() -> Vec<u8> {
+            frame(
+                true,
+                0,
+                &[0xC0, 0x02, 0, 246, 0x00, 0x00, 0x00, 0x01, 2, b'o', b'k'],
+            )
+        }
+
+        fn read_attr_frame() -> Vec<u8> {
+            frame(true, 1, &[0xC1, 0x01, 0, 246, 0x00, 0x00, 0x00])
+        }
+
+        fn expected_read_attr_reply() -> Vec<u8> {
+            frame(
+                false,
+                0,
+                &[
+                    0xC1, 0x81, 0x80, 0x00, 0, 246, 0x00, 0x00, 0x00, 0x01, 2, b'o', b'k',
+                ],
+            )
+        }
+
+        fn spawn_with_gated_attr() -> (
+            Fixture,
+            tokio::sync::oneshot::Receiver<()>,
+            tokio::sync::oneshot::Sender<bool>,
+        ) {
+            use crate::app::attr::{AttrProp, AttrSet, OwnedAttrValue, OwnedAttribute};
+            let (started_tx, started_rx) = tokio::sync::oneshot::channel();
+            let (gate_tx, gate_rx) = tokio::sync::oneshot::channel();
+            let fixture = spawn_with_app(Box::new(GatedAttrApp {
+                started: Some(started_tx),
+                gate: Some(gate_rx),
+            }));
+            fixture.outstation.transaction(|db| {
+                db.define_attr(
+                    AttrProp::writable(),
+                    OwnedAttribute::new(
+                        AttrSet::Default,
+                        246,
+                        OwnedAttrValue::VisibleString("init".to_string()),
+                    ),
+                )
+                .unwrap();
+            });
+            (fixture, started_rx, gate_tx)
+        }
+
+        #[tokio::test(start_paused = true)]
+        async fn in_flight_handle_input_completes_before_new_connection_switches_session() {
+            watchdog(async {
+                let (mut fixture, started, gate) = spawn_with_gated_attr();
+
+                let (mut first, _) = fixture.peers.connect(LOOPBACK);
+                fixture
+                    .states
+                    .expect(START, ConnectionState::Connected)
+                    .await;
+
+                // Trigger an in-flight `handle_input` awaiting `write_device_attr`.
+                first.write_all(&write_attr_frame()).await.unwrap();
+                started.await.unwrap();
+
+                // Connect a second peer while `handle_input` is in flight.
+                let (mut second, _) = fixture.peers.connect(LOOPBACK);
+                settle().await;
+                // Connection switch must wait for the in-flight callback to finish.
+                fixture.states.assert_quiet();
+
+                // Release the callback: `send` succeeds only because the future was not dropped.
+                gate.send(true).unwrap();
+                fixture
+                    .states
+                    .expect(SETTLE, ConnectionState::Disconnected)
+                    .await;
+                fixture
+                    .states
+                    .expect(SETTLE, ConnectionState::Connected)
+                    .await;
+                assert_closed(&mut first).await;
+
+                // On the new connection, reading g0v246 returns the persisted value "ok".
+                second.write_all(&read_attr_frame()).await.unwrap();
+                let expected = expected_read_attr_reply();
+                let mut reply = vec![0u8; expected.len()];
+                second.read_exact(&mut reply).await.unwrap();
+                assert_eq!(reply, expected);
+            })
+            .await;
+        }
+
+        #[tokio::test(start_paused = true)]
+        async fn in_flight_handle_input_completes_before_shutdown_ends_session() {
+            watchdog(async {
+                let (mut fixture, started, gate) = spawn_with_gated_attr();
+
+                let (mut first, _) = fixture.peers.connect(LOOPBACK);
+                fixture
+                    .states
+                    .expect(START, ConnectionState::Connected)
+                    .await;
+
+                first.write_all(&write_attr_frame()).await.unwrap();
+                started.await.unwrap();
+
+                // Request shutdown while `handle_input` is in flight.
+                fixture.outstation.shutdown().await.unwrap();
+                settle().await;
+                assert!(!fixture.outstation_task.is_finished());
+
+                // Release the callback: `send` succeeds only because the future was not dropped.
+                gate.send(true).unwrap();
+                fixture.outstation_task.await.unwrap();
+                fixture
+                    .states
+                    .expect(SETTLE, ConnectionState::Disconnected)
+                    .await;
             })
             .await;
         }

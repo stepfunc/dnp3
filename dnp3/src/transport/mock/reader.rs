@@ -75,10 +75,6 @@ impl MockReader {
 }
 
 impl TransportRead for MockReader {
-    fn peek(&self) -> Option<TransportData<'_>> {
-        Some(TransportData::Fragment(self.get(self.count)?))
-    }
-
     fn pop(&mut self) -> Option<TransportData<'_>> {
         let count = self.count;
         self.count = 0;

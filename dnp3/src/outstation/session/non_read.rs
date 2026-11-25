@@ -4,39 +4,62 @@
 // Text and data mining rights, including for AI training, are reserved under
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
-use super::*;
+use super::context::{parameter_error, SessionContext};
+use super::response::{Prepared, ResponseSlot};
+use super::state::{ControlRequest, LastValidRequest, UnsolicitedState};
+use crate::app::format::write::HeaderWriter;
+use crate::app::gen::count::CountVariation;
+use crate::app::parse::parser::{HeaderCollection, ObjectHeader};
+use crate::app::parse::traits::FixedSizeVariation;
+use crate::app::variations::{Group52Var1, Group52Var2};
+use crate::app::{FunctionCode, Iin, Iin2, ResponseHeader, Sequence};
+use crate::outstation::control::select::SelectState;
+use crate::outstation::database::assign::Assignments;
+use crate::outstation::database::{DatabaseHandle, EventClass};
+use crate::outstation::target::{FreezeTarget, Selector};
+use crate::outstation::traits::{FreezeInterval, FreezeType, RestartDelay};
+use crate::util::clock::MonotonicClock;
+use crate::util::skipped::Skipped;
 
-impl OutstationSession {
+impl<C: MonotonicClock> SessionContext<C> {
     pub(super) async fn handle_non_read<'a>(
         &mut self,
         sol: &'a mut ResponseSlot,
-        database: &mut DatabaseHandle,
         function: FunctionCode,
         request: LastValidRequest,
         selection: Option<SelectState>,
         object_headers: HeaderCollection<'_>,
+        database: &mut DatabaseHandle,
     ) -> Option<Prepared<'a>> {
         let LastValidRequest { seq, request_hash } = request;
-        let mut result = match function {
+        let extra_iin2 = get_iin2(function, object_headers);
+
+        let mut response = match function {
             FunctionCode::Write => {
                 let header = self.handle_write(seq, object_headers, database).await;
-                Some(sol.empty(header))
+                sol.empty(header)
             }
-            // these function don't process objects
-            FunctionCode::DelayMeasure => Some(self.handle_delay_measure(sol, seq)),
+            // These functions don't process objects.
+            FunctionCode::DelayMeasure => {
+                let g52v2 = Group52Var2 {
+                    time: self.application.get_processing_delay_ms(),
+                };
+                single_object_response(sol, seq, g52v2)
+            }
             FunctionCode::RecordCurrentTime => {
-                Some(sol.empty(self.handle_record_current_time(seq)))
+                let header = self.handle_record_current_time(seq);
+                sol.empty(header)
             }
             FunctionCode::ColdRestart => {
                 let delay = self.application.cold_restart();
-                Some(Self::handle_restart(sol, seq, delay))
+                handle_restart(sol, seq, delay)
             }
             FunctionCode::WarmRestart => {
                 let delay = self.application.warm_restart();
-                Some(Self::handle_restart(sol, seq, delay))
+                handle_restart(sol, seq, delay)
             }
-            // controls
-            FunctionCode::Select => Some(
+            // Controls
+            FunctionCode::Select => {
                 self.handle_controls(
                     sol,
                     ControlRequest::Select { request_hash },
@@ -44,9 +67,9 @@ impl OutstationSession {
                     seq,
                     object_headers,
                 )
-                .await,
-            ),
-            FunctionCode::Operate => Some(
+                .await
+            }
+            FunctionCode::Operate => {
                 self.handle_controls(
                     sol,
                     ControlRequest::Operate { selection },
@@ -54,9 +77,9 @@ impl OutstationSession {
                     seq,
                     object_headers,
                 )
-                .await,
-            ),
-            FunctionCode::DirectOperate => Some(
+                .await
+            }
+            FunctionCode::DirectOperate => {
                 self.handle_controls(
                     sol,
                     ControlRequest::DirectOperate,
@@ -64,20 +87,23 @@ impl OutstationSession {
                     seq,
                     object_headers,
                 )
-                .await,
-            ),
+                .await
+            }
             FunctionCode::DirectOperateNoResponse => {
                 self.handle_direct_operate_no_ack(database, object_headers)
                     .await;
-                None
+                return None;
             }
-            FunctionCode::ImmediateFreeze => Some(sol.empty(self.handle_freeze(
-                database,
-                seq,
-                object_headers,
-                function,
-                FreezeType::ImmediateFreeze,
-            ))),
+            FunctionCode::ImmediateFreeze => {
+                let header = self.handle_freeze(
+                    database,
+                    seq,
+                    object_headers,
+                    function,
+                    FreezeType::ImmediateFreeze,
+                );
+                sol.empty(header)
+            }
             FunctionCode::ImmediateFreezeNoResponse => {
                 self.handle_freeze(
                     database,
@@ -86,15 +112,18 @@ impl OutstationSession {
                     function,
                     FreezeType::ImmediateFreeze,
                 );
-                None
+                return None;
             }
-            FunctionCode::FreezeClear => Some(sol.empty(self.handle_freeze(
-                database,
-                seq,
-                object_headers,
-                function,
-                FreezeType::FreezeAndClear,
-            ))),
+            FunctionCode::FreezeClear => {
+                let header = self.handle_freeze(
+                    database,
+                    seq,
+                    object_headers,
+                    function,
+                    FreezeType::FreezeAndClear,
+                );
+                sol.empty(header)
+            }
             FunctionCode::FreezeClearNoResponse => {
                 self.handle_freeze(
                     database,
@@ -103,119 +132,46 @@ impl OutstationSession {
                     function,
                     FreezeType::FreezeAndClear,
                 );
-                None
+                return None;
             }
             FunctionCode::FreezeAtTime => {
-                Some(sol.empty(self.handle_freeze_at_time(database, seq, object_headers, function)))
+                let header = self.handle_freeze_at_time(database, seq, object_headers, function);
+                sol.empty(header)
             }
             FunctionCode::FreezeAtTimeNoResponse => {
                 self.handle_freeze_at_time(database, seq, object_headers, function);
-                None
+                return None;
             }
-            FunctionCode::EnableUnsolicited => Some(
-                sol.empty(self.handle_enable_or_disable_unsolicited(true, seq, object_headers)),
-            ),
-            FunctionCode::DisableUnsolicited => Some(
-                sol.empty(self.handle_enable_or_disable_unsolicited(false, seq, object_headers)),
-            ),
-            FunctionCode::AssignClass => Some(
-                sol.empty(
-                    self.handle_assign_class(database, seq, object_headers)
-                        .await,
-                ),
-            ),
-
+            FunctionCode::EnableUnsolicited => {
+                let header = self.handle_enable_or_disable_unsolicited(true, seq, object_headers);
+                sol.empty(header)
+            }
+            FunctionCode::DisableUnsolicited => {
+                let header = self.handle_enable_or_disable_unsolicited(false, seq, object_headers);
+                sol.empty(header)
+            }
+            FunctionCode::AssignClass => {
+                let header = self
+                    .handle_assign_class(database, seq, object_headers)
+                    .await;
+                sol.empty(header)
+            }
             _ => {
                 tracing::warn!("unsupported function code: {:?}", function);
-                Some(sol.empty(ResponseHeader::solicited(
+                sol.empty(ResponseHeader::solicited(
                     seq,
                     Iin::default() | Iin2::NO_FUNC_CODE_SUPPORT,
-                )))
+                ))
             }
         };
 
-        if let Some(response) = &mut result {
-            response.header_mut().iin |= Self::get_iin2(function, object_headers);
-        }
-
-        result
-    }
-
-    pub(super) fn get_iin2(function: FunctionCode, object_headers: HeaderCollection) -> Iin2 {
-        if function.objects_allowed() {
-            return Iin2::default();
-        }
-
-        if object_headers.is_empty() {
-            Iin2::default()
-        } else {
-            tracing::warn!("ignoring object headers in {:?} request", function);
-            Iin2::PARAMETER_ERROR
-        }
-    }
-
-    pub(super) fn handle_delay_measure<'a>(
-        &mut self,
-        sol: &'a mut ResponseSlot,
-        seq: Sequence,
-    ) -> Prepared<'a> {
-        let g52v2 = Group52Var2 {
-            time: self.application.get_processing_delay_ms(),
-        };
-
-        Self::single_object_response(sol, seq, g52v2)
-    }
-
-    /// Respond with a single object, or with IIN2.2 if it can't be written
-    pub(super) fn single_object_response<V>(
-        sol: &mut ResponseSlot,
-        seq: Sequence,
-        item: V,
-    ) -> Prepared<'_>
-    where
-        V: FixedSizeVariation,
-    {
-        let (result, staged) =
-            sol.build(|cursor| HeaderWriter::new(cursor).write_count_of_one(item));
-        let header = match result {
-            Ok(()) => ResponseHeader::solicited(seq, Iin::default()),
-            Err(err) => {
-                tracing::error!("unable to write {item} to the response buffer: {err:?}");
-                parameter_error(seq)
-            }
-        };
-        staged.with_header(header)
+        response.header_mut().iin |= extra_iin2;
+        Some(response)
     }
 
     pub(super) fn handle_record_current_time(&mut self, seq: Sequence) -> ResponseHeader {
         self.state.last_recorded_time = Some(self.clock.now());
         ResponseHeader::solicited(seq, Iin::default())
-    }
-
-    pub(super) fn handle_restart(
-        sol: &mut ResponseSlot,
-        seq: Sequence,
-        delay: Option<RestartDelay>,
-    ) -> Prepared<'_> {
-        let delay = match delay {
-            None => {
-                return sol.empty(ResponseHeader::solicited(
-                    seq,
-                    Iin::default() | Iin2::NO_FUNC_CODE_SUPPORT,
-                ));
-            }
-            Some(x) => x,
-        };
-
-        // respond with the delay
-        match delay {
-            RestartDelay::Seconds(value) => {
-                Self::single_object_response(sol, seq, Group52Var1 { time: value })
-            }
-            RestartDelay::Milliseconds(value) => {
-                Self::single_object_response(sol, seq, Group52Var2 { time: value })
-            }
-        }
     }
 
     pub(super) fn handle_enable_or_disable_unsolicited(
@@ -230,7 +186,7 @@ impl OutstationSession {
             FunctionCode::DisableUnsolicited
         };
 
-        if self.config.unsolicited.is_disabled() {
+        if self.state.unsolicited == UnsolicitedState::Disabled {
             tracing::warn!("received {function:?} request, but unsolicited support is disabled by configuration");
             return ResponseHeader::solicited(seq, Iin::default() | Iin2::NO_FUNC_CODE_SUPPORT);
         }
@@ -252,8 +208,8 @@ impl OutstationSession {
         ResponseHeader::solicited(seq, Iin::default() | iin2)
     }
 
-    /// Apply an ASSIGN_CLASS request to the database, then report it to the application
-    pub(super) async fn handle_assign_class(
+    /// Apply an ASSIGN_CLASS request to the database, then report it to the application.
+    async fn handle_assign_class(
         &mut self,
         database: &mut DatabaseHandle,
         seq: Sequence,
@@ -263,12 +219,12 @@ impl OutstationSession {
             tracing::warn!("received ASSIGN_CLASS request, but the application doesn't support it");
             return ResponseHeader::solicited(seq, Iin::default() | Iin2::NO_FUNC_CODE_SUPPORT);
         }
-        // an assignment set needs at least a class header
+        // An assignment set needs at least a class header.
         if object_headers.is_empty() {
             tracing::warn!("ASSIGN_CLASS request has no object headers");
             return ResponseHeader::solicited(seq, Iin::default() | Iin2::PARAMETER_ERROR);
         }
-        if let Err(iin2) = database.transaction(|db| db.inner.assign_classes(&object_headers)) {
+        if let Err(iin2) = database.with_database(|db| db.inner.assign_classes(&object_headers)) {
             return ResponseHeader::solicited(seq, Iin::default() | iin2);
         }
 
@@ -331,7 +287,7 @@ impl OutstationSession {
                 | ObjectHeader::CountAndPrefix16(..)
                 | ObjectHeader::FreeFormat(_)
                 | ObjectHeader::Read(..) => {
-                    // other variations require that there be a preceding g50v2
+                    // Other variations require that there be a preceding g50v2.
                     match timing {
                         None => {
                             without_timing.add(header.variation());
@@ -358,7 +314,7 @@ impl OutstationSession {
         ResponseHeader::solicited(seq, iin)
     }
 
-    pub(super) fn handle_freeze_header(
+    fn handle_freeze_header(
         &mut self,
         database: &mut DatabaseHandle,
         selector: &mut Selector,
@@ -371,6 +327,61 @@ impl OutstationSession {
                 .freeze_counter(indices, freeze_type, database)
                 .map_or_else(|err| err.into(), |_| Iin2::default()),
             Err(err) => err,
+        }
+    }
+}
+
+fn get_iin2(function: FunctionCode, object_headers: HeaderCollection) -> Iin2 {
+    if function.objects_allowed() {
+        return Iin2::default();
+    }
+
+    if object_headers.is_empty() {
+        Iin2::default()
+    } else {
+        tracing::warn!("ignoring object headers in {:?} request", function);
+        Iin2::PARAMETER_ERROR
+    }
+}
+
+/// Respond with a single object, or with IIN2.2 if it can't be written.
+fn single_object_response<V>(sol: &mut ResponseSlot, seq: Sequence, item: V) -> Prepared<'_>
+where
+    V: FixedSizeVariation,
+{
+    let (result, staged) = sol.build(|cursor| HeaderWriter::new(cursor).write_count_of_one(item));
+    let header = match result {
+        Ok(()) => ResponseHeader::solicited(seq, Iin::default()),
+        Err(err) => {
+            tracing::error!("unable to write {item} to the response buffer: {err:?}");
+            parameter_error(seq)
+        }
+    };
+    staged.with_header(header)
+}
+
+fn handle_restart(
+    sol: &mut ResponseSlot,
+    seq: Sequence,
+    delay: Option<RestartDelay>,
+) -> Prepared<'_> {
+    let delay = match delay {
+        None => {
+            return sol.empty(ResponseHeader::solicited(
+                seq,
+                Iin::default() | Iin2::NO_FUNC_CODE_SUPPORT,
+            ));
+        }
+        Some(x) => x,
+    };
+
+    // Respond with the delay.
+    match delay {
+        RestartDelay::Seconds(value) => {
+            single_object_response(sol, seq, Group52Var1 { time: value })
+        }
+        RestartDelay::Milliseconds(value) => {
+            single_object_response(sol, seq, Group52Var2 { time: value })
         }
     }
 }

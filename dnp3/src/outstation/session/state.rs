@@ -4,41 +4,35 @@
 // Text and data mining rights, including for AI training, are reserved under
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
-//! State shared by the session handlers.
+//! State shared by the outstation protocol state machine.
 
 use core::time::Duration;
 
 use super::deferred::DeferredRead;
-use crate::app::parse::parser::{HeaderCollection, Request};
+use crate::app::parse::parser::HeaderCollection;
 use crate::app::{Iin1, ObjectParseError, RequestHeader, ResponseHeader, Sequence};
 use crate::link::header::BroadcastConfirmMode;
 use crate::master::EventClasses;
+use crate::outstation::config::Feature;
 use crate::outstation::control::select::SelectState;
-use crate::outstation::traits::BroadcastAction;
 use crate::transport::{FragmentAddr, FragmentInfo};
 use crate::util::clock::MonotonicTime;
 
-#[derive(Copy, Clone)]
-pub(super) enum TimeoutStatus {
-    Yes,
-    No,
-}
-
-/// A control request, with what its function needs to know about the selection
+/// A control request, with what its function needs to know about the selection.
 #[derive(Copy, Clone)]
 pub(super) enum ControlRequest {
     Select {
-        /// the request's hash, which the selection records to recognize the SELECT's retry
+        /// The request's hash, which the selection records to recognize the SELECT's retry.
         request_hash: u64,
     },
     Operate {
-        /// the selection that this request ended
+        /// The selection that this request ended.
         selection: Option<SelectState>,
     },
     DirectOperate,
 }
 
-#[derive(Copy, Clone, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(super) struct ResponseSeries {
     pub(super) ecsn: Sequence,
     pub(super) fin: bool,
@@ -50,6 +44,7 @@ impl ResponseSeries {
     }
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(super) struct RetryCounter {
     retries: Option<usize>,
 }
@@ -72,13 +67,13 @@ impl RetryCounter {
         }
     }
 
-    /// allow no further retries
+    /// Allow no further retries.
     pub(super) fn stop(&mut self) {
         self.retries = Some(0);
     }
 }
 
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, Debug)]
 pub(super) struct LastValidRequest {
     pub(super) seq: Sequence,
     pub(super) request_hash: u64,
@@ -90,11 +85,76 @@ impl LastValidRequest {
     }
 }
 
-#[derive(Copy, Clone)]
+/// Unsolicited response readiness and configuration state.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(super) enum UnsolicitedState {
-    /// need to perform NULL unsolicited
+    /// Unsolicited responses are disabled by configuration.
+    Disabled,
+    /// Must send and get confirmation of the startup NULL unsolicited response first.
     NullRequired,
-    Ready(Option<MonotonicTime>),
+    /// Ready to send unsolicited events, optionally gated by a retry delay.
+    Ready { retry_at: Option<MonotonicTime> },
+}
+
+impl UnsolicitedState {
+    fn from_feature(feature: Feature) -> Self {
+        match feature {
+            Feature::Disabled => Self::Disabled,
+            Feature::Enabled => Self::NullRequired,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub(super) struct SolConfirmWait {
+    pub(super) series: ResponseSeries,
+    pub(super) deadline: MonotonicTime,
+}
+
+/// What kind of unsolicited response is awaiting confirmation.
+#[derive(Copy, Clone, Debug)]
+pub(super) enum UnsolicitedWaitKind {
+    /// Startup NULL unsolicited response: 0 retries, regenerated with a new sequence number on
+    /// timeout, and confirming it does not emit event-clear callbacks.
+    Null,
+    /// Regular event unsolicited response: retried byte-for-byte up to `retries` times.
+    Events { retries: RetryCounter },
+}
+
+impl UnsolicitedWaitKind {
+    pub(super) fn stop_retries(&mut self) {
+        if let Self::Events { retries } = self {
+            retries.stop();
+        }
+    }
+}
+
+/// What the unsolicited confirm wait expects (IEEE 1815-2012 Table 6-1 rows 20-34).
+#[derive(Copy, Clone, Debug)]
+pub(super) struct UnsolConfirmWait {
+    /// The sequence number of the unsolicited response.
+    pub(super) seq: Sequence,
+    /// Confirm timeout deadline for the unsolicited response.
+    pub(super) deadline: MonotonicTime,
+    /// The confirm of a solicited response sent during the wait, if one asked for it.
+    pub(super) solicited: Option<ExpectedConfirm>,
+    /// Whether this wait is for a NULL response or an event response (with its remaining retries).
+    pub(super) kind: UnsolicitedWaitKind,
+}
+
+/// A solicited response's confirm, expected until the confirm timeout. The timeout is checked
+/// when a confirm arrives, rather than with a timer.
+#[derive(Copy, Clone, Debug)]
+pub(super) struct ExpectedConfirm {
+    pub(super) ecsn: Sequence,
+    pub(super) deadline: MonotonicTime,
+}
+
+/// Tracing span identity for an active confirm wait.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(super) enum ConfirmWaitInfo {
+    Solicited(Sequence),
+    Unsolicited(Sequence),
 }
 
 /// Keep-alive (REQUEST_LINK_STATUS) timer state.
@@ -139,13 +199,13 @@ impl KeepAlive {
     }
 }
 
-/// a broadcast whose IIN1.0 hasn't been cleared
+/// A broadcast whose IIN1.0 hasn't been cleared.
 #[derive(Copy, Clone)]
 struct PendingBroadcast {
     mode: BroadcastConfirmMode,
-    /// a solicited response has carried IIN1.0 for this broadcast
+    /// A solicited response has carried IIN1.0 for this broadcast.
     solicited_reported: bool,
-    /// an unsolicited response has carried IIN1.0 for this broadcast
+    /// An unsolicited response has carried IIN1.0 for this broadcast.
     unsolicited_reported: bool,
 }
 
@@ -170,7 +230,7 @@ impl BroadcastIin {
     }
 
     /// Report the broadcast in a response: IIN1.0, and in a solicited response, CON if the
-    /// broadcast requires a confirm
+    /// broadcast requires a confirm.
     pub(super) fn report(&mut self, header: &mut ResponseHeader, kind: ResponseKind) {
         let Some(pending) = &mut self.0 else {
             return;
@@ -193,7 +253,7 @@ impl BroadcastIin {
     }
 
     /// The master confirmed a response of this kind, which ends the IIN1.0 if such a response
-    /// reported it
+    /// reported it.
     pub(super) fn confirmed(&mut self, kind: ResponseKind) {
         let reported = self.0.is_some_and(|pending| match kind {
             ResponseKind::Solicited => pending.solicited_reported,
@@ -205,7 +265,7 @@ impl BroadcastIin {
     }
 }
 
-/// state that mutates while the session runs
+/// State that mutates while the outstation runs.
 pub(super) struct SessionState {
     pub(super) restart_iin_asserted: bool,
     pub(super) enabled_unsolicited_classes: EventClasses,
@@ -219,13 +279,13 @@ pub(super) struct SessionState {
 }
 
 impl SessionState {
-    pub(super) fn new(max_read_headers: u16) -> Self {
+    pub(super) fn new(max_read_headers: u16, unsolicited: Feature) -> Self {
         Self {
             enabled_unsolicited_classes: EventClasses::none(),
             restart_iin_asserted: true,
             last_valid_request: None,
             select: None,
-            unsolicited: UnsolicitedState::NullRequired,
+            unsolicited: UnsolicitedState::from_feature(unsolicited),
             unsolicited_seq: Sequence::default(),
             deferred_read: DeferredRead::new(max_read_headers),
             last_recorded_time: None,
@@ -233,7 +293,7 @@ impl SessionState {
         }
     }
 
-    // reset items that should reset between communication (TCP) sessions
+    /// Reset items that should reset between communication (TCP) sessions.
     pub(super) fn reset(&mut self) {
         self.last_valid_request = None;
         self.select = None;
@@ -241,146 +301,39 @@ impl SessionState {
     }
 }
 
-pub(super) enum Confirm {
-    Yes(FragmentAddr),
-    Timeout,
-    NewRequest,
-}
-
-/// How the solicited confirm wait ended
-#[derive(Copy, Clone)]
-pub(super) enum SolicitedWait {
-    /// the response series was confirmed or timed out, or never waited for a confirm
-    Done,
-    /// a new request ended it, retained to be processed from idle at once, before any unsolicited
-    /// response (IEEE 1815-2012 Table 6-1 rows 15 and 18)
-    RequestPending,
-}
-
-/// How the confirm wait for a response ended
-#[derive(Copy, Clone)]
-pub(super) enum ConfirmOutcome {
-    /// the master confirmed the response, so its events were delivered
-    Confirmed,
-    /// the response wasn't confirmed, so its events must be reported again
-    Unconfirmed,
-}
-
-/// What the unsolicited confirm wait expects (IEEE 1815-2012 Table 6-1 rows 20-34)
-pub(super) struct UnsolicitedWait {
-    /// the sequence number of the unsolicited response
-    pub(super) seq: Sequence,
-    /// the confirm of a solicited response sent during the wait, if one asked for it
-    pub(super) solicited: Option<ExpectedConfirm>,
-    /// the retries left. A DISABLE_UNSOLICITED processed during the wait stops them, so the wait
-    /// ends on timeout without a retry (TB2015-002a rule 15)
-    pub(super) retries: RetryCounter,
-}
-
-/// A solicited response's confirm, expected until the confirm timeout. The timeout is checked
-/// when a confirm arrives, rather than with a timer
-#[derive(Copy, Clone)]
-pub(super) struct ExpectedConfirm {
-    pub(super) ecsn: Sequence,
-    pub(super) deadline: MonotonicTime,
-}
-
-/// What [`OutstationSession::accept`](crate::outstation::session::OutstationSession::accept) did with a request
-#[derive(Copy, Clone)]
-pub(super) struct Accepted {
-    /// the confirm that the answer waits for
-    pub(super) confirm: Option<ResponseSeries>,
-    /// how a broadcast request was processed
-    pub(super) broadcast: Option<BroadcastAction>,
-}
-
-#[derive(Copy, Clone)]
-pub(super) enum UnsolicitedWaitResult {
-    Timeout,
-    ReadNext,
-    Complete(ConfirmOutcome),
-}
-
-/// A request, classified against the last valid request
+/// A request, classified against the last valid request.
 #[derive(Copy, Clone)]
 pub(super) enum FragmentType<'a> {
     MalformedRequest(u64, ObjectParseError),
     NewRead(u64, HeaderCollection<'a>),
     RepeatRead(u64, HeaderCollection<'a>),
-    NewNonRead(u64, HeaderCollection<'a>),
-    RepeatNonRead(u64),
-    Broadcast(BroadcastConfirmMode),
+    NewNonRead {
+        hash: u64,
+        objects: HeaderCollection<'a>,
+        selection: Option<SelectState>,
+    },
+    RepeatNonRead,
+    Broadcast {
+        mode: BroadcastConfirmMode,
+        objects: Result<HeaderCollection<'a>, ObjectParseError>,
+    },
 }
 
-impl FragmentType<'_> {
-    pub(super) fn is_read(&self) -> bool {
-        match self {
-            FragmentType::NewRead(..) | FragmentType::RepeatRead(..) => true,
-            FragmentType::MalformedRequest(..)
-            | FragmentType::NewNonRead(..)
-            | FragmentType::RepeatNonRead(_)
-            | FragmentType::Broadcast(_) => false,
-        }
-    }
-}
-
-/// A fragment from the master, after [`OutstationSession::receive`](crate::outstation::session::OutstationSession::receive) filtered and classified it
+/// A fragment from the master, after filtering and classification.
 pub(super) enum Intake<'a> {
-    /// nothing to answer: no fragment, a link-layer message, a fragment that isn't a valid
-    /// request, or a SELECT that the selection discards
-    Nothing,
-    /// a request with an unknown function code, answered with IIN2.0
+    /// A request with an unknown function code, answered with IIN2.0.
     UnknownFunction(FragmentAddr, Sequence),
-    /// the confirm of a solicited or an unsolicited response
+    /// The confirm of a solicited or an unsolicited response.
     Confirm(FragmentAddr, RequestHeader),
-    /// a request, for the state to answer or defer
+    /// A request, for the current phase to answer or defer.
     Request(Received<'a>),
 }
 
 #[derive(Copy, Clone)]
 pub(super) struct Received<'a> {
     pub(super) info: FragmentInfo,
-    pub(super) request: Request<'a>,
+    pub(super) header: RequestHeader,
     pub(super) fragment: FragmentType<'a>,
-}
-
-/// What a state does with a READ
-#[derive(Copy, Clone)]
-pub(super) enum Reads {
-    /// answer it now
-    Answer,
-    /// keep it until the session returns to idle (IEEE 1815-2012 Table 6-1 row 25)
-    Defer,
-}
-
-#[derive(Copy, Clone)]
-pub(super) enum ConfirmAction {
-    Confirmed(FragmentAddr),
-    NewRequest,
-    EchoLastResponse(FragmentAddr),
-    ContinueWait,
-}
-
-#[derive(Copy, Clone)]
-pub(super) enum NextIdleAction {
-    NoSleep,
-    SleepUntilEvent,
-    SleepUntil(MonotonicTime),
-}
-
-impl NextIdleAction {
-    pub(super) fn select_earliest(self, instant: Option<MonotonicTime>) -> Self {
-        match instant {
-            None => self,
-            Some(instant) => match self {
-                NextIdleAction::NoSleep => self,
-                NextIdleAction::SleepUntilEvent => Self::SleepUntil(instant),
-                NextIdleAction::SleepUntil(other) => {
-                    Self::SleepUntil(MonotonicTime::min(instant, other))
-                }
-            },
-        }
-    }
 }
 
 #[cfg(test)]

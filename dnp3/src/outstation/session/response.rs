@@ -4,11 +4,42 @@
 // Text and data mining rights, including for AI training, are reserved under
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
-use super::*;
-
 use scursor::{WriteCursor, WriteError};
 
+use super::context::SessionContext;
+use super::phase::SolTx;
+use super::state::{ResponseKind, ResponseSeries};
 use crate::app::*;
+use crate::outstation::config::OutstationConfig;
+use crate::outstation::database::DatabaseHandle;
+use crate::transport::FragmentAddr;
+use crate::util::clock::MonotonicClock;
+
+/// Pre-allocated response buffers owned separately from [`SessionContext`] so response builders
+/// can borrow a slot while calling `&mut self` methods on the context.
+pub(super) struct Slots {
+    /// Stored response to the last valid request (for repeats and solicited confirm-wait echoes).
+    pub(super) sol: ResponseSlot,
+    /// Stored last unsolicited response (for retries).
+    pub(super) unsol: ResponseSlot,
+    /// Ephemeral 4-byte response header for unknown function codes (does not overwrite `sol`).
+    pub(super) transient: [u8; ResponseHeader::LENGTH],
+}
+
+impl Slots {
+    pub(super) fn new(config: &OutstationConfig) -> Self {
+        Self {
+            sol: ResponseSlot::new(config.solicited_buffer_size),
+            unsol: ResponseSlot::new(config.unsolicited_buffer_size),
+            transient: [0; ResponseHeader::LENGTH],
+        }
+    }
+
+    pub(super) fn clear(&mut self) {
+        self.sol.clear();
+        self.unsol.clear();
+    }
+}
 
 /// Holds an outstation response, from when it's written until it's replaced.
 ///
@@ -24,7 +55,7 @@ use crate::app::*;
 ///
 /// The master doesn't need this. It sends each request or confirm from the cursor that just wrote
 /// it, and never resends one. A retried task formats a new request.
-pub(crate) struct ResponseSlot {
+pub(super) struct ResponseSlot {
     bytes: Box<[u8]>,
     /// length of the response in `bytes`, header included, never less than the header
     len: usize,
@@ -34,16 +65,16 @@ pub(crate) struct ResponseSlot {
 
 /// The objects a build left in its slot, waiting for their header: all of them, or none if the
 /// build failed
-pub(crate) struct Staged<'a> {
+pub(super) struct Staged<'a> {
     slot: &'a mut ResponseSlot,
 }
 
 impl<'a> Staged<'a> {
-    pub(crate) fn has_objects(&self) -> bool {
+    pub(super) fn has_objects(&self) -> bool {
         self.slot.len > ResponseHeader::LENGTH
     }
 
-    pub(crate) fn with_header(self, header: ResponseHeader) -> Prepared<'a> {
+    pub(super) fn with_header(self, header: ResponseHeader) -> Prepared<'a> {
         Prepared {
             slot: self.slot,
             header,
@@ -52,22 +83,22 @@ impl<'a> Staged<'a> {
 }
 
 /// A response prepared in a slot, ready to publish there
-pub(crate) struct Prepared<'a> {
+pub(super) struct Prepared<'a> {
     slot: &'a mut ResponseSlot,
     header: ResponseHeader,
 }
 
 impl<'a> Prepared<'a> {
-    pub(crate) fn header(&self) -> ResponseHeader {
+    pub(super) fn header(&self) -> ResponseHeader {
         self.header
     }
 
-    pub(crate) fn header_mut(&mut self) -> &mut ResponseHeader {
+    pub(super) fn header_mut(&mut self) -> &mut ResponseHeader {
         &mut self.header
     }
 
     /// Publish the response in its slot and return the bytes to send
-    pub(crate) fn publish(self) -> &'a [u8] {
+    pub(super) fn publish(self) -> &'a [u8] {
         let Self { slot, header } = self;
         for (dest, src) in slot.bytes.iter_mut().zip(header.to_bytes()) {
             *dest = src;
@@ -78,7 +109,7 @@ impl<'a> Prepared<'a> {
 }
 
 impl ResponseSlot {
-    pub(crate) fn new(size: BufferSize<249, 2048>) -> Self {
+    pub(super) fn new(size: BufferSize<249, 2048>) -> Self {
         Self {
             bytes: vec![0; size.value()].into_boxed_slice(),
             len: ResponseHeader::LENGTH,
@@ -88,7 +119,7 @@ impl ResponseSlot {
 
     /// Write objects after the header, for a response to prepare from the result. The response
     /// published before is gone.
-    pub(crate) fn build<R>(
+    pub(super) fn build<R>(
         &mut self,
         write: impl FnOnce(&mut WriteCursor) -> Result<R, WriteError>,
     ) -> (Result<R, WriteError>, Staged<'_>) {
@@ -110,23 +141,23 @@ impl ResponseSlot {
     }
 
     /// Prepare a response with no objects. The response published before is gone.
-    pub(crate) fn empty(&mut self, header: ResponseHeader) -> Prepared<'_> {
+    pub(super) fn empty(&mut self, header: ResponseHeader) -> Prepared<'_> {
         self.header = None;
         self.len = ResponseHeader::LENGTH;
         Prepared { slot: self, header }
     }
 
     /// The published response, to send again exactly as it was
-    pub(crate) fn ready(&self) -> Option<&[u8]> {
+    pub(super) fn ready(&self) -> Option<&[u8]> {
         self.header.map(|_| self.view())
     }
 
     /// The header of the published response
-    pub(crate) fn header(&self) -> Option<ResponseHeader> {
+    pub(super) fn header(&self) -> Option<ResponseHeader> {
         self.header
     }
 
-    pub(crate) fn clear(&mut self) {
+    pub(super) fn clear(&mut self) {
         self.header = None;
     }
 
@@ -135,140 +166,70 @@ impl ResponseSlot {
     }
 }
 
-impl OutstationSession {
-    /// Answer a request that becomes the last valid request, publishing its response. Returns the
-    /// confirm that the response waits for.
-    pub(super) async fn respond<T: Transport>(
+/// The confirm that a written solicited response waits for: its own, or a mandatory
+/// broadcast's.
+pub(super) fn awaited_confirm(header: ResponseHeader) -> Option<ResponseSeries> {
+    header
+        .control
+        .con
+        .then(|| ResponseSeries::new(header.control.seq, header.control.fin))
+}
+
+impl<C: MonotonicClock> SessionContext<C> {
+    pub(super) fn publish_solicited(
         &mut self,
-        io: &mut PhysLayer,
-        writer: &mut TransportWriter<T>,
-        respond_to: FragmentAddr,
-        request: LastValidRequest,
+        to: FragmentAddr,
         response: Prepared<'_>,
-        database: &DatabaseHandle,
-    ) -> Result<Option<ResponseSeries>, LinkError> {
-        let header = self
-            .write_solicited(io, writer, respond_to, response, database)
-            .await?;
-        self.state.last_valid_request = Some(request);
-        Ok(Self::awaited_confirm(header))
+        database: &mut DatabaseHandle,
+    ) -> SolTx {
+        let header = self.publish(response, ResponseKind::Solicited, database);
+        SolTx::new(to, header)
     }
 
-    /// Accept a request without a response as the last valid request, so its repeat gets none
-    pub(super) fn respond_with_nothing(
+    pub(super) fn publish_unsolicited(
         &mut self,
-        sol: &mut ResponseSlot,
-        request: LastValidRequest,
-    ) {
-        sol.clear();
-        self.state.last_valid_request = Some(request);
+        response: Prepared<'_>,
+        database: &mut DatabaseHandle,
+    ) -> Sequence {
+        self.publish(response, ResponseKind::Unsolicited, database)
+            .control
+            .seq
     }
 
-    pub(super) async fn repeat_solicited<T: Transport>(
+    fn publish(
         &mut self,
-        io: &mut PhysLayer,
-        respond_to: FragmentAddr,
-        out: &mut Responder<T>,
-    ) -> Result<(), LinkError> {
-        if let Some(response) = out.sol.ready() {
-            out.writer
-                .write(io, self.config.decode_level, respond_to, response)
-                .await?;
-        }
-        Ok(())
-    }
-
-    pub(super) async fn repeat_unsolicited<T: Transport>(
-        &mut self,
-        io: &mut PhysLayer,
-        out: &mut Responder<T>,
-    ) -> Result<(), LinkError> {
-        if let Some(response) = out.unsol.ready() {
-            out.writer
-                .write(io, self.config.decode_level, self.destination, response)
-                .await?;
-        }
-        Ok(())
-    }
-
-    pub(super) async fn write_solicited<T: Transport>(
-        &mut self,
-        io: &mut PhysLayer,
-        writer: &mut TransportWriter<T>,
-        respond_to: FragmentAddr,
         mut response: Prepared<'_>,
-        database: &DatabaseHandle,
-    ) -> Result<ResponseHeader, LinkError> {
-        self.finish_solicited_header(response.header_mut(), database);
-
+        kind: ResponseKind,
+        database: &mut DatabaseHandle,
+    ) -> ResponseHeader {
+        self.finish_header(response.header_mut(), kind, database);
         let header = response.header();
-        writer
-            .write(io, self.config.decode_level, respond_to, response.publish())
-            .await?;
-
-        Ok(header)
+        response.publish();
+        header
     }
 
-    pub(super) async fn write_unsolicited<T: Transport>(
+    /// Build a transient 4-byte solicited response header that doesn't overwrite `sol`.
+    pub(super) fn build_transient_solicited(
         &mut self,
-        io: &mut PhysLayer,
-        writer: &mut TransportWriter<T>,
-        mut response: Prepared<'_>,
-        database: &DatabaseHandle,
-    ) -> Result<ResponseHeader, LinkError> {
-        response.header_mut().iin |= self.get_response_iin(database);
-        self.state
-            .broadcast
-            .report(response.header_mut(), ResponseKind::Unsolicited);
-
-        let header = response.header();
-        writer
-            .write(
-                io,
-                self.config.decode_level,
-                self.destination,
-                response.publish(),
-            )
-            .await?;
-
-        Ok(header)
-    }
-
-    /// Send a response with no objects that doesn't replace the response to the last valid request
-    pub(super) async fn write_transient_solicited<T: Transport>(
-        &mut self,
-        io: &mut PhysLayer,
-        writer: &mut TransportWriter<T>,
-        respond_to: FragmentAddr,
+        transient: &mut [u8; ResponseHeader::LENGTH],
         mut header: ResponseHeader,
-        database: &DatabaseHandle,
-    ) -> Result<(), LinkError> {
-        self.finish_solicited_header(&mut header, database);
-
-        writer
-            .write(io, self.config.decode_level, respond_to, &header.to_bytes())
-            .await
+        database: &mut DatabaseHandle,
+    ) {
+        self.finish_header(&mut header, ResponseKind::Solicited, database);
+        *transient = header.to_bytes();
     }
 
-    pub(super) fn finish_solicited_header(
+    fn finish_header(
         &mut self,
         header: &mut ResponseHeader,
-        database: &DatabaseHandle,
+        kind: ResponseKind,
+        database: &mut DatabaseHandle,
     ) {
         header.iin |= self.get_response_iin(database);
-        self.state.broadcast.report(header, ResponseKind::Solicited);
+        self.state.broadcast.report(header, kind);
     }
 
-    /// The confirm that a written solicited response waits for: its own, or a mandatory
-    /// broadcast's
-    pub(super) fn awaited_confirm(header: ResponseHeader) -> Option<ResponseSeries> {
-        header
-            .control
-            .con
-            .then(|| ResponseSeries::new(header.control.seq, header.control.fin))
-    }
-
-    pub(super) fn get_response_iin(&self, database: &DatabaseHandle) -> Iin {
+    fn get_response_iin(&self, database: &mut DatabaseHandle) -> Iin {
         let mut iin = Iin::default();
 
         // Restart IIN bit
@@ -276,7 +237,7 @@ impl OutstationSession {
             iin |= Iin1::RESTART
         }
 
-        // Events available
+        // Events available & buffer overflow (short DB lock, released before application callback)
         let events_info = database.get_events_info();
         if events_info.unwritten_classes.class1 {
             iin |= Iin1::CLASS_1_EVENTS;
@@ -288,12 +249,11 @@ impl OutstationSession {
             iin |= Iin1::CLASS_3_EVENTS;
         }
 
-        // Buffer overflow
         if events_info.is_overflown {
             iin |= Iin2::EVENT_BUFFER_OVERFLOW;
         }
 
-        // Application-controlled IIN bits
+        // Application-controlled IIN bits (outside DB lock)
         iin |= self.application.get_application_iin();
 
         iin

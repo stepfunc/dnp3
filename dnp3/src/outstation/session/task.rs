@@ -4,16 +4,24 @@
 // Text and data mining rights, including for AI training, are reserved under
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
+use std::future::Future;
+use std::pin::{pin, Pin};
+
+use tracing::Instrument;
+
 use crate::decode::DecodeLevel;
 use crate::link::reader::LinkModes;
-use crate::link::EndpointAddress;
+use crate::link::{EndpointAddress, LinkRole};
 use crate::outstation::config::*;
 use crate::outstation::database::DatabaseHandle;
-use crate::outstation::session::{OutstationSession, Responder};
+use crate::outstation::session::state::ConfirmWaitInfo;
+use crate::outstation::session::{Outbound, Output, OutstationCore};
 use crate::outstation::traits::{ControlHandler, OutstationApplication, OutstationInformation};
 use crate::outstation::OutstationHandle;
 use crate::phys::{PhysAddr, PhysLayer};
-use crate::transport::{FragmentAddr, RealTransport, Transport, TransportReader};
+use crate::transport::{RealTransport, Transport, TransportRead, TransportWriter};
+use crate::util::channel::Receiver;
+use crate::util::clock::TokioClock;
 use crate::util::lifecycle::{Enabled, RunError, StopReason};
 
 pub(crate) enum ConfigurationChange {
@@ -33,15 +41,17 @@ pub(crate) enum OutstationMessage {
     Configuration(ConfigurationChange),
 }
 
-/// Owns I/O resources and response slots, and orchestrates outstation reads and confirm waits.
-///
-/// Keeping protocol state and processing on the separate session field lets them run while an
-/// incoming fragment borrows the reader or a prepared response borrows its slot.
+/// Thin Tokio driver wiring [`OutstationCore`] and a [`Transport`] to a [`PhysLayer`] and
+/// [`DatabaseHandle`].
 pub(crate) struct OutstationTask<T: Transport = RealTransport> {
-    pub(super) session: OutstationSession,
-    pub(super) reader: TransportReader<T>,
-    pub(super) responder: Responder<T>,
-    pub(super) database: DatabaseHandle,
+    core: OutstationCore<TokioClock>,
+    clock: TokioClock,
+    reader: T::Reader,
+    writer: TransportWriter<T>,
+    database: DatabaseHandle,
+    enabled: Enabled,
+    decode_level: DecodeLevel,
+    messages: Receiver<OutstationMessage>,
 }
 
 /// RAII guard that re-arms per-connection state on session teardown.
@@ -51,16 +61,21 @@ struct SessionTeardown<'a, T: Transport> {
 
 impl<T: Transport> Drop for SessionTeardown<'_, T> {
     fn drop(&mut self) {
-        // re-arm, don't clear: unconfirmed events return to Unselected for re-delivery
-        self.task.database.reset();
+        // Re-arm, don't clear: unconfirmed events return to Unselected for re-delivery.
+        self.task.core.reset(&mut self.task.database);
         self.task.reader.reset();
-        self.task.responder.reset();
-        self.task.session.reset_session_state();
+        self.task.writer.reset();
     }
 }
 
+enum StepOutcome<R> {
+    Continue,
+    Cancelled(R),
+    Stopped(RunError),
+}
+
 impl OutstationTask {
-    /// create an `OutstationTask` and return it along with an `OutstationHandle` for controlling it
+    /// Create an `OutstationTask` and return it along with an `OutstationHandle` for controlling it.
     pub(crate) fn create(
         initial_state: Enabled,
         link_modes: LinkModes,
@@ -94,8 +109,8 @@ impl OutstationTask<crate::transport::mock::MockTransport> {
 }
 
 impl<T: Transport> OutstationTask<T> {
-    /// create an `OutstationTask` over a transport and return it along with an `OutstationHandle`
-    /// for controlling it
+    /// Create an `OutstationTask` over a transport and return it along with an `OutstationHandle`
+    /// for controlling it.
     pub(crate) fn with_transport(
         initial_state: Enabled,
         link_modes: LinkModes,
@@ -111,31 +126,33 @@ impl<T: Transport> OutstationTask<T> {
             config.class_zero,
             config.event_buffer_config,
         );
-        let (reader, writer) = crate::transport::create_transport_layer(
+        let (reader, writer) = T::new(
             link_modes,
-            crate::link::LinkRole::Outstation {
+            LinkRole::Outstation {
                 self_address: config.features.self_address == Feature::Enabled,
             },
             config.outstation_address,
             config.rx_buffer_size.value(),
         );
-        let destination = FragmentAddr {
-            link: config.master_address,
-            phys: phys_addr,
-        };
+        let decode_level = config.decode_level;
+        let clock = TokioClock::new();
+        let core = OutstationCore::new(
+            &config,
+            phys_addr,
+            application,
+            information,
+            control_handler,
+            clock,
+        );
         let task = Self {
-            session: OutstationSession::new(
-                initial_state,
-                rx,
-                destination,
-                config.into(),
-                application,
-                information,
-                control_handler,
-            ),
+            core,
+            clock,
             reader,
-            responder: Responder::new(writer, &config),
+            writer: TransportWriter::new(writer),
             database: handle.clone(),
+            enabled: initial_state,
+            decode_level,
+            messages: rx,
         };
         (
             task,
@@ -147,25 +164,214 @@ impl<T: Transport> OutstationTask<T> {
     }
 
     pub(crate) fn enabled(&self) -> Enabled {
-        self.session.enabled()
+        self.enabled
     }
 
     pub(crate) fn change_master_address(&mut self, address: EndpointAddress) {
-        self.session.change_master_address(address);
+        self.core.change_master_address(address);
     }
 
-    /// run the outstation task asynchronously until a `RunError` occurs
+    /// Run the outstation task asynchronously until a `RunError` occurs.
     ///
     /// Cancel-safe: per-connection state is re-armed by `SessionTeardown`'s `Drop`, so
     /// dropping this future tears down exactly as returning from it does.
     pub(crate) async fn run(&mut self, io: &mut PhysLayer) -> RunError {
-        let guard = SessionTeardown { task: self };
-        let task = &mut *guard.task; // reborrow so Drop can reset after the run future releases its borrows
-        task.run_session(io).await
+        match self
+            .run_until(io, std::future::pending::<std::convert::Infallible>())
+            .await
+        {
+            Ok(never) => match never {},
+            Err(err) => err,
+        }
     }
 
-    /// process received outstation messages while idle without a session
+    /// Run the outstation task until either a `RunError` occurs or `cancel` resolves while no
+    /// `handle_input` call is in flight.
+    ///
+    /// Writes and idle waits stay cancellable by `cancel` and stop messages, while an in-flight
+    /// `handle_input` always finishes before the session switches connections or shuts down.
+    pub(crate) async fn run_until<F, R>(
+        &mut self,
+        io: &mut PhysLayer,
+        cancel: F,
+    ) -> Result<R, RunError>
+    where
+        F: Future<Output = R>,
+    {
+        let guard = SessionTeardown { task: self };
+        let task = &mut *guard.task; // reborrow so Drop can reset after the run future releases its borrows
+        let cancel = pin!(cancel);
+        task.run_session(io, cancel).await
+    }
+
+    /// Process received outstation messages while idle without a session.
     pub(crate) async fn process_next_message(&mut self) -> Result<(), StopReason> {
-        self.session.process_next_message().await
+        handle_one_message(
+            &mut self.messages,
+            &mut self.enabled,
+            &mut self.decode_level,
+        )
+        .await
+    }
+
+    async fn run_session<F, R>(
+        &mut self,
+        io: &mut PhysLayer,
+        mut cancel: Pin<&mut F>,
+    ) -> Result<R, RunError>
+    where
+        F: Future<Output = R>,
+    {
+        loop {
+            let span = self.confirm_wait_span();
+            match self.run_step(io, cancel.as_mut()).instrument(span).await {
+                StepOutcome::Continue => {}
+                StepOutcome::Cancelled(val) => return Ok(val),
+                StepOutcome::Stopped(err) => return Err(err),
+            }
+        }
+    }
+
+    fn confirm_wait_span(&self) -> tracing::Span {
+        match self.core.confirm_wait_info() {
+            Some(ConfirmWaitInfo::Solicited(ecsn)) => {
+                tracing::info_span!("SolConfirmWait", "ecsn" = ecsn.value())
+            }
+            Some(ConfirmWaitInfo::Unsolicited(seq)) => {
+                tracing::info_span!("UnsolConfirmWait", "seq" = seq.value())
+            }
+            None => tracing::Span::none(),
+        }
+    }
+
+    async fn run_step<F, R>(
+        &mut self,
+        io: &mut PhysLayer,
+        mut cancel: Pin<&mut F>,
+    ) -> StepOutcome<R>
+    where
+        F: Future<Output = R>,
+    {
+        match self.core.poll(&mut self.database) {
+            Output::Transmit(tx) => {
+                let level = self.decode_level;
+                let outbound = tx.outbound();
+                let write = async {
+                    match outbound {
+                        Outbound::Fragment { destination, bytes } => {
+                            self.writer.write(io, level, destination, bytes).await
+                        }
+                        Outbound::LinkStatusRequest { destination } => {
+                            self.writer
+                                .send_link_status_request(io, level, destination)
+                                .await
+                        }
+                    }
+                };
+
+                let write_result = tokio::select! {
+                    biased;
+                    val = cancel.as_mut() => return StepOutcome::Cancelled(val),
+                    stop = wait_for_stop(&mut self.messages, &mut self.enabled, &mut self.decode_level) => {
+                        return StepOutcome::Stopped(stop.into());
+                    }
+                    res = write => res,
+                };
+
+                match write_result {
+                    Ok(()) => {
+                        tx.sent();
+                        StepOutcome::Continue
+                    }
+                    Err(err) => StepOutcome::Stopped(err.into()),
+                }
+            }
+            Output::Wait {
+                deadline,
+                watch_database,
+            } => {
+                let level = self.decode_level;
+                let sleep_target = deadline.map(|d| self.clock.to_tokio_instant(d));
+
+                let read_ready = tokio::select! {
+                    biased;
+                    val = cancel.as_mut() => return StepOutcome::Cancelled(val),
+                    res = handle_one_message(&mut self.messages, &mut self.enabled, &mut self.decode_level) => match res {
+                        Ok(()) => false,
+                        Err(stop) => return StepOutcome::Stopped(stop.into()),
+                    },
+                    _ = sleep_option(sleep_target) => false,
+                    res = self.reader.read(io, level) => match res {
+                        Ok(()) => true,
+                        Err(err) => return StepOutcome::Stopped(err.into()),
+                    },
+                    _ = wait_for_db(&self.database, watch_database) => false,
+                };
+
+                if read_ready {
+                    if let Some(input) = self.reader.pop() {
+                        // In-flight `handle_input` runs to completion before switching TCP
+                        // connections or shutting down.
+                        self.core
+                            .handle_input(input, self.decode_level.application, &mut self.database)
+                            .await;
+                    }
+                }
+
+                StepOutcome::Continue
+            }
+        }
+    }
+}
+
+async fn sleep_option(target: Option<tokio::time::Instant>) {
+    match target {
+        Some(target) => tokio::time::sleep_until(target).await,
+        None => std::future::pending().await,
+    }
+}
+
+async fn wait_for_db(database: &DatabaseHandle, enabled: bool) {
+    if enabled {
+        database.wait_for_change().await
+    } else {
+        std::future::pending().await
+    }
+}
+
+async fn wait_for_stop(
+    messages: &mut Receiver<OutstationMessage>,
+    enabled: &mut Enabled,
+    decode_level: &mut DecodeLevel,
+) -> StopReason {
+    loop {
+        if let Err(stop) = handle_one_message(messages, enabled, decode_level).await {
+            return stop;
+        }
+    }
+}
+
+async fn handle_one_message(
+    messages: &mut Receiver<OutstationMessage>,
+    enabled: &mut Enabled,
+    decode_level: &mut DecodeLevel,
+) -> Result<(), StopReason> {
+    match messages.receive().await? {
+        OutstationMessage::Shutdown => Err(StopReason::Shutdown),
+        OutstationMessage::Enable => {
+            tracing::info!("enable communication");
+            *enabled = Enabled::Yes;
+            Ok(())
+        }
+        OutstationMessage::Disable => {
+            tracing::info!("disable communication");
+            *enabled = Enabled::No;
+            Err(StopReason::Disable)
+        }
+        OutstationMessage::Configuration(ConfigurationChange::SetDecodeLevel(level)) => {
+            tracing::info!("decode level changed to: {:?}", level);
+            *decode_level = level;
+            Ok(())
+        }
     }
 }

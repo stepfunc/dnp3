@@ -4,14 +4,26 @@
 // Text and data mining rights, including for AI training, are reserved under
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
-use super::*;
+use super::context::SessionContext;
+use crate::app::attr::Attribute;
+use crate::app::parse::bit::BitSequence;
+use crate::app::parse::count::CountSequence;
+use crate::app::parse::parser::HeaderCollection;
+use crate::app::parse::prefix::Prefix;
+use crate::app::parse::range::RangedSequence;
+use crate::app::parse::traits::{FixedSizeVariation, Index};
+use crate::app::variations::{Group34Var1, Group34Var2, Group34Var3, Group50Var1, Group50Var3};
+use crate::app::{FunctionCode, Iin, Iin2, ResponseHeader, Sequence};
+use crate::outstation::database::DatabaseHandle;
+use crate::outstation::target::{DeadBands, Selector, WriteHeader, WriteTarget};
+use crate::util::clock::MonotonicClock;
 
-impl OutstationSession {
+impl<C: MonotonicClock> SessionContext<C> {
     pub(super) async fn handle_write(
         &mut self,
         seq: Sequence,
         object_headers: HeaderCollection<'_>,
-        database: &DatabaseHandle,
+        database: &mut DatabaseHandle,
     ) -> ResponseHeader {
         let mut iin2 = Iin2::default();
         let mut empty = true;
@@ -33,57 +45,61 @@ impl OutstationSession {
         ResponseHeader::solicited(seq, Iin::default() | iin2)
     }
 
-    pub(super) async fn handle_single_write_header(
+    async fn handle_single_write_header(
         &mut self,
         header: WriteHeader<'_>,
-        db: &DatabaseHandle,
+        db: &mut DatabaseHandle,
     ) -> Iin2 {
-        match header {
-            WriteHeader::Attr(attr) => self.handle_write_attr(attr, db).await,
-            WriteHeader::Iin(bits) => self.handle_write_iin(bits),
-            WriteHeader::AbsoluteTime(seq) => self.handle_write_abs_time(seq),
-            WriteHeader::LastRecordedTime(seq) => self.handle_write_at_last_recorded_time(seq),
-            WriteHeader::DeadBands16(items) => self.handle_write_dead_bands(items, db).await,
-            WriteHeader::DeadBands32(items) => self.handle_write_dead_bands(items, db).await,
-            WriteHeader::DeadBandsFloat(items) => self.handle_write_dead_bands(items, db).await,
+        let deadband_iin = match header {
+            WriteHeader::Attr(attr) => return self.handle_write_attr(attr, db).await,
+            WriteHeader::Iin(bits) => return self.handle_write_iin(bits),
+            WriteHeader::AbsoluteTime(seq) => return self.handle_write_abs_time(seq),
+            WriteHeader::LastRecordedTime(seq) => {
+                return self.handle_write_at_last_recorded_time(seq);
+            }
+            WriteHeader::DeadBands16(items) => self.apply_write_dead_bands(items, db),
+            WriteHeader::DeadBands32(items) => self.apply_write_dead_bands(items, db),
+            WriteHeader::DeadBandsFloat(items) => self.apply_write_dead_bands(items, db),
+        };
+
+        match deadband_iin {
+            Some(iin2) => {
+                self.application.end_write_analog_dead_bands().get().await;
+                iin2
+            }
+            None => Iin2::OBJECT_UNKNOWN,
         }
     }
 
-    pub(super) async fn handle_write_attr(
-        &mut self,
-        attr: Attribute<'_>,
-        db: &DatabaseHandle,
-    ) -> Iin2 {
-        // first validate that attribute can be written
-        if let Err(err) = db.transaction(|db| db.inner.get_attr_map().can_write(attr)) {
+    async fn handle_write_attr(&mut self, attr: Attribute<'_>, db: &mut DatabaseHandle) -> Iin2 {
+        // First validate that attribute can be written.
+        if let Err(err) = db.with_database(|db| db.inner.get_attr_map().can_write(attr)) {
             tracing::warn!("Unable to WRITE attribute: {err}");
             return err.into();
         }
 
-        // next, ask the application to validate and persist the value
+        // Next, ask the application to validate and persist the value (outside DB lock).
         if !self.application.write_device_attr(attr).get().await {
-            // validation of the value failed
             return Iin2::PARAMETER_ERROR;
         }
 
-        // this can't fail today: nothing removes an attribute or changes its type once defined
-        if let Err(err) = db.transaction(|db| db.inner.get_attr_map().write(attr)) {
+        // This can't fail today: nothing removes an attribute or changes its type once defined.
+        if let Err(err) = db.with_database(|db| db.inner.get_attr_map().write(attr)) {
             tracing::error!("Unable to store the WRITE of an attribute: {err}");
             return Iin2::PARAMETER_ERROR;
         }
         Iin2::default()
     }
 
-    pub(super) fn handle_write_iin(&mut self, bits: BitSequence) -> Iin2 {
+    fn handle_write_iin(&mut self, bits: BitSequence) -> Iin2 {
         let mut iin2 = Iin2::default();
         for (value, index) in bits.iter() {
             if index == 7 {
-                // restart IIN
+                // Restart IIN
                 if value {
                     tracing::warn!("ignoring request to write IIN 1.7 to TRUE");
                     iin2 |= Iin2::PARAMETER_ERROR;
                 } else {
-                    // clear the restart bit
                     self.state.restart_iin_asserted = false;
                     self.info.clear_restart_iin();
                 }
@@ -95,7 +111,7 @@ impl OutstationSession {
         iin2
     }
 
-    pub(super) fn handle_write_abs_time(&mut self, seq: CountSequence<Group50Var1>) -> Iin2 {
+    fn handle_write_abs_time(&mut self, seq: CountSequence<Group50Var1>) -> Iin2 {
         if let Some(value) = seq.single() {
             match self.application.write_absolute_time(value.time) {
                 Err(err) => err.into(),
@@ -107,10 +123,8 @@ impl OutstationSession {
         }
     }
 
-    pub(super) fn handle_write_at_last_recorded_time(
-        &mut self,
-        seq: CountSequence<Group50Var3>,
-    ) -> Iin2 {
+    fn handle_write_at_last_recorded_time(&mut self, seq: CountSequence<Group50Var3>) -> Iin2 {
+        let now = self.clock.now();
         let value = if let Some(value) = seq.single() {
             value
         } else {
@@ -125,8 +139,7 @@ impl OutstationSession {
             return Iin2::PARAMETER_ERROR;
         };
 
-        let delay = if let Some(delay) = self.clock.now().checked_duration_since(last_recorded_time)
-        {
+        let delay = if let Some(delay) = now.checked_duration_since(last_recorded_time) {
             delay
         } else {
             tracing::warn!("clock rollback detected");
@@ -147,18 +160,21 @@ impl OutstationSession {
         }
     }
 
-    pub(super) async fn handle_write_analog_deadbands(
+    fn apply_write_analog_deadbands<I>(
         &mut self,
-        mut items: impl Iterator<Item = (u16, f64)>,
-        db: &DatabaseHandle,
-    ) -> Iin2 {
+        mut items: I,
+        db: &mut DatabaseHandle,
+    ) -> Option<Iin2>
+    where
+        I: Iterator<Item = (u16, f64)>,
+    {
         if !self.application.support_write_analog_dead_bands() {
-            return Iin2::OBJECT_UNKNOWN;
+            return None;
         }
 
         self.application.begin_write_analog_dead_bands();
 
-        let iin = db.transaction(|db| {
+        let iin = db.with_database(|db| {
             let mut iin2 = Iin2::default();
             for (index, deadband) in items.by_ref() {
                 match db.inner.set_analog_deadband(index, deadband) {
@@ -169,60 +185,52 @@ impl OutstationSession {
             iin2
         });
 
-        self.application.end_write_analog_dead_bands().get().await;
-
-        iin
+        Some(iin)
     }
 
-    pub(super) async fn handle_write_ranged_analog_deadbands<V>(
+    fn apply_write_ranged_analog_deadbands<V>(
         &mut self,
         items: RangedSequence<'_, V>,
-        db: &DatabaseHandle,
-    ) -> Iin2
+        db: &mut DatabaseHandle,
+    ) -> Option<Iin2>
     where
         V: FixedSizeVariation + Into<f64>,
     {
-        self.handle_write_analog_deadbands(
+        self.apply_write_analog_deadbands(
             items.iter().map(|(value, index)| (index, value.into())),
             db,
         )
-        .await
     }
 
-    pub(super) async fn handle_write_prefixed_analog_deadbands<I, V>(
+    fn apply_write_prefixed_analog_deadbands<I, V>(
         &mut self,
         items: CountSequence<'_, Prefix<I, V>>,
-        db: &DatabaseHandle,
-    ) -> Iin2
+        db: &mut DatabaseHandle,
+    ) -> Option<Iin2>
     where
         I: Index,
         V: FixedSizeVariation + Into<f64>,
     {
-        self.handle_write_analog_deadbands(
+        self.apply_write_analog_deadbands(
             items
                 .iter()
                 .map(|x| (x.index.widen_to_u16(), x.value.into())),
             db,
         )
-        .await
     }
 
-    pub(super) async fn handle_write_dead_bands<V>(
+    fn apply_write_dead_bands<V>(
         &mut self,
         items: DeadBands<'_, V>,
-        db: &DatabaseHandle,
-    ) -> Iin2
+        db: &mut DatabaseHandle,
+    ) -> Option<Iin2>
     where
         V: FixedSizeVariation + Into<f64>,
     {
         match items {
-            DeadBands::Range(seq) => self.handle_write_ranged_analog_deadbands(seq, db).await,
-            DeadBands::OneBytePrefix(seq) => {
-                self.handle_write_prefixed_analog_deadbands(seq, db).await
-            }
-            DeadBands::TwoBytePrefix(seq) => {
-                self.handle_write_prefixed_analog_deadbands(seq, db).await
-            }
+            DeadBands::Range(seq) => self.apply_write_ranged_analog_deadbands(seq, db),
+            DeadBands::OneBytePrefix(seq) => self.apply_write_prefixed_analog_deadbands(seq, db),
+            DeadBands::TwoBytePrefix(seq) => self.apply_write_prefixed_analog_deadbands(seq, db),
         }
     }
 }

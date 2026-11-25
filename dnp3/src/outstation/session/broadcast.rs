@@ -4,36 +4,45 @@
 // Text and data mining rights, including for AI training, are reserved under
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
-use super::*;
+use super::context::SessionContext;
+use crate::app::parse::parser::HeaderCollection;
+use crate::app::{FunctionCode, ObjectParseError, RequestHeader};
+use crate::link::header::BroadcastConfirmMode;
+use crate::outstation::database::DatabaseHandle;
+use crate::outstation::traits::{BroadcastAction, FreezeType};
+use crate::util::clock::MonotonicClock;
 
-impl OutstationSession {
+impl<C: MonotonicClock> SessionContext<C> {
     pub(super) async fn process_broadcast(
         &mut self,
         database: &mut DatabaseHandle,
         mode: BroadcastConfirmMode,
-        request: Request<'_>,
+        header: RequestHeader,
+        objects: Result<HeaderCollection<'_>, ObjectParseError>,
     ) -> BroadcastAction {
         self.state.broadcast.received(mode);
-        let action = self.process_broadcast_get_action(database, request).await;
-        self.info
-            .broadcast_received(request.header.function, action);
+        let action = self
+            .process_broadcast_get_action(database, header, objects)
+            .await;
+        self.info.broadcast_received(header.function, action);
         action
     }
 
-    pub(super) async fn process_broadcast_get_action(
+    async fn process_broadcast_get_action(
         &mut self,
         database: &mut DatabaseHandle,
-        request: Request<'_>,
+        header: RequestHeader,
+        objects: Result<HeaderCollection<'_>, ObjectParseError>,
     ) -> BroadcastAction {
         if self.config.broadcast.is_disabled() {
             tracing::warn!(
                 "ignoring broadcast request (broadcast support disabled): {:?}",
-                request.header.function
+                header.function
             );
             return BroadcastAction::IgnoredByConfiguration;
         }
 
-        let objects = match request.objects {
+        let objects = match objects {
             Ok(x) => x,
             Err(err) => {
                 tracing::warn!(
@@ -44,9 +53,9 @@ impl OutstationSession {
             }
         };
 
-        let seq = request.header.control.seq;
+        let seq = header.control.seq;
 
-        match request.header.function {
+        match header.function {
             FunctionCode::Write => {
                 self.handle_write(seq, objects, database).await;
                 BroadcastAction::Processed
@@ -60,7 +69,7 @@ impl OutstationSession {
                     database,
                     seq,
                     objects,
-                    request.header.function,
+                    header.function,
                     FreezeType::ImmediateFreeze,
                 );
                 BroadcastAction::Processed
@@ -70,13 +79,13 @@ impl OutstationSession {
                     database,
                     seq,
                     objects,
-                    request.header.function,
+                    header.function,
                     FreezeType::FreezeAndClear,
                 );
                 BroadcastAction::Processed
             }
             FunctionCode::FreezeAtTimeNoResponse => {
-                self.handle_freeze_at_time(database, seq, objects, request.header.function);
+                self.handle_freeze_at_time(database, seq, objects, header.function);
                 BroadcastAction::Processed
             }
             FunctionCode::RecordCurrentTime => {
@@ -92,11 +101,8 @@ impl OutstationSession {
                 BroadcastAction::Processed
             }
             _ => {
-                tracing::warn!(
-                    "unsupported broadcast function: {:?}",
-                    request.header.function
-                );
-                BroadcastAction::UnsupportedFunction(request.header.function)
+                tracing::warn!("unsupported broadcast function: {:?}", header.function);
+                BroadcastAction::UnsupportedFunction(header.function)
             }
         }
     }
