@@ -79,6 +79,14 @@ impl TokioClock {
         let remaining = target.saturating_duration_since(self.elapsed(now));
         crate::util::deadline::deadline(now, remaining)
     }
+
+    /// Sleep until `deadline`, or stay pending forever when `deadline` is `None`.
+    pub(crate) async fn sleep_until(self, deadline: Option<MonotonicTime>) {
+        match deadline {
+            Some(target) => tokio::time::sleep_until(self.to_tokio_instant(target)).await,
+            None => std::future::pending().await,
+        }
+    }
 }
 
 impl MonotonicClock for TokioClock {

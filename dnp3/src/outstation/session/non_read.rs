@@ -4,7 +4,7 @@
 // Text and data mining rights, including for AI training, are reserved under
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
-use super::context::{parameter_error, SessionContext};
+use super::context::SessionContext;
 use super::response::{Prepared, ResponseSlot};
 use super::state::{ControlRequest, LastValidRequest, UnsolicitedState};
 use crate::app::format::write::HeaderWriter;
@@ -318,7 +318,7 @@ where
         Ok(()) => ResponseHeader::solicited(seq, Iin::default()),
         Err(err) => {
             tracing::error!("unable to write {item} to the response buffer: {err:?}");
-            parameter_error(seq)
+            ResponseHeader::parameter_error(seq)
         }
     };
     staged.with_header(header)

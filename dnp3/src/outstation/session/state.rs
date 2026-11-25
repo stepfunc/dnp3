@@ -42,6 +42,15 @@ impl ResponseSeries {
     pub(super) fn new(ecsn: Sequence, fin: bool) -> Self {
         Self { ecsn, fin }
     }
+
+    /// The confirm that a written solicited response waits for: its own, or a mandatory
+    /// broadcast's.
+    pub(super) fn from_header(header: ResponseHeader) -> Option<Self> {
+        header
+            .control
+            .con
+            .then(|| Self::new(header.control.seq, header.control.fin))
+    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]

@@ -8,7 +8,7 @@ use ::core::time::Duration;
 
 use super::state::{KeepAlive, SessionState};
 use crate::app::parse::options::ParseOptions;
-use crate::app::{Iin, Iin2, ResponseHeader, Sequence, Timeout};
+use crate::app::Timeout;
 use crate::link::EndpointAddress;
 use crate::outstation::config::{Feature, OutstationConfig};
 use crate::outstation::database::DatabaseHandle;
@@ -108,9 +108,4 @@ impl From<&OutstationConfig> for SessionConfig {
             max_controls_per_request: config.max_controls_per_request,
         }
     }
-}
-
-/// The header of a solicited response that reports IIN2.2.
-pub(super) fn parameter_error(seq: Sequence) -> ResponseHeader {
-    ResponseHeader::solicited(seq, Iin::default() | Iin2::PARAMETER_ERROR)
 }

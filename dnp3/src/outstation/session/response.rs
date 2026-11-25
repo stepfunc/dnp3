@@ -8,7 +8,7 @@ use scursor::{WriteCursor, WriteError};
 
 use super::context::SessionContext;
 use super::phase::SolTx;
-use super::state::{ResponseKind, ResponseSeries};
+use super::state::ResponseKind;
 use crate::app::*;
 use crate::outstation::config::OutstationConfig;
 use crate::transport::FragmentAddr;
@@ -163,15 +163,6 @@ impl ResponseSlot {
     fn view(&self) -> &[u8] {
         self.bytes.get(..self.len).unwrap_or_default()
     }
-}
-
-/// The confirm that a written solicited response waits for: its own, or a mandatory
-/// broadcast's.
-pub(super) fn awaited_confirm(header: ResponseHeader) -> Option<ResponseSeries> {
-    header
-        .control
-        .con
-        .then(|| ResponseSeries::new(header.control.seq, header.control.fin))
 }
 
 impl<C: MonotonicClock> SessionContext<C> {

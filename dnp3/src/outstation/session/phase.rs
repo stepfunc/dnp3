@@ -6,7 +6,7 @@
 
 use super::context::SessionContext;
 use super::core::Outbound;
-use super::response::{awaited_confirm, Slots};
+use super::response::Slots;
 use super::state::{
     ConfirmWaitInfo, ExpectedConfirm, FragmentType, Intake, ResponseKind, ResponseSeries,
     SolConfirmWait, UnsolConfirmWait, UnsolicitedState, UnsolicitedWaitKind,
@@ -238,7 +238,7 @@ impl SolTx {
     pub(super) fn new(to: FragmentAddr, header: ResponseHeader) -> Self {
         Self {
             to,
-            awaits: awaited_confirm(header),
+            awaits: ResponseSeries::from_header(header),
         }
     }
 }

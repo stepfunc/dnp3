@@ -4,7 +4,7 @@
 // Text and data mining rights, including for AI training, are reserved under
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
-use super::context::{parameter_error, SessionContext};
+use super::context::SessionContext;
 use super::response::{Prepared, ResponseSlot, Staged};
 use super::state::ControlRequest;
 use crate::app::control::CommandStatus;
@@ -36,7 +36,7 @@ impl<C: MonotonicClock> SessionContext<C> {
             tracing::warn!(
                 "ignoring control request whose response doesn't fit in the response buffer"
             );
-            return sol.empty(parameter_error(seq));
+            return sol.empty(ResponseHeader::parameter_error(seq));
         }
 
         let (result, staged) = match request {
@@ -176,7 +176,7 @@ fn control_response(
         }
         Err(_) => {
             tracing::warn!("control response doesn't fit in the response buffer");
-            parameter_error(seq)
+            ResponseHeader::parameter_error(seq)
         }
     };
     staged.with_header(header)
