@@ -24,23 +24,6 @@ use crate::util::channel::Receiver;
 use crate::util::clock::TokioClock;
 use crate::util::lifecycle::{Enabled, RunError, StopReason};
 
-pub(crate) enum ConfigurationChange {
-    SetDecodeLevel(DecodeLevel),
-}
-
-impl From<ConfigurationChange> for OutstationMessage {
-    fn from(x: ConfigurationChange) -> Self {
-        OutstationMessage::Configuration(x)
-    }
-}
-
-pub(crate) enum OutstationMessage {
-    Enable,
-    Disable,
-    Shutdown,
-    Configuration(ConfigurationChange),
-}
-
 /// Thin Tokio driver wiring [`OutstationCore`] and a [`Transport`] to a [`PhysLayer`] and
 /// [`DatabaseHandle`].
 pub(crate) struct OutstationTask<T: Transport = RealTransport> {
@@ -52,26 +35,6 @@ pub(crate) struct OutstationTask<T: Transport = RealTransport> {
     enabled: Enabled,
     decode_level: DecodeLevel,
     messages: Receiver<OutstationMessage>,
-}
-
-/// RAII guard that re-arms per-connection state on session teardown.
-struct SessionTeardown<'a, T: Transport> {
-    task: &'a mut OutstationTask<T>,
-}
-
-impl<T: Transport> Drop for SessionTeardown<'_, T> {
-    fn drop(&mut self) {
-        // Re-arm, don't clear: unconfirmed events return to Unselected for re-delivery.
-        self.task.core.reset();
-        self.task.reader.reset();
-        self.task.writer.reset();
-    }
-}
-
-enum StepOutcome<R> {
-    Continue,
-    Cancelled(R),
-    Stopped(RunError),
 }
 
 impl OutstationTask {
@@ -94,17 +57,6 @@ impl OutstationTask {
             information,
             control_handler,
         )
-    }
-}
-
-#[cfg(test)]
-impl OutstationTask<crate::transport::mock::MockTransport> {
-    pub(crate) fn set_rx_frame_info(&mut self, info: crate::link::header::FrameInfo) {
-        self.reader.set_rx_frame_info(info);
-    }
-
-    pub(crate) fn rx_frame_info(&self) -> crate::transport::mock::reader::RxFrameInfo {
-        self.reader.rx_frame_info()
     }
 }
 
@@ -323,6 +275,54 @@ impl<T: Transport> OutstationTask<T> {
             }
         }
     }
+}
+
+#[cfg(test)]
+impl OutstationTask<crate::transport::mock::MockTransport> {
+    pub(crate) fn set_rx_frame_info(&mut self, info: crate::link::header::FrameInfo) {
+        self.reader.set_rx_frame_info(info);
+    }
+
+    pub(crate) fn rx_frame_info(&self) -> crate::transport::mock::reader::RxFrameInfo {
+        self.reader.rx_frame_info()
+    }
+}
+
+pub(crate) enum OutstationMessage {
+    Enable,
+    Disable,
+    Shutdown,
+    Configuration(ConfigurationChange),
+}
+
+pub(crate) enum ConfigurationChange {
+    SetDecodeLevel(DecodeLevel),
+}
+
+impl From<ConfigurationChange> for OutstationMessage {
+    fn from(x: ConfigurationChange) -> Self {
+        OutstationMessage::Configuration(x)
+    }
+}
+
+/// RAII guard that re-arms per-connection state on session teardown.
+struct SessionTeardown<'a, T: Transport> {
+    task: &'a mut OutstationTask<T>,
+}
+
+impl<T: Transport> Drop for SessionTeardown<'_, T> {
+    fn drop(&mut self) {
+        // Re-arm, don't clear: unconfirmed events return to Unselected for re-delivery.
+        self.task.core.reset();
+        self.task.reader.reset();
+        self.task.writer.reset();
+    }
+}
+
+enum StepOutcome<R> {
+    Continue,
+    Cancelled(R),
+    Stopped(RunError),
 }
 
 async fn sleep_option(target: Option<tokio::time::Instant>) {

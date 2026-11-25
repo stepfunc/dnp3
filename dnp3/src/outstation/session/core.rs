@@ -17,58 +17,6 @@ use crate::phys::PhysAddr;
 use crate::transport::{FragmentAddr, TransportData};
 use crate::util::clock::{MonotonicClock, MonotonicTime};
 
-/// What [`OutstationCore::poll`] wants the driver to transmit.
-#[derive(Copy, Clone, Debug)]
-pub(super) enum Outbound<'a> {
-    /// An application-layer fragment to segment and write to `destination`.
-    Fragment {
-        destination: FragmentAddr,
-        bytes: &'a [u8],
-    },
-    /// A link-layer `REQUEST_LINK_STATUS` keep-alive frame to write to `destination`.
-    LinkStatusRequest { destination: FragmentAddr },
-}
-
-/// Output of [`OutstationCore::poll`].
-#[must_use]
-pub(super) enum Output<'a, C: MonotonicClock> {
-    /// Transmit this payload, then call [`Transmit::sent`] once the write completes.
-    Transmit(Transmit<'a, C>),
-    /// Nothing to transmit now; wait for incoming input, database updates (when `watch_database`
-    /// is true), or `deadline`.
-    Wait {
-        deadline: Option<MonotonicTime>,
-        watch_database: bool,
-    },
-}
-
-/// Borrow token representing an outbound transmission in progress.
-///
-/// Holding `Transmit<'_, C>` borrows `&mut OutstationCore<C>`, statically preventing `handle_input`
-/// or another `poll` while a write is underway. Call [`Self::sent`] once the write completes, or
-/// tear down the session with [`OutstationCore::reset`] if the write fails or is cancelled.
-/// Dropping `Transmit` without calling [`Self::sent`] leaves the phase in flight so a subsequent
-/// `poll` or `handle_input` resets per-connection state and the database automatically.
-#[must_use]
-pub(super) struct Transmit<'a, C: MonotonicClock> {
-    outbound: Outbound<'a>,
-    staged: StagedTx,
-    phase: &'a mut Phase,
-    ctx: &'a mut SessionContext<C>,
-}
-
-impl<'a, C: MonotonicClock> Transmit<'a, C> {
-    /// The payload to write to the transport.
-    pub(super) fn outbound(&self) -> Outbound<'a> {
-        self.outbound
-    }
-
-    /// Commit the state transition after the write completes.
-    pub(super) fn sent(self) {
-        self.phase.sent(self.staged, self.ctx);
-    }
-}
-
 /// Sans-I/O DNP3 outstation application-layer protocol state machine.
 pub(super) struct OutstationCore<C: MonotonicClock> {
     phase: Phase,
@@ -151,4 +99,56 @@ impl<C: MonotonicClock> OutstationCore<C> {
             .input(&mut self.slots, &mut self.ctx, input, app_decode_level)
             .await;
     }
+}
+
+/// Output of [`OutstationCore::poll`].
+#[must_use]
+pub(super) enum Output<'a, C: MonotonicClock> {
+    /// Transmit this payload, then call [`Transmit::sent`] once the write completes.
+    Transmit(Transmit<'a, C>),
+    /// Nothing to transmit now; wait for incoming input, database updates (when `watch_database`
+    /// is true), or `deadline`.
+    Wait {
+        deadline: Option<MonotonicTime>,
+        watch_database: bool,
+    },
+}
+
+/// Borrow token representing an outbound transmission in progress.
+///
+/// Holding `Transmit<'_, C>` borrows `&mut OutstationCore<C>`, statically preventing `handle_input`
+/// or another `poll` while a write is underway. Call [`Self::sent`] once the write completes, or
+/// tear down the session with [`OutstationCore::reset`] if the write fails or is cancelled.
+/// Dropping `Transmit` without calling [`Self::sent`] leaves the phase in flight so a subsequent
+/// `poll` or `handle_input` resets per-connection state and the database automatically.
+#[must_use]
+pub(super) struct Transmit<'a, C: MonotonicClock> {
+    outbound: Outbound<'a>,
+    staged: StagedTx,
+    phase: &'a mut Phase,
+    ctx: &'a mut SessionContext<C>,
+}
+
+impl<'a, C: MonotonicClock> Transmit<'a, C> {
+    /// The payload to write to the transport.
+    pub(super) fn outbound(&self) -> Outbound<'a> {
+        self.outbound
+    }
+
+    /// Commit the state transition after the write completes.
+    pub(super) fn sent(self) {
+        self.phase.sent(self.staged, self.ctx);
+    }
+}
+
+/// What [`OutstationCore::poll`] wants the driver to transmit.
+#[derive(Copy, Clone, Debug)]
+pub(super) enum Outbound<'a> {
+    /// An application-layer fragment to segment and write to `destination`.
+    Fragment {
+        destination: FragmentAddr,
+        bytes: &'a [u8],
+    },
+    /// A link-layer `REQUEST_LINK_STATUS` keep-alive frame to write to `destination`.
+    LinkStatusRequest { destination: FragmentAddr },
 }
