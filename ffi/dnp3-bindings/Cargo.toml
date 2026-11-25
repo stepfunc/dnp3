@@ -16,3 +16,5 @@ oo-bindgen = { workspace = true }
 dnp3-schema = { path = "../dnp3-schema" }
 tracing-subscriber = "0.3"
 tracing = "0.1"
+
+[lints]

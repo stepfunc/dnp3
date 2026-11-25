@@ -9,61 +9,12 @@ use crate::app::parse::parser::ParsedFragment;
 use crate::app::HeaderParseError;
 use crate::decode::{AppDecodeLevel, DecodeLevel};
 use crate::link::error::LinkError;
-use crate::link::EndpointAddress;
 use crate::phys::PhysLayer;
-use crate::transport::{
-    RealTransport, Transport, TransportData, TransportRead, TransportRequest, TransportResponse,
-};
+use crate::transport::{RealTransport, Transport, TransportData, TransportRead, TransportResponse};
 
 pub(crate) struct TransportReader<T: Transport> {
     parse_options: ParseOptions,
-    /// a guard retained the request at the head, which it already logged
-    retained: bool,
     inner: T::Reader,
-}
-
-/// Keeps the current request available while it is handled.
-///
-/// Dropping the guard consumes the request, including when the handling future is cancelled.
-/// Calling [`Self::retain`] leaves it queued for the next session state to process.
-pub(crate) struct RequestGuard<'a, T: Transport> {
-    consume_on_drop: bool,
-    master_address: Option<EndpointAddress>,
-    level: AppDecodeLevel,
-    reader: &'a mut TransportReader<T>,
-}
-
-impl<'a, T: Transport> RequestGuard<'a, T> {
-    fn new(
-        reader: &'a mut TransportReader<T>,
-        master_address: Option<EndpointAddress>,
-        level: AppDecodeLevel,
-    ) -> Self {
-        RequestGuard {
-            consume_on_drop: true,
-            master_address,
-            level,
-            reader,
-        }
-    }
-
-    pub(crate) fn retain(&mut self) {
-        self.consume_on_drop = false;
-        self.reader.retained = true;
-    }
-
-    /// Parse the available request, or `None` if there is none or it came from another master
-    pub(crate) fn get(&self) -> Option<TransportRequest<'_>> {
-        self.reader.peek_request(self.master_address, self.level)
-    }
-}
-
-impl<T: Transport> Drop for RequestGuard<'_, T> {
-    fn drop(&mut self) {
-        if self.consume_on_drop {
-            self.reader.pop()
-        }
-    }
 }
 
 impl TransportReader<RealTransport> {
@@ -87,7 +38,6 @@ impl<T: Transport> TransportReader<T> {
     pub(crate) fn new(inner: T::Reader) -> Self {
         Self {
             parse_options: ParseOptions::get_static(),
-            retained: false,
             inner,
         }
     }
@@ -106,13 +56,7 @@ impl<T: Transport> TransportReader<T> {
     }
 
     pub(crate) fn reset(&mut self) {
-        self.retained = false;
         self.inner.reset()
-    }
-
-    fn pop(&mut self) {
-        self.retained = false;
-        self.inner.pop();
     }
 
     pub(crate) fn pop_response(&mut self, level: AppDecodeLevel) -> Option<TransportResponse<'_>> {
@@ -125,7 +69,7 @@ impl<T: Transport> TransportReader<T> {
         };
 
         let source = fragment.info.addr;
-        let response = match parse(options, level, fragment.data) {
+        let response = match parse_fragment(options, level, fragment.data) {
             Ok(parsed) => match parsed.to_response() {
                 Ok(response) => TransportResponse::Response(source, response),
                 Err(err) => TransportResponse::Error(source, err.into()),
@@ -134,66 +78,10 @@ impl<T: Transport> TransportReader<T> {
         };
         Some(response)
     }
-
-    /// Guard the available request, which is consumed when the guard drops unless retained. A
-    /// retained request was logged when it was first parsed, so it isn't logged again
-    pub(crate) fn pop_request(
-        &mut self,
-        master_address: Option<EndpointAddress>,
-        level: AppDecodeLevel,
-    ) -> RequestGuard<'_, T> {
-        let level = if self.retained {
-            AppDecodeLevel::Nothing
-        } else {
-            level
-        };
-        RequestGuard::new(self, master_address, level)
-    }
-
-    fn peek_request(
-        &self,
-        master_address: Option<EndpointAddress>,
-        level: AppDecodeLevel,
-    ) -> Option<TransportRequest<'_>> {
-        let fragment = match self.inner.peek()? {
-            TransportData::Fragment(fragment) => fragment,
-            TransportData::LinkLayerMessage(_) => return Some(TransportRequest::LinkLayerMessage),
-        };
-
-        let parsed = parse(self.parse_options, level, fragment.data);
-
-        if let Some(required_master_addr) = master_address {
-            if fragment.info.addr.link != required_master_addr {
-                tracing::warn!(
-                    "Discarding ASDU from master address: {} (configured address == {})",
-                    fragment.info.addr.link.raw_value(),
-                    required_master_addr.raw_value()
-                );
-                return None;
-            }
-        }
-
-        let parsed = match parsed {
-            Ok(parsed) => parsed,
-            Err(err) => return Some(TransportRequest::Error(fragment.info.addr, err.into())),
-        };
-
-        let request = match parsed.to_request() {
-            Ok(request) => request,
-            Err(err) => {
-                return Some(TransportRequest::Error(
-                    fragment.info.addr,
-                    err.with_seq(parsed.control.seq),
-                ))
-            }
-        };
-
-        Some(TransportRequest::Request(fragment.info, request))
-    }
 }
 
 /// Parse a received fragment, logging it at `level`
-fn parse(
+pub(crate) fn parse_fragment(
     options: ParseOptions,
     level: AppDecodeLevel,
     fragment: &[u8],

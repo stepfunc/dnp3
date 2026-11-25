@@ -565,7 +565,6 @@ dependencies = [
 name = "example-master-tcp-server"
 version = "0.1.0"
 dependencies = [
- "clap",
  "dnp3",
  "tokio",
  "tokio-stream",

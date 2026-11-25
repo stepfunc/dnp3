@@ -66,16 +66,9 @@ impl ServerTask {
     }
 
     async fn run_one_session(&mut self, io: &mut PhysLayer) -> Result<NewSession, RunError> {
-        tokio::select! {
-            res = self.task.run(io) => {
-                Err(res)
-            }
-            // a new connection cancels the session.run() future above; this relies on
-            // session.run() being cancel-safe
-            x = self.receiver.receive() => {
-                Ok(x?)
-            }
-        }
+        // Let any in-flight `handle_input` finish before switching to a new connection,
+        // while keeping writes and idle waits cancellable.
+        Ok(self.task.run_until(io, self.receiver.receive()).await??)
     }
 
     pub(crate) async fn run_new_session(

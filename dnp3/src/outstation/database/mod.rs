@@ -19,7 +19,7 @@ use crate::outstation::database::read::ReadHeaders;
 use crate::outstation::read_log::Tracing;
 
 use crate::app::attr::{AttrProp, AttrSet, BadAttribute, OwnedAttribute, TypeError};
-use crate::outstation::{ClassCount, OutstationApplication};
+use crate::outstation::ClassCount;
 use scursor::WriteCursor;
 
 /// the assignments of an ASSIGN_CLASS request
@@ -539,7 +539,7 @@ impl DatabaseHandle {
         clippy::expect_used,
         reason = "the mutex is only poisoned by an earlier panic while it was held"
     )]
-    fn with_database<R>(&self, func: impl FnOnce(&mut Database) -> R) -> R {
+    pub(crate) fn with_database<R>(&self, func: impl FnOnce(&mut Database) -> R) -> R {
         func(&mut self.inner.lock().expect("database mutex poisoned"))
     }
 
@@ -560,12 +560,6 @@ impl DatabaseHandle {
             ))),
             notify: Arc::new(tokio::sync::Notify::new()),
         }
-    }
-
-    pub(crate) async fn clear_written_events(&mut self, app: &mut dyn OutstationApplication) {
-        app.begin_confirm();
-        let state = self.with_database(|db| db.inner.clear_written_events(app));
-        app.end_confirm(state).get().await;
     }
 
     pub(crate) fn get_events_info(&self) -> EventsInfo {
@@ -1165,5 +1159,30 @@ mod test {
             UpdateInfo::Created(3),
             db.update2(0, &AnalogOutputStatus::new(1.0, forced, time()), options)
         );
+    }
+
+    #[test]
+    fn with_database_does_not_notify_unsolicited_waiters() {
+        use std::pin::pin;
+        use std::task::Poll;
+
+        use crate::util::test_support::poll_once;
+
+        let handle = DatabaseHandle::new(
+            OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS,
+            ClassZeroConfig::default(),
+            EventBufferConfig::all_types(5),
+        );
+        let waiter_handle = handle.clone();
+        let mut wait = pin!(waiter_handle.wait_for_change());
+        assert!(matches!(poll_once(wait.as_mut()), Poll::Pending));
+
+        // Non-notifying `with_database` must NOT wake `wait_for_change`.
+        handle.with_database(|_| {});
+        assert!(matches!(poll_once(wait.as_mut()), Poll::Pending));
+
+        // Public `DatabaseHandle::transaction` DOES wake `wait_for_change`.
+        handle.transaction(|_| {});
+        assert!(matches!(poll_once(wait.as_mut()), Poll::Ready(())));
     }
 }

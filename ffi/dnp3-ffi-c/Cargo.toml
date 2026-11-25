@@ -25,3 +25,5 @@ default = ["tls", "serial"]
 tls = ["dnp3-ffi-impl/tls"]
 tls-aws-lc = ["dnp3-ffi-impl/tls-aws-lc"]
 serial = ["dnp3-ffi-impl/serial"]
+
+[lints]

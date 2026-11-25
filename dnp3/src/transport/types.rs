@@ -4,8 +4,8 @@
 // Text and data mining rights, including for AI training, are reserved under
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
-use crate::app::parse::parser::{Request, Response};
-use crate::app::{HeaderParseError, RequestValidationError, ResponseValidationError, Sequence};
+use crate::app::parse::parser::Response;
+use crate::app::{HeaderParseError, ResponseValidationError};
 use crate::link::header::BroadcastConfirmMode;
 use crate::link::EndpointAddress;
 use crate::phys::PhysAddr;
@@ -73,29 +73,5 @@ impl From<HeaderParseError> for TransportResponseError {
 impl From<ResponseValidationError> for TransportResponseError {
     fn from(from: ResponseValidationError) -> Self {
         Self::ResponseValidationError(from)
-    }
-}
-
-pub(crate) enum TransportRequest<'a> {
-    Request(FragmentInfo, Request<'a>),
-    LinkLayerMessage,
-    Error(FragmentAddr, TransportRequestError),
-}
-
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub(crate) enum TransportRequestError {
-    HeaderParseError(HeaderParseError),
-    RequestValidationError(Sequence, RequestValidationError),
-}
-
-impl RequestValidationError {
-    pub(crate) fn with_seq(self, seq: Sequence) -> TransportRequestError {
-        TransportRequestError::RequestValidationError(seq, self)
-    }
-}
-
-impl From<HeaderParseError> for TransportRequestError {
-    fn from(from: HeaderParseError) -> Self {
-        Self::HeaderParseError(from)
     }
 }

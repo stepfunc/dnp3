@@ -10,3 +10,5 @@ license-file = "../../LICENSE.txt"
 dnp3 = { path = "../../dnp3", features = ["tls", "serial"] }
 tracing = "0.1"
 clap = { version = "4.0", features = ["derive"] }
+
+[lints]

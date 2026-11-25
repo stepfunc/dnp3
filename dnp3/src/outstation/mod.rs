@@ -25,7 +25,6 @@ pub(crate) mod control;
 pub(crate) mod read_log;
 #[cfg(feature = "unstable")]
 mod runner;
-/// outstation session
 pub(crate) mod session;
 /// the headers each function supports
 pub(crate) mod target;

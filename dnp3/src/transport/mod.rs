@@ -49,9 +49,6 @@ pub(crate) trait TransportRead: Send {
         level: DecodeLevel,
     ) -> impl Future<Output = Result<(), LinkError>> + Send;
 
-    /// The available fragment or link-layer message, without consuming it
-    fn peek(&self) -> Option<TransportData<'_>>;
-
     /// Consume the available fragment or link-layer message
     fn pop(&mut self) -> Option<TransportData<'_>>;
 

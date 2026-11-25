@@ -36,3 +36,5 @@ dnp3-schema = { path = "../dnp3-schema" }
 oo-bindgen = { workspace = true }
 sfio-tracing-ffi = {  workspace = true  }
 sfio-tokio-ffi = {  workspace = true  }
+
+[lints]

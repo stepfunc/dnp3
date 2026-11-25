@@ -534,6 +534,11 @@ impl ResponseHeader {
         )
     }
 
+    /// a solicited response that reports IIN2.2 (parameter error)
+    pub(crate) fn parameter_error(seq: Sequence) -> Self {
+        Self::solicited(seq, Iin::default() | Iin2::PARAMETER_ERROR)
+    }
+
     pub(crate) fn to_bytes(self) -> [u8; Self::LENGTH] {
         [
             self.control.to_u8(),

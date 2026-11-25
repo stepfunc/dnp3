@@ -4,137 +4,81 @@
 // Text and data mining rights, including for AI training, are reserved under
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
-use super::*;
+use super::context::SessionContext;
+use super::response::ResponseSlot;
+use super::state::{RetryCounter, UnsolicitedState, UnsolicitedWaitKind};
+use crate::app::{ControlField, Iin, ResponseFunction, ResponseHeader, Sequence};
+use crate::util::clock::{MonotonicClock, MonotonicTime};
 
-impl OutstationSession {
-    pub(super) fn write_unsolicited_data<'a>(
+impl<C: MonotonicClock> SessionContext<C> {
+    pub(super) fn new_unsolicited_retry_deadline(&self) -> MonotonicTime {
+        self.clock.deadline(self.config.unsolicited_retry_delay)
+    }
+
+    /// Try to publish a NULL or event unsolicited response into `unsol`.
+    ///
+    /// When a retry delay has not yet elapsed, leaves `retry_at` in `self.state.unsolicited` so
+    /// `Waiting::deadline` reports it.
+    pub(super) fn stage_unsolicited(
         &mut self,
-        unsol: &'a mut ResponseSlot,
-        database: &mut DatabaseHandle,
-    ) -> Option<Prepared<'a>> {
+        unsol: &mut ResponseSlot,
+    ) -> Option<(Sequence, UnsolicitedWaitKind)> {
+        match self.state.unsolicited {
+            UnsolicitedState::Disabled => None,
+            UnsolicitedState::NullRequired => Some(self.stage_null_unsolicited(unsol)),
+            UnsolicitedState::Ready { retry_at } => {
+                if let Some(deadline) = retry_at {
+                    if !self.clock.has_reached(deadline) {
+                        return None;
+                    }
+                    // Retry delay has elapsed; clear it so we don't re-enter with a stale deadline.
+                    self.state.unsolicited = UnsolicitedState::Ready { retry_at: None };
+                }
+                self.stage_unsolicited_events(unsol)
+            }
+        }
+    }
+
+    fn next_unsolicited_header(&mut self) -> ResponseHeader {
+        let seq = self.state.unsolicited_seq.increment();
+        ResponseHeader::new(
+            ControlField::unsolicited_response(seq),
+            ResponseFunction::UnsolicitedResponse,
+            Iin::default(),
+        )
+    }
+
+    fn stage_null_unsolicited(
+        &mut self,
+        unsol: &mut ResponseSlot,
+    ) -> (Sequence, UnsolicitedWaitKind) {
+        let header = self.next_unsolicited_header();
+        let seq = self.publish_unsolicited(unsol.empty(header));
+        (seq, UnsolicitedWaitKind::Null)
+    }
+
+    fn stage_unsolicited_events(
+        &mut self,
+        unsol: &mut ResponseSlot,
+    ) -> Option<(Sequence, UnsolicitedWaitKind)> {
+        if !self.state.enabled_unsolicited_classes.any() {
+            return None;
+        }
+
         let classes = self.state.enabled_unsolicited_classes;
-        let (count, staged) = unsol.build(|cursor| Ok(database.write_unsolicited(classes, cursor)));
+        let (count, staged) = unsol.build(|cursor| Ok(self.db.write_unsolicited(classes, cursor)));
 
         if count.unwrap_or_default() == 0 {
             return None;
         }
 
-        let seq = self.state.unsolicited_seq.increment();
-        let header = ResponseHeader::new(
-            ControlField::unsolicited_response(seq),
-            ResponseFunction::UnsolicitedResponse,
-            Iin::default(),
-        );
-        Some(staged.with_header(header))
-    }
-
-    pub(super) fn new_unsolicited_retry_deadline(&self) -> MonotonicTime {
-        self.clock.deadline(self.config.unsolicited_retry_delay)
-    }
-}
-
-impl<T: Transport> OutstationTask<T> {
-    pub(super) async fn check_unsolicited(
-        &mut self,
-        io: &mut PhysLayer,
-    ) -> Result<NextIdleAction, RunError> {
-        if self.session.config.unsolicited.is_disabled() {
-            return Ok(NextIdleAction::SleepUntilEvent);
-        }
-
-        match self.session.state.unsolicited {
-            UnsolicitedState::NullRequired => {
-                // perform NULL unsolicited
-                match self.perform_null_unsolicited(io).await? {
-                    ConfirmOutcome::Unconfirmed => {
-                        self.session
-                            .end_confirm_wait(&mut self.database, ConfirmOutcome::Unconfirmed)
-                            .await;
-                        self.session.state.unsolicited = UnsolicitedState::NullRequired;
-                        Ok(NextIdleAction::NoSleep)
-                    }
-                    ConfirmOutcome::Confirmed => {
-                        self.session.state.unsolicited = UnsolicitedState::Ready(None);
-                        Ok(NextIdleAction::NoSleep)
-                    }
-                }
-            }
-            UnsolicitedState::Ready(Some(deadline))
-                if !self.session.clock.has_reached(deadline) =>
-            {
-                Ok(NextIdleAction::SleepUntil(deadline)) // not ready yet
-            }
-            UnsolicitedState::Ready(_) => {
-                // perform regular unsolicited
-                let Some(outcome) = self.maybe_perform_unsolicited(io).await? else {
-                    // there was nothing to send
-                    return Ok(NextIdleAction::SleepUntilEvent);
-                };
-                self.session
-                    .end_confirm_wait(&mut self.database, outcome)
-                    .await;
-                match outcome {
-                    ConfirmOutcome::Unconfirmed => {
-                        let retry_at = self.session.new_unsolicited_retry_deadline();
-                        self.session.state.unsolicited = UnsolicitedState::Ready(Some(retry_at));
-                        Ok(NextIdleAction::SleepUntil(retry_at))
-                    }
-                    ConfirmOutcome::Confirmed => {
-                        self.session.state.unsolicited = UnsolicitedState::Ready(None);
-                        Ok(NextIdleAction::NoSleep)
-                    }
-                }
-            }
-        }
-    }
-
-    pub(super) async fn perform_null_unsolicited(
-        &mut self,
-        io: &mut PhysLayer,
-    ) -> Result<ConfirmOutcome, RunError> {
-        let header = ResponseHeader::new(
-            ControlField::unsolicited_response(self.session.state.unsolicited_seq.increment()),
-            ResponseFunction::UnsolicitedResponse,
-            Iin::default(),
-        );
-        let seq = self
-            .session
-            .write_unsolicited(
-                io,
-                &mut self.responder.writer,
-                self.responder.unsol.empty(header),
-                &self.database,
-            )
-            .await?
-            .control
-            .seq;
-        // For null responses, we want to regenerate a response everytime (see section 5.1.1.1.1 Rule 2)
-        self.unsolicited_confirm_wait(seq, Some(0), io).await
-    }
-
-    pub(super) async fn maybe_perform_unsolicited(
-        &mut self,
-        io: &mut PhysLayer,
-    ) -> Result<Option<ConfirmOutcome>, RunError> {
-        if !self.session.state.enabled_unsolicited_classes.any() {
-            return Ok(None);
-        }
-
-        let Some(response) = self
-            .session
-            .write_unsolicited_data(&mut self.responder.unsol, &mut self.database)
-        else {
-            return Ok(None);
-        };
-        let seq = self
-            .session
-            .write_unsolicited(io, &mut self.responder.writer, response, &self.database)
-            .await?
-            .control
-            .seq;
-        let result = self
-            .unsolicited_confirm_wait(seq, self.session.config.max_unsolicited_retries, io)
-            .await?;
-        Ok(Some(result))
+        let header = self.next_unsolicited_header();
+        let seq = self.publish_unsolicited(staged.with_header(header));
+        Some((
+            seq,
+            UnsolicitedWaitKind::Events {
+                retries: RetryCounter::new(self.config.max_unsolicited_retries),
+            },
+        ))
     }
 }

@@ -39,6 +39,14 @@ impl Reader {
     pub(crate) fn seed_link(&mut self, seed_data: &[u8]) -> Result<(), LinkError> {
         self.link.seed(seed_data)
     }
+
+    pub(super) fn peek(&self) -> Option<TransportData<'_>> {
+        if let Some(msg) = self.pending_link_layer_message {
+            return Some(TransportData::LinkLayerMessage(msg));
+        }
+
+        self.assembler.peek().map(TransportData::Fragment)
+    }
 }
 
 impl TransportRead for Reader {
@@ -54,14 +62,6 @@ impl TransportRead for Reader {
         }
 
         self.assembler.pop().map(TransportData::Fragment)
-    }
-
-    fn peek(&self) -> Option<TransportData<'_>> {
-        if let Some(msg) = self.pending_link_layer_message {
-            return Some(TransportData::LinkLayerMessage(msg));
-        }
-
-        self.assembler.peek().map(TransportData::Fragment)
     }
 
     async fn read(&mut self, io: &mut PhysLayer, level: DecodeLevel) -> Result<(), LinkError> {
