@@ -126,12 +126,10 @@ impl<T: Transport> OutstationTask<T> {
 
     /// Run the outstation task asynchronously until a `RunError` occurs.
     ///
-    /// Cancel-safe: per-connection state is re-armed by `SessionTeardown`'s `Drop`, so
+    /// Cancel-safe: per-connection state is re-armed by `DropGuard` on teardown, so
     /// dropping this future tears down exactly as returning from it does.
     pub(crate) async fn run(&mut self, io: &mut PhysLayer) -> RunError {
-        let Err(err) = self
-            .run_until(io, std::future::pending::<std::convert::Infallible>())
-            .await;
+        let Err(err) = self.run_until(io, std::future::pending::<!>()).await;
         err
     }
 
@@ -148,10 +146,9 @@ impl<T: Transport> OutstationTask<T> {
     where
         F: Future<Output = R>,
     {
-        let guard = SessionTeardown { task: self };
-        let task = &mut *guard.task; // reborrow so Drop can reset after the run future releases its borrows
+        let mut guard = std::mem::DropGuard::new(self, Self::reset);
         let cancel = pin!(cancel);
-        task.run_session(io, cancel).await
+        guard.run_session(io, cancel).await
     }
 
     /// Process received outstation messages while idle without a session.
@@ -306,17 +303,6 @@ pub(crate) enum ConfigurationChange {
 impl From<ConfigurationChange> for OutstationMessage {
     fn from(x: ConfigurationChange) -> Self {
         OutstationMessage::Configuration(x)
-    }
-}
-
-/// RAII guard that re-arms per-connection state on session teardown.
-struct SessionTeardown<'a, T: Transport> {
-    task: &'a mut OutstationTask<T>,
-}
-
-impl<T: Transport> Drop for SessionTeardown<'_, T> {
-    fn drop(&mut self) {
-        self.task.reset();
     }
 }
 

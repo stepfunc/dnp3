@@ -33,7 +33,7 @@ Optional features that may be enabled at compile time:
 * `tls-aws-lc` - Same as the `tls` feature but uses [aws-lc-rs](https://crates.io/crates/aws-lc-rs) for cryptography.
 * `serialization` - Add [serde](https://docs.rs/crate/serde/latest) de(serialization) support for public configuration types.
 
-The minimum supported Rust version is 1.88.
+The minimum supported Rust version is 1.100.
 
 # License
 

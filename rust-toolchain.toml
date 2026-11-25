@@ -3,6 +3,6 @@
 # new toolchain can lose an optimization the no-panic link needs, and changes rustdoc's JSON format,
 # which cargo-semver-checks reads.
 [toolchain]
-channel = "1.99.1"
+channel = "1.100.0"
 components = ["rustfmt", "clippy"]
 profile = "minimal"
