@@ -12,9 +12,10 @@ use super::state::{
     SolConfirmWait, UnsolConfirmWait, UnsolicitedState, UnsolicitedWaitKind,
 };
 use crate::app::{FunctionCode, ResponseHeader, Sequence};
+use crate::decode::AppDecodeLevel;
 use crate::outstation::database::DatabaseHandle;
 use crate::outstation::traits::BroadcastAction;
-use crate::transport::FragmentAddr;
+use crate::transport::{FragmentAddr, TransportData};
 use crate::util::clock::{MonotonicClock, MonotonicTime};
 
 /// Result of handling an accepted request in [`SessionContext::accept_request`].
@@ -45,6 +46,18 @@ impl SolTx {
     }
 }
 
+/// Outcome of [`Phase::poll`] for [`super::OutstationCore`] to wrap into [`super::Output`].
+pub(super) enum PollOutcome<'a> {
+    Wait {
+        deadline: Option<MonotonicTime>,
+        watch_database: bool,
+    },
+    Transmit {
+        outbound: Outbound<'a>,
+        staged: StagedTx,
+    },
+}
+
 #[derive(Copy, Clone, Debug)]
 enum IdleTx {
     Solicited(SolTx),
@@ -64,17 +77,11 @@ enum UnsolTx {
 }
 
 /// Phase with no transmission staged: waiting on input, timers, or database updates.
-pub(super) struct Waiting(WaitingState);
-
-enum WaitingState {
+enum Waiting {
     Idle,
     SolConfirmWait(SolConfirmWait),
     UnsolConfirmWait(UnsolConfirmWait),
 }
-
-/// Phase with a transmission staged, pairing it with the exact phase it was staged from.
-#[derive(Copy, Clone, Debug)]
-pub(super) struct StagedTx(StagedState);
 
 #[derive(Copy, Clone, Debug)]
 enum StagedState {
@@ -83,30 +90,58 @@ enum StagedState {
     UnsolWait(UnsolConfirmWait, UnsolTx),
 }
 
-/// Move-only outstation application-layer phase: either waiting or carrying a staged transmission.
+/// Move-only staged transmission pairing an outbound send with the phase it was staged from.
 ///
-/// All phase transitions live in this module: each transition method consumes `self` by value and
-/// returns the next [`Phase`] or [`Waiting`].
-pub(super) enum Phase {
+/// Moves into [`super::core::Transmit`] while a write is underway and is consumed by
+/// [`Phase::sent`] once the write completes.
+#[derive(Debug)]
+pub(super) struct StagedTx {
+    state: StagedState,
+}
+
+/// Active (non-in-flight) protocol phase.
+enum Active {
     Waiting(Waiting),
     Staged(StagedTx),
 }
 
+enum State {
+    Waiting(Waiting),
+    Staged(StagedTx),
+    /// Placeholder while [`Phase::input`] or [`super::core::Transmit`] owns the active phase.
+    /// Observed at entry to `poll` or `input`, it means the previous operation was dropped without
+    /// completing and per-connection state plus the database must be reset.
+    InFlight,
+}
+
+impl From<Active> for State {
+    fn from(active: Active) -> Self {
+        match active {
+            Active::Waiting(waiting) => Self::Waiting(waiting),
+            Active::Staged(staged) => Self::Staged(staged),
+        }
+    }
+}
+
+/// Encapsulated outstation application-layer phase state machine.
+///
+/// All phase reads and transitions live in this module.
+pub(super) struct Phase {
+    state: State,
+}
+
 impl Waiting {
-    /// Active confirm-wait tracing span metadata, if waiting for a confirm.
-    pub(super) fn confirm_wait_info(&self) -> Option<ConfirmWaitInfo> {
-        match self.0 {
-            WaitingState::Idle => None,
-            WaitingState::SolConfirmWait(wait) => {
-                Some(ConfirmWaitInfo::Solicited(wait.series.ecsn))
-            }
-            WaitingState::UnsolConfirmWait(wait) => Some(ConfirmWaitInfo::Unsolicited(wait.seq)),
+    fn confirm_wait_info(&self) -> Option<ConfirmWaitInfo> {
+        match *self {
+            Self::Idle => None,
+            Self::SolConfirmWait(wait) => Some(ConfirmWaitInfo::Solicited(wait.series.ecsn)),
+            Self::UnsolConfirmWait(wait) => Some(ConfirmWaitInfo::Unsolicited(wait.seq)),
         }
     }
 
     /// Whether new events added to the database can immediately trigger an unsolicited response.
-    pub(super) fn watches_database<C: MonotonicClock>(&self, ctx: &SessionContext<C>) -> bool {
-        matches!(self.0, WaitingState::Idle)
+    fn watches_database<C: MonotonicClock>(&self, ctx: &SessionContext<C>) -> bool {
+        matches!(self, Self::Idle)
             && matches!(
                 ctx.state.unsolicited,
                 UnsolicitedState::Ready { retry_at: None }
@@ -115,14 +150,11 @@ impl Waiting {
     }
 
     /// Next timer deadline relevant while waiting.
-    pub(super) fn deadline<C: MonotonicClock>(
-        &self,
-        ctx: &SessionContext<C>,
-    ) -> Option<MonotonicTime> {
-        match self.0 {
-            WaitingState::SolConfirmWait(wait) => Some(wait.deadline),
-            WaitingState::UnsolConfirmWait(wait) => Some(wait.deadline),
-            WaitingState::Idle => {
+    fn deadline<C: MonotonicClock>(&self, ctx: &SessionContext<C>) -> Option<MonotonicTime> {
+        match *self {
+            Self::SolConfirmWait(wait) => Some(wait.deadline),
+            Self::UnsolConfirmWait(wait) => Some(wait.deadline),
+            Self::Idle => {
                 let unsol = match ctx.state.unsolicited {
                     UnsolicitedState::Ready { retry_at } => retry_at,
                     UnsolicitedState::Disabled | UnsolicitedState::NullRequired => None,
@@ -134,16 +166,33 @@ impl Waiting {
             }
         }
     }
+
+    fn wait_outcome<'a, C: MonotonicClock>(&self, ctx: &SessionContext<C>) -> PollOutcome<'a> {
+        PollOutcome::Wait {
+            deadline: self.deadline(ctx),
+            watch_database: self.watches_database(ctx),
+        }
+    }
+}
+
+impl StagedState {
+    fn unstage(self) -> Waiting {
+        match self {
+            Self::Idle(_) => Waiting::Idle,
+            Self::SolWait(wait, _) => Waiting::SolConfirmWait(wait),
+            Self::UnsolWait(wait, _) => Waiting::UnsolConfirmWait(wait),
+        }
+    }
+
+    fn confirm_wait_info(self) -> Option<ConfirmWaitInfo> {
+        self.unstage().confirm_wait_info()
+    }
 }
 
 impl StagedTx {
     /// Resolve the staged transmission into its outbound payload from `slots`.
-    pub(super) fn outbound<'a>(
-        &self,
-        slots: &'a Slots,
-        default_dest: FragmentAddr,
-    ) -> Option<Outbound<'a>> {
-        let (destination, bytes) = match self.0 {
+    fn outbound<'a>(&self, slots: &'a Slots, default_dest: FragmentAddr) -> Option<Outbound<'a>> {
+        let (destination, bytes) = match self.state {
             StagedState::Idle(IdleTx::Solicited(sol))
             | StagedState::UnsolWait(_, UnsolTx::Solicited(sol)) => (sol.to, slots.sol.ready()?),
             StagedState::SolWait(_, to) => (to, slots.sol.ready()?),
@@ -161,53 +210,48 @@ impl StagedTx {
     }
 
     /// Drop the staged transmission while keeping the active wait phase.
-    pub(super) fn unstage(self) -> Waiting {
-        match self.0 {
-            StagedState::Idle(_) => Waiting(WaitingState::Idle),
-            StagedState::SolWait(wait, _) => Waiting(WaitingState::SolConfirmWait(wait)),
-            StagedState::UnsolWait(wait, _) => Waiting(WaitingState::UnsolConfirmWait(wait)),
-        }
+    fn unstage(self) -> Waiting {
+        self.state.unstage()
     }
 
-    /// Active confirm-wait tracing span metadata, if staged from a confirm wait.
-    pub(super) fn confirm_wait_info(&self) -> Option<ConfirmWaitInfo> {
-        self.unstage().confirm_wait_info()
+    fn confirm_wait_info(&self) -> Option<ConfirmWaitInfo> {
+        self.state.confirm_wait_info()
     }
 
     /// Commit the post-send transition once this transmission finishes writing.
-    pub(super) fn on_sent<C: MonotonicClock>(self, ctx: &mut SessionContext<C>) -> Waiting {
+    fn on_sent<C: MonotonicClock>(self, ctx: &mut SessionContext<C>) -> Waiting {
         let confirm_deadline = || ctx.clock.deadline(ctx.config.confirm_timeout.into());
-        match self.0 {
+        match self.state {
             StagedState::Idle(IdleTx::Solicited(SolTx {
                 awaits: Some(series),
                 ..
             })) => {
                 ctx.info.enter_solicited_confirm_wait(series.ecsn);
-                Waiting(WaitingState::SolConfirmWait(SolConfirmWait {
+                Waiting::SolConfirmWait(SolConfirmWait {
                     series,
                     deadline: confirm_deadline(),
-                }))
+                })
             }
             StagedState::Idle(IdleTx::Unsolicited { seq, kind }) => {
                 ctx.info.enter_unsolicited_confirm_wait(seq);
-                Waiting(WaitingState::UnsolConfirmWait(UnsolConfirmWait {
+                Waiting::UnsolConfirmWait(UnsolConfirmWait {
                     seq,
                     deadline: confirm_deadline(),
                     solicited: None,
                     kind,
-                }))
+                })
             }
             StagedState::Idle(IdleTx::LinkStatus) => {
                 ctx.keep_alive.on_activity(ctx.clock.now());
-                Waiting(WaitingState::Idle)
+                Waiting::Idle
             }
             StagedState::Idle(
                 IdleTx::Solicited(SolTx { awaits: None, .. }) | IdleTx::Transient(_),
-            ) => Waiting(WaitingState::Idle),
+            ) => Waiting::Idle,
 
             StagedState::SolWait(mut wait, _) => {
                 wait.deadline = confirm_deadline();
-                Waiting(WaitingState::SolConfirmWait(wait))
+                Waiting::SolConfirmWait(wait)
             }
 
             StagedState::UnsolWait(mut wait, UnsolTx::Solicited(sol)) => {
@@ -215,14 +259,12 @@ impl StagedTx {
                     ecsn: series.ecsn,
                     deadline: confirm_deadline(),
                 });
-                Waiting(WaitingState::UnsolConfirmWait(wait))
+                Waiting::UnsolConfirmWait(wait)
             }
-            StagedState::UnsolWait(wait, UnsolTx::Transient(_)) => {
-                Waiting(WaitingState::UnsolConfirmWait(wait))
-            }
+            StagedState::UnsolWait(wait, UnsolTx::Transient(_)) => Waiting::UnsolConfirmWait(wait),
             StagedState::UnsolWait(mut wait, UnsolTx::Retry) => {
                 wait.deadline = confirm_deadline();
-                Waiting(WaitingState::UnsolConfirmWait(wait))
+                Waiting::UnsolConfirmWait(wait)
             }
         }
     }
@@ -230,38 +272,129 @@ impl StagedTx {
 
 impl Phase {
     pub(super) fn idle() -> Self {
-        Self::Waiting(Waiting(WaitingState::Idle))
-    }
-
-    fn sol_wait(wait: SolConfirmWait) -> Self {
-        Self::Waiting(Waiting(WaitingState::SolConfirmWait(wait)))
-    }
-
-    fn unsol_wait(wait: UnsolConfirmWait) -> Self {
-        Self::Waiting(Waiting(WaitingState::UnsolConfirmWait(wait)))
-    }
-
-    fn stage_idle(tx: IdleTx) -> Self {
-        Self::Staged(StagedTx(StagedState::Idle(tx)))
-    }
-
-    fn stage_sol(wait: SolConfirmWait, to: FragmentAddr) -> Self {
-        Self::Staged(StagedTx(StagedState::SolWait(wait, to)))
-    }
-
-    fn stage_unsol(wait: UnsolConfirmWait, tx: UnsolTx) -> Self {
-        Self::Staged(StagedTx(StagedState::UnsolWait(wait, tx)))
-    }
-
-    pub(super) fn confirm_wait_info(&self) -> Option<ConfirmWaitInfo> {
-        match self {
-            Self::Waiting(waiting) => waiting.confirm_wait_info(),
-            Self::Staged(staged) => staged.confirm_wait_info(),
+        Self {
+            state: State::Waiting(Waiting::Idle),
         }
     }
 
+    pub(super) fn reset(&mut self) {
+        self.state = State::Waiting(Waiting::Idle);
+    }
+
+    pub(super) fn confirm_wait_info(&self) -> Option<ConfirmWaitInfo> {
+        match &self.state {
+            State::Waiting(waiting) => waiting.confirm_wait_info(),
+            State::Staged(staged) => staged.confirm_wait_info(),
+            State::InFlight => None,
+        }
+    }
+
+    /// Take the active phase out, leaving [`State::InFlight`] in place. If the previous operation
+    /// was dropped while in flight, reset per-connection state and the database before proceeding.
+    fn begin<C: MonotonicClock>(
+        &mut self,
+        slots: &mut Slots,
+        ctx: &mut SessionContext<C>,
+        db: &mut DatabaseHandle,
+    ) -> Active {
+        match std::mem::replace(&mut self.state, State::InFlight) {
+            State::Waiting(waiting) => Active::Waiting(waiting),
+            State::Staged(staged) => Active::Staged(staged),
+            State::InFlight => {
+                tracing::warn!("recovering outstation core after abandoned operation");
+                slots.clear();
+                ctx.reset(db);
+                Active::Waiting(Waiting::Idle)
+            }
+        }
+    }
+
+    /// Drive timers and outbound staging.
+    ///
+    /// Leaves `self` in [`State::InFlight`] when returning [`PollOutcome::Transmit`] until
+    /// [`Self::sent`] commits the post-send phase or [`Self::reset`] clears the session.
+    pub(super) fn poll<'a, C: MonotonicClock>(
+        &mut self,
+        slots: &'a mut Slots,
+        ctx: &mut SessionContext<C>,
+        db: &mut DatabaseHandle,
+    ) -> PollOutcome<'a> {
+        let waiting = match self.begin(slots, ctx, db).on_poll(slots, ctx, db) {
+            Active::Waiting(waiting) => waiting,
+            Active::Staged(staged) => match staged.outbound(slots, ctx.destination) {
+                Some(outbound) => return PollOutcome::Transmit { outbound, staged },
+                None => {
+                    tracing::error!("staged response missing from slot");
+                    staged.unstage()
+                }
+            },
+        };
+        let outcome = waiting.wait_outcome(ctx);
+        self.state = State::Waiting(waiting);
+        outcome
+    }
+
+    /// Process one incoming fragment or link-layer message, leaving `self` in [`State::InFlight`]
+    /// while awaiting callbacks.
+    pub(super) async fn input<C: MonotonicClock>(
+        &mut self,
+        slots: &mut Slots,
+        ctx: &mut SessionContext<C>,
+        input: TransportData<'_>,
+        app_decode_level: AppDecodeLevel,
+        db: &mut DatabaseHandle,
+    ) {
+        let active = self.begin(slots, ctx, db);
+        let next = match ctx.receive(input, app_decode_level) {
+            Some(intake) => active.on_input(slots, ctx, intake, db).await,
+            None => active,
+        };
+        self.state = next.into();
+    }
+
+    /// Commit the post-send transition once a transmission finishes writing.
+    pub(super) fn sent<C: MonotonicClock>(
+        &mut self,
+        staged: StagedTx,
+        ctx: &mut SessionContext<C>,
+    ) {
+        self.state = State::Waiting(staged.on_sent(ctx));
+    }
+}
+
+impl Active {
+    fn idle() -> Self {
+        Self::Waiting(Waiting::Idle)
+    }
+
+    fn sol_wait(wait: SolConfirmWait) -> Self {
+        Self::Waiting(Waiting::SolConfirmWait(wait))
+    }
+
+    fn unsol_wait(wait: UnsolConfirmWait) -> Self {
+        Self::Waiting(Waiting::UnsolConfirmWait(wait))
+    }
+
+    fn stage_idle(tx: IdleTx) -> Self {
+        Self::Staged(StagedTx {
+            state: StagedState::Idle(tx),
+        })
+    }
+
+    fn stage_sol(wait: SolConfirmWait, to: FragmentAddr) -> Self {
+        Self::Staged(StagedTx {
+            state: StagedState::SolWait(wait, to),
+        })
+    }
+
+    fn stage_unsol(wait: UnsolConfirmWait, tx: UnsolTx) -> Self {
+        Self::Staged(StagedTx {
+            state: StagedState::UnsolWait(wait, tx),
+        })
+    }
+
     /// Drive timers and outbound staging, leaving any already-staged transmission intact.
-    pub(super) fn on_poll<C: MonotonicClock>(
+    fn on_poll<C: MonotonicClock>(
         self,
         slots: &mut Slots,
         ctx: &mut SessionContext<C>,
@@ -272,8 +405,8 @@ impl Phase {
             Self::Waiting(waiting) => waiting,
         };
 
-        match waiting.0 {
-            WaitingState::SolConfirmWait(wait) => {
+        match waiting {
+            Waiting::SolConfirmWait(wait) => {
                 if !ctx.clock.has_reached(wait.deadline) {
                     return Self::sol_wait(wait);
                 }
@@ -283,19 +416,19 @@ impl Phase {
                 Self::idle_poll(slots, ctx, db)
             }
 
-            WaitingState::UnsolConfirmWait(wait) => {
+            Waiting::UnsolConfirmWait(wait) => {
                 if !ctx.clock.has_reached(wait.deadline) {
                     return Self::unsol_wait(wait);
                 }
                 Self::unsol_confirm_timeout(wait, slots, ctx, db)
             }
 
-            WaitingState::Idle => Self::idle_poll(slots, ctx, db),
+            Waiting::Idle => Self::idle_poll(slots, ctx, db),
         }
     }
 
     /// Process one incoming fragment or link-layer message, dropping any previously staged tx.
-    pub(super) async fn on_input<C: MonotonicClock>(
+    async fn on_input<C: MonotonicClock>(
         self,
         slots: &mut Slots,
         ctx: &mut SessionContext<C>,
@@ -306,12 +439,12 @@ impl Phase {
             Self::Waiting(waiting) => waiting,
             Self::Staged(staged) => staged.unstage(),
         };
-        match waiting.0 {
-            WaitingState::Idle => Self::idle_input(slots, ctx, intake, db).await,
-            WaitingState::SolConfirmWait(wait) => {
+        match waiting {
+            Waiting::Idle => Self::idle_input(slots, ctx, intake, db).await,
+            Waiting::SolConfirmWait(wait) => {
                 Self::sol_wait_input(wait, slots, ctx, intake, db).await
             }
-            WaitingState::UnsolConfirmWait(wait) => {
+            Waiting::UnsolConfirmWait(wait) => {
                 Self::unsol_wait_input(wait, slots, ctx, intake, db).await
             }
         }

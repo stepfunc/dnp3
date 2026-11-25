@@ -5,7 +5,7 @@
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
 use super::context::SessionContext;
-use super::phase::{Phase, StagedTx, Waiting};
+use super::phase::{Phase, PollOutcome, StagedTx};
 use super::response::Slots;
 use super::state::ConfirmWaitInfo;
 use crate::decode::AppDecodeLevel;
@@ -30,6 +30,7 @@ pub(super) enum Outbound<'a> {
 }
 
 /// Output of [`OutstationCore::poll`].
+#[must_use]
 pub(super) enum Output<'a, C: MonotonicClock> {
     /// Transmit this payload, then call [`Transmit::sent`] once the write completes.
     Transmit(Transmit<'a, C>),
@@ -44,14 +45,15 @@ pub(super) enum Output<'a, C: MonotonicClock> {
 /// Borrow token representing an outbound transmission in progress.
 ///
 /// Holding `Transmit<'_, C>` borrows `&mut OutstationCore<C>`, statically preventing `handle_input`
-/// or another `poll` while a write is underway. Dropping `Transmit` without calling [`Self::sent`]
-/// leaves the transmission staged so a subsequent [`OutstationCore::poll`] offers the same payload
-/// again (or a subsequent [`OutstationCore::handle_input`] discards it); session teardown calls
-/// [`OutstationCore::reset`] to clear it.
+/// or another `poll` while a write is underway. Call [`Self::sent`] once the write completes, or
+/// tear down the session with [`OutstationCore::reset`] if the write fails or is cancelled.
+/// Dropping `Transmit` without calling [`Self::sent`] leaves the phase in flight so a subsequent
+/// `poll` or `handle_input` resets per-connection state and the database automatically.
+#[must_use]
 pub(super) struct Transmit<'a, C: MonotonicClock> {
     outbound: Outbound<'a>,
     staged: StagedTx,
-    phase: &'a mut Option<Phase>,
+    phase: &'a mut Phase,
     ctx: &'a mut SessionContext<C>,
 }
 
@@ -63,16 +65,13 @@ impl<'a, C: MonotonicClock> Transmit<'a, C> {
 
     /// Commit the state transition after the write completes.
     pub(super) fn sent(self) {
-        *self.phase = Some(Phase::Waiting(self.staged.on_sent(self.ctx)));
+        self.phase.sent(self.staged, self.ctx);
     }
 }
 
 /// Sans-I/O DNP3 outstation application-layer protocol state machine.
 pub(super) struct OutstationCore<C: MonotonicClock> {
-    /// Active phase, or `None` while [`Self::handle_input`] is in flight. If a caller drops
-    /// `handle_input` mid-await, `phase` remains `None` and the next `poll` or `handle_input`
-    /// resets per-connection state and the database so half-processed state is never observed.
-    phase: Option<Phase>,
+    phase: Phase,
     slots: Slots,
     ctx: SessionContext<C>,
 }
@@ -87,7 +86,7 @@ impl<C: MonotonicClock> OutstationCore<C> {
         clock: C,
     ) -> Self {
         Self {
-            phase: Some(Phase::idle()),
+            phase: Phase::idle(),
             slots: Slots::new(config),
             ctx: SessionContext::new(
                 config,
@@ -106,84 +105,49 @@ impl<C: MonotonicClock> OutstationCore<C> {
 
     /// Reset per-connection protocol state and database selection between communication sessions.
     pub(super) fn reset(&mut self, db: &mut DatabaseHandle) {
-        self.phase = Some(Phase::idle());
+        self.phase.reset();
         self.slots.clear();
         self.ctx.reset(db);
     }
 
-    fn take_phase_or_reset(&mut self, db: &mut DatabaseHandle) -> Phase {
-        match self.phase.take() {
-            Some(phase) => phase,
-            None => {
-                self.slots.clear();
-                self.ctx.reset(db);
-                Phase::idle()
-            }
-        }
-    }
-
     /// Active confirm-wait tracing span metadata, if the core is waiting for a confirm.
     pub(super) fn confirm_wait_info(&self) -> Option<ConfirmWaitInfo> {
-        self.phase.as_ref().and_then(Phase::confirm_wait_info)
+        self.phase.confirm_wait_info()
     }
 
     /// Drive timers and outbound staging, returning either a [`Transmit`] borrow token to write or
     /// the next deadline and database-watch flag to sleep on.
     pub(super) fn poll(&mut self, db: &mut DatabaseHandle) -> Output<'_, C> {
-        let phase = self.take_phase_or_reset(db);
-        match phase.on_poll(&mut self.slots, &mut self.ctx, db) {
-            Phase::Waiting(waiting) => wait(&mut self.phase, &self.ctx, waiting),
-            Phase::Staged(staged) => {
-                let Some(outbound) = staged.outbound(&self.slots, self.ctx.destination) else {
-                    tracing::error!("staged response missing from slot");
-                    return wait(&mut self.phase, &self.ctx, staged.unstage());
-                };
-                self.phase = Some(Phase::Staged(staged));
-                Output::Transmit(Transmit {
-                    outbound,
-                    staged,
-                    phase: &mut self.phase,
-                    ctx: &mut self.ctx,
-                })
-            }
+        match self.phase.poll(&mut self.slots, &mut self.ctx, db) {
+            PollOutcome::Wait {
+                deadline,
+                watch_database,
+            } => Output::Wait {
+                deadline,
+                watch_database,
+            },
+            PollOutcome::Transmit { outbound, staged } => Output::Transmit(Transmit {
+                outbound,
+                staged,
+                phase: &mut self.phase,
+                ctx: &mut self.ctx,
+            }),
         }
     }
 
     /// Process one incoming fragment or link-layer message, staging any response to be returned by
     /// the next [`Self::poll`].
     ///
-    /// While this future is in flight, `phase` is `None`; dropping this future mid-await leaves
-    /// `phase` as `None` so the next `poll` or `handle_input` resets per-connection state and the
-    /// database.
+    /// Dropping this future mid-await leaves the phase in flight so the next `poll` or
+    /// `handle_input` resets per-connection state and the database.
     pub(super) async fn handle_input(
         &mut self,
         input: TransportData<'_>,
         app_decode_level: AppDecodeLevel,
         db: &mut DatabaseHandle,
     ) {
-        let phase = self.take_phase_or_reset(db);
-        let next = match self.ctx.receive(input, app_decode_level) {
-            Some(intake) => {
-                phase
-                    .on_input(&mut self.slots, &mut self.ctx, intake, db)
-                    .await
-            }
-            None => phase,
-        };
-        self.phase = Some(next);
-    }
-}
-
-fn wait<'a, C: MonotonicClock>(
-    phase: &mut Option<Phase>,
-    ctx: &SessionContext<C>,
-    waiting: Waiting,
-) -> Output<'a, C> {
-    let deadline = waiting.deadline(ctx);
-    let watch_database = waiting.watches_database(ctx);
-    *phase = Some(Phase::Waiting(waiting));
-    Output::Wait {
-        deadline,
-        watch_database,
+        self.phase
+            .input(&mut self.slots, &mut self.ctx, input, app_decode_level, db)
+            .await;
     }
 }
