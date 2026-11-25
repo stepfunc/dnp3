@@ -195,15 +195,11 @@ impl<T: Transport> OutstationTask<T> {
         F: Future<Output = R>,
     {
         match self.core.poll() {
-            Output::Transmit(tx) => self.driver.transmit(io, cancel, tx).await,
+            Output::Transmit(tx) => or_cancel(cancel, self.driver.transmit(io, tx)).await,
             Output::Wait {
                 deadline,
                 watch_database,
-            } => match self
-                .driver
-                .wait(io, cancel, deadline, watch_database)
-                .await?
-            {
+            } => match or_cancel(cancel, self.driver.wait(io, deadline, watch_database)).await? {
                 ControlFlow::Break(val) => Ok(ControlFlow::Break(val)),
                 ControlFlow::Continue(Some((input, app_level))) => {
                     // In-flight `handle_input` runs to completion before switching TCP
@@ -263,60 +259,47 @@ struct Driver<T: Transport> {
 }
 
 impl<T: Transport> Driver<T> {
-    async fn transmit<F, R>(
+    async fn transmit(
         &mut self,
         io: &mut PhysLayer,
-        mut cancel: Pin<&mut F>,
         tx: Transmit<'_, TokioClock>,
-    ) -> Result<ControlFlow<R>, RunError>
-    where
-        F: Future<Output = R>,
-    {
+    ) -> Result<(), RunError> {
         let level = self.control.decode_level;
         let write_result = tokio::select! {
             biased;
-            val = cancel.as_mut() => return Ok(ControlFlow::Break(val)),
             stop = self.control.wait_for_stop() => return Err(stop.into()),
             res = write_outbound(&mut self.writer, io, level, tx.outbound()) => res,
         };
 
         write_result?;
         tx.sent();
-        Ok(ControlFlow::Continue(()))
+        Ok(())
     }
 
-    async fn wait<F, R>(
+    async fn wait(
         &mut self,
         io: &mut PhysLayer,
-        mut cancel: Pin<&mut F>,
         deadline: Option<MonotonicTime>,
         watch_database: bool,
-    ) -> Result<ControlFlow<R, Option<(TransportData<'_>, AppDecodeLevel)>>, RunError>
-    where
-        F: Future<Output = R>,
-    {
+    ) -> Result<Option<(TransportData<'_>, AppDecodeLevel)>, RunError> {
         let level = self.control.decode_level;
         let sleep_target = deadline.map(|d| self.clock.to_tokio_instant(d));
 
         tokio::select! {
             biased;
-            val = cancel.as_mut() => Ok(ControlFlow::Break(val)),
             res = self.control.next_message() => {
                 res?;
-                Ok(ControlFlow::Continue(None))
+                Ok(None)
             }
-            _ = sleep_option(sleep_target) => Ok(ControlFlow::Continue(None)),
+            _ = sleep_option(sleep_target) => Ok(None),
             res = self.reader.read(io, level) => {
                 res?;
-                let input = self
+                Ok(self
                     .reader
                     .pop()
-                    .map(|data| (data, self.control.decode_level.application));
-                Ok(ControlFlow::Continue(input))
+                    .map(|data| (data, self.control.decode_level.application)))
             }
-            _ = self.database.wait_for_change(), if watch_database => {
-                Ok(ControlFlow::Continue(None))
-            }
+            _ = self.database.wait_for_change(), if watch_database => Ok(None),
         }
     }
 
@@ -362,6 +345,25 @@ impl TaskControl {
                 return stop;
             }
         }
+    }
+}
+
+/// Race `fut` against `cancel`, polling `cancel` first.
+///
+/// `fut` must commit any post-I/O side effects (such as `Transmit::sent` or `reader.pop`) without
+/// another `.await`, so `cancel` cannot drop it after I/O completes and before the commit.
+async fn or_cancel<F, Fut, R, T>(
+    cancel: Pin<&mut F>,
+    fut: Fut,
+) -> Result<ControlFlow<R, T>, RunError>
+where
+    F: Future<Output = R>,
+    Fut: Future<Output = Result<T, RunError>>,
+{
+    tokio::select! {
+        biased;
+        val = cancel => Ok(ControlFlow::Break(val)),
+        res = fut => Ok(ControlFlow::Continue(res?)),
     }
 }
 
