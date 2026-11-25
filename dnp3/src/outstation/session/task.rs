@@ -129,13 +129,10 @@ impl<T: Transport> OutstationTask<T> {
     /// Cancel-safe: per-connection state is re-armed by `SessionTeardown`'s `Drop`, so
     /// dropping this future tears down exactly as returning from it does.
     pub(crate) async fn run(&mut self, io: &mut PhysLayer) -> RunError {
-        match self
+        let Err(err) = self
             .run_until(io, std::future::pending::<std::convert::Infallible>())
-            .await
-        {
-            Ok(never) => match never {},
-            Err(err) => err,
-        }
+            .await;
+        err
     }
 
     /// Run the outstation task until either a `RunError` occurs or `cancel` resolves while no
