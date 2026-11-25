@@ -11,7 +11,7 @@ import dev.gridio.dnp3.codegen.model.FixedSizeField._
 import dev.gridio.dnp3.codegen.model.VariationNames._
 
 object Group13 extends ObjectGroup {
-  def variations: List[Variation] = List(Group13Var1, Group13Var2)
+  def variations: List[Variation] = List(Group13Var0, Group13Var1, Group13Var2)
 
   def group: Byte = 13
 
@@ -19,6 +19,8 @@ object Group13 extends ObjectGroup {
 
   override def groupType: GroupType = GroupType.BinaryOutputCommandEvent
 }
+
+object Group13Var0 extends AnyVariation(Group13, 0)
 
 object Group13Var1 extends FixedSize(Group13, 1, withoutTime)(flags)
 

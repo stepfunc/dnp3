@@ -13,6 +13,7 @@ use crate::app::measurement::*;
 use crate::app::BufferSize;
 use crate::outstation::database::*;
 use crate::outstation::tests::harness::*;
+use crate::util::test_support::watchdog;
 
 const READ_G1V0_ALL: &[u8] = &[0xC0, 0x01, 0x01, 0x00, 0x06];
 const READ_G2V0_ALL: &[u8] = &[0xC0, 0x01, 0x02, 0x00, 0x06];
@@ -415,4 +416,24 @@ async fn headers_after_a_read_of_time_with_a_count_are_processed() {
             ],
         )
         .await;
+}
+
+#[tokio::test]
+async fn read_of_command_events_any_variation_sets_object_unknown() {
+    watchdog(async {
+        let mut harness = new_harness(get_default_config());
+        let mut seq: u8 = 0;
+
+        for group in [13, 43] {
+            let qualifiers: [&[u8]; 3] = [&[0x06], &[0x07, 0x01], &[0x08, 0x01, 0x00]];
+            for qualifier in qualifiers {
+                let request = [&[0xC0 | seq, 0x01, group, 0x00], qualifier].concat();
+                harness
+                    .test_request_response(&request, &empty_response(seq, iin2::OBJECT_UNKNOWN))
+                    .await;
+                seq = seq.wrapping_add(1) & 0x0F;
+            }
+        }
+    })
+    .await;
 }

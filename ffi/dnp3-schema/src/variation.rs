@@ -44,6 +44,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
         .push("group11_var1", "Binary Output Event - Without time")?
         .push("group11_var2", "Binary Output Event - With time")?
         .push("group12_var1", "Binary Output Command - Control relay output block")?
+        .push("group13_var0", "Binary Output Command Event - Any variation")?
         .push("group13_var1", "Binary Output Command Event - Without time")?
         .push("group13_var2", "Binary Output Command Event - With time")?
         .push("group20_var0", "Counter - Any variation")?
@@ -124,6 +125,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<EnumHandle> {
         .push("group42_var6", "Analog Output Event - Double-precision floating point without time")?
         .push("group42_var7", "Analog Output Event - Single-precision floating point with time")?
         .push("group42_var8", "Analog Output Event - Double-precision floating point with time")?
+        .push("group43_var0", "Analog Output Command Event - Any variation")?
         .push("group43_var1", "Analog Output Command Event - 32-bit without time")?
         .push("group43_var2", "Analog Output Command Event - 16-bit without time")?
         .push("group43_var3", "Analog Output Command Event - 32-bit with time")?

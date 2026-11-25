@@ -94,6 +94,7 @@ impl ReadQualifier {
                 | Variation::Group11Var0
                 | Variation::Group11Var1
                 | Variation::Group11Var2
+                | Variation::Group13Var0
                 | Variation::Group13Var1
                 | Variation::Group13Var2
                 | Variation::Group22Var0
@@ -133,6 +134,7 @@ impl ReadQualifier {
                 | Variation::Group42Var6
                 | Variation::Group42Var7
                 | Variation::Group42Var8
+                | Variation::Group43Var0
                 | Variation::Group43Var1
                 | Variation::Group43Var2
                 | Variation::Group43Var3

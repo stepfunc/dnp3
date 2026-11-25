@@ -50,6 +50,7 @@ const ROWS: &[([u8; 2], Option<ReadTarget>)] = &[
     ([11, 2], Some(Event(E::BinaryOutputStatus(Some(EventBinaryOutputStatusVariation::Group11Var2))))),
     // binary commands and their events are not read
     ([12, 1], None),
+    ([13, 0], None),
     ([13, 1], None),
     ([13, 2], None),
     // counter
@@ -137,6 +138,7 @@ const ROWS: &[([u8; 2], Option<ReadTarget>)] = &[
     ([41, 2], None),
     ([41, 3], None),
     ([41, 4], None),
+    ([43, 0], None),
     ([43, 1], None),
     ([43, 2], None),
     ([43, 3], None),

@@ -25,6 +25,7 @@ use scursor::*;
 
 /// All variations supported by the library
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[cfg_attr(not(feature = "ffi"), non_exhaustive)]
 pub enum Variation {
     /// Device Attributes - All attributes request
     Group0Var254,
@@ -72,6 +73,8 @@ pub enum Variation {
     Group11Var2,
     /// Binary Output Command - Control relay output block
     Group12Var1,
+    /// Binary Output Command Event - Any variation
+    Group13Var0,
     /// Binary Output Command Event - Without time
     Group13Var1,
     /// Binary Output Command Event - With time
@@ -232,6 +235,8 @@ pub enum Variation {
     Group42Var7,
     /// Analog Output Event - Double-precision floating point with time
     Group42Var8,
+    /// Analog Output Command Event - Any variation
+    Group43Var0,
     /// Analog Output Command Event - 32-bit without time
     Group43Var1,
     /// Analog Output Command Event - 16-bit without time
@@ -349,6 +354,7 @@ impl Variation {
                 _ => None,
             },
             13 => match var {
+                0 => Some(Variation::Group13Var0),
                 1 => Some(Variation::Group13Var1),
                 2 => Some(Variation::Group13Var2),
                 _ => None,
@@ -468,6 +474,7 @@ impl Variation {
                 _ => None,
             },
             43 => match var {
+                0 => Some(Variation::Group43Var0),
                 1 => Some(Variation::Group43Var1),
                 2 => Some(Variation::Group43Var2),
                 3 => Some(Variation::Group43Var3),
@@ -552,6 +559,7 @@ impl Variation {
             Variation::Group11Var1 => (11, 1),
             Variation::Group11Var2 => (11, 2),
             Variation::Group12Var1 => (12, 1),
+            Variation::Group13Var0 => (13, 0),
             Variation::Group13Var1 => (13, 1),
             Variation::Group13Var2 => (13, 2),
             Variation::Group20Var0 => (20, 0),
@@ -632,6 +640,7 @@ impl Variation {
             Variation::Group42Var6 => (42, 6),
             Variation::Group42Var7 => (42, 7),
             Variation::Group42Var8 => (42, 8),
+            Variation::Group43Var0 => (43, 0),
             Variation::Group43Var1 => (43, 1),
             Variation::Group43Var2 => (43, 2),
             Variation::Group43Var3 => (43, 3),
@@ -692,6 +701,7 @@ impl Variation {
             Variation::Group11Var1 => "Binary Output Event - Without time",
             Variation::Group11Var2 => "Binary Output Event - With time",
             Variation::Group12Var1 => "Binary Output Command - Control relay output block",
+            Variation::Group13Var0 => "Binary Output Command Event - Any variation",
             Variation::Group13Var1 => "Binary Output Command Event - Without time",
             Variation::Group13Var2 => "Binary Output Command Event - With time",
             Variation::Group20Var0 => "Counter - Any variation",
@@ -772,6 +782,7 @@ impl Variation {
             Variation::Group42Var6 => "Analog Output Event - Double-precision floating point without time",
             Variation::Group42Var7 => "Analog Output Event - Single-precision floating point with time",
             Variation::Group42Var8 => "Analog Output Event - Double-precision floating point with time",
+            Variation::Group43Var0 => "Analog Output Command Event - Any variation",
             Variation::Group43Var1 => "Analog Output Command Event - 32-bit without time",
             Variation::Group43Var2 => "Analog Output Command Event - 16-bit without time",
             Variation::Group43Var3 => "Analog Output Command Event - 32-bit with time",
