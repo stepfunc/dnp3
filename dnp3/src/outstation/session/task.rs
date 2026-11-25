@@ -5,6 +5,7 @@
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
 use std::future::Future;
+use std::ops::ControlFlow;
 use std::pin::{pin, Pin};
 
 use tracing::Instrument;
@@ -166,10 +167,10 @@ impl<T: Transport> OutstationTask<T> {
     {
         loop {
             let span = self.confirm_wait_span();
-            match self.run_step(io, cancel.as_mut()).instrument(span).await {
-                StepOutcome::Continue => {}
-                StepOutcome::Cancelled(val) => return Ok(val),
-                StepOutcome::Stopped(err) => return Err(err),
+            if let ControlFlow::Break(val) =
+                self.run_step(io, cancel.as_mut()).instrument(span).await?
+            {
+                return Ok(val);
             }
         }
     }
@@ -190,7 +191,7 @@ impl<T: Transport> OutstationTask<T> {
         &mut self,
         io: &mut PhysLayer,
         mut cancel: Pin<&mut F>,
-    ) -> StepOutcome<R>
+    ) -> Result<ControlFlow<R>, RunError>
     where
         F: Future<Output = R>,
     {
@@ -213,20 +214,14 @@ impl<T: Transport> OutstationTask<T> {
 
                 let write_result = tokio::select! {
                     biased;
-                    val = cancel.as_mut() => return StepOutcome::Cancelled(val),
-                    stop = self.control.wait_for_stop() => {
-                        return StepOutcome::Stopped(stop.into());
-                    }
+                    val = cancel.as_mut() => return Ok(ControlFlow::Break(val)),
+                    stop = self.control.wait_for_stop() => return Err(stop.into()),
                     res = write => res,
                 };
 
-                match write_result {
-                    Ok(()) => {
-                        tx.sent();
-                        StepOutcome::Continue
-                    }
-                    Err(err) => StepOutcome::Stopped(err.into()),
-                }
+                write_result?;
+                tx.sent();
+                Ok(ControlFlow::Continue(()))
             }
             Output::Wait {
                 deadline,
@@ -237,29 +232,23 @@ impl<T: Transport> OutstationTask<T> {
 
                 tokio::select! {
                     biased;
-                    val = cancel.as_mut() => return StepOutcome::Cancelled(val),
-                    res = self.control.next_message() => {
-                        if let Err(stop) = res {
-                            return StepOutcome::Stopped(stop.into());
+                    val = cancel.as_mut() => return Ok(ControlFlow::Break(val)),
+                    res = self.control.next_message() => res?,
+                    _ = sleep_option(sleep_target) => {}
+                    res = self.reader.read(io, level) => {
+                        res?;
+                        if let Some(input) = self.reader.pop() {
+                            // In-flight `handle_input` runs to completion before switching TCP
+                            // connections or shutting down.
+                            self.core
+                                .handle_input(input, self.control.decode_level.application)
+                                .await;
                         }
                     }
-                    _ = sleep_option(sleep_target) => {}
-                    res = self.reader.read(io, level) => match res {
-                        Ok(()) => {
-                            if let Some(input) = self.reader.pop() {
-                                // In-flight `handle_input` runs to completion before switching TCP
-                                // connections or shutting down.
-                                self.core
-                                    .handle_input(input, self.control.decode_level.application)
-                                    .await;
-                            }
-                        }
-                        Err(err) => return StepOutcome::Stopped(err.into()),
-                    },
                     _ = self.database.wait_for_change(), if watch_database => {}
                 }
 
-                StepOutcome::Continue
+                Ok(ControlFlow::Continue(()))
             }
         }
     }
@@ -298,12 +287,6 @@ impl From<ConfigurationChange> for OutstationMessage {
     fn from(x: ConfigurationChange) -> Self {
         OutstationMessage::Configuration(x)
     }
-}
-
-enum StepOutcome<R> {
-    Continue,
-    Cancelled(R),
-    Stopped(RunError),
 }
 
 /// Handle-driven control state kept separate from I/O and [`OutstationCore`] so `tokio::select!`
