@@ -184,17 +184,28 @@ impl<T: Transport> OutstationTask<T> {
         io: &mut PhysLayer,
         cancel: impl Future<Output = R>,
     ) -> Result<ControlFlow<R>, RunError> {
+        /// Race `fut` against `cancel`, polling `cancel` first.
+        ///
+        /// `fut` must commit any post-I/O side effects (such as `Transmit::sent` or `reader.pop`)
+        /// without another `.await`, so `cancel` cannot drop it after I/O completes and before the
+        /// commit.
+        async fn or_cancel<R, T>(
+            cancel: impl Future<Output = R>,
+            fut: impl Future<Output = Result<T, RunError>>,
+        ) -> Result<ControlFlow<R, T>, RunError> {
+            tokio::select! {
+                biased;
+                val = cancel => Ok(ControlFlow::Break(val)),
+                res = fut => Ok(ControlFlow::Continue(res?)),
+            }
+        }
+
         match self.core.poll() {
-            Output::Transmit(tx) => self.driver.transmit(io, tx).or_cancel(cancel).await,
+            Output::Transmit(tx) => or_cancel(cancel, self.driver.transmit(io, tx)).await,
             Output::Wait {
                 deadline,
                 watch_database,
-            } => match self
-                .driver
-                .wait(io, deadline, watch_database)
-                .or_cancel(cancel)
-                .await?
-            {
+            } => match or_cancel(cancel, self.driver.wait(io, deadline, watch_database)).await? {
                 ControlFlow::Break(val) => Ok(ControlFlow::Break(val)),
                 ControlFlow::Continue(Some((input, app_level))) => {
                     // In-flight `handle_input` runs to completion before switching TCP
@@ -263,7 +274,7 @@ impl<T: Transport> Driver<T> {
         let write_result = tokio::select! {
             biased;
             stop = self.control.wait_for_stop() => return Err(stop.into()),
-            res = self.writer.write_outbound(io, level, tx.outbound()) => res,
+            res = write_outbound(&mut self.writer, io, level, tx.outbound()) => res,
         };
 
         write_result?;
@@ -342,42 +353,20 @@ impl TaskControl {
     }
 }
 
-impl<T: Transport> TransportWriter<T> {
-    async fn write_outbound(
-        &mut self,
-        io: &mut PhysLayer,
-        level: DecodeLevel,
-        outbound: Outbound<'_>,
-    ) -> Result<(), LinkError> {
-        match outbound {
-            Outbound::Fragment { destination, bytes } => {
-                self.write(io, level, destination, bytes).await
-            }
-            Outbound::LinkStatusRequest { destination } => {
-                self.send_link_status_request(io, level, destination).await
-            }
+async fn write_outbound<T: Transport>(
+    writer: &mut TransportWriter<T>,
+    io: &mut PhysLayer,
+    level: DecodeLevel,
+    outbound: Outbound<'_>,
+) -> Result<(), LinkError> {
+    match outbound {
+        Outbound::Fragment { destination, bytes } => {
+            writer.write(io, level, destination, bytes).await
+        }
+        Outbound::LinkStatusRequest { destination } => {
+            writer
+                .send_link_status_request(io, level, destination)
+                .await
         }
     }
 }
-
-trait CancelFutureExt<T>: Future<Output = Result<T, RunError>> + Sized {
-    /// Race `self` against `cancel`, polling `cancel` first.
-    ///
-    /// `self` must commit any post-I/O side effects (such as `Transmit::sent` or `reader.pop`)
-    /// without another `.await`, so `cancel` cannot drop it after I/O completes and before the
-    /// commit.
-    fn or_cancel<R>(
-        self,
-        cancel: impl Future<Output = R>,
-    ) -> impl Future<Output = Result<ControlFlow<R, T>, RunError>> {
-        async move {
-            tokio::select! {
-                biased;
-                val = cancel => Ok(ControlFlow::Break(val)),
-                res = self => Ok(ControlFlow::Continue(res?)),
-            }
-        }
-    }
-}
-
-impl<T, F: Future<Output = Result<T, RunError>>> CancelFutureExt<T> for F {}

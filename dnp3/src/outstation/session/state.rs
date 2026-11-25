@@ -39,17 +39,12 @@ pub(super) struct ResponseSeries {
 }
 
 impl ResponseSeries {
-    pub(super) fn new(ecsn: Sequence, fin: bool) -> Self {
-        Self { ecsn, fin }
-    }
-
-    /// The confirm that a written solicited response waits for: its own, or a mandatory
-    /// broadcast's.
-    pub(super) fn from_header(header: ResponseHeader) -> Option<Self> {
-        header
-            .control
-            .con
-            .then(|| Self::new(header.control.seq, header.control.fin))
+    /// The confirm series expected for `header`, if `CON` is set.
+    pub(super) fn awaited_by(header: ResponseHeader) -> Option<Self> {
+        header.control.con.then_some(Self {
+            ecsn: header.control.seq,
+            fin: header.control.fin,
+        })
     }
 }
 

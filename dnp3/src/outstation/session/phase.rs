@@ -238,7 +238,7 @@ impl SolTx {
     pub(super) fn new(to: FragmentAddr, header: ResponseHeader) -> Self {
         Self {
             to,
-            awaits: ResponseSeries::from_header(header),
+            awaits: ResponseSeries::awaited_by(header),
         }
     }
 }
