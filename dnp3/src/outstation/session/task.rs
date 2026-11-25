@@ -10,30 +10,27 @@ use std::pin::{pin, Pin};
 
 use tracing::Instrument;
 
-use crate::decode::DecodeLevel;
+use super::core::{Outbound, Output, OutstationCore, Transmit};
+use super::state::ConfirmWaitInfo;
+use crate::decode::{AppDecodeLevel, DecodeLevel};
+use crate::link::error::LinkError;
 use crate::link::reader::LinkModes;
 use crate::link::{EndpointAddress, LinkRole};
 use crate::outstation::config::*;
 use crate::outstation::database::DatabaseHandle;
-use crate::outstation::session::state::ConfirmWaitInfo;
-use crate::outstation::session::{Outbound, Output, OutstationCore};
 use crate::outstation::traits::{ControlHandler, OutstationApplication, OutstationInformation};
 use crate::outstation::OutstationHandle;
 use crate::phys::{PhysAddr, PhysLayer};
-use crate::transport::{RealTransport, Transport, TransportRead, TransportWriter};
+use crate::transport::{RealTransport, Transport, TransportData, TransportRead, TransportWriter};
 use crate::util::channel::Receiver;
-use crate::util::clock::TokioClock;
+use crate::util::clock::{MonotonicTime, TokioClock};
 use crate::util::lifecycle::{Enabled, RunError, StopReason};
 
 /// Thin Tokio driver wiring [`OutstationCore`] and a [`Transport`] to a [`PhysLayer`] and
 /// [`DatabaseHandle`].
 pub(crate) struct OutstationTask<T: Transport = RealTransport> {
     core: OutstationCore<TokioClock>,
-    clock: TokioClock,
-    reader: T::Reader,
-    writer: TransportWriter<T>,
-    database: DatabaseHandle,
-    control: TaskControl,
+    driver: Driver<T>,
 }
 
 impl OutstationTask {
@@ -98,14 +95,16 @@ impl<T: Transport> OutstationTask<T> {
         );
         let task = Self {
             core,
-            clock,
-            reader,
-            writer: TransportWriter::new(writer),
-            database: handle.clone(),
-            control: TaskControl {
-                messages: rx,
-                enabled: initial_state,
-                decode_level,
+            driver: Driver {
+                clock,
+                reader,
+                writer: TransportWriter::new(writer),
+                database: handle.clone(),
+                control: TaskControl {
+                    messages: rx,
+                    enabled: initial_state,
+                    decode_level,
+                },
             },
         };
         (
@@ -118,7 +117,7 @@ impl<T: Transport> OutstationTask<T> {
     }
 
     pub(crate) fn enabled(&self) -> Enabled {
-        self.control.enabled
+        self.driver.control.enabled
     }
 
     pub(crate) fn change_master_address(&mut self, address: EndpointAddress) {
@@ -154,7 +153,7 @@ impl<T: Transport> OutstationTask<T> {
 
     /// Process received outstation messages while idle without a session.
     pub(crate) async fn process_next_message(&mut self) -> Result<(), StopReason> {
-        self.control.next_message().await
+        self.driver.control.next_message().await
     }
 
     async fn run_session<F, R>(
@@ -190,85 +189,48 @@ impl<T: Transport> OutstationTask<T> {
     async fn run_step<F, R>(
         &mut self,
         io: &mut PhysLayer,
-        mut cancel: Pin<&mut F>,
+        cancel: Pin<&mut F>,
     ) -> Result<ControlFlow<R>, RunError>
     where
         F: Future<Output = R>,
     {
         match self.core.poll() {
-            Output::Transmit(tx) => {
-                let level = self.control.decode_level;
-                let outbound = tx.outbound();
-                let write = async {
-                    match outbound {
-                        Outbound::Fragment { destination, bytes } => {
-                            self.writer.write(io, level, destination, bytes).await
-                        }
-                        Outbound::LinkStatusRequest { destination } => {
-                            self.writer
-                                .send_link_status_request(io, level, destination)
-                                .await
-                        }
-                    }
-                };
-
-                let write_result = tokio::select! {
-                    biased;
-                    val = cancel.as_mut() => return Ok(ControlFlow::Break(val)),
-                    stop = self.control.wait_for_stop() => return Err(stop.into()),
-                    res = write => res,
-                };
-
-                write_result?;
-                tx.sent();
-                Ok(ControlFlow::Continue(()))
-            }
+            Output::Transmit(tx) => self.driver.transmit(io, cancel, tx).await,
             Output::Wait {
                 deadline,
                 watch_database,
-            } => {
-                let level = self.control.decode_level;
-                let sleep_target = deadline.map(|d| self.clock.to_tokio_instant(d));
-
-                tokio::select! {
-                    biased;
-                    val = cancel.as_mut() => return Ok(ControlFlow::Break(val)),
-                    res = self.control.next_message() => res?,
-                    _ = sleep_option(sleep_target) => {}
-                    res = self.reader.read(io, level) => {
-                        res?;
-                        if let Some(input) = self.reader.pop() {
-                            // In-flight `handle_input` runs to completion before switching TCP
-                            // connections or shutting down.
-                            self.core
-                                .handle_input(input, self.control.decode_level.application)
-                                .await;
-                        }
-                    }
-                    _ = self.database.wait_for_change(), if watch_database => {}
+            } => match self
+                .driver
+                .wait(io, cancel, deadline, watch_database)
+                .await?
+            {
+                ControlFlow::Break(val) => Ok(ControlFlow::Break(val)),
+                ControlFlow::Continue(Some((input, app_level))) => {
+                    // In-flight `handle_input` runs to completion before switching TCP
+                    // connections or shutting down.
+                    self.core.handle_input(input, app_level).await;
+                    Ok(ControlFlow::Continue(()))
                 }
-
-                Ok(ControlFlow::Continue(()))
-            }
+                ControlFlow::Continue(None) => Ok(ControlFlow::Continue(())),
+            },
         }
     }
 
     fn reset(&mut self) {
         // Re-arm, don't clear: unconfirmed events return to Unselected for re-delivery.
         self.core.reset();
-        self.reader.reset();
-        self.writer.reset();
+        self.driver.reset();
     }
 }
 
 #[cfg(test)]
 impl OutstationTask<crate::transport::mock::MockTransport> {
     pub(crate) fn set_rx_frame_info(&mut self, info: crate::link::header::FrameInfo) {
-        self.reader.set_rx_frame_info(info);
+        self.driver.reader.set_rx_frame_info(info);
     }
 
     pub(crate) fn rx_frame_info(&self) -> crate::transport::mock::reader::RxFrameInfo {
-        self.reader.rx_frame_info()
+        self.driver.reader.rx_frame_info()
     }
 }
 
@@ -289,8 +251,83 @@ impl From<ConfigurationChange> for OutstationMessage {
     }
 }
 
-/// Handle-driven control state kept separate from I/O and [`OutstationCore`] so `tokio::select!`
-/// can borrow it alongside reads and writes.
+/// Tokio I/O, clock, database notifications, and handle control owned separately from
+/// [`OutstationCore`] so transmit and wait steps can run while borrows into the core or reader are
+/// live.
+struct Driver<T: Transport> {
+    clock: TokioClock,
+    reader: T::Reader,
+    writer: TransportWriter<T>,
+    database: DatabaseHandle,
+    control: TaskControl,
+}
+
+impl<T: Transport> Driver<T> {
+    async fn transmit<F, R>(
+        &mut self,
+        io: &mut PhysLayer,
+        mut cancel: Pin<&mut F>,
+        tx: Transmit<'_, TokioClock>,
+    ) -> Result<ControlFlow<R>, RunError>
+    where
+        F: Future<Output = R>,
+    {
+        let level = self.control.decode_level;
+        let write_result = tokio::select! {
+            biased;
+            val = cancel.as_mut() => return Ok(ControlFlow::Break(val)),
+            stop = self.control.wait_for_stop() => return Err(stop.into()),
+            res = write_outbound(&mut self.writer, io, level, tx.outbound()) => res,
+        };
+
+        write_result?;
+        tx.sent();
+        Ok(ControlFlow::Continue(()))
+    }
+
+    async fn wait<F, R>(
+        &mut self,
+        io: &mut PhysLayer,
+        mut cancel: Pin<&mut F>,
+        deadline: Option<MonotonicTime>,
+        watch_database: bool,
+    ) -> Result<ControlFlow<R, Option<(TransportData<'_>, AppDecodeLevel)>>, RunError>
+    where
+        F: Future<Output = R>,
+    {
+        let level = self.control.decode_level;
+        let sleep_target = deadline.map(|d| self.clock.to_tokio_instant(d));
+
+        tokio::select! {
+            biased;
+            val = cancel.as_mut() => Ok(ControlFlow::Break(val)),
+            res = self.control.next_message() => {
+                res?;
+                Ok(ControlFlow::Continue(None))
+            }
+            _ = sleep_option(sleep_target) => Ok(ControlFlow::Continue(None)),
+            res = self.reader.read(io, level) => {
+                res?;
+                let input = self
+                    .reader
+                    .pop()
+                    .map(|data| (data, self.control.decode_level.application));
+                Ok(ControlFlow::Continue(input))
+            }
+            _ = self.database.wait_for_change(), if watch_database => {
+                Ok(ControlFlow::Continue(None))
+            }
+        }
+    }
+
+    fn reset(&mut self) {
+        self.reader.reset();
+        self.writer.reset();
+    }
+}
+
+/// Handle-driven control state kept separate from I/O so `tokio::select!` can borrow it alongside
+/// reads and writes.
 struct TaskControl {
     messages: Receiver<OutstationMessage>,
     enabled: Enabled,
@@ -324,6 +361,24 @@ impl TaskControl {
             if let Err(stop) = self.next_message().await {
                 return stop;
             }
+        }
+    }
+}
+
+async fn write_outbound<T: Transport>(
+    writer: &mut TransportWriter<T>,
+    io: &mut PhysLayer,
+    level: DecodeLevel,
+    outbound: Outbound<'_>,
+) -> Result<(), LinkError> {
+    match outbound {
+        Outbound::Fragment { destination, bytes } => {
+            writer.write(io, level, destination, bytes).await
+        }
+        Outbound::LinkStatusRequest { destination } => {
+            writer
+                .send_link_status_request(io, level, destination)
+                .await
         }
     }
 }
