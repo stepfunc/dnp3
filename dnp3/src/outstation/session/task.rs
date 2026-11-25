@@ -12,7 +12,7 @@ use tracing::Instrument;
 
 use super::core::{Outbound, Output, OutstationCore, Transmit};
 use super::state::ConfirmWaitInfo;
-use crate::decode::{AppDecodeLevel, DecodeLevel};
+use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
 use crate::link::reader::LinkModes;
 use crate::link::{EndpointAddress, LinkRole};
@@ -184,6 +184,7 @@ impl<T: Transport> OutstationTask<T> {
         io: &mut PhysLayer,
         cancel: impl Future<Output = R>,
     ) -> Result<ControlFlow<R>, RunError> {
+        let app_level = self.driver.control.decode_level.application;
         let io_step = async {
             match self.core.poll() {
                 Output::Transmit(tx) => {
@@ -200,7 +201,7 @@ impl<T: Transport> OutstationTask<T> {
             res = io_step => res?,
         };
 
-        if let Some((input, app_level)) = input {
+        if let Some(input) = input {
             // In-flight `handle_input` runs to completion before switching TCP
             // connections or shutting down.
             self.core.handle_input(input, app_level).await;
@@ -281,7 +282,7 @@ impl<T: Transport> Driver<T> {
         &mut self,
         io: &mut PhysLayer,
         deadline: Option<MonotonicTime>,
-    ) -> Result<Option<(TransportData<'_>, AppDecodeLevel)>, RunError> {
+    ) -> Result<Option<TransportData<'_>>, RunError> {
         let level = self.control.decode_level;
 
         tokio::select! {
@@ -293,10 +294,7 @@ impl<T: Transport> Driver<T> {
             _ = self.clock.sleep_until(deadline) => Ok(None),
             res = self.reader.read(io, level) => {
                 res?;
-                Ok(self
-                    .reader
-                    .pop()
-                    .map(|data| (data, self.control.decode_level.application)))
+                Ok(self.reader.pop())
             }
             _ = self.database.wait_for_change() => Ok(None),
         }
