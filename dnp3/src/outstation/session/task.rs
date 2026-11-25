@@ -32,9 +32,7 @@ pub(crate) struct OutstationTask<T: Transport = RealTransport> {
     reader: T::Reader,
     writer: TransportWriter<T>,
     database: DatabaseHandle,
-    enabled: Enabled,
-    decode_level: DecodeLevel,
-    messages: Receiver<OutstationMessage>,
+    control: TaskControl,
 }
 
 impl OutstationTask {
@@ -103,9 +101,11 @@ impl<T: Transport> OutstationTask<T> {
             reader,
             writer: TransportWriter::new(writer),
             database: handle.clone(),
-            enabled: initial_state,
-            decode_level,
-            messages: rx,
+            control: TaskControl {
+                messages: rx,
+                enabled: initial_state,
+                decode_level,
+            },
         };
         (
             task,
@@ -117,7 +117,7 @@ impl<T: Transport> OutstationTask<T> {
     }
 
     pub(crate) fn enabled(&self) -> Enabled {
-        self.enabled
+        self.control.enabled
     }
 
     pub(crate) fn change_master_address(&mut self, address: EndpointAddress) {
@@ -153,12 +153,7 @@ impl<T: Transport> OutstationTask<T> {
 
     /// Process received outstation messages while idle without a session.
     pub(crate) async fn process_next_message(&mut self) -> Result<(), StopReason> {
-        handle_one_message(
-            &mut self.messages,
-            &mut self.enabled,
-            &mut self.decode_level,
-        )
-        .await
+        self.control.next_message().await
     }
 
     async fn run_session<F, R>(
@@ -201,7 +196,7 @@ impl<T: Transport> OutstationTask<T> {
     {
         match self.core.poll() {
             Output::Transmit(tx) => {
-                let level = self.decode_level;
+                let level = self.control.decode_level;
                 let outbound = tx.outbound();
                 let write = async {
                     match outbound {
@@ -219,7 +214,7 @@ impl<T: Transport> OutstationTask<T> {
                 let write_result = tokio::select! {
                     biased;
                     val = cancel.as_mut() => return StepOutcome::Cancelled(val),
-                    stop = wait_for_stop(&mut self.messages, &mut self.enabled, &mut self.decode_level) => {
+                    stop = self.control.wait_for_stop() => {
                         return StepOutcome::Stopped(stop.into());
                     }
                     res = write => res,
@@ -237,32 +232,31 @@ impl<T: Transport> OutstationTask<T> {
                 deadline,
                 watch_database,
             } => {
-                let level = self.decode_level;
+                let level = self.control.decode_level;
                 let sleep_target = deadline.map(|d| self.clock.to_tokio_instant(d));
 
-                let read_ready = tokio::select! {
+                tokio::select! {
                     biased;
                     val = cancel.as_mut() => return StepOutcome::Cancelled(val),
-                    res = handle_one_message(&mut self.messages, &mut self.enabled, &mut self.decode_level) => match res {
-                        Ok(()) => false,
-                        Err(stop) => return StepOutcome::Stopped(stop.into()),
-                    },
-                    _ = sleep_option(sleep_target) => false,
+                    res = self.control.next_message() => {
+                        if let Err(stop) = res {
+                            return StepOutcome::Stopped(stop.into());
+                        }
+                    }
+                    _ = sleep_option(sleep_target) => {}
                     res = self.reader.read(io, level) => match res {
-                        Ok(()) => true,
+                        Ok(()) => {
+                            if let Some(input) = self.reader.pop() {
+                                // In-flight `handle_input` runs to completion before switching TCP
+                                // connections or shutting down.
+                                self.core
+                                    .handle_input(input, self.control.decode_level.application)
+                                    .await;
+                            }
+                        }
                         Err(err) => return StepOutcome::Stopped(err.into()),
                     },
-                    _ = wait_for_db(&self.database, watch_database) => false,
-                };
-
-                if read_ready {
-                    if let Some(input) = self.reader.pop() {
-                        // In-flight `handle_input` runs to completion before switching TCP
-                        // connections or shutting down.
-                        self.core
-                            .handle_input(input, self.decode_level.application)
-                            .await;
-                    }
+                    _ = self.database.wait_for_change(), if watch_database => {}
                 }
 
                 StepOutcome::Continue
@@ -312,54 +306,48 @@ enum StepOutcome<R> {
     Stopped(RunError),
 }
 
+/// Handle-driven control state kept separate from I/O and [`OutstationCore`] so `tokio::select!`
+/// can borrow it alongside reads and writes.
+struct TaskControl {
+    messages: Receiver<OutstationMessage>,
+    enabled: Enabled,
+    decode_level: DecodeLevel,
+}
+
+impl TaskControl {
+    async fn next_message(&mut self) -> Result<(), StopReason> {
+        match self.messages.receive().await? {
+            OutstationMessage::Shutdown => Err(StopReason::Shutdown),
+            OutstationMessage::Enable => {
+                tracing::info!("enable communication");
+                self.enabled = Enabled::Yes;
+                Ok(())
+            }
+            OutstationMessage::Disable => {
+                tracing::info!("disable communication");
+                self.enabled = Enabled::No;
+                Err(StopReason::Disable)
+            }
+            OutstationMessage::Configuration(ConfigurationChange::SetDecodeLevel(level)) => {
+                tracing::info!("decode level changed to: {:?}", level);
+                self.decode_level = level;
+                Ok(())
+            }
+        }
+    }
+
+    async fn wait_for_stop(&mut self) -> StopReason {
+        loop {
+            if let Err(stop) = self.next_message().await {
+                return stop;
+            }
+        }
+    }
+}
+
 async fn sleep_option(target: Option<tokio::time::Instant>) {
     match target {
         Some(target) => tokio::time::sleep_until(target).await,
         None => std::future::pending().await,
-    }
-}
-
-async fn wait_for_db(database: &DatabaseHandle, enabled: bool) {
-    if enabled {
-        database.wait_for_change().await
-    } else {
-        std::future::pending().await
-    }
-}
-
-async fn wait_for_stop(
-    messages: &mut Receiver<OutstationMessage>,
-    enabled: &mut Enabled,
-    decode_level: &mut DecodeLevel,
-) -> StopReason {
-    loop {
-        if let Err(stop) = handle_one_message(messages, enabled, decode_level).await {
-            return stop;
-        }
-    }
-}
-
-async fn handle_one_message(
-    messages: &mut Receiver<OutstationMessage>,
-    enabled: &mut Enabled,
-    decode_level: &mut DecodeLevel,
-) -> Result<(), StopReason> {
-    match messages.receive().await? {
-        OutstationMessage::Shutdown => Err(StopReason::Shutdown),
-        OutstationMessage::Enable => {
-            tracing::info!("enable communication");
-            *enabled = Enabled::Yes;
-            Ok(())
-        }
-        OutstationMessage::Disable => {
-            tracing::info!("disable communication");
-            *enabled = Enabled::No;
-            Err(StopReason::Disable)
-        }
-        OutstationMessage::Configuration(ConfigurationChange::SetDecodeLevel(level)) => {
-            tracing::info!("decode level changed to: {:?}", level);
-            *decode_level = level;
-            Ok(())
-        }
     }
 }
