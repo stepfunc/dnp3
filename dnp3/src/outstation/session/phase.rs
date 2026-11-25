@@ -62,7 +62,7 @@ impl Phase {
                 }
             },
         };
-        let outcome = waiting.wait_outcome(ctx);
+        let outcome = PollOutcome::Wait(waiting.deadline(ctx));
         self.state = State::Waiting(waiting);
         outcome
     }
@@ -115,10 +115,7 @@ impl Phase {
 
 /// Outcome of [`Phase::poll`] for [`super::OutstationCore`] to wrap into [`super::Output`].
 pub(super) enum PollOutcome<'a> {
-    Wait {
-        deadline: Option<MonotonicTime>,
-        watch_database: bool,
-    },
+    Wait(Option<MonotonicTime>),
     Transmit {
         outbound: Outbound<'a>,
         staged: StagedTx,
@@ -591,16 +588,6 @@ impl Waiting {
         }
     }
 
-    /// Whether new events added to the database can immediately trigger an unsolicited response.
-    fn watches_database<C: MonotonicClock>(&self, ctx: &SessionContext<C>) -> bool {
-        matches!(self, Self::Idle)
-            && matches!(
-                ctx.state.unsolicited,
-                UnsolicitedState::Ready { retry_at: None }
-            )
-            && ctx.state.enabled_unsolicited_classes.any()
-    }
-
     /// Next timer deadline relevant while waiting.
     fn deadline<C: MonotonicClock>(&self, ctx: &SessionContext<C>) -> Option<MonotonicTime> {
         match *self {
@@ -616,13 +603,6 @@ impl Waiting {
                     (a, b) => a.or(b),
                 }
             }
-        }
-    }
-
-    fn wait_outcome<'a, C: MonotonicClock>(&self, ctx: &SessionContext<C>) -> PollOutcome<'a> {
-        PollOutcome::Wait {
-            deadline: self.deadline(ctx),
-            watch_database: self.watches_database(ctx),
         }
     }
 }

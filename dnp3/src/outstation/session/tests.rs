@@ -168,7 +168,7 @@ fn send_expect_fragment(core: &mut OutstationCore<&TestClock>) -> Vec<u8> {
             tx.sent();
             bytes
         }
-        Output::Wait { .. } => panic!("expected staged fragment"),
+        Output::Wait(_) => panic!("expected staged fragment"),
     }
 }
 
@@ -190,13 +190,7 @@ fn transmit_sent_arms_confirm_deadline_and_dropping_transmit_resets() {
         &clock,
     );
 
-    assert!(matches!(
-        core.poll(),
-        Output::Wait {
-            deadline: None,
-            watch_database: false,
-        }
-    ));
+    assert!(matches!(core.poll(), Output::Wait(None)));
 
     // READ class 1 (g60v2, qualifier 0x06), seq 0 -> stages a response requiring confirm.
     let read_class_1 = [0xC0, 0x01, 60, 2, 0x06];
@@ -226,13 +220,7 @@ fn transmit_sent_arms_confirm_deadline_and_dropping_transmit_resets() {
 
     // Next `poll` detects `InFlight`, resets per-connection state and DB (restoring the Class 1
     // event to Unselected), and returns `Wait`.
-    assert!(matches!(
-        core.poll(),
-        Output::Wait {
-            deadline: None,
-            watch_database: false,
-        }
-    ));
+    assert!(matches!(core.poll(), Output::Wait(None)));
     assert!(db.get_events_info().unwritten_classes.class1);
 
     // A fresh READ gets the restored event; calling `sent()` arms the deadline from `t1`.
@@ -254,13 +242,7 @@ fn transmit_sent_arms_confirm_deadline_and_dropping_transmit_resets() {
     );
 
     let expected_deadline = t1.saturating_add(Duration::from_secs(5));
-    assert!(matches!(
-        core.poll(),
-        Output::Wait {
-            deadline: Some(d),
-            watch_database: false,
-        } if d == expected_deadline
-    ));
+    assert!(matches!(core.poll(), Output::Wait(Some(d)) if d == expected_deadline));
 }
 
 #[test]
@@ -377,13 +359,7 @@ fn static_final_continuation_fragment_does_not_hold_confirm_wait() {
     let frag1 = send_expect_fragment(&mut core);
     assert_eq!(&frag1[..4], &[0x41, 0x81, 0x80, 0x00]); // FIR=0, FIN=1, CON=0, seq=1
     assert_eq!(core.confirm_wait_info(), None);
-    assert!(matches!(
-        core.poll(),
-        Output::Wait {
-            deadline: None,
-            watch_database: false,
-        }
-    ));
+    assert!(matches!(core.poll(), Output::Wait(None)));
 }
 
 struct PendingAttrApp;
@@ -812,7 +788,7 @@ fn outside_the_lock_callbacks_can_transact_on_database_handle_without_deadlock()
     exchange_ok(&mut core, &[0xCE, 0x18]);
     exchange_ok(&mut core, &[0xCF, 0x01, 60, 2, 0x06]);
     clock.advance(Duration::from_secs(2));
-    assert!(matches!(core.poll(), Output::Wait { .. }));
+    assert!(matches!(core.poll(), Output::Wait(_)));
 
     let expected: BTreeSet<&'static str> = [
         "get_processing_delay_ms",

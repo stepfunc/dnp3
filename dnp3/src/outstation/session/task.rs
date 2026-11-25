@@ -190,10 +190,7 @@ impl<T: Transport> OutstationTask<T> {
                     self.driver.transmit(io, tx).await?;
                     Ok(None)
                 }
-                Output::Wait {
-                    deadline,
-                    watch_database,
-                } => self.driver.wait(io, deadline, watch_database).await,
+                Output::Wait(deadline) => self.driver.wait(io, deadline).await,
             }
         };
 
@@ -276,11 +273,14 @@ impl<T: Transport> Driver<T> {
         Ok(())
     }
 
+    /// Wait for the next handle message, timer deadline, incoming fragment, or database change.
+    ///
+    /// Database wakeups are level-triggered hints: returning `Ok(None)` lets the next
+    /// `OutstationCore::poll` re-check whether unsolicited events can be sent.
     async fn wait(
         &mut self,
         io: &mut PhysLayer,
         deadline: Option<MonotonicTime>,
-        watch_database: bool,
     ) -> Result<Option<(TransportData<'_>, AppDecodeLevel)>, RunError> {
         let level = self.control.decode_level;
 
@@ -298,7 +298,7 @@ impl<T: Transport> Driver<T> {
                     .pop()
                     .map(|data| (data, self.control.decode_level.application)))
             }
-            _ = self.database.wait_for_change(), if watch_database => Ok(None),
+            _ = self.database.wait_for_change() => Ok(None),
         }
     }
 

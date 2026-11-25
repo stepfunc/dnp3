@@ -66,16 +66,10 @@ impl<C: MonotonicClock> OutstationCore<C> {
     }
 
     /// Drive timers and outbound staging, returning either a [`Transmit`] borrow token to write or
-    /// the next deadline and database-watch flag to sleep on.
+    /// the next timer deadline to wait on.
     pub(super) fn poll(&mut self) -> Output<'_, C> {
         match self.phase.poll(&mut self.slots, &mut self.ctx) {
-            PollOutcome::Wait {
-                deadline,
-                watch_database,
-            } => Output::Wait {
-                deadline,
-                watch_database,
-            },
+            PollOutcome::Wait(deadline) => Output::Wait(deadline),
             PollOutcome::Transmit { outbound, staged } => Output::Transmit(Transmit {
                 outbound,
                 staged,
@@ -106,12 +100,9 @@ impl<C: MonotonicClock> OutstationCore<C> {
 pub(super) enum Output<'a, C: MonotonicClock> {
     /// Transmit this payload, then call [`Transmit::sent`] once the write completes.
     Transmit(Transmit<'a, C>),
-    /// Nothing to transmit now; wait for incoming input, database updates (when `watch_database`
-    /// is true), or `deadline`.
-    Wait {
-        deadline: Option<MonotonicTime>,
-        watch_database: bool,
-    },
+    /// Nothing to transmit now; wait for incoming input, database updates, or the next timer
+    /// deadline.
+    Wait(Option<MonotonicTime>),
 }
 
 /// Borrow token representing an outbound transmission in progress.
