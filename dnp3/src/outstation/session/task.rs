@@ -184,38 +184,32 @@ impl<T: Transport> OutstationTask<T> {
         io: &mut PhysLayer,
         cancel: impl Future<Output = R>,
     ) -> Result<ControlFlow<R>, RunError> {
-        /// Race `fut` against `cancel`, polling `cancel` first.
-        ///
-        /// `fut` must commit any post-I/O side effects (such as `Transmit::sent` or `reader.pop`)
-        /// without another `.await`, so `cancel` cannot drop it after I/O completes and before the
-        /// commit.
-        async fn or_cancel<R, T>(
-            cancel: impl Future<Output = R>,
-            fut: impl Future<Output = Result<T, RunError>>,
-        ) -> Result<ControlFlow<R, T>, RunError> {
-            tokio::select! {
-                biased;
-                val = cancel => Ok(ControlFlow::Break(val)),
-                res = fut => Ok(ControlFlow::Continue(res?)),
+        let io_step = async {
+            match self.core.poll() {
+                Output::Transmit(tx) => {
+                    self.driver.transmit(io, tx).await?;
+                    Ok(None)
+                }
+                Output::Wait {
+                    deadline,
+                    watch_database,
+                } => self.driver.wait(io, deadline, watch_database).await,
             }
+        };
+
+        let input = tokio::select! {
+            biased;
+            val = cancel => return Ok(ControlFlow::Break(val)),
+            res = io_step => res?,
+        };
+
+        if let Some((input, app_level)) = input {
+            // In-flight `handle_input` runs to completion before switching TCP
+            // connections or shutting down.
+            self.core.handle_input(input, app_level).await;
         }
 
-        match self.core.poll() {
-            Output::Transmit(tx) => or_cancel(cancel, self.driver.transmit(io, tx)).await,
-            Output::Wait {
-                deadline,
-                watch_database,
-            } => match or_cancel(cancel, self.driver.wait(io, deadline, watch_database)).await? {
-                ControlFlow::Break(val) => Ok(ControlFlow::Break(val)),
-                ControlFlow::Continue(Some((input, app_level))) => {
-                    // In-flight `handle_input` runs to completion before switching TCP
-                    // connections or shutting down.
-                    self.core.handle_input(input, app_level).await;
-                    Ok(ControlFlow::Continue(()))
-                }
-                ControlFlow::Continue(None) => Ok(ControlFlow::Continue(())),
-            },
-        }
+        Ok(ControlFlow::Continue(()))
     }
 
     fn reset(&mut self) {
