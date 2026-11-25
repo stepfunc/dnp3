@@ -272,6 +272,13 @@ impl<T: Transport> OutstationTask<T> {
             }
         }
     }
+
+    fn reset(&mut self) {
+        // Re-arm, don't clear: unconfirmed events return to Unselected for re-delivery.
+        self.core.reset();
+        self.reader.reset();
+        self.writer.reset();
+    }
 }
 
 #[cfg(test)]
@@ -309,10 +316,7 @@ struct SessionTeardown<'a, T: Transport> {
 
 impl<T: Transport> Drop for SessionTeardown<'_, T> {
     fn drop(&mut self) {
-        // Re-arm, don't clear: unconfirmed events return to Unselected for re-delivery.
-        self.task.core.reset();
-        self.task.reader.reset();
-        self.task.writer.reset();
+        self.task.reset();
     }
 }
 
