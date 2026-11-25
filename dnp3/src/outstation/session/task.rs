@@ -6,7 +6,7 @@
 
 use std::future::Future;
 use std::ops::ControlFlow;
-use std::pin::{pin, Pin};
+use std::pin::pin;
 
 use tracing::Instrument;
 
@@ -138,14 +138,11 @@ impl<T: Transport> OutstationTask<T> {
     ///
     /// Writes and idle waits stay cancellable by `cancel` and stop messages, while an in-flight
     /// `handle_input` always finishes before the session switches connections or shuts down.
-    pub(crate) async fn run_until<F, R>(
+    pub(crate) async fn run_until<R>(
         &mut self,
         io: &mut PhysLayer,
-        cancel: F,
-    ) -> Result<R, RunError>
-    where
-        F: Future<Output = R>,
-    {
+        cancel: impl Future<Output = R>,
+    ) -> Result<R, RunError> {
         let mut guard = std::mem::DropGuard::new(self, Self::reset);
         let cancel = pin!(cancel);
         guard.run_session(io, cancel).await
@@ -156,18 +153,14 @@ impl<T: Transport> OutstationTask<T> {
         self.driver.control.next_message().await
     }
 
-    async fn run_session<F, R>(
+    async fn run_session<R>(
         &mut self,
         io: &mut PhysLayer,
-        mut cancel: Pin<&mut F>,
-    ) -> Result<R, RunError>
-    where
-        F: Future<Output = R>,
-    {
+        mut cancel: impl Future<Output = R> + Unpin,
+    ) -> Result<R, RunError> {
         loop {
             let span = self.confirm_wait_span();
-            if let ControlFlow::Break(val) =
-                self.run_step(io, cancel.as_mut()).instrument(span).await?
+            if let ControlFlow::Break(val) = self.run_step(io, &mut cancel).instrument(span).await?
             {
                 return Ok(val);
             }
@@ -186,14 +179,11 @@ impl<T: Transport> OutstationTask<T> {
         }
     }
 
-    async fn run_step<F, R>(
+    async fn run_step<R>(
         &mut self,
         io: &mut PhysLayer,
-        cancel: Pin<&mut F>,
-    ) -> Result<ControlFlow<R>, RunError>
-    where
-        F: Future<Output = R>,
-    {
+        cancel: impl Future<Output = R>,
+    ) -> Result<ControlFlow<R>, RunError> {
         match self.core.poll() {
             Output::Transmit(tx) => or_cancel(cancel, self.driver.transmit(io, tx)).await,
             Output::Wait {
@@ -352,14 +342,10 @@ impl TaskControl {
 ///
 /// `fut` must commit any post-I/O side effects (such as `Transmit::sent` or `reader.pop`) without
 /// another `.await`, so `cancel` cannot drop it after I/O completes and before the commit.
-async fn or_cancel<F, Fut, R, T>(
-    cancel: Pin<&mut F>,
-    fut: Fut,
-) -> Result<ControlFlow<R, T>, RunError>
-where
-    F: Future<Output = R>,
-    Fut: Future<Output = Result<T, RunError>>,
-{
+async fn or_cancel<R, T>(
+    cancel: impl Future<Output = R>,
+    fut: impl Future<Output = Result<T, RunError>>,
+) -> Result<ControlFlow<R, T>, RunError> {
     tokio::select! {
         biased;
         val = cancel => Ok(ControlFlow::Break(val)),
