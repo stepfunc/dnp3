@@ -8,7 +8,7 @@ use xxhash_rust::xxh64::xxh64;
 
 use super::context::SessionContext;
 use super::phase::{Answer, SolTx};
-use super::response::{Prepared, ResponseSlot};
+use super::response::ResponseSlot;
 use super::state::{FragmentType, Intake, LastValidRequest, Received};
 use crate::app::parse::parser::{HeaderCollection, Request};
 use crate::app::{
@@ -16,7 +16,6 @@ use crate::app::{
     ResponseHeader, Sequence,
 };
 use crate::decode::AppDecodeLevel;
-use crate::outstation::database::DatabaseHandle;
 use crate::outstation::read_log::Tracing;
 use crate::transport::{FragmentAddr, FragmentInfo, TransportData};
 use crate::util::clock::MonotonicClock;
@@ -201,8 +200,8 @@ impl<C: MonotonicClock> SessionContext<C> {
                 // repeated READ. We deliberately answer it as a new READ instead: the fresh
                 // response carries current values, and events that were never confirmed are still
                 // buffered, so they are reported again.
-                let response = format_first_read_response(sol, &mut self.db, seq, objects);
-                let tx = self.publish_solicited(info.addr, response);
+                let iin2 = self.db.select(&objects);
+                let tx = self.publish_read_response(sol, info.addr, true, seq, iin2);
                 self.state.last_valid_request = Some(LastValidRequest::new(seq, hash));
                 Answer::Respond(tx)
             }
@@ -266,60 +265,50 @@ impl<C: MonotonicClock> SessionContext<C> {
         to: FragmentAddr,
         seq: Sequence,
     ) -> SolTx {
-        let response = format_read_response(sol, &mut self.db, false, seq, Iin2::default());
-        self.publish_solicited(to, response)
+        self.publish_read_response(sol, to, false, seq, Iin2::default())
     }
 
     /// If a deferred READ is pending, select it and publish its first response fragment into `sol`.
     pub(super) fn stage_deferred_read(&mut self, sol: &mut ResponseSlot) -> Option<SolTx> {
         let deferred = self.state.deferred_read.select(&mut self.db)?;
         tracing::info!("handling deferred READ request");
-        let response = format_read_response(sol, &mut self.db, true, deferred.seq, deferred.iin2);
-        let tx = self.publish_solicited(deferred.info.addr, response);
+        let tx =
+            self.publish_read_response(sol, deferred.info.addr, true, deferred.seq, deferred.iin2);
         self.state.last_valid_request = Some(LastValidRequest::new(deferred.seq, deferred.hash));
         Some(tx)
     }
-}
 
-fn format_first_read_response<'a>(
-    sol: &'a mut ResponseSlot,
-    database: &mut DatabaseHandle,
-    seq: Sequence,
-    object_headers: HeaderCollection,
-) -> Prepared<'a> {
-    let iin2 = database.select(&object_headers);
-    format_read_response(sol, database, true, seq, iin2)
-}
-
-fn format_read_response<'a>(
-    sol: &'a mut ResponseSlot,
-    database: &mut DatabaseHandle,
-    fir: bool,
-    seq: Sequence,
-    iin2: Iin2,
-) -> Prepared<'a> {
-    let (result, staged) = sol.build(|cursor| Ok(database.write_response_headers(cursor)));
-    let header = match result {
-        Ok(info) if !info.complete && !staged.has_objects() => {
-            tracing::error!("unable to make progress writing a READ response");
-            database.reset();
-            ResponseHeader::new(
-                ControlField::response(seq, fir, true, false),
+    fn publish_read_response(
+        &mut self,
+        sol: &mut ResponseSlot,
+        to: FragmentAddr,
+        fir: bool,
+        seq: Sequence,
+        iin2: Iin2,
+    ) -> SolTx {
+        let (result, staged) = sol.build(|cursor| Ok(self.db.write_response_headers(cursor)));
+        let header = match result {
+            Ok(info) if !info.complete && !staged.has_objects() => {
+                tracing::error!("unable to make progress writing a READ response");
+                self.db.reset();
+                ResponseHeader::new(
+                    ControlField::response(seq, fir, true, false),
+                    ResponseFunction::Response,
+                    Iin::default() | Iin2::PARAMETER_ERROR,
+                )
+            }
+            Ok(info) => ResponseHeader::new(
+                ControlField::response(seq, fir, info.complete, info.need_confirm()),
                 ResponseFunction::Response,
-                Iin::default() | Iin2::PARAMETER_ERROR,
-            )
-        }
-        Ok(info) => ResponseHeader::new(
-            ControlField::response(seq, fir, info.complete, info.need_confirm()),
-            ResponseFunction::Response,
-            Iin::default() | iin2,
-        ),
-        Err(err) => {
-            tracing::error!("unable to write a READ response: {err:?}");
-            ResponseHeader::parameter_error(seq)
-        }
-    };
-    staged.with_header(header)
+                Iin::default() | iin2,
+            ),
+            Err(err) => {
+                tracing::error!("unable to write a READ response: {err:?}");
+                ResponseHeader::parameter_error(seq)
+            }
+        };
+        self.publish_solicited(to, staged.with_header(header))
+    }
 }
 
 impl From<ObjectParseError> for Iin2 {
