@@ -6,7 +6,7 @@
 
 //! Sans-I/O outstation protocol core and thin Tokio driver.
 //!
-//! [`OutstationCore`] owns all application-layer protocol state, response buffers,
+//! [`OutstationCore`](self::core::OutstationCore) owns all application-layer protocol state, response buffers,
 //! handler callbacks, and its [`MonotonicClock`](crate::util::clock::MonotonicClock).
 //! [`OutstationTask`](crate::outstation::session::task::OutstationTask) is a thin Tokio driver
 //! that wires it to a [`Transport`](crate::transport::Transport),
@@ -28,5 +28,3 @@ pub(crate) mod task;
 mod tests;
 mod unsolicited;
 mod write;
-
-use self::core::{Outbound, Output, OutstationCore};

@@ -113,7 +113,7 @@ impl Phase {
     }
 }
 
-/// Outcome of [`Phase::poll`] for [`super::OutstationCore`] to wrap into [`super::Output`].
+/// Outcome of [`Phase::poll`] for [`super::core::OutstationCore`] to wrap into [`super::core::Output`].
 pub(super) enum PollOutcome<'a> {
     Wait(Option<MonotonicTime>),
     Transmit {

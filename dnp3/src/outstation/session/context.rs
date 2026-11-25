@@ -17,7 +17,7 @@ use crate::phys::PhysAddr;
 use crate::transport::FragmentAddr;
 use crate::util::clock::MonotonicClock;
 
-/// Protocol state, database handle, handlers, and clock owned by [`super::OutstationCore`]
+/// Protocol state, database handle, handlers, and clock owned by [`super::core::OutstationCore`]
 /// separately from its active [`super::phase::Phase`] and response [`super::response::Slots`].
 pub(super) struct SessionContext<C: MonotonicClock> {
     pub(super) config: SessionConfig,
