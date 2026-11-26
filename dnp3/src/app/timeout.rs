@@ -92,10 +92,6 @@ impl Timeout {
         Ok(Self(value))
     }
 
-    pub(crate) const fn as_duration(self) -> Duration {
-        self.0
-    }
-
     pub(crate) fn deadline_from_now(self) -> tokio::time::Instant {
         crate::util::deadline::deadline(tokio::time::Instant::now(), self.0)
     }

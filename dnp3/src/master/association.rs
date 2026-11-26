@@ -455,7 +455,7 @@ impl Association {
             PollMap::new(),
             config
                 .keep_alive_timeout
-                .map(|delay| deadline(now, delay.as_duration())),
+                .map(|delay| deadline(now, delay.into())),
         )
     }
 
@@ -510,7 +510,7 @@ impl Association {
             self.next_link_status_deadline = self
                 .config
                 .keep_alive_timeout
-                .map(|delay| deadline(now, delay.as_duration()));
+                .map(|delay| deadline(now, delay.into()));
         }
     }
 
@@ -697,7 +697,7 @@ impl Association {
         self.next_link_status_deadline = self
             .config
             .keep_alive_timeout
-            .map(|timeout| deadline(Instant::now(), timeout.as_duration()))
+            .map(Timeout::deadline_from_now)
     }
 
     pub(crate) async fn handle_unsolicited_response(&mut self, response: &Response<'_>) -> bool {

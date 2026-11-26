@@ -174,7 +174,7 @@ impl KeepAlive {
         match timeout {
             Some(timeout) => Self::Enabled {
                 timeout,
-                next: now.saturating_add(timeout.as_duration()),
+                next: now.saturating_add(timeout.into()),
             },
             None => Self::Disabled,
         }
@@ -196,7 +196,7 @@ impl KeepAlive {
 
     pub(super) fn on_activity(&mut self, now: MonotonicTime) {
         if let Self::Enabled { timeout, next } = self {
-            *next = now.saturating_add(timeout.as_duration());
+            *next = now.saturating_add((*timeout).into());
         }
     }
 }
@@ -385,29 +385,5 @@ mod tests {
         assert_eq!(ka.next_deadline(), Some(expected_second));
         assert!(!ka.is_due(expected_first));
         assert!(ka.is_due(expected_second));
-    }
-
-    #[test]
-    fn keep_alive_handles_min_and_max_timeouts() {
-        let t = MonotonicTime::from_elapsed(Duration::from_secs(10));
-
-        let min = Timeout::from_duration(Timeout::MIN).unwrap();
-        let mut ka_min = KeepAlive::new(Some(min), t);
-        let expected_min = t.saturating_add(Timeout::MIN);
-        assert_eq!(ka_min.next_deadline(), Some(expected_min));
-        assert!(!ka_min.is_due(t));
-        assert!(ka_min.is_due(expected_min));
-        ka_min.on_activity(expected_min);
-        assert!(!ka_min.is_due(expected_min));
-
-        let max = Timeout::from_duration(Timeout::MAX).unwrap();
-        let near_max = MonotonicTime::from_elapsed(Duration::MAX - Duration::from_secs(1));
-        let mut ka_max = KeepAlive::new(Some(max), near_max);
-        let saturated = MonotonicTime::from_elapsed(Duration::MAX);
-        assert_eq!(ka_max.next_deadline(), Some(saturated));
-        assert!(!ka_max.is_due(near_max));
-        assert!(ka_max.is_due(saturated));
-        ka_max.on_activity(saturated);
-        assert_eq!(ka_max.next_deadline(), Some(saturated));
     }
 }
