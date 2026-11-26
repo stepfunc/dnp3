@@ -150,47 +150,10 @@ impl<T: Transport> MasterTask<T> {
 
         // read responses until we get a FIN or an error occurs
         loop {
-            let deadline = Deadline::from_now(self.session.associations.get_timeout(dest.link)?);
-
-            let action = loop {
-                let (source, response) = match self
-                    .session
-                    .next_event(io, &mut self.reader, Some(deadline.at))
-                    .await?
-                {
-                    Event::Timeout => return Err(deadline.expired()),
-                    Event::Malformed(source, err) => {
-                        if fails_task(source, dest) {
-                            return Err(err.into());
-                        }
-                        continue;
-                    }
-                    Event::Fragment(source, response) => (source, response),
-                    Event::Message | Event::LinkLayer(_) | Event::Nothing => continue,
-                };
-
-                if let Some(response) = self
-                    .session
-                    .filter_solicited(io, &mut self.writer, dest, seq, source, response)
-                    .await?
-                {
-                    break self
-                        .session
-                        .process_read_response(
-                            dest,
-                            is_first,
-                            seq,
-                            task,
-                            &mut outcome,
-                            io,
-                            &mut self.writer,
-                            response,
-                        )
-                        .await?;
-                }
-            };
-
-            match action {
+            match self
+                .read_next_fragment(io, dest, is_first, seq, task, &mut outcome)
+                .await?
+            {
                 // read task complete
                 ReadResponseAction::Complete => {
                     outcome.result(task)?;
@@ -205,6 +168,53 @@ impl<T: Transport> MasterTask<T> {
                         .get_mut(dest.link)?
                         .increment_seq();
                 }
+            }
+        }
+    }
+
+    async fn read_next_fragment(
+        &mut self,
+        io: &mut PhysLayer,
+        dest: FragmentAddr,
+        is_first: bool,
+        seq: Sequence,
+        task: &mut ReadTask,
+        outcome: &mut ReadOutcome,
+    ) -> Result<ReadResponseAction, TaskErrorKind> {
+        let deadline = Deadline::from_now(self.session.associations.get_timeout(dest.link)?);
+
+        loop {
+            let (source, response) = match self
+                .session
+                .next_event(io, &mut self.reader, Some(deadline.at))
+                .await?
+            {
+                Event::Timeout => return Err(deadline.expired()),
+                Event::Malformed(source, err) if fails_task(source, dest) => return Err(err.into()),
+                Event::Fragment(source, response) => (source, response),
+                Event::Malformed(..) | Event::Message | Event::LinkLayer(_) | Event::Nothing => {
+                    continue;
+                }
+            };
+
+            if let Some(response) = self
+                .session
+                .filter_solicited(io, &mut self.writer, dest, seq, source, response)
+                .await?
+            {
+                return self
+                    .session
+                    .process_read_response(
+                        dest,
+                        is_first,
+                        seq,
+                        task,
+                        outcome,
+                        io,
+                        &mut self.writer,
+                        response,
+                    )
+                    .await;
             }
         }
     }

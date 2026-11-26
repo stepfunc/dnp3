@@ -30,6 +30,53 @@ impl MasterSession {
             }
         }
     }
+
+    async fn poll_non_read_response<'a, 'b, T: Transport>(
+        &'b mut self,
+        io: &mut PhysLayer,
+        reader: &'a mut TransportReader<T>,
+        writer: &mut TransportWriter<T>,
+        dest: FragmentAddr,
+        seq: Sequence,
+        deadline: Deadline,
+    ) -> Result<Option<(&'b mut Association, Response<'a>)>, TaskErrorKind> {
+        let (source, response) = match self.next_event(io, reader, Some(deadline.at)).await? {
+            Event::Timeout => return Err(deadline.expired()),
+            Event::Malformed(source, err) if fails_task(source, dest) => return Err(err.into()),
+            Event::Fragment(source, response) => (source, response),
+            Event::Malformed(..) | Event::Message | Event::LinkLayer(_) | Event::Nothing => {
+                return Ok(None);
+            }
+        };
+
+        let Some(response) = self
+            .filter_solicited(io, writer, dest, seq, source, response)
+            .await?
+        else {
+            return Ok(None);
+        };
+
+        if !response.header.control.is_fir_and_fin() {
+            return Err(TaskErrorKind::MultiFragmentResponse);
+        }
+
+        // a response for a removed association isn't processed, so it isn't confirmed
+        self.associations.get_mut(dest.link)?;
+
+        // confirm before handling the response, so the confirm precedes any next request
+        if response.header.control.con && response.objects.is_ok() {
+            self.send_confirm(io, dest, ControlField::request(seq), writer)
+                .await?;
+        }
+
+        let association = self.associations.get_mut(dest.link)?;
+        association.process_iin(response.header.iin);
+        if response.header.iin.has_bad_request_error() {
+            return Err(TaskErrorKind::RejectedByIin2(response.header.iin));
+        }
+
+        Ok(Some((association, response)))
+    }
 }
 
 impl<T: Transport> MasterTask<T> {
@@ -59,87 +106,50 @@ impl<T: Transport> MasterTask<T> {
         dest: FragmentAddr,
         task: NonReadTask,
     ) -> Result<NextStep, TaskErrorKind> {
-        let err = 'failed: {
-            let seq = match self
-                .session
-                .send_request(io, dest, &task, &mut self.writer)
-                .await
-            {
-                Ok(seq) => seq,
-                Err(err) => break 'failed err,
-            };
-
-            let deadline = match self.session.associations.get_timeout(dest.link) {
-                Ok(timeout) => Deadline::from_now(timeout),
-                Err(err) => break 'failed err,
-            };
-
-            loop {
-                let (source, response) = match self
-                    .session
-                    .next_event(io, &mut self.reader, Some(deadline.at))
-                    .await
-                {
-                    Err(err) => break 'failed err.into(),
-                    Ok(Event::Timeout) => break 'failed deadline.expired(),
-                    Ok(Event::Malformed(source, err)) => {
-                        if fails_task(source, dest) {
-                            break 'failed err.into();
-                        }
-                        continue;
-                    }
-                    Ok(Event::Fragment(source, response)) => (source, response),
-                    Ok(Event::Message | Event::LinkLayer(_) | Event::Nothing) => continue,
-                };
-
-                let response = match self
-                    .session
-                    .filter_solicited(io, &mut self.writer, dest, seq, source, response)
-                    .await
-                {
-                    Err(err) => break 'failed err.into(),
-                    Ok(None) => continue,
-                    Ok(Some(response)) => response,
-                };
-
-                if !response.header.control.is_fir_and_fin() {
-                    break 'failed TaskErrorKind::MultiFragmentResponse;
-                }
-
-                // a response for a removed association isn't processed, so it isn't confirmed
-                if let Err(err) = self.session.associations.get_mut(dest.link) {
-                    break 'failed err.into();
-                }
-
-                // confirm before handling the response, so the confirm precedes any next request
-                if response.header.control.con && response.objects.is_ok() {
-                    if let Err(err) = self
-                        .session
-                        .send_confirm(io, dest, ControlField::request(seq), &mut self.writer)
-                        .await
-                    {
-                        break 'failed err.into();
-                    }
-                }
-
-                let association = match self.session.associations.get_mut(dest.link) {
-                    Ok(association) => association,
-                    Err(err) => break 'failed err.into(),
-                };
-
-                association.process_iin(response.header.iin);
-                if response.header.iin.has_bad_request_error() {
-                    break 'failed TaskErrorKind::RejectedByIin2(response.header.iin);
-                }
-
-                return match task.handle_response(association, response).await? {
-                    Some(next) => Ok(NextStep::Continue(next)),
-                    None => Ok(NextStep::Complete(seq)),
-                };
-            }
+        let (seq, deadline) = match self.send_non_read_request(io, dest, &task).await {
+            Ok(started) => started,
+            Err(err) => return Err(self.fail_non_read(dest, task, err)),
         };
 
+        loop {
+            match self
+                .session
+                .poll_non_read_response(io, &mut self.reader, &mut self.writer, dest, seq, deadline)
+                .await
+            {
+                Ok(Some((association, response))) => {
+                    return match task.handle_response(association, response).await? {
+                        Some(next) => Ok(NextStep::Continue(next)),
+                        None => Ok(NextStep::Complete(seq)),
+                    };
+                }
+                Ok(None) => {}
+                Err(err) => return Err(self.fail_non_read(dest, task, err)),
+            }
+        }
+    }
+
+    async fn send_non_read_request(
+        &mut self,
+        io: &mut PhysLayer,
+        dest: FragmentAddr,
+        task: &NonReadTask,
+    ) -> Result<(Sequence, Deadline), TaskErrorKind> {
+        let seq = self
+            .session
+            .send_request(io, dest, task, &mut self.writer)
+            .await?;
+        let deadline = Deadline::from_now(self.session.associations.get_timeout(dest.link)?);
+        Ok((seq, deadline))
+    }
+
+    fn fail_non_read(
+        &mut self,
+        dest: FragmentAddr,
+        task: NonReadTask,
+        err: TaskErrorKind,
+    ) -> TaskErrorKind {
         task.on_task_error(self.session.associations.get_mut(dest.link).ok(), err);
-        Err(err)
+        err
     }
 }
