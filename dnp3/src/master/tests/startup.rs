@@ -344,7 +344,7 @@ async fn detect_restart_in_read_response() {
         // Spawn a task that sends an integrity scan
         let mut assoc = harness.association.clone();
         let read_task =
-            tokio::spawn(async move { assoc.read(ReadRequest::ClassScan(Classes::all())).await });
+            tokio::spawn(async move { assoc.read(ReadRequest::class_scan(Classes::all())).await });
 
         // expect the integrity scan and respond with DEVICE_RESTART
         harness

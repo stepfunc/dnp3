@@ -17,13 +17,16 @@ may need only the occasional integrity poll.
 
 ## Read requests
 
-Polls and one-time reads both take a request that says what to read. It's a `ReadRequest` in Rust and a `Request` in the
-bindings, and it can ask for:
+Polls and one-time reads both take a `ReadRequest` that says what to read. It can ask for:
 
 * Classes (any of 0, 1, 2, 3)
 * A range of points of a variation
 * All the points of a variation
+* A limited count of a variation
 * [Device attributes](./attributes.mdx)
+
+A `ReadRequest` holds only what a READ can carry. Requests that freeze or write objects are a `Request`, sent with
+`send_and_expect_empty_response`.
 
 ## Polls
 

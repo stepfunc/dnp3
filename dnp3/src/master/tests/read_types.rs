@@ -114,7 +114,7 @@ async fn periodic_poll_reports_periodic_poll() {
         let mut association = harness.association.clone();
         let _poll = association
             .add_poll(
-                ReadRequest::ClassScan(Classes::class0()),
+                ReadRequest::class_scan(Classes::class0()),
                 std::time::Duration::from_secs(1),
             )
             .await
@@ -146,7 +146,7 @@ async fn single_read_reports_single_poll() {
         let mut association = harness.association.clone();
         let read = tokio::spawn(async move {
             association
-                .read(ReadRequest::ClassScan(Classes::class0()))
+                .read(ReadRequest::class_scan(Classes::class0()))
                 .await
         });
         harness
@@ -178,7 +178,10 @@ async fn single_read_with_custom_handler_reports_single_poll_to_that_handler_onl
         let mut association = harness.association.clone();
         let read = tokio::spawn(async move {
             association
-                .read_with_handler(ReadRequest::ClassScan(Classes::class0()), Box::new(handler))
+                .read_with_handler(
+                    ReadRequest::class_scan(Classes::class0()),
+                    Box::new(handler),
+                )
                 .await
         });
         harness

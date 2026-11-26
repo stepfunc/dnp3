@@ -685,7 +685,7 @@ fn class_3() -> Classes {
 async fn add_class_3_poll(harness: &mut TestHarness, period: Duration) -> PollHandle {
     harness
         .association
-        .add_poll(ReadRequest::ClassScan(class_3()), period)
+        .add_poll(ReadRequest::class_scan(class_3()), period)
         .await
         .unwrap()
 }

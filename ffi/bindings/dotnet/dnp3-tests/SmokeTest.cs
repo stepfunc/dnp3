@@ -219,7 +219,7 @@ namespace dnp3_tests
                 await connected.Task.WaitAsync(WaitTimeout);
 
                 // a class 0 read returns the outstation's values
-                await channel.Read(association, Request.ClassRequest(true, false, false, false)).WaitAsync(WaitTimeout);
+                await channel.Read(association, ReadRequest.ClassScan(true, false, false, false)).WaitAsync(WaitTimeout);
                 Assert.AreEqual(true, readHandler.BinaryValue);
                 Assert.AreEqual(42.0, readHandler.AnalogValue);
 

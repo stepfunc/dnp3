@@ -266,7 +266,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
 
     let association_information_interface = define_association_information(lib, shared)?;
 
-    let request_class = crate::master::request::define(lib, shared)?;
+    let requests = crate::master::request::define(lib, shared)?;
 
     let add_association_method = lib
         .define_method("add_association", master_channel_class.clone())?
@@ -342,7 +342,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
 
     let add_poll_method = lib.define_method("add_poll", master_channel_class.clone())?
         .param("id", association_id.clone(), "Association on which to add the poll")?
-        .param("request", request_class.declaration(), "Request to perform")?
+        .param("request", requests.read_request.declaration(), "Request to perform")?
         .param("period", DurationType::Milliseconds, "Period to wait between each poll (in ms)")?
         .returns(poll_id.clone(), "Id of the created poll")?
         .fails_with(shared.error_type.clone())?
@@ -398,7 +398,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
     let read_async = lib
         .define_future_method("read", master_channel_class.clone(), read_callback.clone())?
         .param("association",association_id.clone(), "Association on which to perform the read")?
-        .param("request",request_class.declaration(), "Request to send")?
+        .param("request",requests.read_request.declaration(), "Request to send")?
         .fails_with(shared.error_type.clone())?
         .doc(
             doc("Perform a read on the association.")
@@ -446,7 +446,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
         )?
         .param(
             "headers",
-            request_class.declaration(),
+            requests.request.declaration(),
             "Headers that will be contained in the request",
         )?
         .fails_with(shared.error_type.clone())?
@@ -460,7 +460,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
     let read_with_handler_async = lib
         .define_future_method("read_with_handler", master_channel_class.clone(), read_callback)?
         .param("association",association_id.clone(), "Association on which to perform the read")?
-        .param("request",request_class.declaration(), "Request to send")?
+        .param("request",requests.read_request.declaration(), "Request to send")?
         .param("handler",read_handler, "Custom {interface:read_handler} to send the data to")?
         .fails_with(shared.error_type.clone())?
         .doc(

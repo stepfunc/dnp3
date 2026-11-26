@@ -36,7 +36,7 @@ use crate::master::tasks::time::PendingTimeSync;
 use crate::master::tasks::{OneShot, QueuedTask, Task};
 use crate::master::{
     AuthKey, BlockNumber, DeadBandHeader, DirReadConfig, FileCredentials, FileError, FileHandle,
-    FileInfo, FileMode, FileReadConfig, FileReader, Headers, OpenFile, ReadHandler,
+    FileInfo, FileMode, FileReadConfig, FileReader, OpenFile, ReadHandler, Request,
 };
 use crate::phys::PhysAddr;
 use crate::transport::FragmentAddr;
@@ -310,10 +310,10 @@ impl AssociationHandle {
     pub async fn send_and_expect_empty_response(
         &mut self,
         function: FunctionCode,
-        headers: Headers,
+        request: Request,
     ) -> Result<(), TaskError> {
         let (promise, rx) = Promise::one_shot();
-        let task = OneShot::new(EmptyResponseRequest::new(function, headers), promise);
+        let task = OneShot::new(EmptyResponseRequest::new(function, request), promise);
         self.send_task(task).await?;
         await_result(rx).await
     }

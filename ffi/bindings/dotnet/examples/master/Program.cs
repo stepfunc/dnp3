@@ -73,7 +73,7 @@ class ExampleMaster
 
             // create an event poll
             // ANCHOR: add_poll
-            var poll = channel.AddPoll(association, Request.ClassRequest(false, true, true, true), TimeSpan.FromSeconds(5));
+            var poll = channel.AddPoll(association, ReadRequest.ClassScan(false, true, true, true), TimeSpan.FromSeconds(5));
             // ANCHOR_END: add_poll
 
             // enable communications
@@ -237,23 +237,20 @@ class ExampleMaster
                 }
             case "rao":
                 {
-                    var request = new Request();
-                    request.AddAllObjectsHeader(Variation.Group40Var0);
+                    var request = ReadRequest.AllObjects(Variation.Group40Var0);
                     await channel.Read(association, request);
                     return Success;
                 }
             case "rmo":
                 {
-                    var request = new Request();
-                    request.AddAllObjectsHeader(Variation.Group10Var0);
+                    var request = ReadRequest.AllObjects(Variation.Group10Var0);
                     request.AddAllObjectsHeader(Variation.Group40Var0);
                     await channel.Read(association, request);
                     return Success;
                 }
             case "rco":
                 {
-                    var request = new Request();
-                    request.AddAllObjectsHeader(Variation.Group20Var0);
+                    var request = ReadRequest.AllObjects(Variation.Group20Var0);
                     request.AddAllObjectsHeader(Variation.Group21Var0);
                     await channel.Read(association, request);
                     return Success;
@@ -334,8 +331,7 @@ class ExampleMaster
             case "rda":
                 {
                     // ANCHOR: read_attributes
-                    var request = new Request();
-                    request.AddSpecificAttribute(AttributeVariations.AllAttributesRequest, 0);
+                    var request = ReadRequest.SpecificAttribute(AttributeVariations.AllAttributesRequest, 0);
                     await channel.Read(association, request);
                     // ANCHOR_END: read_attributes
                     return Success;
@@ -351,8 +347,7 @@ class ExampleMaster
                 }
             case "ral":
                 {
-                    var request = new Request();
-                    request.AddSpecificAttribute(AttributeVariations.ListOfVariations, 0);
+                    var request = ReadRequest.SpecificAttribute(AttributeVariations.ListOfVariations, 0);
                     await channel.Read(association, request);
                     return Success;
                 }

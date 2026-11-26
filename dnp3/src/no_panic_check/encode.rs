@@ -26,7 +26,7 @@
 //! - [`read_request`]: `ReadRequest::format`, which periodic polls and single reads use
 //! - [`command_headers`]: `CommandHeaders::write`, for g12v1 and g41v1 to g41v4 with 8 and
 //!   16-bit indexes, which commands with and without acknowledgment use
-//! - [`one_shot`]: `OneShotRequest::write` for deadbands, generic requests (`Headers`, with read
+//! - [`one_shot`]: `OneShotRequest::write` for deadbands, generic requests (`Request`, with read
 //!   headers, freeze intervals and attributes), restarts and the file requests
 //! - [`auto_task`]: `ResponseTask::write` for the automatic tasks (class scans for startup
 //!   integrity and event scans are `Classes::write`, reached through [`read_request`])
@@ -70,7 +70,7 @@ use crate::master::tasks::restart::RestartType;
 use crate::master::tasks::{OneShotRequest, ResponseTask};
 use crate::master::{
     AuthKey, BlockNumber, Classes, CommandBuilder, CommandHeaders, CommandSupport, DeadBandHeader,
-    EventClasses, FileCredentials, FileHandle, FileMode, Headers, ReadHeader, ReadRequest,
+    EventClasses, FileCredentials, FileHandle, FileMode, ReadRequest, Request,
 };
 use crate::outstation::FreezeInterval;
 use crate::transport::real::sequence::Sequence;
@@ -228,14 +228,17 @@ fn variation(source: &mut Source) -> Variation {
     Variation::lookup(source.u8(), source.u8()).unwrap_or(Variation::Group0(0))
 }
 
-fn read_header(source: &mut Source) -> ReadHeader {
+/// a request of one header, a device attribute read or a class scan
+fn read_start(source: &mut Source) -> ReadRequest {
     let variation = variation(source);
-    match source.u8() % 5 {
-        0 => ReadHeader::one_byte_range(variation, source.u8(), source.u8()),
-        1 => ReadHeader::two_byte_range(variation, source.u16(), source.u16()),
-        2 => ReadHeader::all_objects(variation),
-        3 => ReadHeader::one_byte_limited_count(variation, source.u8()),
-        _ => ReadHeader::two_byte_limited_count(variation, source.u16()),
+    match source.u8() % 7 {
+        0 => ReadRequest::one_byte_range(variation, source.u8(), source.u8()),
+        1 => ReadRequest::two_byte_range(variation, source.u16(), source.u16()),
+        2 => ReadRequest::all_objects(variation),
+        3 => ReadRequest::one_byte_limited_count(variation, source.u8()),
+        4 => ReadRequest::two_byte_limited_count(variation, source.u16()),
+        5 => ReadRequest::device_attribute(source.u8(), AttrSet::new(source.u8())),
+        _ => ReadRequest::class_scan(classes(source)),
     }
 }
 
@@ -248,11 +251,18 @@ fn classes(source: &mut Source) -> Classes {
 }
 
 fn read(source: &mut Source) -> ReadRequest {
-    match source.u8() % 3 {
-        0 => ReadRequest::SingleHeader(read_header(source)),
-        1 => ReadRequest::ClassScan(classes(source)),
-        _ => ReadRequest::MultipleHeader(source.many(read_header)),
-    }
+    let len = source.len();
+    (0..len).fold(read_start(source), |request, _| {
+        let variation = variation(source);
+        match source.u8() % 6 {
+            0 => request.add_all_objects(variation),
+            1 => request.add_range_8(variation, source.u8(), source.u8()),
+            2 => request.add_range_16(variation, source.u16(), source.u16()),
+            3 => request.add_one_byte_limited_count(variation, source.u8()),
+            4 => request.add_two_byte_limited_count(variation, source.u16()),
+            _ => request.add_device_attribute(source.u8(), AttrSet::new(source.u8())),
+        }
+    })
 }
 
 fn attr_value(source: &mut Source) -> OwnedAttrValue {
@@ -277,21 +287,21 @@ pub(super) fn attribute(source: &mut Source) -> OwnedAttribute {
     OwnedAttribute::new(set, source.u8(), attr_value(source))
 }
 
-fn headers(source: &mut Source) -> Headers {
+fn request(source: &mut Source) -> Request {
     let len = source.len();
-    (0..len).fold(Headers::new(), |headers, _| {
+    (0..len).fold(Request::new(), |request, _| {
         let variation = variation(source);
         match source.u8() % 7 {
-            0 => headers.add_all_objects(variation),
-            1 => headers.add_range_8(variation, source.u8(), source.u8()),
-            2 => headers.add_range_16(variation, source.u16(), source.u16()),
-            3 => headers.add_one_byte_limited_count(variation, source.u8()),
-            4 => headers.add_two_byte_limited_count(variation, source.u16()),
-            5 => headers.add_freeze_interval(FreezeInterval::new(
+            0 => request.add_all_objects(variation),
+            1 => request.add_range_8(variation, source.u8(), source.u8()),
+            2 => request.add_range_16(variation, source.u16(), source.u16()),
+            3 => request.add_one_byte_limited_count(variation, source.u8()),
+            4 => request.add_two_byte_limited_count(variation, source.u16()),
+            5 => request.add_freeze_interval(FreezeInterval::new(
                 Timestamp::new(source.u64()),
                 source.u32(),
             )),
-            _ => headers.add_attribute(attribute(source)),
+            _ => request.add_attribute(attribute(source)),
         }
     })
 }
@@ -502,7 +512,7 @@ fn encoders(source: &mut Source) {
     let dead_bands = DeadBandsRequest::new(source.many(dead_band_header));
     one_shot(&dead_bands, &mut source.buffer());
     let function = FunctionCode::from(source.u8()).unwrap_or(FunctionCode::Write);
-    let generic = EmptyResponseRequest::new(function, headers(source));
+    let generic = EmptyResponseRequest::new(function, request(source));
     one_shot(&generic, &mut source.buffer());
     let restart = if source.bool() {
         RestartType::ColdRestart

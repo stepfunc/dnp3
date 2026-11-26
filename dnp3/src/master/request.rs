@@ -83,53 +83,6 @@ pub struct Classes {
     pub events: EventClasses,
 }
 
-/// struct representing a one-byte range scan
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct OneByteRangeScan {
-    /// variation to READ
-    pub variation: Variation,
-    /// start address of the READ
-    pub start: u8,
-    /// stop address of the READ
-    pub stop: u8,
-}
-
-/// struct representing a two-byte range scan
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct TwoByteRangeScan {
-    /// variation to READ
-    pub variation: Variation,
-    /// start address of the READ
-    pub start: u16,
-    /// stop address of the READ
-    pub stop: u16,
-}
-
-/// struct representing an "all objects" (QC = 0x06) scan
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct AllObjectsScan {
-    /// variation to READ
-    pub variation: Variation,
-}
-
-/// struct representing a one-byte limited count scan
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct OneByteLimitedCountScan {
-    /// variation to READ
-    pub variation: Variation,
-    /// maximum number of events
-    pub count: u8,
-}
-
-/// struct representing a two-byte limited count scan
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct TwoByteLimitedCountScan {
-    /// variation to READ
-    pub variation: Variation,
-    /// maximum number of events
-    pub count: u16,
-}
-
 /// Represents a single header in a WRITE request to modify dead-bands within the outstation
 #[derive(Debug, Clone)]
 pub struct DeadBandHeader {
@@ -249,16 +202,7 @@ impl EventClasses {
     }
 
     pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
-        if self.class1 {
-            writer.write_all_objects_header(Variation::Group60Var2)?;
-        }
-        if self.class2 {
-            writer.write_all_objects_header(Variation::Group60Var3)?;
-        }
-        if self.class3 {
-            writer.write_all_objects_header(Variation::Group60Var4)?;
-        }
-        Ok(())
+        Classes::new(false, self).write(writer)
     }
 }
 
@@ -306,152 +250,171 @@ impl Classes {
     }
 
     pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
-        self.events.write(writer)?;
-        if self.class0 {
-            writer.write_all_objects_header(Variation::Group60Var1)?;
+        for variation in self.variations() {
+            writer.write_all_objects_header(variation)?;
         }
         Ok(())
     }
-}
 
-impl OneByteRangeScan {
-    /// construct a `OneByteRangeScan` from its fields
-    pub fn new(variation: Variation, start: u8, stop: u8) -> Self {
-        Self {
-            variation,
-            start,
-            stop,
-        }
-    }
-
-    pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
-        writer.write_range_only(self.variation, self.start, self.stop)
+    /// the class variations to read, events in classes 1, 2 and 3 first, then class 0
+    fn variations(self) -> impl Iterator<Item = Variation> {
+        [
+            (self.events.class1, Variation::Group60Var2),
+            (self.events.class2, Variation::Group60Var3),
+            (self.events.class3, Variation::Group60Var4),
+            (self.class0, Variation::Group60Var1),
+        ]
+        .into_iter()
+        .filter_map(|(enabled, variation)| enabled.then_some(variation))
     }
 }
 
-impl TwoByteRangeScan {
-    /// construct a `TwoByteRangeScan` from its fields
-    pub fn new(variation: Variation, start: u16, stop: u16) -> Self {
-        Self {
-            variation,
-            start,
-            stop,
-        }
-    }
-
-    pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
-        writer.write_range_only(self.variation, self.start, self.stop)
-    }
+/// The object headers of a READ, for one-time reads and polls
+///
+/// Only headers that are valid in a READ can be added. A request that also writes or freezes
+/// objects is a [`Request`].
+#[derive(Clone, Debug)]
+pub struct ReadRequest {
+    inner: ReadInner,
 }
 
-impl AllObjectsScan {
-    /// construct an `AllObjectsScan` from the variation
-    pub fn new(variation: Variation) -> Self {
-        Self { variation }
-    }
-
-    pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
-        writer.write_all_objects_header(self.variation)
-    }
+/// Single headers and class scans don't allocate, since polls clone their request every period
+#[derive(Clone, Debug)]
+enum ReadInner {
+    Single(ReadHeader),
+    ClassScan(Classes),
+    Multiple(Vec<ReadHeader>),
 }
 
-impl OneByteLimitedCountScan {
-    /// construct an [`OneByteLimitedCountScan`] from the variation
-    pub fn new(variation: Variation, count: u8) -> Self {
-        Self { variation, count }
+impl ReadRequest {
+    /// Read the specified classes: events in classes 1, 2 and 3, then class 0
+    pub fn class_scan(classes: Classes) -> Self {
+        Self::from_inner(ReadInner::ClassScan(classes))
     }
 
-    pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
-        writer.write_limited_count(self.variation, self.count)
-    }
-}
-
-impl TwoByteLimitedCountScan {
-    /// construct an [`TwoByteLimitedCountScan`] from the variation
-    pub fn new(variation: Variation, count: u16) -> Self {
-        Self { variation, count }
-    }
-
-    pub(crate) fn write(self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
-        writer.write_limited_count(self.variation, self.count)
-    }
-}
-
-/// Enum representing all of the allowed scan types
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum ReadHeader {
-    /// variant for one byte range scans
-    Range8(OneByteRangeScan),
-    /// variant for two byte range scans
-    Range16(TwoByteRangeScan),
-    /// variant for all objects scans
-    AllObjects(AllObjectsScan),
-    /// variant for one byte limited count
-    LimitedCount8(OneByteLimitedCountScan),
-    /// variant for two byte limited count
-    LimitedCount16(TwoByteLimitedCountScan),
-}
-
-impl ReadHeader {
-    /// construct a one byte range [`ReadHeader`]
-    pub fn one_byte_range(variation: Variation, start: u8, stop: u8) -> Self {
-        ReadHeader::Range8(OneByteRangeScan::new(variation, start, stop))
-    }
-
-    /// construct a two range [`ReadHeader`]
-    pub fn two_byte_range(variation: Variation, start: u16, stop: u16) -> Self {
-        ReadHeader::Range16(TwoByteRangeScan::new(variation, start, stop))
-    }
-
-    /// construct an all objects [`ReadHeader`]
+    /// Read every object of a variation, with an all objects header (0x06)
     pub fn all_objects(variation: Variation) -> Self {
-        ReadHeader::AllObjects(AllObjectsScan::new(variation))
+        Self::single(ReadHeader::AllObjects { variation })
     }
 
-    /// construct a one byte limited count scan [`ReadHeader`]
+    /// Read a range of a variation, with an 8-bit start/stop header (0x00)
+    pub fn one_byte_range(variation: Variation, start: u8, stop: u8) -> Self {
+        Self::single(ReadHeader::Range8 {
+            variation,
+            start,
+            stop,
+        })
+    }
+
+    /// Read a range of a variation, with a 16-bit start/stop header (0x01)
+    pub fn two_byte_range(variation: Variation, start: u16, stop: u16) -> Self {
+        Self::single(ReadHeader::Range16 {
+            variation,
+            start,
+            stop,
+        })
+    }
+
+    /// Read up to `count` objects of a variation, with an 8-bit limited count header (0x07)
     pub fn one_byte_limited_count(variation: Variation, count: u8) -> Self {
-        ReadHeader::LimitedCount8(OneByteLimitedCountScan::new(variation, count))
+        Self::single(ReadHeader::LimitedCount8 { variation, count })
     }
 
-    /// construct a two byte limited count scan [`ReadHeader`]
+    /// Read up to `count` objects of a variation, with a 16-bit limited count header (0x08)
     pub fn two_byte_limited_count(variation: Variation, count: u16) -> Self {
-        ReadHeader::LimitedCount16(TwoByteLimitedCountScan::new(variation, count))
+        Self::single(ReadHeader::LimitedCount16 { variation, count })
     }
 
-    fn variation(self) -> Variation {
-        match self {
-            ReadHeader::Range8(scan) => scan.variation,
-            ReadHeader::Range16(scan) => scan.variation,
-            ReadHeader::AllObjects(scan) => scan.variation,
-            ReadHeader::LimitedCount8(scan) => scan.variation,
-            ReadHeader::LimitedCount16(scan) => scan.variation,
-        }
+    /// Read a device attribute (group 0) of a set
+    pub fn device_attribute<T: Into<u8>>(variation: T, set: AttrSet) -> Self {
+        Self::single(ReadHeader::device_attribute(variation.into(), set))
     }
 
-    /// The variation must name an object: `Group0(0)` writes g0v0, which names none
-    fn validate(self) -> Result<(), BadEncoding> {
-        let variation = self.variation();
-        let (group, var) = variation.to_group_and_var();
-        match Variation::lookup(group, var) {
-            Some(_) => Ok(()),
-            None => Err(BadEncoding::UndefinedVariation(variation)),
-        }
+    /// Add an all objects header (0x06) with the specified variation
+    pub fn add_all_objects(self, variation: Variation) -> Self {
+        self.add(ReadHeader::AllObjects { variation })
     }
 
-    pub(crate) fn format(self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
-        match self {
-            ReadHeader::Range8(scan) => scan.write(writer),
-            ReadHeader::Range16(scan) => scan.write(writer),
-            ReadHeader::AllObjects(scan) => scan.write(writer),
-            ReadHeader::LimitedCount8(scan) => scan.write(writer),
-            ReadHeader::LimitedCount16(scan) => scan.write(writer),
+    /// Add an 8-bit start/stop header (0x00) with the specified variation
+    pub fn add_range_8(self, variation: Variation, start: u8, stop: u8) -> Self {
+        self.add(ReadHeader::Range8 {
+            variation,
+            start,
+            stop,
+        })
+    }
+
+    /// Add a 16-bit start/stop header (0x01) with the specified variation
+    pub fn add_range_16(self, variation: Variation, start: u16, stop: u16) -> Self {
+        self.add(ReadHeader::Range16 {
+            variation,
+            start,
+            stop,
+        })
+    }
+
+    /// Add an 8-bit limited count header (0x07) with the specified count and variation
+    pub fn add_one_byte_limited_count(self, variation: Variation, count: u8) -> Self {
+        self.add(ReadHeader::LimitedCount8 { variation, count })
+    }
+
+    /// Add a 16-bit limited count header (0x08) with the specified count and variation
+    pub fn add_two_byte_limited_count(self, variation: Variation, count: u16) -> Self {
+        self.add(ReadHeader::LimitedCount16 { variation, count })
+    }
+
+    /// Add a header that reads a device attribute (group 0) of a set
+    pub fn add_device_attribute<T: Into<u8>>(self, variation: T, set: AttrSet) -> Self {
+        self.add(ReadHeader::device_attribute(variation.into(), set))
+    }
+
+    pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), TaskErrorKind> {
+        match &self.inner {
+            ReadInner::Single(header) => {
+                header.validate()?;
+                header.format(writer)?;
+            }
+            ReadInner::ClassScan(classes) => classes.write(writer)?,
+            ReadInner::Multiple(headers) => {
+                for header in headers {
+                    header.validate()?;
+                }
+                for header in headers {
+                    header.format(writer)?;
+                }
+            }
         }
+        Ok(())
+    }
+
+    fn single(header: ReadHeader) -> Self {
+        Self::from_inner(ReadInner::Single(header))
+    }
+
+    fn from_inner(inner: ReadInner) -> Self {
+        Self { inner }
+    }
+
+    fn add(self, header: ReadHeader) -> Self {
+        let mut headers = match self.inner {
+            ReadInner::Single(first) => vec![first],
+            ReadInner::ClassScan(classes) => classes
+                .variations()
+                .map(|variation| ReadHeader::AllObjects { variation })
+                .collect(),
+            ReadInner::Multiple(headers) => headers,
+        };
+        headers.push(header);
+        Self::from_inner(ReadInner::Multiple(headers))
     }
 }
 
-/// Builder for write requests that hides the underlying type
+/// The object headers of a request that expects an empty response, such as a WRITE or a FREEZE
+///
+/// It holds READ-style headers, which name the objects to freeze, as well as freeze times and
+/// device attributes to write.
 #[derive(Clone, Debug, Default)]
-pub struct Headers {
+pub struct Request {
     headers: Vec<Header>,
 }
 
@@ -462,99 +425,46 @@ enum Header {
     Attribute(OwnedAttribute),
 }
 
-impl Header {
-    pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), TaskErrorKind> {
-        match self {
-            Header::Read(x) => {
-                x.format(writer)?;
-            }
-            Header::TimeAndInterval(x) => {
-                let g50v2: Group50Var2 = <FreezeInterval as Into<Group50Var2>>::into(*x);
-                writer.write_count_of_one(g50v2)?;
-            }
-            Header::Attribute(x) => {
-                writer.write_attribute(x)?;
-            }
-        }
-        Ok(())
-    }
-
-    fn validate(&self) -> Result<(), BadEncoding> {
-        match self {
-            Header::Read(x) => x.validate(),
-            Header::TimeAndInterval(_) => Ok(()),
-            Header::Attribute(x) => x.check_encodable().map_err(BadEncoding::Attribute),
-        }
-    }
-
-    #[cfg(feature = "ffi")]
-    pub(crate) fn to_read_header(&self) -> Option<ReadHeader> {
-        match self {
-            Header::Read(x) => Some(*x),
-            Header::TimeAndInterval(_) => None,
-            Header::Attribute(_) => None,
-        }
-    }
-}
-
-impl Headers {
-    /// Construct an empty set of request headers
+impl Request {
+    /// Construct a request with no headers
     pub fn new() -> Self {
         Default::default()
     }
 
-    /// Convert this generic request into a ReadRequest dropping irrelevant headers
-    #[cfg(feature = "ffi")]
-    pub fn to_read_request(&self) -> ReadRequest {
-        ReadRequest::MultipleHeader(
-            self.headers
-                .iter()
-                .filter_map(|x| x.to_read_header())
-                .collect(),
-        )
-    }
-
-    /// Add a header to the collection
-    #[cfg(feature = "ffi")]
-    pub fn push_read_header(&mut self, header: ReadHeader) {
-        self.headers.push(header.into());
-    }
-
-    /// Add a header to the collection
-    #[cfg(feature = "ffi")]
-    pub fn push_freeze_interval(&mut self, interval: FreezeInterval) {
-        self.headers.push(Header::TimeAndInterval(interval));
-    }
-
-    /// Add an attribute header to the collection
-    #[cfg(feature = "ffi")]
-    pub fn push_attr(&mut self, attr: OwnedAttribute) {
-        self.headers.push(Header::Attribute(attr));
-    }
-
     /// Add an all objects header (0x06) with the specified variation
     pub fn add_all_objects(self, variation: Variation) -> Self {
-        self.add(ReadHeader::all_objects(variation).into())
+        self.add(Header::Read(ReadHeader::AllObjects { variation }))
     }
 
-    /// Add 8-bit start/stop header (0x00) with the specified variation
+    /// Add an 8-bit start/stop header (0x00) with the specified variation
     pub fn add_range_8(self, variation: Variation, start: u8, stop: u8) -> Self {
-        self.add(ReadHeader::one_byte_range(variation, start, stop).into())
+        self.add(Header::Read(ReadHeader::Range8 {
+            variation,
+            start,
+            stop,
+        }))
     }
 
-    /// Add 16-bit start/stop header (0x01) with the specified variation
+    /// Add a 16-bit start/stop header (0x01) with the specified variation
     pub fn add_range_16(self, variation: Variation, start: u16, stop: u16) -> Self {
-        self.add(ReadHeader::two_byte_range(variation, start, stop).into())
+        self.add(Header::Read(ReadHeader::Range16 {
+            variation,
+            start,
+            stop,
+        }))
     }
 
-    /// add a one byte limited count header (0x7) with the specified count and variation
+    /// Add an 8-bit limited count header (0x07) with the specified count and variation
     pub fn add_one_byte_limited_count(self, variation: Variation, count: u8) -> Self {
-        self.add(ReadHeader::one_byte_limited_count(variation, count).into())
+        self.add(Header::Read(ReadHeader::LimitedCount8 { variation, count }))
     }
 
-    /// add a two byte limited count (0x08) header with the specified count and variation
+    /// Add a 16-bit limited count header (0x08) with the specified count and variation
     pub fn add_two_byte_limited_count(self, variation: Variation, count: u16) -> Self {
-        self.add(ReadHeader::two_byte_limited_count(variation, count).into())
+        self.add(Header::Read(ReadHeader::LimitedCount16 {
+            variation,
+            count,
+        }))
     }
 
     /// Add a limited count (0x07) with a single g50v2
@@ -596,71 +506,108 @@ impl Headers {
     }
 }
 
-/// Enum representing all of the READ request types available from the master API
-#[derive(Clone, Debug)]
-pub enum ReadRequest {
-    /// Read a single header
-    SingleHeader(ReadHeader),
-    /// Read class data
-    ClassScan(Classes),
-    /// Read multiple headers
-    MultipleHeader(Vec<ReadHeader>),
-}
-
-impl ReadRequest {
-    /// construct a `ReadRequest` from a `Classes` instance
-    pub fn class_scan(scan: Classes) -> Self {
-        Self::ClassScan(scan)
-    }
-
-    /// construct a `ReadRequest` consisting of a single one-byte range
-    pub fn one_byte_range(variation: Variation, start: u8, stop: u8) -> Self {
-        Self::SingleHeader(ReadHeader::one_byte_range(variation, start, stop))
-    }
-
-    /// construct a `ReadRequest` consisting of a single one-byte range specifying a specific device attribute
-    pub fn device_attribute<T: Into<u8>>(variation: T, set: AttrSet) -> Self {
-        Self::one_byte_range(Group0(variation.into()), set.value(), set.value())
-    }
-
-    /// construct a `ReadRequest` consisting of a single two-byte range
-    pub fn two_byte_range(variation: Variation, start: u16, stop: u16) -> Self {
-        Self::SingleHeader(ReadHeader::two_byte_range(variation, start, stop))
-    }
-
-    /// construct an all objects `ReadRequest` for a particular variation
-    pub fn all_objects(variation: Variation) -> Self {
-        Self::SingleHeader(ReadHeader::all_objects(variation))
-    }
-
-    /// construct a `ReadRequest` consisting of multiple headers
-    pub fn multiple_headers(headers: &[ReadHeader]) -> Self {
-        Self::MultipleHeader(headers.to_vec())
-    }
-
-    pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), TaskErrorKind> {
+impl Header {
+    fn format(&self, writer: &mut HeaderWriter) -> Result<(), TaskErrorKind> {
         match self {
-            ReadRequest::SingleHeader(req) => {
-                req.validate()?;
-                req.format(writer)?;
+            Header::Read(x) => {
+                x.format(writer)?;
             }
-            ReadRequest::ClassScan(req) => req.write(writer)?,
-            ReadRequest::MultipleHeader(reqs) => {
-                for req in reqs {
-                    req.validate()?;
-                }
-                for req in reqs {
-                    req.format(writer)?;
-                }
+            Header::TimeAndInterval(x) => {
+                let g50v2: Group50Var2 = <FreezeInterval as Into<Group50Var2>>::into(*x);
+                writer.write_count_of_one(g50v2)?;
+            }
+            Header::Attribute(x) => {
+                writer.write_attribute(x)?;
             }
         }
         Ok(())
     }
+
+    fn validate(&self) -> Result<(), BadEncoding> {
+        match self {
+            Header::Read(x) => x.validate(),
+            Header::TimeAndInterval(_) => Ok(()),
+            Header::Attribute(x) => x.check_encodable().map_err(BadEncoding::Attribute),
+        }
+    }
 }
 
-impl From<ReadHeader> for Header {
-    fn from(value: ReadHeader) -> Self {
-        Header::Read(value)
+/// A header that names objects without carrying values, as in a READ
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+enum ReadHeader {
+    Range8 {
+        variation: Variation,
+        start: u8,
+        stop: u8,
+    },
+    Range16 {
+        variation: Variation,
+        start: u16,
+        stop: u16,
+    },
+    AllObjects {
+        variation: Variation,
+    },
+    LimitedCount8 {
+        variation: Variation,
+        count: u8,
+    },
+    LimitedCount16 {
+        variation: Variation,
+        count: u16,
+    },
+}
+
+impl ReadHeader {
+    fn device_attribute(variation: u8, set: AttrSet) -> Self {
+        let set = set.value();
+        ReadHeader::Range8 {
+            variation: Group0(variation),
+            start: set,
+            stop: set,
+        }
+    }
+
+    fn variation(self) -> Variation {
+        match self {
+            ReadHeader::Range8 { variation, .. }
+            | ReadHeader::Range16 { variation, .. }
+            | ReadHeader::AllObjects { variation }
+            | ReadHeader::LimitedCount8 { variation, .. }
+            | ReadHeader::LimitedCount16 { variation, .. } => variation,
+        }
+    }
+
+    /// The variation must name an object: `Group0(0)` writes g0v0, which names none
+    fn validate(self) -> Result<(), BadEncoding> {
+        let variation = self.variation();
+        let (group, var) = variation.to_group_and_var();
+        match Variation::lookup(group, var) {
+            Some(_) => Ok(()),
+            None => Err(BadEncoding::UndefinedVariation(variation)),
+        }
+    }
+
+    fn format(self, writer: &mut HeaderWriter) -> Result<(), scursor::WriteError> {
+        match self {
+            ReadHeader::Range8 {
+                variation,
+                start,
+                stop,
+            } => writer.write_range_only(variation, start, stop),
+            ReadHeader::Range16 {
+                variation,
+                start,
+                stop,
+            } => writer.write_range_only(variation, start, stop),
+            ReadHeader::AllObjects { variation } => writer.write_all_objects_header(variation),
+            ReadHeader::LimitedCount8 { variation, count } => {
+                writer.write_limited_count(variation, count)
+            }
+            ReadHeader::LimitedCount16 { variation, count } => {
+                writer.write_limited_count(variation, count)
+            }
+        }
     }
 }
 
@@ -1218,8 +1165,8 @@ mod tests {
     fn attribute_with_a_variation_that_cannot_carry_a_value_leaves_the_cursor_untouched() {
         use crate::app::attr::{var, BadAttribute, OwnedAttrValue};
 
-        let headers = |variation| {
-            Headers::new()
+        let request = |variation| {
+            Request::new()
                 .add_all_objects(Variation::Group60Var1)
                 .add_attribute(OwnedAttribute::new(
                     AttrSet::Default,
@@ -1238,7 +1185,7 @@ mod tests {
             cursor.write_u8(0xAA).unwrap();
 
             assert_eq!(
-                headers(variation).write(&mut HeaderWriter::new(&mut cursor)),
+                request(variation).write(&mut HeaderWriter::new(&mut cursor)),
                 Err(BadEncoding::Attribute(BadAttribute::BadVariation(variation)).into())
             );
             assert_eq!(cursor.written(), &[0xAA]);
@@ -1246,7 +1193,7 @@ mod tests {
 
         let mut buffer = [0u8; 64];
         let mut cursor = WriteCursor::new(&mut buffer);
-        headers(var::DEVICE_MANUFACTURER_NAME)
+        request(var::DEVICE_MANUFACTURER_NAME)
             .write(&mut HeaderWriter::new(&mut cursor))
             .unwrap();
         assert_eq!(
@@ -1259,45 +1206,53 @@ mod tests {
     fn read_of_group0_var0_leaves_the_cursor_untouched() {
         const G0V0: Variation = Variation::Group0(0);
         let expected: Result<(), TaskErrorKind> = Err(BadEncoding::UndefinedVariation(G0V0).into());
-        let valid = ReadHeader::all_objects(Variation::Group60Var1);
 
-        for header in [
-            ReadHeader::all_objects(G0V0),
-            ReadHeader::one_byte_range(G0V0, 1, 2),
-            ReadHeader::two_byte_range(G0V0, 1, 2),
-            ReadHeader::one_byte_limited_count(G0V0, 1),
-            ReadHeader::two_byte_limited_count(G0V0, 1),
+        let valid = || ReadRequest::all_objects(Variation::Group60Var1);
+        for request in [
+            ReadRequest::all_objects(G0V0),
+            ReadRequest::one_byte_range(G0V0, 1, 2),
+            ReadRequest::two_byte_range(G0V0, 1, 2),
+            ReadRequest::one_byte_limited_count(G0V0, 1),
+            ReadRequest::two_byte_limited_count(G0V0, 1),
+            valid().add_all_objects(G0V0),
+            valid().add_range_8(G0V0, 1, 2),
+            valid().add_range_16(G0V0, 1, 2),
+            valid().add_one_byte_limited_count(G0V0, 1),
+            valid().add_two_byte_limited_count(G0V0, 1),
         ] {
-            for request in [
-                ReadRequest::SingleHeader(header),
-                ReadRequest::multiple_headers(&[valid, header]),
-            ] {
-                let mut buffer = [0u8; 64];
-                let mut cursor = WriteCursor::new(&mut buffer);
-                cursor.write_u8(0xAA).unwrap();
-                assert_eq!(
-                    request.format(&mut HeaderWriter::new(&mut cursor)),
-                    expected,
-                    "{request:?}"
-                );
-                assert_eq!(cursor.written(), &[0xAA], "{request:?}");
-            }
-
-            let headers = Headers::new().add(valid.into()).add(header.into());
             let mut buffer = [0u8; 64];
             let mut cursor = WriteCursor::new(&mut buffer);
             cursor.write_u8(0xAA).unwrap();
             assert_eq!(
-                headers.write(&mut HeaderWriter::new(&mut cursor)),
+                request.format(&mut HeaderWriter::new(&mut cursor)),
                 expected,
-                "{header:?}"
+                "{request:?}"
             );
-            assert_eq!(cursor.written(), &[0xAA], "{header:?}");
+            assert_eq!(cursor.written(), &[0xAA], "{request:?}");
+        }
+
+        let valid = || Request::new().add_all_objects(Variation::Group60Var1);
+        for request in [
+            valid().add_all_objects(G0V0),
+            valid().add_range_8(G0V0, 1, 2),
+            valid().add_range_16(G0V0, 1, 2),
+            valid().add_one_byte_limited_count(G0V0, 1),
+            valid().add_two_byte_limited_count(G0V0, 1),
+        ] {
+            let mut buffer = [0u8; 64];
+            let mut cursor = WriteCursor::new(&mut buffer);
+            cursor.write_u8(0xAA).unwrap();
+            assert_eq!(
+                request.write(&mut HeaderWriter::new(&mut cursor)),
+                expected,
+                "{request:?}"
+            );
+            assert_eq!(cursor.written(), &[0xAA], "{request:?}");
         }
     }
 
     mod round_trip {
-        //! READ requests and generic request headers as the master writes them, against oracles
+        //! READ requests and `Request` headers as the master writes them, against oracles
         //! that share no code with it: a hand encoding of each header (`model_request`,
         //! `model_header`, `Qualifier::bytes`, `freeze_bytes`), and for which headers the
         //! outstation accepts, the READ table `read_accepts` in
@@ -1307,13 +1262,13 @@ mod tests {
         //! Generated: for each qualifier kind, variations a READ accepts with it, less often ones
         //! it doesn't, and rarely g0v0, in any header position, with groups 0, 110 and 111 no more
         //! likely than the others; one and two-byte ranges, with single indices and the ends more
-        //! likely; one and two-byte counts, with 0, 1, 255 and the maximum more likely; single and
-        //! multiple headers (up to five), class scans of any classes, and device attribute reads;
-        //! generic headers of up to five READ headers and g50v2 freeze times, with a time and
-        //! interval of 0 or any value.
+        //! likely; one and two-byte counts, with 0, 1, 255 and the maximum more likely; READ
+        //! requests built from a single header, a class scan of any classes or a device attribute
+        //! read, then up to five headers or device attribute reads added to it; a `Request` of up
+        //! to five READ headers and g50v2 freeze times, with a time and interval of 0 or any value.
         //!
-        //! Not generated: a group and variation that isn't a `Variation`, attribute headers among
-        //! generic headers (see `app/attr.rs` and the attribute example above), and requests
+        //! Not generated: a group and variation that isn't a `Variation`, attribute headers in a
+        //! `Request` (see `app/attr.rs` and the attribute example above), and requests
         //! longer than the write buffer.
 
         use super::*;
@@ -1379,23 +1334,56 @@ mod tests {
 
         fn model_header(header: ReadHeader) -> ModelHeader {
             let (variation, qualifier) = match header {
-                ReadHeader::Range8(x) => (x.variation, Qualifier::Range8(x.start, x.stop)),
-                ReadHeader::Range16(x) => (x.variation, Qualifier::Range16(x.start, x.stop)),
-                ReadHeader::AllObjects(x) => (x.variation, Qualifier::AllObjects),
-                ReadHeader::LimitedCount8(x) => (x.variation, Qualifier::Count8(x.count)),
-                ReadHeader::LimitedCount16(x) => (x.variation, Qualifier::Count16(x.count)),
+                ReadHeader::Range8 {
+                    variation,
+                    start,
+                    stop,
+                } => (variation, Qualifier::Range8(start, stop)),
+                ReadHeader::Range16 {
+                    variation,
+                    start,
+                    stop,
+                } => (variation, Qualifier::Range16(start, stop)),
+                ReadHeader::AllObjects { variation } => (variation, Qualifier::AllObjects),
+                ReadHeader::LimitedCount8 { variation, count } => {
+                    (variation, Qualifier::Count8(count))
+                }
+                ReadHeader::LimitedCount16 { variation, count } => {
+                    (variation, Qualifier::Count16(count))
+                }
             };
             (variation.to_group_and_var(), qualifier)
         }
 
-        fn model_request(request: &ReadRequest) -> Vec<ModelHeader> {
-            match request {
-                ReadRequest::SingleHeader(header) => vec![model_header(*header)],
-                ReadRequest::MultipleHeader(headers) => {
-                    headers.iter().copied().map(model_header).collect()
+        /// How a generated READ request starts: a single header, a device attribute or classes
+        #[derive(Clone, Debug)]
+        enum Start {
+            Read(ReadOp),
+            Classes(Classes),
+        }
+
+        /// A header that a READ request starts with or adds
+        #[derive(Clone, Copy, Debug)]
+        enum ReadOp {
+            Header(ReadHeader),
+            /// the variation and set of a device attribute read
+            DeviceAttribute(u8, u8),
+        }
+
+        fn model_op(op: ReadOp) -> ModelHeader {
+            match op {
+                ReadOp::Header(header) => model_header(header),
+                ReadOp::DeviceAttribute(variation, set) => {
+                    ((0, variation), Qualifier::Range8(set, set))
                 }
+            }
+        }
+
+        fn model_request(start: &Start, ops: &[ReadOp]) -> Vec<ModelHeader> {
+            let first: Vec<ModelHeader> = match start {
+                Start::Read(op) => vec![model_op(*op)],
                 // the event classes first, then class 0
-                ReadRequest::ClassScan(classes) => [
+                Start::Classes(classes) => [
                     (classes.events.class1, (60, 2)),
                     (classes.events.class2, (60, 3)),
                     (classes.events.class3, (60, 4)),
@@ -1405,7 +1393,64 @@ mod tests {
                 .filter(|(enabled, _)| *enabled)
                 .map(|(_, group_var)| (group_var, Qualifier::AllObjects))
                 .collect(),
-            }
+            };
+            first
+                .into_iter()
+                .chain(ops.iter().copied().map(model_op))
+                .collect()
+        }
+
+        /// the request built through the public constructor and add method for each header
+        fn build_request(start: &Start, ops: &[ReadOp]) -> ReadRequest {
+            let first = match *start {
+                Start::Classes(classes) => ReadRequest::class_scan(classes),
+                Start::Read(ReadOp::DeviceAttribute(variation, set)) => {
+                    ReadRequest::device_attribute(variation, AttrSet::new(set))
+                }
+                Start::Read(ReadOp::Header(header)) => match header {
+                    ReadHeader::Range8 {
+                        variation,
+                        start,
+                        stop,
+                    } => ReadRequest::one_byte_range(variation, start, stop),
+                    ReadHeader::Range16 {
+                        variation,
+                        start,
+                        stop,
+                    } => ReadRequest::two_byte_range(variation, start, stop),
+                    ReadHeader::AllObjects { variation } => ReadRequest::all_objects(variation),
+                    ReadHeader::LimitedCount8 { variation, count } => {
+                        ReadRequest::one_byte_limited_count(variation, count)
+                    }
+                    ReadHeader::LimitedCount16 { variation, count } => {
+                        ReadRequest::two_byte_limited_count(variation, count)
+                    }
+                },
+            };
+            ops.iter().fold(first, |request, op| match *op {
+                ReadOp::DeviceAttribute(variation, set) => {
+                    request.add_device_attribute(variation, AttrSet::new(set))
+                }
+                ReadOp::Header(ReadHeader::Range8 {
+                    variation,
+                    start,
+                    stop,
+                }) => request.add_range_8(variation, start, stop),
+                ReadOp::Header(ReadHeader::Range16 {
+                    variation,
+                    start,
+                    stop,
+                }) => request.add_range_16(variation, start, stop),
+                ReadOp::Header(ReadHeader::AllObjects { variation }) => {
+                    request.add_all_objects(variation)
+                }
+                ReadOp::Header(ReadHeader::LimitedCount8 { variation, count }) => {
+                    request.add_one_byte_limited_count(variation, count)
+                }
+                ReadOp::Header(ReadHeader::LimitedCount16 { variation, count }) => {
+                    request.add_two_byte_limited_count(variation, count)
+                }
+            })
         }
 
         fn model_bytes(&((group, var), qualifier): &ModelHeader) -> Vec<u8> {
@@ -1508,36 +1553,50 @@ mod tests {
 
         fn read_header() -> impl Strategy<Value = ReadHeader> {
             prop_oneof![
-                (variation(ReadKind::Range), range(u8::MAX))
-                    .prop_map(|(v, (start, stop))| { ReadHeader::one_byte_range(v, start, stop) }),
-                (variation(ReadKind::Range), range(u16::MAX))
-                    .prop_map(|(v, (start, stop))| { ReadHeader::two_byte_range(v, start, stop) }),
-                variation(ReadKind::AllObjects).prop_map(ReadHeader::all_objects),
+                (variation(ReadKind::Range), range(u8::MAX)).prop_map(
+                    |(variation, (start, stop))| {
+                        ReadHeader::Range8 {
+                            variation,
+                            start,
+                            stop,
+                        }
+                    }
+                ),
+                (variation(ReadKind::Range), range(u16::MAX)).prop_map(
+                    |(variation, (start, stop))| ReadHeader::Range16 {
+                        variation,
+                        start,
+                        stop,
+                    }
+                ),
+                variation(ReadKind::AllObjects)
+                    .prop_map(|variation| ReadHeader::AllObjects { variation }),
                 (variation(ReadKind::Count), count(vec![0, 1, u8::MAX]))
-                    .prop_map(|(v, count)| ReadHeader::one_byte_limited_count(v, count)),
+                    .prop_map(|(variation, count)| ReadHeader::LimitedCount8 { variation, count }),
                 (
                     variation(ReadKind::Count),
                     count(vec![0, 1, 255, 256, u16::MAX])
                 )
-                    .prop_map(|(v, count)| ReadHeader::two_byte_limited_count(v, count)),
+                    .prop_map(|(variation, count)| ReadHeader::LimitedCount16 { variation, count }),
             ]
         }
 
-        fn read_request() -> impl Strategy<Value = ReadRequest> {
+        fn read_op() -> impl Strategy<Value = ReadOp> {
             prop_oneof![
-                read_header().prop_map(ReadRequest::SingleHeader),
-                prop::collection::vec(read_header(), 0..6)
-                    .prop_map(|headers| ReadRequest::multiple_headers(&headers)),
-                any::<[bool; 4]>().prop_map(|[class0, class1, class2, class3]| {
-                    ReadRequest::class_scan(Classes::new(
-                        class0,
-                        EventClasses::new(class1, class2, class3),
-                    ))
-                }),
-                (count(vec![0, 254, 255]), any::<u8>()).prop_map(|(variation, set)| {
-                    ReadRequest::device_attribute(variation, AttrSet::new(set))
-                }),
+                3 => read_header().prop_map(ReadOp::Header),
+                1 => (count(vec![0, 254, 255]), any::<u8>())
+                    .prop_map(|(variation, set)| ReadOp::DeviceAttribute(variation, set)),
             ]
+        }
+
+        fn read_request() -> impl Strategy<Value = (Start, Vec<ReadOp>)> {
+            let start = prop_oneof![
+                2 => read_op().prop_map(Start::Read),
+                1 => any::<[bool; 4]>().prop_map(|[class0, class1, class2, class3]| {
+                    Start::Classes(Classes::new(class0, EventClasses::new(class1, class2, class3)))
+                }),
+            ];
+            (start, prop::collection::vec(read_op(), 0..6))
         }
 
         #[derive(Clone, Debug)]
@@ -1558,23 +1617,29 @@ mod tests {
             ]
         }
 
-        fn add(headers: Headers, item: &Item) -> Headers {
+        fn add(request: Request, item: &Item) -> Request {
             match *item {
-                Item::Read(ReadHeader::Range8(x)) => {
-                    headers.add_range_8(x.variation, x.start, x.stop)
+                Item::Read(ReadHeader::Range8 {
+                    variation,
+                    start,
+                    stop,
+                }) => request.add_range_8(variation, start, stop),
+                Item::Read(ReadHeader::Range16 {
+                    variation,
+                    start,
+                    stop,
+                }) => request.add_range_16(variation, start, stop),
+                Item::Read(ReadHeader::AllObjects { variation }) => {
+                    request.add_all_objects(variation)
                 }
-                Item::Read(ReadHeader::Range16(x)) => {
-                    headers.add_range_16(x.variation, x.start, x.stop)
+                Item::Read(ReadHeader::LimitedCount8 { variation, count }) => {
+                    request.add_one_byte_limited_count(variation, count)
                 }
-                Item::Read(ReadHeader::AllObjects(x)) => headers.add_all_objects(x.variation),
-                Item::Read(ReadHeader::LimitedCount8(x)) => {
-                    headers.add_one_byte_limited_count(x.variation, x.count)
-                }
-                Item::Read(ReadHeader::LimitedCount16(x)) => {
-                    headers.add_two_byte_limited_count(x.variation, x.count)
+                Item::Read(ReadHeader::LimitedCount16 { variation, count }) => {
+                    request.add_two_byte_limited_count(variation, count)
                 }
                 Item::Freeze(time, interval) => {
-                    headers.add_time_and_interval(Timestamp::new(time), interval)
+                    request.add_time_and_interval(Timestamp::new(time), interval)
                 }
             }
         }
@@ -1611,11 +1676,12 @@ mod tests {
             /// variation with that qualifier. A request with a header for g0v0 in any position,
             /// which names no object, fails and writes nothing
             #[test]
-            fn read_requests_parse_to_the_headers_written(request in read_request()) {
+            fn read_requests_parse_to_the_headers_written((start, ops) in read_request()) {
+                let request = build_request(&start, &ops);
                 let mut buffer = [0; 256];
                 let mut cursor = WriteCursor::new(&mut buffer);
                 let result = request.format(&mut HeaderWriter::new(&mut cursor));
-                let model = model_request(&request);
+                let model = model_request(&start, &ops);
                 if model.iter().any(|(group_var, _)| *group_var == (0, 0)) {
                     prop_assert_eq!(
                         result,
@@ -1639,7 +1705,7 @@ mod tests {
                 prop_assert_eq!(parse_read(written), expected);
             }
 
-            /// Generic request headers are written as the READ headers and g50v2 freeze times
+            /// A `Request` is written as the READ-style headers and g50v2 freeze times
             /// they hold, in order, and each g50v2 parses back to its time and interval. Headers
             /// with a READ of g0v0 in any position fail and write nothing. Attribute headers aren't
             /// generated: `app/attr.rs` tests their values, and
@@ -1647,10 +1713,10 @@ mod tests {
             /// the header
             #[test]
             fn headers_are_written_in_order(items in prop::collection::vec(item(), 0..6)) {
-                let headers = items.iter().fold(Headers::new(), add);
+                let request = items.iter().fold(Request::new(), add);
                 let mut buffer = [0; 256];
                 let mut cursor = WriteCursor::new(&mut buffer);
-                let result = headers.write(&mut HeaderWriter::new(&mut cursor));
+                let result = request.write(&mut HeaderWriter::new(&mut cursor));
                 let g0v0 = Variation::Group0(0);
                 if items
                     .iter()

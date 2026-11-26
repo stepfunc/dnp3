@@ -9,17 +9,17 @@ use crate::app::parse::parser::Response;
 use crate::app::FunctionCode;
 use crate::master::error::TaskErrorKind;
 use crate::master::tasks::{NonReadTask, OneShot, OneShotRequest};
-use crate::master::{Headers, TaskType};
+use crate::master::{Request, TaskType};
 
 /// Any request whose response has no object headers
 pub(crate) struct EmptyResponseRequest {
     function: FunctionCode,
-    headers: Headers,
+    request: Request,
 }
 
 impl EmptyResponseRequest {
-    pub(crate) fn new(function: FunctionCode, headers: Headers) -> Self {
-        Self { function, headers }
+    pub(crate) fn new(function: FunctionCode, request: Request) -> Self {
+        Self { function, request }
     }
 }
 
@@ -45,7 +45,7 @@ impl OneShotRequest for EmptyResponseRequest {
     }
 
     fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskErrorKind> {
-        self.headers.write(writer)
+        self.request.write(writer)
     }
 
     fn parse(&self, response: Response<'_>) -> Result<(), TaskErrorKind> {

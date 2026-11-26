@@ -277,7 +277,7 @@ class SmokeTest {
 
       // a class 0 read returns the outstation's values
       channel
-          .read(association, Request.classRequest(true, false, false, false))
+          .read(association, ReadRequest.classScan(true, false, false, false))
           .toCompletableFuture()
           .get(WAIT_TIMEOUT_SECONDS, TimeUnit.SECONDS);
       assertEquals(Boolean.TRUE, readHandler.getBinaryValue());
