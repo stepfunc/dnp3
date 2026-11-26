@@ -167,7 +167,8 @@ impl TlsServerConfig {
         let name_verification = match client_subject_name {
             None => ClientNameVerification::None,
             Some(name) => {
-                let name: ServerName<'static> = name.try_into()?;
+                let name: ServerName<'static> =
+                    ServerName::try_from(name).map_err(TlsError::invalid_dns_name)?;
                 ClientNameVerification::SanOrCommonName(name)
             }
         };
@@ -179,7 +180,8 @@ impl TlsServerConfig {
             local_cert_path,
             private_key_path,
             password,
-        )?;
+        )
+        .map_err(TlsError::config)?;
 
         Ok(Self {
             config: Arc::new(config),
@@ -207,7 +209,8 @@ impl TlsServerConfig {
             local_cert_path,
             private_key_path,
             password,
-        )?;
+        )
+        .map_err(TlsError::config)?;
 
         Ok(Self {
             config: Arc::new(config),

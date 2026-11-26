@@ -153,7 +153,8 @@ impl TlsClientConfig {
                 ServerName::IpAddress(IpAddr::V4(Ipv4Addr::UNSPECIFIED.into())),
             ),
             Some(x) => {
-                let server_name: ServerName<'static> = ServerName::try_from(x)?;
+                let server_name: ServerName<'static> =
+                    ServerName::try_from(x).map_err(TlsError::invalid_dns_name)?;
                 (ServerNameVerification::SanOrCommonName, server_name)
             }
         };
@@ -165,7 +166,8 @@ impl TlsClientConfig {
             local_cert_path,
             private_key_path,
             password,
-        )?;
+        )
+        .map_err(TlsError::config)?;
 
         Ok(Self {
             server_name,
@@ -194,7 +196,8 @@ impl TlsClientConfig {
             local_cert_path,
             private_key_path,
             password,
-        )?;
+        )
+        .map_err(TlsError::config)?;
 
         Ok(Self {
             //  it doesn't matter what we put here, it just needs to be an IP so that the client won't send an SNI extension
