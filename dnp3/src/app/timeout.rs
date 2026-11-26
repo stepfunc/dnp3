@@ -51,12 +51,13 @@ impl Timeout {
     pub const MAX: Duration = Duration::from_secs(60 * 60); // one hour
 
     /// construct from a duration, saturating at the minimum and maximum
-    pub fn saturating(value: Duration) -> Self {
-        if value < Self::MIN {
+    pub const fn saturating(value: Duration) -> Self {
+        // Duration's comparison operators are not const; as_nanos() is lossless (u128).
+        if value.as_nanos() < Self::MIN.as_nanos() {
             return Self(Self::MIN);
         }
 
-        if value > Self::MAX {
+        if value.as_nanos() > Self::MAX.as_nanos() {
             return Self(Self::MAX);
         }
 
@@ -66,26 +67,27 @@ impl Timeout {
     /// try to construct a `Timeout` from a count of seconds
     ///
     /// returns a [`TimeoutRangeError`] if it is < [`Timeout::MIN`] or > [`Timeout::MAX`]
-    pub fn from_secs(x: u64) -> Result<Self, TimeoutRangeError> {
+    pub const fn from_secs(x: u64) -> Result<Self, TimeoutRangeError> {
         Self::from_duration(Duration::from_secs(x))
     }
 
     /// try to construct a `Timeout` from a count of milliseconds
     ///
     /// returns a [`TimeoutRangeError`] if it is < [`Timeout::MIN`] or > [`Timeout::MAX`]
-    pub fn from_millis(x: u64) -> Result<Self, TimeoutRangeError> {
+    pub const fn from_millis(x: u64) -> Result<Self, TimeoutRangeError> {
         Self::from_duration(Duration::from_millis(x))
     }
 
     /// try to construct a `Timeout` from a `Duration`
     ///
     /// returns a [`TimeoutRangeError`] if it is < [`Timeout::MIN`] or > [`Timeout::MAX`]
-    pub fn from_duration(value: Duration) -> Result<Self, TimeoutRangeError> {
-        if value < Self::MIN {
+    pub const fn from_duration(value: Duration) -> Result<Self, TimeoutRangeError> {
+        // Duration's comparison operators are not const; as_nanos() is lossless (u128).
+        if value.as_nanos() < Self::MIN.as_nanos() {
             return Err(TimeoutRangeError::TooSmall(value));
         }
 
-        if value > Self::MAX {
+        if value.as_nanos() > Self::MAX.as_nanos() {
             return Err(TimeoutRangeError::TooLarge(value));
         }
 

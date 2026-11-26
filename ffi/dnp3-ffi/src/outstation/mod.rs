@@ -646,7 +646,7 @@ fn convert_outstation_config(
     let keep_alive_timeout = if config.keep_alive_timeout() == Duration::default() {
         None
     } else {
-        Some(config.keep_alive_timeout())
+        Some(Timeout::from_duration(config.keep_alive_timeout())?)
     };
 
     Ok(OutstationConfig {

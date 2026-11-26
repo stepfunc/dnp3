@@ -7,7 +7,7 @@
 use tokio::task::JoinHandle;
 use tokio::time::{Duration, Instant};
 
-use crate::app::FunctionCode;
+use crate::app::{FunctionCode, Timeout};
 use crate::decode::{
     AppDecodeLevel, DecodeLevel, LinkDecodeLevel, PhysDecodeLevel, TransportDecodeLevel,
 };
@@ -575,7 +575,7 @@ async fn link_status_request_after(
     frame: &[u8],
     response: Option<(u16, &[u8])>,
 ) -> Duration {
-    config.keep_alive_timeout = Some(KEEP_ALIVE_TIMEOUT);
+    config.keep_alive_timeout = Some(Timeout::from_duration(KEEP_ALIVE_TIMEOUT).unwrap());
     let start = Instant::now();
     let mut harness = LinkHarness::new(config, level);
     tokio::time::advance(ACTIVITY_AT).await;
@@ -741,7 +741,7 @@ impl LinkHarness {
 }
 
 fn with_keep_alive(mut config: OutstationConfig) -> OutstationConfig {
-    config.keep_alive_timeout = Some(KEEP_ALIVE_TIMEOUT);
+    config.keep_alive_timeout = Some(Timeout::from_duration(KEEP_ALIVE_TIMEOUT).unwrap());
     config
 }
 

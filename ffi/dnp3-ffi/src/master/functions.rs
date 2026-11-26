@@ -427,7 +427,7 @@ impl TryFrom<ffi::AssociationConfig> for AssociationConfig {
             keep_alive_timeout: if config.keep_alive_timeout() == Duration::from_secs(0) {
                 None
             } else {
-                Some(config.keep_alive_timeout())
+                Some(Timeout::from_duration(config.keep_alive_timeout())?)
             },
             auto_integrity_scan_on_buffer_overflow: config.auto_integrity_scan_on_buffer_overflow(),
             event_scan_on_events_available: convert_event_classes(

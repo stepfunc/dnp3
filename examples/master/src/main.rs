@@ -704,7 +704,7 @@ fn get_association_config() -> AssociationConfig {
         EventClasses::none(),
     );
     config.auto_time_sync = Some(TimeSyncProcedure::Lan);
-    config.keep_alive_timeout = Some(Duration::from_secs(60));
+    config.keep_alive_timeout = Some(Timeout::saturating(Duration::from_secs(60)));
     config
 }
 // ANCHOR_END: association_config
