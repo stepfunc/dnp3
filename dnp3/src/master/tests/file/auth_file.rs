@@ -6,6 +6,8 @@
 
 use crate::app::{FileStatus, FunctionCode, Group70Var2, Sequence};
 use crate::master::association::AssociationConfig;
+use crate::master::error::TaskErrorKind;
+use crate::master::file::FileErrorKind;
 use crate::master::tests::harness::{create_association, AssocInfoEvent, TestHarness};
 use crate::master::{AuthKey, FileCredentials, FileError, TaskError, TaskType};
 use crate::util::test_support::watchdog;
@@ -30,9 +32,12 @@ async fn fails_with_no_permission_when_auth_key_is_zero() {
 
         assert_eq!(
             auth_task.await.unwrap().map(u32::from),
-            Err(FileError::NoPermission)
+            Err(FileErrorKind::NoPermission.into())
         );
-        expect_failure(&mut harness, TaskError::UnexpectedResponseHeaders);
+        expect_failure(
+            &mut harness,
+            TaskErrorKind::UnexpectedResponseHeaders.into(),
+        );
     })
     .await;
 }
@@ -49,9 +54,12 @@ async fn fails_on_unexpected_variation() {
 
         assert_eq!(
             auth_task.await.unwrap().map(u32::from),
-            Err(TaskError::UnexpectedResponseHeaders.into())
+            Err(TaskErrorKind::UnexpectedResponseHeaders.into())
         );
-        expect_failure(&mut harness, TaskError::UnexpectedResponseHeaders);
+        expect_failure(
+            &mut harness,
+            TaskErrorKind::UnexpectedResponseHeaders.into(),
+        );
     })
     .await;
 }

@@ -17,7 +17,7 @@ use crate::app::{ExponentialBackOff, FunctionCode, RetryStrategy};
 use crate::app::{Iin, ResponseHeader};
 use crate::app::{Sequence, Timeout};
 use crate::link::EndpointAddress;
-use crate::master::error::{AssociationError, TaskError, TimeSyncError};
+use crate::master::error::{AssociationErrorKind, TaskErrorKind, TimeSyncErrorKind};
 use crate::master::extract::{extract_measurements, Delivered, ProcessableResponse};
 use crate::master::handler::AssociationHandler;
 use crate::master::messages::AssociationMsgType;
@@ -77,7 +77,7 @@ pub struct AssociationConfig {
     #[cfg_attr(feature = "serialization", serde(default = "EventClasses::none"))]
     pub event_scan_on_events_available: EventClasses,
     /// The maximum number of user requests (e.g. commands, adhoc reads, etc) that will be queued
-    /// before back-pressure is applied by failing requests with TaskError::TooManyRequests
+    /// before back-pressure is applied by failing additional requests with a [`crate::master::TaskError`].
     #[cfg_attr(
         feature = "serialization",
         serde(default = "AssociationConfig::default_max_queued_user_requests")
@@ -526,10 +526,10 @@ impl Association {
                     if self.request_queue.len() < self.config.max_queued_user_requests {
                         self.request_queue.push_back(task);
                     } else {
-                        task.on_task_error(Some(self), TaskError::TooManyRequests);
+                        task.on_task_error(Some(self), TaskErrorKind::TooManyRequests);
                     }
                 } else {
-                    task.on_task_error(Some(self), TaskError::NoConnection);
+                    task.on_task_error(Some(self), TaskErrorKind::NoConnection);
                 }
             }
             AssociationMsgType::Poll(msg) => {
@@ -555,7 +555,7 @@ impl Association {
     }
 
     /// Fail the queued requests of an association that is being removed
-    fn fail_queued_requests(&mut self, err: TaskError) {
+    fn fail_queued_requests(&mut self, err: TaskErrorKind) {
         while let Some(task) = self.request_queue.pop_front() {
             task.on_task_error(None, err);
         }
@@ -686,8 +686,8 @@ impl Association {
         self.auto_tasks.time_sync.done();
     }
 
-    pub(crate) fn on_time_sync_failure(&mut self, err: TimeSyncError) {
-        tracing::warn!("auto time sync failed: {}", err);
+    pub(crate) fn on_time_sync_failure(&mut self, err: TimeSyncErrorKind) {
+        tracing::warn!("auto time sync failed: {err}");
         self.auto_tasks
             .time_sync
             .failure(self.config.auto_tasks_retry_strategy);
@@ -779,8 +779,8 @@ impl Association {
         self.assoc_info.task_success(task_type, fc, seq);
     }
 
-    pub(crate) fn notify_task_fail(&mut self, task_type: TaskType, err: TaskError) {
-        self.assoc_info.task_fail(task_type, err);
+    pub(crate) fn notify_task_fail(&mut self, task_type: TaskType, err: TaskErrorKind) {
+        self.assoc_info.task_fail(task_type, err.into());
     }
 
     fn notify_unsolicited_response(&mut self, is_duplicate: bool, seq: Sequence) {
@@ -913,10 +913,10 @@ impl AssociationMap {
         }
     }
 
-    pub(crate) fn get_timeout(&self, address: EndpointAddress) -> Result<Timeout, TaskError> {
+    pub(crate) fn get_timeout(&self, address: EndpointAddress) -> Result<Timeout, TaskErrorKind> {
         match self.map.get(&address) {
             Some(x) => Ok(x.config.response_timeout),
-            None => Err(TaskError::NoSuchAssociation(address)),
+            None => Err(TaskErrorKind::NoSuchAssociation(address)),
         }
     }
 
@@ -926,17 +926,17 @@ impl AssociationMap {
         }
     }
 
-    pub(crate) fn register(&mut self, session: Association) -> Result<(), AssociationError> {
+    pub(crate) fn register(&mut self, session: Association) -> Result<(), AssociationErrorKind> {
         self.register_and_get(session).map(|_| ())
     }
 
     pub(crate) fn register_and_get(
         &mut self,
         session: Association,
-    ) -> Result<&mut Association, AssociationError> {
+    ) -> Result<&mut Association, AssociationErrorKind> {
         let address = session.address.link;
         match self.map.entry(address) {
-            Entry::Occupied(_) => Err(AssociationError::DuplicateAddress(address)),
+            Entry::Occupied(_) => Err(AssociationErrorKind::DuplicateAddress(address)),
             Entry::Vacant(entry) => {
                 self.priority.push_back(address);
                 Ok(entry.insert(session))
@@ -946,7 +946,7 @@ impl AssociationMap {
 
     pub(crate) fn remove(&mut self, address: EndpointAddress) {
         if let Some(mut association) = self.map.remove(&address) {
-            association.fail_queued_requests(TaskError::NoSuchAssociation(address));
+            association.fail_queued_requests(TaskErrorKind::NoSuchAssociation(address));
         }
         self.priority.retain(|x| *x != address);
     }

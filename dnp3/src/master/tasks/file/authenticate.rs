@@ -7,8 +7,10 @@
 use crate::app::format::write::HeaderWriter;
 use crate::app::parse::parser::Response;
 use crate::app::FunctionCode;
+use crate::master::error::TaskErrorKind;
+use crate::master::file::FileErrorKind;
 use crate::master::tasks::{NonReadTask, OneShot, OneShotRequest};
-use crate::master::{AuthKey, FileCredentials, FileError, TaskError, TaskType};
+use crate::master::{AuthKey, FileCredentials, TaskType};
 
 pub(crate) struct AuthFileRequest {
     pub(crate) credentials: FileCredentials,
@@ -16,7 +18,7 @@ pub(crate) struct AuthFileRequest {
 
 impl OneShotRequest for AuthFileRequest {
     type Output = AuthKey;
-    type Error = FileError;
+    type Error = FileErrorKind;
 
     fn function(&self) -> FunctionCode {
         FunctionCode::AuthenticateFile
@@ -26,11 +28,11 @@ impl OneShotRequest for AuthFileRequest {
         TaskType::FileAuth
     }
 
-    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskErrorKind> {
         Ok(super::write_auth(&self.credentials, writer)?)
     }
 
-    fn parse(&self, response: Response<'_>) -> Result<AuthKey, FileError> {
+    fn parse(&self, response: Response<'_>) -> Result<AuthKey, FileErrorKind> {
         super::parse_auth_response(response.objects?.get_only_header()?)
     }
 

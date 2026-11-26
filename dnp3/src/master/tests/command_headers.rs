@@ -30,7 +30,8 @@ use crate::app::format::write::HeaderWriter;
 use crate::app::parse::options::ParseOptions;
 use crate::app::parse::parser::HeaderCollection;
 use crate::app::FunctionCode;
-use crate::master::{CommandBuilder, CommandHeaders, CommandResponseError, CommandSupport};
+use crate::master::error::CommandResponseError;
+use crate::master::{CommandBuilder, CommandHeaders, CommandSupport};
 
 /// The fields of a command object
 #[derive(Clone, Copy, Debug)]
@@ -368,7 +369,7 @@ mod property {
     use crate::app::gen::prefixed::PrefixedVariation;
     use crate::app::parse::parser::ObjectHeader;
     use crate::app::parse::traits::Index;
-    use crate::master::{BadEncoding, TaskError};
+    use crate::master::error::BadEncoding;
 
     use proptest::prelude::*;
 
@@ -743,10 +744,7 @@ mod property {
             _ => None,
         });
         if let Some(code) = invalid {
-            assert_eq!(
-                result,
-                Err(TaskError::BadEncoding(BadEncoding::ControlCode(code)))
-            );
+            assert_eq!(result, Err(BadEncoding::ControlCode(code).into()));
             assert_eq!(cursor.written(), &[0xAA]);
             return;
         }

@@ -11,8 +11,11 @@ use std::str::Utf8Error;
 use std::time::Duration;
 
 use dnp3::app::{
-    BufferSize, ConnectStrategy, Listener, MaybeAsync, ParseErrorCause, PermissionSet, Permissions,
-    RetryStrategy, Timeout, TimeoutRangeError, Timestamp,
+    BufferSize, ConnectStrategy, Listener, MaybeAsync, PermissionSet, Permissions, RetryStrategy,
+    Timeout, TimeoutRangeError, Timestamp,
+};
+use dnp3::ffi::{
+    AssociationErrorClass, CommandErrorClass, PollErrorClass, TaskErrorClass, TimeSyncErrorClass,
 };
 use dnp3::link::{EndpointAddress, SpecialAddressError};
 use dnp3::master::*;
@@ -678,27 +681,22 @@ pub(crate) unsafe fn master_channel_operate_no_ack(
 
 impl From<CommandError> for ffi::CommandError {
     fn from(value: CommandError) -> Self {
-        match value {
-            CommandError::Task(err) => err.into(),
-            CommandError::Response(err) => match err {
-                CommandResponseError::BadStatus(_) => Self::BadStatus,
-                CommandResponseError::HeaderCountMismatch => Self::HeaderMismatch,
-                CommandResponseError::HeaderTypeMismatch => Self::HeaderMismatch,
-                CommandResponseError::ObjectCountMismatch => Self::HeaderMismatch,
-                CommandResponseError::ObjectValueMismatch => Self::HeaderMismatch,
-            },
+        match CommandErrorClass::from(value) {
+            CommandErrorClass::Task(err) => err.into(),
+            CommandErrorClass::BadStatus => Self::BadStatus,
+            CommandErrorClass::HeaderMismatch => Self::HeaderMismatch,
         }
     }
 }
 
 impl From<TimeSyncError> for ffi::TimeSyncError {
     fn from(err: TimeSyncError) -> Self {
-        match err {
-            TimeSyncError::Task(err) => err.into(),
-            TimeSyncError::ClockRollback => Self::ClockRollback,
-            TimeSyncError::BadOutstationTimeDelay(_) => Self::BadOutstationTimeDelay,
-            TimeSyncError::Overflow => Self::Overflow,
-            TimeSyncError::StillNeedsTime => Self::StillNeedsTime,
+        match TimeSyncErrorClass::from(err) {
+            TimeSyncErrorClass::Task(err) => err.into(),
+            TimeSyncErrorClass::ClockRollback => Self::ClockRollback,
+            TimeSyncErrorClass::BadOutstationTimeDelay => Self::BadOutstationTimeDelay,
+            TimeSyncErrorClass::Overflow => Self::Overflow,
+            TimeSyncErrorClass::StillNeedsTime => Self::StillNeedsTime,
         }
     }
 }
@@ -1268,19 +1266,19 @@ impl From<SpecialAddressError> for ffi::ParamError {
 
 impl From<AssociationError> for ffi::ParamError {
     fn from(error: AssociationError) -> Self {
-        match error {
-            AssociationError::Shutdown => Self::MasterAlreadyShutdown,
-            AssociationError::DuplicateAddress(_) => Self::AssociationDuplicateAddress,
-            AssociationError::WrongChannelType { .. } => Self::WrongChannelType,
+        match AssociationErrorClass::from(error) {
+            AssociationErrorClass::Shutdown => Self::MasterAlreadyShutdown,
+            AssociationErrorClass::DuplicateAddress => Self::AssociationDuplicateAddress,
+            AssociationErrorClass::WrongChannelType => Self::WrongChannelType,
         }
     }
 }
 
 impl From<PollError> for ffi::ParamError {
     fn from(error: PollError) -> Self {
-        match error {
-            PollError::Shutdown => Self::MasterAlreadyShutdown,
-            PollError::NoSuchAssociation(_) => Self::AssociationDoesNotExist,
+        match PollErrorClass::from(error) {
+            PollErrorClass::Shutdown => Self::MasterAlreadyShutdown,
+            PollErrorClass::NoSuchAssociation => Self::AssociationDoesNotExist,
         }
     }
 }
@@ -1354,32 +1352,28 @@ impl From<ffi::ConnectStrategy> for ConnectStrategy {
 
 macro_rules! define_task_from_impl {
     ($name:ident, $system_time_not_available:ident) => {
+        impl From<TaskErrorClass> for ffi::$name {
+            fn from(err: TaskErrorClass) -> Self {
+                match err {
+                    TaskErrorClass::TooManyRequests => Self::TooManyRequests,
+                    TaskErrorClass::NoConnection => Self::NoConnection,
+                    TaskErrorClass::UnsupportedResponse => Self::UnsupportedResponse,
+                    TaskErrorClass::BadResponse => Self::BadResponse,
+                    TaskErrorClass::UnsupportedOrBadResponse => Self::UnsupportedOrBadResponse,
+                    TaskErrorClass::ResponseTimeout => Self::ResponseTimeout,
+                    TaskErrorClass::WriteError => Self::WriteError,
+                    TaskErrorClass::AssociationRemoved => Self::AssociationRemoved,
+                    TaskErrorClass::Shutdown => Self::Shutdown,
+                    TaskErrorClass::BadEncoding => Self::BadEncoding,
+                    TaskErrorClass::IinError => Self::IinError,
+                    TaskErrorClass::SystemTimeNotAvailable => Self::$system_time_not_available,
+                }
+            }
+        }
+
         impl From<TaskError> for ffi::$name {
             fn from(err: TaskError) -> Self {
-                match err {
-                    TaskError::TooManyRequests => Self::TooManyRequests,
-                    TaskError::Link(_) => Self::NoConnection,
-                    TaskError::Transport => Self::NoConnection,
-                    TaskError::MalformedResponse(err) => match err.into() {
-                        ParseErrorCause::Unsupported => Self::UnsupportedResponse,
-                        ParseErrorCause::Invalid => Self::BadResponse,
-                        ParseErrorCause::UnsupportedOrInvalid => Self::UnsupportedOrBadResponse,
-                    },
-                    TaskError::UnexpectedResponseHeaders => Self::BadResponse,
-                    TaskError::NonFinWithoutCon => Self::BadResponse,
-                    TaskError::NeverReceivedFir => Self::BadResponse,
-                    TaskError::UnexpectedFir => Self::BadResponse,
-                    TaskError::MultiFragmentResponse => Self::BadResponse,
-                    TaskError::ResponseTimeout => Self::ResponseTimeout,
-                    TaskError::WriteError => Self::WriteError,
-                    TaskError::NoSuchAssociation(_) => Self::AssociationRemoved,
-                    TaskError::NoConnection => Self::NoConnection,
-                    TaskError::Shutdown => Self::Shutdown,
-                    TaskError::Disabled => Self::NoConnection,
-                    TaskError::BadEncoding(_) => Self::BadEncoding,
-                    TaskError::RejectedByIin2(_) => Self::IinError,
-                    TaskError::SystemTimeNotAvailable => Self::$system_time_not_available,
-                }
+                TaskErrorClass::from(err).into()
             }
         }
     };

@@ -18,8 +18,7 @@ use crate::app::variations::*;
 use crate::app::CommandObject;
 use crate::app::Timestamp;
 use crate::app::Variation::Group0;
-use crate::master::error::CommandResponseError;
-use crate::master::{BadEncoding, TaskError};
+use crate::master::error::{BadEncoding, CommandResponseError, TaskErrorKind};
 use crate::outstation::FreezeInterval;
 
 /// Controls how a command request is issued
@@ -464,7 +463,7 @@ enum Header {
 }
 
 impl Header {
-    pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
+    pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), TaskErrorKind> {
         match self {
             Header::Read(x) => {
                 x.format(writer)?;
@@ -580,9 +579,9 @@ impl Headers {
         self.add(Header::Attribute(attr))
     }
 
-    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
+    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskErrorKind> {
         for header in self.headers.iter() {
-            header.validate().map_err(TaskError::BadEncoding)?;
+            header.validate()?;
         }
 
         for header in self.headers.iter() {
@@ -639,16 +638,16 @@ impl ReadRequest {
         Self::MultipleHeader(headers.to_vec())
     }
 
-    pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
+    pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), TaskErrorKind> {
         match self {
             ReadRequest::SingleHeader(req) => {
-                req.validate().map_err(TaskError::BadEncoding)?;
+                req.validate()?;
                 req.format(writer)?;
             }
             ReadRequest::ClassScan(req) => req.write(writer)?,
             ReadRequest::MultipleHeader(reqs) => {
                 for req in reqs {
-                    req.validate().map_err(TaskError::BadEncoding)?;
+                    req.validate()?;
                 }
                 for req in reqs {
                     req.format(writer)?;
@@ -811,9 +810,9 @@ impl CommandHeaders {
         }
     }
 
-    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
+    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskErrorKind> {
         for header in self.headers.iter() {
-            header.validate().map_err(TaskError::BadEncoding)?;
+            header.validate()?;
         }
 
         for header in self.headers.iter() {
@@ -1240,9 +1239,7 @@ mod tests {
 
             assert_eq!(
                 headers(variation).write(&mut HeaderWriter::new(&mut cursor)),
-                Err(TaskError::BadEncoding(BadEncoding::Attribute(
-                    BadAttribute::BadVariation(variation)
-                )))
+                Err(BadEncoding::Attribute(BadAttribute::BadVariation(variation)).into())
             );
             assert_eq!(cursor.written(), &[0xAA]);
         }
@@ -1261,9 +1258,7 @@ mod tests {
     #[test]
     fn read_of_group0_var0_leaves_the_cursor_untouched() {
         const G0V0: Variation = Variation::Group0(0);
-        let expected = Err(TaskError::BadEncoding(BadEncoding::UndefinedVariation(
-            G0V0,
-        )));
+        let expected: Result<(), TaskErrorKind> = Err(BadEncoding::UndefinedVariation(G0V0).into());
         let valid = ReadHeader::all_objects(Variation::Group60Var1);
 
         for header in [
@@ -1603,9 +1598,7 @@ mod tests {
             assert_eq!(
                 ReadRequest::device_attribute(0u8, AttrSet::Private(7))
                     .format(&mut HeaderWriter::new(&mut cursor)),
-                Err(TaskError::BadEncoding(BadEncoding::UndefinedVariation(
-                    Variation::Group0(0)
-                )))
+                Err(BadEncoding::UndefinedVariation(Variation::Group0(0)).into())
             );
             assert_eq!(cursor.written(), [0u8; 0]);
         }
@@ -1626,9 +1619,7 @@ mod tests {
                 if model.iter().any(|(group_var, _)| *group_var == (0, 0)) {
                     prop_assert_eq!(
                         result,
-                        Err(TaskError::BadEncoding(BadEncoding::UndefinedVariation(
-                            Variation::Group0(0)
-                        )))
+                        Err(BadEncoding::UndefinedVariation(Variation::Group0(0)).into())
                     );
                     prop_assert_eq!(cursor.written(), &[0u8; 0]);
                     return Ok(());
@@ -1667,7 +1658,7 @@ mod tests {
                 {
                     prop_assert_eq!(
                         result,
-                        Err(TaskError::BadEncoding(BadEncoding::UndefinedVariation(g0v0)))
+                        Err(BadEncoding::UndefinedVariation(g0v0).into())
                     );
                     prop_assert_eq!(cursor.written(), &[0u8; 0]);
                     return Ok(());

@@ -11,9 +11,10 @@ use tokio::time::Instant;
 use crate::app::Sequence;
 use crate::app::{ControlField, FunctionCode, Iin, Iin1, Iin2};
 use crate::master::association::AssociationConfig;
+use crate::master::error::TaskErrorKind;
 use crate::master::request::EventClasses;
 use crate::master::tests::harness::AssocInfoEvent;
-use crate::master::{Classes, TaskError, TaskType, TimeSyncProcedure};
+use crate::master::{Classes, TaskType, TimeSyncProcedure};
 
 use super::harness::requests::*;
 use super::harness::{create_association, create_association_with_handler, TestHarness};
@@ -174,7 +175,10 @@ async fn cold_restart_rejected_with(harness: &mut TestHarness, seq: &mut Sequenc
             empty_response_custom_iin(seq.increment(), iin),
         )
         .await;
-    assert_eq!(restart.await.unwrap(), Err(TaskError::RejectedByIin2(iin)));
+    assert_eq!(
+        restart.await.unwrap(),
+        Err(TaskErrorKind::RejectedByIin2(iin).into())
+    );
 }
 
 #[tokio::test(start_paused = true)]
@@ -724,7 +728,7 @@ async fn clear_restart_answered_with_restart_iin_reports_failure_and_retries_aft
                 ),
                 AssocInfoEvent::TaskFailure(
                     TaskType::ClearRestartBit,
-                    TaskError::UnexpectedResponseHeaders
+                    TaskErrorKind::UnexpectedResponseHeaders.into(),
                 ),
                 AssocInfoEvent::TaskStart(
                     TaskType::ClearRestartBit,

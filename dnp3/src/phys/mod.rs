@@ -240,7 +240,7 @@ impl PhysLayer {
         level: PhysDecodeLevel,
     ) -> Result<(), LogicError> {
         if self.reply != PendingReply::None {
-            return Err(LogicError::BadWrite);
+            return Err(LogicError::Write);
         }
         if level.enabled() {
             tracing::info!("PHYS TX - {}", PhysDisplay::new(level, &frame));

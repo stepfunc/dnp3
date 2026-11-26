@@ -10,8 +10,8 @@ use crate::app::parse::count::CountSequence;
 use crate::app::parse::parser::{HeaderCollection, ObjectHeader};
 use crate::app::variations::*;
 use crate::app::{ObjectParseError, ResponseHeader};
-use crate::master::{HeaderInfo, ReadHandler};
-use crate::master::{ReadType, TaskError};
+use crate::master::error::TaskErrorKind;
+use crate::master::{HeaderInfo, ReadHandler, ReadType};
 use crate::util::skipped::Skipped;
 
 #[rustfmt::skip]
@@ -134,11 +134,11 @@ impl std::fmt::Display for InvalidResponse {
     }
 }
 
-impl From<InvalidResponse> for TaskError {
+impl From<InvalidResponse> for TaskErrorKind {
     fn from(err: InvalidResponse) -> Self {
         match err {
-            InvalidResponse::Malformed(err) => TaskError::MalformedResponse(err),
-            InvalidResponse::RelativeTimeWithoutCto(_) => TaskError::UnexpectedResponseHeaders,
+            InvalidResponse::Malformed(err) => TaskErrorKind::MalformedResponse(err),
+            InvalidResponse::RelativeTimeWithoutCto(_) => TaskErrorKind::UnexpectedResponseHeaders,
         }
     }
 }

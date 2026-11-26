@@ -30,7 +30,7 @@ use crate::decode::DecodeLevel;
 use crate::link::error::LinkError;
 use crate::link::EndpointAddress;
 use crate::master::association::{AssociationMap, Next};
-use crate::master::error::TaskError;
+use crate::master::error::TaskErrorKind;
 use crate::master::extract::{Delivered, ProcessableResponse};
 use crate::master::messages::{MasterMsg, Message};
 use crate::master::tasks::command_no_ack::CommandNoAckTask;
@@ -90,9 +90,9 @@ impl Deadline {
         }
     }
 
-    fn expired(self) -> TaskError {
+    fn expired(self) -> TaskErrorKind {
         tracing::warn!("no response within timeout: {}", self.timeout);
-        TaskError::ResponseTimeout
+        TaskErrorKind::ResponseTimeout
     }
 }
 
@@ -242,7 +242,7 @@ impl<T: Transport> MasterTask<T> {
                     assoc.notify_task_start(task_type, function, assoc.seq());
                 }
 
-                let res: Result<Sequence, TaskError> = match t {
+                let res: Result<Sequence, TaskErrorKind> = match t {
                     AppTask::Read(t) => self.run_read_task(io, task.dest, t).await,
                     AppTask::NonRead(t) => {
                         std::pin::pin!(self.run_non_read_task(io, task.dest, t)).await
@@ -269,7 +269,7 @@ impl<T: Transport> MasterTask<T> {
             }
             Task::LinkStatus(promise) => {
                 let res = self.run_link_status_task(io, task.dest).await;
-                promise.complete(res);
+                promise.complete(res.map_err(Into::into));
                 res
             }
         };
@@ -278,24 +278,24 @@ impl<T: Transport> MasterTask<T> {
         match result {
             Ok(()) => Ok(()),
             Err(err) => match err {
-                TaskError::Shutdown => Err(RunError::Stop(StopReason::Shutdown)),
-                TaskError::Disabled => Err(RunError::Stop(StopReason::Disable)),
-                TaskError::Link(err) => Err(RunError::Link(err)),
-                TaskError::TooManyRequests
-                | TaskError::Transport
-                | TaskError::RejectedByIin2(_)
-                | TaskError::MalformedResponse(_)
-                | TaskError::UnexpectedResponseHeaders
-                | TaskError::NonFinWithoutCon
-                | TaskError::NeverReceivedFir
-                | TaskError::UnexpectedFir
-                | TaskError::MultiFragmentResponse
-                | TaskError::ResponseTimeout
-                | TaskError::WriteError
-                | TaskError::BadEncoding(_)
-                | TaskError::NoSuchAssociation(_)
-                | TaskError::NoConnection
-                | TaskError::SystemTimeNotAvailable => Ok(()),
+                TaskErrorKind::Shutdown => Err(RunError::Stop(StopReason::Shutdown)),
+                TaskErrorKind::Disabled => Err(RunError::Stop(StopReason::Disable)),
+                TaskErrorKind::Link(err) => Err(RunError::Link(err)),
+                TaskErrorKind::TooManyRequests
+                | TaskErrorKind::Transport
+                | TaskErrorKind::RejectedByIin2(_)
+                | TaskErrorKind::MalformedResponse(_)
+                | TaskErrorKind::UnexpectedResponseHeaders
+                | TaskErrorKind::NonFinWithoutCon
+                | TaskErrorKind::NeverReceivedFir
+                | TaskErrorKind::UnexpectedFir
+                | TaskErrorKind::MultiFragmentResponse
+                | TaskErrorKind::ResponseTimeout
+                | TaskErrorKind::WriteError
+                | TaskErrorKind::BadEncoding(_)
+                | TaskErrorKind::NoSuchAssociation(_)
+                | TaskErrorKind::NoConnection
+                | TaskErrorKind::SystemTimeNotAvailable => Ok(()),
             },
         }
     }

@@ -16,11 +16,11 @@ use crate::app::variations::{Group50Var1, Group50Var3};
 use crate::app::Timestamp;
 use crate::app::{ControlField, FunctionCode, Iin, Iin1, Iin2, ObjectParseError, Sequence};
 use crate::master::association::AssociationConfig;
+use crate::master::error::{TaskErrorKind, TimeSyncErrorKind};
 use crate::master::test_fixtures::{FixedTime, SYSTEM_TIME};
 use crate::master::tests::harness::AssocInfoEvent;
 use crate::master::{
-    AssociationHandler, Classes, EventClasses, PollHandle, ReadRequest, TaskError, TaskType,
-    TimeSyncError, TimeSyncProcedure,
+    AssociationHandler, Classes, EventClasses, PollHandle, ReadRequest, TaskType, TimeSyncProcedure,
 };
 
 use super::harness::requests::*;
@@ -238,7 +238,10 @@ async fn auto_time_sync_without_system_time_reports_failure_and_retries_with_a_g
                 FunctionCode::RecordCurrentTime,
                 Sequence::new(0),
             ),
-            AssocInfoEvent::TaskFailure(TaskType::TimeSync, TaskError::SystemTimeNotAvailable),
+            AssocInfoEvent::TaskFailure(
+                TaskType::TimeSync,
+                TaskErrorKind::SystemTimeNotAvailable.into(),
+            ),
         ];
         let mut events = vec![AssocInfoEvent::Unsolicited(false, Sequence::new(0))];
         for (at_ms, expected) in [(500, 1), (1500, 2), (3500, 3), (7500, 4)] {
@@ -334,7 +337,7 @@ async fn non_lan_time_sync_fails_without_a_write_if_the_delay_is_not_one_g52v2()
 
             assert_eq!(
                 sync.await.unwrap(),
-                Err(TimeSyncError::Task(TaskError::UnexpectedResponseHeaders)),
+                Err(TaskErrorKind::UnexpectedResponseHeaders.into()),
                 "{objects:?}"
             );
         }
@@ -374,7 +377,7 @@ async fn user_time_sync_timeout_is_reported_to_the_caller_and_not_retried() {
 
         assert_eq!(
             sync.await.unwrap(),
-            Err(TimeSyncError::Task(TaskError::ResponseTimeout))
+            Err(TaskErrorKind::ResponseTimeout.into())
         );
         harness.expect_idle_for(Duration::from_secs(60)).await;
     })
@@ -395,7 +398,7 @@ async fn user_time_sync_without_system_time_fails_without_scheduling_a_retry() {
             .association
             .synchronize_time(TimeSyncProcedure::Lan)
             .await;
-        assert_eq!(result, Err(TaskError::SystemTimeNotAvailable.into()));
+        assert_eq!(result, Err(TaskErrorKind::SystemTimeNotAvailable.into()));
 
         tokio::time::sleep(Duration::from_secs(60)).await;
         assert_eq!(count.load(Ordering::SeqCst), 1);
@@ -422,7 +425,10 @@ async fn user_time_sync_that_still_needs_time_fails_and_starts_the_auto_time_syn
                 empty_response_custom_iin(seq.increment(), NEED_TIME),
             )
             .await;
-        assert_eq!(sync.await.unwrap(), Err(TimeSyncError::StillNeedsTime));
+        assert_eq!(
+            sync.await.unwrap(),
+            Err(TimeSyncErrorKind::StillNeedsTime.into())
+        );
 
         // the NEED_TIME bit in the response schedules the automatic time sync right away
         let failed = Instant::now();
@@ -439,7 +445,7 @@ async fn user_time_sync_that_still_needs_time_fails_and_starts_the_auto_time_syn
                 ),
                 AssocInfoEvent::TaskFailure(
                     TaskType::TimeSync,
-                    TaskError::UnexpectedResponseHeaders
+                    TaskErrorKind::UnexpectedResponseHeaders.into()
                 ),
                 AssocInfoEvent::TaskStart(
                     TaskType::TimeSync,
@@ -488,18 +494,14 @@ async fn user_non_lan_time_sync_fails_with_the_cause_when_the_delay_measure_resp
                 .expect_write_and_respond(delay_measure(seq), response)
                 .await;
 
-            let err = TaskError::MalformedResponse(cause);
-            assert_eq!(
-                sync.await.unwrap(),
-                Err(TimeSyncError::Task(err)),
-                "{objects:?}"
-            );
+            let err: TaskErrorKind = cause.into();
+            assert_eq!(sync.await.unwrap(), Err(err.into()), "{objects:?}");
             harness.expect_idle_for(Duration::from_secs(60)).await;
             assert_eq!(
                 harness.assoc_events.pop(),
                 [
                     AssocInfoEvent::TaskStart(TaskType::TimeSync, FunctionCode::DelayMeasure, seq),
-                    AssocInfoEvent::TaskFailure(TaskType::TimeSync, err),
+                    AssocInfoEvent::TaskFailure(TaskType::TimeSync, err.into()),
                 ],
                 "{objects:?}"
             );
@@ -513,21 +515,18 @@ async fn user_non_lan_time_sync_fails_with_the_cause_when_the_delay_measure_resp
 #[tokio::test(start_paused = true)]
 async fn user_time_sync_fails_when_the_write_response_has_objects() {
     watchdog(async {
-        let cases: [(&[u8], TaskError); 3] = [
+        let cases: [(&[u8], TaskErrorKind); 3] = [
             // a g52v2 time delay
             (
                 &[52, 2, 0x07, 1, 0x00, 0x00],
-                TaskError::UnexpectedResponseHeaders,
+                TaskErrorKind::UnexpectedResponseHeaders,
             ),
             // a header cut short after its group
-            (
-                &[0x01],
-                TaskError::MalformedResponse(ObjectParseError::InsufficientBytes),
-            ),
+            (&[0x01], ObjectParseError::InsufficientBytes.into()),
             // a variation of g50 that doesn't exist
             (
                 &[50, 9, 0x07, 1],
-                TaskError::MalformedResponse(ObjectParseError::UnknownGroupVariation(50, 9)),
+                ObjectParseError::UnknownGroupVariation(50, 9).into(),
             ),
         ];
         let procedures = [
@@ -576,7 +575,7 @@ async fn user_time_sync_fails_when_the_write_response_has_objects() {
 
                 assert_eq!(
                     sync.await.unwrap(),
-                    Err(TimeSyncError::Task(err)),
+                    Err(err.into()),
                     "{procedure:?} {objects:?}"
                 );
                 harness.expect_idle_for(Duration::from_secs(60)).await;
@@ -584,7 +583,7 @@ async fn user_time_sync_fails_when_the_write_response_has_objects() {
                     harness.assoc_events.pop(),
                     [
                         AssocInfoEvent::TaskStart(TaskType::TimeSync, first, Sequence::new(0)),
-                        AssocInfoEvent::TaskFailure(TaskType::TimeSync, err),
+                        AssocInfoEvent::TaskFailure(TaskType::TimeSync, err.into()),
                     ],
                     "{procedure:?} {objects:?}"
                 );

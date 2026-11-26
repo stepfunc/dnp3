@@ -6,7 +6,7 @@
 
 use crate::app::format::write::HeaderWriter;
 use crate::app::FunctionCode;
-use crate::master::error::TaskError;
+use crate::master::error::{TaskError, TaskErrorKind};
 use crate::master::promise::Promise;
 use crate::master::request::CommandHeaders;
 use crate::master::tasks::{AppTask, RequestWriter, Task};
@@ -28,7 +28,7 @@ impl RequestWriter for CommandNoAckTask {
         self.function()
     }
 
-    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskErrorKind> {
         self.headers.write(writer)
     }
 }
@@ -42,8 +42,8 @@ impl CommandNoAckTask {
         FunctionCode::DirectOperateNoResponse
     }
 
-    pub(crate) fn on_task_error(self, err: TaskError) {
-        self.promise.complete(Err(err))
+    pub(crate) fn on_task_error(self, err: TaskErrorKind) {
+        self.promise.complete(Err(err.into()))
     }
 
     /// The request was written to the transport, which is all that can be known

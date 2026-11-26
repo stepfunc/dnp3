@@ -8,7 +8,7 @@ use crate::app::format::write::HeaderWriter;
 use crate::app::parse::parser::Response;
 use crate::app::FunctionCode;
 use crate::master::association::Association;
-use crate::master::error::{CommandError, TaskError};
+use crate::master::error::{CommandError, CommandErrorKind, TaskErrorKind};
 use crate::master::promise::Promise;
 use crate::master::request::*;
 use crate::master::tasks::{AppTask, NonReadTask, ResponseTask, Step, Task};
@@ -57,7 +57,7 @@ impl CommandTask {
 
 impl ResponseTask for CommandTask {
     type Output = ();
-    type Error = CommandError;
+    type Error = CommandErrorKind;
 
     fn function(&self) -> FunctionCode {
         match self.state {
@@ -71,7 +71,7 @@ impl ResponseTask for CommandTask {
         TaskType::Command
     }
 
-    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskErrorKind> {
         self.headers.write(writer)
     }
 
@@ -79,8 +79,8 @@ impl ResponseTask for CommandTask {
         &mut self,
         _association: &mut Association,
         response: Response<'_>,
-    ) -> Result<Step<()>, CommandError> {
-        let headers = response.objects.map_err(TaskError::MalformedResponse)?;
+    ) -> Result<Step<()>, CommandErrorKind> {
+        let headers = response.objects.map_err(TaskErrorKind::MalformedResponse)?;
 
         self.headers.compare(headers)?;
 
@@ -93,7 +93,11 @@ impl ResponseTask for CommandTask {
         }
     }
 
-    fn complete(self, _association: Option<&mut Association>, result: Result<(), CommandError>) {
-        self.promise.complete(result)
+    fn complete(
+        self,
+        _association: Option<&mut Association>,
+        result: Result<(), CommandErrorKind>,
+    ) {
+        self.promise.complete(result.map_err(Into::into))
     }
 }

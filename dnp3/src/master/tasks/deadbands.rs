@@ -8,9 +8,10 @@ use crate::app::format::write::HeaderWriter;
 use crate::app::parse::parser::Response;
 use crate::app::parse::traits::Index;
 use crate::app::FunctionCode;
+use crate::master::error::TaskErrorKind;
 use crate::master::tasks::empty_response::expect_empty;
 use crate::master::tasks::{NonReadTask, OneShot, OneShotRequest};
-use crate::master::{DeadBandHeader, DeadBandHeaderVariants, DeadBands, TaskError, TaskType};
+use crate::master::{DeadBandHeader, DeadBandHeaderVariants, DeadBands, TaskType};
 
 pub(crate) struct DeadBandsRequest {
     headers: Vec<DeadBandHeader>,
@@ -43,7 +44,7 @@ impl DeadBandsRequest {
 
 impl OneShotRequest for DeadBandsRequest {
     type Output = ();
-    type Error = TaskError;
+    type Error = TaskErrorKind;
 
     fn function(&self) -> FunctionCode {
         FunctionCode::Write
@@ -53,7 +54,7 @@ impl OneShotRequest for DeadBandsRequest {
         TaskType::WriteDeadBands
     }
 
-    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskErrorKind> {
         for header in self.headers.iter() {
             header.inner.write(writer)?;
         }
@@ -61,7 +62,7 @@ impl OneShotRequest for DeadBandsRequest {
         Ok(())
     }
 
-    fn parse(&self, response: Response<'_>) -> Result<(), TaskError> {
+    fn parse(&self, response: Response<'_>) -> Result<(), TaskErrorKind> {
         expect_empty(&response)
     }
 

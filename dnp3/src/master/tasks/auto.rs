@@ -8,7 +8,7 @@ use crate::app::format::write::HeaderWriter;
 use crate::app::parse::parser::Response;
 use crate::app::FunctionCode;
 use crate::master::association::Association;
-use crate::master::error::TaskError;
+use crate::master::error::TaskErrorKind;
 use crate::master::request::EventClasses;
 use crate::master::tasks::{AppTask, NonReadTask, ResponseTask, Step, Task};
 use crate::master::TaskType;
@@ -36,7 +36,7 @@ impl AutoTask {
 
 impl ResponseTask for AutoTask {
     type Output = ();
-    type Error = TaskError;
+    type Error = TaskErrorKind;
 
     fn function(&self) -> FunctionCode {
         match self {
@@ -54,7 +54,7 @@ impl ResponseTask for AutoTask {
         }
     }
 
-    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskErrorKind> {
         match self {
             AutoTask::ClearRestartBit => writer.write_clear_restart()?,
             AutoTask::EnableUnsolicited(classes) => classes.write(writer)?,
@@ -67,7 +67,7 @@ impl ResponseTask for AutoTask {
         &mut self,
         _association: &mut Association,
         response: Response<'_>,
-    ) -> Result<Step<()>, TaskError> {
+    ) -> Result<Step<()>, TaskErrorKind> {
         if !response.raw_objects.is_empty() {
             tracing::warn!("ignoring object headers in reply to {}", self.description());
         }
@@ -76,13 +76,13 @@ impl ResponseTask for AutoTask {
             && response.header.iin.iin1.get_device_restart()
         {
             tracing::warn!("device failed to clear restart IIN bit");
-            return Err(TaskError::UnexpectedResponseHeaders);
+            return Err(TaskErrorKind::UnexpectedResponseHeaders);
         }
 
         Ok(Step::Done(()))
     }
 
-    fn complete(self, association: Option<&mut Association>, result: Result<(), TaskError>) {
+    fn complete(self, association: Option<&mut Association>, result: Result<(), TaskErrorKind>) {
         let association = match association {
             None => return,
             Some(x) => x,
@@ -90,7 +90,7 @@ impl ResponseTask for AutoTask {
 
         match result {
             Ok(()) => association.on_auto_task_success(&self),
-            Err(TaskError::RejectedByIin2(iin)) => {
+            Err(TaskErrorKind::RejectedByIin2(iin)) => {
                 tracing::warn!("Auto task '{}' rejected by outstation IIN.2: {}. Check your outstation configuration?", self.description(), iin.iin2);
                 // a rejection still answers the task, unless the restart bit is still set
                 if matches!(self, AutoTask::ClearRestartBit) && iin.iin1.get_device_restart() {

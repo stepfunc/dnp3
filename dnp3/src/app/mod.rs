@@ -10,7 +10,7 @@ pub use file::*;
 pub use header::*;
 pub use listener::*;
 pub use maybe_async::MaybeAsync;
-pub use parse_error::*;
+pub(crate) use parse_error::*;
 pub use retry::*;
 pub use sequence::*;
 pub use shutdown::*;

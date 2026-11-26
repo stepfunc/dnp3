@@ -383,8 +383,10 @@ pub trait Get<T> {
 
 /// Errors that can occur when manipulating attributes
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(not(feature = "ffi"), non_exhaustive)]
-pub enum AttrDefError {
+pub struct AttrDefError(pub(crate) AttrDefErrorKind);
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) enum AttrDefErrorKind {
     /// The attribute is already defined
     AlreadyDefined,
     /// The attribute does not match the type expected for set 0
@@ -397,36 +399,42 @@ pub enum AttrDefError {
     BadValue(BadAttribute),
 }
 
-impl std::fmt::Display for AttrDefError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Self::BadType(x) => write!(
-                f,
-                "The type {:?} does not match the expected type {:?}",
-                x.actual, x.expected
-            ),
-            Self::ReservedVariation(x) => {
+impl core::fmt::Display for AttrDefError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self.0 {
+            AttrDefErrorKind::BadType(x) => core::fmt::Display::fmt(&x, f),
+            AttrDefErrorKind::ReservedVariation(x) => {
                 write!(f, "Reserved variation cannot be defined: {x}")
             }
-            Self::NotWritable(set, var) => write!(
+            AttrDefErrorKind::NotWritable(set, var) => write!(
                 f,
                 "Attribute with set = {set:?} and var = {var} cannot be written"
             ),
-            Self::AlreadyDefined => write!(f, "The requested attribute is already defined"),
-            Self::BadValue(x) => write!(f, "{x}"),
+            AttrDefErrorKind::AlreadyDefined => {
+                f.write_str("The requested attribute is already defined")
+            }
+            AttrDefErrorKind::BadValue(x) => write!(f, "{x}"),
         }
     }
 }
 
-impl From<TypeError> for AttrDefError {
+impl core::error::Error for AttrDefError {}
+
+impl From<TypeError> for AttrDefErrorKind {
     fn from(value: TypeError) -> Self {
         Self::BadType(value)
     }
 }
 
-impl From<BadAttribute> for AttrDefError {
+impl From<BadAttribute> for AttrDefErrorKind {
     fn from(value: BadAttribute) -> Self {
         Self::BadValue(value)
+    }
+}
+
+impl From<AttrDefErrorKind> for AttrDefError {
+    fn from(kind: AttrDefErrorKind) -> Self {
+        Self(kind)
     }
 }
 
@@ -485,7 +493,10 @@ impl Database {
         prop: AttrProp,
         attr: OwnedAttribute,
     ) -> Result<(), AttrDefError> {
-        self.inner.get_attr_map().define(prop, attr)
+        self.inner
+            .get_attr_map()
+            .define(prop, attr)
+            .map_err(AttrDefError::from)
     }
 }
 

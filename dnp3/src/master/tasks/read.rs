@@ -5,7 +5,7 @@
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
 use crate::app::format::write::HeaderWriter;
-use crate::master::error::TaskError;
+use crate::master::error::{TaskError, TaskErrorKind};
 use crate::master::promise::Promise;
 use crate::master::request::ReadRequest;
 use crate::master::tasks::{AppTask, ReadTask, Task};
@@ -44,12 +44,12 @@ impl SingleReadTask {
         }
     }
 
-    pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
+    pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), TaskErrorKind> {
         self.request.format(writer)
     }
 
-    pub(crate) fn on_task_error(self, err: TaskError) {
-        self.promise.complete(Err(err))
+    pub(crate) fn on_task_error(self, err: TaskErrorKind) {
+        self.promise.complete(Err(err.into()))
     }
 
     pub(crate) fn on_complete(self) {

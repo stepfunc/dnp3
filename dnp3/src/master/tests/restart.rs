@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use crate::app::{ControlField, Iin, ObjectParseError, Sequence};
 use crate::master::association::AssociationConfig;
-use crate::master::TaskError;
+use crate::master::error::TaskErrorKind;
 
 use super::harness::create_association;
 use super::harness::requests::response;
@@ -33,7 +33,7 @@ impl Restart {
 struct Case {
     restart: Restart,
     objects: &'static [u8],
-    expected: Result<Duration, TaskError>,
+    expected: Result<Duration, TaskErrorKind>,
 }
 
 const CASES: [Case; 14] = [
@@ -59,61 +59,61 @@ const CASES: [Case; 14] = [
     Case {
         restart: Restart::Cold,
         objects: &[51, 1, 0x07, 1, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
-        expected: Err(TaskError::UnexpectedResponseHeaders),
+        expected: Err(TaskErrorKind::UnexpectedResponseHeaders),
     },
     // g1v2 with a 1-byte start/stop instead of a counted time delay
     Case {
         restart: Restart::Cold,
         objects: &[1, 2, 0x00, 0, 0, 0x01],
-        expected: Err(TaskError::UnexpectedResponseHeaders),
+        expected: Err(TaskErrorKind::UnexpectedResponseHeaders),
     },
     // g52v1 with a count of zero
     Case {
         restart: Restart::Cold,
         objects: &[52, 1, 0x07, 0],
-        expected: Err(TaskError::UnexpectedResponseHeaders),
+        expected: Err(TaskErrorKind::UnexpectedResponseHeaders),
     },
     // g52v1 with a count of two
     Case {
         restart: Restart::Cold,
         objects: &[52, 1, 0x07, 2, 0x02, 0x00, 0x03, 0x00],
-        expected: Err(TaskError::UnexpectedResponseHeaders),
+        expected: Err(TaskErrorKind::UnexpectedResponseHeaders),
     },
     // g52v2 with a count of zero
     Case {
         restart: Restart::Warm,
         objects: &[52, 2, 0x07, 0],
-        expected: Err(TaskError::UnexpectedResponseHeaders),
+        expected: Err(TaskErrorKind::UnexpectedResponseHeaders),
     },
     // g52v2 with a count of two
     Case {
         restart: Restart::Warm,
         objects: &[52, 2, 0x07, 2, 0x02, 0x00, 0x03, 0x00],
-        expected: Err(TaskError::UnexpectedResponseHeaders),
+        expected: Err(TaskErrorKind::UnexpectedResponseHeaders),
     },
     // two g52v2 headers, each with a count of one
     Case {
         restart: Restart::Warm,
         objects: &[52, 2, 0x07, 1, 0x02, 0x00, 52, 2, 0x07, 1, 0x03, 0x00],
-        expected: Err(TaskError::UnexpectedResponseHeaders),
+        expected: Err(TaskErrorKind::UnexpectedResponseHeaders),
     },
     // no object header
     Case {
         restart: Restart::Cold,
         objects: &[],
-        expected: Err(TaskError::UnexpectedResponseHeaders),
+        expected: Err(TaskErrorKind::UnexpectedResponseHeaders),
     },
     // two g52v1 time delays
     Case {
         restart: Restart::Cold,
         objects: &[52, 1, 0x07, 1, 0x02, 0x00, 52, 1, 0x07, 1, 0x03, 0x00],
-        expected: Err(TaskError::UnexpectedResponseHeaders),
+        expected: Err(TaskErrorKind::UnexpectedResponseHeaders),
     },
     // g52v1 cut short after its qualifier
     Case {
         restart: Restart::Cold,
         objects: &[52, 1, 0x07],
-        expected: Err(TaskError::MalformedResponse(
+        expected: Err(TaskErrorKind::MalformedResponse(
             ObjectParseError::InsufficientBytes,
         )),
     },
@@ -121,7 +121,7 @@ const CASES: [Case; 14] = [
     Case {
         restart: Restart::Warm,
         objects: &[52, 9, 0x07, 1, 0x02, 0x00],
-        expected: Err(TaskError::MalformedResponse(
+        expected: Err(TaskErrorKind::MalformedResponse(
             ObjectParseError::UnknownGroupVariation(52, 9),
         )),
     },
@@ -154,7 +154,7 @@ async fn restart_returns_the_time_delay_of_the_response() {
 
             assert_eq!(
                 restart.await.unwrap(),
-                case.expected,
+                case.expected.map_err(Into::into),
                 "{:?} {:?}",
                 case.restart,
                 case.objects

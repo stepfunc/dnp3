@@ -36,11 +36,11 @@ impl FramePayload {
         let end = self
             .length
             .checked_add(data.len())
-            .ok_or(LogicError::BadSize)?;
+            .ok_or(LogicError::Size)?;
         let dest = self
             .buffer
             .get_mut(self.length..end)
-            .ok_or(LogicError::BadSize)?;
+            .ok_or(LogicError::Size)?;
         for (dest, src) in dest.iter_mut().zip(data) {
             *dest = *src;
         }
@@ -108,7 +108,7 @@ enum NoFrame {
 
 impl From<ReadError> for ParseError {
     fn from(_: ReadError) -> Self {
-        ParseError::BadLogic(LogicError::BadRead)
+        ParseError::BadLogic(LogicError::Read)
     }
 }
 
@@ -216,12 +216,10 @@ impl Parser {
         for block in crate::util::chunks::<_, { constant::MAX_BLOCK_SIZE_WITH_CRC }>(trailer) {
             // a block holds at least one byte of data before its CRC
             let Some(data_len) = block.len().checked_sub(2).filter(|n| *n > 0) else {
-                return Err(LogicError::BadSize.into());
+                return Err(LogicError::Size.into());
             };
 
-            let (data, crc) = block
-                .split_at_checked(data_len)
-                .ok_or(LogicError::BadSize)?;
+            let (data, crc) = block.split_at_checked(data_len).ok_or(LogicError::Size)?;
             let crc_value = ReadCursor::new(crc).read_u16_le()?;
             let calc_crc = super::crc::calc_crc(data);
 

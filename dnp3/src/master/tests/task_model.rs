@@ -43,6 +43,7 @@ use crate::app::{
 };
 use crate::link::EndpointAddress;
 use crate::master::association::AssociationConfig;
+use crate::master::error::{CommandResponseError, TaskErrorKind};
 use crate::master::test_fixtures::FixedTime;
 use crate::master::tests::harness::requests::{analog_event, response};
 use crate::master::tests::harness::{
@@ -51,7 +52,7 @@ use crate::master::tests::harness::{
 use crate::master::tests::outcomes::{
     Entry, Kind, Log, Reply, MALFORMED, OTHER, OUTSTATION, UNKNOWN,
 };
-use crate::master::{Classes, CommandError, CommandResponseError, ReadType, TaskError, TaskType};
+use crate::master::{Classes, ReadType, TaskType};
 use crate::util::test_support::run_paused;
 
 /// The response timeout the harness configures, in milliseconds
@@ -382,7 +383,7 @@ struct StepObs {
 enum End {
     /// with the sequence number of the last response
     Success(u8),
-    Failure(TaskError),
+    Failure(TaskErrorKind),
     /// a command whose response doesn't echo the request
     CommandMismatch,
 }
@@ -393,10 +394,11 @@ impl End {
             End::Success(seq) => {
                 AssocInfoEvent::TaskSuccess(task.task_type(), task.function(), Sequence::new(seq))
             }
-            End::Failure(err) => AssocInfoEvent::TaskFailure(task.task_type(), err),
-            End::CommandMismatch => {
-                AssocInfoEvent::TaskFailure(task.task_type(), TaskError::UnexpectedResponseHeaders)
-            }
+            End::Failure(err) => AssocInfoEvent::TaskFailure(task.task_type(), err.into()),
+            End::CommandMismatch => AssocInfoEvent::TaskFailure(
+                task.task_type(),
+                TaskErrorKind::UnexpectedResponseHeaders.into(),
+            ),
         }
     }
 
@@ -404,9 +406,9 @@ impl End {
         match self {
             End::Success(_) => kind.ok(),
             End::Failure(err) => kind.failed(err),
-            End::CommandMismatch => Reply::Command(Err(CommandError::Response(
-                CommandResponseError::HeaderCountMismatch,
-            ))),
+            End::CommandMismatch => {
+                Reply::Command(Err(CommandResponseError::HeaderCountMismatch.into()))
+            }
         }
     }
 }
@@ -550,7 +552,7 @@ impl Model {
         if let Some(deadline) = self.deadline() {
             if deadline <= until {
                 self.now = deadline;
-                self.end(End::Failure(TaskError::ResponseTimeout));
+                self.end(End::Failure(TaskErrorKind::ResponseTimeout));
             }
         }
         self.now = until;
@@ -606,7 +608,7 @@ impl Model {
             Input::Malformed(source, which) => {
                 self.obs.reads = 1;
                 if source == Source::Outstation {
-                    self.end(End::Failure(TaskError::Transport));
+                    self.end(End::Failure(TaskErrorKind::Transport));
                 }
                 let bytes = MALFORMED.get(which).copied().unwrap_or_default();
                 Some((source.address(), bytes.to_vec()))
@@ -749,11 +751,11 @@ impl Model {
         };
         // a fragment that breaks a FIR rule and the FIN and CON rule fails for the FIR rule
         let broken = if fir && !first {
-            Some(TaskError::UnexpectedFir)
+            Some(TaskErrorKind::UnexpectedFir)
         } else if !fir && first {
-            Some(TaskError::NeverReceivedFir)
+            Some(TaskErrorKind::NeverReceivedFir)
         } else if !answer.fin && !answer.con {
-            Some(TaskError::NonFinWithoutCon)
+            Some(TaskErrorKind::NonFinWithoutCon)
         } else {
             None
         };
@@ -767,13 +769,11 @@ impl Model {
         let measurement = match answer.objects.content() {
             Content::Valid(measurement) => measurement,
             Content::Malformed => {
-                self.end(End::Failure(TaskError::MalformedResponse(
-                    ObjectParseError::InsufficientBytes,
-                )));
+                self.end(End::Failure(ObjectParseError::InsufficientBytes.into()));
                 return;
             }
             Content::RelativeWithoutCto => {
-                self.end(End::Failure(TaskError::UnexpectedResponseHeaders));
+                self.end(End::Failure(TaskErrorKind::UnexpectedResponseHeaders));
                 return;
             }
         };
@@ -807,7 +807,7 @@ impl Model {
             let end = if *errors == 0 || *values || !fails_without_data {
                 End::Success(seq)
             } else {
-                End::Failure(TaskError::RejectedByIin2(Iin::new(
+                End::Failure(TaskErrorKind::RejectedByIin2(Iin::new(
                     Iin1::new(*last_iin1),
                     Iin2::new(*errors),
                 )))
@@ -827,7 +827,7 @@ impl Model {
             return;
         };
         if !(fir && answer.fin) {
-            self.end(End::Failure(TaskError::MultiFragmentResponse));
+            self.end(End::Failure(TaskErrorKind::MultiFragmentResponse));
             return;
         }
 
@@ -842,17 +842,15 @@ impl Model {
 
         // a rejected response is reported as such, even if its objects can't be parsed
         let end = if answer.iin2 & BAD_REQUEST_ERRORS != 0 {
-            End::Failure(TaskError::RejectedByIin2(Iin::new(
+            End::Failure(TaskErrorKind::RejectedByIin2(Iin::new(
                 Iin1::new(iin1),
                 Iin2::new(answer.iin2),
             )))
         } else {
             match reaction {
-                Reaction::Malformed => End::Failure(TaskError::MalformedResponse(
-                    ObjectParseError::InsufficientBytes,
-                )),
+                Reaction::Malformed => End::Failure(ObjectParseError::InsufficientBytes.into()),
                 Reaction::Unexpected if self.task.is_command() => End::CommandMismatch,
-                Reaction::Unexpected => End::Failure(TaskError::UnexpectedResponseHeaders),
+                Reaction::Unexpected => End::Failure(TaskErrorKind::UnexpectedResponseHeaders),
                 Reaction::Correct => {
                     let selected =
                         matches!(self.task, Task::User(Kind::SelectBeforeOperate)) && !operating;
@@ -1336,7 +1334,7 @@ fn the_model_accepts_the_master_and_rejects_known_wrong_outcomes() {
     run.probe = probe;
 
     // failing the read for the request error, though it returned data
-    let rejected = TaskError::RejectedByIin2(Iin::new(Iin1::new(0), Iin2::new(0x02)));
+    let rejected = TaskErrorKind::RejectedByIin2(Iin::new(Iin1::new(0), Iin2::new(0x02))).into();
     run.observed[2].info = vec![AssocInfoEvent::TaskFailure(TaskType::UserRead, rejected)];
     run.reply = ReplyObs::Done(Reply::Read(Err(rejected)), 2 * TICK);
     run.check().unwrap_err();
@@ -1362,23 +1360,29 @@ fn a_read_fragment_breaking_a_fir_rule_and_the_fin_con_rule_fails_for_the_fir_ru
     let mut run = run_paused(execute(task, &[fragment]));
     run.check().unwrap();
 
-    let failed = |err| AssocInfoEvent::TaskFailure(TaskType::UserRead, err);
+    let failed = |err: TaskErrorKind| AssocInfoEvent::TaskFailure(TaskType::UserRead, err.into());
     assert_eq!(
         run.observed[1],
         StepObs {
             reads: 1,
-            info: vec![failed(TaskError::NeverReceivedFir)],
+            info: vec![failed(TaskErrorKind::NeverReceivedFir)],
             ..StepObs::default()
         }
     );
     assert_eq!(
         run.reply,
-        ReplyObs::Done(Reply::Read(Err(TaskError::NeverReceivedFir)), TICK)
+        ReplyObs::Done(
+            Reply::Read(Err(TaskErrorKind::NeverReceivedFir.into())),
+            TICK
+        )
     );
 
     // failing it for the FIN and CON rule instead
-    run.observed[1].info = vec![failed(TaskError::NonFinWithoutCon)];
-    run.reply = ReplyObs::Done(Reply::Read(Err(TaskError::NonFinWithoutCon)), TICK);
+    run.observed[1].info = vec![failed(TaskErrorKind::NonFinWithoutCon)];
+    run.reply = ReplyObs::Done(
+        Reply::Read(Err(TaskErrorKind::NonFinWithoutCon.into())),
+        TICK,
+    );
     run.check().unwrap_err();
 }
 
@@ -1402,7 +1406,7 @@ fn a_rejected_response_with_malformed_objects_fails_as_rejected() {
     let mut run = run_paused(execute(task, &[response]));
     run.check().unwrap();
 
-    let rejected = TaskError::RejectedByIin2(Iin::new(Iin1::new(0), Iin2::new(0x02)));
+    let rejected = TaskErrorKind::RejectedByIin2(Iin::new(Iin1::new(0), Iin2::new(0x02))).into();
     let failed = |err| AssocInfoEvent::TaskFailure(TaskType::Restart, err);
     assert_eq!(
         run.observed[1],
@@ -1418,7 +1422,7 @@ fn a_rejected_response_with_malformed_objects_fails_as_rejected() {
     );
 
     // failing it for the malformed objects instead
-    let malformed = TaskError::MalformedResponse(ObjectParseError::InsufficientBytes);
+    let malformed = ObjectParseError::InsufficientBytes.into();
     run.observed[1].info = vec![failed(malformed)];
     run.reply = ReplyObs::Done(Reply::Restart(Err(malformed)), TICK);
     run.check().unwrap_err();
@@ -1442,8 +1446,10 @@ fn a_startup_integrity_scan_times_out_one_response_timeout_after_its_last_fragme
     let run = run_paused(execute(Task::StartupIntegrity, &[first]));
     run.check().unwrap();
 
-    let failed =
-        AssocInfoEvent::TaskFailure(TaskType::StartupIntegrity, TaskError::ResponseTimeout);
+    let failed = AssocInfoEvent::TaskFailure(
+        TaskType::StartupIntegrity,
+        TaskErrorKind::ResponseTimeout.into(),
+    );
     // the fragment at 7 ms and nothing else until a millisecond before its timeout at 1007 ms,
     // then the failure
     assert_eq!(run.observed.len(), 3);

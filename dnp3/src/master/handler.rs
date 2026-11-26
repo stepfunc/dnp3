@@ -12,10 +12,12 @@ use crate::app::*;
 use crate::decode::DecodeLevel;
 use crate::link::EndpointAddress;
 use crate::master::association::AssociationConfig;
-use crate::master::error::{AssociationError, CommandError, PollError, TaskError, TimeSyncError};
+use crate::master::error::{
+    AssociationError, AssociationErrorKind, CommandError, PollError, TaskError, TimeSyncError,
+};
 use crate::master::messages::{AssociationMsg, AssociationMsgType, MasterMsg, Message};
 use crate::master::poll::{PollHandle, PollMsg};
-use crate::master::promise::Promise;
+use crate::master::promise::{await_result, Promise};
 use crate::master::request::{CommandHeaders, CommandMode, ReadRequest, TimeSyncProcedure};
 use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::command_no_ack::CommandNoAckTask;
@@ -139,17 +141,18 @@ impl MasterChannel {
         let (promise, rx) = Promise::one_shot();
         self.send_master_message(MasterMsg::GetDecodeLevel(promise))
             .await?;
-        rx.await?
+        await_result(rx).await
     }
 
     fn assert_channel_type(&self, required: MasterChannelType) -> Result<(), AssociationError> {
         if self.channel_type == required {
             Ok(())
         } else {
-            Err(AssociationError::WrongChannelType {
+            Err(AssociationErrorKind::WrongChannelType {
                 actual: self.channel_type,
                 required,
-            })
+            }
+            .into())
         }
     }
 
@@ -182,7 +185,8 @@ impl MasterChannel {
             promise,
         ))
         .await?;
-        rx.await?
+        await_result(rx)
+            .await
             .map(|_| AssociationHandle::new(address, self.clone()))
     }
 
@@ -217,7 +221,8 @@ impl MasterChannel {
             promise,
         ))
         .await?;
-        rx.await?
+        await_result(rx)
+            .await
             .map(|_| AssociationHandle::new(address, self.clone()))
     }
 
@@ -276,7 +281,7 @@ impl AssociationHandle {
         let (promise, rx) = Promise::one_shot();
         self.send_poll_message(PollMsg::AddPoll(self.clone(), request, period, promise))
             .await?;
-        rx.await?
+        await_result(rx).await
     }
 
     /// Remove the association from the master
@@ -294,7 +299,7 @@ impl AssociationHandle {
         let (promise, rx) = Promise::one_shot();
         let task = SingleReadTask::new(request, promise);
         self.send_task(task).await?;
-        rx.await?
+        await_result(rx).await
     }
 
     /// Perform an asynchronous request with the specified function code and object headers
@@ -310,7 +315,7 @@ impl AssociationHandle {
         let (promise, rx) = Promise::one_shot();
         let task = OneShot::new(EmptyResponseRequest::new(function, headers), promise);
         self.send_task(task).await?;
-        rx.await?
+        await_result(rx).await
     }
 
     /// Perform an asynchronous READ request with a custom read handler
@@ -324,7 +329,7 @@ impl AssociationHandle {
         let (promise, rx) = Promise::one_shot();
         let task = SingleReadTask::new_with_custom_handler(request, handler, promise);
         self.send_task(task).await?;
-        rx.await?
+        await_result(rx).await
     }
 
     /// Perform an asynchronous operate request
@@ -338,7 +343,7 @@ impl AssociationHandle {
         let (promise, rx) = Promise::one_shot();
         let task = CommandTask::from_mode(mode, headers, promise);
         self.send_task(task).await?;
-        rx.await?
+        await_result(rx).await
     }
 
     /// Perform an asynchronous `DIRECT_OPERATE_NO_ACK` (function code 0x06) request
@@ -351,7 +356,7 @@ impl AssociationHandle {
         let (promise, rx) = Promise::one_shot();
         self.send_task(CommandNoAckTask::new(headers, promise))
             .await?;
-        rx.await?
+        await_result(rx).await
     }
 
     /// Perform a WARM_RESTART operation
@@ -372,7 +377,7 @@ impl AssociationHandle {
         let (promise, rx) = Promise::one_shot();
         let task = OneShot::new(restart_type, promise);
         self.send_task(task).await?;
-        rx.await?
+        await_result(rx).await
     }
 
     /// Perform the specified time synchronization operation
@@ -383,7 +388,7 @@ impl AssociationHandle {
         let (promise, rx) = Promise::one_shot();
         self.queue_task(PendingTimeSync::user(procedure, promise).into())
             .await?;
-        rx.await?
+        await_result(rx).await
     }
 
     /// Perform write one or more headers of analog input dead-bands to the outstation
@@ -394,7 +399,7 @@ impl AssociationHandle {
         let (promise, rx) = Promise::one_shot();
         let task = OneShot::new(DeadBandsRequest::new(headers), promise);
         self.send_task(task).await?;
-        rx.await?
+        await_result(rx).await
     }
 
     /// Trigger the master to issue a REQUEST_LINK_STATUS function in advance of the link status timeout
@@ -402,12 +407,12 @@ impl AssociationHandle {
     /// This function is provided for testing purposes. Using the configured link status timeout
     /// is the preferred so that the master automatically issues these requests.
     ///
-    /// If a [`TaskError::UnexpectedResponseHeaders`] is returned, the link might be alive
-    /// but it didn't answer with the expected `LINK_STATUS`.
+    /// If the link answers with something other than the expected `LINK_STATUS`, this returns a
+    /// [`TaskError`] even though the link may still be alive.
     pub async fn check_link_status(&mut self) -> Result<(), TaskError> {
         let (promise, rx) = Promise::one_shot();
         self.send_task(Task::LinkStatus(promise)).await?;
-        rx.await?
+        await_result(rx).await
     }
 
     /// Obtain an [`AuthKey`] from the outstation which may then be used to open the file.
@@ -420,7 +425,7 @@ impl AssociationHandle {
         let task = OneShot::new(AuthFileRequest { credentials }, promise);
 
         self.send_task(task).await?;
-        rx.await?
+        await_result(rx).await
     }
 
     /// Open a file on the outstation with the requested parameters
@@ -446,7 +451,7 @@ impl AssociationHandle {
         let task = OneShot::new(request, promise);
 
         self.send_task(task).await?;
-        rx.await?
+        await_result(rx).await
     }
 
     /// Write a file block to the outstation
@@ -466,7 +471,7 @@ impl AssociationHandle {
         let task = OneShot::new(request, promise);
 
         self.send_task(task).await?;
-        rx.await?
+        await_result(rx).await
     }
 
     /// Close a file on the outstation
@@ -476,7 +481,7 @@ impl AssociationHandle {
         let task = OneShot::new(CloseFileRequest { handle }, promise);
 
         self.send_task(task).await?;
-        rx.await?
+        await_result(rx).await
     }
 
     /// Start an operation to READ a file from the outstation using a [`FileReader`] to receive data
@@ -499,8 +504,8 @@ impl AssociationHandle {
     /// Read a file directory
     ///
     /// The returned result is the source of truth for the read. Entries that fail to parse after
-    /// the transfer completes fail with [`TaskError::MalformedResponse`], while the
-    /// [`AssociationInformation`] may still report the [`TaskType::FileRead`] task as a success.
+    /// the transfer completes return a [`FileError`], while [`AssociationInformation`] may still
+    /// report the [`TaskType::FileRead`] task as a success.
     pub async fn read_directory<T: ToString>(
         &mut self,
         dir_path: T,
@@ -511,7 +516,7 @@ impl AssociationHandle {
         let reader = Box::new(DirectoryReader::new(promise));
         self.read_file(dir_path, config.into(), reader, credentials)
             .await?;
-        rx.await?
+        await_result(rx).await
     }
 
     /// Get information about a file
@@ -522,7 +527,7 @@ impl AssociationHandle {
         let (promise, reply) = Promise::one_shot();
         let task = OneShot::new(GetFileInfoRequest::new(file_path.to_string()), promise);
         self.send_task(task).await?;
-        reply.await?
+        await_result(reply).await
     }
 
     pub(crate) async fn send_task<T: Into<Task>>(&mut self, task: T) -> Result<(), Shutdown> {
@@ -575,11 +580,10 @@ pub enum TaskType {
     GenericEmptyResponse(FunctionCode),
     /// Read a file or directory from the outstation
     ///
-    /// The task fails with [`TaskError::UnexpectedResponseHeaders`] when a response from the
-    /// outstation ends the transfer: an unsuccessful OPEN status, an authentication key of 0, an
-    /// unexpected object variation, or an unexpected block number. When the master ends the
-    /// transfer itself, because the [`FileReader`] aborted it or the file exceeded the configured
-    /// maximum size, that doesn't by itself fail the task.
+    /// The task fails when a response from the outstation ends the transfer: an unsuccessful OPEN
+    /// status, an authentication key of 0, an unexpected object variation, or an unexpected block
+    /// number. When the master ends the transfer itself, because the [`FileReader`] aborted it or
+    /// the file exceeded the configured maximum size, that doesn't by itself fail the task.
     ///
     /// Success therefore doesn't mean that the transfer succeeded. The [`FileReader`] is the source
     /// of truth for the transfer.

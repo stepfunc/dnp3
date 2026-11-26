@@ -9,8 +9,10 @@ use crate::app::format::write::HeaderWriter;
 use crate::app::parse::free_format::FreeFormatVariation;
 use crate::app::parse::parser::{ObjectHeader, Response};
 use crate::app::{FunctionCode, Timestamp};
+use crate::master::error::TaskErrorKind;
+use crate::master::file::FileErrorKind;
 use crate::master::tasks::{NonReadTask, OneShot, OneShotRequest};
-use crate::master::{FileError, FileInfo, TaskError, TaskType};
+use crate::master::{FileInfo, TaskType};
 
 pub(crate) struct GetFileInfoRequest {
     file_name: String,
@@ -24,7 +26,7 @@ impl GetFileInfoRequest {
 
 impl OneShotRequest for GetFileInfoRequest {
     type Output = FileInfo;
-    type Error = FileError;
+    type Error = FileErrorKind;
 
     fn function(&self) -> FunctionCode {
         FunctionCode::GetFileInfo
@@ -34,7 +36,7 @@ impl OneShotRequest for GetFileInfoRequest {
         TaskType::GetFileInfo
     }
 
-    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskErrorKind> {
         let obj = Group70Var7 {
             file_type: FileType::Other(0),
             file_size: 0,
@@ -46,7 +48,7 @@ impl OneShotRequest for GetFileInfoRequest {
         Ok(writer.write_free_format(&obj)?)
     }
 
-    fn parse(&self, response: Response<'_>) -> Result<FileInfo, FileError> {
+    fn parse(&self, response: Response<'_>) -> Result<FileInfo, FileErrorKind> {
         let header = response.objects?.get_only_header()?;
 
         match header {
@@ -55,14 +57,14 @@ impl OneShotRequest for GetFileInfoRequest {
                 if obj.status_code != FileStatus::Success {
                     tracing::warn!("Unable to get file info: {}", obj.text);
                 }
-                Err(FileError::BadStatus(obj.status_code))
+                Err(FileErrorKind::BadStatus(obj.status_code))
             }
             _ => {
                 tracing::warn!(
                     "File GET_FILE_INFO response contains unexpected variation: {}",
                     header.variation()
                 );
-                Err(TaskError::UnexpectedResponseHeaders.into())
+                Err(TaskErrorKind::UnexpectedResponseHeaders.into())
             }
         }
     }

@@ -61,6 +61,7 @@ use crate::app::parse::options::ParseOptions;
 use crate::app::parse::parser::ParsedFragment;
 use crate::app::{ControlField, Iin1, Iin2, ResponseFunction};
 use crate::link::error::LinkError;
+use crate::master::error::{TaskError, TaskErrorKind};
 use crate::master::request::ReadRequest;
 use crate::master::session::read::ReadOutcome;
 use crate::master::tasks::read::SingleReadTask;
@@ -820,13 +821,13 @@ impl System {
     ) -> Result<(), TestCaseError> {
         let Ok(association) = self.map.get_mut(task.dest.link) else {
             task.details
-                .on_task_error(None, TaskError::NoSuchAssociation(task.dest.link));
+                .on_task_error(None, TaskErrorKind::NoSuchAssociation(task.dest.link));
             return Ok(());
         };
         let answer = match outcome {
             Outcome::Timeout => {
                 task.details
-                    .on_task_error(Some(association), TaskError::ResponseTimeout);
+                    .on_task_error(Some(association), TaskErrorKind::ResponseTimeout);
                 return Ok(());
             }
             Outcome::Answer(answer) => answer,
@@ -855,7 +856,7 @@ impl System {
             Task::App(AppTask::NonRead(task)) => {
                 association.process_iin(iin);
                 if iin.has_bad_request_error() {
-                    task.on_task_error(Some(association), TaskError::RejectedByIin2(iin));
+                    task.on_task_error(Some(association), TaskErrorKind::RejectedByIin2(iin));
                 } else {
                     let mut buffer = [0; 4];
                     let mut cursor = WriteCursor::new(&mut buffer);
@@ -876,7 +877,7 @@ impl System {
                 }
             }
             Task::App(task @ AppTask::NoResponse(_)) => {
-                task.on_task_error(Some(association), TaskError::ResponseTimeout)
+                task.on_task_error(Some(association), TaskErrorKind::ResponseTimeout)
             }
         }
         Ok(())

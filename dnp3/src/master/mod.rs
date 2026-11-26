@@ -17,8 +17,8 @@ pub use request::*;
 mod association;
 #[cfg(feature = "unstable")]
 mod builder;
-mod error;
-mod file;
+pub(crate) mod error;
+pub(crate) mod file;
 mod handler;
 mod read_handler;
 mod request;

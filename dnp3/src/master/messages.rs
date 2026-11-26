@@ -7,8 +7,7 @@
 use crate::app::Shutdown;
 use crate::decode::DecodeLevel;
 use crate::link::EndpointAddress;
-use crate::master::error::PollError;
-use crate::master::error::{AssociationError, TaskError};
+use crate::master::error::{AssociationError, PollErrorKind, TaskErrorKind};
 use crate::master::poll::PollMsg;
 use crate::master::promise::Promise;
 use crate::master::tasks::QueuedTask;
@@ -66,10 +65,10 @@ impl AssociationMsgType {
     pub(crate) fn on_association_failure(self, address: EndpointAddress) {
         match self {
             AssociationMsgType::QueueTask(task) => {
-                task.on_task_error(None, TaskError::NoSuchAssociation(address));
+                task.on_task_error(None, TaskErrorKind::NoSuchAssociation(address));
             }
             AssociationMsgType::Poll(msg) => {
-                msg.on_error(PollError::NoSuchAssociation(address));
+                msg.on_error(PollErrorKind::NoSuchAssociation(address));
             }
         }
     }

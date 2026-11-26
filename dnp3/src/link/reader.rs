@@ -110,7 +110,7 @@ impl ReadBuffer {
     /// move the unread bytes to the start of the buffer
     fn shift_unread_bytes(&mut self) -> Result<(), LogicError> {
         if self.begin > self.end || self.end > self.buffer.len() {
-            return Err(LogicError::BadSize);
+            return Err(LogicError::Size);
         }
         // front to back, so each byte is read before the copy overwrites it
         let cells = Cell::from_mut(&mut *self.buffer).as_slice_of_cells();
@@ -124,13 +124,13 @@ impl ReadBuffer {
     }
 
     fn writable(&mut self) -> Result<&mut [u8], LogicError> {
-        self.buffer.get_mut(self.end..).ok_or(LogicError::BadSize)
+        self.buffer.get_mut(self.end..).ok_or(LogicError::Size)
     }
 
     fn readable(&self) -> Result<&[u8], LogicError> {
         self.buffer
             .get(self.begin..self.end)
-            .ok_or(LogicError::BadSize)
+            .ok_or(LogicError::Size)
     }
 
     fn advance_write(&mut self, count: usize) -> Result<(), LogicError> {
@@ -138,7 +138,7 @@ impl ReadBuffer {
             .end
             .checked_add(count)
             .filter(|end| *end <= self.buffer.len())
-            .ok_or(LogicError::BadSize)?;
+            .ok_or(LogicError::Size)?;
         Ok(())
     }
 
@@ -147,7 +147,7 @@ impl ReadBuffer {
             .begin
             .checked_add(count)
             .filter(|begin| *begin <= self.end)
-            .ok_or(LogicError::BadSize)?;
+            .ok_or(LogicError::Size)?;
         Ok(())
     }
 
@@ -310,11 +310,11 @@ mod tests {
     fn read_buffer_rejects_advances_past_its_bounds() {
         let mut buffer = ReadBuffer::new(4);
 
-        assert_eq!(buffer.advance_write(5), Err(LogicError::BadSize));
+        assert_eq!(buffer.advance_write(5), Err(LogicError::Size));
         assert_eq!((buffer.begin, buffer.end), (0, 0));
 
         buffer.advance_write(3).unwrap();
-        assert_eq!(buffer.advance_read(4), Err(LogicError::BadSize));
+        assert_eq!(buffer.advance_read(4), Err(LogicError::Size));
         assert_eq!((buffer.begin, buffer.end), (0, 3));
 
         buffer.advance_read(3).unwrap();

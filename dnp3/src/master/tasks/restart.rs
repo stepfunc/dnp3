@@ -10,7 +10,7 @@ use crate::app::format::write::HeaderWriter;
 use crate::app::gen::count::CountVariation;
 use crate::app::parse::parser::Response;
 use crate::app::FunctionCode;
-use crate::master::error::TaskError;
+use crate::master::error::TaskErrorKind;
 use crate::master::tasks::{NonReadTask, OneShot, OneShotRequest};
 use crate::master::TaskType;
 
@@ -29,7 +29,7 @@ pub(crate) enum RestartType {
 
 impl OneShotRequest for RestartType {
     type Output = Duration;
-    type Error = TaskError;
+    type Error = TaskErrorKind;
 
     fn function(&self) -> FunctionCode {
         match self {
@@ -42,25 +42,27 @@ impl OneShotRequest for RestartType {
         TaskType::Restart
     }
 
-    fn write(&self, _writer: &mut HeaderWriter) -> Result<(), TaskError> {
+    fn write(&self, _writer: &mut HeaderWriter) -> Result<(), TaskErrorKind> {
         Ok(())
     }
 
-    fn parse(&self, response: Response<'_>) -> Result<Duration, TaskError> {
+    fn parse(&self, response: Response<'_>) -> Result<Duration, TaskErrorKind> {
         let header = response.get_only_object_header()?;
 
-        let count = header.count().ok_or(TaskError::UnexpectedResponseHeaders)?;
+        let count = header
+            .count()
+            .ok_or(TaskErrorKind::UnexpectedResponseHeaders)?;
 
         match count {
             CountVariation::Group52Var1(val) => match val.single() {
                 Some(val) => Ok(Duration::from_secs(val.time.into())),
-                None => Err(TaskError::UnexpectedResponseHeaders),
+                None => Err(TaskErrorKind::UnexpectedResponseHeaders),
             },
             CountVariation::Group52Var2(val) => match val.single() {
                 Some(val) => Ok(Duration::from_millis(val.time.into())),
-                None => Err(TaskError::UnexpectedResponseHeaders),
+                None => Err(TaskErrorKind::UnexpectedResponseHeaders),
             },
-            _ => Err(TaskError::UnexpectedResponseHeaders),
+            _ => Err(TaskErrorKind::UnexpectedResponseHeaders),
         }
     }
 

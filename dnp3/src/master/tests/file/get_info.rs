@@ -9,8 +9,10 @@ use crate::app::{
     Sequence, Timestamp,
 };
 use crate::master::association::AssociationConfig;
+use crate::master::error::TaskErrorKind;
+use crate::master::file::FileErrorKind;
 use crate::master::tests::harness::{create_association, AssocInfoEvent, TestHarness};
-use crate::master::{FileError, FileInfo, TaskError, TaskType};
+use crate::master::{FileError, FileInfo, TaskType};
 use crate::util::test_support::watchdog;
 
 #[tokio::test]
@@ -91,7 +93,10 @@ async fn status_object_with_failure_fails_with_bad_status() {
             FileStatus::FileNotFound,
         ))
         .await;
-        assert_eq!(result, Err(FileError::BadStatus(FileStatus::FileNotFound)));
+        assert_eq!(
+            result,
+            Err(FileErrorKind::BadStatus(FileStatus::FileNotFound).into())
+        );
     })
     .await;
 }
@@ -102,7 +107,10 @@ async fn status_object_with_success_fails_with_bad_status() {
         let result =
             get_info_with_response(super::file_status_response(0, 0, 0, 0, FileStatus::Success))
                 .await;
-        assert_eq!(result, Err(FileError::BadStatus(FileStatus::Success)));
+        assert_eq!(
+            result,
+            Err(FileErrorKind::BadStatus(FileStatus::Success).into())
+        );
     })
     .await;
 }
@@ -119,7 +127,7 @@ async fn fails_on_unexpected_variation() {
             },
         ))
         .await;
-        assert_eq!(result, Err(TaskError::UnexpectedResponseHeaders.into()));
+        assert_eq!(result, Err(TaskErrorKind::UnexpectedResponseHeaders.into()));
     })
     .await;
 }
@@ -141,7 +149,7 @@ async fn get_info_with_response(response: Vec<u8>) -> Result<(), FileError> {
             ),
             AssocInfoEvent::TaskFailure(
                 TaskType::GetFileInfo,
-                TaskError::UnexpectedResponseHeaders
+                TaskErrorKind::UnexpectedResponseHeaders.into()
             ),
         ]
     );

@@ -8,7 +8,7 @@ use crate::app::parse::range::Range;
 use crate::app::parse::traits::Index;
 use crate::app::{ObjectParseError, Timestamp};
 #[cfg(test)]
-use crate::master::{BadEncoding, TaskError};
+use crate::master::error::BadEncoding;
 use scursor::{ReadCursor, ReadError, WriteCursor, WriteError};
 use std::fmt::{Display, Formatter};
 use std::str::Utf8Error;
@@ -1013,9 +1013,8 @@ impl OwnedAttrValue {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[non_exhaustive]
 /// Ways in which attribute encoding can fail
-pub enum BadAttribute {
+pub(crate) enum BadAttribute {
     /// length of the string attribute exceeds what's encodable (max 255)
     BadLength(usize),
     /// variation can't be written as an attribute value: 0 doesn't exist, 254 is the request for
@@ -1223,6 +1222,18 @@ impl TypeError {
         Self { expected, actual }
     }
 }
+
+impl core::fmt::Display for TypeError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(
+            f,
+            "attribute type {:?} does not match expected type {:?}",
+            self.actual, self.expected
+        )
+    }
+}
+
+impl core::error::Error for TypeError {}
 
 impl<'a> AttrValue<'a> {
     pub(crate) fn format(&self, f: &mut Formatter) -> std::fmt::Result {
@@ -1506,9 +1517,8 @@ impl<'a> Attribute<'a> {
 }
 
 /// Possible errors when parsing device attributes
-#[non_exhaustive]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum AttrParseError {
+pub(crate) enum AttrParseError {
     /// End of buffer
     ReadError,
     /// Unknown data type code
@@ -1574,7 +1584,7 @@ impl From<Utf8Error> for AttrParseError {
 
 impl<'a> AttrValue<'a> {
     /// Parse a device attribute (code, length, and payload)
-    pub fn parse(cursor: &mut ReadCursor<'a>) -> Result<Self, AttrParseError> {
+    pub(crate) fn parse(cursor: &mut ReadCursor<'a>) -> Result<Self, AttrParseError> {
         let data_type = {
             let data_type = cursor.read_u8()?;
             match AttrDataType::get(data_type) {
@@ -2145,6 +2155,7 @@ mod test {
         use crate::app::parse::options::ParseOptions;
         use crate::app::parse::parser::{HeaderCollection, ObjectHeader, Width};
         use crate::app::FunctionCode;
+        use crate::master::error::TaskErrorKind;
         use crate::master::Headers;
         use proptest::prelude::*;
 
@@ -2364,7 +2375,7 @@ mod test {
 
         /// writes the attribute as a master request does, returning the result and the bytes
         /// written
-        fn write(attr: &OwnedAttribute, buffer: &mut [u8]) -> (Result<(), TaskError>, Vec<u8>) {
+        fn write(attr: &OwnedAttribute, buffer: &mut [u8]) -> (Result<(), TaskErrorKind>, Vec<u8>) {
             let mut cursor = WriteCursor::new(buffer);
             let result = Headers::new()
                 .add_attribute(attr.clone())
@@ -2372,8 +2383,8 @@ mod test {
             (result, cursor.written().to_vec())
         }
 
-        fn bad_attribute(err: BadAttribute) -> Result<(), TaskError> {
-            Err(TaskError::BadEncoding(BadEncoding::Attribute(err)))
+        fn bad_attribute(err: BadAttribute) -> Result<(), TaskErrorKind> {
+            Err(BadEncoding::Attribute(err).into())
         }
 
         /// the only header, a g0 attribute in a one-byte range of the set
@@ -2491,7 +2502,7 @@ mod test {
                     let mut buffer = vec![0u8; encoded_size(len)];
                     prop_assert_eq!(write(&attr, &mut buffer).0, Ok(()));
                     let one_short = buffer.split_last_mut().map(|(_, rest)| write(&attr, rest).0);
-                    prop_assert_eq!(one_short, Some(Err(TaskError::WriteError)));
+                    prop_assert_eq!(one_short, Some(Err(TaskErrorKind::WriteError)));
                 }
             }
         }

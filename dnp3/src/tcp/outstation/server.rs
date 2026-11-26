@@ -188,7 +188,7 @@ impl Server {
     ) -> Result<(OutstationHandle, OutstationServerTask), FilterError> {
         for item in self.outstations.iter() {
             if filter.conflicts_with(&item.filter) {
-                return Err(FilterError::Conflict);
+                return Err(FilterError);
             }
         }
 
@@ -775,7 +775,7 @@ mod tests {
                     AddressFilter::AnyOf([addr.parse().unwrap()].into())
                 )
                 .err(),
-                Some(FilterError::Conflict),
+                Some(FilterError),
                 "{addr}"
             );
         }
