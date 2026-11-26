@@ -152,18 +152,110 @@ impl std::fmt::Display for EndpointAddress {
     }
 }
 
-/// Parses a decimal `u16` without validating it.
-///
-/// Unlike [`EndpointAddress::try_new`] and `TryFrom<u16>`, this doesn't reject the special
-/// addresses (0xFFF0 to 0xFFFF, which include the self and broadcast addresses), so
-/// `"65535".parse::<EndpointAddress>()` succeeds. To reject them, parse the string as a `u16`
-/// and pass it to [`EndpointAddress::try_new`].
-impl std::str::FromStr for EndpointAddress {
-    type Err = std::num::ParseIntError;
+/// Error returned when parsing an [`EndpointAddress`] from a string
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ParseEndpointAddressError(pub(crate) ParseEndpointAddressErrorKind);
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum ParseEndpointAddressErrorKind {
+    ParseInt(core::num::ParseIntError),
+    SpecialAddress(SpecialAddressError),
+}
+
+impl core::fmt::Display for ParseEndpointAddressError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match &self.0 {
+            ParseEndpointAddressErrorKind::ParseInt(err) => core::fmt::Display::fmt(err, f),
+            ParseEndpointAddressErrorKind::SpecialAddress(err) => core::fmt::Display::fmt(err, f),
+        }
+    }
+}
+
+impl core::error::Error for ParseEndpointAddressError {}
+
+/// Parses a decimal `u16` and rejects the special DNP3 addresses (`0xFFF0` to `0xFFFF`).
+impl core::str::FromStr for EndpointAddress {
+    type Err = ParseEndpointAddressError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        let value = s.parse::<u16>()?;
-        Ok(EndpointAddress::raw(value))
+        let value = s.parse::<u16>().map_err(|err| {
+            ParseEndpointAddressError(ParseEndpointAddressErrorKind::ParseInt(err))
+        })?;
+        EndpointAddress::try_new(value).map_err(|err| {
+            ParseEndpointAddressError(ParseEndpointAddressErrorKind::SpecialAddress(err))
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn assert_error_bounds<T: core::error::Error + Send + Sync + 'static>() {}
+
+    #[test]
+    fn parse_endpoint_address_error_implements_error_send_sync_static() {
+        assert_error_bounds::<ParseEndpointAddressError>();
+        assert_error_bounds::<SpecialAddressError>();
+    }
+
+    #[test]
+    fn from_str_agrees_with_try_new_and_try_from_for_all_u16_values() {
+        for raw in 0u16..=u16::MAX {
+            let text = raw.to_string();
+            let parsed = text.parse::<EndpointAddress>();
+            let from_try_new = EndpointAddress::try_new(raw);
+            let from_try_from = EndpointAddress::try_from(raw);
+
+            assert_eq!(from_try_new, from_try_from);
+
+            if raw < 0xFFF0 {
+                let expected = EndpointAddress::raw(raw);
+                assert_eq!(parsed, Ok(expected));
+                assert_eq!(from_try_new, Ok(expected));
+            } else {
+                let special = SpecialAddressError { address: raw };
+                assert_eq!(from_try_new, Err(special));
+                let err = parsed.unwrap_err();
+                assert_eq!(
+                    err.0,
+                    ParseEndpointAddressErrorKind::SpecialAddress(special)
+                );
+                assert_eq!(err.to_string(), special.to_string());
+            }
+        }
+    }
+
+    #[test]
+    fn from_str_handles_string_edge_cases() {
+        assert_eq!("+1".parse::<EndpointAddress>(), Ok(EndpointAddress::raw(1)));
+
+        for invalid in ["", "-1", "65536", "0x0001", "abc", " 1 "] {
+            let expected_int_err = invalid.parse::<u16>().unwrap_err();
+            let err = invalid.parse::<EndpointAddress>().unwrap_err();
+            assert_eq!(
+                err.0,
+                ParseEndpointAddressErrorKind::ParseInt(expected_int_err.clone()),
+                "input: {invalid:?}"
+            );
+            assert_eq!(err.to_string(), expected_int_err.to_string());
+        }
+    }
+
+    #[cfg(feature = "serialization")]
+    #[test]
+    fn serde_round_trips_valid_addresses_and_rejects_special_addresses() {
+        for raw in [0u16, 1, 1024, 0xFFEF] {
+            let addr = EndpointAddress::try_new(raw).unwrap();
+            let json = serde_json::to_string(&addr).unwrap();
+            let decoded: EndpointAddress = serde_json::from_str(&json).unwrap();
+            assert_eq!(decoded, addr);
+        }
+
+        for raw in [0xFFF0u16, 0xFFF5, 0xFFFB, 0xFFFC, 0xFFFD, 0xFFFE, 0xFFFF] {
+            let res: Result<EndpointAddress, _> = serde_json::from_str(&raw.to_string());
+            assert!(res.is_err(), "expected special address {raw:#06X} to fail");
+        }
     }
 }
 
