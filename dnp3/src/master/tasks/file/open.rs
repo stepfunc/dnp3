@@ -7,8 +7,10 @@
 use crate::app::format::write::HeaderWriter;
 use crate::app::parse::parser::Response;
 use crate::app::{FunctionCode, Permissions};
+use crate::master::error::TaskErrorKind;
+use crate::master::file::FileErrorKind;
 use crate::master::tasks::{NonReadTask, OneShot, OneShotRequest};
-use crate::master::{AuthKey, FileError, FileMode, OpenFile, TaskError, TaskType};
+use crate::master::{AuthKey, FileMode, OpenFile, TaskType};
 
 pub(crate) struct OpenFileRequest {
     pub(crate) file_name: String,
@@ -21,7 +23,7 @@ pub(crate) struct OpenFileRequest {
 
 impl OneShotRequest for OpenFileRequest {
     type Output = OpenFile;
-    type Error = FileError;
+    type Error = FileErrorKind;
 
     fn function(&self) -> FunctionCode {
         FunctionCode::OpenFile
@@ -31,7 +33,7 @@ impl OneShotRequest for OpenFileRequest {
         TaskType::FileOpen
     }
 
-    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskErrorKind> {
         Ok(super::write_open(
             &self.file_name,
             self.auth_key,
@@ -43,7 +45,7 @@ impl OneShotRequest for OpenFileRequest {
         )?)
     }
 
-    fn parse(&self, response: Response<'_>) -> Result<OpenFile, FileError> {
+    fn parse(&self, response: Response<'_>) -> Result<OpenFile, FileErrorKind> {
         super::parse_open_response(response.objects?.get_only_header()?)
     }
 

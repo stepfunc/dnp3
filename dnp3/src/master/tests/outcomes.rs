@@ -22,8 +22,12 @@ use crate::app::{
     Iin1, Iin2, MaybeAsync, ObjectParseError, Permissions, ResponseHeader, Sequence, Timestamp,
     Variation,
 };
-use crate::link::{EndpointAddress, LinkError};
+use crate::link::error::LinkError;
+use crate::link::EndpointAddress;
 use crate::master::association::AssociationConfig;
+use crate::master::error::{
+    AssociationErrorKind, BadEncoding, CommandResponseError, PollErrorKind, TaskErrorKind,
+};
 use crate::master::promise::Promise;
 use crate::master::tasks::command::CommandTask;
 use crate::master::tasks::read::SingleReadTask;
@@ -42,12 +46,11 @@ use crate::master::tests::harness::{
     create_association, create_association_with_handler, AssocInfoEvent, ReadEvent, TestHarness,
 };
 use crate::master::{
-    AssociationError, AssociationHandle, AssociationHandler, AssociationInformation, AuthKey,
-    BadEncoding, BlockNumber, Classes, CommandBuilder, CommandError, CommandHeaders, CommandMode,
-    CommandSupport, DeadBandHeader, DirReadConfig, FileCredentials, FileError, FileHandle,
-    FileMode, FileReadConfig, HeaderInfo, Headers, MasterChannel, MasterChannelType, OpenFile,
-    PollError, ReadHandler, ReadRequest, ReadType, TaskError, TaskType, TimeSyncError,
-    TimeSyncProcedure,
+    AssociationHandle, AssociationHandler, AssociationInformation, AuthKey, BlockNumber, Classes,
+    CommandBuilder, CommandError, CommandHeaders, CommandMode, CommandSupport, DeadBandHeader,
+    DirReadConfig, FileCredentials, FileError, FileHandle, FileMode, FileReadConfig, HeaderInfo,
+    Headers, MasterChannel, MasterChannelType, OpenFile, ReadHandler, ReadRequest, ReadType,
+    TaskError, TaskType, TimeSyncError, TimeSyncProcedure,
 };
 use crate::util::lifecycle::{RunError, StopReason};
 use crate::util::test_support::watchdog;
@@ -265,20 +268,18 @@ impl Kind {
         }
     }
 
-    pub(super) fn failed(self, err: TaskError) -> Reply {
+    pub(super) fn failed(self, err: TaskErrorKind) -> Reply {
         match self {
-            Kind::Read => Reply::Read(Err(err)),
-            Kind::DirectOperate | Kind::SelectBeforeOperate => {
-                Reply::Command(Err(CommandError::Task(err)))
-            }
-            Kind::ColdRestart => Reply::Restart(Err(err)),
-            Kind::EmptyResponse | Kind::DeadBands => Reply::Write(Err(err)),
-            Kind::TimeSync => Reply::TimeSync(Err(TimeSyncError::Task(err))),
-            Kind::AuthFile => Reply::AuthKey(Err(FileError::TaskError(err))),
-            Kind::OpenFile => Reply::Open(Err(FileError::TaskError(err))),
-            Kind::CloseFile | Kind::WriteFileBlock => Reply::File(Err(FileError::TaskError(err))),
-            Kind::GetFileInfo => Reply::Info(Err(FileError::TaskError(err))),
-            Kind::ReadDirectory => Reply::Directory(Err(FileError::TaskError(err))),
+            Kind::Read => Reply::Read(Err(err.into())),
+            Kind::DirectOperate | Kind::SelectBeforeOperate => Reply::Command(Err(err.into())),
+            Kind::ColdRestart => Reply::Restart(Err(err.into())),
+            Kind::EmptyResponse | Kind::DeadBands => Reply::Write(Err(err.into())),
+            Kind::TimeSync => Reply::TimeSync(Err(err.into())),
+            Kind::AuthFile => Reply::AuthKey(Err(err.into())),
+            Kind::OpenFile => Reply::Open(Err(err.into())),
+            Kind::CloseFile | Kind::WriteFileBlock => Reply::File(Err(err.into())),
+            Kind::GetFileInfo => Reply::Info(Err(err.into())),
+            Kind::ReadDirectory => Reply::Directory(Err(err.into())),
         }
     }
 
@@ -290,8 +291,8 @@ impl Kind {
         AssocInfoEvent::TaskSuccess(self.task_type(), self.function(), last)
     }
 
-    fn failure_event(self, err: TaskError) -> AssocInfoEvent {
-        AssocInfoEvent::TaskFailure(self.task_type(), err)
+    fn failure_event(self, err: TaskErrorKind) -> AssocInfoEvent {
+        AssocInfoEvent::TaskFailure(self.task_type(), err.into())
     }
 
     /// The successful response to the first request
@@ -452,7 +453,7 @@ impl Started {
     }
 
     /// Check that the task ended with this error and the master kept running
-    async fn expect_failure(&mut self, err: TaskError) {
+    async fn expect_failure(&mut self, err: TaskErrorKind) {
         let kind = self.kind;
         assert_eq!(self.reply().await, kind.failed(err), "{kind:?}");
         self.harness.barrier().await;
@@ -509,7 +510,7 @@ async fn every_task_times_out_one_response_timeout_after_its_request() {
         for kind in KINDS {
             let mut started = start(kind).await;
             let now = Instant::now();
-            started.expect_failure(TaskError::ResponseTimeout).await;
+            started.expect_failure(TaskErrorKind::ResponseTimeout).await;
             TestHarness::assert_elapsed(now, Duration::from_secs(1));
         }
     })
@@ -527,7 +528,7 @@ async fn every_task_fails_when_its_response_is_rejected_by_iin2() {
             )
             .await;
             started
-                .expect_failure(TaskError::RejectedByIin2(REJECTED))
+                .expect_failure(TaskErrorKind::RejectedByIin2(REJECTED))
                 .await;
         }
     })
@@ -542,9 +543,9 @@ async fn every_task_fails_on_a_response_without_fin_or_con() {
             // FIR, but neither FIN nor CON
             respond(&mut started.harness, vec![0x80, 0x81, 0x00, 0x00]).await;
             let err = if kind.is_read() {
-                TaskError::NonFinWithoutCon
+                TaskErrorKind::NonFinWithoutCon
             } else {
-                TaskError::MultiFragmentResponse
+                TaskErrorKind::MultiFragmentResponse
             };
             started.expect_failure(err).await;
         }
@@ -568,12 +569,10 @@ async fn every_task_fails_on_a_response_with_unexpected_objects() {
                     vec![0xC0, 0x81, 0x00, 0x00, 52, 1, 0x07, 1, 0x02, 0x00]
                 };
                 answer(&mut started.harness, con, response).await;
-                let unexpected = TaskError::UnexpectedResponseHeaders;
+                let unexpected = TaskErrorKind::UnexpectedResponseHeaders;
                 let reply = match kind {
                     Kind::DirectOperate | Kind::SelectBeforeOperate => {
-                        Reply::Command(Err(CommandError::Response(
-                            crate::master::CommandResponseError::HeaderCountMismatch,
-                        )))
+                        Reply::Command(Err(CommandResponseError::HeaderCountMismatch.into()))
                     }
                     _ => kind.failed(unexpected),
                 };
@@ -614,7 +613,7 @@ async fn every_task_confirms_a_response_with_con_rejected_by_iin2() {
             let response = empty_response_custom_iin(Sequence::new(0), REJECTED);
             answer(&mut started.harness, true, response).await;
             started
-                .expect_failure(TaskError::RejectedByIin2(REJECTED))
+                .expect_failure(TaskErrorKind::RejectedByIin2(REJECTED))
                 .await;
             assert_eq!(started.harness.io.pop_event(), None, "{kind:?}");
         }
@@ -631,9 +630,7 @@ async fn no_task_confirms_a_response_with_con_whose_objects_do_not_parse() {
             let response = with_con(vec![0xC0, 0x81, 0x00, 0x00, 0x01]);
             respond(&mut started.harness, response).await;
             started
-                .expect_failure(TaskError::MalformedResponse(
-                    ObjectParseError::InsufficientBytes,
-                ))
+                .expect_failure(ObjectParseError::InsufficientBytes.into())
                 .await;
             assert_eq!(started.harness.io.pop_event(), None, "{kind:?}");
         }
@@ -654,7 +651,7 @@ async fn every_single_header_task_fails_on_a_response_with_two_headers() {
                 response.extend_from_slice(&header);
                 answer(&mut started.harness, con, response).await;
 
-                let err = TaskError::UnexpectedResponseHeaders;
+                let err = TaskErrorKind::UnexpectedResponseHeaders;
                 assert_eq!(
                     started.reply().await,
                     kind.failed(err),
@@ -684,7 +681,7 @@ async fn every_task_fails_on_a_malformed_fragment_from_its_outstation() {
             for kind in KINDS {
                 let mut started = start(kind).await;
                 respond(&mut started.harness, fragment.to_vec()).await;
-                started.expect_failure(TaskError::Transport).await;
+                started.expect_failure(TaskErrorKind::Transport).await;
             }
         }
     })
@@ -722,7 +719,7 @@ async fn malformed_fragments_from_other_outstations_do_not_extend_any_task_deadl
                 respond(harness, fragment.to_vec()).await;
             }
             harness.set_source(OUTSTATION);
-            let err = TaskError::ResponseTimeout;
+            let err = TaskErrorKind::ResponseTimeout;
             assert_eq!(started.reply().await, kind.failed(err), "{kind:?}");
             assert_eq!(now.elapsed(), Duration::from_secs(1), "{kind:?}");
             started.harness.barrier().await;
@@ -744,7 +741,7 @@ async fn every_task_fails_with_disabled_when_the_channel_is_disabled() {
             started.harness.master.disable().await.unwrap();
             assert_eq!(
                 started.reply().await,
-                kind.failed(TaskError::Disabled),
+                kind.failed(TaskErrorKind::Disabled),
                 "{kind:?}"
             );
             assert_eq!(
@@ -754,7 +751,7 @@ async fn every_task_fails_with_disabled_when_the_channel_is_disabled() {
             );
             assert_eq!(
                 started.harness.assoc_events.pop(),
-                [kind.failure_event(TaskError::Disabled)],
+                [kind.failure_event(TaskErrorKind::Disabled)],
                 "{kind:?}"
             );
         }
@@ -779,7 +776,7 @@ async fn every_task_fails_with_shutdown_when_the_master_shuts_down() {
             );
             assert_eq!(
                 started.harness.assoc_events.pop(),
-                [kind.failure_event(TaskError::Shutdown)],
+                [kind.failure_event(TaskErrorKind::Shutdown)],
                 "{kind:?}"
             );
         }
@@ -809,10 +806,14 @@ async fn every_task_fails_with_a_link_error_when_the_connection_drops() {
             started.harness.io.read_error(ErrorKind::ConnectionReset);
             assert_eq!(
                 started.reply().await,
-                kind.failed(TaskError::Link(err)),
+                kind.failed(TaskErrorKind::Link(err)),
                 "{kind:?}"
             );
-            assert_eq!(queued.await, Ok(Err(TaskError::Link(err))), "{kind:?}");
+            assert_eq!(
+                queued.await,
+                Ok(Err(TaskErrorKind::Link(err).into())),
+                "{kind:?}"
+            );
             assert_eq!(
                 (&mut started.harness.task).await.unwrap(),
                 RunError::Link(err),
@@ -820,7 +821,7 @@ async fn every_task_fails_with_a_link_error_when_the_connection_drops() {
             );
             assert_eq!(
                 started.harness.assoc_events.pop(),
-                [kind.failure_event(TaskError::Link(err))],
+                [kind.failure_event(TaskErrorKind::Link(err))],
                 "{kind:?}"
             );
         }
@@ -892,16 +893,17 @@ async fn running_and_queued_tasks_complete_their_promises_on_shutdown() {
             RunError::Stop(StopReason::Shutdown)
         );
 
-        let shutdown = Err(CommandError::Task(TaskError::Shutdown));
+        let shutdown = Err(TaskErrorKind::Shutdown.into());
         assert_eq!(running.await, Ok(shutdown));
         assert_eq!(queued_command.await, Ok(shutdown));
-        assert_eq!(queued_read.await, Ok(Err(TaskError::Shutdown)));
-        assert_eq!(queued_link_status.await, Ok(Err(TaskError::Shutdown)));
+        assert_eq!(queued_read.await, Ok(Err(TaskErrorKind::Shutdown.into())));
+        assert_eq!(
+            queued_link_status.await,
+            Ok(Err(TaskErrorKind::Shutdown.into()))
+        );
         assert_eq!(
             reader.pop(),
-            [ReaderEvent::Aborted(FileError::TaskError(
-                TaskError::Shutdown
-            ))]
+            [ReaderEvent::Aborted(TaskErrorKind::Shutdown.into())]
         );
         assert_eq!(
             harness.assoc_events.pop(),
@@ -911,7 +913,7 @@ async fn running_and_queued_tasks_complete_their_promises_on_shutdown() {
                     FunctionCode::DirectOperate,
                     Sequence::new(0)
                 ),
-                AssocInfoEvent::TaskFailure(TaskType::Command, TaskError::Shutdown),
+                AssocInfoEvent::TaskFailure(TaskType::Command, TaskErrorKind::Shutdown.into()),
             ]
         );
     })
@@ -985,15 +987,12 @@ async fn queued_tasks_fail_with_no_such_association_when_the_association_is_remo
         harness.master.remove_association(OUTSTATION).await.unwrap();
         harness.barrier().await;
 
-        let err = TaskError::NoSuchAssociation(OUTSTATION);
-        assert_eq!(queued_command.await, Ok(Err(CommandError::Task(err))));
-        assert_eq!(queued_read.await, Ok(Err(err)));
-        assert_eq!(queued_link_status.await, Ok(Err(err)));
-        assert_eq!(queued_time_sync.await, Ok(Err(TimeSyncError::Task(err))));
-        assert_eq!(
-            reader.pop(),
-            [ReaderEvent::Aborted(FileError::TaskError(err))]
-        );
+        let err = TaskErrorKind::NoSuchAssociation(OUTSTATION);
+        assert_eq!(queued_command.await, Ok(Err(err.into())));
+        assert_eq!(queued_read.await, Ok(Err(err.into())));
+        assert_eq!(queued_link_status.await, Ok(Err(err.into())));
+        assert_eq!(queued_time_sync.await, Ok(Err(err.into())));
+        assert_eq!(reader.pop(), [ReaderEvent::Aborted(err.into())]);
         assert_eq!(harness.assoc_events.pop(), []);
         assert!(!harness.task.is_finished());
 
@@ -1024,7 +1023,7 @@ async fn every_task_fails_with_no_such_association_when_removed_while_it_waits()
                 let response = if con { with_con(response) } else { response };
                 respond(&mut started.harness, response).await;
 
-                let err = TaskError::NoSuchAssociation(OUTSTATION);
+                let err = TaskErrorKind::NoSuchAssociation(OUTSTATION);
                 assert_eq!(
                     started.reply().await,
                     kind.failed(err),
@@ -1060,7 +1059,7 @@ async fn requests_to_a_removed_association_fail_with_no_such_association() {
             }
             harness.barrier().await;
 
-            let err = TaskError::NoSuchAssociation(OUTSTATION);
+            let err = TaskErrorKind::NoSuchAssociation(OUTSTATION);
             for kind in KINDS {
                 let reply = kind.spawn(stale.clone()).await.unwrap();
                 assert_eq!(reply, kind.failed(err), "{kind:?} {via_handle}");
@@ -1073,7 +1072,7 @@ async fn requests_to_a_removed_association_fail_with_no_such_association() {
                 .await;
             assert_eq!(
                 poll.err(),
-                Some(PollError::NoSuchAssociation(OUTSTATION)),
+                Some(PollErrorKind::NoSuchAssociation(OUTSTATION).into()),
                 "{via_handle}"
             );
             assert_eq!(harness.assoc_events.pop(), [], "{via_handle}");
@@ -1123,7 +1122,7 @@ async fn adding_an_association_fails_for_a_used_address_or_the_wrong_channel_typ
             .await;
         assert_eq!(
             duplicate.err(),
-            Some(AssociationError::DuplicateAddress(OUTSTATION))
+            Some(AssociationErrorKind::DuplicateAddress(OUTSTATION).into())
         );
 
         let destination = "127.0.0.1:20000".parse().unwrap();
@@ -1141,10 +1140,13 @@ async fn adding_an_association_fails_for_a_used_address_or_the_wrong_channel_typ
             .await;
         assert_eq!(
             udp.err(),
-            Some(AssociationError::WrongChannelType {
-                actual: MasterChannelType::Stream,
-                required: MasterChannelType::Udp,
-            })
+            Some(
+                AssociationErrorKind::WrongChannelType {
+                    actual: MasterChannelType::Stream,
+                    required: MasterChannelType::Udp,
+                }
+                .into()
+            )
         );
 
         let (tx, _rx) = crate::util::channel::request_channel();
@@ -1160,10 +1162,13 @@ async fn adding_an_association_fails_for_a_used_address_or_the_wrong_channel_typ
             .await;
         assert_eq!(
             stream.err(),
-            Some(AssociationError::WrongChannelType {
-                actual: MasterChannelType::Udp,
-                required: MasterChannelType::Stream,
-            })
+            Some(
+                AssociationErrorKind::WrongChannelType {
+                    actual: MasterChannelType::Udp,
+                    required: MasterChannelType::Stream,
+                }
+                .into()
+            )
         );
 
         // the existing association still handles its outstation
@@ -1443,7 +1448,9 @@ async fn read_fails_if_the_first_fragment_is_not_fir() {
             read_fragment(Sequence::new(0), false, true, false),
         )
         .await;
-        started.expect_failure(TaskError::NeverReceivedFir).await;
+        started
+            .expect_failure(TaskErrorKind::NeverReceivedFir)
+            .await;
     })
     .await;
 }
@@ -1459,7 +1466,7 @@ async fn read_fails_if_a_later_fragment_is_fir() {
             .await;
         respond(harness, read_fragment(Sequence::new(1), true, true, false)).await;
         harness.read_events.pop();
-        started.expect_failure(TaskError::UnexpectedFir).await;
+        started.expect_failure(TaskErrorKind::UnexpectedFir).await;
     })
     .await;
 }
@@ -1475,7 +1482,7 @@ async fn read_times_out_one_response_timeout_after_the_last_fragment() {
             .expect_write(solicited_confirm(Sequence::new(0)))
             .await;
         let now = Instant::now();
-        started.expect_failure(TaskError::ResponseTimeout).await;
+        started.expect_failure(TaskErrorKind::ResponseTimeout).await;
         TestHarness::assert_elapsed(now, Duration::from_secs(1));
     })
     .await;
@@ -1489,7 +1496,7 @@ async fn select_before_operate_times_out_waiting_for_the_operate_response() {
         respond(&mut started.harness, echo).await;
         next_request(&mut started.harness, 1, FunctionCode::Operate).await;
         let now = Instant::now();
-        started.expect_failure(TaskError::ResponseTimeout).await;
+        started.expect_failure(TaskErrorKind::ResponseTimeout).await;
         TestHarness::assert_elapsed(now, Duration::from_secs(1));
     })
     .await;
@@ -1541,16 +1548,16 @@ async fn interrupt_auto_task(integrity: bool, disable: bool) {
 
     let (stop, err) = if disable {
         harness.master.disable().await.unwrap();
-        (StopReason::Disable, TaskError::Disabled)
+        (StopReason::Disable, TaskErrorKind::Disabled)
     } else {
         drop(harness.association);
         drop(harness.master);
-        (StopReason::Shutdown, TaskError::Shutdown)
+        (StopReason::Shutdown, TaskErrorKind::Shutdown)
     };
     assert_eq!((&mut harness.task).await.unwrap(), RunError::Stop(stop));
     assert_eq!(
         harness.assoc_events.pop(),
-        [AssocInfoEvent::TaskFailure(task_type, err)]
+        [AssocInfoEvent::TaskFailure(task_type, err.into())]
     );
 }
 
@@ -1592,9 +1599,7 @@ async fn writing_an_attribute_whose_variation_cannot_carry_a_value_sends_nothing
                     .association
                     .send_and_expect_empty_response(FunctionCode::Write, headers)
                     .await,
-                Err(TaskError::BadEncoding(BadEncoding::Attribute(
-                    BadAttribute::BadVariation(variation)
-                )))
+                Err(BadEncoding::Attribute(BadAttribute::BadVariation(variation)).into())
             );
             harness.assert_no_events();
         }
@@ -1607,7 +1612,7 @@ async fn reading_group0_var0_sends_nothing() {
     watchdog(async {
         let mut harness = create_association(AssociationConfig::quiet()).await;
         let g0v0 = Variation::Group0(0);
-        let err = TaskError::BadEncoding(BadEncoding::UndefinedVariation(g0v0));
+        let err: TaskError = BadEncoding::UndefinedVariation(g0v0).into();
 
         assert_eq!(
             harness

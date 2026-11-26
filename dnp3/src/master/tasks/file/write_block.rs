@@ -8,8 +8,10 @@ use crate::app::format::write::HeaderWriter;
 use crate::app::parse::free_format::FreeFormatVariation;
 use crate::app::parse::parser::{ObjectHeader, Response};
 use crate::app::{FileStatus, FunctionCode, Group70Var5};
+use crate::master::error::TaskErrorKind;
+use crate::master::file::FileErrorKind;
 use crate::master::tasks::{NonReadTask, OneShot, OneShotRequest};
-use crate::master::{BlockNumber, FileError, FileHandle, TaskError, TaskType};
+use crate::master::{BlockNumber, FileHandle, TaskType};
 
 pub(crate) struct WriteBlockRequest {
     pub(crate) handle: FileHandle,
@@ -19,7 +21,7 @@ pub(crate) struct WriteBlockRequest {
 
 impl OneShotRequest for WriteBlockRequest {
     type Output = ();
-    type Error = FileError;
+    type Error = FileErrorKind;
 
     fn function(&self) -> FunctionCode {
         FunctionCode::Write
@@ -29,7 +31,7 @@ impl OneShotRequest for WriteBlockRequest {
         TaskType::FileWriteBlock
     }
 
-    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskErrorKind> {
         let obj = Group70Var5 {
             file_handle: self.handle.into(),
             block_number: self.block_number.wire_value(),
@@ -39,7 +41,7 @@ impl OneShotRequest for WriteBlockRequest {
         Ok(writer.write_free_format(&obj)?)
     }
 
-    fn parse(&self, response: Response<'_>) -> Result<(), FileError> {
+    fn parse(&self, response: Response<'_>) -> Result<(), FileErrorKind> {
         let header = response.objects?.get_only_header()?;
 
         let obj = match header {
@@ -49,7 +51,7 @@ impl OneShotRequest for WriteBlockRequest {
                     "File WRITE response contains unexpected variation: {}",
                     header.variation()
                 );
-                return Err(TaskError::UnexpectedResponseHeaders.into());
+                return Err(TaskErrorKind::UnexpectedResponseHeaders.into());
             }
         };
 
@@ -58,7 +60,7 @@ impl OneShotRequest for WriteBlockRequest {
                 "Unable to write file block (status code == {:?})",
                 obj.status_code
             );
-            return Err(FileError::BadStatus(obj.status_code));
+            return Err(FileErrorKind::BadStatus(obj.status_code));
         }
 
         Ok(())

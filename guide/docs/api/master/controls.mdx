@@ -78,11 +78,11 @@ Calling `operate` begins an asynchronous operation that will complete successful
 The master checks that the outstation echoed each command. Success means the outstation accepted it, not that the output
 changed; watch the output status points for that.
 
-The operation fails if the outstation returns a status other than `CommandStatus::Success` for any of the commands. In Rust
-the error is `CommandError::Response(CommandResponseError::BadStatus(status))`, carrying the status of the first command
-that failed, and the other `CommandResponseError` values report a response that doesn't echo the request. The bindings
-report `BadStatus` without the status, and `HeaderMismatch` for a response that doesn't echo the request. Consult the
-language-specific documentation for the meaning of each error code.
+The operation fails if the outstation returns a status other than `CommandStatus::Success` for any of the commands. In Rust,
+call `CommandError::command_status()` to retrieve the status of the first command that failed; it returns `None` if the
+failure was not a command status error (for example, a mismatched echo or timeout). The bindings report `BadStatus` without
+the status, and `HeaderMismatch` for a response that doesn't echo the request. Consult the language-specific documentation
+for the meaning of each error code.
 
 ## Direct operate without acknowledgement
 

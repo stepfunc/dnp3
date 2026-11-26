@@ -11,9 +11,9 @@ use crate::app::parse::parser::ObjectHeader;
 use crate::app::{
     FileStatus, Group70Var2, Group70Var3, Group70Var4, Group70Var5, Permissions, Timestamp,
 };
-use crate::master::{
-    AuthKey, BlockNumber, FileCredentials, FileError, FileHandle, FileMode, OpenFile, TaskError,
-};
+use crate::master::error::TaskErrorKind;
+use crate::master::file::FileErrorKind;
+use crate::master::{AuthKey, BlockNumber, FileCredentials, FileHandle, FileMode, OpenFile};
 
 pub(crate) mod authenticate;
 pub(crate) mod close;
@@ -89,7 +89,7 @@ pub(crate) fn write_close(handle: FileHandle, writer: &mut HeaderWriter) -> Resu
     writer.write_free_format(&obj)
 }
 
-pub(super) fn parse_auth_response(header: ObjectHeader) -> Result<AuthKey, FileError> {
+pub(super) fn parse_auth_response(header: ObjectHeader) -> Result<AuthKey, FileErrorKind> {
     let obj = match header {
         ObjectHeader::FreeFormat(FreeFormatVariation::Group70Var2(obj)) => obj,
         _ => {
@@ -97,24 +97,24 @@ pub(super) fn parse_auth_response(header: ObjectHeader) -> Result<AuthKey, FileE
                 "File AUTHENTICATE response contains unexpected variation: {}",
                 header.variation()
             );
-            return Err(TaskError::UnexpectedResponseHeaders.into());
+            return Err(TaskErrorKind::UnexpectedResponseHeaders.into());
         }
     };
 
     if obj.auth_key == 0 {
         tracing::warn!("Outstation returned auth key == 0: no permission to access file");
-        return Err(FileError::NoPermission);
+        return Err(FileErrorKind::NoPermission);
     }
 
     Ok(AuthKey::new(obj.auth_key))
 }
 
-pub(super) fn parse_open_response(header: ObjectHeader) -> Result<OpenFile, FileError> {
+pub(super) fn parse_open_response(header: ObjectHeader) -> Result<OpenFile, FileErrorKind> {
     let obj = parse_status_object(header, "OPEN")?;
 
     if obj.status_code != FileStatus::Success {
         tracing::warn!("Unable to open file (status code == {:?})", obj.status_code);
-        return Err(FileError::BadStatus(obj.status_code));
+        return Err(FileErrorKind::BadStatus(obj.status_code));
     }
 
     Ok(OpenFile {
@@ -128,7 +128,7 @@ pub(super) fn parse_open_response(header: ObjectHeader) -> Result<OpenFile, File
 pub(super) fn check_close_response(
     handle: FileHandle,
     header: ObjectHeader<'_>,
-) -> Result<(), FileError> {
+) -> Result<(), FileErrorKind> {
     let obj = parse_status_object(header, "CLOSE")?;
 
     if obj.file_handle != u32::from(handle) {
@@ -137,7 +137,7 @@ pub(super) fn check_close_response(
             obj.file_handle,
             u32::from(handle)
         );
-        return Err(FileError::WrongHandle);
+        return Err(FileErrorKind::WrongHandle);
     }
 
     if obj.status_code != FileStatus::Success {
@@ -145,7 +145,7 @@ pub(super) fn check_close_response(
             "Unable to close file (status code == {:?})",
             obj.status_code
         );
-        return Err(FileError::BadStatus(obj.status_code));
+        return Err(FileErrorKind::BadStatus(obj.status_code));
     }
 
     Ok(())
@@ -155,7 +155,7 @@ pub(super) fn check_close_response(
 fn parse_status_object<'a>(
     header: ObjectHeader<'a>,
     function: &str,
-) -> Result<Group70Var4<'a>, FileError> {
+) -> Result<Group70Var4<'a>, FileErrorKind> {
     match header {
         ObjectHeader::FreeFormat(FreeFormatVariation::Group70Var4(obj)) => Ok(obj),
         _ => {
@@ -163,7 +163,7 @@ fn parse_status_object<'a>(
                 "File {function} response contains unexpected variation: {}",
                 header.variation()
             );
-            Err(TaskError::UnexpectedResponseHeaders.into())
+            Err(TaskErrorKind::UnexpectedResponseHeaders.into())
         }
     }
 }

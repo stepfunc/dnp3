@@ -12,7 +12,7 @@
 use std::io::ErrorKind;
 
 use crate::app::{FunctionCode, Sequence};
-use crate::link::LinkError;
+use crate::link::error::LinkError;
 use crate::master::association::AssociationConfig;
 use crate::master::tests::harness::requests::{
     disable_unsol_request, empty_response, enable_unsol_request, integrity_poll_request,

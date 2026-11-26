@@ -9,9 +9,9 @@ use crate::app::file::*;
 use crate::app::parse::parser::Response;
 use crate::app::FunctionCode;
 use crate::master::association::Association;
-use crate::master::file::BlockNumber;
+use crate::master::file::{BlockNumber, FileErrorKind};
 use crate::master::tasks::{AppTask, NonReadTask, ResponseTask, Step, Task};
-use crate::master::{FileAction, FileMode, FileReadConfig, FileReader, TaskError, TaskType};
+use crate::master::{FileAction, FileMode, FileReadConfig, FileReader, TaskType};
 
 /// The user's reader, until it is told how the read ended
 pub(crate) struct FileReaderType {
@@ -39,9 +39,9 @@ impl FileReaderType {
         }
     }
 
-    fn aborted(&mut self, err: FileError) {
+    fn aborted(&mut self, err: FileErrorKind) {
         if let Some(mut x) = self.inner.take() {
-            x.aborted(err);
+            x.aborted(err.into());
         }
     }
 
@@ -54,7 +54,7 @@ impl FileReaderType {
 
 impl Drop for FileReaderType {
     fn drop(&mut self) {
-        self.aborted(FileError::TaskError(TaskError::Shutdown));
+        self.aborted(TaskErrorKind::Shutdown.into());
     }
 }
 
@@ -93,7 +93,7 @@ enum State {
     ///
     /// If the transfer ended early, this holds the error that ended it, which the reader was
     /// already given, until the CLOSE response arrives
-    Close(FileHandle, Option<FileError>),
+    Close(FileHandle, Option<FileErrorKind>),
 }
 
 pub(crate) struct FileReadTask {
@@ -133,7 +133,7 @@ impl FileReadTask {
     }
 
     /// Abort the reader with `err`, and close the file once without retries
-    fn end_early(&mut self, handle: FileHandle, err: FileError) {
+    fn end_early(&mut self, handle: FileHandle, err: FileErrorKind) {
         self.settings.reader.aborted(err);
         self.state = State::Close(handle, Some(err));
     }
@@ -143,7 +143,7 @@ impl FileReadTask {
         settings: &mut Settings,
         rs: ReadState,
         header: ObjectHeader<'_>,
-    ) -> Result<Option<ReadState>, FileError> {
+    ) -> Result<Option<ReadState>, FileErrorKind> {
         let obj = match header {
             ObjectHeader::FreeFormat(FreeFormatVariation::Group70Var5(obj)) => obj,
             _ => {
@@ -151,7 +151,7 @@ impl FileReadTask {
                     "File READ response contains unexpected variation: {}",
                     header.variation()
                 );
-                return Err(TaskError::UnexpectedResponseHeaders.into());
+                return Err(TaskErrorKind::UnexpectedResponseHeaders.into());
             }
         };
 
@@ -161,7 +161,7 @@ impl FileReadTask {
                 obj.file_handle,
                 u32::from(rs.handle)
             );
-            return Err(FileError::WrongHandle);
+            return Err(FileErrorKind::WrongHandle);
         }
 
         let rx_block = BlockNumber::new(obj.block_number);
@@ -172,13 +172,13 @@ impl FileReadTask {
                 rs.block.bottom_bits(),
                 rx_block.bottom_bits()
             );
-            return Err(FileError::BadBlockNum);
+            return Err(FileErrorKind::BadBlockNum);
         }
 
         let new_total = match rs.total_rx.checked_add(obj.file_data.len()) {
             None => {
                 tracing::error!("Total rx file data overflow");
-                return Err(FileError::MaxLengthExceeded);
+                return Err(FileErrorKind::MaxLengthExceeded);
             }
             Some(x) => x,
         };
@@ -188,7 +188,7 @@ impl FileReadTask {
                 "Received bytes ({new_total}) exceeds configured maximum {}",
                 settings.config.max_file_size
             );
-            return Err(FileError::MaxLengthExceeded);
+            return Err(FileErrorKind::MaxLengthExceeded);
         }
 
         if settings
@@ -198,14 +198,14 @@ impl FileReadTask {
             .is_abort()
         {
             tracing::warn!("File transfer aborted by user");
-            return Err(FileError::AbortByUser);
+            return Err(FileErrorKind::AbortByUser);
         }
 
         Ok(if rx_block.is_last() {
             None
         } else {
             let mut block = BlockNumber::new(obj.block_number);
-            block.increment().map_err(|_| FileError::BadBlockNum)?;
+            block.increment().map_err(|_| FileErrorKind::BadBlockNum)?;
 
             Some(ReadState {
                 handle: rs.handle,
@@ -218,7 +218,7 @@ impl FileReadTask {
 
 impl ResponseTask for FileReadTask {
     type Output = ();
-    type Error = FileError;
+    type Error = FileErrorKind;
 
     fn function(&self) -> FunctionCode {
         match self.state {
@@ -233,7 +233,7 @@ impl ResponseTask for FileReadTask {
         TaskType::FileRead
     }
 
-    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskErrorKind> {
         let result = match &self.state {
             State::GetAuth(auth) => write_auth(auth, writer),
             State::Open(auth) => write_open(
@@ -255,8 +255,10 @@ impl ResponseTask for FileReadTask {
         &mut self,
         _association: &mut Association,
         response: Response<'_>,
-    ) -> Result<Step<()>, FileError> {
-        let header = response.get_only_object_header().map_err(FileError::from);
+    ) -> Result<Step<()>, FileErrorKind> {
+        let header = response
+            .get_only_object_header()
+            .map_err(FileErrorKind::from);
 
         match self.state {
             State::GetAuth(_) => {
@@ -267,7 +269,7 @@ impl ResponseTask for FileReadTask {
                 let file = parse_open_response(header?)?;
                 if self.settings.reader.opened(file.file_size).is_abort() {
                     tracing::warn!("File transfer aborted by user");
-                    self.end_early(file.file_handle, FileError::AbortByUser);
+                    self.end_early(file.file_handle, FileErrorKind::AbortByUser);
                 } else {
                     self.state = State::Read(ReadState::new(file.file_handle));
                 }
@@ -298,7 +300,11 @@ impl ResponseTask for FileReadTask {
         }
     }
 
-    fn complete(mut self, _association: Option<&mut Association>, result: Result<(), FileError>) {
+    fn complete(
+        mut self,
+        _association: Option<&mut Association>,
+        result: Result<(), FileErrorKind>,
+    ) {
         if let Err(err) = result {
             if let State::Close(_, Some(early)) = self.state {
                 tracing::warn!(
@@ -311,18 +317,21 @@ impl ResponseTask for FileReadTask {
 }
 
 /// How a task whose transfer ended early with `err` ends, once the outstation answered the CLOSE
-fn closed_early(err: FileError, closed: Result<(), FileError>) -> Result<(), FileError> {
+fn closed_early(
+    err: FileErrorKind,
+    closed: Result<(), FileErrorKind>,
+) -> Result<(), FileErrorKind> {
     if let Err(close_err) = closed {
         tracing::warn!("Unable to close the file after the transfer ended ({err}): {close_err}");
     }
 
     match err {
         // the master ended the transfer itself, which only fails the task if the CLOSE fails
-        FileError::AbortByUser | FileError::MaxLengthExceeded => closed,
-        FileError::BadStatus(_)
-        | FileError::WrongHandle
-        | FileError::NoPermission
-        | FileError::BadBlockNum
-        | FileError::TaskError(_) => Err(err),
+        FileErrorKind::AbortByUser | FileErrorKind::MaxLengthExceeded => closed,
+        FileErrorKind::BadStatus(_)
+        | FileErrorKind::WrongHandle
+        | FileErrorKind::NoPermission
+        | FileErrorKind::BadBlockNum
+        | FileErrorKind::Task(_) => Err(err),
     }
 }

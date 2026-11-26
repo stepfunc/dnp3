@@ -16,8 +16,6 @@ pub(crate) mod layer;
 pub(crate) mod parser;
 pub(crate) mod reader;
 
-pub use error::{FrameError, LinkError, LogicError};
-
 /// The role of a link-layer endpoint, which sets the direction bit it sends and the frames it accepts
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(crate) enum LinkRole {
@@ -97,14 +95,20 @@ pub struct EndpointAddress(u16);
 /// The specified address is special and may not be used as an EndpointAddress
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct SpecialAddressError {
-    /// reserved special address
-    pub address: u16,
+    address: u16,
 }
 
-impl std::error::Error for SpecialAddressError {}
+impl SpecialAddressError {
+    /// Returns the rejected special address
+    pub fn address(&self) -> u16 {
+        self.address
+    }
+}
 
-impl std::fmt::Display for SpecialAddressError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl core::error::Error for SpecialAddressError {}
+
+impl core::fmt::Display for SpecialAddressError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(
             f,
             "special address ({}) may not be used as a master or outstation address",

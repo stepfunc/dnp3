@@ -27,9 +27,9 @@ impl<const MIN_SIZE: usize, const DEFAULT_SIZE: usize> TryFrom<usize>
 
 /// Error type returned for invalid buffer sizes
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum BufferSizeError {
-    /// provided size vs minimum size
-    TooSmall(usize, usize),
+pub struct BufferSizeError {
+    provided: usize,
+    min: usize,
 }
 
 impl<const MIN_SIZE: usize, const DEFAULT_SIZE: usize> BufferSize<MIN_SIZE, DEFAULT_SIZE> {
@@ -57,7 +57,10 @@ impl<const MIN_SIZE: usize, const DEFAULT_SIZE: usize> BufferSize<MIN_SIZE, DEFA
     /// attempt to construct a [`BufferSize`]
     pub fn new(size: usize) -> Result<Self, BufferSizeError> {
         if size < Self::MIN {
-            return Err(BufferSizeError::TooSmall(size, Self::MIN));
+            return Err(BufferSizeError {
+                provided: size,
+                min: Self::MIN,
+            });
         }
         Ok(Self(size))
     }
@@ -72,18 +75,17 @@ impl<const MIN_SIZE: usize, const DEFAULT_SIZE: usize> Default
     }
 }
 
-impl std::fmt::Display for BufferSizeError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Self::TooSmall(provided_size, min_size) => write!(
-                f,
-                "provided size {provided_size} is less than the minimum allowed size of {min_size}",
-            ),
-        }
+impl core::fmt::Display for BufferSizeError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(
+            f,
+            "provided size {} is less than the minimum allowed size of {}",
+            self.provided, self.min,
+        )
     }
 }
 
-impl std::error::Error for BufferSizeError {}
+impl core::error::Error for BufferSizeError {}
 
 #[cfg(test)]
 mod test {

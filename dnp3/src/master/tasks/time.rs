@@ -13,7 +13,7 @@ use crate::app::variations::{Group50Var1, Group50Var3};
 use crate::app::FunctionCode;
 use crate::app::Timestamp;
 use crate::master::association::Association;
-use crate::master::error::{TaskError, TimeSyncError};
+use crate::master::error::{TaskErrorKind, TimeSyncError, TimeSyncErrorKind};
 use crate::master::promise::Promise;
 use crate::master::request::TimeSyncProcedure;
 use crate::master::tasks::empty_response::expect_empty;
@@ -31,9 +31,13 @@ enum Requester {
 }
 
 impl Requester {
-    fn complete(self, association: Option<&mut Association>, result: Result<(), TimeSyncError>) {
+    fn complete(
+        self,
+        association: Option<&mut Association>,
+        result: Result<(), TimeSyncErrorKind>,
+    ) {
         match self {
-            Self::User(promise) => promise.complete(result),
+            Self::User(promise) => promise.complete(result.map_err(Into::into)),
             Self::Auto => {
                 if let Some(association) = association {
                     match result {
@@ -92,7 +96,7 @@ impl PendingTimeSync {
         match state {
             Some(state) => Some(TimeSyncTask::new(state, self.requester)),
             None => {
-                let err = TaskError::SystemTimeNotAvailable;
+                let err = TaskErrorKind::SystemTimeNotAvailable;
                 if matches!(self.requester, Requester::Auto) {
                     let seq = association.seq();
                     association.notify_task_start(TaskType::TimeSync, self.first_function(), seq);
@@ -113,7 +117,7 @@ impl PendingTimeSync {
         }
     }
 
-    pub(crate) fn on_task_error(self, association: Option<&mut Association>, err: TaskError) {
+    pub(crate) fn on_task_error(self, association: Option<&mut Association>, err: TaskErrorKind) {
         self.requester.complete(association, Err(err.into()))
     }
 }
@@ -139,10 +143,10 @@ impl From<TimeSyncTask> for Task {
 }
 
 /// Check the response to the WRITE that sets the outstation's time
-fn check_write_response(response: &Response) -> Result<(), TimeSyncError> {
+fn check_write_response(response: &Response) -> Result<(), TimeSyncErrorKind> {
     expect_empty(response)?;
     if response.header.iin.iin1.get_need_time() {
-        return Err(TimeSyncError::StillNeedsTime);
+        return Err(TimeSyncErrorKind::StillNeedsTime);
     }
     Ok(())
 }
@@ -162,7 +166,7 @@ impl TimeSyncTask {
         association: &mut Association,
         request_tx: Instant,
         response: Response,
-    ) -> Result<Timestamp, TimeSyncError> {
+    ) -> Result<Timestamp, TimeSyncErrorKind> {
         let now = Instant::now();
 
         let interval = match now.checked_duration_since(request_tx) {
@@ -170,11 +174,13 @@ impl TimeSyncTask {
             None => {
                 // This should NEVER happen. `tokio::time::Instant` is guaranteed to be monotonic
                 tracing::error!("clock rollback detected while synchronizing outstation");
-                return Err(TimeSyncError::ClockRollback);
+                return Err(TimeSyncErrorKind::ClockRollback);
             }
         };
 
-        let header = response.get_only_object_header().map_err(TaskError::from)?;
+        let header = response
+            .get_only_object_header()
+            .map_err(TaskErrorKind::from)?;
 
         let delay_ms: Option<u16> = if let Some(CountVariation::Group52Var2(seq)) = header.count() {
             seq.single().map(|x| x.time)
@@ -186,7 +192,7 @@ impl TimeSyncTask {
             Some(x) => x,
             None => {
                 tracing::warn!("received unexpected header(s) in response to delay measure");
-                return Err(TaskError::UnexpectedResponseHeaders.into());
+                return Err(TaskErrorKind::UnexpectedResponseHeaders.into());
             }
         };
 
@@ -200,7 +206,7 @@ impl TimeSyncTask {
                 Some(x) => x / 2,
                 None => {
                     tracing::warn!("outstation time delay is larger than the response delay");
-                    return Err(TimeSyncError::BadOutstationTimeDelay(delay_ms));
+                    return Err(TimeSyncErrorKind::BadOutstationTimeDelay(delay_ms));
                 }
             };
 
@@ -208,27 +214,27 @@ impl TimeSyncTask {
             Some(time) => time,
             None => {
                 tracing::warn!("system time not available");
-                return Err(TaskError::SystemTimeNotAvailable.into());
+                return Err(TaskErrorKind::SystemTimeNotAvailable.into());
             }
         };
 
-        Self::get_timestamp(time, propagation_delay).inspect_err(|err| tracing::error!("{}", err))
+        Self::get_timestamp(time, propagation_delay).inspect_err(|err| tracing::error!("{err}"))
     }
 
     fn get_timestamp(
         now: Timestamp,
         propagation_delay: Duration,
-    ) -> Result<Timestamp, TimeSyncError> {
+    ) -> Result<Timestamp, TimeSyncErrorKind> {
         match now.checked_add(propagation_delay) {
             Some(x) => Ok(x),
-            None => Err(TimeSyncError::Overflow),
+            None => Err(TimeSyncErrorKind::Overflow),
         }
     }
 }
 
 impl ResponseTask for TimeSyncTask {
     type Output = ();
-    type Error = TimeSyncError;
+    type Error = TimeSyncErrorKind;
 
     fn function(&self) -> FunctionCode {
         match self.state {
@@ -243,7 +249,7 @@ impl ResponseTask for TimeSyncTask {
         TaskType::TimeSync
     }
 
-    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskErrorKind> {
         match self.state {
             State::MeasureDelay(_) => {}
             State::WriteAbsoluteTime(time) => writer.write_count_of_one(Group50Var1 { time })?,
@@ -259,7 +265,7 @@ impl ResponseTask for TimeSyncTask {
         &mut self,
         association: &mut Association,
         response: Response<'_>,
-    ) -> Result<Step<()>, TimeSyncError> {
+    ) -> Result<Step<()>, TimeSyncErrorKind> {
         match self.state {
             State::MeasureDelay(request_tx) => {
                 let timestamp = Self::handle_delay_measure(association, request_tx, response)?;
@@ -278,7 +284,11 @@ impl ResponseTask for TimeSyncTask {
         }
     }
 
-    fn complete(self, association: Option<&mut Association>, result: Result<(), TimeSyncError>) {
+    fn complete(
+        self,
+        association: Option<&mut Association>,
+        result: Result<(), TimeSyncErrorKind>,
+    ) {
         self.requester.complete(association, result)
     }
 }
@@ -314,7 +324,7 @@ mod tests {
         association: &mut Association,
         iin: Iin,
         objects: &[u8],
-    ) -> Result<Option<NonReadTask>, TaskError> {
+    ) -> Result<Option<NonReadTask>, TaskErrorKind> {
         let mut buffer = [0; 20];
         let mut cursor = WriteCursor::new(&mut buffer);
         start_response(
@@ -474,10 +484,10 @@ mod tests {
                 send_measure_delay_response(task, &mut association)
                     .await
                     .err(),
-                Some(TaskError::UnexpectedResponseHeaders)
+                Some(TaskErrorKind::UnexpectedResponseHeaders)
             );
             assert_eq!(
-                Err(TimeSyncError::BadOutstationTimeDelay(OUTSTATION_DELAY_MS)),
+                Err(TimeSyncErrorKind::BadOutstationTimeDelay(OUTSTATION_DELAY_MS).into()),
                 rx.try_recv().unwrap()
             );
         }
@@ -491,11 +501,11 @@ mod tests {
                 respond(task, &mut association, Iin::default(), &[])
                     .await
                     .err(),
-                Some(TaskError::UnexpectedResponseHeaders)
+                Some(TaskErrorKind::UnexpectedResponseHeaders)
             );
             assert_eq!(
                 rx.try_recv().unwrap(),
-                Err(TimeSyncError::Task(TaskError::UnexpectedResponseHeaders))
+                Err(TaskErrorKind::UnexpectedResponseHeaders.into())
             );
         }
 
@@ -513,11 +523,11 @@ mod tests {
                 respond(task, &mut association, Iin::default(), CLASS_1230)
                     .await
                     .err(),
-                Some(TaskError::UnexpectedResponseHeaders)
+                Some(TaskErrorKind::UnexpectedResponseHeaders)
             );
-            assert_matches!(
+            assert_eq!(
                 rx.try_recv().unwrap(),
-                Err(TimeSyncError::Task(TaskError::UnexpectedResponseHeaders))
+                Err(TaskErrorKind::UnexpectedResponseHeaders.into())
             );
         }
 
@@ -534,9 +544,12 @@ mod tests {
             let task = check_write_request(task, system_time);
             assert_eq!(
                 respond(task, &mut association, NEED_TIME, &[]).await.err(),
-                Some(TaskError::UnexpectedResponseHeaders)
+                Some(TaskErrorKind::UnexpectedResponseHeaders)
             );
-            assert_matches!(rx.try_recv().unwrap(), Err(TimeSyncError::StillNeedsTime));
+            assert_eq!(
+                rx.try_recv().unwrap(),
+                Err(TimeSyncErrorKind::StillNeedsTime.into())
+            );
         }
 
         #[tokio::test(start_paused = true)]
@@ -549,10 +562,10 @@ mod tests {
                 .unwrap()
                 .unwrap();
             let task = check_write_request(task, system_time);
-            task.on_task_error(Some(&mut association), TaskError::ResponseTimeout);
+            task.on_task_error(Some(&mut association), TaskErrorKind::ResponseTimeout);
             assert_eq!(
                 rx.try_recv().unwrap(),
-                Err(TimeSyncError::Task(TaskError::ResponseTimeout))
+                Err(TaskErrorKind::ResponseTimeout.into())
             );
         }
 
@@ -565,7 +578,7 @@ mod tests {
             assert!(task.start(&mut association).is_none());
             assert_eq!(
                 rx.try_recv().unwrap(),
-                Err(TaskError::SystemTimeNotAvailable.into())
+                Err(TaskErrorKind::SystemTimeNotAvailable.into())
             );
         }
 
@@ -579,11 +592,11 @@ mod tests {
                 send_measure_delay_response(task, &mut association)
                     .await
                     .err(),
-                Some(TaskError::SystemTimeNotAvailable)
+                Some(TaskErrorKind::SystemTimeNotAvailable)
             );
             assert_eq!(
                 rx.try_recv().unwrap(),
-                Err(TaskError::SystemTimeNotAvailable.into())
+                Err(TaskErrorKind::SystemTimeNotAvailable.into())
             );
         }
 
@@ -612,7 +625,7 @@ mod tests {
         async fn send_measure_delay_response(
             task: NonReadTask,
             association: &mut Association,
-        ) -> Result<Option<NonReadTask>, TaskError> {
+        ) -> Result<Option<NonReadTask>, TaskErrorKind> {
             // g52v2 with a count of one
             let [low, high] = OUTSTATION_DELAY_MS.to_le_bytes();
             respond(
@@ -688,11 +701,11 @@ mod tests {
                 respond(task, &mut association, Iin::default(), CLASS_1230)
                     .await
                     .err(),
-                Some(TaskError::UnexpectedResponseHeaders)
+                Some(TaskErrorKind::UnexpectedResponseHeaders)
             );
             assert_eq!(
                 rx.try_recv().unwrap(),
-                Err(TimeSyncError::Task(TaskError::UnexpectedResponseHeaders))
+                Err(TaskErrorKind::UnexpectedResponseHeaders.into())
             );
         }
 
@@ -706,10 +719,10 @@ mod tests {
                 .unwrap()
                 .unwrap();
             let task = check_write_request(task, system_time);
-            task.on_task_error(Some(&mut association), TaskError::ResponseTimeout);
+            task.on_task_error(Some(&mut association), TaskErrorKind::ResponseTimeout);
             assert_eq!(
                 rx.try_recv().unwrap(),
-                Err(TimeSyncError::Task(TaskError::ResponseTimeout))
+                Err(TaskErrorKind::ResponseTimeout.into())
             );
         }
 
@@ -721,7 +734,7 @@ mod tests {
             assert!(task.start(&mut association).is_none());
             assert_eq!(
                 rx.try_recv().unwrap(),
-                Err(TaskError::SystemTimeNotAvailable.into())
+                Err(TaskErrorKind::SystemTimeNotAvailable.into())
             );
         }
 
@@ -761,7 +774,7 @@ mod tests {
         async fn send_record_current_time_response(
             task: NonReadTask,
             association: &mut Association,
-        ) -> Result<Option<NonReadTask>, TaskError> {
+        ) -> Result<Option<NonReadTask>, TaskErrorKind> {
             respond(task, association, Iin::default(), &[]).await
         }
 
@@ -830,7 +843,7 @@ mod tests {
             assert!(task.start(&mut association).is_none());
             assert_eq!(
                 rx.try_recv().unwrap(),
-                Err(TaskError::SystemTimeNotAvailable.into())
+                Err(TaskErrorKind::SystemTimeNotAvailable.into())
             );
         }
 

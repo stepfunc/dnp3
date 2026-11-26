@@ -6,7 +6,7 @@
 
 use crate::app::attr::*;
 use crate::app::BufferSize;
-use crate::outstation::database::AttrDefError;
+use crate::outstation::database::AttrDefErrorKind;
 use crate::outstation::tests::harness::*;
 use crate::util::test_support::watchdog;
 
@@ -44,7 +44,7 @@ async fn attribute_values_longer_than_255_bytes_cannot_be_defined() {
 
     assert_eq!(
         results,
-        [Err(AttrDefError::BadValue(BadAttribute::BadLength(256))); 3]
+        [Err(AttrDefErrorKind::BadValue(BadAttribute::BadLength(256)).into()); 3]
     );
 }
 

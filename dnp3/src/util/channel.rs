@@ -62,9 +62,3 @@ impl<T> Sender<T> {
         self.inner.send(value).await.map_err(|_| Shutdown)
     }
 }
-
-impl From<tokio::sync::oneshot::error::RecvError> for Shutdown {
-    fn from(_: tokio::sync::oneshot::error::RecvError) -> Self {
-        Shutdown
-    }
-}

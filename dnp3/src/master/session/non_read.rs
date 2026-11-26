@@ -18,7 +18,7 @@ impl MasterSession {
         dest: FragmentAddr,
         task: CommandNoAckTask,
         writer: &mut TransportWriter<T>,
-    ) -> Result<Sequence, TaskError> {
+    ) -> Result<Sequence, TaskErrorKind> {
         match self.send_request(io, dest, &task, writer).await {
             Ok(seq) => {
                 task.complete();
@@ -38,7 +38,7 @@ impl<T: Transport> MasterTask<T> {
         io: &mut PhysLayer,
         dest: FragmentAddr,
         task: NonReadTask,
-    ) -> Result<Sequence, TaskError> {
+    ) -> Result<Sequence, TaskErrorKind> {
         let mut next = NextStep::Continue(task);
 
         loop {
@@ -58,7 +58,7 @@ impl<T: Transport> MasterTask<T> {
         io: &mut PhysLayer,
         dest: FragmentAddr,
         task: NonReadTask,
-    ) -> Result<NextStep, TaskError> {
+    ) -> Result<NextStep, TaskErrorKind> {
         let err = 'failed: {
             let seq = match self
                 .session
@@ -103,7 +103,7 @@ impl<T: Transport> MasterTask<T> {
                 };
 
                 if !response.header.control.is_fir_and_fin() {
-                    break 'failed TaskError::MultiFragmentResponse;
+                    break 'failed TaskErrorKind::MultiFragmentResponse;
                 }
 
                 // a response for a removed association isn't processed, so it isn't confirmed
@@ -129,7 +129,7 @@ impl<T: Transport> MasterTask<T> {
 
                 association.process_iin(response.header.iin);
                 if response.header.iin.has_bad_request_error() {
-                    break 'failed TaskError::RejectedByIin2(response.header.iin);
+                    break 'failed TaskErrorKind::RejectedByIin2(response.header.iin);
                 }
 
                 return match task.handle_response(association, response).await? {

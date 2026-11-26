@@ -15,9 +15,11 @@ use crate::app::control::{ControlCode, Group12Var1, Group41Var1, OpType, TripClo
 use crate::app::format::write::{start_request, start_response};
 use crate::app::{BufferSize, ControlField, FunctionCode, Iin, ResponseFunction, Sequence};
 use crate::decode::AppDecodeLevel;
+use crate::link::error::LinkError;
 use crate::link::reader::LinkModes;
-use crate::link::{EndpointAddress, LinkError, LinkErrorMode};
+use crate::link::{EndpointAddress, LinkErrorMode};
 use crate::master::association::{AssociationConfig, AssociationMap};
+use crate::master::error::{BadEncoding, TaskErrorKind};
 use crate::master::promise::Promise;
 use crate::master::session::task::MasterTask;
 use crate::master::tasks::command_no_ack::CommandNoAckTask;
@@ -27,9 +29,8 @@ use crate::master::tests::harness::requests::{empty_response, unsol_confirm, uns
 use crate::master::tests::harness::{create_association, AssocInfoEvent, ReadEvent, TestHarness};
 use crate::master::Classes;
 use crate::master::{
-    AssociationHandle, BadEncoding, CommandBuilder, CommandError, CommandHeaders, CommandMode,
-    CommandSupport, MasterChannel, MasterChannelConfig, MasterChannelType, ReadRequest, TaskError,
-    TaskType,
+    AssociationHandle, CommandBuilder, CommandHeaders, CommandMode, CommandSupport, MasterChannel,
+    MasterChannelConfig, MasterChannelType, ReadRequest, TaskError, TaskType,
 };
 use crate::util::lifecycle::{Enabled, RunError};
 use crate::util::test_support::watchdog;
@@ -233,7 +234,10 @@ async fn requests_beyond_the_queue_limit_fail_with_too_many_requests() {
 
         let mut queued = queue_no_ack(&mut harness).await;
         let rejected = queue_no_ack(&mut harness).await;
-        assert_eq!(rejected.await.unwrap(), Err(TaskError::TooManyRequests));
+        assert_eq!(
+            rejected.await.unwrap(),
+            Err(TaskErrorKind::TooManyRequests.into())
+        );
         assert_eq!(queued.try_recv(), Err(TryRecvError::Empty));
 
         harness
@@ -318,7 +322,7 @@ async fn operate_no_ack_fails_if_the_write_fails() {
         harness.io.write_error(ErrorKind::BrokenPipe);
         let result = harness.association.operate_no_ack(crob()).await;
         let err = LinkError::Stdio(ErrorKind::BrokenPipe);
-        assert_eq!(result, Err(TaskError::Link(err)));
+        assert_eq!(result, Err(TaskErrorKind::Link(err).into()));
 
         // the link error ends the session
         assert_eq!((&mut harness.task).await.unwrap(), RunError::Link(err));
@@ -326,7 +330,7 @@ async fn operate_no_ack_fails_if_the_write_fails() {
             harness.assoc_events.pop(),
             [
                 AssocInfoEvent::TaskStart(TaskType::Command, NO_ACK, Sequence::new(0)),
-                AssocInfoEvent::TaskFailure(TaskType::Command, TaskError::Link(err)),
+                AssocInfoEvent::TaskFailure(TaskType::Command, TaskErrorKind::Link(err).into()),
             ]
         );
     })
@@ -345,13 +349,13 @@ async fn operate_no_ack_fails_if_the_request_does_not_fit() {
         }
 
         let result = harness.association.operate_no_ack(builder.build()).await;
-        assert_eq!(result, Err(TaskError::WriteError));
+        assert_eq!(result, Err(TaskErrorKind::WriteError.into()));
         harness.assert_no_events();
         assert_eq!(
             harness.assoc_events.pop(),
             vec![
                 AssocInfoEvent::TaskStart(TaskType::Command, NO_ACK, Sequence::new(0)),
-                AssocInfoEvent::TaskFailure(TaskType::Command, TaskError::WriteError),
+                AssocInfoEvent::TaskFailure(TaskType::Command, TaskErrorKind::WriteError.into()),
             ]
         );
     })
@@ -368,7 +372,7 @@ async fn queued_operate_no_ack_fails_when_the_channel_is_disabled() {
         harness.barrier().await;
         harness.master.disable().await.unwrap();
 
-        assert_eq!(no_ack.await.unwrap(), Err(TaskError::Disabled));
+        assert_eq!(no_ack.await.unwrap(), Err(TaskErrorKind::Disabled.into()));
         assert!(blocker.await.unwrap().is_err());
         harness.assert_no_events();
     })
@@ -403,7 +407,10 @@ async fn operate_no_ack_fails_without_a_connection() {
         let operate = tokio::spawn(async move { association.operate_no_ack(crob()).await });
         task.process_next_message().await.unwrap();
 
-        assert_eq!(operate.await.unwrap(), Err(TaskError::NoConnection));
+        assert_eq!(
+            operate.await.unwrap(),
+            Err(TaskErrorKind::NoConnection.into())
+        );
     })
     .await;
 }
@@ -476,13 +483,13 @@ async fn non_canonical_control_codes_are_rejected_before_anything_is_sent() {
         let mut harness = quiet_association().await;
 
         for code in non_canonical_codes() {
-            let expected = TaskError::BadEncoding(BadEncoding::ControlCode(code));
+            let expected: TaskErrorKind = BadEncoding::ControlCode(code).into();
 
             for mode in [CommandMode::DirectOperate, CommandMode::SelectBeforeOperate] {
                 for headers in requests_containing(code) {
                     assert_eq!(
                         harness.association.operate(mode, headers).await,
-                        Err(CommandError::Task(expected))
+                        Err(expected.into())
                     );
                     harness.assert_no_events();
                 }
@@ -491,7 +498,7 @@ async fn non_canonical_control_codes_are_rejected_before_anything_is_sent() {
             for headers in requests_containing(code) {
                 assert_eq!(
                     harness.association.operate_no_ack(headers).await,
-                    Err(expected)
+                    Err(expected.into())
                 );
                 harness.assert_no_events();
             }

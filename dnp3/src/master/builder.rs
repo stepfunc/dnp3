@@ -599,10 +599,10 @@ mod tests {
         let association = add_stream_association(&mut builder, address).unwrap();
         let _handle = association.into_handle();
 
-        assert!(matches!(
-            add_stream_association(&mut builder, address),
-            Err(AssociationError::DuplicateAddress(x)) if x == address
-        ));
+        assert_eq!(
+            add_stream_association(&mut builder, address).unwrap_err(),
+            crate::master::error::AssociationErrorKind::DuplicateAddress(address).into()
+        );
     }
 
     #[tokio::test]

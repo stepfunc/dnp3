@@ -13,6 +13,8 @@ use crate::app::{
     Permissions, Sequence, Shutdown, Timestamp,
 };
 use crate::master::association::AssociationConfig;
+use crate::master::error::TaskErrorKind;
+use crate::master::file::FileErrorKind;
 use crate::master::tasks::file::REQUEST_ID;
 use crate::master::tests::file::auth_file::{auth_response, AUTH_REQUEST};
 use crate::master::tests::file::close_file::close_request_bytes_for;
@@ -20,8 +22,7 @@ use crate::master::tests::file::{ReaderEvent, RecordingReader};
 use crate::master::tests::harness::requests::empty_response_custom_iin;
 use crate::master::tests::harness::{create_association, AssocInfoEvent, TestHarness};
 use crate::master::{
-    DirReadConfig, FileAction, FileCredentials, FileError, FileMode, FileReadConfig, TaskError,
-    TaskType,
+    DirReadConfig, FileAction, FileCredentials, FileError, FileMode, FileReadConfig, TaskType,
 };
 use crate::util::lifecycle::{RunError, StopReason};
 use crate::util::test_support::watchdog;
@@ -163,7 +164,7 @@ enum Finished {
     /// `task_success`, with the sequence number of the last request
     Success(u8),
     /// `task_fail` with this error
-    Failure(TaskError),
+    Failure(TaskErrorKind),
 }
 
 /// Check that the read task, whose first request had function code `first`, finished this way and
@@ -174,7 +175,7 @@ async fn expect_finished(harness: &mut TestHarness, first: FunctionCode, finishe
         Finished::Success(seq) => {
             AssocInfoEvent::TaskSuccess(TaskType::FileRead, first, Sequence::new(seq))
         }
-        Finished::Failure(err) => AssocInfoEvent::TaskFailure(TaskType::FileRead, err),
+        Finished::Failure(err) => AssocInfoEvent::TaskFailure(TaskType::FileRead, err.into()),
     };
     assert_eq!(
         harness.assoc_events.pop(),
@@ -298,14 +299,12 @@ impl OpenFailure {
 
     fn error(self) -> FileError {
         match self {
-            Self::NoPermission => FileError::NoPermission,
+            Self::NoPermission => FileErrorKind::NoPermission.into(),
             Self::AuthVariation | Self::OpenVariation | Self::NoObjectHeader => {
-                TaskError::UnexpectedResponseHeaders.into()
+                TaskErrorKind::UnexpectedResponseHeaders.into()
             }
-            Self::OpenStatus => FileError::BadStatus(FileStatus::FileNotFound),
-            Self::AuthUnparseable | Self::OpenUnparseable => {
-                FileError::TaskError(TaskError::MalformedResponse(UNPARSEABLE))
-            }
+            Self::OpenStatus => FileErrorKind::BadStatus(FileStatus::FileNotFound).into(),
+            Self::AuthUnparseable | Self::OpenUnparseable => UNPARSEABLE.into(),
         }
     }
 
@@ -316,10 +315,8 @@ impl OpenFailure {
             | Self::AuthVariation
             | Self::OpenStatus
             | Self::OpenVariation
-            | Self::NoObjectHeader => Finished::Failure(TaskError::UnexpectedResponseHeaders),
-            Self::AuthUnparseable | Self::OpenUnparseable => {
-                Finished::Failure(TaskError::MalformedResponse(UNPARSEABLE))
-            }
+            | Self::NoObjectHeader => Finished::Failure(TaskErrorKind::UnexpectedResponseHeaders),
+            Self::AuthUnparseable | Self::OpenUnparseable => Finished::Failure(UNPARSEABLE.into()),
         }
     }
 
@@ -438,9 +435,9 @@ impl Ending {
             | Self::ReaderAbort
             | Self::ReaderAbortOnLastBlock => closed,
             Self::BlockVariation | Self::BlockNumber | Self::Handle | Self::NoObjectHeader => {
-                Finished::Failure(TaskError::UnexpectedResponseHeaders)
+                Finished::Failure(TaskErrorKind::UnexpectedResponseHeaders)
             }
-            Self::Unparseable => Finished::Failure(TaskError::MalformedResponse(UNPARSEABLE)),
+            Self::Unparseable => Finished::Failure(UNPARSEABLE.into()),
         }
     }
 
@@ -466,13 +463,15 @@ impl Ending {
     fn error(self) -> FileError {
         match self {
             Self::BlockVariation | Self::NoObjectHeader => {
-                TaskError::UnexpectedResponseHeaders.into()
+                TaskErrorKind::UnexpectedResponseHeaders.into()
             }
-            Self::BlockNumber => FileError::BadBlockNum,
-            Self::Handle => FileError::WrongHandle,
-            Self::Unparseable => FileError::TaskError(TaskError::MalformedResponse(UNPARSEABLE)),
-            Self::MaxFileSize | Self::MaxFileSizeOnLastBlock => FileError::MaxLengthExceeded,
-            Self::ReaderAbort | Self::ReaderAbortOnLastBlock => FileError::AbortByUser,
+            Self::BlockNumber => FileErrorKind::BadBlockNum.into(),
+            Self::Handle => FileErrorKind::WrongHandle.into(),
+            Self::Unparseable => UNPARSEABLE.into(),
+            Self::MaxFileSize | Self::MaxFileSizeOnLastBlock => {
+                FileErrorKind::MaxLengthExceeded.into()
+            }
+            Self::ReaderAbort | Self::ReaderAbortOnLastBlock => FileErrorKind::AbortByUser.into(),
         }
     }
 
@@ -499,23 +498,23 @@ fn close_responses(seq: u8) -> [(Vec<u8>, Finished); 6] {
         (close_success(seq), Finished::Success(seq)),
         (
             super::file_status_response(seq, HANDLE, 0, 0, FileStatus::InvalidHandle),
-            Finished::Failure(TaskError::UnexpectedResponseHeaders),
+            Finished::Failure(TaskErrorKind::UnexpectedResponseHeaders),
         ),
         (
             super::file_status_response(seq, HANDLE + 1, 0, 0, FileStatus::Success),
-            Finished::Failure(TaskError::UnexpectedResponseHeaders),
+            Finished::Failure(TaskErrorKind::UnexpectedResponseHeaders),
         ),
         (
             super::file_transport_response(seq, HANDLE, 0, b""),
-            Finished::Failure(TaskError::UnexpectedResponseHeaders),
+            Finished::Failure(TaskErrorKind::UnexpectedResponseHeaders),
         ),
         (
             super::no_object_response(seq),
-            Finished::Failure(TaskError::UnexpectedResponseHeaders),
+            Finished::Failure(TaskErrorKind::UnexpectedResponseHeaders),
         ),
         (
             unparseable_response(seq),
-            Finished::Failure(TaskError::MalformedResponse(UNPARSEABLE)),
+            Finished::Failure(UNPARSEABLE.into()),
         ),
     ]
 }
@@ -576,7 +575,7 @@ async fn reader_abort_on_open_closes_the_file_without_another_callback() {
                 reader.pop(),
                 [
                     ReaderEvent::Opened(8),
-                    ReaderEvent::Aborted(FileError::AbortByUser)
+                    ReaderEvent::Aborted(FileErrorKind::AbortByUser.into())
                 ]
             );
             harness.process_response(close).await;
@@ -660,7 +659,7 @@ async fn interrupted_file_read_fails_the_task_and_tells_the_reader_once_without_
                         assert_eq!(reader.pop(), [], "{waiting:?}");
                         tokio::time::sleep(Duration::from_millis(2)).await;
                         harness.barrier().await;
-                        TaskError::ResponseTimeout
+                        TaskErrorKind::ResponseTimeout
                     }
                     Interruption::RejectedByIin2 => {
                         harness
@@ -670,12 +669,12 @@ async fn interrupted_file_read_fails_the_task_and_tells_the_reader_once_without_
                             ))
                             .await;
                         harness.barrier().await;
-                        TaskError::RejectedByIin2(REJECTED)
+                        TaskErrorKind::RejectedByIin2(REJECTED)
                     }
                     Interruption::Malformed(fragment) => {
                         harness.process_response(fragment.to_vec()).await;
                         harness.barrier().await;
-                        TaskError::Transport
+                        TaskErrorKind::Transport
                     }
                     Interruption::Disabled => {
                         harness.master.disable().await.unwrap();
@@ -683,7 +682,7 @@ async fn interrupted_file_read_fails_the_task_and_tells_the_reader_once_without_
                             (&mut harness.task).await.unwrap(),
                             RunError::Stop(StopReason::Disable)
                         );
-                        TaskError::Disabled
+                        TaskErrorKind::Disabled
                     }
                     Interruption::Shutdown => {
                         drop(harness.association);
@@ -692,7 +691,7 @@ async fn interrupted_file_read_fails_the_task_and_tells_the_reader_once_without_
                             (&mut harness.task).await.unwrap(),
                             RunError::Stop(StopReason::Shutdown)
                         );
-                        TaskError::Shutdown
+                        TaskErrorKind::Shutdown
                     }
                 };
                 let context = format!("{waiting:?} {interruption:?}");
@@ -704,12 +703,12 @@ async fn interrupted_file_read_fails_the_task_and_tells_the_reader_once_without_
                             FunctionCode::OpenFile,
                             Sequence::new(0)
                         ),
-                        AssocInfoEvent::TaskFailure(TaskType::FileRead, err)
+                        AssocInfoEvent::TaskFailure(TaskType::FileRead, err.into())
                     ],
                     "{context}"
                 );
                 let told = match waiting {
-                    Waiting::Read => vec![ReaderEvent::Aborted(FileError::TaskError(err))],
+                    Waiting::Read => vec![ReaderEvent::Aborted(err.into())],
                     Waiting::Close(_) => vec![],
                 };
                 assert_eq!(reader.pop(), told, "{context}");
@@ -738,12 +737,10 @@ async fn file_read_requested_after_the_master_stops_aborts_the_reader_once() {
                 None,
             )
             .await;
-        assert!(matches!(result, Err(Shutdown)));
+        assert_eq!(result, Err(Shutdown));
         assert_eq!(
             reader.pop(),
-            [ReaderEvent::Aborted(FileError::TaskError(
-                TaskError::Shutdown
-            ))]
+            [ReaderEvent::Aborted(TaskErrorKind::Shutdown.into())]
         );
     })
     .await;
@@ -831,7 +828,7 @@ async fn directory_read_cleanup_that_fails_keeps_the_original_error() {
                 end_directory_read(&mut harness, ending).await;
                 let err = if timeout {
                     tokio::time::sleep(Duration::from_secs(2)).await;
-                    TaskError::ResponseTimeout
+                    TaskErrorKind::ResponseTimeout
                 } else {
                     harness
                         .process_response(super::file_status_response(
@@ -842,7 +839,7 @@ async fn directory_read_cleanup_that_fails_keeps_the_original_error() {
                             FileStatus::InvalidHandle,
                         ))
                         .await;
-                    TaskError::UnexpectedResponseHeaders
+                    TaskErrorKind::UnexpectedResponseHeaders
                 };
                 harness.barrier().await;
                 assert_eq!(
@@ -853,7 +850,7 @@ async fn directory_read_cleanup_that_fails_keeps_the_original_error() {
                             FunctionCode::OpenFile,
                             Sequence::new(0)
                         ),
-                        AssocInfoEvent::TaskFailure(TaskType::FileRead, err)
+                        AssocInfoEvent::TaskFailure(TaskType::FileRead, err.into())
                     ],
                     "{ending:?} {timeout}"
                 );

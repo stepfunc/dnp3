@@ -122,7 +122,7 @@ pub async fn spawn_master_tcp_server<C: ConnectionHandler>(
 }
 
 /// Error type indicating the connection should be rejected
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Reject;
 
 /// Information returned by user code to configure an accepted connection

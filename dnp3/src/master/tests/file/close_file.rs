@@ -6,9 +6,11 @@
 
 use crate::app::{FileStatus, FunctionCode, Group70Var4, Group70Var5, Sequence};
 use crate::master::association::AssociationConfig;
+use crate::master::error::TaskErrorKind;
+use crate::master::file::FileErrorKind;
 use crate::master::tasks::file::REQUEST_ID;
 use crate::master::tests::harness::{create_association, AssocInfoEvent, TestHarness};
-use crate::master::{AssociationHandle, FileError, FileHandle, TaskError, TaskType};
+use crate::master::{AssociationHandle, FileError, FileHandle, TaskType};
 use crate::util::test_support::watchdog;
 
 const HANDLE: FileHandle = FileHandle::new(42);
@@ -37,7 +39,7 @@ async fn fails_on_wrong_handle() {
             FileStatus::Success,
         ))
         .await;
-        assert_eq!(result, Err(FileError::WrongHandle));
+        assert_eq!(result, Err(FileErrorKind::WrongHandle.into()));
     })
     .await;
 }
@@ -53,7 +55,10 @@ async fn fails_on_bad_status() {
             FileStatus::InvalidHandle,
         ))
         .await;
-        assert_eq!(result, Err(FileError::BadStatus(FileStatus::InvalidHandle)));
+        assert_eq!(
+            result,
+            Err(FileErrorKind::BadStatus(FileStatus::InvalidHandle).into())
+        );
     })
     .await;
 }
@@ -69,7 +74,7 @@ async fn wrong_handle_is_reported_before_bad_status() {
             FileStatus::InvalidHandle,
         ))
         .await;
-        assert_eq!(result, Err(FileError::WrongHandle));
+        assert_eq!(result, Err(FileErrorKind::WrongHandle.into()));
     })
     .await;
 }
@@ -106,7 +111,7 @@ async fn fails_on_unexpected_variation() {
             },
         ))
         .await;
-        assert_eq!(result, Err(TaskError::UnexpectedResponseHeaders.into()));
+        assert_eq!(result, Err(TaskErrorKind::UnexpectedResponseHeaders.into()));
     })
     .await;
 }
@@ -131,7 +136,10 @@ fn expect_failure(harness: &mut TestHarness) {
                 FunctionCode::CloseFile,
                 Sequence::new(0)
             ),
-            AssocInfoEvent::TaskFailure(TaskType::FileClose, TaskError::UnexpectedResponseHeaders),
+            AssocInfoEvent::TaskFailure(
+                TaskType::FileClose,
+                TaskErrorKind::UnexpectedResponseHeaders.into()
+            ),
         ]
     );
 }

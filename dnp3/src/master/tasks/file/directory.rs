@@ -5,6 +5,7 @@
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
 use crate::app::{Group70Var7, MaybeAsync, ObjectParseError};
+use crate::master::file::FileErrorKind;
 use crate::master::promise::Promise;
 use crate::master::{FileAction, FileError, FileInfo, FileReader};
 use scursor::ReadCursor;
@@ -44,7 +45,7 @@ impl FileReader for DirectoryReader {
         fn read_entries<'a>(
             data: &'a [u8],
             mut each: impl FnMut(Group70Var7<'a>),
-        ) -> Result<(), FileError> {
+        ) -> Result<(), FileErrorKind> {
             let mut cursor = ReadCursor::new(data);
             while !cursor.is_empty() {
                 match Group70Var7::read(&mut cursor) {
@@ -58,7 +59,7 @@ impl FileReader for DirectoryReader {
             Ok(())
         }
 
-        fn parse(data: &[u8]) -> Result<Vec<FileInfo>, FileError> {
+        fn parse(data: &[u8]) -> Result<Vec<FileInfo>, FileErrorKind> {
             // every entry is read before any is converted, so a rejected directory allocates
             // nothing
             let mut count: usize = 0;
@@ -70,7 +71,7 @@ impl FileReader for DirectoryReader {
 
         // parse the accumulated data
 
-        let res = parse(self.data.as_slice());
+        let res = parse(self.data.as_slice()).map_err(FileError::from);
         if let Some(promise) = self.promise.take() {
             promise.complete(res);
         }

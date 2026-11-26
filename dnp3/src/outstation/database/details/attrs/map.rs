@@ -9,7 +9,7 @@ use crate::app::attr::{
     OwnedAttribute, TypeError,
 };
 use crate::app::Iin2;
-use crate::outstation::database::AttrDefError;
+use crate::outstation::database::AttrDefErrorKind;
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 
@@ -21,7 +21,7 @@ struct Variation {
 
 struct Reserved(u8);
 
-impl From<Reserved> for AttrDefError {
+impl From<Reserved> for AttrDefErrorKind {
     fn from(value: Reserved) -> Self {
         Self::ReservedVariation(value.0)
     }
@@ -130,7 +130,7 @@ impl SetMap {
         &mut self,
         prop: AttrProp,
         mut attr: OwnedAttribute,
-    ) -> Result<(), AttrDefError> {
+    ) -> Result<(), AttrDefErrorKind> {
         attr.set = AttrSet::new(attr.set.value());
 
         // reject reserved variations
@@ -144,7 +144,7 @@ impl SetMap {
 
         // constraints that apply to certain items in the default set
         if attr.set == AttrSet::Default && prop.is_writable() && !variation.can_be_written() {
-            return Err(AttrDefError::NotWritable(attr.set, attr.variation));
+            return Err(AttrDefErrorKind::NotWritable(attr.set, attr.variation));
         }
 
         self.insert(variation, prop, attr)
@@ -157,7 +157,7 @@ impl SetMap {
         &mut self,
         prop: AttrProp,
         attr: OwnedAttribute,
-    ) -> Result<(), AttrDefError> {
+    ) -> Result<(), AttrDefErrorKind> {
         let variation = Variation::create(attr.variation)?;
         self.insert(variation, prop, attr)
     }
@@ -167,11 +167,11 @@ impl SetMap {
         variation: Variation,
         prop: AttrProp,
         attr: OwnedAttribute,
-    ) -> Result<(), AttrDefError> {
+    ) -> Result<(), AttrDefErrorKind> {
         // lookup or create the set
         match self.sets.entry(attr.set) {
             Entry::Occupied(mut e) => match e.get_mut().entry(variation) {
-                Entry::Occupied(_) => Err(AttrDefError::AlreadyDefined),
+                Entry::Occupied(_) => Err(AttrDefErrorKind::AlreadyDefined),
                 Entry::Vacant(x) => {
                     x.insert((prop, attr));
                     Ok(())
@@ -321,7 +321,7 @@ mod test {
         let err = map.define(AttrProp::writable(), attr).unwrap_err();
         assert_eq!(
             err,
-            AttrDefError::BadType(TypeError {
+            AttrDefErrorKind::BadType(TypeError {
                 expected: AttrDataType::VisibleString,
                 actual: AttrDataType::SignedInt
             })
@@ -345,7 +345,7 @@ mod test {
                     let attr = OwnedAttribute::new(set, variation, value);
                     assert_eq!(
                         map.define(AttrProp::default(), attr),
-                        Err(AttrDefError::ReservedVariation(variation))
+                        Err(AttrDefErrorKind::ReservedVariation(variation))
                     );
                 }
                 assert_eq!(
@@ -374,7 +374,7 @@ mod test {
         let err = map.define(AttrProp::writable(), attr).unwrap_err();
         assert_eq!(
             err,
-            AttrDefError::NotWritable(
+            AttrDefErrorKind::NotWritable(
                 AttrSet::Default,
                 StringAttr::DeviceSubsetAndConformance.variation()
             )
@@ -405,7 +405,7 @@ mod test {
         let again = StringAttr::UserAssignedLocation.with_value("Bend");
         assert_eq!(
             map.define(AttrProp::writable(), again).unwrap_err(),
-            AttrDefError::AlreadyDefined
+            AttrDefErrorKind::AlreadyDefined
         );
     }
 
@@ -419,7 +419,7 @@ mod test {
         );
         assert_eq!(
             map.define(AttrProp::writable(), attr).unwrap_err(),
-            AttrDefError::BadType(TypeError {
+            AttrDefErrorKind::BadType(TypeError {
                 expected: AttrDataType::VisibleString,
                 actual: AttrDataType::SignedInt
             })
@@ -432,7 +432,7 @@ mod test {
         );
         assert_eq!(
             map.define(AttrProp::writable(), attr).unwrap_err(),
-            AttrDefError::NotWritable(
+            AttrDefErrorKind::NotWritable(
                 AttrSet::Default,
                 StringAttr::DeviceSubsetAndConformance.variation()
             )

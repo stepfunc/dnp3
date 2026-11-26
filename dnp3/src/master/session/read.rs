@@ -31,7 +31,7 @@ impl ReadOutcome {
     }
 
     /// A read with errors still succeeds if it delivered data, or if it's an automatic task
-    pub(crate) fn result(&self, task: &ReadTask) -> Result<(), TaskError> {
+    pub(crate) fn result(&self, task: &ReadTask) -> Result<(), TaskErrorKind> {
         if self.errors == Iin2::default() {
             return Ok(());
         }
@@ -42,7 +42,10 @@ impl ReadOutcome {
             );
             return Ok(());
         }
-        Err(TaskError::RejectedByIin2(Iin::new(self.iin1, self.errors)))
+        Err(TaskErrorKind::RejectedByIin2(Iin::new(
+            self.iin1,
+            self.errors,
+        )))
     }
 }
 
@@ -66,17 +69,17 @@ impl MasterSession {
         io: &mut PhysLayer,
         writer: &mut TransportWriter<T>,
         response: Response<'_>,
-    ) -> Result<ReadResponseAction, TaskError> {
+    ) -> Result<ReadResponseAction, TaskErrorKind> {
         if response.header.control.fir && !is_first {
-            return Err(TaskError::UnexpectedFir);
+            return Err(TaskErrorKind::UnexpectedFir);
         }
 
         if !response.header.control.fir && is_first {
-            return Err(TaskError::NeverReceivedFir);
+            return Err(TaskErrorKind::NeverReceivedFir);
         }
 
         if !response.header.control.fin && !response.header.control.con {
-            return Err(TaskError::NonFinWithoutCon);
+            return Err(TaskErrorKind::NonFinWithoutCon);
         }
 
         // a response with IIN2 errors is still processed, and the errors decide the outcome at the end
@@ -109,7 +112,7 @@ impl<T: Transport> MasterTask<T> {
         io: &mut PhysLayer,
         dest: FragmentAddr,
         mut task: ReadTask,
-    ) -> Result<Sequence, TaskError> {
+    ) -> Result<Sequence, TaskErrorKind> {
         let result = self.execute_read_task(io, dest, &mut task).await;
 
         let association = self.session.associations.get_mut(dest.link).ok();
@@ -119,7 +122,7 @@ impl<T: Transport> MasterTask<T> {
                 if let Some(association) = association {
                     task.complete(association, events_without_request_errors);
                 } else {
-                    task.on_task_error(None, TaskError::NoSuchAssociation(dest.link));
+                    task.on_task_error(None, TaskErrorKind::NoSuchAssociation(dest.link));
                 }
                 Ok(seq)
             }
@@ -137,7 +140,7 @@ impl<T: Transport> MasterTask<T> {
         io: &mut PhysLayer,
         dest: FragmentAddr,
         task: &mut ReadTask,
-    ) -> Result<(Sequence, bool), TaskError> {
+    ) -> Result<(Sequence, bool), TaskErrorKind> {
         let mut seq = self
             .session
             .send_request(io, dest, task, &mut self.writer)

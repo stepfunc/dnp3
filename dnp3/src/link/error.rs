@@ -9,14 +9,13 @@ use crate::util::BadWrite;
 /// Errors that should never occur, but are preferable to functions that could panic. If one ever
 /// happens, it indicates a bug in the library itself
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-#[non_exhaustive]
-pub enum LogicError {
+pub(crate) enum LogicError {
     /// A read was out of bounds
-    BadRead,
+    Read,
     /// A write was out of bounds
-    BadWrite,
+    Write,
     /// A size was out of bounds
-    BadSize,
+    Size,
 }
 
 /// Errors that can occur when parsing a link-layer frame. What happens next depends on the
@@ -24,8 +23,7 @@ pub enum LogicError {
 /// main master/outstation task and close the communication session; with `Discard`, the bad data
 /// is discarded. Serial and UDP always discard.
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-#[non_exhaustive]
-pub enum FrameError {
+pub(crate) enum FrameError {
     /// The first start byte wasn't 0x05
     UnexpectedStart1(u8),
     /// The second start byte wasn't 0x64
@@ -46,8 +44,7 @@ pub(crate) enum ParseError {
 
 /// Errors that end a communication session at the link layer
 #[derive(Copy, Clone, PartialEq, Eq, Debug)]
-#[non_exhaustive]
-pub enum LinkError {
+pub(crate) enum LinkError {
     /// An I/O error on the underlying channel, including the channel closing
     Stdio(std::io::ErrorKind),
     /// A malformed link-layer frame with [`LinkErrorMode::Close`](crate::link::LinkErrorMode::Close)
@@ -58,7 +55,7 @@ pub enum LinkError {
 
 impl From<BadWrite> for LinkError {
     fn from(_: BadWrite) -> Self {
-        LinkError::BadLogic(LogicError::BadWrite)
+        LinkError::BadLogic(LogicError::Write)
     }
 }
 
@@ -87,9 +84,9 @@ impl std::fmt::Display for FrameError {
 impl std::fmt::Display for LogicError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            LogicError::BadRead => f.write_str("read operation was out-of-bounds"),
-            LogicError::BadSize => f.write_str("size was out-of-bounds"),
-            LogicError::BadWrite => f.write_str("writer operation was out-of-bounds"),
+            LogicError::Read => f.write_str("read operation was out-of-bounds"),
+            LogicError::Size => f.write_str("size was out-of-bounds"),
+            LogicError::Write => f.write_str("writer operation was out-of-bounds"),
         }
     }
 }
@@ -111,7 +108,7 @@ impl From<LogicError> for LinkError {
 
 impl From<scursor::WriteError> for LinkError {
     fn from(_: scursor::WriteError) -> Self {
-        LinkError::BadLogic(LogicError::BadWrite)
+        LinkError::BadLogic(LogicError::Write)
     }
 }
 

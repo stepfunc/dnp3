@@ -7,7 +7,7 @@
 use crate::app::file::{FileStatus, FileType, Permissions};
 use crate::app::parse::parser::SingleHeaderError;
 use crate::app::{MaybeAsync, ObjectParseError, Shutdown, Timestamp};
-use crate::master::TaskError;
+use crate::master::error::{TaskError, TaskErrorKind};
 use std::fmt::Debug;
 
 /// Credentials for obtaining a file authorization token from the outstation
@@ -131,10 +131,12 @@ impl Default for DirReadConfig {
     }
 }
 
-/// Errors that can occur during a file operations
+/// Errors that can occur during file operations
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[cfg_attr(not(feature = "ffi"), non_exhaustive)]
-pub enum FileError {
+pub struct FileError(pub(crate) FileErrorKind);
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) enum FileErrorKind {
     /// Outstation returned an error status code
     BadStatus(FileStatus),
     /// File handle returned did not match request
@@ -148,52 +150,91 @@ pub enum FileError {
     /// Exceeded the maximum length specified by the user
     MaxLengthExceeded,
     /// Generic task error occurred
-    TaskError(TaskError),
+    Task(TaskErrorKind),
 }
 
-impl From<tokio::sync::oneshot::error::RecvError> for FileError {
-    fn from(_: tokio::sync::oneshot::error::RecvError) -> Self {
-        Self::TaskError(TaskError::Shutdown)
+impl FileError {
+    /// Returns the file status if the outstation reported a non-success file status
+    pub fn file_status(&self) -> Option<FileStatus> {
+        match self.0 {
+            FileErrorKind::BadStatus(status) => Some(status),
+            FileErrorKind::WrongHandle
+            | FileErrorKind::NoPermission
+            | FileErrorKind::BadBlockNum
+            | FileErrorKind::AbortByUser
+            | FileErrorKind::MaxLengthExceeded
+            | FileErrorKind::Task(_) => None,
+        }
+    }
+}
+
+impl From<FileErrorKind> for FileError {
+    fn from(kind: FileErrorKind) -> Self {
+        Self(kind)
+    }
+}
+
+impl From<TaskErrorKind> for FileError {
+    fn from(err: TaskErrorKind) -> Self {
+        Self(err.into())
+    }
+}
+
+impl From<ObjectParseError> for FileError {
+    fn from(err: ObjectParseError) -> Self {
+        Self(err.into())
     }
 }
 
 impl From<Shutdown> for FileError {
     fn from(_: Shutdown) -> Self {
-        Self::TaskError(TaskError::Shutdown)
+        TaskErrorKind::Shutdown.into()
     }
 }
 
-impl From<ObjectParseError> for FileError {
+impl From<ObjectParseError> for FileErrorKind {
     fn from(value: ObjectParseError) -> Self {
-        FileError::TaskError(value.into())
+        Self::Task(value.into())
     }
 }
 
-impl From<SingleHeaderError> for FileError {
+impl From<SingleHeaderError> for FileErrorKind {
     fn from(err: SingleHeaderError) -> Self {
-        Self::TaskError(err.into())
+        Self::Task(err.into())
+    }
+}
+
+impl From<TaskErrorKind> for FileErrorKind {
+    fn from(err: TaskErrorKind) -> Self {
+        Self::Task(err)
     }
 }
 
 impl From<TaskError> for FileError {
     fn from(err: TaskError) -> Self {
-        FileError::TaskError(err)
+        Self(FileErrorKind::Task(err.0))
+    }
+}
+
+impl std::fmt::Display for FileErrorKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FileErrorKind::BadStatus(s) => write!(f, "bad status code: {s:?}"),
+            FileErrorKind::NoPermission => f.write_str("no permission"),
+            FileErrorKind::BadBlockNum => f.write_str("bad block number"),
+            FileErrorKind::AbortByUser => f.write_str("aborted by user"),
+            FileErrorKind::Task(t) => std::fmt::Display::fmt(t, f),
+            FileErrorKind::MaxLengthExceeded => f.write_str("exceeded maximum received length"),
+            FileErrorKind::WrongHandle => {
+                f.write_str("file handle returned by outstation did not match the request")
+            }
+        }
     }
 }
 
 impl std::fmt::Display for FileError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            FileError::BadStatus(s) => write!(f, "bad status code: {s:?}"),
-            FileError::NoPermission => f.write_str("no permission"),
-            FileError::BadBlockNum => f.write_str("bad block number"),
-            FileError::AbortByUser => f.write_str("aborted by user"),
-            FileError::TaskError(t) => std::fmt::Display::fmt(t, f),
-            FileError::MaxLengthExceeded => f.write_str("exceeded maximum received length"),
-            FileError::WrongHandle => {
-                f.write_str("file handle returned by outstation did not match the request")
-            }
-        }
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(&self.0, f)
     }
 }
 
@@ -325,6 +366,7 @@ impl FileHandle {
 pub struct BlockNumber(u32);
 
 /// Error returned when a block cannot be incremented
+#[non_exhaustive]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct FailedBlockIncrement;
 
@@ -408,6 +450,18 @@ pub struct OpenFile {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn file_status_accessor_returns_status_only_for_bad_status() {
+        let status_err: FileError = FileErrorKind::BadStatus(FileStatus::FileNotFound).into();
+        assert_eq!(status_err.file_status(), Some(FileStatus::FileNotFound));
+
+        let task_err: FileError = TaskErrorKind::ResponseTimeout.into();
+        assert_eq!(task_err.file_status(), None);
+
+        let wrong_handle: FileError = FileErrorKind::WrongHandle.into();
+        assert_eq!(wrong_handle.file_status(), None);
+    }
 
     #[test]
     fn block_number_increments_to_the_maximum_and_keeps_the_last_flag() {

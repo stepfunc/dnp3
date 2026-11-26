@@ -9,10 +9,12 @@ use crate::app::{
     Timestamp,
 };
 use crate::master::association::AssociationConfig;
+use crate::master::error::TaskErrorKind;
+use crate::master::file::FileErrorKind;
 use crate::master::tasks::file::REQUEST_ID;
 use crate::master::tests::harness::{create_association, AssocInfoEvent, TestHarness};
 use crate::master::{
-    AssociationHandle, AuthKey, FileError, FileHandle, FileMode, OpenFile, TaskError, TaskType,
+    AssociationHandle, AuthKey, FileError, FileHandle, FileMode, OpenFile, TaskType,
 };
 use crate::util::test_support::watchdog;
 
@@ -95,7 +97,7 @@ async fn bad_status_fails_the_task() {
         for status in [FileStatus::PermissionDenied, FileStatus::FileLocked] {
             let result =
                 open_with_response(super::file_status_response(0, 21, 0, 512, status)).await;
-            assert_eq!(result, Err(FileError::BadStatus(status)));
+            assert_eq!(result, Err(FileErrorKind::BadStatus(status).into()));
         }
     })
     .await;
@@ -113,7 +115,7 @@ async fn fails_on_unexpected_variation() {
             },
         ))
         .await;
-        assert_eq!(result, Err(TaskError::UnexpectedResponseHeaders.into()));
+        assert_eq!(result, Err(TaskErrorKind::UnexpectedResponseHeaders.into()));
     })
     .await;
 }
@@ -144,7 +146,10 @@ fn expect_failure(harness: &mut TestHarness) {
         harness.assoc_events.pop().as_slice(),
         &[
             AssocInfoEvent::TaskStart(TaskType::FileOpen, FunctionCode::OpenFile, Sequence::new(0)),
-            AssocInfoEvent::TaskFailure(TaskType::FileOpen, TaskError::UnexpectedResponseHeaders),
+            AssocInfoEvent::TaskFailure(
+                TaskType::FileOpen,
+                TaskErrorKind::UnexpectedResponseHeaders.into()
+            ),
         ]
     );
 }

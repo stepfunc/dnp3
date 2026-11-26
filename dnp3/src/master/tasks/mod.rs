@@ -11,8 +11,11 @@ use crate::app::parse::parser::Response;
 use crate::app::FunctionCode;
 use crate::app::ResponseHeader;
 use crate::master::association::Association;
-use crate::master::error::TaskError;
+use crate::master::error::{
+    CommandError, CommandErrorKind, TaskError, TaskErrorKind, TimeSyncError, TimeSyncErrorKind,
+};
 use crate::master::extract::{extract_measurements, Delivered, ProcessableResponse};
+use crate::master::file::{FileError, FileErrorKind};
 use crate::master::poll::Poll;
 use crate::master::promise::Promise;
 use crate::master::request::{Classes, EventClasses};
@@ -22,7 +25,7 @@ use crate::master::tasks::command_no_ack::CommandNoAckTask;
 use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::restart::RestartType;
 use crate::master::tasks::time::{PendingTimeSync, TimeSyncTask};
-use crate::master::{CommandError, FileError, ReadType, TaskType, TimeSyncError};
+use crate::master::{ReadType, TaskType};
 
 use crate::master::tasks::deadbands::DeadBandsRequest;
 use crate::master::tasks::empty_response::EmptyResponseRequest;
@@ -98,7 +101,7 @@ impl From<PendingTimeSync> for QueuedTask {
 }
 
 impl QueuedTask {
-    pub(crate) fn on_task_error(self, association: Option<&mut Association>, err: TaskError) {
+    pub(crate) fn on_task_error(self, association: Option<&mut Association>, err: TaskErrorKind) {
         match self {
             Self::Ready(task) => task.on_task_error(association, err),
             Self::TimeSync(task) => task.on_task_error(association, err),
@@ -139,7 +142,7 @@ impl AppTask {
         }
     }
 
-    pub(crate) fn on_task_error(self, association: Option<&mut Association>, err: TaskError) {
+    pub(crate) fn on_task_error(self, association: Option<&mut Association>, err: TaskErrorKind) {
         match self {
             Self::NonRead(task) => task.on_task_error(association, err),
             Self::Read(task) => task.on_task_error(association, err),
@@ -149,10 +152,10 @@ impl AppTask {
 }
 
 impl Task {
-    pub(crate) fn on_task_error(self, association: Option<&mut Association>, err: TaskError) {
+    pub(crate) fn on_task_error(self, association: Option<&mut Association>, err: TaskErrorKind) {
         match self {
             Self::App(task) => task.on_task_error(association, err),
-            Self::LinkStatus(promise) => promise.complete(Err(err)),
+            Self::LinkStatus(promise) => promise.complete(Err(err.into())),
         }
     }
 
@@ -166,7 +169,7 @@ impl Task {
 
 pub(crate) trait RequestWriter {
     fn function(&self) -> FunctionCode;
-    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError>;
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskErrorKind>;
 }
 
 pub(crate) enum ReadTask {
@@ -184,7 +187,7 @@ pub(crate) enum ReadTask {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) enum ReadFailureLog {
     /// Log a warning that names the cause
-    Warn(TaskError),
+    Warn(TaskErrorKind),
     /// Log nothing
     Nothing,
 }
@@ -211,7 +214,7 @@ pub(crate) trait ResponseTask: Send + Sized {
 
     fn task_type(&self) -> TaskType;
 
-    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError>;
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskErrorKind>;
 
     /// Handle the response to the last request
     fn on_response(
@@ -229,48 +232,59 @@ pub(crate) trait ResponseTask: Send + Sized {
 }
 
 /// Why a task failed, as its requester sees it
-pub(crate) trait RequestError: Copy + Send + From<TaskError> {
+pub(crate) trait RequestError: Copy + Send + From<TaskErrorKind> {
+    /// Public opaque error returned to the caller
+    type Public: From<Self> + Send;
+
     /// The error the session and the association see when the task fails
-    fn task_error(self) -> TaskError;
+    fn task_error(self) -> TaskErrorKind;
 }
 
-impl RequestError for TaskError {
-    fn task_error(self) -> TaskError {
+impl RequestError for TaskErrorKind {
+    type Public = TaskError;
+
+    fn task_error(self) -> TaskErrorKind {
         self
     }
 }
 
-impl RequestError for CommandError {
-    fn task_error(self) -> TaskError {
+impl RequestError for CommandErrorKind {
+    type Public = CommandError;
+
+    fn task_error(self) -> TaskErrorKind {
         match self {
-            CommandError::Task(err) => err,
-            CommandError::Response(_) => TaskError::UnexpectedResponseHeaders,
+            CommandErrorKind::Task(err) => err,
+            CommandErrorKind::Response(_) => TaskErrorKind::UnexpectedResponseHeaders,
         }
     }
 }
 
-impl RequestError for TimeSyncError {
-    fn task_error(self) -> TaskError {
+impl RequestError for TimeSyncErrorKind {
+    type Public = TimeSyncError;
+
+    fn task_error(self) -> TaskErrorKind {
         match self {
-            TimeSyncError::Task(err) => err,
-            TimeSyncError::ClockRollback
-            | TimeSyncError::BadOutstationTimeDelay(_)
-            | TimeSyncError::Overflow
-            | TimeSyncError::StillNeedsTime => TaskError::UnexpectedResponseHeaders,
+            TimeSyncErrorKind::Task(err) => err,
+            TimeSyncErrorKind::ClockRollback
+            | TimeSyncErrorKind::BadOutstationTimeDelay(_)
+            | TimeSyncErrorKind::Overflow
+            | TimeSyncErrorKind::StillNeedsTime => TaskErrorKind::UnexpectedResponseHeaders,
         }
     }
 }
 
-impl RequestError for FileError {
-    fn task_error(self) -> TaskError {
+impl RequestError for FileErrorKind {
+    type Public = FileError;
+
+    fn task_error(self) -> TaskErrorKind {
         match self {
-            FileError::TaskError(err) => err,
-            FileError::BadStatus(_)
-            | FileError::WrongHandle
-            | FileError::NoPermission
-            | FileError::BadBlockNum
-            | FileError::AbortByUser
-            | FileError::MaxLengthExceeded => TaskError::UnexpectedResponseHeaders,
+            FileErrorKind::Task(err) => err,
+            FileErrorKind::BadStatus(_)
+            | FileErrorKind::WrongHandle
+            | FileErrorKind::NoPermission
+            | FileErrorKind::BadBlockNum
+            | FileErrorKind::AbortByUser
+            | FileErrorKind::MaxLengthExceeded => TaskErrorKind::UnexpectedResponseHeaders,
         }
     }
 }
@@ -280,7 +294,7 @@ async fn respond<T: ResponseTask>(
     mut task: T,
     association: &mut Association,
     response: Response<'_>,
-) -> Result<Option<T>, TaskError> {
+) -> Result<Option<T>, TaskErrorKind> {
     match task.on_response(association, response).await {
         Ok(Step::Next) => Ok(Some(task)),
         Ok(Step::Done(output)) => {
@@ -294,7 +308,7 @@ async fn respond<T: ResponseTask>(
     }
 }
 
-fn fail<T: ResponseTask>(task: T, association: Option<&mut Association>, err: TaskError) {
+fn fail<T: ResponseTask>(task: T, association: Option<&mut Association>, err: TaskErrorKind) {
     task.complete(association, Err(err.into()))
 }
 
@@ -307,7 +321,7 @@ pub(crate) trait OneShotRequest: Send + Sized {
 
     fn task_type(&self) -> TaskType;
 
-    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError>;
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskErrorKind>;
 
     fn parse(&self, response: Response<'_>) -> Result<Self::Output, Self::Error>;
 
@@ -317,11 +331,14 @@ pub(crate) trait OneShotRequest: Send + Sized {
 /// A task that sends one request and passes the parsed response to its requester
 pub(crate) struct OneShot<R: OneShotRequest> {
     request: R,
-    promise: Promise<Result<R::Output, R::Error>>,
+    promise: Promise<Result<R::Output, <R::Error as RequestError>::Public>>,
 }
 
 impl<R: OneShotRequest> OneShot<R> {
-    pub(crate) fn new(request: R, promise: Promise<Result<R::Output, R::Error>>) -> Self {
+    pub(crate) fn new(
+        request: R,
+        promise: Promise<Result<R::Output, <R::Error as RequestError>::Public>>,
+    ) -> Self {
         Self { request, promise }
     }
 }
@@ -344,7 +361,7 @@ impl<R: OneShotRequest> ResponseTask for OneShot<R> {
         self.request.task_type()
     }
 
-    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskErrorKind> {
         self.request.write(writer)
     }
 
@@ -357,7 +374,7 @@ impl<R: OneShotRequest> ResponseTask for OneShot<R> {
     }
 
     fn complete(self, _association: Option<&mut Association>, result: Result<R::Output, R::Error>) {
-        self.promise.complete(result)
+        self.promise.complete(result.map_err(Into::into))
     }
 }
 
@@ -393,7 +410,7 @@ impl RequestWriter for ReadTask {
         FunctionCode::Read
     }
 
-    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskErrorKind> {
         match self {
             ReadTask::PeriodicPoll(poll) => poll.format(writer)?,
             ReadTask::StartupIntegrity(classes) => classes.write(writer)?,
@@ -409,7 +426,7 @@ impl RequestWriter for NonReadTask {
         self.function()
     }
 
-    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskErrorKind> {
         match self {
             NonReadTask::Auto(t) => t.write(writer),
             NonReadTask::Command(t) => t.write(writer),
@@ -427,9 +444,9 @@ impl RequestWriter for NonReadTask {
     }
 }
 
-impl From<crate::app::format::WriteError> for TaskError {
+impl From<crate::app::format::WriteError> for TaskErrorKind {
     fn from(_: crate::app::format::WriteError) -> Self {
-        TaskError::WriteError
+        TaskErrorKind::WriteError
     }
 }
 
@@ -496,34 +513,34 @@ impl ReadTask {
 
     /// How a failure of this task is logged. User reads don't log a shutdown or disable, which
     /// fails every queued read
-    fn failure_log(&self, err: TaskError) -> ReadFailureLog {
+    fn failure_log(&self, err: TaskErrorKind) -> ReadFailureLog {
         match self {
             ReadTask::StartupIntegrity(_) | ReadTask::PeriodicPoll(_) | ReadTask::EventScan(_) => {
                 ReadFailureLog::Warn(err)
             }
             ReadTask::SingleRead(_) => match err {
-                TaskError::Shutdown | TaskError::Disabled => ReadFailureLog::Nothing,
-                TaskError::TooManyRequests
-                | TaskError::Link(_)
-                | TaskError::Transport
-                | TaskError::RejectedByIin2(_)
-                | TaskError::MalformedResponse(_)
-                | TaskError::UnexpectedResponseHeaders
-                | TaskError::NonFinWithoutCon
-                | TaskError::NeverReceivedFir
-                | TaskError::UnexpectedFir
-                | TaskError::MultiFragmentResponse
-                | TaskError::ResponseTimeout
-                | TaskError::WriteError
-                | TaskError::BadEncoding(_)
-                | TaskError::NoSuchAssociation(_)
-                | TaskError::NoConnection
-                | TaskError::SystemTimeNotAvailable => ReadFailureLog::Warn(err),
+                TaskErrorKind::Shutdown | TaskErrorKind::Disabled => ReadFailureLog::Nothing,
+                TaskErrorKind::TooManyRequests
+                | TaskErrorKind::Link(_)
+                | TaskErrorKind::Transport
+                | TaskErrorKind::RejectedByIin2(_)
+                | TaskErrorKind::MalformedResponse(_)
+                | TaskErrorKind::UnexpectedResponseHeaders
+                | TaskErrorKind::NonFinWithoutCon
+                | TaskErrorKind::NeverReceivedFir
+                | TaskErrorKind::UnexpectedFir
+                | TaskErrorKind::MultiFragmentResponse
+                | TaskErrorKind::ResponseTimeout
+                | TaskErrorKind::WriteError
+                | TaskErrorKind::BadEncoding(_)
+                | TaskErrorKind::NoSuchAssociation(_)
+                | TaskErrorKind::NoConnection
+                | TaskErrorKind::SystemTimeNotAvailable => ReadFailureLog::Warn(err),
             },
         }
     }
 
-    fn log_failure(&self, err: TaskError) {
+    fn log_failure(&self, err: TaskErrorKind) {
         let ReadFailureLog::Warn(cause) = self.failure_log(err) else {
             return;
         };
@@ -537,7 +554,7 @@ impl ReadTask {
         }
     }
 
-    pub(crate) fn on_task_error(self, association: Option<&mut Association>, err: TaskError) {
+    pub(crate) fn on_task_error(self, association: Option<&mut Association>, err: TaskErrorKind) {
         self.log_failure(err);
         match self {
             ReadTask::StartupIntegrity(_) => {
@@ -587,7 +604,7 @@ impl NonReadTask {
         }
     }
 
-    pub(crate) fn on_task_error(self, association: Option<&mut Association>, err: TaskError) {
+    pub(crate) fn on_task_error(self, association: Option<&mut Association>, err: TaskErrorKind) {
         match self {
             Self::Command(task) => fail(task, association, err),
             Self::TimeSync(task) => fail(task, association, err),
@@ -608,7 +625,7 @@ impl NonReadTask {
         self,
         association: &mut Association,
         response: Response<'_>,
-    ) -> Result<Option<NonReadTask>, TaskError> {
+    ) -> Result<Option<NonReadTask>, TaskErrorKind> {
         let next = match self {
             Self::Command(task) => respond(task, association, response)
                 .await?
@@ -693,10 +710,10 @@ mod test {
     #[test]
     fn every_read_task_warns_with_the_cause() {
         let causes = [
-            TaskError::MalformedResponse(ObjectParseError::InsufficientBytes),
-            TaskError::ResponseTimeout,
-            TaskError::TooManyRequests,
-            TaskError::NoConnection,
+            TaskErrorKind::MalformedResponse(ObjectParseError::InsufficientBytes),
+            TaskErrorKind::ResponseTimeout,
+            TaskErrorKind::TooManyRequests,
+            TaskErrorKind::NoConnection,
         ];
         for task in read_tasks() {
             for cause in causes {
@@ -714,7 +731,7 @@ mod test {
     fn only_user_reads_skip_shutdown_and_disable() {
         for task in read_tasks() {
             let user_read = matches!(task, ReadTask::SingleRead(_));
-            for cause in [TaskError::Shutdown, TaskError::Disabled] {
+            for cause in [TaskErrorKind::Shutdown, TaskErrorKind::Disabled] {
                 let expected = if user_read {
                     ReadFailureLog::Nothing
                 } else {

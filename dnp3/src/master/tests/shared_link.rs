@@ -11,10 +11,11 @@ use tokio::time::Instant;
 use crate::app::{Sequence, Timeout};
 use crate::link::EndpointAddress;
 use crate::master::association::AssociationConfig;
+use crate::master::error::TaskErrorKind;
 use crate::master::test_fixtures::null;
 use crate::master::tests::harness::create_association;
 use crate::master::tests::harness::requests::{class_scan_request, empty_response};
-use crate::master::{Classes, ReadRequest, TaskError};
+use crate::master::{Classes, ReadRequest};
 use crate::util::test_support::watchdog;
 
 const COLD_RESTART: u8 = 0x0D;
@@ -75,7 +76,7 @@ async fn response_from_another_outstation_during_any_task_refreshes_its_own_keep
             // the task ignores the response, which isn't from its outstation
             assert_eq!(
                 task.await.unwrap(),
-                Err(TaskError::ResponseTimeout),
+                Err(TaskErrorKind::ResponseTimeout.into()),
                 "{kind:?}"
             );
 

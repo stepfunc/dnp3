@@ -17,7 +17,7 @@ use crate::util::BadWrite;
 
 impl From<BadWrite> for LogicError {
     fn from(_: BadWrite) -> Self {
-        LogicError::BadWrite
+        LogicError::Write
     }
 }
 

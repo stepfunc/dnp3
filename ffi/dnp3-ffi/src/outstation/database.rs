@@ -426,12 +426,12 @@ where
 
 impl From<AttrDefError> for ffi::AttrDefError {
     fn from(value: AttrDefError) -> Self {
-        match value {
-            AttrDefError::AlreadyDefined => ffi::AttrDefError::AlreadyDefined,
-            AttrDefError::BadType(_) => ffi::AttrDefError::BadType,
-            AttrDefError::ReservedVariation(_) => ffi::AttrDefError::ReservedVariation,
-            AttrDefError::NotWritable(_, _) => ffi::AttrDefError::NotWritable,
-            AttrDefError::BadValue(_) => ffi::AttrDefError::BadValue,
+        match dnp3::ffi::AttrDefErrorClass::from(value) {
+            dnp3::ffi::AttrDefErrorClass::AlreadyDefined => ffi::AttrDefError::AlreadyDefined,
+            dnp3::ffi::AttrDefErrorClass::BadType => ffi::AttrDefError::BadType,
+            dnp3::ffi::AttrDefErrorClass::ReservedVariation => ffi::AttrDefError::ReservedVariation,
+            dnp3::ffi::AttrDefErrorClass::NotWritable => ffi::AttrDefError::NotWritable,
+            dnp3::ffi::AttrDefErrorClass::BadValue => ffi::AttrDefError::BadValue,
         }
     }
 }

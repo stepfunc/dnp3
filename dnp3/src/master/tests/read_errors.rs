@@ -14,6 +14,7 @@ use crate::app::{
     ControlField, Iin, Iin1, Iin2, ObjectParseError, QualifierCode, Sequence, Variation,
 };
 use crate::master::association::AssociationConfig;
+use crate::master::error::TaskErrorKind;
 use crate::master::test_objects::{RELATIVE_TIME_EVENT, SYNCHRONIZED_CTO, TRUNCATED_ANALOG_EVENT};
 use crate::master::tests::harness::{AssocInfoEvent, ReadEvent, TestHarness};
 use crate::master::{Classes, ReadRequest, ReadType, TaskError, TaskType};
@@ -102,10 +103,10 @@ async fn read_with_iin2_and_no_data_fails() {
 
         assert_eq!(
             read.await.unwrap(),
-            Err(TaskError::RejectedByIin2(Iin::new(
-                Iin1::default(),
-                Iin2::OBJECT_UNKNOWN
-            )))
+            Err(
+                TaskErrorKind::RejectedByIin2(Iin::new(Iin1::default(), Iin2::OBJECT_UNKNOWN))
+                    .into()
+            )
         );
         assert_eq!(harness.read_events.count(ReadEvent::AnalogInput), 0);
     })
@@ -192,10 +193,10 @@ async fn multi_fragment_read_with_iin2_and_no_data_fails() {
 
         assert_eq!(
             read.await.unwrap(),
-            Err(TaskError::RejectedByIin2(Iin::new(
-                Iin1::default(),
-                Iin2::OBJECT_UNKNOWN
-            )))
+            Err(
+                TaskErrorKind::RejectedByIin2(Iin::new(Iin1::default(), Iin2::OBJECT_UNKNOWN))
+                    .into()
+            )
         );
     })
     .await;
@@ -242,10 +243,10 @@ async fn read_with_iin2_and_an_empty_header_fails() {
 
         assert_eq!(
             read.await.unwrap(),
-            Err(TaskError::RejectedByIin2(Iin::new(
-                Iin1::default(),
-                Iin2::OBJECT_UNKNOWN
-            )))
+            Err(
+                TaskErrorKind::RejectedByIin2(Iin::new(Iin1::default(), Iin2::OBJECT_UNKNOWN))
+                    .into()
+            )
         );
     })
     .await;
@@ -280,7 +281,7 @@ async fn periodic_poll_with_iin2_and_no_data_fails() {
             .pop()
             .contains(&AssocInfoEvent::TaskFailure(
                 TaskType::PeriodicPoll,
-                TaskError::RejectedByIin2(iin)
+                TaskErrorKind::RejectedByIin2(iin).into()
             )));
     })
     .await;
@@ -303,12 +304,11 @@ async fn read_with_counted_event_objects_is_malformed() {
 
         assert_eq!(
             read.await.unwrap(),
-            Err(TaskError::MalformedResponse(
-                ObjectParseError::InvalidQualifierForVariation(
-                    Variation::Group2Var1,
-                    QualifierCode::Count8
-                )
-            ))
+            Err(ObjectParseError::InvalidQualifierForVariation(
+                Variation::Group2Var1,
+                QualifierCode::Count8
+            )
+            .into())
         );
         assert_eq!(harness.read_events.pop(), Vec::new());
     })
@@ -338,9 +338,9 @@ async fn read_with_a_count_of_objects_that_carry_no_data_is_malformed() {
 
                 assert_eq!(
                     read.await.unwrap(),
-                    Err(TaskError::MalformedResponse(
-                        ObjectParseError::InvalidQualifierForVariation(variation, qualifier)
-                    ))
+                    Err(
+                        ObjectParseError::InvalidQualifierForVariation(variation, qualifier).into()
+                    )
                 );
                 assert_eq!(harness.read_events.pop(), Vec::new());
             }
@@ -403,7 +403,7 @@ async fn read_with_relative_time_without_cto_fails_without_confirm() {
 
         assert_eq!(
             read.await.unwrap(),
-            Err(TaskError::UnexpectedResponseHeaders)
+            Err(TaskErrorKind::UnexpectedResponseHeaders.into())
         );
         assert_eq!(harness.read_events.pop(), Vec::new());
         harness.assert_no_events();
@@ -459,7 +459,7 @@ async fn multi_fragment_read_with_cto_only_in_the_first_fragment_fails() {
 
         assert_eq!(
             read.await.unwrap(),
-            Err(TaskError::UnexpectedResponseHeaders)
+            Err(TaskErrorKind::UnexpectedResponseHeaders.into())
         );
         // only the first fragment was delivered
         assert_eq!(
@@ -489,7 +489,7 @@ async fn read_with_valid_measurements_before_relative_time_without_cto_delivers_
 
         assert_eq!(
             read.await.unwrap(),
-            Err(TaskError::UnexpectedResponseHeaders)
+            Err(TaskErrorKind::UnexpectedResponseHeaders.into())
         );
         assert_eq!(harness.read_events.pop(), Vec::new());
         harness.assert_no_events();
@@ -556,7 +556,7 @@ async fn read_with_relative_time_without_cto_then_a_parse_error_is_malformed() {
     watchdog(async {
         expect_read_rejected(
             &[RELATIVE_TIME_EVENT, TRUNCATED_ANALOG_EVENT],
-            TaskError::MalformedResponse(ObjectParseError::InsufficientBytes),
+            ObjectParseError::InsufficientBytes.into(),
         )
         .await;
     })

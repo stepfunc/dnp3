@@ -6,8 +6,10 @@
 
 use crate::app::{FileStatus, FunctionCode, Group70Var4, Group70Var6, Sequence};
 use crate::master::association::AssociationConfig;
+use crate::master::error::TaskErrorKind;
+use crate::master::file::FileErrorKind;
 use crate::master::tests::harness::{create_association, AssocInfoEvent, TestHarness};
-use crate::master::{BlockNumber, FileError, FileHandle, TaskError, TaskType};
+use crate::master::{BlockNumber, FileError, FileHandle, TaskType};
 use crate::util::test_support::watchdog;
 
 const HANDLE: u32 = 0xDEADCAFE;
@@ -53,7 +55,10 @@ async fn write_block_request_bytes_and_success() {
 async fn fails_on_bad_status() {
     watchdog(async {
         let result = write_with_response(block_status_response(2, FileStatus::BlockSeq)).await;
-        assert_eq!(result, Err(FileError::BadStatus(FileStatus::BlockSeq)));
+        assert_eq!(
+            result,
+            Err(FileErrorKind::BadStatus(FileStatus::BlockSeq).into())
+        );
     })
     .await;
 }
@@ -73,7 +78,7 @@ async fn fails_on_unexpected_variation() {
             },
         ))
         .await;
-        assert_eq!(result, Err(TaskError::UnexpectedResponseHeaders.into()));
+        assert_eq!(result, Err(TaskErrorKind::UnexpectedResponseHeaders.into()));
     })
     .await;
 }
@@ -95,7 +100,7 @@ async fn write_with_response(response: Vec<u8>) -> Result<(), FileError> {
             ),
             AssocInfoEvent::TaskFailure(
                 TaskType::FileWriteBlock,
-                TaskError::UnexpectedResponseHeaders
+                TaskErrorKind::UnexpectedResponseHeaders.into()
             ),
         ]
     );

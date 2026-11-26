@@ -16,8 +16,17 @@ pub struct WildcardIPv4 {
 }
 
 /// Error returned when an IPv4 wildcard is not in the correct format
+#[non_exhaustive]
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct BadIpv4Wildcard;
+
+impl std::fmt::Display for BadIpv4Wildcard {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("invalid IPv4 wildcard address")
+    }
+}
+
+impl std::error::Error for BadIpv4Wildcard {}
 
 fn get_byte(value: &str) -> Result<Option<u8>, BadIpv4Wildcard> {
     match value {
@@ -131,20 +140,16 @@ impl AddressFilter {
     }
 }
 
-/// error type returned when a filter conflicts with another filter
+/// Error type returned when a filter conflicts with another filter
+#[non_exhaustive]
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum FilterError {
-    /// filter conflicts with an existing filter
-    Conflict,
-}
+pub struct FilterError;
 
 impl std::error::Error for FilterError {}
 
 impl std::fmt::Display for FilterError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            FilterError::Conflict => f.write_str("filter conflicts with an existing filter"),
-        }
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("filter conflicts with an existing filter")
     }
 }
 

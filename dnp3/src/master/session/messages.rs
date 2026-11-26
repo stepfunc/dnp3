@@ -48,13 +48,17 @@ impl MasterSession {
                 assoc_info,
                 callback,
             ) => {
-                callback.complete(self.associations.register(Association::new(
-                    address,
-                    config,
-                    read_handler,
-                    assoc_handler,
-                    assoc_info,
-                )));
+                callback.complete(
+                    self.associations
+                        .register(Association::new(
+                            address,
+                            config,
+                            read_handler,
+                            assoc_handler,
+                            assoc_info,
+                        ))
+                        .map_err(Into::into),
+                );
             }
             MasterMsg::RemoveAssociation(address) => {
                 self.associations.remove(address);

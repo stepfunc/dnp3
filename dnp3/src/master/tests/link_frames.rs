@@ -19,6 +19,7 @@ use crate::link::reader::LinkModes;
 use crate::link::test_data;
 use crate::link::{EndpointAddress, LinkErrorMode};
 use crate::master::association::AssociationConfig;
+use crate::master::error::TaskErrorKind;
 use crate::master::session::task::MasterTask;
 use crate::master::test_fixtures::null;
 use crate::master::tests::harness::requests::{empty_response, unsol_null, unsol_with_data};
@@ -258,7 +259,7 @@ async fn deadline_holds(kind: Kind, trickle: Trickle) {
     let (result, completed) = task.await.unwrap();
     assert_eq!(
         result,
-        Err(TaskError::ResponseTimeout),
+        Err(TaskErrorKind::ResponseTimeout.into()),
         "{kind:?} {trickle:?}"
     );
     let elapsed = completed.duration_since(start);
@@ -349,7 +350,7 @@ async fn link_status_request_ignores_other_link_layer_messages_and_times_out() {
             assert!(!task.is_finished(), "{frame:?}");
             assert_eq!(
                 task.await.unwrap().0,
-                Err(TaskError::ResponseTimeout),
+                Err(TaskErrorKind::ResponseTimeout.into()),
                 "{frame:?}"
             );
         }
@@ -385,7 +386,7 @@ async fn link_status_request_fails_on_a_fragment() {
             .await;
         assert_eq!(
             task.await.unwrap().0,
-            Err(TaskError::UnexpectedResponseHeaders)
+            Err(TaskErrorKind::UnexpectedResponseHeaders.into())
         );
 
         // a fragment too short to be a response
@@ -395,7 +396,7 @@ async fn link_status_request_fails_on_a_fragment() {
             .await;
         assert_eq!(
             task.await.unwrap().0,
-            Err(TaskError::UnexpectedResponseHeaders)
+            Err(TaskErrorKind::UnexpectedResponseHeaders.into())
         );
 
         // a solicited response with the UNS bit
@@ -405,7 +406,7 @@ async fn link_status_request_fails_on_a_fragment() {
             .await;
         assert_eq!(
             task.await.unwrap().0,
-            Err(TaskError::UnexpectedResponseHeaders)
+            Err(TaskErrorKind::UnexpectedResponseHeaders.into())
         );
 
         // an unsolicited response, which is still processed and confirmed
@@ -417,7 +418,7 @@ async fn link_status_request_fails_on_a_fragment() {
         assert_eq!(app_data(&confirm), [0xD3, 0x00]);
         assert_eq!(
             task.await.unwrap().0,
-            Err(TaskError::UnexpectedResponseHeaders)
+            Err(TaskErrorKind::UnexpectedResponseHeaders.into())
         );
     })
     .await;
@@ -495,7 +496,11 @@ async fn malformed_fragments_from_other_outstations_do_not_extend_the_response_d
             }
 
             let (result, completed) = task.await.unwrap();
-            assert_eq!(result, Err(TaskError::ResponseTimeout), "{kind:?}");
+            assert_eq!(
+                result,
+                Err(TaskErrorKind::ResponseTimeout.into()),
+                "{kind:?}"
+            );
             assert_eq!(completed, start + RESPONSE_TIMEOUT, "{kind:?}");
             assert!(!harness.task.is_finished(), "{kind:?}");
             barrier(&mut harness.master).await;

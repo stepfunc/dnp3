@@ -10,7 +10,7 @@ use std::time::Duration;
 use crate::app::format::write::HeaderWriter;
 use crate::app::Shutdown;
 use crate::master::association::Next;
-use crate::master::error::{PollError, TaskError};
+use crate::master::error::{PollError, PollErrorKind, TaskErrorKind};
 use crate::master::handler::AssociationHandle;
 use crate::master::request::ReadRequest;
 
@@ -166,7 +166,7 @@ impl Poll {
         self.next = now.checked_add(self.period);
     }
 
-    pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
+    pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), TaskErrorKind> {
         self.request.format(writer)
     }
 
@@ -203,9 +203,9 @@ pub(crate) enum PollMsg {
 }
 
 impl PollMsg {
-    pub(crate) fn on_error(self, err: PollError) {
+    pub(crate) fn on_error(self, err: PollErrorKind) {
         match self {
-            PollMsg::AddPoll(_, _, _, callback) => callback.complete(Err(err)),
+            PollMsg::AddPoll(_, _, _, callback) => callback.complete(Err(err.into())),
             PollMsg::RemovePoll(_) => {}
             PollMsg::Demand(_) => {}
         }

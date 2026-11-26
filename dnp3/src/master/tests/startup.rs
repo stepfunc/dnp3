@@ -10,9 +10,10 @@ use crate::app::Sequence;
 use crate::app::{FunctionCode, RetryStrategy};
 use crate::app::{Iin, Iin1, Iin2};
 use crate::master::association::AssociationConfig;
+use crate::master::error::TaskErrorKind;
 use crate::master::request::{Classes, EventClasses};
 use crate::master::tests::harness::{AssocInfoEvent, ReadEvent};
-use crate::master::{ReadRequest, TaskError, TaskType};
+use crate::master::{ReadRequest, TaskType};
 use crate::util::test_support::watchdog;
 
 use super::harness::requests::*;
@@ -164,7 +165,7 @@ async fn startup_continues_when_auto_tasks_return_iin2_errors() {
             &[
                 AssocInfoEvent::TaskFailure(
                     TaskType::DisableUnsolicited,
-                    TaskError::RejectedByIin2(iin),
+                    TaskErrorKind::RejectedByIin2(iin).into(),
                 ),
                 // even though disable unsolicited fails, the master should continue performing the startup tasks
                 AssocInfoEvent::TaskStart(

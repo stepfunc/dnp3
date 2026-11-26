@@ -37,12 +37,7 @@ impl TryFrom<Duration> for Timeout {
 
 /// Error type returned when a Timeout is constructed with an out-of-range value
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum TimeoutRangeError {
-    /// value smaller than library allowed minimum
-    TooSmall(Duration),
-    /// value larger than library allowed maximum
-    TooLarge(Duration),
-}
+pub struct TimeoutRangeError(Duration);
 
 impl Timeout {
     /// minimum allowed timeout value as a duration
@@ -83,12 +78,8 @@ impl Timeout {
     /// returns a [`TimeoutRangeError`] if it is < [`Timeout::MIN`] or > [`Timeout::MAX`]
     pub const fn from_duration(value: Duration) -> Result<Self, TimeoutRangeError> {
         // Duration's comparison operators are not const; as_nanos() is lossless (u128).
-        if value.as_nanos() < Self::MIN.as_nanos() {
-            return Err(TimeoutRangeError::TooSmall(value));
-        }
-
-        if value.as_nanos() > Self::MAX.as_nanos() {
-            return Err(TimeoutRangeError::TooLarge(value));
+        if value.as_nanos() < Self::MIN.as_nanos() || value.as_nanos() > Self::MAX.as_nanos() {
+            return Err(TimeoutRangeError(value));
         }
 
         Ok(Self(value))
@@ -105,26 +96,27 @@ impl std::fmt::Display for Timeout {
     }
 }
 
-impl std::fmt::Display for TimeoutRangeError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            TimeoutRangeError::TooSmall(x) => write!(
+impl core::fmt::Display for TimeoutRangeError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        if self.0 < Timeout::MIN {
+            write!(
                 f,
                 "specified duration ({} ms) smaller than allowed library minimum ({} ms)",
-                x.as_millis(),
+                self.0.as_millis(),
                 Timeout::MIN.as_millis()
-            ),
-            TimeoutRangeError::TooLarge(x) => write!(
+            )
+        } else {
+            write!(
                 f,
                 "specified duration ({} ms) larger than allowed library maximum ({} ms)",
-                x.as_millis(),
+                self.0.as_millis(),
                 Timeout::MAX.as_millis()
-            ),
+            )
         }
     }
 }
 
-impl std::error::Error for TimeoutRangeError {}
+impl core::error::Error for TimeoutRangeError {}
 
 #[cfg(test)]
 mod test {
@@ -142,24 +134,12 @@ mod test {
     #[test]
     fn from_duration_accepts_only_the_closed_range() {
         let cases = [
-            (
-                Duration::ZERO,
-                Err(TimeoutRangeError::TooSmall(Duration::ZERO)),
-            ),
-            (
-                JUST_BELOW_MIN,
-                Err(TimeoutRangeError::TooSmall(JUST_BELOW_MIN)),
-            ),
+            (Duration::ZERO, Err(TimeoutRangeError(Duration::ZERO))),
+            (JUST_BELOW_MIN, Err(TimeoutRangeError(JUST_BELOW_MIN))),
             (Timeout::MIN, Ok(Timeout::MIN)),
             (Timeout::MAX, Ok(Timeout::MAX)),
-            (
-                JUST_ABOVE_MAX,
-                Err(TimeoutRangeError::TooLarge(JUST_ABOVE_MAX)),
-            ),
-            (
-                Duration::MAX,
-                Err(TimeoutRangeError::TooLarge(Duration::MAX)),
-            ),
+            (JUST_ABOVE_MAX, Err(TimeoutRangeError(JUST_ABOVE_MAX))),
+            (Duration::MAX, Err(TimeoutRangeError(Duration::MAX))),
         ];
 
         for (input, expected) in cases {
@@ -180,7 +160,7 @@ mod test {
     fn from_millis_and_from_secs_check_the_range() {
         assert_eq!(
             Timeout::from_millis(0),
-            Err(TimeoutRangeError::TooSmall(Duration::ZERO))
+            Err(TimeoutRangeError(Duration::ZERO))
         );
         assert_eq!(
             Timeout::from_millis(1).map(Duration::from),
@@ -192,7 +172,7 @@ mod test {
         );
         assert_eq!(
             Timeout::from_secs(3601),
-            Err(TimeoutRangeError::TooLarge(Duration::from_secs(3601)))
+            Err(TimeoutRangeError(Duration::from_secs(3601)))
         );
     }
 

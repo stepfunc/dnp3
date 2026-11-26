@@ -5,13 +5,14 @@
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
 use crate::{ffi, FileInfoIterator};
+use dnp3::ffi::{shutdown, FileErrorClass};
 use dnp3::master::*;
 use std::ffi::CString;
 use std::time::Duration;
 
 impl<T> sfio_promise::FutureType<Result<T, TaskError>> for ffi::EmptyResponseCallback {
     fn on_drop() -> Result<T, TaskError> {
-        Err(TaskError::Shutdown)
+        Err(shutdown().into())
     }
 
     fn complete(self, result: Result<T, TaskError>) {
@@ -28,7 +29,7 @@ impl<T> sfio_promise::FutureType<Result<T, TaskError>> for ffi::EmptyResponseCal
 
 impl sfio_promise::FutureType<Result<AuthKey, FileError>> for ffi::FileAuthCallback {
     fn on_drop() -> Result<AuthKey, FileError> {
-        Err(TaskError::Shutdown.into())
+        Err(shutdown().into())
     }
 
     fn complete(self, result: Result<AuthKey, FileError>) {
@@ -41,7 +42,7 @@ impl sfio_promise::FutureType<Result<AuthKey, FileError>> for ffi::FileAuthCallb
 
 impl sfio_promise::FutureType<Result<OpenFile, FileError>> for ffi::FileOpenCallback {
     fn on_drop() -> Result<OpenFile, FileError> {
-        Err(TaskError::Shutdown.into())
+        Err(shutdown().into())
     }
 
     fn complete(self, result: Result<OpenFile, FileError>) {
@@ -54,7 +55,7 @@ impl sfio_promise::FutureType<Result<OpenFile, FileError>> for ffi::FileOpenCall
 
 impl sfio_promise::FutureType<Result<(), FileError>> for ffi::FileOperationCallback {
     fn on_drop() -> Result<(), FileError> {
-        Err(TaskError::Shutdown.into())
+        Err(shutdown().into())
     }
 
     fn complete(self, result: Result<(), FileError>) {
@@ -67,7 +68,7 @@ impl sfio_promise::FutureType<Result<(), FileError>> for ffi::FileOperationCallb
 
 impl sfio_promise::FutureType<Result<(), TaskError>> for crate::ffi::ReadTaskCallback {
     fn on_drop() -> Result<(), TaskError> {
-        Err(TaskError::Shutdown)
+        Err(shutdown().into())
     }
 
     fn complete(self, result: Result<(), TaskError>) {
@@ -84,7 +85,7 @@ impl sfio_promise::FutureType<Result<(), TaskError>> for crate::ffi::ReadTaskCal
 
 impl sfio_promise::FutureType<Result<(), CommandError>> for crate::ffi::CommandTaskCallback {
     fn on_drop() -> Result<(), CommandError> {
-        Err(TaskError::Shutdown.into())
+        Err(shutdown().into())
     }
 
     fn complete(self, result: Result<(), CommandError>) {
@@ -101,7 +102,7 @@ impl sfio_promise::FutureType<Result<(), CommandError>> for crate::ffi::CommandT
 
 impl sfio_promise::FutureType<Result<(), TimeSyncError>> for crate::ffi::TimeSyncTaskCallback {
     fn on_drop() -> Result<(), TimeSyncError> {
-        Err(TaskError::Shutdown.into())
+        Err(shutdown().into())
     }
 
     fn complete(self, result: Result<(), TimeSyncError>) {
@@ -118,7 +119,7 @@ impl sfio_promise::FutureType<Result<(), TimeSyncError>> for crate::ffi::TimeSyn
 
 impl sfio_promise::FutureType<Result<Duration, TaskError>> for crate::ffi::RestartTaskCallback {
     fn on_drop() -> Result<Duration, TaskError> {
-        Err(TaskError::Shutdown)
+        Err(shutdown().into())
     }
 
     fn complete(self, result: Result<Duration, TaskError>) {
@@ -135,7 +136,7 @@ impl sfio_promise::FutureType<Result<Duration, TaskError>> for crate::ffi::Resta
 
 impl sfio_promise::FutureType<Result<(), TaskError>> for crate::ffi::LinkStatusCallback {
     fn on_drop() -> Result<(), TaskError> {
-        Err(TaskError::Shutdown)
+        Err(shutdown().into())
     }
 
     fn complete(self, result: Result<(), TaskError>) {
@@ -152,7 +153,7 @@ impl sfio_promise::FutureType<Result<(), TaskError>> for crate::ffi::LinkStatusC
 
 impl sfio_promise::FutureType<Result<FileInfo, FileError>> for crate::ffi::FileInfoCallback {
     fn on_drop() -> Result<FileInfo, FileError> {
-        Err(FileError::TaskError(TaskError::Shutdown))
+        Err(shutdown().into())
     }
 
     fn complete(self, result: Result<FileInfo, FileError>) {
@@ -185,7 +186,7 @@ impl sfio_promise::FutureType<Result<Vec<FileInfo>, FileError>>
     for crate::ffi::ReadDirectoryCallback
 {
     fn on_drop() -> Result<Vec<FileInfo>, FileError> {
-        Err(FileError::TaskError(TaskError::Shutdown))
+        Err(shutdown().into())
     }
 
     fn complete(self, result: Result<Vec<FileInfo>, FileError>) {
@@ -240,14 +241,14 @@ impl From<dnp3::app::PermissionSet> for ffi::PermissionSet {
 
 impl From<FileError> for ffi::FileError {
     fn from(value: FileError) -> Self {
-        match value {
-            FileError::BadStatus(_) => ffi::FileError::BadStatus,
-            FileError::NoPermission => ffi::FileError::NoPermission,
-            FileError::BadBlockNum => ffi::FileError::BadBlockNum,
-            FileError::AbortByUser => ffi::FileError::AbortByUser,
-            FileError::MaxLengthExceeded => ffi::FileError::MaxLengthExceeded,
-            FileError::TaskError(x) => x.into(),
-            FileError::WrongHandle => ffi::FileError::WrongHandle,
+        match FileErrorClass::from(value) {
+            FileErrorClass::BadStatus => ffi::FileError::BadStatus,
+            FileErrorClass::NoPermission => ffi::FileError::NoPermission,
+            FileErrorClass::BadBlockNum => ffi::FileError::BadBlockNum,
+            FileErrorClass::AbortByUser => ffi::FileError::AbortByUser,
+            FileErrorClass::MaxLengthExceeded => ffi::FileError::MaxLengthExceeded,
+            FileErrorClass::Task(x) => x.into(),
+            FileErrorClass::WrongHandle => ffi::FileError::WrongHandle,
         }
     }
 }

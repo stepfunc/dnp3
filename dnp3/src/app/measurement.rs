@@ -793,7 +793,7 @@ impl OctetString {
     /// explicitly disallows them and they are not parsed by this library by default.
     pub fn new(value: &[u8]) -> Result<Self, OctetStringLengthError> {
         let len =
-            u8::try_from(value.len()).map_err(|_| OctetStringLengthError::MoreThan255Octets)?;
+            u8::try_from(value.len()).map_err(|_| OctetStringLengthError { len: value.len() })?;
 
         let mut result = Self {
             value: [0u8; Self::MAX_SIZE],
@@ -828,16 +828,23 @@ impl OctetString {
     }
 }
 
-/// Errors when creating an octet string
+/// Error returned when creating an octet string longer than 255 bytes
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum OctetStringLengthError {
-    /// The standard explicitly disallows zero-length octet strings; however, many implementations
-    /// use them anyway. This error variant is now unused by the library as the library allows zero-length
-    /// strings to be contructed and transmitted, but will not parse them by default.
-    ZeroLength,
-    /// Octet strings can only hold up to 255 octets.
-    MoreThan255Octets,
+pub struct OctetStringLengthError {
+    len: usize,
 }
+
+impl core::fmt::Display for OctetStringLengthError {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(
+            f,
+            "octet string length {} exceeds the maximum of 255 bytes",
+            self.len
+        )
+    }
+}
+
+impl core::error::Error for OctetStringLengthError {}
 
 /// The low 16 bits of a counter, which is how a 32-bit counter rolls over in a 16-bit variation
 pub(crate) fn low_16_bits(value: u32) -> u16 {
@@ -1149,7 +1156,7 @@ mod tests {
     #[test]
     fn new_octet_string_greater_size() {
         assert_eq!(
-            Err(OctetStringLengthError::MoreThan255Octets),
+            Err(OctetStringLengthError { len: 500 }),
             OctetString::new(&[0; 500])
         );
     }

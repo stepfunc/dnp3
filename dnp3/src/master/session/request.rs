@@ -29,7 +29,7 @@ impl MasterSession {
         addr: FragmentAddr,
         request: &U,
         writer: &mut TransportWriter<T>,
-    ) -> Result<Sequence, TaskError>
+    ) -> Result<Sequence, TaskErrorKind>
     where
         U: RequestWriter,
     {

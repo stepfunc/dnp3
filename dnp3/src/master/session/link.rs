@@ -19,7 +19,7 @@ impl<T: Transport> MasterTask<T> {
         &mut self,
         io: &mut PhysLayer,
         destination: FragmentAddr,
-    ) -> Result<(), TaskError> {
+    ) -> Result<(), TaskErrorKind> {
         // Send link status request
         tracing::info!("sending link status request (for {})", destination.link);
         self.writer
@@ -44,12 +44,12 @@ impl<T: Transport> MasterTask<T> {
                         .handle_fragment_while_idle(io, &mut self.writer, source, response)
                         .await?;
                     if source.link == destination.link {
-                        return Err(TaskError::UnexpectedResponseHeaders);
+                        return Err(TaskErrorKind::UnexpectedResponseHeaders);
                     }
                 }
                 Event::Malformed(source, _) => {
                     if fails_task(source, destination) {
-                        return Err(TaskError::UnexpectedResponseHeaders);
+                        return Err(TaskErrorKind::UnexpectedResponseHeaders);
                     }
                 }
                 Event::LinkLayer(_) | Event::Message | Event::Nothing => {}

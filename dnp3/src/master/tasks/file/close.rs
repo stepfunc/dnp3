@@ -7,8 +7,10 @@
 use crate::app::format::write::HeaderWriter;
 use crate::app::parse::parser::Response;
 use crate::app::FunctionCode;
+use crate::master::error::TaskErrorKind;
+use crate::master::file::FileErrorKind;
 use crate::master::tasks::{NonReadTask, OneShot, OneShotRequest};
-use crate::master::{FileError, FileHandle, TaskError, TaskType};
+use crate::master::{FileHandle, TaskType};
 
 pub(crate) struct CloseFileRequest {
     pub(crate) handle: FileHandle,
@@ -16,7 +18,7 @@ pub(crate) struct CloseFileRequest {
 
 impl OneShotRequest for CloseFileRequest {
     type Output = ();
-    type Error = FileError;
+    type Error = FileErrorKind;
 
     fn function(&self) -> FunctionCode {
         FunctionCode::CloseFile
@@ -26,11 +28,11 @@ impl OneShotRequest for CloseFileRequest {
         TaskType::FileClose
     }
 
-    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskError> {
+    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskErrorKind> {
         Ok(super::write_close(self.handle, writer)?)
     }
 
-    fn parse(&self, response: Response<'_>) -> Result<(), FileError> {
+    fn parse(&self, response: Response<'_>) -> Result<(), FileErrorKind> {
         super::check_close_response(self.handle, response.objects?.get_only_header()?)
     }
 

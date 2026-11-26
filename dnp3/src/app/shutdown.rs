@@ -5,7 +5,8 @@
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
 /// Indicates that a task has been shut down
-#[derive(Copy, Clone, Debug)]
+#[non_exhaustive]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Shutdown;
 
 impl std::fmt::Display for Shutdown {

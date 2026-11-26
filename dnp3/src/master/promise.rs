@@ -4,6 +4,8 @@
 // Text and data mining rights, including for AI training, are reserved under
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
+use crate::app::Shutdown;
+
 /// A reply that's sent once, if anyone is waiting for it
 pub(crate) struct Promise<T> {
     reply: Option<tokio::sync::oneshot::Sender<T>>,
@@ -23,5 +25,15 @@ impl<T> Promise<T> {
         if let Some(reply) = self.reply.take() {
             reply.send(value).ok();
         }
+    }
+}
+
+/// Await a oneshot result, mapping a dropped sender to `Shutdown`.
+pub(crate) async fn await_result<T, E: From<Shutdown>>(
+    rx: tokio::sync::oneshot::Receiver<Result<T, E>>,
+) -> Result<T, E> {
+    match rx.await {
+        Ok(res) => res,
+        Err(_) => Err(Shutdown.into()),
     }
 }

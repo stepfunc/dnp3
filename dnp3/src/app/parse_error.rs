@@ -16,8 +16,7 @@ use scursor::{ReadError, TrailingBytes};
 
 /// Errors that occur when parsing an application layer header
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum HeaderParseError {
+pub(crate) enum HeaderParseError {
     /// Unknown function code
     UnknownFunction(Sequence, u8),
     /// insufficient bytes for a header
@@ -26,8 +25,7 @@ pub enum HeaderParseError {
 
 /// Errors that occur when parsing object headers
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum ObjectParseError {
+pub(crate) enum ObjectParseError {
     /// Unknown group and variation
     UnknownGroupVariation(u8, u8),
     /// Unknown qualifier code
@@ -48,29 +46,16 @@ pub enum ObjectParseError {
     BadEncoding,
 }
 
-#[cfg(feature = "ffi")]
-pub use cause::ParseErrorCause;
-#[cfg(not(feature = "ffi"))]
-pub(crate) use cause::ParseErrorCause;
-
-mod cause {
-    /// Whether an [`ObjectParseError`](super::ObjectParseError) means the input is invalid or
-    /// that the parser doesn't support it
-    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-    #[cfg_attr(feature = "ffi", doc(hidden))]
-    #[cfg_attr(
-        not(feature = "ffi"),
-        expect(unreachable_pub, reason = "public only when building the FFI")
-    )]
-    pub enum ParseErrorCause {
-        /// The parser doesn't support what was received, which may be valid
-        Unsupported,
-        /// What was received is encoded incorrectly
-        Invalid,
-        /// Either, depending on the case: e.g. a qualifier the specification disallows for a
-        /// variation, or one it allows that the parser doesn't support
-        UnsupportedOrInvalid,
-    }
+/// Whether an [`ObjectParseError`] means the input is invalid or that the parser doesn't support it
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) enum ParseErrorCause {
+    /// The parser doesn't support what was received, which may be valid
+    Unsupported,
+    /// What was received is encoded incorrectly
+    Invalid,
+    /// Either, depending on the case: e.g. a qualifier the specification disallows for a
+    /// variation, or one it allows that the parser doesn't support
+    UnsupportedOrInvalid,
 }
 
 impl From<ObjectParseError> for ParseErrorCause {
@@ -106,8 +91,7 @@ impl From<TrailingBytes> for ObjectParseError {
 
 /// Errors that occur when interpreting a header as a request header
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum RequestValidationError {
+pub(crate) enum RequestValidationError {
     /// Function code not allowed in requests
     UnexpectedFunction(FunctionCode),
     /// Request with either FIR or FIN == 0
@@ -118,8 +102,7 @@ pub enum RequestValidationError {
 
 /// Errors that occur when interpreting a header as a response header
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-#[non_exhaustive]
-pub enum ResponseValidationError {
+pub(crate) enum ResponseValidationError {
     /// Function code not allowed in responses
     UnexpectedFunction(FunctionCode),
     /// Solicited response with UNS == 1
