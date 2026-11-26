@@ -168,7 +168,7 @@ impl TlsServerConfig {
             None => ClientNameVerification::None,
             Some(name) => {
                 let name: ServerName<'static> =
-                    ServerName::try_from(name).map_err(TlsError::invalid_dns_name)?;
+                    ServerName::try_from(name).map_err(|_| TlsError::invalid_dns_name())?;
                 ClientNameVerification::SanOrCommonName(name)
             }
         };

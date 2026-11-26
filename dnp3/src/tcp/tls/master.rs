@@ -154,7 +154,7 @@ impl TlsClientConfig {
             ),
             Some(x) => {
                 let server_name: ServerName<'static> =
-                    ServerName::try_from(x).map_err(TlsError::invalid_dns_name)?;
+                    ServerName::try_from(x).map_err(|_| TlsError::invalid_dns_name())?;
                 (ServerNameVerification::SanOrCommonName, server_name)
             }
         };

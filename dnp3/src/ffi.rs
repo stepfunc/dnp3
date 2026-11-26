@@ -20,7 +20,7 @@ pub enum TlsErrorClass {
 impl From<crate::tcp::tls::TlsError> for TlsErrorClass {
     fn from(err: crate::tcp::tls::TlsError) -> Self {
         match err.0 {
-            crate::tcp::tls::TlsErrorKind::InvalidDnsName(_) => Self::InvalidDnsName,
+            crate::tcp::tls::TlsErrorKind::InvalidDnsName => Self::InvalidDnsName,
             crate::tcp::tls::TlsErrorKind::Config(_) => Self::Other,
         }
     }

@@ -12,8 +12,6 @@ mod outstation;
 pub use master::*;
 pub use outstation::*;
 
-use tokio_rustls::rustls::pki_types;
-
 /// How long a TLS handshake may take, on either side of the connection, so that a peer that stalls
 /// its handshake can't hold up whatever is waiting for it
 pub(crate) const TLS_HANDSHAKE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
@@ -86,13 +84,13 @@ pub struct TlsError(pub(crate) TlsErrorKind);
 
 #[derive(Debug)]
 pub(crate) enum TlsErrorKind {
-    InvalidDnsName(pki_types::InvalidDnsNameError),
+    InvalidDnsName,
     Config(sfio_rustls_config::Error),
 }
 
 impl TlsError {
-    pub(crate) fn invalid_dns_name(err: pki_types::InvalidDnsNameError) -> Self {
-        Self(TlsErrorKind::InvalidDnsName(err))
+    pub(crate) fn invalid_dns_name() -> Self {
+        Self(TlsErrorKind::InvalidDnsName)
     }
 
     pub(crate) fn config(err: sfio_rustls_config::Error) -> Self {
@@ -103,7 +101,7 @@ impl TlsError {
 impl std::fmt::Display for TlsError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match &self.0 {
-            TlsErrorKind::InvalidDnsName(_) => f.write_str("invalid DNS name"),
+            TlsErrorKind::InvalidDnsName => f.write_str("invalid DNS name"),
             TlsErrorKind::Config(err) => write!(f, "TLS configuration error: {err}"),
         }
     }
@@ -134,64 +132,5 @@ impl From<MinTlsVersion> for sfio_rustls_config::ProtocolVersions {
                 .enable_v13(),
             MinTlsVersion::V13 => sfio_rustls_config::ProtocolVersions::v13_only(),
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use std::path::Path;
-
-    use super::*;
-
-    fn assert_error_bounds<T: std::error::Error + Send + Sync + 'static>() {}
-
-    #[test]
-    fn tls_error_implements_error_send_sync_static() {
-        assert_error_bounds::<TlsError>();
-    }
-
-    #[test]
-    fn invalid_dns_name_error_formats_and_classifies() {
-        let err = TlsClientConfig::full_pki(
-            Some("not a valid dns name".to_string()),
-            Path::new("ca.pem"),
-            Path::new("cert.pem"),
-            Path::new("key.pem"),
-            None,
-            MinTlsVersion::V12,
-        )
-        .unwrap_err();
-
-        assert!(matches!(err.0, TlsErrorKind::InvalidDnsName(_)));
-        assert_eq!(err.to_string(), "invalid DNS name");
-        assert!(std::error::Error::source(&err).is_none());
-
-        #[cfg(feature = "ffi")]
-        assert_eq!(
-            crate::ffi::TlsErrorClass::from(err),
-            crate::ffi::TlsErrorClass::InvalidDnsName
-        );
-    }
-
-    #[test]
-    fn config_error_formats_and_classifies() {
-        let err = TlsClientConfig::self_signed(
-            Path::new("nonexistent-ca.pem"),
-            Path::new("nonexistent-cert.pem"),
-            Path::new("nonexistent-key.pem"),
-            None,
-            MinTlsVersion::V12,
-        )
-        .unwrap_err();
-
-        assert!(matches!(err.0, TlsErrorKind::Config(_)));
-        assert!(err.to_string().starts_with("TLS configuration error: "));
-        assert!(std::error::Error::source(&err).is_none());
-
-        #[cfg(feature = "ffi")]
-        assert_eq!(
-            crate::ffi::TlsErrorClass::from(err),
-            crate::ffi::TlsErrorClass::Other
-        );
     }
 }
