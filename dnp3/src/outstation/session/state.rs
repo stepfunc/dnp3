@@ -6,11 +6,9 @@
 
 //! State shared by the outstation protocol state machine.
 
-use core::time::Duration;
-
 use super::deferred::DeferredRead;
 use crate::app::parse::parser::HeaderCollection;
-use crate::app::{Iin1, ObjectParseError, RequestHeader, ResponseHeader, Sequence};
+use crate::app::{Iin1, ObjectParseError, RequestHeader, ResponseHeader, Sequence, Timeout};
 use crate::link::header::BroadcastConfirmMode;
 use crate::master::EventClasses;
 use crate::outstation::config::Feature;
@@ -166,17 +164,17 @@ pub(super) enum ConfirmWaitInfo {
 pub(super) enum KeepAlive {
     Disabled,
     Enabled {
-        timeout: Duration,
+        timeout: Timeout,
         next: MonotonicTime,
     },
 }
 
 impl KeepAlive {
-    pub(super) fn new(timeout: Option<Duration>, now: MonotonicTime) -> Self {
+    pub(super) fn new(timeout: Option<Timeout>, now: MonotonicTime) -> Self {
         match timeout {
             Some(timeout) => Self::Enabled {
                 timeout,
-                next: now.saturating_add(timeout),
+                next: now.saturating_add(timeout.as_duration()),
             },
             None => Self::Disabled,
         }
@@ -198,7 +196,7 @@ impl KeepAlive {
 
     pub(super) fn on_activity(&mut self, now: MonotonicTime) {
         if let Self::Enabled { timeout, next } = self {
-            *next = now.saturating_add(*timeout);
+            *next = now.saturating_add(timeout.as_duration());
         }
     }
 }
@@ -342,6 +340,8 @@ pub(super) struct Received<'a> {
 
 #[cfg(test)]
 mod tests {
+    use core::time::Duration;
+
     use super::*;
 
     #[test]
@@ -364,7 +364,7 @@ mod tests {
     #[test]
     fn keep_alive_enabled_transitions() {
         let t0 = MonotonicTime::from_elapsed(Duration::from_secs(5));
-        let timeout = Duration::from_secs(60);
+        let timeout = Timeout::from_secs(60).unwrap();
 
         let mut ka = KeepAlive::new(Some(timeout), t0);
         let expected_first = MonotonicTime::from_elapsed(Duration::from_secs(65));
@@ -388,21 +388,26 @@ mod tests {
     }
 
     #[test]
-    fn keep_alive_handles_zero_and_max_timeouts() {
+    fn keep_alive_handles_min_and_max_timeouts() {
         let t = MonotonicTime::from_elapsed(Duration::from_secs(10));
 
-        let mut zero = KeepAlive::new(Some(Duration::ZERO), t);
-        assert_eq!(zero.next_deadline(), Some(t));
-        assert!(zero.is_due(t));
-        zero.on_activity(t);
-        assert!(zero.is_due(t));
+        let min = Timeout::from_duration(Timeout::MIN).unwrap();
+        let mut ka_min = KeepAlive::new(Some(min), t);
+        let expected_min = t.saturating_add(Timeout::MIN);
+        assert_eq!(ka_min.next_deadline(), Some(expected_min));
+        assert!(!ka_min.is_due(t));
+        assert!(ka_min.is_due(expected_min));
+        ka_min.on_activity(expected_min);
+        assert!(!ka_min.is_due(expected_min));
 
-        let mut max = KeepAlive::new(Some(Duration::MAX), t);
+        let max = Timeout::from_duration(Timeout::MAX).unwrap();
+        let near_max = MonotonicTime::from_elapsed(Duration::MAX - Duration::from_secs(1));
+        let mut ka_max = KeepAlive::new(Some(max), near_max);
         let saturated = MonotonicTime::from_elapsed(Duration::MAX);
-        assert_eq!(max.next_deadline(), Some(saturated));
-        assert!(!max.is_due(t));
-        assert!(max.is_due(saturated));
-        max.on_activity(MonotonicTime::from_elapsed(Duration::from_secs(20)));
-        assert_eq!(max.next_deadline(), Some(saturated));
+        assert_eq!(ka_max.next_deadline(), Some(saturated));
+        assert!(!ka_max.is_due(near_max));
+        assert!(ka_max.is_due(saturated));
+        ka_max.on_activity(saturated);
+        assert_eq!(ka_max.next_deadline(), Some(saturated));
     }
 }

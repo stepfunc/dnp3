@@ -8,7 +8,7 @@ use std::time::Duration;
 
 use tokio::time::Instant;
 
-use crate::app::Sequence;
+use crate::app::{Sequence, Timeout};
 use crate::link::EndpointAddress;
 use crate::master::association::AssociationConfig;
 use crate::master::test_fixtures::null;
@@ -33,7 +33,7 @@ async fn response_from_another_outstation_during_any_task_refreshes_its_own_keep
         for kind in [Kind::NonRead, Kind::Read, Kind::LinkStatus] {
             // the harness outstation, which sends every response, has a 10 second keep-alive
             let config = AssociationConfig {
-                keep_alive_timeout: Some(Duration::from_secs(10)),
+                keep_alive_timeout: Some(Timeout::from_secs(10).unwrap()),
                 ..AssociationConfig::quiet()
             };
             let mut harness = create_association(config).await;

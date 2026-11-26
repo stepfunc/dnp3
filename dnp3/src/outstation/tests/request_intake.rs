@@ -12,7 +12,7 @@ use std::time::Duration;
 use tokio::time::Instant;
 
 use crate::app::measurement::{BinaryInput, Flags, Time};
-use crate::app::FunctionCode;
+use crate::app::{FunctionCode, Timeout};
 use crate::link::header::BroadcastConfirmMode;
 use crate::outstation::config::OutstationConfig;
 use crate::outstation::database::{Add, BinaryInputConfig, EventClass, Update, UpdateOptions};
@@ -791,7 +791,7 @@ const ACTIVITY_AT: Duration = Duration::from_secs(4);
 
 fn keep_alive<F: FnOnce() -> OutstationConfig>(config: F) -> OutstationConfig {
     let mut config = config();
-    config.keep_alive_timeout = Some(KEEP_ALIVE_TIMEOUT);
+    config.keep_alive_timeout = Some(Timeout::from_duration(KEEP_ALIVE_TIMEOUT).unwrap());
     config
 }
 

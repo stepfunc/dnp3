@@ -6,6 +6,7 @@
 
 use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, VecDeque};
+#[cfg(any(feature = "unstable", test))]
 use std::time::Duration;
 
 use xxhash_rust::xxh64::xxh64;
@@ -68,7 +69,7 @@ pub struct AssociationConfig {
     /// When no bytes are received within this timeout value,
     /// a `REQUEST_LINK_STATUS` request is sent
     #[cfg_attr(feature = "serialization", serde(default))]
-    pub keep_alive_timeout: Option<Duration>,
+    pub keep_alive_timeout: Option<Timeout>,
     /// Automatic integrity scan when a `EVENT_BUFFER_OVERFLOW` is detected
     #[cfg_attr(feature = "serialization", serde(default))]
     pub auto_integrity_scan_on_buffer_overflow: bool,
@@ -452,7 +453,9 @@ impl Association {
             assoc_handler,
             assoc_info,
             PollMap::new(),
-            config.keep_alive_timeout.map(|delay| deadline(now, delay)),
+            config
+                .keep_alive_timeout
+                .map(|delay| deadline(now, delay.as_duration())),
         )
     }
 
@@ -507,7 +510,7 @@ impl Association {
             self.next_link_status_deadline = self
                 .config
                 .keep_alive_timeout
-                .map(|delay| deadline(now, delay));
+                .map(|delay| deadline(now, delay.as_duration()));
         }
     }
 
@@ -694,7 +697,7 @@ impl Association {
         self.next_link_status_deadline = self
             .config
             .keep_alive_timeout
-            .map(|timeout| deadline(Instant::now(), timeout))
+            .map(|timeout| deadline(Instant::now(), timeout.as_duration()))
     }
 
     pub(crate) async fn handle_unsolicited_response(&mut self, response: &Response<'_>) -> bool {
@@ -1042,7 +1045,7 @@ mod timer_tests {
     use super::*;
     use crate::master::test_fixtures::{fragment_addr, null};
 
-    fn deferred_association(keep_alive_timeout: Duration) -> Association {
+    fn deferred_association(keep_alive_timeout: Timeout) -> Association {
         let mut config = AssociationConfig::quiet();
         config.keep_alive_timeout = Some(keep_alive_timeout);
         Association::new_deferred(
@@ -1056,23 +1059,29 @@ mod timer_tests {
 
     #[test]
     fn deferred_keep_alive_is_scheduled_from_start_time() {
-        let timeout = Duration::from_secs(5);
+        let timeout = Timeout::from_secs(5).unwrap();
         let start = Instant::now();
         let mut association = deferred_association(timeout);
 
         assert_eq!(association.next_link_status_deadline, None);
         association.start(start);
-        assert_eq!(association.next_link_status_deadline, Some(start + timeout));
+        assert_eq!(
+            association.next_link_status_deadline,
+            Some(start + Duration::from(timeout))
+        );
     }
 
     #[test]
     fn starting_twice_does_not_reset_keep_alive_deadline() {
-        let timeout = Duration::from_secs(5);
+        let timeout = Timeout::from_secs(5).unwrap();
         let start = Instant::now();
         let mut association = deferred_association(timeout);
 
         association.start(start);
         association.start(start + Duration::from_secs(1));
-        assert_eq!(association.next_link_status_deadline, Some(start + timeout));
+        assert_eq!(
+            association.next_link_status_deadline,
+            Some(start + Duration::from(timeout))
+        );
     }
 }

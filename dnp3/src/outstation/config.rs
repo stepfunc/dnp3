@@ -106,7 +106,7 @@ pub struct OutstationConfig {
         feature = "serialization",
         serde(default = "OutstationConfig::default_keep_alive_timeout")
     )]
-    pub keep_alive_timeout: Option<std::time::Duration>,
+    pub keep_alive_timeout: Option<Timeout>,
     /// Limits the selections or headers processed in a READ request. Internally, this controls
     /// the size of pre-allocated buffers used to process requests. A minimum value of
     /// [`OutstationConfig::DEFAULT_MAX_READ_REQUEST_HEADERS`] is always enforced.
@@ -141,8 +141,8 @@ impl Feature {
 }
 
 impl OutstationConfig {
-    const fn default_keep_alive_timeout() -> Option<core::time::Duration> {
-        Some(core::time::Duration::from_secs(60))
+    const fn default_keep_alive_timeout() -> Option<Timeout> {
+        Some(Timeout::saturating(core::time::Duration::from_secs(60)))
     }
 
     const fn default_unsolicited_retry_delay() -> core::time::Duration {

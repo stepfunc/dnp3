@@ -122,7 +122,7 @@ fn quiet(response_timeout: u64) -> AssociationConfig {
 /// [`quiet`] with a keep-alive timeout
 fn keep_alive(response_timeout: u64, keep_alive_timeout: Duration) -> AssociationConfig {
     AssociationConfig {
-        keep_alive_timeout: Some(keep_alive_timeout),
+        keep_alive_timeout: Some(Timeout::from_duration(keep_alive_timeout).unwrap()),
         ..quiet(response_timeout)
     }
 }

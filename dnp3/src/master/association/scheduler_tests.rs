@@ -166,7 +166,9 @@ impl Config {
                 .time_sync
                 .then_some(TimeSyncProcedure::DirectWriteAbsTime),
             auto_tasks_retry_strategy: RetryStrategy::new(self.retry_min, self.retry_max),
-            keep_alive_timeout: self.keep_alive,
+            keep_alive_timeout: self
+                .keep_alive
+                .map(|delay| Timeout::from_duration(delay).unwrap()),
             auto_integrity_scan_on_buffer_overflow: self.integrity_on_overflow,
             event_scan_on_events_available: self.event_scan,
             max_queued_user_requests: 1000,
@@ -1090,7 +1092,7 @@ fn config() -> impl Strategy<Value = Config> {
         (any::<bool>(), any::<bool>(), any::<bool>()),
         prop_oneof![
             2 => Just(None),
-            1 => Just(Some(Duration::ZERO)),
+            1 => Just(Some(Timeout::MIN)),
             2 => millis(&[3000, 5000]).prop_map(Some),
         ],
         millis(&[1, 1000, 2000]),
