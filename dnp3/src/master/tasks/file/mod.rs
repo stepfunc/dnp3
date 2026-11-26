@@ -12,7 +12,7 @@ use crate::app::{
     FileStatus, Group70Var2, Group70Var3, Group70Var4, Group70Var5, Permissions, Timestamp,
 };
 use crate::master::{
-    AuthKey, BlockNumber, FileCredentials, FileError, FileHandle, FileMode, OpenFile,
+    AuthKey, BlockNumber, FileCredentials, FileError, FileHandle, FileMode, OpenFile, TaskError,
 };
 
 pub(crate) mod authenticate;
@@ -97,7 +97,7 @@ pub(super) fn parse_auth_response(header: ObjectHeader) -> Result<AuthKey, FileE
                 "File AUTHENTICATE response contains unexpected variation: {}",
                 header.variation()
             );
-            return Err(FileError::BadResponse);
+            return Err(FileError::TaskError(TaskError::UnexpectedResponseHeaders));
         }
     };
 
@@ -163,7 +163,7 @@ fn parse_status_object<'a>(
                 "File {function} response contains unexpected variation: {}",
                 header.variation()
             );
-            Err(FileError::BadResponse)
+            Err(FileError::TaskError(TaskError::UnexpectedResponseHeaders))
         }
     }
 }

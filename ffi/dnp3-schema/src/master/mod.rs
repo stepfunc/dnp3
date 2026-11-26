@@ -1472,10 +1472,6 @@ fn define_time_sync_callback(
         )?
         .add_error("clock_rollback", "Detected a clock rollback")?
         .add_error(
-            "system_time_not_unix",
-            "The system time cannot be converted to a Unix timestamp",
-        )?
-        .add_error(
             "bad_outstation_time_delay",
             "Outstation time delay exceeded the response delay",
         )?
@@ -1696,10 +1692,6 @@ fn define_empty_response_callback(
             "empty_response_error",
             "empty_response_exception",
             ExceptionType::CheckedException,
-        )?
-        .add_error(
-            "rejected_by_iin2",
-            "IIN2 indicates request was not completely successful",
         )?
         .add_task_errors()?
         .doc("Errors that may occur when performing a request that expects a response with zero object headers")?

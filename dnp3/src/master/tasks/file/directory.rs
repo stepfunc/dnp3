@@ -6,7 +6,7 @@
 
 use crate::app::{Group70Var7, MaybeAsync};
 use crate::master::promise::Promise;
-use crate::master::{FileAction, FileError, FileInfo, FileReader};
+use crate::master::{FileAction, FileError, FileInfo, FileReader, TaskError};
 use scursor::ReadCursor;
 
 pub(crate) struct DirectoryReader {
@@ -51,7 +51,9 @@ impl FileReader for DirectoryReader {
                     Ok(x) => each(x),
                     Err(err) => {
                         tracing::warn!("Error reading directory information: {err}");
-                        return Err(FileError::BadResponse);
+                        return Err(FileError::TaskError(TaskError::MalformedResponse(
+                            err.into(),
+                        )));
                     }
                 }
             }

@@ -9,12 +9,12 @@ use dnp3::master::*;
 use std::ffi::CString;
 use std::time::Duration;
 
-impl<T> sfio_promise::FutureType<Result<T, WriteError>> for ffi::EmptyResponseCallback {
-    fn on_drop() -> Result<T, WriteError> {
-        Err(TaskError::Shutdown.into())
+impl<T> sfio_promise::FutureType<Result<T, TaskError>> for ffi::EmptyResponseCallback {
+    fn on_drop() -> Result<T, TaskError> {
+        Err(TaskError::Shutdown)
     }
 
-    fn complete(self, result: Result<T, WriteError>) {
+    fn complete(self, result: Result<T, TaskError>) {
         match result {
             Ok(_) => {
                 self.on_complete(ffi::Nothing::Nothing);
@@ -241,7 +241,6 @@ impl From<dnp3::app::PermissionSet> for ffi::PermissionSet {
 impl From<FileError> for ffi::FileError {
     fn from(value: FileError) -> Self {
         match value {
-            FileError::BadResponse => ffi::FileError::BadResponse,
             FileError::BadStatus(_) => ffi::FileError::BadStatus,
             FileError::NoPermission => ffi::FileError::NoPermission,
             FileError::BadBlockNum => ffi::FileError::BadBlockNum,

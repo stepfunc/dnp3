@@ -92,7 +92,7 @@ impl PendingTimeSync {
         match state {
             Some(state) => Some(TimeSyncTask::new(state, self.requester)),
             None => {
-                let err = TimeSyncError::SystemTimeNotAvailable;
+                let err = TimeSyncError::Task(TaskError::SystemTimeNotAvailable);
                 if matches!(self.requester, Requester::Auto) {
                     let seq = association.seq();
                     association.notify_task_start(TaskType::TimeSync, self.first_function(), seq);
@@ -208,7 +208,7 @@ impl TimeSyncTask {
             Some(time) => time,
             None => {
                 tracing::warn!("system time not available");
-                return Err(TimeSyncError::SystemTimeNotAvailable);
+                return Err(TimeSyncError::Task(TaskError::SystemTimeNotAvailable));
             }
         };
 
@@ -280,12 +280,6 @@ impl ResponseTask for TimeSyncTask {
 
     fn complete(self, association: Option<&mut Association>, result: Result<(), TimeSyncError>) {
         self.requester.complete(association, result)
-    }
-}
-
-impl From<std::num::TryFromIntError> for TimeSyncError {
-    fn from(_: std::num::TryFromIntError) -> Self {
-        TimeSyncError::Overflow
     }
 }
 
@@ -571,7 +565,7 @@ mod tests {
             assert!(task.start(&mut association).is_none());
             assert_eq!(
                 rx.try_recv().unwrap(),
-                Err(TimeSyncError::SystemTimeNotAvailable)
+                Err(TimeSyncError::Task(TaskError::SystemTimeNotAvailable))
             );
         }
 
@@ -589,7 +583,7 @@ mod tests {
             );
             assert_eq!(
                 rx.try_recv().unwrap(),
-                Err(TimeSyncError::SystemTimeNotAvailable)
+                Err(TimeSyncError::Task(TaskError::SystemTimeNotAvailable))
             );
         }
 
@@ -727,7 +721,7 @@ mod tests {
             assert!(task.start(&mut association).is_none());
             assert_eq!(
                 rx.try_recv().unwrap(),
-                Err(TimeSyncError::SystemTimeNotAvailable)
+                Err(TimeSyncError::Task(TaskError::SystemTimeNotAvailable))
             );
         }
 
@@ -836,7 +830,7 @@ mod tests {
             assert!(task.start(&mut association).is_none());
             assert_eq!(
                 rx.try_recv().unwrap(),
-                Err(TimeSyncError::SystemTimeNotAvailable)
+                Err(TimeSyncError::Task(TaskError::SystemTimeNotAvailable))
             );
         }
 

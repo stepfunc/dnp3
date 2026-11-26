@@ -22,7 +22,7 @@ use crate::master::tasks::command_no_ack::CommandNoAckTask;
 use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::restart::RestartType;
 use crate::master::tasks::time::{PendingTimeSync, TimeSyncTask};
-use crate::master::{CommandError, FileError, ReadType, TaskType, TimeSyncError, WriteError};
+use crate::master::{CommandError, FileError, ReadType, TaskType, TimeSyncError};
 
 use crate::master::tasks::deadbands::DeadBandsRequest;
 use crate::master::tasks::empty_response::EmptyResponseRequest;
@@ -257,34 +257,21 @@ impl RequestError for TimeSyncError {
             | TimeSyncError::BadOutstationTimeDelay(_)
             | TimeSyncError::Overflow
             | TimeSyncError::StillNeedsTime => TaskError::UnexpectedResponseHeaders,
-            TimeSyncError::SystemTimeNotAvailable => TaskError::SystemTimeNotAvailable,
-            #[expect(
-                deprecated,
-                reason = "the match must cover every variant until removal"
-            )]
-            TimeSyncError::SystemTimeNotUnix | TimeSyncError::IinError(_) => {
-                TaskError::UnexpectedResponseHeaders
-            }
-        }
-    }
-}
-
-impl RequestError for WriteError {
-    fn task_error(self) -> TaskError {
-        match self {
-            WriteError::Task(err) => err,
-            #[expect(
-                deprecated,
-                reason = "the match must cover every variant until removal"
-            )]
-            WriteError::IinError(_) => TaskError::UnexpectedResponseHeaders,
         }
     }
 }
 
 impl RequestError for FileError {
     fn task_error(self) -> TaskError {
-        self.into()
+        match self {
+            FileError::TaskError(err) => err,
+            FileError::BadStatus(_)
+            | FileError::WrongHandle
+            | FileError::NoPermission
+            | FileError::BadBlockNum
+            | FileError::AbortByUser
+            | FileError::MaxLengthExceeded => TaskError::UnexpectedResponseHeaders,
+        }
     }
 }
 
