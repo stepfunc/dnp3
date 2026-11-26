@@ -52,6 +52,7 @@ impl Timeout {
 
     /// construct from a duration, saturating at the minimum and maximum
     pub const fn saturating(value: Duration) -> Self {
+        // Duration's comparison operators are not const; as_nanos() is lossless (u128).
         if value.as_nanos() < Self::MIN.as_nanos() {
             return Self(Self::MIN);
         }
@@ -81,6 +82,7 @@ impl Timeout {
     ///
     /// returns a [`TimeoutRangeError`] if it is < [`Timeout::MIN`] or > [`Timeout::MAX`]
     pub const fn from_duration(value: Duration) -> Result<Self, TimeoutRangeError> {
+        // Duration's comparison operators are not const; as_nanos() is lossless (u128).
         if value.as_nanos() < Self::MIN.as_nanos() {
             return Err(TimeoutRangeError::TooSmall(value));
         }
