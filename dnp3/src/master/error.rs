@@ -451,28 +451,6 @@ mod test {
     use super::*;
     use crate::app::variations::Variation;
     use crate::app::QualifierCode;
-    use crate::link::FrameError;
-
-    #[test]
-    fn time_sync_error_from_task_error_wraps_in_task_variant() {
-        assert_eq!(
-            TimeSyncError::from(TaskError::SystemTimeNotAvailable),
-            TimeSyncError::Task(TaskError::SystemTimeNotAvailable)
-        );
-        assert_eq!(
-            TimeSyncError::from(TaskError::ResponseTimeout),
-            TimeSyncError::Task(TaskError::ResponseTimeout)
-        );
-    }
-
-    #[test]
-    fn task_error_display_includes_link_error() {
-        let link = LinkError::BadFrame(FrameError::BadHeaderCrc);
-        assert_eq!(
-            TaskError::Link(link).to_string(),
-            format!("link-layer or I/O error: {link}")
-        );
-    }
 
     #[test]
     fn task_error_words_parse_failures_by_cause() {

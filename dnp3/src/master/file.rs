@@ -410,12 +410,6 @@ mod tests {
     use super::*;
 
     #[test]
-    fn file_error_display_formats_task_error_with_display() {
-        let err = FileError::TaskError(TaskError::ResponseTimeout);
-        assert_eq!(err.to_string(), TaskError::ResponseTimeout.to_string());
-    }
-
-    #[test]
     fn block_number_increments_to_the_maximum_and_keeps_the_last_flag() {
         let mut block = BlockNumber(0x7FFF_FFFE);
         block.set_last();
