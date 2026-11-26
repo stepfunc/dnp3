@@ -79,6 +79,11 @@ pub mod tcp;
 /// Entry points and types for UDP
 pub mod udp;
 
+/// Internal bridge for `dnp3-ffi`
+#[cfg(feature = "ffi")]
+#[doc(hidden)]
+pub mod ffi;
+
 pub(crate) mod phys;
 pub(crate) mod session;
 pub(crate) mod transport;

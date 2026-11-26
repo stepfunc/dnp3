@@ -1344,12 +1344,9 @@ impl FileReader for ffi::FileReader {
 #[cfg(feature = "enable-tls")]
 impl From<TlsError> for ffi::ParamError {
     fn from(error: TlsError) -> Self {
-        match error {
-            TlsError::InvalidDnsName => Self::InvalidDnsName,
-            TlsError::InvalidPeerCertificate(_) => Self::InvalidPeerCertificate,
-            TlsError::InvalidLocalCertificate(_) => Self::InvalidLocalCertificate,
-            TlsError::InvalidPrivateKey(_) => Self::InvalidPrivateKey,
-            TlsError::Other(_) => Self::OtherTlsError,
+        match dnp3::ffi::TlsErrorClass::from(error) {
+            dnp3::ffi::TlsErrorClass::InvalidDnsName => Self::InvalidDnsName,
+            dnp3::ffi::TlsErrorClass::Other => Self::OtherTlsError,
         }
     }
 }

@@ -12,8 +12,6 @@ mod outstation;
 pub use master::*;
 pub use outstation::*;
 
-use tokio_rustls::rustls::pki_types;
-
 /// How long a TLS handshake may take, on either side of the connection, so that a peer that stalls
 /// its handshake can't hold up whatever is waiting for it
 pub(crate) const TLS_HANDSHAKE_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(5);
@@ -82,46 +80,29 @@ pub enum CertificateMode {
 
 /// TLS-related errors
 #[derive(Debug)]
-pub enum TlsError {
-    /// Invalid peer certificate
-    InvalidPeerCertificate(std::io::Error),
-    /// Invalid local certificate
-    InvalidLocalCertificate(std::io::Error),
-    /// Invalid private key
-    InvalidPrivateKey(std::io::Error),
-    /// DNS name is invalid
+pub struct TlsError(pub(crate) TlsErrorKind);
+
+#[derive(Debug)]
+pub(crate) enum TlsErrorKind {
     InvalidDnsName,
-    /// Other error
-    Other(std::io::Error),
+    Config(sfio_rustls_config::Error),
 }
 
-impl From<sfio_rustls_config::Error> for TlsError {
-    fn from(err: sfio_rustls_config::Error) -> Self {
-        Self::Other(std::io::Error::new(
-            std::io::ErrorKind::InvalidData,
-            err.to_string(),
-        ))
+impl TlsError {
+    pub(crate) fn invalid_dns_name() -> Self {
+        Self(TlsErrorKind::InvalidDnsName)
     }
-}
 
-impl From<pki_types::InvalidDnsNameError> for TlsError {
-    fn from(_: pki_types::InvalidDnsNameError) -> Self {
-        Self::InvalidDnsName
+    pub(crate) fn config(err: sfio_rustls_config::Error) -> Self {
+        Self(TlsErrorKind::Config(err))
     }
 }
 
 impl std::fmt::Display for TlsError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            Self::InvalidPeerCertificate(err) => {
-                write!(f, "invalid peer certificate file: {err}")
-            }
-            Self::InvalidLocalCertificate(err) => {
-                write!(f, "invalid local certificate file: {err}")
-            }
-            Self::InvalidPrivateKey(err) => write!(f, "invalid private key file: {err}"),
-            Self::InvalidDnsName => write!(f, "invalid DNS name"),
-            Self::Other(err) => write!(f, "miscellaneous TLS error: {err}"),
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.0 {
+            TlsErrorKind::InvalidDnsName => f.write_str("invalid DNS name"),
+            TlsErrorKind::Config(err) => write!(f, "TLS configuration error: {err}"),
         }
     }
 }

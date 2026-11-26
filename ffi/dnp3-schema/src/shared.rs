@@ -117,12 +117,6 @@ pub(crate) fn define(lib: &mut LibraryBuilder) -> BackTraced<SharedDefinitions> 
             "Logging can only be configured once",
         )?
         .add_error("point_does_not_exist", "Point does not exist")?
-        .add_error("invalid_peer_certificate", "Invalid peer certificate file")?
-        .add_error(
-            "invalid_local_certificate",
-            "Invalid local certificate file",
-        )?
-        .add_error("invalid_private_key", "Invalid private key file")?
         .add_error("invalid_dns_name", "Invalid DNS name")?
         .add_error("other_tls_error", "Other TLS error")?
         .add_error(
