@@ -96,7 +96,7 @@ impl UdpLayer {
         &mut self,
         buffer: &mut [u8],
     ) -> Result<(usize, PhysAddr), std::io::Error> {
-        let (count, source) = loop {
+        loop {
             match self.inner.read(buffer).await {
                 // an empty datagram is a valid zero-length read, not the end of a stream
                 Ok((0, _)) => tracing::debug!("Discarded empty UDP datagram"),
@@ -104,7 +104,12 @@ impl UdpLayer {
                 Ok((_, PhysAddr::Udp(source))) if source.port() == 0 => {
                     tracing::debug!("Discarded UDP datagram from port 0 of {}", source.ip())
                 }
-                Ok(x) => break x,
+                Ok((count, source)) => {
+                    if count == buffer.len() {
+                        tracing::error!("UDP under-read w/ buffer size == {count}");
+                    }
+                    return Ok((count, source));
+                }
                 Err(err) if is_oversized_datagram(&err) => tracing::warn!(
                     "Discarded UDP datagram larger than the read buffer of {} bytes",
                     buffer.len()
@@ -117,12 +122,7 @@ impl UdpLayer {
                     }
                 }
             }
-        };
-
-        if count == buffer.len() {
-            tracing::error!("UDP under-read w/ buffer size == {count}");
         }
-        Ok((count, source))
     }
 
     pub(crate) async fn write_all(

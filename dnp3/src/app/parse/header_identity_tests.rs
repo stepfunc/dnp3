@@ -162,7 +162,6 @@ fn probe(
     variation: Variation,
     qualifier: QualifierCode,
 ) -> Probe {
-    let mut last = E::InsufficientBytes;
     for payload in payloads(variation, qualifier) {
         let bytes = [prefix(variation, qualifier), payload].concat();
         match HeaderCollection::parse(options, function, &bytes) {
@@ -170,14 +169,11 @@ fn probe(
                 assert_eq!(headers.iter().count(), 1);
                 return Probe::Accepted(bytes);
             }
-            Err(E::InsufficientBytes) => continue,
-            Err(err) => {
-                last = err;
-                break;
-            }
+            Err(E::InsufficientBytes) => {}
+            Err(err) => return Probe::Rejected(err),
         }
     }
-    Probe::Rejected(last)
+    Probe::Rejected(E::InsufficientBytes)
 }
 
 /// The variations of each group, outside groups 0, 110 and 111, that an all-objects header accepts,
