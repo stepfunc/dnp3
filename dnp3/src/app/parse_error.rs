@@ -38,9 +38,6 @@ pub enum ObjectParseError {
     InvalidRange(u16, u16),
     /// Specified variation and qualifier code are invalid or not supported
     InvalidQualifierForVariation(Variation, QualifierCode),
-    /// Specified qualifier code is not supported
-    #[deprecated(since = "1.8.0", note = "never returned; will be removed in 2.0")]
-    UnsupportedQualifierCode(QualifierCode),
     /// Free format parser can only handle counts of 1
     UnsupportedFreeFormatCount(u8),
     /// Response containing zero-length octet data disallowed by the specification
@@ -88,11 +85,6 @@ impl ObjectParseError {
         match self {
             ObjectParseError::UnknownGroupVariation(_, _)
             | ObjectParseError::UnsupportedFreeFormatCount(_) => ParseErrorCause::Unsupported,
-            #[expect(
-                deprecated,
-                reason = "the mapping must cover every variant until removal"
-            )]
-            ObjectParseError::UnsupportedQualifierCode(_) => ParseErrorCause::Unsupported,
             ObjectParseError::InvalidQualifierForVariation(_, _) => {
                 ParseErrorCause::UnsupportedOrInvalid
             }
@@ -166,13 +158,6 @@ impl std::fmt::Display for ObjectParseError {
                 f,
                 "{:?} may not be used with the qualifier: {} (0x{:02X})",
                 v,
-                q.description(),
-                q.as_u8()
-            ),
-            #[expect(deprecated, reason = "Display must cover every variant until removal")]
-            ObjectParseError::UnsupportedQualifierCode(q) => write!(
-                f,
-                "Unsupported qualifier code: {} (0x{:02X})",
                 q.description(),
                 q.as_u8()
             ),
@@ -255,10 +240,6 @@ mod test {
     fn classifies_each_error_by_cause() {
         use ParseErrorCause::*;
 
-        #[expect(
-            deprecated,
-            reason = "the classification covers every variant until removal"
-        )]
         let cases = [
             (ObjectParseError::UnknownGroupVariation(111, 5), Unsupported),
             (
@@ -267,10 +248,6 @@ mod test {
                     QualifierCode::Range8,
                 ),
                 UnsupportedOrInvalid,
-            ),
-            (
-                ObjectParseError::UnsupportedQualifierCode(QualifierCode::Range8),
-                Unsupported,
             ),
             (ObjectParseError::UnsupportedFreeFormatCount(2), Unsupported),
             (ObjectParseError::UnknownQualifier(0xFF), Invalid),

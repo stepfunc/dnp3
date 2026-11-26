@@ -49,7 +49,7 @@ async fn fails_on_unexpected_variation() {
 
         assert_eq!(
             auth_task.await.unwrap().map(u32::from),
-            Err(FileError::BadResponse)
+            Err(TaskError::UnexpectedResponseHeaders.into())
         );
         expect_failure(&mut harness, TaskError::UnexpectedResponseHeaders);
     })

@@ -7,7 +7,7 @@
 use std::error::Error;
 
 use crate::app::control::{CommandStatus, ControlCode};
-use crate::app::{Iin, Iin2};
+use crate::app::Iin;
 use crate::app::{ObjectParseError, ParseErrorCause, Shutdown, Variation};
 use crate::link::error::LinkError;
 use crate::link::EndpointAddress;
@@ -121,9 +121,6 @@ pub enum PollError {
 /// Errors that can occur when verifying the respond to a command request
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum CommandResponseError {
-    /// Command failed before receiving a response
-    #[deprecated(since = "1.8.0", note = "never returned; will be removed in 2.0")]
-    Request(TaskError),
     /// Outstation indicated that a command was not SUCCESS for the specified reason
     BadStatus(CommandStatus),
     /// Number of headers in the response doesn't match the number in the request
@@ -136,17 +133,6 @@ pub enum CommandResponseError {
     ObjectValueMismatch,
 }
 
-/// Error type for operations that don't return anything from the outstation but might fail
-/// b/c IIN2 has an error bit set
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum WriteError {
-    /// Error occurred during task execution
-    Task(TaskError),
-    /// Outstation returned an IIN.2 error
-    #[deprecated(since = "1.8.0", note = "never returned; will be removed in 2.0")]
-    IinError(Iin2),
-}
-
 /// Parent error type for time sync tasks
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum TimeSyncError {
@@ -154,20 +140,12 @@ pub enum TimeSyncError {
     Task(TaskError),
     /// Clock rollback was detected
     ClockRollback,
-    /// System time could not be converted to a UNIX timestamp
-    #[deprecated(since = "1.8.0", note = "never returned; will be removed in 2.0")]
-    SystemTimeNotUnix,
     /// Outstation time not return a value time delay
     BadOutstationTimeDelay(u16),
     /// Time calculation would overflow its representation
     Overflow,
     /// Outstation did not clear its NEED_TIME bit
     StillNeedsTime,
-    /// System time was not available to perform the synchronization
-    SystemTimeNotAvailable,
-    /// Outstation returned an IIN.2 error
-    #[deprecated(since = "1.8.0", note = "never returned; will be removed in 2.0")]
-    IinError(Iin2),
 }
 /// Parent error type for command tasks
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -210,8 +188,6 @@ impl std::fmt::Display for PollError {
 impl std::fmt::Display for CommandResponseError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            #[expect(deprecated, reason = "Display must cover every variant until removal")]
-            CommandResponseError::Request(err) => write!(f, "{err}"),
             CommandResponseError::BadStatus(status) => write!(
                 f,
                 "command status value other than Success was returned: {status:?}"
@@ -247,7 +223,7 @@ impl std::fmt::Display for TaskError {
             TaskError::TooManyRequests => {
                 f.write_str("the number of queued user requests has reached the configured limit")
             }
-            TaskError::Link(_) => f.write_str("link-layer or I/O error"),
+            TaskError::Link(err) => write!(f, "link-layer or I/O error: {err}"),
             TaskError::Transport => f.write_str("malformed response"),
             TaskError::MalformedResponse(err) => match err.cause() {
                 ParseErrorCause::Unsupported => write!(f, "unsupported response content: {err}"),
@@ -294,29 +270,12 @@ impl std::fmt::Display for TimeSyncError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
             TimeSyncError::Task(err) => write!(f, "{err}"),
-            #[expect(deprecated, reason = "Display must cover every variant until removal")]
-            TimeSyncError::SystemTimeNotUnix => {
-                f.write_str("the system time cannot be converted to unix time")
-            }
             TimeSyncError::BadOutstationTimeDelay(x) => {
                 write!(f, "outstation time delay ({x}) exceeded the response delay")
             }
             TimeSyncError::Overflow => f.write_str("overflow in calculation"),
             TimeSyncError::ClockRollback => f.write_str("detected a clock rollback"),
             TimeSyncError::StillNeedsTime => f.write_str("outstation did not clear NEED_TIME bit"),
-            TimeSyncError::SystemTimeNotAvailable => f.write_str("system time not available"),
-            #[expect(deprecated, reason = "Display must cover every variant until removal")]
-            TimeSyncError::IinError(iin2) => write!(f, "outstation indicated an error: {iin2}"),
-        }
-    }
-}
-
-impl std::fmt::Display for WriteError {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        match self {
-            WriteError::Task(err) => write!(f, "{err}"),
-            #[expect(deprecated, reason = "Display must cover every variant until removal")]
-            WriteError::IinError(iin2) => write!(f, "outstation indicated an error: {iin2}"),
         }
     }
 }
@@ -407,28 +366,13 @@ impl From<TaskError> for CommandError {
 
 impl From<TaskError> for TimeSyncError {
     fn from(err: TaskError) -> Self {
-        match err {
-            TaskError::SystemTimeNotAvailable => TimeSyncError::SystemTimeNotAvailable,
-            err => TimeSyncError::Task(err),
-        }
+        TimeSyncError::Task(err)
     }
 }
 
 impl From<RecvError> for AssociationError {
     fn from(_: RecvError) -> Self {
         AssociationError::Shutdown
-    }
-}
-
-impl From<RecvError> for WriteError {
-    fn from(_: RecvError) -> Self {
-        WriteError::Task(TaskError::Shutdown)
-    }
-}
-
-impl From<TaskError> for WriteError {
-    fn from(err: TaskError) -> Self {
-        WriteError::Task(err)
     }
 }
 
@@ -495,37 +439,18 @@ impl From<Shutdown> for PollError {
     }
 }
 
-impl From<Shutdown> for WriteError {
-    fn from(_: Shutdown) -> Self {
-        WriteError::Task(TaskError::Shutdown)
-    }
-}
-
 impl Error for AssociationError {}
 impl Error for TaskError {}
 impl Error for PollError {}
 impl Error for CommandError {}
 impl Error for CommandResponseError {}
 impl Error for TimeSyncError {}
-impl Error for WriteError {}
 
 #[cfg(test)]
 mod test {
     use super::*;
     use crate::app::variations::Variation;
     use crate::app::QualifierCode;
-
-    #[test]
-    fn time_sync_error_from_task_error_uses_the_dedicated_system_time_variant() {
-        assert_eq!(
-            TimeSyncError::from(TaskError::SystemTimeNotAvailable),
-            TimeSyncError::SystemTimeNotAvailable
-        );
-        assert_eq!(
-            TimeSyncError::from(TaskError::ResponseTimeout),
-            TimeSyncError::Task(TaskError::ResponseTimeout)
-        );
-    }
 
     #[test]
     fn task_error_words_parse_failures_by_cause() {

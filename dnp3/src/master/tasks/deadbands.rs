@@ -10,9 +10,7 @@ use crate::app::parse::traits::Index;
 use crate::app::FunctionCode;
 use crate::master::tasks::empty_response::expect_empty;
 use crate::master::tasks::{NonReadTask, OneShot, OneShotRequest};
-use crate::master::{
-    DeadBandHeader, DeadBandHeaderVariants, DeadBands, TaskError, TaskType, WriteError,
-};
+use crate::master::{DeadBandHeader, DeadBandHeaderVariants, DeadBands, TaskError, TaskType};
 
 pub(crate) struct DeadBandsRequest {
     headers: Vec<DeadBandHeader>,
@@ -45,7 +43,7 @@ impl DeadBandsRequest {
 
 impl OneShotRequest for DeadBandsRequest {
     type Output = ();
-    type Error = WriteError;
+    type Error = TaskError;
 
     fn function(&self) -> FunctionCode {
         FunctionCode::Write
@@ -63,8 +61,8 @@ impl OneShotRequest for DeadBandsRequest {
         Ok(())
     }
 
-    fn parse(&self, response: Response<'_>) -> Result<(), WriteError> {
-        Ok(expect_empty(&response)?)
+    fn parse(&self, response: Response<'_>) -> Result<(), TaskError> {
+        expect_empty(&response)
     }
 
     fn wrap(task: OneShot<Self>) -> NonReadTask {

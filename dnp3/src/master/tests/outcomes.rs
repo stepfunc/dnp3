@@ -47,7 +47,7 @@ use crate::master::{
     CommandSupport, DeadBandHeader, DirReadConfig, FileCredentials, FileError, FileHandle,
     FileMode, FileReadConfig, HeaderInfo, Headers, MasterChannel, MasterChannelType, OpenFile,
     PollError, ReadHandler, ReadRequest, ReadType, TaskError, TaskType, TimeSyncError,
-    TimeSyncProcedure, WriteError,
+    TimeSyncProcedure,
 };
 use crate::util::lifecycle::{RunError, StopReason};
 use crate::util::test_support::watchdog;
@@ -111,7 +111,7 @@ pub(super) enum Reply {
     Read(Result<(), TaskError>),
     Command(Result<(), CommandError>),
     Restart(Result<Duration, TaskError>),
-    Write(Result<(), WriteError>),
+    Write(Result<(), TaskError>),
     TimeSync(Result<(), TimeSyncError>),
     AuthKey(Result<u32, FileError>),
     Open(Result<OpenFile, FileError>),
@@ -272,7 +272,7 @@ impl Kind {
                 Reply::Command(Err(CommandError::Task(err)))
             }
             Kind::ColdRestart => Reply::Restart(Err(err)),
-            Kind::EmptyResponse | Kind::DeadBands => Reply::Write(Err(WriteError::Task(err))),
+            Kind::EmptyResponse | Kind::DeadBands => Reply::Write(Err(err)),
             Kind::TimeSync => Reply::TimeSync(Err(TimeSyncError::Task(err))),
             Kind::AuthFile => Reply::AuthKey(Err(FileError::TaskError(err))),
             Kind::OpenFile => Reply::Open(Err(FileError::TaskError(err))),
@@ -1592,8 +1592,8 @@ async fn writing_an_attribute_whose_variation_cannot_carry_a_value_sends_nothing
                     .association
                     .send_and_expect_empty_response(FunctionCode::Write, headers)
                     .await,
-                Err(WriteError::Task(TaskError::BadEncoding(
-                    BadEncoding::Attribute(BadAttribute::BadVariation(variation))
+                Err(TaskError::BadEncoding(BadEncoding::Attribute(
+                    BadAttribute::BadVariation(variation)
                 )))
             );
             harness.assert_no_events();
@@ -1626,7 +1626,7 @@ async fn reading_group0_var0_sends_nothing() {
                     Headers::new().add_all_objects(g0v0)
                 )
                 .await,
-            Err(WriteError::Task(err))
+            Err(err)
         );
         harness.assert_no_events();
 

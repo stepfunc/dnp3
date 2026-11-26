@@ -151,7 +151,7 @@ impl FileReadTask {
                     "File READ response contains unexpected variation: {}",
                     header.variation()
                 );
-                return Err(FileError::BadResponse);
+                return Err(TaskError::UnexpectedResponseHeaders.into());
             }
         };
 
@@ -319,8 +319,7 @@ fn closed_early(err: FileError, closed: Result<(), FileError>) -> Result<(), Fil
     match err {
         // the master ended the transfer itself, which only fails the task if the CLOSE fails
         FileError::AbortByUser | FileError::MaxLengthExceeded => closed,
-        FileError::BadResponse
-        | FileError::BadStatus(_)
+        FileError::BadStatus(_)
         | FileError::WrongHandle
         | FileError::NoPermission
         | FileError::BadBlockNum

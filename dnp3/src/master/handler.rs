@@ -34,7 +34,7 @@ use crate::master::tasks::time::PendingTimeSync;
 use crate::master::tasks::{OneShot, QueuedTask, Task};
 use crate::master::{
     AuthKey, BlockNumber, DeadBandHeader, DirReadConfig, FileCredentials, FileError, FileHandle,
-    FileInfo, FileMode, FileReadConfig, FileReader, Headers, OpenFile, ReadHandler, WriteError,
+    FileInfo, FileMode, FileReadConfig, FileReader, Headers, OpenFile, ReadHandler,
 };
 use crate::phys::PhysAddr;
 use crate::transport::FragmentAddr;
@@ -306,7 +306,7 @@ impl AssociationHandle {
         &mut self,
         function: FunctionCode,
         headers: Headers,
-    ) -> Result<(), WriteError> {
+    ) -> Result<(), TaskError> {
         let (promise, rx) = Promise::one_shot();
         let task = OneShot::new(EmptyResponseRequest::new(function, headers), promise);
         self.send_task(task).await?;
@@ -390,7 +390,7 @@ impl AssociationHandle {
     pub async fn write_dead_bands(
         &mut self,
         headers: Vec<DeadBandHeader>,
-    ) -> Result<(), WriteError> {
+    ) -> Result<(), TaskError> {
         let (promise, rx) = Promise::one_shot();
         let task = OneShot::new(DeadBandsRequest::new(headers), promise);
         self.send_task(task).await?;
@@ -499,7 +499,7 @@ impl AssociationHandle {
     /// Read a file directory
     ///
     /// The returned result is the source of truth for the read. Entries that fail to parse after
-    /// the transfer completes return [`FileError::BadResponse`], while the
+    /// the transfer completes fail with [`TaskError::MalformedResponse`], while the
     /// [`AssociationInformation`] may still report the [`TaskType::FileRead`] task as a success.
     pub async fn read_directory<T: ToString>(
         &mut self,

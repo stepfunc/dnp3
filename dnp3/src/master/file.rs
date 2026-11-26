@@ -135,8 +135,6 @@ impl Default for DirReadConfig {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(not(feature = "ffi"), non_exhaustive)]
 pub enum FileError {
-    /// Outstation returned a bad response
-    BadResponse,
     /// Outstation returned an error status code
     BadStatus(FileStatus),
     /// File handle returned did not match request
@@ -177,21 +175,6 @@ impl From<SingleHeaderError> for FileError {
     }
 }
 
-impl From<FileError> for TaskError {
-    fn from(err: FileError) -> Self {
-        match err {
-            FileError::TaskError(err) => err,
-            FileError::BadResponse
-            | FileError::BadStatus(_)
-            | FileError::WrongHandle
-            | FileError::NoPermission
-            | FileError::BadBlockNum
-            | FileError::AbortByUser
-            | FileError::MaxLengthExceeded => TaskError::UnexpectedResponseHeaders,
-        }
-    }
-}
-
 impl From<TaskError> for FileError {
     fn from(err: TaskError) -> Self {
         FileError::TaskError(err)
@@ -201,12 +184,11 @@ impl From<TaskError> for FileError {
 impl std::fmt::Display for FileError {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
         match self {
-            FileError::BadResponse => f.write_str("bad response data"),
             FileError::BadStatus(s) => write!(f, "bad status code: {s:?}"),
             FileError::NoPermission => f.write_str("no permission"),
             FileError::BadBlockNum => f.write_str("bad block number"),
             FileError::AbortByUser => f.write_str("aborted by user"),
-            FileError::TaskError(t) => Debug::fmt(&t, f),
+            FileError::TaskError(t) => std::fmt::Display::fmt(t, f),
             FileError::MaxLengthExceeded => f.write_str("exceeded maximum received length"),
             FileError::WrongHandle => {
                 f.write_str("file handle returned by outstation did not match the request")

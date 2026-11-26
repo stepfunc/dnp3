@@ -119,7 +119,7 @@ async fn fails_on_unexpected_variation() {
             },
         ))
         .await;
-        assert_eq!(result, Err(FileError::BadResponse));
+        assert_eq!(result, Err(TaskError::UnexpectedResponseHeaders.into()));
     })
     .await;
 }

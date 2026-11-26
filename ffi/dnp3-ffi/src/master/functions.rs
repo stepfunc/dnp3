@@ -681,11 +681,6 @@ impl From<CommandError> for ffi::CommandError {
         match value {
             CommandError::Task(err) => err.into(),
             CommandError::Response(err) => match err {
-                #[expect(
-                    deprecated,
-                    reason = "the FFI mapping must cover every variant until removal"
-                )]
-                CommandResponseError::Request(err) => err.into(),
                 CommandResponseError::BadStatus(_) => Self::BadStatus,
                 CommandResponseError::HeaderCountMismatch => Self::HeaderMismatch,
                 CommandResponseError::HeaderTypeMismatch => Self::HeaderMismatch,
@@ -701,20 +696,9 @@ impl From<TimeSyncError> for ffi::TimeSyncError {
         match err {
             TimeSyncError::Task(err) => err.into(),
             TimeSyncError::ClockRollback => Self::ClockRollback,
-            #[expect(
-                deprecated,
-                reason = "the FFI mapping must cover every variant until removal"
-            )]
-            TimeSyncError::SystemTimeNotUnix => Self::SystemTimeNotUnix,
             TimeSyncError::BadOutstationTimeDelay(_) => Self::BadOutstationTimeDelay,
             TimeSyncError::Overflow => Self::Overflow,
             TimeSyncError::StillNeedsTime => Self::StillNeedsTime,
-            TimeSyncError::SystemTimeNotAvailable => Self::SystemTimeNotAvailable,
-            #[expect(
-                deprecated,
-                reason = "the FFI mapping must cover every variant until removal"
-            )]
-            TimeSyncError::IinError(_) => Self::IinError,
         }
     }
 }
@@ -1297,19 +1281,6 @@ impl From<PollError> for ffi::ParamError {
         match error {
             PollError::Shutdown => Self::MasterAlreadyShutdown,
             PollError::NoSuchAssociation(_) => Self::AssociationDoesNotExist,
-        }
-    }
-}
-
-impl From<WriteError> for ffi::EmptyResponseError {
-    fn from(value: WriteError) -> Self {
-        match value {
-            WriteError::Task(x) => x.into(),
-            #[expect(
-                deprecated,
-                reason = "the FFI mapping must cover every variant until removal"
-            )]
-            WriteError::IinError(_) => Self::RejectedByIin2,
         }
     }
 }

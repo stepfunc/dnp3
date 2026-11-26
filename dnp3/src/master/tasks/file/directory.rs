@@ -4,7 +4,7 @@
 // Text and data mining rights, including for AI training, are reserved under
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
-use crate::app::{Group70Var7, MaybeAsync};
+use crate::app::{Group70Var7, MaybeAsync, ObjectParseError};
 use crate::master::promise::Promise;
 use crate::master::{FileAction, FileError, FileInfo, FileReader};
 use scursor::ReadCursor;
@@ -51,7 +51,7 @@ impl FileReader for DirectoryReader {
                     Ok(x) => each(x),
                     Err(err) => {
                         tracing::warn!("Error reading directory information: {err}");
-                        return Err(FileError::BadResponse);
+                        return Err(ObjectParseError::from(err).into());
                     }
                 }
             }
