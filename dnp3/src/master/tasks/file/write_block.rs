@@ -49,7 +49,7 @@ impl OneShotRequest for WriteBlockRequest {
                     "File WRITE response contains unexpected variation: {}",
                     header.variation()
                 );
-                return Err(FileError::TaskError(TaskError::UnexpectedResponseHeaders));
+                return Err(TaskError::UnexpectedResponseHeaders.into());
             }
         };
 

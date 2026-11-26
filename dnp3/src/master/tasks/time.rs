@@ -17,7 +17,7 @@ use crate::master::error::{TaskError, TimeSyncError};
 use crate::master::promise::Promise;
 use crate::master::request::TimeSyncProcedure;
 use crate::master::tasks::empty_response::expect_empty;
-use crate::master::tasks::{AppTask, NonReadTask, RequestError, ResponseTask, Step, Task};
+use crate::master::tasks::{AppTask, NonReadTask, ResponseTask, Step, Task};
 use crate::master::TaskType;
 
 use tokio::time::Instant;
@@ -92,13 +92,13 @@ impl PendingTimeSync {
         match state {
             Some(state) => Some(TimeSyncTask::new(state, self.requester)),
             None => {
-                let err = TimeSyncError::Task(TaskError::SystemTimeNotAvailable);
+                let err = TaskError::SystemTimeNotAvailable;
                 if matches!(self.requester, Requester::Auto) {
                     let seq = association.seq();
                     association.notify_task_start(TaskType::TimeSync, self.first_function(), seq);
-                    association.notify_task_fail(TaskType::TimeSync, err.task_error());
+                    association.notify_task_fail(TaskType::TimeSync, err);
                 }
-                self.requester.complete(Some(association), Err(err));
+                self.requester.complete(Some(association), Err(err.into()));
                 None
             }
         }
@@ -208,7 +208,7 @@ impl TimeSyncTask {
             Some(time) => time,
             None => {
                 tracing::warn!("system time not available");
-                return Err(TimeSyncError::Task(TaskError::SystemTimeNotAvailable));
+                return Err(TaskError::SystemTimeNotAvailable.into());
             }
         };
 
@@ -565,7 +565,7 @@ mod tests {
             assert!(task.start(&mut association).is_none());
             assert_eq!(
                 rx.try_recv().unwrap(),
-                Err(TimeSyncError::Task(TaskError::SystemTimeNotAvailable))
+                Err(TaskError::SystemTimeNotAvailable.into())
             );
         }
 
@@ -583,7 +583,7 @@ mod tests {
             );
             assert_eq!(
                 rx.try_recv().unwrap(),
-                Err(TimeSyncError::Task(TaskError::SystemTimeNotAvailable))
+                Err(TaskError::SystemTimeNotAvailable.into())
             );
         }
 
@@ -721,7 +721,7 @@ mod tests {
             assert!(task.start(&mut association).is_none());
             assert_eq!(
                 rx.try_recv().unwrap(),
-                Err(TimeSyncError::Task(TaskError::SystemTimeNotAvailable))
+                Err(TaskError::SystemTimeNotAvailable.into())
             );
         }
 
@@ -830,7 +830,7 @@ mod tests {
             assert!(task.start(&mut association).is_none());
             assert_eq!(
                 rx.try_recv().unwrap(),
-                Err(TimeSyncError::Task(TaskError::SystemTimeNotAvailable))
+                Err(TaskError::SystemTimeNotAvailable.into())
             );
         }
 

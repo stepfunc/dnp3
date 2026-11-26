@@ -62,7 +62,7 @@ impl OneShotRequest for GetFileInfoRequest {
                     "File GET_FILE_INFO response contains unexpected variation: {}",
                     header.variation()
                 );
-                Err(FileError::TaskError(TaskError::UnexpectedResponseHeaders))
+                Err(TaskError::UnexpectedResponseHeaders.into())
             }
         }
     }

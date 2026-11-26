@@ -151,7 +151,7 @@ impl FileReadTask {
                     "File READ response contains unexpected variation: {}",
                     header.variation()
                 );
-                return Err(FileError::TaskError(TaskError::UnexpectedResponseHeaders));
+                return Err(TaskError::UnexpectedResponseHeaders.into());
             }
         };
 

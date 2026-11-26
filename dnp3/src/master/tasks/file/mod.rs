@@ -97,7 +97,7 @@ pub(super) fn parse_auth_response(header: ObjectHeader) -> Result<AuthKey, FileE
                 "File AUTHENTICATE response contains unexpected variation: {}",
                 header.variation()
             );
-            return Err(FileError::TaskError(TaskError::UnexpectedResponseHeaders));
+            return Err(TaskError::UnexpectedResponseHeaders.into());
         }
     };
 
@@ -163,7 +163,7 @@ fn parse_status_object<'a>(
                 "File {function} response contains unexpected variation: {}",
                 header.variation()
             );
-            Err(FileError::TaskError(TaskError::UnexpectedResponseHeaders))
+            Err(TaskError::UnexpectedResponseHeaders.into())
         }
     }
 }

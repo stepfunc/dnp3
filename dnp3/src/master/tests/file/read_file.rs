@@ -299,11 +299,10 @@ impl OpenFailure {
     fn error(self) -> FileError {
         match self {
             Self::NoPermission => FileError::NoPermission,
-            Self::AuthVariation | Self::OpenVariation => {
-                FileError::TaskError(TaskError::UnexpectedResponseHeaders)
+            Self::AuthVariation | Self::OpenVariation | Self::NoObjectHeader => {
+                TaskError::UnexpectedResponseHeaders.into()
             }
             Self::OpenStatus => FileError::BadStatus(FileStatus::FileNotFound),
-            Self::NoObjectHeader => FileError::TaskError(TaskError::UnexpectedResponseHeaders),
             Self::AuthUnparseable | Self::OpenUnparseable => {
                 FileError::TaskError(TaskError::MalformedResponse(UNPARSEABLE))
             }
@@ -466,10 +465,11 @@ impl Ending {
     /// The error that ends the transfer
     fn error(self) -> FileError {
         match self {
-            Self::BlockVariation => FileError::TaskError(TaskError::UnexpectedResponseHeaders),
+            Self::BlockVariation | Self::NoObjectHeader => {
+                TaskError::UnexpectedResponseHeaders.into()
+            }
             Self::BlockNumber => FileError::BadBlockNum,
             Self::Handle => FileError::WrongHandle,
-            Self::NoObjectHeader => FileError::TaskError(TaskError::UnexpectedResponseHeaders),
             Self::Unparseable => FileError::TaskError(TaskError::MalformedResponse(UNPARSEABLE)),
             Self::MaxFileSize | Self::MaxFileSizeOnLastBlock => FileError::MaxLengthExceeded,
             Self::ReaderAbort | Self::ReaderAbortOnLastBlock => FileError::AbortByUser,
@@ -809,9 +809,7 @@ async fn directory_read_with_unparseable_entries_fails_the_read_but_not_the_task
                 .await;
             assert_eq!(
                 reply.await.unwrap(),
-                Err(FileError::TaskError(TaskError::MalformedResponse(
-                    ObjectParseError::InsufficientBytes
-                ))),
+                Err(ObjectParseError::InsufficientBytes.into()),
                 "{data:?}"
             );
             harness

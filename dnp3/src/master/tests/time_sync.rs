@@ -395,10 +395,7 @@ async fn user_time_sync_without_system_time_fails_without_scheduling_a_retry() {
             .association
             .synchronize_time(TimeSyncProcedure::Lan)
             .await;
-        assert_eq!(
-            result,
-            Err(TimeSyncError::Task(TaskError::SystemTimeNotAvailable))
-        );
+        assert_eq!(result, Err(TaskError::SystemTimeNotAvailable.into()));
 
         tokio::time::sleep(Duration::from_secs(60)).await;
         assert_eq!(count.load(Ordering::SeqCst), 1);
