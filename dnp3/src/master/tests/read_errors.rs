@@ -54,7 +54,7 @@ async fn read_with_iin2_and_data_delivers_the_data_and_succeeds() {
         let mut association = harness.association.clone();
         let read = tokio::spawn(async move {
             association
-                .read(ReadRequest::class_scan(Classes::class0()))
+                .read(ReadRequest::new().add_classes(Classes::class0()))
                 .await
         });
 
@@ -90,7 +90,7 @@ async fn read_with_iin2_and_no_data_fails() {
         let mut association = harness.association.clone();
         let read = tokio::spawn(async move {
             association
-                .read(ReadRequest::class_scan(Classes::class0()))
+                .read(ReadRequest::new().add_classes(Classes::class0()))
                 .await
         });
 
@@ -123,7 +123,7 @@ async fn multi_fragment_read_with_iin2_in_the_first_fragment_reads_every_fragmen
         let mut association = harness.association.clone();
         let read = tokio::spawn(async move {
             association
-                .read(ReadRequest::class_scan(Classes::class0()))
+                .read(ReadRequest::new().add_classes(Classes::class0()))
                 .await
         });
 
@@ -160,7 +160,7 @@ async fn start_read(
     let mut association = harness.association.clone();
     let read = tokio::spawn(async move {
         association
-            .read(ReadRequest::class_scan(Classes::class0()))
+            .read(ReadRequest::new().add_classes(Classes::class0()))
             .await
     });
     harness
@@ -262,7 +262,7 @@ async fn periodic_poll_with_iin2_and_no_data_fails() {
         let mut association = harness.association.clone();
         let _poll = association
             .add_poll(
-                ReadRequest::class_scan(Classes::class0()),
+                ReadRequest::new().add_classes(Classes::class0()),
                 std::time::Duration::from_secs(1),
             )
             .await

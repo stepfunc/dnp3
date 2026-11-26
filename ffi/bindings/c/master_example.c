@@ -294,7 +294,8 @@ int run_channel(dnp3_master_channel_t *channel, dnp3_association_id_t associatio
 {
     // create an event poll
     // ANCHOR: add_poll
-    dnp3_read_request_t *poll_request = dnp3_read_request_new_class_scan(false, true, true, true);
+    dnp3_read_request_t *poll_request = dnp3_read_request_create();
+    dnp3_read_request_add_classes(poll_request, false, true, true, true);
     dnp3_poll_id_t poll_id;
     dnp3_param_error_t err = dnp3_master_channel_add_poll(channel, association_id, poll_request, 5000, &poll_id);
     dnp3_read_request_destroy(poll_request);
@@ -347,7 +348,8 @@ void run_command(dnp3_master_channel_t *channel, dnp3_association_id_t associati
         print_outcome("dlv", dnp3_master_channel_set_decode_level(channel, level), "success");
     }
     else if (strcmp(cmd, "rao") == 0) {
-        dnp3_read_request_t *request = dnp3_read_request_new_all_objects(DNP3_VARIATION_GROUP40_VAR0);
+        dnp3_read_request_t *request = dnp3_read_request_create();
+        dnp3_read_request_add_all_objects_header(request, DNP3_VARIATION_GROUP40_VAR0);
         dnp3_read_task_callback_t cb = {
             .on_complete = &on_read_complete,
             .on_failure = &on_read_failure,
@@ -359,7 +361,8 @@ void run_command(dnp3_master_channel_t *channel, dnp3_association_id_t associati
         print_outcome("rao", err, NULL);
     }
     else if (strcmp(cmd, "rmo") == 0) {
-        dnp3_read_request_t *request = dnp3_read_request_new_all_objects(DNP3_VARIATION_GROUP10_VAR0);
+        dnp3_read_request_t *request = dnp3_read_request_create();
+        dnp3_read_request_add_all_objects_header(request, DNP3_VARIATION_GROUP10_VAR0);
         dnp3_read_request_add_all_objects_header(request, DNP3_VARIATION_GROUP40_VAR0);
         dnp3_read_task_callback_t cb = {
             .on_complete = &on_read_complete,
@@ -372,7 +375,8 @@ void run_command(dnp3_master_channel_t *channel, dnp3_association_id_t associati
         print_outcome("rmo", err, NULL);
     }
     else if (strcmp(cmd, "rco") == 0) {
-        dnp3_read_request_t *request = dnp3_read_request_new_all_objects(DNP3_VARIATION_GROUP20_VAR0);
+        dnp3_read_request_t *request = dnp3_read_request_create();
+        dnp3_read_request_add_all_objects_header(request, DNP3_VARIATION_GROUP20_VAR0);
         dnp3_read_request_add_all_objects_header(request, DNP3_VARIATION_GROUP21_VAR0);
         dnp3_read_task_callback_t cb = {
             .on_complete = &on_read_complete,
@@ -513,7 +517,8 @@ void run_command(dnp3_master_channel_t *channel, dnp3_association_id_t associati
     }
     else if (strcmp(cmd, "rda") == 0) {
         // ANCHOR: read_attributes
-        dnp3_read_request_t *request = dnp3_read_request_new_specific_attribute(DNP3_ATTRIBUTE_VARIATIONS_ALL_ATTRIBUTES_REQUEST, 0);
+        dnp3_read_request_t *request = dnp3_read_request_create();
+        dnp3_read_request_add_specific_attribute(request, DNP3_ATTRIBUTE_VARIATIONS_ALL_ATTRIBUTES_REQUEST, 0);
 
         dnp3_read_task_callback_t cb = {
             .on_complete = &on_read_complete,
@@ -545,7 +550,8 @@ void run_command(dnp3_master_channel_t *channel, dnp3_association_id_t associati
         print_outcome("wda", err, NULL);
     }
     else if (strcmp(cmd, "ral") == 0) {
-        dnp3_read_request_t *request = dnp3_read_request_new_specific_attribute(DNP3_ATTRIBUTE_VARIATIONS_LIST_OF_VARIATIONS, 0);
+        dnp3_read_request_t *request = dnp3_read_request_create();
+        dnp3_read_request_add_specific_attribute(request, DNP3_ATTRIBUTE_VARIATIONS_LIST_OF_VARIATIONS, 0);
         dnp3_read_task_callback_t cb = {
             .on_complete = &on_read_complete,
             .on_failure = &on_read_failure,

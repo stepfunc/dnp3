@@ -696,12 +696,12 @@ mod test {
             ReadTask::StartupIntegrity(Classes::all()),
             ReadTask::PeriodicPoll(Poll::new(
                 0,
-                ReadRequest::class_scan(Classes::class123()),
+                ReadRequest::new().add_classes(Classes::class123()),
                 Duration::from_secs(1),
             )),
             ReadTask::EventScan(EventClasses::all()),
             ReadTask::SingleRead(SingleReadTask::new(
-                ReadRequest::class_scan(Classes::all()),
+                ReadRequest::new().add_classes(Classes::all()),
                 Promise::null(),
             )),
         ]

@@ -231,7 +231,11 @@ fn spawn_read(
     classes: Classes,
 ) -> JoinHandle<Result<(), TaskError>> {
     let mut association = association.clone();
-    tokio::spawn(async move { association.read(ReadRequest::class_scan(classes)).await })
+    tokio::spawn(async move {
+        association
+            .read(ReadRequest::new().add_classes(classes))
+            .await
+    })
 }
 
 async fn add_poll(
@@ -240,7 +244,7 @@ async fn add_poll(
     period: Duration,
 ) -> PollHandle {
     association
-        .add_poll(ReadRequest::class_scan(classes), period)
+        .add_poll(ReadRequest::new().add_classes(classes), period)
         .await
         .unwrap()
 }

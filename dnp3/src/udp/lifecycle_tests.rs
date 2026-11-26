@@ -394,7 +394,7 @@ async fn spawn_associated_master(
 }
 
 fn class0_read() -> ReadRequest {
-    ReadRequest::class_scan(Classes::class0())
+    ReadRequest::new().add_classes(Classes::class0())
 }
 
 #[tokio::test]

@@ -29,37 +29,26 @@ fn define_read_request(
     lib: &mut LibraryBuilder,
     shared: &SharedDefinitions,
 ) -> BackTraced<ClassHandle> {
-    const NAME: &str = "read_request";
-    let read_request = lib.declare_class(NAME)?;
+    let read_request = lib.declare_class("read_request")?;
 
-    let class_scan_fn = lib
-        .define_function("read_request_new_class_scan")?
+    let constructor = lib
+        .define_constructor(read_request.clone())?
+        .doc("Create a new read request with no headers")?
+        .build()?;
+
+    let destructor = lib.define_destructor(read_request.clone(), "Destroy a read request")?;
+
+    let add_classes_fn = lib
+        .define_method("add_classes", read_request.clone())?
         .param("class0", Primitive::Bool, "Ask for class 0 (static data)")?
         .param("class1", Primitive::Bool, "Ask for class 1 events")?
         .param("class2", Primitive::Bool, "Ask for class 2 events")?
         .param("class3", Primitive::Bool, "Ask for class 3 events")?
-        .returns(read_request.clone(), "Handle to the created request")?
         .doc(
-            doc("Create a new read request asking for classes")
-                .details("The request asks for events in classes 1, 2 and 3, then class 0."),
+            doc("Add headers asking for classes")
+                .details("The headers ask for events in classes 1, 2 and 3, then class 0."),
         )?
-        .build_static("class_scan")?;
-
-    let specific_attribute_fn = lib
-        .define_function("read_request_new_specific_attribute")?
-        .param(
-            "variation",
-            Primitive::U8,
-            "Variation of the device attribute, 1 to 255 (254 reads every attribute of the set)",
-        )?
-        .param(
-            "set",
-            Primitive::U8,
-            "The set (point) to which the attribute belongs",
-        )?
-        .returns(read_request.clone(), "Handle to the created request")?
-        .doc("Create a new read request asking for a specific device attribute (group 0)")?
-        .build_static("specific_attribute")?;
+        .build()?;
 
     let add_specific_attribute_fn = lib
         .define_method("add_specific_attribute", read_request.clone())?
@@ -76,19 +65,13 @@ fn define_read_request(
         .doc("Add a header that reads a specific device attribute (group 0)")?
         .build()?;
 
-    let destructor = lib.define_destructor(read_request.clone(), "Destroy a read request")?;
-
-    let constructors = define_single_header_constructors(lib, shared, &read_request, NAME)?;
     let header_methods = define_header_methods(lib, shared, &read_request)?;
 
     let mut builder = lib
         .define_class(&read_request)?
+        .constructor(constructor)?
         .destructor(destructor)?
-        .static_method(class_scan_fn)?
-        .static_method(specific_attribute_fn)?;
-    for method in constructors {
-        builder = builder.static_method(method)?;
-    }
+        .method(add_classes_fn)?;
     for method in header_methods {
         builder = builder.method(method)?;
     }

@@ -66,7 +66,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ANCHOR: add_poll
     let poll = association
         .add_poll(
-            ReadRequest::class_scan(Classes::class123()),
+            ReadRequest::new().add_classes(Classes::class123()),
             Duration::from_secs(5),
         )
         .await?;
@@ -453,13 +453,14 @@ impl CliHandler {
             }
             "rao" => {
                 self.association
-                    .read(ReadRequest::all_objects(Variation::Group40Var0))
+                    .read(ReadRequest::new().add_all_objects(Variation::Group40Var0))
                     .await?;
             }
             "rmo" => {
                 self.association
                     .read(
-                        ReadRequest::all_objects(Variation::Group10Var0)
+                        ReadRequest::new()
+                            .add_all_objects(Variation::Group10Var0)
                             .add_all_objects(Variation::Group40Var0),
                     )
                     .await?;
@@ -467,7 +468,8 @@ impl CliHandler {
             "rco" => {
                 self.association
                     .read(
-                        ReadRequest::all_objects(Variation::Group20Var0)
+                        ReadRequest::new()
+                            .add_all_objects(Variation::Group20Var0)
                             .add_all_objects(Variation::Group21Var0),
                     )
                     .await?;
@@ -548,10 +550,7 @@ impl CliHandler {
             "rda" => {
                 // ANCHOR: read_attributes
                 self.association
-                    .read(ReadRequest::device_attribute(
-                        AllAttributes,
-                        AttrSet::Default,
-                    ))
+                    .read(ReadRequest::new().add_device_attribute(AllAttributes, AttrSet::Default))
                     .await?;
                 // ANCHOR_END: read_attributes
             }
@@ -567,7 +566,7 @@ impl CliHandler {
             }
             "ral" => {
                 self.association
-                    .read(ReadRequest::device_attribute(
+                    .read(ReadRequest::new().add_device_attribute(
                         VariationListAttr::ListOfVariations,
                         AttrSet::Default,
                     ))

@@ -91,9 +91,9 @@ public class MasterExample {
 
     // create an event poll
     // ANCHOR: add_poll
-    PollId poll =
-            channel.addPoll(
-                    association, ReadRequest.classScan(false, true, true, true), Duration.ofSeconds(5));
+    ReadRequest eventScan = new ReadRequest();
+    eventScan.addClasses(false, true, true, true);
+    PollId poll = channel.addPoll(association, eventScan, Duration.ofSeconds(5));
     // ANCHOR_END: add_poll
 
     // enable communications
@@ -297,20 +297,23 @@ public class MasterExample {
         return success;
       case "rao":
       {
-        ReadRequest request = ReadRequest.allObjects(Variation.GROUP40_VAR0);
+        ReadRequest request = new ReadRequest();
+        request.addAllObjectsHeader(Variation.GROUP40_VAR0);
         channel.read(association, request).toCompletableFuture().get();
         return success;
       }
       case "rmo":
       {
-        ReadRequest request = ReadRequest.allObjects(Variation.GROUP10_VAR0);
+        ReadRequest request = new ReadRequest();
+        request.addAllObjectsHeader(Variation.GROUP10_VAR0);
         request.addAllObjectsHeader(Variation.GROUP40_VAR0);
         channel.read(association, request).toCompletableFuture().get();
         return success;
       }
       case "rco":
       {
-        ReadRequest request = ReadRequest.allObjects(Variation.GROUP20_VAR0);
+        ReadRequest request = new ReadRequest();
+        request.addAllObjectsHeader(Variation.GROUP20_VAR0);
         request.addAllObjectsHeader(Variation.GROUP21_VAR0);
         channel.read(association, request).toCompletableFuture().get();
         return success;
@@ -390,8 +393,8 @@ public class MasterExample {
       case "rda":
       {
         // ANCHOR: read_attributes
-        ReadRequest request =
-            ReadRequest.specificAttribute(AttributeVariations.ALL_ATTRIBUTES_REQUEST, ubyte(0));
+        ReadRequest request = new ReadRequest();
+        request.addSpecificAttribute(AttributeVariations.ALL_ATTRIBUTES_REQUEST, ubyte(0));
         channel.read(association, request).toCompletableFuture().get();
         // ANCHOR_END: read_attributes
         return success;
@@ -407,8 +410,8 @@ public class MasterExample {
       }
       case "ral":
       {
-        ReadRequest request =
-            ReadRequest.specificAttribute(AttributeVariations.LIST_OF_VARIATIONS, ubyte(0));
+        ReadRequest request = new ReadRequest();
+        request.addSpecificAttribute(AttributeVariations.LIST_OF_VARIATIONS, ubyte(0));
         channel.read(association, request).toCompletableFuture().get();
         return success;
       }

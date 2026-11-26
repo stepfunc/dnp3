@@ -20,16 +20,9 @@ impl ReadRequest {
         self.inner.clone()
     }
 
-    fn create(inner: dnp3::master::ReadRequest) -> *mut ReadRequest {
-        Box::into_raw(Box::new(ReadRequest { inner }))
-    }
-
     /// replace the request with `f` of it, since its add methods take it by value
     fn update(&mut self, f: impl FnOnce(dnp3::master::ReadRequest) -> dnp3::master::ReadRequest) {
-        // a single header, which doesn't allocate, stands in until `f` returns
-        let placeholder = dnp3::master::ReadRequest::all_objects(Variation::Group60Var1);
-        let request = std::mem::replace(&mut self.inner, placeholder);
-        self.inner = f(request);
+        self.inner = f(std::mem::take(&mut self.inner));
     }
 }
 
@@ -52,76 +45,28 @@ impl Request {
     }
 }
 
-pub unsafe fn read_request_new_class_scan(
-    class0: bool,
-    class1: bool,
-    class2: bool,
-    class3: bool,
-) -> *mut ReadRequest {
-    ReadRequest::create(dnp3::master::ReadRequest::class_scan(Classes::new(
-        class0,
-        EventClasses::new(class1, class2, class3),
-    )))
-}
-
-pub unsafe fn read_request_new_specific_attribute(variation: u8, set: u8) -> *mut ReadRequest {
-    ReadRequest::create(dnp3::master::ReadRequest::device_attribute(
-        variation,
-        AttrSet::new(set),
-    ))
-}
-
-pub unsafe fn read_request_new_all_objects(variation: ffi::Variation) -> *mut ReadRequest {
-    ReadRequest::create(dnp3::master::ReadRequest::all_objects(variation.into()))
-}
-
-pub unsafe fn read_request_new_one_byte_range(
-    variation: ffi::Variation,
-    start: u8,
-    stop: u8,
-) -> *mut ReadRequest {
-    ReadRequest::create(dnp3::master::ReadRequest::one_byte_range(
-        variation.into(),
-        start,
-        stop,
-    ))
-}
-
-pub unsafe fn read_request_new_two_byte_range(
-    variation: ffi::Variation,
-    start: u16,
-    stop: u16,
-) -> *mut ReadRequest {
-    ReadRequest::create(dnp3::master::ReadRequest::two_byte_range(
-        variation.into(),
-        start,
-        stop,
-    ))
-}
-
-pub unsafe fn read_request_new_one_byte_limited_count(
-    variation: ffi::Variation,
-    count: u8,
-) -> *mut ReadRequest {
-    ReadRequest::create(dnp3::master::ReadRequest::one_byte_limited_count(
-        variation.into(),
-        count,
-    ))
-}
-
-pub unsafe fn read_request_new_two_byte_limited_count(
-    variation: ffi::Variation,
-    count: u16,
-) -> *mut ReadRequest {
-    ReadRequest::create(dnp3::master::ReadRequest::two_byte_limited_count(
-        variation.into(),
-        count,
-    ))
+pub unsafe fn read_request_create() -> *mut ReadRequest {
+    Box::into_raw(Box::new(ReadRequest {
+        inner: dnp3::master::ReadRequest::new(),
+    }))
 }
 
 pub unsafe fn read_request_destroy(request: *mut ReadRequest) {
     if !request.is_null() {
         drop(Box::from_raw(request));
+    }
+}
+
+pub(crate) unsafe fn read_request_add_classes(
+    request: *mut ReadRequest,
+    class0: bool,
+    class1: bool,
+    class2: bool,
+    class3: bool,
+) {
+    if let Some(request) = request.as_mut() {
+        let classes = Classes::new(class0, EventClasses::new(class1, class2, class3));
+        request.update(|r| r.add_classes(classes));
     }
 }
 

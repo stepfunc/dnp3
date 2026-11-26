@@ -65,7 +65,11 @@ async fn response_from_another_outstation_during_any_task_refreshes_its_own_keep
             let task = tokio::spawn(async move {
                 match kind {
                     Kind::NonRead => other.cold_restart().await.map(|_| ()),
-                    Kind::Read => other.read(ReadRequest::class_scan(Classes::class0())).await,
+                    Kind::Read => {
+                        other
+                            .read(ReadRequest::new().add_classes(Classes::class0()))
+                            .await
+                    }
                     Kind::LinkStatus => other.check_link_status().await,
                 }
             });
@@ -87,7 +91,7 @@ async fn response_from_another_outstation_during_any_task_refreshes_its_own_keep
             let mut association = harness.association.clone();
             let read = tokio::spawn(async move {
                 association
-                    .read(ReadRequest::class_scan(Classes::class0()))
+                    .read(ReadRequest::new().add_classes(Classes::class0()))
                     .await
             });
             harness

@@ -286,7 +286,8 @@ void run(State &state)
     state.wait_for([&]() { return state.connected; }, "the master to connect");
 
     // a class 0 read returns the outstation's values
-    auto request = dnp3::ReadRequest::class_scan(true, false, false, false);
+    dnp3::ReadRequest request;
+    request.add_classes(true, false, false, false);
     channel.read(association, request, std::make_unique<ReadTaskCallback>(state));
     state.wait_for([&]() { return state.read_result != Result::pending; }, "the read");
     {

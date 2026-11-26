@@ -228,20 +228,6 @@ fn variation(source: &mut Source) -> Variation {
     Variation::lookup(source.u8(), source.u8()).unwrap_or(Variation::Group0(0))
 }
 
-/// a request of one header, a device attribute read or a class scan
-fn read_start(source: &mut Source) -> ReadRequest {
-    let variation = variation(source);
-    match source.u8() % 7 {
-        0 => ReadRequest::one_byte_range(variation, source.u8(), source.u8()),
-        1 => ReadRequest::two_byte_range(variation, source.u16(), source.u16()),
-        2 => ReadRequest::all_objects(variation),
-        3 => ReadRequest::one_byte_limited_count(variation, source.u8()),
-        4 => ReadRequest::two_byte_limited_count(variation, source.u16()),
-        5 => ReadRequest::device_attribute(source.u8(), AttrSet::new(source.u8())),
-        _ => ReadRequest::class_scan(classes(source)),
-    }
-}
-
 fn event_classes(source: &mut Source) -> EventClasses {
     EventClasses::new(source.bool(), source.bool(), source.bool())
 }
@@ -252,15 +238,16 @@ fn classes(source: &mut Source) -> Classes {
 
 fn read(source: &mut Source) -> ReadRequest {
     let len = source.len();
-    (0..len).fold(read_start(source), |request, _| {
+    (0..len).fold(ReadRequest::new(), |request, _| {
         let variation = variation(source);
-        match source.u8() % 6 {
+        match source.u8() % 7 {
             0 => request.add_all_objects(variation),
             1 => request.add_range_8(variation, source.u8(), source.u8()),
             2 => request.add_range_16(variation, source.u16(), source.u16()),
             3 => request.add_one_byte_limited_count(variation, source.u8()),
             4 => request.add_two_byte_limited_count(variation, source.u16()),
-            _ => request.add_device_attribute(source.u8(), AttrSet::new(source.u8())),
+            5 => request.add_device_attribute(source.u8(), AttrSet::new(source.u8())),
+            _ => request.add_classes(classes(source)),
         }
     })
 }
