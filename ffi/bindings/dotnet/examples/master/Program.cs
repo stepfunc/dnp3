@@ -240,23 +240,23 @@ class ExampleMaster
             case "rao":
                 {
                     var request = new ReadRequest();
-                    request.AddAllObjectsHeader(Variation.Group40Var0);
+                    request.AddAllObjects(Variation.Group40Var0);
                     await channel.Read(association, request);
                     return Success;
                 }
             case "rmo":
                 {
                     var request = new ReadRequest();
-                    request.AddAllObjectsHeader(Variation.Group10Var0);
-                    request.AddAllObjectsHeader(Variation.Group40Var0);
+                    request.AddAllObjects(Variation.Group10Var0);
+                    request.AddAllObjects(Variation.Group40Var0);
                     await channel.Read(association, request);
                     return Success;
                 }
             case "rco":
                 {
                     var request = new ReadRequest();
-                    request.AddAllObjectsHeader(Variation.Group20Var0);
-                    request.AddAllObjectsHeader(Variation.Group21Var0);
+                    request.AddAllObjects(Variation.Group20Var0);
+                    request.AddAllObjects(Variation.Group21Var0);
                     await channel.Read(association, request);
                     return Success;
                 }
@@ -312,7 +312,7 @@ class ExampleMaster
                     // freeze all the counters once per day relative to the beginning of the current hour
                     request.AddTimeAndInterval(0, 86400000);
                     // apply this schedule to all counters
-                    request.AddAllObjectsHeader(Variation.Group20Var0);
+                    request.AddAllObjects(Variation.Group20Var0);
                     await channel.SendAndExpectEmptyResponse(association, FunctionCode.FreezeAtTime, request);
                     // ANCHOR_END: freeze_at_time
                     return Success;
@@ -321,7 +321,7 @@ class ExampleMaster
                 {
                     // copy every counter to its frozen counter
                     var request = new Request();
-                    request.AddAllObjectsHeader(Variation.Group20Var0);
+                    request.AddAllObjects(Variation.Group20Var0);
                     await channel.SendAndExpectEmptyResponse(association, FunctionCode.ImmediateFreeze, request);
                     return Success;
                 }
@@ -329,7 +329,7 @@ class ExampleMaster
                 {
                     // copy every counter to its frozen counter, then clear the counter
                     var request = new Request();
-                    request.AddAllObjectsHeader(Variation.Group20Var0);
+                    request.AddAllObjects(Variation.Group20Var0);
                     await channel.SendAndExpectEmptyResponse(association, FunctionCode.FreezeClear, request);
                     return Success;
                 }
@@ -337,7 +337,7 @@ class ExampleMaster
                 {
                     // ANCHOR: read_attributes
                     var request = new ReadRequest();
-                    request.AddSpecificAttribute(AttributeVariations.AllAttributesRequest, 0);
+                    request.AddDeviceAttribute(AttributeVariations.AllAttributesRequest, 0);
                     await channel.Read(association, request);
                     // ANCHOR_END: read_attributes
                     return Success;
@@ -354,7 +354,7 @@ class ExampleMaster
             case "ral":
                 {
                     var request = new ReadRequest();
-                    request.AddSpecificAttribute(AttributeVariations.ListOfVariations, 0);
+                    request.AddDeviceAttribute(AttributeVariations.ListOfVariations, 0);
                     await channel.Read(association, request);
                     return Success;
                 }

@@ -298,23 +298,23 @@ public class MasterExample {
       case "rao":
       {
         ReadRequest request = new ReadRequest();
-        request.addAllObjectsHeader(Variation.GROUP40_VAR0);
+        request.addAllObjects(Variation.GROUP40_VAR0);
         channel.read(association, request).toCompletableFuture().get();
         return success;
       }
       case "rmo":
       {
         ReadRequest request = new ReadRequest();
-        request.addAllObjectsHeader(Variation.GROUP10_VAR0);
-        request.addAllObjectsHeader(Variation.GROUP40_VAR0);
+        request.addAllObjects(Variation.GROUP10_VAR0);
+        request.addAllObjects(Variation.GROUP40_VAR0);
         channel.read(association, request).toCompletableFuture().get();
         return success;
       }
       case "rco":
       {
         ReadRequest request = new ReadRequest();
-        request.addAllObjectsHeader(Variation.GROUP20_VAR0);
-        request.addAllObjectsHeader(Variation.GROUP21_VAR0);
+        request.addAllObjects(Variation.GROUP20_VAR0);
+        request.addAllObjects(Variation.GROUP21_VAR0);
         channel.read(association, request).toCompletableFuture().get();
         return success;
       }
@@ -369,7 +369,7 @@ public class MasterExample {
         // freeze all the counters once per day relative to the beginning of the current hour
         request.addTimeAndInterval(ulong(0), uint(86400000));
         // apply this schedule to all counters
-        request.addAllObjectsHeader(Variation.GROUP20_VAR0);
+        request.addAllObjects(Variation.GROUP20_VAR0);
         channel.sendAndExpectEmptyResponse(association, FunctionCode.FREEZE_AT_TIME, request).toCompletableFuture().get();
         // ANCHOR_END: freeze_at_time
         return success;
@@ -378,7 +378,7 @@ public class MasterExample {
       {
         // copy every counter to its frozen counter
         Request request = new Request();
-        request.addAllObjectsHeader(Variation.GROUP20_VAR0);
+        request.addAllObjects(Variation.GROUP20_VAR0);
         channel.sendAndExpectEmptyResponse(association, FunctionCode.IMMEDIATE_FREEZE, request).toCompletableFuture().get();
         return success;
       }
@@ -386,7 +386,7 @@ public class MasterExample {
       {
         // copy every counter to its frozen counter, then clear the counter
         Request request = new Request();
-        request.addAllObjectsHeader(Variation.GROUP20_VAR0);
+        request.addAllObjects(Variation.GROUP20_VAR0);
         channel.sendAndExpectEmptyResponse(association, FunctionCode.FREEZE_CLEAR, request).toCompletableFuture().get();
         return success;
       }
@@ -394,7 +394,7 @@ public class MasterExample {
       {
         // ANCHOR: read_attributes
         ReadRequest request = new ReadRequest();
-        request.addSpecificAttribute(AttributeVariations.ALL_ATTRIBUTES_REQUEST, ubyte(0));
+        request.addDeviceAttribute(AttributeVariations.ALL_ATTRIBUTES_REQUEST, ubyte(0));
         channel.read(association, request).toCompletableFuture().get();
         // ANCHOR_END: read_attributes
         return success;
@@ -411,7 +411,7 @@ public class MasterExample {
       case "ral":
       {
         ReadRequest request = new ReadRequest();
-        request.addSpecificAttribute(AttributeVariations.LIST_OF_VARIATIONS, ubyte(0));
+        request.addDeviceAttribute(AttributeVariations.LIST_OF_VARIATIONS, ubyte(0));
         channel.read(association, request).toCompletableFuture().get();
         return success;
       }

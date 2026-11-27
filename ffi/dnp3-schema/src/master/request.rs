@@ -50,8 +50,8 @@ fn define_read_request(
         )?
         .build()?;
 
-    let add_specific_attribute_fn = lib
-        .define_method("add_specific_attribute", read_request.clone())?
+    let add_device_attribute_fn = lib
+        .define_method("add_device_attribute", read_request.clone())?
         .param(
             "variation",
             Primitive::U8,
@@ -76,7 +76,7 @@ fn define_read_request(
         builder = builder.method(method)?;
     }
     let read_request = builder
-        .method(add_specific_attribute_fn)?
+        .method(add_device_attribute_fn)?
         .doc(
             doc("The object headers of a READ, for one-time reads and polls")
             .details("Only headers that are valid in a READ can be added. A request that writes or freezes objects is a {class:request}.")
@@ -189,7 +189,7 @@ fn define_header_methods(
     class: &ClassDeclarationHandle,
 ) -> BackTraced<Vec<Method<Unvalidated>>> {
     let add_one_byte_range_header = lib
-        .define_method("add_one_byte_range_header", class.clone())?
+        .define_method("add_one_byte_range", class.clone())?
         .param(
             "variation",
             shared.variation_enum.clone(),
@@ -201,7 +201,7 @@ fn define_header_methods(
         .build()?;
 
     let add_two_byte_range_header = lib
-        .define_method("add_two_byte_range_header", class.clone())?
+        .define_method("add_two_byte_range", class.clone())?
         .param(
             "variation",
             shared.variation_enum.clone(),
@@ -213,7 +213,7 @@ fn define_header_methods(
         .build()?;
 
     let add_all_objects_header = lib
-        .define_method("add_all_objects_header", class.clone())?
+        .define_method("add_all_objects", class.clone())?
         .param(
             "variation",
             shared.variation_enum.clone(),
@@ -223,7 +223,7 @@ fn define_header_methods(
         .build()?;
 
     let add_one_byte_limited_count_header = lib
-        .define_method("add_one_byte_limited_count_header", class.clone())?
+        .define_method("add_one_byte_limited_count", class.clone())?
         .param(
             "variation",
             shared.variation_enum.clone(),
@@ -234,7 +234,7 @@ fn define_header_methods(
         .build()?;
 
     let add_two_byte_limited_count_header = lib
-        .define_method("add_two_byte_limited_count_header", class.clone())?
+        .define_method("add_two_byte_limited_count", class.clone())?
         .param(
             "variation",
             shared.variation_enum.clone(),

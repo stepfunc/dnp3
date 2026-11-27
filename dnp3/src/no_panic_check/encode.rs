@@ -242,8 +242,8 @@ fn read(source: &mut Source) -> ReadRequest {
         let variation = variation(source);
         match source.u8() % 7 {
             0 => request.add_all_objects(variation),
-            1 => request.add_range_8(variation, source.u8(), source.u8()),
-            2 => request.add_range_16(variation, source.u16(), source.u16()),
+            1 => request.add_one_byte_range(variation, source.u8(), source.u8()),
+            2 => request.add_two_byte_range(variation, source.u16(), source.u16()),
             3 => request.add_one_byte_limited_count(variation, source.u8()),
             4 => request.add_two_byte_limited_count(variation, source.u16()),
             5 => request.add_device_attribute(source.u8(), AttrSet::new(source.u8())),
@@ -280,8 +280,8 @@ fn request(source: &mut Source) -> Request {
         let variation = variation(source);
         match source.u8() % 7 {
             0 => request.add_all_objects(variation),
-            1 => request.add_range_8(variation, source.u8(), source.u8()),
-            2 => request.add_range_16(variation, source.u16(), source.u16()),
+            1 => request.add_one_byte_range(variation, source.u8(), source.u8()),
+            2 => request.add_two_byte_range(variation, source.u16(), source.u16()),
             3 => request.add_one_byte_limited_count(variation, source.u8()),
             4 => request.add_two_byte_limited_count(variation, source.u16()),
             5 => request.add_freeze_interval(FreezeInterval::new(

@@ -349,7 +349,7 @@ void run_command(dnp3_master_channel_t *channel, dnp3_association_id_t associati
     }
     else if (strcmp(cmd, "rao") == 0) {
         dnp3_read_request_t *request = dnp3_read_request_create();
-        dnp3_read_request_add_all_objects_header(request, DNP3_VARIATION_GROUP40_VAR0);
+        dnp3_read_request_add_all_objects(request, DNP3_VARIATION_GROUP40_VAR0);
         dnp3_read_task_callback_t cb = {
             .on_complete = &on_read_complete,
             .on_failure = &on_read_failure,
@@ -362,8 +362,8 @@ void run_command(dnp3_master_channel_t *channel, dnp3_association_id_t associati
     }
     else if (strcmp(cmd, "rmo") == 0) {
         dnp3_read_request_t *request = dnp3_read_request_create();
-        dnp3_read_request_add_all_objects_header(request, DNP3_VARIATION_GROUP10_VAR0);
-        dnp3_read_request_add_all_objects_header(request, DNP3_VARIATION_GROUP40_VAR0);
+        dnp3_read_request_add_all_objects(request, DNP3_VARIATION_GROUP10_VAR0);
+        dnp3_read_request_add_all_objects(request, DNP3_VARIATION_GROUP40_VAR0);
         dnp3_read_task_callback_t cb = {
             .on_complete = &on_read_complete,
             .on_failure = &on_read_failure,
@@ -376,8 +376,8 @@ void run_command(dnp3_master_channel_t *channel, dnp3_association_id_t associati
     }
     else if (strcmp(cmd, "rco") == 0) {
         dnp3_read_request_t *request = dnp3_read_request_create();
-        dnp3_read_request_add_all_objects_header(request, DNP3_VARIATION_GROUP20_VAR0);
-        dnp3_read_request_add_all_objects_header(request, DNP3_VARIATION_GROUP21_VAR0);
+        dnp3_read_request_add_all_objects(request, DNP3_VARIATION_GROUP20_VAR0);
+        dnp3_read_request_add_all_objects(request, DNP3_VARIATION_GROUP21_VAR0);
         dnp3_read_task_callback_t cb = {
             .on_complete = &on_read_complete,
             .on_failure = &on_read_failure,
@@ -467,7 +467,7 @@ void run_command(dnp3_master_channel_t *channel, dnp3_association_id_t associati
     else if (strcmp(cmd, "ifz") == 0) {
         // copy every counter to its frozen counter
         dnp3_request_t *request = dnp3_request_create();
-        dnp3_request_add_all_objects_header(request, DNP3_VARIATION_GROUP20_VAR0);
+        dnp3_request_add_all_objects(request, DNP3_VARIATION_GROUP20_VAR0);
         dnp3_empty_response_callback_t cb = {
             .on_complete = &on_empty_response_complete,
             .on_failure = &on_empty_response_failure,
@@ -482,7 +482,7 @@ void run_command(dnp3_master_channel_t *channel, dnp3_association_id_t associati
     else if (strcmp(cmd, "fcl") == 0) {
         // copy every counter to its frozen counter, then clear the counter
         dnp3_request_t *request = dnp3_request_create();
-        dnp3_request_add_all_objects_header(request, DNP3_VARIATION_GROUP20_VAR0);
+        dnp3_request_add_all_objects(request, DNP3_VARIATION_GROUP20_VAR0);
         dnp3_empty_response_callback_t cb = {
             .on_complete = &on_empty_response_complete,
             .on_failure = &on_empty_response_failure,
@@ -500,7 +500,7 @@ void run_command(dnp3_master_channel_t *channel, dnp3_association_id_t associati
         // freeze all the counters once per day relative to the beginning of the current hour
         dnp3_request_add_time_and_interval(request, 0, 86400000);
         // apply this schedule to all counters
-        dnp3_request_add_all_objects_header(request, DNP3_VARIATION_GROUP20_VAR0);
+        dnp3_request_add_all_objects(request, DNP3_VARIATION_GROUP20_VAR0);
 
         dnp3_empty_response_callback_t cb = {
             .on_complete = &on_empty_response_complete,
@@ -518,7 +518,7 @@ void run_command(dnp3_master_channel_t *channel, dnp3_association_id_t associati
     else if (strcmp(cmd, "rda") == 0) {
         // ANCHOR: read_attributes
         dnp3_read_request_t *request = dnp3_read_request_create();
-        dnp3_read_request_add_specific_attribute(request, DNP3_ATTRIBUTE_VARIATIONS_ALL_ATTRIBUTES_REQUEST, 0);
+        dnp3_read_request_add_device_attribute(request, DNP3_ATTRIBUTE_VARIATIONS_ALL_ATTRIBUTES_REQUEST, 0);
 
         dnp3_read_task_callback_t cb = {
             .on_complete = &on_read_complete,
@@ -551,7 +551,7 @@ void run_command(dnp3_master_channel_t *channel, dnp3_association_id_t associati
     }
     else if (strcmp(cmd, "ral") == 0) {
         dnp3_read_request_t *request = dnp3_read_request_create();
-        dnp3_read_request_add_specific_attribute(request, DNP3_ATTRIBUTE_VARIATIONS_LIST_OF_VARIATIONS, 0);
+        dnp3_read_request_add_device_attribute(request, DNP3_ATTRIBUTE_VARIATIONS_LIST_OF_VARIATIONS, 0);
         dnp3_read_task_callback_t cb = {
             .on_complete = &on_read_complete,
             .on_failure = &on_read_failure,

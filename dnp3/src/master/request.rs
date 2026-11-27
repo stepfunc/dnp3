@@ -330,7 +330,7 @@ impl ReadRequest {
     }
 
     /// Add an 8-bit start/stop header (0x00) with the specified variation
-    pub fn add_range_8(self, variation: Variation, start: u8, stop: u8) -> Self {
+    pub fn add_one_byte_range(self, variation: Variation, start: u8, stop: u8) -> Self {
         self.add(ReadHeader::Range8 {
             variation,
             start,
@@ -339,7 +339,7 @@ impl ReadRequest {
     }
 
     /// Add a 16-bit start/stop header (0x01) with the specified variation
-    pub fn add_range_16(self, variation: Variation, start: u16, stop: u16) -> Self {
+    pub fn add_two_byte_range(self, variation: Variation, start: u16, stop: u16) -> Self {
         self.add(ReadHeader::Range16 {
             variation,
             start,
@@ -441,7 +441,7 @@ impl Request {
     }
 
     /// Add an 8-bit start/stop header (0x00) with the specified variation
-    pub fn add_range_8(self, variation: Variation, start: u8, stop: u8) -> Self {
+    pub fn add_one_byte_range(self, variation: Variation, start: u8, stop: u8) -> Self {
         self.add(Header::Read(ReadHeader::Range8 {
             variation,
             start,
@@ -450,7 +450,7 @@ impl Request {
     }
 
     /// Add a 16-bit start/stop header (0x01) with the specified variation
-    pub fn add_range_16(self, variation: Variation, start: u16, stop: u16) -> Self {
+    pub fn add_two_byte_range(self, variation: Variation, start: u16, stop: u16) -> Self {
         self.add(Header::Read(ReadHeader::Range16 {
             variation,
             start,
@@ -1214,13 +1214,13 @@ mod tests {
         let valid = || ReadRequest::new().add_all_objects(Variation::Group60Var1);
         for request in [
             ReadRequest::new().add_all_objects(G0V0),
-            ReadRequest::new().add_range_8(G0V0, 1, 2),
-            ReadRequest::new().add_range_16(G0V0, 1, 2),
+            ReadRequest::new().add_one_byte_range(G0V0, 1, 2),
+            ReadRequest::new().add_two_byte_range(G0V0, 1, 2),
             ReadRequest::new().add_one_byte_limited_count(G0V0, 1),
             ReadRequest::new().add_two_byte_limited_count(G0V0, 1),
             valid().add_all_objects(G0V0),
-            valid().add_range_8(G0V0, 1, 2),
-            valid().add_range_16(G0V0, 1, 2),
+            valid().add_one_byte_range(G0V0, 1, 2),
+            valid().add_two_byte_range(G0V0, 1, 2),
             valid().add_one_byte_limited_count(G0V0, 1),
             valid().add_two_byte_limited_count(G0V0, 1),
         ] {
@@ -1238,8 +1238,8 @@ mod tests {
         let valid = || Request::new().add_all_objects(Variation::Group60Var1);
         for request in [
             valid().add_all_objects(G0V0),
-            valid().add_range_8(G0V0, 1, 2),
-            valid().add_range_16(G0V0, 1, 2),
+            valid().add_one_byte_range(G0V0, 1, 2),
+            valid().add_two_byte_range(G0V0, 1, 2),
             valid().add_one_byte_limited_count(G0V0, 1),
             valid().add_two_byte_limited_count(G0V0, 1),
         ] {
@@ -1404,12 +1404,12 @@ mod tests {
                         variation,
                         start,
                         stop,
-                    }) => request.add_range_8(variation, start, stop),
+                    }) => request.add_one_byte_range(variation, start, stop),
                     ReadOp::Header(ReadHeader::Range16 {
                         variation,
                         start,
                         stop,
-                    }) => request.add_range_16(variation, start, stop),
+                    }) => request.add_two_byte_range(variation, start, stop),
                     ReadOp::Header(ReadHeader::AllObjects { variation }) => {
                         request.add_all_objects(variation)
                     }
@@ -1592,12 +1592,12 @@ mod tests {
                     variation,
                     start,
                     stop,
-                }) => request.add_range_8(variation, start, stop),
+                }) => request.add_one_byte_range(variation, start, stop),
                 Item::Read(ReadHeader::Range16 {
                     variation,
                     start,
                     stop,
-                }) => request.add_range_16(variation, start, stop),
+                }) => request.add_two_byte_range(variation, start, stop),
                 Item::Read(ReadHeader::AllObjects { variation }) => {
                     request.add_all_objects(variation)
                 }

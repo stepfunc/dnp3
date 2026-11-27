@@ -283,19 +283,19 @@ void run_command(const std::string &cmd, dnp3::MasterChannel &channel, dnp3::Ass
     }
     else if (cmd == "rao") {
         dnp3::ReadRequest request;
-        request.add_all_objects_header(dnp3::Variation::group40_var0);
+        request.add_all_objects(dnp3::Variation::group40_var0);
         channel.read(assoc, request, create_read_callback("rao"));
     }
     else if (cmd == "rmo") {
         dnp3::ReadRequest request;
-        request.add_all_objects_header(dnp3::Variation::group10_var0);
-        request.add_all_objects_header(dnp3::Variation::group40_var0);
+        request.add_all_objects(dnp3::Variation::group10_var0);
+        request.add_all_objects(dnp3::Variation::group40_var0);
         channel.read(assoc, request, create_read_callback("rmo"));
     }
     else if (cmd == "rco") {
         dnp3::ReadRequest request;
-        request.add_all_objects_header(dnp3::Variation::group20_var0);
-        request.add_all_objects_header(dnp3::Variation::group21_var0);
+        request.add_all_objects(dnp3::Variation::group20_var0);
+        request.add_all_objects(dnp3::Variation::group21_var0);
         channel.read(assoc, request, create_read_callback("rco"));
     }
     else if (cmd == "cmd") {
@@ -334,13 +334,13 @@ void run_command(const std::string &cmd, dnp3::MasterChannel &channel, dnp3::Ass
     else if (cmd == "ifz") {
         // copy every counter to its frozen counter
         dnp3::Request request;
-        request.add_all_objects_header(dnp3::Variation::group20_var0);
+        request.add_all_objects(dnp3::Variation::group20_var0);
         channel.send_and_expect_empty_response(assoc, dnp3::FunctionCode::immediate_freeze, request, create_empty_response_callback("ifz"));
     }
     else if (cmd == "fcl") {
         // copy every counter to its frozen counter, then clear the counter
         dnp3::Request request;
-        request.add_all_objects_header(dnp3::Variation::group20_var0);
+        request.add_all_objects(dnp3::Variation::group20_var0);
         channel.send_and_expect_empty_response(assoc, dnp3::FunctionCode::freeze_clear, request, create_empty_response_callback("fcl"));
     }
     else if (cmd == "fat") {
@@ -349,14 +349,14 @@ void run_command(const std::string &cmd, dnp3::MasterChannel &channel, dnp3::Ass
         // freeze all the counters once per day relative to the beginning of the current hour
         request.add_time_and_interval(0, 86400000);
         // apply this schedule to all counters
-        request.add_all_objects_header(dnp3::Variation::group20_var0);
+        request.add_all_objects(dnp3::Variation::group20_var0);
         channel.send_and_expect_empty_response(assoc, dnp3::FunctionCode::freeze_at_time, request, create_empty_response_callback("fat"));
         // ANCHOR_END: freeze_at_time
     }
     else if (cmd == "rda") {
         // ANCHOR: read_attributes
         dnp3::ReadRequest request;
-        request.add_specific_attribute(dnp3::attribute_variations::all_attributes_request, 0);
+        request.add_device_attribute(dnp3::attribute_variations::all_attributes_request, 0);
         channel.read(assoc, request, create_read_callback("rda"));
         // ANCHOR_END: read_attributes
     }
@@ -369,7 +369,7 @@ void run_command(const std::string &cmd, dnp3::MasterChannel &channel, dnp3::Ass
     }
     else if (cmd == "ral") {
         dnp3::ReadRequest request;
-        request.add_specific_attribute(dnp3::attribute_variations::list_of_variations, 0);
+        request.add_device_attribute(dnp3::attribute_variations::list_of_variations, 0);
         channel.read(assoc, request, create_read_callback("ral"));
     }
     else if (cmd == "crt") {

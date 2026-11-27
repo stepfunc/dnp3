@@ -66,7 +66,7 @@ pub(crate) unsafe fn read_request_add_classes(
     }
 }
 
-pub(crate) unsafe fn read_request_add_specific_attribute(
+pub(crate) unsafe fn read_request_add_device_attribute(
     request: *mut ReadRequest,
     variation: u8,
     set: u8,
@@ -76,29 +76,29 @@ pub(crate) unsafe fn read_request_add_specific_attribute(
     }
 }
 
-pub(crate) unsafe fn read_request_add_one_byte_range_header(
+pub(crate) unsafe fn read_request_add_one_byte_range(
     request: *mut ReadRequest,
     variation: ffi::Variation,
     start: u8,
     stop: u8,
 ) {
     if let Some(request) = request.as_mut() {
-        request.update(|r| r.add_range_8(variation.into(), start, stop));
+        request.update(|r| r.add_one_byte_range(variation.into(), start, stop));
     }
 }
 
-pub(crate) unsafe fn read_request_add_two_byte_range_header(
+pub(crate) unsafe fn read_request_add_two_byte_range(
     request: *mut ReadRequest,
     variation: ffi::Variation,
     start: u16,
     stop: u16,
 ) {
     if let Some(request) = request.as_mut() {
-        request.update(|r| r.add_range_16(variation.into(), start, stop));
+        request.update(|r| r.add_two_byte_range(variation.into(), start, stop));
     }
 }
 
-pub(crate) unsafe fn read_request_add_all_objects_header(
+pub(crate) unsafe fn read_request_add_all_objects(
     request: *mut ReadRequest,
     variation: ffi::Variation,
 ) {
@@ -107,7 +107,7 @@ pub(crate) unsafe fn read_request_add_all_objects_header(
     }
 }
 
-pub(crate) unsafe fn read_request_add_one_byte_limited_count_header(
+pub(crate) unsafe fn read_request_add_one_byte_limited_count(
     request: *mut ReadRequest,
     variation: ffi::Variation,
     count: u8,
@@ -117,7 +117,7 @@ pub(crate) unsafe fn read_request_add_one_byte_limited_count_header(
     }
 }
 
-pub(crate) unsafe fn read_request_add_two_byte_limited_count_header(
+pub(crate) unsafe fn read_request_add_two_byte_limited_count(
     request: *mut ReadRequest,
     variation: ffi::Variation,
     count: u16,
@@ -184,38 +184,35 @@ pub(crate) unsafe fn request_add_uint_attribute(
     }
 }
 
-pub(crate) unsafe fn request_add_one_byte_range_header(
+pub(crate) unsafe fn request_add_one_byte_range(
     request: *mut Request,
     variation: ffi::Variation,
     start: u8,
     stop: u8,
 ) {
     if let Some(request) = request.as_mut() {
-        request.update(|r| r.add_range_8(variation.into(), start, stop));
+        request.update(|r| r.add_one_byte_range(variation.into(), start, stop));
     }
 }
 
-pub(crate) unsafe fn request_add_two_byte_range_header(
+pub(crate) unsafe fn request_add_two_byte_range(
     request: *mut Request,
     variation: ffi::Variation,
     start: u16,
     stop: u16,
 ) {
     if let Some(request) = request.as_mut() {
-        request.update(|r| r.add_range_16(variation.into(), start, stop));
+        request.update(|r| r.add_two_byte_range(variation.into(), start, stop));
     }
 }
 
-pub(crate) unsafe fn request_add_all_objects_header(
-    request: *mut Request,
-    variation: ffi::Variation,
-) {
+pub(crate) unsafe fn request_add_all_objects(request: *mut Request, variation: ffi::Variation) {
     if let Some(request) = request.as_mut() {
         request.update(|r| r.add_all_objects(variation.into()));
     }
 }
 
-pub(crate) unsafe fn request_add_one_byte_limited_count_header(
+pub(crate) unsafe fn request_add_one_byte_limited_count(
     request: *mut Request,
     variation: ffi::Variation,
     count: u8,
@@ -225,7 +222,7 @@ pub(crate) unsafe fn request_add_one_byte_limited_count_header(
     }
 }
 
-pub(crate) unsafe fn request_add_two_byte_limited_count_header(
+pub(crate) unsafe fn request_add_two_byte_limited_count(
     request: *mut Request,
     variation: ffi::Variation,
     count: u16,
