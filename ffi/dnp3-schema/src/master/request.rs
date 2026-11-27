@@ -8,132 +8,50 @@ use oo_bindgen::model::*;
 
 use crate::shared::SharedDefinitions;
 
+pub(crate) struct RequestClasses {
+    /// the headers of a READ, for reads and polls
+    pub(crate) read_request: ClassHandle,
+    /// the headers of a request that expects an empty response, such as a WRITE or a FREEZE
+    pub(crate) request: ClassHandle,
+}
+
 pub(crate) fn define(
     lib: &mut LibraryBuilder,
     shared: &SharedDefinitions,
+) -> BackTraced<RequestClasses> {
+    Ok(RequestClasses {
+        read_request: define_read_request(lib, shared)?,
+        request: define_request(lib, shared)?,
+    })
+}
+
+fn define_read_request(
+    lib: &mut LibraryBuilder,
+    shared: &SharedDefinitions,
 ) -> BackTraced<ClassHandle> {
-    let request = lib.declare_class("request")?;
+    let read_request = lib.declare_class("read_request")?;
 
     let constructor = lib
-        .define_constructor(request.clone())?
-        .doc("Create a new request")?
+        .define_constructor(read_request.clone())?
+        .doc("Create a new read request with no headers")?
         .build()?;
 
-    let request_new_class_fn = lib
-        .define_function("request_new_class")?
+    let destructor = lib.define_destructor(read_request.clone(), "Destroy a read request")?;
+
+    let add_classes_fn = lib
+        .define_method("add_classes", read_request.clone())?
         .param("class0", Primitive::Bool, "Ask for class 0 (static data)")?
         .param("class1", Primitive::Bool, "Ask for class 1 events")?
         .param("class2", Primitive::Bool, "Ask for class 2 events")?
         .param("class3", Primitive::Bool, "Ask for class 3 events")?
-        .returns(
-          request.clone(),
-            "Handle to the created request",
-        )?
         .doc(
-            doc("Create a new request asking for classes")
-            .details("An identical request can be created manually with {class:request.add_all_objects_header()} and variations {enum:variation.group60_var1}, {enum:variation.group60_var2}, {enum:variation.group60_var3} and {enum:variation.group60_var4}.")
+            doc("Add headers asking for classes")
+                .details("The headers ask for events in classes 1, 2 and 3, then class 0."),
         )?
-        .build_static("class_request")?;
+        .build()?;
 
-    let request_new_all_objects_fn = lib
-        .define_function("request_new_all_objects")?
-        .param(
-            "variation",
-            shared.variation_enum.clone(),
-            "Variation to ask for",
-        )?
-        .returns(
-          request.clone(),
-            "Handle to the created request",
-        )?
-        .doc(
-            doc("Create a new request asking for all objects of a particular variation.")
-            .details("An identical request can be created manually with {class:request.[constructor]} and {class:request.add_all_objects_header()}.")
-        )?
-        .build_static("all_objects")?;
-
-    let request_new_one_byte_range_fn = lib
-        .define_function("request_new_one_byte_range")?
-        .param(
-            "variation",
-            shared.variation_enum.clone(),
-            "Variation to ask for",
-        )?
-        .param("start", Primitive::U8, "Start index to ask")?
-        .param("stop", Primitive::U8, "Stop index to ask (inclusive)")?
-        .returns(
-          request.clone(),
-            "Handle to the created request",
-        )?
-        .doc(
-            doc("Create a new request asking for range of objects (using 8-bit start/stop).")
-            .details("An identical request can be created manually with {class:request.[constructor]} and {class:request.add_one_byte_range_header()}.")
-        )?
-        .build_static("one_byte_range")?;
-
-    let request_new_two_byte_range_fn = lib
-        .define_function("request_new_two_byte_range")?
-        .param(
-            "variation",
-            shared.variation_enum.clone(),
-            "Variation to ask for",
-        )?
-        .param("start", Primitive::U16, "Start index to ask")?
-        .param("stop", Primitive::U16, "Stop index to ask (inclusive)")?
-        .returns(
-          request.clone(),
-            "Handle to the created request",
-        )?
-        .doc(
-            doc("Create a new request asking for range of objects (using 16-bit start/stop).")
-            .details("An identical request can be created manually with {class:request.[constructor]} and {class:request.add_two_byte_range_header()}.")
-        )?
-        .build_static("two_byte_range")?;
-
-    let request_new_one_byte_limited_count_fn = lib
-        .define_function("request_new_one_byte_limited_count")?
-        .param(
-            "variation",
-            shared.variation_enum.clone(),
-            "Variation to ask for",
-        )?
-        .param("count", Primitive::U8, "Maximum number of events")?
-        .returns(
-          request.clone(),
-            "Handle to the created request",
-        )?
-        .doc(
-            doc("Create a new request asking for a limited count of objects (using 8-bit start/stop).")
-            .details("An identical request can be created manually with {class:request.[constructor]} and {class:request.add_one_byte_limited_count_header()}.")
-        )?
-        .build_static("one_byte_limited_count")?;
-
-    let request_new_two_byte_limited_count_fn = lib
-        .define_function("request_new_two_byte_limited_count")?
-        .param(
-            "variation",
-            shared.variation_enum.clone(),
-            "Variation to ask for",
-        )?
-        .param("count", Primitive::U16, "Maximum number of events")?
-        .returns(
-          request.clone(),
-            "Handle to the created request",
-        )?
-        .doc(
-            doc("Create a new request asking for a limited count of objects (using 16-bit start/stop).")
-            .details("An identical request can be created manually with {class:request.[constructor]} and {class:request.add_two_byte_limited_count_header()}.")
-        )?
-        .build_static("two_byte_limited_count")?;
-
-    let destructor = lib
-        .define_destructor(
-            request.clone(),
-            "Destroy a request created with {class:request.[constructor]} or {class:request.class_request()}."
-        )?;
-
-    let add_specific_attribute_fn = lib
-        .define_method("add_specific_attribute", request.clone())?
+    let add_device_attribute_fn = lib
+        .define_method("add_device_attribute", read_request.clone())?
         .param(
             "variation",
             Primitive::U8,
@@ -144,9 +62,54 @@ pub(crate) fn define(
             Primitive::U8,
             "The set (point) to which the attribute belongs",
         )?
-        .doc(doc(
-            "Add a header that reads a specific device attribute (group 0) for use with a READ request",
-        ))?
+        .doc("Add a header that reads a specific device attribute (group 0)")?
+        .build()?;
+
+    let header_methods = define_header_methods(lib, shared, &read_request)?;
+
+    let mut builder = lib
+        .define_class(&read_request)?
+        .constructor(constructor)?
+        .destructor(destructor)?
+        .method(add_classes_fn)?;
+    for method in header_methods {
+        builder = builder.method(method)?;
+    }
+    let read_request = builder
+        .method(add_device_attribute_fn)?
+        .doc(
+            doc("The object headers of a READ, for one-time reads and polls")
+            .details("Only headers that are valid in a READ can be added. A request that writes or freezes objects is a {class:request}.")
+            .details("Whenever a method takes a read request as a parameter, the request is internally copied. Therefore, it is possible to reuse the same requests over and over.")
+        )?
+        .build()?;
+
+    Ok(read_request)
+}
+
+fn define_request(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> BackTraced<ClassHandle> {
+    let request = lib.declare_class("request")?;
+
+    let constructor = lib
+        .define_constructor(request.clone())?
+        .doc("Create a new request with no headers")?
+        .build()?;
+
+    let destructor = lib.define_destructor(
+        request.clone(),
+        "Destroy a request created with {class:request.[constructor]}",
+    )?;
+
+    let add_classes_fn = lib
+        .define_method("add_classes", request.clone())?
+        .param("class0", Primitive::Bool, "Ask for class 0 (static data)")?
+        .param("class1", Primitive::Bool, "Ask for class 1 events")?
+        .param("class2", Primitive::Bool, "Ask for class 2 events")?
+        .param("class3", Primitive::Bool, "Ask for class 3 events")?
+        .doc(
+            doc("Add headers naming classes")
+                .details("The headers name events in classes 1, 2 and 3, then class 0."),
+        )?
         .build()?;
 
     let add_string_attribute_fn = lib
@@ -177,62 +140,6 @@ pub(crate) fn define(
         ))?
         .build()?;
 
-    let add_one_byte_range_header = lib
-        .define_method("add_one_byte_range_header", request.clone())?
-        .param(
-            "variation",
-            shared.variation_enum.clone(),
-            "Variation to ask for",
-        )?
-        .param("start", Primitive::U8, "Start index to ask")?
-        .param("stop", Primitive::U8, "Stop index to ask (inclusive)")?
-        .doc("Add a one-byte start/stop header for use with a READ request")?
-        .build()?;
-
-    let add_two_byte_range_header = lib
-        .define_method("add_two_byte_range_header", request.clone())?
-        .param(
-            "variation",
-            shared.variation_enum.clone(),
-            "Variation to ask for",
-        )?
-        .param("start", Primitive::U16, "Start index to ask")?
-        .param("stop", Primitive::U16, "Stop index to ask (inclusive)")?
-        .doc("Add a two-byte start/stop header for use with a READ request")?
-        .build()?;
-
-    let add_all_objects_header = lib
-        .define_method("add_all_objects_header", request.clone())?
-        .param(
-            "variation",
-            shared.variation_enum.clone(),
-            "Variation to ask for",
-        )?
-        .doc("Add an all objects variation request")?
-        .build()?;
-
-    let add_one_byte_limited_count_header = lib
-        .define_method("add_one_byte_limited_count_header", request.clone())?
-        .param(
-            "variation",
-            shared.variation_enum.clone(),
-            "Variation to ask for",
-        )?
-        .param("count", Primitive::U8, "Maximum number of events")?
-        .doc("Add a one-byte limited count variation header for use with a READ request")?
-        .build()?;
-
-    let add_two_byte_limited_count_header = lib
-        .define_method("add_two_byte_limited_count_header", request.clone())?
-        .param(
-            "variation",
-            shared.variation_enum.clone(),
-            "Variation to ask for",
-        )?
-        .param("count", Primitive::U16, "Maximum number of events")?
-        .doc("Add a two-byte limited count variation header for use with a READ request")?
-        .build()?;
-
     let add_time_and_interval = lib
         .define_method("add_time_and_interval", request.clone())?
         .param(
@@ -246,35 +153,102 @@ pub(crate) fn define(
             "Interval expressed in milliseconds",
         )?
         .doc(
-            doc("Add a single g51v1 time-and-interval")
+            doc("Add a single g50v2 time-and-interval")
                 .details("This is useful when constructing freeze-at-time requests"),
         )?
         .build()?;
 
-    let request = lib
+    let header_methods = define_header_methods(lib, shared, &request)?;
+
+    let mut builder = lib
         .define_class(&request)?
         .constructor(constructor)?
         .destructor(destructor)?
-        .static_method(request_new_class_fn)?
-        .static_method(request_new_all_objects_fn)?
-        .static_method(request_new_one_byte_range_fn)?
-        .static_method(request_new_two_byte_range_fn)?
-        .static_method(request_new_one_byte_limited_count_fn)?
-        .static_method(request_new_two_byte_limited_count_fn)?
-        .method(add_one_byte_range_header)?
-        .method(add_two_byte_range_header)?
-        .method(add_all_objects_header)?
-        .method(add_one_byte_limited_count_header)?
-        .method(add_two_byte_limited_count_header)?
+        .method(add_classes_fn)?;
+    for method in header_methods {
+        builder = builder.method(method)?;
+    }
+    let request = builder
         .method(add_time_and_interval)?
-        .method(add_specific_attribute_fn)?
         .method(add_string_attribute_fn)?
         .method(add_uint_attribute_fn)?
         .doc(
-            doc("Custom request")
+            doc("The object headers of a request that expects an empty response, such as a WRITE or a FREEZE")
+            .details("Reads and polls take a {class:read_request} instead.")
             .details("Whenever a method takes a request as a parameter, the request is internally copied. Therefore, it is possible to reuse the same requests over and over.")
         )?
         .build()?;
 
     Ok(request)
+}
+
+/// The methods that add a READ-style header, for both request classes
+fn define_header_methods(
+    lib: &mut LibraryBuilder,
+    shared: &SharedDefinitions,
+    class: &ClassDeclarationHandle,
+) -> BackTraced<Vec<Method<Unvalidated>>> {
+    let add_one_byte_range_header = lib
+        .define_method("add_one_byte_range", class.clone())?
+        .param(
+            "variation",
+            shared.variation_enum.clone(),
+            "Variation to ask for",
+        )?
+        .param("start", Primitive::U8, "Start index to ask")?
+        .param("stop", Primitive::U8, "Stop index to ask (inclusive)")?
+        .doc("Add a one-byte start/stop header")?
+        .build()?;
+
+    let add_two_byte_range_header = lib
+        .define_method("add_two_byte_range", class.clone())?
+        .param(
+            "variation",
+            shared.variation_enum.clone(),
+            "Variation to ask for",
+        )?
+        .param("start", Primitive::U16, "Start index to ask")?
+        .param("stop", Primitive::U16, "Stop index to ask (inclusive)")?
+        .doc("Add a two-byte start/stop header")?
+        .build()?;
+
+    let add_all_objects_header = lib
+        .define_method("add_all_objects", class.clone())?
+        .param(
+            "variation",
+            shared.variation_enum.clone(),
+            "Variation to ask for",
+        )?
+        .doc("Add an all objects header")?
+        .build()?;
+
+    let add_one_byte_limited_count_header = lib
+        .define_method("add_one_byte_limited_count", class.clone())?
+        .param(
+            "variation",
+            shared.variation_enum.clone(),
+            "Variation to ask for",
+        )?
+        .param("count", Primitive::U8, "Maximum number of events")?
+        .doc("Add a one-byte limited count header")?
+        .build()?;
+
+    let add_two_byte_limited_count_header = lib
+        .define_method("add_two_byte_limited_count", class.clone())?
+        .param(
+            "variation",
+            shared.variation_enum.clone(),
+            "Variation to ask for",
+        )?
+        .param("count", Primitive::U16, "Maximum number of events")?
+        .doc("Add a two-byte limited count header")?
+        .build()?;
+
+    Ok(vec![
+        add_one_byte_range_header,
+        add_two_byte_range_header,
+        add_all_objects_header,
+        add_one_byte_limited_count_header,
+        add_two_byte_limited_count_header,
+    ])
 }

@@ -300,9 +300,10 @@ static bool read_class0(dnp3_master_channel_t *channel, dnp3_association_id_t as
         .on_failure = &on_read_failure,
         .ctx = state,
     };
-    dnp3_request_t *request = dnp3_request_new_class(true, false, false, false);
+    dnp3_read_request_t *request = dnp3_read_request_create();
+    dnp3_read_request_add_classes(request, true, false, false, false);
     dnp3_param_error_t err = dnp3_master_channel_read(channel, association, request, callback);
-    dnp3_request_destroy(request);
+    dnp3_read_request_destroy(request);
     if (!check_param(err, "start the read") || !wait_for(state, &read_done, "the read")) {
         return false;
     }

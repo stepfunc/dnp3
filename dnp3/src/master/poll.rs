@@ -270,7 +270,7 @@ mod tests {
     use crate::master::Classes;
 
     fn request() -> ReadRequest {
-        ReadRequest::ClassScan(Classes::all())
+        ReadRequest::new().add_classes(Classes::all())
     }
 
     #[test]

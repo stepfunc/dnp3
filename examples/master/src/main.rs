@@ -66,7 +66,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ANCHOR: add_poll
     let poll = association
         .add_poll(
-            ReadRequest::ClassScan(Classes::class123()),
+            ReadRequest::new().add_classes(Classes::class123()),
             Duration::from_secs(5),
         )
         .await?;
@@ -453,23 +453,25 @@ impl CliHandler {
             }
             "rao" => {
                 self.association
-                    .read(ReadRequest::all_objects(Variation::Group40Var0))
+                    .read(ReadRequest::new().add_all_objects(Variation::Group40Var0))
                     .await?;
             }
             "rmo" => {
                 self.association
-                    .read(ReadRequest::multiple_headers(&[
-                        ReadHeader::all_objects(Variation::Group10Var0),
-                        ReadHeader::all_objects(Variation::Group40Var0),
-                    ]))
+                    .read(
+                        ReadRequest::new()
+                            .add_all_objects(Variation::Group10Var0)
+                            .add_all_objects(Variation::Group40Var0),
+                    )
                     .await?;
             }
             "rco" => {
                 self.association
-                    .read(ReadRequest::multiple_headers(&[
-                        ReadHeader::all_objects(Variation::Group20Var0),
-                        ReadHeader::all_objects(Variation::Group21Var0),
-                    ]))
+                    .read(
+                        ReadRequest::new()
+                            .add_all_objects(Variation::Group20Var0)
+                            .add_all_objects(Variation::Group21Var0),
+                    )
                     .await?;
             }
             "cmd" => {
@@ -520,54 +522,51 @@ impl CliHandler {
             }
             "fat" => {
                 // ANCHOR: freeze_at_time
-                let headers = Headers::new()
+                let request = Request::new()
                     // freeze all the counters once per day relative to the beginning of the current hour
                     .add_freeze_interval(FreezeInterval::PeriodicallyFreezeRelative(86_400_000))
                     // apply this schedule to all counters
                     .add_all_objects(Variation::Group20Var0);
 
                 self.association
-                    .send_and_expect_empty_response(FunctionCode::FreezeAtTime, headers)
+                    .send_and_expect_empty_response(FunctionCode::FreezeAtTime, request)
                     .await?;
                 // ANCHOR_END: freeze_at_time
             }
             "ifz" => {
                 // copy every counter to its frozen counter
-                let headers = Headers::new().add_all_objects(Variation::Group20Var0);
+                let request = Request::new().add_all_objects(Variation::Group20Var0);
                 self.association
-                    .send_and_expect_empty_response(FunctionCode::ImmediateFreeze, headers)
+                    .send_and_expect_empty_response(FunctionCode::ImmediateFreeze, request)
                     .await?;
             }
             "fcl" => {
                 // copy every counter to its frozen counter, then clear the counter
-                let headers = Headers::new().add_all_objects(Variation::Group20Var0);
+                let request = Request::new().add_all_objects(Variation::Group20Var0);
                 self.association
-                    .send_and_expect_empty_response(FunctionCode::FreezeClear, headers)
+                    .send_and_expect_empty_response(FunctionCode::FreezeClear, request)
                     .await?;
             }
             "rda" => {
                 // ANCHOR: read_attributes
                 self.association
-                    .read(ReadRequest::device_attribute(
-                        AllAttributes,
-                        AttrSet::Default,
-                    ))
+                    .read(ReadRequest::new().add_device_attribute(AllAttributes, AttrSet::Default))
                     .await?;
                 // ANCHOR_END: read_attributes
             }
             "wda" => {
                 // ANCHOR: write_attribute
-                let headers = Headers::default()
+                let request = Request::new()
                     .add_attribute(StringAttr::UserAssignedLocation.with_value("Mt. Olympus"));
 
                 self.association
-                    .send_and_expect_empty_response(FunctionCode::Write, headers)
+                    .send_and_expect_empty_response(FunctionCode::Write, request)
                     .await?;
                 // ANCHOR_END: write_attribute
             }
             "ral" => {
                 self.association
-                    .read(ReadRequest::device_attribute(
+                    .read(ReadRequest::new().add_device_attribute(
                         VariationListAttr::ListOfVariations,
                         AttrSet::Default,
                     ))

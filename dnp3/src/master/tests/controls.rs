@@ -139,7 +139,7 @@ async fn operate_no_ack_does_not_delay_the_next_task() {
         let mut association = harness.association.clone();
         let read = tokio::spawn(async move {
             association
-                .read(ReadRequest::class_scan(Classes::class0()))
+                .read(ReadRequest::new().add_classes(Classes::class0()))
                 .await
         });
         harness
@@ -185,7 +185,7 @@ async fn queued_tasks_run_back_to_back_after_operate_no_ack_and_ignore_its_seque
         harness
             .association
             .send_task(SingleReadTask::new(
-                ReadRequest::class_scan(Classes::class0()),
+                ReadRequest::new().add_classes(Classes::class0()),
                 promise,
             ))
             .await

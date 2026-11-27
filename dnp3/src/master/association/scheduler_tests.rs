@@ -773,7 +773,7 @@ impl System {
 
     fn queue_request(&mut self, index: usize) {
         let (promise, reply) = Promise::one_shot();
-        let task = SingleReadTask::new(ReadRequest::ClassScan(Classes::all()), promise);
+        let task = SingleReadTask::new(ReadRequest::new().add_classes(Classes::all()), promise);
         self.association(index)
             .process_message(AssociationMsgType::QueueTask(Task::from(task).into()), true);
         self.requests.push(reply);
@@ -927,7 +927,7 @@ async fn apply(
                 let id = system
                     .association(index)
                     .polls
-                    .add(ReadRequest::ClassScan(Classes::all()), period);
+                    .add(ReadRequest::new().add_classes(Classes::all()), period);
                 system.polls[index].push(id);
             }
         }

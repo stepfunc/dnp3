@@ -49,7 +49,7 @@ use crate::master::{
     AssociationHandle, AssociationHandler, AssociationInformation, AuthKey, BlockNumber, Classes,
     CommandBuilder, CommandError, CommandHeaders, CommandMode, CommandSupport, DeadBandHeader,
     DirReadConfig, FileCredentials, FileError, FileHandle, FileMode, FileReadConfig, HeaderInfo,
-    Headers, MasterChannel, MasterChannelType, OpenFile, ReadHandler, ReadRequest, ReadType,
+    MasterChannel, MasterChannelType, OpenFile, ReadHandler, ReadRequest, ReadType, Request,
     TaskError, TaskType, TimeSyncError, TimeSyncProcedure,
 };
 use crate::util::lifecycle::{RunError, StopReason};
@@ -132,7 +132,7 @@ impl Kind {
             match self {
                 Kind::Read => Reply::Read(
                     association
-                        .read(ReadRequest::ClassScan(Classes::class0()))
+                        .read(ReadRequest::new().add_classes(Classes::class0()))
                         .await,
                 ),
                 Kind::DirectOperate => Reply::Command(
@@ -150,7 +150,7 @@ impl Kind {
                     association
                         .send_and_expect_empty_response(
                             FunctionCode::ImmediateFreeze,
-                            Headers::new().add_all_objects(Variation::Group20Var0),
+                            Request::new().add_all_objects(Variation::Group20Var0),
                         )
                         .await,
                 ),
@@ -796,7 +796,7 @@ async fn every_task_fails_with_a_link_error_when_the_connection_drops() {
                 .harness
                 .association
                 .send_task(SingleReadTask::new(
-                    ReadRequest::ClassScan(Classes::class0()),
+                    ReadRequest::new().add_classes(Classes::class0()),
                     promise,
                 ))
                 .await
@@ -862,7 +862,7 @@ async fn running_and_queued_tasks_complete_their_promises_on_shutdown() {
         harness
             .association
             .send_task(SingleReadTask::new(
-                ReadRequest::ClassScan(Classes::class0()),
+                ReadRequest::new().add_classes(Classes::class0()),
                 promise,
             ))
             .await
@@ -953,7 +953,7 @@ async fn queued_tasks_fail_with_no_such_association_when_the_association_is_remo
         harness
             .association
             .send_task(SingleReadTask::new(
-                ReadRequest::ClassScan(Classes::class0()),
+                ReadRequest::new().add_classes(Classes::class0()),
                 promise,
             ))
             .await
@@ -1066,7 +1066,7 @@ async fn requests_to_a_removed_association_fail_with_no_such_association() {
             }
             let poll = stale
                 .add_poll(
-                    ReadRequest::ClassScan(Classes::class0()),
+                    ReadRequest::new().add_classes(Classes::class0()),
                     Duration::from_secs(1),
                 )
                 .await;
@@ -1092,10 +1092,11 @@ async fn requests_to_a_removed_association_fail_with_no_such_association() {
                 .await
                 .unwrap();
             harness.set_source(OTHER);
-            let read =
-                tokio::spawn(
-                    async move { other.read(ReadRequest::ClassScan(Classes::class0())).await },
-                );
+            let read = tokio::spawn(async move {
+                other
+                    .read(ReadRequest::new().add_classes(Classes::class0()))
+                    .await
+            });
             next_request(&mut harness, 0, FunctionCode::Read).await;
             respond(&mut harness, empty_response(Sequence::new(0))).await;
             assert_eq!(read.await.unwrap(), Ok(()), "{via_handle}");
@@ -1377,7 +1378,7 @@ async fn read_callbacks_and_sequence_numbers_follow_the_fragments_in_order() {
 
         let read = tokio::spawn(async move {
             association
-                .read(ReadRequest::ClassScan(Classes::class0()))
+                .read(ReadRequest::new().add_classes(Classes::class0()))
                 .await
         });
         next_request(&mut harness, 0, FunctionCode::Read).await;
@@ -1589,7 +1590,7 @@ async fn writing_an_attribute_whose_variation_cannot_carry_a_value_sends_nothing
             var::ALL_ATTRIBUTES_REQUEST,
             var::LIST_OF_ATTRIBUTE_VARIATIONS,
         ] {
-            let headers = Headers::new().add_attribute(OwnedAttribute::new(
+            let headers = Request::new().add_attribute(OwnedAttribute::new(
                 AttrSet::Default,
                 variation,
                 OwnedAttrValue::UnsignedInt(0),
@@ -1617,7 +1618,7 @@ async fn reading_group0_var0_sends_nothing() {
         assert_eq!(
             harness
                 .association
-                .read(ReadRequest::all_objects(g0v0))
+                .read(ReadRequest::new().add_all_objects(g0v0))
                 .await,
             Err(err)
         );
@@ -1628,7 +1629,7 @@ async fn reading_group0_var0_sends_nothing() {
                 .association
                 .send_and_expect_empty_response(
                     FunctionCode::Read,
-                    Headers::new().add_all_objects(g0v0)
+                    Request::new().add_all_objects(g0v0)
                 )
                 .await,
             Err(err)
@@ -1637,7 +1638,10 @@ async fn reading_group0_var0_sends_nothing() {
 
         let mut poll = harness
             .association
-            .add_poll(ReadRequest::all_objects(g0v0), Duration::from_secs(3600))
+            .add_poll(
+                ReadRequest::new().add_all_objects(g0v0),
+                Duration::from_secs(3600),
+            )
             .await
             .unwrap();
         harness.assoc_events.pop();

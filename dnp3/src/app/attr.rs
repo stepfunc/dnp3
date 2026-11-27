@@ -2156,7 +2156,7 @@ mod test {
         use crate::app::parse::parser::{HeaderCollection, ObjectHeader, Width};
         use crate::app::FunctionCode;
         use crate::master::error::TaskErrorKind;
-        use crate::master::Headers;
+        use crate::master::Request;
         use proptest::prelude::*;
 
         /// group, variation, qualifier, start and stop
@@ -2377,7 +2377,7 @@ mod test {
         /// written
         fn write(attr: &OwnedAttribute, buffer: &mut [u8]) -> (Result<(), TaskErrorKind>, Vec<u8>) {
             let mut cursor = WriteCursor::new(buffer);
-            let result = Headers::new()
+            let result = Request::new()
                 .add_attribute(attr.clone())
                 .write(&mut HeaderWriter::new(&mut cursor));
             (result, cursor.written().to_vec())

@@ -164,7 +164,7 @@ impl Kind {
             let result = match self {
                 Kind::Read => {
                     association
-                        .read(ReadRequest::ClassScan(Classes::class0()))
+                        .read(ReadRequest::new().add_classes(Classes::class0()))
                         .await
                 }
                 Kind::NonRead => association.cold_restart().await.map(|_| ()),
