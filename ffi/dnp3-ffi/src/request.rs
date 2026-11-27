@@ -5,7 +5,7 @@
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
 use dnp3::app::attr::*;
-use dnp3::app::{Timestamp, Variation};
+use dnp3::app::Timestamp;
 use dnp3::master::{Classes, EventClasses};
 use std::ffi::CStr;
 
@@ -33,10 +33,6 @@ pub struct Request {
 impl Request {
     pub(crate) fn clone_inner(&self) -> dnp3::master::Request {
         self.inner.clone()
-    }
-
-    fn create(inner: dnp3::master::Request) -> *mut Request {
-        Box::into_raw(Box::new(Request { inner }))
     }
 
     /// replace the request with `f` of it, since its add methods take it by value
@@ -132,72 +128,27 @@ pub(crate) unsafe fn read_request_add_two_byte_limited_count_header(
 }
 
 pub unsafe fn request_create() -> *mut Request {
-    Request::create(dnp3::master::Request::new())
-}
-
-pub unsafe fn request_new_class(
-    class0: bool,
-    class1: bool,
-    class2: bool,
-    class3: bool,
-) -> *mut Request {
-    // the event classes first, then class 0, as a class scan writes them
-    let classes = [
-        (class1, Variation::Group60Var2),
-        (class2, Variation::Group60Var3),
-        (class3, Variation::Group60Var4),
-        (class0, Variation::Group60Var1),
-    ];
-    let request = classes
-        .into_iter()
-        .filter(|(enabled, _)| *enabled)
-        .fold(dnp3::master::Request::new(), |request, (_, variation)| {
-            request.add_all_objects(variation)
-        });
-    Request::create(request)
-}
-
-pub unsafe fn request_new_all_objects(variation: ffi::Variation) -> *mut Request {
-    Request::create(dnp3::master::Request::new().add_all_objects(variation.into()))
-}
-
-pub unsafe fn request_new_one_byte_range(
-    variation: ffi::Variation,
-    start: u8,
-    stop: u8,
-) -> *mut Request {
-    Request::create(dnp3::master::Request::new().add_range_8(variation.into(), start, stop))
-}
-
-pub unsafe fn request_new_two_byte_range(
-    variation: ffi::Variation,
-    start: u16,
-    stop: u16,
-) -> *mut Request {
-    Request::create(dnp3::master::Request::new().add_range_16(variation.into(), start, stop))
-}
-
-pub unsafe fn request_new_one_byte_limited_count(
-    variation: ffi::Variation,
-    count: u8,
-) -> *mut Request {
-    Request::create(
-        dnp3::master::Request::new().add_one_byte_limited_count(variation.into(), count),
-    )
-}
-
-pub unsafe fn request_new_two_byte_limited_count(
-    variation: ffi::Variation,
-    count: u16,
-) -> *mut Request {
-    Request::create(
-        dnp3::master::Request::new().add_two_byte_limited_count(variation.into(), count),
-    )
+    Box::into_raw(Box::new(Request {
+        inner: dnp3::master::Request::new(),
+    }))
 }
 
 pub unsafe fn request_destroy(request: *mut Request) {
     if !request.is_null() {
         drop(Box::from_raw(request));
+    }
+}
+
+pub(crate) unsafe fn request_add_classes(
+    request: *mut Request,
+    class0: bool,
+    class1: bool,
+    class2: bool,
+    class3: bool,
+) {
+    if let Some(request) = request.as_mut() {
+        let classes = Classes::new(class0, EventClasses::new(class1, class2, class3));
+        request.update(|r| r.add_classes(classes));
     }
 }
 

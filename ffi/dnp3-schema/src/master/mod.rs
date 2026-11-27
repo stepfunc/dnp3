@@ -454,6 +454,7 @@ pub(crate) fn define(lib: &mut LibraryBuilder, shared: &SharedDefinitions) -> Ba
             doc("Send the specified request to the association using the supplied function and collection of request headers")
                 .details("This is useful for constructing various types of WRITE and FREEZE operations where an empty response is expected from the outstation, and the only indication of success are bits in IIN.2.")
                 .details("The request will fail if 1) The response contains object headers or 2) One of the error bits in IIN.2 is set.")
+                .details("The request is sent with whatever function code is given. Reads take a {class:read_request}, which can't carry values.")
         )?
         .build()?;
 

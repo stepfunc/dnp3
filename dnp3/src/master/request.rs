@@ -276,9 +276,12 @@ impl Classes {
 
 /// The object headers of a READ, for one-time reads and polls
 ///
-/// Only headers that are valid in a READ can be added. A request that also writes or freezes
-/// objects is a [`Request`]. Each `add_*` method consumes the request and returns it, so calls
-/// chain:
+/// It holds only headers that name objects without carrying values, as a READ does. A request
+/// that writes or freezes objects is a [`Request`]. The variation and qualifier of each header
+/// aren't checked against what an outstation accepts in a READ, so a master can test how an
+/// outstation answers any read.
+///
+/// Each `add_*` method consumes the request and returns it, so calls chain:
 ///
 /// ```
 /// # use dnp3::app::Variation;
@@ -293,17 +296,13 @@ pub struct ReadRequest {
 }
 
 /// Single headers and class scans don't allocate, since polls clone their request every period
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 enum ReadInner {
+    #[default]
+    Empty,
     Single(ReadHeader),
     ClassScan(Classes),
     Multiple(Vec<ReadHeader>),
-}
-
-impl Default for ReadInner {
-    fn default() -> Self {
-        ReadInner::Multiple(Vec::new())
-    }
 }
 
 impl ReadRequest {
@@ -315,7 +314,7 @@ impl ReadRequest {
     /// Add headers for the specified classes: events in classes 1, 2 and 3, then class 0
     pub fn add_classes(self, classes: Classes) -> Self {
         let inner = match self.inner {
-            ReadInner::Multiple(headers) if headers.is_empty() => ReadInner::ClassScan(classes),
+            ReadInner::Empty => ReadInner::ClassScan(classes),
             inner => {
                 let mut headers = inner.into_headers();
                 headers.extend(classes.read_headers());
@@ -365,6 +364,7 @@ impl ReadRequest {
 
     pub(crate) fn format(&self, writer: &mut HeaderWriter) -> Result<(), TaskErrorKind> {
         match &self.inner {
+            ReadInner::Empty => {}
             ReadInner::Single(header) => {
                 header.validate()?;
                 header.format(writer)?;
@@ -384,7 +384,7 @@ impl ReadRequest {
 
     fn add(self, header: ReadHeader) -> Self {
         let inner = match self.inner {
-            ReadInner::Multiple(headers) if headers.is_empty() => ReadInner::Single(header),
+            ReadInner::Empty => ReadInner::Single(header),
             inner => {
                 let mut headers = inner.into_headers();
                 headers.push(header);
@@ -398,6 +398,7 @@ impl ReadRequest {
 impl ReadInner {
     fn into_headers(self) -> Vec<ReadHeader> {
         match self {
+            ReadInner::Empty => Vec::new(),
             ReadInner::Single(header) => vec![header],
             ReadInner::ClassScan(classes) => classes.read_headers().collect(),
             ReadInner::Multiple(headers) => headers,
@@ -425,6 +426,13 @@ impl Request {
     /// Construct a request with no headers
     pub fn new() -> Self {
         Default::default()
+    }
+
+    /// Add headers for the specified classes: events in classes 1, 2 and 3, then class 0
+    pub fn add_classes(mut self, classes: Classes) -> Self {
+        self.headers
+            .extend(classes.read_headers().map(Header::Read));
+        self
     }
 
     /// Add an all objects header (0x06) with the specified variation
@@ -1260,8 +1268,8 @@ mod tests {
         //! likely than the others; one and two-byte ranges, with single indices and the ends more
         //! likely; one and two-byte counts, with 0, 1, 255 and the maximum more likely; READ
         //! requests of up to six headers, device attribute reads and class scans of any classes,
-        //! added in any order to an empty request; a `Request` of up
-        //! to five READ headers and g50v2 freeze times, with a time and interval of 0 or any value.
+        //! added in any order to an empty request; a `Request` of up to five READ headers, class
+        //! headers and g50v2 freeze times, with a time and interval of 0 or any value.
         //!
         //! Not generated: a group and variation that isn't a `Variation`, attribute headers in a
         //! `Request` (see `app/attr.rs` and the attribute example above), and requests
@@ -1556,6 +1564,7 @@ mod tests {
         #[derive(Clone, Debug)]
         enum Item {
             Read(ReadHeader),
+            Classes(Classes),
             /// the time and interval of a g50v2
             Freeze(u64, u32),
         }
@@ -1563,6 +1572,12 @@ mod tests {
         fn item() -> impl Strategy<Value = Item> {
             prop_oneof![
                 read_header().prop_map(Item::Read),
+                any::<[bool; 4]>().prop_map(|[class0, class1, class2, class3]| {
+                    Item::Classes(Classes::new(
+                        class0,
+                        EventClasses::new(class1, class2, class3),
+                    ))
+                }),
                 (
                     prop_oneof![Just(0), 0..=Timestamp::MAX_VALUE],
                     prop_oneof![Just(0), any::<u32>()],
@@ -1592,6 +1607,7 @@ mod tests {
                 Item::Read(ReadHeader::LimitedCount16 { variation, count }) => {
                     request.add_two_byte_limited_count(variation, count)
                 }
+                Item::Classes(classes) => request.add_classes(classes),
                 Item::Freeze(time, interval) => {
                     request.add_time_and_interval(Timestamp::new(time), interval)
                 }
@@ -1631,7 +1647,9 @@ mod tests {
             /// variation with that qualifier. A request with a header for g0v0 in any position,
             /// which names no object, fails and writes nothing
             #[test]
-            fn read_requests_parse_to_the_headers_written(ops in prop::collection::vec(read_op(), 0..7)) {
+            fn read_requests_parse_to_the_headers_written(
+                ops in prop::collection::vec(read_op(), 0..7)
+            ) {
                 let request = build_request(&ops);
                 let mut buffer = [0; 256];
                 let mut cursor = WriteCursor::new(&mut buffer);
@@ -1660,10 +1678,10 @@ mod tests {
                 prop_assert_eq!(parse_read(written), expected);
             }
 
-            /// A `Request` is written as the READ-style headers and g50v2 freeze times
-            /// they hold, in order, and each g50v2 parses back to its time and interval. Headers
-            /// with a READ of g0v0 in any position fail and write nothing. Attribute headers aren't
-            /// generated: `app/attr.rs` tests their values, and
+            /// A `Request` is written as the READ-style headers, class headers and g50v2 freeze
+            /// times it holds, in order, and each g50v2 parses back to its time and interval.
+            /// Headers with a READ of g0v0 in any position fail and write nothing. Attribute
+            /// headers aren't generated: `app/attr.rs` tests their values, and
             /// `attribute_with_a_variation_that_cannot_carry_a_value_leaves_the_cursor_untouched`
             /// the header
             #[test]
@@ -1689,6 +1707,10 @@ mod tests {
                     .iter()
                     .flat_map(|item| match *item {
                         Item::Read(header) => model_bytes(&model_header(header)),
+                        Item::Classes(classes) => model_op(ReadOp::Classes(classes))
+                            .iter()
+                            .flat_map(model_bytes)
+                            .collect(),
                         Item::Freeze(time, interval) => freeze_bytes(time, interval),
                     })
                     .collect();

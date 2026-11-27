@@ -307,6 +307,9 @@ impl AssociationHandle {
     /// This is useful for constructing various types of WRITE and FREEZE operations where
     /// an empty response is expected from the outstation, and the only indication of success
     /// are bits in IIN.2
+    ///
+    /// The request is sent with whatever function code is given. Reads go through
+    /// [`AssociationHandle::read`] with a [`ReadRequest`], which can't carry values.
     pub async fn send_and_expect_empty_response(
         &mut self,
         function: FunctionCode,
