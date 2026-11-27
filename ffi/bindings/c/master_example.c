@@ -294,11 +294,11 @@ int run_channel(dnp3_master_channel_t *channel, dnp3_association_id_t associatio
 {
     // create an event poll
     // ANCHOR: add_poll
-    dnp3_read_request_t *poll_request = dnp3_read_request_create();
-    dnp3_read_request_add_classes(poll_request, false, true, true, true);
+    dnp3_read_request_t *event_scan = dnp3_read_request_create();
+    dnp3_read_request_add_classes(event_scan, false, true, true, true);
     dnp3_poll_id_t poll_id;
-    dnp3_param_error_t err = dnp3_master_channel_add_poll(channel, association_id, poll_request, 5000, &poll_id);
-    dnp3_read_request_destroy(poll_request);
+    dnp3_param_error_t err = dnp3_master_channel_add_poll(channel, association_id, event_scan, 5000, &poll_id);
+    dnp3_read_request_destroy(event_scan);
     // ANCHOR_END: add_poll
     if (err) {
         printf("unable to add poll: %s\n", dnp3_param_error_to_string(err));
