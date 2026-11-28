@@ -5,7 +5,7 @@
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
 use super::context::SessionContext;
-use super::phase::{Phase, PollOutcome, StagedTx};
+use super::phase::{Phase, PollOutcome};
 use super::response::Slots;
 use super::state::ConfirmWaitInfo;
 use crate::decode::AppDecodeLevel;
@@ -70,9 +70,8 @@ impl<C: MonotonicClock> OutstationCore<C> {
     pub(super) fn poll(&mut self) -> Output<'_, C> {
         match self.phase.poll(&mut self.slots, &mut self.ctx) {
             PollOutcome::Wait(deadline) => Output::Wait(deadline),
-            PollOutcome::Transmit { outbound, staged } => Output::Transmit(Transmit {
+            PollOutcome::Transmit(outbound) => Output::Transmit(Transmit {
                 outbound,
-                staged,
                 phase: &mut self.phase,
                 ctx: &mut self.ctx,
             }),
@@ -110,12 +109,11 @@ pub(super) enum Output<'a, C: MonotonicClock> {
 /// Holding `Transmit<'_, C>` borrows `&mut OutstationCore<C>`, statically preventing `handle_input`
 /// or another `poll` while a write is underway. Call [`Self::sent`] once the write completes, or
 /// tear down the session with [`OutstationCore::reset`] if the write fails or is cancelled.
-/// Dropping `Transmit` without calling [`Self::sent`] leaves the phase in flight so a subsequent
-/// `poll` or `handle_input` resets per-connection state and the database automatically.
+/// Dropping `Transmit` without calling [`Self::sent`] leaves the transmission staged, so the next
+/// `poll` offers it again.
 #[must_use]
 pub(super) struct Transmit<'a, C: MonotonicClock> {
     outbound: Outbound<'a>,
-    staged: StagedTx,
     phase: &'a mut Phase,
     ctx: &'a mut SessionContext<C>,
 }
@@ -128,7 +126,7 @@ impl<'a, C: MonotonicClock> Transmit<'a, C> {
 
     /// Commit the state transition after the write completes.
     pub(super) fn sent(self) {
-        self.phase.sent(self.staged, self.ctx);
+        self.phase.sent(self.ctx);
     }
 }
 
