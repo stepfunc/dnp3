@@ -25,7 +25,7 @@ use crate::tcp::{ClientConnectionHandler, ClientState, PostConnectionHandler};
 use crate::transport::FragmentAddr;
 use crate::udp::factory::UdpFactory;
 use crate::udp::task::UdpTask;
-use crate::util::channel::Receiver;
+use crate::util::channel::RequestReceiver;
 use crate::util::lifecycle::Enabled;
 use tokio::time::Instant;
 
@@ -38,7 +38,7 @@ use tokio::time::Instant;
 /// require the task to be running.
 pub struct MasterBuilder {
     channel: MasterChannel,
-    rx: Receiver<super::messages::Message>,
+    rx: RequestReceiver<super::messages::Message>,
     config: MasterChannelConfig,
     enabled: Enabled,
     associations: AssociationMap,
@@ -60,7 +60,7 @@ impl std::fmt::Debug for MasterBuilder {
 /// require the task to be running.
 pub struct UdpMasterBuilder {
     channel: MasterChannel,
-    rx: Receiver<super::messages::Message>,
+    rx: RequestReceiver<super::messages::Message>,
     config: MasterChannelConfig,
     enabled: Enabled,
     associations: AssociationMap,
@@ -155,7 +155,7 @@ fn build_inner_task(
     associations: AssociationMap,
     link_modes: LinkModes,
     config: MasterChannelConfig,
-    rx: Receiver<super::messages::Message>,
+    rx: RequestReceiver<super::messages::Message>,
 ) -> InnerMasterTask {
     InnerMasterTask::with_associations(enabled, associations, link_modes, config, rx)
 }
@@ -166,7 +166,7 @@ impl MasterBuilder {
     /// The channel can be cloned and stored for later use. Async operations
     /// on the channel require the task to be running.
     pub fn new(config: MasterChannelConfig) -> (Self, MasterChannel) {
-        let (tx, rx) = crate::util::channel::request_channel();
+        let (tx, rx) = crate::util::channel::request_queue();
         let channel = MasterChannel::new(tx, MasterChannelType::Stream);
         let builder = Self {
             channel: channel.clone(),
@@ -309,7 +309,7 @@ impl UdpMasterBuilder {
     /// The channel can be cloned and stored for later use. Async operations
     /// on the channel require the task to be running.
     pub fn new(config: MasterChannelConfig) -> (Self, MasterChannel) {
-        let (tx, rx) = crate::util::channel::request_channel();
+        let (tx, rx) = crate::util::channel::request_queue();
         let channel = MasterChannel::new(tx, MasterChannelType::Udp);
         let builder = Self {
             channel: channel.clone(),
@@ -415,8 +415,9 @@ impl AssociationBuilder<'_> {
 impl MasterTask {
     /// Run the master event loop.
     ///
-    /// This method consumes the task and runs until the [`MasterChannel`] (and
-    /// all associated handles) are dropped.
+    /// This method consumes the task and runs until it is shut down with
+    /// [`MasterChannel::shutdown`], or until the [`MasterChannel`] and all associated handles are
+    /// dropped.
     pub async fn run(mut self) {
         self.inner.start(Instant::now());
         match self.inner {
@@ -446,7 +447,7 @@ impl MasterTaskType {
 impl TcpTask {
     async fn run(self) {
         let session = Session::master(self.inner);
-        let mut client = ClientTask::new(
+        let client = ClientTask::new(
             session,
             self.connect_handler,
             PostConnectionHandler::Tcp,
@@ -460,7 +461,7 @@ impl TcpTask {
 impl TlsTask {
     async fn run(self) {
         let session = Session::master(self.inner);
-        let mut client = ClientTask::new(
+        let client = ClientTask::new(
             session,
             self.connect_handler,
             PostConnectionHandler::Tls(self.tls_config),
@@ -474,7 +475,7 @@ impl TlsTask {
 impl SerialTask {
     async fn run(self) {
         let session = Session::master(self.inner);
-        let mut serial = crate::serial::task::SerialTask::new(
+        let serial = crate::serial::task::SerialTask::new(
             &self.path,
             self.settings,
             session,

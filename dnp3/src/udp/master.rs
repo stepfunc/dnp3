@@ -17,8 +17,9 @@ use crate::app::Timeout;
 use std::net::SocketAddr;
 use tracing::Instrument;
 
-/// Spawn a UDP master task onto the `Tokio` runtime. The task runs until the returned handle, and any
-/// `AssociationHandle` created from it, are dropped.
+/// Spawn a UDP master task onto the `Tokio` runtime. The task runs until it is shut down with
+/// [`MasterChannel::shutdown`](crate::master::MasterChannel::shutdown), or until the returned
+/// handle and every `AssociationHandle` created from it are dropped.
 ///
 /// **Note**: This function may only be called from within the runtime itself, and panics otherwise.
 /// Use Runtime::enter() if required.
@@ -28,7 +29,7 @@ pub fn spawn_master_udp(
     retry_delay: Timeout,
     config: MasterChannelConfig,
 ) -> MasterChannel {
-    let (tx, rx) = crate::util::channel::request_channel();
+    let (tx, rx) = crate::util::channel::request_queue();
     let link_modes = LinkModes {
         error_mode: LinkErrorMode::Discard,
         read_mode,

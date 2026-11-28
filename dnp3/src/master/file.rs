@@ -310,6 +310,9 @@ pub trait FileReader: Send + Sync + 'static {
     fn block_received(&mut self, block_num: u32, data: &[u8]) -> MaybeAsync<FileAction>;
 
     /// Called when the transfer is aborted before completion due to an error or user request
+    ///
+    /// This can run while the master is shutting down, so it must not wait for another
+    /// unfinished request on the same channel.
     fn aborted(&mut self, err: FileError);
 
     /// Called when the transfer completes successfully

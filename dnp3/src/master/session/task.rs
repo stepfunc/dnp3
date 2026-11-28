@@ -5,6 +5,7 @@
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
 use super::*;
+use crate::util::shutdown::ShutdownListener;
 
 /// Owns transport resources and orchestrates master I/O, task execution, and deadlines.
 ///
@@ -21,7 +22,7 @@ impl MasterTask {
         initial_state: Enabled,
         link_modes: LinkModes,
         config: MasterChannelConfig,
-        messages: Receiver<Message>,
+        messages: RequestReceiver<Message>,
     ) -> Self {
         Self::with_associations(
             initial_state,
@@ -37,7 +38,7 @@ impl MasterTask {
         associations: AssociationMap,
         link_modes: LinkModes,
         config: MasterChannelConfig,
-        messages: Receiver<Message>,
+        messages: RequestReceiver<Message>,
     ) -> Self {
         Self::with_transport(enabled, associations, link_modes, config, messages)
     }
@@ -69,7 +70,7 @@ impl<T: Transport> MasterTask<T> {
         associations: AssociationMap,
         link_modes: LinkModes,
         config: MasterChannelConfig,
-        messages: Receiver<Message>,
+        messages: RequestReceiver<Message>,
     ) -> Self {
         let session = MasterSession::new(
             enabled,
@@ -111,5 +112,30 @@ impl<T: Transport> MasterTask<T> {
 
     pub(crate) async fn process_next_message(&mut self) -> Result<(), StopReason> {
         self.session.process_next_message().await
+    }
+
+    /// True once shutdown is requested, or every handle is dropped
+    pub(crate) fn is_shutdown(&self) -> bool {
+        self.session.messages.is_shutdown()
+    }
+
+    /// An observer of the shutdown signal, for waits outside the session
+    pub(crate) fn shutdown_listener(&self) -> ShutdownListener {
+        self.session.messages.listener()
+    }
+
+    /// End the task for good: drain the request queue, so every queued request fails, then fail
+    /// the associations' requests with `Shutdown`
+    ///
+    /// Callers run nothing that can reach user code, including logging, between the session
+    /// stopping with `Shutdown` and this call.
+    pub(crate) async fn finish(self) {
+        let MasterSession {
+            messages,
+            mut associations,
+            ..
+        } = self.session;
+        messages.close_and_drain().await;
+        associations.reset(RunError::Stop(StopReason::Shutdown));
     }
 }

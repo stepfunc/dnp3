@@ -9,7 +9,7 @@ use std::time::Duration;
 use crate::app::Timeout;
 use crate::link::error::LinkError;
 use crate::phys::PhysLayer;
-use crate::session::connection::{run_connection, Connection};
+use crate::session::connection::{run_connection, Connection, OpenError};
 use crate::session::Session;
 use crate::udp::factory::UdpFactory;
 
@@ -22,6 +22,7 @@ pub(crate) struct UdpTask {
 impl UdpTask {
     pub(crate) async fn run(mut self) {
         run_connection(&mut self).await;
+        self.session.finish().await;
     }
 }
 
@@ -36,12 +37,17 @@ impl Connection for UdpTask {
 
     async fn disabled(&mut self) {}
 
-    async fn open(&mut self) -> Result<(PhysLayer, ()), Duration> {
-        match self.factory.open().await {
+    async fn open(&mut self) -> Result<(PhysLayer, ()), OpenError> {
+        let mut shutdown = self.session.shutdown_listener();
+        let result = tokio::select! {
+            _ = shutdown.wait() => return Err(OpenError::Shutdown),
+            result = self.factory.open() => result,
+        };
+        match result {
             Ok(phys) => Ok((phys, ())),
             Err(err) => {
                 tracing::error!("{err}");
-                Err(self.retry_delay.into())
+                Err(OpenError::Retry(self.retry_delay.into()))
             }
         }
     }

@@ -14,13 +14,12 @@ impl MasterSession {
         dest: FragmentAddr,
         control: ControlField,
         writer: &mut TransportWriter<T>,
-    ) -> Result<(), LinkError> {
+    ) -> Result<(), RunError> {
         let mut cursor = self.tx_buffer.write_cursor();
-        write::start_request(control, FunctionCode::Confirm, &mut cursor)?;
-        writer
-            .write(io, self.decode_level, dest, cursor.written())
-            .await?;
-        Ok(())
+        write::start_request(control, FunctionCode::Confirm, &mut cursor)
+            .map_err(LinkError::from)?;
+        let write = writer.write(io, self.decode_level, dest, cursor.written());
+        unless_shutdown(&mut self.messages, write).await
     }
 
     pub(super) async fn send_request<T: Transport, U>(
@@ -40,9 +39,8 @@ impl MasterSession {
         let mut hw =
             write::start_request(ControlField::request(seq), request.function(), &mut cursor)?;
         request.write(&mut hw)?;
-        writer
-            .write(io, self.decode_level, addr, cursor.written())
-            .await?;
+        let write = writer.write(io, self.decode_level, addr, cursor.written());
+        unless_shutdown(&mut self.messages, write).await?;
         Ok(seq)
     }
 }

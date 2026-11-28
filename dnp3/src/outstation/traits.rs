@@ -234,6 +234,9 @@ pub trait OutstationApplication: Sync + Send + 'static {
     /// to persist the modified value to non-volatile memory if desired
     ///
     /// A negative dead-band written by the master is stored, and reported here, as 0
+    ///
+    /// This runs with the database locked, so it must not call `transaction` on the same
+    /// outstation.
     #[expect(
         unused_variables,
         reason = "the default implementation ignores its arguments"
@@ -314,6 +317,9 @@ pub trait OutstationApplication: Sync + Send + 'static {
     fn begin_confirm(&mut self) {}
 
     /// Called when an event is cleared from the buffer due to master confirmation
+    ///
+    /// This runs with the database locked, so it must not call `transaction` on the same
+    /// outstation.
     #[expect(
         unused_variables,
         reason = "the default implementation ignores its arguments"

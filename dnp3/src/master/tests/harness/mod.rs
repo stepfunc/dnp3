@@ -27,7 +27,7 @@ use crate::master::{
 use crate::phys::{PhysAddr, PhysLayer};
 use crate::transport::mock::reader::RxFrameInfo;
 use crate::transport::mock::MockTransport;
-use crate::util::lifecycle::{Enabled, RunError};
+use crate::util::lifecycle::{Enabled, RunError, StopReason};
 
 pub(crate) mod requests;
 
@@ -57,19 +57,27 @@ fn spawn_run(
     let (io, io_handle) = sfio_tokio_mock_io::mock();
     let mut io = PhysLayer::mock(io);
     let run = tokio::spawn(async move {
-        while task.enabled() == Enabled::No {
-            if let Err(reason) = task.process_next_message().await {
-                return RunError::Stop(reason);
-            }
-        }
-        let err = task.run(&mut io).await;
-        if let Some(keep) = keep {
+        let err = run_until_stopped(&mut task, &mut io).await;
+        if err == RunError::Stop(StopReason::Shutdown) {
+            // terminal, as for the real tasks
+            task.finish().await;
+        } else if let Some(keep) = keep {
             // a harness that was dropped won't run it again
             drop(keep.send(task));
         }
         err
     });
     (run, io_handle)
+}
+
+/// Wait while disabled, then run the master on `io`
+async fn run_until_stopped(task: &mut MasterTask<MockTransport>, io: &mut PhysLayer) -> RunError {
+    while task.enabled() == Enabled::No {
+        if let Err(reason) = task.process_next_message().await {
+            return RunError::Stop(reason);
+        }
+    }
+    task.run(io).await
 }
 
 async fn create(
@@ -90,7 +98,7 @@ async fn create(
     };
 
     // Create the master session
-    let (tx, rx) = crate::util::channel::request_channel();
+    let (tx, rx) = crate::util::channel::request_queue();
     let mut task = MasterTask::<MockTransport>::with_transport(
         Enabled::Yes,
         AssociationMap::new(),

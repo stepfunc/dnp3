@@ -42,7 +42,7 @@ use crate::transport::{
     TransportReader, TransportResponse, TransportResponseError, TransportWriter,
 };
 use crate::util::buffer::Buffer;
-use crate::util::channel::Receiver;
+use crate::util::channel::RequestReceiver;
 
 use crate::app::parse::options::ParseOptions;
 use crate::link::reader::LinkModes;
@@ -53,8 +53,10 @@ use tokio::time::Instant;
 struct MasterSession {
     enabled: Enabled,
     decode_level: DecodeLevel,
+    // declared before the associations, so a task dropped without `finish` closes its queue before
+    // the association objects are dropped
+    messages: RequestReceiver<Message>,
     associations: AssociationMap,
-    messages: Receiver<Message>,
     tx_buffer: Buffer,
 }
 
@@ -110,6 +112,19 @@ fn fails_task(source: FragmentAddr, destination: FragmentAddr) -> bool {
     false
 }
 
+/// Run a write unless shutdown is requested first. A shutdown must not surface as a link error,
+/// which would run the reconnect path and its callbacks.
+async fn unless_shutdown(
+    messages: &mut RequestReceiver<Message>,
+    write: impl std::future::Future<Output = Result<(), LinkError>>,
+) -> Result<(), RunError> {
+    tokio::select! {
+        biased;
+        _ = messages.wait_for_shutdown() => Err(RunError::Stop(StopReason::Shutdown)),
+        result = write => Ok(result?),
+    }
+}
+
 async fn sleep_until(deadline: Option<Instant>) {
     match deadline {
         Some(deadline) => tokio::time::sleep_until(deadline).await,
@@ -122,7 +137,7 @@ impl MasterSession {
         initial_state: Enabled,
         decode_level: DecodeLevel,
         tx_buffer_size: BufferSize<249, 2048>,
-        messages: Receiver<Message>,
+        messages: RequestReceiver<Message>,
         associations: AssociationMap,
     ) -> Self {
         Self {
@@ -181,6 +196,11 @@ impl<T: Transport> MasterTask<T> {
     /// Run the master until an error or shutdown occurs.
     async fn run_session(&mut self, io: &mut PhysLayer) -> RunError {
         loop {
+            // a task can fail without waiting, for example a request that can't be formatted, and
+            // a zero-period poll then runs again at once
+            if self.session.messages.is_shutdown() {
+                return RunError::Stop(StopReason::Shutdown);
+            }
             let result = match self.session.get_next_task() {
                 Next::Now(task) => {
                     let id = task.details.get_id();
@@ -193,12 +213,10 @@ impl<T: Transport> MasterTask<T> {
             };
 
             if let Err(err) = result {
-                self.session.reset(err);
-
-                if RunError::Stop(StopReason::Shutdown) == err {
-                    self.session.messages.close_and_drain();
+                // a shutdown is terminal: `finish` drains the queue and then resets
+                if err != RunError::Stop(StopReason::Shutdown) {
+                    self.session.reset(err);
                 }
-
                 return err;
             }
         }

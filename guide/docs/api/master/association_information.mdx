@@ -19,6 +19,9 @@ automatic task, such as a rejected enable-unsolicited, shows up here before anyw
 | `taskFail` | A task fails. It receives the reason |
 | `unsolicitedResponse` | The master processes an unsolicited response, or receives a repeat of the last one |
 
+A failure can be reported while the channel shuts down, so `taskFail` must not wait for another unfinished request on
+the same channel. The same goes for a `FileReader`'s `aborted`.
+
 Keep-alives and link status checks aren't reported, and neither is a request that fails before it starts, for example
 because the channel isn't connected: only its caller sees that error.
 

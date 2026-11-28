@@ -20,7 +20,9 @@ use crate::tcp::{
 };
 use crate::util::lifecycle::Enabled;
 
-/// Spawn a TCP client task onto the `Tokio` runtime. The task runs until the returned handle is dropped.
+/// Spawn a TCP client task onto the `Tokio` runtime. The task runs until it is shut down with
+/// [`OutstationHandle::shutdown`](crate::outstation::OutstationHandle::shutdown) or every clone of the
+/// returned handle is dropped.
 ///
 /// **Note**: This function may only be called from within the runtime itself, and panics otherwise.
 /// Use Runtime::enter() if required.
@@ -52,7 +54,9 @@ pub fn spawn_outstation_tcp_client(
     )
 }
 
-/// Spawn a TCP client task onto the `Tokio` runtime. The task runs until the returned handle is dropped.
+/// Spawn a TCP client task onto the `Tokio` runtime. The task runs until it is shut down with
+/// [`OutstationHandle::shutdown`](crate::outstation::OutstationHandle::shutdown) or every clone of the
+/// returned handle is dropped.
 ///
 /// This function is similar to [`spawn_outstation_tcp_client`] but provides fine-grained control over
 /// connection management via a user implementation of the [`ClientConnectionHandler`] trait.
@@ -97,6 +101,6 @@ pub(crate) fn spawn_outstation_client(
 ) {
     let name = connect_handler.endpoint_span_name();
     let session = Session::outstation(task);
-    let mut client = ClientTask::new(session, connect_handler, post_connection, listener);
+    let client = ClientTask::new(session, connect_handler, post_connection, listener);
     tokio::spawn(async move { client.run().instrument(span(&name)).await });
 }

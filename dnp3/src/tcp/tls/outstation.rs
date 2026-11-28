@@ -28,7 +28,9 @@ use tokio_rustls::rustls::pki_types::ServerName;
 
 use crate::link::reader::LinkModes;
 
-/// Spawn a TLS client task onto the `Tokio` runtime. The task runs until the returned handle is dropped.
+/// Spawn a TLS client task onto the `Tokio` runtime. The task runs until it is shut down with
+/// [`OutstationHandle::shutdown`](crate::outstation::OutstationHandle::shutdown) or every clone of the
+/// returned handle is dropped.
 ///
 /// **Note**: This function may only be called from within the runtime itself, and panics otherwise.
 /// Use Runtime::enter() if required.
@@ -62,7 +64,9 @@ pub fn spawn_outstation_tls_client(
     )
 }
 
-/// Spawn a TLS client task onto the `Tokio` runtime. The task runs until the returned handle is dropped.
+/// Spawn a TLS client task onto the `Tokio` runtime. The task runs until it is shut down with
+/// [`OutstationHandle::shutdown`](crate::outstation::OutstationHandle::shutdown) or every clone of the
+/// returned handle is dropped.
 ///
 /// This function is similar to [`spawn_outstation_tls_client`] but provides fine-grained control over
 /// connection management via a user implementation of the [`ClientConnectionHandler`] trait.

@@ -102,10 +102,23 @@ impl ServerTask {
         }
     }
 
-    pub(crate) async fn run(&mut self) -> Result<(), Shutdown> {
+    /// Run until shut down, then drain the outstation's request queue
+    pub(crate) async fn run(mut self) -> Result<(), Shutdown> {
+        let result = self.run_sessions().await;
+        self.task.finish().await;
+        result
+    }
+
+    /// Serve connections from the server, one at a time, until shut down
+    async fn run_sessions(&mut self) -> Result<(), Shutdown> {
         let mut session = None;
 
         loop {
+            // a replacement connection can win over a shutdown request; don't start another
+            // `Connected` callback for it
+            if self.task.is_shutdown() {
+                return Err(Shutdown);
+            }
             match session.take() {
                 None => {
                     session.replace(self.wait_for_session().await?);

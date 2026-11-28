@@ -192,12 +192,8 @@ impl Poll {
 }
 
 pub(crate) enum PollMsg {
-    AddPoll(
-        AssociationHandle,
-        ReadRequest,
-        Duration,
-        Promise<Result<PollHandle, PollError>>,
-    ),
+    /// replies with the id of the new poll
+    AddPoll(ReadRequest, Duration, Promise<Result<u64, PollError>>),
     RemovePoll(u64),
     Demand(u64),
 }
@@ -205,7 +201,7 @@ pub(crate) enum PollMsg {
 impl PollMsg {
     pub(crate) fn on_error(self, err: PollErrorKind) {
         match self {
-            PollMsg::AddPoll(_, _, _, callback) => callback.complete(Err(err.into())),
+            PollMsg::AddPoll(_, _, callback) => callback.complete(Err(err.into())),
             PollMsg::RemovePoll(_) => {}
             PollMsg::Demand(_) => {}
         }

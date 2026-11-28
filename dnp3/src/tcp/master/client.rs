@@ -17,8 +17,9 @@ use crate::tcp::{ClientConnectionHandler, EndpointList, SimpleConnectHandler};
 use crate::tcp::{ClientState, ConnectOptions, PostConnectionHandler};
 use crate::util::lifecycle::Enabled;
 
-/// Spawn a task onto the `Tokio` runtime. The task runs until the returned handle, and any
-/// `AssociationHandle` created from it is dropped.
+/// Spawn a task onto the `Tokio` runtime. The task runs until it is shut down with
+/// [`MasterChannel::shutdown`](crate::master::MasterChannel::shutdown), or until the returned
+/// handle and every `AssociationHandle` created from it are dropped.
 ///
 /// **Note**: This function may only be called from within the runtime itself, and panics otherwise.
 /// Use Runtime::enter() if required.
@@ -83,7 +84,7 @@ pub(crate) fn spawn_master_client(
     span: fn(&str) -> tracing::Span,
 ) -> MasterChannel {
     let name = connect_handler.endpoint_span_name();
-    let (mut task, handle) = wire_master_client(
+    let (task, handle) = wire_master_client(
         LinkModes::stream(link_error_mode),
         MasterChannelType::Stream,
         connect_handler,
@@ -103,7 +104,7 @@ pub(crate) fn wire_master_client(
     connection_handler: PostConnectionHandler,
     listener: Box<dyn Listener<ClientState>>,
 ) -> (ClientTask, MasterChannel) {
-    let (tx, rx) = crate::util::channel::request_channel();
+    let (tx, rx) = crate::util::channel::request_queue();
     let session = Session::master(MasterTask::new(Enabled::No, link_modes, config, rx));
     let client = ClientTask::new(session, connect_handler, connection_handler, listener);
     (client, MasterChannel::new(tx, channel_type))

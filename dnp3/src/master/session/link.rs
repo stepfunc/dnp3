@@ -22,9 +22,10 @@ impl<T: Transport> MasterTask<T> {
     ) -> Result<(), TaskErrorKind> {
         // Send link status request
         tracing::info!("sending link status request (for {})", destination.link);
-        self.writer
-            .send_link_status_request(io, self.session.decode_level, destination)
-            .await?;
+        let write =
+            self.writer
+                .send_link_status_request(io, self.session.decode_level, destination);
+        unless_shutdown(&mut self.session.messages, write).await?;
 
         let deadline = Deadline::from_now(self.session.associations.get_timeout(destination.link)?);
 

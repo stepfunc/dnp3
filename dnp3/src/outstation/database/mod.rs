@@ -534,6 +534,11 @@ impl std::fmt::Debug for DatabaseHandle {
 
 impl DatabaseHandle {
     /// Acquire a mutex on the underlying database and apply a set of changes as a transaction
+    ///
+    /// `func` runs with the database locked, so it must not wait for space in the outstation's
+    /// request queue, as [`OutstationHandle::enable`](crate::outstation::OutstationHandle::enable), [`OutstationHandle::disable`](crate::outstation::OutstationHandle::disable) and
+    /// [`OutstationHandle::set_decode_level`](crate::outstation::OutstationHandle::set_decode_level) can: if the queue is full while the outstation waits
+    /// for the lock, that wait never ends. [`OutstationHandle::shutdown`](crate::outstation::OutstationHandle::shutdown) never waits.
     pub fn transaction<F, R>(&self, func: F) -> R
     where
         F: FnMut(&mut Database) -> R,

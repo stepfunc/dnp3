@@ -40,7 +40,7 @@ use crate::master::{
 };
 use crate::phys::PhysAddr;
 use crate::transport::FragmentAddr;
-use crate::util::channel::Sender;
+use crate::util::channel::RequestSender;
 use crate::util::lifecycle::Enabled;
 
 /// Master channels may be Udp or of a "stream" type such as TCP
@@ -61,7 +61,7 @@ pub enum MasterChannelType {
 #[derive(Debug, Clone)]
 pub struct MasterChannel {
     channel_type: MasterChannelType,
-    sender: Sender<Message>,
+    sender: RequestSender<Message>,
 }
 
 /// Handle used to make requests against a particular outstation associated with the master channel
@@ -108,11 +108,29 @@ impl MasterChannelConfig {
 }
 
 impl MasterChannel {
-    pub(crate) fn new(sender: Sender<Message>, channel_type: MasterChannelType) -> Self {
+    pub(crate) fn new(sender: RequestSender<Message>, channel_type: MasterChannelType) -> Self {
         Self {
             sender,
             channel_type,
         }
+    }
+
+    /// Shut down the master task
+    ///
+    /// The task observes the request at its next wait: for a request queue, a timer, or the
+    /// physical layer. A callback in progress completes first, and a request that overlaps this call
+    /// can still complete. Requests still queued or waiting when the task observes it fail with
+    /// [`Shutdown`], as does any later request. Calling it again, or after the task has ended, does
+    /// nothing.
+    ///
+    /// Dropping every clone of the handle has the same effect. A Rust caller that holds a pending
+    /// request future which has already been given a slot in the queue, and neither polls nor
+    /// drops it, delays the task's exit until it does.
+    ///
+    /// This covers protocol shutdown only. When the Tokio runtime itself shuts down, it drops the
+    /// task at its next yield, including inside a user callback that is awaiting.
+    pub fn shutdown(&self) {
+        self.sender.shutdown();
     }
 
     /// enable communications
@@ -279,9 +297,12 @@ impl AssociationHandle {
         period: Duration,
     ) -> Result<PollHandle, PollError> {
         let (promise, rx) = Promise::one_shot();
-        self.send_poll_message(PollMsg::AddPoll(self.clone(), request, period, promise))
+        // the message carries no handle: a handle left in a queue the task can't drain would keep
+        // the task alive after every other handle is dropped
+        self.send_poll_message(PollMsg::AddPoll(request, period, promise))
             .await?;
-        await_result(rx).await
+        let id = await_result(rx).await?;
+        Ok(PollHandle::new(self.clone(), id))
     }
 
     /// Remove the association from the master
@@ -616,6 +637,9 @@ pub trait AssociationInformation: Send + Sync {
     /// documentation.
     fn task_success(&mut self, _task_type: TaskType, _fc: FunctionCode, _seq: Sequence) {}
     /// Called when a task fails
+    ///
+    /// This can run while the master is shutting down, so it must not wait for another
+    /// unfinished request on the same channel.
     fn task_fail(&mut self, _task_type: TaskType, _error: TaskError) {}
 
     /// Called when an unsolicited response is processed, or when it duplicates the last one

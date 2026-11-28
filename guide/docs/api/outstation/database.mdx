@@ -20,6 +20,11 @@ Access the database in a transaction two ways:
 
 2. `ControlHandler` callbacks and `OutstationApplication` freeze operations provide a `DatabaseHandle` with an identical `transaction` method.
 
+The database stays locked while a transaction runs, so the transaction must not wait for space in the outstation's
+request queue, as `enable`, `disable` and `set_decode_level` can; the outstation's own `shutdown` never waits. For the
+same reason, `OutstationApplication::event_cleared` and `OutstationApplication::write_analog_dead_band`, which run with
+the database locked, must not start a transaction on the same outstation.
+
 :::tip
 Structure any common update code to operate on the `Database` type and not depend on `Outstation` or `DatabaseHandle`.
 :::

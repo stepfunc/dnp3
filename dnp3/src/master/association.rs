@@ -21,7 +21,7 @@ use crate::master::error::{AssociationErrorKind, TaskErrorKind, TimeSyncErrorKin
 use crate::master::extract::{extract_measurements, Delivered, ProcessableResponse};
 use crate::master::handler::AssociationHandler;
 use crate::master::messages::AssociationMsgType;
-use crate::master::poll::{Poll, PollHandle, PollMap, PollMsg};
+use crate::master::poll::{Poll, PollMap, PollMsg};
 #[cfg(feature = "unstable")]
 use crate::master::request::ReadRequest;
 use crate::master::request::{Classes, EventClasses, TimeSyncProcedure};
@@ -540,10 +540,8 @@ impl Association {
 
     fn process_poll_message(&mut self, msg: PollMsg) {
         match msg {
-            PollMsg::AddPoll(association, request, period, callback) => {
-                let id = self.polls.add(request, period);
-                let handle = PollHandle::new(association, id);
-                callback.complete(Ok(handle))
+            PollMsg::AddPoll(request, period, callback) => {
+                callback.complete(Ok(self.polls.add(request, period)));
             }
             PollMsg::RemovePoll(id) => {
                 self.polls.remove(id);

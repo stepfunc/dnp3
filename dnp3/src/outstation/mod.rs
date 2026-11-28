@@ -13,7 +13,7 @@ use crate::app::Shutdown;
 use crate::decode::DecodeLevel;
 use crate::outstation::database::{Database, DatabaseHandle};
 use crate::outstation::session::task::{ConfigurationChange, OutstationMessage};
-use crate::util::channel::Sender;
+use crate::util::channel::RequestSender;
 
 /// database API to add/remove/update values
 pub mod database;
@@ -37,7 +37,7 @@ mod tests;
 #[derive(Clone)]
 pub struct OutstationHandle {
     database: DatabaseHandle,
-    sender: Sender<OutstationMessage>,
+    sender: RequestSender<OutstationMessage>,
 }
 
 impl std::fmt::Debug for OutstationHandle {
@@ -53,6 +53,11 @@ impl OutstationHandle {
     }
 
     /// Acquire a mutex on the underlying database and apply a set of changes as a transaction
+    ///
+    /// `func` runs with the database locked, so it must not wait for space in the outstation's
+    /// request queue, as [`OutstationHandle::enable`], [`OutstationHandle::disable`] and
+    /// [`OutstationHandle::set_decode_level`] can: if the queue is full while the outstation waits
+    /// for the lock, that wait never ends. [`OutstationHandle::shutdown`] never waits.
     pub fn transaction<F, R>(&self, func: F) -> R
     where
         F: FnMut(&mut Database) -> R,
@@ -80,8 +85,34 @@ impl OutstationHandle {
         Ok(())
     }
 
-    pub(crate) async fn shutdown(&self) -> Result<(), Shutdown> {
-        self.sender.send(OutstationMessage::Shutdown).await?;
-        Ok(())
+    /// Shut down the outstation task
+    ///
+    /// The task observes the request at its next wait: for its request queue, a timer, or the
+    /// physical layer. A callback in progress completes first, and a request from the master that
+    /// overlaps this call can still be answered. Later calls that send to the task fail with
+    /// [`Shutdown`]; [`OutstationHandle::transaction`] still updates the database, but nothing
+    /// transmits the change. Calling it again, or after the task has ended, does
+    /// nothing.
+    ///
+    /// For an outstation not added to a server, dropping every clone of the handle has the same
+    /// effect. A Rust caller that holds a pending
+    /// `enable`, `disable` or `set_decode_level` future which has already been given a slot in the queue, and neither polls nor
+    /// drops it, delays the task's exit until it does.
+    ///
+    /// This covers protocol shutdown only. When the Tokio runtime itself shuts down, it drops the
+    /// task at its next yield, including inside a user callback that is awaiting.
+    ///
+    /// An outstation added to a TCP server stops while the server keeps running, and the server
+    /// closes later connections for it.
+    pub fn shutdown(&self) {
+        self.sender.shutdown();
+    }
+
+    pub(crate) fn is_shutdown(&self) -> bool {
+        self.sender.is_shutdown()
+    }
+
+    pub(crate) fn shutdown_listener(&self) -> crate::util::shutdown::ShutdownListener {
+        self.sender.listener()
     }
 }
