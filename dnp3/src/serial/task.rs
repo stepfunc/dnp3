@@ -11,7 +11,7 @@ use crate::app::{ExponentialBackOff, Listener, RetryStrategy};
 use crate::link::error::LinkError;
 use crate::phys::PhysLayer;
 use crate::serial::{PortState, SerialSettings};
-use crate::session::connection::{run_connection, Connection};
+use crate::session::connection::{run_connection, Connection, OpenError};
 use crate::session::Session;
 
 pub(crate) struct SerialTask {
@@ -39,9 +39,15 @@ impl SerialTask {
         }
     }
 
-    pub(crate) async fn run(&mut self) {
-        run_connection(self).await;
-        self.listener.update(PortState::Shutdown).get().await;
+    pub(crate) async fn run(mut self) {
+        run_connection(&mut self).await;
+        let Self {
+            session,
+            mut listener,
+            ..
+        } = self;
+        session.finish().await;
+        listener.update(PortState::Shutdown).get().await;
     }
 
     async fn wait(&mut self, err: impl Display + Send) -> Duration {
@@ -63,13 +69,19 @@ impl Connection for SerialTask {
         self.listener.update(PortState::Disabled).get().await;
     }
 
-    async fn open(&mut self) -> Result<(PhysLayer, ()), Duration> {
+    async fn open(&mut self) -> Result<(PhysLayer, ()), OpenError> {
+        // opening is synchronous and can't be interrupted, so the flag is checked around it
         match crate::serial::open(self.path.as_str(), self.serial_settings) {
-            Err(err) => Err(self.wait(err).await),
+            // a shutdown requested during the open isn't a failure to report and retry
+            Err(_) if self.session.is_shutdown() => Err(OpenError::Shutdown),
+            Err(err) => Err(OpenError::Retry(self.wait(err).await)),
             Ok(serial) => {
                 self.back_off.on_success();
                 tracing::info!("serial port open");
                 self.listener.update(PortState::Open).get().await;
+                if self.session.is_shutdown() {
+                    return Err(OpenError::Shutdown);
+                }
                 Ok((PhysLayer::serial(serial), ()))
             }
         }

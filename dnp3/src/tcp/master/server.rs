@@ -13,7 +13,7 @@ use crate::master::session::task::MasterTask;
 use crate::master::{MasterChannel, MasterChannelConfig, MasterChannelType};
 use crate::phys::{PhysLayer, Socket};
 use crate::session::Session;
-use crate::util::lifecycle::Enabled;
+use crate::util::lifecycle::{Enabled, RunError};
 use std::future::Future;
 
 use crate::app::parse::options::ParseOptions;
@@ -100,7 +100,7 @@ pub async fn spawn_master_tcp_server<C: ConnectionHandler>(
 
     let assigned_addr = listener.local_addr().ok();
 
-    let (token, shutdown_listener) = crate::util::shutdown::shutdown_token();
+    let (signal, shutdown_listener) = crate::util::shutdown::shutdown_signal();
 
     let accept_task = AcceptTask::new(listener, shutdown_listener, link_id_config, handler);
 
@@ -115,7 +115,7 @@ pub async fn spawn_master_tcp_server<C: ConnectionHandler>(
 
     let handle = ServerHandle {
         addr: assigned_addr,
-        _token: token,
+        signal,
     };
 
     Ok(handle)
@@ -269,7 +269,7 @@ impl<C: ConnectionHandler, L: Listen> AcceptTask<C, L> {
                 let res = res.unwrap_or_else(|err| Err(std::io::Error::other(err)));
                 Ok(TaskEvent::LinkId(res))
             }
-            _ = self.shutdown_listener.listen() => {
+            _ = self.shutdown_listener.wait() => {
                 Err(Shutdown)
             }
         }
@@ -350,7 +350,7 @@ impl SessionTask {
         accept: AcceptConfig,
         link_id: Option<&LinkIdentity>,
     ) -> Option<(Self, MasterChannel)> {
-        let (tx, rx) = crate::util::channel::request_channel();
+        let (tx, rx) = crate::util::channel::request_queue();
         let mut task = MasterTask::new(
             Enabled::No,
             LinkModes::stream(accept.error_mode),
@@ -372,19 +372,27 @@ impl SessionTask {
     }
 
     fn spawn(self, addr: SocketAddr, conn_id: u64) {
-        let future = async move {
-            let _: Result<(), crate::app::Shutdown> = self.run().await;
-        }
-        .instrument(tracing::info_span!("master-session", remote = ?addr, conn = conn_id));
+        let future = self
+            .run()
+            .instrument(tracing::info_span!("master-session", remote = ?addr, conn = conn_id));
 
         tokio::spawn(future);
     }
 
-    async fn run(mut self) -> Result<(), Shutdown> {
-        self.session.wait_for_enabled().await?;
-        let err = self.session.run(&mut self.phys).await;
-        tracing::info!("closing: {err}");
-        Ok(())
+    /// Run until shut down, disabled or the link fails, then end the session for good
+    async fn run(mut self) {
+        let result = self.serve().await;
+        // the queue drains before anything that can reach user code, including the log below
+        self.session.finish().await;
+        if let Some(err) = result {
+            tracing::info!("closing: {err}");
+        }
+    }
+
+    /// Wait to be enabled, then run the session. Returns nothing if shut down while waiting.
+    async fn serve(&mut self) -> Option<RunError> {
+        self.session.wait_for_enabled().await.ok()?;
+        Some(self.session.run(&mut self.phys).await)
     }
 }
 
@@ -793,13 +801,10 @@ mod tests {
                 events: events_tx,
                 channels: channels_tx,
             };
-            let (token, shutdown_listener) = crate::util::shutdown::shutdown_token();
+            let (signal, shutdown_listener) = crate::util::shutdown::shutdown_signal();
             let task = AcceptTask::new(listener, shutdown_listener, config, handler);
             Self {
-                handle: ServerHandle {
-                    addr: None,
-                    _token: token,
-                },
+                handle: ServerHandle { addr: None, signal },
                 task: tokio::spawn(task.run()),
                 events,
                 channels,
@@ -868,6 +873,18 @@ mod tests {
             server.task.await.unwrap();
             assert!(failed_at.elapsed() < ACCEPT_ERROR_DELAY);
             assert_eq!(peers.attempts.recv().await, None);
+        })
+        .await;
+    }
+
+    // catches a handle whose `shutdown` doesn't reach the accept loop: the handle is alive
+    #[tokio::test(start_paused = true)]
+    async fn shutting_down_the_server_stops_it() {
+        watchdog(async {
+            let (listener, _peers) = FaultyListener::new(&[]);
+            let server = FaultyServer::spawn(listener, false);
+            server.handle.shutdown();
+            let Shutdown = server.task.await.unwrap();
         })
         .await;
     }

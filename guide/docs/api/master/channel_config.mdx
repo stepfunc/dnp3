@@ -74,7 +74,13 @@ to stop communicating without losing them.
 
 Keep the channel for as long as it should run. In Java and .NET, a channel shuts down when it's garbage collected, so
 keep a reference to it, and shut it down yourself when you're done. In C and C++, destroying it shuts it down. In Rust,
-it runs until the `MasterChannel` and every `AssociationHandle` created from it are dropped.
+it runs until you call `MasterChannel::shutdown`, or until the `MasterChannel` and every `AssociationHandle` created
+from it are dropped.
+
+The master stops at its next wait, on a request, a timer or the connection. A callback that is running finishes first,
+so a request that overlaps the shutdown can still complete. Requests still queued then fail with a shutdown error. In
+Rust they have failed before the channel's final state is reported; in the bindings the failure can be delivered after
+it. Shutting down the runtime is different: it stops each task at its next yield, even one waiting inside a callback.
 
 ## Logging at runtime
 

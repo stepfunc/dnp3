@@ -16,8 +16,9 @@ use crate::serial::{PortState, SerialSettings};
 use crate::session::Session;
 use crate::util::lifecycle::Enabled;
 
-/// Spawn a master task onto the `Tokio` runtime. The task runs until the returned handle, and any
-/// `AssociationHandle` created from it, are dropped.
+/// Spawn a master task onto the `Tokio` runtime. The task runs until it is shut down with
+/// [`MasterChannel::shutdown`](crate::master::MasterChannel::shutdown), or until the returned
+/// handle and every `AssociationHandle` created from it are dropped.
 ///
 /// **Note**: This function may only be called from within the runtime itself, and panics otherwise.
 /// Use Runtime::enter() if required.
@@ -29,9 +30,9 @@ pub fn spawn_master_serial(
     listener: Box<dyn Listener<PortState>>,
 ) -> MasterChannel {
     let log_path = path.to_owned();
-    let (tx, rx) = crate::util::channel::request_channel();
+    let (tx, rx) = crate::util::channel::request_queue();
     let task = MasterTask::new(Enabled::No, LinkModes::serial(), config, rx);
-    let mut serial = super::task::SerialTask::new(
+    let serial = super::task::SerialTask::new(
         path,
         serial_settings,
         Session::master(task),

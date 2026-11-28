@@ -388,7 +388,7 @@ async fn operate_no_ack_fails_without_a_connection() {
             .register(association(address, AssociationConfig::quiet(), null()))
             .unwrap();
 
-        let (tx, rx) = crate::util::channel::request_channel();
+        let (tx, rx) = crate::util::channel::request_queue();
         let mut task = MasterTask::with_associations(
             Enabled::Yes,
             associations,

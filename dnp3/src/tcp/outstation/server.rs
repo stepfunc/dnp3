@@ -29,6 +29,22 @@ struct OutstationInfo {
     sender: Sender<NewSession>,
 }
 
+impl OutstationInfo {
+    /// False once the outstation was shut down, or its adapter is gone
+    fn is_available(&self) -> bool {
+        !self.handle.is_shutdown() && !self.sender.is_closed()
+    }
+
+    /// Wait until the route is no longer available
+    async fn unavailable(&self) {
+        let mut listener = self.handle.shutdown_listener();
+        tokio::select! {
+            _ = listener.wait() => {}
+            _ = self.sender.closed() => {}
+        }
+    }
+}
+
 /// A builder for creating a TCP server with one or more outstation instances
 /// associated with it
 pub struct Server {
@@ -136,7 +152,7 @@ impl Server {
         listener: Box<dyn Listener<ConnectionState>>,
         filter: AddressFilter,
     ) -> Result<(OutstationHandle, impl std::future::Future<Output = ()>), FilterError> {
-        let (handle, mut adapter) = self.register_outstation(
+        let (handle, adapter) = self.register_outstation(
             config,
             application,
             information,
@@ -278,7 +294,7 @@ impl Server {
         listener: L,
         addr: Option<SocketAddr>,
     ) -> (ServerHandle, AcceptTask<L>) {
-        let (token, shutdown_rx) = crate::util::shutdown::shutdown_token();
+        let (signal, shutdown_rx) = crate::util::shutdown::shutdown_signal();
 
         let task = AcceptTask {
             server: self,
@@ -286,17 +302,16 @@ impl Server {
             shutdown_rx,
         };
 
-        let handle = ServerHandle {
-            addr,
-            _token: token,
-        };
+        let handle = ServerHandle { addr, signal };
 
         (handle, task)
     }
 
     /// Consume the `TcpServer` builder object, bind it to pre-specified port, and spawn the server
-    /// task onto the Tokio runtime. Returns a ServerHandle that will shut down the server and all
-    /// associated outstations when dropped.
+    /// task onto the Tokio runtime. Returns a ServerHandle that shuts down the server and all
+    /// associated outstations when [`ServerHandle::shutdown`] is called or it is dropped. The
+    /// accept loop shuts the outstations down when it observes the request, so until then they
+    /// can still accept calls.
     ///
     ///
     /// This must be called from within the Tokio runtime
@@ -325,15 +340,14 @@ impl Server {
         loop {
             tokio::select! {
                 _ = self.accept_one(&mut acceptor) => {}
-                _ = shutdown_rx.listen() => break,
+                _ = shutdown_rx.wait() => break,
             }
         }
 
         tracing::info!("shutting down outstations");
 
-        for x in self.outstations.iter_mut() {
-            // best effort to shut down outstations before exiting
-            let _: Result<(), crate::app::Shutdown> = x.handle.shutdown().await;
+        for x in self.outstations.iter() {
+            x.handle.shutdown();
         }
 
         tracing::info!("shutdown");
@@ -353,22 +367,44 @@ impl Server {
 
         tracing::info!("accepted connection {} from: {}", id, addr);
 
-        let first_match = self
-            .outstations
-            .iter_mut()
-            .find(|x| x.filter.matches(addr.ip()));
+        // a stopped outstation, or one whose adapter is gone, no longer matches connections
+        self.outstations.retain(OutstationInfo::is_available);
 
-        match first_match {
-            None => {
-                tracing::warn!("no matching outstation for: {}", addr)
-            }
-            Some(x) => {
-                if let Some(phys) = self.connection_handler.handle(stream, addr).await {
-                    if x.sender.send(NewSession::new(id, phys)).await.is_err() {
-                        tracing::warn!("outstation is shut down, closing connection from {}", addr);
-                    }
-                }
-            }
+        let Some(route) = self
+            .outstations
+            .iter()
+            .find(|x| x.filter.matches(addr.ip()))
+        else {
+            tracing::warn!("no matching outstation for: {}", addr);
+            return;
+        };
+
+        // a route that goes away during the handshake or the handoff must not hold up the accept
+        // loop, and with it every other outstation
+        let result = tokio::select! {
+            result = Self::hand_off(&self.connection_handler, route, stream, id, addr) => result,
+            _ = route.unavailable() => Err(Shutdown),
+        };
+        if result.is_err() {
+            tracing::warn!("outstation is shut down, closing connection from {}", addr);
+        }
+
+        // retiring a route whose adapter went away after the handoff drops the socket queued for it
+        self.outstations.retain(OutstationInfo::is_available);
+    }
+
+    /// Complete any TLS handshake and pass the connection to the outstation's adapter. Fails only
+    /// if the adapter is gone; a failed handshake was logged and is dropped.
+    async fn hand_off<S: Socket>(
+        handler: &ServerConnectionHandler,
+        route: &OutstationInfo,
+        stream: S,
+        id: u64,
+        addr: SocketAddr,
+    ) -> Result<(), Shutdown> {
+        match handler.handle(stream, addr).await {
+            Some(phys) => route.sender.send(NewSession::new(id, phys)).await,
+            None => Ok(()),
         }
     }
 }
@@ -381,7 +417,8 @@ impl<L: Listen> AcceptTask<L> {
 
 #[cfg(feature = "unstable")]
 impl TcpServerTask {
-    /// Run until the associated [`ServerHandle`] is dropped or the accept loop terminates.
+    /// Run until the associated [`ServerHandle`] is shut down or dropped, or the accept loop
+    /// terminates.
     pub async fn run(self) {
         self.inner.run().await;
     }
@@ -568,6 +605,72 @@ mod tests {
         async fn assert_closed<S: AsyncRead + Unpin>(socket: &mut S) {
             let mut buffer = [0; 64];
             while let Ok(1..) = socket.read(&mut buffer).await {}
+        }
+
+        /// How a test makes an outstation go away
+        #[derive(Copy, Clone, Debug)]
+        enum GoAway {
+            Shutdown,
+            DropAdapter,
+        }
+
+        // catches a handshake that isn't raced against its outstation going away: the accept loop
+        // would wait out the handshake timeout before serving the sibling
+        #[tokio::test(start_paused = true)]
+        async fn an_outstation_going_away_during_its_withheld_handshake_lets_a_sibling_be_served() {
+            for go_away in [GoAway::Shutdown, GoAway::DropAdapter] {
+                watchdog(async move {
+                    let sibling_ip = std::net::IpAddr::V4(std::net::Ipv4Addr::new(192, 0, 2, 1));
+                    let mut server = Server::new_tls_server(
+                        LinkErrorMode::Close,
+                        "127.0.0.1:0".parse().unwrap(),
+                        server_config(MinTlsVersion::V12),
+                    );
+                    let (gone, future) = server
+                        .add_outstation_no_spawn(
+                            outstation_config(),
+                            Box::new(NullApplication),
+                            Box::new(NullInformation),
+                            crate::outstation::DefaultControlHandler::create(),
+                            crate::app::NullListener::create(),
+                            AddressFilter::Exact(LOOPBACK),
+                        )
+                        .unwrap();
+                    // never polled, so only the stop signal or the dropped future can retire it
+                    let mut gone_adapter = Some(Box::pin(future));
+                    let (listener, mut sibling) = Timeline::new();
+                    let (_sibling, future) = server
+                        .add_outstation_no_spawn(
+                            outstation_config(),
+                            Box::new(NullApplication),
+                            Box::new(NullInformation),
+                            crate::outstation::DefaultControlHandler::create(),
+                            listener,
+                            AddressFilter::Exact(sibling_ip),
+                        )
+                        .unwrap();
+                    tokio::spawn(future);
+                    let (accept, mut peers) = FaultyListener::new(&[]);
+                    let (_handle, task) = server.create_task_with(accept, None);
+                    tokio::spawn(task.run());
+
+                    // never sends its ClientHello
+                    let (_withheld, _) = peers.connect(LOOPBACK);
+                    tokio::time::sleep(Duration::from_millis(1)).await;
+                    match go_away {
+                        GoAway::Shutdown => gone.shutdown(),
+                        GoAway::DropAdapter => drop(gone_adapter.take()),
+                    }
+
+                    let (peer, _) = peers.connect(sibling_ip);
+                    let _tls = handshake(peer).await;
+                    sibling
+                        .expect(Duration::from_millis(1), ConnectionState::Connected)
+                        .await;
+                    drop(gone_adapter);
+                })
+                .await;
+            }
         }
 
         #[tokio::test(start_paused = true)]
@@ -1071,7 +1174,7 @@ mod tests {
         async fn shutting_down_an_idle_outstation_ends_its_task_and_closes_later_connections() {
             watchdog(async {
                 let mut fixture = spawn();
-                fixture.outstation.shutdown().await.unwrap();
+                fixture.outstation.shutdown();
                 fixture.outstation_task.await.unwrap();
 
                 let (mut peer, _) = fixture.peers.connect(LOOPBACK);
@@ -1244,7 +1347,7 @@ mod tests {
                 started.await.unwrap();
 
                 // Request shutdown while `handle_input` is in flight.
-                fixture.outstation.shutdown().await.unwrap();
+                fixture.outstation.shutdown();
                 settle().await;
                 assert!(!fixture.outstation_task.is_finished());
 
@@ -1255,6 +1358,89 @@ mod tests {
                     .states
                     .expect(SETTLE, ConnectionState::Disconnected)
                     .await;
+            })
+            .await;
+        }
+
+        /// Reports each state, and holds the first `Connected` callback until the gate opens
+        struct HeldConnected {
+            entered: Option<tokio::sync::oneshot::Sender<()>>,
+            gate: Option<tokio::sync::oneshot::Receiver<()>>,
+        }
+
+        impl Listener<ConnectionState> for HeldConnected {
+            fn update(&mut self, value: ConnectionState) -> MaybeAsync<()> {
+                let (Some(entered), Some(gate)) = (self.entered.take(), self.gate.take()) else {
+                    return MaybeAsync::ready(());
+                };
+                assert_eq!(value, ConnectionState::Connected);
+                MaybeAsync::asynchronous(async move {
+                    entered.send(()).unwrap();
+                    gate.await.unwrap();
+                })
+            }
+        }
+
+        /// another outstation's peer address
+        const SIBLING: std::net::IpAddr =
+            std::net::IpAddr::V4(std::net::Ipv4Addr::new(192, 0, 2, 1));
+
+        // catches a handoff that isn't raced against its outstation stopping: with the adapter
+        // held in a callback, the handoff queue is full and the accept loop is blocked in the next
+        // send when the outstation stops, so the sibling would never be served
+        #[tokio::test(start_paused = true)]
+        async fn a_stopped_outstation_held_in_a_callback_does_not_hold_up_its_siblings() {
+            watchdog(async {
+                let mut server =
+                    Server::new_tcp_server(LinkErrorMode::Close, "127.0.0.1:0".parse().unwrap());
+                let (entered_tx, entered) = tokio::sync::oneshot::channel();
+                let (open, gate) = tokio::sync::oneshot::channel();
+                let (stopped, future) = server
+                    .add_outstation_no_spawn(
+                        outstation_config(),
+                        Box::new(NullApplication),
+                        Box::new(NullInformation),
+                        DefaultControlHandler::create(),
+                        Box::new(HeldConnected {
+                            entered: Some(entered_tx),
+                            gate: Some(gate),
+                        }),
+                        AddressFilter::Exact(LOOPBACK),
+                    )
+                    .unwrap();
+                let stopped_task = tokio::spawn(future);
+                let mut sibling =
+                    add_outstation(&mut server, AddressFilter::Exact(SIBLING)).unwrap();
+                let (_handle, mut peers) = run_in_memory(server);
+
+                let (_held, _) = peers.connect(LOOPBACK);
+                entered.await.unwrap();
+                // one more than the handoff queue holds
+                let waiting: Vec<_> = (0..17).map(|_| peers.connect(LOOPBACK)).collect();
+                tokio::time::sleep(SETTLE).await;
+                stopped.shutdown();
+
+                let (_served, _) = peers.connect(SIBLING);
+                assert_eq!(sibling.recv().await, Some(ConnectionState::Connected));
+                // and a later connection for the stopped outstation is closed
+                let (mut late, _) = peers.connect(LOOPBACK);
+                assert_closed(&mut late).await;
+                drop(waiting);
+
+                open.send(()).unwrap();
+                stopped_task.await.unwrap();
+            })
+            .await;
+        }
+
+        // catches a handle whose `shutdown` doesn't reach the accept loop: the handle is alive
+        #[tokio::test(start_paused = true)]
+        async fn shutting_down_the_server_ends_it_and_its_outstations() {
+            watchdog(async {
+                let fixture = spawn();
+                fixture.server.shutdown();
+                let Shutdown = fixture.server_task.await.unwrap();
+                fixture.outstation_task.await.unwrap();
             })
             .await;
         }

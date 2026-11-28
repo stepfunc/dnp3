@@ -375,10 +375,17 @@ mod tls {
 /// clock jumps only to the end of them.
 mod lifecycle {
     use super::*;
+    use crate::app::{Listener, MaybeAsync};
+    use crate::master::error::TaskErrorKind;
+    use crate::master::promise::Promise;
+    use crate::master::tasks::read::SingleReadTask;
+    use crate::master::{AssociationHandle, Classes, FileReadConfig, ReadRequest, TaskError};
     use crate::util::test_support::watchdog;
     use std::io::Read;
+    use std::sync::{Arc, Mutex};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use tokio::net::TcpSocket;
+    use tokio::sync::oneshot;
 
     const fn secs(x: u64) -> Duration {
         Duration::from_secs(x)
@@ -662,6 +669,297 @@ mod lifecycle {
             .unwrap();
     }
 
+    /// What a [`GatedListener`] saw, in order
+    #[derive(Copy, Clone, Debug, PartialEq, Eq)]
+    enum Seen {
+        State(ClientState),
+        /// the held callback returned
+        Released(ClientState),
+        /// a queued file read was aborted with this error
+        Aborted(crate::master::FileError),
+        /// when the final callback started, whether the queued request had already failed
+        RequestFailed(bool),
+    }
+
+    type Log = Arc<Mutex<Vec<Seen>>>;
+
+    /// The reply of a queued request, once the test has queued it
+    type PendingRequest = Arc<Mutex<Option<oneshot::Receiver<Result<(), TaskError>>>>>;
+
+    /// Records each state, and holds the callback for one state until the gate opens
+    struct GatedListener {
+        held: ClientState,
+        entered: Option<oneshot::Sender<()>>,
+        gate: Option<oneshot::Receiver<()>>,
+        /// a request the final callback checks
+        request: PendingRequest,
+        log: Log,
+    }
+
+    impl Listener<ClientState> for GatedListener {
+        fn update(&mut self, state: ClientState) -> MaybeAsync<()> {
+            if state == ClientState::Shutdown {
+                if let Some(mut request) = self.request.lock().unwrap().take() {
+                    // the drain drops the request's promise, which closes its reply
+                    let failed = request.try_recv() == Err(oneshot::error::TryRecvError::Closed);
+                    self.log.lock().unwrap().push(Seen::RequestFailed(failed));
+                }
+            }
+            self.log.lock().unwrap().push(Seen::State(state));
+            if state != self.held {
+                return MaybeAsync::ready(());
+            }
+            let entered = self.entered.take().unwrap();
+            let gate = self.gate.take().unwrap();
+            let log = self.log.clone();
+            MaybeAsync::asynchronous(async move {
+                entered.send(()).unwrap();
+                gate.await.unwrap();
+                log.lock().unwrap().push(Seen::Released(state));
+            })
+        }
+    }
+
+    /// Ignores reads and task results
+    struct Quiet;
+
+    impl crate::master::ReadHandler for Quiet {
+        fn begin_fragment(
+            &mut self,
+            _: crate::master::ReadType,
+            _: crate::app::ResponseHeader,
+        ) -> MaybeAsync<()> {
+            MaybeAsync::ready(())
+        }
+
+        fn end_fragment(
+            &mut self,
+            _: crate::master::ReadType,
+            _: crate::app::ResponseHeader,
+        ) -> MaybeAsync<()> {
+            MaybeAsync::ready(())
+        }
+    }
+
+    impl crate::master::AssociationInformation for Quiet {}
+
+    impl crate::master::AssociationHandler for Quiet {}
+
+    struct RecordingReader(Log);
+
+    impl crate::master::FileReader for RecordingReader {
+        fn opened(&mut self, _: u32) -> crate::master::FileAction {
+            crate::master::FileAction::Continue
+        }
+
+        fn block_received(&mut self, _: u32, _: &[u8]) -> MaybeAsync<crate::master::FileAction> {
+            MaybeAsync::ready(crate::master::FileAction::Continue)
+        }
+
+        fn aborted(&mut self, err: crate::master::FileError) {
+            self.0.lock().unwrap().push(Seen::Aborted(err));
+        }
+
+        fn completed(&mut self) {}
+    }
+
+    struct Gated {
+        channel: MasterChannel,
+        entered: oneshot::Receiver<()>,
+        open: oneshot::Sender<()>,
+        request: PendingRequest,
+        log: Log,
+    }
+
+    /// Spawn a master TCP client whose callback for `held` waits until [`Gated::open`] is sent
+    fn spawn_gated_master(endpoints: EndpointList, held: ClientState) -> Gated {
+        let (entered_tx, entered) = oneshot::channel();
+        let (open, gate) = oneshot::channel();
+        let request = Arc::new(Mutex::new(None));
+        let log = Log::default();
+        let listener = GatedListener {
+            held,
+            entered: Some(entered_tx),
+            gate: Some(gate),
+            request: request.clone(),
+            log: log.clone(),
+        };
+        let channel = crate::tcp::spawn_master_tcp_client_2(
+            LinkErrorMode::Close,
+            master_config(),
+            endpoints,
+            strategy(),
+            ConnectOptions::default(),
+            Box::new(listener),
+        );
+        Gated {
+            channel,
+            entered,
+            open,
+            request,
+            log,
+        }
+    }
+
+    /// Wait for the final callback, then take everything the listener saw
+    async fn seen_through_shutdown(log: &Log) -> Vec<Seen> {
+        while !log
+            .lock()
+            .unwrap()
+            .contains(&Seen::State(ClientState::Shutdown))
+        {
+            tokio::time::sleep(Duration::from_millis(1)).await;
+        }
+        std::mem::take(&mut *log.lock().unwrap())
+    }
+
+    fn black_hole() -> EndpointList {
+        EndpointList::new(crate::tcp::client::BLACK_HOLE.to_string(), &[])
+    }
+
+    // catches an unraced connect, which never completes here, and one that reports a failed
+    // connect on shutdown
+    #[tokio::test(start_paused = true)]
+    async fn shutdown_during_a_pending_connect_stops_at_once() {
+        watchdog(async {
+            let (channel, mut timeline) = spawn_master(black_hole(), strategy());
+            timeline.expect(secs(0), ClientState::Disabled).await;
+            channel.enable().await.unwrap();
+            timeline.expect(secs(0), ClientState::Connecting).await;
+            channel.shutdown();
+            timeline.expect(secs(0), ClientState::Shutdown).await;
+        })
+        .await;
+    }
+
+    // catches a shutdown raced around listener callbacks, which would drop the pending one
+    #[tokio::test(start_paused = true)]
+    async fn shutdown_lets_a_pending_listener_callback_complete() {
+        watchdog(async {
+            let peer = Peer::new().await;
+            let gated = spawn_gated_master(peer.endpoints(), ClientState::Connecting);
+            gated.channel.enable().await.unwrap();
+            gated.entered.await.unwrap();
+            gated.channel.shutdown();
+            tokio::time::sleep(secs(1)).await;
+            gated.open.send(()).unwrap();
+            assert_eq!(
+                seen_through_shutdown(&gated.log).await,
+                [
+                    Seen::State(ClientState::Disabled),
+                    Seen::State(ClientState::Connecting),
+                    Seen::Released(ClientState::Connecting),
+                    Seen::State(ClientState::Shutdown),
+                ]
+            );
+        })
+        .await;
+    }
+
+    // catches a drain that runs after the final callback, or not at all: the requests are still
+    // queued when the disabled master sees the shutdown
+    #[tokio::test(start_paused = true)]
+    async fn requests_queued_while_disabled_fail_before_the_final_callback() {
+        watchdog(async {
+            let gated = spawn_gated_master(black_hole(), ClientState::Disabled);
+            gated.entered.await.unwrap();
+
+            let association = AssociationHandle::new(
+                EndpointAddress::try_new(OUTSTATION).unwrap(),
+                gated.channel.clone(),
+            );
+            let (promise, request) = Promise::one_shot();
+            association
+                .send_task(SingleReadTask::new(
+                    ReadRequest::new().add_classes(Classes::class0()),
+                    promise,
+                ))
+                .await
+                .unwrap();
+            *gated.request.lock().unwrap() = Some(request);
+            let reader = RecordingReader(gated.log.clone());
+            association
+                .read_file("f.txt", FileReadConfig::default(), Box::new(reader), None)
+                .await
+                .unwrap();
+
+            gated.channel.shutdown();
+            gated.open.send(()).unwrap();
+            assert_eq!(
+                seen_through_shutdown(&gated.log).await,
+                [
+                    Seen::State(ClientState::Disabled),
+                    Seen::Released(ClientState::Disabled),
+                    Seen::Aborted(TaskErrorKind::Shutdown.into()),
+                    Seen::RequestFailed(true),
+                    Seen::State(ClientState::Shutdown),
+                ]
+            );
+        })
+        .await;
+    }
+
+    // catches delivering queued messages after the last handle is dropped: the disabled master
+    // would process the file read and report `NoConnection`
+    #[tokio::test(start_paused = true)]
+    async fn dropping_every_handle_aborts_a_file_read_queued_while_disabled() {
+        watchdog(async {
+            let (channel, mut timeline) = spawn_master(black_hole(), strategy());
+            timeline.expect(secs(0), ClientState::Disabled).await;
+            let association = channel
+                .add_association(
+                    EndpointAddress::try_new(OUTSTATION).unwrap(),
+                    crate::master::AssociationConfig::quiet(),
+                    Box::new(Quiet),
+                    Box::new(Quiet),
+                    Box::new(Quiet),
+                )
+                .await
+                .unwrap();
+            let log = Log::default();
+            association
+                .read_file(
+                    "f.txt",
+                    FileReadConfig::default(),
+                    Box::new(RecordingReader(log.clone())),
+                    None,
+                )
+                .await
+                .unwrap();
+            drop(association);
+            drop(channel);
+            timeline.expect(secs(0), ClientState::Shutdown).await;
+            assert_eq!(
+                *log.lock().unwrap(),
+                [Seen::Aborted(TaskErrorKind::Shutdown.into())]
+            );
+        })
+        .await;
+    }
+
+    // catches a queued message that holds a handle: the master would wait in the connect forever
+    #[tokio::test(start_paused = true)]
+    async fn a_cancelled_add_poll_does_not_keep_the_master_alive() {
+        watchdog(async {
+            let (channel, mut timeline) = spawn_master(black_hole(), strategy());
+            timeline.expect(secs(0), ClientState::Disabled).await;
+            channel.enable().await.unwrap();
+            timeline.expect(secs(0), ClientState::Connecting).await;
+
+            let association =
+                AssociationHandle::new(EndpointAddress::try_new(OUTSTATION).unwrap(), channel);
+            let add_poll =
+                association.add_poll(ReadRequest::new().add_classes(Classes::class0()), secs(10));
+            // queued, then cancelled while the master is still connecting
+            tokio::time::timeout(Duration::ZERO, add_poll)
+                .await
+                .unwrap_err();
+            drop(association);
+            timeline.expect(secs(0), ClientState::Shutdown).await;
+        })
+        .await;
+    }
+
     #[cfg(feature = "enable-tls")]
     mod tls {
         use super::*;
@@ -682,24 +980,6 @@ mod lifecycle {
                     .expect(secs(5), ClientState::WaitAfterFailedConnect(secs(1)))
                     .await;
                 timeline.expect(secs(5), ClientState::Disabled).await;
-            })
-            .await;
-        }
-
-        /// The peer never answers the ClientHello, so the handshake times out after 5 seconds
-        #[tokio::test(start_paused = true)]
-        async fn shutdown_during_a_tls_handshake_takes_effect_once_it_fails() {
-            watchdog(async {
-                let peer = Peer::new().await;
-                let (channel, mut timeline) = spawn_tls_master(peer.endpoints(), strategy());
-                timeline.expect(secs(0), ClientState::Disabled).await;
-                channel.enable().await.unwrap();
-                timeline.expect(secs(0), ClientState::Connecting).await;
-                drop(channel);
-                timeline
-                    .expect(secs(5), ClientState::WaitAfterFailedConnect(secs(1)))
-                    .await;
-                timeline.expect(secs(5), ClientState::Shutdown).await;
             })
             .await;
         }
@@ -751,18 +1031,30 @@ mod lifecycle {
             assert_tls_closed(&mut phys).await;
         }
 
+        // The handshake has started when the shutdown arrives. Catches a race around the TCP
+        // connect alone, which would wait out the 5 second handshake timeout and report a failed
+        // connect, and a socket left open after the abandoned handshake.
         #[tokio::test]
-        async fn shutdown_during_a_tls_handshake_that_completes_closes_the_session() {
-            let peer = Peer::new().await;
-            let (channel, mut states, stream) = connecting_tls_master(&peer).await;
-            drop(channel);
-            let mut phys = server_config(MinTlsVersion::V12)
-                .handle_connection(stream)
-                .await
-                .unwrap();
-            expect(&mut states, ClientState::Connected).await;
-            expect(&mut states, ClientState::Shutdown).await;
-            assert_tls_closed(&mut phys).await;
+        async fn shutdown_during_a_tls_handshake_stops_at_once_and_closes_the_connection() {
+            watchdog(async {
+                let peer = Peer::new().await;
+                let (channel, mut states, mut stream) = connecting_tls_master(&peer).await;
+                // the start of the ClientHello
+                let mut hello = [0; 1];
+                tokio::time::timeout(TIMEOUT, stream.read_exact(&mut hello))
+                    .await
+                    .unwrap()
+                    .unwrap();
+                drop(channel);
+                expect(&mut states, ClientState::Shutdown).await;
+                let mut rest = Vec::new();
+                // the end of the stream or a reset; either way, closed
+                let _closed: std::io::Result<usize> =
+                    tokio::time::timeout(secs(1), stream.read_to_end(&mut rest))
+                        .await
+                        .unwrap();
+            })
+            .await;
         }
     }
 }

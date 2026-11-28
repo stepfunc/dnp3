@@ -70,6 +70,7 @@ impl OneShotSerialOutstationTask {
     pub(crate) async fn run(mut self) {
         let mut io = PhysLayer::serial(self.serial);
         let _: crate::util::lifecycle::RunError = self.task.run(&mut io).await;
+        self.task.finish().await;
     }
 }
 
@@ -90,7 +91,9 @@ fn create_outstation(
     )
 }
 
-/// Spawn an outstation task onto the `Tokio` runtime. The task runs until the returned handle is dropped or
+/// Spawn an outstation task onto the `Tokio` runtime. The task runs until it is shut down with
+/// [`OutstationHandle::shutdown`](crate::outstation::OutstationHandle::shutdown), every clone of the
+/// returned handle is dropped, or
 /// a serial port error occurs, e.g. a serial port is removed from the OS. It attempts to open
 /// the serial port immediately, and fails if it cannot.
 ///
@@ -118,7 +121,9 @@ pub fn spawn_outstation_serial(
     Ok(handle)
 }
 
-/// Spawns an outstation task onto the `Tokio` runtime. The task runs until the returned handle is dropped.
+/// Spawns an outstation task onto the `Tokio` runtime. The task runs until it is shut down with
+/// [`OutstationHandle::shutdown`](crate::outstation::OutstationHandle::shutdown) or every clone of the
+/// returned handle is dropped.
 /// It is tolerant to the serial port being unavailable at startup or being removed from the OS. It
 /// uses the provided `RetryStrategy` to determine when to retry the port if the port cannot be
 /// opened or fails.
@@ -144,7 +149,7 @@ pub fn spawn_outstation_serial_2(
 ) -> OutstationHandle {
     let (task, handle) = create_outstation(config, application, information, control_handler);
 
-    let mut serial = SerialTask::new(path, settings, Session::outstation(task), retry, listener);
+    let serial = SerialTask::new(path, settings, Session::outstation(task), retry, listener);
 
     let log_path = path.to_owned();
     let future = async move {

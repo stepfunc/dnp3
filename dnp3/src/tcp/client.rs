@@ -5,18 +5,22 @@
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
 use crate::app::Listener;
+use crate::app::Shutdown;
 use crate::link::error::LinkError;
 use crate::phys::PhysLayer;
-use crate::session::connection::{run_connection, Connection};
+use crate::session::connection::{run_connection, Connection, OpenError};
 use crate::session::Session;
 use crate::tcp::{
     ClientConnectionHandler, ClientState, ConnectionInfo, EndpointInner, PostConnectionHandler,
 };
+use crate::util::shutdown::ShutdownListener;
 use std::net::SocketAddr;
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::net::{TcpSocket, TcpStream};
 
+#[cfg(test)]
+pub(crate) use tests::BLACK_HOLE;
 #[cfg(test)]
 use tests::{connect, lookup_host};
 #[cfg(not(test))]
@@ -52,16 +56,31 @@ impl ClientTask {
         }
     }
 
-    pub(crate) async fn run(&mut self) {
-        run_connection(self).await;
-        self.listener.update(ClientState::Shutdown).get().await;
+    pub(crate) async fn run(mut self) {
+        run_connection(&mut self).await;
+        let Self {
+            session,
+            mut listener,
+            ..
+        } = self;
+        session.finish().await;
+        listener.update(ClientState::Shutdown).get().await;
     }
 
-    async fn connect(&mut self) -> Result<(PhysLayer, SocketAddr, Option<Arc<String>>), Duration> {
+    async fn connect(&mut self) -> Result<(PhysLayer, SocketAddr, Option<Arc<String>>), OpenError> {
+        let mut shutdown = self.session.shutdown_listener();
         loop {
-            let conn_info = self.connect_handler.next()?;
+            // the handler can keep supplying endpoints that fail without waiting
+            if shutdown.is_shutdown() {
+                return Err(OpenError::Shutdown);
+            }
+            let conn_info = self.connect_handler.next().map_err(OpenError::Retry)?;
             let settings = conn_info.settings;
-            if let Some((phys, addr, hostname)) = self.connect_to_endpoint(conn_info).await {
+            let connected = self
+                .connect_to_endpoint(conn_info, &mut shutdown)
+                .await
+                .map_err(|Shutdown| OpenError::Shutdown)?;
+            if let Some((phys, addr, hostname)) = connected {
                 if let Some(master_address) = settings.master_address {
                     self.session.change_master_address(master_address);
                 }
@@ -73,39 +92,50 @@ impl ClientTask {
         }
     }
 
+    /// Connect to one endpoint, or fail if shutdown is requested while resolving or connecting
     async fn connect_to_endpoint(
         &mut self,
         info: ConnectionInfo,
-    ) -> Option<(PhysLayer, SocketAddr, Option<Arc<String>>)> {
-        match info.endpoint.inner {
-            EndpointInner::Address(addr) => self
-                .connect_to_addr(addr, info.timeout, info.local_endpoint, None)
-                .await
-                .map(|x| (x, addr, None)),
-            EndpointInner::Hostname(hostname) => match lookup_host(hostname.as_str()).await {
-                Ok(addrs) => {
-                    for addr in addrs {
-                        if let Some(x) = self
-                            .connect_to_addr(
-                                addr,
-                                info.timeout,
-                                info.local_endpoint,
-                                Some(hostname.as_str()),
-                            )
-                            .await
-                        {
-                            return Some((x, addr, Some(hostname.clone())));
-                        }
-                    }
-                    None
-                }
-                Err(err) => {
-                    tracing::warn!("Unable to resolve: '{hostname}', err: {err}");
-                    self.connect_handler.resolution_failed(hostname.as_str());
-                    None
-                }
-            },
+        shutdown: &mut ShutdownListener,
+    ) -> Result<Option<(PhysLayer, SocketAddr, Option<Arc<String>>)>, Shutdown> {
+        let hostname = match info.endpoint.inner {
+            EndpointInner::Address(addr) => {
+                let phys = self
+                    .connect_to_addr(addr, info.timeout, info.local_endpoint, None, shutdown)
+                    .await?;
+                return Ok(phys.map(|x| (x, addr, None)));
+            }
+            EndpointInner::Hostname(hostname) => hostname,
+        };
+
+        let resolved = tokio::select! {
+            _ = shutdown.wait() => return Err(Shutdown),
+            resolved = lookup_host(hostname.as_str()) => resolved,
+        };
+        let addrs = match resolved {
+            Ok(addrs) => addrs,
+            Err(err) => {
+                tracing::warn!("Unable to resolve: '{hostname}', err: {err}");
+                self.connect_handler.resolution_failed(hostname.as_str());
+                return Ok(None);
+            }
+        };
+
+        for addr in addrs {
+            let phys = self
+                .connect_to_addr(
+                    addr,
+                    info.timeout,
+                    info.local_endpoint,
+                    Some(hostname.as_str()),
+                    shutdown,
+                )
+                .await?;
+            if let Some(x) = phys {
+                return Ok(Some((x, addr, Some(hostname.clone()))));
+            }
         }
+        Ok(None)
     }
 
     async fn connect_to_addr(
@@ -114,7 +144,8 @@ impl ClientTask {
         timeout: Option<Duration>,
         local_endpoint: Option<SocketAddr>,
         hostname: Option<&str>,
-    ) -> Option<PhysLayer> {
+        shutdown: &mut ShutdownListener,
+    ) -> Result<Option<PhysLayer>, Shutdown> {
         let result = if addr.is_ipv4() {
             TcpSocket::new_v4()
         } else {
@@ -125,14 +156,14 @@ impl ClientTask {
             Ok(x) => x,
             Err(err) => {
                 tracing::warn!("unable to create socket: {}", err);
-                return None;
+                return Ok(None);
             }
         };
 
         if let Some(local) = local_endpoint {
             if let Err(err) = socket.bind(local) {
                 tracing::warn!("unable to bind socket to {}: {}", local, err);
-                return None;
+                return Ok(None);
             }
         }
 
@@ -142,15 +173,20 @@ impl ClientTask {
         }
         self.connect_handler.connecting(addr, hostname);
 
-        let phys = self.connect_socket(socket, addr, timeout).await;
+        // covers the connect and any TLS handshake; a shutdown here is not a failed connect
+        let phys = tokio::select! {
+            _ = shutdown.wait() => return Err(Shutdown),
+            phys = Self::connect_socket(&self.post_connection, socket, addr, timeout) => phys,
+        };
         if phys.is_none() {
             self.connect_handler.connect_failed(addr, hostname);
         }
-        phys
+        Ok(phys)
     }
 
+    /// Not a method: holding `&self` across its awaits would need the task to be `Sync`
     async fn connect_socket(
-        &mut self,
+        post_connection: &PostConnectionHandler,
         socket: TcpSocket,
         addr: SocketAddr,
         timeout: Option<Duration>,
@@ -181,7 +217,7 @@ impl ClientTask {
 
         crate::tcp::configure_client(&stream);
 
-        let phys = self.post_connection.post_connect(stream, &addr).await?;
+        let phys = post_connection.post_connect(stream, &addr).await?;
 
         tracing::info!("connected to {}", addr);
 
@@ -200,7 +236,7 @@ impl Connection for ClientTask {
         self.listener.update(ClientState::Disabled).get().await;
     }
 
-    async fn open(&mut self) -> Result<(PhysLayer, Self::Peer), Duration> {
+    async fn open(&mut self) -> Result<(PhysLayer, Self::Peer), OpenError> {
         self.listener.update(ClientState::Connecting).get().await;
 
         match self.connect().await {
@@ -208,13 +244,14 @@ impl Connection for ClientTask {
                 self.listener.update(ClientState::Connected).get().await;
                 Ok((phys, (addr, hostname)))
             }
-            Err(delay) => {
+            Err(OpenError::Shutdown) => Err(OpenError::Shutdown),
+            Err(OpenError::Retry(delay)) => {
                 tracing::info!("waiting {} ms to retry connection", delay.as_millis());
                 self.listener
                     .update(ClientState::WaitAfterFailedConnect(delay))
                     .get()
                     .await;
-                Err(delay)
+                Err(OpenError::Retry(delay))
             }
         }
     }
@@ -242,7 +279,7 @@ mod tests {
     use crate::app::NullListener;
     use crate::link::reader::LinkModes;
     use crate::link::EndpointAddress;
-    use crate::master::{MasterChannelConfig, MasterChannelType};
+    use crate::master::{MasterChannel, MasterChannelConfig, MasterChannelType};
     use crate::tcp::{wire_master_client, Endpoint};
     use crate::util::test_support::{watchdog, Timeline};
     use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender};
@@ -265,7 +302,7 @@ mod tests {
     }
 
     /// an address the test connect never reaches, so only a timeout ends an attempt to it
-    const BLACK_HOLE: SocketAddr = SocketAddr::new(
+    pub(crate) const BLACK_HOLE: SocketAddr = SocketAddr::new(
         std::net::IpAddr::V4(std::net::Ipv4Addr::new(192, 0, 2, 1)),
         20000,
     );
@@ -332,7 +369,7 @@ mod tests {
     fn client_task(
         addr: SocketAddr,
         post_connection: PostConnectionHandler,
-    ) -> (ClientTask, UnboundedReceiver<Event>) {
+    ) -> (ClientTask, UnboundedReceiver<Event>, MasterChannel) {
         client_task_with(
             vec![ConnectionInfo::new(Endpoint::address(addr))],
             post_connection,
@@ -343,22 +380,23 @@ mod tests {
     fn client_task_with(
         attempts: Vec<ConnectionInfo>,
         post_connection: PostConnectionHandler,
-    ) -> (ClientTask, UnboundedReceiver<Event>) {
+    ) -> (ClientTask, UnboundedReceiver<Event>, MasterChannel) {
         client_task_listening(attempts, post_connection, NullListener::create())
     }
 
-    /// a task that makes the attempts once each and reports its state to `listener`
+    /// a task that makes the attempts once each and reports its state to `listener`, with the
+    /// channel that keeps it from shutting down
     fn client_task_listening(
         attempts: Vec<ConnectionInfo>,
         post_connection: PostConnectionHandler,
         listener: Box<dyn Listener<ClientState>>,
-    ) -> (ClientTask, UnboundedReceiver<Event>) {
+    ) -> (ClientTask, UnboundedReceiver<Event>, MasterChannel) {
         let (tx, rx) = tokio::sync::mpsc::unbounded_channel();
         let handler = RecordingHandler {
             attempts: attempts.into(),
             events: tx,
         };
-        let (task, _channel) = wire_master_client(
+        let (task, channel) = wire_master_client(
             LinkModes::test(),
             MasterChannelType::Stream,
             Box::new(handler),
@@ -366,7 +404,7 @@ mod tests {
             post_connection,
             listener,
         );
-        (task, rx)
+        (task, rx, channel)
     }
 
     fn events(rx: &mut UnboundedReceiver<Event>) -> Vec<Event> {
@@ -388,17 +426,36 @@ mod tests {
 
     /// the address and hostname of a successful connection
     fn connected_to(
-        result: Result<(PhysLayer, SocketAddr, Option<Arc<String>>), Duration>,
-    ) -> Result<(SocketAddr, Option<String>), Duration> {
+        result: Result<(PhysLayer, SocketAddr, Option<Arc<String>>), OpenError>,
+    ) -> Result<(SocketAddr, Option<String>), OpenError> {
         result.map(|(_, addr, hostname)| (addr, hostname.map(|x| x.to_string())))
+    }
+
+    // catches reporting a failed connect for one that shutdown abandoned
+    #[tokio::test(start_paused = true)]
+    async fn shutdown_during_a_connect_reports_no_failure() {
+        watchdog(async {
+            let (mut task, mut rx, channel) = client_task(BLACK_HOLE, PostConnectionHandler::Tcp);
+            let shutdown = async {
+                tokio::task::yield_now().await;
+                channel.shutdown();
+            };
+            let (result, ()) = tokio::join!(task.connect(), shutdown);
+            assert_eq!(result.err(), Some(OpenError::Shutdown));
+            assert_eq!(events(&mut rx), [Event::Connecting(BLACK_HOLE, None)]);
+        })
+        .await;
     }
 
     #[tokio::test]
     async fn refused_connection_notifies_connect_failed() {
         let (reserved, addr) = refusing_port();
-        let (mut task, mut rx) = client_task(addr, PostConnectionHandler::Tcp);
+        let (mut task, mut rx, _channel) = client_task(addr, PostConnectionHandler::Tcp);
 
-        assert_eq!(task.connect().await.err(), Some(Duration::from_secs(60)));
+        assert_eq!(
+            task.connect().await.err(),
+            Some(OpenError::Retry(Duration::from_secs(60)))
+        );
         assert_eq!(
             events(&mut rx),
             [
@@ -413,7 +470,7 @@ mod tests {
     async fn successful_connection_notifies_connected() {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let addr = listener.local_addr().unwrap();
-        let (mut task, mut rx) = client_task(addr, PostConnectionHandler::Tcp);
+        let (mut task, mut rx, _channel) = client_task(addr, PostConnectionHandler::Tcp);
 
         assert_eq!(task.connect().await.ok().map(|(_, x, _)| x), Some(addr));
         assert_eq!(
@@ -436,9 +493,12 @@ mod tests {
             drop(socket);
         });
 
-        let (mut task, mut rx) = client_task(addr, PostConnectionHandler::Tls(config));
+        let (mut task, mut rx, _channel) = client_task(addr, PostConnectionHandler::Tls(config));
 
-        assert_eq!(task.connect().await.err(), Some(Duration::from_secs(60)));
+        assert_eq!(
+            task.connect().await.err(),
+            Some(OpenError::Retry(Duration::from_secs(60)))
+        );
         server.await.unwrap();
         assert_eq!(
             events(&mut rx),
@@ -461,7 +521,8 @@ mod tests {
             let mut black_hole = ConnectionInfo::new(Endpoint::address(BLACK_HOLE));
             black_hole.set_timeout(Duration::from_secs(3));
             let attempts = vec![black_hole, ConnectionInfo::new(Endpoint::address(addr))];
-            let (mut task, mut rx) = client_task_with(attempts, PostConnectionHandler::Tcp);
+            let (mut task, mut rx, _channel) =
+                client_task_with(attempts, PostConnectionHandler::Tcp);
 
             let start = tokio::time::Instant::now();
             assert_eq!(connected_to(task.connect().await), Ok((addr, None)));
@@ -486,7 +547,7 @@ mod tests {
             let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
             let addr = listener.local_addr().unwrap();
             let host = format!("{CANNED}{refused},{addr}");
-            let (mut task, mut rx) =
+            let (mut task, mut rx, _channel) =
                 client_task_with(vec![hostname(&host)], PostConnectionHandler::Tcp);
 
             assert_eq!(
@@ -534,7 +595,7 @@ mod tests {
             let (listener, _reserved) = localhost_listener().await;
             let addr = listener.local_addr().unwrap();
             let host = format!("localhost:{}", addr.port());
-            let (mut task, mut rx) =
+            let (mut task, mut rx, _channel) =
                 client_task_with(vec![hostname(&host)], PostConnectionHandler::Tcp);
 
             assert_eq!(
@@ -571,12 +632,12 @@ mod tests {
     async fn failed_resolution_notifies_resolution_failed() {
         watchdog(async {
             // without a port, the lookup fails before any DNS query
-            let (mut task, mut rx) =
+            let (mut task, mut rx, _channel) =
                 client_task_with(vec![hostname("no-port")], PostConnectionHandler::Tcp);
 
             assert_eq!(
                 connected_to(task.connect().await),
-                Err(Duration::from_secs(60))
+                Err(OpenError::Retry(Duration::from_secs(60)))
             );
             assert_eq!(
                 events(&mut rx),
@@ -598,7 +659,8 @@ mod tests {
                 hostname(CANNED),
                 ConnectionInfo::new(Endpoint::address(addr)),
             ];
-            let (mut task, mut rx) = client_task_with(attempts, PostConnectionHandler::Tcp);
+            let (mut task, mut rx, _channel) =
+                client_task_with(attempts, PostConnectionHandler::Tcp);
 
             assert_eq!(connected_to(task.connect().await), Ok((addr, None)));
             assert_eq!(
@@ -618,7 +680,8 @@ mod tests {
             let mut bind_fails = ConnectionInfo::new(Endpoint::address(addr));
             bind_fails.set_local_endpoint(addr);
             let attempts = vec![bind_fails, ConnectionInfo::new(Endpoint::address(addr))];
-            let (mut task, mut rx) = client_task_with(attempts, PostConnectionHandler::Tcp);
+            let (mut task, mut rx, _channel) =
+                client_task_with(attempts, PostConnectionHandler::Tcp);
 
             assert_eq!(connected_to(task.connect().await), Ok((addr, None)));
             assert_eq!(
@@ -638,10 +701,13 @@ mod tests {
             let mut bind_fails = ConnectionInfo::new(Endpoint::address(addr));
             bind_fails.set_local_endpoint(addr);
             let (states, mut timeline) = Timeline::new();
-            let (mut task, mut rx) =
+            let (mut task, mut rx, _channel) =
                 client_task_listening(vec![bind_fails], PostConnectionHandler::Tcp, states);
 
-            assert_eq!(task.open().await.err(), Some(Duration::from_secs(60)));
+            assert_eq!(
+                task.open().await.err(),
+                Some(OpenError::Retry(Duration::from_secs(60)))
+            );
             timeline.expect_state(ClientState::Connecting).await;
             timeline
                 .expect_state(ClientState::WaitAfterFailedConnect(Duration::from_secs(60)))
@@ -662,7 +728,8 @@ mod tests {
             let local = std::net::Ipv4Addr::new(127, 0, 0, 2);
             let mut info = ConnectionInfo::new(Endpoint::address(addr));
             info.set_local_endpoint((local, 0).into());
-            let (mut task, mut rx) = client_task_with(vec![info], PostConnectionHandler::Tcp);
+            let (mut task, mut rx, _channel) =
+                client_task_with(vec![info], PostConnectionHandler::Tcp);
 
             assert_eq!(connected_to(task.connect().await), Ok((addr, None)));
             let (_stream, peer) = listener.accept().await.unwrap();

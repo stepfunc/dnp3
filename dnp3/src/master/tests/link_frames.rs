@@ -98,7 +98,7 @@ impl Harness {
     async fn create(info: Box<dyn AssociationInformation>) -> Self {
         let (io, handle) = sfio_tokio_mock_io::mock();
         let mut io = PhysLayer::mock(io);
-        let (tx, rx) = crate::util::channel::request_channel();
+        let (tx, rx) = crate::util::channel::request_queue();
         let mut task = MasterTask::new(
             Enabled::Yes,
             LinkModes::stream(LinkErrorMode::Discard),

@@ -31,12 +31,21 @@ pub(crate) trait Connection: Send {
     /// The session is disabled
     fn disabled(&mut self) -> impl Future<Output = ()> + Send;
 
-    /// Open the physical layer, or return the delay before trying again
-    fn open(&mut self) -> impl Future<Output = Result<(PhysLayer, Self::Peer), Duration>> + Send;
+    /// Open the physical layer, or fail with the delay before trying again or with shutdown
+    fn open(&mut self) -> impl Future<Output = Result<(PhysLayer, Self::Peer), OpenError>> + Send;
 
     /// The session failed, returning the delay before opening again, which can be zero
     fn failed(&mut self, peer: Self::Peer, err: LinkError)
         -> impl Future<Output = Duration> + Send;
+}
+
+/// Why [`Connection::open`] didn't open the physical layer
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) enum OpenError {
+    /// try again after this delay
+    Retry(Duration),
+    /// shutdown was requested while opening
+    Shutdown,
 }
 
 /// Run a channel until it's shut down: wait while it's disabled, open the physical layer, run the
@@ -52,9 +61,14 @@ async fn run_enabled<C: Connection>(connection: &mut C) -> Result<Infallible, St
         connection.session().wait_for_enabled().await?;
     }
     loop {
+        // opening can fail without waiting, and a serial port opens synchronously
+        if connection.session().is_shutdown() {
+            return Err(StopReason::Shutdown);
+        }
         let (mut phys, peer) = match connection.open().await {
             Ok(x) => x,
-            Err(delay) => {
+            Err(OpenError::Shutdown) => return Err(StopReason::Shutdown),
+            Err(OpenError::Retry(delay)) => {
                 connection.session().wait_for_retry(delay).await?;
                 continue;
             }

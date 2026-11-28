@@ -205,15 +205,16 @@ values={[
 </TabItem>
 </Tabs>
 
-Keep the channel for as long as you want to talk to the outstation. In Rust, dropping the `MasterChannel` and its
-`AssociationHandle`s ends the session; in the bindings, shut the channel down when you're done with it.
+Keep the channel for as long as you want to talk to the outstation. In Rust, call `MasterChannel::shutdown`, or drop the
+`MasterChannel` and its `AssociationHandle`s, to end the session; in the bindings, shut the channel down when you're
+done with it.
 
 The server doesn't track the channels it has created. When an outstation reconnects, it gets a new channel, so shut down
 the old one. Both examples keep their channels in a map keyed by the outstation's address and replace the old entry.
 
 ## Shutting down
 
-In Rust, dropping the `ServerHandle` stops the server. In the bindings, shut down the `MasterServer`: `close()` in Java,
+In Rust, call `ServerHandle::shutdown`, or drop the `ServerHandle`, to stop the server. In the bindings, shut down the `MasterServer`: `close()` in Java,
 `Dispose()` in C#, its destructor in C++, or `dnp3_master_server_destroy()` in C.
 
 The server then stops accepting connections. Channels it has already created keep running until you shut them down.

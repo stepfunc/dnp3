@@ -54,7 +54,9 @@ impl OutstationUdpConfig {
     }
 }
 
-/// Spawn an outstation task onto the `Tokio` runtime that reads and writes from a UDP socket. The task runs until the returned handle is dropped.
+/// Spawn an outstation task onto the `Tokio` runtime that reads and writes from a UDP socket. The task runs until it is shut down with
+/// [`OutstationHandle::shutdown`](crate::outstation::OutstationHandle::shutdown) or every clone of the
+/// returned handle is dropped.
 ///
 /// With [`UdpSocketMode::OneToOne`], the outstation will **only** read/write
 /// datagrams to/from the `remote_endpoint`. With [`UdpSocketMode::OneToMany`],

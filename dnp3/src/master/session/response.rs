@@ -18,7 +18,7 @@ impl MasterSession {
         seq: Sequence,
         source: FragmentAddr,
         response: Response<'a>,
-    ) -> Result<Option<Response<'a>>, LinkError> {
+    ) -> Result<Option<Response<'a>>, RunError> {
         if response.header.function.is_unsolicited() {
             self.handle_unsolicited(source, &response, io, writer)
                 .await?;
@@ -72,7 +72,7 @@ impl MasterSession {
         response: &Response<'_>,
         io: &mut PhysLayer,
         writer: &mut TransportWriter<T>,
-    ) -> Result<(), LinkError> {
+    ) -> Result<(), RunError> {
         let association = match self.associations.get_mut(source.link).ok() {
             Some(x) => x,
             None => {

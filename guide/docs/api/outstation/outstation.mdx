@@ -17,6 +17,7 @@ outstation runs and uses it to:
 | Update the values the master reads, in transactions | `transaction` (`execute_transaction` in the bindings), see [Database](./database.mdx) |
 | Start or stop communicating | `enable` and `disable` |
 | Change how much of the protocol traffic is logged, for example to debug a site | `set_decode_level` |
+| Stop the outstation for good (Rust) | `shutdown` |
 
 The Outstation class has the same interface regardless of which transport-specific method you used to create it. This allows you to treat an Outstation operating
 over TCP or serial identically.
@@ -29,3 +30,7 @@ never connects. Outstations on every other transport start enabled.
 An outstation created on its own, as a TCP or TLS client, on a serial port or over UDP, stops when its `Outstation` is destroyed. In Java and .NET that happens
 when the object is garbage collected, so keep a reference to it for as long as the outstation should run. Outstations added to an `OutstationServer` are kept
 running by the server.
+
+In Rust, `OutstationHandle::shutdown` stops an outstation at any time. One added to a server stops while the server
+keeps running, and the server closes later connections for it. Updates made in a transaction afterwards are stored, but
+nothing sends them.

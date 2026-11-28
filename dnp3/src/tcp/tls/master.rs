@@ -38,8 +38,9 @@ impl std::fmt::Debug for TlsClientConfig {
     }
 }
 
-/// Spawn a task onto the `Tokio` runtime. The task runs until the returned handle, and any
-/// `AssociationHandle` created from it is dropped.
+/// Spawn a task onto the `Tokio` runtime. The task runs until it is shut down with
+/// [`MasterChannel::shutdown`](crate::master::MasterChannel::shutdown), or until the returned
+/// handle and every `AssociationHandle` created from it are dropped.
 ///
 /// **Note**: This function may only be called from within the runtime itself, and panics otherwise.
 /// Use Runtime::enter() if required.

@@ -13,6 +13,7 @@ use crate::link::EndpointAddress;
 use crate::phys::PhysLayer;
 use crate::util::deadline::deadline;
 use crate::util::lifecycle::{Enabled, RunError, StopReason};
+use crate::util::shutdown::ShutdownListener;
 use std::time::Duration;
 
 enum SessionType {
@@ -49,6 +50,30 @@ impl Session {
             SessionType::Outstation(x) => {
                 x.change_master_address(address);
             }
+        }
+    }
+
+    /// True once shutdown is requested, or every handle is dropped
+    pub(crate) fn is_shutdown(&self) -> bool {
+        match &self.inner {
+            SessionType::Master(x) => x.is_shutdown(),
+            SessionType::Outstation(x) => x.is_shutdown(),
+        }
+    }
+
+    /// An observer of the shutdown signal, for waits that don't poll the session
+    pub(crate) fn shutdown_listener(&self) -> ShutdownListener {
+        match &self.inner {
+            SessionType::Master(x) => x.shutdown_listener(),
+            SessionType::Outstation(x) => x.shutdown_listener(),
+        }
+    }
+
+    /// End the session for good once it has stopped: requests still queued fail with `Shutdown`
+    pub(crate) async fn finish(self) {
+        match self.inner {
+            SessionType::Master(x) => x.finish().await,
+            SessionType::Outstation(x) => x.finish().await,
         }
     }
 
@@ -113,7 +138,7 @@ mod tests {
 
     #[tokio::test]
     async fn retry_wait_accepts_a_delay_too_long_to_represent() {
-        let (tx, rx) = crate::util::channel::request_channel();
+        let (tx, rx) = crate::util::channel::request_queue();
         let mut session = Session::master(MasterTask::new(
             Enabled::Yes,
             LinkModes::test(),

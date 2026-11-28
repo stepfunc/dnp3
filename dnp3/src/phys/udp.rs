@@ -626,7 +626,7 @@ mod tests {
     async fn master_session_ignores_a_request_from_port_0_and_answers_the_next() {
         let (layer, mut remote) = UdpLayer::scripted(None, &[]);
         let mut phys = PhysLayer::udp(layer);
-        let (_channel, rx) = crate::util::channel::request_channel();
+        let (_channel, rx) = crate::util::channel::request_queue();
         let mut session = Session::master(MasterTask::new(
             Enabled::Yes,
             LinkModes::datagram(LinkErrorMode::Discard),

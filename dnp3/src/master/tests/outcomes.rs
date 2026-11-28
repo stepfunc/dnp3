@@ -1150,7 +1150,7 @@ async fn adding_an_association_fails_for_a_used_address_or_the_wrong_channel_typ
             )
         );
 
-        let (tx, _rx) = crate::util::channel::request_channel();
+        let (tx, _rx) = crate::util::channel::request_queue();
         let udp_channel = MasterChannel::new(tx, MasterChannelType::Udp);
         let stream = udp_channel
             .add_association(
@@ -1657,6 +1657,277 @@ async fn reading_group0_var0_sends_nothing() {
                 ),
                 AssocInfoEvent::TaskFailure(TaskType::PeriodicPoll, err),
             ]
+        );
+    })
+    .await;
+}
+
+// catches `shutdown` that isn't wired to the task: every handle is still alive here
+#[tokio::test(start_paused = true)]
+async fn every_task_fails_with_shutdown_when_shutdown_is_requested() {
+    watchdog(async {
+        for kind in KINDS {
+            let mut started = start(kind).await;
+            started.harness.master.shutdown();
+            assert_eq!(
+                started.reply().await,
+                kind.failed(TaskErrorKind::Shutdown),
+                "{kind:?}"
+            );
+            assert_eq!(
+                (&mut started.harness.task).await.unwrap(),
+                RunError::Stop(StopReason::Shutdown),
+                "{kind:?}"
+            );
+            assert_eq!(
+                started.harness.assoc_events.pop(),
+                [kind.failure_event(TaskErrorKind::Shutdown)],
+                "{kind:?}"
+            );
+        }
+    })
+    .await;
+}
+
+/// A read handler whose `end_fragment` signals `entered`, waits for `gate`, then signals
+/// `finished`
+struct GatedEndFragment {
+    entered: Option<tokio::sync::oneshot::Sender<()>>,
+    gate: Option<tokio::sync::oneshot::Receiver<()>>,
+    finished: Option<tokio::sync::oneshot::Sender<()>>,
+}
+
+impl ReadHandler for GatedEndFragment {
+    fn begin_fragment(&mut self, _: ReadType, _: ResponseHeader) -> MaybeAsync<()> {
+        MaybeAsync::ready(())
+    }
+
+    fn end_fragment(&mut self, _: ReadType, _: ResponseHeader) -> MaybeAsync<()> {
+        let entered = self.entered.take().unwrap();
+        let gate = self.gate.take().unwrap();
+        let finished = self.finished.take().unwrap();
+        MaybeAsync::asynchronous(async move {
+            entered.send(()).unwrap();
+            gate.await.unwrap();
+            finished.send(()).unwrap();
+        })
+    }
+}
+
+// catches a shutdown observed around the whole task, which drops a callback in progress
+#[tokio::test(start_paused = true)]
+async fn shutdown_lets_a_pending_end_fragment_complete_before_the_session_ends() {
+    watchdog(async {
+        let mut harness = create_association(AssociationConfig::quiet()).await;
+        let (entered_tx, entered) = tokio::sync::oneshot::channel();
+        let (open, gate) = tokio::sync::oneshot::channel();
+        let (finished_tx, mut finished) = tokio::sync::oneshot::channel();
+        let handler = GatedEndFragment {
+            entered: Some(entered_tx),
+            gate: Some(gate),
+            finished: Some(finished_tx),
+        };
+        let log = Log::default();
+        let association = harness
+            .master
+            .add_association(
+                OTHER,
+                AssociationConfig::quiet(),
+                Box::new(handler),
+                Box::new(log.clone()),
+                Box::new(log),
+            )
+            .await
+            .unwrap();
+        harness.set_source(OTHER);
+
+        let read = tokio::spawn(async move {
+            association
+                .read(ReadRequest::new().add_classes(Classes::class0()))
+                .await
+        });
+        next_request(&mut harness, 0, FunctionCode::Read).await;
+        respond(
+            &mut harness,
+            read_fragment(Sequence::new(0), true, true, false),
+        )
+        .await;
+        entered.await.unwrap();
+
+        harness.master.shutdown();
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        assert!(!harness.task.is_finished());
+
+        open.send(()).unwrap();
+        assert_eq!(
+            (&mut harness.task).await.unwrap(),
+            RunError::Stop(StopReason::Shutdown)
+        );
+        assert_eq!(finished.try_recv(), Ok(()));
+        // the final response needed no confirm, so the read completed before shutdown was seen
+        assert_eq!(read.await.unwrap(), Ok(()));
+    })
+    .await;
+}
+
+// catches an unraced write, which stalls the task forever, and a race that reports a link error
+#[tokio::test(start_paused = true)]
+async fn shutdown_during_a_stalled_write_ends_the_session_without_a_link_error() {
+    watchdog(async {
+        let (tx, rx) = crate::util::channel::request_queue();
+        let mut task = crate::master::session::task::MasterTask::new(
+            crate::util::lifecycle::Enabled::Yes,
+            crate::link::reader::LinkModes::test(),
+            crate::master::MasterChannelConfig::new(EndpointAddress::raw(1)),
+            rx,
+        );
+        let master = MasterChannel::new(tx, crate::master::MasterChannelType::Stream);
+        // smaller than any request, so the first write stalls
+        let (stream, _peer) = tokio::io::duplex(4);
+        let mut phys = crate::phys::PhysLayer::duplex(stream);
+        let run = tokio::spawn(async move {
+            let err = task.run(&mut phys).await;
+            task.finish().await;
+            err
+        });
+
+        let log = Log::default();
+        let association = master
+            .add_association(
+                OUTSTATION,
+                AssociationConfig::quiet(),
+                Box::new(log.clone()),
+                Box::new(log.clone()),
+                Box::new(log.clone()),
+            )
+            .await
+            .unwrap();
+        let read = tokio::spawn(async move {
+            association
+                .read(ReadRequest::new().add_classes(Classes::class0()))
+                .await
+        });
+        tokio::time::sleep(Duration::from_millis(10)).await;
+        assert!(!run.is_finished());
+
+        master.shutdown();
+        assert_eq!(run.await.unwrap(), RunError::Stop(StopReason::Shutdown));
+        assert_eq!(read.await.unwrap(), Err(TaskErrorKind::Shutdown.into()));
+    })
+    .await;
+}
+
+/// Records its tag when its read is aborted
+struct TaggedReader(char, Arc<Mutex<Vec<(char, FileError)>>>);
+
+impl crate::master::FileReader for TaggedReader {
+    fn opened(&mut self, _: u32) -> crate::master::FileAction {
+        crate::master::FileAction::Continue
+    }
+
+    fn block_received(&mut self, _: u32, _: &[u8]) -> MaybeAsync<crate::master::FileAction> {
+        MaybeAsync::ready(crate::master::FileAction::Continue)
+    }
+
+    fn aborted(&mut self, err: FileError) {
+        self.1.lock().unwrap().push((self.0, err));
+    }
+
+    fn completed(&mut self) {}
+}
+
+// catches resetting the associations before draining the request queue: the read still in the
+// queue would be aborted after the one already handed to its association
+#[tokio::test(start_paused = true)]
+async fn shutdown_fails_queued_requests_before_those_of_the_associations() {
+    watchdog(async {
+        let mut harness = create_association(AssociationConfig::quiet()).await;
+        let association = harness.association.clone();
+        let running = tokio::spawn(async move {
+            association
+                .read(ReadRequest::new().add_classes(Classes::class0()))
+                .await
+        });
+        next_request(&mut harness, 0, FunctionCode::Read).await;
+
+        let aborted = Arc::new(Mutex::new(Vec::new()));
+        let association = harness.association.clone();
+        let read_file = |tag| {
+            let reader = Box::new(TaggedReader(tag, aborted.clone()));
+            let association = association.clone();
+            async move {
+                association
+                    .read_file("f.txt", FileReadConfig::default(), reader, None)
+                    .await
+                    .unwrap()
+            }
+        };
+        // waits behind the running read in its association's queue
+        read_file('a').await;
+        harness.barrier().await;
+        // still in the request queue when the shutdown is seen: queuing it doesn't yield
+        read_file('q').await;
+        harness.master.shutdown();
+
+        assert_eq!(
+            (&mut harness.task).await.unwrap(),
+            RunError::Stop(StopReason::Shutdown)
+        );
+        let shutdown: FileError = TaskErrorKind::Shutdown.into();
+        assert_eq!(*aborted.lock().unwrap(), [('q', shutdown), ('a', shutdown)]);
+        assert_eq!(running.await.unwrap(), Err(TaskErrorKind::Shutdown.into()));
+    })
+    .await;
+}
+
+/// Shuts its channel down when a task fails
+struct ShutdownOnFailure(MasterChannel);
+
+impl AssociationHandler for ShutdownOnFailure {}
+
+impl ReadHandler for ShutdownOnFailure {
+    fn begin_fragment(&mut self, _: ReadType, _: ResponseHeader) -> MaybeAsync<()> {
+        MaybeAsync::ready(())
+    }
+
+    fn end_fragment(&mut self, _: ReadType, _: ResponseHeader) -> MaybeAsync<()> {
+        MaybeAsync::ready(())
+    }
+}
+
+impl AssociationInformation for ShutdownOnFailure {
+    fn task_fail(&mut self, _: TaskType, _: TaskError) {
+        self.0.shutdown();
+    }
+}
+
+// catches a session loop that only observes shutdown while waiting: a zero-period poll that
+// can't be formatted fails and runs again without ever waiting
+#[tokio::test(start_paused = true)]
+async fn shutdown_stops_a_poll_that_fails_without_waiting() {
+    watchdog(async {
+        let mut harness = create_association(AssociationConfig::quiet()).await;
+        let association = harness
+            .master
+            .add_association(
+                OTHER,
+                AssociationConfig::quiet(),
+                Box::new(ShutdownOnFailure(harness.master.clone())),
+                Box::new(ShutdownOnFailure(harness.master.clone())),
+                Box::new(ShutdownOnFailure(harness.master.clone())),
+            )
+            .await
+            .unwrap();
+        association
+            .add_poll(
+                ReadRequest::new().add_all_objects(Variation::Group0(0)),
+                Duration::ZERO,
+            )
+            .await
+            .unwrap();
+        assert_eq!(
+            (&mut harness.task).await.unwrap(),
+            RunError::Stop(StopReason::Shutdown)
         );
     })
     .await;

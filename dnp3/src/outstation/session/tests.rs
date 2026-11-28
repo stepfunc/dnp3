@@ -906,7 +906,7 @@ async fn stalled_write_is_cancelled_immediately_by_shutdown_and_disable() {
             assert!(!driver.is_finished());
 
             match expected {
-                StopReason::Shutdown => handle.shutdown().await.unwrap(),
+                StopReason::Shutdown => handle.shutdown(),
                 StopReason::Disable => handle.disable().await.unwrap(),
             }
 

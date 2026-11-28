@@ -22,9 +22,10 @@ use crate::outstation::traits::{ControlHandler, OutstationApplication, Outstatio
 use crate::outstation::OutstationHandle;
 use crate::phys::{PhysAddr, PhysLayer};
 use crate::transport::{RealTransport, Transport, TransportData, TransportRead, TransportWriter};
-use crate::util::channel::Receiver;
+use crate::util::channel::RequestReceiver;
 use crate::util::clock::{MonotonicTime, TokioClock};
 use crate::util::lifecycle::{Enabled, RunError, StopReason};
+use crate::util::shutdown::ShutdownListener;
 
 /// Thin Tokio driver wiring [`OutstationCore`] and a [`Transport`] to a [`PhysLayer`] and
 /// [`DatabaseHandle`].
@@ -68,7 +69,7 @@ impl<T: Transport> OutstationTask<T> {
         information: Box<dyn OutstationInformation>,
         control_handler: Box<dyn ControlHandler>,
     ) -> (Self, OutstationHandle) {
-        let (tx, rx) = crate::util::channel::request_channel();
+        let (tx, rx) = crate::util::channel::request_queue();
         let handle = DatabaseHandle::new(
             config.read_header_limit(),
             config.class_zero,
@@ -122,6 +123,21 @@ impl<T: Transport> OutstationTask<T> {
 
     pub(crate) fn change_master_address(&mut self, address: EndpointAddress) {
         self.core.change_master_address(address);
+    }
+
+    /// True once shutdown is requested, or every handle is dropped
+    pub(crate) fn is_shutdown(&self) -> bool {
+        self.driver.control.messages.is_shutdown()
+    }
+
+    /// An observer of the shutdown signal, for waits outside the session
+    pub(crate) fn shutdown_listener(&self) -> ShutdownListener {
+        self.driver.control.messages.listener()
+    }
+
+    /// Close and drain the request queue once the task has stopped for good
+    pub(crate) async fn finish(self) {
+        self.driver.control.messages.close_and_drain().await;
     }
 
     /// Run the outstation task asynchronously until a `RunError` occurs.
@@ -231,7 +247,6 @@ impl OutstationTask<crate::transport::mock::MockTransport> {
 pub(crate) enum OutstationMessage {
     Enable,
     Disable,
-    Shutdown,
     Configuration(ConfigurationChange),
 }
 
@@ -309,7 +324,7 @@ impl<T: Transport> Driver<T> {
 /// Handle-driven control state kept separate from I/O so `tokio::select!` can borrow it alongside
 /// reads and writes.
 struct TaskControl {
-    messages: Receiver<OutstationMessage>,
+    messages: RequestReceiver<OutstationMessage>,
     enabled: Enabled,
     decode_level: DecodeLevel,
 }
@@ -317,7 +332,6 @@ struct TaskControl {
 impl TaskControl {
     async fn next_message(&mut self) -> Result<(), StopReason> {
         match self.messages.receive().await? {
-            OutstationMessage::Shutdown => Err(StopReason::Shutdown),
             OutstationMessage::Enable => {
                 tracing::info!("enable communication");
                 self.enabled = Enabled::Yes;
