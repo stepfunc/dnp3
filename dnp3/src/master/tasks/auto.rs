@@ -10,7 +10,7 @@ use crate::app::FunctionCode;
 use crate::master::association::Association;
 use crate::master::error::TaskErrorKind;
 use crate::master::request::EventClasses;
-use crate::master::tasks::{AppTask, NonReadTask, Task};
+use crate::master::tasks::{NonReadTask, SolicitedTask, Task};
 use crate::master::TaskType;
 
 #[derive(Clone)]
@@ -22,7 +22,7 @@ pub(crate) enum AutoTask {
 
 impl AutoTask {
     pub(crate) fn wrap(self) -> Task {
-        Task::App(AppTask::NonRead(NonReadTask::Auto(self)))
+        Task::Solicited(SolicitedTask::NonRead(NonReadTask::Auto(self)))
     }
 
     pub(crate) fn description(&self) -> &'static str {

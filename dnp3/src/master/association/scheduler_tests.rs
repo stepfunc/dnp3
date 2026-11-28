@@ -65,7 +65,7 @@ use crate::master::error::{TaskError, TaskErrorKind};
 use crate::master::request::ReadRequest;
 use crate::master::session::read::ReadOutcome;
 use crate::master::tasks::read::SingleReadTask;
-use crate::master::tasks::NonReadTask;
+use crate::master::tasks::{NonReadTask, SolicitedTask};
 use crate::master::test_fixtures::association;
 use crate::util::test_support::run_paused;
 
@@ -793,7 +793,7 @@ impl System {
             .unwrap();
         let work = match &task.details {
             Task::LinkStatus(_) => Work::KeepAlive,
-            Task::App(AppTask::Read(read)) => match read {
+            Task::Solicited(SolicitedTask::Read(read)) => match read {
                 ReadTask::SingleRead(_) => Work::User,
                 ReadTask::StartupIntegrity(_) => Work::Integrity,
                 ReadTask::EventScan(classes) => Work::EventScan(*classes),
@@ -802,13 +802,13 @@ impl System {
                     .position(|id| *id == poll.id)
                     .map_or(Work::Unexpected, Work::Poll),
             },
-            Task::App(AppTask::NonRead(NonReadTask::Auto(task))) => match task {
+            Task::Solicited(SolicitedTask::NonRead(NonReadTask::Auto(task))) => match task {
                 AutoTask::ClearRestartBit => Work::ClearRestart,
                 AutoTask::DisableUnsolicited(_) => Work::DisableUnsolicited,
                 AutoTask::EnableUnsolicited(_) => Work::EnableUnsolicited,
             },
-            Task::App(AppTask::NonRead(NonReadTask::TimeSync(_))) => Work::TimeSync,
-            Task::App(_) => Work::Unexpected,
+            Task::Solicited(SolicitedTask::NonRead(NonReadTask::TimeSync(_))) => Work::TimeSync,
+            Task::Solicited(_) | Task::NoResponse(_) => Work::Unexpected,
         };
         Observed::Run { assoc, work }
     }
@@ -836,7 +836,7 @@ impl System {
         let iin = answer.iin.iin();
         match task.details {
             Task::LinkStatus(promise) => promise.complete(Ok(())),
-            Task::App(AppTask::Read(read)) => {
+            Task::Solicited(SolicitedTask::Read(read)) => {
                 association.process_iin(iin);
                 // a response with events delivers their values
                 let mut outcome = ReadOutcome::default();
@@ -854,7 +854,7 @@ impl System {
                     Err(err) => association.fail_read(read, err),
                 }
             }
-            Task::App(AppTask::NonRead(task)) => {
+            Task::Solicited(SolicitedTask::NonRead(task)) => {
                 association.process_iin(iin);
                 if iin.has_bad_request_error() {
                     association.fail_non_read(task, TaskErrorKind::RejectedByIin2(iin));
@@ -877,9 +877,7 @@ impl System {
                     prop_assert!(!matches!(next, Ok(Some(_))));
                 }
             }
-            Task::App(task @ AppTask::NoResponse(_)) => {
-                task.on_task_error(TaskErrorKind::ResponseTimeout)
-            }
+            Task::NoResponse(task) => task.on_task_error(TaskErrorKind::ResponseTimeout),
         }
         Ok(())
     }
@@ -888,8 +886,8 @@ impl System {
 /// Fail a task that ran, the way the session does for its kind
 fn fail_running(association: &mut Association, task: Task, err: TaskErrorKind) {
     match task {
-        Task::App(AppTask::Read(task)) => association.fail_read(task, err),
-        Task::App(AppTask::NonRead(task)) => association.fail_non_read(task, err),
+        Task::Solicited(SolicitedTask::Read(task)) => association.fail_read(task, err),
+        Task::Solicited(SolicitedTask::NonRead(task)) => association.fail_non_read(task, err),
         task => task.on_task_error(err),
     }
 }

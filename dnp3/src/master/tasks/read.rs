@@ -8,7 +8,7 @@ use crate::app::format::write::HeaderWriter;
 use crate::master::error::{TaskError, TaskErrorKind};
 use crate::master::promise::Promise;
 use crate::master::request::ReadRequest;
-use crate::master::tasks::{AppTask, ReadTask, Task};
+use crate::master::tasks::{ReadTask, Task};
 use crate::master::ReadHandler;
 
 pub(crate) struct SingleReadTask {
@@ -19,7 +19,7 @@ pub(crate) struct SingleReadTask {
 
 impl From<SingleReadTask> for Task {
     fn from(value: SingleReadTask) -> Self {
-        Task::App(AppTask::Read(ReadTask::SingleRead(value)))
+        ReadTask::SingleRead(value).wrap()
     }
 }
 

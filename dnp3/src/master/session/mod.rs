@@ -34,8 +34,10 @@ use crate::master::error::TaskErrorKind;
 use crate::master::extract::{Delivered, ProcessableResponse};
 use crate::master::messages::{MasterMsg, Message};
 use crate::master::tasks::command_no_ack::CommandNoAckTask;
-use crate::master::tasks::{AppTask, AssociationTask, NonReadTask, ReadTask, RequestWriter, Task};
-use crate::master::{Association, MasterChannelConfig};
+use crate::master::tasks::{
+    AssociationTask, NonReadTask, ReadTask, RequestWriter, SolicitedTask, Task,
+};
+use crate::master::{Association, MasterChannelConfig, TaskType};
 use crate::phys::PhysLayer;
 use crate::transport::{
     FragmentAddr, LinkLayerMessage, LinkLayerMessageType, RealTransport, Transport,
@@ -175,6 +177,36 @@ impl MasterSession {
     fn get_next_task(&mut self) -> Next<AssociationTask> {
         self.associations.next_task()
     }
+
+    /// Tell the association's information callback that a task started
+    fn notify_task_start(
+        &mut self,
+        dest: FragmentAddr,
+        task_type: TaskType,
+        function: FunctionCode,
+    ) {
+        if let Ok(assoc) = self.associations.get_mut(dest.link) {
+            assoc.notify_task_start(task_type, function, assoc.seq());
+        }
+    }
+
+    /// Tell the association's information callback how a task ended: with the function it started
+    /// with and the sequence the completed task returned
+    fn notify_task_end(
+        &mut self,
+        dest: FragmentAddr,
+        task_type: TaskType,
+        function: FunctionCode,
+        result: Result<Sequence, TaskErrorKind>,
+    ) -> Result<(), TaskErrorKind> {
+        if let Ok(assoc) = self.associations.get_mut(dest.link) {
+            match result {
+                Ok(seq) => assoc.notify_task_success(task_type, function, seq),
+                Err(err) => assoc.notify_task_fail(task_type, err),
+            }
+        }
+        result.map(|_| ())
+    }
 }
 
 impl<T: Transport> MasterTask<T> {
@@ -234,38 +266,29 @@ impl<T: Transport> MasterTask<T> {
         task: AssociationTask,
     ) -> Result<(), RunError> {
         let result = match task.details {
-            Task::App(t) => {
-                let task_type = t.as_task_type();
-                let function = t.function();
-
-                if let Ok(assoc) = self.session.associations.get_mut(task.dest.link) {
-                    assoc.notify_task_start(task_type, function, assoc.seq());
-                }
-
-                let res: Result<Sequence, TaskErrorKind> = match t {
-                    AppTask::Read(t) => self.run_read_task(io, task.dest, t).await,
-                    AppTask::NonRead(t) => {
+            Task::Solicited(t) => {
+                let (task_type, function) = t.identity();
+                self.session
+                    .notify_task_start(task.dest, task_type, function);
+                let res = match t {
+                    SolicitedTask::Read(t) => self.run_read_task(io, task.dest, t).await,
+                    SolicitedTask::NonRead(t) => {
                         std::pin::pin!(self.run_non_read_task(io, task.dest, t)).await
                     }
-                    AppTask::NoResponse(t) => {
-                        self.session
-                            .run_no_response_task(io, task.dest, t, &mut self.writer)
-                            .await
-                    }
                 };
-
-                if let Ok(assoc) = self.session.associations.get_mut(task.dest.link) {
-                    match res {
-                        Ok(seq) => {
-                            assoc.notify_task_success(task_type, function, seq);
-                        }
-                        Err(err) => {
-                            assoc.notify_task_fail(task_type, err);
-                        }
-                    }
-                }
-
-                res.map(|_| ())
+                self.session
+                    .notify_task_end(task.dest, task_type, function, res)
+            }
+            Task::NoResponse(t) => {
+                let function = t.function();
+                self.session
+                    .notify_task_start(task.dest, TaskType::Command, function);
+                let res = self
+                    .session
+                    .run_no_response_task(io, task.dest, t, &mut self.writer)
+                    .await;
+                self.session
+                    .notify_task_end(task.dest, TaskType::Command, function, res)
             }
             Task::LinkStatus(promise) => {
                 let res = self.run_link_status_task(io, task.dest).await;

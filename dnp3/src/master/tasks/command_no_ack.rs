@@ -9,7 +9,7 @@ use crate::app::FunctionCode;
 use crate::master::error::{TaskError, TaskErrorKind};
 use crate::master::promise::Promise;
 use crate::master::request::CommandHeaders;
-use crate::master::tasks::{AppTask, RequestWriter, Task};
+use crate::master::tasks::{RequestWriter, Task};
 
 /// Command sent with `DIRECT_OPERATE_NO_ACK`, which the outstation never responds to
 pub(crate) struct CommandNoAckTask {
@@ -19,7 +19,7 @@ pub(crate) struct CommandNoAckTask {
 
 impl From<CommandNoAckTask> for Task {
     fn from(value: CommandNoAckTask) -> Self {
-        Task::App(AppTask::NoResponse(value))
+        Task::NoResponse(value)
     }
 }
 

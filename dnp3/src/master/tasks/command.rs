@@ -10,7 +10,7 @@ use crate::app::FunctionCode;
 use crate::master::error::{CommandError, CommandErrorKind, TaskErrorKind};
 use crate::master::promise::Promise;
 use crate::master::request::*;
-use crate::master::tasks::{AppTask, NonReadTask, ResponseTask, Step, Task};
+use crate::master::tasks::{NonReadTask, ResponseTask, SolicitedTask, Step, Task};
 use crate::master::TaskType;
 
 enum State {
@@ -27,7 +27,7 @@ pub(crate) struct CommandTask {
 
 impl From<CommandTask> for Task {
     fn from(value: CommandTask) -> Self {
-        Task::App(AppTask::NonRead(NonReadTask::Command(value)))
+        Task::Solicited(SolicitedTask::NonRead(NonReadTask::Command(value)))
     }
 }
 

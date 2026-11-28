@@ -9,7 +9,7 @@ use crate::app::file::*;
 use crate::app::parse::parser::Response;
 use crate::app::FunctionCode;
 use crate::master::file::{BlockNumber, FileErrorKind};
-use crate::master::tasks::{AppTask, NonReadTask, ResponseTask, Step, Task};
+use crate::master::tasks::{NonReadTask, ResponseTask, SolicitedTask, Step, Task};
 use crate::master::{FileAction, FileMode, FileReadConfig, FileReader, TaskType};
 
 /// The user's reader, until it is told how the read ended
@@ -104,7 +104,7 @@ pub(crate) struct FileReadTask {
 
 impl From<FileReadTask> for Task {
     fn from(value: FileReadTask) -> Self {
-        Task::App(AppTask::NonRead(NonReadTask::FileRead(value)))
+        Task::Solicited(SolicitedTask::NonRead(NonReadTask::FileRead(value)))
     }
 }
 
