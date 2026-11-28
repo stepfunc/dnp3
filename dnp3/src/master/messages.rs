@@ -7,11 +7,12 @@
 use crate::app::Shutdown;
 use crate::decode::DecodeLevel;
 use crate::link::EndpointAddress;
+use crate::master::association::AssociationCallbacks;
 use crate::master::error::{AssociationError, PollErrorKind, TaskErrorKind};
 use crate::master::poll::PollMsg;
 use crate::master::promise::Promise;
 use crate::master::tasks::QueuedTask;
-use crate::master::{AssociationConfig, AssociationHandler, AssociationInformation, ReadHandler};
+use crate::master::AssociationConfig;
 use crate::transport::FragmentAddr;
 use crate::util::lifecycle::Enabled;
 
@@ -30,9 +31,7 @@ pub(crate) enum MasterMsg {
     AddAssociation(
         FragmentAddr,
         AssociationConfig,
-        Box<dyn ReadHandler>,
-        Box<dyn AssociationHandler>,
-        Box<dyn AssociationInformation>,
+        AssociationCallbacks,
         Promise<Result<(), AssociationError>>,
     ),
     /// Remove an association from the master

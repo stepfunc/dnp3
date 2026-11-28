@@ -7,7 +7,7 @@
 use std::net::SocketAddr;
 use std::time::Duration;
 
-use super::association::{Association, AssociationMap};
+use super::association::{Association, AssociationCallbacks, AssociationMap};
 use super::handler::{AssociationHandle, MasterChannel, MasterChannelConfig, MasterChannelType};
 use super::poll::PollHandle;
 use super::request::ReadRequest;
@@ -203,9 +203,7 @@ impl MasterBuilder {
         let association = self.associations.register_deferred(
             addr,
             config,
-            read_handler,
-            assoc_handler,
-            assoc_information,
+            AssociationCallbacks::new(read_handler, assoc_handler, assoc_information),
         )?;
         Ok(AssociationBuilder {
             handle,
@@ -348,9 +346,7 @@ impl UdpMasterBuilder {
         let association = self.associations.register_deferred(
             addr,
             config,
-            read_handler,
-            assoc_handler,
-            assoc_information,
+            AssociationCallbacks::new(read_handler, assoc_handler, assoc_information),
         )?;
         Ok(AssociationBuilder {
             handle,

@@ -8,7 +8,7 @@
 
 use crate::app::Timestamp;
 use crate::link::EndpointAddress;
-use crate::master::association::{Association, AssociationConfig};
+use crate::master::association::{Association, AssociationCallbacks, AssociationConfig};
 use crate::master::{AssociationHandler, AssociationInformation, ReadHandler};
 use crate::phys::PhysAddr;
 use crate::transport::FragmentAddr;
@@ -54,9 +54,12 @@ pub(crate) fn association(
     Association::new(
         fragment_addr(link),
         config,
-        null(),
-        handler,
-        null(),
+        callbacks(handler),
         TokioClock::new(),
     )
+}
+
+/// Callbacks with this association handler, whose read handler and information ignore everything
+pub(crate) fn callbacks(handler: Box<dyn AssociationHandler>) -> AssociationCallbacks {
+    AssociationCallbacks::new(null(), handler, null())
 }

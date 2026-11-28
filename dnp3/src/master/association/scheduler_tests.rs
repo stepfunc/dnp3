@@ -66,7 +66,7 @@ use crate::master::request::ReadRequest;
 use crate::master::session::read::ReadOutcome;
 use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::{NonReadTask, SolicitedTask};
-use crate::master::test_fixtures::{fragment_addr, null};
+use crate::master::test_fixtures::{callbacks, fragment_addr};
 use crate::util::test_support::run_paused;
 
 /// What the channel starts, as the model names it
@@ -764,9 +764,7 @@ impl System {
             .register(
                 fragment_addr(link),
                 config.association_config(),
-                null(),
-                Box::new(Clock(config.has_clock)),
-                null(),
+                callbacks(Box::new(Clock(config.has_clock))),
             )
             .unwrap();
         self.addresses.push(link);
