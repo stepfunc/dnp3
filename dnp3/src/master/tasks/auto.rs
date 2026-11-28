@@ -7,7 +7,7 @@
 use crate::app::format::write::HeaderWriter;
 use crate::app::parse::parser::Response;
 use crate::app::FunctionCode;
-use crate::master::association::Association;
+use crate::master::association::{Association, MasterClock};
 use crate::master::error::TaskErrorKind;
 use crate::master::request::EventClasses;
 use crate::master::tasks::{NonReadTask, SolicitedTask, Task};
@@ -75,7 +75,7 @@ impl AutoTask {
     }
 }
 
-impl Association {
+impl<C: MasterClock> Association<C> {
     /// Handle the response to an automatic task, which completes it
     pub(crate) fn respond_auto_task(
         &mut self,

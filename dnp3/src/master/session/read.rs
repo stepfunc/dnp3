@@ -185,7 +185,10 @@ impl<T: Transport> MasterTask<T> {
         task: &mut ReadTask,
         outcome: &mut ReadOutcome,
     ) -> Result<ReadResponseAction, TaskErrorKind> {
-        let deadline = Deadline::from_now(self.session.associations.get_timeout(dest.link)?);
+        let deadline = Deadline::from_now(
+            self.session.associations.get_timeout(dest.link)?,
+            self.session.associations.clock(),
+        );
 
         loop {
             let (source, response) = match self

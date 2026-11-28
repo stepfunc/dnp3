@@ -24,7 +24,7 @@ use crate::master::promise::Promise;
 use crate::master::session::task::MasterTask;
 use crate::master::tasks::command_no_ack::CommandNoAckTask;
 use crate::master::tasks::read::SingleReadTask;
-use crate::master::test_fixtures::{association, null};
+use crate::master::test_fixtures::{fragment_addr, null};
 use crate::master::tests::harness::requests::{empty_response, unsol_confirm, unsol_with_data};
 use crate::master::tests::harness::{create_association, AssocInfoEvent, ReadEvent, TestHarness};
 use crate::master::Classes;
@@ -385,7 +385,13 @@ async fn operate_no_ack_fails_without_a_connection() {
         let address = EndpointAddress::try_new(1024).unwrap();
         let mut associations = AssociationMap::new();
         associations
-            .register(association(address, AssociationConfig::quiet(), null()))
+            .register(
+                fragment_addr(address),
+                AssociationConfig::quiet(),
+                null(),
+                null(),
+                null(),
+            )
             .unwrap();
 
         let (tx, rx) = crate::util::channel::request_channel();

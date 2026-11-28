@@ -26,8 +26,8 @@ use crate::transport::FragmentAddr;
 use crate::udp::factory::UdpFactory;
 use crate::udp::task::UdpTask;
 use crate::util::channel::Receiver;
+use crate::util::clock::TokioClock;
 use crate::util::lifecycle::Enabled;
-use tokio::time::Instant;
 
 /// Builder for configuring a stream-based master task (TCP, TLS, serial)
 /// before binding it to a transport.
@@ -41,7 +41,7 @@ pub struct MasterBuilder {
     rx: Receiver<super::messages::Message>,
     config: MasterChannelConfig,
     enabled: Enabled,
-    associations: AssociationMap,
+    associations: AssociationMap<TokioClock>,
 }
 
 impl std::fmt::Debug for MasterBuilder {
@@ -63,7 +63,7 @@ pub struct UdpMasterBuilder {
     rx: Receiver<super::messages::Message>,
     config: MasterChannelConfig,
     enabled: Enabled,
-    associations: AssociationMap,
+    associations: AssociationMap<TokioClock>,
 }
 
 impl std::fmt::Debug for UdpMasterBuilder {
@@ -84,7 +84,7 @@ impl std::fmt::Debug for UdpMasterBuilder {
 #[must_use = "call .into_handle() if runtime access to the association is needed"]
 pub struct AssociationBuilder<'a> {
     handle: AssociationHandle,
-    association: &'a mut Association,
+    association: &'a mut Association<TokioClock>,
 }
 
 impl std::fmt::Debug for AssociationBuilder<'_> {
@@ -152,7 +152,7 @@ struct UdpMasterTask {
 
 fn build_inner_task(
     enabled: Enabled,
-    associations: AssociationMap,
+    associations: AssociationMap<TokioClock>,
     link_modes: LinkModes,
     config: MasterChannelConfig,
     rx: Receiver<super::messages::Message>,
@@ -200,15 +200,13 @@ impl MasterBuilder {
             phys: PhysAddr::None,
         };
         let handle = AssociationHandle::new(address, self.channel.clone());
-        let association = self
-            .associations
-            .register_and_get(Association::new_deferred(
-                addr,
-                config,
-                read_handler,
-                assoc_handler,
-                assoc_information,
-            ))?;
+        let association = self.associations.register_deferred(
+            addr,
+            config,
+            read_handler,
+            assoc_handler,
+            assoc_information,
+        )?;
         Ok(AssociationBuilder {
             handle,
             association,
@@ -347,15 +345,13 @@ impl UdpMasterBuilder {
             phys: PhysAddr::Udp(destination),
         };
         let handle = AssociationHandle::new(address, self.channel.clone());
-        let association = self
-            .associations
-            .register_and_get(Association::new_deferred(
-                addr,
-                config,
-                read_handler,
-                assoc_handler,
-                assoc_information,
-            ))?;
+        let association = self.associations.register_deferred(
+            addr,
+            config,
+            read_handler,
+            assoc_handler,
+            assoc_information,
+        )?;
         Ok(AssociationBuilder {
             handle,
             association,
@@ -418,7 +414,7 @@ impl MasterTask {
     /// This method consumes the task and runs until the [`MasterChannel`] (and
     /// all associated handles) are dropped.
     pub async fn run(mut self) {
-        self.inner.start(Instant::now());
+        self.inner.start();
         match self.inner {
             MasterTaskType::Tcp(task) => task.run().await,
             #[cfg(feature = "enable-tls")]
@@ -431,14 +427,14 @@ impl MasterTask {
 }
 
 impl MasterTaskType {
-    fn start(&mut self, now: Instant) {
+    fn start(&mut self) {
         match self {
-            MasterTaskType::Tcp(task) => task.inner.start(now),
+            MasterTaskType::Tcp(task) => task.inner.start(),
             #[cfg(feature = "enable-tls")]
-            MasterTaskType::Tls(task) => task.inner.start(now),
+            MasterTaskType::Tls(task) => task.inner.start(),
             #[cfg(feature = "serial")]
-            MasterTaskType::Serial(task) => task.inner.start(now),
-            MasterTaskType::Udp(task) => task.inner.start(now),
+            MasterTaskType::Serial(task) => task.inner.start(),
+            MasterTaskType::Udp(task) => task.inner.start(),
         }
     }
 }

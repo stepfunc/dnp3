@@ -66,7 +66,7 @@ use crate::master::request::ReadRequest;
 use crate::master::session::read::ReadOutcome;
 use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::{NonReadTask, SolicitedTask};
-use crate::master::test_fixtures::association;
+use crate::master::test_fixtures::{fragment_addr, null};
 use crate::util::test_support::run_paused;
 
 /// What the channel starts, as the model names it
@@ -90,7 +90,7 @@ enum Work {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 enum Observed {
     Run { assoc: usize, work: Work },
-    NotBefore(Instant),
+    NotBefore(MonotonicTime),
     Nothing,
 }
 
@@ -104,12 +104,12 @@ enum Prediction {
         user: Option<u32>,
     },
     /// Sleep until the earliest time some work becomes ready
-    Sleep(Instant),
+    Sleep(MonotonicTime),
     Nothing,
 }
 
 impl Prediction {
-    fn accepts(&self, now: Instant, observed: Observed) -> bool {
+    fn accepts(&self, now: MonotonicTime, observed: Observed) -> bool {
         match (self, observed) {
             (Self::Run { assoc, work, .. }, Observed::Run { assoc: a, work: w }) => {
                 *assoc == a && *work == w
@@ -237,7 +237,7 @@ enum Auto {
     /// failed `failures` times in a row, and retries at `at`
     Retry {
         failures: u32,
-        at: Instant,
+        at: MonotonicTime,
     },
 }
 
@@ -248,14 +248,14 @@ impl Auto {
         }
     }
 
-    fn fail(&mut self, now: Instant, config: &Config) {
+    fn fail(&mut self, now: MonotonicTime, config: &Config) {
         let failures = match *self {
             Self::Retry { failures, .. } => failures + 1,
             Self::Idle | Self::Pending => 1,
         };
         *self = Self::Retry {
             failures,
-            at: now + config.retry_delay(failures),
+            at: now.saturating_add(config.retry_delay(failures)),
         };
     }
 }
@@ -263,7 +263,7 @@ impl Auto {
 #[derive(Copy, Clone, Debug)]
 struct ModelPoll {
     period: Duration,
-    next: Instant,
+    next: MonotonicTime,
 }
 
 /// What an association does next
@@ -271,10 +271,10 @@ struct ModelPoll {
 enum AssocNext {
     Run(Work),
     /// nothing is ready until this time, if anything is waiting
-    Sleep(Option<Instant>),
+    Sleep(Option<MonotonicTime>),
 }
 
-fn earliest(lhs: Option<Instant>, rhs: Option<Instant>) -> Option<Instant> {
+fn earliest(lhs: Option<MonotonicTime>, rhs: Option<MonotonicTime>) -> Option<MonotonicTime> {
     match (lhs, rhs) {
         (Some(lhs), Some(rhs)) => Some(lhs.min(rhs)),
         (lhs, None) => lhs,
@@ -295,13 +295,13 @@ struct ModelAssociation {
     events: EventClasses,
     /// the polls in the order added, `None` once removed
     polls: Vec<Option<ModelPoll>>,
-    keep_alive_at: Option<Instant>,
+    keep_alive_at: Option<MonotonicTime>,
     /// ids of the queued user requests, oldest first
     requests: VecDeque<u32>,
 }
 
 impl ModelAssociation {
-    fn new(config: Config, now: Instant) -> Self {
+    fn new(config: Config, now: MonotonicTime) -> Self {
         let mut association = Self {
             config,
             clear_restart: Auto::Idle,
@@ -312,7 +312,7 @@ impl ModelAssociation {
             event_scan: Auto::Idle,
             events: EventClasses::none(),
             polls: Vec::new(),
-            keep_alive_at: config.keep_alive.map(|timeout| now + timeout),
+            keep_alive_at: config.keep_alive.map(|timeout| now.saturating_add(timeout)),
             requests: VecDeque::new(),
         };
         association.start_communicating();
@@ -335,8 +335,11 @@ impl ModelAssociation {
     }
 
     /// Something was received from the outstation
-    fn received(&mut self, now: Instant) {
-        self.keep_alive_at = self.config.keep_alive.map(|timeout| now + timeout);
+    fn received(&mut self, now: MonotonicTime) {
+        self.keep_alive_at = self
+            .config
+            .keep_alive
+            .map(|timeout| now.saturating_add(timeout));
     }
 
     fn observe_iin(&mut self, iin: IinBits) {
@@ -358,7 +361,7 @@ impl ModelAssociation {
     }
 
     /// The next work, after failing any time sync that can't start for lack of a clock
-    fn next(&mut self, now: Instant) -> AssocNext {
+    fn next(&mut self, now: MonotonicTime) -> AssocNext {
         loop {
             match self.select(now) {
                 AssocNext::Run(Work::TimeSync) if !self.config.has_clock => {
@@ -370,7 +373,7 @@ impl ModelAssociation {
         }
     }
 
-    fn select(&self, now: Instant) -> AssocNext {
+    fn select(&self, now: MonotonicTime) -> AssocNext {
         let config = &self.config;
         let time_sync_failed = matches!(self.time_sync, Auto::Retry { .. });
         let to_scan = self.events_to_scan();
@@ -443,7 +446,7 @@ impl ModelAssociation {
     }
 
     /// The task `run` completed at `now` with this outcome
-    fn complete(&mut self, run: &Running, outcome: &Outcome, now: Instant) {
+    fn complete(&mut self, run: &Running, outcome: &Outcome, now: MonotonicTime) {
         let config = self.config;
         let answer = match outcome {
             Outcome::Timeout => {
@@ -495,7 +498,7 @@ impl ModelAssociation {
         }
     }
 
-    fn failed(&mut self, run: &Running, now: Instant) {
+    fn failed(&mut self, run: &Running, now: MonotonicTime) {
         let config = self.config;
         match run.work {
             Work::User | Work::KeepAlive | Work::Unexpected => {}
@@ -509,11 +512,11 @@ impl ModelAssociation {
         }
     }
 
-    fn poll_ran(&mut self, index: usize, demanded: bool, now: Instant) {
+    fn poll_ran(&mut self, index: usize, demanded: bool, now: MonotonicTime) {
         if let Some(Some(poll)) = self.polls.get_mut(index) {
             // a poll demanded while it ran stays due from the demand
             if !demanded {
-                poll.next = now + poll.period;
+                poll.next = now.saturating_add(poll.period);
             }
         }
     }
@@ -548,7 +551,7 @@ struct Model {
 }
 
 impl Model {
-    fn add(&mut self, config: Config, now: Instant) -> usize {
+    fn add(&mut self, config: Config, now: MonotonicTime) -> usize {
         let index = self.associations.len();
         self.associations
             .push(Some(ModelAssociation::new(config, now)));
@@ -598,7 +601,7 @@ impl Model {
         }
     }
 
-    fn ready(&self, now: Instant) -> Vec<Ready> {
+    fn ready(&self, now: MonotonicTime) -> Vec<Ready> {
         self.line
             .iter()
             .filter_map(|index| {
@@ -612,7 +615,7 @@ impl Model {
             .collect()
     }
 
-    fn pick(&mut self, now: Instant) -> Prediction {
+    fn pick(&mut self, now: MonotonicTime) -> Prediction {
         for position in 0..self.line.len() {
             let index = self.line[position];
             let user = self.association(index).and_then(|x| x.requests.pop_front());
@@ -728,7 +731,7 @@ enum Op {
 
 /// The associations under test
 struct System {
-    map: AssociationMap,
+    map: AssociationMap<TokioClock>,
     /// by the order added
     addresses: Vec<EndpointAddress>,
     /// poll ids by association and the order added
@@ -757,17 +760,20 @@ impl System {
 
     fn add(&mut self, config: &Config, address: u16) {
         let link = EndpointAddress::try_new(address).unwrap();
-        let association = association(
-            link,
-            config.association_config(),
-            Box::new(Clock(config.has_clock)),
-        );
-        self.map.register(association).unwrap();
+        self.map
+            .register(
+                fragment_addr(link),
+                config.association_config(),
+                null(),
+                Box::new(Clock(config.has_clock)),
+                null(),
+            )
+            .unwrap();
         self.addresses.push(link);
         self.polls.push(Vec::new());
     }
 
-    fn association(&mut self, index: usize) -> &mut Association {
+    fn association(&mut self, index: usize) -> &mut Association<TokioClock> {
         self.map.get_mut(self.addresses[index]).ok().unwrap()
     }
 
@@ -884,7 +890,7 @@ impl System {
 }
 
 /// Fail a task that ran, the way the session does for its kind
-fn fail_running(association: &mut Association, task: Task, err: TaskErrorKind) {
+fn fail_running(association: &mut Association<TokioClock>, task: Task, err: TaskErrorKind) {
     match task {
         Task::Solicited(SolicitedTask::Read(task)) => association.fail_read(task, err),
         Task::Solicited(SolicitedTask::NonRead(task)) => association.fail_non_read(task, err),
@@ -899,7 +905,7 @@ async fn apply(
     mut running: Option<&mut Running>,
     event: Event,
 ) {
-    let now = Instant::now();
+    let now = system.map.clock().now();
     match event {
         Event::Advance(delay) => tokio::time::advance(delay).await,
         Event::Request(n) => {
@@ -929,13 +935,14 @@ async fn apply(
                 if let Some(association) = model.association(index) {
                     association.polls.push(Some(ModelPoll {
                         period,
-                        next: now + period,
+                        next: now.saturating_add(period),
                     }));
                 }
-                let id = system
-                    .association(index)
-                    .polls
-                    .add(ReadRequest::new().add_classes(Classes::all()), period);
+                let id = system.association(index).polls.add(
+                    ReadRequest::new().add_classes(Classes::all()),
+                    period,
+                    now,
+                );
                 system.polls[index].push(id);
             }
         }
@@ -997,13 +1004,13 @@ async fn run(case: Case) -> Result<(), TestCaseError> {
 
     for config in &case.associations {
         system.add(config, case.addresses[model.associations.len()]);
-        model.add(*config, Instant::now());
+        model.add(*config, system.map.clock().now());
     }
 
     for op in &case.ops {
         match op {
             Op::Step(events, outcome) => {
-                let now = Instant::now();
+                let now = system.map.clock().now();
                 let ready = model.ready(now);
                 let prediction = model.pick(now);
                 let next = system.map.next_task();
@@ -1028,7 +1035,7 @@ async fn run(case: Case) -> Result<(), TestCaseError> {
                         for event in events {
                             apply(&mut model, &mut system, Some(&mut running), *event).await;
                         }
-                        let now = Instant::now();
+                        let now = system.map.clock().now();
                         if let Some(association) = model.association(running.assoc) {
                             association.complete(&running, outcome, now);
                         }
@@ -1052,9 +1059,9 @@ async fn run(case: Case) -> Result<(), TestCaseError> {
             Op::Event(event) => apply(&mut model, &mut system, None, *event).await,
             Op::Sleep => {
                 if let Some(at) = wake.take() {
-                    let now = Instant::now();
+                    let now = system.map.clock().now();
                     if at > now {
-                        tokio::time::advance(at - now).await;
+                        tokio::time::advance(at.saturating_duration_since(now)).await;
                     }
                 }
             }
@@ -1067,7 +1074,7 @@ async fn run(case: Case) -> Result<(), TestCaseError> {
             Op::AddAssociation(config) => {
                 if let Some(address) = case.addresses.get(model.associations.len()) {
                     system.add(config, *address);
-                    model.add(*config, Instant::now());
+                    model.add(*config, system.map.clock().now());
                 }
             }
             Op::RemoveAssociation(n) => {
@@ -1265,7 +1272,7 @@ fn quiet_config() -> Config {
 
 #[test]
 fn model_rejects_a_failed_time_sync_ahead_of_the_integrity_scan() {
-    let now = Instant::now();
+    let now = MonotonicTime::from_elapsed(Duration::from_secs(100));
     let mut model = Model::default();
     let index = model.add(
         Config {
@@ -1301,8 +1308,8 @@ fn model_rejects_a_failed_time_sync_ahead_of_the_integrity_scan() {
 
 #[test]
 fn model_rejects_a_poll_held_up_by_a_failed_integrity_scan_but_not_by_a_failed_time_sync() {
-    let now = Instant::now();
-    let retry = now + Duration::from_secs(1);
+    let now = MonotonicTime::from_elapsed(Duration::from_secs(100));
+    let retry = now.saturating_add(Duration::from_secs(1));
     let mut model = Model::default();
     let index = model.add(
         Config {
@@ -1343,9 +1350,9 @@ fn model_rejects_a_poll_held_up_by_a_failed_integrity_scan_but_not_by_a_failed_t
 
 #[test]
 fn model_rejects_waking_for_a_failed_time_sync_held_up_by_a_failed_integrity_scan() {
-    let now = Instant::now();
-    let time_sync_retry = now + Duration::from_secs(1);
-    let integrity_retry = now + Duration::from_secs(2);
+    let now = MonotonicTime::from_elapsed(Duration::from_secs(100));
+    let time_sync_retry = now.saturating_add(Duration::from_secs(1));
+    let integrity_retry = now.saturating_add(Duration::from_secs(2));
     let mut model = Model::default();
     let index = model.add(
         Config {
