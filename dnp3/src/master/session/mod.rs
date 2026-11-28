@@ -48,14 +48,14 @@ use crate::util::channel::Receiver;
 
 use crate::app::parse::options::ParseOptions;
 use crate::link::reader::LinkModes;
+use crate::util::clock::{MonotonicClock, MonotonicTime, TokioClock};
 use crate::util::lifecycle::{Enabled, RunError, StopReason};
-use tokio::time::Instant;
 
 /// Protocol state and message handling, borrowed independently of the task's transport storage.
 struct MasterSession {
     enabled: Enabled,
     decode_level: DecodeLevel,
-    associations: AssociationMap,
+    associations: AssociationMap<TokioClock>,
     messages: Receiver<Message>,
     tx_buffer: Buffer,
 }
@@ -80,14 +80,14 @@ enum Event<'a> {
 /// When a task stops waiting for a response
 #[derive(Copy, Clone)]
 struct Deadline {
-    at: Instant,
+    at: MonotonicTime,
     timeout: Timeout,
 }
 
 impl Deadline {
-    fn from_now(timeout: Timeout) -> Self {
+    fn from_now(timeout: Timeout, clock: TokioClock) -> Self {
         Self {
-            at: timeout.deadline_from_now(),
+            at: timeout.deadline(clock.now()),
             timeout,
         }
     }
@@ -112,20 +112,13 @@ fn fails_task(source: FragmentAddr, destination: FragmentAddr) -> bool {
     false
 }
 
-async fn sleep_until(deadline: Option<Instant>) {
-    match deadline {
-        Some(deadline) => tokio::time::sleep_until(deadline).await,
-        None => std::future::pending().await,
-    }
-}
-
 impl MasterSession {
     fn new(
         initial_state: Enabled,
         decode_level: DecodeLevel,
         tx_buffer_size: BufferSize<249, 2048>,
         messages: Receiver<Message>,
-        associations: AssociationMap,
+        associations: AssociationMap<TokioClock>,
     ) -> Self {
         Self {
             enabled: initial_state,
@@ -143,16 +136,17 @@ impl MasterSession {
         &mut self,
         io: &mut PhysLayer,
         reader: &'a mut TransportReader<T>,
-        deadline: Option<Instant>,
+        deadline: Option<MonotonicTime>,
     ) -> Result<Event<'a>, RunError> {
         let decode_level = self.decode_level;
+        let clock = self.associations.clock();
         tokio::select! {
             result = self.process_message(true) => {
                 result?;
                 return Ok(Event::Message);
             }
             result = reader.read(io, decode_level) => result?,
-            _ = sleep_until(deadline) => return Ok(Event::Timeout),
+            _ = clock.sleep_until(deadline) => return Ok(Event::Timeout),
         }
 
         let event = match reader.pop_response(decode_level.application) {
@@ -239,7 +233,11 @@ impl<T: Transport> MasterTask<T> {
     /// Wait until a message is received, a response is received, or we reach the time, if any.
     ///
     /// Returns an error only if shutdown or link layer error occurred.
-    async fn idle(&mut self, until: Option<Instant>, io: &mut PhysLayer) -> Result<(), RunError> {
+    async fn idle(
+        &mut self,
+        until: Option<MonotonicTime>,
+        io: &mut PhysLayer,
+    ) -> Result<(), RunError> {
         loop {
             match self.session.next_event(io, &mut self.reader, until).await? {
                 Event::Fragment(source, response) => {

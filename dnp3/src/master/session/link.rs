@@ -26,7 +26,10 @@ impl<T: Transport> MasterTask<T> {
             .send_link_status_request(io, self.session.decode_level, destination)
             .await?;
 
-        let deadline = Deadline::from_now(self.session.associations.get_timeout(destination.link)?);
+        let deadline = Deadline::from_now(
+            self.session.associations.get_timeout(destination.link)?,
+            self.session.associations.clock(),
+        );
 
         loop {
             match self

@@ -12,7 +12,7 @@ use crate::app::parse::parser::Response;
 use crate::app::variations::{Group50Var1, Group50Var3};
 use crate::app::FunctionCode;
 use crate::app::Timestamp;
-use crate::master::association::Association;
+use crate::master::association::{Association, MasterClock};
 use crate::master::error::{TaskErrorKind, TimeSyncError, TimeSyncErrorKind};
 use crate::master::promise::Promise;
 use crate::master::request::TimeSyncProcedure;
@@ -20,7 +20,7 @@ use crate::master::tasks::empty_response::expect_empty;
 use crate::master::tasks::{NonReadTask, RequestError, SolicitedTask, Step, Task};
 use crate::master::TaskType;
 
-use tokio::time::Instant;
+use crate::util::clock::MonotonicTime;
 
 /// Who receives the outcome of a time synchronization
 enum Requester {
@@ -84,7 +84,7 @@ impl PendingTimeSync {
 
 enum State {
     /// time the delay measurement request is sent
-    MeasureDelay(Instant),
+    MeasureDelay(MonotonicTime),
     WriteAbsoluteTime(Timestamp),
     /// time the record current time request is sent
     RecordCurrentTime(Timestamp),
@@ -162,13 +162,13 @@ impl TimeSyncTask {
     }
 }
 
-impl Association {
+impl<C: MasterClock> Association<C> {
     /// Start a time synchronization, or report an error and return `None` if the system time
     /// isn't available
     pub(crate) fn start_time_sync(&mut self, task: PendingTimeSync) -> Option<TimeSyncTask> {
         let state = match task.procedure {
             TimeSyncProcedure::NonLan => {
-                let request_tx = Instant::now();
+                let request_tx = self.now();
                 self.get_system_time()
                     .map(|_| State::MeasureDelay(request_tx))
             }
@@ -224,15 +224,15 @@ impl Association {
     /// The time to write to the outstation, from the response to the delay measurement
     fn handle_delay_measure(
         &mut self,
-        request_tx: Instant,
+        request_tx: MonotonicTime,
         response: Response,
     ) -> Result<Timestamp, TimeSyncErrorKind> {
-        let now = Instant::now();
+        let now = self.now();
 
         let interval = match now.checked_duration_since(request_tx) {
             Some(x) => x,
             None => {
-                // This should NEVER happen. `tokio::time::Instant` is guaranteed to be monotonic
+                // This should NEVER happen. The master's clock is monotonic
                 tracing::error!("clock rollback detected while synchronizing outstation");
                 return Err(TimeSyncErrorKind::ClockRollback);
             }
@@ -337,6 +337,7 @@ mod tests {
     use crate::master::tasks::RequestWriter;
     use crate::master::test_fixtures::association;
     use crate::master::AssociationConfig;
+    use crate::util::clock::TokioClock;
 
     use scursor::WriteCursor;
 
@@ -350,7 +351,7 @@ mod tests {
     /// Answer `task` with a response that has this IIN and these object headers
     async fn respond(
         task: NonReadTask,
-        association: &mut Association,
+        association: &mut Association<TokioClock>,
         iin: Iin,
         objects: &[u8],
     ) -> Result<Option<NonReadTask>, TaskErrorKind> {
@@ -416,7 +417,7 @@ mod tests {
     ) -> (
         PendingTimeSync,
         Timestamp,
-        Association,
+        Association<TokioClock>,
         tokio::sync::oneshot::Receiver<Result<(), TimeSyncError>>,
     ) {
         let system_time = Timestamp::try_from_system_time(SystemTime::now()).unwrap();
@@ -424,6 +425,7 @@ mod tests {
             EndpointAddress::try_new(1).unwrap(),
             AssociationConfig::default(),
             handler(system_time),
+            TokioClock::new(),
         );
         let (promise, rx) = Promise::one_shot();
         let task = PendingTimeSync::user(procedure, promise);
@@ -431,7 +433,7 @@ mod tests {
         (task, system_time, association, rx)
     }
 
-    async fn send_write_response(task: NonReadTask, association: &mut Association) {
+    async fn send_write_response(task: NonReadTask, association: &mut Association<TokioClock>) {
         respond(task, association, Iin::default(), &[])
             .await
             .unwrap();
@@ -447,7 +449,7 @@ mod tests {
         fn non_lan_time_sync_setup() -> (
             PendingTimeSync,
             Timestamp,
-            Association,
+            Association<TokioClock>,
             tokio::sync::oneshot::Receiver<Result<(), TimeSyncError>>,
         ) {
             time_sync_setup(TimeSyncProcedure::NonLan, |time| {
@@ -458,7 +460,7 @@ mod tests {
         fn non_lan_time_sync_single_time_setup() -> (
             PendingTimeSync,
             Timestamp,
-            Association,
+            Association<TokioClock>,
             tokio::sync::oneshot::Receiver<Result<(), TimeSyncError>>,
         ) {
             time_sync_setup(TimeSyncProcedure::NonLan, |time| {
@@ -631,7 +633,7 @@ mod tests {
 
         fn check_measure_delay_request(
             task: PendingTimeSync,
-            association: &mut Association,
+            association: &mut Association<TokioClock>,
         ) -> NonReadTask {
             let mut buffer = [0; 20];
             let mut cursor = WriteCursor::new(&mut buffer);
@@ -653,7 +655,7 @@ mod tests {
 
         async fn send_measure_delay_response(
             task: NonReadTask,
-            association: &mut Association,
+            association: &mut Association<TokioClock>,
         ) -> Result<Option<NonReadTask>, TaskErrorKind> {
             // g52v2 with a count of one
             let [low, high] = OUTSTATION_DELAY_MS.to_le_bytes();
@@ -770,7 +772,7 @@ mod tests {
         fn lan_time_sync_setup() -> (
             PendingTimeSync,
             Timestamp,
-            Association,
+            Association<TokioClock>,
             tokio::sync::oneshot::Receiver<Result<(), TimeSyncError>>,
         ) {
             time_sync_setup(TimeSyncProcedure::Lan, |time| {
@@ -780,7 +782,7 @@ mod tests {
 
         fn check_record_current_time_request(
             task: PendingTimeSync,
-            association: &mut Association,
+            association: &mut Association<TokioClock>,
         ) -> NonReadTask {
             let mut buffer = [0; 20];
             let mut cursor = WriteCursor::new(&mut buffer);
@@ -802,7 +804,7 @@ mod tests {
 
         async fn send_record_current_time_response(
             task: NonReadTask,
-            association: &mut Association,
+            association: &mut Association<TokioClock>,
         ) -> Result<Option<NonReadTask>, TaskErrorKind> {
             respond(task, association, Iin::default(), &[]).await
         }
@@ -879,7 +881,7 @@ mod tests {
         fn direct_write_setup() -> (
             PendingTimeSync,
             Timestamp,
-            Association,
+            Association<TokioClock>,
             tokio::sync::oneshot::Receiver<Result<(), TimeSyncError>>,
         ) {
             time_sync_setup(TimeSyncProcedure::DirectWriteAbsTime, |time| {

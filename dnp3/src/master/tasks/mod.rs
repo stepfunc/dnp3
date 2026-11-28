@@ -10,7 +10,7 @@ use crate::app::format::write::HeaderWriter;
 use crate::app::parse::parser::Response;
 use crate::app::FunctionCode;
 use crate::app::ResponseHeader;
-use crate::master::association::Association;
+use crate::master::association::{Association, MasterClock};
 use crate::master::error::{
     CommandError, CommandErrorKind, TaskError, TaskErrorKind, TimeSyncError, TimeSyncErrorKind,
 };
@@ -512,7 +512,7 @@ impl ReadTask {
     }
 }
 
-impl Association {
+impl<C: MasterClock> Association<C> {
     /// Perform any operation needed before sending and check that the task should still be sent
     ///
     /// Returning `None` means starting failed and the failure has already been reported.
@@ -664,6 +664,7 @@ mod test {
     use super::*;
     use crate::app::ObjectParseError;
     use crate::master::request::ReadRequest;
+    use crate::util::clock::MonotonicTime;
 
     fn read_tasks() -> [ReadTask; 4] {
         [
@@ -672,6 +673,7 @@ mod test {
                 0,
                 ReadRequest::new().add_classes(Classes::class123()),
                 Duration::from_secs(1),
+                MonotonicTime::from_elapsed(Duration::ZERO),
             )),
             ReadTask::EventScan(EventClasses::all()),
             ReadTask::SingleRead(SingleReadTask::new(

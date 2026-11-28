@@ -384,8 +384,14 @@ async fn operate_no_ack_fails_without_a_connection() {
     watchdog(async {
         let address = EndpointAddress::try_new(1024).unwrap();
         let mut associations = AssociationMap::new();
+        let clock = associations.clock();
         associations
-            .register(association(address, AssociationConfig::quiet(), null()))
+            .register(association(
+                address,
+                AssociationConfig::quiet(),
+                null(),
+                clock,
+            ))
             .unwrap();
 
         let (tx, rx) = crate::util::channel::request_channel();

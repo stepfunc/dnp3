@@ -34,7 +34,7 @@ impl MasterTask {
 
     pub(crate) fn with_associations(
         enabled: Enabled,
-        associations: AssociationMap,
+        associations: AssociationMap<TokioClock>,
         link_modes: LinkModes,
         config: MasterChannelConfig,
         messages: Receiver<Message>,
@@ -66,7 +66,7 @@ impl MasterTask<crate::transport::mock::MockTransport> {
 impl<T: Transport> MasterTask<T> {
     pub(crate) fn with_transport(
         enabled: Enabled,
-        associations: AssociationMap,
+        associations: AssociationMap<TokioClock>,
         link_modes: LinkModes,
         config: MasterChannelConfig,
         messages: Receiver<Message>,
@@ -96,8 +96,8 @@ impl<T: Transport> MasterTask<T> {
     }
 
     #[cfg(feature = "unstable")]
-    pub(crate) fn start(&mut self, now: Instant) {
-        self.session.associations.start(now);
+    pub(crate) fn start(&mut self) {
+        self.session.associations.start();
     }
 
     pub(crate) async fn run(&mut self, io: &mut PhysLayer) -> RunError {

@@ -56,6 +56,7 @@ impl MasterSession {
                             read_handler,
                             assoc_handler,
                             assoc_info,
+                            self.associations.clock(),
                         ))
                         .map_err(Into::into),
                 );

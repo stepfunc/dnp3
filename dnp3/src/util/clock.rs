@@ -16,6 +16,11 @@ impl MonotonicTime {
         Self(elapsed)
     }
 
+    /// Add `duration`, or `None` if the result can't be represented.
+    pub(crate) fn checked_add(self, duration: Duration) -> Option<Self> {
+        self.0.checked_add(duration).map(Self)
+    }
+
     /// Add `duration`, saturating at [`Duration::MAX`] instead of overflowing.
     pub(crate) fn saturating_add(self, duration: Duration) -> Self {
         Self(self.0.saturating_add(duration))

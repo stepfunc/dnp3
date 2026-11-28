@@ -8,12 +8,20 @@ use std::time::Duration;
 
 use tokio::time::Instant;
 
+use crate::util::clock::MonotonicTime;
+
 /// Delays longer than this are treated as this long, so a deadline can always be represented
 const MAX_DELAY: Duration = Duration::from_secs(946_080_000); // 30 years
 
 /// The instant `delay` after `now`
 pub(crate) fn deadline(now: Instant, delay: Duration) -> Instant {
     now.checked_add(delay.min(MAX_DELAY)).unwrap_or(now)
+}
+
+/// The time `delay` after `now`, with the same clamp as [`deadline`], so a deadline recorded here is
+/// due when the Tokio sleep for it wakes
+pub(crate) fn monotonic_deadline(now: MonotonicTime, delay: Duration) -> MonotonicTime {
+    now.saturating_add(delay.min(MAX_DELAY))
 }
 
 #[cfg(test)]

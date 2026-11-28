@@ -39,7 +39,7 @@ impl MasterSession {
         dest: FragmentAddr,
         seq: Sequence,
         deadline: Deadline,
-    ) -> Result<Option<(&'b mut Association, Response<'a>)>, TaskErrorKind> {
+    ) -> Result<Option<(&'b mut Association<TokioClock>, Response<'a>)>, TaskErrorKind> {
         let (source, response) = match self.next_event(io, reader, Some(deadline.at)).await? {
             Event::Timeout => return Err(deadline.expired()),
             Event::Malformed(source, err) if fails_task(source, dest) => return Err(err.into()),
@@ -139,7 +139,10 @@ impl<T: Transport> MasterTask<T> {
             .session
             .send_request(io, dest, task, &mut self.writer)
             .await?;
-        let deadline = Deadline::from_now(self.session.associations.get_timeout(dest.link)?);
+        let deadline = Deadline::from_now(
+            self.session.associations.get_timeout(dest.link)?,
+            self.session.associations.clock(),
+        );
         Ok((seq, deadline))
     }
 

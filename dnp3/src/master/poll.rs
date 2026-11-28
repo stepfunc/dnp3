@@ -15,7 +15,7 @@ use crate::master::handler::AssociationHandle;
 use crate::master::request::ReadRequest;
 
 use crate::master::promise::Promise;
-use tokio::time::Instant;
+use crate::util::clock::MonotonicTime;
 
 /// Periodic poll representation
 #[derive(Clone)]
@@ -27,7 +27,7 @@ pub(crate) struct Poll {
     /// Period to wait between two polls
     period: Duration,
     /// Next instant to send the request (`None` if it was just created)
-    next: Option<Instant>,
+    next: Option<MonotonicTime>,
     /// How many times the poll was demanded, so a run can tell if it was demanded meanwhile
     demands: u64,
 }
@@ -66,16 +66,21 @@ impl PollMap {
         }
     }
 
-    pub(crate) fn add(&mut self, request: ReadRequest, period: Duration) -> u64 {
+    pub(crate) fn add(
+        &mut self,
+        request: ReadRequest,
+        period: Duration,
+        now: MonotonicTime,
+    ) -> u64 {
         let id = self.id;
         self.id = self.id.wrapping_add(1);
         #[cfg(feature = "unstable")]
         let poll = match self.timer_state {
             TimerState::Deferred => Poll::new_deferred(id, request, period),
-            TimerState::Running => Poll::new(id, request, period),
+            TimerState::Running => Poll::new(id, request, period, now),
         };
         #[cfg(not(feature = "unstable"))]
-        let poll = Poll::new(id, request, period);
+        let poll = Poll::new(id, request, period, now);
         self.polls.insert(id, poll);
         id
     }
@@ -84,7 +89,7 @@ impl PollMap {
     ///
     /// Returns `true` only when this call transitions the map to running.
     #[cfg(feature = "unstable")]
-    pub(crate) fn start(&mut self, now: Instant) -> bool {
+    pub(crate) fn start(&mut self, now: MonotonicTime) -> bool {
         if self.timer_state == TimerState::Running {
             return false;
         }
@@ -100,9 +105,9 @@ impl PollMap {
         self.polls.remove(&id).is_some()
     }
 
-    pub(crate) fn demand(&mut self, id: u64) -> bool {
+    pub(crate) fn demand(&mut self, id: u64, now: MonotonicTime) -> bool {
         if let Some(poll) = self.polls.get_mut(&id) {
-            poll.demand();
+            poll.demand(now);
             true
         } else {
             false
@@ -111,16 +116,16 @@ impl PollMap {
 
     /// Schedule the poll after `run` completes: one period later, or at once if it was demanded
     /// while it ran
-    pub(crate) fn complete(&mut self, run: &Poll) {
+    pub(crate) fn complete(&mut self, run: &Poll, now: MonotonicTime) {
         if let Some(x) = self.polls.get_mut(&run.id) {
             if x.demands == run.demands {
-                x.reset_next()
+                x.reset_next(now)
             }
         }
     }
 
-    pub(crate) fn next(&self, now: Instant) -> Next<Poll> {
-        let mut earliest: Option<Instant> = None;
+    pub(crate) fn next(&self, now: MonotonicTime) -> Next<Poll> {
+        let mut earliest: Option<MonotonicTime> = None;
 
         for poll in self.polls.values() {
             if poll.is_ready(now) {
@@ -140,12 +145,12 @@ impl PollMap {
 }
 
 impl Poll {
-    pub(crate) fn new(id: u64, request: ReadRequest, period: Duration) -> Self {
+    pub(crate) fn new(id: u64, request: ReadRequest, period: Duration, now: MonotonicTime) -> Self {
         Self {
             id,
             request,
             period,
-            next: Instant::now().checked_add(period),
+            next: now.checked_add(period),
             demands: 0,
         }
     }
@@ -162,7 +167,7 @@ impl Poll {
     }
 
     #[cfg(feature = "unstable")]
-    fn start(&mut self, now: Instant) {
+    fn start(&mut self, now: MonotonicTime) {
         self.next = now.checked_add(self.period);
     }
 
@@ -170,23 +175,23 @@ impl Poll {
         self.request.format(writer)
     }
 
-    pub(crate) fn demand(&mut self) {
-        self.next = Some(Instant::now());
+    pub(crate) fn demand(&mut self, now: MonotonicTime) {
+        self.next = Some(now);
         self.demands = self.demands.wrapping_add(1);
     }
 
-    pub(crate) fn reset_next(&mut self) {
-        self.next = Instant::now().checked_add(self.period)
+    pub(crate) fn reset_next(&mut self, now: MonotonicTime) {
+        self.next = now.checked_add(self.period)
     }
 
-    pub(crate) fn is_ready(&self, now: Instant) -> bool {
+    pub(crate) fn is_ready(&self, now: MonotonicTime) -> bool {
         if let Some(next) = self.next {
             return next <= now;
         }
         false
     }
 
-    pub(crate) fn next(&self) -> Option<Instant> {
+    pub(crate) fn next(&self) -> Option<MonotonicTime> {
         self.next
     }
 }
@@ -276,15 +281,15 @@ mod tests {
     #[test]
     fn deferred_polls_are_scheduled_from_start_time() {
         let period = Duration::from_secs(5);
-        let start = Instant::now();
+        let start = MonotonicTime::from_elapsed(Duration::from_secs(100));
         let mut polls = PollMap::new_deferred();
-        polls.add(request(), period);
+        polls.add(request(), period, start);
 
         assert!(matches!(polls.next(start), Next::None));
         assert!(polls.start(start));
 
         match polls.next(start) {
-            Next::NotBefore(deadline) => assert_eq!(deadline, start + period),
+            Next::NotBefore(deadline) => assert_eq!(deadline, start.saturating_add(period)),
             _ => panic!("expected a scheduled poll"),
         }
     }
@@ -292,15 +297,15 @@ mod tests {
     #[test]
     fn starting_twice_does_not_reset_poll_deadlines() {
         let period = Duration::from_secs(5);
-        let start = Instant::now();
+        let start = MonotonicTime::from_elapsed(Duration::from_secs(100));
         let mut polls = PollMap::new_deferred();
-        polls.add(request(), period);
+        polls.add(request(), period, start);
 
         assert!(polls.start(start));
-        assert!(!polls.start(start + Duration::from_secs(1)));
+        assert!(!polls.start(start.saturating_add(Duration::from_secs(1))));
 
         match polls.next(start) {
-            Next::NotBefore(deadline) => assert_eq!(deadline, start + period),
+            Next::NotBefore(deadline) => assert_eq!(deadline, start.saturating_add(period)),
             _ => panic!("expected a scheduled poll"),
         }
     }

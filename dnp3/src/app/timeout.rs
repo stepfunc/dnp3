@@ -6,6 +6,8 @@
 
 use std::time::Duration;
 
+use crate::util::clock::MonotonicTime;
+
 /// A wrapper around a std::time::Duration that ensures values are in the range `[1ms .. 1hour]`
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(
@@ -85,8 +87,9 @@ impl Timeout {
         Ok(Self(value))
     }
 
-    pub(crate) fn deadline_from_now(self) -> tokio::time::Instant {
-        crate::util::deadline::deadline(tokio::time::Instant::now(), self.0)
+    /// The time this timeout after `now`
+    pub(crate) fn deadline(self, now: MonotonicTime) -> MonotonicTime {
+        now.saturating_add(self.0)
     }
 }
 

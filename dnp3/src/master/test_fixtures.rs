@@ -12,6 +12,7 @@ use crate::master::association::{Association, AssociationConfig};
 use crate::master::{AssociationHandler, AssociationInformation, ReadHandler};
 use crate::phys::PhysAddr;
 use crate::transport::FragmentAddr;
+use crate::util::clock::TokioClock;
 
 /// A handler that ignores every callback and has no system time
 pub(crate) struct NullHandler;
@@ -49,6 +50,7 @@ pub(crate) fn association(
     link: EndpointAddress,
     config: AssociationConfig,
     handler: Box<dyn AssociationHandler>,
-) -> Association {
-    Association::new(fragment_addr(link), config, null(), handler, null())
+    clock: TokioClock,
+) -> Association<TokioClock> {
+    Association::new(fragment_addr(link), config, null(), handler, null(), clock)
 }

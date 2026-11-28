@@ -32,10 +32,9 @@ use crate::master::{AssociationInformation, ReadHandler, ReadType, TaskType};
 
 use crate::master::promise::Promise;
 use crate::transport::FragmentAddr;
+use crate::util::clock::{MonotonicClock, MonotonicTime, TokioClock};
+use crate::util::deadline::monotonic_deadline;
 use crate::util::lifecycle::RunError;
-use tokio::time::Instant;
-
-use crate::util::deadline::deadline;
 
 /// Configuration for a master association
 #[derive(Debug, Copy, Clone)]
@@ -155,7 +154,7 @@ pub(crate) enum AutoTaskState {
     /// The task needs to run
     Pending,
     /// The task failed and is waiting for retry
-    Failed(ExponentialBackOff, Instant),
+    Failed(ExponentialBackOff, MonotonicTime),
 }
 
 impl AutoTaskState {
@@ -176,7 +175,7 @@ impl AutoTaskState {
     /// Create a `Next<QueuedTask>`, given the time it is `now`
     fn create_next_task(
         &self,
-        now: Instant,
+        now: MonotonicTime,
         builder: impl FnOnce() -> QueuedTask,
     ) -> Next<QueuedTask> {
         match self {
@@ -214,16 +213,16 @@ impl AutoTaskState {
     }
 
     /// The task failed and needs rescheduling
-    fn failure(&mut self, retry_strategy: RetryStrategy) {
+    fn failure(&mut self, retry_strategy: RetryStrategy, now: MonotonicTime) {
         *self = match self {
             Self::Failed(backoff, _) => {
                 let delay = backoff.on_failure();
-                Self::Failed(backoff.clone(), deadline(Instant::now(), delay))
+                Self::Failed(backoff.clone(), monotonic_deadline(now, delay))
             }
             Self::Idle | Self::Pending => {
                 let mut backoff = ExponentialBackOff::new(retry_strategy);
                 let delay = backoff.on_failure();
-                Self::Failed(backoff, deadline(Instant::now(), delay))
+                Self::Failed(backoff, monotonic_deadline(now, delay))
             }
         }
     }
@@ -309,10 +308,10 @@ impl TaskStates {
     /// The next automatic task, and when a failed time sync that's behind it in the order retries
     fn next(
         &self,
-        now: Instant,
+        now: MonotonicTime,
         config: &AssociationConfig,
         events_to_scan: EventClasses,
-    ) -> (Next<QueuedTask>, Option<Instant>) {
+    ) -> (Next<QueuedTask>, Option<MonotonicTime>) {
         if self.clear_restart_iin.is_active() {
             return (
                 self.clear_restart_iin
@@ -380,7 +379,11 @@ impl TaskStates {
     }
 
     /// The automatic time sync, if it's enabled and due now
-    fn time_sync_if_due(&self, now: Instant, config: &AssociationConfig) -> Option<QueuedTask> {
+    fn time_sync_if_due(
+        &self,
+        now: MonotonicTime,
+        config: &AssociationConfig,
+    ) -> Option<QueuedTask> {
         let procedure = config.auto_time_sync?;
         match self
             .time_sync
@@ -392,7 +395,11 @@ impl TaskStates {
     }
 
     /// When the automatic time sync retries, if it failed and is waiting for its backoff to end
-    fn time_sync_retry(&self, now: Instant, config: &AssociationConfig) -> Option<Instant> {
+    fn time_sync_retry(
+        &self,
+        now: MonotonicTime,
+        config: &AssociationConfig,
+    ) -> Option<MonotonicTime> {
         config.auto_time_sync?;
         match self.time_sync {
             AutoTaskState::Failed(_, next) if now < next => Some(next),
@@ -419,7 +426,7 @@ impl LastUnsolFragment {
 /// A logical connection between a master and an outstation
 /// as defined by the DNP3 standard. A master manages requests
 /// and responses for multiple associations (i.e. multi-drop).
-pub(crate) struct Association {
+pub(crate) struct Association<C: MasterClock> {
     address: FragmentAddr,
     seq: Sequence,
     last_unsol_frag: Option<LastUnsolFragment>,
@@ -430,32 +437,36 @@ pub(crate) struct Association {
     assoc_info: Box<dyn AssociationInformation>,
     config: AssociationConfig,
     polls: PollMap,
-    next_link_status_deadline: Option<Instant>,
+    next_link_status_deadline: Option<MonotonicTime>,
     startup_integrity_done: bool,
     events_available: EventClasses,
+    /// a copy of the master's clock, which every association of the master shares
+    clock: C,
 }
 
-impl Association {
+impl<C: MasterClock> Association<C> {
     pub(crate) fn new(
         address: FragmentAddr,
         config: AssociationConfig,
         read_handler: Box<dyn ReadHandler>,
         assoc_handler: Box<dyn AssociationHandler>,
         assoc_info: Box<dyn AssociationInformation>,
+        clock: C,
     ) -> Self {
-        let now = Instant::now();
-
-        Self::create(
+        let mut association = Self::create(
             address,
             config,
             read_handler,
             assoc_handler,
             assoc_info,
             PollMap::new(),
-            config
-                .keep_alive_timeout
-                .map(|delay| deadline(now, delay.into())),
-        )
+            clock,
+        );
+        let now = association.now();
+        association.next_link_status_deadline = config
+            .keep_alive_timeout
+            .map(|delay| monotonic_deadline(now, delay.into()));
+        association
     }
 
     #[cfg(feature = "unstable")]
@@ -465,6 +476,7 @@ impl Association {
         read_handler: Box<dyn ReadHandler>,
         assoc_handler: Box<dyn AssociationHandler>,
         assoc_info: Box<dyn AssociationInformation>,
+        clock: C,
     ) -> Self {
         Self::create(
             address,
@@ -473,10 +485,11 @@ impl Association {
             assoc_handler,
             assoc_info,
             PollMap::new_deferred(),
-            None,
+            clock,
         )
     }
 
+    /// An association without a keep-alive deadline yet
     fn create(
         address: FragmentAddr,
         config: AssociationConfig,
@@ -484,7 +497,7 @@ impl Association {
         assoc_handler: Box<dyn AssociationHandler>,
         assoc_info: Box<dyn AssociationInformation>,
         polls: PollMap,
-        next_link_status_deadline: Option<Instant>,
+        clock: C,
     ) -> Self {
         Self {
             address,
@@ -497,25 +510,31 @@ impl Association {
             assoc_info,
             config,
             polls,
-            next_link_status_deadline,
+            next_link_status_deadline: None,
             startup_integrity_done: false,
             events_available: EventClasses::none(),
+            clock,
         }
     }
 
+    /// The current time on the master's clock
+    pub(crate) fn now(&self) -> MonotonicTime {
+        self.clock.now()
+    }
+
     #[cfg(feature = "unstable")]
-    pub(crate) fn start(&mut self, now: Instant) {
+    pub(crate) fn start(&mut self, now: MonotonicTime) {
         if self.polls.start(now) {
             self.next_link_status_deadline = self
                 .config
                 .keep_alive_timeout
-                .map(|delay| deadline(now, delay.into()));
+                .map(|delay| monotonic_deadline(now, delay.into()));
         }
     }
 
     #[cfg(feature = "unstable")]
     pub(crate) fn add_poll(&mut self, request: ReadRequest, period: Duration) -> u64 {
-        self.polls.add(request, period)
+        self.polls.add(request, period, self.clock.now())
     }
 
     pub(crate) fn process_message(&mut self, msg: AssociationMsgType, is_connected: bool) {
@@ -540,7 +559,7 @@ impl Association {
     fn process_poll_message(&mut self, msg: PollMsg) {
         match msg {
             PollMsg::AddPoll(association, request, period, callback) => {
-                let id = self.polls.add(request, period);
+                let id = self.polls.add(request, period, self.clock.now());
                 let handle = PollHandle::new(association, id);
                 callback.complete(Ok(handle))
             }
@@ -548,7 +567,7 @@ impl Association {
                 self.polls.remove(id);
             }
             PollMsg::Demand(id) => {
-                self.polls.demand(id);
+                self.polls.demand(id, self.clock.now());
             }
         }
     }
@@ -576,7 +595,7 @@ impl Association {
     }
 
     pub(crate) fn complete_poll(&mut self, run: &Poll) {
-        self.polls.complete(run)
+        self.polls.complete(run, self.clock.now())
     }
 
     pub(crate) fn seq(&self) -> Sequence {
@@ -642,7 +661,7 @@ impl Association {
     pub(crate) fn on_integrity_scan_failure(&mut self) {
         self.auto_tasks
             .integrity_scan
-            .failure(self.config.auto_tasks_retry_strategy);
+            .failure(self.config.auto_tasks_retry_strategy, self.clock.now());
     }
 
     /// The classes with events available that the automatic event scan reads
@@ -665,7 +684,7 @@ impl Association {
     pub(crate) fn on_event_scan_failure(&mut self) {
         self.auto_tasks
             .event_scan
-            .failure(self.config.auto_tasks_retry_strategy);
+            .failure(self.config.auto_tasks_retry_strategy, self.clock.now());
     }
 
     pub(crate) fn on_auto_task_success(&mut self, task: &AutoTask) {
@@ -675,7 +694,7 @@ impl Association {
     pub(crate) fn on_auto_task_failure(&mut self, task: &AutoTask) {
         self.auto_tasks
             .state_mut(task)
-            .failure(self.config.auto_tasks_retry_strategy);
+            .failure(self.config.auto_tasks_retry_strategy, self.clock.now());
     }
 
     pub(crate) fn on_time_sync_success(&mut self) {
@@ -686,14 +705,14 @@ impl Association {
         tracing::warn!("auto time sync failed: {err}");
         self.auto_tasks
             .time_sync
-            .failure(self.config.auto_tasks_retry_strategy);
+            .failure(self.config.auto_tasks_retry_strategy, self.clock.now());
     }
 
     pub(crate) fn on_link_activity(&mut self) {
         self.next_link_status_deadline = self
             .config
             .keep_alive_timeout
-            .map(Timeout::deadline_from_now)
+            .map(|timeout| timeout.deadline(self.clock.now()))
     }
 
     pub(crate) async fn handle_unsolicited_response(&mut self, response: &Response<'_>) -> bool {
@@ -793,7 +812,7 @@ impl Association {
         None
     }
 
-    fn next_task(&mut self, now: Instant) -> Next<Task> {
+    fn next_task(&mut self, now: MonotonicTime) -> Next<Task> {
         loop {
             match self.get_next_task(now) {
                 Next::Now(task) => {
@@ -808,7 +827,7 @@ impl Association {
         }
     }
 
-    fn next_link_status_task(&self, now: Instant) -> Next<QueuedTask> {
+    fn next_link_status_task(&self, now: MonotonicTime) -> Next<QueuedTask> {
         match self.next_link_status_deadline {
             None => Next::None,
             Some(next) => {
@@ -821,7 +840,7 @@ impl Association {
         }
     }
 
-    fn get_next_task(&self, now: Instant) -> Next<QueuedTask> {
+    fn get_next_task(&self, now: MonotonicTime) -> Next<QueuedTask> {
         let (next, time_sync_retry) =
             self.auto_tasks
                 .next(now, &self.config, self.events_to_scan());
@@ -837,7 +856,7 @@ impl Association {
         }
     }
 
-    fn next_poll_or_keep_alive(&self, now: Instant) -> Next<QueuedTask> {
+    fn next_poll_or_keep_alive(&self, now: MonotonicTime) -> Next<QueuedTask> {
         match self.polls.next(now) {
             Next::Now(poll) => {
                 // always prioritize polls over link status requests
@@ -849,7 +868,7 @@ impl Association {
                     Next::Now(x) => Next::Now(x),
                     Next::NotBefore(next_link_status) => {
                         // return the earlier one
-                        Next::NotBefore(Instant::min(next_poll, next_link_status))
+                        Next::NotBefore(next_poll.min(next_link_status))
                     }
                 }
             }
@@ -864,29 +883,30 @@ impl Association {
 pub(crate) enum Next<T> {
     None,
     Now(T),
-    NotBefore(Instant),
+    NotBefore(MonotonicTime),
 }
 
 impl<T> Next<T> {
     /// Also wait for `deadline`, if nothing is ready now
-    fn or_not_before(self, deadline: Instant) -> Self {
+    fn or_not_before(self, deadline: MonotonicTime) -> Self {
         match self {
             Self::Now(x) => Self::Now(x),
-            Self::NotBefore(next) => Self::NotBefore(Instant::min(next, deadline)),
+            Self::NotBefore(next) => Self::NotBefore(next.min(deadline)),
             Self::None => Self::NotBefore(deadline),
         }
     }
 }
 
-pub(crate) struct AssociationMap {
-    map: BTreeMap<EndpointAddress, Association>,
-    priority: VecDeque<EndpointAddress>,
-}
+/// A master's clock, which it shares with its associations
+pub(crate) trait MasterClock: MonotonicClock + Copy + Send {}
 
-impl Default for AssociationMap {
-    fn default() -> Self {
-        Self::new()
-    }
+impl<C: MonotonicClock + Copy + Send> MasterClock for C {}
+
+pub(crate) struct AssociationMap<C: MasterClock> {
+    map: BTreeMap<EndpointAddress, Association<C>>,
+    priority: VecDeque<EndpointAddress>,
+    /// the master's one clock: each association gets a copy, so all of them share its epoch
+    clock: C,
 }
 
 #[derive(Copy, Clone)]
@@ -894,16 +914,30 @@ pub(crate) struct NoAssociation {
     pub(crate) address: EndpointAddress,
 }
 
-impl AssociationMap {
+impl AssociationMap<TokioClock> {
     pub(crate) fn new() -> Self {
+        Self::with_clock(TokioClock::new())
+    }
+}
+
+impl<C: MasterClock> AssociationMap<C> {
+    pub(crate) fn with_clock(clock: C) -> Self {
         Self {
             map: BTreeMap::new(),
             priority: VecDeque::new(),
+            clock,
         }
     }
 
+    /// The clock the master and its associations share
+    pub(crate) fn clock(&self) -> C {
+        self.clock
+    }
+
+    /// Start every association's deferred timers from one instant
     #[cfg(feature = "unstable")]
-    pub(crate) fn start(&mut self, now: Instant) {
+    pub(crate) fn start(&mut self) {
+        let now = self.clock.now();
         for association in self.map.values_mut() {
             association.start(now);
         }
@@ -922,14 +956,14 @@ impl AssociationMap {
         }
     }
 
-    pub(crate) fn register(&mut self, session: Association) -> Result<(), AssociationErrorKind> {
+    pub(crate) fn register(&mut self, session: Association<C>) -> Result<(), AssociationErrorKind> {
         self.register_and_get(session).map(|_| ())
     }
 
     pub(crate) fn register_and_get(
         &mut self,
-        session: Association,
-    ) -> Result<&mut Association, AssociationErrorKind> {
+        session: Association<C>,
+    ) -> Result<&mut Association<C>, AssociationErrorKind> {
         let address = session.address.link;
         match self.map.entry(address) {
             Entry::Occupied(_) => Err(AssociationErrorKind::DuplicateAddress(address)),
@@ -950,7 +984,7 @@ impl AssociationMap {
     pub(crate) fn get_mut(
         &mut self,
         address: EndpointAddress,
-    ) -> Result<&mut Association, NoAssociation> {
+    ) -> Result<&mut Association<C>, NoAssociation> {
         match self.map.get_mut(&address) {
             Some(x) => Ok(x),
             None => Err(NoAssociation { address }),
@@ -975,8 +1009,8 @@ impl AssociationMap {
         }
 
         // Check for non-priority tasks
-        let now = Instant::now();
-        let mut earliest: Option<Instant> = None;
+        let now = self.clock.now();
+        let mut earliest: Option<MonotonicTime> = None;
 
         for (index, address) in self.priority.iter().enumerate() {
             if let Some(association) = self.map.get_mut(address) {
@@ -1010,22 +1044,21 @@ mod scheduler_tests;
 mod retry_tests {
     use super::*;
 
-    #[tokio::test(start_paused = true)]
-    async fn retry_delays_too_long_to_represent_are_scheduled_far_in_the_future() {
+    #[test]
+    fn retry_delays_too_long_to_represent_are_scheduled_far_in_the_future() {
         let config = AssociationConfig {
             auto_tasks_retry_strategy: RetryStrategy::new(Duration::MAX, Duration::MAX),
             ..AssociationConfig::default()
         };
 
-        // the clock is paused, so the failures are recorded at this instant
-        let now = Instant::now();
+        let now = MonotonicTime::from_elapsed(Duration::from_secs(100));
         let mut state = AutoTaskState::Pending;
         // the first failure, then a retry whose delay would double past the maximum
         for _ in 0..2 {
-            state.failure(config.auto_tasks_retry_strategy);
+            state.failure(config.auto_tasks_retry_strategy, now);
             assert!(matches!(
                 state.create_next_task(now, unreachable_task),
-                Next::NotBefore(x) if x == deadline(now, Duration::MAX)
+                Next::NotBefore(x) if x == monotonic_deadline(now, Duration::MAX)
             ));
         }
     }
@@ -1041,7 +1074,7 @@ mod timer_tests {
     use super::*;
     use crate::master::test_fixtures::{fragment_addr, null};
 
-    fn deferred_association(keep_alive_timeout: Timeout) -> Association {
+    fn deferred_association(keep_alive_timeout: Timeout) -> Association<TokioClock> {
         let mut config = AssociationConfig::quiet();
         config.keep_alive_timeout = Some(keep_alive_timeout);
         Association::new_deferred(
@@ -1050,34 +1083,35 @@ mod timer_tests {
             null(),
             null(),
             null(),
+            TokioClock::new(),
         )
     }
 
     #[test]
     fn deferred_keep_alive_is_scheduled_from_start_time() {
         let timeout = Timeout::from_secs(5).unwrap();
-        let start = Instant::now();
+        let start = MonotonicTime::from_elapsed(Duration::from_secs(100));
         let mut association = deferred_association(timeout);
 
         assert_eq!(association.next_link_status_deadline, None);
         association.start(start);
         assert_eq!(
             association.next_link_status_deadline,
-            Some(start + Duration::from(timeout))
+            Some(start.saturating_add(Duration::from(timeout)))
         );
     }
 
     #[test]
     fn starting_twice_does_not_reset_keep_alive_deadline() {
         let timeout = Timeout::from_secs(5).unwrap();
-        let start = Instant::now();
+        let start = MonotonicTime::from_elapsed(Duration::from_secs(100));
         let mut association = deferred_association(timeout);
 
         association.start(start);
-        association.start(start + Duration::from_secs(1));
+        association.start(start.saturating_add(Duration::from_secs(1)));
         assert_eq!(
             association.next_link_status_deadline,
-            Some(start + Duration::from(timeout))
+            Some(start.saturating_add(Duration::from(timeout)))
         );
     }
 }
