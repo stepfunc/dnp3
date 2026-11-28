@@ -422,6 +422,38 @@ impl LastUnsolFragment {
     }
 }
 
+/// The callbacks the user gives an association, which travel together from the API to the
+/// association that invokes them
+pub(crate) struct AssociationCallbacks {
+    read: Box<dyn ReadHandler>,
+    handler: Box<dyn AssociationHandler>,
+    info: Box<dyn AssociationInformation>,
+}
+
+impl AssociationCallbacks {
+    pub(crate) fn new(
+        read: Box<dyn ReadHandler>,
+        handler: Box<dyn AssociationHandler>,
+        info: Box<dyn AssociationInformation>,
+    ) -> Self {
+        Self {
+            read,
+            handler,
+            info,
+        }
+    }
+
+    /// Pass a response's measurements to the read handler, returning what was delivered
+    async fn extract(
+        &mut self,
+        read_type: ReadType,
+        header: ResponseHeader,
+        objects: ProcessableResponse<'_>,
+    ) -> Delivered {
+        extract_measurements(read_type, header, objects, self.read.as_mut()).await
+    }
+}
+
 /// A logical connection between a master and an outstation
 /// as defined by the DNP3 standard. A master manages requests
 /// and responses for multiple associations (i.e. multi-drop).
@@ -431,9 +463,7 @@ pub(crate) struct Association<C: MasterClock> {
     last_unsol_frag: Option<LastUnsolFragment>,
     request_queue: VecDeque<QueuedTask>,
     auto_tasks: TaskStates,
-    read_handler: Box<dyn ReadHandler>,
-    assoc_handler: Box<dyn AssociationHandler>,
-    assoc_info: Box<dyn AssociationInformation>,
+    callbacks: AssociationCallbacks,
     config: AssociationConfig,
     polls: PollMap,
     next_link_status_deadline: Option<MonotonicTime>,
@@ -447,20 +477,10 @@ impl<C: MasterClock> Association<C> {
     pub(crate) fn new(
         address: FragmentAddr,
         config: AssociationConfig,
-        read_handler: Box<dyn ReadHandler>,
-        assoc_handler: Box<dyn AssociationHandler>,
-        assoc_info: Box<dyn AssociationInformation>,
+        callbacks: AssociationCallbacks,
         clock: C,
     ) -> Self {
-        let mut association = Self::create(
-            address,
-            config,
-            read_handler,
-            assoc_handler,
-            assoc_info,
-            PollMap::new(),
-            clock,
-        );
+        let mut association = Self::create(address, config, callbacks, PollMap::new(), clock);
         let now = association.now();
         association.next_link_status_deadline = config
             .keep_alive_timeout
@@ -472,29 +492,17 @@ impl<C: MasterClock> Association<C> {
     fn new_deferred(
         address: FragmentAddr,
         config: AssociationConfig,
-        read_handler: Box<dyn ReadHandler>,
-        assoc_handler: Box<dyn AssociationHandler>,
-        assoc_info: Box<dyn AssociationInformation>,
+        callbacks: AssociationCallbacks,
         clock: C,
     ) -> Self {
-        Self::create(
-            address,
-            config,
-            read_handler,
-            assoc_handler,
-            assoc_info,
-            PollMap::new_deferred(),
-            clock,
-        )
+        Self::create(address, config, callbacks, PollMap::new_deferred(), clock)
     }
 
     /// An association without a keep-alive deadline yet
     fn create(
         address: FragmentAddr,
         config: AssociationConfig,
-        read_handler: Box<dyn ReadHandler>,
-        assoc_handler: Box<dyn AssociationHandler>,
-        assoc_info: Box<dyn AssociationInformation>,
+        callbacks: AssociationCallbacks,
         polls: PollMap,
         clock: C,
     ) -> Self {
@@ -504,9 +512,7 @@ impl<C: MasterClock> Association<C> {
             last_unsol_frag: None,
             request_queue: VecDeque::new(),
             auto_tasks: TaskStates::new(),
-            read_handler,
-            assoc_handler,
-            assoc_info,
+            callbacks,
             config,
             polls,
             next_link_status_deadline: None,
@@ -590,7 +596,7 @@ impl<C: MasterClock> Association<C> {
     }
 
     pub(crate) fn get_system_time(&self) -> Option<Timestamp> {
-        self.assoc_handler.get_current_time()
+        self.callbacks.handler.get_current_time()
     }
 
     pub(crate) fn complete_poll(&mut self, run: &Poll) {
@@ -731,7 +737,9 @@ impl<C: MasterClock> Association<C> {
             // Ignore repeat
             if self.last_unsol_frag == Some(new_frag) {
                 tracing::warn!("ignoring duplicate unsolicited response");
-                self.notify_unsolicited_response(true, new_frag.header.control.seq);
+                self.callbacks
+                    .info
+                    .unsolicited_response(true, new_frag.header.control.seq);
                 return true; // still want to send confirmation if requested
             }
 
@@ -747,15 +755,13 @@ impl<C: MasterClock> Association<C> {
 
             self.last_unsol_frag = Some(new_frag);
 
-            extract_measurements(
-                ReadType::Unsolicited,
-                response.header,
-                objects,
-                self.read_handler.as_mut(),
-            )
-            .await;
+            self.callbacks
+                .extract(ReadType::Unsolicited, response.header, objects)
+                .await;
 
-            self.notify_unsolicited_response(false, new_frag.header.control.seq);
+            self.callbacks
+                .info
+                .unsolicited_response(false, new_frag.header.control.seq);
 
             true
         } else {
@@ -772,7 +778,7 @@ impl<C: MasterClock> Association<C> {
         header: ResponseHeader,
         objects: ProcessableResponse<'_>,
     ) -> Delivered {
-        extract_measurements(read_type, header, objects, self.read_handler.as_mut()).await
+        self.callbacks.extract(read_type, header, objects).await
     }
 
     pub(crate) fn notify_task_start(
@@ -781,7 +787,7 @@ impl<C: MasterClock> Association<C> {
         fc: FunctionCode,
         seq: Sequence,
     ) {
-        self.assoc_info.task_start(task_type, fc, seq)
+        self.callbacks.info.task_start(task_type, fc, seq)
     }
 
     pub(crate) fn notify_task_success(
@@ -790,15 +796,11 @@ impl<C: MasterClock> Association<C> {
         fc: FunctionCode,
         seq: Sequence,
     ) {
-        self.assoc_info.task_success(task_type, fc, seq);
+        self.callbacks.info.task_success(task_type, fc, seq);
     }
 
     pub(crate) fn notify_task_fail(&mut self, task_type: TaskType, err: TaskErrorKind) {
-        self.assoc_info.task_fail(task_type, err.into());
-    }
-
-    fn notify_unsolicited_response(&mut self, is_duplicate: bool, seq: Sequence) {
-        self.assoc_info.unsolicited_response(is_duplicate, seq);
+        self.callbacks.info.task_fail(task_type, err.into());
     }
 
     pub(crate) fn priority_task(&mut self) -> Option<Task> {
@@ -960,18 +962,9 @@ impl<C: MasterClock> AssociationMap<C> {
         &mut self,
         address: FragmentAddr,
         config: AssociationConfig,
-        read_handler: Box<dyn ReadHandler>,
-        assoc_handler: Box<dyn AssociationHandler>,
-        assoc_info: Box<dyn AssociationInformation>,
+        callbacks: AssociationCallbacks,
     ) -> Result<(), AssociationErrorKind> {
-        let association = Association::new(
-            address,
-            config,
-            read_handler,
-            assoc_handler,
-            assoc_info,
-            self.clock,
-        );
+        let association = Association::new(address, config, callbacks, self.clock);
         self.insert(association).map(|_| ())
     }
 
@@ -981,18 +974,9 @@ impl<C: MasterClock> AssociationMap<C> {
         &mut self,
         address: FragmentAddr,
         config: AssociationConfig,
-        read_handler: Box<dyn ReadHandler>,
-        assoc_handler: Box<dyn AssociationHandler>,
-        assoc_info: Box<dyn AssociationInformation>,
+        callbacks: AssociationCallbacks,
     ) -> Result<&mut Association<C>, AssociationErrorKind> {
-        let association = Association::new_deferred(
-            address,
-            config,
-            read_handler,
-            assoc_handler,
-            assoc_info,
-            self.clock,
-        );
+        let association = Association::new_deferred(address, config, callbacks, self.clock);
         self.insert(association)
     }
 
@@ -1110,7 +1094,7 @@ mod retry_tests {
 #[cfg(feature = "unstable")]
 mod timer_tests {
     use super::*;
-    use crate::master::test_fixtures::{fragment_addr, null};
+    use crate::master::test_fixtures::{callbacks, fragment_addr, null};
 
     fn deferred_association(keep_alive_timeout: Timeout) -> Association<TokioClock> {
         let mut config = AssociationConfig::quiet();
@@ -1118,9 +1102,7 @@ mod timer_tests {
         Association::new_deferred(
             fragment_addr(EndpointAddress::try_new(1).unwrap()),
             config,
-            null(),
-            null(),
-            null(),
+            callbacks(null()),
             TokioClock::new(),
         )
     }

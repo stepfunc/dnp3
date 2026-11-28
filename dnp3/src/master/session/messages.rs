@@ -40,17 +40,10 @@ impl MasterSession {
                 }
                 self.enabled = enabled;
             }
-            MasterMsg::AddAssociation(
-                address,
-                config,
-                read_handler,
-                assoc_handler,
-                assoc_info,
-                callback,
-            ) => {
-                callback.complete(
+            MasterMsg::AddAssociation(address, config, callbacks, promise) => {
+                promise.complete(
                     self.associations
-                        .register(address, config, read_handler, assoc_handler, assoc_info)
+                        .register(address, config, callbacks)
                         .map_err(Into::into),
                 );
             }

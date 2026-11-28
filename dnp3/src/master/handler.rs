@@ -11,7 +11,7 @@ use crate::app::*;
 
 use crate::decode::DecodeLevel;
 use crate::link::EndpointAddress;
-use crate::master::association::AssociationConfig;
+use crate::master::association::{AssociationCallbacks, AssociationConfig};
 use crate::master::error::{
     AssociationError, AssociationErrorKind, CommandError, PollError, TaskError, TimeSyncError,
 };
@@ -179,9 +179,7 @@ impl MasterChannel {
         self.send_master_message(MasterMsg::AddAssociation(
             addr,
             config,
-            read_handler,
-            assoc_handler,
-            assoc_information,
+            AssociationCallbacks::new(read_handler, assoc_handler, assoc_information),
             promise,
         ))
         .await?;
@@ -215,9 +213,7 @@ impl MasterChannel {
         self.send_master_message(MasterMsg::AddAssociation(
             addr,
             config,
-            read_handler,
-            assoc_handler,
-            assoc_information,
+            AssociationCallbacks::new(read_handler, assoc_handler, assoc_information),
             promise,
         ))
         .await?;
