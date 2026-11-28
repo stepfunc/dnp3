@@ -66,7 +66,7 @@ use crate::master::request::ReadRequest;
 use crate::master::session::read::ReadOutcome;
 use crate::master::tasks::read::SingleReadTask;
 use crate::master::tasks::{NonReadTask, SolicitedTask};
-use crate::master::test_fixtures::association;
+use crate::master::test_fixtures::{fragment_addr, null};
 use crate::util::test_support::run_paused;
 
 /// What the channel starts, as the model names it
@@ -760,13 +760,15 @@ impl System {
 
     fn add(&mut self, config: &Config, address: u16) {
         let link = EndpointAddress::try_new(address).unwrap();
-        let association = association(
-            link,
-            config.association_config(),
-            Box::new(Clock(config.has_clock)),
-            self.map.clock(),
-        );
-        self.map.register(association).unwrap();
+        self.map
+            .register(
+                fragment_addr(link),
+                config.association_config(),
+                null(),
+                Box::new(Clock(config.has_clock)),
+                null(),
+            )
+            .unwrap();
         self.addresses.push(link);
         self.polls.push(Vec::new());
     }

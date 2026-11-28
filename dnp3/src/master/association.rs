@@ -33,7 +33,6 @@ use crate::master::{AssociationInformation, ReadHandler, ReadType, TaskType};
 use crate::master::promise::Promise;
 use crate::transport::FragmentAddr;
 use crate::util::clock::{MonotonicClock, MonotonicTime, TokioClock};
-use crate::util::deadline::monotonic_deadline;
 use crate::util::lifecycle::RunError;
 
 /// Configuration for a master association
@@ -217,12 +216,12 @@ impl AutoTaskState {
         *self = match self {
             Self::Failed(backoff, _) => {
                 let delay = backoff.on_failure();
-                Self::Failed(backoff.clone(), monotonic_deadline(now, delay))
+                Self::Failed(backoff.clone(), now.saturating_add(delay))
             }
             Self::Idle | Self::Pending => {
                 let mut backoff = ExponentialBackOff::new(retry_strategy);
                 let delay = backoff.on_failure();
-                Self::Failed(backoff, monotonic_deadline(now, delay))
+                Self::Failed(backoff, now.saturating_add(delay))
             }
         }
     }
@@ -465,12 +464,12 @@ impl<C: MasterClock> Association<C> {
         let now = association.now();
         association.next_link_status_deadline = config
             .keep_alive_timeout
-            .map(|delay| monotonic_deadline(now, delay.into()));
+            .map(|timeout| timeout.deadline(now));
         association
     }
 
     #[cfg(feature = "unstable")]
-    pub(crate) fn new_deferred(
+    fn new_deferred(
         address: FragmentAddr,
         config: AssociationConfig,
         read_handler: Box<dyn ReadHandler>,
@@ -528,7 +527,7 @@ impl<C: MasterClock> Association<C> {
             self.next_link_status_deadline = self
                 .config
                 .keep_alive_timeout
-                .map(|delay| monotonic_deadline(now, delay.into()));
+                .map(|timeout| timeout.deadline(now));
         }
     }
 
@@ -956,11 +955,49 @@ impl<C: MasterClock> AssociationMap<C> {
         }
     }
 
-    pub(crate) fn register(&mut self, session: Association<C>) -> Result<(), AssociationErrorKind> {
-        self.register_and_get(session).map(|_| ())
+    /// Add an association, on the master's clock
+    pub(crate) fn register(
+        &mut self,
+        address: FragmentAddr,
+        config: AssociationConfig,
+        read_handler: Box<dyn ReadHandler>,
+        assoc_handler: Box<dyn AssociationHandler>,
+        assoc_info: Box<dyn AssociationInformation>,
+    ) -> Result<(), AssociationErrorKind> {
+        let association = Association::new(
+            address,
+            config,
+            read_handler,
+            assoc_handler,
+            assoc_info,
+            self.clock,
+        );
+        self.insert(association).map(|_| ())
     }
 
-    pub(crate) fn register_and_get(
+    /// Add an association whose timers start with the master, on the master's clock
+    #[cfg(feature = "unstable")]
+    pub(crate) fn register_deferred(
+        &mut self,
+        address: FragmentAddr,
+        config: AssociationConfig,
+        read_handler: Box<dyn ReadHandler>,
+        assoc_handler: Box<dyn AssociationHandler>,
+        assoc_info: Box<dyn AssociationInformation>,
+    ) -> Result<&mut Association<C>, AssociationErrorKind> {
+        let association = Association::new_deferred(
+            address,
+            config,
+            read_handler,
+            assoc_handler,
+            assoc_info,
+            self.clock,
+        );
+        self.insert(association)
+    }
+
+    /// Insert an association built on this map's clock
+    fn insert(
         &mut self,
         session: Association<C>,
     ) -> Result<&mut Association<C>, AssociationErrorKind> {
@@ -1045,7 +1082,7 @@ mod retry_tests {
     use super::*;
 
     #[test]
-    fn retry_delays_too_long_to_represent_are_scheduled_far_in_the_future() {
+    fn retry_delays_too_long_to_represent_saturate() {
         let config = AssociationConfig {
             auto_tasks_retry_strategy: RetryStrategy::new(Duration::MAX, Duration::MAX),
             ..AssociationConfig::default()
@@ -1058,7 +1095,8 @@ mod retry_tests {
             state.failure(config.auto_tasks_retry_strategy, now);
             assert!(matches!(
                 state.create_next_task(now, unreachable_task),
-                Next::NotBefore(x) if x == monotonic_deadline(now, Duration::MAX)
+                // the Tokio driver clamps the sleep; the schedule only saturates
+                Next::NotBefore(x) if x == MonotonicTime::from_elapsed(Duration::MAX)
             ));
         }
     }

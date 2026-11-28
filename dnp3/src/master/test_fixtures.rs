@@ -50,7 +50,13 @@ pub(crate) fn association(
     link: EndpointAddress,
     config: AssociationConfig,
     handler: Box<dyn AssociationHandler>,
-    clock: TokioClock,
 ) -> Association<TokioClock> {
-    Association::new(fragment_addr(link), config, null(), handler, null(), clock)
+    Association::new(
+        fragment_addr(link),
+        config,
+        null(),
+        handler,
+        null(),
+        TokioClock::new(),
+    )
 }

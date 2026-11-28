@@ -77,11 +77,18 @@ impl TokioClock {
         MonotonicTime::from_elapsed(instant.saturating_duration_since(self.epoch))
     }
 
-    /// Convert a [`MonotonicTime`] into a [`tokio::time::Instant`] sleep deadline,
-    /// clamping excessively large remaining delays so the deadline can always be represented.
+    /// Convert a [`MonotonicTime`] into a [`tokio::time::Instant`] sleep deadline.
+    ///
+    /// A deadline that has passed keeps its own instant: Tokio rounds a sleep up to the next
+    /// millisecond, so a sleep until `now` could keep losing a select to other ready events, where
+    /// a sleep until a past instant is ready at once. A future deadline clamps excessively large
+    /// delays so it can always be represented.
     pub(crate) fn to_tokio_instant(self, target: MonotonicTime) -> tokio::time::Instant {
         let now = tokio::time::Instant::now();
         let remaining = target.saturating_duration_since(self.elapsed(now));
+        if remaining.is_zero() {
+            return self.epoch.checked_add(target.0).unwrap_or(now);
+        }
         crate::util::deadline::deadline(now, remaining)
     }
 
@@ -180,10 +187,11 @@ mod tests {
             tokio_now.checked_add(delay).unwrap()
         );
 
-        // past and current deadlines resolve to now
+        // past and current deadlines keep their own instant
+        let epoch = tokio_now.checked_sub(Duration::from_secs(10)).unwrap();
         assert_eq!(
             clock.to_tokio_instant(MonotonicTime::from_elapsed(Duration::from_secs(3))),
-            tokio_now
+            epoch.checked_add(Duration::from_secs(3)).unwrap()
         );
         assert_eq!(clock.to_tokio_instant(now), tokio_now);
 

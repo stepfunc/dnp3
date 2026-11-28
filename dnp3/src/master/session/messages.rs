@@ -50,14 +50,7 @@ impl MasterSession {
             ) => {
                 callback.complete(
                     self.associations
-                        .register(Association::new(
-                            address,
-                            config,
-                            read_handler,
-                            assoc_handler,
-                            assoc_info,
-                            self.associations.clock(),
-                        ))
+                        .register(address, config, read_handler, assoc_handler, assoc_info)
                         .map_err(Into::into),
                 );
             }

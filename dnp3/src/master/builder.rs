@@ -200,16 +200,13 @@ impl MasterBuilder {
             phys: PhysAddr::None,
         };
         let handle = AssociationHandle::new(address, self.channel.clone());
-        let association = self
-            .associations
-            .register_and_get(Association::new_deferred(
-                addr,
-                config,
-                read_handler,
-                assoc_handler,
-                assoc_information,
-                self.associations.clock(),
-            ))?;
+        let association = self.associations.register_deferred(
+            addr,
+            config,
+            read_handler,
+            assoc_handler,
+            assoc_information,
+        )?;
         Ok(AssociationBuilder {
             handle,
             association,
@@ -348,16 +345,13 @@ impl UdpMasterBuilder {
             phys: PhysAddr::Udp(destination),
         };
         let handle = AssociationHandle::new(address, self.channel.clone());
-        let association = self
-            .associations
-            .register_and_get(Association::new_deferred(
-                addr,
-                config,
-                read_handler,
-                assoc_handler,
-                assoc_information,
-                self.associations.clock(),
-            ))?;
+        let association = self.associations.register_deferred(
+            addr,
+            config,
+            read_handler,
+            assoc_handler,
+            assoc_information,
+        )?;
         Ok(AssociationBuilder {
             handle,
             association,

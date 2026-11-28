@@ -425,7 +425,6 @@ mod tests {
             EndpointAddress::try_new(1).unwrap(),
             AssociationConfig::default(),
             handler(system_time),
-            TokioClock::new(),
         );
         let (promise, rx) = Promise::one_shot();
         let task = PendingTimeSync::user(procedure, promise);
