@@ -116,28 +116,28 @@ impl MasterChannel {
     }
 
     /// enable communications
-    pub async fn enable(&mut self) -> Result<(), Shutdown> {
+    pub async fn enable(&self) -> Result<(), Shutdown> {
         self.send_master_message(MasterMsg::EnableCommunication(Enabled::Yes))
             .await?;
         Ok(())
     }
 
     /// disable communications
-    pub async fn disable(&mut self) -> Result<(), Shutdown> {
+    pub async fn disable(&self) -> Result<(), Shutdown> {
         self.send_master_message(MasterMsg::EnableCommunication(Enabled::No))
             .await?;
         Ok(())
     }
 
     /// Set the decoding level used by this master
-    pub async fn set_decode_level(&mut self, decode_level: DecodeLevel) -> Result<(), Shutdown> {
+    pub async fn set_decode_level(&self, decode_level: DecodeLevel) -> Result<(), Shutdown> {
         self.send_master_message(MasterMsg::SetDecodeLevel(decode_level))
             .await?;
         Ok(())
     }
 
     /// Get the current decoding level used by this master
-    pub async fn get_decode_level(&mut self) -> Result<DecodeLevel, Shutdown> {
+    pub async fn get_decode_level(&self) -> Result<DecodeLevel, Shutdown> {
         let (promise, rx) = Promise::one_shot();
         self.send_master_message(MasterMsg::GetDecodeLevel(promise))
             .await?;
@@ -162,7 +162,7 @@ impl MasterChannel {
     /// * `config` controls the behavior of the master for this outstation
     /// * `handler` is a callback trait invoked when events occur for this outstation
     pub async fn add_association(
-        &mut self,
+        &self,
         address: EndpointAddress,
         config: AssociationConfig,
         read_handler: Box<dyn ReadHandler>,
@@ -197,7 +197,7 @@ impl MasterChannel {
     /// * `config` controls the behavior of the master for this outstation
     /// * `handler` is a callback trait invoked when events occur for this outstation
     pub async fn add_udp_association(
-        &mut self,
+        &self,
         address: EndpointAddress,
         destination: SocketAddr,
         config: AssociationConfig,
@@ -228,19 +228,19 @@ impl MasterChannel {
 
     /// Remove an association
     /// * `address` is the DNP3 link-layer address of the outstation
-    pub async fn remove_association(&mut self, address: EndpointAddress) -> Result<(), Shutdown> {
+    pub async fn remove_association(&self, address: EndpointAddress) -> Result<(), Shutdown> {
         self.send_master_message(MasterMsg::RemoveAssociation(address))
             .await?;
         Ok(())
     }
 
-    async fn send_master_message(&mut self, msg: MasterMsg) -> Result<(), Shutdown> {
+    async fn send_master_message(&self, msg: MasterMsg) -> Result<(), Shutdown> {
         self.sender.send(Message::Master(msg)).await?;
         Ok(())
     }
 
     async fn send_association_message(
-        &mut self,
+        &self,
         address: EndpointAddress,
         msg: AssociationMsgType,
     ) -> Result<(), Shutdown> {
@@ -274,7 +274,7 @@ impl AssociationHandle {
     /// * `request` defines what data is being requested
     /// * `period` defines how often the READ operation is performed
     pub async fn add_poll(
-        &mut self,
+        &self,
         request: ReadRequest,
         period: Duration,
     ) -> Result<PollHandle, PollError> {
@@ -285,7 +285,7 @@ impl AssociationHandle {
     }
 
     /// Remove the association from the master
-    pub async fn remove(mut self) -> Result<(), Shutdown> {
+    pub async fn remove(self) -> Result<(), Shutdown> {
         self.master
             .send_master_message(MasterMsg::RemoveAssociation(self.address))
             .await?;
@@ -295,7 +295,7 @@ impl AssociationHandle {
     /// Perform an asynchronous READ request
     ///
     /// If successful, the [ReadHandler] will process the received measurement data
-    pub async fn read(&mut self, request: ReadRequest) -> Result<(), TaskError> {
+    pub async fn read(&self, request: ReadRequest) -> Result<(), TaskError> {
         let (promise, rx) = Promise::one_shot();
         let task = SingleReadTask::new(request, promise);
         self.send_task(task).await?;
@@ -311,7 +311,7 @@ impl AssociationHandle {
     /// The request is sent with whatever function code is given. Reads go through
     /// [`AssociationHandle::read`] with a [`ReadRequest`], which can't carry values.
     pub async fn send_and_expect_empty_response(
-        &mut self,
+        &self,
         function: FunctionCode,
         request: Request,
     ) -> Result<(), TaskError> {
@@ -325,7 +325,7 @@ impl AssociationHandle {
     ///
     /// If successful, the custom [ReadHandler] will process the received measurement data
     pub async fn read_with_handler(
-        &mut self,
+        &self,
         request: ReadRequest,
         handler: Box<dyn ReadHandler>,
     ) -> Result<(), TaskError> {
@@ -339,7 +339,7 @@ impl AssociationHandle {
     ///
     /// The actual function code used depends on the value of the [CommandMode].
     pub async fn operate(
-        &mut self,
+        &self,
         mode: CommandMode,
         headers: CommandHeaders,
     ) -> Result<(), CommandError> {
@@ -355,7 +355,7 @@ impl AssociationHandle {
     /// completes successfully once the request has been written to the transport. Success does
     /// NOT mean that the outstation received, accepted, or executed the command, and gives no
     /// guarantee about the order or rate at which the outstation can process commands.
-    pub async fn operate_no_ack(&mut self, headers: CommandHeaders) -> Result<(), TaskError> {
+    pub async fn operate_no_ack(&self, headers: CommandHeaders) -> Result<(), TaskError> {
         let (promise, rx) = Promise::one_shot();
         self.send_task(CommandNoAckTask::new(headers, promise))
             .await?;
@@ -365,18 +365,18 @@ impl AssociationHandle {
     /// Perform a WARM_RESTART operation
     ///
     /// Returns the delay from the outstation's response as a [Duration]
-    pub async fn warm_restart(&mut self) -> Result<Duration, TaskError> {
+    pub async fn warm_restart(&self) -> Result<Duration, TaskError> {
         self.restart(RestartType::WarmRestart).await
     }
 
     /// Perform a COLD_RESTART operation
     ///
     /// Returns the delay from the outstation's response as a [Duration]
-    pub async fn cold_restart(&mut self) -> Result<Duration, TaskError> {
+    pub async fn cold_restart(&self) -> Result<Duration, TaskError> {
         self.restart(RestartType::ColdRestart).await
     }
 
-    async fn restart(&mut self, restart_type: RestartType) -> Result<Duration, TaskError> {
+    async fn restart(&self, restart_type: RestartType) -> Result<Duration, TaskError> {
         let (promise, rx) = Promise::one_shot();
         let task = OneShot::new(restart_type, promise);
         self.send_task(task).await?;
@@ -385,7 +385,7 @@ impl AssociationHandle {
 
     /// Perform the specified time synchronization operation
     pub async fn synchronize_time(
-        &mut self,
+        &self,
         procedure: TimeSyncProcedure,
     ) -> Result<(), TimeSyncError> {
         let (promise, rx) = Promise::one_shot();
@@ -395,10 +395,7 @@ impl AssociationHandle {
     }
 
     /// Perform write one or more headers of analog input dead-bands to the outstation
-    pub async fn write_dead_bands(
-        &mut self,
-        headers: Vec<DeadBandHeader>,
-    ) -> Result<(), TaskError> {
+    pub async fn write_dead_bands(&self, headers: Vec<DeadBandHeader>) -> Result<(), TaskError> {
         let (promise, rx) = Promise::one_shot();
         let task = OneShot::new(DeadBandsRequest::new(headers), promise);
         self.send_task(task).await?;
@@ -412,7 +409,7 @@ impl AssociationHandle {
     ///
     /// If the link answers with something other than the expected `LINK_STATUS`, this returns a
     /// [`TaskError`] even though the link may still be alive.
-    pub async fn check_link_status(&mut self) -> Result<(), TaskError> {
+    pub async fn check_link_status(&self) -> Result<(), TaskError> {
         let (promise, rx) = Promise::one_shot();
         self.send_task(Task::LinkStatus(promise)).await?;
         await_result(rx).await
@@ -420,7 +417,7 @@ impl AssociationHandle {
 
     /// Obtain an [`AuthKey`] from the outstation which may then be used to open the file.
     pub async fn get_file_auth_key(
-        &mut self,
+        &self,
         credentials: FileCredentials,
     ) -> Result<AuthKey, FileError> {
         let (promise, rx) = Promise::one_shot();
@@ -433,7 +430,7 @@ impl AssociationHandle {
 
     /// Open a file on the outstation with the requested parameters
     pub async fn open_file<T: ToString>(
-        &mut self,
+        &self,
         file_name: T,
         auth_key: AuthKey,
         permissions: Permissions,
@@ -459,7 +456,7 @@ impl AssociationHandle {
 
     /// Write a file block to the outstation
     pub async fn write_file_block(
-        &mut self,
+        &self,
         handle: FileHandle,
         block_number: BlockNumber,
         block_data: Vec<u8>,
@@ -478,7 +475,7 @@ impl AssociationHandle {
     }
 
     /// Close a file on the outstation
-    pub async fn close_file(&mut self, handle: FileHandle) -> Result<(), FileError> {
+    pub async fn close_file(&self, handle: FileHandle) -> Result<(), FileError> {
         let (promise, rx) = Promise::one_shot();
 
         let task = OneShot::new(CloseFileRequest { handle }, promise);
@@ -489,7 +486,7 @@ impl AssociationHandle {
 
     /// Start an operation to READ a file from the outstation using a [`FileReader`] to receive data
     pub async fn read_file<T: ToString>(
-        &mut self,
+        &self,
         remote_file_path: T,
         config: FileReadConfig,
         reader: Box<dyn FileReader>,
@@ -510,7 +507,7 @@ impl AssociationHandle {
     /// the transfer completes return a [`FileError`], while [`AssociationInformation`] may still
     /// report the [`TaskType::FileRead`] task as a success.
     pub async fn read_directory<T: ToString>(
-        &mut self,
+        &self,
         dir_path: T,
         config: DirReadConfig,
         credentials: Option<FileCredentials>,
@@ -523,27 +520,24 @@ impl AssociationHandle {
     }
 
     /// Get information about a file
-    pub async fn get_file_info<T: ToString>(
-        &mut self,
-        file_path: T,
-    ) -> Result<FileInfo, FileError> {
+    pub async fn get_file_info<T: ToString>(&self, file_path: T) -> Result<FileInfo, FileError> {
         let (promise, reply) = Promise::one_shot();
         let task = OneShot::new(GetFileInfoRequest::new(file_path.to_string()), promise);
         self.send_task(task).await?;
         await_result(reply).await
     }
 
-    pub(crate) async fn send_task<T: Into<Task>>(&mut self, task: T) -> Result<(), Shutdown> {
+    pub(crate) async fn send_task<T: Into<Task>>(&self, task: T) -> Result<(), Shutdown> {
         self.queue_task(QueuedTask::Ready(task.into())).await
     }
 
-    pub(crate) async fn queue_task(&mut self, task: QueuedTask) -> Result<(), Shutdown> {
+    pub(crate) async fn queue_task(&self, task: QueuedTask) -> Result<(), Shutdown> {
         self.master
             .send_association_message(self.address, AssociationMsgType::QueueTask(task))
             .await
     }
 
-    pub(crate) async fn send_poll_message(&mut self, msg: PollMsg) -> Result<(), Shutdown> {
+    pub(crate) async fn send_poll_message(&self, msg: PollMsg) -> Result<(), Shutdown> {
         self.master
             .send_association_message(self.address, AssociationMsgType::Poll(msg))
             .await

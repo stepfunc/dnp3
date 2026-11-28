@@ -60,7 +60,7 @@ fn spawn_master(path: &str, retry_delay: Duration) -> (MasterChannel, Timeline<P
 #[tokio::test(start_paused = true)]
 async fn outstation_retries_failed_opens_with_growing_delays_kept_across_a_disable() {
     watchdog(async {
-        let (mut handle, mut timeline) =
+        let (handle, mut timeline) =
             spawn_outstation(MISSING_PORT, RetryStrategy::new(secs(1), secs(4)));
         timeline.expect(secs(0), PortState::Wait(secs(1))).await;
         timeline.expect(secs(1), PortState::Wait(secs(2))).await;
@@ -82,7 +82,7 @@ async fn outstation_retries_failed_opens_with_growing_delays_kept_across_a_disab
 #[tokio::test(start_paused = true)]
 async fn master_starts_disabled_and_retries_failed_opens_with_a_fixed_delay() {
     watchdog(async {
-        let (mut channel, mut timeline) = spawn_master(MISSING_PORT, secs(2));
+        let (channel, mut timeline) = spawn_master(MISSING_PORT, secs(2));
         timeline.expect(secs(0), PortState::Disabled).await;
         tokio::time::sleep(secs(5)).await;
         timeline.assert_quiet();
@@ -179,7 +179,7 @@ mod pty {
         watchdog(async {
             let link = Link::new("legacy-outstation");
             let mut controller = link.connect();
-            let mut handle = crate::serial::spawn_outstation_serial(
+            let handle = crate::serial::spawn_outstation_serial(
                 link.path(),
                 SerialSettings::default(),
                 session_config(),
@@ -258,7 +258,7 @@ mod pty {
         watchdog(async {
             let link = Link::new("master-retry");
             let mut controller = link.connect();
-            let (mut channel, mut timeline) = spawn_master(link.path(), secs(2));
+            let (channel, mut timeline) = spawn_master(link.path(), secs(2));
             timeline.expect(secs(0), PortState::Disabled).await;
             channel.enable().await.unwrap();
             timeline.expect(secs(0), PortState::Open).await;
@@ -281,7 +281,7 @@ mod pty {
         watchdog(async {
             let link = Link::new("master-disable");
             let mut controller = link.connect();
-            let (mut channel, mut timeline) = spawn_master(link.path(), secs(2));
+            let (channel, mut timeline) = spawn_master(link.path(), secs(2));
             timeline.expect(secs(0), PortState::Disabled).await;
             channel.enable().await.unwrap();
             timeline.expect(secs(0), PortState::Open).await;
@@ -304,7 +304,7 @@ mod pty {
         watchdog(async {
             let link = Link::new("master-disable-wait");
             let controller = link.connect();
-            let (mut channel, mut timeline) = spawn_master(link.path(), secs(5));
+            let (channel, mut timeline) = spawn_master(link.path(), secs(5));
             timeline.expect(secs(0), PortState::Disabled).await;
             channel.enable().await.unwrap();
             timeline.expect(secs(0), PortState::Open).await;

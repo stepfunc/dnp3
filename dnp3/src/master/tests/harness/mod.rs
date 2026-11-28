@@ -99,7 +99,7 @@ async fn create(
         rx,
     );
 
-    let mut master = MasterChannel::new(tx, MasterChannelType::Stream);
+    let master = MasterChannel::new(tx, MasterChannelType::Stream);
 
     task.set_rx_frame_info(FrameInfo::new(
         outstation_address,

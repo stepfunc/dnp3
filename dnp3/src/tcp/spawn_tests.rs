@@ -142,7 +142,7 @@ fn spawn_tls_master(
 #[tokio::test]
 async fn master_tcp_client_runs_a_master_session_over_tcp() {
     let peer = Peer::new().await;
-    let (mut channel, mut states) = spawn_master(peer.endpoints(), strategy());
+    let (channel, mut states) = spawn_master(peer.endpoints(), strategy());
     expect(&mut states, ClientState::Disabled).await;
     channel.enable().await.unwrap();
     expect(&mut states, ClientState::Connecting).await;
@@ -157,7 +157,7 @@ async fn master_tcp_client_runs_a_master_session_over_tcp() {
 async fn outstation_tcp_client_runs_an_outstation_session_over_tcp() {
     let peer = Peer::new().await;
     let (listener, mut states) = Timeline::new();
-    let mut handle = crate::tcp::spawn_outstation_tcp_client(
+    let handle = crate::tcp::spawn_outstation_tcp_client(
         LinkErrorMode::Close,
         peer.endpoints(),
         strategy(),
@@ -235,7 +235,7 @@ async fn outstation_tcp_client_uses_the_master_address_its_connection_handler_se
     crate::util::test_support::watchdog(async {
         let peer = Peer::new().await;
         let (listener, mut states) = Timeline::new();
-        let mut handle = crate::tcp::spawn_outstation_tcp_client_2(
+        let handle = crate::tcp::spawn_outstation_tcp_client_2(
             LinkErrorMode::Close,
             outstation_config(),
             Box::new(NewMasterHandler(peer.listener.local_addr().unwrap())),
@@ -308,7 +308,7 @@ mod tls {
     #[tokio::test]
     async fn master_tls_client_runs_a_master_session_over_tls() {
         let peer = Peer::new().await;
-        let (mut channel, mut states) = spawn_tls_master(peer.endpoints(), strategy());
+        let (channel, mut states) = spawn_tls_master(peer.endpoints(), strategy());
         expect(&mut states, ClientState::Disabled).await;
         channel.enable().await.unwrap();
         expect(&mut states, ClientState::Connecting).await;
@@ -323,7 +323,7 @@ mod tls {
     #[tokio::test]
     async fn outstation_tls_client_runs_an_outstation_session_over_tls() {
         let peer = Peer::new().await;
-        let (mut handle, mut states) = spawn_tls_outstation(peer.endpoints());
+        let (handle, mut states) = spawn_tls_outstation(peer.endpoints());
         expect(&mut states, ClientState::Disabled).await;
         handle.enable().await.unwrap();
         expect(&mut states, ClientState::Connecting).await;
@@ -338,7 +338,7 @@ mod tls {
     #[tokio::test]
     async fn master_tls_client_does_not_connect_to_a_plain_tcp_peer() {
         let peer = Peer::new().await;
-        let (mut channel, mut states) = spawn_tls_master(peer.endpoints(), strategy());
+        let (channel, mut states) = spawn_tls_master(peer.endpoints(), strategy());
         expect(&mut states, ClientState::Disabled).await;
         channel.enable().await.unwrap();
         expect(&mut states, ClientState::Connecting).await;
@@ -354,7 +354,7 @@ mod tls {
     #[tokio::test]
     async fn outstation_tls_client_does_not_connect_to_a_plain_tcp_peer() {
         let peer = Peer::new().await;
-        let (mut handle, mut states) = spawn_tls_outstation(peer.endpoints());
+        let (handle, mut states) = spawn_tls_outstation(peer.endpoints());
         expect(&mut states, ClientState::Disabled).await;
         handle.enable().await.unwrap();
         expect(&mut states, ClientState::Connecting).await;
@@ -406,7 +406,7 @@ mod lifecycle {
     async fn failed_connects_retry_with_growing_delays_until_a_session_resets_them() {
         watchdog(async {
             let (socket, endpoints) = refusing_port();
-            let (mut channel, mut timeline) =
+            let (channel, mut timeline) =
                 spawn_master(endpoints, ConnectStrategy::new(secs(1), secs(4), secs(3)));
             timeline.expect(secs(0), ClientState::Disabled).await;
             channel.enable().await.unwrap();
@@ -456,7 +456,7 @@ mod lifecycle {
     async fn link_error_keeps_the_connection_open_until_the_reconnect_delay_elapses() {
         watchdog(async {
             let peer = Peer::new().await;
-            let (mut channel, mut timeline) = spawn_master(
+            let (channel, mut timeline) = spawn_master(
                 peer.endpoints(),
                 ConnectStrategy::new(secs(1), secs(10), secs(3)),
             );
@@ -494,7 +494,7 @@ mod lifecycle {
     async fn zero_reconnect_delay_reconnects_at_once() {
         watchdog(async {
             let peer = Peer::new().await;
-            let (mut channel, mut timeline) = spawn_master(
+            let (channel, mut timeline) = spawn_master(
                 peer.endpoints(),
                 ConnectStrategy::new(secs(1), secs(10), Duration::ZERO),
             );
@@ -519,7 +519,7 @@ mod lifecycle {
     async fn disable_during_a_connect_retry_wait_stops_at_once_and_keeps_the_back_off() {
         watchdog(async {
             let (_socket, endpoints) = refusing_port();
-            let (mut channel, mut timeline) =
+            let (channel, mut timeline) =
                 spawn_master(endpoints, ConnectStrategy::new(secs(5), secs(20), secs(1)));
             timeline.expect(secs(0), ClientState::Disabled).await;
             channel.enable().await.unwrap();
@@ -547,7 +547,7 @@ mod lifecycle {
     async fn disable_during_a_reconnect_wait_stops_at_once() {
         watchdog(async {
             let peer = Peer::new().await;
-            let (mut channel, mut timeline) = spawn_master(
+            let (channel, mut timeline) = spawn_master(
                 peer.endpoints(),
                 ConnectStrategy::new(secs(1), secs(10), secs(5)),
             );
@@ -578,7 +578,7 @@ mod lifecycle {
     async fn shutdown_during_a_connect_retry_wait_stops_at_once() {
         watchdog(async {
             let (_socket, endpoints) = refusing_port();
-            let (mut channel, mut timeline) =
+            let (channel, mut timeline) =
                 spawn_master(endpoints, ConnectStrategy::new(secs(5), secs(20), secs(1)));
             timeline.expect(secs(0), ClientState::Disabled).await;
             channel.enable().await.unwrap();
@@ -596,7 +596,7 @@ mod lifecycle {
     async fn shutdown_during_a_reconnect_wait_stops_at_once() {
         watchdog(async {
             let peer = Peer::new().await;
-            let (mut channel, mut timeline) = spawn_master(
+            let (channel, mut timeline) = spawn_master(
                 peer.endpoints(),
                 ConnectStrategy::new(secs(1), secs(10), secs(5)),
             );
@@ -618,7 +618,7 @@ mod lifecycle {
     async fn disable_during_a_session_closes_the_connection_until_enabled() {
         watchdog(async {
             let peer = Peer::new().await;
-            let (mut channel, mut timeline) = spawn_master(
+            let (channel, mut timeline) = spawn_master(
                 peer.endpoints(),
                 ConnectStrategy::new(secs(1), secs(10), secs(5)),
             );
@@ -649,7 +649,7 @@ mod lifecycle {
     #[tokio::test]
     async fn disable_while_connecting_takes_effect_once_connected() {
         let peer = Peer::new().await;
-        let (mut channel, mut states) = spawn_master(peer.endpoints(), strategy());
+        let (channel, mut states) = spawn_master(peer.endpoints(), strategy());
         expect(&mut states, ClientState::Disabled).await;
         channel.enable().await.unwrap();
         expect(&mut states, ClientState::Connecting).await;
@@ -673,7 +673,7 @@ mod lifecycle {
         async fn disable_during_a_tls_handshake_takes_effect_once_it_fails() {
             watchdog(async {
                 let peer = Peer::new().await;
-                let (mut channel, mut timeline) = spawn_tls_master(peer.endpoints(), strategy());
+                let (channel, mut timeline) = spawn_tls_master(peer.endpoints(), strategy());
                 timeline.expect(secs(0), ClientState::Disabled).await;
                 channel.enable().await.unwrap();
                 timeline.expect(secs(0), ClientState::Connecting).await;
@@ -691,7 +691,7 @@ mod lifecycle {
         async fn shutdown_during_a_tls_handshake_takes_effect_once_it_fails() {
             watchdog(async {
                 let peer = Peer::new().await;
-                let (mut channel, mut timeline) = spawn_tls_master(peer.endpoints(), strategy());
+                let (channel, mut timeline) = spawn_tls_master(peer.endpoints(), strategy());
                 timeline.expect(secs(0), ClientState::Disabled).await;
                 channel.enable().await.unwrap();
                 timeline.expect(secs(0), ClientState::Connecting).await;
@@ -729,7 +729,7 @@ mod lifecycle {
         async fn connecting_tls_master(
             peer: &Peer,
         ) -> (MasterChannel, Timeline<ClientState>, tokio::net::TcpStream) {
-            let (mut channel, mut states) = spawn_tls_master(peer.endpoints(), strategy());
+            let (channel, mut states) = spawn_tls_master(peer.endpoints(), strategy());
             expect(&mut states, ClientState::Disabled).await;
             channel.enable().await.unwrap();
             expect(&mut states, ClientState::Connecting).await;
@@ -740,7 +740,7 @@ mod lifecycle {
         #[tokio::test]
         async fn disable_during_a_tls_handshake_that_completes_closes_the_session() {
             let peer = Peer::new().await;
-            let (mut channel, mut states, stream) = connecting_tls_master(&peer).await;
+            let (channel, mut states, stream) = connecting_tls_master(&peer).await;
             channel.disable().await.unwrap();
             let mut phys = server_config(MinTlsVersion::V12)
                 .handle_connection(stream)

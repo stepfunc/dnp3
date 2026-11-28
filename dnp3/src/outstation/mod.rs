@@ -61,7 +61,7 @@ impl OutstationHandle {
     }
 
     /// Set the decode level of the outstation
-    pub async fn set_decode_level(&mut self, decode_level: DecodeLevel) -> Result<(), Shutdown> {
+    pub async fn set_decode_level(&self, decode_level: DecodeLevel) -> Result<(), Shutdown> {
         self.sender
             .send(ConfigurationChange::SetDecodeLevel(decode_level).into())
             .await?;
@@ -69,18 +69,18 @@ impl OutstationHandle {
     }
 
     /// Enable communications
-    pub async fn enable(&mut self) -> Result<(), Shutdown> {
+    pub async fn enable(&self) -> Result<(), Shutdown> {
         self.sender.send(OutstationMessage::Enable).await?;
         Ok(())
     }
 
     /// Disable communications
-    pub async fn disable(&mut self) -> Result<(), Shutdown> {
+    pub async fn disable(&self) -> Result<(), Shutdown> {
         self.sender.send(OutstationMessage::Disable).await?;
         Ok(())
     }
 
-    pub(crate) async fn shutdown(&mut self) -> Result<(), Shutdown> {
+    pub(crate) async fn shutdown(&self) -> Result<(), Shutdown> {
         self.sender.send(OutstationMessage::Shutdown).await?;
         Ok(())
     }

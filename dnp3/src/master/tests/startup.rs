@@ -342,7 +342,7 @@ async fn detect_restart_in_read_response() {
         startup_procedure(&mut harness, &mut seq).await;
 
         // Spawn a task that sends an integrity scan
-        let mut assoc = harness.association.clone();
+        let assoc = harness.association.clone();
         let read_task = tokio::spawn(async move {
             assoc
                 .read(ReadRequest::new().add_classes(Classes::all()))

@@ -24,7 +24,7 @@ async fn open_request_bytes() {
         let config = AssociationConfig::quiet();
         let mut harness = create_association(config).await;
 
-        let mut association = harness.association.clone();
+        let association = harness.association.clone();
         let open_task = tokio::spawn(async move {
             association
                 .open_file(
@@ -155,7 +155,7 @@ fn expect_failure(harness: &mut TestHarness) {
 }
 
 fn spawn_open_task(
-    mut association: AssociationHandle,
+    association: AssociationHandle,
 ) -> tokio::task::JoinHandle<Result<OpenFile, FileError>> {
     tokio::spawn({
         async move {

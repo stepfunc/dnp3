@@ -941,7 +941,7 @@ async fn start(task: Task) -> (TestHarness, Log) {
             ..AssociationConfig::quiet()
         },
     };
-    let mut harness = create_association_with_handler(config, Box::new(FixedTime)).await;
+    let harness = create_association_with_handler(config, Box::new(FixedTime)).await;
     let other = Log::default();
     harness
         .master
@@ -1016,7 +1016,7 @@ async fn execute(task: Task, steps: &[Step]) -> Run {
             break;
         }
         if let Input::Api = step.input {
-            let mut master = harness.master.clone();
+            let master = harness.master.clone();
             drop(tokio::spawn(async move { master.get_decode_level().await }));
         }
         if let Some((source, bytes)) = model.input(step.input, &last_request) {

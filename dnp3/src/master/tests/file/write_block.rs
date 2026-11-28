@@ -108,7 +108,7 @@ async fn write_with_response(response: Vec<u8>) -> Result<(), FileError> {
 }
 
 fn spawn_write_task(harness: &TestHarness) -> tokio::task::JoinHandle<Result<(), FileError>> {
-    let mut association = harness.association.clone();
+    let association = harness.association.clone();
     tokio::spawn(async move {
         let mut block = BlockNumber::default();
         block.increment().unwrap();

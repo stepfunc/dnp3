@@ -249,14 +249,14 @@ impl PollHandle {
     /// Flag the poll for immediate execution prior to its period elapsing
     ///
     /// If the poll is running, it runs again as soon as that run completes.
-    pub async fn demand(&mut self) -> Result<(), Shutdown> {
+    pub async fn demand(&self) -> Result<(), Shutdown> {
         self.association
             .send_poll_message(PollMsg::Demand(self.id))
             .await
     }
 
     /// Remove the poll from the association
-    pub async fn remove(mut self) -> Result<(), Shutdown> {
+    pub async fn remove(self) -> Result<(), Shutdown> {
         self.association
             .send_poll_message(PollMsg::RemovePoll(self.id))
             .await

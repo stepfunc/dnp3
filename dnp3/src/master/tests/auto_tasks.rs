@@ -167,7 +167,7 @@ const RESTART_AND_NO_FUNC_CODE_SUPPORT: Iin = Iin::new(Iin1::new(0x80), Iin2::ne
 const NEED_TIME_AND_NO_FUNC_CODE_SUPPORT: Iin = Iin::new(Iin1::new(0x10), Iin2::new(0x01));
 
 async fn cold_restart_rejected_with(harness: &mut TestHarness, seq: &mut Sequence, iin: Iin) {
-    let mut association = harness.association.clone();
+    let association = harness.association.clone();
     let restart = tokio::spawn(async move { association.cold_restart().await });
     harness
         .expect_write_and_respond(

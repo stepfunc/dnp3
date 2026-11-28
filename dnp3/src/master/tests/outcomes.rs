@@ -1051,7 +1051,7 @@ async fn requests_to_a_removed_association_fail_with_no_such_association() {
             let mut harness =
                 create_association_with_handler(AssociationConfig::quiet(), Box::new(FixedTime))
                     .await;
-            let mut stale = harness.association.clone();
+            let stale = harness.association.clone();
             if via_handle {
                 harness.association.clone().remove().await.unwrap();
             } else {
@@ -1080,7 +1080,7 @@ async fn requests_to_a_removed_association_fail_with_no_such_association() {
             // the master still serves another association, and the first thing it writes is that
             // association's request
             let log = Log::default();
-            let mut other = harness
+            let other = harness
                 .master
                 .add_association(
                     OTHER,
@@ -1151,7 +1151,7 @@ async fn adding_an_association_fails_for_a_used_address_or_the_wrong_channel_typ
         );
 
         let (tx, _rx) = crate::util::channel::request_channel();
-        let mut udp_channel = MasterChannel::new(tx, MasterChannelType::Udp);
+        let udp_channel = MasterChannel::new(tx, MasterChannelType::Udp);
         let stream = udp_channel
             .add_association(
                 OTHER,
@@ -1363,7 +1363,7 @@ async fn read_callbacks_and_sequence_numbers_follow_the_fragments_in_order() {
     watchdog(async {
         let mut harness = create_association(AssociationConfig::quiet()).await;
         let log = Log::default();
-        let mut association = harness
+        let association = harness
             .master
             .add_association(
                 OTHER,
@@ -1636,7 +1636,7 @@ async fn reading_group0_var0_sends_nothing() {
         );
         harness.assert_no_events();
 
-        let mut poll = harness
+        let poll = harness
             .association
             .add_poll(
                 ReadRequest::new().add_all_objects(g0v0),

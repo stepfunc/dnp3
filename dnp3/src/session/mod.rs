@@ -120,7 +120,7 @@ mod tests {
             MasterChannelConfig::new(EndpointAddress::raw(1)),
             rx,
         ));
-        let mut channel = MasterChannel::new(tx, MasterChannelType::Stream);
+        let channel = MasterChannel::new(tx, MasterChannelType::Stream);
 
         let (result, _) = tokio::join!(session.wait_for_retry(Duration::MAX), channel.disable());
         assert!(matches!(result, Err(StopReason::Disable)));

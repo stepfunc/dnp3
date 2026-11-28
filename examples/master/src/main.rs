@@ -60,7 +60,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // spawn the master channel based on the command line argument
-    let (mut channel, mut association) = create_channel_and_association(&args).await?;
+    let (channel, association) = create_channel_and_association(&args).await?;
 
     // create an event poll
     // ANCHOR: add_poll

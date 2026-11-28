@@ -157,7 +157,7 @@ impl TestHarness {
 
         for pair in self.pairs {
             let task = tokio::spawn(async move {
-                let mut pair = pair;
+                let pair = pair;
                 let mut iterations: usize = 0;
                 loop {
                     let result = pair
@@ -325,7 +325,7 @@ impl Pair {
         Measurements,
         tokio::sync::mpsc::Receiver<usize>,
     ) {
-        let mut master = dnp3::tcp::spawn_master_tcp_client(
+        let master = dnp3::tcp::spawn_master_tcp_client(
             LinkErrorMode::Close,
             Self::get_master_config(config.master_level),
             EndpointList::single(format!("127.0.0.1:{port}")),

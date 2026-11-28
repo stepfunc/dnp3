@@ -76,7 +76,7 @@ async fn start_blocker(
     harness: &mut TestHarness,
     seq: Sequence,
 ) -> tokio::task::JoinHandle<Result<(), crate::master::CommandError>> {
-    let mut association = harness.association.clone();
+    let association = harness.association.clone();
     let blocker = tokio::spawn(async move {
         association
             .operate(CommandMode::DirectOperate, crob())
@@ -136,7 +136,7 @@ async fn operate_no_ack_does_not_delay_the_next_task() {
         harness
             .expect_write(command_request(NO_ACK, Sequence::new(0)))
             .await;
-        let mut association = harness.association.clone();
+        let association = harness.association.clone();
         let read = tokio::spawn(async move {
             association
                 .read(ReadRequest::new().add_classes(Classes::class0()))
@@ -155,7 +155,7 @@ async fn operate_no_ack_does_not_delay_the_next_task() {
         harness
             .expect_write(command_request(NO_ACK, Sequence::new(2)))
             .await;
-        let mut association = harness.association.clone();
+        let association = harness.association.clone();
         let operate = tokio::spawn(async move {
             association
                 .operate(CommandMode::DirectOperate, crob())
@@ -401,7 +401,7 @@ async fn operate_no_ack_fails_without_a_connection() {
             },
             rx,
         );
-        let mut association =
+        let association =
             AssociationHandle::new(address, MasterChannel::new(tx, MasterChannelType::Stream));
 
         let operate = tokio::spawn(async move { association.operate_no_ack(crob()).await });

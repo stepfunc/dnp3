@@ -263,7 +263,7 @@ async fn user_lan_time_sync_completes_the_request() {
         let mut harness = harness(None).await;
         let mut seq = Sequence::default();
 
-        let mut association = harness.association.clone();
+        let association = harness.association.clone();
         let sync =
             tokio::spawn(async move { association.synchronize_time(TimeSyncProcedure::Lan).await });
         complete_lan_procedure(&mut harness, &mut seq).await;
@@ -280,7 +280,7 @@ async fn user_non_lan_time_sync_completes_the_request() {
         let mut harness = harness(None).await;
         let mut seq = Sequence::default();
 
-        let mut association = harness.association.clone();
+        let association = harness.association.clone();
         let sync = tokio::spawn(async move {
             association
                 .synchronize_time(TimeSyncProcedure::NonLan)
@@ -323,7 +323,7 @@ async fn non_lan_time_sync_fails_without_a_write_if_the_delay_is_not_one_g52v2()
         let mut seq = Sequence::default();
 
         for objects in BAD_DELAYS {
-            let mut association = harness.association.clone();
+            let association = harness.association.clone();
             let sync = tokio::spawn(async move {
                 association
                     .synchronize_time(TimeSyncProcedure::NonLan)
@@ -343,7 +343,7 @@ async fn non_lan_time_sync_fails_without_a_write_if_the_delay_is_not_one_g52v2()
         }
 
         // a valid delay measure is answered with a WRITE
-        let mut association = harness.association.clone();
+        let association = harness.association.clone();
         let sync = tokio::spawn(async move {
             association
                 .synchronize_time(TimeSyncProcedure::NonLan)
@@ -368,7 +368,7 @@ async fn user_time_sync_timeout_is_reported_to_the_caller_and_not_retried() {
     watchdog(async {
         let mut harness = harness(Some(TimeSyncProcedure::Lan)).await;
 
-        let mut association = harness.association.clone();
+        let association = harness.association.clone();
         let sync =
             tokio::spawn(async move { association.synchronize_time(TimeSyncProcedure::Lan).await });
         harness
@@ -413,7 +413,7 @@ async fn user_time_sync_that_still_needs_time_fails_and_starts_the_auto_time_syn
         let mut harness = harness(Some(TimeSyncProcedure::Lan)).await;
         let mut seq = Sequence::default();
 
-        let mut association = harness.association.clone();
+        let association = harness.association.clone();
         let sync =
             tokio::spawn(async move { association.synchronize_time(TimeSyncProcedure::Lan).await });
         harness
@@ -482,7 +482,7 @@ async fn user_non_lan_time_sync_fails_with_the_cause_when_the_delay_measure_resp
                 create_association_with_handler(config(None), Box::new(FixedTime)).await;
             let seq = Sequence::default();
 
-            let mut association = harness.association.clone();
+            let association = harness.association.clone();
             let sync = tokio::spawn(async move {
                 association
                     .synchronize_time(TimeSyncProcedure::NonLan)
@@ -540,7 +540,7 @@ async fn user_time_sync_fails_when_the_write_response_has_objects() {
                     create_association_with_handler(config(None), Box::new(FixedTime)).await;
                 let mut seq = Sequence::default();
 
-                let mut association = harness.association.clone();
+                let association = harness.association.clone();
                 let sync =
                     tokio::spawn(async move { association.synchronize_time(procedure).await });
                 let (first, write) = match procedure {
