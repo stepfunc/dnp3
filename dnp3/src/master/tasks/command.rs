@@ -7,7 +7,6 @@
 use crate::app::format::write::HeaderWriter;
 use crate::app::parse::parser::Response;
 use crate::app::FunctionCode;
-use crate::master::association::Association;
 use crate::master::error::{CommandError, CommandErrorKind, TaskErrorKind};
 use crate::master::promise::Promise;
 use crate::master::request::*;
@@ -75,11 +74,7 @@ impl ResponseTask for CommandTask {
         self.headers.write(writer)
     }
 
-    async fn on_response(
-        &mut self,
-        _association: &mut Association,
-        response: Response<'_>,
-    ) -> Result<Step<()>, CommandErrorKind> {
+    async fn on_response(&mut self, response: Response<'_>) -> Result<Step<()>, CommandErrorKind> {
         let headers = response.objects.map_err(TaskErrorKind::MalformedResponse)?;
 
         self.headers.compare(headers)?;
@@ -93,11 +88,7 @@ impl ResponseTask for CommandTask {
         }
     }
 
-    fn complete(
-        self,
-        _association: Option<&mut Association>,
-        result: Result<(), CommandErrorKind>,
-    ) {
+    fn complete(self, result: Result<(), CommandErrorKind>) {
         self.promise.complete(result.map_err(Into::into))
     }
 }

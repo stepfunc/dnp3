@@ -10,7 +10,7 @@ use crate::app::FunctionCode;
 use crate::master::association::Association;
 use crate::master::error::TaskErrorKind;
 use crate::master::request::EventClasses;
-use crate::master::tasks::{AppTask, NonReadTask, ResponseTask, Step, Task};
+use crate::master::tasks::{AppTask, NonReadTask, Task};
 use crate::master::TaskType;
 
 #[derive(Clone)]
@@ -32,13 +32,8 @@ impl AutoTask {
             AutoTask::DisableUnsolicited(_) => "disable unsolicited reporting",
         }
     }
-}
 
-impl ResponseTask for AutoTask {
-    type Output = ();
-    type Error = TaskErrorKind;
-
-    fn function(&self) -> FunctionCode {
+    pub(crate) fn function(&self) -> FunctionCode {
         match self {
             AutoTask::ClearRestartBit => FunctionCode::Write,
             AutoTask::EnableUnsolicited(_) => FunctionCode::EnableUnsolicited,
@@ -46,7 +41,7 @@ impl ResponseTask for AutoTask {
         }
     }
 
-    fn task_type(&self) -> TaskType {
+    pub(crate) fn task_type(&self) -> TaskType {
         match self {
             AutoTask::ClearRestartBit => TaskType::ClearRestartBit,
             AutoTask::EnableUnsolicited(_) => TaskType::EnableUnsolicited,
@@ -54,7 +49,7 @@ impl ResponseTask for AutoTask {
         }
     }
 
-    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskErrorKind> {
+    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskErrorKind> {
         match self {
             AutoTask::ClearRestartBit => writer.write_clear_restart()?,
             AutoTask::EnableUnsolicited(classes) => classes.write(writer)?,
@@ -63,11 +58,8 @@ impl ResponseTask for AutoTask {
         Ok(())
     }
 
-    async fn on_response(
-        &mut self,
-        _association: &mut Association,
-        response: Response<'_>,
-    ) -> Result<Step<()>, TaskErrorKind> {
+    /// Check the response, which completes the task
+    fn check_response(&self, response: Response<'_>) -> Result<(), TaskErrorKind> {
         if !response.raw_objects.is_empty() {
             tracing::warn!("ignoring object headers in reply to {}", self.description());
         }
@@ -79,30 +71,43 @@ impl ResponseTask for AutoTask {
             return Err(TaskErrorKind::UnexpectedResponseHeaders);
         }
 
-        Ok(Step::Done(()))
+        Ok(())
+    }
+}
+
+impl Association {
+    /// Handle the response to an automatic task, which completes it
+    pub(crate) fn respond_auto_task(
+        &mut self,
+        task: AutoTask,
+        response: Response<'_>,
+    ) -> Result<(), TaskErrorKind> {
+        let result = task.check_response(response);
+        self.complete_auto_task(&task, result);
+        result
     }
 
-    fn complete(self, association: Option<&mut Association>, result: Result<(), TaskErrorKind>) {
-        let association = match association {
-            None => return,
-            Some(x) => x,
-        };
-
+    /// Update the schedule with the outcome of an automatic task
+    pub(crate) fn complete_auto_task(
+        &mut self,
+        task: &AutoTask,
+        result: Result<(), TaskErrorKind>,
+    ) {
         match result {
-            Ok(()) => association.on_auto_task_success(&self),
+            Ok(()) => self.on_auto_task_success(task),
             Err(TaskErrorKind::RejectedByIin2(iin)) => {
-                tracing::warn!("Auto task '{}' rejected by outstation IIN.2: {}. Check your outstation configuration?", self.description(), iin.iin2);
+                tracing::warn!("Auto task '{}' rejected by outstation IIN.2: {}. Check your outstation configuration?", task.description(), iin.iin2);
                 // a rejection still answers the task, unless the restart bit is still set
-                if matches!(self, AutoTask::ClearRestartBit) && iin.iin1.get_device_restart() {
+                if matches!(task, AutoTask::ClearRestartBit) && iin.iin1.get_device_restart() {
                     tracing::warn!("device failed to clear restart IIN bit");
-                    association.on_auto_task_failure(&self);
+                    self.on_auto_task_failure(task);
                 } else {
-                    association.on_auto_task_success(&self);
+                    self.on_auto_task_success(task);
                 }
             }
             Err(_) => {
-                tracing::warn!("failed to {}", self.description());
-                association.on_auto_task_failure(&self);
+                tracing::warn!("failed to {}", task.description());
+                self.on_auto_task_failure(task);
             }
         }
     }

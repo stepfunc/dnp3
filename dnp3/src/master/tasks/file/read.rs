@@ -8,7 +8,6 @@ use super::*;
 use crate::app::file::*;
 use crate::app::parse::parser::Response;
 use crate::app::FunctionCode;
-use crate::master::association::Association;
 use crate::master::file::{BlockNumber, FileErrorKind};
 use crate::master::tasks::{AppTask, NonReadTask, ResponseTask, Step, Task};
 use crate::master::{FileAction, FileMode, FileReadConfig, FileReader, TaskType};
@@ -251,11 +250,7 @@ impl ResponseTask for FileReadTask {
         Ok(result?)
     }
 
-    async fn on_response(
-        &mut self,
-        _association: &mut Association,
-        response: Response<'_>,
-    ) -> Result<Step<()>, FileErrorKind> {
+    async fn on_response(&mut self, response: Response<'_>) -> Result<Step<()>, FileErrorKind> {
         let header = response
             .get_only_object_header()
             .map_err(FileErrorKind::from);
@@ -300,11 +295,7 @@ impl ResponseTask for FileReadTask {
         }
     }
 
-    fn complete(
-        mut self,
-        _association: Option<&mut Association>,
-        result: Result<(), FileErrorKind>,
-    ) {
+    fn complete(mut self, result: Result<(), FileErrorKind>) {
         if let Err(err) = result {
             if let State::Close(_, Some(early)) = self.state {
                 tracing::warn!(

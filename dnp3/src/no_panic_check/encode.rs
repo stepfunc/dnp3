@@ -28,7 +28,7 @@
 //!   16-bit indexes, which commands with and without acknowledgment use
 //! - [`one_shot`]: `OneShotRequest::write` for deadbands, generic requests (`Request`, with read
 //!   headers, freeze intervals and attributes), restarts and the file requests
-//! - [`auto_task`]: `ResponseTask::write` for the automatic tasks (class scans for startup
+//! - [`auto_task`]: `AutoTask::write` for the automatic tasks (class scans for startup
 //!   integrity and event scans are `Classes::write`, reached through [`read_request`])
 //! - [`time_sync`] and [`file_read`]: the writers that the time sync and file read tasks choose
 //!   between, by state
@@ -67,7 +67,7 @@ use crate::master::tasks::file::open::OpenFileRequest;
 use crate::master::tasks::file::write_block::WriteBlockRequest;
 use crate::master::tasks::file::{write_auth, write_close, write_open, write_read};
 use crate::master::tasks::restart::RestartType;
-use crate::master::tasks::{OneShotRequest, ResponseTask};
+use crate::master::tasks::OneShotRequest;
 use crate::master::{
     AuthKey, BlockNumber, Classes, CommandBuilder, CommandHeaders, CommandSupport, DeadBandHeader,
     EventClasses, FileCredentials, FileHandle, FileMode, ReadRequest, Request,

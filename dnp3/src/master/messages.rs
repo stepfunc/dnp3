@@ -65,7 +65,7 @@ impl AssociationMsgType {
     pub(crate) fn on_association_failure(self, address: EndpointAddress) {
         match self {
             AssociationMsgType::QueueTask(task) => {
-                task.on_task_error(None, TaskErrorKind::NoSuchAssociation(address));
+                task.on_task_error(TaskErrorKind::NoSuchAssociation(address));
             }
             AssociationMsgType::Poll(msg) => {
                 msg.on_error(PollErrorKind::NoSuchAssociation(address));

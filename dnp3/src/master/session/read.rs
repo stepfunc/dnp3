@@ -88,8 +88,8 @@ impl MasterSession {
         let objects = ProcessableResponse::new(response.objects).inspect_err(|err| {
             tracing::warn!("discarding response: {err}");
         })?;
-        let delivered = task
-            .process_response(association, response.header, objects)
+        let delivered = association
+            .deliver_read_response(task, response.header, objects)
             .await;
         outcome.add(response.header.iin, delivered);
 
@@ -117,17 +117,21 @@ impl<T: Transport> MasterTask<T> {
 
         let association = self.session.associations.get_mut(dest.link).ok();
 
-        match result {
-            Ok((seq, events_without_request_errors)) => {
-                if let Some(association) = association {
-                    task.complete(association, events_without_request_errors);
-                } else {
-                    task.on_task_error(None, TaskErrorKind::NoSuchAssociation(dest.link));
-                }
+        match (result, association) {
+            (Ok((seq, events_without_request_errors)), Some(association)) => {
+                association.complete_read(task, events_without_request_errors);
                 Ok(seq)
             }
-            Err(err) => {
-                task.on_task_error(association, err);
+            (Ok((seq, _)), None) => {
+                task.on_task_error(TaskErrorKind::NoSuchAssociation(dest.link));
+                Ok(seq)
+            }
+            (Err(err), Some(association)) => {
+                association.fail_read(task, err);
+                Err(err)
+            }
+            (Err(err), None) => {
+                task.on_task_error(err);
                 Err(err)
             }
         }

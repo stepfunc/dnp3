@@ -118,7 +118,7 @@ impl<T: Transport> MasterTask<T> {
                 .await
             {
                 Ok(Some((association, response))) => {
-                    return match task.handle_response(association, response).await? {
+                    return match association.handle_non_read_response(task, response).await? {
                         Some(next) => Ok(NextStep::Continue(next)),
                         None => Ok(NextStep::Complete(seq)),
                     };
@@ -149,7 +149,10 @@ impl<T: Transport> MasterTask<T> {
         task: NonReadTask,
         err: TaskErrorKind,
     ) -> TaskErrorKind {
-        task.on_task_error(self.session.associations.get_mut(dest.link).ok(), err);
+        match self.session.associations.get_mut(dest.link) {
+            Ok(association) => association.fail_non_read(task, err),
+            Err(_) => task.on_task_error(err),
+        }
         err
     }
 }

@@ -821,13 +821,12 @@ impl System {
     ) -> Result<(), TestCaseError> {
         let Ok(association) = self.map.get_mut(task.dest.link) else {
             task.details
-                .on_task_error(None, TaskErrorKind::NoSuchAssociation(task.dest.link));
+                .on_task_error(TaskErrorKind::NoSuchAssociation(task.dest.link));
             return Ok(());
         };
         let answer = match outcome {
             Outcome::Timeout => {
-                task.details
-                    .on_task_error(Some(association), TaskErrorKind::ResponseTimeout);
+                fail_running(association, task.details, TaskErrorKind::ResponseTimeout);
                 return Ok(());
             }
             Outcome::Answer(answer) => answer,
@@ -849,14 +848,16 @@ impl System {
                     },
                 );
                 match outcome.result(&read) {
-                    Ok(()) => read.complete(association, outcome.events_without_request_errors()),
-                    Err(err) => read.on_task_error(Some(association), err),
+                    Ok(()) => {
+                        association.complete_read(read, outcome.events_without_request_errors())
+                    }
+                    Err(err) => association.fail_read(read, err),
                 }
             }
             Task::App(AppTask::NonRead(task)) => {
                 association.process_iin(iin);
                 if iin.has_bad_request_error() {
-                    task.on_task_error(Some(association), TaskErrorKind::RejectedByIin2(iin));
+                    association.fail_non_read(task, TaskErrorKind::RejectedByIin2(iin));
                 } else {
                     let mut buffer = [0; 4];
                     let mut cursor = WriteCursor::new(&mut buffer);
@@ -871,16 +872,25 @@ impl System {
                         .unwrap()
                         .to_response()
                         .unwrap();
-                    let next = task.handle_response(association, response).await;
+                    let next = association.handle_non_read_response(task, response).await;
                     // every automatic task and the time sync procedure used here take one request
                     prop_assert!(!matches!(next, Ok(Some(_))));
                 }
             }
             Task::App(task @ AppTask::NoResponse(_)) => {
-                task.on_task_error(Some(association), TaskErrorKind::ResponseTimeout)
+                task.on_task_error(TaskErrorKind::ResponseTimeout)
             }
         }
         Ok(())
+    }
+}
+
+/// Fail a task that ran, the way the session does for its kind
+fn fail_running(association: &mut Association, task: Task, err: TaskErrorKind) {
+    match task {
+        Task::App(AppTask::Read(task)) => association.fail_read(task, err),
+        Task::App(AppTask::NonRead(task)) => association.fail_non_read(task, err),
+        task => task.on_task_error(err),
     }
 }
 

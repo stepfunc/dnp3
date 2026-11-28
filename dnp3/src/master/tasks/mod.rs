@@ -101,20 +101,11 @@ impl From<PendingTimeSync> for QueuedTask {
 }
 
 impl QueuedTask {
-    pub(crate) fn on_task_error(self, association: Option<&mut Association>, err: TaskErrorKind) {
+    /// Fail a task that never ran, reporting to its requester
+    pub(crate) fn on_task_error(self, err: TaskErrorKind) {
         match self {
-            Self::Ready(task) => task.on_task_error(association, err),
-            Self::TimeSync(task) => task.on_task_error(association, err),
-        }
-    }
-
-    /// Perform any operation needed before sending and check that the task should still be sent
-    ///
-    /// Returning `None` means starting failed and the failure has already been reported.
-    pub(crate) fn start(self, association: &mut Association) -> Option<Task> {
-        match self {
-            Self::Ready(task) => Some(task),
-            Self::TimeSync(task) => task.start(association).map(Task::from),
+            Self::Ready(task) => task.on_task_error(err),
+            Self::TimeSync(task) => task.on_task_error(err),
         }
     }
 }
@@ -142,19 +133,21 @@ impl AppTask {
         }
     }
 
-    pub(crate) fn on_task_error(self, association: Option<&mut Association>, err: TaskErrorKind) {
+    /// Fail the task, reporting to its requester
+    pub(crate) fn on_task_error(self, err: TaskErrorKind) {
         match self {
-            Self::NonRead(task) => task.on_task_error(association, err),
-            Self::Read(task) => task.on_task_error(association, err),
+            Self::NonRead(task) => task.on_task_error(err),
+            Self::Read(task) => task.on_task_error(err),
             Self::NoResponse(task) => task.on_task_error(err),
         }
     }
 }
 
 impl Task {
-    pub(crate) fn on_task_error(self, association: Option<&mut Association>, err: TaskErrorKind) {
+    /// Fail the task, reporting to its requester
+    pub(crate) fn on_task_error(self, err: TaskErrorKind) {
         match self {
-            Self::App(task) => task.on_task_error(association, err),
+            Self::App(task) => task.on_task_error(err),
             Self::LinkStatus(promise) => promise.complete(Err(err.into())),
         }
     }
@@ -200,10 +193,12 @@ pub(crate) enum Step<T> {
     Done(T),
 }
 
-/// A task that sends requests and handles their responses until it's done
+/// A task for a requester that sends requests and handles their responses until it's done
 ///
 /// The task never reports its own outcome: the session passes it to [`ResponseTask::complete`]
 /// exactly once, whether the task succeeds, its response is bad, or it fails some other way.
+/// The automatic tasks and time synchronization aren't response tasks: the association runs them,
+/// since their outcome updates its schedule.
 pub(crate) trait ResponseTask: Send + Sized {
     /// What the task produces when it succeeds
     type Output: Send;
@@ -219,16 +214,11 @@ pub(crate) trait ResponseTask: Send + Sized {
     /// Handle the response to the last request
     fn on_response(
         &mut self,
-        association: &mut Association,
         response: Response<'_>,
     ) -> impl Future<Output = Result<Step<Self::Output>, Self::Error>> + Send;
 
     /// Report the outcome to whoever is waiting for it
-    fn complete(
-        self,
-        association: Option<&mut Association>,
-        result: Result<Self::Output, Self::Error>,
-    );
+    fn complete(self, result: Result<Self::Output, Self::Error>);
 }
 
 /// Why a task failed, as its requester sees it
@@ -292,24 +282,23 @@ impl RequestError for FileErrorKind {
 /// Handle a response, completing the task unless it has another request to send
 async fn respond<T: ResponseTask>(
     mut task: T,
-    association: &mut Association,
     response: Response<'_>,
 ) -> Result<Option<T>, TaskErrorKind> {
-    match task.on_response(association, response).await {
+    match task.on_response(response).await {
         Ok(Step::Next) => Ok(Some(task)),
         Ok(Step::Done(output)) => {
-            task.complete(Some(association), Ok(output));
+            task.complete(Ok(output));
             Ok(None)
         }
         Err(err) => {
-            task.complete(Some(association), Err(err));
+            task.complete(Err(err));
             Err(err.task_error())
         }
     }
 }
 
-fn fail<T: ResponseTask>(task: T, association: Option<&mut Association>, err: TaskErrorKind) {
-    task.complete(association, Err(err.into()))
+fn fail<T: ResponseTask>(task: T, err: TaskErrorKind) {
+    task.complete(Err(err.into()))
 }
 
 /// A request that one response answers
@@ -365,15 +354,11 @@ impl<R: OneShotRequest> ResponseTask for OneShot<R> {
         self.request.write(writer)
     }
 
-    async fn on_response(
-        &mut self,
-        _association: &mut Association,
-        response: Response<'_>,
-    ) -> Result<Step<R::Output>, R::Error> {
+    async fn on_response(&mut self, response: Response<'_>) -> Result<Step<R::Output>, R::Error> {
         self.request.parse(response).map(Step::Done)
     }
 
-    fn complete(self, _association: Option<&mut Association>, result: Result<R::Output, R::Error>) {
+    fn complete(self, result: Result<R::Output, R::Error>) {
         self.promise.complete(result.map_err(Into::into))
     }
 }
@@ -455,27 +440,6 @@ impl ReadTask {
         Task::App(AppTask::Read(self))
     }
 
-    /// Pass the response's measurements to the handler, returning what was delivered
-    pub(crate) async fn process_response(
-        &mut self,
-        association: &mut Association,
-        header: ResponseHeader,
-        objects: ProcessableResponse<'_>,
-    ) -> Delivered {
-        let read_type = self.read_type();
-        match self {
-            ReadTask::SingleRead(SingleReadTask {
-                custom_handler: Some(handler),
-                ..
-            }) => extract_measurements(read_type, header, objects, handler.as_mut()).await,
-            _ => {
-                association
-                    .handle_read_response(read_type, header, objects)
-                    .await
-            }
-        }
-    }
-
     /// The ReadType reported to the ReadHandler for this read's responses
     fn read_type(&self) -> ReadType {
         match self {
@@ -492,22 +456,6 @@ impl ReadTask {
         match self {
             Self::SingleRead(_) | Self::PeriodicPoll(_) => true,
             Self::StartupIntegrity(_) | Self::EventScan(_) => false,
-        }
-    }
-
-    /// Complete the read, given whether it returned events without an IIN2 request error
-    pub(crate) fn complete(
-        self,
-        association: &mut Association,
-        events_without_request_errors: bool,
-    ) {
-        match self {
-            ReadTask::StartupIntegrity(_) => association.on_integrity_scan_complete(),
-            ReadTask::PeriodicPoll(poll) => association.complete_poll(&poll),
-            ReadTask::EventScan(_) => {
-                association.on_event_scan_complete(events_without_request_errors)
-            }
-            ReadTask::SingleRead(task) => task.on_complete(),
         }
     }
 
@@ -554,25 +502,11 @@ impl ReadTask {
         }
     }
 
-    pub(crate) fn on_task_error(self, association: Option<&mut Association>, err: TaskErrorKind) {
+    /// Fail the read, reporting to its requester. An automatic read has none, so it's only logged
+    pub(crate) fn on_task_error(self, err: TaskErrorKind) {
         self.log_failure(err);
-        match self {
-            ReadTask::StartupIntegrity(_) => {
-                if let Some(association) = association {
-                    association.on_integrity_scan_failure();
-                }
-            }
-            ReadTask::PeriodicPoll(poll) => {
-                if let Some(association) = association {
-                    association.complete_poll(&poll);
-                }
-            }
-            ReadTask::EventScan(_) => {
-                if let Some(association) = association {
-                    association.on_event_scan_failure();
-                }
-            }
-            ReadTask::SingleRead(task) => task.on_task_error(err),
+        if let ReadTask::SingleRead(task) = self {
+            task.on_task_error(err);
         }
     }
 
@@ -583,6 +517,112 @@ impl ReadTask {
             Self::EventScan(_) => TaskType::AutoEventScan,
             Self::SingleRead(_) => TaskType::UserRead,
         }
+    }
+}
+
+impl Association {
+    /// Perform any operation needed before sending and check that the task should still be sent
+    ///
+    /// Returning `None` means starting failed and the failure has already been reported.
+    pub(crate) fn start_task(&mut self, task: QueuedTask) -> Option<Task> {
+        match task {
+            QueuedTask::Ready(task) => Some(task),
+            QueuedTask::TimeSync(task) => self.start_time_sync(task).map(Task::from),
+        }
+    }
+
+    /// Pass a read response's measurements to the read's own handler, if it has one, or to the
+    /// association's, returning what was delivered
+    pub(crate) async fn deliver_read_response(
+        &mut self,
+        task: &mut ReadTask,
+        header: ResponseHeader,
+        objects: ProcessableResponse<'_>,
+    ) -> Delivered {
+        let read_type = task.read_type();
+        match task {
+            ReadTask::SingleRead(SingleReadTask {
+                custom_handler: Some(handler),
+                ..
+            }) => extract_measurements(read_type, header, objects, handler.as_mut()).await,
+            _ => self.handle_read_response(read_type, header, objects).await,
+        }
+    }
+
+    /// Complete a read, given whether it returned events without an IIN2 request error
+    pub(crate) fn complete_read(&mut self, task: ReadTask, events_without_request_errors: bool) {
+        match task {
+            ReadTask::StartupIntegrity(_) => self.on_integrity_scan_complete(),
+            ReadTask::PeriodicPoll(poll) => self.complete_poll(&poll),
+            ReadTask::EventScan(_) => self.on_event_scan_complete(events_without_request_errors),
+            ReadTask::SingleRead(task) => task.on_complete(),
+        }
+    }
+
+    /// Fail a read that ran: an automatic read reschedules, a user read reports to its requester
+    pub(crate) fn fail_read(&mut self, task: ReadTask, err: TaskErrorKind) {
+        task.log_failure(err);
+        match task {
+            ReadTask::StartupIntegrity(_) => self.on_integrity_scan_failure(),
+            ReadTask::PeriodicPoll(poll) => self.complete_poll(&poll),
+            ReadTask::EventScan(_) => self.on_event_scan_failure(),
+            ReadTask::SingleRead(task) => task.on_task_error(err),
+        }
+    }
+
+    /// Fail a non-read task that ran: an automatic task or time synchronization updates the
+    /// schedule, any other task reports to its requester
+    pub(crate) fn fail_non_read(&mut self, task: NonReadTask, err: TaskErrorKind) {
+        match task {
+            NonReadTask::Auto(task) => self.complete_auto_task(&task, Err(err)),
+            NonReadTask::TimeSync(task) => self.complete_time_sync(task, Err(err.into())),
+            task => task.on_task_error(err),
+        }
+    }
+
+    /// Handle the response to a non-read task, returning the task if it has another request
+    pub(crate) async fn handle_non_read_response(
+        &mut self,
+        task: NonReadTask,
+        response: Response<'_>,
+    ) -> Result<Option<NonReadTask>, TaskErrorKind> {
+        let next = match task {
+            NonReadTask::Auto(task) => {
+                // an automatic task takes one request
+                self.respond_auto_task(task, response)?;
+                None
+            }
+            NonReadTask::TimeSync(task) => self
+                .respond_time_sync(task, response)?
+                .map(NonReadTask::TimeSync),
+            NonReadTask::Command(task) => respond(task, response).await?.map(NonReadTask::Command),
+            NonReadTask::Restart(task) => respond(task, response).await?.map(NonReadTask::Restart),
+            NonReadTask::DeadBands(task) => {
+                respond(task, response).await?.map(NonReadTask::DeadBands)
+            }
+            NonReadTask::EmptyResponseTask(task) => respond(task, response)
+                .await?
+                .map(NonReadTask::EmptyResponseTask),
+            NonReadTask::FileRead(task) => {
+                respond(task, response).await?.map(NonReadTask::FileRead)
+            }
+            NonReadTask::GetFileInfo(task) => {
+                respond(task, response).await?.map(NonReadTask::GetFileInfo)
+            }
+            NonReadTask::OpenFile(task) => {
+                respond(task, response).await?.map(NonReadTask::OpenFile)
+            }
+            NonReadTask::CloseFile(task) => {
+                respond(task, response).await?.map(NonReadTask::CloseFile)
+            }
+            NonReadTask::WriteFileBlock(task) => respond(task, response)
+                .await?
+                .map(NonReadTask::WriteFileBlock),
+            NonReadTask::AuthFile(task) => {
+                respond(task, response).await?.map(NonReadTask::AuthFile)
+            }
+        };
+        Ok(next)
     }
 }
 
@@ -604,65 +644,22 @@ impl NonReadTask {
         }
     }
 
-    pub(crate) fn on_task_error(self, association: Option<&mut Association>, err: TaskErrorKind) {
+    /// Fail the task, reporting to its requester. An automatic task has none
+    pub(crate) fn on_task_error(self, err: TaskErrorKind) {
         match self {
-            Self::Command(task) => fail(task, association, err),
-            Self::TimeSync(task) => fail(task, association, err),
-            Self::Auto(task) => fail(task, association, err),
-            Self::Restart(task) => fail(task, association, err),
-            Self::DeadBands(task) => fail(task, association, err),
-            Self::EmptyResponseTask(task) => fail(task, association, err),
-            Self::FileRead(task) => fail(task, association, err),
-            Self::GetFileInfo(task) => fail(task, association, err),
-            Self::OpenFile(task) => fail(task, association, err),
-            Self::CloseFile(task) => fail(task, association, err),
-            Self::WriteFileBlock(task) => fail(task, association, err),
-            Self::AuthFile(task) => fail(task, association, err),
+            Self::Command(task) => fail(task, err),
+            Self::TimeSync(task) => task.on_task_error(err),
+            Self::Auto(_) => {}
+            Self::Restart(task) => fail(task, err),
+            Self::DeadBands(task) => fail(task, err),
+            Self::EmptyResponseTask(task) => fail(task, err),
+            Self::FileRead(task) => fail(task, err),
+            Self::GetFileInfo(task) => fail(task, err),
+            Self::OpenFile(task) => fail(task, err),
+            Self::CloseFile(task) => fail(task, err),
+            Self::WriteFileBlock(task) => fail(task, err),
+            Self::AuthFile(task) => fail(task, err),
         }
-    }
-
-    pub(crate) async fn handle_response(
-        self,
-        association: &mut Association,
-        response: Response<'_>,
-    ) -> Result<Option<NonReadTask>, TaskErrorKind> {
-        let next = match self {
-            Self::Command(task) => respond(task, association, response)
-                .await?
-                .map(Self::Command),
-            Self::Auto(task) => respond(task, association, response).await?.map(Self::Auto),
-            Self::TimeSync(task) => respond(task, association, response)
-                .await?
-                .map(Self::TimeSync),
-            Self::Restart(task) => respond(task, association, response)
-                .await?
-                .map(Self::Restart),
-            Self::DeadBands(task) => respond(task, association, response)
-                .await?
-                .map(Self::DeadBands),
-            Self::EmptyResponseTask(task) => respond(task, association, response)
-                .await?
-                .map(Self::EmptyResponseTask),
-            Self::FileRead(task) => respond(task, association, response)
-                .await?
-                .map(Self::FileRead),
-            Self::GetFileInfo(task) => respond(task, association, response)
-                .await?
-                .map(Self::GetFileInfo),
-            Self::OpenFile(task) => respond(task, association, response)
-                .await?
-                .map(Self::OpenFile),
-            Self::CloseFile(task) => respond(task, association, response)
-                .await?
-                .map(Self::CloseFile),
-            Self::WriteFileBlock(task) => respond(task, association, response)
-                .await?
-                .map(Self::WriteFileBlock),
-            Self::AuthFile(task) => respond(task, association, response)
-                .await?
-                .map(Self::AuthFile),
-        };
-        Ok(next)
     }
 
     pub(crate) fn as_task_type(&self) -> TaskType {
