@@ -4,9 +4,9 @@
 // Text and data mining rights, including for AI training, are reserved under
 // Directive (EU) 2019/790 Art. 4(3), subject to LICENSE.txt Section 3.3.
 
-//! Unit tests for [`OutstationCore`]'s sans-I/O contract (in-flight drop recovery on abandoned
-//! `Transmit` and `handle_input`, confirm-wait tracking, and callback DB-lock reentrancy) and
-//! cancellable-write tests on [`OutstationTask`].
+//! Unit tests for [`OutstationCore`]'s sans-I/O contract (a dropped `Transmit` leaving its response
+//! staged, in-flight drop recovery on an abandoned `handle_input`, confirm-wait tracking, and
+//! callback DB-lock reentrancy) and cancellable-write tests on [`OutstationTask`].
 
 use std::cell::Cell;
 use std::collections::BTreeSet;
@@ -30,7 +30,7 @@ use crate::outstation::database::{
     Add, AnalogInputConfig, BinaryInputConfig, CounterConfig, DatabaseHandle,
     EventBinaryInputVariation, EventBufferConfig, EventClass, Update, UpdateOptions,
 };
-use crate::outstation::session::core::{Outbound, Output, OutstationCore};
+use crate::outstation::session::core::{Outbound, Output, OutstationCore, Transmit};
 use crate::outstation::session::state::ConfirmWaitInfo;
 use crate::outstation::session::task::OutstationTask;
 use crate::outstation::traits::{
@@ -172,8 +172,22 @@ fn send_expect_fragment(core: &mut OutstationCore<&TestClock>) -> Vec<u8> {
     }
 }
 
+/// The fragment a `Transmit` offers, which must be a response to the master
+fn outbound_fragment(tx: &Transmit<'_, &TestClock>) -> Vec<u8> {
+    match tx.outbound() {
+        Outbound::Fragment { destination, bytes } => {
+            assert_eq!(destination.link, MASTER);
+            bytes.to_vec()
+        }
+        Outbound::LinkStatusRequest { .. } => panic!("unexpected link status"),
+    }
+}
+
+// catches a `Transmit` that takes the staged response with it, so dropping it loses the response;
+// confirm wait entered (and reported) before the write completes; and a `sent` that arms the
+// confirm deadline from when the response was staged or polled instead of when it was sent
 #[test]
-fn transmit_sent_arms_confirm_deadline_and_dropping_transmit_resets() {
+fn dropping_transmit_keeps_the_response_staged_and_sent_arms_confirm_deadline() {
     let clock = TestClock::new();
     let config = base_config();
     let info = RecordingInfo::default();
@@ -196,21 +210,16 @@ fn transmit_sent_arms_confirm_deadline_and_dropping_transmit_resets() {
     let read_class_1 = [0xC0, 0x01, 60, 2, 0x06];
     run_sync_input(&mut core, input_fragment(&read_class_1));
 
-    // Drop `Transmit` without calling `sent` (simulating an aborted write without `reset`).
-    {
+    // Drop `Transmit` without calling `sent` (a write that never completed, without `reset`).
+    let first = {
         let Output::Transmit(tx) = core.poll() else {
             panic!("expected staged response");
         };
-        match tx.outbound() {
-            Outbound::Fragment { destination, bytes } => {
-                assert_eq!(destination.link, MASTER);
-                assert_eq!(&bytes[..4], &[0xE0, 0x81, 0x80, 0x00]);
-            }
-            Outbound::LinkStatusRequest { .. } => panic!("unexpected link status"),
-        }
-    }
+        outbound_fragment(&tx)
+    };
+    assert_eq!(&first[..4], &[0xE0, 0x81, 0x80, 0x00]);
 
-    // Confirm wait was NOT entered, and the Class 1 event is still Written until recovery runs.
+    // Confirm wait was not entered, and the Class 1 event is still written into the response.
     assert_eq!(core.confirm_wait_info(), None);
     assert_eq!(
         info.take(),
@@ -218,30 +227,23 @@ fn transmit_sent_arms_confirm_deadline_and_dropping_transmit_resets() {
     );
     assert!(!db.get_events_info().unwritten_classes.class1);
 
-    // Next `poll` detects `InFlight`, resets per-connection state and DB (restoring the Class 1
-    // event to Unselected), and returns `Wait`.
-    assert!(matches!(core.poll(), Output::Wait(None)));
-    assert!(db.get_events_info().unwritten_classes.class1);
-
-    // A fresh READ gets the restored event; calling `sent()` arms the deadline from `t1`.
-    run_sync_input(&mut core, input_fragment(&read_class_1));
-    let t1 = clock.advance(Duration::from_secs(1));
-    let sent_bytes = send_expect_fragment(&mut core);
-    assert_eq!(&sent_bytes[..4], &[0xE0, 0x81, 0x80, 0x00]);
+    // The next `poll` offers the same response. Its write completes at `t2`, so `sent` arms the
+    // deadline from `t2`.
+    clock.advance(Duration::from_secs(1));
+    let Output::Transmit(tx) = core.poll() else {
+        panic!("expected the staged response again");
+    };
+    assert_eq!(outbound_fragment(&tx), first);
+    let t2 = clock.advance(Duration::from_secs(1));
+    tx.sent();
 
     assert_eq!(
         core.confirm_wait_info(),
         Some(ConfirmWaitInfo::Solicited(Sequence::new(0)))
     );
-    assert_eq!(
-        info.take(),
-        vec![
-            InfoEvent::RequestFromIdle(FunctionCode::Read, 0),
-            InfoEvent::EnterSolWait(0),
-        ]
-    );
+    assert_eq!(info.take(), vec![InfoEvent::EnterSolWait(0)]);
 
-    let expected_deadline = t1.saturating_add(Duration::from_secs(5));
+    let expected_deadline = t2.saturating_add(Duration::from_secs(5));
     assert!(matches!(core.poll(), Output::Wait(Some(d)) if d == expected_deadline));
 }
 
