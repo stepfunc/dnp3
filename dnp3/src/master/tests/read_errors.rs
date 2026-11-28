@@ -51,7 +51,7 @@ async fn read_with_iin2_and_data_delivers_the_data_and_succeeds() {
         let mut harness = create_association(AssociationConfig::default()).await;
         startup_procedure(&mut harness, &mut seq).await;
 
-        let mut association = harness.association.clone();
+        let association = harness.association.clone();
         let read = tokio::spawn(async move {
             association
                 .read(ReadRequest::new().add_classes(Classes::class0()))
@@ -87,7 +87,7 @@ async fn read_with_iin2_and_no_data_fails() {
         let mut harness = create_association(AssociationConfig::default()).await;
         startup_procedure(&mut harness, &mut seq).await;
 
-        let mut association = harness.association.clone();
+        let association = harness.association.clone();
         let read = tokio::spawn(async move {
             association
                 .read(ReadRequest::new().add_classes(Classes::class0()))
@@ -120,7 +120,7 @@ async fn multi_fragment_read_with_iin2_in_the_first_fragment_reads_every_fragmen
         let mut harness = create_association(AssociationConfig::default()).await;
         startup_procedure(&mut harness, &mut seq).await;
 
-        let mut association = harness.association.clone();
+        let association = harness.association.clone();
         let read = tokio::spawn(async move {
             association
                 .read(ReadRequest::new().add_classes(Classes::class0()))
@@ -157,7 +157,7 @@ async fn start_read(
     seq: &mut Sequence,
 ) -> (tokio::task::JoinHandle<Result<(), TaskError>>, Sequence) {
     startup_procedure(harness, seq).await;
-    let mut association = harness.association.clone();
+    let association = harness.association.clone();
     let read = tokio::spawn(async move {
         association
             .read(ReadRequest::new().add_classes(Classes::class0()))
@@ -259,7 +259,7 @@ async fn periodic_poll_with_iin2_and_no_data_fails() {
         let mut harness = create_association(AssociationConfig::default()).await;
         startup_procedure(&mut harness, &mut seq).await;
         drop(harness.assoc_events.pop());
-        let mut association = harness.association.clone();
+        let association = harness.association.clone();
         let _poll = association
             .add_poll(
                 ReadRequest::new().add_classes(Classes::class0()),

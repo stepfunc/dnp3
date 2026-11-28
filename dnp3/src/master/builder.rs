@@ -570,7 +570,7 @@ mod tests {
         let address = endpoint(1024);
 
         let mut association = add_stream_association(&mut builder, address).unwrap();
-        let mut poll = association.add_poll(
+        let poll = association.add_poll(
             ReadRequest::new().add_classes(crate::master::Classes::all()),
             Duration::from_secs(5),
         );

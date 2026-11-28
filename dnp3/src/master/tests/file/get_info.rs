@@ -159,7 +159,7 @@ async fn get_info_with_response(response: Vec<u8>) -> Result<(), FileError> {
 fn spawn_get_info_task(
     harness: &TestHarness,
 ) -> tokio::task::JoinHandle<Result<FileInfo, FileError>> {
-    let mut association = harness.association.clone();
+    let association = harness.association.clone();
     tokio::spawn(async move { association.get_file_info("f.txt").await })
 }
 

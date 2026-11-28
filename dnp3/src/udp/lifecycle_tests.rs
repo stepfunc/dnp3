@@ -90,7 +90,7 @@ async fn exchange_with_master(address: SocketAddr) {
 async fn master_binds_when_enabled_and_retries_a_failed_bind_after_the_delay() {
     watchdog(async {
         let (address, blocker) = reserve();
-        let mut channel = spawn_master(address);
+        let channel = spawn_master(address);
         // a disabled master doesn't bind: one that tried would fail against the blocker, and bind
         // when its retry delay ends, before the delay that the enable starts
         tokio::time::sleep(secs(1)).await;
@@ -118,7 +118,7 @@ async fn master_binds_when_enabled_and_retries_a_failed_bind_after_the_delay() {
 async fn master_disable_during_a_session_closes_the_socket_until_enabled() {
     watchdog(async {
         let (address, reservation) = reserve();
-        let mut channel = spawn_master(address);
+        let channel = spawn_master(address);
         drop(reservation);
         channel.enable().await.unwrap();
         settle().await;
@@ -142,7 +142,7 @@ async fn master_disable_during_a_session_closes_the_socket_until_enabled() {
 async fn master_disable_during_a_retry_wait_skips_the_rest_of_the_delay() {
     watchdog(async {
         let (address, blocker) = reserve();
-        let mut channel = spawn_master(address);
+        let channel = spawn_master(address);
         channel.enable().await.unwrap();
         settle().await;
         channel.disable().await.unwrap();
@@ -162,7 +162,7 @@ async fn master_disable_during_a_retry_wait_skips_the_rest_of_the_delay() {
 async fn master_shutdown_during_a_retry_wait_ends_the_task_at_once() {
     watchdog(async {
         let (address, _blocker) = reserve();
-        let mut channel = spawn_master(address);
+        let channel = spawn_master(address);
         channel.enable().await.unwrap();
         settle().await;
         assert_eq!(alive_tasks(), 1);
@@ -377,7 +377,7 @@ async fn spawn_associated_master(
     local: SocketAddr,
     destination: SocketAddr,
 ) -> (MasterChannel, AssociationHandle) {
-    let mut channel = spawn_master(local);
+    let channel = spawn_master(local);
     channel.enable().await.unwrap();
     let association = channel
         .add_udp_association(
@@ -404,7 +404,7 @@ async fn master_udp_association_reads_from_its_destination() {
         let (outstation, outstation_reservation) = reserve();
         drop((master_reservation, outstation_reservation));
         let _outstation = spawn_quiet_outstation(outstation, master);
-        let (_channel, mut association) = spawn_associated_master(master, outstation).await;
+        let (_channel, association) = spawn_associated_master(master, outstation).await;
         assert_eq!(association.read(class0_read()).await, Ok(()));
     })
     .await;
@@ -421,7 +421,7 @@ async fn master_udp_association_accepts_a_response_from_another_port() {
         let relay = UdpSocket::bind("127.0.0.1:0").await.unwrap();
         drop((master_reservation, outstation_reservation));
         let _outstation = spawn_quiet_outstation(outstation, master);
-        let (_channel, mut association) =
+        let (_channel, association) =
             spawn_associated_master(master, destination.local_addr().unwrap()).await;
 
         let forward = async {

@@ -88,7 +88,7 @@ fn expect_failure(harness: &mut TestHarness, err: TaskError) {
 }
 
 fn spawn_auth_task(harness: &TestHarness) -> tokio::task::JoinHandle<Result<AuthKey, FileError>> {
-    let mut association = harness.association.clone();
+    let association = harness.association.clone();
     tokio::spawn(async move {
         association
             .get_file_auth_key(FileCredentials {

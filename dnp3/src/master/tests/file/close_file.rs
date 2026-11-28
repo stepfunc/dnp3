@@ -145,7 +145,7 @@ fn expect_failure(harness: &mut TestHarness) {
 }
 
 fn spawn_close_task(
-    mut association: AssociationHandle,
+    association: AssociationHandle,
     handle: FileHandle,
 ) -> tokio::task::JoinHandle<Result<(), FileError>> {
     tokio::spawn(async move { association.close_file(handle).await })

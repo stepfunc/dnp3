@@ -604,7 +604,7 @@ mod tests {
         }
 
         async fn enable_channel(&mut self) {
-            let mut channel = tokio::time::timeout(Duration::from_secs(5), self.channels.recv())
+            let channel = tokio::time::timeout(Duration::from_secs(5), self.channels.recv())
                 .await
                 .unwrap()
                 .unwrap();
@@ -1011,7 +1011,7 @@ mod tests {
             let mut server = FaultyServer::spawn(listener, false);
             assert_eq!(server.events.recv().await, Some(Event::Accept));
             assert_eq!(server.events.recv().await, Some(Event::Start));
-            let mut channel = server.channels.recv().await.unwrap();
+            let channel = server.channels.recv().await.unwrap();
             channel.enable().await.unwrap();
             answers(&mut first).await;
 
@@ -1023,7 +1023,7 @@ mod tests {
             let (mut second, _) = peers.connect(LOOPBACK);
             assert_eq!(server.events.recv().await, Some(Event::Accept));
             assert_eq!(server.events.recv().await, Some(Event::Start));
-            let mut channel = server.channels.recv().await.unwrap();
+            let channel = server.channels.recv().await.unwrap();
             channel.enable().await.unwrap();
             answers(&mut second).await;
         })

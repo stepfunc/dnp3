@@ -132,7 +132,7 @@ async fn restart_returns_the_time_delay_of_the_response() {
     watchdog(async {
         for case in CASES {
             let mut harness = create_association(AssociationConfig::quiet()).await;
-            let mut association = harness.association.clone();
+            let association = harness.association.clone();
             let restart = tokio::spawn(async move {
                 match case.restart {
                     Restart::Cold => association.cold_restart().await,

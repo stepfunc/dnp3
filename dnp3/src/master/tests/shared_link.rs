@@ -41,7 +41,7 @@ async fn response_from_another_outstation_during_any_task_refreshes_its_own_keep
             let start = Instant::now();
 
             // a second outstation on the same link
-            let mut other = harness
+            let other = harness
                 .master
                 .add_association(
                     EndpointAddress::try_new(2048).unwrap(),
@@ -88,7 +88,7 @@ async fn response_from_another_outstation_during_any_task_refreshes_its_own_keep
             // waiting behind a link status request
             tokio::time::advance(Duration::from_secs(11).saturating_sub(start.elapsed())).await;
             let now = Instant::now();
-            let mut association = harness.association.clone();
+            let association = harness.association.clone();
             let read = tokio::spawn(async move {
                 association
                     .read(ReadRequest::new().add_classes(Classes::class0()))

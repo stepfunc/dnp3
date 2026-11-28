@@ -111,7 +111,7 @@ impl Harness {
             rx,
         );
         let task = tokio::spawn(async move { task.run(&mut io).await });
-        let mut master = MasterChannel::new(tx, MasterChannelType::Stream);
+        let master = MasterChannel::new(tx, MasterChannelType::Stream);
         let association = master
             .add_association(OUTSTATION, config(), null(), null(), info)
             .await
@@ -156,10 +156,7 @@ const KINDS: [Kind; 3] = [Kind::Read, Kind::NonRead, Kind::LinkStatus];
 
 impl Kind {
     /// Start the task, which completes with the outcome and the time it completed
-    fn spawn(
-        self,
-        mut association: AssociationHandle,
-    ) -> JoinHandle<(Result<(), TaskError>, Instant)> {
+    fn spawn(self, association: AssociationHandle) -> JoinHandle<(Result<(), TaskError>, Instant)> {
         tokio::spawn(async move {
             let result = match self {
                 Kind::Read => {

@@ -58,7 +58,7 @@ impl<T> Sender<T> {
         Sender { inner }
     }
 
-    pub(crate) async fn send(&mut self, value: T) -> Result<(), Shutdown> {
+    pub(crate) async fn send(&self, value: T) -> Result<(), Shutdown> {
         self.inner.send(value).await.map_err(|_| Shutdown)
     }
 }

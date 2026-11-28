@@ -57,7 +57,7 @@ fn start_directory_read(
     config: FileReadConfig,
     credentials: Option<FileCredentials>,
 ) -> JoinHandle<Result<usize, FileError>> {
-    let mut association = harness.association.clone();
+    let association = harness.association.clone();
     let config = DirReadConfig {
         max_block_size: config.max_block_size,
         max_file_size: config.max_file_size,

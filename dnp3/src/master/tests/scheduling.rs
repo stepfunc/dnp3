@@ -230,7 +230,7 @@ fn spawn_read(
     association: &AssociationHandle,
     classes: Classes,
 ) -> JoinHandle<Result<(), TaskError>> {
-    let mut association = association.clone();
+    let association = association.clone();
     tokio::spawn(async move {
         association
             .read(ReadRequest::new().add_classes(classes))
@@ -420,7 +420,7 @@ async fn demanding_a_poll_runs_it_at_once_and_restarts_its_period() {
     watchdog(async {
         let mut harness = Harness::new();
         let mut a = harness.add(A, quiet(1)).await;
-        let mut poll = add_poll(&mut a, class(1), secs(10)).await;
+        let poll = add_poll(&mut a, class(1), secs(10)).await;
 
         tokio::time::advance(secs(3)).await;
         poll.demand().await.unwrap();
@@ -438,7 +438,7 @@ async fn demanding_a_poll_while_it_runs_runs_it_again_when_that_run_completes() 
     watchdog(async {
         let mut harness = Harness::new();
         let mut a = harness.add(A, quiet(5)).await;
-        let mut poll = add_poll(&mut a, class(1), secs(10)).await;
+        let poll = add_poll(&mut a, class(1), secs(10)).await;
 
         // the poll is demanded while it waits for its response, which comes 2 seconds later
         assert_eq!(harness.next().await, (secs(10), read(A, class(1))));
@@ -461,7 +461,7 @@ async fn demanding_a_poll_whose_run_then_times_out_runs_it_again_when_that_run_f
     watchdog(async {
         let mut harness = Harness::new();
         let mut a = harness.add(A, quiet(5)).await;
-        let mut poll = add_poll(&mut a, class(1), secs(10)).await;
+        let poll = add_poll(&mut a, class(1), secs(10)).await;
 
         // the poll is demanded while it waits for a response that never comes
         assert_eq!(harness.next().await, (secs(10), read(A, class(1))));

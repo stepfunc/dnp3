@@ -899,7 +899,7 @@ async fn stalled_write_is_cancelled_immediately_by_run_until() {
 async fn stalled_write_is_cancelled_immediately_by_shutdown_and_disable() {
     for expected in [StopReason::Shutdown, StopReason::Disable] {
         watchdog(async move {
-            let (mut task, mut handle, mut phys, _peer) = new_stalled_write_task();
+            let (mut task, handle, mut phys, _peer) = new_stalled_write_task();
             let driver = tokio::spawn(async move { task.run(&mut phys).await });
 
             tokio::time::sleep(Duration::from_millis(10)).await;
