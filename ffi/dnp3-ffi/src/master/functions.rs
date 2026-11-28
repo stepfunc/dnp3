@@ -1047,9 +1047,10 @@ pub(crate) unsafe fn master_channel_set_decode_level(
     level: ffi::DecodeLevel,
 ) -> Result<(), ffi::ParamError> {
     let channel = channel.as_mut().ok_or(ffi::ParamError::NullParameter)?;
+    let handle = channel.handle.clone();
     channel
         .runtime
-        .spawn(channel.handle.set_decode_level(level.into()))?;
+        .spawn(async move { handle.set_decode_level(level.into()).await })?;
     Ok(())
 }
 
