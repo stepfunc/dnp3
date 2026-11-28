@@ -526,10 +526,10 @@ impl Association {
                     if self.request_queue.len() < self.config.max_queued_user_requests {
                         self.request_queue.push_back(task);
                     } else {
-                        task.on_task_error(Some(self), TaskErrorKind::TooManyRequests);
+                        task.on_task_error(TaskErrorKind::TooManyRequests);
                     }
                 } else {
-                    task.on_task_error(Some(self), TaskErrorKind::NoConnection);
+                    task.on_task_error(TaskErrorKind::NoConnection);
                 }
             }
             AssociationMsgType::Poll(msg) => {
@@ -554,18 +554,15 @@ impl Association {
         }
     }
 
-    /// Fail the queued requests of an association that is being removed
+    /// Fail the queued requests, in the order they were queued
     fn fail_queued_requests(&mut self, err: TaskErrorKind) {
         while let Some(task) = self.request_queue.pop_front() {
-            task.on_task_error(None, err);
+            task.on_task_error(err);
         }
     }
 
     fn reset(&mut self, err: RunError) {
-        // Fail any pending requests
-        while let Some(task) = self.request_queue.pop_front() {
-            task.on_task_error(Some(self), err.into());
-        }
+        self.fail_queued_requests(err.into());
 
         // Reset the auto tasks
         self.auto_tasks.reset();
@@ -789,7 +786,7 @@ impl Association {
 
     pub(crate) fn priority_task(&mut self) -> Option<Task> {
         while let Some(task) = self.request_queue.pop_front() {
-            if let Some(task) = task.start(self) {
+            if let Some(task) = self.start_task(task) {
                 return Some(task);
             }
         }
@@ -802,7 +799,7 @@ impl Association {
             match self.get_next_task(now) {
                 Next::Now(task) => {
                     // Check if execution can still happen
-                    if let Some(task) = task.start(self) {
+                    if let Some(task) = self.start_task(task) {
                         return Next::Now(task);
                     }
                 }

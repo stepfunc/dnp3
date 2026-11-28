@@ -17,7 +17,7 @@ use crate::master::error::{TaskErrorKind, TimeSyncError, TimeSyncErrorKind};
 use crate::master::promise::Promise;
 use crate::master::request::TimeSyncProcedure;
 use crate::master::tasks::empty_response::expect_empty;
-use crate::master::tasks::{AppTask, NonReadTask, ResponseTask, Step, Task};
+use crate::master::tasks::{AppTask, NonReadTask, RequestError, Step, Task};
 use crate::master::TaskType;
 
 use tokio::time::Instant;
@@ -31,21 +31,11 @@ enum Requester {
 }
 
 impl Requester {
-    fn complete(
-        self,
-        association: Option<&mut Association>,
-        result: Result<(), TimeSyncErrorKind>,
-    ) {
+    /// Fail a time synchronization without an association. An automatic one has no one to tell
+    fn fail(self, err: TaskErrorKind) {
         match self {
-            Self::User(promise) => promise.complete(result.map_err(Into::into)),
-            Self::Auto => {
-                if let Some(association) = association {
-                    match result {
-                        Ok(()) => association.on_time_sync_success(),
-                        Err(err) => association.on_time_sync_failure(err),
-                    }
-                }
-            }
+            Self::User(promise) => promise.complete(Err(TimeSyncErrorKind::from(err).into())),
+            Self::Auto => {}
         }
     }
 }
@@ -77,37 +67,6 @@ impl PendingTimeSync {
         }
     }
 
-    /// Start the time synchronization, or report an error and return `None` if the system
-    /// time isn't available
-    pub(crate) fn start(self, association: &mut Association) -> Option<TimeSyncTask> {
-        let state = match self.procedure {
-            TimeSyncProcedure::NonLan => {
-                let request_tx = Instant::now();
-                association
-                    .get_system_time()
-                    .map(|_| State::MeasureDelay(request_tx))
-            }
-            TimeSyncProcedure::Lan => association.get_system_time().map(State::RecordCurrentTime),
-            TimeSyncProcedure::DirectWriteAbsTime => {
-                association.get_system_time().map(State::WriteAbsoluteTime)
-            }
-        };
-
-        match state {
-            Some(state) => Some(TimeSyncTask::new(state, self.requester)),
-            None => {
-                let err = TaskErrorKind::SystemTimeNotAvailable;
-                if matches!(self.requester, Requester::Auto) {
-                    let seq = association.seq();
-                    association.notify_task_start(TaskType::TimeSync, self.first_function(), seq);
-                    association.notify_task_fail(TaskType::TimeSync, err);
-                }
-                self.requester.complete(Some(association), Err(err.into()));
-                None
-            }
-        }
-    }
-
     /// The function of the first request
     fn first_function(&self) -> FunctionCode {
         match self.procedure {
@@ -117,8 +76,9 @@ impl PendingTimeSync {
         }
     }
 
-    pub(crate) fn on_task_error(self, association: Option<&mut Association>, err: TaskErrorKind) {
-        self.requester.complete(association, Err(err.into()))
+    /// Fail the time synchronization before it started, reporting to its requester
+    pub(crate) fn on_task_error(self, err: TaskErrorKind) {
+        self.requester.fail(err)
     }
 }
 
@@ -161,9 +121,109 @@ impl TimeSyncTask {
         NonReadTask::TimeSync(self)
     }
 
+    fn get_timestamp(
+        now: Timestamp,
+        propagation_delay: Duration,
+    ) -> Result<Timestamp, TimeSyncErrorKind> {
+        match now.checked_add(propagation_delay) {
+            Some(x) => Ok(x),
+            None => Err(TimeSyncErrorKind::Overflow),
+        }
+    }
+
+    pub(crate) fn function(&self) -> FunctionCode {
+        match self.state {
+            State::MeasureDelay(_) => FunctionCode::DelayMeasure,
+            State::WriteAbsoluteTime(_) => FunctionCode::Write,
+            State::RecordCurrentTime(_) => FunctionCode::RecordCurrentTime,
+            State::WriteLastRecordedTime(_) => FunctionCode::Write,
+        }
+    }
+
+    pub(crate) fn task_type(&self) -> TaskType {
+        TaskType::TimeSync
+    }
+
+    pub(crate) fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskErrorKind> {
+        match self.state {
+            State::MeasureDelay(_) => {}
+            State::WriteAbsoluteTime(time) => writer.write_count_of_one(Group50Var1 { time })?,
+            State::RecordCurrentTime(_) => {}
+            State::WriteLastRecordedTime(x) => {
+                writer.write_count_of_one(Group50Var3 { time: x })?
+            }
+        }
+        Ok(())
+    }
+
+    /// Fail the time synchronization, reporting to its requester if it has one
+    pub(crate) fn on_task_error(self, err: TaskErrorKind) {
+        self.requester.fail(err)
+    }
+}
+
+impl Association {
+    /// Start a time synchronization, or report an error and return `None` if the system time
+    /// isn't available
+    pub(crate) fn start_time_sync(&mut self, task: PendingTimeSync) -> Option<TimeSyncTask> {
+        let state = match task.procedure {
+            TimeSyncProcedure::NonLan => {
+                let request_tx = Instant::now();
+                self.get_system_time()
+                    .map(|_| State::MeasureDelay(request_tx))
+            }
+            TimeSyncProcedure::Lan => self.get_system_time().map(State::RecordCurrentTime),
+            TimeSyncProcedure::DirectWriteAbsTime => {
+                self.get_system_time().map(State::WriteAbsoluteTime)
+            }
+        };
+
+        match state {
+            Some(state) => Some(TimeSyncTask::new(state, task.requester)),
+            None => {
+                let err = TaskErrorKind::SystemTimeNotAvailable;
+                if matches!(task.requester, Requester::Auto) {
+                    let seq = self.seq();
+                    self.notify_task_start(TaskType::TimeSync, task.first_function(), seq);
+                    self.notify_task_fail(TaskType::TimeSync, err);
+                }
+                self.complete_time_sync_requester(task.requester, Err(err.into()));
+                None
+            }
+        }
+    }
+
+    /// Handle the response to a time synchronization, returning it if it has another request
+    pub(crate) fn respond_time_sync(
+        &mut self,
+        mut task: TimeSyncTask,
+        response: Response<'_>,
+    ) -> Result<Option<TimeSyncTask>, TaskErrorKind> {
+        match self.time_sync_step(&mut task, response) {
+            Ok(Step::Next) => Ok(Some(task)),
+            Ok(Step::Done(())) => {
+                self.complete_time_sync(task, Ok(()));
+                Ok(None)
+            }
+            Err(err) => {
+                self.complete_time_sync(task, Err(err));
+                Err(err.task_error())
+            }
+        }
+    }
+
+    /// Report the outcome of a time synchronization that ran
+    pub(crate) fn complete_time_sync(
+        &mut self,
+        task: TimeSyncTask,
+        result: Result<(), TimeSyncErrorKind>,
+    ) {
+        self.complete_time_sync_requester(task.requester, result)
+    }
+
     /// The time to write to the outstation, from the response to the delay measurement
     fn handle_delay_measure(
-        association: &mut Association,
+        &mut self,
         request_tx: Instant,
         response: Response,
     ) -> Result<Timestamp, TimeSyncErrorKind> {
@@ -210,7 +270,7 @@ impl TimeSyncTask {
                 }
             };
 
-        let time = match association.get_system_time() {
+        let time = match self.get_system_time() {
             Some(time) => time,
             None => {
                 tracing::warn!("system time not available");
@@ -218,63 +278,25 @@ impl TimeSyncTask {
             }
         };
 
-        Self::get_timestamp(time, propagation_delay).inspect_err(|err| tracing::error!("{err}"))
+        TimeSyncTask::get_timestamp(time, propagation_delay)
+            .inspect_err(|err| tracing::error!("{err}"))
     }
 
-    fn get_timestamp(
-        now: Timestamp,
-        propagation_delay: Duration,
-    ) -> Result<Timestamp, TimeSyncErrorKind> {
-        match now.checked_add(propagation_delay) {
-            Some(x) => Ok(x),
-            None => Err(TimeSyncErrorKind::Overflow),
-        }
-    }
-}
-
-impl ResponseTask for TimeSyncTask {
-    type Output = ();
-    type Error = TimeSyncErrorKind;
-
-    fn function(&self) -> FunctionCode {
-        match self.state {
-            State::MeasureDelay(_) => FunctionCode::DelayMeasure,
-            State::WriteAbsoluteTime(_) => FunctionCode::Write,
-            State::RecordCurrentTime(_) => FunctionCode::RecordCurrentTime,
-            State::WriteLastRecordedTime(_) => FunctionCode::Write,
-        }
-    }
-
-    fn task_type(&self) -> TaskType {
-        TaskType::TimeSync
-    }
-
-    fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskErrorKind> {
-        match self.state {
-            State::MeasureDelay(_) => {}
-            State::WriteAbsoluteTime(time) => writer.write_count_of_one(Group50Var1 { time })?,
-            State::RecordCurrentTime(_) => {}
-            State::WriteLastRecordedTime(x) => {
-                writer.write_count_of_one(Group50Var3 { time: x })?
-            }
-        }
-        Ok(())
-    }
-
-    async fn on_response(
+    /// Advance the time synchronization with the response to its last request
+    fn time_sync_step(
         &mut self,
-        association: &mut Association,
+        task: &mut TimeSyncTask,
         response: Response<'_>,
     ) -> Result<Step<()>, TimeSyncErrorKind> {
-        match self.state {
+        match task.state {
             State::MeasureDelay(request_tx) => {
-                let timestamp = Self::handle_delay_measure(association, request_tx, response)?;
-                self.state = State::WriteAbsoluteTime(timestamp);
+                let timestamp = self.handle_delay_measure(request_tx, response)?;
+                task.state = State::WriteAbsoluteTime(timestamp);
                 Ok(Step::Next)
             }
             State::RecordCurrentTime(recorded_time) => {
                 expect_empty(&response)?;
-                self.state = State::WriteLastRecordedTime(recorded_time);
+                task.state = State::WriteLastRecordedTime(recorded_time);
                 Ok(Step::Next)
             }
             State::WriteAbsoluteTime(_) | State::WriteLastRecordedTime(_) => {
@@ -284,12 +306,19 @@ impl ResponseTask for TimeSyncTask {
         }
     }
 
-    fn complete(
-        self,
-        association: Option<&mut Association>,
+    /// Report the outcome to the user, or for an automatic time synchronization, to the schedule
+    fn complete_time_sync_requester(
+        &mut self,
+        requester: Requester,
         result: Result<(), TimeSyncErrorKind>,
     ) {
-        self.requester.complete(association, result)
+        match requester {
+            Requester::User(promise) => promise.complete(result.map_err(Into::into)),
+            Requester::Auto => match result {
+                Ok(()) => self.on_time_sync_success(),
+                Err(err) => self.on_time_sync_failure(err),
+            },
+        }
     }
 }
 
@@ -340,7 +369,7 @@ mod tests {
             .to_response()
             .unwrap();
 
-        task.handle_response(association, response).await
+        association.handle_non_read_response(task, response).await
     }
 
     struct SingleTimestampTestHandler {
@@ -562,7 +591,7 @@ mod tests {
                 .unwrap()
                 .unwrap();
             let task = check_write_request(task, system_time);
-            task.on_task_error(Some(&mut association), TaskErrorKind::ResponseTimeout);
+            association.fail_non_read(task, TaskErrorKind::ResponseTimeout);
             assert_eq!(
                 rx.try_recv().unwrap(),
                 Err(TaskErrorKind::ResponseTimeout.into())
@@ -575,7 +604,7 @@ mod tests {
                 non_lan_time_sync_single_time_setup();
             association.get_system_time(); // Empty the time
 
-            assert!(task.start(&mut association).is_none());
+            assert!(association.start_time_sync(task).is_none());
             assert_eq!(
                 rx.try_recv().unwrap(),
                 Err(TaskErrorKind::SystemTimeNotAvailable.into())
@@ -606,7 +635,7 @@ mod tests {
         ) -> NonReadTask {
             let mut buffer = [0; 20];
             let mut cursor = WriteCursor::new(&mut buffer);
-            let task = task.start(association).unwrap().wrap();
+            let task = association.start_time_sync(task).unwrap().wrap();
             let mut writer = start_request(
                 ControlField::request(Sequence::default()),
                 task.function(),
@@ -719,7 +748,7 @@ mod tests {
                 .unwrap()
                 .unwrap();
             let task = check_write_request(task, system_time);
-            task.on_task_error(Some(&mut association), TaskErrorKind::ResponseTimeout);
+            association.fail_non_read(task, TaskErrorKind::ResponseTimeout);
             assert_eq!(
                 rx.try_recv().unwrap(),
                 Err(TaskErrorKind::ResponseTimeout.into())
@@ -731,7 +760,7 @@ mod tests {
             let (task, _system_time, mut association, mut rx) = lan_time_sync_setup();
             association.get_system_time(); // Empty the time
 
-            assert!(task.start(&mut association).is_none());
+            assert!(association.start_time_sync(task).is_none());
             assert_eq!(
                 rx.try_recv().unwrap(),
                 Err(TaskErrorKind::SystemTimeNotAvailable.into())
@@ -755,7 +784,7 @@ mod tests {
         ) -> NonReadTask {
             let mut buffer = [0; 20];
             let mut cursor = WriteCursor::new(&mut buffer);
-            let task = task.start(association).unwrap().wrap();
+            let task = association.start_time_sync(task).unwrap().wrap();
             let mut writer = start_request(
                 ControlField::request(Sequence::default()),
                 task.function(),
@@ -809,7 +838,7 @@ mod tests {
         #[test]
         fn transitions_to_write_absolute_time() {
             let (task, system_time, mut association, _rx) = direct_write_setup();
-            let task = task.start(&mut association).unwrap();
+            let task = association.start_time_sync(task).unwrap();
 
             // Should have transitioned to WriteAbsoluteTime
             assert_eq!(task.function(), FunctionCode::Write);
@@ -840,7 +869,7 @@ mod tests {
             let (task, _system_time, mut association, mut rx) = direct_write_setup();
             association.get_system_time(); // Empty the time
 
-            assert!(task.start(&mut association).is_none());
+            assert!(association.start_time_sync(task).is_none());
             assert_eq!(
                 rx.try_recv().unwrap(),
                 Err(TaskErrorKind::SystemTimeNotAvailable.into())
