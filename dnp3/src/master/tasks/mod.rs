@@ -62,20 +62,19 @@ impl AssociationTask {
     }
 }
 
-/// There are two broad categories of tasks. Reads
-/// require handling for multi-fragmented responses.
-pub(crate) enum AppTask {
+/// A task whose requests the outstation answers with solicited responses
+pub(crate) enum SolicitedTask {
     /// Reads require handling for multi-fragmented responses
     Read(ReadTask),
     /// NonRead tasks always require FIR/FIN == 1, but might require multiple read/response cycles, e.g. SBO
     NonRead(NonReadTask),
-    /// Tasks whose request the outstation never responds to, complete once it is sent
-    NoResponse(CommandNoAckTask),
 }
 
 pub(crate) enum Task {
-    /// An application layer task
-    App(AppTask),
+    /// An application layer task the outstation answers
+    Solicited(SolicitedTask),
+    /// A command the outstation never responds to, complete once it is sent
+    NoResponse(CommandNoAckTask),
     /// Send link status request
     LinkStatus(Promise<Result<(), TaskError>>),
 }
@@ -116,20 +115,12 @@ pub(crate) enum TaskId {
     Function(FunctionCode),
 }
 
-impl AppTask {
-    pub(crate) fn as_task_type(&self) -> TaskType {
+impl SolicitedTask {
+    /// The task's type and the function of its current request
+    pub(crate) fn identity(&self) -> (TaskType, FunctionCode) {
         match self {
-            AppTask::Read(t) => t.as_task_type(),
-            AppTask::NonRead(t) => t.as_task_type(),
-            AppTask::NoResponse(_) => TaskType::Command,
-        }
-    }
-
-    pub(crate) fn function(&self) -> FunctionCode {
-        match self {
-            AppTask::Read(t) => t.function(),
-            AppTask::NonRead(t) => t.function(),
-            AppTask::NoResponse(t) => t.function(),
+            SolicitedTask::Read(t) => (t.as_task_type(), FunctionCode::Read),
+            SolicitedTask::NonRead(t) => t.identity(),
         }
     }
 
@@ -138,7 +129,6 @@ impl AppTask {
         match self {
             Self::NonRead(task) => task.on_task_error(err),
             Self::Read(task) => task.on_task_error(err),
-            Self::NoResponse(task) => task.on_task_error(err),
         }
     }
 }
@@ -147,7 +137,8 @@ impl Task {
     /// Fail the task, reporting to its requester
     pub(crate) fn on_task_error(self, err: TaskErrorKind) {
         match self {
-            Self::App(task) => task.on_task_error(err),
+            Self::Solicited(task) => task.on_task_error(err),
+            Self::NoResponse(task) => task.on_task_error(err),
             Self::LinkStatus(promise) => promise.complete(Err(err.into())),
         }
     }
@@ -155,7 +146,8 @@ impl Task {
     pub(crate) fn get_id(&self) -> TaskId {
         match self {
             Task::LinkStatus(_) => TaskId::LinkStatus,
-            Task::App(task) => TaskId::Function(task.function()),
+            Task::Solicited(task) => TaskId::Function(task.identity().1),
+            Task::NoResponse(task) => TaskId::Function(task.function()),
         }
     }
 }
@@ -334,7 +326,7 @@ impl<R: OneShotRequest> OneShot<R> {
 
 impl<R: OneShotRequest> From<OneShot<R>> for Task {
     fn from(value: OneShot<R>) -> Self {
-        Task::App(AppTask::NonRead(R::wrap(value)))
+        Task::Solicited(SolicitedTask::NonRead(R::wrap(value)))
     }
 }
 
@@ -408,7 +400,7 @@ impl RequestWriter for ReadTask {
 
 impl RequestWriter for NonReadTask {
     fn function(&self) -> FunctionCode {
-        self.function()
+        self.identity().1
     }
 
     fn write(&self, writer: &mut HeaderWriter) -> Result<(), TaskErrorKind> {
@@ -437,7 +429,7 @@ impl From<crate::app::format::WriteError> for TaskErrorKind {
 
 impl ReadTask {
     pub(crate) fn wrap(self) -> Task {
-        Task::App(AppTask::Read(self))
+        Task::Solicited(SolicitedTask::Read(self))
     }
 
     /// The ReadType reported to the ReadHandler for this read's responses
@@ -627,20 +619,22 @@ impl Association {
 }
 
 impl NonReadTask {
-    pub(crate) fn function(&self) -> FunctionCode {
+    /// The task's type and the function of its current request, which can change as it
+    /// advances: SELECT then OPERATE, or a file read's OPEN, READ and CLOSE
+    pub(crate) fn identity(&self) -> (TaskType, FunctionCode) {
         match self {
-            Self::Command(task) => task.function(),
-            Self::Auto(task) => task.function(),
-            Self::TimeSync(task) => task.function(),
-            Self::Restart(task) => task.function(),
-            Self::DeadBands(task) => task.function(),
-            Self::EmptyResponseTask(task) => task.function(),
-            Self::FileRead(task) => task.function(),
-            Self::GetFileInfo(task) => task.function(),
-            Self::OpenFile(task) => task.function(),
-            Self::CloseFile(task) => task.function(),
-            Self::WriteFileBlock(task) => task.function(),
-            Self::AuthFile(task) => task.function(),
+            Self::Command(task) => (task.task_type(), task.function()),
+            Self::Auto(task) => (task.task_type(), task.function()),
+            Self::TimeSync(task) => (task.task_type(), task.function()),
+            Self::Restart(task) => (task.task_type(), task.function()),
+            Self::DeadBands(task) => (task.task_type(), task.function()),
+            Self::EmptyResponseTask(task) => (task.task_type(), task.function()),
+            Self::FileRead(task) => (task.task_type(), task.function()),
+            Self::GetFileInfo(task) => (task.task_type(), task.function()),
+            Self::OpenFile(task) => (task.task_type(), task.function()),
+            Self::CloseFile(task) => (task.task_type(), task.function()),
+            Self::WriteFileBlock(task) => (task.task_type(), task.function()),
+            Self::AuthFile(task) => (task.task_type(), task.function()),
         }
     }
 
@@ -659,23 +653,6 @@ impl NonReadTask {
             Self::CloseFile(task) => fail(task, err),
             Self::WriteFileBlock(task) => fail(task, err),
             Self::AuthFile(task) => fail(task, err),
-        }
-    }
-
-    pub(crate) fn as_task_type(&self) -> TaskType {
-        match self {
-            Self::Command(task) => task.task_type(),
-            Self::Auto(task) => task.task_type(),
-            Self::TimeSync(task) => task.task_type(),
-            Self::Restart(task) => task.task_type(),
-            Self::DeadBands(task) => task.task_type(),
-            Self::EmptyResponseTask(task) => task.task_type(),
-            Self::FileRead(task) => task.task_type(),
-            Self::GetFileInfo(task) => task.task_type(),
-            Self::AuthFile(task) => task.task_type(),
-            Self::OpenFile(task) => task.task_type(),
-            Self::CloseFile(task) => task.task_type(),
-            Self::WriteFileBlock(task) => task.task_type(),
         }
     }
 }

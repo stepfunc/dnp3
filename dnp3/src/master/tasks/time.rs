@@ -17,7 +17,7 @@ use crate::master::error::{TaskErrorKind, TimeSyncError, TimeSyncErrorKind};
 use crate::master::promise::Promise;
 use crate::master::request::TimeSyncProcedure;
 use crate::master::tasks::empty_response::expect_empty;
-use crate::master::tasks::{AppTask, NonReadTask, RequestError, Step, Task};
+use crate::master::tasks::{NonReadTask, RequestError, SolicitedTask, Step, Task};
 use crate::master::TaskType;
 
 use tokio::time::Instant;
@@ -98,7 +98,7 @@ pub(crate) struct TimeSyncTask {
 
 impl From<TimeSyncTask> for Task {
     fn from(value: TimeSyncTask) -> Self {
-        Task::App(AppTask::NonRead(NonReadTask::TimeSync(value)))
+        Task::Solicited(SolicitedTask::NonRead(NonReadTask::TimeSync(value)))
     }
 }
 

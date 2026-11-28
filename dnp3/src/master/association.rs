@@ -27,7 +27,7 @@ use crate::master::request::ReadRequest;
 use crate::master::request::{Classes, EventClasses, TimeSyncProcedure};
 use crate::master::tasks::auto::AutoTask;
 use crate::master::tasks::time::PendingTimeSync;
-use crate::master::tasks::{AppTask, AssociationTask, QueuedTask, ReadTask, Task};
+use crate::master::tasks::{AssociationTask, QueuedTask, ReadTask, Task};
 use crate::master::{AssociationInformation, ReadHandler, ReadType, TaskType};
 
 use crate::master::promise::Promise;
@@ -344,10 +344,9 @@ impl TaskStates {
         if config.startup_integrity_classes.any() && self.integrity_scan.is_active() {
             return (
                 self.integrity_scan.create_next_task(now, || {
-                    Task::App(AppTask::Read(ReadTask::StartupIntegrity(
-                        config.startup_integrity_classes,
-                    )))
-                    .into()
+                    ReadTask::StartupIntegrity(config.startup_integrity_classes)
+                        .wrap()
+                        .into()
                 }),
                 None,
             );
@@ -842,7 +841,7 @@ impl Association {
         match self.polls.next(now) {
             Next::Now(poll) => {
                 // always prioritize polls over link status requests
-                Next::Now(Task::App(AppTask::Read(ReadTask::PeriodicPoll(poll))).into())
+                Next::Now(ReadTask::PeriodicPoll(poll).wrap().into())
             }
             Next::NotBefore(next_poll) => {
                 match self.next_link_status_task(now) {
